@@ -1,0 +1,7 @@
+name: Planner
+model: opus
+skills:
+  - grill-me
+prompt: >
+  Write an implementation plan for the task and return it in the report
+  summary, without separate files: %s

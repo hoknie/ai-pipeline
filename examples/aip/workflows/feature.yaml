@@ -1,0 +1,17 @@
+steps:
+  - id: plan
+    specialist: plan
+  - id: code
+    specialist: coder
+  - id: review
+    specialist: reviewer
+    on_reject:
+      goto: code
+      max_rounds: 3
+    # appended to the reviewer prompt in this step only
+    additional_prompt: Also check that the new tests actually assert something.
+  - id: qa
+    specialist: qa
+    on_reject:
+      goto: code
+      max_rounds: 2

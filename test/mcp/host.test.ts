@@ -1,0 +1,277 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { createHostServer } from '../../src/mcp/host.ts';
+import { groupView, runView, type QueueView } from '../../src/protocol/index.ts';
+import { run } from '../core/helpers.ts';
+
+const VIEW: QueueView & { item: string } = {
+  repository: '/repo',
+  status: 'stopped',
+  parallel: 1,
+  autoDeliver: true,
+  stop: null,
+  items: [
+    {
+      id: 'q1',
+      position: 1,
+      workflow: 'feature',
+      task: 'Сделать вход',
+      groups: null,
+      title: null,
+      autoDeliver: null,
+      tags: [],
+      createdAt: 1,
+      error: null,
+    },
+  ],
+  runs: [],
+  updatedAt: 1,
+  item: 'q1',
+};
+
+async function connect(
+  send: (method: string, params: Record<string, unknown>) => Promise<unknown>,
+) {
+  const server = createHostServer({ send, cwd: '/repo' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  const client = new Client({ name: 'test', version: '0' });
+  await client.connect(clientTransport);
+  return client;
+}
+
+const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string =>
+  (result.content as { text: string }[])[0]?.text ?? '';
+
+describe('host MCP queue tools', () => {
+  it('lists the queue tools', async () => {
+    const client = await connect(async () => VIEW);
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    for (const name of [
+      'swarm_queue',
+      'swarm_queue_add',
+      'swarm_queue_edit',
+      'swarm_queue_remove',
+      'swarm_queue_start',
+      'swarm_queue_parallel',
+      'swarm_queue_pause',
+      'swarm_queue_run_now',
+    ]) {
+      expect(names).toContain(name);
+    }
+  });
+
+  it('puts a task into the queue of the current directory', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'Сделать вход' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('Added item q1.');
+    expect(textOf(result)).toContain('1. q1  feature  Сделать вход');
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'Сделать вход' },
+      },
+    ]);
+  });
+
+  it('passes autoDeliver only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', autoDeliver: false },
+    });
+    await client.callTool({
+      name: 'swarm_queue_edit',
+      arguments: { item: 'q1', autoDeliver: null },
+    });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x', autoDeliver: true },
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'y' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', autoDeliver: false },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', autoDeliver: null } },
+      {
+        method: 'run',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', autoDeliver: true },
+      },
+      { method: 'queue_add', params: { repository: '/repo', workflow: 'feature', task: 'y' } },
+    ]);
+  });
+
+  it('passes tag names to run, queue_add and queue_edit only when they are given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', tags: ['auth'] },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', tags: [] } });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x', tags: ['auth', 'v2'] },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 'T' } });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', tags: ['auth'] },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', tags: [] } },
+      {
+        method: 'run',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', tags: ['auth', 'v2'] },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 'T' } },
+    ]);
+  });
+
+  it('shows the tags of a queued task and offers no tool for the catalog', async () => {
+    const tagged = {
+      ...VIEW,
+      items: [{ ...VIEW.items[0]!, tags: [{ id: 'tg-a', name: 'auth', color: 'blue' as const }] }],
+    };
+    const client = await connect(async () => tagged);
+    const result = await client.callTool({ name: 'swarm_queue', arguments: {} });
+    expect(textOf(result)).toContain('#auth');
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names.filter((name) => name.includes('tag'))).toEqual([]);
+  });
+
+  it('passes the position, the repository and the parallel limit', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_edit',
+      arguments: { item: 'q1', position: 2, repo: '/other' },
+    });
+    await client.callTool({ name: 'swarm_queue_start', arguments: { parallel: 2 } });
+    await client.callTool({ name: 'swarm_queue_pause', arguments: {} });
+    await client.callTool({ name: 'swarm_queue_remove', arguments: { item: 'q1' } });
+    expect(calls).toEqual([
+      { method: 'queue_edit', params: { repository: '/other', item: 'q1', position: 2 } },
+      { method: 'queue_start', params: { repository: '/repo', parallel: 2 } },
+      { method: 'queue_pause', params: { repository: '/repo' } },
+      { method: 'queue_remove', params: { repository: '/repo', item: 'q1' } },
+    ]);
+  });
+
+  it('changes parallel through queue_settings and returns the queue', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return { ...VIEW, parallel: 3 };
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_parallel',
+      arguments: { parallel: 3 },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('parallel 3');
+    expect(calls).toEqual([
+      { method: 'queue_settings', params: { repository: '/repo', parallel: 3 } },
+    ]);
+    const wrong = await client.callTool({
+      name: 'swarm_queue_parallel',
+      arguments: { parallel: 0 },
+    });
+    expect(wrong.isError).toBe(true);
+  });
+
+  it('returns the run and the daemon errors', async () => {
+    const client = await connect(async (method) => {
+      if (method === 'queue_run_now') {
+        return { runId: 'r1', branch: 'refs/aip/r1/run', groups: [], split: true, warnings: [] };
+      }
+      throw new Error('unknown queue item');
+    });
+    const run = await client.callTool({ name: 'swarm_queue_run_now', arguments: { item: 'q1' } });
+    expect(textOf(run)).toContain('Run r1 started');
+    const failed = await client.callTool({ name: 'swarm_queue', arguments: {} });
+    expect(failed.isError).toBe(true);
+    expect(textOf(failed)).toContain('unknown queue item');
+  });
+
+  it('queues a task with swarm_run and shows whether the run exists', async () => {
+    const created = {
+      runId: 'r1',
+      branch: 'refs/aip/r1/run',
+      groups: [],
+      split: true,
+      warnings: [],
+    };
+    const sent: string[] = [];
+    let answer: unknown = { item: 'q1', run: created, queue: VIEW };
+    const client = await connect(async (method) => {
+      sent.push(method);
+      return answer;
+    });
+    const started = await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x' },
+    });
+    expect(sent).toEqual(['run']);
+    expect(textOf(started)).toContain('Run r1 started');
+    answer = { item: 'q1', run: null, queue: { ...VIEW, status: 'running' } };
+    const waiting = await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x' },
+    });
+    expect(textOf(waiting)).toContain(
+      'Task q1 queued at position 1 (queue running, 0 of 1 places taken).',
+    );
+    expect(textOf(waiting)).toContain('"run": null');
+  });
+});
+
+describe('host MCP texts', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('stay plain under FORCE_COLOR=1', async () => {
+    vi.stubEnv('FORCE_COLOR', '1');
+    const state = run(1);
+    state.groups[0]!.status = 'failed';
+    const runs = runView(state, 2000);
+    const group = groupView(state, state.groups[0]!, '/w', null, 2000);
+    const client = await connect(async (method, params) =>
+      method === 'group' ? group : (params as { runId?: string }).runId ? runs : [runs],
+    );
+    for (const [name, args] of [
+      ['swarm_status', {}],
+      ['swarm_status', { run_id: runs.id }],
+      ['swarm_group', { run_id: runs.id, group: group.slug }],
+    ] as const) {
+      const text = textOf(await client.callTool({ name, arguments: args }));
+      expect(text, name).toContain('failed');
+      expect(text, name).not.toContain('\x1b[');
+      expect(text, name).not.toMatch(/[✓✗?▸◦⊘] /);
+    }
+  });
+});

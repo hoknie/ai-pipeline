@@ -1,0 +1,114 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --radius: 0.5rem;
+
+  --color-background: oklch(0.985 0.002 250);
+  --color-foreground: oklch(0.21 0.02 255);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.21 0.02 255);
+  --color-muted: oklch(0.95 0.005 250);
+  --color-muted-foreground: oklch(0.48 0.02 255);
+  --color-border: oklch(0.9 0.006 250);
+  --color-input: oklch(0.86 0.008 250);
+  --color-primary: oklch(0.48 0.17 262);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-accent: oklch(0.94 0.012 255);
+  --color-accent-foreground: oklch(0.25 0.03 260);
+  --color-destructive: oklch(0.52 0.2 27);
+  --color-destructive-foreground: oklch(0.99 0 0);
+  --color-ring: oklch(0.55 0.17 262);
+
+  --color-status-run: oklch(0.5 0.16 255);
+  --color-status-run-bg: oklch(0.94 0.035 255);
+  --color-status-warn: oklch(0.5 0.12 70);
+  --color-status-warn-bg: oklch(0.95 0.06 85);
+  --color-status-err: oklch(0.48 0.19 27);
+  --color-status-err-bg: oklch(0.95 0.035 25);
+  --color-status-ok: oklch(0.42 0.12 150);
+  --color-status-ok-bg: oklch(0.95 0.04 150);
+  --color-status-mute: oklch(0.45 0.015 255);
+  --color-status-mute-bg: oklch(0.94 0.005 250);
+}
+
+.dark {
+  color-scheme: dark;
+  --color-background: oklch(0.17 0.012 258);
+  --color-foreground: oklch(0.95 0.005 250);
+  --color-card: oklch(0.21 0.014 258);
+  --color-card-foreground: oklch(0.95 0.005 250);
+  --color-muted: oklch(0.25 0.014 258);
+  --color-muted-foreground: oklch(0.7 0.015 255);
+  --color-border: oklch(0.31 0.015 258);
+  --color-input: oklch(0.36 0.016 258);
+  --color-primary: oklch(0.7 0.14 262);
+  --color-primary-foreground: oklch(0.17 0.02 260);
+  --color-accent: oklch(0.29 0.02 258);
+  --color-accent-foreground: oklch(0.95 0.005 250);
+  --color-destructive: oklch(0.65 0.19 25);
+  --color-destructive-foreground: oklch(0.17 0.02 260);
+  --color-ring: oklch(0.7 0.14 262);
+
+  --color-status-run: oklch(0.78 0.11 255);
+  --color-status-run-bg: oklch(0.29 0.05 255);
+  --color-status-warn: oklch(0.82 0.12 85);
+  --color-status-warn-bg: oklch(0.3 0.05 80);
+  --color-status-err: oklch(0.76 0.14 25);
+  --color-status-err-bg: oklch(0.29 0.06 25);
+  --color-status-ok: oklch(0.78 0.12 150);
+  --color-status-ok-bg: oklch(0.28 0.05 150);
+  --color-status-mute: oklch(0.74 0.012 255);
+  --color-status-mute-bg: oklch(0.27 0.01 258);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    font-size: 14px;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  * {
+    @apply border-border;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
+/* React Flow follows the theme tokens. */
+.react-flow {
+  --xy-background-color: var(--color-background);
+  --xy-edge-stroke: var(--color-muted-foreground);
+  --xy-node-border-radius: var(--radius);
+  --xy-controls-button-background-color: var(--color-card);
+  --xy-controls-button-color: var(--color-foreground);
+  --xy-controls-button-border-color: var(--color-border);
+  --xy-minimap-background-color: var(--color-card);
+}
+
+/* Edges drawn by the topology graph. */
+.edge-reject path {
+  stroke-dasharray: 6 4;
+  stroke: var(--color-muted-foreground);
+}
+
+.edge-reject.edge-used path {
+  stroke: var(--color-status-warn);
+  stroke-width: 2;
+}

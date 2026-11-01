@@ -1,0 +1,6 @@
+name: Reviewer
+model: opus
+permissions: read
+prompt: >
+  Review the changes in this branch against the task. If you find problems,
+  reject the step and list your remarks.

@@ -1,0 +1,931 @@
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  ConfigLoadError,
+  configFromFiles,
+  configPaths,
+  findSpecialist,
+  findWorkflow,
+  groupWorkflow,
+  loadConfig,
+  loadConfigSources,
+  loadWebSettings,
+  parseConfig,
+  withConfigDefaults,
+  type ConfigPaths,
+  type FieldError,
+  type LevelPaths,
+} from '../../src/config/index.ts';
+import { writeLevelDirectory } from '../fixtures/config.ts';
+
+const repositoryRoot = join(import.meta.dirname, '..', '..');
+
+function temporaryPaths(): ConfigPaths {
+  const root = mkdtempSync(join(tmpdir(), 'aip-config-'));
+  return configPaths(join(root, 'repo'), join(root, 'xdg'), undefined);
+}
+
+function writeLevel(level: LevelPaths, text: string): void {
+  writeLevelDirectory(level.directory, text);
+}
+
+function write(path: string, text: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text);
+}
+
+function errorsOf(text: string): FieldError[] {
+  try {
+    parseConfig(text);
+  } catch (error) {
+    if (error instanceof ConfigLoadError && error.detail.kind === 'invalid') {
+      return error.detail.errors;
+    }
+    throw error;
+  }
+  throw new Error('expected field errors');
+}
+
+function expectError(errors: FieldError[], path: string, fragment: string): void {
+  expect(errors).toContainEqual({ path, message: expect.stringContaining(fragment) });
+}
+
+const BASE = 'swarm:\n  specialists:\n    coder: { name: Кодировщик }\n';
+
+describe('loading files', () => {
+  it('replaces the global specialist with the project one', () => {
+    const paths = temporaryPaths();
+    writeLevel(
+      paths.global,
+      'swarm:\n  specialists:\n    coder: { name: C, model: a, skills: [x] }\n',
+    );
+    writeLevel(paths.project, 'swarm:\n  specialists:\n    coder: { name: C, model: b }\n');
+    const coder = findSpecialist(loadConfig(paths), 'coder');
+    expect(coder?.model).toBe('b');
+    expect(coder?.skills).toEqual([]);
+  });
+
+  it('names every expected path when no file exists, also with an empty specialists directory', () => {
+    const paths = temporaryPaths();
+    mkdirSync(join(paths.project.directory, 'specialists'), { recursive: true });
+    const message = (() => {
+      try {
+        loadConfig(paths);
+        return '';
+      } catch (error) {
+        return (error as Error).message;
+      }
+    })();
+    for (const expected of [paths.global.directory, paths.project.directory]) {
+      expect(message).toContain(expected);
+    }
+  });
+
+  it('accepts the global file alone', () => {
+    const paths = temporaryPaths();
+    writeLevel(paths.global, BASE);
+    expect(loadConfig(paths).specialists).toHaveLength(1);
+  });
+
+  it('names the file and the line of a syntax error', () => {
+    const paths = temporaryPaths();
+    writeLevel(paths.project, 'swarm:\n  max: 1\n');
+    write(join(paths.project.directory, 'settings.yaml'), 'max: [\n');
+    expect(() => loadConfig(paths)).toThrow(/aip\/settings\.yaml: .*line/);
+  });
+});
+
+describe('validation', () => {
+  it('reports max out of range with its path and range', () => {
+    expectError(errorsOf('swarm:\n  max: 0\n'), 'swarm.max', 'from 1 to 32');
+  });
+
+  it('defaults max to three', () => {
+    expect(parseConfig(BASE).max).toBe(3);
+  });
+
+  it('lets a specialist inherit runtime and the other defaults', () => {
+    const config = parseConfig(
+      'swarm:\n  defaults: { runtime: opencode, permissions: read, timeout: 5m, allow_commands: ["make*"] }\n  specialists:\n    qa: { name: QA }\n    coder: { name: C, runtime: claude, permissions: full }\n',
+    );
+    expect(findSpecialist(config, 'qa')).toMatchObject({
+      runtime: 'opencode',
+      permissions: 'read',
+      timeoutSeconds: 300,
+      allowCommands: ['make*'],
+    });
+    expect(findSpecialist(config, 'coder')).toMatchObject({
+      runtime: 'claude',
+      permissions: 'full',
+    });
+  });
+
+  it('applies built-in defaults without a defaults section', () => {
+    expect(findSpecialist(parseConfig(BASE), 'coder')).toMatchObject({
+      runtime: 'claude',
+      permissions: 'edit',
+      timeoutSeconds: 1800,
+    });
+  });
+
+  it('requires a specialist name', () => {
+    expectError(
+      errorsOf('swarm:\n  specialists:\n    coder: { model: x }\n'),
+      'swarm.specialists.coder.name',
+      'required',
+    );
+  });
+
+  it('reports an invalid slug with the pattern', () => {
+    expectError(
+      errorsOf('swarm:\n  specialists:\n    Code_R: { name: C }\n'),
+      'swarm.specialists.Code_R',
+      '^[a-z][a-z0-9-]{0,31}$',
+    );
+  });
+
+  it('reads queue of a specialist, defaults it to false and keeps it out of defaults', () => {
+    const config = parseConfig(
+      'swarm:\n  specialists:\n    summary: { name: S, queue: true }\n    coder: { name: C }\n',
+    );
+    expect(findSpecialist(config, 'summary')?.queue).toBe(true);
+    expect(findSpecialist(config, 'coder')?.queue).toBe(false);
+    expectError(
+      errorsOf('swarm:\n  specialists:\n    summary: { name: S, queue: yes please }\n'),
+      'swarm.specialists.summary.queue',
+      '',
+    );
+    expectError(
+      errorsOf('swarm:\n  defaults: { queue: true }\n'),
+      'swarm.defaults.queue',
+      'unknown key',
+    );
+  });
+
+  it('reports invalid runtimes, permissions and durations', () => {
+    const errors = errorsOf(
+      'swarm:\n  defaults: { runtime: cursor, permissions: admin, timeout: 30x }\n',
+    );
+    expectError(errors, 'swarm.defaults.runtime', 'claude, opencode');
+    expectError(errors, 'swarm.defaults.permissions', 'read, edit, full');
+    expectError(errors, 'swarm.defaults.timeout', 'duration');
+  });
+
+  it('treats unknown keys as errors at every level', () => {
+    const errors = errorsOf(
+      'extra: 1\nswarm:\n  maxx: 2\n  specialists:\n    coder: { name: C, modle: x }\n  workflows:\n    f:\n      stepz: []\n',
+    );
+    expectError(errors, 'extra', 'unknown key');
+    expectError(errors, 'swarm.maxx', 'unknown key');
+    expectError(errors, 'swarm.specialists.coder.modle', 'unknown key');
+    expectError(errors, 'swarm.workflows.f.stepz', 'unknown key');
+    expectError(errors, 'swarm.workflows.f.steps', 'required');
+  });
+
+  it('requires the swarm root', () => {
+    expectError(errorsOf('other: 1\n'), 'swarm', 'required');
+  });
+
+  it('lists known slugs for a reference to an unknown specialist', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    coder: { name: C }\n    reviewer: { name: R }\n  workflows:\n    feature:\n      steps:\n        - { id: plan, specialist: coder }\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewr }\n',
+    );
+    expectError(errors, 'swarm.workflows.feature.steps[2].specialist', 'known: coder, reviewer');
+  });
+
+  it('requires goto to point to an earlier step', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder, on_reject: { goto: qa, max_rounds: 2 } }\n        - { id: qa, specialist: coder }\n',
+    );
+    expectError(errors, 'swarm.workflows.feature.steps[0].on_reject.goto', 'earlier step');
+  });
+
+  it('rejects goto to the same step and to an unknown step', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder, on_reject: { goto: code, max_rounds: 1 } }\n        - { id: qa, specialist: coder, on_reject: { goto: nope, max_rounds: 1 } }\n',
+    );
+    expectError(errors, 'swarm.workflows.feature.steps[0].on_reject.goto', 'earlier step');
+    expectError(errors, 'swarm.workflows.feature.steps[1].on_reject.goto', 'unknown step');
+  });
+
+  it('checks the range and presence of max_rounds', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: coder, on_reject: { goto: code, max_rounds: 11 } }\n        - { id: qa, specialist: coder, on_reject: { goto: code } }\n',
+    );
+    expectError(errors, 'swarm.workflows.feature.steps[1].on_reject.max_rounds', 'from 1 to 10');
+    expectError(errors, 'swarm.workflows.feature.steps[2].on_reject.max_rounds', 'required');
+  });
+
+  it('rejects duplicate step ids and empty steps', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    a:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: code, specialist: coder }\n    b:\n      steps: []\n',
+    );
+    expectError(errors, 'swarm.workflows.a.steps[1].id', 'duplicate');
+    expectError(errors, 'swarm.workflows.b.steps', 'must not be empty');
+  });
+
+  it('reports every error at once', () => {
+    const errors = errorsOf(
+      'swarm:\n  max: 100\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialst: coder }\n',
+    );
+    expectError(errors, 'swarm.max', 'from 1 to 32');
+    expectError(errors, 'swarm.workflows.feature.steps[0].specialst', 'unknown key');
+    expectError(errors, 'swarm.workflows.feature.steps[0].specialist', 'required');
+  });
+});
+
+describe('yaml features and examples', () => {
+  it('supports anchors and merge keys', () => {
+    const config = parseConfig(
+      'swarm:\n  specialists:\n    coder: &coder { name: Coder, model: m }\n    qa:\n      <<: *coder\n      name: QA\n',
+    );
+    expect(findSpecialist(config, 'qa')).toMatchObject({ name: 'QA', model: 'm' });
+  });
+
+  it('parses a specialists-only file with comments and a multi-line prompt', () => {
+    const config = parseConfig(`swarm:
+  max: 5 # parallel specialists
+  specialists:
+    plan: # specialist slug
+      name: Планировщик
+      model: opus-5-5
+      skills:
+        - opsx:propose
+        - grill-me
+      prompt: |
+        Используя все навыки, которые нам передали, необходимо сделать следующее: %s
+    coder:
+      name: Кодировщик
+      model: sonnet-5
+    qa:
+      name: Тестировщик
+      model: opus-5-5
+      prompt: Проверь все внесенные изменения и выведи QA Check List
+`);
+    expect(config.max).toBe(5);
+    expect(findSpecialist(config, 'plan')).toMatchObject({
+      name: 'Планировщик',
+      skills: ['opsx:propose', 'grill-me'],
+    });
+  });
+
+  it('accepts the shipped example', () => {
+    const paths = configPaths(
+      join(repositoryRoot, 'examples'),
+      join(tmpdir(), 'aip-no-xdg'),
+      undefined,
+    );
+    const loaded = loadConfigSources(paths);
+    expect(loaded.files[0]).toBe(join(repositoryRoot, 'examples', 'aip', 'settings.yaml'));
+    const feature = findWorkflow(loaded.config, 'feature');
+    expect(feature?.steps).toHaveLength(4);
+    expect(feature?.steps[2]?.onReject?.goto).toBe('code');
+  });
+});
+
+describe('project settings', () => {
+  it('defaults workspace_dir, outside_changes and claude.edit_mode', () => {
+    expect(parseConfig(BASE)).toMatchObject({
+      workspaceDir: '.aip',
+      outsideChanges: 'warn',
+      claude: { editMode: 'allowlist', settings: 'isolated' },
+    });
+  });
+
+  it('reads the settings and merges claude field by field', () => {
+    const paths = temporaryPaths();
+    writeLevel(
+      paths.global,
+      `${BASE}  claude: { edit_mode: accept_edits }\n  outside_changes: stop\n`,
+    );
+    writeLevel(
+      paths.project,
+      `${BASE}  workspace_dir: /tmp/aip-work\n  claude: { settings: inherit }\n`,
+    );
+    expect(loadConfig(paths)).toMatchObject({
+      workspaceDir: '/tmp/aip-work',
+      outsideChanges: 'stop',
+      claude: { editMode: 'accept_edits', settings: 'inherit' },
+    });
+    expect(parseConfig(`${BASE}  claude: { edit_mode: auto }\n`).claude.editMode).toBe('auto');
+  });
+
+  it('rejects unknown modes with the allowed values', () => {
+    const errors = errorsOf(
+      `${BASE}  claude: { edit_mode: yolo, settings: user, other: 1 }\n  outside_changes: loud\n`,
+    );
+    expectError(errors, 'swarm.claude.edit_mode', 'allowlist, accept_edits, auto');
+    expectError(errors, 'swarm.claude.settings', 'isolated, inherit');
+    expectError(errors, 'swarm.claude.other', 'unknown key');
+    expectError(errors, 'swarm.outside_changes', 'warn, stop, off');
+  });
+});
+
+describe('split', () => {
+  const workflow = (split: string) =>
+    `${BASE}  workflows:\n    feature:\n      split: ${split}\n      steps:\n        - { id: code, specialist: coder }\n`;
+
+  it('reads the splitting specialist and defaults max_groups to five', () => {
+    expect(findWorkflow(parseConfig(workflow('{ specialist: coder }')), 'feature')?.split).toEqual({
+      specialist: 'coder',
+      maxGroups: 5,
+      additionalPrompt: null,
+      workflow: null,
+    });
+    expect(
+      findWorkflow(parseConfig(workflow('{ specialist: coder, max_groups: 2 }')), 'feature')?.split
+        ?.maxGroups,
+    ).toBe(2);
+  });
+
+  it('has no split by default', () => {
+    expect(
+      findWorkflow(
+        parseConfig(workflow('{ specialist: coder }').replace(/      split.*\n/, '')),
+        'feature',
+      )?.split,
+    ).toBeNull();
+  });
+
+  it('rejects an unknown splitting specialist and max_groups out of range', () => {
+    expectError(
+      errorsOf(workflow('{ specialist: splitter }')),
+      'swarm.workflows.feature.split.specialist',
+      'unknown specialist',
+    );
+    expectError(
+      errorsOf(workflow('{ specialist: coder, max_groups: 21 }')),
+      'swarm.workflows.feature.split.max_groups',
+      'from 1 to 20',
+    );
+    expectError(
+      errorsOf(workflow('{ max_groups: 2 }')),
+      'swarm.workflows.feature.split.specialist',
+      'required',
+    );
+  });
+});
+
+describe('delivery and MCP settings', () => {
+  it('defaults delivery and claude.mcp', () => {
+    expect(parseConfig(BASE)).toMatchObject({
+      claude: { editMode: 'allowlist', mcp: 'isolated' },
+      delivery: {
+        mode: 'worktree',
+        auto: true,
+        keep: false,
+        commitMessage: '{title}\n\n{groups}',
+        messageSpecialist: null,
+        resolver: null,
+        resolverRounds: 1,
+      },
+      workspace: { base: 'working_tree', include: [] },
+    });
+  });
+
+  it('merges delivery field by field between the global and the project file', () => {
+    const paths = temporaryPaths();
+    writeLevel(
+      paths.global,
+      `${BASE}  delivery: { mode: commit, auto: true }\n  claude: { mcp: inherit }\n`,
+    );
+    writeLevel(
+      paths.project,
+      `${BASE}  delivery: { keep: true, commit_message: "feat: {title}" }\n`,
+    );
+    expect(loadConfig(paths)).toMatchObject({
+      claude: { mcp: 'inherit' },
+      delivery: { mode: 'commit', auto: true, keep: true, commitMessage: 'feat: {title}' },
+    });
+  });
+
+  it('rejects unknown modes, non-booleans and an unknown message author', () => {
+    const errors = errorsOf(
+      `${BASE}  claude: { mcp: none }\n  delivery: { mode: push, auto: yes, keep: 1, message_specialist: writer, extra: 1 }\n`,
+    );
+    expectError(errors, 'swarm.claude.mcp', 'isolated, inherit');
+    expectError(errors, 'swarm.delivery.mode', 'worktree, commit, branch');
+    expectError(errors, 'swarm.delivery.keep', 'true or false');
+    expectError(errors, 'swarm.delivery.message_specialist', 'known: coder');
+    expectError(errors, 'swarm.delivery.extra', 'unknown key');
+  });
+
+  it('accepts a known message author', () => {
+    expect(
+      parseConfig(`${BASE}  delivery: { mode: commit, message_specialist: coder }\n`).delivery,
+    ).toMatchObject({
+      messageSpecialist: 'coder',
+    });
+  });
+
+  it('accepts a known resolver with rounds and rejects an unknown one', () => {
+    expect(
+      parseConfig(`${BASE}  delivery: { resolver: coder, resolver_rounds: 3 }\n`).delivery,
+    ).toMatchObject({ resolver: 'coder', resolverRounds: 3 });
+    const errors = errorsOf(`${BASE}  delivery: { resolver: fixer, resolver_rounds: 0 }\n`);
+    expectError(errors, 'swarm.delivery.resolver', 'known: coder');
+    expectError(errors, 'swarm.delivery.resolver_rounds', 'from 1 to 10');
+  });
+});
+
+describe('workspace settings', () => {
+  it('reads base and include and merges them field by field', () => {
+    const paths = temporaryPaths();
+    writeLevel(paths.global, `${BASE}  workspace: { base: head }\n`);
+    writeLevel(paths.project, `${BASE}  workspace: { include: [openspec/, CLAUDE.md] }\n`);
+    expect(loadConfig(paths).workspace).toEqual({
+      base: 'head',
+      include: ['openspec/', 'CLAUDE.md'],
+    });
+  });
+
+  it('rejects paths outside the repository or inside workspace_dir', () => {
+    const errors = errorsOf(
+      `${BASE}  workspace: { base: tree, include: [../secrets, /etc, .aip/logs, ok/], extra: 1 }\n`,
+    );
+    expectError(errors, 'swarm.workspace.base', 'working_tree, head');
+    expectError(errors, 'swarm.workspace.include[0]', 'inside the repository');
+    expectError(errors, 'swarm.workspace.include[1]', 'inside the repository');
+    expectError(errors, 'swarm.workspace.include[2]', 'workspace_dir');
+    expectError(errors, 'swarm.workspace.extra', 'unknown key');
+    expect(errors.some((error) => error.path.includes('include[3]'))).toBe(false);
+  });
+});
+
+describe('naming settings', () => {
+  it('defaults to a quick claude haiku call and merges field by field', () => {
+    expect(parseConfig(BASE).naming).toEqual({ enabled: true, runtime: 'claude', model: 'haiku' });
+    const paths = temporaryPaths();
+    writeLevel(paths.global, `${BASE}  naming: { runtime: opencode, model: anthropic/haiku }\n`);
+    writeLevel(paths.project, `${BASE}  naming: { enabled: false }\n`);
+    expect(loadConfig(paths).naming).toEqual({
+      enabled: false,
+      runtime: 'opencode',
+      model: 'anthropic/haiku',
+    });
+  });
+
+  it('rejects wrong values', () => {
+    const errors = errorsOf(`${BASE}  naming: { enabled: 1, runtime: gpt, extra: 1 }\n`);
+    expectError(errors, 'swarm.naming.enabled', 'true or false');
+    expectError(errors, 'swarm.naming.runtime', 'claude, opencode');
+    expectError(errors, 'swarm.naming.extra', 'unknown key');
+  });
+});
+
+describe('specialist max', () => {
+  it('reads max and leaves it null when absent', () => {
+    const config = parseConfig(
+      'swarm:\n  specialists:\n    coder: { name: C, max: 1 }\n    plan: { name: P }\n',
+    );
+    expect(findSpecialist(config, 'coder')?.max).toBe(1);
+    expect(findSpecialist(config, 'plan')?.max).toBeNull();
+  });
+
+  it.each(['0', '33', '2.5', '"1"'])('rejects max: %s with the field path', (value) => {
+    expectError(
+      errorsOf(`swarm:\n  specialists:\n    coder: { name: C, max: ${value} }\n`),
+      'swarm.specialists.coder.max',
+      '',
+    );
+  });
+
+  it('does not accept max in defaults', () => {
+    expectError(errorsOf(`${BASE}  defaults: { max: 1 }\n`), 'swarm.defaults.max', '');
+  });
+
+  it('fills null for specialists of runs stored before the field existed', () => {
+    const config = parseConfig(BASE);
+    const stored = structuredClone(config);
+    for (const specialist of stored.specialists) delete (specialist as { max?: number }).max;
+    expect(withConfigDefaults(stored).specialists.map((specialist) => specialist.max)).toEqual([
+      null,
+    ]);
+  });
+});
+
+describe('specialist tools', () => {
+  it('inherits tools from defaults unless the specialist sets its own', () => {
+    const config = parseConfig(
+      'swarm:\n  defaults: { tools: [WebFetch] }\n  specialists:\n    coder: { name: C }\n    web: { name: W, tools: [WebSearch, WebFetch] }\n',
+    );
+    expect(config.defaults.tools).toEqual(['WebFetch']);
+    expect(config.specialists.find((specialist) => specialist.slug === 'coder')?.tools).toEqual([
+      'WebFetch',
+    ]);
+    expect(config.specialists.find((specialist) => specialist.slug === 'web')?.tools).toEqual([
+      'WebSearch',
+      'WebFetch',
+    ]);
+    expect(parseConfig(BASE).specialists[0]?.tools).toEqual([]);
+  });
+
+  it('rejects tools that are not a list of strings', () => {
+    expectError(
+      errorsOf(`${BASE}  defaults: { tools: WebFetch }\n`),
+      'swarm.defaults.tools',
+      'list',
+    );
+  });
+});
+
+describe('additional prompts', () => {
+  const WORKFLOW = (step: string, split = '') =>
+    `${BASE}    reviewer: { name: R }\n  workflows:\n    feature:\n${split}      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
+
+  it('reads the additional prompt of a step and of the split, null by default', () => {
+    const config = parseConfig(
+      WORKFLOW(
+        ', additional_prompt: "Только тесты"',
+        '      split: { specialist: coder, additional_prompt: Не больше двух групп }\n',
+      ),
+    );
+    const feature = config.workflows[0]!;
+    expect(feature.steps.map((step) => step.additionalPrompt)).toEqual([null, 'Только тесты']);
+    expect(feature.split?.additionalPrompt).toBe('Не больше двух групп');
+    expect(parseConfig(WORKFLOW('')).workflows[0]?.split).toBeNull();
+  });
+
+  it('rejects an empty or non-text additional prompt', () => {
+    expectError(
+      errorsOf(WORKFLOW(', additional_prompt: ""')),
+      'swarm.workflows.feature.steps[1].additional_prompt',
+      'empty',
+    );
+    expectError(
+      errorsOf(WORKFLOW('', '      split: { specialist: coder, additional_prompt: [a, b] }\n')),
+      'swarm.workflows.feature.split.additional_prompt',
+      'string',
+    );
+  });
+});
+
+describe('configuration directory', () => {
+  const CODER = 'name: Кодировщик\n';
+  const FEATURE = 'steps:\n  - { id: code, specialist: coder }\n';
+
+  function files(paths: ConfigPaths): string {
+    return paths.project.directory;
+  }
+
+  it('reads settings, then specialists and workflows by name, skipping other and hidden files', () => {
+    const paths = temporaryPaths();
+    const dir = files(paths);
+    write(join(dir, 'settings.yaml'), 'max: 2\n');
+    write(join(dir, 'specialists', 'b.yml'), 'name: B\n');
+    write(join(dir, 'specialists', 'a.yaml'), CODER);
+    write(join(dir, 'specialists', 'README.md'), 'not yaml');
+    write(join(dir, 'specialists', '.draft.yaml'), 'max: 9\n');
+    write(join(dir, 'specialists', 'old', 'x.yaml'), 'name: X\n');
+    write(join(dir, 'workflows', 'feature.yaml'), 'steps:\n  - { id: code, specialist: a }\n');
+    const loaded = loadConfigSources(paths);
+    expect(loaded.files).toEqual([
+      join(dir, 'settings.yaml'),
+      join(dir, 'specialists', 'a.yaml'),
+      join(dir, 'specialists', 'b.yml'),
+      join(dir, 'workflows', 'feature.yaml'),
+    ]);
+    expect(loaded.config.max).toBe(2);
+    expect(loaded.config.specialists.map((specialist) => specialist.slug)).toEqual(['a', 'b']);
+  });
+
+  it('works without settings.yaml and orders the global level first', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'specialists', 'coder.yaml'), 'name: C\nmodel: a\n');
+    write(join(paths.project.directory, 'specialists', 'coder.yaml'), 'name: C\nmodel: b\n');
+    write(join(paths.project.directory, 'workflows', 'feature.yaml'), FEATURE);
+    const loaded = loadConfigSources(paths);
+    expect(loaded.files).toEqual([
+      join(paths.global.directory, 'specialists', 'coder.yaml'),
+      join(paths.project.directory, 'specialists', 'coder.yaml'),
+      join(paths.project.directory, 'workflows', 'feature.yaml'),
+    ]);
+    expect(findSpecialist(loaded.config, 'coder')?.model).toBe('b');
+  });
+
+  it('reads a symlink to a file', () => {
+    const paths = temporaryPaths();
+    const dir = files(paths);
+    write(join(dir, 'real', 'coder.yaml'), CODER);
+    mkdirSync(join(dir, 'specialists'), { recursive: true });
+    symlinkSync(join(dir, 'real', 'coder.yaml'), join(dir, 'specialists', 'coder.yaml'));
+    expect(findSpecialist(loadConfig(paths), 'coder')?.name).toBe('Кодировщик');
+  });
+
+  it('merges delivery fields of the two levels', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'settings.yaml'), 'delivery: { mode: commit }\n');
+    write(join(paths.project.directory, 'settings.yaml'), 'delivery: { auto: false }\n');
+    write(join(paths.project.directory, 'specialists', 'coder.yaml'), CODER);
+    expect(loadConfig(paths).delivery).toMatchObject({ mode: 'commit', auto: false });
+  });
+
+  it('refuses x.yaml next to x.yml and names both files', () => {
+    const paths = temporaryPaths();
+    const dir = files(paths);
+    write(join(dir, 'specialists', 'coder.yaml'), CODER);
+    write(join(dir, 'specialists', 'coder.yml'), CODER);
+    const error = thrown(() => loadConfig(paths));
+    expect(error.detail.kind).toBe('invalid');
+    expect(error.message).toContain('swarm.specialists.coder');
+    expect(error.message).toContain(join(dir, 'specialists', 'coder.yaml'));
+    expect(error.message).toContain(join(dir, 'specialists', 'coder.yml'));
+  });
+
+  it('names the file of a syntax error', () => {
+    const paths = temporaryPaths();
+    write(join(paths.project.directory, 'specialists', 'coder.yaml'), 'name: [\n');
+    expect(() => loadConfig(paths)).toThrow(join('aip', 'specialists', 'coder.yaml'));
+  });
+
+  it('gives errors the file they come from', () => {
+    const paths = temporaryPaths();
+    const dir = files(paths);
+    write(join(dir, 'settings.yaml'), 'max: 0\nswarm: {}\n');
+    write(join(dir, 'specialists', 'coder.yaml'), 'name: C\nslug: coder\n');
+    write(join(dir, 'workflows', 'feature.yaml'), 'steps:\n  - { id: code, specialist: nobody }\n');
+    const errors = (thrown(() => loadConfig(paths)).detail as { errors: FieldError[] }).errors;
+    expect(errors).toContainEqual({
+      file: join(dir, 'settings.yaml'),
+      path: 'swarm.max',
+      message: expect.stringContaining('from 1 to 32'),
+    });
+    expect(errors).toContainEqual({
+      file: join(dir, 'settings.yaml'),
+      path: 'swarm.swarm',
+      message: expect.stringContaining('unknown'),
+    });
+    expect(errors).toContainEqual({
+      file: join(dir, 'specialists', 'coder.yaml'),
+      path: 'swarm.specialists.coder.slug',
+      message: expect.stringContaining('unknown'),
+    });
+    expect(errors).toContainEqual({
+      file: join(dir, 'workflows', 'feature.yaml'),
+      path: 'swarm.workflows.feature.steps[0].specialist',
+      message: expect.stringContaining('unknown specialist'),
+    });
+  });
+
+  it('points an error of a replaced global entry at the project file', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'specialists', 'coder.yaml'), 'name: C\n');
+    write(join(paths.project.directory, 'specialists', 'coder.yaml'), 'name: C\nmax: 0\n');
+    const errors = (thrown(() => loadConfig(paths)).detail as { errors: FieldError[] }).errors;
+    expect(errors[0]?.file).toBe(join(paths.project.directory, 'specialists', 'coder.yaml'));
+  });
+
+  it('checks the workflow id as a slug', () => {
+    const paths = temporaryPaths();
+    const dir = files(paths);
+    write(join(dir, 'specialists', 'coder.yaml'), CODER);
+    write(join(dir, 'workflows', 'Feature_1.yaml'), FEATURE);
+    const errors = (thrown(() => loadConfig(paths)).detail as { errors: FieldError[] }).errors;
+    expect(errors).toContainEqual({
+      file: join(dir, 'workflows', 'Feature_1.yaml'),
+      path: 'swarm.workflows.Feature_1',
+      message: expect.stringContaining('^[a-z][a-z0-9-]{0,31}$'),
+    });
+  });
+
+  it('explains a leftover swarm.yaml and ignores it next to aip/', () => {
+    const paths = temporaryPaths();
+    write(join(paths.project.directory, '..', 'swarm.yaml'), 'swarm:\n  max: 2\n');
+    const error = thrown(() => loadConfig(paths));
+    expect(error.detail).toEqual({
+      kind: 'legacy',
+      found: join(paths.project.directory, '..', 'swarm.yaml'),
+      expected: paths.project.directory,
+    });
+    write(join(paths.project.directory, 'specialists', 'coder.yaml'), CODER);
+    expect(loadConfig(paths).max).toBe(3);
+  });
+
+  it('reports a legacy swarm.d of the global level', () => {
+    const paths = temporaryPaths();
+    write(join(paths.project.directory, 'specialists', 'coder.yaml'), CODER);
+    write(join(paths.global.directory, 'swarm.d', 'x.yaml'), 'swarm: {}\n');
+    expect(thrown(() => loadConfig(paths)).detail).toMatchObject({
+      kind: 'legacy',
+      found: join(paths.global.directory, 'swarm.d'),
+    });
+  });
+
+  it('builds a configuration from texts with logical file names in errors', () => {
+    const config = configFromFiles({
+      settings: 'max: 4\n',
+      specialists: { coder: CODER },
+      workflows: { feature: FEATURE },
+    });
+    expect(config.max).toBe(4);
+    expect(findWorkflow(config, 'feature')?.steps).toHaveLength(1);
+    const error = thrown(() => configFromFiles({ specialists: { coder: 'name: C\nmax: 0\n' } }));
+    expect(error.message).toContain('specialists/coder.yaml');
+  });
+});
+
+function thrown(action: () => unknown): ConfigLoadError {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof ConfigLoadError) return error;
+    throw error;
+  }
+  throw new Error('expected ConfigLoadError');
+}
+
+describe('web settings', () => {
+  const web = (text: string) => parseConfig(`${BASE}${text}`).web;
+
+  it('default to autostart with a token on 127.0.0.1:7341', () => {
+    expect(web('')).toEqual({ autostart: true, auth: 'token', port: 7341, host: '127.0.0.1' });
+  });
+
+  it('accept auth none and keep the other fields at their defaults', () => {
+    expect(web('  web: { auth: none }\n')).toEqual({
+      autostart: true,
+      auth: 'none',
+      port: 7341,
+      host: '127.0.0.1',
+    });
+  });
+
+  it('reject a host outside loopback, an unknown key and a wrong port', () => {
+    expectError(errorsOf(`${BASE}  web: { host: 0.0.0.0 }\n`), 'swarm.web.host', 'must be one of');
+    expectError(errorsOf(`${BASE}  web: { token: x }\n`), 'swarm.web.token', 'unknown key');
+    expectError(errorsOf(`${BASE}  web: { port: 0 }\n`), 'swarm.web.port', 'integer from 1');
+    expectError(errorsOf(`${BASE}  web: { auth: maybe }\n`), 'swarm.web.auth', 'token, none');
+    expectError(
+      errorsOf(`${BASE}  web: { autostart: 1 }\n`),
+      'swarm.web.autostart',
+      'true or false',
+    );
+  });
+
+  it('fill the defaults of a stored snapshot without them', () => {
+    const stored = structuredClone(parseConfig(BASE)) as { web?: unknown };
+    delete stored.web;
+    expect(withConfigDefaults(stored as Parameters<typeof withConfigDefaults>[0]).web).toEqual({
+      autostart: true,
+      auth: 'token',
+      port: 7341,
+      host: '127.0.0.1',
+    });
+  });
+
+  it('are an error in the project settings, naming the project file', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'specialists', 'coder.yaml'), 'name: C\n');
+    write(join(paths.project.directory, 'settings.yaml'), 'web: { autostart: false }\n');
+    const error = thrown(() => loadConfigSources(paths));
+    expect(error.detail).toMatchObject({ kind: 'invalid' });
+    const errors = error.detail.kind === 'invalid' ? error.detail.errors : [];
+    expect(errors).toContainEqual({
+      file: join(paths.project.directory, 'settings.yaml'),
+      path: 'swarm.web',
+      message: 'web is set only in the global aip/ directory',
+    });
+  });
+
+  it('are read from the global file alone, whatever else is wrong', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'settings.yaml'), 'web: { auth: none }\nmax: 100\n');
+    expect(loadWebSettings(paths).auth).toBe('none');
+    expect(() => loadConfig(paths)).toThrow(ConfigLoadError);
+  });
+
+  it('ignore a broken specialist file in the global directory', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'settings.yaml'), 'web: { auth: none }\n');
+    write(join(paths.global.directory, 'specialists', 'x.yaml'), 'name: [\n');
+    expect(loadWebSettings(paths).auth).toBe('none');
+    expect(() => loadConfig(paths)).toThrow(ConfigLoadError);
+  });
+
+  it('fail when settings.yaml and settings.yml both exist', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'settings.yaml'), 'web: { auth: none }\n');
+    write(join(paths.global.directory, 'settings.yml'), 'web: { autostart: false }\n');
+    expect(() => loadWebSettings(paths)).toThrow(ConfigLoadError);
+  });
+
+  it('are the defaults without a global directory or section', () => {
+    const paths = temporaryPaths();
+    expect(loadWebSettings(paths)).toEqual({
+      autostart: true,
+      auth: 'token',
+      port: 7341,
+      host: '127.0.0.1',
+    });
+    write(join(paths.global.directory, 'settings.yaml'), 'max: 2\n');
+    expect(loadWebSettings(paths).port).toBe(7341);
+  });
+
+  it('fail to load with the global file and the field path when wrong', () => {
+    const paths = temporaryPaths();
+    const file = join(paths.global.directory, 'settings.yaml');
+    write(file, 'web: { port: 70000 }\n');
+    const error = thrown(() => loadWebSettings(paths));
+    expect(error.detail).toMatchObject({
+      kind: 'invalid',
+      errors: [{ file, path: 'swarm.web.port' }],
+    });
+  });
+});
+
+describe('split.workflow', () => {
+  const SPEC = `${BASE}    plan: { name: П }\n`;
+  const epic = (body: string, extra = '') =>
+    `${SPEC}  workflows:\n    explore:\n      steps:\n        - { id: research, specialist: coder }\n${extra}    epic:\n${body}`;
+  const WITH = '      split: { specialist: plan, workflow: explore }\n';
+
+  it('reads the target and gives the workflow no steps of its own', () => {
+    const config = parseConfig(epic(WITH));
+    const found = findWorkflow(config, 'epic');
+    expect(found?.split?.workflow).toBe('explore');
+    expect(found?.steps).toEqual([]);
+    expect(groupWorkflow(config, found!).id).toBe('explore');
+  });
+
+  it('uses the workflow itself without the field, also for a snapshot without it', () => {
+    const config = parseConfig(workflowWithSteps());
+    const found = findWorkflow(config, 'feature')!;
+    expect(groupWorkflow(config, found)).toBe(found);
+    delete (found.split as unknown as Record<string, unknown>).workflow;
+    expect(groupWorkflow(config, found)).toBe(found);
+  });
+
+  it('throws when the target is gone from the configuration', () => {
+    const config = parseConfig(epic(WITH));
+    config.workflows = config.workflows.filter((item) => item.id !== 'explore');
+    expect(() => groupWorkflow(config, findWorkflow(config, 'epic')!)).toThrow(/explore/);
+  });
+
+  it('rejects steps together with split.workflow', () => {
+    expectError(
+      errorsOf(epic(`${WITH}      steps:\n        - { id: a, specialist: coder }\n`)),
+      'swarm.workflows.epic.steps',
+      'split.workflow',
+    );
+  });
+
+  it('requires steps or split.workflow', () => {
+    expectError(
+      errorsOf(epic('      split: { specialist: plan }\n')),
+      'swarm.workflows.epic.steps',
+      'is required',
+    );
+  });
+
+  it('rejects an unknown target', () => {
+    const errors = errorsOf(epic('      split: { specialist: plan, workflow: nope }\n'));
+    expectError(
+      errors,
+      'swarm.workflows.epic.split.workflow',
+      'unknown workflow `nope`; known: explore',
+    );
+  });
+
+  it('rejects a link to itself', () => {
+    expectError(
+      errorsOf(epic('      split: { specialist: plan, workflow: epic }\n')),
+      'swarm.workflows.epic.split.workflow',
+      'itself',
+    );
+  });
+
+  it('rejects a chain', () => {
+    const extra = '    mid:\n      split: { specialist: plan, workflow: explore }\n';
+    expectError(
+      errorsOf(epic('      split: { specialist: plan, workflow: mid }\n', extra)),
+      'swarm.workflows.epic.split.workflow',
+      'chains',
+    );
+  });
+
+  it('resolves a target from another level', () => {
+    const paths = temporaryPaths();
+    writeLevel(
+      paths.global,
+      `swarm:\n  specialists:\n    coder: { name: C }\n    plan: { name: П }\n`,
+    );
+    write(
+      join(paths.global.directory, 'workflows', 'explore.yaml'),
+      'steps:\n  - { id: research, specialist: coder }\n',
+    );
+    write(
+      join(paths.project.directory, 'workflows', 'epic.yaml'),
+      'split: { specialist: plan, workflow: explore }\n',
+    );
+    const config = loadConfig(paths);
+    expect(groupWorkflow(config, findWorkflow(config, 'epic')!).steps[0]?.id).toBe('research');
+  });
+});
+
+function workflowWithSteps(): string {
+  return `${BASE}  workflows:\n    feature:\n      split: { specialist: coder }\n      steps:\n        - { id: code, specialist: coder }\n`;
+}

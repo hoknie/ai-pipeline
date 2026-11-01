@@ -1,0 +1,81 @@
+import { findWorkflow, type ResolvedConfig } from '../config/index.ts';
+
+import { groupSlugs, runName } from './ids.ts';
+import { SPLIT_GROUP, newGroup, type RunState } from './model.ts';
+
+export interface NewGroup {
+  title: string;
+  task: string;
+}
+
+export interface NewRun {
+  id: string;
+  repository: string;
+  workflow: string;
+  baseCommit: string;
+  config: ResolvedConfig;
+  dirtyWarning: boolean;
+  groups: NewGroup[];
+  split: boolean;
+  now: number;
+  /** Title given by the user; the name is then derived from it. */
+  title?: string;
+  /** The run is created by a task queue. */
+  fromQueue?: boolean;
+  /** Overrides `delivery.auto` of the configuration for this run only. */
+  autoDeliver?: boolean | undefined;
+  /** Ids of catalog tags. */
+  tags?: string[] | undefined;
+}
+
+export function createRun(input: NewRun): RunState {
+  const workflow = findWorkflow(input.config, input.workflow);
+  if (!workflow) {
+    const known = input.config.workflows.map((workflow) => workflow.id).join(', ');
+    throw new Error(`unknown workflow \`${input.workflow}\`; known: ${known || 'none'}`);
+  }
+  if (input.groups.length === 0) throw new Error('a run needs at least one group');
+  for (const group of input.groups) {
+    if (group.task.trim() === '') throw new Error(`group \`${group.title}\` has an empty task`);
+  }
+  const splitting = input.split && workflow.split !== null && input.groups.length === 1;
+  const slugs = groupSlugs(input.groups.map((group) => group.title));
+  const task = input.groups[0]?.task ?? '';
+  return {
+    run: {
+      id: input.id,
+      repository: input.repository,
+      workflow: input.workflow,
+      baseCommit: input.baseCommit,
+      branch: `refs/aip/${input.id}/run`,
+      refStyle: 'refs',
+      createdAt: input.now,
+      finishedAt: null,
+      config:
+        input.autoDeliver === undefined
+          ? input.config
+          : { ...input.config, delivery: { ...input.config.delivery, auto: input.autoDeliver } },
+      dirtyWarning: input.dirtyWarning,
+      nextMergeSeq: 0,
+      pendingDelivery: null,
+      title: input.title?.trim() || null,
+      name: input.title?.trim() ? runName(input.title) : null,
+      namingUsage: null,
+      fromQueue: input.fromQueue ?? false,
+      tags: [...(input.tags ?? [])],
+    },
+    split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,
+    groups: splitting
+      ? []
+      : input.groups.map((group, index) =>
+          newGroup(slugs[index] ?? `group-${index + 1}`, group.title, group.task, index),
+        ),
+    message: null,
+    resolve: null,
+  };
+}
+
+export function groupsFromTask(task: string): NewGroup[] {
+  const firstLine = task.trim().split('\n')[0] ?? '';
+  return [{ title: firstLine.slice(0, 80) || 'task', task }];
+}

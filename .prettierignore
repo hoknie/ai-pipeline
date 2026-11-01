@@ -1,0 +1,10 @@
+dist
+node_modules
+target
+openspec
+.claude
+.idea
+package-lock.json
+*.md
+.aip
+integrations/claude-code/.claude-plugin/types

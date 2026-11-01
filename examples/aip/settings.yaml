@@ -1,0 +1,19 @@
+max: 3
+workspace:
+  base: working_tree
+delivery:
+  mode: worktree
+  auto: true
+claude:
+  mcp: isolated
+  settings: isolated
+defaults:
+  runtime: claude
+  permissions: edit
+  timeout: 30m
+  allow_commands:
+    - npm run build*
+    - npm test*
+    - npm run format*
+    - npm run typecheck*
+  tools: []

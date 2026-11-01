@@ -1,0 +1,3 @@
+name: QA
+model: opus
+prompt: Check all the changes and output a QA checklist

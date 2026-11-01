@@ -1,0 +1,19 @@
+{
+  "name": "aip",
+  "version": "0.1.0",
+  "description": "Watch and control the aip agent swarm from Claude Code: a pane, a status line, toasts and slash commands",
+  "author": {
+    "name": "hoknie"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "aipCommand": {
+      "type": "string",
+      "multiple": true,
+      "title": "aip command",
+      "description": "The command that runs aip, as a list of arguments, e.g. [\"node\", \"/path/to/dist/cli/main.js\"]",
+      "default": ["aip"]
+    }
+  }
+}

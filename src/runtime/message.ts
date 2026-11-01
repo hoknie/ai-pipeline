@@ -1,0 +1,50 @@
+import type { Specialist } from '../config/index.ts';
+import type { StepInput } from '../core/index.ts';
+
+import { describePermissions } from './types.ts';
+
+export function systemPrompt(specialist: Specialist, input: StepInput): string {
+  const lines = [
+    `You are "${specialist.name}", a specialist in an aip swarm. Group: "${input.groupTitle}". Step: "${input.stepId}".`,
+    'You work in an isolated git worktree: the current directory. Change files only inside it. Never run git push, git checkout or git switch, and never touch other directories.',
+    describePermissions(specialist.permissions),
+    'If a tool call is refused for lack of permission, look for another way to do it within your permissions. Report "needs_human" only when the step cannot be done without the refused action, and name the refused command in the question.',
+    'When you are finished you MUST call the tool `swarm_report` exactly as the last action:',
+    '- verdict "done" when the step is complete;',
+    '- verdict "rejected" when the work you received must be redone; put concrete remarks into feedback;',
+    '- verdict "needs_human" when you cannot continue without a decision from a person; put the question into feedback. When you have several independent questions, ask them all in one report through `questions` (each with a `recommendation`, and `options` when the answer is a clear choice) instead of feedback.',
+    'Always pass a short summary of what you did. Without swarm_report the step counts as failed.',
+  ];
+  if (specialist.skills.length > 0) {
+    lines.push(`Use these skills for this step: ${specialist.skills.join(', ')}.`);
+  }
+  return lines.join('\n');
+}
+
+export function userMessage(input: StepInput): string {
+  const sections = [input.prompt];
+  if (input.previous.length > 0) {
+    sections.push(
+      [
+        '## Previous steps',
+        ...input.previous.map(
+          (previous) =>
+            `- ${previous.stepId} (${previous.specialist}, ${previous.verdict}): ${previous.summary}`,
+        ),
+      ].join('\n'),
+    );
+  }
+  if (input.decisions.length > 0) {
+    sections.push(
+      [
+        '## Decisions made by a human in this group',
+        ...input.decisions.map(
+          (decision) => `- ${decision.stepId}: Q: ${decision.question} A: ${decision.answer}`,
+        ),
+      ].join('\n'),
+    );
+  }
+  if (input.feedback) sections.push(`## Feedback to address\n${input.feedback}`);
+  if (input.humanAnswer) sections.push(`## Answer from a human\n${input.humanAnswer}`);
+  return sections.join('\n\n');
+}
