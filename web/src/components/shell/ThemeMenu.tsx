@@ -17,7 +17,7 @@ import { navRowClass } from './navRow.ts';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 
-export function ThemeMenu({ collapsed = false }: { collapsed?: boolean }) {
+export function ThemeMenu({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
   const { theme, resolved, setTheme } = useTheme();
   const label = t('theme.label', { theme: t(`theme.${theme}`) });
@@ -27,25 +27,25 @@ export function ThemeMenu({ collapsed = false }: { collapsed?: boolean }) {
       <Button
         variant="ghost"
         data-nav-row
-        className={cn(navRowClass(collapsed))}
+        className={cn(navRowClass(), compact && 'w-8 justify-center px-0')}
         aria-label={label}
       >
         <Icon />
-        {collapsed ? null : <span>{label}</span>}
+        {compact ? null : <span>{label}</span>}
       </Button>
     </DropdownMenuTrigger>
   );
   return (
     <DropdownMenu>
-      {collapsed ? (
+      {compact ? (
         <Tooltip>
           <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent side="right">{label}</TooltipContent>
+          <TooltipContent side="bottom">{label}</TooltipContent>
         </Tooltip>
       ) : (
         trigger
       )}
-      <DropdownMenuContent align="start" side="top">
+      <DropdownMenuContent align={compact ? 'end' : 'start'} side={compact ? 'bottom' : 'top'}>
         <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as Theme)}>
           {THEMES.map((key) => (
             <DropdownMenuRadioItem key={key} value={key}>

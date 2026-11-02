@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip.tsx';
 import { navRowClass } from './navRow.ts';
 
 /** Choice of the language: «as in the browser» or one of the languages, named in itself. */
-export function LanguageMenu({ collapsed = false }: { collapsed?: boolean }) {
+export function LanguageMenu({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
   const { choice, setChoice } = useLanguage();
   const current =
@@ -29,25 +29,25 @@ export function LanguageMenu({ collapsed = false }: { collapsed?: boolean }) {
       <Button
         variant="ghost"
         data-nav-row
-        className={cn(navRowClass(collapsed))}
+        className={cn(navRowClass(), compact && 'w-8 justify-center px-0')}
         aria-label={label}
       >
         <Languages />
-        {collapsed ? null : <span className="truncate">{label}</span>}
+        {compact ? null : <span className="truncate">{label}</span>}
       </Button>
     </DropdownMenuTrigger>
   );
   return (
     <DropdownMenu>
-      {collapsed ? (
+      {compact ? (
         <Tooltip>
           <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent side="right">{label}</TooltipContent>
+          <TooltipContent side="bottom">{label}</TooltipContent>
         </Tooltip>
       ) : (
         trigger
       )}
-      <DropdownMenuContent align="start" side="top">
+      <DropdownMenuContent align={compact ? 'end' : 'start'} side={compact ? 'bottom' : 'top'}>
         <DropdownMenuRadioGroup
           value={choice}
           onValueChange={(value) => setChoice(value as LanguageChoice)}

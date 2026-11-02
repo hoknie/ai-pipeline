@@ -46,10 +46,6 @@ export const ru: Dictionary = {
     workingWaiting: 'в работе: {{count}}, ждут ответа: {{waiting}}',
     waiting: 'ждут ответа: {{count}}',
     queued: 'в очереди: {{count}}',
-    expandNavigation: 'Развернуть навигацию',
-    collapseNavigation: 'Свернуть навигацию',
-    expand: 'Развернуть',
-    collapse: 'Свернуть',
   },
   status: {
     queued: 'В очереди',
@@ -150,6 +146,8 @@ export const ru: Dictionary = {
       empty: 'Ничего не найдено',
       reset: 'Сбросить',
       fromQueue: 'из очереди',
+      filters: 'Фильтры',
+      filtersCount: 'Фильтры ({{count}})',
       groups: 'группы запуска',
     },
     page: {

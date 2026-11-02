@@ -274,7 +274,7 @@ describe.each(Object.keys(DICTIONARIES))('dictionary %s', (language) => {
   });
 });
 
-describe('collapsed navigation', () => {
+describe('navigation in the strip', () => {
   it('names the language menu with the current language', async () => {
     window.localStorage.setItem('aip.web.language', '"ru"');
     window.localStorage.setItem('aip.web.navCollapsed', 'true');

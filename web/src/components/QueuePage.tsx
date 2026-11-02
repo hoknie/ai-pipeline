@@ -3,21 +3,18 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import type { Api } from '../api.ts';
-import { notifySuccess } from '../notify.ts';
 import { formatRoute } from '../route.ts';
-import { queueStateLabel } from '../status.ts';
 import type { QueueView, WorkflowsView } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
-import { Button } from '../ui/button.tsx';
 import { Skeleton } from '../ui/skeleton.tsx';
 
-import { StatusBadge } from './StatusBadge.tsx';
 import { QueueForm, emptyDraft, type QueueDraft } from './QueueForm.tsx';
 import { QueueList, itemLabel } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
 import { afterOptions, related } from './queueLinks.ts';
-import { ParallelStepper, parseParallel } from './ParallelStepper.tsx';
+import { parseParallel } from './ParallelStepper.tsx';
+import { QueueControls } from './QueueControls.tsx';
 
 export { parseParallel };
 
@@ -92,98 +89,58 @@ export default function QueuePage({
       </div>
     );
 
-  const text = parallel ?? String(queue.parallel);
-  const parsed = parseParallel(text);
-  const invalid = parsed === null;
-  const busy = queue.status === 'running';
-  const canStart = queue.status === 'stopped' && (queue.items.length > 0 || queue.runs.length > 0);
-
-  const act = async (work: () => Promise<QueueView>, done: string) => {
-    try {
-      onQueue(await work());
-      setParallel(null);
-      notifySuccess(done);
-    } catch (error) {
-      onError((error as Error).message);
-    }
-  };
-
   const chain = highlight === null ? null : related(queue, highlight);
   // a task without links has nothing to light up
   const linked = chain !== null && chain.size > 1 ? chain : null;
   const newDraft = drafts.new ?? emptyDraft();
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 p-4">
-      <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-semibold">{t('queue.title')}</h2>
-        <StatusBadge
-          status={queue.status === 'running' ? 'running' : 'stopped'}
-          label={queueStateLabel(queue.status, t)}
-        />
-        <ParallelStepper
-          api={api}
-          queue={queue}
-          text={parallel}
-          onText={setParallel}
-          onQueue={onQueue}
-          onError={onError}
-        />
-        <span className="flex gap-2">
-          <Button
-            disabled={!canStart || invalid}
-            onClick={() =>
-              void act(
-                () => api.queueStart(parsed !== queue.parallel ? (parsed ?? undefined) : undefined),
-                t('queue.started'),
-              )
-            }
-          >
-            {t('queue.start')}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!busy}
-            onClick={() => void act(() => api.queuePause(), t('queue.paused'))}
-          >
-            {t('queue.pause')}
-          </Button>
-        </span>
-      </header>
-      <StopReason queue={queue} />
-      <QueueRuns queue={queue} now={now} highlight={linked} />
-      <section aria-label={t('queue.newTaskLabel')}>
-        <h3 className="mb-2 font-semibold">{t('queue.newTask')}</h3>
-        <QueueForm
-          idPrefix="new"
-          draft={newDraft}
-          workflows={workflows}
-          api={api}
-          autoDeliverDefault={queue.autoDeliver}
-          afterChoices={afterOptions(queue, (item) => itemLabel(item, t))}
-          submitLabel={t('queue.add')}
-          onDraft={(draft) => onDraft('new', draft)}
-          onSubmit={async (fields) => {
-            const view = await api.queueAdd(fields);
-            onQueue(view);
-            onDraft('new', emptyDraft(fields.workflow));
-          }}
-        />
-      </section>
-      <section aria-label={t('queue.waitingLabel')}>
-        <h3 className="mb-2 font-semibold">{t('queue.waiting')}</h3>
-        <QueueList
-          api={api}
-          queue={queue}
-          workflows={workflows}
-          now={now}
-          drafts={drafts}
-          onDraft={onDraft}
-          onQueue={onQueue}
-          highlight={linked}
-          onHighlight={setHighlight}
-        />
-      </section>
+    <div className="grid w-full gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
+      <QueueControls
+        api={api}
+        queue={queue}
+        parallel={parallel}
+        onParallel={setParallel}
+        onQueue={onQueue}
+        onError={onError}
+        onDone={() => setParallel(null)}
+      />
+      <div className="flex min-w-0 flex-col gap-4">
+        <StopReason queue={queue} />
+        <QueueRuns queue={queue} now={now} highlight={linked} />
+        <section aria-label={t('queue.newTaskLabel')}>
+          <h3 className="mb-2 font-semibold">{t('queue.newTask')}</h3>
+          <QueueForm
+            idPrefix="new"
+            draft={newDraft}
+            workflows={workflows}
+            api={api}
+            autoDeliverDefault={queue.autoDeliver}
+            afterChoices={afterOptions(queue, (item) => itemLabel(item, t))}
+            submitLabel={t('queue.add')}
+            onDraft={(draft) => onDraft('new', draft)}
+            onSubmit={async (fields) => {
+              const view = await api.queueAdd(fields);
+              onQueue(view);
+              onDraft('new', emptyDraft(fields.workflow));
+            }}
+          />
+        </section>
+        <section aria-label={t('queue.waitingLabel')}>
+          <h3 className="mb-2 font-semibold">{t('queue.waiting')}</h3>
+          <QueueList
+            api={api}
+            queue={queue}
+            workflows={workflows}
+            now={now}
+            drafts={drafts}
+            onDraft={onDraft}
+            onQueue={onQueue}
+            highlight={linked}
+            onHighlight={setHighlight}
+          />
+        </section>
+      </div>
     </div>
   );
 }

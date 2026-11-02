@@ -119,7 +119,9 @@ describe('command palette', () => {
 describe('section counters', () => {
   it('counts the runs waiting for an answer from the live events', async () => {
     mount([runView({ id: 'a', state: 'needs_human', waiting: 2 })]);
-    expect(screen.getByLabelText('running: 1, waiting for an answer: 1')).toBeTruthy();
+    expect(screen.getAllByLabelText('running: 1, waiting for an answer: 1').length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getByLabelText('waiting for an answer: 1')).toBeTruthy();
     act(() =>
       FakeEventSource.last!.send({
@@ -129,7 +131,7 @@ describe('section counters', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByLabelText(/waiting for an answer/)).toBeNull());
-    expect(screen.getByLabelText('running: 1')).toBeTruthy();
+    expect(screen.getAllByLabelText('running: 1').length).toBeGreaterThan(0);
     act(() =>
       FakeEventSource.last!.send({
         event: 'run',
@@ -140,12 +142,10 @@ describe('section counters', () => {
     await waitFor(() => expect(screen.queryByLabelText(/^running: /)).toBeNull());
   });
 
-  it('remembers the collapsed navigation after a remount', () => {
+  it('ignores the navigation collapsed by an older version', () => {
+    window.localStorage.setItem('aip.web.navCollapsed', 'true');
     mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }));
-    cleanup();
-    mount();
-    expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /navigation/i })).toBeNull();
     expect(screen.getByRole('link', { name: /Runs/ })).toBeTruthy();
   });
 

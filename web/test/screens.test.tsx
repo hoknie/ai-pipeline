@@ -8,6 +8,7 @@ import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
 import { RunHeader } from '../src/components/runs/RunHeader.tsx';
 
 import { FakeEventSource, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
+import { setWindowWidth } from './media.ts';
 import { act, cleanup, fireEvent, openTab, render, screen, waitFor, within } from './render.tsx';
 
 beforeEach(() => {
@@ -241,9 +242,9 @@ describe('counter of the runs section', () => {
       runView({ id: 'a', state: 'needs_human', waiting: 3 }),
       runView({ id: 'b', state: 'active', waiting: 0 }),
     ]);
-    const link = await screen.findByRole('link', { name: /^Runs/ });
-    expect(link.textContent).toContain('1');
-    expect(link.textContent).not.toContain('3');
+    const badge = (await screen.findAllByLabelText('running: 2, waiting for an answer: 1'))[0]!;
+    expect(badge.textContent).toBe('2');
+    expect(screen.getByLabelText('waiting for an answer: 1').textContent).toBe('1');
   });
 });
 
@@ -503,5 +504,75 @@ describe('run state badges', () => {
     ]);
     await screen.findAllByLabelText('Finished (finished)');
     expect(screen.queryByText(/^Warnings: /)).toBeNull();
+  });
+});
+
+describe('runs section columns', () => {
+  let restore = () => {};
+  afterEach(() => restore());
+
+  const two = () => [
+    runView({ id: 'a', title: 'Первый', state: 'needs_human', waiting: 1 }),
+    runView({ id: 'b', title: 'Второй' }),
+  ];
+
+  it('stands the filters, the list and the run in three columns in a wide window', async () => {
+    restore = setWindowWidth(1600);
+    window.location.hash = '#runs/a';
+    mount(two());
+    const filters = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(filters.className).toContain('w-64');
+    expect(within(filters).getByRole('searchbox', { name: 'Search runs' })).toBeTruthy();
+    expect(within(filters).getByRole('radio', { name: 'Waiting 1' })).toBeTruthy();
+    expect(within(filters).getByRole('radio', { name: 'This repository' })).toBeTruthy();
+    expect(within(filters).queryByText('Первый')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
+    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.className).toContain('w-80');
+    expect(screen.getByRole('main')).toBeTruthy();
+  });
+
+  it('keeps the filters behind a button in a medium window', async () => {
+    restore = setWindowWidth(1100);
+    mount(two());
+    expect(screen.queryByRole('complementary', { name: 'Filters' })).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Search runs' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+    expect(await screen.findByRole('searchbox', { name: 'Search runs' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Waiting 1' })).toBeTruthy();
+  });
+
+  it('shows the number of filters in effect on the button', async () => {
+    restore = setWindowWidth(1100);
+    mount(two());
+    fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Waiting 1' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {
+      target: { value: 'Первый' },
+    });
+    expect(await screen.findByRole('button', { name: 'Filters (2)' })).toBeTruthy();
+  });
+
+  it('opens the filters in a sheet in a phone-wide window', async () => {
+    restore = setWindowWidth(360);
+    mount(two());
+    fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('searchbox', { name: 'Search runs' })).toBeTruthy();
+  });
+
+  it('resets the filters of the column with «Reset»', async () => {
+    restore = setWindowWidth(1600);
+    mount(two());
+    const filters = await screen.findByRole('complementary', { name: 'Filters' });
+    fireEvent.change(within(filters).getByRole('searchbox', { name: 'Search runs' }), {
+      target: { value: 'nothing-like-this' },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
+    await waitFor(() =>
+      expect(
+        (within(filters).getByRole('searchbox', { name: 'Search runs' }) as HTMLInputElement).value,
+      ).toBe(''),
+    );
+    expect(screen.getAllByText('Первый').length).toBeGreaterThan(0);
   });
 });

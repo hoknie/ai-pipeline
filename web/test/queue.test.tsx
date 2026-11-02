@@ -11,6 +11,7 @@ import { parseParallel } from '../src/components/QueuePage.tsx';
 import { formatRoute, parseRoute } from '../src/route.ts';
 import { useRuns } from '../src/store.ts';
 
+import { setWindowWidth } from './media.ts';
 import {
   FakeEventSource,
   dependency,
@@ -83,7 +84,7 @@ describe('routes and order helpers', () => {
 describe('queue tab', () => {
   it('is selected after a reload and shows the queue', async () => {
     show();
-    const tab = await screen.findByRole('link', { name: /^Queue/ });
+    const tab = await screen.findByRole('link', { name: /Queue/ });
     expect(tab.getAttribute('aria-current')).toBe('page');
     await screen.findByRole('list', { name: 'tasks in the queue' });
     expect(labels()).toEqual(['1. A', '2. B', '3. C']);
@@ -531,8 +532,8 @@ describe('new task form', () => {
     });
     await waitFor(() => expect(labels()).toEqual(['1. A', '2. Z']));
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('черновик');
-    fireEvent.click(screen.getByRole('link', { name: /^Runs/ }));
-    fireEvent.click(await screen.findByRole('link', { name: /^Queue/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Runs/ }));
+    fireEvent.click(await screen.findByRole('link', { name: /Queue/ }));
     expect(((await screen.findByLabelText('Task text')) as HTMLTextAreaElement).value).toBe(
       'черновик',
     );
@@ -1483,5 +1484,46 @@ describe('confirmations with dependencies', () => {
     expect(dialog.textContent).toContain('will stop waiting');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Keep' }));
     expect(api.queueRemove).not.toHaveBeenCalled();
+  });
+});
+
+describe('queue layout', () => {
+  let restore = () => {};
+  afterEach(() => restore());
+
+  const running = () =>
+    queueOf({
+      status: 'running',
+      parallel: 3,
+      runs: [queueRun('r1'), queueRun('r2'), queueRun('r3')],
+      items: items('A'),
+    });
+
+  it('puts the controls in a column and the runs in a grid in a wide window', async () => {
+    restore = setWindowWidth(1600);
+    show(running());
+    const controls = await screen.findByRole('region', { name: 'Queue' });
+    expect(controls.className).toContain('lg:flex-col');
+    expect(controls.parentElement?.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]');
+    expect(within(controls).getByRole('button', { name: 'Start' })).toBeTruthy();
+    expect(within(controls).getByRole('button', { name: 'Pause' })).toBeTruthy();
+    expect(within(controls).getByLabelText('Parallelism')).toBeTruthy();
+    const runs = screen.getByRole('region', { name: 'running from the queue' });
+    expect(controls.contains(runs)).toBe(false);
+    expect(within(runs).getByRole('list').className).toContain('md:grid-cols-2');
+    expect(within(runs).getByRole('list').className).toContain('2xl:grid-cols-3');
+    const order = [runs, screen.getByRole('region', { name: 'waiting to start' })];
+    expect(
+      order[0]!.compareDocumentPosition(order[1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('stacks the controls over the content in a narrow window', async () => {
+    restore = setWindowWidth(600);
+    show(running());
+    const controls = await screen.findByRole('region', { name: 'Queue' });
+    const runs = screen.getByRole('region', { name: 'running from the queue' });
+    expect(controls.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(runs).getByRole('list').className).toContain('grid-cols-1');
   });
 });

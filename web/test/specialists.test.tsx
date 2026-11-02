@@ -739,3 +739,11 @@ describe('form layout', () => {
     expect(within(header).getByRole('heading', { name: 'coder' })).toBeTruthy();
   });
 });
+
+describe('form width', () => {
+  it('has no centred width limit on the root of the form', async () => {
+    render(<Page api={fakeApi()} start="coder" />);
+    const root = await screen.findByRole('region', { name: 'specialist coder' });
+    expect(root.className).not.toMatch(/max-w-|mx-auto/);
+  });
+});

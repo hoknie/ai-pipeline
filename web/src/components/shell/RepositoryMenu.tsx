@@ -25,7 +25,6 @@ import {
 } from '../../ui/dropdown-menu.tsx';
 import { Input } from '../../ui/input.tsx';
 import { Label } from '../../ui/label.tsx';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip.tsx';
 
 import { navRowClass } from './navRow.ts';
 
@@ -120,10 +119,11 @@ function AddRepositoryDialog({
 /** Picks the repository whose queue, configuration and workflows the panel shows. */
 export function RepositoryMenu({
   choice,
-  collapsed = false,
+  compact = false,
 }: {
   choice: RepositoryChoice;
-  collapsed?: boolean;
+  /** The top bar: the button is as wide as the name, which is cut when long. */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const { repositories, selected, waiting, home, onSelect, onAdd, onRemove } = choice;
@@ -134,15 +134,13 @@ export function RepositoryMenu({
         <Button
           variant="outline"
           data-repository-add-empty
-          className={navRowClass(collapsed)}
+          className={cn(navRowClass(), compact && 'w-auto max-w-48')}
           aria-label={t('nav.repositoryAdd')}
           title={t('nav.repositoryAdd')}
           onClick={() => setAdding(true)}
         >
           <Plus aria-hidden />
-          {collapsed ? null : (
-            <span className="flex-1 truncate text-left">{t('nav.repositoryAdd')}</span>
-          )}
+          <span className="flex-1 truncate text-left">{t('nav.repositoryAdd')}</span>
         </Button>
         <AddRepositoryDialog open={adding} onOpenChange={setAdding} onAdd={onAdd} />
       </>
@@ -159,22 +157,14 @@ export function RepositoryMenu({
         variant="outline"
         data-nav-row
         data-repository-trigger
-        className={cn(navRowClass(collapsed), 'relative')}
+        className={cn(navRowClass(), 'relative', compact && 'w-auto max-w-48')}
         aria-label={label}
         title={selected}
       >
         <FolderGit2 aria-hidden />
-        {collapsed ? null : <span className="flex-1 truncate text-left">{name}</span>}
+        <span className="flex-1 truncate text-left">{name}</span>
         {others > 0 ? (
-          <Badge
-            variant="warn"
-            aria-label={t('nav.repositoryWaiting', { count: others })}
-            className={
-              collapsed
-                ? 'absolute -right-2 -top-2 min-w-4 justify-center px-1 py-0 text-[10px] leading-4'
-                : undefined
-            }
-          >
+          <Badge variant="warn" aria-label={t('nav.repositoryWaiting', { count: others })}>
             {others}
           </Badge>
         ) : null}
@@ -184,14 +174,7 @@ export function RepositoryMenu({
   return (
     <>
       <DropdownMenu>
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-            <TooltipContent side="right">{selected}</TooltipContent>
-          </Tooltip>
-        ) : (
-          trigger
-        )}
+        {trigger}
         <DropdownMenuContent align="start" aria-label={t('nav.repository')}>
           <DropdownMenuRadioGroup value={selected} onValueChange={onSelect}>
             {repositories.map((path) => {

@@ -46,10 +46,6 @@ export const zh: Dictionary = {
     workingWaiting: '进行中：{{count}}，等待回答：{{waiting}}',
     waiting: '等待回答：{{count}}',
     queued: '队列中：{{count}}',
-    expandNavigation: '展开导航',
-    collapseNavigation: '收起导航',
-    expand: '展开',
-    collapse: '收起',
   },
   status: {
     queued: '排队中',
@@ -147,6 +143,8 @@ export const zh: Dictionary = {
       empty: '未找到结果',
       reset: '重置',
       fromQueue: '来自队列',
+      filters: '筛选',
+      filtersCount: '筛选（{{count}}）',
       groups: '运行的分组',
     },
     page: {

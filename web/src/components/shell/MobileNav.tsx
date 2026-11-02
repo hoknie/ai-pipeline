@@ -31,8 +31,6 @@ export function MobileNav(props: NavProps) {
           <SheetDescription>{t('nav.sectionsDescription')}</SheetDescription>
           <NavSidebar
             {...props}
-            collapsed={false}
-            onToggleCollapsed={undefined}
             onNavigate={(view) => {
               setOpen(false);
               props.onNavigate(view);

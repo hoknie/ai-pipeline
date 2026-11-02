@@ -106,7 +106,6 @@ function Panel({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [queueDrafts, setQueueDrafts] = useState<Record<string, QueueDraft>>({});
   const [onlyReplies, setOnlyReplies] = usePreference('onlyReplies', false);
-  const [collapsed, setCollapsed] = usePreference('navCollapsed', false);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [notify, setNotify] = useState(
@@ -295,8 +294,6 @@ function Panel({
                     setNotify(result === 'granted'),
                   )
               : null,
-          collapsed,
-          onToggleCollapsed: () => setCollapsed(!collapsed),
         }}
       >
         <CommandPalette

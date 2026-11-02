@@ -136,7 +136,7 @@ export function QueueRuns({
       {queue.runs.length > queue.parallel ? (
         <p className="mb-2 text-sm text-muted-foreground">{t('queue.runsOverflow')}</p>
       ) : null}
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
         {queue.runs.map((run) => (
           <li key={run.id} className="min-w-0">
             <RunCard run={run} now={now} linked={highlight?.has(run.id) === true} />

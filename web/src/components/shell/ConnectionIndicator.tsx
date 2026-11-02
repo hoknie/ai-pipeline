@@ -15,10 +15,10 @@ const DOT: Record<Connection, string> = {
 /** Dot and label of the link with the daemon; the code is in the tooltip. */
 export function ConnectionIndicator({
   connection,
-  collapsed = false,
+  compact = false,
 }: {
   connection: Connection;
-  collapsed?: boolean;
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const label = connectionLabel(connection, t);
@@ -30,15 +30,21 @@ export function ConnectionIndicator({
           tabIndex={0}
           aria-label={t('connection.label', { state: label })}
           data-nav-row
-          className={cn(navRowClass(collapsed), 'text-xs text-muted-foreground')}
+          className={cn(
+            navRowClass(),
+            'text-xs text-muted-foreground',
+            compact && 'w-8 justify-center px-0',
+          )}
         >
           <span aria-hidden className="flex size-4 items-center justify-center">
             <span className={cn('size-2 shrink-0 rounded-full', DOT[connection])} />
           </span>
-          {collapsed ? null : <span>{label}</span>}
+          {compact ? null : <span>{label}</span>}
         </div>
       </TooltipTrigger>
-      <TooltipContent>{connection}</TooltipContent>
+      <TooltipContent side={compact ? 'bottom' : 'top'}>
+        {compact ? `${label} (${connection})` : connection}
+      </TooltipContent>
     </Tooltip>
   );
 }

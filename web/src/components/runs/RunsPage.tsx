@@ -1,4 +1,4 @@
-import { ArrowLeft, Inbox, MousePointerClick } from 'lucide-react';
+import { ArrowLeft, Inbox, ListFilter, MousePointerClick } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,15 +12,24 @@ import type { RunView } from '../../types.ts';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
 import { Kbd } from '../../ui/kbd.tsx';
+import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover.tsx';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from '../../ui/sheet.tsx';
 import { Skeleton } from '../../ui/skeleton.tsx';
 import { needsAttention, orderGroups } from '../order.ts';
 
 import { GroupScreen } from './GroupScreen.tsx';
 import { RunHeader } from './RunHeader.tsx';
+import { RunFilters } from './RunFilters.tsx';
 import { RunList } from './RunList.tsx';
-import { filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
+import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
 
-/** The runs section: the list of runs on the left, the open run and its group on the right. */
+/** The runs section: filters, the list of runs and the open run with its group; filters sit in a column from 1280 px and behind a button below. */
 export function RunsPage({
   api,
   runs,
@@ -57,6 +66,7 @@ export function RunsPage({
 }) {
   const { t } = useTranslation();
   const wide = useMediaQuery('(min-width: 768px)');
+  const columns = useMediaQuery('(min-width: 1280px)');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = usePreference<RunFilter>('runFilter', 'all');
   const { byId } = useTags();
@@ -115,9 +125,49 @@ export function RunsPage({
     if (wide) setScreen('list');
   }, [wide]);
 
+  const filterProps = {
+    runs,
+    query,
+    onQuery: setQuery,
+    filter,
+    onFilter: setFilter,
+    scope,
+    onScope,
+    repository,
+    tagIds,
+    onTagIds: setStoredTags,
+  };
+  const count = activeFilters(query, filter, tagIds);
+  const filterButton = (
+    <Button variant="outline" size="sm" className="w-full justify-start">
+      <ListFilter />
+      {count > 0 ? t('runs.list.filtersCount', { count }) : t('runs.list.filters')}
+    </Button>
+  );
+  const filtersControl = columns ? null : wide ? (
+    <Popover>
+      <PopoverTrigger asChild>{filterButton}</PopoverTrigger>
+      <PopoverContent className="w-80 p-3">
+        <RunFilters {...filterProps} />
+      </PopoverContent>
+    </Popover>
+  ) : (
+    <Sheet>
+      <SheetTrigger asChild>{filterButton}</SheetTrigger>
+      <SheetContent>
+        <SheetTitle>{t('runs.list.filters')}</SheetTitle>
+        <SheetDescription className="sr-only">{t('runs.list.filters')}</SheetDescription>
+        <div className="p-3">
+          <RunFilters {...filterProps} />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+
   const list = loaded ? (
     runs.length === 0 ? null : (
       <RunList
+        filters={false}
         runs={runs}
         selectedRun={run?.id ?? null}
         selectedGroup={group?.slug ?? null}
@@ -204,12 +254,26 @@ export function RunsPage({
         {detail}
       </div>
     ) : (
-      <div className="p-3">{list}</div>
+      <div className="flex flex-col gap-2 p-3">
+        {loaded ? filtersControl : null}
+        {list}
+      </div>
     );
   }
   return (
     <div className="flex min-h-0 flex-1">
-      <aside className="w-80 shrink-0 overflow-y-auto border-r p-3">{list}</aside>
+      {columns && loaded ? (
+        <aside
+          aria-label={t('runs.list.filters')}
+          className="w-64 shrink-0 overflow-y-auto border-r p-3"
+        >
+          <RunFilters {...filterProps} />
+        </aside>
+      ) : null}
+      <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r p-3">
+        {loaded ? filtersControl : null}
+        {list}
+      </aside>
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">{detail}</main>
     </div>
   );

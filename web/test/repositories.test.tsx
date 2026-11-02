@@ -345,13 +345,15 @@ describe('run list scope', () => {
     expect(screen.queryByTitle(APP + '/')).toBeNull();
     // counters follow the mode: two of /work/app work, /work/lib is not counted
     const runsLink = screen.getByRole('link', { name: /Runs/ });
-    expect(within(runsLink).getByLabelText('running: 2')).toBeTruthy();
+    expect(within(runsLink).getAllByLabelText('running: 2').length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('radio', { name: 'All repositories' }));
     expect(await screen.findByText('lib waits')).toBeTruthy();
     expect(screen.getAllByTitle(APP).length).toBeGreaterThan(0);
     expect(screen.getAllByTitle(LIB).length).toBeGreaterThan(0);
-    expect(within(runsLink).getByLabelText('running: 4, waiting for an answer: 1')).toBeTruthy();
+    expect(
+      within(runsLink).getAllByLabelText('running: 4, waiting for an answer: 1').length,
+    ).toBeGreaterThan(0);
     first.unmount();
 
     render(<App api={api} openStream={openFake} />);

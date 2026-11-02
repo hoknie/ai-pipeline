@@ -44,10 +44,6 @@ export const en = {
     workingWaiting: 'running: {{count}}, waiting for an answer: {{waiting}}',
     waiting: 'waiting for an answer: {{count}}',
     queued: 'in the queue: {{count}}',
-    expandNavigation: 'Expand navigation',
-    collapseNavigation: 'Collapse navigation',
-    expand: 'Expand',
-    collapse: 'Collapse',
   },
   status: {
     queued: 'Queued',
@@ -146,6 +142,8 @@ export const en = {
       empty: 'Nothing found',
       reset: 'Reset',
       fromQueue: 'from the queue',
+      filters: 'Filters',
+      filtersCount: 'Filters ({{count}})',
       groups: 'run groups',
     },
     page: {

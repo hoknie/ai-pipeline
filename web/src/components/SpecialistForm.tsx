@@ -453,7 +453,7 @@ export function SpecialistForm({
 
   return (
     <section
-      className="mx-auto flex max-w-3xl flex-col gap-3"
+      className="flex flex-col gap-3"
       aria-label={t('specialists.section', { id: id || t('specialists.newName') })}
     >
       <header

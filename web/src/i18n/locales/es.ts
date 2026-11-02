@@ -47,10 +47,6 @@ export const es: Dictionary = {
     workingWaiting: 'en curso: {{count}}, esperan respuesta: {{waiting}}',
     waiting: 'esperan respuesta: {{count}}',
     queued: 'en la cola: {{count}}',
-    expandNavigation: 'Expandir la navegación',
-    collapseNavigation: 'Contraer la navegación',
-    expand: 'Expandir',
-    collapse: 'Contraer',
   },
   status: {
     queued: 'En cola',
@@ -150,6 +146,8 @@ export const es: Dictionary = {
       empty: 'No se encontró nada',
       reset: 'Restablecer',
       fromQueue: 'de la cola',
+      filters: 'Filtros',
+      filtersCount: 'Filtros ({{count}})',
       groups: 'grupos de la ejecución',
     },
     page: {

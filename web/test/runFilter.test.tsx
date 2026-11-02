@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RunList } from '../src/components/runs/RunList.tsx';
 import {
+  activeFilters,
   filterCounts,
   filterRuns,
   navRunCounts,
@@ -195,5 +196,16 @@ describe('filter by tags', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     expect(onTagIds).toHaveBeenCalledWith([]);
+  });
+});
+
+describe('activeFilters', () => {
+  it('counts a search, a status other than «all» and every chosen tag', () => {
+    expect(activeFilters('', 'all', [])).toBe(0);
+    expect(activeFilters('  ', 'all', [])).toBe(0);
+    expect(activeFilters('json', 'all', [])).toBe(1);
+    expect(activeFilters('', 'waiting', [])).toBe(1);
+    expect(activeFilters('', 'all', ['ta', 'tv'])).toBe(2);
+    expect(activeFilters('x', 'done', ['ta'])).toBe(3);
   });
 });

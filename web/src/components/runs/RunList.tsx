@@ -10,22 +10,13 @@ import type { RunView } from '../../types.ts';
 import { useTags } from '../../tags.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
-import { Input } from '../../ui/input.tsx';
-import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.tsx';
 import { orderGroups } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { TagChips } from '../TagChip.tsx';
-import { TagPicker } from '../TagPicker.tsx';
+import { RunFilters } from './RunFilters.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
-import {
-  filterCounts,
-  filterRuns,
-  RUN_FILTERS,
-  runsOf,
-  type RunFilter,
-  type RunScope,
-} from './runFilter.ts';
+import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
 
 export function RunList({
   runs,
@@ -42,6 +33,7 @@ export function RunList({
   repository,
   tagIds,
   onTagIds,
+  filters = true,
 }: {
   runs: RunView[];
   selectedRun: string | null;
@@ -60,47 +52,31 @@ export function RunList({
   /** Ids of the tags to filter by (a run needs any one of them). */
   tagIds: string[];
   onTagIds: (ids: string[]) => void;
+  /** Whether the filters stand above the list; false when the page shows them elsewhere. */
+  filters?: boolean;
 }) {
   const { t } = useTranslation();
   const locale = useLocale();
   const { byId } = useTags();
   const only = scope === 'repository' ? repository : null;
   const shown = filterRuns(runs, query, filter, only, tagIds, byId);
-  const counts = filterCounts(runsOf(runs, only), tagIds);
-  const filtered = query.trim() !== '' || filter !== 'all' || tagIds.length > 0;
+  const filtered = activeFilters(query, filter, tagIds) > 0;
   return (
     <div className="flex flex-col gap-2">
-      <Input
-        type="search"
-        aria-label={t('runs.list.search')}
-        placeholder={t('runs.list.search')}
-        value={query}
-        onChange={(event) => onQuery(event.target.value)}
-      />
-      <ToggleGroup
-        type="single"
-        aria-label={t('runs.list.scope')}
-        value={scope}
-        className="flex-wrap"
-        onValueChange={(value) => value && onScope(value as RunScope)}
-      >
-        <ToggleGroupItem value="repository">{t('runs.list.scopeRepository')}</ToggleGroupItem>
-        <ToggleGroupItem value="all">{t('runs.list.scopeAll')}</ToggleGroupItem>
-      </ToggleGroup>
-      <ToggleGroup
-        type="single"
-        aria-label={t('runs.list.filter')}
-        value={filter}
-        className="flex-wrap"
-        onValueChange={(value) => value && onFilter(value as RunFilter)}
-      >
-        {RUN_FILTERS.map(({ value, labelKey }) => (
-          <ToggleGroupItem key={value} value={value}>
-            {t(`runs.list.${labelKey}`)} {counts[value]}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-      <TagPicker label={t('runs.list.tags')} selected={tagIds} onChange={onTagIds} />
+      {filters ? (
+        <RunFilters
+          runs={runs}
+          query={query}
+          onQuery={onQuery}
+          filter={filter}
+          onFilter={onFilter}
+          scope={scope}
+          onScope={onScope}
+          repository={repository}
+          tagIds={tagIds}
+          onTagIds={onTagIds}
+        />
+      ) : null}
       {shown.length === 0 ? (
         <Empty icon={<SearchX />} title={t('runs.list.empty')}>
           {filtered ? (

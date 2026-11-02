@@ -95,3 +95,8 @@ export function filterCounts(
     done: runs.filter((run) => inFilter(run, 'done')).length,
   };
 }
+
+/** How many filters are in effect: a non-empty search, a status other than «all», chosen tags. */
+export function activeFilters(query: string, filter: RunFilter, tagIds: readonly string[]): number {
+  return (query.trim() !== '' ? 1 : 0) + (filter !== 'all' ? 1 : 0) + tagIds.length;
+}

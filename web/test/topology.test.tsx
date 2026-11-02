@@ -605,3 +605,23 @@ describe('specialist occupancy', () => {
     expect(screen.queryByText('Specialist busy in other runs')).toBeNull();
   });
 });
+
+describe('wide window', () => {
+  it('stretches the graph area over the page without a width limit', async () => {
+    const api = fakeApi({ workflows: vi.fn(async () => workflowsView()) });
+    const { container } = render(
+      <TopologyPage
+        api={api}
+        runs={[runView()]}
+        workflow={null}
+        onSelectWorkflow={() => undefined}
+        onOpenGroup={() => undefined}
+      />,
+    );
+    await screen.findByLabelText(/^workflow /);
+    for (const element of container.querySelectorAll('div, section'))
+      expect(element.className).not.toMatch(/(^|\s)(max-w-(?!full)\S+|mx-auto)/);
+    const grid = container.querySelector('[class*="lg:grid-cols-[minmax(0,1fr)_18rem]"]');
+    expect(grid).not.toBeNull();
+  });
+});
