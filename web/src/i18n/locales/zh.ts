@@ -313,8 +313,9 @@ export const zh: Dictionary = {
     dependency: { done: '已完成', waiting: '等待中', blocked: '已阻塞' },
     form: {
       after: '等待任务',
-      afterItems: '队列中的任务',
-      afterRuns: '运行',
+      afterCurrent: '当前前置任务',
+      afterItems: '等待中的任务',
+      afterRuns: '队列中的运行',
       tags: '标签',
       autoDeliver: '自动交付',
       autoDeliverBySetting: '按设置',
@@ -340,6 +341,7 @@ export const zh: Dictionary = {
     list: {
       after: '在此之后：{{title}}',
       linked: '与所选任务相关',
+      readyHint: '无需等待：一有空位任务就会开始',
       unmetTitle: '依赖未满足',
       unmetText: '该任务仍在等待：{{items}}。仍要运行吗？',
       removeDependents: '以下任务依赖它：{{items}}。它们将不再等待它。',

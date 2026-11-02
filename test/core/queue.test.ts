@@ -722,6 +722,25 @@ describe('dependencies', () => {
     expect(dependencyState(queue, 'gone', lookup)).toBe('blocked');
   });
 
+  it('does not call a finished run without groups done', () => {
+    const queue = queueOf('A');
+    const state = mergedRun('r1', true);
+    expect(dependencyState(queue, 'r1', lookupOf(state))).toBe('done');
+    state.groups = [];
+    expect(dependencyState(queue, 'r1', lookupOf(state))).toBe('waiting');
+  });
+
+  it('treats a cycle in stored data as waiting', () => {
+    const queue = queueOf('A', 'B', 'C');
+    queue.items[0]!.after = ['q2'];
+    queue.items[1]!.after = ['q1'];
+    const [a, b] = queue.items as [QueueItem, QueueItem];
+    expect(itemReadiness(queue, a, none)).toBe('waiting');
+    expect(itemReadiness(queue, b, none)).toBe('waiting');
+    startQueue(queue, [], 3);
+    expect(advance(queue, [], none, 4).take.map((item) => item.id)).toEqual(['q3']);
+  });
+
   it('derives the readiness of an item through a chain of items', () => {
     const queue = queueOf('A', 'B', 'C');
     withAfter(queue, 'q2', ['q1']);

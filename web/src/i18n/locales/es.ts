@@ -320,8 +320,9 @@ export const es: Dictionary = {
     dependency: { done: 'hecha', waiting: 'en espera', blocked: 'bloqueada' },
     form: {
       after: 'Espera a',
-      afterItems: 'Tareas de la cola',
-      afterRuns: 'Ejecuciones',
+      afterCurrent: 'Predecesores actuales',
+      afterItems: 'Tareas en espera',
+      afterRuns: 'Ejecuciones de la cola',
       tags: 'Etiquetas',
       autoDeliver: 'Entrega automática',
       autoDeliverBySetting: 'según la configuración',
@@ -347,6 +348,7 @@ export const es: Dictionary = {
     list: {
       after: 'después de: {{title}}',
       linked: 'relacionada con la tarea seleccionada',
+      readyHint: 'Nada que esperar: la tarea empieza en cuanto haya una plaza libre',
       unmetTitle: 'Las dependencias no se han cumplido',
       unmetText: 'La tarea aún espera a: {{items}}. ¿Ejecutarla de todos modos?',
       removeDependents: 'Estas tareas dependen de ella: {{items}}. Dejarán de esperarla.',

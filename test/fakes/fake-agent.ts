@@ -15,7 +15,10 @@ interface Action {
   read?: string[];
   outside?: Record<string, string>;
   split?: { title: string; task: string }[];
-  /** Calls swarm_queue_add with these arguments; its text result goes to queued.jsonl. */
+  /**
+   * Calls swarm_queue_add with these arguments; its text result goes to queued.jsonl. `$last` in
+   * `after` stands for the id on the last line of queued.jsonl.
+   */
   queue?: Record<string, unknown>;
   /**
    * Calls swarm_queue_add once per entry; `$prev` in `after` stands for the id of the item the
@@ -218,7 +221,21 @@ if (!action.noReport) {
   if (action.split)
     await client.callTool({ name: 'swarm_split', arguments: { groups: action.split } });
   if (action.queue) {
-    const queued = await client.callTool({ name: 'swarm_queue_add', arguments: action.queue });
+    const lastQueued = (() => {
+      try {
+        const lines = readFileSync(join(state, 'queued.jsonl'), 'utf8').trim().split('\n');
+        return /Queued (\S+) for/.exec(lines.at(-1) ?? '')?.[1] ?? '';
+      } catch {
+        return '';
+      }
+    })();
+    const queueArguments = Array.isArray(action.queue.after)
+      ? {
+          ...action.queue,
+          after: action.queue.after.map((id) => (id === '$last' ? lastQueued : id)),
+        }
+      : action.queue;
+    const queued = await client.callTool({ name: 'swarm_queue_add', arguments: queueArguments });
     appendFileSync(join(state, 'queued.jsonl'), `${JSON.stringify({ step, group, queued })}\n`);
   }
   if (action.queueChain) {

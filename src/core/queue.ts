@@ -226,6 +226,7 @@ export type ItemReadiness = 'ready' | 'waiting' | 'blocked';
 export function runDone(state: RunState): boolean {
   return (
     runPhase(state) === 'finished' &&
+    state.groups.length > 0 &&
     state.groups.every((group) => group.status === 'merged' && group.delivery.state === 'applied')
   );
 }
@@ -234,9 +235,15 @@ export function dependencyState(
   queue: Queue,
   ref: string,
   lookup: (id: string) => RunState | undefined,
+  seen: ReadonlySet<string> = new Set(),
 ): DependencyState {
+  if (seen.has(ref)) return 'waiting';
   const item = queue.items.find((candidate) => candidate.id === ref);
-  if (item) return itemReadiness(queue, item, lookup) === 'blocked' ? 'blocked' : 'waiting';
+  if (item) {
+    return itemReadiness(queue, item, lookup, new Set([...seen, ref])) === 'blocked'
+      ? 'blocked'
+      : 'waiting';
+  }
   const state = lookup(ref);
   if (!state) return 'blocked';
   if (runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))) return 'blocked';
@@ -247,8 +254,9 @@ export function itemReadiness(
   queue: Queue,
   item: QueueItem,
   lookup: (id: string) => RunState | undefined,
+  seen: ReadonlySet<string> = new Set(),
 ): ItemReadiness {
-  const states = item.after.map((ref) => dependencyState(queue, ref, lookup));
+  const states = item.after.map((ref) => dependencyState(queue, ref, lookup, seen));
   if (states.includes('blocked')) return 'blocked';
   return states.every((state) => state === 'done') ? 'ready' : 'waiting';
 }

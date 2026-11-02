@@ -367,7 +367,10 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const delivery =
       item.autoDeliver === null ? '' : item.autoDeliver ? ' · auto delivery' : ' · manual delivery';
     const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
-    const mark = item.readiness === 'ready' ? '' : ` (${item.readiness})`;
+    const mark =
+      item.readiness === 'ready'
+        ? ''
+        : ` (${item.readiness === 'blocked' ? style.danger('blocked') : item.readiness})`;
     const after =
       item.after.length === 0
         ? ''

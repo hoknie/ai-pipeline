@@ -108,7 +108,9 @@ export default function QueuePage({
     }
   };
 
-  const linked = highlight === null ? null : related(queue, highlight);
+  const chain = highlight === null ? null : related(queue, highlight);
+  // a task without links has nothing to light up
+  const linked = chain !== null && chain.size > 1 ? chain : null;
   const newDraft = drafts.new ?? emptyDraft();
 
   return (

@@ -58,7 +58,7 @@ export function unmet(item: Pick<QueueItemView, 'after'>): DependencyView[] {
 export interface AfterOption {
   id: string;
   title: string;
-  kind: 'item' | 'run';
+  kind: 'item' | 'run' | 'current';
 }
 
 /**
@@ -77,6 +77,6 @@ export function afterOptions(
   for (const run of queue.runs) result.set(run.id, { id: run.id, title: run.title, kind: 'run' });
   for (const ref of editing?.after ?? [])
     if (!result.has(ref.id))
-      result.set(ref.id, { id: ref.id, title: ref.title || ref.id, kind: ref.kind });
+      result.set(ref.id, { id: ref.id, title: ref.title || ref.id, kind: 'current' });
   return [...result.values()];
 }

@@ -320,8 +320,9 @@ export const ru: Dictionary = {
     dependency: { done: 'выполнена', waiting: 'ждёт', blocked: 'заблокирована' },
     form: {
       after: 'Ждёт задач',
-      afterItems: 'Задачи в очереди',
-      afterRuns: 'Запуски',
+      afterCurrent: 'Текущие предшественники',
+      afterItems: 'Ждущие задачи',
+      afterRuns: 'Запуски из очереди',
       tags: 'Теги',
       autoDeliver: 'Автодоставка',
       autoDeliverBySetting: 'по настройке',
@@ -347,6 +348,7 @@ export const ru: Dictionary = {
     list: {
       after: 'после: {{title}}',
       linked: 'связана с выбранной задачей',
+      readyHint: 'Ждать нечего: задача стартует, как только освободится место',
       unmetTitle: 'Зависимости не выполнены',
       unmetText: 'Задача ещё ждёт: {{items}}. Всё равно запустить?',
       removeDependents: 'От неё зависят: {{items}}. Зависимость с них снимется.',

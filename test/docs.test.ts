@@ -187,4 +187,16 @@ describe('documentation examples', () => {
     }
     expect(problems).toEqual([]);
   });
+
+  it('document the dependencies of queue tasks', () => {
+    const cli = readFileSync(join(root, 'docs/cli.md'), 'utf8');
+    expect(cli).toContain('--after <id>');
+    expect(cli).toContain('--no-after');
+    const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+    expect(hosts).toContain('"Waits for"');
+    expect(hosts).toContain('Dependencies are not met');
+    expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_add`'))).toContain(
+      'after?',
+    );
+  });
 });

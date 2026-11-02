@@ -354,6 +354,14 @@ describe('queue text', () => {
     expect(text).not.toMatch(/q3.*after/);
   });
 
+  it('colours the blocked mark of an item', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'y', after: ['gone'] }, 'q1', 2);
+    const view = queueView(queue, () => undefined);
+    const style = createStyle(true);
+    expect(formatQueue(view, style)).toContain(`after gone (${style.danger('blocked')})`);
+  });
+
   it('marks the delivery of an item and of a run', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);

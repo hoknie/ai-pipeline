@@ -241,7 +241,7 @@ function registerQueue(program: Command): void {
         'aip queue edit 1 --workflow feature',
         'aip queue edit 1 --skip qa',
         'aip queue edit 1 --no-skips',
-        'aip queue edit 2 --after 1',
+        'aip queue edit 2 --after q1',
         'aip queue edit 2 --no-after',
       ]),
     )

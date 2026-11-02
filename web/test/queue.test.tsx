@@ -1228,6 +1228,44 @@ describe('dependencies in the form', () => {
     expect('after' in body).toBe(false);
   });
 
+  it('does not send after when nothing is chosen', async () => {
+    const api = show(queueOf({ items: [model()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
+    expect('after' in (api.queueAdd as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe(false);
+  });
+
+  it('groups a predecessor that left the queue under current predecessors', async () => {
+    const failed = apiItem({
+      readiness: 'blocked',
+      after: [dependency('run', 'run7', 'Упавший', 'blocked')],
+    });
+    show(queueOf({ items: [model(), failed] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    const picker = (await screen.findAllByRole('combobox', { name: 'Waits for' }))[1]!;
+    fireEvent.click(picker);
+    await screen.findByRole('option', { name: /Модель/ });
+    expect(screen.getByText('Current predecessors')).toBeTruthy();
+    expect(screen.getByText('Waiting tasks')).toBeTruthy();
+  });
+
+  it('has no current group when the predecessor is a waiting task', async () => {
+    show(
+      queueOf({
+        items: [model(), apiItem()],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    const picker = (await screen.findAllByRole('combobox', { name: 'Waits for' }))[1]!;
+    fireEvent.click(picker);
+    await screen.findAllByRole('option');
+    expect(screen.queryByText('Current predecessors')).toBeNull();
+  });
+
   it('offers a predecessor that no longer holds a place and removes it', async () => {
     const failed = apiItem({
       readiness: 'blocked',
@@ -1335,6 +1373,41 @@ describe('dependencies in the list', () => {
     expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
     expect(li.querySelector('[data-state]')).toBeNull();
     expect(li.className).not.toContain('border-destructive');
+  });
+
+  it('explains in the hint that a ready task has nothing to wait for', async () => {
+    show(queueOf({ items: [model()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const badge = row('Модель').querySelector('[data-readiness="ready"]')!;
+    expect(badge.getAttribute('title')).toContain('Nothing to wait for');
+  });
+
+  it('does not light up a task without links', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        runs: [queueRun('run1', { title: 'Запуск' })],
+        items: [model()],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.mouseEnter(row('Модель'));
+    expect(row('Модель').hasAttribute('data-highlighted')).toBe(false);
+    expect(screen.getByRole('group', { name: 'Запуск' }).hasAttribute('data-highlighted')).toBe(
+      false,
+    );
+  });
+
+  it('keeps the highlight when focus moves to a button of the row', async () => {
+    show(queueOf({ items: [model(), apiItem()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.focus(row('API'));
+    const edit = within(row('API')).getByRole('button', { name: 'Edit' });
+    fireEvent.blur(row('API'), { relatedTarget: edit });
+    for (const title of ['Модель', 'API'])
+      expect(row(title).hasAttribute('data-highlighted')).toBe(true);
+    fireEvent.blur(row('API'), { relatedTarget: document.body });
+    expect(row('API').hasAttribute('data-highlighted')).toBe(false);
   });
 
   it('highlights the chain and indents branches by depth', async () => {

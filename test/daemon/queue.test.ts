@@ -943,6 +943,62 @@ describe('dependencies of queue items', () => {
     expect(queue.items[1]).toMatchObject({ readiness: 'waiting' });
   });
 
+  it('starts a task after a restart once the run it waits for is delivered', async () => {
+    const h = await start(MANUAL_CONFIG);
+    const a = await add(h, 'A');
+    const b = await add(h, 'B', { after: [a.item] });
+    await h.call('queue_start', { repository: h.repo });
+    const [runId] = (await queueOf(h)).runs.map((run) => run.id);
+    await h.waitFor(runId!, (view) => view.finished);
+    await h.restart();
+    const waiting = await queueOf(h);
+    expect(itemById(waiting, b.item)).toMatchObject({ readiness: 'waiting' });
+    expect(itemById(waiting, b.item)?.after).toEqual([
+      expect.objectContaining({ kind: 'run', id: runId, state: 'waiting' }),
+    ]);
+    expect(await allRuns(h)).toHaveLength(1);
+    await h.call('apply', { runId: runId! });
+    await waitQueue(h, (queue) => queue.items.length === 0);
+    const runs = await allRuns(h);
+    expect(runs).toHaveLength(2);
+    expect(runs.every((run) => run.fromQueue)).toBe(true);
+  });
+
+  it('reports a workflow error before an unknown dependency', async () => {
+    const h = await start();
+    await expect(add(h, 'A', { workflow: 'nope', after: ['missing'] })).rejects.toThrow(
+      'unknown workflow',
+    );
+    expect((await queueOf(h)).items).toEqual([]);
+  });
+
+  it('chains a task to an item queued by an earlier step', async () => {
+    const h = await start(
+      WORKFLOW_CONFIG.replace(
+        'coder: { name: Кодировщик }',
+        'coder: { name: Кодировщик, queue: true }',
+      ).replace(
+        'reviewer: { name: Ревьюер, permissions: read }',
+        'reviewer: { name: Ревьюер, permissions: read, queue: true }',
+      ),
+    );
+    h.script({
+      code: [{ ...WRITE_LIB, queue: { workflow: 'feature', task: 'модель', title: 'модель' } }],
+      review: [
+        {
+          queue: { workflow: 'feature', task: 'API', title: 'API', after: ['$last'] },
+        },
+      ],
+    });
+    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    await h.call('queue_pause', { repository: h.repo });
+    await h.waitFor(created.runId, (view) => view.finished);
+    const queue = await queueOf(h);
+    expect(queue.items.map((item) => item.title)).toEqual(['модель', 'API']);
+    expect(queue.items[1]!.after.map((dependency) => dependency.id)).toEqual([queue.items[0]!.id]);
+    expect(queue.items[1]).toMatchObject({ readiness: 'waiting' });
+  });
+
   it('sends a queue event when the readiness of an item changes', async () => {
     const h = await start();
     h.script({ code: [WRITE_LIB, {}] });

@@ -383,6 +383,12 @@ export class Daemon {
         case 'queue_edit': {
           const { item, workflow, task, groups, title, position, autoDeliver, skip } =
             request.params;
+          if (workflow !== undefined || skip !== undefined) {
+            const current = queue.items.find((candidate) => candidate.id === item);
+            if (current) {
+              await this.ensureItem(repository, workflow ?? current.workflow, skip ?? current.skip);
+            }
+          }
           const after =
             request.params.after === undefined
               ? undefined
@@ -391,12 +397,6 @@ export class Daemon {
             request.params.tags === undefined
               ? undefined
               : resolveTags(this.catalog, request.params.tags);
-          if (workflow !== undefined || skip !== undefined) {
-            const current = queue.items.find((candidate) => candidate.id === item);
-            if (current) {
-              await this.ensureItem(repository, workflow ?? current.workflow, skip ?? current.skip);
-            }
-          }
           editItem(
             queue,
             item,
@@ -839,8 +839,8 @@ export class Daemon {
     const now = this.now();
     const { workflow, task, groups, title, autoDeliver, skip } = params;
     const tags = resolveTags(this.catalog, params.tags ?? []);
-    const after = this.resolveDependencies(queue, params.after ?? []);
     await this.ensureItem(repository, workflow, skip);
+    const after = this.resolveDependencies(queue, params.after ?? []);
     const item = addItem(
       queue,
       { workflow, task, groups, title, autoDeliver, tags, skip, after },
@@ -876,8 +876,8 @@ export class Daemon {
     const tags = inherited ?? resolveTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
-    const after = this.resolveDependencies(queue, params.after ?? []);
     await this.ensureItem(repository, workflow, skip);
+    const after = this.resolveDependencies(queue, params.after ?? []);
     const item = addItem(
       queue,
       { workflow, task, groups, title, autoDeliver, tags, skip, after },

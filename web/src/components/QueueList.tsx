@@ -256,7 +256,10 @@ export function QueueList({
               onMouseEnter={() => dragging === null && onHighlight(item.id)}
               onMouseLeave={() => onHighlight(null)}
               onFocus={() => dragging === null && onHighlight(item.id)}
-              onBlur={() => onHighlight(null)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                  onHighlight(null);
+              }}
               draggable={!editing}
               aria-label={`${index + 1}. ${itemLabel(item, t)}`}
               onDragStart={(event) => {
@@ -415,7 +418,11 @@ function ReadinessBadge({ item }: { item: QueueItemView }) {
     .map((ref) => ref.title || ref.id)
     .join(', ');
   const title =
-    pending === '' ? `${label} (${item.readiness})` : `${label} (${item.readiness}): ${pending}`;
+    pending !== ''
+      ? `${label} (${item.readiness}): ${pending}`
+      : item.readiness === 'ready'
+        ? `${label} (${item.readiness}): ${t('queue.list.readyHint')}`
+        : `${label} (${item.readiness})`;
   return (
     <Badge variant={tone} title={title} aria-label={title} data-readiness={item.readiness}>
       <Icon aria-hidden />

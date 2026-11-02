@@ -37,6 +37,9 @@ export interface QueueDraft {
 
 export const TITLE_LIMIT = 60;
 
+/** Picker group of each kind of predecessor. */
+const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global' } as const;
+
 export function emptyDraft(workflow = ''): QueueDraft {
   return {
     workflow,
@@ -184,7 +187,7 @@ export function QueueForm({
   const afterTitle = new Map(afterChoices.map((choice) => [choice.id, choice.title]));
   const afterPick: PickerOption[] = afterChoices.map((choice) => ({
     name: choice.id,
-    source: choice.kind === 'run' ? 'builtin' : 'project',
+    source: SOURCE_OF[choice.kind],
     description: choice.title,
   }));
   const options = [...ids];
@@ -317,7 +320,11 @@ export function QueueForm({
             onChange={(after) => change({ after, afterTouched: true })}
             options={afterPick}
             display={(id) => afterTitle.get(id) || id}
-            headings={{ project: t('queue.form.afterItems'), builtin: t('queue.form.afterRuns') }}
+            headings={{
+              builtin: t('queue.form.afterCurrent'),
+              project: t('queue.form.afterItems'),
+              global: t('queue.form.afterRuns'),
+            }}
             creatable={false}
           />
         </div>

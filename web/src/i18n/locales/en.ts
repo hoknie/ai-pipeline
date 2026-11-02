@@ -313,8 +313,9 @@ export const en = {
     dependency: { done: 'done', waiting: 'waiting', blocked: 'blocked' },
     form: {
       after: 'Waits for',
-      afterItems: 'Tasks in the queue',
-      afterRuns: 'Runs',
+      afterCurrent: 'Current predecessors',
+      afterItems: 'Waiting tasks',
+      afterRuns: 'Runs from the queue',
       tags: 'Tags',
       autoDeliver: 'Auto delivery',
       autoDeliverBySetting: 'as in the settings',
@@ -340,6 +341,7 @@ export const en = {
     list: {
       after: 'after: {{title}}',
       linked: 'linked to the selected task',
+      readyHint: 'Nothing to wait for: the task starts as soon as a place is free',
       unmetTitle: 'Dependencies are not met',
       unmetText: 'The task still waits for: {{items}}. Run it anyway?',
       removeDependents: 'These tasks wait for it: {{items}}. They will stop waiting for it.',
