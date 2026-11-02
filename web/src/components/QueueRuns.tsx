@@ -21,7 +21,23 @@ function reasonText(reason: string, t: TFunction): string {
 
 function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked: boolean }) {
   const { t } = useTranslation();
-  const { done, total } = run.groups;
+  const { total } = run.groups;
+  const { steps } = run;
+  const caption =
+    total > 1
+      ? t('queue.groupsSteps', {
+          done: run.groups.done,
+          count: total,
+          steps: steps.done,
+          total: steps.total,
+        })
+      : steps.current
+        ? t('queue.stepOf', {
+            number: steps.current.number,
+            count: steps.total,
+            step: steps.current.step,
+          })
+        : t('queue.stepsAll', { count: steps.total });
   const problem = run.problem;
   return (
     <Card
@@ -30,13 +46,14 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
       data-highlighted={linked ? '' : undefined}
       className={cn('flex min-w-0 flex-col gap-2 p-3 text-sm', linked && 'ring-2 ring-primary')}
     >
+      <a
+        className="block min-w-0 truncate font-medium text-primary underline"
+        title={run.title}
+        href={formatRoute({ view: 'runs', run: run.id, group: null, step: null })}
+      >
+        {run.title}
+      </a>
       <div className="flex flex-wrap items-center gap-2">
-        <a
-          className="min-w-0 truncate font-medium text-primary underline"
-          href={formatRoute({ view: 'runs', run: run.id, group: null, step: null })}
-        >
-          {run.title}
-        </a>
         <StatusBadge status={run.state} />
         <TagChips tags={run.tags ?? []} />
         {run.delivering ? (
@@ -58,15 +75,16 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
             role="progressbar"
             aria-label={t('queue.progress')}
             aria-valuemin={0}
-            aria-valuenow={done}
-            aria-valuemax={total}
+            aria-valuenow={steps.done}
+            aria-valuemax={steps.total}
             className="h-1.5 w-full overflow-hidden rounded bg-muted"
           >
-            <div className="h-full bg-primary" style={{ width: `${(done / total) * 100}%` }} />
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${steps.total === 0 ? 0 : (steps.done / steps.total) * 100}%` }}
+            />
           </div>
-          <span className="text-muted-foreground">
-            {t('queue.groupsDone', { done, count: total })}
-          </span>
+          <span className="text-muted-foreground">{caption}</span>
         </div>
       )}
       {run.active.length > 0 ? (

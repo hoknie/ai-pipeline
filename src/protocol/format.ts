@@ -333,7 +333,9 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     lines.push(style.muted('Runs holding a place:'));
     for (const run of view.runs) {
       const progress =
-        run.groups.total === 0 ? 'splitting' : `${run.groups.done}/${run.groups.total} groups`;
+        run.groups.total === 0
+          ? 'splitting'
+          : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
       const delivering = run.delivering ? ' · delivering' : '';
       lines.push(
         `  ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,

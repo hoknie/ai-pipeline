@@ -21,6 +21,7 @@ export {
   type MergeOutcome,
 } from './machine.ts';
 export * from './model.ts';
+export { stepProgress, type StepProgress } from './progress.ts';
 export { applySkip, checkSkip, cleanSkip } from './skip.ts';
 export { questionsText } from './questions.ts';
 export { dispatch, runningBySpecialist, runningCount } from './scheduler.ts';

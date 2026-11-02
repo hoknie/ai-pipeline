@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import {
   attemptVerdict,
+  stepProgress,
+  type StepProgress,
   describeFailReason,
   deliveryCounts,
   formatCounts,
@@ -532,6 +534,8 @@ export interface QueueRunView {
   createdAt: number;
   /** Work groups in a final status out of all work groups; `total` is 0 while the task is split. */
   groups: { done: number; total: number };
+  /** Steps passed by the groups out of all their steps, and the step of a single group. */
+  steps: StepProgress;
   /** Groups that run or merge now, with the step of their last attempt. */
   active: { group: string; step: string | null }[];
   /** The run is finished and waits for its automatic delivery. */
@@ -575,6 +579,7 @@ export function queueView(
         done: state.groups.filter((group) => isTerminal(group.status)).length,
         total: state.groups.length,
       },
+      steps: stepProgress(state),
       active: state.groups
         .filter((group) => group.status === 'running' || group.status === 'merging')
         .map((group) => ({ group: group.slug, step: group.attempts.at(-1)?.stepId ?? null })),

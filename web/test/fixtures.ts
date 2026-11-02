@@ -188,6 +188,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
+    steps: { done: 0, total: 4, current: { step: 'plan', number: 1 } },
     active: [],
     delivering: false,
     problem: null,

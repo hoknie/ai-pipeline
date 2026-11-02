@@ -291,7 +291,7 @@ describe('queue text', () => {
         'Queue: stopped, parallel 2 (1 of 2 places taken)',
         'Stopped: run run000000001, group gruppa-1: needs_human',
         'Runs holding a place:',
-        '  run000000001  needs_human  feature  задача 1  0/1 groups',
+        '  run000000001  needs_human  feature  задача 1  0/1 groups · steps 0/4',
         '    problem: needs_human in gruppa-1',
         'Waiting:',
         '  1. q1  feature  первая строка  added 2026-11-01 14:32',
@@ -317,9 +317,20 @@ describe('queue text', () => {
     );
     const text = formatQueue(view);
     expect(text).toContain('Queue: running, parallel 2 (2 of 2 places taken)');
-    expect(text).toContain('feature  Группа 1, Группа 2, Группа 3  1/3 groups\n    gruppa-2: plan');
-    expect(text).toContain('1/1 groups · delivering');
-    const splitting = { ...view, runs: [{ ...view.runs[0]!, groups: { done: 0, total: 0 } }] };
+    expect(text).toContain(
+      'feature  Группа 1, Группа 2, Группа 3  1/3 groups · steps 4/12\n    gruppa-2: plan',
+    );
+    expect(text).toContain('1/1 groups · steps 4/4 · delivering');
+    const splitting = {
+      ...view,
+      runs: [
+        {
+          ...view.runs[0]!,
+          groups: { done: 0, total: 0 },
+          steps: { done: 0, total: 0, current: null },
+        },
+      ],
+    };
     expect(formatQueue(splitting)).toContain('splitting');
   });
 

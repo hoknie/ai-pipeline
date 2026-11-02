@@ -111,7 +111,7 @@ To check, run `opencode mcp list`: it shows `aip`.
 | `swarm_cancel` | `run_id`, `group?` | Stops a group or a whole run |
 | `swarm_retry` | `run_id`, `group` | Retries a failed or cancelled step from where it stopped, or retries the merge after a conflict |
 | `swarm_answer` | `run_id`, `group`, `answer` | Answers a specialist who is waiting for a human decision |
-| `swarm_queue` | `repo?` | The repository's task queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order (each with its readiness `ready`, `waiting` or `blocked` and its predecessors with their state), and the runs that hold a place, with workflow, progress by group, active steps and problem |
+| `swarm_queue` | `repo?` | The repository's task queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order (each with its readiness `ready`, `waiting` or `blocked` and its predecessors with their state), and the runs that hold a place, with workflow, progress by group and by step (`steps` with `done`, `total` and, for a single group, `current`), active steps and problem |
 | `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `tags?`, `skip?`, `after?`, `repo?` | Puts a task at the end of the queue; does not start the queue |
 | `swarm_queue_edit` | `item`, `workflow?`, `task?` or `groups?`, `title?`, `tags?`, `skip?`, `after?`, `position?`, `repo?` | Changes a waiting task or moves it to a position (1 is first); `after` replaces the whole list of predecessors and `[]` clears it |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |

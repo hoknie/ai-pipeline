@@ -90,6 +90,8 @@ describe('queueView', () => {
       workflow: 'feature',
       createdAt: 1000,
       groups: { done: 1, total: 3 },
+      // gruppa-1 is merged (4 steps), gruppa-2 runs `plan`, gruppa-3 waits at the start
+      steps: { done: 4, total: 12, current: null },
       delivering: false,
     });
     expect(view.active.length).toBeGreaterThan(0);
@@ -104,7 +106,32 @@ describe('queueView', () => {
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
     const view = queueView(queue, lookup(state)).runs[0]!;
-    expect(view).toMatchObject({ groups: { done: 1, total: 1 }, active: [], delivering: true });
+    expect(view).toMatchObject({
+      groups: { done: 1, total: 1 },
+      steps: { done: 4, total: 4, current: null },
+      active: [],
+      delivering: true,
+    });
+  });
+
+  it('shows the step of a single group and no steps while the task is split', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'done', { slug: 'gruppa-1' });
+    step(state);
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    expect(queueView(queue, lookup(state)).runs[0]!.steps).toEqual({
+      done: 1,
+      total: 4,
+      current: { step: 'code', number: 2 },
+    });
+    state.groups = [];
+    expect(queueView(queue, lookup(state)).runs[0]!.steps).toEqual({
+      done: 0,
+      total: 0,
+      current: null,
+    });
   });
 
   it('shows a question to a human as a problem without stopping the queue', () => {

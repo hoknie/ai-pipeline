@@ -263,6 +263,7 @@ describe('runs from the queue', () => {
           queueRun('run1', {
             title: 'Вход',
             groups: { done: 1, total: 3 },
+            steps: { done: 2, total: 6, current: null },
             active: [{ group: 'signup', step: 'coder' }],
           }),
         ],
@@ -270,12 +271,12 @@ describe('runs from the queue', () => {
     );
     const card = await screen.findByRole('group', { name: 'Вход' });
     expect(within(card).getByText('feature')).toBeTruthy();
-    expect(within(card).getByText('1 of 3 groups')).toBeTruthy();
+    expect(within(card).getByText('1 of 3 groups · steps 2 of 6')).toBeTruthy();
     expect(within(card).getByText('signup', { selector: 'code' })).toBeTruthy();
     expect(within(card).getByText(/coder/)).toBeTruthy();
     const bar = within(card).getByRole('progressbar');
-    expect(bar.getAttribute('aria-valuenow')).toBe('1');
-    expect(bar.getAttribute('aria-valuemax')).toBe('3');
+    expect(bar.getAttribute('aria-valuenow')).toBe('2');
+    expect(bar.getAttribute('aria-valuemax')).toBe('6');
     expect(screen.getByText(/1 of 2 places/)).toBeTruthy();
     expect(screen.getAllByText('Free place')).toHaveLength(1);
   });
@@ -284,16 +285,116 @@ describe('runs from the queue', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { title: 'A', delivering: true, groups: { done: 2, total: 2 } })],
+        runs: [
+          queueRun('run1', {
+            title: 'A',
+            delivering: true,
+            groups: { done: 2, total: 2 },
+            steps: { done: 8, total: 8, current: null },
+          }),
+        ],
         parallel: 3,
       }),
     );
     await screen.findByText('Delivery');
     cleanup();
     show(
-      queueOf({ status: 'running', runs: [queueRun('run2', { groups: { done: 0, total: 0 } })] }),
+      queueOf({
+        status: 'running',
+        runs: [
+          queueRun('run2', {
+            groups: { done: 0, total: 0 },
+            steps: { done: 0, total: 0, current: null },
+          }),
+        ],
+      }),
     );
     await screen.findByText('splitting the task');
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
+  it('puts the title and the status on different rows', async () => {
+    const title = 'Очень длинное название запуска '.repeat(5).trim();
+    show(
+      queueOf({
+        status: 'running',
+        runs: [queueRun('run1', { title })],
+      }),
+    );
+    const card = await screen.findByRole('group', { name: title });
+    const link = within(card).getByRole('link', { name: title });
+    expect(link.getAttribute('title')).toBe(title);
+    expect(link.className).toContain('truncate');
+    const badge = within(card).getByText('Active');
+    expect(link.parentElement).toBe(card);
+    expect(badge.parentElement).not.toBe(link.parentElement);
+    expect(badge.closest('div')!.contains(link)).toBe(false);
+  });
+
+  it('shows the step of a single group', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        runs: [
+          queueRun('run1', {
+            title: 'Один',
+            steps: { done: 1, total: 4, current: { step: 'coder', number: 2 } },
+          }),
+        ],
+      }),
+    );
+    const card = await screen.findByRole('group', { name: 'Один' });
+    expect(within(card).getByText('step 2 of 4 · coder')).toBeTruthy();
+    expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
+  });
+
+  it('rolls the bar back when a group returns to an earlier step', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        runs: [
+          queueRun('run1', {
+            title: 'Один',
+            steps: { done: 1, total: 3, current: { step: 'review', number: 2 } },
+          }),
+        ],
+      }),
+    );
+    const card = await screen.findByRole('group', { name: 'Один' });
+    expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'queue',
+        seq: 5,
+        queue: queueOf({
+          status: 'running',
+          runs: [
+            queueRun('run1', {
+              title: 'Один',
+              steps: { done: 0, total: 3, current: { step: 'coder', number: 1 } },
+            }),
+          ],
+        }),
+      });
+    });
+    await screen.findByText('step 1 of 3 · coder');
+    expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0');
+  });
+
+  it('says all steps are passed for a single finished group', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        runs: [
+          queueRun('run1', {
+            title: 'Готово',
+            steps: { done: 4, total: 4, current: null },
+          }),
+        ],
+      }),
+    );
+    await screen.findByText('steps 4 of 4');
   });
 
   it('shows more runs than places with a note and without free places', async () => {
@@ -970,7 +1071,10 @@ describe('tags in the queue', () => {
     expect(within(list).getByText('auth')).toBeTruthy();
     expect(within(list).getByText('v2')).toBeTruthy();
     const card = screen.getByRole('group', { name: 'r1' });
-    expect(within(card).getByText('v2')).toBeTruthy();
+    const tag = within(card).getByText('v2');
+    const row = tag.closest('div')!;
+    expect(row.contains(within(card).getByRole('link', { name: 'r1' }))).toBe(false);
+    expect(row.contains(within(card).getByText('Active'))).toBe(true);
   });
 });
 
