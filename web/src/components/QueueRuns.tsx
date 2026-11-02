@@ -11,6 +11,7 @@ import { Card } from '../ui/card.tsx';
 
 import { StatusBadge } from './StatusBadge.tsx';
 import { TagChips } from './TagChip.tsx';
+import { WorkflowBadge } from './WorkflowBadge.tsx';
 
 const REASONS = ['needs_human', 'failed', 'conflict', 'cancelled', 'apply_failed'] as const;
 
@@ -55,6 +56,7 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
       </a>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={run.state} />
+        <WorkflowBadge id={run.workflow} />
         <TagChips tags={run.tags ?? []} />
         {run.delivering ? (
           <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -64,7 +66,6 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
-        <span>{run.workflow}</span>
         <span>{t('format.running', { duration: duration(now - run.createdAt) })}</span>
       </div>
       {total === 0 ? (

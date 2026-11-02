@@ -434,6 +434,9 @@ export const es: Dictionary = {
     machine: 'en la máquina: {{n}}',
     none: 'No hay especialistas ocupados.',
   },
+  workflowBadge: {
+    label: 'Workflow: {{id}}',
+  },
   tags: {
     remove: 'Quitar la etiqueta {{name}}',
     searchOrCreate: 'Busca o escribe una etiqueta nueva…',

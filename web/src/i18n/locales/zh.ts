@@ -423,6 +423,9 @@ export const zh: Dictionary = {
     machine: '本机：{{n}}',
     none: '没有被占用的专家。',
   },
+  workflowBadge: {
+    label: 'Workflow: {{id}}',
+  },
   tags: {
     remove: '移除标签 {{name}}',
     searchOrCreate: '搜索或输入新标签…',

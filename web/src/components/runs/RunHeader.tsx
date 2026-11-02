@@ -19,6 +19,7 @@ import {
 import { useTags } from '../../tags.tsx';
 import { TagPicker } from '../TagPicker.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
+import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
 import { ApplyDialog } from './ApplyDialog.tsx';
@@ -138,7 +139,7 @@ export function RunHeader({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
         <RunWarningsBadge run={run} />
-        <span>{run.workflow}</span>
+        <WorkflowBadge id={run.workflow} />
         <span>{duration((run.finishedAt ?? now) - run.createdAt)}</span>
         {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
         {run.diff ? <span>{diffText(run.diff, t)}</span> : null}

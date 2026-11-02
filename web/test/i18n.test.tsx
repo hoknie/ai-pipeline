@@ -221,6 +221,7 @@ const DICTIONARIES = { es, ru, zh } as Record<string, Tree>;
 const SAME_AS_ENGLISH = new Set([
   'Workflow',
   'workflow {{id}}',
+  'Workflow: {{id}}',
   '{{action}} «{{id}}»?',
   'English',
   'Español',

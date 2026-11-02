@@ -24,6 +24,7 @@ import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
 
 import { TagChips } from './TagChip.tsx';
+import { WorkflowBadge } from './WorkflowBadge.tsx';
 import { QueueForm, draftOf, type QueueDraft } from './QueueForm.tsx';
 import { dropPosition, dropSlot, moveId } from './queueOrder.ts';
 import { afterOptions, dependents, depth, unmet } from './queueLinks.ts';
@@ -284,9 +285,7 @@ export function QueueList({
                   <title>{t('queue.list.drag')}</title>
                 </GripVertical>
                 <span className="w-5 text-muted-foreground tabular-nums">{index + 1}</span>
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                  {item.workflow}
-                </span>
+                <WorkflowBadge id={item.workflow} />
                 <span className="min-w-0 flex-1 truncate" title={itemLabel(item, t)}>
                   {itemLabel(item, t)}
                 </span>

@@ -425,6 +425,9 @@ export const en = {
     machine: 'on the machine: {{n}}',
     none: 'No specialists are busy.',
   },
+  workflowBadge: {
+    label: 'Workflow: {{id}}',
+  },
   tags: {
     remove: 'Remove tag {{name}}',
     searchOrCreate: 'Search or type a new tag…',

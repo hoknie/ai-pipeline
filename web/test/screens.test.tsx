@@ -236,6 +236,31 @@ describe('run header', () => {
   });
 });
 
+describe('workflow badge in runs', () => {
+  it('shows the badge in the run list instead of plain text', async () => {
+    mount([runView({ id: 'a', title: 'Первый', workflow: 'feature' })]);
+    const badge = await screen.findByLabelText('Workflow: feature');
+    expect(badge.closest('button')).toBeTruthy();
+    expect(badge.hasAttribute('tabindex')).toBe(false);
+    const row = badge.parentElement!;
+    const plain = [...row.querySelectorAll('span')].filter(
+      (node) => node.textContent === 'feature' && !badge.contains(node),
+    );
+    expect(plain).toHaveLength(0);
+  });
+
+  it('shows the badge in the run header next to the state badge', () => {
+    render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
+    const badge = screen.getByLabelText('Workflow: feature');
+    expect(badge.hasAttribute('tabindex')).toBe(true);
+    const row = badge.parentElement!;
+    const state = row.firstElementChild!;
+    expect(state).not.toBe(badge);
+    expect(state.textContent).not.toContain('feature');
+    expect(state.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 describe('counter of the runs section', () => {
   it('counts runs waiting for an answer, not their groups', async () => {
     mount([

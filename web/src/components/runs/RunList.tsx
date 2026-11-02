@@ -13,6 +13,7 @@ import { Empty } from '../../ui/empty.tsx';
 import { orderGroups } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { TagChips } from '../TagChip.tsx';
+import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunFilters } from './RunFilters.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
@@ -125,7 +126,7 @@ export function RunList({
                         {repositoryLabel(run.repository)}
                       </span>
                     ) : null}
-                    <span>{run.workflow}</span>
+                    <WorkflowBadge id={run.workflow} focusable={false} />
                     {run.fromQueue ? <span>{t('runs.list.fromQueue')}</span> : null}
                     <span>{runTime(run, now, t, locale)}</span>
                     {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}

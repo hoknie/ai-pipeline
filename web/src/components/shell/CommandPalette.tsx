@@ -18,6 +18,7 @@ import {
   CommandList,
 } from '../../ui/command.tsx';
 import { orderGroups } from '../order.ts';
+import { WorkflowBadge } from '../WorkflowBadge.tsx';
 
 interface Entries {
   workflows: EditorWorkflow[];
@@ -98,8 +99,9 @@ export function CommandPalette({
               onSelect={() => go({ view: 'runs', run: run.id, group: null, step: null })}
             >
               <span className="truncate">{runTitle(run)}</span>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {runStatusLabel(run, t)}
+              <span className="ml-auto flex items-center gap-2">
+                <WorkflowBadge id={run.workflow} focusable={false} />
+                <span className="text-xs text-muted-foreground">{runStatusLabel(run, t)}</span>
               </span>
             </CommandItem>
           ))}

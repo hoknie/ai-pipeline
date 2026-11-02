@@ -34,6 +34,18 @@ function mount(runs = [runView()], extra: Parameters<typeof fakeApi>[0] = {}) {
   return api;
 }
 
+describe('workflow badge in the palette', () => {
+  it('shows the badge on a run item', async () => {
+    mount([runView({ id: 'a', title: 'First run', workflow: 'feature' })]);
+    openPalette();
+    const badge = (await screen.findAllByLabelText('Workflow: feature')).find((node) =>
+      node.closest('[cmdk-item]'),
+    )!;
+    expect(badge.closest('[cmdk-item]')).toBeTruthy();
+    expect(badge.hasAttribute('tabindex')).toBe(false);
+  });
+});
+
 describe('command palette', () => {
   it('opens a run chosen from the palette', async () => {
     mount([runView({ id: 'a', title: 'First run' }), runView({ id: 'b', title: 'Second run' })]);

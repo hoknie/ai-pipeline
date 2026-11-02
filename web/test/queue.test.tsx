@@ -442,6 +442,25 @@ describe('runs from the queue', () => {
   });
 });
 
+describe('workflow badge in the queue', () => {
+  it('stands right after the state badge on the card, not in the time row', async () => {
+    show(queueOf({ status: 'running', runs: [queueRun('run1', { title: 'Вход' })] }));
+    const card = await screen.findByRole('group', { name: 'Вход' });
+    const badge = within(card).getByLabelText('Workflow: feature');
+    const state = within(card).getByText('Active').closest('span')!.parentElement!;
+    expect(state.nextElementSibling).toBe(badge);
+    expect(badge.parentElement).toBe(state.parentElement);
+    const time = within(card).getByText(/^running /).parentElement!;
+    expect(time.textContent).not.toContain('feature');
+  });
+
+  it('shows the badge in the row of a waiting task', async () => {
+    show(queueOf({ items: [queueItem('q1', 'A', 1, { workflow: 'epic', readiness: 'waiting' })] }));
+    const row = await screen.findByRole('listitem', { name: /A/ });
+    expect(within(row).getByLabelText('Workflow: epic')).toBeTruthy();
+  });
+});
+
 describe('new task form', () => {
   it('adds a task and clears the form without starting the queue', async () => {
     const api = show(queueOf(), {
@@ -1374,7 +1393,7 @@ describe('dependencies in the list', () => {
     await screen.findByRole('list', { name: 'tasks in the queue' });
     const li = row('Модель');
     expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
-    expect(li.querySelector('[data-state]')).toBeNull();
+    expect(li.querySelector('[data-state]:not([aria-label^="Workflow"])')).toBeNull();
     expect(li.className).not.toContain('border-destructive');
   });
 

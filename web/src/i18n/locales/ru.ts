@@ -435,6 +435,9 @@ export const ru: Dictionary = {
     machine: 'на машине: {{n}}',
     none: 'Нет занятых специалистов.',
   },
+  workflowBadge: {
+    label: 'Workflow: {{id}}',
+  },
   tags: {
     remove: 'Снять тег {{name}}',
     searchOrCreate: 'Поиск или имя нового тега…',
