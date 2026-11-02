@@ -318,6 +318,7 @@ describe('delivery resolver', () => {
       specialist: 'coder',
     });
     expect(state.resolve?.task).toContain('- src/app.ts');
+    expect(state.resolve?.task).toContain('Run the checks in the foreground');
     const effects = finish(state, 'done', { slug: RESOLVE_GROUP, now: 6400 });
     expect(effects).toEqual([
       {

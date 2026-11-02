@@ -175,6 +175,7 @@ function resolveTask(state: RunState, groups: Group[], conflicts: string[]): str
   return [
     `Your working directory holds the user's current working tree with the changes of run ${state.run.id} applied on top. The files below contain git conflict markers (<<<<<<<, =======, >>>>>>>) where the changes of the run and the user's own edits collide.`,
     'Resolve every conflict so that both the edits of the user and the intent of the run are kept. Remove every conflict marker, run the checks of the project if you can, and report done. Report rejected if the conflicts cannot be resolved safely.',
+    'Run the checks in the foreground and wait for their result in the same shell command, with a timeout long enough for the whole check (up to 10 minutes). Never start them in the background and never wait for them with `pgrep`, `pkill` or `sleep` loops: the name of the check command also appears in the command lines of other agents and of your own shell, so such a wait never ends.',
     `Conflicting files:\n${conflicts.map((file) => `- ${file}`).join('\n')}`,
     `Task of the run:\n${task(state, groups)}`,
     `Groups:\n${groups.map((group) => `- ${group.title}: ${lastSummary(group)}`).join('\n')}`,
