@@ -10,6 +10,8 @@ const VIEW: QueueView & { item: string } = {
   repository: '/repo',
   status: 'stopped',
   parallel: 1,
+  autopilot: false,
+  skipFailed: false,
   autoDeliver: true,
   stop: null,
   items: [
@@ -30,6 +32,7 @@ const VIEW: QueueView & { item: string } = {
     },
   ],
   runs: [],
+  skipped: [],
   updatedAt: 1,
   item: 'q1',
 };
@@ -59,6 +62,7 @@ describe('host MCP queue tools', () => {
       'swarm_queue_remove',
       'swarm_queue_start',
       'swarm_queue_parallel',
+      'swarm_queue_settings',
       'swarm_queue_pause',
       'swarm_queue_run_now',
     ]) {
@@ -291,6 +295,35 @@ describe('host MCP queue tools', () => {
       arguments: { parallel: 0 },
     });
     expect(wrong.isError).toBe(true);
+  });
+
+  it('turns on skipping of failed runs from Claude Code', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return { ...VIEW, skipFailed: true };
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_settings',
+      arguments: { skip_failed: true },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('skip failed on');
+    expect(calls).toEqual([
+      { method: 'queue_settings', params: { repository: '/repo', skipFailed: true } },
+    ]);
+  });
+
+  it('returns the daemon error of an empty settings call', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      throw new Error('pass parallel, autopilot or skipFailed');
+    });
+    const result = await client.callTool({ name: 'swarm_queue_settings', arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('pass parallel, autopilot or skipFailed');
+    expect(calls).toEqual([{ method: 'queue_settings', params: { repository: '/repo' } }]);
   });
 
   it('returns a skip check error as a tool error', async () => {

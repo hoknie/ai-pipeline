@@ -156,7 +156,19 @@ describe('queue requests', () => {
     ok('queue_start', { repository: '/r', parallel: 20 });
     ok('queue_pause', { repository: '/r' });
     ok('queue_settings', { repository: '/r', parallel: 2 });
+    ok('queue_settings', { repository: '/r', skipFailed: true });
+    ok('queue_settings', { repository: '/r', autopilot: false, skipFailed: false, parallel: 1 });
     ok('queue_run_now', { repository: '/r', item: 'q1' });
+  });
+
+  it('requires at least one setting and checks their types', () => {
+    bad('queue_settings', { repository: '/r' });
+    bad('queue_settings', { repository: '/r', parallel: 0 });
+    bad('queue_settings', { repository: '/r', parallel: 21 });
+    bad('queue_settings', { repository: '/r', autopilot: 'on' });
+    bad('queue_settings', { repository: '/r', skipFailed: 1 });
+    const error = parse('queue_settings', { repository: '/r' });
+    expect(JSON.stringify(error)).toContain('pass parallel, autopilot or skipFailed');
   });
 
   it('takes skip as a list of non-empty step ids', () => {

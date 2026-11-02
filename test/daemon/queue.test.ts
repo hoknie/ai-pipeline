@@ -1020,6 +1020,57 @@ describe('dependencies of queue items', () => {
     current = null;
     expect(await ended).toBe('closed');
   });
+
+  it('drops a skipped run after its retry succeeds and sends a queue event', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, {}] });
+    await add(h, 'A');
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.skipped.length === 1 && queue.items.length === 0);
+    const runId = (await allRuns(h))[0]!.id;
+    const view = await h.status(runId);
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await h.call('retry', { runId, group: view.groups[0]!.slug });
+    await waitQueue(h, (queue) => queue.skipped.length === 0);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const queues = events.flatMap((event) =>
+      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    );
+    expect(queues.some((queue) => queue.skipped.length === 0)).toBe(true);
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
+
+  it('sends a queue event with the new autoDeliver after delivery.auto is written', async () => {
+    const h = await start();
+    await add(h, 'A');
+    const before = await queueOf(h);
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    const value = before.autoDeliver !== true;
+    await h.call('config_setting', {
+      repository: h.repo,
+      path: 'delivery.auto',
+      value,
+      revision: null,
+      level: 'global',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const queues = events.flatMap((event) =>
+      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    );
+    expect(queues.at(-1)?.autoDeliver).toBe(value);
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
 });
 
 async function run_(h: Harness, title: string, after: string[]): Promise<RunQueued> {
@@ -1031,3 +1082,114 @@ async function run_(h: Harness, title: string, after: string[]): Promise<RunQueu
     after,
   })) as RunQueued;
 }
+
+describe('queue settings', () => {
+  it('starts a new queue with a waiting task when the autopilot is turned on', async () => {
+    const h = await start();
+    h.script({ code: [{ delayMs: 3000 }] });
+    await add(h, 'A');
+    const view = (await h.call('queue_settings', {
+      repository: h.repo,
+      autopilot: true,
+    })) as QueueView;
+    expect(view).toMatchObject({ status: 'running', autopilot: true, skipFailed: false });
+    expect(view.runs).toHaveLength(1);
+    expect(view.items).toEqual([]);
+  });
+
+  it('keeps an empty running queue on the autopilot and takes a task added later', async () => {
+    const h = await start();
+    h.script({ code: [{}, {}] });
+    await h.call('queue_settings', { repository: h.repo, autopilot: true });
+    await add(h, 'A');
+    const done = await waitQueue(h, (queue) => queue.items.length === 0 && queue.runs.length === 0);
+    expect(done.status).toBe('running');
+    await add(h, 'B');
+    await waitQueue(h, (queue) => queue.items.length === 0 && queue.runs.length === 0);
+    expect(await allRuns(h)).toHaveLength(2);
+    expect((await queueOf(h)).status).toBe('running');
+    const off = (await h.call('queue_settings', {
+      repository: h.repo,
+      autopilot: false,
+    })) as QueueView;
+    expect(off.status).toBe('stopped');
+  });
+
+  it('does not start a task added to a paused queue on the autopilot', async () => {
+    const h = await start();
+    await h.call('queue_settings', { repository: h.repo, autopilot: true });
+    await h.call('queue_pause', { repository: h.repo });
+    const view = await add(h, 'A');
+    expect(view.status).toBe('stopped');
+    expect(view.runs).toEqual([]);
+    expect(await allRuns(h)).toEqual([]);
+  });
+
+  it('does not lift a stop when the autopilot is turned on', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, {}] });
+    await add(h, 'A');
+    await add(h, 'B');
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitQueue(h, (queue) => queue.stop !== null);
+    const view = (await h.call('queue_settings', {
+      repository: h.repo,
+      autopilot: true,
+    })) as QueueView;
+    expect(view).toMatchObject({ status: 'stopped', autopilot: true, stop: stopped.stop });
+    expect(view.items).toHaveLength(1);
+  });
+
+  it('does not stop on a failed run when failed runs are skipped', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, {}] });
+    await add(h, 'A');
+    await add(h, 'B');
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    const done = await waitQueue(
+      h,
+      (queue) => queue.skipped.length === 1 && queue.items.length === 0 && queue.runs.length === 0,
+    );
+    expect(done.stop).toBeNull();
+    expect(done.skipped[0]).toMatchObject({ problem: { reason: 'failed' } });
+    expect(await allRuns(h)).toHaveLength(2);
+  });
+
+  it('keeps settings and skipped runs after the daemon restarts', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, {}] });
+    await add(h, 'A');
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true, autopilot: true });
+    await waitQueue(h, (queue) => queue.skipped.length === 1);
+    await h.restart();
+    const view = await queueOf(h);
+    expect(view).toMatchObject({ autopilot: true, skipFailed: true });
+    expect(view.skipped).toHaveLength(1);
+  });
+
+  it('rejects an empty settings request and leaves the queue unchanged', async () => {
+    const h = await start();
+    await expect(h.call('queue_settings', { repository: h.repo })).rejects.toThrow(
+      'pass parallel, autopilot or skipFailed',
+    );
+    expect(await queueOf(h)).toMatchObject({ autopilot: false, skipFailed: false, parallel: 1 });
+  });
+
+  it('keeps an item with an error and goes on when failed runs are skipped', async () => {
+    const h = await start();
+    await add(h, 'A');
+    await add(h, 'B');
+    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('feature:', 'other:'));
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    const view = await waitQueue(h, (queue) => queue.items.every((item) => item.error !== null));
+    expect(view.status).toBe('running');
+    expect(view.stop).toBeNull();
+    expect(view.items.map((item) => item.error)).toEqual([
+      expect.stringContaining('unknown workflow'),
+      expect.stringContaining('unknown workflow'),
+    ]);
+    expect(await allRuns(h)).toEqual([]);
+  });
+});

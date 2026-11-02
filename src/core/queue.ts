@@ -5,6 +5,8 @@ import { cleanSkip } from './skip.ts';
 import { allGroups, runPhase, type RunState } from './model.ts';
 
 export const QUEUE_PARALLEL_MAX = 20;
+/** The most runs the queue remembers as skipped. */
+export const QUEUE_SKIPPED_MAX = 10;
 
 export interface QueueItem {
   id: string;
@@ -49,11 +51,17 @@ export interface Queue {
   repository: string;
   status: 'stopped' | 'running';
   parallel: number;
+  /** A running queue does not stop when it becomes empty. */
+  autopilot: boolean;
+  /** A run with a stopping problem leaves its place and the queue goes on. */
+  skipFailed: boolean;
   items: QueueItem[];
   /** Runs created by the queue that still occupy a place. */
   runs: string[];
   /** Keys of the problems the user already knows about. */
   acknowledged: string[];
+  /** Runs taken off the places because of a stopping problem, the latest first. */
+  skipped: string[];
   stop: QueueStop | null;
   updatedAt: number;
 }
@@ -74,9 +82,12 @@ export function emptyQueue(repository: string, now: number): Queue {
     repository,
     status: 'stopped',
     parallel: 1,
+    autopilot: false,
+    skipFailed: false,
     items: [],
     runs: [],
     acknowledged: [],
+    skipped: [],
     stop: null,
     updatedAt: now,
   };
@@ -287,6 +298,27 @@ export function setParallel(queue: Queue, parallel: number, now: number): void {
   queue.updatedAt = now;
 }
 
+export interface QueueSettingsPatch {
+  parallel?: number | undefined;
+  autopilot?: boolean | undefined;
+  skipFailed?: boolean | undefined;
+}
+
+/** Changes only the passed settings; the state of the queue stays as is. */
+export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: number): void {
+  if (
+    patch.parallel === undefined &&
+    patch.autopilot === undefined &&
+    patch.skipFailed === undefined
+  ) {
+    throw new Rejection('pass parallel, autopilot or skipFailed');
+  }
+  if (patch.parallel !== undefined) setParallel(queue, patch.parallel, now);
+  if (patch.autopilot !== undefined) queue.autopilot = patch.autopilot;
+  if (patch.skipFailed !== undefined) queue.skipFailed = patch.skipFailed;
+  queue.updatedAt = now;
+}
+
 export function pauseQueue(queue: Queue, now: number): void {
   queue.status = 'stopped';
   queue.updatedAt = now;
@@ -373,7 +405,33 @@ export function advance(
   lookup: (id: string) => RunState | undefined,
   now: number,
 ): { take: QueueItem[] } {
-  const own = queueStates(queue, states);
+  let own = queueStates(queue, states);
+  if (queue.skipFailed) {
+    const failed = own.filter((state) =>
+      runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason)),
+    );
+    if (failed.length > 0) {
+      const ids = new Set(failed.map((state) => state.run.id));
+      queue.skipped = [
+        ...failed.map((state) => state.run.id).reverse(),
+        ...queue.skipped.filter((id) => !ids.has(id)),
+      ];
+      queue.runs = queue.runs.filter((id) => !ids.has(id));
+      queue.acknowledged = queue.acknowledged.filter(
+        (key) => ![...ids].some((id) => key.startsWith(`${id}/`)),
+      );
+      own = own.filter((state) => !ids.has(state.run.id));
+    }
+  }
+  queue.skipped = queue.skipped
+    .filter((id) => {
+      const state = lookup(id);
+      return (
+        state !== undefined &&
+        runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))
+      );
+    })
+    .slice(0, QUEUE_SKIPPED_MAX);
   const known = new Set(queue.acknowledged);
   if (queue.stop === null) {
     for (const state of own) {
@@ -402,9 +460,15 @@ export function advance(
   let take: QueueItem[] = [];
   if (queue.status === 'running') {
     take = queue.items
-      .filter((item) => itemReadiness(queue, item, lookup) === 'ready')
+      .filter(
+        (item) =>
+          !(queue.skipFailed && item.error !== null) &&
+          itemReadiness(queue, item, lookup) === 'ready',
+      )
       .slice(0, Math.max(0, queue.parallel - queue.runs.length));
-    if (queue.items.length === 0 && queue.runs.length === 0) queue.status = 'stopped';
+    if (!queue.autopilot && queue.items.length === 0 && queue.runs.length === 0) {
+      queue.status = 'stopped';
+    }
   }
   queue.updatedAt = now;
   return { take };
@@ -423,7 +487,9 @@ export function itemStarted(queue: Queue, id: string, run: string, now: number):
 export function itemFailed(queue: Queue, id: string, error: string, now: number): void {
   const item = find(queue, id);
   item.error = error;
-  queue.status = 'stopped';
-  queue.stop = { kind: 'item', item: id, error };
+  if (!queue.skipFailed) {
+    queue.status = 'stopped';
+    queue.stop = { kind: 'item', item: id, error };
+  }
   queue.updatedAt = now;
 }

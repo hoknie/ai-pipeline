@@ -548,13 +548,42 @@ export interface QueueView {
   repository: string;
   status: 'stopped' | 'running';
   parallel: number;
+  autopilot: boolean;
+  skipFailed: boolean;
   /** `delivery.auto` of the repository now; null when its configuration is invalid. */
   autoDeliver: boolean | null;
   stop: QueueStop | null;
   items: QueueItemView[];
   /** Runs of the queue that still occupy a place. */
   runs: QueueRunView[];
+  /** Runs taken off the places because of a stopping problem, the latest first. */
+  skipped: QueueRunView[];
   updatedAt: number;
+}
+
+/** Card of a run of the queue; `stopping`: the problem shown is the one that stops a queue. */
+function queueRunView(state: RunState, catalog: readonly Tag[], stopping: boolean): QueueRunView {
+  const problems = runProblems(state);
+  const problem =
+    (stopping ? problems.find((p) => p.reason !== 'needs_human') : undefined) ?? problems[0];
+  return {
+    id: state.run.id,
+    title: runTitle(state),
+    state: summarize(state).state,
+    workflow: state.run.workflow,
+    tags: tagViews(catalog, state.run.tags),
+    createdAt: state.run.createdAt,
+    groups: {
+      done: state.groups.filter((group) => isTerminal(group.status)).length,
+      total: state.groups.length,
+    },
+    steps: stepProgress(state),
+    active: state.groups
+      .filter((group) => group.status === 'running' || group.status === 'merging')
+      .map((group) => ({ group: group.slug, step: group.attempts.at(-1)?.stepId ?? null })),
+    delivering: isRunFinished(state) && occupiesSlot(state),
+    problem: problem ? { group: problem.group, reason: problem.reason } : null,
+  };
 }
 
 export function queueView(
@@ -563,34 +592,19 @@ export function queueView(
   autoDeliver: boolean | null = null,
   catalog: readonly Tag[] = [],
 ): QueueView {
-  const runs: QueueRunView[] = [];
-  for (const id of queue.runs) {
-    const state = lookup(id);
-    if (!state) continue;
-    const problem = runProblems(state)[0];
-    runs.push({
-      id,
-      title: runTitle(state),
-      state: summarize(state).state,
-      workflow: state.run.workflow,
-      tags: tagViews(catalog, state.run.tags),
-      createdAt: state.run.createdAt,
-      groups: {
-        done: state.groups.filter((group) => isTerminal(group.status)).length,
-        total: state.groups.length,
-      },
-      steps: stepProgress(state),
-      active: state.groups
-        .filter((group) => group.status === 'running' || group.status === 'merging')
-        .map((group) => ({ group: group.slug, step: group.attempts.at(-1)?.stepId ?? null })),
-      delivering: isRunFinished(state) && occupiesSlot(state),
-      problem: problem ? { group: problem.group, reason: problem.reason } : null,
+  const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
+    ids.flatMap((id) => {
+      const state = lookup(id);
+      return state ? [queueRunView(state, catalog, stopping)] : [];
     });
-  }
+  const runs = cards(queue.runs, false);
+  const skipped = cards(queue.skipped, true);
   return {
     repository: queue.repository,
     status: queue.status,
     parallel: queue.parallel,
+    autopilot: queue.autopilot,
+    skipFailed: queue.skipFailed,
     autoDeliver,
     stop: queue.stop,
     items: queue.items.map((item, index) => ({
@@ -618,6 +632,7 @@ export function queueView(
       error: item.error,
     })),
     runs,
+    skipped,
     updatedAt: queue.updatedAt,
   };
 }

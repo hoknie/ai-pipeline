@@ -267,6 +267,22 @@ export const en = {
     },
   },
   queue: {
+    settings: {
+      title: 'Queue settings',
+      label: 'queue settings',
+      autopilot: 'Autopilot',
+      autopilotHint:
+        'A running queue does not stop when it becomes empty and takes added tasks at once. A paused queue stays paused.',
+      skipFailed: 'Skip failed',
+      skipFailedHint:
+        'A run with a failed, conflicting, cancelled or undelivered group leaves its place, and the queue goes on.',
+      autoDeliver: 'Auto delivery by default',
+      autoDeliverHint: 'Applies to tasks without their own auto delivery, when they start.',
+      autoDeliverProject: 'The project file sets this value',
+      autoDeliverInvalid: 'The configuration is not valid',
+    },
+    skipped: 'Skipped with a problem ({{count}})',
+    skippedLabel: 'skipped with a problem',
     loading: 'Loading the queue',
     title: 'Queue',
     parallel: 'Parallelism',

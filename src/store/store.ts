@@ -291,9 +291,9 @@ export class Store {
     this.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json`,
         )
         .run(
           queue.repository,
@@ -303,6 +303,9 @@ export class Store {
           JSON.stringify(queue.acknowledged),
           json(queue.stop),
           queue.updatedAt,
+          queue.autopilot ? 1 : 0,
+          queue.skipFailed ? 1 : 0,
+          JSON.stringify(queue.skipped),
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
@@ -338,6 +341,9 @@ export class Store {
       repository,
       status: String(row.status) as Queue['status'],
       parallel: Number(row.parallel),
+      autopilot: Number(row.autopilot ?? 0) === 1,
+      skipFailed: Number(row.skip_failed ?? 0) === 1,
+      skipped: row.skipped_json ? parse(row.skipped_json) : [],
       items: items.map((item): QueueItem => ({
         id: String(item.id),
         workflow: String(item.workflow),

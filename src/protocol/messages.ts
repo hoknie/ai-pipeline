@@ -232,7 +232,20 @@ export const requestSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('queue_pause'), params: z.object({ repository: queueRepository }) }),
   z.object({
     method: z.literal('queue_settings'),
-    params: z.object({ repository: queueRepository, parallel: queueParallel }),
+    params: z
+      .object({
+        repository: queueRepository,
+        parallel: queueParallel.optional(),
+        autopilot: z.boolean().optional(),
+        skipFailed: z.boolean().optional(),
+      })
+      .refine(
+        (params) =>
+          params.parallel !== undefined ||
+          params.autopilot !== undefined ||
+          params.skipFailed !== undefined,
+        { message: 'pass parallel, autopilot or skipFailed' },
+      ),
   }),
   z.object({
     method: z.literal('queue_run_now'),

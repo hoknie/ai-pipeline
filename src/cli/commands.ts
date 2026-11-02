@@ -144,6 +144,13 @@ interface QueueTaskOptions {
   json?: boolean;
 }
 
+function parseSwitch(flag: string, value: string | undefined): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'on') return true;
+  if (value === 'off') return false;
+  throw new Error(`${flag} must be on or off`);
+}
+
 function showQueue(json: boolean | undefined, view: QueueView): void {
   output(json, formatQueue(view, activeStyle), view);
 }
@@ -364,6 +371,43 @@ function registerQueue(program: Command): void {
         })) as QueueView,
       );
     });
+
+  common(
+    queue
+      .command('settings')
+      .description('Change queue settings; only the passed ones change, takes effect at once')
+      .option('-p, --parallel <n>', 'runs at the same time (1-20)')
+      .option('--autopilot <on|off>', 'a running queue does not stop when it becomes empty')
+      .option('--skip-failed <on|off>', 'a run with a stopping problem leaves its place'),
+  )
+    .addHelpText(
+      'after',
+      examples([
+        'aip queue settings --autopilot on',
+        'aip queue settings --skip-failed on --parallel 2',
+      ]),
+    )
+    .action(
+      async (options: {
+        repo: string;
+        parallel?: string;
+        autopilot?: string;
+        skipFailed?: string;
+        json?: boolean;
+      }) => {
+        const autopilot = parseSwitch('--autopilot', options.autopilot);
+        const skipFailed = parseSwitch('--skip-failed', options.skipFailed);
+        showQueue(
+          options.json,
+          (await call(context(), 'queue_settings', {
+            repository: resolve(options.repo),
+            ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
+            ...(autopilot !== undefined ? { autopilot } : {}),
+            ...(skipFailed !== undefined ? { skipFailed } : {}),
+          })) as QueueView,
+        );
+      },
+    );
 
   common(queue.command('pause').description('Stop taking tasks; runs already started keep going'))
     .addHelpText('after', examples(['aip queue pause']))

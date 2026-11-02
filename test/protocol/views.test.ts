@@ -156,6 +156,43 @@ describe('queueView', () => {
   });
 });
 
+describe('queueView settings and skipped runs', () => {
+  it('shows the settings and an empty skipped list of a new queue', () => {
+    const view = queueView(emptyQueue('/repo', 1), () => undefined);
+    expect(view).toMatchObject({ autopilot: false, skipFailed: false, skipped: [] });
+  });
+
+  it('shows a skipped run with its stopping problem and leaves it out of the places', () => {
+    const state = run(1, { id: 'a' });
+    step(state);
+    group(state).status = 'failed';
+    const queue = emptyQueue('/repo', 1);
+    queue.skipFailed = true;
+    queue.runs.push('a');
+    startQueue(queue, [], 2);
+    advance(queue, [state], (id) => (id === 'a' ? state : undefined), 3);
+    const view = queueView(queue, (id) => (id === 'a' ? state : undefined));
+    expect(view.skipFailed).toBe(true);
+    expect(view.runs).toEqual([]);
+    expect(view.skipped).toHaveLength(1);
+    expect(view.skipped[0]).toMatchObject({
+      id: 'a',
+      problem: { reason: 'failed', group: 'gruppa-1' },
+    });
+  });
+
+  it('shows the stopping problem of a skipped run before a question to a human', () => {
+    const state = run(2, { id: 'a' });
+    step(state);
+    finish(state, 'needs_human', { slug: 'gruppa-1', feedback: 'q' });
+    group(state, 'gruppa-2').status = 'conflict';
+    const queue = emptyQueue('/repo', 1);
+    queue.skipped = ['a'];
+    const view = queueView(queue, (id) => (id === 'a' ? state : undefined));
+    expect(view.skipped[0]!.problem).toEqual({ group: 'gruppa-2', reason: 'conflict' });
+  });
+});
+
 describe('automatic delivery in views', () => {
   it('reports the setting of the repository and the choice of each item', () => {
     const queue = emptyQueue('/repo', 1);

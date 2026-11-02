@@ -41,6 +41,7 @@ import {
   removeTag,
   resolveTags,
   setParallel,
+  setQueueSettings,
   startQueue,
   dispatch,
   findGroup,
@@ -177,7 +178,7 @@ export class Daemon {
       for (const { state, effects } of recovered) await this.executor.perform(state, effects);
       await this.schedule();
       for (const queue of [...this.queues.values()]) {
-        if (queue.status === 'running' || queue.runs.length > 0) {
+        if (queue.status === 'running' || queue.runs.length > 0 || queue.skipped.length > 0) {
           await this.advanceQueue(queue.repository);
         }
       }
@@ -191,7 +192,9 @@ export class Daemon {
     const queue = this.queues.get(state.run.repository);
     if (
       queue &&
-      (queue.runs.length > 0 || queue.items.some((item) => item.after.includes(state.run.id)))
+      (queue.runs.length > 0 ||
+        queue.skipped.includes(state.run.id) ||
+        queue.items.some((item) => item.after.includes(state.run.id)))
     ) {
       this.requestAdvance(state.run.repository);
     }
@@ -240,6 +243,12 @@ export class Daemon {
       if (error instanceof ConfigLoadError) return null;
       throw error;
     }
+  }
+
+  /** Configuration may change `delivery.auto`, which the queue view shows. */
+  private republishQueue(repository: string): void {
+    const queue = this.queues.get(repository);
+    if (queue) this.publishQueue(queue);
   }
 
   private saveQueue(queue: Queue): QueueView {
@@ -328,6 +337,7 @@ export class Daemon {
     });
     const { take } = advance(queue, states, (id) => this.lookupState(id), this.now());
     let changed = fingerprint() !== before;
+    let failed = false;
     for (const item of take) {
       try {
         const created = await this.createRun(
@@ -341,7 +351,9 @@ export class Daemon {
       } catch (error) {
         itemFailed(queue, item.id, (error as Error).message, this.now());
         changed = true;
-        break;
+        if (!queue.skipFailed) break;
+        failed = true;
+        continue;
       }
       changed = true;
     }
@@ -349,7 +361,9 @@ export class Daemon {
     else if (this.queueRuns.get(repository) !== queueSignature(this.queueSnapshot(queue))) {
       this.publishQueue(queue);
     }
-    if (take.length > 0 && queue.runs.length > 0) this.requestAdvance(repository);
+    if ((take.length > 0 && queue.runs.length > 0) || (failed && queue.status === 'running')) {
+      this.requestAdvance(repository);
+    }
     return started;
   }
 
@@ -426,11 +440,21 @@ export class Daemon {
         case 'queue_pause':
           pauseQueue(queue, now);
           return this.saveQueue(queue);
-        case 'queue_settings':
-          setParallel(queue, request.params.parallel, now);
+        case 'queue_settings': {
+          const { parallel, autopilot, skipFailed } = request.params;
+          const enablesAutopilot = autopilot === true && !queue.autopilot;
+          setQueueSettings(queue, { parallel, autopilot, skipFailed }, now);
+          if (enablesAutopilot && queue.status === 'stopped' && queue.stop === null) {
+            startQueue(
+              queue,
+              queue.runs.flatMap((id) => this.lookupState(id) ?? []),
+              now,
+            );
+          }
           this.saveQueue(queue);
           await this.advanceQueue(repository);
           return this.queueSnapshot(queue);
+        }
         case 'queue_run_now': {
           const item = queue.items.find((candidate) => candidate.id === request.params.item);
           if (!item) throw new Rejection('unknown queue item');
@@ -1051,7 +1075,9 @@ export class Daemon {
       throw error;
     }
     if (!plan.ok) return plan;
-    return { ok: true, ...commitEdit(plan) };
+    const result = { ok: true as const, ...commitEdit(plan) };
+    this.republishQueue(repository);
+    return result;
   }
 
   private async configSetting(params: ParamsOf<'config_setting'>): Promise<ConfigEditResult> {
@@ -1069,7 +1095,9 @@ export class Daemon {
       throw error;
     }
     if (!plan.ok) return plan;
-    return { ok: true, ...commitEdit(plan) };
+    const result = { ok: true as const, ...commitEdit(plan) };
+    this.republishQueue(repository);
+    return result;
   }
 
   private async configPreview(params: ParamsOf<'config_preview'>): Promise<ConfigPreview> {
@@ -1186,6 +1214,8 @@ function describePath(detail: ConfigError): string {
 function queueSignature(view: QueueView): string {
   return JSON.stringify({
     runs: view.runs,
+    skipped: view.skipped,
+    autoDeliver: view.autoDeliver,
     items: view.items.map((item) => [item.id, item.readiness, item.after]),
   });
 }

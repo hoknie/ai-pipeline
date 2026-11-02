@@ -1,12 +1,11 @@
 import type { TFunction } from 'i18next';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { useState } from 'react';
-
 import { Alert } from '../ui/alert.tsx';
 import { Switch } from '../ui/switch.tsx';
 
 import type { Api } from '../api.ts';
+import { useGeneralSetting } from '../useGeneralSetting.ts';
 import { TagsSettings } from './TagsSettings.tsx';
 import type { ConfigEditorResponse, EditorSetting } from '../types.ts';
 
@@ -37,33 +36,13 @@ export function SettingsView({
   onChanged?: () => Promise<void> | void;
 }) {
   const { t } = useTranslation();
-  const [failure, setFailure] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const toggle = async (setting: EditorSetting, value: boolean) => {
-    if (!api || !settingsFiles) return;
-    setBusy(true);
-    setFailure(null);
-    try {
-      const result = await api.writeSetting(
-        setting.path,
-        value,
-        settingsFiles.global.revision,
-        'global',
-      );
-      if (!result.ok) {
-        setFailure(
-          result.reason === 'conflict'
-            ? t('settings.writeConflict', { message: result.message })
-            : result.errors.map((error) => `${error.path}: ${error.message}`).join('; '),
-        );
-      }
-      await onChanged?.();
-    } catch (error) {
-      setFailure((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const delivery = useGeneralSetting(
+    api,
+    'delivery.auto',
+    settingsFiles ? { settings, settingsFiles } : undefined,
+    onChanged,
+  );
+  const failure = delivery.failure;
   return (
     <section aria-label={t('settings.label')} className="flex flex-col gap-3">
       <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
@@ -90,11 +69,11 @@ export function SettingsView({
                   <span className="flex items-center gap-2">
                     <Switch
                       aria-label={setting.path}
-                      checked={setting.value === true}
-                      disabled={busy || setting.file === settingsFiles.project.file}
-                      onCheckedChange={(value) => void toggle(setting, value)}
+                      checked={delivery.value}
+                      disabled={delivery.busy || delivery.overridden}
+                      onCheckedChange={(value) => void delivery.set(value)}
                     />
-                    {setting.file === settingsFiles.project.file ? (
+                    {delivery.overridden ? (
                       <span className="text-xs text-muted-foreground">
                         {t('settings.overriddenByProject')}
                       </span>

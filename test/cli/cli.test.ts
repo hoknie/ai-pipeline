@@ -633,6 +633,37 @@ describe('cli', () => {
     expect(paused.stdout).toContain('Queue: stopped');
   });
 
+  it('sets the autopilot from the terminal', async () => {
+    const box = sandbox();
+    const on = await aip(box, 'queue', 'settings', '--autopilot', 'on', '--json');
+    expect(on.code).toBe(0);
+    expect(JSON.parse(on.stdout)).toMatchObject({
+      autopilot: true,
+      skipFailed: false,
+      parallel: 1,
+      status: 'running',
+    });
+    const text = await aip(box, 'queue', 'settings', '--skip-failed', 'on', '--parallel', '2');
+    expect(text.stdout).toContain('parallel 2');
+    expect(text.stdout).toContain('autopilot on, skip failed on');
+    const list = await aip(box, 'queue', 'list');
+    expect(list.stdout).toContain('autopilot on, skip failed on');
+    const off = await aip(box, 'queue', 'settings', '--autopilot', 'off', '--json');
+    expect(JSON.parse(off.stdout)).toMatchObject({ autopilot: false, skipFailed: true });
+  });
+
+  it('refuses a wrong switch value and an empty call of queue settings', async () => {
+    const box = sandbox();
+    const wrong = await aip(box, 'queue', 'settings', '--autopilot', 'yes');
+    expect(wrong.code).not.toBe(0);
+    expect(`${wrong.stdout}${wrong.stderr}`).toContain('--autopilot must be on or off');
+    const empty = await aip(box, 'queue', 'settings');
+    expect(empty.code).not.toBe(0);
+    expect(`${empty.stdout}${empty.stderr}`).toContain('pass parallel, autopilot or skipFailed');
+    const view = await aip(box, 'queue', 'list', '--json');
+    expect(JSON.parse(view.stdout)).toMatchObject({ autopilot: false, skipFailed: false });
+  });
+
   it('sets automatic delivery of a run and of queued tasks from flags', async () => {
     const box = sandbox();
     const run = JSON.parse(
@@ -738,6 +769,7 @@ describe('cli', () => {
       'swarm_queue_pause',
       'swarm_queue_remove',
       'swarm_queue_run_now',
+      'swarm_queue_settings',
       'swarm_queue_start',
       'swarm_retry',
       'swarm_run',

@@ -272,6 +272,22 @@ export const es: Dictionary = {
     },
   },
   queue: {
+    settings: {
+      title: 'Ajustes de la cola',
+      label: 'ajustes de la cola',
+      autopilot: 'Piloto automático',
+      autopilotHint:
+        'Una cola en marcha no se detiene al vaciarse y toma las tareas añadidas al instante. Una cola en pausa sigue en pausa.',
+      skipFailed: 'Omitir fallidas',
+      skipFailedHint:
+        'Una ejecución con un grupo fallido, en conflicto, cancelado o sin entregar libera su plaza y la cola sigue.',
+      autoDeliver: 'Entrega automática',
+      autoDeliverHint: 'Se aplica a las tareas sin entrega automática propia cuando empiezan.',
+      autoDeliverProject: 'El archivo del proyecto fija este valor',
+      autoDeliverInvalid: 'La configuración no es válida',
+    },
+    skipped: 'Omitidas con error ({{count}})',
+    skippedLabel: 'omitidas con error',
     loading: 'Cargando la cola',
     title: 'Cola',
     parallel: 'Paralelismo',

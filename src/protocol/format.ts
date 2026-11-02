@@ -323,34 +323,44 @@ function stopReason(view: QueueView): string | null {
   return `${where}: ${stop.reason}`;
 }
 
+function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
+  const lines: string[] = [];
+  for (const run of runs) {
+    const progress =
+      run.groups.total === 0
+        ? 'splitting'
+        : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
+    const delivering = run.delivering ? ' · delivering' : '';
+    lines.push(
+      `  ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
+    );
+    for (const active of run.active) {
+      lines.push(`    ${active.group}${active.step ? `: ${active.step}` : ''}`);
+    }
+    if (run.problem) {
+      lines.push(
+        style.danger(
+          `    problem: ${run.problem.reason}${run.problem.group ? ` in ${run.problem.group}` : ''}`,
+        ),
+      );
+    }
+  }
+  return lines;
+}
+
 export function formatQueue(view: QueueView, style: Style = plainStyle): string {
   const lines = [
-    `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken)`,
+    `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken), autopilot ${view.autopilot ? 'on' : 'off'}, skip failed ${view.skipFailed ? 'on' : 'off'}`,
   ];
   const reason = stopReason(view);
   if (reason) lines.push(style.danger(`Stopped: ${reason}`));
   if (view.runs.length > 0) {
     lines.push(style.muted('Runs holding a place:'));
-    for (const run of view.runs) {
-      const progress =
-        run.groups.total === 0
-          ? 'splitting'
-          : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
-      const delivering = run.delivering ? ' · delivering' : '';
-      lines.push(
-        `  ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
-      );
-      for (const active of run.active) {
-        lines.push(`    ${active.group}${active.step ? `: ${active.step}` : ''}`);
-      }
-      if (run.problem) {
-        lines.push(
-          style.danger(
-            `    problem: ${run.problem.reason}${run.problem.group ? ` in ${run.problem.group}` : ''}`,
-          ),
-        );
-      }
-    }
+    lines.push(...queueRunLines(view.runs, style));
+  }
+  if (view.skipped.length > 0) {
+    lines.push(style.muted('Skipped with a problem:'));
+    lines.push(...queueRunLines(view.skipped, style));
   }
   if (view.items.length === 0) {
     lines.push('No tasks waiting.');

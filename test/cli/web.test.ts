@@ -473,6 +473,19 @@ describe('aip web', () => {
       await post('/api/queue/settings', { parallel: 2 })
     ).json()) as QueueView;
     expect(settings).toMatchObject({ parallel: 2, status: 'stopped' });
+    const skipFailed = await post('/api/queue/settings', { skipFailed: true });
+    expect(skipFailed.status).toBe(200);
+    expect(await skipFailed.json()).toMatchObject({
+      skipFailed: true,
+      parallel: 2,
+      autopilot: false,
+    });
+    expect((await read()).skipFailed).toBe(true);
+    const empty = await post('/api/queue/settings', {});
+    expect(empty.status).toBe(400);
+    expect(((await empty.json()) as { error: string }).error).toContain(
+      'pass parallel, autopilot or skipFailed',
+    );
     const removed = (await (
       await post(`/api/queue/items/${third.item}/remove`, {})
     ).json()) as QueueView;

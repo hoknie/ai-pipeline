@@ -21,6 +21,8 @@ import {
   queueOf,
   queueRun,
   runView,
+  configView,
+  settingsOf,
   workflowsView,
 } from './fixtures.ts';
 
@@ -174,7 +176,7 @@ describe('queue tab', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
     fireEvent.change(field, { target: { value: '3' } });
     fireEvent.keyDown(field, { key: 'Enter' });
-    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith(3));
+    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ parallel: 3 }));
     expect(api.queueStart).not.toHaveBeenCalled();
   });
 
@@ -192,13 +194,13 @@ describe('live parallelism', () => {
 
   it('raises the limit of a running queue at once without starting it', async () => {
     const api = show(queueOf({ status: 'running', items: items('A') }), {
-      queueSettings: vi.fn(async (parallel: number) =>
-        queueOf({ status: 'running', parallel, items: items('A') }),
+      queueSettings: vi.fn(async ({ parallel }: { parallel?: number }) =>
+        queueOf({ status: 'running', ...(parallel ? { parallel } : {}), items: items('A') }),
       ),
     });
     fireEvent.click(await stepper());
     expect(screen.getByLabelText<HTMLInputElement>('Parallelism').value).toBe('2');
-    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith(2));
+    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ parallel: 2 }));
     expect(api.queueStart).not.toHaveBeenCalled();
   });
 
@@ -206,7 +208,7 @@ describe('live parallelism', () => {
     const releases: (() => void)[] = [];
     let active = 0;
     let peak = 0;
-    const queueSettings = vi.fn(async (parallel: number) => {
+    const queueSettings = vi.fn(async ({ parallel }: { parallel?: number }) => {
       active += 1;
       peak = Math.max(peak, active);
       await new Promise<void>((resolve) => releases.push(resolve));
@@ -221,7 +223,7 @@ describe('live parallelism', () => {
     await waitFor(() => expect(queueSettings).toHaveBeenCalledTimes(1));
     act(() => releases.shift()!());
     await waitFor(() => expect(queueSettings).toHaveBeenCalledTimes(2));
-    expect(queueSettings).toHaveBeenLastCalledWith(3);
+    expect(queueSettings).toHaveBeenLastCalledWith({ parallel: 3 });
     act(() => releases.shift()!());
     await waitFor(() =>
       expect(screen.getByLabelText<HTMLInputElement>('Parallelism').value).toBe('3'),
@@ -1502,8 +1504,7 @@ describe('queue layout', () => {
   it('puts the controls in a column and the runs in a grid in a wide window', async () => {
     restore = setWindowWidth(1600);
     show(running());
-    const controls = await screen.findByRole('region', { name: 'Queue' });
-    expect(controls.className).toContain('lg:flex-col');
+    const controls = await screen.findByRole('region', { name: 'queue settings' });
     expect(controls.parentElement?.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]');
     expect(within(controls).getByRole('button', { name: 'Start' })).toBeTruthy();
     expect(within(controls).getByRole('button', { name: 'Pause' })).toBeTruthy();
@@ -1521,9 +1522,203 @@ describe('queue layout', () => {
   it('stacks the controls over the content in a narrow window', async () => {
     restore = setWindowWidth(600);
     show(running());
-    const controls = await screen.findByRole('region', { name: 'Queue' });
+    const controls = await screen.findByRole('region', { name: 'queue settings' });
     const runs = screen.getByRole('region', { name: 'running from the queue' });
     expect(controls.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(runs).getByRole('list').className).toContain('grid-cols-1');
+  });
+});
+
+describe('queue settings block', () => {
+  const settingsBlock = async () =>
+    within(await screen.findByRole('region', { name: 'queue settings' }));
+
+  it('shows the badge, start, pause, parallelism and three switches with hints', async () => {
+    show(queueOf({ items: items('A') }));
+    const block = await settingsBlock();
+    expect(block.getByText('Stopped')).toBeTruthy();
+    expect(block.getByRole('button', { name: 'Start' })).toBeTruthy();
+    expect(block.getByRole('button', { name: 'Pause' })).toBeTruthy();
+    expect(block.getByLabelText('Parallelism')).toBeTruthy();
+    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default']) {
+      expect(block.getByRole('switch', { name })).toBeTruthy();
+    }
+    expect(block.getByText(/does not stop when it becomes empty/)).toBeTruthy();
+    expect(block.getByText(/leaves its place/)).toBeTruthy();
+    expect(block.getByText(/tasks without their own auto delivery/)).toBeTruthy();
+  });
+
+  it('sends only skipFailed when the switch is turned on', async () => {
+    const api = show(queueOf({ parallel: 2 }), {
+      queueSettings: vi.fn(async () => queueOf({ parallel: 2, skipFailed: true })),
+    });
+    const block = await settingsBlock();
+    const toggle = block.getByRole('switch', { name: 'Skip failed' });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle);
+    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ skipFailed: true }));
+    await waitFor(() =>
+      expect(block.getByRole('switch', { name: 'Skip failed' }).getAttribute('aria-checked')).toBe(
+        'true',
+      ),
+    );
+    expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
+      'false',
+    );
+    expect(api.queueSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns the autopilot on in a stopped queue and moves the task to the running block', async () => {
+    const api = show(queueOf({ items: items('A') }), {
+      queueSettings: vi.fn(async () =>
+        queueOf({
+          status: 'running',
+          autopilot: true,
+          runs: [queueRun('run1', { title: 'Вход' })],
+        }),
+      ),
+    });
+    const block = await settingsBlock();
+    fireEvent.click(block.getByRole('switch', { name: 'Autopilot' }));
+    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ autopilot: true }));
+    await screen.findByRole('region', { name: 'running from the queue' });
+    expect(block.getByText('Running')).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Вход' })).toBeTruthy();
+  });
+
+  it('returns the switch and shows the error when the server refuses', async () => {
+    show(queueOf(), {
+      queueSettings: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    });
+    const block = await settingsBlock();
+    fireEvent.click(block.getByRole('switch', { name: 'Autopilot' }));
+    await screen.findByText('boom');
+    expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
+      'false',
+    );
+  });
+
+  it('follows the queue event', async () => {
+    show(queueOf());
+    const block = await settingsBlock();
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'queue',
+        seq: 5,
+        queue: queueOf({ autopilot: true, skipFailed: true }),
+      });
+    });
+    await waitFor(() =>
+      expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
+        'true',
+      ),
+    );
+    expect(block.getByRole('switch', { name: 'Skip failed' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+  });
+
+  it('writes delivery.auto to the global settings when auto delivery is turned off', async () => {
+    const api = show(queueOf({ autoDeliver: true }));
+    const block = await settingsBlock();
+    const toggle = await waitFor(() => {
+      const found = block.getByRole<HTMLButtonElement>('switch', {
+        name: 'Auto delivery by default',
+      });
+      expect(found.disabled).toBe(false);
+      return found;
+    });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
+    );
+    act(() => {
+      stream().open();
+      stream().send({ event: 'queue', seq: 5, queue: queueOf({ autoDeliver: false }) });
+    });
+    await waitFor(() =>
+      expect(
+        block
+          .getByRole('switch', { name: 'Auto delivery by default' })
+          .getAttribute('aria-checked'),
+      ).toBe('false'),
+    );
+  });
+
+  it('shows the value from the project file as unavailable with a hint', async () => {
+    show(queueOf({ autoDeliver: false }), {
+      config: vi.fn(async () =>
+        configView({
+          settings: settingsOf({
+            'delivery.auto': {
+              path: 'delivery.auto',
+              value: false,
+              file: '/repo/aip/settings.yaml',
+            },
+          }),
+        }),
+      ),
+    });
+    const block = await settingsBlock();
+    const toggle = block.getByRole<HTMLButtonElement>('switch', {
+      name: 'Auto delivery by default',
+    });
+    await waitFor(() => expect(toggle.disabled).toBe(true));
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    expect(block.getByText('The project file sets this value')).toBeTruthy();
+  });
+
+  it('disables auto delivery while the configuration is invalid', async () => {
+    show(queueOf({ autoDeliver: null }));
+    const block = await settingsBlock();
+    expect(
+      block.getByRole<HTMLButtonElement>('switch', { name: 'Auto delivery by default' }).disabled,
+    ).toBe(true);
+    expect(block.getByText('The configuration is not valid')).toBeTruthy();
+  });
+});
+
+describe('skipped runs', () => {
+  it('shows them under the running block and does not count them as places', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        skipFailed: true,
+        runs: [queueRun('run2', { title: 'Регистрация' })],
+        skipped: [
+          queueRun('run1', {
+            title: 'Логин',
+            state: 'failed',
+            problem: { group: 'login', reason: 'failed' },
+          }),
+        ],
+      }),
+    );
+    const skipped = within(await screen.findByRole('region', { name: 'skipped with a problem' }));
+    expect(skipped.getByRole('heading').textContent).toBe('Skipped with a problem (1)');
+    const card = within(skipped.getByRole('group', { name: 'Логин' }));
+    expect(card.getByText('a group failed', { exact: false })).toBeTruthy();
+    expect(card.getByRole('link', { name: /login/ }).getAttribute('href')).toBe(
+      formatRoute({ view: 'runs', run: 'run1', group: 'login', step: null }),
+    );
+    const running = screen.getByRole('region', { name: 'running from the queue' });
+    expect(within(running).getByRole('heading').textContent).toContain('1 of 1 place');
+    expect(within(running).queryByText('Логин')).toBeNull();
+  });
+
+  it('has no block without skipped runs', async () => {
+    show(queueOf({ status: 'running' }));
+    await screen.findByRole('region', { name: 'queue settings' });
+    expect(screen.queryByRole('region', { name: 'skipped with a problem' })).toBeNull();
+  });
+
+  it('shows the block of a paused queue without runs', async () => {
+    show(queueOf({ skipped: [queueRun('run1', { title: 'Логин', state: 'failed' })] }));
+    await screen.findByRole('region', { name: 'skipped with a problem' });
+    expect(screen.queryByRole('region', { name: 'running from the queue' })).toBeNull();
   });
 });

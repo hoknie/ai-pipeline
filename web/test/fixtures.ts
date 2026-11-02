@@ -201,10 +201,13 @@ export function queueOf(overrides: Partial<QueueView> = {}): QueueView {
     repository: '/repo',
     status: 'stopped',
     parallel: 1,
+    autopilot: false,
+    skipFailed: false,
     autoDeliver: true,
     stop: null,
     items: [],
     runs: [],
+    skipped: [],
     updatedAt: 1,
     ...overrides,
   };

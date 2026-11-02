@@ -25,6 +25,12 @@ export class ApiError extends Error {
   }
 }
 
+export interface QueueSettingsPatch {
+  parallel?: number;
+  autopilot?: boolean;
+  skipFailed?: boolean;
+}
+
 export interface Api {
   /**
    * The same API bound to a repository: queue, configuration and workflow requests carry
@@ -63,7 +69,7 @@ export interface Api {
   queueRunNow(item: string): Promise<RunCreated>;
   queueStart(parallel?: number): Promise<QueueView>;
   queuePause(): Promise<QueueView>;
-  queueSettings(parallel: number): Promise<QueueView>;
+  queueSettings(patch: QueueSettingsPatch): Promise<QueueView>;
   /** The configuration of the bound repository, for the editors. */
   config(): Promise<ConfigEditorResponse>;
   /** Tools and skills a specialist can name, per runtime. */
@@ -175,7 +181,7 @@ function bound(repository: string | null): Api {
     queueStart: (parallel) =>
       post(at('/api/queue/start'), parallel === undefined ? {} : { parallel }),
     queuePause: () => post(at('/api/queue/pause')),
-    queueSettings: (parallel) => post(at('/api/queue/settings'), { parallel }),
+    queueSettings: (patch) => post(at('/api/queue/settings'), patch),
     config: () => call(at('/api/config')),
     catalog: () => call(at('/api/config/catalog')),
     writeSpecialist: (id, value, revision, level) =>

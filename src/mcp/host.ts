@@ -387,6 +387,36 @@ export function createHostServer(options: HostOptions): McpServer {
   );
 
   server.registerTool(
+    'swarm_queue_settings',
+    {
+      title: 'Change queue settings',
+      description:
+        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once; turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting, cancelled or undelivered group leaves its place and goes to the skipped list, the queue keeps going. Takes effect at once.',
+      inputSchema: {
+        parallel: z.number().int().min(1).max(20).optional().describe('Runs at the same time'),
+        autopilot: z.boolean().optional().describe('Keep the running queue going when it is empty'),
+        skip_failed: z
+          .boolean()
+          .optional()
+          .describe('Skip runs with a stopping problem instead of stopping the queue'),
+        repo,
+      },
+    },
+    ({ parallel, autopilot, skip_failed, repo: where }) =>
+      attempt(() =>
+        showQueue(
+          'queue_settings',
+          {
+            ...(parallel !== undefined ? { parallel } : {}),
+            ...(autopilot !== undefined ? { autopilot } : {}),
+            ...(skip_failed !== undefined ? { skipFailed: skip_failed } : {}),
+          },
+          where,
+        ),
+      ),
+  );
+
+  server.registerTool(
     'swarm_queue_pause',
     {
       title: 'Pause the queue',

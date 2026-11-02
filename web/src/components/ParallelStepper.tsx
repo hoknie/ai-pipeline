@@ -57,7 +57,7 @@ export function ParallelStepper({
       let view: QueueView;
       do {
         sent = wanted.current;
-        view = await api.queueSettings(sent);
+        view = await api.queueSettings({ parallel: sent });
       } while (wanted.current !== sent);
       onQueue(view);
       setLocal(null);

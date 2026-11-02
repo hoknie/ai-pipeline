@@ -18,6 +18,7 @@ import {
   runPhase,
   runProblems,
   setParallel,
+  setQueueSettings,
   startQueue,
   transition,
   type Queue,
@@ -780,5 +781,217 @@ describe('dependencies', () => {
     expect(
       advance(queue, [], lookupOf(mergedRun('r1', true)), 5).take.map((item) => item.id),
     ).toEqual(['q1']);
+  });
+});
+
+describe('queue settings', () => {
+  it('changes only the passed fields', () => {
+    const queue = emptyQueue('/repo', 1);
+    setParallel(queue, 2, 2);
+    setQueueSettings(queue, { skipFailed: true }, 3);
+    expect(queue).toMatchObject({ parallel: 2, autopilot: false, skipFailed: true, updatedAt: 3 });
+    setQueueSettings(queue, { autopilot: true, parallel: 4 }, 4);
+    expect(queue).toMatchObject({ parallel: 4, autopilot: true, skipFailed: true });
+  });
+
+  it('refuses an empty patch and a wrong parallel without a change', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(() => setQueueSettings(queue, {}, 2)).toThrow('pass parallel, autopilot or skipFailed');
+    expect(() => setQueueSettings(queue, { parallel: 0, autopilot: true }, 2)).toThrow(
+      /parallel must be/,
+    );
+    expect(queue).toMatchObject({ parallel: 1, autopilot: false, updatedAt: 1 });
+  });
+
+  it('starts a new queue with both modes off and nothing skipped', () => {
+    expect(emptyQueue('/repo', 1)).toMatchObject({
+      autopilot: false,
+      skipFailed: false,
+      skipped: [],
+    });
+  });
+});
+
+describe('autopilot', () => {
+  it('keeps an empty running queue running and takes a task added later', () => {
+    const queue = queueOf('A');
+    queue.autopilot = true;
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = run(1, { id: 'a' });
+    state.run.config.delivery.auto = false;
+    toMerging(state);
+    merge(state);
+    expect(advance(queue, [state], none, 5).take).toEqual([]);
+    expect(queue).toMatchObject({ status: 'running', runs: [] });
+    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 6);
+    expect(advance(queue, [], none, 7).take.map((item) => item.id)).toEqual(['q2']);
+  });
+
+  it('stops an empty queue on the next step after it is turned off', () => {
+    const queue = emptyQueue('/repo', 1);
+    queue.autopilot = true;
+    startQueue(queue, [], 2);
+    advance(queue, [], none, 3);
+    expect(queue.status).toBe('running');
+    setQueueSettings(queue, { autopilot: false }, 4);
+    expect(queue.status).toBe('running');
+    advance(queue, [], none, 5);
+    expect(queue.status).toBe('stopped');
+  });
+
+  it('stays paused after a pause and does not take tasks', () => {
+    const queue = emptyQueue('/repo', 1);
+    queue.autopilot = true;
+    startQueue(queue, [], 2);
+    pauseQueue(queue, 3);
+    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 4);
+    expect(advance(queue, [], none, 5).take).toEqual([]);
+    expect(queue.status).toBe('stopped');
+  });
+
+  it('does not change the stop reason when it is turned on', () => {
+    const queue = queueOf('A', 'B');
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    advance(queue, [state], none, 5);
+    setQueueSettings(queue, { autopilot: true }, 6);
+    advance(queue, [state], none, 7);
+    expect(queue).toMatchObject({ status: 'stopped', stop: { reason: 'failed' } });
+  });
+});
+
+describe('skip failed', () => {
+  function started(...tasks: string[]): Queue {
+    const queue = queueOf(...tasks);
+    queue.skipFailed = true;
+    startQueue(queue, [], 3);
+    return queue;
+  }
+
+  it('moves a failed run to skipped and takes the next task', () => {
+    const queue = started('A', 'B');
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    const take = advance(queue, [state], lookupOf(state), 5).take;
+    expect(take.map((item) => item.id)).toEqual(['q2']);
+    expect(queue).toMatchObject({ status: 'running', stop: null, runs: [], skipped: ['a'] });
+  });
+
+  it('skips on a conflict as well', () => {
+    const queue = started('A', 'B');
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = run(1, { id: 'a' });
+    step(state);
+    group(state).status = 'conflict';
+    advance(queue, [state], lookupOf(state), 5);
+    expect(queue).toMatchObject({ status: 'running', stop: null, skipped: ['a'] });
+  });
+
+  it('skips a run with a known problem when the mode is turned on', () => {
+    const queue = queueOf('A', 'B');
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    startQueue(queue, [state], 5);
+    expect(queue.acknowledged.length).toBe(1);
+    setQueueSettings(queue, { skipFailed: true }, 6);
+    const take = advance(queue, [state], lookupOf(state), 7).take;
+    expect(take.map((item) => item.id)).toEqual(['q2']);
+    expect(queue).toMatchObject({ runs: [], skipped: ['a'], acknowledged: [] });
+  });
+
+  it('does not touch a stopped queue state when it is turned on', () => {
+    const queue = queueOf('A', 'B');
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    advance(queue, [state], lookupOf(state), 5);
+    setQueueSettings(queue, { skipFailed: true }, 6);
+    expect(queue).toMatchObject({ status: 'stopped', stop: { reason: 'failed' } });
+  });
+
+  it('does not put a question to a human into skipped', () => {
+    const queue = started('A', 'B');
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = run(1, { id: 'a' });
+    step(state);
+    finish(state, 'needs_human', { feedback: 'q' });
+    expect(advance(queue, [state], lookupOf(state), 5).take).toEqual([]);
+    expect(queue).toMatchObject({ runs: ['a'], skipped: [] });
+  });
+
+  it('removes a skipped run when its problem is gone or the run does not exist', () => {
+    const queue = started('A');
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    advance(queue, [state], lookupOf(state), 5);
+    expect(queue.skipped).toEqual(['a']);
+    group(state).status = 'running';
+    advance(queue, [], lookupOf(state), 6);
+    expect(queue.skipped).toEqual([]);
+    queue.skipped = ['gone'];
+    advance(queue, [], none, 7);
+    expect(queue.skipped).toEqual([]);
+  });
+
+  it('keeps a skipped run out of the places after the mode is turned off', () => {
+    const queue = started('A');
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    advance(queue, [state], lookupOf(state), 5);
+    setQueueSettings(queue, { skipFailed: false }, 6);
+    advance(queue, [state], lookupOf(state), 7);
+    expect(queue).toMatchObject({ runs: [], skipped: ['a'], stop: null });
+  });
+
+  it('keeps at most ten, dropping the earliest', () => {
+    const queue = started();
+    const states: RunState[] = [];
+    for (let index = 1; index <= 11; index += 1) {
+      const state = failedRun(`r${index}`);
+      states.push(state);
+      queue.runs.push(state.run.id);
+      advance(queue, states, lookupOf(...states), 5 + index);
+    }
+    expect(queue.skipped).toHaveLength(10);
+    expect(queue.skipped[0]).toBe('r11');
+    expect(queue.skipped).not.toContain('r1');
+  });
+
+  it('blocks a task that waits for a skipped run and takes the others', () => {
+    const queue = started('A', 'B', 'C');
+    itemStarted(queue, 'q1', 'a', 4);
+    withAfter(queue, 'q2', ['a']);
+    const state = failedRun('a');
+    const lookup = lookupOf(state);
+    const take = advance(queue, [state], lookup, 5).take;
+    expect(take.map((item) => item.id)).toEqual(['q3']);
+    expect(itemReadiness(queue, queue.items[0]!, lookup)).toBe('blocked');
+    expect(queue.status).toBe('running');
+  });
+
+  it('keeps the item with an error and the running state when a start fails', () => {
+    const queue = started('A', 'B');
+    itemFailed(queue, 'q1', 'unknown workflow `feature`', 5);
+    expect(queue).toMatchObject({ status: 'running', stop: null });
+    expect(queue.items[0]).toMatchObject({ id: 'q1', error: 'unknown workflow `feature`' });
+    expect(advance(queue, [], none, 6).take.map((item) => item.id)).toEqual(['q2']);
+  });
+
+  it('takes an item with an error again after a start or an edit', () => {
+    const queue = started('A');
+    itemFailed(queue, 'q1', 'boom', 5);
+    expect(advance(queue, [], none, 6).take).toEqual([]);
+    startQueue(queue, [], 7);
+    expect(advance(queue, [], none, 8).take.map((item) => item.id)).toEqual(['q1']);
+  });
+
+  it('stops on a failed start when the mode is off', () => {
+    const queue = queueOf('A');
+    startQueue(queue, [], 3);
+    itemFailed(queue, 'q1', 'boom', 5);
+    expect(queue).toMatchObject({ status: 'stopped', stop: { kind: 'item', item: 'q1' } });
   });
 });

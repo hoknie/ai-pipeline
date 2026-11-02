@@ -136,11 +136,47 @@ describe('queues', () => {
     old.saveRun(run(1));
     old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
     old.database.exec('ALTER TABLE runs DROP COLUMN queue_item');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
     expect(store.loadRun('run000000001')?.run.queueItem).toBeNull();
+    store.close();
+  });
+
+  it('keeps the settings and the skipped runs of a queue', () => {
+    const store = temporaryStore();
+    const queue = emptyQueue('/repo', 1);
+    queue.autopilot = true;
+    queue.skipFailed = true;
+    queue.skipped = ['r2', 'r1'];
+    store.saveQueue(queue);
+    expect(store.loadQueue('/repo')).toMatchObject({
+      autopilot: true,
+      skipFailed: true,
+      skipped: ['r2', 'r1'],
+    });
+    expect(store.queues()[0]).toEqual(queue);
+  });
+
+  it('reads a queue saved before the settings with both modes off', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aip-store-'));
+    const old = new Store(databasePath(directory));
+    old.saveQueue(emptyQueue('/repo', 1));
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.close();
+    const store = new Store(databasePath(directory));
+    expect(store.loadQueue('/repo')).toMatchObject({
+      autopilot: false,
+      skipFailed: false,
+      skipped: [],
+    });
     store.close();
   });
 
@@ -336,7 +372,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-9)).toContain('denials_json');
+    expect(MIGRATIONS.at(-10)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -359,7 +395,7 @@ describe('refused tool calls', () => {
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-8)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-9)).toContain('outside_changes_json');
   });
 });
 
@@ -402,7 +438,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(12);
+    expect(SCHEMA_VERSION).toBe(13);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -439,7 +475,10 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN skip_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN tags_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN auto_deliver');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -464,7 +503,10 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN tags_json');
     old.database.exec('DROP TABLE repositories');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN auto_deliver');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -539,7 +581,10 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN queue_item');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN skip_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN tags_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
+    old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);

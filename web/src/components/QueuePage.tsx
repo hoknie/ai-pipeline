@@ -14,7 +14,7 @@ import { QueueList, itemLabel } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
 import { afterOptions, related } from './queueLinks.ts';
 import { parseParallel } from './ParallelStepper.tsx';
-import { QueueControls } from './QueueControls.tsx';
+import { QueueSettings } from './QueueSettings.tsx';
 
 export { parseParallel };
 
@@ -66,7 +66,6 @@ export default function QueuePage({
 }) {
   const { t } = useTranslation();
   const [workflows, setWorkflows] = useState<WorkflowsView | null>(null);
-  const [parallel, setParallel] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
 
   useEffect(() => {
@@ -96,15 +95,7 @@ export default function QueuePage({
 
   return (
     <div className="grid w-full gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-      <QueueControls
-        api={api}
-        queue={queue}
-        parallel={parallel}
-        onParallel={setParallel}
-        onQueue={onQueue}
-        onError={onError}
-        onDone={() => setParallel(null)}
-      />
+      <QueueSettings api={api} queue={queue} onQueue={onQueue} onError={onError} />
       <div className="flex min-w-0 flex-col gap-4">
         <StopReason queue={queue} />
         <QueueRuns queue={queue} now={now} highlight={linked} />

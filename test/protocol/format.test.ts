@@ -288,7 +288,7 @@ describe('queue text', () => {
     expect(view.runs[0]).toMatchObject({ problem: { reason: 'needs_human' } });
     expect(formatQueue(view)).toBe(
       [
-        'Queue: stopped, parallel 2 (1 of 2 places taken)',
+        'Queue: stopped, parallel 2 (1 of 2 places taken), autopilot off, skip failed off',
         'Stopped: run run000000001, group gruppa-1: needs_human',
         'Runs holding a place:',
         '  run000000001  needs_human  feature  задача 1  0/1 groups · steps 0/4',
@@ -380,7 +380,7 @@ describe('queue text', () => {
   it('shows an item error and an empty queue', () => {
     const queue = emptyQueue('/repo', 1);
     expect(formatQueue(queueView(queue, () => undefined))).toBe(
-      'Queue: stopped, parallel 1 (0 of 1 places taken)\nNo tasks waiting.',
+      'Queue: stopped, parallel 1 (0 of 1 places taken), autopilot off, skip failed off\nNo tasks waiting.',
     );
     addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
     queue.stop = { kind: 'item', item: 'q1', error: 'unknown workflow' };
@@ -443,14 +443,37 @@ describe('colored text', () => {
       repository: '/repo',
       status: 'stopped' as const,
       parallel: 1,
+      autopilot: false,
+      skipFailed: false,
       stop: null,
       items: [],
       runs: [],
+      skipped: [],
       autoDeliver: true,
       updatedAt: 1,
     };
     expect(ansi(formatQueue(queue, style)).split('\n')[0]).toContain('◦ stopped');
     expect(strip(formatQueue(queue, style))).toBe(strip(formatQueue(queue)));
+  });
+
+  it('shows the modes and the skipped runs of the queue', () => {
+    const state = run(1);
+    step(state);
+    group(state).status = 'failed';
+    const queue = emptyQueue('/repo', 1);
+    queue.autopilot = true;
+    queue.skipFailed = true;
+    queue.skipped = [state.run.id];
+    const view = queueView(queue, (id) => (id === state.run.id ? state : undefined));
+    expect(formatQueue(view)).toBe(
+      [
+        'Queue: stopped, parallel 1 (0 of 1 places taken), autopilot on, skip failed on',
+        'Skipped with a problem:',
+        `  ${state.run.id}  failed  feature  задача 1  1/1 groups · steps 0/4 · delivering`,
+        '    problem: failed in gruppa-1',
+        'No tasks waiting.',
+      ].join('\n'),
+    );
   });
 
   it('paints added lines green and removed lines red', () => {

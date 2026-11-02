@@ -89,6 +89,7 @@ export {
   removeItem,
   runProblems,
   setParallel,
+  setQueueSettings,
   startQueue,
   type DependencyState,
   type ItemFields,
@@ -98,5 +99,6 @@ export {
   type ProblemReason,
   type Queue,
   type QueueItem,
+  type QueueSettingsPatch,
   type QueueStop,
 } from './queue.ts';

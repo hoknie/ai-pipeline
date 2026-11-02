@@ -112,6 +112,23 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
   );
 }
 
+/** Runs taken off the places by a stopping problem; they do not count as places taken. */
+function SkippedRuns({ queue, now }: { queue: QueueView; now: number }) {
+  const { t } = useTranslation();
+  return (
+    <section aria-label={t('queue.skippedLabel')}>
+      <h3 className="mb-2 font-semibold">{t('queue.skipped', { count: queue.skipped.length })}</h3>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {queue.skipped.map((run) => (
+          <li key={run.id} className="min-w-0">
+            <RunCard run={run} now={now} linked={false} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** Runs of the queue that hold a place, as cards, with the free places of a running queue. */
 export function QueueRuns({
   queue,
@@ -125,32 +142,36 @@ export function QueueRuns({
 }) {
   const { t } = useTranslation();
   const running = queue.status === 'running';
-  if (queue.runs.length === 0 && !running) return null;
+  const skipped = queue.skipped.length > 0 ? <SkippedRuns queue={queue} now={now} /> : null;
+  if (queue.runs.length === 0 && !running) return skipped;
   const free = running ? Math.max(0, queue.parallel - queue.runs.length) : 0;
   return (
-    <section aria-label={t('queue.runningLabel')}>
-      <h3 className="mb-2 font-semibold">
-        {t('queue.running')} ·{' '}
-        {t('queue.runsPlaces', { taken: queue.runs.length, count: queue.parallel })}
-      </h3>
-      {queue.runs.length > queue.parallel ? (
-        <p className="mb-2 text-sm text-muted-foreground">{t('queue.runsOverflow')}</p>
-      ) : null}
-      <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
-        {queue.runs.map((run) => (
-          <li key={run.id} className="min-w-0">
-            <RunCard run={run} now={now} linked={highlight?.has(run.id) === true} />
-          </li>
-        ))}
-        {Array.from({ length: free }, (_, index) => (
-          <li
-            key={`free-${index}`}
-            className="flex items-center justify-center rounded-xl border border-dashed p-3 text-sm text-muted-foreground"
-          >
-            {t('queue.freeSlot')}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      <section aria-label={t('queue.runningLabel')}>
+        <h3 className="mb-2 font-semibold">
+          {t('queue.running')} ·{' '}
+          {t('queue.runsPlaces', { taken: queue.runs.length, count: queue.parallel })}
+        </h3>
+        {queue.runs.length > queue.parallel ? (
+          <p className="mb-2 text-sm text-muted-foreground">{t('queue.runsOverflow')}</p>
+        ) : null}
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
+          {queue.runs.map((run) => (
+            <li key={run.id} className="min-w-0">
+              <RunCard run={run} now={now} linked={highlight?.has(run.id) === true} />
+            </li>
+          ))}
+          {Array.from({ length: free }, (_, index) => (
+            <li
+              key={`free-${index}`}
+              className="flex items-center justify-center rounded-xl border border-dashed p-3 text-sm text-muted-foreground"
+            >
+              {t('queue.freeSlot')}
+            </li>
+          ))}
+        </ul>
+      </section>
+      {skipped}
+    </>
   );
 }

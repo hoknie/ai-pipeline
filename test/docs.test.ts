@@ -188,6 +188,24 @@ describe('documentation examples', () => {
     expect(problems).toEqual([]);
   });
 
+  it('document the queue settings', () => {
+    const cli = readFileSync(join(root, 'docs/cli.md'), 'utf8');
+    for (const text of [
+      'aip queue settings',
+      '--autopilot on|off',
+      '--skip-failed on|off',
+      'Skipped with a problem:',
+    ]) {
+      expect(cli).toContain(text);
+    }
+    const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+    expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_settings`'))).toContain(
+      'skip_failed?',
+    );
+    expect(hosts).toContain('"Queue settings"');
+    expect(hosts).toContain('"Skipped with a problem"');
+  });
+
   it('document the dependencies of queue tasks', () => {
     const cli = readFileSync(join(root, 'docs/cli.md'), 'utf8');
     expect(cli).toContain('--after <id>');
