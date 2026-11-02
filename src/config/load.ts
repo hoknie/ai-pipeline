@@ -240,7 +240,16 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
         })),
   ];
   if (errors.length > 0 || !result.ok) throw new ConfigLoadError({ kind: 'invalid', errors });
-  return { config: result.config, files: [...global.files, ...project.files] };
+  const projectSpecialists = isMapping(projectSwarm) ? projectSwarm.specialists : undefined;
+  const config: ResolvedConfig = {
+    ...result.config,
+    specialists: result.config.specialists.map((specialist) =>
+      isMapping(projectSpecialists) && specialist.slug in projectSpecialists
+        ? specialist
+        : { ...specialist, level: 'global' },
+    ),
+  };
+  return { config, files: [...global.files, ...project.files] };
 }
 
 /**

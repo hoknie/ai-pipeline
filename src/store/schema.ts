@@ -123,6 +123,11 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE runs ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
   ALTER TABLE queue_items ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]';
   `,
+  `ALTER TABLE queue_items ADD COLUMN skip_json TEXT NOT NULL DEFAULT '[]'`,
+  `
+  ALTER TABLE queue_items ADD COLUMN after_json TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE runs ADD COLUMN queue_item TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

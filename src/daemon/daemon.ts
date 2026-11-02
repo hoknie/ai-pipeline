@@ -23,6 +23,7 @@ import {
 import {
   Rejection,
   addItem,
+  checkSkip,
   addTag,
   advance,
   allGroups,
@@ -94,12 +95,24 @@ import {
   type ConfigCatalogResponse,
   type ConfigEditorResponse,
   type WorkflowsView,
+  type WebStartResult,
+  type WebStatusResult,
+  type WebStopResult,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import { Store, type KnownRepository } from '../store/index.ts';
 
 import { Executor, type AttemptKey } from './executor.ts';
 import { readLines, readTail } from './logs.ts';
+
+const NO_PANEL = 'this daemon serves no web panel';
+
+/** The web panel the daemon serves; implemented outside the daemon layer and passed in. */
+export interface PanelControl {
+  status(): WebStatusResult;
+  start(options: { token?: string; restart?: boolean }): Promise<WebStartResult>;
+  stop(): Promise<WebStopResult>;
+}
 
 export interface DaemonOptions {
   stateDirectory: string;
@@ -109,6 +122,8 @@ export interface DaemonOptions {
   graceMs?: number;
   /** Build the daemon reports to its clients; defaults to the build of this process. */
   build?: BuildInfo;
+  /** Serves `web_status`, `web_start` and `web_stop`; without it the daemon refuses them. */
+  panel?: PanelControl;
 }
 
 export class Daemon {
@@ -117,6 +132,7 @@ export class Daemon {
   readonly environment: NodeJS.ProcessEnv;
   readonly now: () => number;
   readonly build: BuildInfo;
+  private readonly panel: PanelControl | undefined;
   private readonly states = new Map<string, RunState>();
   private readonly executor: Executor;
   stopping = false;
@@ -140,6 +156,7 @@ export class Daemon {
     this.environment = options.environment ?? process.env;
     this.now = options.now ?? Date.now;
     this.build = options.build ?? currentBuild();
+    this.panel = options.panel;
     this.executor = new Executor({
       daemon: this,
       entry: options.entry,
@@ -171,7 +188,11 @@ export class Daemon {
     this.store.saveRun(state);
     this.broadcast(state);
     this.publishRepositories();
-    if ((this.queues.get(state.run.repository)?.runs.length ?? 0) > 0) {
+    const queue = this.queues.get(state.run.repository);
+    if (
+      queue &&
+      (queue.runs.length > 0 || queue.items.some((item) => item.after.includes(state.run.id)))
+    ) {
       this.requestAdvance(state.run.repository);
     }
   }
@@ -229,7 +250,7 @@ export class Daemon {
   /** Sends the `queue` event and remembers which runs subscribers have seen. */
   private publishQueue(queue: Queue): QueueView {
     const view = this.queueSnapshot(queue);
-    this.queueRuns.set(queue.repository, JSON.stringify(view.runs));
+    this.queueRuns.set(queue.repository, queueSignature(view));
     if (this.subscribers.size > 0) {
       this.seq += 1;
       const line = JSON.stringify({ event: 'queue', seq: this.seq, queue: view });
@@ -305,13 +326,14 @@ export class Daemon {
       const state = this.lookupState(id);
       return state ? [state] : [];
     });
-    const { take } = advance(queue, states, this.now());
+    const { take } = advance(queue, states, (id) => this.lookupState(id), this.now());
     let changed = fingerprint() !== before;
     for (const item of take) {
       try {
         const created = await this.createRun(
           itemParams(queue, item),
           knownTags(this.catalog, item.tags),
+          item.id,
         );
         itemStarted(queue, item.id, created.runId, this.now());
         started.set(item.id, created);
@@ -324,14 +346,19 @@ export class Daemon {
       changed = true;
     }
     if (changed) this.saveQueue(queue);
-    else if (this.queueRuns.get(repository) !== JSON.stringify(this.queueSnapshot(queue).runs)) {
+    else if (this.queueRuns.get(repository) !== queueSignature(this.queueSnapshot(queue))) {
       this.publishQueue(queue);
     }
     if (take.length > 0 && queue.runs.length > 0) this.requestAdvance(repository);
     return started;
   }
 
-  private async ensureWorkflow(repository: string, workflow: string): Promise<void> {
+  /** Rejects an unknown workflow or a `skip` that does not fit it. */
+  private async ensureItem(
+    repository: string,
+    workflow: string,
+    skip: readonly string[] = [],
+  ): Promise<void> {
     const config = loadConfig(
       configPaths(repository, this.environment.XDG_CONFIG_HOME, this.environment.HOME),
     );
@@ -339,6 +366,8 @@ export class Daemon {
       const known = config.workflows.map((candidate) => candidate.id).join(', ') || 'none';
       throw new Rejection(`unknown workflow \`${workflow}\`; known: ${known}`);
     }
+    const error = checkSkip(config, workflow, skip);
+    if (error !== null) throw new Rejection(error);
   }
 
   private queueRequest(request: Extract<Request, { method: `queue${string}` }>): Promise<unknown> {
@@ -352,16 +381,26 @@ export class Daemon {
         case 'queue_add':
           return this.addQueueItem(repository, request.params);
         case 'queue_edit': {
-          const { item, workflow, task, groups, title, position, autoDeliver } = request.params;
+          const { item, workflow, task, groups, title, position, autoDeliver, skip } =
+            request.params;
+          const after =
+            request.params.after === undefined
+              ? undefined
+              : this.resolveDependencies(queue, request.params.after);
           const tags =
             request.params.tags === undefined
               ? undefined
               : resolveTags(this.catalog, request.params.tags);
-          if (workflow !== undefined) await this.ensureWorkflow(repository, workflow);
+          if (workflow !== undefined || skip !== undefined) {
+            const current = queue.items.find((candidate) => candidate.id === item);
+            if (current) {
+              await this.ensureItem(repository, workflow ?? current.workflow, skip ?? current.skip);
+            }
+          }
           editItem(
             queue,
             item,
-            { workflow, task, groups, title, position, autoDeliver, tags },
+            { workflow, task, groups, title, position, autoDeliver, tags, skip, after },
             now,
           );
           this.saveQueue(queue);
@@ -398,6 +437,7 @@ export class Daemon {
           const created = await this.createRun(
             itemParams(queue, item),
             knownTags(this.catalog, item.tags),
+            item.id,
           );
           itemStarted(queue, item.id, created.runId, this.now());
           this.saveQueue(queue);
@@ -567,6 +607,24 @@ export class Daemon {
         });
       case 'subscribe':
         return Promise.reject(new Rejection('subscribe is served on its own connection'));
+      case 'web_status':
+        return Promise.resolve(
+          this.panel?.status() ?? {
+            running: false,
+            host: null,
+            port: null,
+            auth: null,
+            url: null,
+            reason: NO_PANEL,
+            stopped: false,
+          },
+        );
+      case 'web_start':
+        return this.panel
+          ? this.panel.start(request.params)
+          : Promise.reject(new Rejection(NO_PANEL));
+      case 'web_stop':
+        return this.panel ? this.panel.stop() : Promise.reject(new Rejection(NO_PANEL));
       case 'repositories':
         return Promise.resolve(this.repositoryList());
       case 'repository_add':
@@ -779,12 +837,13 @@ export class Daemon {
     const repository = await this.rootOf(params.repository);
     const queue = this.queueFor(repository);
     const now = this.now();
-    const { workflow, task, groups, title, autoDeliver } = params;
+    const { workflow, task, groups, title, autoDeliver, skip } = params;
     const tags = resolveTags(this.catalog, params.tags ?? []);
-    await this.ensureWorkflow(repository, workflow);
+    const after = this.resolveDependencies(queue, params.after ?? []);
+    await this.ensureItem(repository, workflow, skip);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, tags },
+      { workflow, task, groups, title, autoDeliver, tags, skip, after },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -806,18 +865,22 @@ export class Daemon {
 
   private async addQueueItem(
     repository: string,
-    params: Pick<ParamsOf<'queue_add'>, 'workflow' | 'task' | 'groups' | 'title' | 'autoDeliver'> &
+    params: Pick<
+      ParamsOf<'queue_add'>,
+      'workflow' | 'task' | 'groups' | 'title' | 'autoDeliver' | 'skip' | 'after'
+    > &
       Pick<ParamsOf<'queue_add'>, 'tags'>,
     inherited?: string[],
   ): Promise<unknown> {
-    const { workflow, task, groups, title, autoDeliver } = params;
+    const { workflow, task, groups, title, autoDeliver, skip } = params;
     const tags = inherited ?? resolveTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
-    await this.ensureWorkflow(repository, workflow);
+    const after = this.resolveDependencies(queue, params.after ?? []);
+    await this.ensureItem(repository, workflow, skip);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, tags },
+      { workflow, task, groups, title, autoDeliver, tags, skip, after },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -858,7 +921,26 @@ export class Daemon {
     });
   }
 
-  private async createRun(params: ParamsOf<'run'>, tagIds: string[]): Promise<RunCreated> {
+  /**
+   * Turns the ids a task waits for into ids of queue items or runs of the repository.
+   * An item that already became a run is replaced by that run.
+   */
+  private resolveDependencies(queue: Queue, ids: string[]): string[] {
+    return [...new Set(ids)].map((id) => {
+      if (queue.items.some((item) => item.id === id)) return id;
+      const own = this.lookupState(id);
+      if (own?.run.repository === queue.repository) return id;
+      const started = this.store.runOfQueueItem(queue.repository, id);
+      if (started) return started.run.id;
+      throw new Rejection(`unknown dependency \`${id}\``);
+    });
+  }
+
+  private async createRun(
+    params: ParamsOf<'run'>,
+    tagIds: string[],
+    queueItem: string | null = null,
+  ): Promise<RunCreated> {
     const repository = await this.rootOf(params.repository);
     const config = loadConfig(
       configPaths(repository, this.environment.XDG_CONFIG_HOME, this.environment.HOME),
@@ -867,6 +949,8 @@ export class Daemon {
       const known = config.workflows.map((workflow) => workflow.id).join(', ') || 'none';
       throw new Rejection(`unknown workflow \`${params.workflow}\`; known: ${known}`);
     }
+    const skipError = checkSkip(config, params.workflow, params.skip ?? []);
+    if (skipError !== null) throw new Rejection(skipError);
     const id = runId(this.now(), randomInt(36 ** 4));
     const prepared = await prepareRunBranch(repository, `refs/aip/${id}/run`, {
       workingTree: config.workspace.base === 'working_tree',
@@ -885,7 +969,9 @@ export class Daemon {
       groups: params.groups ?? groupsFromTask(params.task ?? ''),
       split: fromTask,
       fromQueue: true,
+      queueItem,
       autoDeliver: params.autoDeliver,
+      skip: params.skip,
       tags: tagIds,
       now: this.now(),
       ...(params.title ? { title: params.title } : {}),
@@ -1077,6 +1163,7 @@ function itemParams(queue: Queue, item: QueueItem): ParamsOf<'run'> {
     ...(item.groups !== null ? { groups: item.groups } : {}),
     ...(item.title !== null ? { title: item.title } : {}),
     ...(item.autoDeliver !== null ? { autoDeliver: item.autoDeliver } : {}),
+    ...(item.skip.length > 0 ? { skip: item.skip } : {}),
   };
 }
 
@@ -1093,4 +1180,12 @@ function describePath(detail: ConfigError): string {
     case 'invalid':
       return '';
   }
+}
+
+/** What subscribers of the `queue` event see: runs that occupy places and readiness of the items. */
+function queueSignature(view: QueueView): string {
+  return JSON.stringify({
+    runs: view.runs,
+    items: view.items.map((item) => [item.id, item.readiness, item.after]),
+  });
 }

@@ -55,7 +55,7 @@ function sh(cwd: string, ...args: string[]): string {
 export async function harness(
   config = WORKFLOW_CONFIG,
   environment: NodeJS.ProcessEnv = {},
-  options: Pick<DaemonOptions, 'build'> = {},
+  options: Pick<DaemonOptions, 'build' | 'panel'> = {},
 ): Promise<Harness> {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-daemon-')));
   const repo = join(base, 'repo');

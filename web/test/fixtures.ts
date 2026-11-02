@@ -15,6 +15,8 @@ import type {
   QueueView,
   RepositoryView,
   RunView,
+  TagColor,
+  TagView,
   Topology,
   Transcript,
   WorkflowTopology,
@@ -102,6 +104,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     resolver: null,
     diff: null,
     topology: topologyOf(),
+    specialists: [],
     groups: [groupRow()],
     ...overrides,
   };
@@ -158,12 +161,22 @@ export function workflowOf(overrides: Partial<WorkflowTopology> = {}): WorkflowT
       ({ groups: _g, attempts: _a, rejections: _r, usage: _u, ...step }) => step,
     ),
     delivery: { mode: 'worktree', resolver: null },
+    limits: {},
     ...overrides,
   };
 }
 
 export function workflowsView(overrides: Partial<WorkflowsView> = {}): WorkflowsView {
   return { repository: '/repo', workflows: [workflowOf()], errors: [], ...overrides };
+}
+
+/** A catalog tag; the id follows the name unless given. */
+export function tagView(
+  name: string,
+  color: TagColor = 'blue',
+  id = `t-${name.toLowerCase()}`,
+): TagView {
+  return { id, name, color };
 }
 
 export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): QueueRunView {
@@ -257,6 +270,9 @@ export function queueItem(id: string, task: string, position: number, extra = {}
     title: null,
     autoDeliver: null,
     tags: [],
+    skip: [],
+    readiness: 'ready' as const,
+    after: [],
     createdAt: 1,
     error: null,
     ...extra,
@@ -342,6 +358,11 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     retry: vi.fn(async () => ({})),
     cancel: vi.fn(async () => ({})),
     apply: vi.fn(async () => ({ runId: 'run1', pending: false, groups: [] })),
+    tags: vi.fn(async () => []),
+    addTag: vi.fn(async (name: string) => [tagView(name)]),
+    editTag: vi.fn(async () => []),
+    removeTag: vi.fn(async () => []),
+    setRunTags: vi.fn(async () => runView()),
     queue: vi.fn(async () => queueOf()),
     queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
     queueEdit: vi.fn(async () => queueOf()),
@@ -420,4 +441,26 @@ export function repositoryView(
   overrides: Partial<RepositoryView> = {},
 ): RepositoryView {
   return { path, addedAt: 1, unfinished: 0, waiting: 0, queued: 0, ...overrides };
+}
+
+type Use = RunView['specialists'][number];
+
+/** A specialist of a run with the groups running on it and waiting for it. */
+export function specialistUse(
+  specialist: string,
+  overrides: {
+    level?: Use['level'];
+    max?: number | null;
+    running?: string[];
+    waiting?: string[];
+  } = {},
+): Use {
+  const item = (slug: string) => ({ slug, title: slug, step: 'code' });
+  return {
+    specialist,
+    level: overrides.level ?? 'project',
+    max: overrides.max ?? null,
+    running: (overrides.running ?? []).map((slug) => ({ ...item(slug), startedAt: 1_000 })),
+    waiting: (overrides.waiting ?? []).map(item),
+  };
 }

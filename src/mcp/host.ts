@@ -38,6 +38,18 @@ export function createHostServer(options: HostOptions): McpServer {
     .array(z.string())
     .optional()
     .describe('Names of existing tags; an unknown name is an error. Edit replaces the whole list');
+  const skip = z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Ids of workflow steps this task skips, e.g. ["review", "qa"]. Edit replaces the whole list; [] runs every step',
+    );
+  const after = z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Ids of queue items or runs of the repository that must be done (finished, merged and delivered) first. Edit replaces the whole list; [] removes the dependencies',
+    );
   const group = z.string().describe('Group slug from swarm_status; `_split` for the split step');
   const showRun = async (method: string, params: Record<string, unknown>) => {
     const view = (await options.send(method, params)) as RunView;
@@ -69,9 +81,21 @@ export function createHostServer(options: HostOptions): McpServer {
             'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
           ),
         tags,
+        skip,
+        after,
       },
     },
-    ({ workflow, task, groups, repo, title, autoDeliver, tags: tagNames }) =>
+    ({
+      workflow,
+      task,
+      groups,
+      repo,
+      title,
+      autoDeliver,
+      tags: tagNames,
+      skip: skipSteps,
+      after: afterIds,
+    }) =>
       attempt(async () => {
         const queued = (await options.send('run', {
           repository: repo ?? options.cwd,
@@ -81,6 +105,8 @@ export function createHostServer(options: HostOptions): McpServer {
           ...(title !== undefined ? { title } : {}),
           ...(autoDeliver !== undefined ? { autoDeliver } : {}),
           ...(tagNames !== undefined ? { tags: tagNames } : {}),
+          ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
+          ...(afterIds !== undefined ? { after: afterIds } : {}),
         })) as RunQueued;
         return withData(formatRunQueued(queued), queued);
       }),
@@ -230,10 +256,22 @@ export function createHostServer(options: HostOptions): McpServer {
             'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
           ),
         tags,
+        skip,
+        after,
         repo,
       },
     },
-    ({ workflow, task, groups, title, autoDeliver, tags: tagNames, repo: where }) =>
+    ({
+      workflow,
+      task,
+      groups,
+      title,
+      autoDeliver,
+      tags: tagNames,
+      skip: skipSteps,
+      after: afterIds,
+      repo: where,
+    }) =>
       attempt(() =>
         showQueue(
           'queue_add',
@@ -244,6 +282,8 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(title !== undefined ? { title } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
+            ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
+            ...(afterIds !== undefined ? { after: afterIds } : {}),
           },
           where,
         ),
@@ -269,6 +309,8 @@ export function createHostServer(options: HostOptions): McpServer {
           .optional()
           .describe('Automatic delivery of this task; null follows delivery.auto again'),
         tags,
+        skip,
+        after,
         repo,
       },
     },
@@ -281,6 +323,8 @@ export function createHostServer(options: HostOptions): McpServer {
       position,
       autoDeliver,
       tags: tagNames,
+      skip: skipSteps,
+      after: afterIds,
       repo: where,
     }) =>
       attempt(() =>
@@ -295,6 +339,8 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(position !== undefined ? { position } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
+            ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
+            ...(afterIds !== undefined ? { after: afterIds } : {}),
           },
           where,
         ),

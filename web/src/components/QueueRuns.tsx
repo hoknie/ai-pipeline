@@ -9,6 +9,7 @@ import type { QueueRunView, QueueView } from '../types.ts';
 import { Card } from '../ui/card.tsx';
 
 import { StatusBadge } from './StatusBadge.tsx';
+import { TagChips } from './TagChip.tsx';
 
 const REASONS = ['needs_human', 'failed', 'conflict', 'cancelled', 'apply_failed'] as const;
 
@@ -31,6 +32,7 @@ function RunCard({ run, now }: { run: QueueRunView; now: number }) {
           {run.title}
         </a>
         <StatusBadge status={run.state} />
+        <TagChips tags={run.tags ?? []} />
         {run.delivering ? (
           <span className="inline-flex items-center gap-1 text-muted-foreground">
             <Truck aria-hidden className="size-4" />

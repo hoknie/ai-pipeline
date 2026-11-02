@@ -11,6 +11,7 @@ import type {
   RepositoryView,
   RunCreated,
   RunView,
+  TagView,
   Transcript,
   WorkflowsView,
   WriteLevel,
@@ -45,6 +46,15 @@ export interface Api {
   retry(runId: string, group: string): Promise<unknown>;
   cancel(runId: string, group?: string): Promise<unknown>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
+  /** The tag catalog (shared by all repositories). */
+  tags(): Promise<TagView[]>;
+  /** Creates a tag (the daemon picks the color when none is given); returns the catalog. */
+  addTag(name: string, color?: string): Promise<TagView[]>;
+  /** Renames and/or recolors a tag, addressed by its current name; returns the catalog. */
+  editTag(tag: string, patch: { name?: string; color?: string }): Promise<TagView[]>;
+  removeTag(tag: string): Promise<TagView[]>;
+  /** Adds and removes tags (by name) of a run in any state. */
+  setRunTags(runId: string, change: { add?: string[]; remove?: string[] }): Promise<RunView>;
   /** The queue of the bound repository. */
   queue(): Promise<QueueView>;
   queueAdd(fields: QueueFields): Promise<QueueView & { item: string }>;
@@ -152,6 +162,11 @@ function bound(repository: string | null): Api {
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)
         : post(`/api/runs/${enc(runId)}/cancel`),
     apply: (runId, force) => post(`/api/runs/${enc(runId)}/apply`, force ? { force: true } : {}),
+    tags: () => call('/api/tags'),
+    addTag: (name, color) => post('/api/tags', color ? { name, color } : { name }),
+    editTag: (tag, patch) => post('/api/tags/edit', { tag, ...patch }),
+    removeTag: (tag) => post('/api/tags/remove', { tag }),
+    setRunTags: (runId, change) => post(`/api/runs/${enc(runId)}/tags`, change),
     queue: () => call(at('/api/queue')),
     queueAdd: (fields) => post(at('/api/queue/items'), fields),
     queueEdit: (item, patch) => post(at(`/api/queue/items/${enc(item)}`), patch),

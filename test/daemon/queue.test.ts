@@ -630,3 +630,348 @@ describe('run goes through the queue', () => {
     expect(queue.runs).toEqual([]);
   });
 });
+
+describe('skipped steps of a task', () => {
+  it('runs the task without the skipped step up to merged', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB] });
+    const view = await add(h, 'A', { skip: ['review'] });
+    expect(view.items[0]?.skip).toEqual(['review']);
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    const [created] = await allRuns(h);
+    const finished = await h.waitFor(created!.id, (run) => run.finished);
+    expect(finished.groups.map((group) => group.status)).toEqual(['merged']);
+    const slug = finished.groups[0]!.slug;
+    const attempts = (await h.group(created!.id, slug)).attempts.map((attempt) => attempt.stepId);
+    expect(attempts).toEqual(['code']);
+  });
+
+  it('rejects an unknown step with the list of steps and keeps the queue', async () => {
+    const h = await start();
+    await expect(
+      h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'x', skip: ['deploy'] }),
+    ).rejects.toThrow('unknown step `deploy` in skip; steps: code, review');
+    await expect(
+      h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'x', skip: ['code'] }),
+    ).rejects.toThrow('step `review` returns to skipped step `code`');
+    await expect(
+      h.call('run', {
+        repository: h.repo,
+        workflow: 'feature',
+        task: 'x',
+        skip: ['code', 'review'],
+      }),
+    ).rejects.toThrow('skip leaves no steps');
+    expect((await queueOf(h)).items).toEqual([]);
+  });
+
+  it('replaces and clears skip when editing and checks the final combination', async () => {
+    const h = await start();
+    const { item } = await add(h, 'A');
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      skip: ['review'],
+    })) as QueueView;
+    expect(edited.items[0]?.skip).toEqual(['review']);
+    const renamed = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      title: 'B',
+    })) as QueueView;
+    expect(renamed.items[0]?.skip).toEqual(['review']);
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item, skip: ['nope'] }),
+    ).rejects.toThrow('unknown step `nope`');
+    expect((await queueOf(h)).items[0]?.skip).toEqual(['review']);
+    const cleared = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      skip: [],
+    })) as QueueView;
+    expect(cleared.items[0]?.skip).toEqual([]);
+  });
+
+  it('refuses to change the workflow to one without the skipped step', async () => {
+    const h = await start(
+      `${WORKFLOW_CONFIG}    other:\n      steps:\n        - { id: code, specialist: coder }\n`,
+    );
+    const { item } = await add(h, 'A', { skip: ['review'] });
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item, workflow: 'other' }),
+    ).rejects.toThrow('unknown step `review` in skip');
+    const unchanged = (await queueOf(h)).items[0];
+    expect(unchanged?.workflow).toBe('feature');
+    expect(unchanged?.skip).toEqual(['review']);
+    const moved = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      workflow: 'other',
+      skip: [],
+    })) as QueueView;
+    expect(moved.items[0]?.workflow).toBe('other');
+    expect(moved.items[0]?.skip).toEqual([]);
+  });
+
+  it('puts a task with a step removed from swarm.yaml first with an error and stops the queue', async () => {
+    const h = await start();
+    await add(h, 'A', { skip: ['review'] });
+    writeConfigDirectory(
+      h.repo,
+      WORKFLOW_CONFIG.replace(
+        '        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }\n',
+        '',
+      ),
+    );
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitQueue(h, (queue) => queue.stop !== null);
+    expect(stopped.stop).toMatchObject({ kind: 'item' });
+    expect(stopped.items[0]?.error).toContain('unknown step `review` in skip');
+    expect(await allRuns(h)).toEqual([]);
+  });
+
+  it('passes skip to a run started now', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB] });
+    const { item } = await add(h, 'A', { skip: ['review'] });
+    const created = (await h.call('queue_run_now', { repository: h.repo, item })) as RunCreated;
+    const finished = await h.waitFor(created.runId, (run) => run.finished);
+    const attempts = (await h.group(created.runId, finished.groups[0]!.slug)).attempts;
+    expect(attempts.map((attempt) => attempt.stepId)).toEqual(['code']);
+  });
+});
+
+const WORKER_QUEUE_CONFIG = WORKFLOW_CONFIG.replace(
+  'coder: { name: Кодировщик }',
+  'coder: { name: Кодировщик, queue: true }',
+);
+
+const itemById = (queue: QueueView, id: string) => queue.items.find((item) => item.id === id);
+
+describe('dependencies of queue items', () => {
+  it('resolves ids of items, started items and runs, and rejects unknown ones', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB, {}] });
+    const first = await add(h, 'A');
+    const second = await add(h, 'B', { after: [first.item, first.item] });
+    expect(itemById(second, second.item)?.after).toEqual([
+      expect.objectContaining({ kind: 'item', id: first.item, state: 'waiting' }),
+    ]);
+    expect(itemById(second, second.item)?.readiness).toBe('waiting');
+    await expect(add(h, 'C', { after: ['nope'] })).rejects.toThrow('unknown dependency `nope`');
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: first.item, after: [second.item] }),
+    ).rejects.toThrow('dependency cycle');
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: first.item, after: [first.item] }),
+    ).rejects.toThrow('a task cannot depend on itself');
+    expect((await queueOf(h)).items).toHaveLength(2);
+    await h.call('queue_start', { repository: h.repo });
+    const running = await waitQueue(h, (queue) => queue.runs.length === 1);
+    const runId = running.runs[0]!.id;
+    expect(itemById(running, second.item)?.after).toEqual([
+      expect.objectContaining({ kind: 'run', id: runId }),
+    ]);
+    // the id of an item that became a run still works
+    const third = await add(h, 'C', { after: [first.item] });
+    expect(itemById(third, third.item)?.after.map((dependency) => dependency.id)).toEqual([runId]);
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    expect((await allRuns(h)).map((run) => run.id)).toContain(runId);
+  });
+
+  it('queues a run with an unfinished dependency and starts the stopped queue', async () => {
+    const h = await start();
+    h.script({ code: [{ ...WRITE_LIB, delayMs: 1500 }, {}] });
+    const first = await add(h, 'A');
+    const queued = await run_(h, 'B', [first.item]);
+    expect(queued.run).toBeNull();
+    expect(queued.queue.status).toBe('running');
+    expect(queued.queue.runs).toHaveLength(1);
+    expect(queued.queue.items).toHaveLength(1);
+    expect(queued.queue.items[0]).toMatchObject({ readiness: 'waiting' });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    expect(await allRuns(h)).toHaveLength(2);
+  });
+
+  it('starts a run at once when its dependency is done', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB, {}] });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    const [done] = await waitQueue(h, (queue) => queue.runs.length === 1).then((queue) =>
+      queue.runs.map((run) => run.id),
+    );
+    await h.waitFor(done!, (view) => view.finished && view.delivery.applied === 1);
+    await waitQueue(h, (queue) => queue.status === 'stopped');
+    const queued = await run_(h, 'B', [done!]);
+    expect(queued.run).not.toBeNull();
+    await h.waitFor(queued.run!.runId, (view) => view.finished);
+  });
+
+  it('starts an independent task before a dependent one and the dependent one after delivery', async () => {
+    const h = await start();
+    h.script({ code: [{ ...WRITE_LIB, delayMs: 1200 }, { delayMs: 2500 }, { read: ['lib.ts'] }] });
+    const a = await add(h, 'A');
+    const b = await add(h, 'B', { after: [a.item] });
+    await add(h, 'C');
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    await h.call('queue_start', { repository: h.repo });
+    const first = await queueOf(h);
+    expect(first.runs).toHaveLength(2);
+    expect(first.items.map((item) => item.id)).toEqual([b.item]);
+    expect(first.items[0]).toMatchObject({ readiness: 'waiting' });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    const runs = await allRuns(h);
+    expect(runs.map((run) => run.title)).toEqual(['A', 'C', 'B']);
+    expect(runs.every((run) => run.state === 'finished')).toBe(true);
+    const reads = readFileSync(join(h.fakeState, 'reads.jsonl'), 'utf8').trim().split('\n');
+    expect(JSON.parse(reads.at(-1)!).contents['lib.ts']).toBe('export const value = 2;\n');
+  });
+
+  it('waits for apply when the predecessor is not delivered automatically', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB, { read: ['lib.ts'] }] });
+    const a = await add(h, 'A', { autoDeliver: false });
+    await add(h, 'B', { after: [a.item] });
+    await h.call('queue_start', { repository: h.repo });
+    const [runId] = (await waitQueue(h, (queue) => queue.runs.length === 1)).runs.map(
+      (run) => run.id,
+    );
+    await h.waitFor(runId!, (view) => view.finished);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const waiting = await queueOf(h);
+    expect(waiting.status).toBe('running');
+    expect(waiting.items).toHaveLength(1);
+    expect(waiting.items[0]).toMatchObject({ readiness: 'waiting' });
+    await h.call('apply', { runId: runId! });
+    await waitQueue(h, (queue) => queue.items.length === 0 && queue.status === 'stopped');
+    expect(await allRuns(h)).toHaveLength(2);
+    const reads = readFileSync(join(h.fakeState, 'reads.jsonl'), 'utf8').trim().split('\n');
+    expect(JSON.parse(reads.at(-1)!).contents['lib.ts']).toBe('export const value = 2;\n');
+  });
+
+  it('blocks on a failed predecessor, becomes ready after a retry and starts only with the queue', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, {}] });
+    const a = await add(h, 'A');
+    const b = await add(h, 'B', { after: [a.item] });
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitQueue(h, (queue) => queue.stop !== null);
+    expect(stopped.stop).toMatchObject({ kind: 'problem', reason: 'failed' });
+    expect(itemById(stopped, b.item)).toMatchObject({ readiness: 'blocked' });
+    const runId = (await allRuns(h))[0]!.id;
+    const view = await h.status(runId);
+    const retryEvents: StreamEvent[] = [];
+    const retryEnded = subscribe(h.socket, (line) =>
+      retryEvents.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await h.call('retry', { runId, group: view.groups[0]!.slug });
+    await h.waitFor(
+      runId,
+      (current) => current.finished && current.groups.every((g) => g.delivery === 'applied'),
+    );
+    const ready = await waitQueue(h, (queue) => itemById(queue, b.item)?.readiness === 'ready');
+    expect(ready.status).toBe('stopped');
+    expect(ready.stop).toMatchObject({ kind: 'problem', reason: 'failed' });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(await allRuns(h)).toHaveLength(1);
+    // the stopped queue changed only in readiness: subscribers still get a queue event
+    const readyEvent = retryEvents.flatMap((event) =>
+      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    );
+    expect(
+      readyEvent.some(
+        (queue) => queue.status === 'stopped' && itemById(queue, b.item)?.readiness === 'ready',
+      ),
+    ).toBe(true);
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    expect(await allRuns(h)).toHaveLength(2);
+    await h.close();
+    current = null;
+    expect(await retryEnded).toBe('closed');
+  });
+
+  it('runs a blocked task now and points its successors at the run', async () => {
+    const h = await start();
+    const a = await add(h, 'A');
+    const b = await add(h, 'B', { after: [a.item] });
+    const c = await add(h, 'C', { after: [b.item] });
+    const created = (await h.call('queue_run_now', {
+      repository: h.repo,
+      item: b.item,
+    })) as RunCreated;
+    const queue = await queueOf(h);
+    expect(queue.items.map((item) => item.id)).toEqual([a.item, c.item]);
+    expect(itemById(queue, c.item)?.after.map((dependency) => dependency.id)).toEqual([
+      created.runId,
+    ]);
+    expect(queue.status).toBe('stopped');
+    await h.waitFor(created.runId, (view) => view.finished);
+  });
+
+  it('keeps the dependencies after a restart', async () => {
+    const h = await start();
+    const a = await add(h, 'A');
+    const b = await add(h, 'B', { after: [a.item] });
+    await h.restart();
+    const queue = await queueOf(h);
+    expect(itemById(queue, b.item)?.after).toEqual([
+      expect.objectContaining({ kind: 'item', id: a.item }),
+    ]);
+  });
+
+  it('chains tasks added by a specialist through the ids of earlier answers', async () => {
+    const h = await start(WORKER_QUEUE_CONFIG);
+    h.script({
+      code: [
+        {
+          queueChain: [
+            { workflow: 'feature', task: 'модель', title: 'модель' },
+            { workflow: 'feature', task: 'API', title: 'API', after: ['$prev'] },
+          ],
+        },
+      ],
+    });
+    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    await h.call('queue_pause', { repository: h.repo });
+    await h.waitFor(created.runId, (view) => view.finished);
+    const queue = await queueOf(h);
+    expect(queue.items.map((item) => item.title)).toEqual(['модель', 'API']);
+    expect(queue.items[1]!.after.map((dependency) => dependency.id)).toEqual([queue.items[0]!.id]);
+    expect(queue.items[1]).toMatchObject({ readiness: 'waiting' });
+  });
+
+  it('sends a queue event when the readiness of an item changes', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB, {}] });
+    const a = await add(h, 'A');
+    const b = await add(h, 'B', { after: [a.item] });
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const queues = events.flatMap((event) =>
+      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    );
+    expect(queues.some((queue) => itemById(queue, b.item)?.readiness === 'waiting')).toBe(true);
+    expect(queues.some((queue) => itemById(queue, b.item)?.after[0]?.kind === 'run')).toBe(true);
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
+});
+
+async function run_(h: Harness, title: string, after: string[]): Promise<RunQueued> {
+  return (await h.call('run', {
+    repository: h.repo,
+    workflow: 'feature',
+    task: 'работа',
+    title,
+    after,
+  })) as RunQueued;
+}

@@ -39,6 +39,9 @@ export interface Defaults {
   tools: string[];
 }
 
+/** Where a specialist is defined: the global aip/ directory only, or the project one. */
+export type SpecialistLevel = 'global' | 'project';
+
 export interface Specialist {
   slug: string;
   name: string;
@@ -57,6 +60,8 @@ export interface Specialist {
    * snapshots of runs made before the field existed.
    */
   queue: boolean;
+  /** Level of the definition; absent in snapshots of runs made before the field existed. */
+  level: SpecialistLevel;
 }
 
 export interface OnReject {
@@ -174,6 +179,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const specialists = stored.specialists.map((specialist) => ({
     ...specialist,
     max: specialist.max ?? null,
+    level: (specialist as Partial<Specialist>).level ?? 'project',
   }));
   // Runs stored before `claude.settings` existed take the default: no user settings.
   const claude: ClaudeSettings = {

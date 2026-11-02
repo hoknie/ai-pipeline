@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import type { WorkflowTopology } from '../types.ts';
 
 import { cn } from '../lib/cn.ts';
+import type { MachineLoad } from '../specialistLoad.ts';
 import { useTheme } from '../theme.ts';
 import { Card } from '../ui/card.tsx';
 
@@ -57,6 +58,7 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
         'grid w-[170px] grid-cols-[minmax(0,1fr)] gap-1 px-3 py-2.5 text-xs',
         data.kind !== 'step' && 'bg-muted',
         data.active && 'border-status-run ring-4 ring-status-run-bg',
+        data.busy?.full && 'border-status-warn bg-status-warn-bg',
         selected && 'border-primary',
       )}
       data-testid={`stage-${data.step ?? data.kind}`}
@@ -86,6 +88,19 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
           ))}
         </div>
       ) : null}
+      {data.busy && (data.busy.running > 0 || data.busy.max !== null) ? (
+        <div
+          className={cn('truncate text-muted-foreground', data.busy.full && 'font-medium')}
+          data-testid={`busy-${data.step ?? data.kind}`}
+        >
+          {data.busy.max === null
+            ? t('topology.busyUnlimited', { n: data.busy.running })
+            : t('topology.busy', { n: data.busy.running, max: data.busy.max })}
+          {data.busy.elsewhere > 0
+            ? ` · ${t('topology.busyElsewhere', { n: data.busy.elsewhere })}`
+            : ''}
+        </div>
+      ) : null}
       {data.attempts !== null ? (
         <div className="truncate text-muted-foreground">
           {t('topology.attempts', { n: data.attempts })}
@@ -105,6 +120,7 @@ const NODE_TYPES = { stage: Stage };
 export function WorkflowGraph({
   workflow,
   live,
+  load,
   selected = null,
   onSelect,
   onNodes,
@@ -112,6 +128,8 @@ export function WorkflowGraph({
 }: {
   workflow: WorkflowTopology;
   live?: Live | null;
+  /** Load of the specialists across the machine; without it nodes show no occupancy. */
+  load?: MachineLoad | null;
   selected?: string | null;
   onSelect?: (id: string | null) => void;
   /** Called with the laid out nodes whenever they change. */
@@ -140,13 +158,13 @@ export function WorkflowGraph({
   const previousEdges = useRef<Edge[]>([]);
   const graph = useMemo(() => {
     void sizeVersion;
-    const raw = layout(workflow, state, t, sizes.current);
+    const raw = layout(workflow, state, t, sizes.current, load ?? undefined);
     const nodes = stabilize(previousNodes.current, raw.nodes, sizes.current, selected);
     const edges = stabilizeEdges(previousEdges.current, raw.edges);
     previousNodes.current = nodes;
     previousEdges.current = edges;
     return { nodes, edges };
-  }, [workflow, state, selected, sizeVersion, t]);
+  }, [workflow, state, load, selected, sizeVersion, t]);
   useEffect(() => onNodes?.(graph.nodes), [graph.nodes, onNodes]);
 
   return (

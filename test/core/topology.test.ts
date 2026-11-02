@@ -9,6 +9,13 @@ import {
 
 import { CONFIG_TEXT, config, finish, run, step } from './helpers.ts';
 
+describe('topology of a run with skipped steps', () => {
+  it('lists only the remaining steps', () => {
+    const view = topology(run(1, { skip: ['review', 'qa'] }));
+    expect(view.steps.map((entry) => entry.id)).toEqual(['plan', 'code']);
+  });
+});
+
 describe('topology', () => {
   it('places groups on steps and sums attempts, rejections and usage per step', () => {
     const state = run(2);
@@ -83,6 +90,28 @@ describe('workflow topology', () => {
     });
     expect(all[0]).toMatchObject({ split: null, delivery: { mode: 'worktree', resolver: null } });
     expect(workflowTopology(config(), 'missing')).toBeNull();
+  });
+
+  it('gives the limit of the specialists of the split, the steps and the resolver', () => {
+    const text = `${CONFIG_TEXT}  delivery: { resolver: qa }\n`
+      .replace('plan: { name: Планировщик,', 'plan: { name: Планировщик, max: 2,')
+      .replace('coder: { name: Кодировщик,', 'coder: { name: Кодировщик, max: 1,')
+      .replace(
+        '    feature:\n      steps:',
+        '    feature:\n      split: { specialist: plan, max_groups: 3 }\n      steps:',
+      );
+    expect(workflowTopology(config(text), 'feature')?.limits).toEqual({
+      plan: 2,
+      coder: 1,
+      reviewer: null,
+      qa: null,
+    });
+    expect(workflowTopology(config(), 'feature')?.limits).toEqual({
+      plan: null,
+      coder: null,
+      reviewer: null,
+      qa: null,
+    });
   });
 });
 

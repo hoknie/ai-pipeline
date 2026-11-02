@@ -105,6 +105,7 @@ export {
   type ResolvedConfig,
   type Runtime,
   type Specialist,
+  type SpecialistLevel,
   type Step,
   type Workflow,
 } from './model.ts';

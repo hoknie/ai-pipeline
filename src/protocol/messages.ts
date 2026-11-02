@@ -36,6 +36,12 @@ export const reportParamsSchema = z.object({
 /** Tag names, as the user sees them; the daemon resolves them to ids. */
 const tagNames = z.array(z.string().trim().min(1).max(TAG_NAME_LIMIT)).max(20);
 
+/** Ids of workflow steps a task skips. */
+const skipSteps = z.array(z.string().trim().min(1)).max(50);
+
+/** Ids of queue items or runs a task waits for. */
+const afterIds = z.array(z.string().min(1)).max(50);
+
 const runParams = z
   .object({
     repository: z.string().min(1),
@@ -45,6 +51,8 @@ const runParams = z
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),
     autoDeliver: z.boolean().optional(),
     tags: tagNames.optional(),
+    skip: skipSteps.optional(),
+    after: afterIds.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -64,6 +72,8 @@ const queueAddParams = z
     title: queueTitle.optional(),
     autoDeliver: z.boolean().optional(),
     tags: tagNames.optional(),
+    skip: skipSteps.optional(),
+    after: afterIds.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -78,6 +88,8 @@ export const workerQueueAddParams = z
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
     autoDeliver: z.boolean().optional(),
+    skip: skipSteps.optional(),
+    after: afterIds.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -93,6 +105,8 @@ const queueEditParams = z
     title: queueTitle.nullable().optional(),
     autoDeliver: z.boolean().nullable().optional(),
     tags: tagNames.optional(),
+    skip: skipSteps.optional(),
+    after: afterIds.optional(),
     position: z.number().int().min(1).optional(),
   })
   .refine((params) => params.task === undefined || params.groups === undefined, {
@@ -254,6 +268,20 @@ export const requestSchema = z.discriminatedUnion('method', [
         message: 'pass tags to add or remove',
       }),
   }),
+  z.object({ method: z.literal('web_status'), params: z.object({}).default({}) }),
+  z.object({
+    method: z.literal('web_start'),
+    params: z
+      .object({
+        token: z
+          .string()
+          .regex(/^[A-Za-z0-9_-]{16,128}$/)
+          .optional(),
+        restart: z.boolean().optional(),
+      })
+      .default({}),
+  }),
+  z.object({ method: z.literal('web_stop'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('report'), params: reportParamsSchema }),
   z.object({ method: z.literal('worker_queue_add'), params: workerQueueAddParams }),
   z.object({
@@ -284,6 +312,32 @@ export type PingResult = z.infer<typeof pingResultSchema>;
 
 /** Answer to `shutdown_idle`: the daemon stops only when no agent runs and nothing merges. */
 export const shutdownIdleResultSchema = z.object({ stopping: z.boolean() });
+
+/** Answer to `web_status`: the panel the daemon serves. */
+export const webStatusResultSchema = z.object({
+  running: z.boolean(),
+  host: z.string().nullable(),
+  port: z.number().int().nullable(),
+  auth: z.enum(['token', 'none']).nullable(),
+  url: z.string().nullable(),
+  /** Why the panel is not running, when a start failed or the daemon serves none. */
+  reason: z.string().nullable(),
+  /** The panel was stopped by `aip web stop` and stays so until the next start. */
+  stopped: z.boolean(),
+});
+
+export type WebStatusResult = z.infer<typeof webStatusResultSchema>;
+
+export const webStartResultSchema = z.object({
+  state: z.enum(['started', 'already_running', 'restarted']),
+  status: webStatusResultSchema,
+});
+
+export type WebStartResult = z.infer<typeof webStartResultSchema>;
+
+export const webStopResultSchema = z.object({ state: z.enum(['stopped', 'not_running']) });
+
+export type WebStopResult = z.infer<typeof webStopResultSchema>;
 
 export const envelopeSchema = z.object({ id: z.number().int() }).loose();
 

@@ -17,6 +17,11 @@ interface Action {
   split?: { title: string; task: string }[];
   /** Calls swarm_queue_add with these arguments; its text result goes to queued.jsonl. */
   queue?: Record<string, unknown>;
+  /**
+   * Calls swarm_queue_add once per entry; `$prev` in `after` stands for the id of the item the
+   * previous call returned. The results go to queued.jsonl.
+   */
+  queueChain?: Record<string, unknown>[];
   delayMs?: number;
   noReport?: boolean;
   hang?: boolean;
@@ -30,6 +35,66 @@ const [mode, ...args] = process.argv.slice(2);
 
 if (args[0] === '--version') {
   console.log(`fake ${mode} 0.0.0`);
+  process.exit(0);
+}
+
+// Host management of the fake claude: `mcp` and `plugin` subcommands keep their state in the JSON
+// file AIP_FAKE_HOST_STATE. AIP_FAKE_HOST_FAIL is a comma-separated list of argument prefixes
+// (`mcp add`, `plugin`) that fail; a failing `plugin` answers like a Claude Code without it.
+if (mode === 'claude' && (args[0] === 'mcp' || args[0] === 'plugin')) {
+  const file = process.env.AIP_FAKE_HOST_STATE!;
+  const joined = args.join(' ');
+  const failing = (process.env.AIP_FAKE_HOST_FAIL ?? '').split(',').filter(Boolean);
+  if (failing.some((prefix) => joined.startsWith(prefix))) {
+    console.error(
+      args[0] === 'plugin' && failing.includes('plugin')
+        ? `error: unknown command '${args[0]}'`
+        : `error: ${joined} failed`,
+    );
+    process.exit(1);
+  }
+  const hostState: {
+    mcp: Record<string, { command: string; args: string[] }>;
+    marketplaces: string[];
+    plugins: string[];
+  } = existsSync(file)
+    ? JSON.parse(readFileSync(file, 'utf8'))
+    : { mcp: {}, marketplaces: [], plugins: [] };
+  const save = (): void => writeFileSync(file, JSON.stringify(hostState));
+  const [, sub, third, fourth] = args;
+  if (args[0] === 'mcp' && sub === 'get') {
+    const server = hostState.mcp[third ?? ''];
+    if (!server) {
+      console.error(`No MCP server found with name: ${third}`);
+      process.exit(1);
+    }
+    console.log(
+      `${third}:\n  Scope: User config\n  Type: stdio\n  Command: ${server.command}\n  Args: ${server.args.join(' ')}`,
+    );
+  } else if (args[0] === 'mcp' && sub === 'add') {
+    const rest = args
+      .slice(2)
+      .filter((arg, index, all) => arg !== '--scope' && all[index - 1] !== '--scope');
+    const separator = rest.indexOf('--');
+    hostState.mcp[rest[0]!] = { command: rest[separator + 1]!, args: rest.slice(separator + 2) };
+    save();
+  } else if (args[0] === 'mcp' && sub === 'remove') {
+    delete hostState.mcp[args.at(-1)!];
+    save();
+  } else if (args[0] === 'plugin' && sub === 'list') {
+    for (const plugin of hostState.plugins) console.log(`  ${plugin}`);
+  } else if (args[0] === 'plugin' && sub === 'marketplace' && third === 'add') {
+    hostState.marketplaces.push(fourth!);
+    save();
+  } else if (args[0] === 'plugin' && (sub === 'update' || sub === 'marketplace')) {
+    // `plugin update` and `plugin marketplace update`: nothing to change in the fake state.
+  } else if (args[0] === 'plugin' && sub === 'install') {
+    hostState.plugins.push(third!);
+    save();
+  } else {
+    console.error(`error: unsupported fake command ${joined}`);
+    process.exit(2);
+  }
   process.exit(0);
 }
 
@@ -155,6 +220,20 @@ if (!action.noReport) {
   if (action.queue) {
     const queued = await client.callTool({ name: 'swarm_queue_add', arguments: action.queue });
     appendFileSync(join(state, 'queued.jsonl'), `${JSON.stringify({ step, group, queued })}\n`);
+  }
+  if (action.queueChain) {
+    let previous = '';
+    for (const entry of action.queueChain) {
+      const after = Array.isArray(entry.after)
+        ? entry.after.map((id) => (id === '$prev' ? previous : id))
+        : undefined;
+      const queued = (await client.callTool({
+        name: 'swarm_queue_add',
+        arguments: { ...entry, ...(after ? { after } : {}) },
+      })) as { content?: { text?: string }[] };
+      previous = /Queued (\S+)/.exec(queued.content?.[0]?.text ?? '')?.[1] ?? previous;
+      appendFileSync(join(state, 'queued.jsonl'), `${JSON.stringify({ step, group, queued })}\n`);
+    }
   }
   const verdict = action.verdict ?? 'done';
   const result = await client.callTool({

@@ -14,6 +14,7 @@ import {
   fingerprintTree,
   pingDaemon,
   request,
+  stopDaemon,
   type BuildInfo,
   type RunCreated,
 } from '../../src/protocol/index.ts';
@@ -113,7 +114,7 @@ describe('ensureDaemon and the build of the daemon', () => {
       mismatch: { outdated: 'daemon', pid: process.pid, daemon: OLD, busy: true },
     });
     expect(daemonMismatchMessage(check, 'aip')).toContain(
-      `restarts it once its agents finish, or \`kill ${process.pid}\` now`,
+      'restarts it once its agents finish, or run `aip daemon restart --force` now',
     );
     expect(await pingDaemon(h.socket)).toMatchObject({ busy: true });
     await h.call('cancel', { runId });
@@ -148,7 +149,47 @@ describe('ensureDaemon and the build of the daemon', () => {
     expect(check.mismatch).toMatchObject({ outdated: 'daemon', pid: 4242, daemon: null });
     expect(methods).toEqual(['ping']);
     expect(daemonMismatchMessage(check, 'aip')).toContain(
-      'it cannot be restarted automatically: `kill 4242`',
+      'it cannot be restarted automatically: run `aip daemon restart --force`',
     );
+  });
+});
+
+// The daemon of the harness lives in this process, which stays alive: it holds no lock file.
+const NO_LOCK = join(tmpdir(), 'aip-no-such-lock');
+
+describe('stopDaemon', () => {
+  it('reports a missing daemon', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aip-stop-'));
+    expect(await stopDaemon(join(directory, 'aip.sock'))).toEqual({ state: 'not_running' });
+  });
+
+  it('stops an idle daemon and waits until it is gone', async () => {
+    const h = await started({});
+    expect(await stopDaemon(h.socket, { lockPath: NO_LOCK })).toEqual({
+      state: 'stopped',
+      pid: process.pid,
+    });
+    expect(await pingDaemon(h.socket)).toBeNull();
+  });
+
+  it('keeps a busy daemon unless forced', async () => {
+    const h = await started({});
+    h.script({ code: [{ hang: true }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
+    expect(await stopDaemon(h.socket, { lockPath: NO_LOCK })).toEqual({
+      state: 'busy',
+      pid: process.pid,
+    });
+    expect(await pingDaemon(h.socket)).not.toBeNull();
+    expect(await stopDaemon(h.socket, { force: true, lockPath: NO_LOCK })).toEqual({
+      state: 'stopped',
+      pid: process.pid,
+    });
+    expect(await pingDaemon(h.socket)).toBeNull();
   });
 });

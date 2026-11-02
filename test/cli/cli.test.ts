@@ -795,6 +795,84 @@ describe('cli', () => {
     await client.close();
   });
 
+  it('starts, reports and stops the daemon with aip daemon', async () => {
+    const box = sandbox();
+    const first = await aip(box, 'daemon', 'start');
+    expect(first.code).toBe(0);
+    const pid = /started \(pid (\d+)\)/.exec(first.stdout)?.[1];
+    expect(pid).toBeDefined();
+    const status = await aip(box, 'daemon', 'status');
+    expect(status.code).toBe(0);
+    expect(status.stdout).toContain(`aip daemon: running (pid ${pid})`);
+    expect(status.stdout).toContain('busy: no');
+    const again = await aip(box, 'daemon', 'start');
+    expect(again).toMatchObject({ code: 0, stdout: `aip daemon: already running (pid ${pid})\n` });
+    const json = JSON.parse((await aip(box, 'daemon', 'status', '--json')).stdout) as {
+      running: boolean;
+      pid: number;
+    };
+    expect(json).toMatchObject({ running: true, pid: Number(pid) });
+    const stopped = await aip(box, 'daemon', 'stop');
+    expect(stopped).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
+    expect(existsSync(box.socket)).toBe(false);
+    expect(existsSync(join(box.state, 'aip.pid'))).toBe(false);
+  });
+
+  it('reports a missing daemon without starting it', async () => {
+    const box = sandbox();
+    const status = await aip(box, 'daemon', 'status', '--json');
+    expect(status.code).toBe(3);
+    expect(JSON.parse(status.stdout)).toMatchObject({ running: false, pid: null });
+    expect(await aip(box, 'daemon', 'status')).toMatchObject({
+      code: 3,
+      stdout: 'aip daemon: not running\n',
+    });
+    expect(await aip(box, 'daemon', 'stop')).toMatchObject({
+      code: 0,
+      stdout: 'aip daemon: not running\n',
+    });
+    expect(existsSync(box.socket)).toBe(false);
+  });
+
+  it('restarts the daemon with a new pid, or just starts it', async () => {
+    const box = sandbox();
+    const fresh = await aip(box, 'daemon', 'restart');
+    expect(fresh.code).toBe(0);
+    const pid = /started \(pid (\d+)\)/.exec(fresh.stdout)?.[1];
+    expect(pid).toBeDefined();
+    const restarted = await aip(box, 'daemon', 'restart');
+    expect(restarted.code).toBe(0);
+    const next = /restarted \(pid (\d+)\)/.exec(restarted.stdout)?.[1];
+    expect(next).toBeDefined();
+    expect(next).not.toBe(pid);
+    expect((await aip(box, 'daemon', 'status')).stdout).toContain(`(pid ${next})`);
+  });
+
+  it('refuses to stop a busy daemon unless --force, and interrupts the step then', async () => {
+    const box = sandbox();
+    writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'x', '--json')).stdout,
+    );
+    await waitUntil('the step to run', async () =>
+      (await aip(box, 'daemon', 'status')).stdout.includes('busy: yes'),
+    );
+    const pid = /\(pid (\d+)\)/.exec((await aip(box, 'daemon', 'status')).stdout)?.[1];
+    const refused = await aip(box, 'daemon', 'stop');
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain('--force');
+    const kept = await aip(box, 'daemon', 'restart');
+    expect(kept.code).toBe(1);
+    expect(kept.stderr).toContain('--force');
+    expect((await aip(box, 'daemon', 'status')).stdout).toContain(`(pid ${pid})`);
+    const forced = await aip(box, 'daemon', 'stop', '--force');
+    expect(forced).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
+    // The next call starts the daemon again; it marks the step it found running as interrupted.
+    const shown = await aip(box, 'run', 'show', runId, '--json');
+    expect(shown.code).toBe(0);
+    expect(shown.stdout).toMatch(/"reason":\s*"interrupted"/);
+  });
+
   it('stops the daemon cleanly on SIGTERM', async () => {
     const box = sandbox();
     const daemon = spawn(process.execPath, [main, 'daemon'], {
@@ -917,6 +995,154 @@ describe('cli', () => {
     const exited = new Promise<number | null>((resolve) => child.once('exit', resolve));
     return { child, stdout: () => out, exited };
   }
+
+  describe('aip web start|stop|restart|status', () => {
+    const noAutostart = (box: Sandbox): Sandbox => {
+      const env = { ...box.env };
+      delete env.AIP_WEB_AUTOSTART;
+      return { ...box, env };
+    };
+    const listening = async (port: number): Promise<boolean> =>
+      fetch(`http://127.0.0.1:${port}/`).then(
+        () => true,
+        () => false,
+      );
+
+    it('starts, reports, stops and restarts the panel of the daemon', async () => {
+      const box = sandbox();
+      const port = await freePort();
+      writeGlobalSettings(box, `web: { autostart: false, port: ${port} }\n`);
+      const env = noAutostart(box);
+
+      const started = await aip(env, 'web', 'start');
+      expect(started.code).toBe(0);
+      const pid = /^aip web: started \(pid (\d+)\)$/m.exec(started.stdout)?.[1];
+      expect(pid).toBeDefined();
+      const url = /^aip web: (http\S+)$/m.exec(started.stdout)?.[1] ?? '';
+      expect(url).toContain(`http://127.0.0.1:${port}/?token=`);
+      expect(await listening(port)).toBe(true);
+
+      const again = await aip(env, 'web', 'start');
+      expect(again.code).toBe(0);
+      expect(again.stdout).toContain(`aip web: already running (pid ${pid})`);
+      expect(again.stdout).toContain(url);
+
+      const status = await aip(env, 'web', 'status');
+      expect(status.code).toBe(0);
+      expect(status.stdout).toContain(`aip web: running (pid ${pid})`);
+      expect(status.stdout).toContain(`address: 127.0.0.1:${port}`);
+      expect(status.stdout).toContain('auth: token');
+      const json = JSON.parse((await aip(env, 'web', 'status', '--json')).stdout) as unknown;
+      expect(json).toMatchObject({ running: true, daemon: true, port, reason: null });
+
+      // a new port after a settings change, the token stays
+      const next = await freePort();
+      writeGlobalSettings(box, `web: { autostart: false, port: ${next} }\n`);
+      const restarted = await aip(env, 'web', 'restart');
+      expect(restarted.code).toBe(0);
+      expect(restarted.stdout).toContain(`aip web: restarted (pid ${pid})`);
+      const token = new URL(url).searchParams.get('token');
+      expect(restarted.stdout).toContain(`http://127.0.0.1:${next}/?token=${token}`);
+      expect(await listening(port)).toBe(false);
+      expect(await listening(next)).toBe(true);
+
+      const stopped = await aip(env, 'web', 'stop');
+      expect(stopped.code).toBe(0);
+      expect(stopped.stdout).toContain(`aip web: stopped (pid ${pid})`);
+      expect(await listening(next)).toBe(false);
+      expect(existsSync(panelFile(box))).toBe(false);
+      const daemonStatus = await aip(env, 'daemon', 'status');
+      expect(daemonStatus.stdout).toContain(`aip daemon: running (pid ${pid})`);
+      const after = await aip(env, 'web', 'status');
+      expect(after.code).toBe(3);
+      expect(after.stdout).toContain('aip web: not running');
+      expect((await aip(env, 'web', 'stop')).stdout).toContain('aip web: not running');
+    });
+
+    it('does not start the daemon for status and stop', async () => {
+      const box = sandbox();
+      const status = await aip(box, 'web', 'status', '--json');
+      expect(status.code).toBe(3);
+      expect(JSON.parse(status.stdout)).toMatchObject({
+        running: false,
+        daemon: false,
+        pid: null,
+        url: null,
+      });
+      expect(status.stdout.trim().split('\n')).toHaveLength(1);
+      const stop = await aip(box, 'web', 'stop');
+      expect(stop.code).toBe(0);
+      expect(stop.stdout).toContain('aip web: not running');
+      expect(existsSync(join(box.state, 'aip.pid'))).toBe(false);
+    });
+
+    it('starts the daemon for start and takes the token from AIP_WEB_TOKEN', async () => {
+      const box = sandbox();
+      const port = await freePort();
+      writeGlobalSettings(box, `web: { port: ${port} }\n`);
+      const token = 'abcdefghijklmnop1234';
+      const env = noAutostart(box);
+      const result = await aip(
+        { ...env, env: { ...env.env, AIP_WEB_TOKEN: token } },
+        'web',
+        'start',
+      );
+      expect(result.code).toBe(0);
+      expect(result.stdout).toContain(`?token=${token}`);
+      expect((await aip(env, 'daemon', 'status')).code).toBe(0);
+    });
+
+    it('fails with code 1 when the port is taken, and the daemon keeps running', async () => {
+      const box = sandbox();
+      const taken = createServer();
+      await new Promise<void>((resolve) => taken.listen(0, '127.0.0.1', resolve));
+      const port = (taken.address() as AddressInfo).port;
+      try {
+        writeGlobalSettings(box, `web: { autostart: false, port: ${port} }\n`);
+        const env = noAutostart(box);
+        const result = await aip(env, 'web', 'start');
+        expect(result.code).toBe(1);
+        expect(result.stderr).toContain(`127.0.0.1:${port}`);
+        expect((await aip(env, 'daemon', 'status')).code).toBe(0);
+        const status = await aip(env, 'web', 'status');
+        expect(status.code).toBe(3);
+        expect(status.stdout).toContain(`reason: port 127.0.0.1:${port} is already in use`);
+        expect(taken.listening).toBe(true);
+      } finally {
+        taken.close();
+      }
+    });
+
+    it('rejects an invalid AIP_WEB_TOKEN before it talks to the daemon', async () => {
+      const box = sandbox();
+      for (const sub of ['start', 'restart']) {
+        const result = await aip(
+          { ...box, env: { ...box.env, AIP_WEB_TOKEN: 'short' } },
+          'web',
+          sub,
+        );
+        expect(result.code).toBe(1);
+        expect(result.stderr).toContain('AIP_WEB_TOKEN');
+      }
+      expect(existsSync(join(box.state, 'aip.pid'))).toBe(false);
+    });
+
+    it('lets a plain `aip web` raise its own server at once after `aip web stop`', async () => {
+      const box = sandbox();
+      const port = await freePort();
+      writeGlobalSettings(box, `web: { port: ${port} }\n`);
+      const env = noAutostart(box);
+      expect((await aip(env, 'web', 'start')).code).toBe(0);
+      expect((await aip(env, 'web', 'stop')).code).toBe(0);
+      const began = Date.now();
+      const web = await runWeb(env, ['--port', String(port)]);
+      await waitUntil('the link of aip web', () => web.stdout().includes('aip web: http'), 4000);
+      expect(Date.now() - began).toBeLessThan(4500);
+      expect(web.stdout()).not.toContain('served by the aip daemon');
+      web.child.kill('SIGTERM');
+      expect(await web.exited).toBe(0);
+    });
+  });
 
   it('starts the web panel with the daemon and removes its state file on shutdown', async () => {
     const box = sandbox();
@@ -1194,6 +1420,119 @@ describe('cli', () => {
     expect(
       (JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as typeof view).items,
     ).toHaveLength(1);
+  });
+
+  it('skips steps of queued tasks and edits the list', async () => {
+    const box = sandbox();
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'Форма входа',
+      '--skip',
+      'review',
+      '--json',
+    );
+    expect(added.code).toBe(0);
+    const view = JSON.parse(added.stdout) as { items: { id: string; skip: string[] }[] };
+    expect(view.items[0]!.skip).toEqual(['review']);
+    const id = view.items[0]!.id;
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('skip: review');
+    const both = await aip(box, 'queue', 'edit', id, '--skip', 'review', '--no-skips');
+    expect(both.code).not.toBe(0);
+    expect(both.stderr).toContain('--no-skips cannot be combined with --skip');
+    expect((await aip(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain(
+      'skip: review',
+    );
+    const cleared = await aip(box, 'queue', 'edit', id, '--no-skips', '--json');
+    expect((JSON.parse(cleared.stdout) as typeof view).items[0]!.skip).toEqual([]);
+    const unknown = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--skip', 'deploy');
+    expect(unknown.code).not.toBe(0);
+    expect(unknown.stderr).toContain('unknown step `deploy` in skip');
+    const accepted = await aip(
+      box,
+      'run',
+      'start',
+      'feature',
+      '--task',
+      'z',
+      '--skip',
+      'review',
+      '--json',
+    );
+    expect(accepted.code).toBe(0);
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'y', '--skip', 'nope');
+    expect(started.code).not.toBe(0);
+    expect(started.stderr).toContain('unknown step `nope` in skip');
+  });
+
+  it('queues a task after another one, clears the dependencies and refuses both flags', async () => {
+    const box = sandbox();
+    const first = JSON.parse(
+      (await aip(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
+    ) as { item: string };
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'API',
+      '--after',
+      first.item,
+      '--json',
+    );
+    expect(added.code).toBe(0);
+    const view = JSON.parse(added.stdout) as {
+      item: string;
+      items: { id: string; readiness: string; after: { id: string; state: string }[] }[];
+    };
+    const second = view.items.find((item) => item.id === view.item)!;
+    expect(second).toMatchObject({ readiness: 'waiting' });
+    expect(second.after).toMatchObject([{ id: first.item, state: 'waiting' }]);
+    expect((await aip(box, 'queue', 'list')).stdout).toContain(`after ${first.item} (waiting)`);
+    const both = await aip(box, 'queue', 'edit', view.item, '--after', first.item, '--no-after');
+    expect(both.code).not.toBe(0);
+    expect(both.stderr).toContain('--no-after cannot be combined with --after');
+    expect((await aip(box, 'queue', 'list')).stdout).toContain(`after ${first.item}`);
+    const cleared = await aip(box, 'queue', 'edit', view.item, '--no-after', '--json');
+    expect(cleared.code).toBe(0);
+    expect(
+      (JSON.parse(cleared.stdout) as typeof view).items.find((item) => item.id === view.item)!
+        .after,
+    ).toEqual([]);
+    const cycle = await aip(box, 'queue', 'edit', first.item, '--after', view.item);
+    expect(cycle.code).toBe(0);
+    const closing = await aip(box, 'queue', 'edit', view.item, '--after', first.item);
+    expect(closing.code).not.toBe(0);
+    expect(closing.stderr).toContain('dependency cycle');
+    const unknown = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--after', 'nope');
+    expect(unknown.code).not.toBe(0);
+    expect(unknown.stderr).toContain('unknown dependency `nope`');
+  });
+
+  it('queues run start with an unfinished dependency instead of creating a run', async () => {
+    const box = sandbox();
+    const first = JSON.parse(
+      (await aip(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
+    ) as { item: string };
+    const started = await aip(
+      box,
+      'run',
+      'start',
+      'feature',
+      '--task',
+      'API',
+      '--after',
+      first.item,
+      '--json',
+    );
+    expect(started.code).toBe(0);
+    expect(JSON.parse(started.stdout)).toMatchObject({ run: null });
+    const text = await aip(box, 'run', 'start', 'feature', '--task', 'UI', '--after', first.item);
+    expect(text.stdout).toMatch(/Task \S+ queued at position/);
   });
 
   it('removes a tag from a queued task', async () => {

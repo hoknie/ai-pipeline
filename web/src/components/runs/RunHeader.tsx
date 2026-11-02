@@ -7,7 +7,7 @@ import { useConfirm } from '../../confirm.tsx';
 import { cost, diffText, duration, runTitle } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
 import { runStatusLabel } from '../../status.ts';
-import type { RunView } from '../../types.ts';
+import type { RunView, TagView } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
 import {
@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../ui/dropdown-menu.tsx';
+import { useTags } from '../../tags.tsx';
+import { TagPicker } from '../TagPicker.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
@@ -38,6 +40,29 @@ export function RunHeader({
   const [retrying, setRetrying] = useState(false);
   const [applying, setApplying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [tagging, setTagging] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
+  const { byId } = useTags();
+  const runTagIds = (run.tags ?? []).map((tag) => tag.id);
+  const changeTags = async (ids: string[], fresh?: TagView[]) => {
+    const lookup = fresh ? new Map(fresh.map((tag) => [tag.id, tag])) : byId;
+    const names = (list: string[]) => list.flatMap((id) => lookup.get(id)?.name ?? []);
+    const add = names(ids.filter((id) => !runTagIds.includes(id)));
+    const remove = names(runTagIds.filter((id) => !ids.includes(id)));
+    if (add.length === 0 && remove.length === 0) return;
+    setTagging(true);
+    setTagError(null);
+    try {
+      await api.setRunTags(run.id, {
+        ...(add.length > 0 ? { add } : {}),
+        ...(remove.length > 0 ? { remove } : {}),
+      });
+    } catch (error) {
+      setTagError((error as Error).message);
+    } finally {
+      setTagging(false);
+    }
+  };
   const retryable = (status: string) => status === 'failed' || status === 'cancelled';
   const failed: { slug: string; title: string; status: string }[] = run.groups.filter((group) =>
     retryable(group.status),
@@ -99,6 +124,17 @@ export function RunHeader({
         {runTitle(run)}
       </h1>
       {run.name ? <div className="font-mono text-xs text-muted-foreground">{run.name}</div> : null}
+      <div className="flex flex-col gap-1">
+        <TagPicker
+          label={t('runs.header.tags')}
+          selected={runTagIds}
+          onChange={(ids, fresh) => void changeTags(ids, fresh)}
+          api={api}
+          allowCreate
+          disabled={tagging}
+        />
+        {tagError ? <Alert variant="destructive">{tagError}</Alert> : null}
+      </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
         <RunWarningsBadge run={run} />

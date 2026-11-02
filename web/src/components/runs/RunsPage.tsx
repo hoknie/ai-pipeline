@@ -6,6 +6,7 @@ import type { Api } from '../../api.ts';
 import { modLabel, useHotkey } from '../../hotkeys.ts';
 import { useMediaQuery } from '../../media.ts';
 import { usePreference } from '../../preferences.ts';
+import { useTags } from '../../tags.tsx';
 import type { Route } from '../../route.ts';
 import type { RunView } from '../../types.ts';
 import { Button } from '../../ui/button.tsx';
@@ -58,6 +59,10 @@ export function RunsPage({
   const wide = useMediaQuery('(min-width: 768px)');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = usePreference<RunFilter>('runFilter', 'all');
+  const { byId } = useTags();
+  const [storedTags, setStoredTags] = usePreference<string[]>('runTags', []);
+  // an id that is not in the catalog (the tag was removed) drops out of the selection
+  const tagIds = storedTags.filter((id) => byId.has(id));
   const [screen, setScreen] = useState<'list' | 'detail'>(route.group ? 'detail' : 'list');
 
   const run = runs.find((candidate) => candidate.id === route.run) ?? null;
@@ -73,7 +78,14 @@ export function RunsPage({
     onRoute({ view: 'runs', run: runId, group: slug, step: null });
   };
 
-  const shown = filterRuns(runs, query, filter, scope === 'repository' ? repository : null);
+  const shown = filterRuns(
+    runs,
+    query,
+    filter,
+    scope === 'repository' ? repository : null,
+    tagIds,
+    byId,
+  );
   const step = (delta: number) => {
     if (shown.length === 0) return;
     const at = shown.findIndex((candidate) => candidate.id === run?.id);
@@ -118,6 +130,8 @@ export function RunsPage({
         scope={scope}
         onScope={onScope}
         repository={repository}
+        tagIds={tagIds}
+        onTagIds={setStoredTags}
       />
     )
   ) : (

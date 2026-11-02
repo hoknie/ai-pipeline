@@ -104,7 +104,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
       {
         title: 'Add a task to the queue',
         description:
-          'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups. It does not start the queue. Call swarm_report afterwards as usual.',
+          'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups; pass after with ids returned by earlier calls to order dependent tasks. The answer contains the id of the new item. It does not start the queue. Call swarm_report afterwards as usual.',
         inputSchema: {
           workflow: z.string().min(1).describe('Workflow id of the configuration, e.g. feature'),
           task: z.string().trim().min(1).optional().describe('One task text'),
@@ -124,9 +124,19 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             .boolean()
             .optional()
             .describe('Deliver merged groups automatically; omit to follow delivery.auto'),
+          skip: z
+            .array(z.string())
+            .optional()
+            .describe('Ids of workflow steps this task skips, e.g. ["review", "qa"]'),
+          after: z
+            .array(z.string().min(1))
+            .optional()
+            .describe(
+              'Ids of queue items or runs that must be done first, e.g. the ids returned by earlier swarm_queue_add calls',
+            ),
         },
       },
-      ({ workflow, task, groups, title, autoDeliver }) =>
+      ({ workflow, task, groups, title, autoDeliver, skip, after }) =>
         attempt(async () => {
           if ((task === undefined) === (groups === undefined)) {
             throw new Error('pass either task or groups');
@@ -138,6 +148,8 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+            ...(skip !== undefined ? { skip } : {}),
+            ...(after !== undefined ? { after } : {}),
           })) as { item?: string };
           return `Queued ${result.item ?? 'the task'} for workflow ${workflow}. It starts when the queue runs.`;
         }),

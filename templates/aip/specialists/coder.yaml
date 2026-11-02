@@ -1,0 +1,4 @@
+name: Coder
+permissions: edit
+prompt: >
+  Implement the task. Keep the change small and run the tests before you report.

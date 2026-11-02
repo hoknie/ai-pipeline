@@ -499,6 +499,7 @@ describe('automatic delivery switch', () => {
         task: 'A',
         title: null,
         autoDeliver: null,
+        tags: [],
       }),
     );
   });
@@ -526,6 +527,7 @@ describe('items', () => {
         task: 'A2',
         title: null,
         autoDeliver: null,
+        tags: [],
       }),
     );
   });
@@ -881,5 +883,91 @@ describe('workflows', () => {
       'feature',
       'fix',
     ]);
+  });
+});
+
+describe('tags in the queue', () => {
+  const auth = { id: 'ta', name: 'auth', color: 'red' as const };
+  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const };
+
+  /** Shows the queue page; the first snapshot brings the catalog. */
+  function withTags(queue = queueOf({ items: items('A', 'B') }), overrides = {}) {
+    const api = show(queue, overrides);
+    act(() => {
+      stream().open();
+      stream().send({ event: 'snapshot', seq: 1, runs: [], tags: [auth, v2] });
+    });
+    return api;
+  }
+  const pick = async (...names: string[]) => {
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Tags' }));
+    for (const name of names) fireEvent.click(await screen.findByRole('option', { name }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  };
+
+  it('centres the label on the compact field', async () => {
+    withTags(queueOf());
+    const picker = (await screen.findByRole('combobox', { name: 'Tags' })).parentElement!;
+    const wrapper = picker.parentElement!.parentElement!;
+    const row = wrapper.parentElement!;
+    const label = row.querySelector('label')!;
+    expect(row.classList.contains('items-center')).toBe(true);
+    expect(row.classList.contains('items-start')).toBe(false);
+    expect(label.classList.contains('pt-1.5')).toBe(false);
+    expect(wrapper.classList.contains('max-w-xl')).toBe(true);
+    expect(wrapper.classList.contains('flex-1')).toBe(false);
+  });
+
+  it('adds a task with two tags', async () => {
+    const api = withTags(queueOf());
+    const text = await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    await pick('auth', 'v2');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        workflow: 'feature',
+        task: 'Сделать вход',
+        tags: ['auth', 'v2'],
+      }),
+    );
+  });
+
+  it('sends an empty list when all tags of an item are removed', async () => {
+    const api = withTags(queueOf({ items: [queueItem('q1', 'A', 1, { tags: [auth] })] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove tag auth' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ tags: [] })),
+    );
+  });
+
+  it('keeps the chosen tags of a draft over queue events', async () => {
+    withTags(queueOf());
+    await screen.findByLabelText('Task text');
+    await pick('auth');
+    act(() => stream().send({ event: 'queue', seq: 5, queue: queueOf() }));
+    const field = screen.getByRole('combobox', { name: 'Tags' }).parentElement!;
+    expect(within(field).getByText('auth')).toBeTruthy();
+  });
+
+  it('shows the tags of an item after its title and the tags of a running task', async () => {
+    withTags(
+      queueOf({
+        items: [queueItem('q1', 'A', 1, { tags: [auth, v2] })],
+        runs: [queueRun('r1', { tags: [v2] })],
+        status: 'running',
+      }),
+    );
+    const list = await screen.findByRole('list', { name: 'tasks in the queue' });
+    expect(within(list).getByText('auth')).toBeTruthy();
+    expect(within(list).getByText('v2')).toBeTruthy();
+    const card = screen.getByRole('group', { name: 'r1' });
+    expect(within(card).getByText('v2')).toBeTruthy();
   });
 });

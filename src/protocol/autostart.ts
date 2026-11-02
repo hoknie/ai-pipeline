@@ -45,7 +45,7 @@ export async function ensureDaemon(
   const client = options.build ?? currentBuild();
   const ping = await pingDaemon(socket);
   if (ping === null) {
-    await startDaemon(socket, command, options);
+    await spawnDaemon(socket, command, options);
     return { started: true, restarted: false, mismatch: null };
   }
   const mismatch = compare(ping, client);
@@ -60,7 +60,7 @@ export async function ensureDaemon(
   );
   if (!stopped) return { started: false, restarted: false, mismatch: { ...mismatch, busy: true } };
   await waitGone(socket, ping.pid ?? null, options);
-  await startDaemon(socket, command, options);
+  await spawnDaemon(socket, command, options);
   return { started: true, restarted: true, mismatch: null };
 }
 
@@ -98,11 +98,46 @@ export function daemonMismatchMessage(check: DaemonCheck, client: string): strin
   if (mismatch.outdated === 'client') {
     return `the aip daemon${pid} runs a newer build (${daemon}) than this ${client} (${own}); restart ${client}`;
   }
-  const kill = mismatch.pid === null ? 'restart the daemon' : `\`kill ${mismatch.pid}\``;
+  const restart = '`aip daemon restart --force`';
   const older = `the aip daemon${pid} runs an older build (${daemon}) than this ${client} (${own})`;
   if (!mismatch.daemon)
-    return `${older}; it cannot be restarted automatically: ${kill} (running agents are stopped)`;
-  return `${older}; the next aip command restarts it once its agents finish, or ${kill} now (running agents are stopped)`;
+    return `${older}; it cannot be restarted automatically: run ${restart} (running agents are stopped)`;
+  return `${older}; the next aip command restarts it once its agents finish, or run ${restart} now (running agents are stopped)`;
+}
+
+export type StopResult =
+  | { state: 'not_running' }
+  | { state: 'busy'; pid: number | null }
+  | { state: 'stopped'; pid: number | null };
+
+export interface StopOptions {
+  /** Stop a busy daemon too, together with its agents. */
+  force?: boolean;
+  /** Lock file of the daemon (`aip.pid`); the call returns once the daemon released it. */
+  lockPath?: string;
+}
+
+/**
+ * Stops the daemon at the socket and waits until it is gone. Without `force` only an idle
+ * daemon stops (a daemon too old to know `shutdown_idle` counts as busy).
+ */
+export async function stopDaemon(socket: string, options: StopOptions = {}): Promise<StopResult> {
+  const ping = await pingDaemon(socket);
+  if (ping === null) return { state: 'not_running' };
+  const pid = ping.pid ?? null;
+  if (options.force) {
+    await request(socket, 'shutdown', {}, 5000).catch(() => undefined);
+  } else {
+    const stopping = ping.build
+      ? await request(socket, 'shutdown_idle', {}, 5000).then(
+          (result) => shutdownIdleResultSchema.safeParse(result).data?.stopping ?? false,
+          () => false,
+        )
+      : false;
+    if (!stopping) return { state: 'busy', pid };
+  }
+  await waitGone(socket, pid, options);
+  return { state: 'stopped', pid };
 }
 
 /** The answer of the daemon to `ping`, or null when no daemon listens at the socket. */
@@ -116,7 +151,7 @@ export async function pingDaemon(socket: string): Promise<PingResult | null> {
   }
 }
 
-async function startDaemon(
+export async function spawnDaemon(
   socket: string,
   command: string[],
   options: EnsureOptions,
@@ -148,10 +183,15 @@ async function startDaemon(
  * Waits until the stopped daemon has released its lock (or exited): a new daemon started before
  * that refuses to run, and the old one would remove its socket on the way out.
  */
-async function waitGone(socket: string, pid: number | null, options: EnsureOptions): Promise<void> {
+async function waitGone(
+  socket: string,
+  pid: number | null,
+  options: { lockPath?: string },
+): Promise<void> {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
-    const unreachable = (await pingDaemon(socket)) === null;
+    // A daemon that is shutting down may stop answering before it exits.
+    const unreachable = (await pingDaemon(socket).catch(() => undefined)) === null;
     if (unreachable && (pid === null || !holdsLock(pid, options.lockPath))) return;
     await sleep(100);
   }

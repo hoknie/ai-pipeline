@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Api } from './api.ts';
 import { repositoryList } from './repositories.ts';
-import type { DaemonMismatch, QueueView, RepositoryView, RunView } from './types.ts';
+import type { DaemonMismatch, QueueView, RepositoryView, RunView, TagView } from './types.ts';
 
 export type Connection = 'live' | 'reconnecting' | 'polling';
 
@@ -23,10 +23,12 @@ type StreamEvent =
       runs: RunView[];
       queues?: QueueView[];
       repositories?: RepositoryView[];
+      tags?: TagView[];
       daemon?: DaemonMismatch;
     }
   | { event: 'daemon'; daemon: DaemonMismatch }
   | { event: 'repositories'; repositories: RepositoryView[] }
+  | { event: 'tags'; tags: TagView[] }
   | { event: 'run'; run: RunView }
   | { event: 'queue'; queue: QueueView };
 
@@ -58,6 +60,11 @@ function putQueue(current: Map<string, QueueView>, view: QueueView): Map<string,
   const previous = current.get(view.repository);
   if (previous && JSON.stringify(previous) === JSON.stringify(view)) return current;
   return new Map(current).set(view.repository, view);
+}
+
+/** The catalog as it was when nothing in it changed. */
+function sameTags(current: TagView[], next: TagView[]): TagView[] {
+  return JSON.stringify(current) === JSON.stringify(next) ? current : next;
 }
 
 /** The registry as it was when nothing in it changed, so unchanged lists do not re-render. */
@@ -93,6 +100,10 @@ export function useRuns(
   queue: QueueView | null;
   /** Takes a fresher queue, for example the answer to a change made on the page. */
   setQueue: (queue: QueueView) => void;
+  /** The tag catalog. */
+  tags: TagView[];
+  /** Takes a fresher catalog, for example the answer to creating a tag. */
+  setTags: (tags: TagView[]) => void;
   /** The daemon runs another build than `aip web`; null when the builds match or unknown. */
   daemon: DaemonMismatch;
 } {
@@ -103,6 +114,7 @@ export function useRuns(
   const [connection, setConnection] = useState<Connection>('reconnecting');
   const [loaded, setLoaded] = useState(false);
   const [daemon, setDaemon] = useState<DaemonMismatch>(null);
+  const [tags, setTags] = useState<TagView[]>([]);
 
   useEffect(() => {
     let closed = false;
@@ -128,6 +140,9 @@ export function useRuns(
         const known = await api.repositories();
         if (closed) return;
         setRegistryState((current) => sameRepositories(current, known));
+        const catalog = await api.tags();
+        if (closed) return;
+        setTags((current) => sameTags(current, catalog));
       } catch {
         // the server is unreachable; keep the last known state
       }
@@ -172,12 +187,17 @@ export function useRuns(
         setDaemon(event.daemon ?? null);
         const list = event.runs;
         setRuns((current) => mergeRuns(current, list));
+        const catalog = event.tags;
+        if (catalog) setTags((current) => sameTags(current, catalog));
         const known = event.repositories;
         if (known) setRegistryState((current) => sameRepositories(current, known));
         const listed = event.queues ?? [];
         if (listed.length > 0) {
           setQueues((current) => listed.reduce((map, view) => putQueue(map, view), current));
         }
+      } else if (event.event === 'tags') {
+        const catalog = event.tags;
+        setTags((current) => sameTags(current, catalog));
       } else if (event.event === 'repositories') {
         const known = event.repositories;
         setRegistryState((current) => sameRepositories(current, known));
@@ -207,6 +227,9 @@ export function useRuns(
   const sorted = useMemo(() => sortRuns(runs.values()), [runs]);
   const setQueue = useCallback((view: QueueView) => {
     setQueues((current) => putQueue(current, view));
+  }, []);
+  const updateTags = useCallback((next: TagView[]) => {
+    setTags((current) => sameTags(current, next));
   }, []);
   const setRegistry = useCallback((next: RepositoryView[]) => {
     setRegistryState((current) => sameRepositories(current, next));
@@ -244,6 +267,8 @@ export function useRuns(
     selected,
     queue,
     setQueue,
+    tags,
+    setTags: updateTags,
     daemon,
   };
 }

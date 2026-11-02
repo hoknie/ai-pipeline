@@ -11,7 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../ui/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
+import type { Api } from '../api.ts';
+import { useTags } from '../tags.tsx';
 import type { QueueFields, WorkflowsView } from '../types.ts';
+import { TagPicker } from './TagPicker.tsx';
 
 /** What the user has typed into a task form; kept outside the form so updates do not erase it. */
 export interface QueueDraft {
@@ -22,6 +25,8 @@ export interface QueueDraft {
   title: string;
   /** `null`: follow the setting. */
   autoDeliver: boolean | null;
+  /** Ids of the chosen tags. */
+  tags: string[];
 }
 
 export const TITLE_LIMIT = 60;
@@ -34,6 +39,7 @@ export function emptyDraft(workflow = ''): QueueDraft {
     groups: [{ title: '', task: '' }],
     title: '',
     autoDeliver: null,
+    tags: [],
   };
 }
 
@@ -44,6 +50,7 @@ export function draftOf(item: {
   groups: { title: string; task: string }[] | null;
   title: string | null;
   autoDeliver: boolean | null;
+  tags?: { id: string }[];
 }): QueueDraft {
   return {
     workflow: item.workflow,
@@ -52,6 +59,7 @@ export function draftOf(item: {
     groups: item.groups ? item.groups.map((group) => ({ ...group })) : [{ title: '', task: '' }],
     title: item.title ?? '',
     autoDeliver: item.autoDeliver,
+    tags: (item.tags ?? []).map((tag) => tag.id),
   };
 }
 
@@ -65,8 +73,17 @@ export function draftValid(draft: QueueDraft): boolean {
   );
 }
 
-export function fieldsOf(draft: QueueDraft): QueueFields {
+/**
+ * The fields to send. Tags go by name; an id that is no longer in the catalog is dropped. With
+ * `allTags` the list is always sent (an edit replaces the tags), otherwise only when not empty.
+ */
+export function fieldsOf(
+  draft: QueueDraft,
+  tagName: (id: string) => string | undefined = () => undefined,
+  allTags = false,
+): QueueFields {
   const title = draft.title.trim();
+  const tags = draft.tags.flatMap((id) => tagName(id) ?? []);
   return {
     workflow: draft.workflow,
     ...(draft.mode === 'task'
@@ -79,6 +96,7 @@ export function fieldsOf(draft: QueueDraft): QueueFields {
         }),
     ...(title !== '' ? { title } : {}),
     ...(draft.autoDeliver !== null ? { autoDeliver: draft.autoDeliver } : {}),
+    ...(allTags || tags.length > 0 ? { tags } : {}),
   };
 }
 
@@ -86,6 +104,7 @@ export function QueueForm({
   idPrefix,
   draft,
   workflows,
+  api,
   autoDeliverDefault = null,
   submitLabel,
   onDraft,
@@ -95,6 +114,8 @@ export function QueueForm({
   idPrefix: string;
   draft: QueueDraft;
   workflows: WorkflowsView | null;
+  /** Lets the tag field create tags; without it the field only picks. */
+  api?: Api;
   /** `delivery.auto` of the repository now; null when it is not known. */
   autoDeliverDefault?: boolean | null;
   submitLabel: string;
@@ -106,6 +127,7 @@ export function QueueForm({
   const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const catalog = useTags();
   const taskField = useRef<HTMLTextAreaElement>(null);
   useEffect(
     () =>
@@ -130,7 +152,7 @@ export function QueueForm({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit(fieldsOf(effective));
+      await onSubmit(fieldsOf(effective, (id) => catalog.byId.get(id)?.name, idPrefix !== 'new'));
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
@@ -244,6 +266,19 @@ export function QueueForm({
             {t('queue.form.autoDeliverReset')}
           </Button>
         ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor={`${idPrefix}-tags`}>{t('queue.form.tags')}</Label>
+        <div className="min-w-0 max-w-xl">
+          <TagPicker
+            id={`${idPrefix}-tags`}
+            label={t('queue.form.tags')}
+            selected={effective.tags}
+            onChange={(tags) => change({ tags })}
+            api={api}
+            allowCreate={api !== undefined}
+          />
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Input

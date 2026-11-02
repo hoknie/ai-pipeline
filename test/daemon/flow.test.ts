@@ -84,6 +84,31 @@ describe('specialist limit', () => {
     expect(statuses(final)).toEqual(['merged', 'merged', 'merged']);
     expect(peak).toBe(1);
   });
+
+  it('reports the running and the waiting group of a limited specialist in the run view', async () => {
+    const h = await start(
+      WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+    );
+    h.script({ code: [{ delayMs: 600 }] });
+    const runId = await run(h, [
+      { title: 'Первая', task: 'один' },
+      { title: 'Вторая', task: 'два' },
+    ]);
+    const busy = await h.waitFor(runId, (view) =>
+      view.specialists.some((use) => use.running.length === 1 && use.waiting.length === 1),
+    );
+    expect(busy.specialists).toMatchObject([
+      {
+        specialist: 'coder',
+        level: 'project',
+        max: 1,
+        running: [{ slug: 'pervaya', step: 'code' }],
+        waiting: [{ slug: 'vtoraya', step: 'code' }],
+      },
+    ]);
+    const final = await h.waitFor(runId, (view) => view.finished);
+    expect(final.specialists).toEqual([]);
+  });
 });
 
 describe('configuration directory', () => {

@@ -7,12 +7,15 @@ import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
 import { runStatusLabel } from '../../status.ts';
 import type { RunView } from '../../types.ts';
+import { useTags } from '../../tags.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
 import { Input } from '../../ui/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.tsx';
 import { orderGroups } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
+import { TagChips } from '../TagChip.tsx';
+import { TagPicker } from '../TagPicker.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
 import {
@@ -37,6 +40,8 @@ export function RunList({
   scope,
   onScope,
   repository,
+  tagIds,
+  onTagIds,
 }: {
   runs: RunView[];
   selectedRun: string | null;
@@ -52,13 +57,17 @@ export function RunList({
   onScope: (scope: RunScope) => void;
   /** The selected repository; null until known. */
   repository: string | null;
+  /** Ids of the tags to filter by (a run needs any one of them). */
+  tagIds: string[];
+  onTagIds: (ids: string[]) => void;
 }) {
   const { t } = useTranslation();
   const locale = useLocale();
+  const { byId } = useTags();
   const only = scope === 'repository' ? repository : null;
-  const shown = filterRuns(runs, query, filter, only);
-  const counts = filterCounts(runsOf(runs, only));
-  const filtered = query.trim() !== '' || filter !== 'all';
+  const shown = filterRuns(runs, query, filter, only, tagIds, byId);
+  const counts = filterCounts(runsOf(runs, only), tagIds);
+  const filtered = query.trim() !== '' || filter !== 'all' || tagIds.length > 0;
   return (
     <div className="flex flex-col gap-2">
       <Input
@@ -91,6 +100,7 @@ export function RunList({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
+      <TagPicker label={t('runs.list.tags')} selected={tagIds} onChange={onTagIds} />
       {shown.length === 0 ? (
         <Empty icon={<SearchX />} title={t('runs.list.empty')}>
           {filtered ? (
@@ -100,6 +110,7 @@ export function RunList({
               onClick={() => {
                 onQuery('');
                 onFilter('all');
+                onTagIds([]);
               }}
             >
               {t('runs.list.reset')}
@@ -129,6 +140,7 @@ export function RunList({
                       {run.name}
                     </span>
                   ) : null}
+                  <TagChips tags={run.tags ?? []} />
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
                     <RunWarningsBadge run={run} />

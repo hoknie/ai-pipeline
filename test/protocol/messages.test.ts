@@ -12,6 +12,9 @@ import {
   request,
   requestSchema,
   streamEventSchema,
+  webStartResultSchema,
+  webStatusResultSchema,
+  webStopResultSchema,
 } from '../../src/protocol/index.ts';
 
 describe('requests', () => {
@@ -154,6 +157,22 @@ describe('queue requests', () => {
     ok('queue_pause', { repository: '/r' });
     ok('queue_settings', { repository: '/r', parallel: 2 });
     ok('queue_run_now', { repository: '/r', item: 'q1' });
+  });
+
+  it('takes skip as a list of non-empty step ids', () => {
+    ok('run', { repository: '/r', workflow: 'feature', task: 'x', skip: ['qa'] });
+    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', skip: ['review', 'qa'] });
+    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', after: ['q1', 'r1'] });
+    ok('queue_edit', { repository: '/r', item: 'q1', after: [] });
+    ok('run', { repository: '/r', workflow: 'feature', task: 'x', after: ['q1'] });
+    ok('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', after: ['q1'] });
+    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', after: [''] });
+    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', after: 'q1' });
+    bad('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', after: [''] });
+    ok('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', skip: ['qa'] });
+    ok('queue_edit', { repository: '/r', item: 'q1', skip: [] });
+    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', skip: [''] });
+    bad('queue_edit', { repository: '/r', item: 'q1', skip: 'qa' });
   });
 
   it('takes autoDeliver as a boolean, and null only when editing', () => {
@@ -376,5 +395,62 @@ describe('stream events of tags', () => {
     const snapshot = { event: 'snapshot', seq: 1, runs: [] };
     expect(streamEventSchema.safeParse(snapshot).success).toBe(true);
     expect(streamEventSchema.safeParse({ ...snapshot, tags: [{ id: 'a' }] }).success).toBe(true);
+  });
+});
+
+describe('web panel control', () => {
+  it('parses web_status, web_start and web_stop', () => {
+    expect(parseRequest(JSON.stringify({ id: 1, method: 'web_status' }))).toEqual({
+      id: 1,
+      request: { method: 'web_status', params: {} },
+    });
+    expect(parseRequest(JSON.stringify({ id: 2, method: 'web_stop', params: {} }))).toMatchObject({
+      request: { method: 'web_stop' },
+    });
+    const start = parseRequest(
+      JSON.stringify({
+        id: 3,
+        method: 'web_start',
+        params: { token: 'abcdefghijklmnop1234', restart: true },
+      }),
+    );
+    expect(start).toEqual({
+      id: 3,
+      request: {
+        method: 'web_start',
+        params: { token: 'abcdefghijklmnop1234', restart: true },
+      },
+    });
+    expect(parseRequest(JSON.stringify({ id: 4, method: 'web_start' }))).toMatchObject({
+      request: { params: {} },
+    });
+  });
+
+  it('rejects a malformed token', () => {
+    const parsed = parseRequest(
+      JSON.stringify({ id: 5, method: 'web_start', params: { token: 'short' } }),
+    );
+    expect(parsed).toMatchObject({ id: 5 });
+    expect('error' in parsed).toBe(true);
+  });
+
+  it('checks the answers', () => {
+    const status = {
+      running: true,
+      host: '127.0.0.1',
+      port: 7341,
+      auth: 'token',
+      url: 'http://127.0.0.1:7341/?token=x',
+      reason: null,
+      stopped: false,
+    };
+    expect(webStatusResultSchema.parse(status)).toEqual(status);
+    expect(webStartResultSchema.parse({ state: 'restarted', status })).toMatchObject({
+      state: 'restarted',
+    });
+    expect(webStopResultSchema.parse({ state: 'not_running' })).toEqual({ state: 'not_running' });
+    expect(webStatusResultSchema.safeParse({ running: true }).success).toBe(false);
+    expect(webStartResultSchema.safeParse({ state: 'started' }).success).toBe(false);
+    expect(webStopResultSchema.safeParse({ state: 'gone' }).success).toBe(false);
   });
 });

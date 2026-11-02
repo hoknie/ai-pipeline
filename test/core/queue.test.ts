@@ -5,9 +5,11 @@ import {
   addItem,
   advance,
   createRun,
+  dependencyState,
   editItem,
   emptyQueue,
   itemFailed,
+  itemReadiness,
   itemStarted,
   moveItem,
   occupiesSlot,
@@ -19,6 +21,7 @@ import {
   startQueue,
   transition,
   type Queue,
+  type QueueItem,
   type RunState,
 } from '../../src/core/index.ts';
 
@@ -51,6 +54,8 @@ function toMerging(state: RunState, slug = 'gruppa-1'): void {
     finish(state, 'done', { slug });
   }
 }
+
+const none = (): undefined => undefined;
 
 describe('items', () => {
   it('appends to the end and trims', () => {
@@ -239,6 +244,28 @@ describe('automatic delivery of an item', () => {
   });
 });
 
+describe('skip of an item', () => {
+  it('is empty by default and collapses repeats', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).skip).toEqual([]);
+    expect(
+      addItem(queue, { workflow: 'feature', task: 'B', skip: ['qa', 'review', 'qa'] }, 'q2', 2)
+        .skip,
+    ).toEqual(['qa', 'review']);
+  });
+
+  it('is replaced as a whole, cleared by [] and kept by other edits', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'A', skip: ['qa'] }, 'q1', 2);
+    editItem(queue, 'q1', { title: 'Имя' }, 3);
+    expect(queue.items[0]?.skip).toEqual(['qa']);
+    editItem(queue, 'q1', { skip: ['review', 'qa'] }, 4);
+    expect(queue.items[0]?.skip).toEqual(['review', 'qa']);
+    editItem(queue, 'q1', { skip: [] }, 5);
+    expect(queue.items[0]?.skip).toEqual([]);
+  });
+});
+
 describe('place', () => {
   it('is held by an unfinished run', () => {
     expect(occupiesSlot(run(1))).toBe(true);
@@ -288,23 +315,23 @@ describe('place', () => {
 describe('start, pause, advance', () => {
   it('does not take anything while stopped', () => {
     const queue = queueOf('A', 'B');
-    expect(advance(queue, [], 5).take).toEqual([]);
+    expect(advance(queue, [], none, 5).take).toEqual([]);
     expect(queue.status).toBe('stopped');
   });
 
   it('takes one item with parallel 1 and the next only after the place is free', () => {
     const queue = queueOf('A', 'B');
     startQueue(queue, [], 3);
-    expect(advance(queue, [], 4).take.map((item) => item.id)).toEqual(['q1']);
+    expect(advance(queue, [], none, 4).take.map((item) => item.id)).toEqual(['q1']);
     const first = run(1, { id: 'r1' });
     itemStarted(queue, 'q1', 'r1', 5);
     taken(queue, first);
     queue.runs = ['r1'];
-    expect(advance(queue, [first], 6).take).toEqual([]);
+    expect(advance(queue, [first], none, 6).take).toEqual([]);
     first.run.config.delivery.auto = false;
     toMerging(first);
     merge(first);
-    expect(advance(queue, [first], 7).take.map((item) => item.id)).toEqual(['q2']);
+    expect(advance(queue, [first], none, 7).take.map((item) => item.id)).toEqual(['q2']);
     expect(queue.runs).toEqual([]);
   });
 
@@ -312,16 +339,16 @@ describe('start, pause, advance', () => {
     const queue = queueOf('A', 'B', 'C');
     setParallel(queue, 2, 1);
     startQueue(queue, [], 3);
-    expect(advance(queue, [], 4).take.map((item) => item.id)).toEqual(['q1', 'q2']);
+    expect(advance(queue, [], none, 4).take.map((item) => item.id)).toEqual(['q1', 'q2']);
     const a = run(1, { id: 'a' });
     const b = run(1, { id: 'b' });
     itemStarted(queue, 'q1', 'a', 5);
     itemStarted(queue, 'q2', 'b', 5);
-    expect(advance(queue, [a, b], 6).take).toEqual([]);
+    expect(advance(queue, [a, b], none, 6).take).toEqual([]);
     a.run.config.delivery.auto = false;
     toMerging(a);
     merge(a);
-    expect(advance(queue, [a, b], 7).take.map((item) => item.id)).toEqual(['q3']);
+    expect(advance(queue, [a, b], none, 7).take.map((item) => item.id)).toEqual(['q3']);
   });
 
   it('lowering parallel does not release runs but holds new ones back', () => {
@@ -331,7 +358,7 @@ describe('start, pause, advance', () => {
     itemStarted(queue, 'q1', 'a', 5);
     itemStarted(queue, 'q2', 'b', 5);
     setParallel(queue, 1, 6);
-    expect(advance(queue, [run(1, { id: 'a' }), run(1, { id: 'b' })], 7).take).toEqual([]);
+    expect(advance(queue, [run(1, { id: 'a' }), run(1, { id: 'b' })], none, 7).take).toEqual([]);
     expect(queue.runs).toEqual(['a', 'b']);
   });
 
@@ -340,7 +367,7 @@ describe('start, pause, advance', () => {
     startQueue(queue, [], 3);
     itemStarted(queue, 'q1', 'a', 4);
     pauseQueue(queue, 5);
-    expect(advance(queue, [run(1, { id: 'a' })], 6).take).toEqual([]);
+    expect(advance(queue, [run(1, { id: 'a' })], none, 6).take).toEqual([]);
     expect(queue.status).toBe('stopped');
     expect(queue.runs).toEqual(['a']);
   });
@@ -348,15 +375,15 @@ describe('start, pause, advance', () => {
   it('stops itself when it is empty and nothing holds a place', () => {
     const queue = queueOf('A');
     startQueue(queue, [], 3);
-    advance(queue, [], 4);
+    advance(queue, [], none, 4);
     itemStarted(queue, 'q1', 'a', 5);
     const state = run(1, { id: 'a' });
     state.run.config.delivery.auto = false;
-    advance(queue, [state], 6);
+    advance(queue, [state], none, 6);
     expect(queue.status).toBe('running');
     toMerging(state);
     merge(state);
-    advance(queue, [state], 7);
+    advance(queue, [state], none, 7);
     expect(queue.status).toBe('stopped');
     expect(queue.runs).toEqual([]);
   });
@@ -369,12 +396,12 @@ describe('start, pause, advance', () => {
       const state = run(1, { id: 'a' });
       step(state);
       group(state).status = reason;
-      advance(queue, [state], 5);
+      advance(queue, [state], none, 5);
       expect(queue).toMatchObject({
         status: 'stopped',
         stop: { kind: 'problem', run: 'a', group: 'gruppa-1', reason },
       });
-      expect(advance(queue, [state], 6).take).toEqual([]);
+      expect(advance(queue, [state], none, 6).take).toEqual([]);
       expect(queue.runs).toEqual(['a']);
     }
   });
@@ -386,7 +413,7 @@ describe('start, pause, advance', () => {
     const state = run(1, { id: 'a' });
     step(state);
     finish(state, 'needs_human', { feedback: 'q' });
-    expect(advance(queue, [state], 5).take).toEqual([]);
+    expect(advance(queue, [state], none, 5).take).toEqual([]);
     expect(queue).toMatchObject({ status: 'running', stop: null, runs: ['a'] });
   });
 
@@ -398,7 +425,7 @@ describe('start, pause, advance', () => {
     const state = run(1, { id: 'a' });
     step(state);
     finish(state, 'needs_human', { feedback: 'q' });
-    expect(advance(queue, [state], 5).take.map((item) => item.id)).toEqual(['q2']);
+    expect(advance(queue, [state], none, 5).take.map((item) => item.id)).toEqual(['q2']);
     expect(queue).toMatchObject({ status: 'running', stop: null });
   });
 
@@ -409,11 +436,11 @@ describe('start, pause, advance', () => {
     const state = run(1, { id: 'a' });
     step(state);
     group(state).status = 'failed';
-    advance(queue, [state], 5);
+    advance(queue, [state], none, 5);
     startQueue(queue, [state], 6);
     group(state).attempts.push({ ...group(state).attempts[0]!, seq: 2 });
     group(state).status = 'needs_human';
-    advance(queue, [state], 7);
+    advance(queue, [state], none, 7);
     expect(queue).toMatchObject({ status: 'running', stop: null });
   });
 
@@ -424,10 +451,10 @@ describe('start, pause, advance', () => {
     const state = run(1, { id: 'a' });
     step(state);
     group(state).status = 'failed';
-    advance(queue, [state], 5);
+    advance(queue, [state], none, 5);
     startQueue(queue, [state], 6);
     expect(queue).toMatchObject({ status: 'running', stop: null });
-    expect(advance(queue, [state], 7).take).toEqual([]);
+    expect(advance(queue, [state], none, 7).take).toEqual([]);
     expect(queue.status).toBe('running');
   });
 
@@ -440,11 +467,11 @@ describe('start, pause, advance', () => {
     finish(state, 'done');
     group(state).status = 'failed';
     state.run.finishedAt = 100;
-    advance(queue, [state], 5);
+    advance(queue, [state], none, 5);
     expect(queue.stop).toMatchObject({ reason: 'failed' });
     expect(queue.runs).toEqual([]);
     startQueue(queue, [state], 6);
-    expect(advance(queue, [state], 7).take.map((item) => item.id)).toEqual(['q2']);
+    expect(advance(queue, [state], none, 7).take.map((item) => item.id)).toEqual(['q2']);
     expect(queue.stop).toBeNull();
   });
 
@@ -455,12 +482,12 @@ describe('start, pause, advance', () => {
     const state = run(2, { id: 'a' });
     step(state);
     group(state).status = 'failed';
-    advance(queue, [state], 5);
+    advance(queue, [state], none, 5);
     startQueue(queue, [state], 6);
-    advance(queue, [state], 7);
+    advance(queue, [state], none, 7);
     expect(queue.status).toBe('running');
     group(state, 'gruppa-2').status = 'conflict';
-    advance(queue, [state], 8);
+    advance(queue, [state], none, 8);
     expect(queue.stop).toMatchObject({ reason: 'conflict', group: 'gruppa-2' });
   });
 
@@ -471,13 +498,13 @@ describe('start, pause, advance', () => {
     const state = run(2, { id: 'a' });
     step(state);
     group(state).status = 'failed';
-    advance(queue, [state], 5);
+    advance(queue, [state], none, 5);
     expect(queue.stop).toMatchObject({ reason: 'failed', group: 'gruppa-1' });
     startQueue(queue, [state], 6);
     // retry: another attempt, the group fails again; the queue did not see the state in between
     group(state).attempts.push({ ...group(state).attempts[0]!, seq: 2 });
     group(state).status = 'failed';
-    advance(queue, [state], 7);
+    advance(queue, [state], none, 7);
     expect(queue).toMatchObject({
       status: 'stopped',
       stop: { reason: 'failed', group: 'gruppa-1' },
@@ -493,16 +520,16 @@ describe('start, pause, advance', () => {
     toMerging(state);
     merge(state);
     pauseQueue(queue, 5);
-    advance(queue, [state], 6);
+    advance(queue, [state], none, 6);
     expect(queue.status).toBe('stopped');
     expect(queue.runs).toEqual(['a']);
     expect(state.run.pendingDelivery).not.toBeNull();
     group(state).delivery = { ...group(state).delivery, state: 'apply_failed' };
-    advance(queue, [state], 7);
+    advance(queue, [state], none, 7);
     expect(queue.stop).toMatchObject({ kind: 'problem', reason: 'apply_failed' });
     expect(queue.runs).toEqual(['a']);
     state.run.pendingDelivery = null;
-    advance(queue, [state], 8);
+    advance(queue, [state], none, 8);
     expect(queue.runs).toEqual([]);
   });
 
@@ -512,7 +539,7 @@ describe('start, pause, advance', () => {
     queue.runs = ['a'];
     const state = run(1, { id: 'a' });
     state.run.finishedAt = 5;
-    advance(queue, [state], 6);
+    advance(queue, [state], none, 6);
     expect(queue.acknowledged).toEqual(['b/x/failed/1']);
   });
 
@@ -526,7 +553,7 @@ describe('start, pause, advance', () => {
     });
     expect(ids(queue)).toEqual(['q1', 'q2']);
     expect(queue.items[0]?.error).toContain('unknown workflow');
-    expect(advance(queue, [], 5).take).toEqual([]);
+    expect(advance(queue, [], none, 5).take).toEqual([]);
     startQueue(queue, [], 6);
     expect(queue.items[0]?.error).toBeNull();
     expect(queue.stop).toBeNull();
@@ -596,3 +623,143 @@ function runInput() {
     now: 1,
   };
 }
+
+/** A run that is merged; `applied` marks its group as delivered to the working tree. */
+function mergedRun(id: string, applied: boolean): RunState {
+  const state = run(1, { id });
+  state.run.config.delivery.auto = false;
+  toMerging(state);
+  merge(state);
+  if (applied) group(state).delivery = { ...group(state).delivery, state: 'applied' };
+  return state;
+}
+
+function failedRun(id: string): RunState {
+  const state = run(1, { id });
+  step(state);
+  group(state).status = 'failed';
+  return state;
+}
+
+const lookupOf =
+  (...states: RunState[]) =>
+  (id: string): RunState | undefined =>
+    states.find((state) => state.run.id === id);
+
+function withAfter(queue: Queue, id: string, after: string[]): void {
+  editItem(queue, id, { after }, 3);
+}
+
+describe('dependencies', () => {
+  it('stores after on add, collapses duplicates and checks the edit', () => {
+    const queue = queueOf('A');
+    const item = addItem(
+      queue,
+      { workflow: 'feature', task: 'B', after: ['q1', 'q1', 'r9'] },
+      'q2',
+      3,
+    );
+    expect(item.after).toEqual(['q1', 'r9']);
+    editItem(queue, 'q2', { title: 'T' }, 4);
+    expect(item.after).toEqual(['q1', 'r9']);
+    editItem(queue, 'q2', { after: ['q1'] }, 5);
+    expect(item.after).toEqual(['q1']);
+    editItem(queue, 'q2', { after: [] }, 6);
+    expect(item.after).toEqual([]);
+  });
+
+  it('rejects a reference to itself and cycles, leaving the queue unchanged', () => {
+    const queue = queueOf('A', 'B', 'C');
+    expect(() => editItem(queue, 'q1', { after: ['q1'] }, 4)).toThrow(
+      'a task cannot depend on itself',
+    );
+    expect(() =>
+      addItem(queue, { workflow: 'feature', task: 'X', after: ['q4'] }, 'q4', 4),
+    ).toThrow('a task cannot depend on itself');
+    expect(queue.items).toHaveLength(3);
+    withAfter(queue, 'q2', ['q1']);
+    expect(() => editItem(queue, 'q1', { after: ['q2'] }, 4)).toThrow(
+      'dependency cycle: q1 → q2 → q1',
+    );
+    withAfter(queue, 'q3', ['q2']);
+    expect(() => editItem(queue, 'q1', { after: ['q3'], title: 'x' }, 4)).toThrow(
+      'dependency cycle: q1 → q3 → q2 → q1',
+    );
+    expect(queue.items[0]!.after).toEqual([]);
+    expect(queue.items[0]!.title).toBeNull();
+  });
+
+  it('points the successors at the run when the item starts', () => {
+    const queue = queueOf('A', 'B', 'C');
+    withAfter(queue, 'q2', ['q1']);
+    withAfter(queue, 'q3', ['q1', 'r1']);
+    itemStarted(queue, 'q1', 'r1', 5);
+    expect(queue.items.map((item) => item.after)).toEqual([['r1'], ['r1']]);
+  });
+
+  it('drops the reference when the predecessor is removed', () => {
+    const queue = queueOf('A', 'B');
+    withAfter(queue, 'q2', ['q1']);
+    removeItem(queue, 'q1', 5);
+    expect(queue.items[0]!.after).toEqual([]);
+  });
+
+  it('reports the state of a run dependency', () => {
+    const queue = queueOf('A');
+    const applied = mergedRun('r1', true);
+    const notApplied = mergedRun('r2', false);
+    const failed = failedRun('r3');
+    const working = run(1, { id: 'r4' });
+    const asked = run(1, { id: 'r5' });
+    step(asked);
+    finish(asked, 'needs_human', { feedback: 'q' });
+    const lookup = lookupOf(applied, notApplied, failed, working, asked);
+    expect(dependencyState(queue, 'r1', lookup)).toBe('done');
+    expect(dependencyState(queue, 'r2', lookup)).toBe('waiting');
+    expect(dependencyState(queue, 'r3', lookup)).toBe('blocked');
+    expect(dependencyState(queue, 'r4', lookup)).toBe('waiting');
+    expect(dependencyState(queue, 'r5', lookup)).toBe('waiting');
+    expect(dependencyState(queue, 'gone', lookup)).toBe('blocked');
+  });
+
+  it('derives the readiness of an item through a chain of items', () => {
+    const queue = queueOf('A', 'B', 'C');
+    withAfter(queue, 'q2', ['q1']);
+    withAfter(queue, 'q3', ['q2']);
+    withAfter(queue, 'q1', ['r1']);
+    const [a, b, c] = queue.items as [QueueItem, QueueItem, QueueItem];
+    expect(itemReadiness(queue, a, lookupOf(mergedRun('r1', true)))).toBe('ready');
+    expect(itemReadiness(queue, a, lookupOf(mergedRun('r1', false)))).toBe('waiting');
+    expect(itemReadiness(queue, b, lookupOf(mergedRun('r1', true)))).toBe('waiting');
+    expect(itemReadiness(queue, c, lookupOf(failedRun('r1')))).toBe('blocked');
+    expect(itemReadiness(queue, b, none)).toBe('blocked');
+  });
+
+  it('lets a ready item overtake a waiting one', () => {
+    const queue = queueOf('A', 'B', 'C');
+    setParallel(queue, 2, 1);
+    withAfter(queue, 'q2', ['q1']);
+    startQueue(queue, [], 3);
+    expect(advance(queue, [], none, 4).take.map((item) => item.id)).toEqual(['q1', 'q3']);
+  });
+
+  it('keeps the queue running when only waiting items are left', () => {
+    const queue = queueOf('A');
+    withAfter(queue, 'q1', ['r1']);
+    startQueue(queue, [], 3);
+    const working = run(1, { id: 'r1' });
+    expect(advance(queue, [], lookupOf(working), 4).take).toEqual([]);
+    expect(queue.status).toBe('running');
+  });
+
+  it('takes the waiting item once its predecessor is delivered, with a larger parallel too', () => {
+    const queue = queueOf('A');
+    setParallel(queue, 3, 1);
+    withAfter(queue, 'q1', ['r1']);
+    startQueue(queue, [], 3);
+    expect(advance(queue, [], lookupOf(mergedRun('r1', false)), 4).take).toEqual([]);
+    expect(
+      advance(queue, [], lookupOf(mergedRun('r1', true)), 5).take.map((item) => item.id),
+    ).toEqual(['q1']);
+  });
+});

@@ -189,6 +189,88 @@ describe('worker MCP server', () => {
     ]);
   });
 
+  it('passes skip of a queued task from a specialist only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q-abc' };
+      },
+      true,
+    );
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', skip: ['review'] },
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', workflow: 'feature', task: 'x', skip: ['review'] },
+      },
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', workflow: 'feature', task: 'x' },
+      },
+    ]);
+  });
+
+  it('passes after of a queued task from a specialist only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q-abc' };
+      },
+      true,
+    );
+    const result = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'API', after: ['q-prev'] },
+    });
+    expect(textOf(result)).toContain('q-abc');
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', workflow: 'feature', task: 'API', after: ['q-prev'] },
+      },
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', workflow: 'feature', task: 'x' },
+      },
+    ]);
+    const tools = await client.listTools();
+    const description = JSON.stringify(
+      tools.tools.find((tool) => tool.name === 'swarm_queue_add')?.inputSchema,
+    );
+    expect(description).toContain('earlier swarm_queue_add');
+  });
+
+  it('returns a skip check error as a tool error', async () => {
+    const client = await connect(
+      false,
+      async () => {
+        throw new Error('unknown step `deploy` in skip; steps: code, review');
+      },
+      true,
+    );
+    const result = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', skip: ['deploy'] },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('unknown step `deploy` in skip');
+  });
+
   it('refuses swarm_queue_add without a task or with both task and groups', async () => {
     const calls: unknown[] = [];
     const client = await connect(

@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import type { TFunction } from 'i18next';
 
+import type { LoadEntry, MachineLoad } from '../specialistLoad.ts';
 import type { RunView, WorkflowTopology } from '../types.ts';
 
 /** A group of an active run, placed on a node of the workflow graph. */
@@ -22,6 +23,8 @@ export interface Live {
   /** Groups on steps the current configuration no longer has. */
   elsewhere: LiveGroup[];
   runs: number;
+  /** Ids of the runs shown, to tell their load from the load of other runs. */
+  runIds: string[];
 }
 
 /** Where the groups of the active runs of a workflow are now. */
@@ -39,12 +42,14 @@ export function liveState(
     splitting: [],
     elsewhere: [],
     runs: 0,
+    runIds: [],
   };
   const known = new Set(workflow.steps.map((step) => step.id));
   for (const run of runs) {
     if (run.finished || run.workflow !== workflow.id) continue;
     if (repository !== null && run.repository !== repository) continue;
     live.runs += 1;
+    live.runIds.push(run.id);
     const place = (group: { slug: string; title: string; status: string }): LiveGroup => ({
       runId: run.id,
       runTitle: run.title,
@@ -74,6 +79,17 @@ export function liveState(
   return live;
 }
 
+/** How busy the specialist of a node is on the whole machine. */
+export interface Busy {
+  /** Attempts of the specialist running now, in all runs. */
+  running: number;
+  /** Of them, those in runs this graph does not show. */
+  elsewhere: number;
+  /** The smallest limit; null when nothing limits the specialist. */
+  max: number | null;
+  full: boolean;
+}
+
 export interface StageData extends Record<string, unknown> {
   kind: 'split' | 'step' | 'merge' | 'delivery' | 'resolver';
   title: string;
@@ -85,6 +101,9 @@ export interface StageData extends Record<string, unknown> {
   active: boolean;
   /** Step id, for steps. */
   step: string | null;
+  /** Slug of the specialist of the node; null for nodes without one. */
+  specialist: string | null;
+  busy: Busy | null;
 }
 
 export type StageNode = Node<StageData, 'stage'>;
@@ -141,6 +160,40 @@ export function stabilizeEdges(previous: readonly Edge[], next: readonly Edge[])
   });
 }
 
+/** Entries of other runs that run on, or wait for, the specialist. */
+export function otherUse(
+  load: MachineLoad,
+  live: Live,
+  specialist: string,
+): { running: LoadEntry[]; waiting: LoadEntry[] } {
+  const own = new Set(live.runIds);
+  const slug = load.get(specialist);
+  return {
+    running: (slug?.running ?? []).filter((entry) => !own.has(entry.runId)),
+    waiting: (slug?.waiting ?? []).filter((entry) => !own.has(entry.runId)),
+  };
+}
+
+function busyOf(
+  workflow: WorkflowTopology,
+  live: Live,
+  load: MachineLoad,
+  specialist: string,
+): Busy {
+  const slug = load.get(specialist);
+  const limits = [slug?.max ?? null, workflow.limits?.[specialist] ?? null].filter(
+    (limit): limit is number => limit !== null && limit > 0,
+  );
+  const max = limits.length > 0 ? Math.min(...limits) : null;
+  const running = slug?.running.length ?? 0;
+  return {
+    running,
+    elsewhere: otherUse(load, live, specialist).running.length,
+    max,
+    full: max !== null && running >= max,
+  };
+}
+
 function active(groups: LiveGroup[]): boolean {
   return groups.some((group) => group.status === 'running' || group.status === 'merging');
 }
@@ -151,6 +204,7 @@ export function layout(
   live: Live,
   t: TFunction,
   sizes: ReadonlyMap<string, Size> = new Map(),
+  load: MachineLoad = new Map(),
 ): { nodes: StageNode[]; edges: Edge[] } {
   const nodes: StageNode[] = [];
   const edges: Edge[] = [];
@@ -171,7 +225,7 @@ export function layout(
     }
     x += GAP;
   };
-  const empty = { attempts: null, costUsd: null, step: null };
+  const empty = { attempts: null, costUsd: null, step: null, specialist: null, busy: null };
   if (workflow.split) {
     place('split', {
       kind: 'split',
@@ -186,6 +240,8 @@ export function layout(
       groups: live.splitting,
       active: live.splitting.some((group) => group.status === 'running'),
       ...empty,
+      specialist: workflow.split.specialist,
+      busy: busyOf(workflow, live, load, workflow.split.specialist),
     });
   }
   for (const step of workflow.steps) {
@@ -200,6 +256,8 @@ export function layout(
       costUsd: live.cost.get(step.id) ?? 0,
       active: active(groups),
       step: step.id,
+      specialist: step.specialist,
+      busy: busyOf(workflow, live, load, step.specialist),
     });
   }
   place('merge', {
@@ -238,6 +296,8 @@ export function layout(
         groups: [],
         active: false,
         ...empty,
+        specialist: workflow.delivery.resolver,
+        busy: busyOf(workflow, live, load, workflow.delivery.resolver),
       },
     });
     edges.push({

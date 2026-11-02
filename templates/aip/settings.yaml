@@ -1,0 +1,10 @@
+# Starter configuration created by `aip init`. Every field is described in docs/configuration.md.
+
+# How many specialists run at the same time.
+max: 2
+
+defaults:
+  runtime: claude
+  # Commands the specialists may run without asking. Put your test and build commands here first.
+  allow_commands:
+    - npm test*

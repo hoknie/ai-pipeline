@@ -1,6 +1,5 @@
-import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Command } from 'commander';
@@ -13,7 +12,6 @@ import {
   socketPath,
   stateDirectoryFromEnvironment,
 } from '../config/index.ts';
-import { AlreadyRunning, startDaemon } from '../daemon/index.ts';
 import { createHostServer, createWorkerServer } from '../mcp/index.ts';
 import {
   daemonMismatchMessage,
@@ -50,12 +48,16 @@ import {
 
 import { examples as renderExamples, HELP_GROUPS } from './help.ts';
 import { checkConfig } from './config-check.ts';
+import { initConfig } from './init.ts';
+import { setupCommand } from './setup.ts';
 import { cleanRun, cleanableRuns, formatCleanable } from './clean.ts';
 import { VERSION } from './version.ts';
 import { latestRepository } from './web/default-repository.ts';
-import { startDaemonPanel } from './web/daemon-panel.ts';
+import { registerDaemon } from './daemon.ts';
 import { assertLoopbackHost, startWebServer, webTokenFromEnv } from './web/server.ts';
+import { openBrowser } from './web/open.ts';
 import { readPanelState } from './web/state.ts';
+import { registerWebControl } from './web-control.ts';
 import { watch } from './watch.ts';
 
 export interface Context {
@@ -132,6 +134,8 @@ function collect(value: string, previous: string[] = []): string[] {
 
 interface QueueTaskOptions {
   tag?: string[];
+  after?: string[];
+  skip?: string[];
   task?: string;
   groups?: string;
   title?: string;
@@ -158,7 +162,13 @@ function registerQueue(program: Command): void {
         'deliver the merged groups automatically, whatever delivery.auto says',
       )
       .option('--no-auto-deliver', 'leave the merged groups for `aip apply`')
-      .option('--tag <name>', 'tag of the task; repeat for several', collect);
+      .option('--tag <name>', 'tag of the task; repeat for several', collect)
+      .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
+      .option(
+        '--after <id>',
+        'queue item or run that must be done first; repeat for several',
+        collect,
+      );
   const common = (command: Command): Command =>
     command.option('-r, --repo <path>', 'repository path', '.').option('--json', 'print JSON');
 
@@ -184,6 +194,8 @@ function registerQueue(program: Command): void {
       examples([
         'aip queue add feature --task "Add a login form"',
         'aip queue add feature -g g.yaml',
+        'aip queue add feature --task "Fix the typo" --skip review --skip qa',
+        'aip queue add feature --task "Add the API" --after q1',
       ]),
     )
     .action(async (workflow: string, options: QueueTaskOptions) => {
@@ -198,25 +210,40 @@ function registerQueue(program: Command): void {
         ...(options.title !== undefined ? { title: options.title } : {}),
         ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
         ...(options.tag !== undefined ? { tags: options.tag } : {}),
+        ...(options.skip !== undefined ? { skip: options.skip } : {}),
+        ...(options.after !== undefined ? { after: options.after } : {}),
       })) as QueueView & { item: string };
       if (!options.json) print(`Added ${view.item}.`);
       showQueue(options.json, view);
     });
 
+  let editAfter = false;
+  let editNoAfter = false;
   common(
     taskOptions(
       queue
         .command('edit')
+        .on('option:after', () => (editAfter = true))
+        .on('option:no-after', () => (editNoAfter = true))
         .description('Change a waiting task')
         .argument('<item>', 'item id from `aip queue list`')
         .option('-w, --workflow <id>', 'new workflow id')
         .option('--default-auto-deliver', 'follow delivery.auto of the configuration again')
-        .option('--no-tags', 'remove all tags of the task'),
+        .option('--no-tags', 'remove all tags of the task')
+        .option('--no-skips', 'run every step of the workflow again')
+        .option('--no-after', 'remove all predecessors of the task'),
     ),
   )
     .addHelpText(
       'after',
-      examples(['aip queue edit 1 --task "New wording"', 'aip queue edit 1 --workflow feature']),
+      examples([
+        'aip queue edit 1 --task "New wording"',
+        'aip queue edit 1 --workflow feature',
+        'aip queue edit 1 --skip qa',
+        'aip queue edit 1 --no-skips',
+        'aip queue edit 2 --after 1',
+        'aip queue edit 2 --no-after',
+      ]),
     )
     .action(
       async (
@@ -225,10 +252,17 @@ function registerQueue(program: Command): void {
           workflow?: string;
           defaultAutoDeliver?: boolean;
           tags?: boolean;
+          skips?: boolean;
         },
       ) => {
+        if (editAfter && editNoAfter) {
+          throw new Error('--no-after cannot be combined with --after');
+        }
         if (options.tags === false && options.tag !== undefined) {
           throw new Error('--no-tags cannot be combined with --tag');
+        }
+        if (options.skips === false && options.skip !== undefined) {
+          throw new Error('--no-skips cannot be combined with --skip');
         }
         if (options.task !== undefined && options.groups !== undefined) {
           throw new Error('pass at most one of --task and --groups');
@@ -252,6 +286,10 @@ function registerQueue(program: Command): void {
                 : {}),
             ...(options.tags === false ? { tags: [] } : {}),
             ...(options.tag !== undefined ? { tags: options.tag } : {}),
+            ...(options.skips === false ? { skip: [] } : {}),
+            ...(options.skip !== undefined ? { skip: options.skip } : {}),
+            ...(editNoAfter ? { after: [] } : {}),
+            ...(editAfter && options.after !== undefined ? { after: options.after } : {}),
           })) as QueueView,
         );
       },
@@ -506,6 +544,12 @@ function registerRun(program: Command): void {
     )
     .option('--no-auto-deliver', 'leave the merged groups for `aip apply`')
     .option('--tag <name>', 'tag of the task; repeat for several', collect)
+    .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
+    .option(
+      '--after <id>',
+      'queue item or run that must be done first; repeat for several',
+      collect,
+    )
     .option('--json', 'print JSON')
     .addHelpText(
       'after',
@@ -514,6 +558,7 @@ function registerRun(program: Command): void {
         'aip run start feature --task "Add a login form"',
         'aip run start feature --title "Login form" --task "Add a login form with OAuth"',
         'aip run start feature --groups groups.yaml --repo ~/projects/app',
+        'aip run start feature --task "Add the API" --after q1',
       ]),
     )
     .action(
@@ -526,6 +571,8 @@ function registerRun(program: Command): void {
           title?: string;
           autoDeliver?: boolean;
           tag?: string[];
+          skip?: string[];
+          after?: string[];
           json?: boolean;
         },
       ) => {
@@ -541,6 +588,8 @@ function registerRun(program: Command): void {
           ...(options.title !== undefined ? { title: options.title } : {}),
           ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
           ...(options.tag !== undefined ? { tags: options.tag } : {}),
+          ...(options.skip !== undefined ? { skip: options.skip } : {}),
+          ...(options.after !== undefined ? { after: options.after } : {}),
         })) as RunQueued;
         output(options.json, formatRunQueued(queued, activeStyle), queued);
       },
@@ -758,17 +807,6 @@ function registerGroup(program: Command): void {
     });
 }
 
-function openBrowser(url: string): void {
-  const opener =
-    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
-  spawn(opener, args, { stdio: 'ignore', detached: true })
-    .on('error', () => {
-      process.stderr.write('aip web: could not open the browser; use the URL above\n');
-    })
-    .unref();
-}
-
 export function registerCommands(program: Command, style: Style = plainStyle): void {
   activeStyle = style;
   const [runs, queueGroup, dashboards, setup, plumbing] = HELP_GROUPS;
@@ -780,7 +818,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
   registerRepositories(program);
   registerTag(program);
   program.commandsGroup(dashboards!.heading);
-  program
+  const web = program
     .command('web')
     .description(
       'Serve a local web dashboard for runs (bound to 127.0.0.1, protected by a token unless web.auth is none)',
@@ -790,9 +828,13 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
     .option('--open', 'open the dashboard in the default browser')
     .addHelpText(
       'after',
-      '\nThe daemon serves the dashboard itself (web.autostart); then `aip web` prints its link and exits.',
+      '\nThe daemon serves the dashboard itself (web.autostart); then `aip web` prints its link and exits. ' +
+        '`aip web start|stop|restart|status` control that panel without stopping the daemon.',
     )
-    .addHelpText('after', examples(['aip web', 'aip web --port 8080 --open']))
+    .addHelpText(
+      'after',
+      examples(['aip web', 'aip web --port 8080 --open', 'aip web start', 'aip web status']),
+    )
     .action(async (options: { port?: string; host?: string; open?: boolean }) => {
       const settings = loadWebSettings(
         configPaths(process.cwd(), process.env.XDG_CONFIG_HOME, process.env.HOME),
@@ -817,7 +859,12 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
         process.env.AIP_WEB_AUTOSTART !== 'false';
       let url: string | undefined;
       if (autostart && host === settings.host && port === settings.port) {
-        const deadline = Date.now() + 5000;
+        // A panel stopped by `aip web stop` is not coming back: do not wait for it.
+        const stopped = await request(ctx.socket, 'web_status', {}).then(
+          (result) => (result as { stopped?: boolean }).stopped === true,
+          () => false,
+        );
+        const deadline = Date.now() + (stopped ? 0 : 5000);
         for (;;) {
           const state = readPanelState(ctx.stateDirectory);
           if (state !== null && state.host === host && state.port === port) {
@@ -863,6 +910,8 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       await web.close();
     });
 
+  registerWebControl(web, activeStyle);
+
   program
     .command('events')
     .description('Stream changes of runs as JSON lines: a snapshot first, then one line per change')
@@ -884,6 +933,67 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
     });
 
   program.commandsGroup(setup!.heading);
+  program
+    .command('setup')
+    .description('Connect aip to Claude Code and OpenCode on this machine')
+    .option('-y, --yes', 'do not ask questions')
+    .option('--dry-run', 'print what would be done and change nothing')
+    .option('--force', 'replace an existing aip setting that differs')
+    .option('--no-claude', 'skip Claude Code')
+    .option('--no-opencode', 'skip OpenCode')
+    .option('--no-plugin', 'do not install the Claude Code plugin')
+    .addHelpText(
+      'after',
+      examples(['aip setup', 'aip setup --dry-run', 'aip setup --yes --no-opencode']),
+    )
+    .action(
+      async (options: {
+        yes?: boolean;
+        dryRun?: boolean;
+        force?: boolean;
+        claude: boolean;
+        opencode: boolean;
+        plugin: boolean;
+      }) => {
+        process.exitCode = await setupCommand(
+          {
+            yes: options.yes ?? false,
+            dryRun: options.dryRun ?? false,
+            force: options.force ?? false,
+            claude: options.claude,
+            opencode: options.opencode,
+            plugin: options.plugin,
+          },
+          activeStyle,
+        );
+      },
+    );
+
+  program
+    .command('init')
+    .description('Create a starter aip/ configuration in the current repository')
+    .option('--shared', 'write to the shared configuration (~/.config/aip) instead')
+    .addHelpText('after', examples(['aip init', 'aip init --shared']))
+    .action(async (options: { shared?: boolean }) => {
+      try {
+        const result = await initConfig({
+          cwd: process.cwd(),
+          shared: options.shared ?? false,
+          env: process.env,
+        });
+        const show = (file: string): string => relative(process.cwd(), file) || file;
+        for (const file of result.created) print(`${activeStyle.success('created')} ${show(file)}`);
+        for (const file of result.kept)
+          print(`${activeStyle.muted('kept   ')} ${show(file)} (already exists)`);
+        print(
+          `\nNext: ${activeStyle.command('aip config check')}, then ${activeStyle.command('aip run start feature --task "Describe the task"')}`,
+        );
+      } catch (error) {
+        process.stderr.write(`aip init: ${(error as Error).message}\n`);
+        process.exitCode = 1;
+      }
+    });
+
   const config = program.command('config').description('Inspect the aip/ configuration');
   config
     .command('check')
@@ -908,34 +1018,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
   program.helpCommand('help [command]', 'Show help for a command');
 
   program.commandsGroup(plumbing!.heading);
-  program
-    .command('daemon')
-    .description('Run the aip daemon in the foreground (clients start it automatically)')
-    .addHelpText('after', examples(['aip daemon']))
-    .action(async () => {
-      const ctx = context();
-      try {
-        const running = await startDaemon({ stateDirectory: ctx.stateDirectory, entry: ctx.entry });
-        const stop = () => void running.close();
-        process.once('SIGTERM', stop);
-        process.once('SIGINT', stop);
-        print(`aip daemon listening on ${ctx.socket} (pid ${process.pid})`);
-        const panel = await startDaemonPanel({
-          stateDirectory: ctx.stateDirectory,
-          socket: ctx.socket,
-        });
-        if (panel !== null) print(`aip web: ${panel.url}`);
-        await running.closed;
-        await panel?.close();
-      } catch (error) {
-        if (error instanceof AlreadyRunning) {
-          process.stderr.write(`aip daemon: ${error.message}\n`);
-          process.exitCode = 1;
-          return;
-        }
-        throw error;
-      }
-    });
+  registerDaemon(program, activeStyle);
 
   program
     .command('mcp')

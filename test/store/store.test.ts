@@ -98,6 +98,52 @@ describe('queues', () => {
     expect(store.queues()).toHaveLength(1);
   });
 
+  it('keeps the skipped steps of an item and reads old rows as empty', () => {
+    const store = temporaryStore();
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'A', skip: ['review', 'qa'] }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3);
+    store.saveQueue(queue);
+    expect(store.loadQueue('/repo')?.items.map((item) => item.skip)).toEqual([
+      ['review', 'qa'],
+      [],
+    ]);
+    store.database.prepare("UPDATE queue_items SET skip_json = '[]' WHERE id = 'q1'").run();
+    expect(store.loadQueue('/repo')?.items[0]?.skip).toEqual([]);
+  });
+
+  it('keeps the dependencies of an item and the queue item of a run', () => {
+    const store = temporaryStore();
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a', after: ['r1', 'q0'] }, 'q1', 1);
+    store.saveQueue(queue);
+    expect(store.loadQueue('/repo')?.items[0]?.after).toEqual(['r1', 'q0']);
+    const state = run(1);
+    state.run.queueItem = 'q7';
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)?.run.queueItem).toBe('q7');
+    expect(store.runOfQueueItem('/repo', 'q7')?.run.id).toBe(state.run.id);
+    expect(store.runOfQueueItem('/repo', 'q8')).toBeNull();
+    expect(run(1, { id: 'run000000002' }).run.queueItem).toBeNull();
+  });
+
+  it('reads items and runs of an older database without dependencies', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aip-store-'));
+    const old = new Store(databasePath(directory));
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a' }, 'q0', 1);
+    old.saveQueue(queue);
+    old.saveRun(run(1));
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
+    old.database.exec('ALTER TABLE runs DROP COLUMN queue_item');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.close();
+    const store = new Store(databasePath(directory));
+    expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
+    expect(store.loadRun('run000000001')?.run.queueItem).toBeNull();
+    store.close();
+  });
+
   it('keeps the queue origin of a run', () => {
     const store = temporaryStore();
     const state = run(1);
@@ -280,7 +326,7 @@ describe('refused tool calls', () => {
     store.saveRun(state);
     // As a database written before the column existed.
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; PRAGMA user_version = 3',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; PRAGMA user_version = 3',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
@@ -290,7 +336,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-7)).toContain('denials_json');
+    expect(MIGRATIONS.at(-9)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -307,13 +353,13 @@ describe('refused tool calls', () => {
     ]);
     // As a database written before the column existed.
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; PRAGMA user_version = 4',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; PRAGMA user_version = 4',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-6)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-8)).toContain('outside_changes_json');
   });
 });
 
@@ -356,7 +402,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(10);
+    expect(SCHEMA_VERSION).toBe(12);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -388,9 +434,12 @@ describe('queue items and automatic delivery', () => {
     addItem(queue, { workflow: 'feature', task: 'a', autoDeliver: false }, 'q0', 1);
     old.saveQueue(queue);
     old.database.exec('DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
+    old.database.exec('ALTER TABLE runs DROP COLUMN queue_item');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN skip_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN tags_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN auto_deliver');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -409,10 +458,13 @@ describe('repository registry', () => {
     old.saveRun(second);
     old.saveQueue(emptyQueue('/work/lib', 7));
     old.database.exec('DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
+    old.database.exec('ALTER TABLE runs DROP COLUMN queue_item');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN skip_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN tags_json');
     old.database.exec('DROP TABLE repositories');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN auto_deliver');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -483,8 +535,11 @@ describe('tags', () => {
     addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 1);
     old.saveQueue(queue);
     old.database.exec('DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
+    old.database.exec('ALTER TABLE runs DROP COLUMN queue_item');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN skip_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN tags_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);

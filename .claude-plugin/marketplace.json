@@ -1,0 +1,13 @@
+{
+  "name": "aip",
+  "owner": {
+    "name": "hoknie"
+  },
+  "plugins": [
+    {
+      "name": "aip",
+      "source": "./integrations/claude-code",
+      "description": "Watch and control the aip agent swarm from Claude Code"
+    }
+  ]
+}

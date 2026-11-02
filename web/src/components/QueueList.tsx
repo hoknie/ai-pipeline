@@ -16,6 +16,7 @@ import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
 
+import { TagChips } from './TagChip.tsx';
 import { QueueForm, draftOf, type QueueDraft } from './QueueForm.tsx';
 import { dropPosition, dropSlot, moveId } from './queueOrder.ts';
 
@@ -229,6 +230,7 @@ export function QueueList({
                 <span className="min-w-0 flex-1 truncate" title={itemLabel(item, t)}>
                   {itemLabel(item, t)}
                 </span>
+                <TagChips tags={item.tags ?? []} />
                 {item.autoDeliver === null ? null : (
                   <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                     {item.autoDeliver
@@ -305,6 +307,7 @@ export function QueueList({
                   idPrefix={`edit-${item.id}`}
                   draft={editing}
                   workflows={workflows}
+                  api={api}
                   autoDeliverDefault={queue.autoDeliver}
                   submitLabel={t('queue.list.save')}
                   onDraft={(draft) => onDraft(`edit:${item.id}`, draft)}
@@ -317,6 +320,7 @@ export function QueueList({
                         ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
                         title: fields.title ?? null,
                         autoDeliver: fields.autoDeliver ?? null,
+                        tags: fields.tags ?? [],
                       });
                       onQueue(view);
                       onDraft(`edit:${item.id}`, null);

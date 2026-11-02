@@ -1,0 +1,5 @@
+name: Reviewer
+permissions: read
+prompt: >
+  Review the changes against the task. If you find problems, reject the step
+  and list your remarks.

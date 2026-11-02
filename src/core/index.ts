@@ -21,6 +21,7 @@ export {
   type MergeOutcome,
 } from './machine.ts';
 export * from './model.ts';
+export { applySkip, checkSkip, cleanSkip } from './skip.ts';
 export { questionsText } from './questions.ts';
 export { dispatch, runningBySpecialist, runningCount } from './scheduler.ts';
 export {
@@ -30,6 +31,12 @@ export {
   type DeliveryResult,
 } from './delivery.ts';
 export { formatCounts, summarize, type RunSummary } from './summary.ts';
+export {
+  specialistUse,
+  type SpecialistRunning,
+  type SpecialistUse,
+  type SpecialistWaiting,
+} from './occupancy.ts';
 export {
   topology,
   workflowTopologies,
@@ -67,7 +74,11 @@ export {
   QUEUE_PARALLEL_MAX,
   addItem,
   advance,
+  checkDependencies,
+  dependencyState,
   editItem,
+  itemReadiness,
+  runDone,
   emptyQueue,
   itemFailed,
   itemStarted,
@@ -78,7 +89,9 @@ export {
   runProblems,
   setParallel,
   startQueue,
+  type DependencyState,
   type ItemFields,
+  type ItemReadiness,
   type ItemPatch,
   type Problem,
   type ProblemReason,

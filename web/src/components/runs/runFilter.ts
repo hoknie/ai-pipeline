@@ -1,5 +1,5 @@
 import { runTitle } from '../../format.ts';
-import type { RunView } from '../../types.ts';
+import type { RunView, TagView } from '../../types.ts';
 
 /** Whose runs the list shows: those of the selected repository or of every repository. */
 export type RunScope = 'repository' | 'all';
@@ -27,9 +27,23 @@ function inFilter(run: RunView, filter: RunFilter): boolean {
   }
 }
 
-/** Searched text of a run: title, name, workflow, id, group titles. */
-function haystack(run: RunView): string {
-  return [runTitle(run), run.name, run.workflow, run.id, ...run.groups.map((group) => group.title)]
+/** Whether the run has at least one of the tags; no chosen tags means every run. */
+export function inTags(run: RunView, tagIds: readonly string[]): boolean {
+  if (tagIds.length === 0) return true;
+  return (run.tags ?? []).some((tag) => tagIds.includes(tag.id));
+}
+
+/** Searched text of a run: title, name, workflow, id, group titles, tag names. */
+function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
+  const tagNames = (run.tags ?? []).flatMap((tag) => catalog.get(tag.id)?.name ?? []);
+  return [
+    runTitle(run),
+    run.name,
+    run.workflow,
+    run.id,
+    ...run.groups.map((group) => group.title),
+    ...tagNames,
+  ]
     .filter((part): part is string => Boolean(part))
     .join('\n')
     .toLowerCase();
@@ -41,18 +55,23 @@ export function runsOf(runs: RunView[], repository: string | null): RunView[] {
 }
 
 /**
- * Runs matching the query (case-insensitive) and the filter, in their own order; with a
- * repository, only its runs (`null` means all repositories).
+ * Runs matching the query (case-insensitive), the status filter and the tags (any of them), in
+ * their own order; with a repository, only its runs (`null` means all repositories).
  */
 export function filterRuns(
   runs: RunView[],
   query: string,
   filter: RunFilter,
   repository: string | null = null,
+  tagIds: readonly string[] = [],
+  catalog: ReadonlyMap<string, TagView> = new Map(),
 ): RunView[] {
   const needle = query.trim().toLowerCase();
   return runsOf(runs, repository).filter(
-    (run) => inFilter(run, filter) && (needle === '' || haystack(run).includes(needle)),
+    (run) =>
+      inFilter(run, filter) &&
+      inTags(run, tagIds) &&
+      (needle === '' || haystack(run, catalog).includes(needle)),
   );
 }
 
@@ -63,7 +82,12 @@ export function navRunCounts(runs: RunView[]): { working: number; waiting: numbe
   return { working: active + waiting, waiting };
 }
 
-export function filterCounts(runs: RunView[]): Record<RunFilter, number> {
+/** Counters of the status filter over the runs that have one of the tags. */
+export function filterCounts(
+  all: RunView[],
+  tagIds: readonly string[] = [],
+): Record<RunFilter, number> {
+  const runs = all.filter((run) => inTags(run, tagIds));
   return {
     all: runs.length,
     waiting: runs.filter((run) => inFilter(run, 'waiting')).length,

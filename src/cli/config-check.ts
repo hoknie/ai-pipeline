@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process';
-
 import { stringify } from 'yaml';
 
 import {
@@ -12,17 +10,7 @@ import {
 import { repositoryRoot } from '../git/index.ts';
 import { findExecutable, runtimeFor } from '../runtime/index.ts';
 
-function version(executable: string): Promise<string> {
-  return new Promise((resolve) => {
-    execFile(executable, ['--version'], { timeout: 10_000 }, (error, stdout) => {
-      resolve(
-        error
-          ? `unknown (${error.message.split('\n')[0]})`
-          : (String(stdout).trim().split('\n')[0] ?? ''),
-      );
-    });
-  });
-}
+import { probeVersion } from './probe.ts';
 
 export function presentConfig(config: ResolvedConfig): unknown {
   return {
@@ -153,7 +141,7 @@ export async function checkConfig(directory: string, environment = process.env):
     const runtime = runtimeFor(name, environment);
     const path = findExecutable(runtime.executable, environment.PATH);
     process.stdout.write(
-      `  ${name}: ${path ? `${await version(path)} (${path})` : 'not found in PATH'}\n`,
+      `  ${name}: ${path ? `${await probeVersion(path)} (${path})` : 'not found in PATH'}\n`,
     );
   }
   for (const warning of configWarnings(config)) process.stdout.write(`Warning: ${warning}\n`);

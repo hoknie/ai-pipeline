@@ -323,6 +323,26 @@ describe('queue text', () => {
     expect(formatQueue(splitting)).toContain('splitting');
   });
 
+  it('marks the skipped steps of an item', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'x', skip: ['review', 'qa'] }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 2);
+    const text = formatQueue(queueView(queue, () => undefined));
+    expect(text).toMatch(/q1 {2}feature {2}x · skip: review, qa {2}added/);
+    expect(text).not.toMatch(/q2.*skip/);
+  });
+
+  it('shows the predecessors and the readiness of an item', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'y', after: ['q1', 'gone'] }, 'q2', 2);
+    addItem(queue, { workflow: 'feature', task: 'z' }, 'q3', 2);
+    const text = formatQueue(queueView(queue, () => undefined));
+    expect(text).toMatch(/q2 {2}feature {2}y · after q1, gone \(blocked\) {2}added/);
+    expect(text).not.toMatch(/q1.*after/);
+    expect(text).not.toMatch(/q3.*after/);
+  });
+
   it('marks the delivery of an item and of a run', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);

@@ -141,6 +141,26 @@ describe('grouped help', () => {
     expect(existsSync(join(base, 'state'))).toBe(before);
   });
 
+  it('lists the subcommands of aip daemon with examples', async () => {
+    const { stdout, code } = await aip(['daemon', '--help']);
+    expect(code).toBe(0);
+    for (const name of ['start', 'stop', 'restart', 'status']) expect(stdout).toContain(name);
+    expect(stdout).toContain('aip daemon status');
+  });
+
+  it('lists the subcommands of aip web', async () => {
+    const { stdout, code } = await aip(['web', '--help']);
+    expect(code).toBe(0);
+    for (const name of ['start', 'stop', 'restart', 'status']) expect(stdout).toContain(name);
+  });
+
+  it('rejects a mistyped daemon subcommand without starting the daemon', async () => {
+    const { code, stderr } = await aip(['daemon', 'stpo']);
+    expect(code).toBe(1);
+    expect(stderr).not.toBe('');
+    expect(existsSync(join(base, 'state', 'aip', 'aip.pid'))).toBe(false);
+  });
+
   it('suggests a close command name', async () => {
     const verb = await aip(['run', 'lsit']);
     expect(verb.code).toBe(1);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RunList } from '../src/components/runs/RunList.tsx';
 import {
@@ -97,6 +97,8 @@ function Harness({ initial = 'all' as RunFilter }) {
       scope="repository"
       onScope={() => undefined}
       repository={null}
+      tagIds={[]}
+      onTagIds={() => undefined}
     />
   );
 }
@@ -135,5 +137,63 @@ describe('run list', () => {
     const items = screen.getAllByRole('listitem');
     expect(within(items[0]!).getByText('Готовый')).toBeTruthy();
     expect(within(items[1]!).getByText('Отменённый')).toBeTruthy();
+  });
+});
+
+describe('filter by tags', () => {
+  const auth = { id: 'ta', name: 'auth', color: 'red' as const };
+  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const };
+  const catalog = new Map([auth, v2].map((tag) => [tag.id, tag]));
+  const tagged = [
+    runView({ id: 'A', title: 'Веб-панель', tags: [auth], state: 'needs_human' }),
+    runView({ id: 'B', title: 'Другое', tags: [v2] }),
+    runView({ id: 'C', title: 'Без тегов' }),
+    runView({ id: 'D', title: 'Ещё', tags: [auth], state: 'finished', finished: true }),
+  ];
+  const ids = (list: typeof tagged) => list.map((run) => run.id);
+
+  it('keeps the runs with any of the chosen tags', () => {
+    expect(ids(filterRuns(tagged, '', 'all', null, ['ta', 'tv'], catalog))).toEqual([
+      'A',
+      'B',
+      'D',
+    ]);
+    expect(ids(filterRuns(tagged, '', 'all', null, [], catalog))).toHaveLength(4);
+  });
+
+  it('combines with the status filter', () => {
+    expect(ids(filterRuns(tagged, '', 'waiting', null, ['ta'], catalog))).toEqual(['A']);
+  });
+
+  it('searches the names of the tags of a run', () => {
+    expect(ids(filterRuns(tagged, 'Auth', 'all', null, [], catalog))).toEqual(['A', 'D']);
+  });
+
+  it('counts the status filter over the runs with the tags', () => {
+    expect(filterCounts(tagged, ['ta'])).toEqual({ all: 2, waiting: 1, active: 0, done: 1 });
+  });
+
+  it('resets the tags together with the search', () => {
+    const onTagIds = vi.fn();
+    render(
+      <RunList
+        runs={[]}
+        selectedRun={null}
+        selectedGroup={null}
+        now={0}
+        query=""
+        onQuery={() => undefined}
+        filter="all"
+        onFilter={() => undefined}
+        onSelect={() => undefined}
+        scope="repository"
+        onScope={() => undefined}
+        repository={null}
+        tagIds={['gone']}
+        onTagIds={onTagIds}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onTagIds).toHaveBeenCalledWith([]);
   });
 });

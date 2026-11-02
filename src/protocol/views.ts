@@ -10,6 +10,8 @@ import {
   isRunFinished,
   isSplitGroup,
   isTerminal,
+  itemReadiness,
+  dependencyState,
   knownTags,
   occupiesSlot,
   runPhase,
@@ -17,7 +19,9 @@ import {
   summarize,
   type Attempt,
   type Suggestion,
+  type DependencyState,
   type Group,
+  type ItemReadiness,
   type NewGroup,
   type Queue,
   type QueueStop,
@@ -32,6 +36,8 @@ import {
   type TagColor,
   type Usage,
   topology,
+  specialistUse,
+  type SpecialistUse,
   type Topology,
   type WorkflowTopology,
 } from '../core/index.ts';
@@ -156,6 +162,8 @@ export interface RunView {
   diff: DiffTotals | null;
   /** Steps of the workflow with the groups on them, for the topology view. */
   topology: Topology;
+  /** Specialists that run or are waited for in the run, for the load across the machine. */
+  specialists: SpecialistUse[];
   groups: GroupRow[];
 }
 
@@ -343,6 +351,7 @@ export function runView(
       : null,
     diff: runDiff(state, diffs),
     topology: topology(state),
+    specialists: specialistUse(state),
     groups: state.groups.map((group) => groupRow(group, now, diffs)),
   };
 }
@@ -458,6 +467,7 @@ export interface ApplyResult {
 }
 
 export type {
+  SpecialistUse,
   StepGroup,
   StepInfo,
   StepTopology,
@@ -498,8 +508,19 @@ export interface QueueItemView {
   /** `null`: follows `delivery.auto` when the task starts. */
   autoDeliver: boolean | null;
   tags: TagView[];
+  skip: string[];
+  /** Whether the task can start now: its predecessors are done, still pending or blocked. */
+  readiness: ItemReadiness;
+  after: DependencyView[];
   createdAt: number;
   error: string | null;
+}
+
+export interface DependencyView {
+  kind: 'item' | 'run';
+  id: string;
+  title: string;
+  state: DependencyState;
 }
 
 export interface QueueRunView {
@@ -576,6 +597,18 @@ export function queueView(
       title: item.title,
       autoDeliver: item.autoDeliver,
       tags: tagViews(catalog, item.tags),
+      skip: [...item.skip],
+      readiness: itemReadiness(queue, item, lookup),
+      after: item.after.map((ref): DependencyView => {
+        const other = queue.items.find((candidate) => candidate.id === ref);
+        const state = dependencyState(queue, ref, lookup);
+        if (other) {
+          const label = other.title ?? (other.task ? other.task.trim().split('\n')[0] : null);
+          return { kind: 'item', id: ref, title: label ?? other.workflow, state };
+        }
+        const run = lookup(ref);
+        return { kind: 'run', id: ref, title: run ? runTitle(run) : ref, state };
+      }),
       createdAt: item.createdAt,
       error: item.error,
     })),

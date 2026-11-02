@@ -417,6 +417,7 @@ class Validator {
       prompt: null,
       max: null,
       queue: false,
+      level: 'project',
     };
     for (const [key, field] of this.entries(mapping, path, SPECIALIST_KEYS)) {
       const fieldPath = join(path, key);

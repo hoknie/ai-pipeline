@@ -54,6 +54,26 @@ describe('repositoryViews', () => {
   });
 });
 
+describe('queueView dependencies', () => {
+  it('shows the readiness and the predecessors with their state', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'API', title: 'API' }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'UI', after: ['q1', 'run00000000a'] }, 'q2', 2);
+    addItem(queue, { workflow: 'feature', task: 'free' }, 'q3', 2);
+    const working = run(1, { id: 'run00000000a' });
+    const view = queueView(queue, (id) => (id === working.run.id ? working : undefined));
+    expect(view.items.map((item) => item.readiness)).toEqual(['ready', 'waiting', 'ready']);
+    expect(view.items[1]!.after).toEqual([
+      { kind: 'item', id: 'q1', title: 'API', state: 'waiting' },
+      { kind: 'run', id: 'run00000000a', title: 'задача 1', state: 'waiting' },
+    ]);
+    expect(view.items[2]!.after).toEqual([]);
+    const lost = queueView(queue, () => undefined);
+    expect(lost.items[1]!.readiness).toBe('blocked');
+    expect(lost.items[1]!.after[1]).toMatchObject({ kind: 'run', state: 'blocked' });
+  });
+});
+
 describe('queueView', () => {
   const lookup = (state: ReturnType<typeof run>) => (id: string) =>
     id === state.run.id ? state : undefined;
@@ -94,7 +114,7 @@ describe('queueView', () => {
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
     startQueue(queue, [], 2);
-    advance(queue, [state], 3);
+    advance(queue, [state], () => undefined, 3);
     const view = queueView(queue, lookup(state));
     expect(view.runs[0]!.problem).toMatchObject({ reason: 'needs_human', group: 'gruppa-1' });
     expect(view.stop).toBeNull();
@@ -146,5 +166,29 @@ describe('tags in views', () => {
     const view = queueView(queue, () => started, null, catalog);
     expect(view.items[0]!.tags).toEqual([{ id: 'tg-a', name: 'auth', color: 'blue' }]);
     expect(view.runs[0]!.tags).toEqual([{ id: 'tg-b', name: 'v2', color: 'red' }]);
+  });
+});
+
+describe('runView specialists', () => {
+  it('lists the specialists that run or are waited for', () => {
+    const state = run(2, {
+      configText: CONFIG_TEXT.replace('coder: {', 'coder: { max: 1,'),
+    });
+    expect(runView(state, 5000).specialists).toMatchObject([
+      { specialist: 'plan', running: [], waiting: [{ slug: 'gruppa-1' }, { slug: 'gruppa-2' }] },
+    ]);
+    step(state);
+    finish(state, 'done');
+    finish(state, 'done', { slug: 'gruppa-2' });
+    step(state);
+    expect(runView(state, 5000).specialists).toEqual([
+      {
+        specialist: 'coder',
+        level: 'project',
+        max: 1,
+        running: [{ slug: 'gruppa-1', title: 'Группа 1', step: 'code', startedAt: 1500 }],
+        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code' }],
+      },
+    ]);
   });
 });

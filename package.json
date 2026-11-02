@@ -1,10 +1,17 @@
 {
-  "name": "ai-pipeline",
+  "name": "@hoknie/aip",
   "version": "0.1.0",
   "description": "aip: local orchestrator for a swarm of AI agents (Claude Code, OpenCode)",
-  "private": true,
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoknie/ai-pipeline.git"
+  },
+  "homepage": "https://github.com/hoknie/ai-pipeline#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24"
   },
@@ -12,9 +19,14 @@
     "aip": "dist/cli/main.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "templates",
+    ".claude-plugin",
+    "integrations/claude-code",
+    "!integrations/claude-code/test"
   ],
   "scripts": {
+    "prepack": "npm run build",
     "build": "tsc -p tsconfig.build.json && vite build --config web/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
     "test": "vitest run",

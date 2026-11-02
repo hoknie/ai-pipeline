@@ -314,6 +314,8 @@ export interface Run {
   namingUsage: Usage | null;
   /** Created by a task queue. */
   fromQueue: boolean;
+  /** Id of the queue item the run started from; null for a run outside the queue. */
+  queueItem: string | null;
   /** Ids of catalog tags. */
   tags: string[];
 }

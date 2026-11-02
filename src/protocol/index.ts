@@ -3,7 +3,11 @@ export {
   daemonMismatchMessage,
   ensureDaemon,
   pingDaemon,
+  spawnDaemon,
+  stopDaemon,
   type DaemonCheck,
+  type StopOptions,
+  type StopResult,
 } from './autostart.ts';
 export { currentBuild, fingerprintTree, type BuildInfo } from './build.ts';
 export { DaemonUnavailable, IpcError, request, subscribe } from './client.ts';

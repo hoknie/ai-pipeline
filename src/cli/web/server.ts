@@ -82,6 +82,20 @@ const applyBody = z.object({
   force: z.boolean().optional(),
 });
 
+const tagName = z.string().trim().min(1);
+const tagAddBody = z.object({ name: tagName, color: z.string().optional() });
+const tagEditBody = z
+  .object({ tag: tagName, name: tagName.optional(), color: z.string().optional() })
+  .refine((body) => body.name !== undefined || body.color !== undefined, {
+    message: 'pass a new name or a new color',
+  });
+const tagRemoveBody = z.object({ tag: tagName });
+const runTagsBody = z
+  .object({ add: z.array(tagName).max(20).optional(), remove: z.array(tagName).max(20).optional() })
+  .refine((body) => (body.add?.length ?? 0) + (body.remove?.length ?? 0) > 0, {
+    message: 'pass tags to add or remove',
+  });
+
 const levelParam = z.enum(['project', 'global']);
 const previewBody = z.object({
   value: z.record(z.string(), z.unknown()),
@@ -196,6 +210,7 @@ class Hub {
   private runs = new Map<string, unknown>();
   private queues = new Map<string, unknown>();
   private repositories: unknown[] = [];
+  private tags: unknown[] = [];
   private seq = 0;
   private ready = false;
   private stopped = false;
@@ -266,6 +281,7 @@ class Hub {
       return;
     }
     if (event.event === 'snapshot') {
+      this.tags = event.tags ?? [];
       this.runs = new Map(event.runs.map((run) => [run.id, run]));
       this.queues = new Map((event.queues ?? []).map((queue) => [queue.repository, queue]));
       this.repositories = event.repositories ?? [];
@@ -284,8 +300,11 @@ class Hub {
       this.queues.set(event.queue.repository, event.queue);
       this.seq = event.seq;
       this.broadcast(event);
+    } else if (event.event === 'tags') {
+      this.tags = event.tags;
+      this.seq = event.seq;
+      this.broadcast(event);
     }
-    // The `tags` event is not relayed to the browser yet.
   }
 
   private snapshot(): unknown {
@@ -295,6 +314,7 @@ class Hub {
       runs: [...this.runs.values()],
       queues: [...this.queues.values()],
       repositories: this.repositories,
+      tags: this.tags,
       daemon: this.daemon,
     };
   }
@@ -572,6 +592,28 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           value: parseBody(previewBody, body).value,
           level: parseBody(previewBody, body).level,
         }),
+    },
+    { method: 'GET', pattern: /^\/api\/tags$/, handle: () => call('tags', {}) },
+    {
+      method: 'POST',
+      pattern: /^\/api\/tags$/,
+      handle: async (_, body) => call('tag_add', parseBody(tagAddBody, body)),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/tags\/edit$/,
+      handle: async (_, body) => call('tag_edit', parseBody(tagEditBody, body)),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/tags\/remove$/,
+      handle: async (_, body) => call('tag_remove', parseBody(tagRemoveBody, body)),
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/tags$`),
+      handle: async ([runId], body) =>
+        call('run_tags', { runId: runId ?? '', ...parseBody(runTagsBody, body) }),
     },
     {
       method: 'POST',

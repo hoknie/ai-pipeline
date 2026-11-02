@@ -7,6 +7,7 @@ import { Alert } from '../ui/alert.tsx';
 import { Switch } from '../ui/switch.tsx';
 
 import type { Api } from '../api.ts';
+import { TagsSettings } from './TagsSettings.tsx';
 import type { ConfigEditorResponse, EditorSetting } from '../types.ts';
 
 /** Settings the panel can write; the others are shown only. */
@@ -114,6 +115,7 @@ export function SettingsView({
           ))}
         </tbody>
       </table>
+      {api ? <TagsSettings api={api} /> : null}
     </section>
   );
 }

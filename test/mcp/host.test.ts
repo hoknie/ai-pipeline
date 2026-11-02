@@ -22,6 +22,9 @@ const VIEW: QueueView & { item: string } = {
       title: null,
       autoDeliver: null,
       tags: [],
+      skip: [],
+      readiness: 'ready',
+      after: [],
       createdAt: 1,
       error: null,
     },
@@ -150,6 +153,91 @@ describe('host MCP queue tools', () => {
     ]);
   });
 
+  it('passes skip to run, queue_add and queue_edit only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', skip: ['review', 'qa'] },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', skip: [] } });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x', skip: ['qa'] },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 'T' } });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', skip: ['review', 'qa'] },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', skip: [] } },
+      {
+        method: 'run',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', skip: ['qa'] },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 'T' } },
+    ]);
+  });
+
+  it('chains tasks: passes after to run, queue_add and queue_edit only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'API', after: ['q1'] },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q2', after: [] } });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'UI', after: ['q1', 'r1'] },
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'API', after: ['q1'] },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q2', after: [] } },
+      {
+        method: 'run',
+        params: {
+          repository: '/repo',
+          workflow: 'feature',
+          task: 'UI',
+          after: ['q1', 'r1'],
+        },
+      },
+      { method: 'queue_add', params: { repository: '/repo', workflow: 'feature', task: 'x' } },
+    ]);
+  });
+
+  it('shows the readiness and the predecessors in swarm_queue', async () => {
+    const waiting = {
+      ...VIEW,
+      items: [
+        {
+          ...VIEW.items[0]!,
+          readiness: 'waiting' as const,
+          after: [{ kind: 'item' as const, id: 'q0', title: 'модель', state: 'waiting' as const }],
+        },
+      ],
+    };
+    const client = await connect(async () => waiting);
+    const result = await client.callTool({ name: 'swarm_queue', arguments: {} });
+    expect(textOf(result)).toContain('after q0 (waiting)');
+    expect(JSON.stringify(result.content)).toContain('readiness');
+  });
+
   it('shows the tags of a queued task and offers no tool for the catalog', async () => {
     const tagged = {
       ...VIEW,
@@ -203,6 +291,20 @@ describe('host MCP queue tools', () => {
       arguments: { parallel: 0 },
     });
     expect(wrong.isError).toBe(true);
+  });
+
+  it('returns a skip check error as a tool error', async () => {
+    const client = await connect(async () => {
+      throw new Error('unknown step `deploy` in skip; steps: code, review');
+    });
+    for (const [name, args] of [
+      ['swarm_queue_add', { workflow: 'feature', task: 'x', skip: ['deploy'] }],
+      ['swarm_queue_edit', { item: 'q1', skip: ['deploy'] }],
+    ] as const) {
+      const result = await client.callTool({ name, arguments: args });
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain('unknown step `deploy` in skip');
+    }
   });
 
   it('returns the run and the daemon errors', async () => {

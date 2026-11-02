@@ -1,6 +1,7 @@
 import type { NewGroup } from './create.ts';
 import { Rejection } from './errors.ts';
 import { RUN_TITLE_LIMIT } from './ids.ts';
+import { cleanSkip } from './skip.ts';
 import { allGroups, runPhase, type RunState } from './model.ts';
 
 export const QUEUE_PARALLEL_MAX = 20;
@@ -15,6 +16,10 @@ export interface QueueItem {
   autoDeliver: boolean | null;
   /** Ids of catalog tags. */
   tags: string[];
+  /** Ids of workflow steps the task skips. */
+  skip: string[];
+  /** Ids of queue items or runs of the repository that must be done first. */
+  after: string[];
   createdAt: number;
   error: string | null;
 }
@@ -60,6 +65,8 @@ export interface ItemFields {
   title?: string | null | undefined;
   autoDeliver?: boolean | undefined;
   tags?: string[] | undefined;
+  skip?: string[] | undefined;
+  after?: string[] | undefined;
 }
 
 export function emptyQueue(repository: string, now: number): Queue {
@@ -124,6 +131,8 @@ function find(queue: Queue, id: string): QueueItem {
 }
 
 export function addItem(queue: Queue, fields: ItemFields, id: string, now: number): QueueItem {
+  const after = [...new Set(fields.after ?? [])];
+  checkDependencies(queue, id, after);
   const item: QueueItem = {
     id,
     workflow: cleanWorkflow(fields.workflow),
@@ -131,6 +140,8 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,
     tags: [...new Set(fields.tags ?? [])],
+    skip: cleanSkip(fields.skip ?? []),
+    after,
     createdAt: now,
     error: null,
   };
@@ -146,6 +157,8 @@ export interface ItemPatch {
   title?: string | null | undefined;
   autoDeliver?: boolean | null | undefined;
   tags?: string[] | undefined;
+  skip?: string[] | undefined;
+  after?: string[] | undefined;
   position?: number | undefined;
 }
 
@@ -161,11 +174,15 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
   const workflow = patch.workflow === undefined ? null : cleanWorkflow(patch.workflow);
   const title = patch.title === undefined ? undefined : cleanTitle(patch.title);
   if (patch.position !== undefined) checkPosition(queue, patch.position);
+  const after = patch.after === undefined ? undefined : [...new Set(patch.after)];
+  if (after !== undefined) checkDependencies(queue, id, after);
   if (workflow !== null) item.workflow = workflow;
   if (body) Object.assign(item, body);
   if (title !== undefined) item.title = title;
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;
   if (patch.tags !== undefined) item.tags = [...new Set(patch.tags)];
+  if (patch.skip !== undefined) item.skip = cleanSkip(patch.skip);
+  if (after !== undefined) item.after = after;
   item.error = null;
   if (patch.position !== undefined) placeItem(queue, item, patch.position);
   queue.updatedAt = now;
@@ -175,7 +192,65 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
 export function removeItem(queue: Queue, id: string, now: number): void {
   const item = find(queue, id);
   queue.items = queue.items.filter((candidate) => candidate !== item);
+  for (const other of queue.items) other.after = other.after.filter((ref) => ref !== id);
   queue.updatedAt = now;
+}
+
+/**
+ * Rejects a dependency list of item `id` (not in the queue yet when adding) that
+ * points at the item itself or closes a cycle. Runs have no dependencies, so a
+ * cycle can only pass through items.
+ */
+export function checkDependencies(queue: Queue, id: string, after: string[]): void {
+  if (after.includes(id)) throw new Rejection('a task cannot depend on itself');
+  const refs = (item: string): string[] =>
+    item === id ? after : (queue.items.find((candidate) => candidate.id === item)?.after ?? []);
+  const walk = (current: string, path: string[]): string[] | null => {
+    for (const next of refs(current)) {
+      if (next === id) return [...path, next];
+      if (path.includes(next)) continue;
+      if (!queue.items.some((candidate) => candidate.id === next)) continue;
+      const found = walk(next, [...path, next]);
+      if (found) return found;
+    }
+    return null;
+  };
+  const cycle = walk(id, [id]);
+  if (cycle) throw new Rejection(`dependency cycle: ${cycle.join(' → ')}`);
+}
+
+export type DependencyState = 'done' | 'waiting' | 'blocked';
+export type ItemReadiness = 'ready' | 'waiting' | 'blocked';
+
+/** A run is done when it is finished and every work group is merged and applied. */
+export function runDone(state: RunState): boolean {
+  return (
+    runPhase(state) === 'finished' &&
+    state.groups.every((group) => group.status === 'merged' && group.delivery.state === 'applied')
+  );
+}
+
+export function dependencyState(
+  queue: Queue,
+  ref: string,
+  lookup: (id: string) => RunState | undefined,
+): DependencyState {
+  const item = queue.items.find((candidate) => candidate.id === ref);
+  if (item) return itemReadiness(queue, item, lookup) === 'blocked' ? 'blocked' : 'waiting';
+  const state = lookup(ref);
+  if (!state) return 'blocked';
+  if (runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))) return 'blocked';
+  return runDone(state) ? 'done' : 'waiting';
+}
+
+export function itemReadiness(
+  queue: Queue,
+  item: QueueItem,
+  lookup: (id: string) => RunState | undefined,
+): ItemReadiness {
+  const states = item.after.map((ref) => dependencyState(queue, ref, lookup));
+  if (states.includes('blocked')) return 'blocked';
+  return states.every((state) => state === 'done') ? 'ready' : 'waiting';
 }
 
 function checkPosition(queue: Queue, position: number): void {
@@ -287,6 +362,7 @@ export function startQueue(queue: Queue, states: Iterable<RunState>, now: number
 export function advance(
   queue: Queue,
   states: Iterable<RunState>,
+  lookup: (id: string) => RunState | undefined,
   now: number,
 ): { take: QueueItem[] } {
   const own = queueStates(queue, states);
@@ -317,7 +393,9 @@ export function advance(
   }
   let take: QueueItem[] = [];
   if (queue.status === 'running') {
-    take = queue.items.slice(0, Math.max(0, queue.parallel - queue.runs.length));
+    take = queue.items
+      .filter((item) => itemReadiness(queue, item, lookup) === 'ready')
+      .slice(0, Math.max(0, queue.parallel - queue.runs.length));
     if (queue.items.length === 0 && queue.runs.length === 0) queue.status = 'stopped';
   }
   queue.updatedAt = now;
@@ -327,6 +405,9 @@ export function advance(
 export function itemStarted(queue: Queue, id: string, run: string, now: number): void {
   const item = find(queue, id);
   queue.items = queue.items.filter((candidate) => candidate !== item);
+  for (const other of queue.items) {
+    other.after = [...new Set(other.after.map((ref) => (ref === id ? run : ref)))];
+  }
   queue.runs.push(run);
   queue.updatedAt = now;
 }

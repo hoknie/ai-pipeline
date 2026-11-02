@@ -1,6 +1,7 @@
 import { findWorkflow, type ResolvedConfig } from '../config/index.ts';
 
 import { groupSlugs, runName } from './ids.ts';
+import { applySkip } from './skip.ts';
 import { SPLIT_GROUP, newGroup, type RunState } from './model.ts';
 
 export interface NewGroup {
@@ -22,10 +23,14 @@ export interface NewRun {
   title?: string;
   /** The run is created by a task queue. */
   fromQueue?: boolean;
+  /** Id of the queue item the run starts from. */
+  queueItem?: string | null;
   /** Overrides `delivery.auto` of the configuration for this run only. */
   autoDeliver?: boolean | undefined;
   /** Ids of catalog tags. */
   tags?: string[] | undefined;
+  /** Ids of workflow steps this run skips. */
+  skip?: string[] | undefined;
 }
 
 export function createRun(input: NewRun): RunState {
@@ -38,6 +43,11 @@ export function createRun(input: NewRun): RunState {
   for (const group of input.groups) {
     if (group.task.trim() === '') throw new Error(`group \`${group.title}\` has an empty task`);
   }
+  const skipped = applySkip(input.config, input.workflow, input.skip ?? []);
+  const config =
+    input.autoDeliver === undefined
+      ? skipped
+      : { ...skipped, delivery: { ...skipped.delivery, auto: input.autoDeliver } };
   const splitting = input.split && workflow.split !== null && input.groups.length === 1;
   const slugs = groupSlugs(input.groups.map((group) => group.title));
   const task = input.groups[0]?.task ?? '';
@@ -51,10 +61,7 @@ export function createRun(input: NewRun): RunState {
       refStyle: 'refs',
       createdAt: input.now,
       finishedAt: null,
-      config:
-        input.autoDeliver === undefined
-          ? input.config
-          : { ...input.config, delivery: { ...input.config.delivery, auto: input.autoDeliver } },
+      config,
       dirtyWarning: input.dirtyWarning,
       nextMergeSeq: 0,
       pendingDelivery: null,
@@ -62,6 +69,7 @@ export function createRun(input: NewRun): RunState {
       name: input.title?.trim() ? runName(input.title) : null,
       namingUsage: null,
       fromQueue: input.fromQueue ?? false,
+      queueItem: input.queueItem ?? null,
       tags: [...(input.tags ?? [])],
     },
     split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,

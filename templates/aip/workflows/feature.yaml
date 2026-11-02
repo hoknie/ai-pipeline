@@ -1,0 +1,4 @@
+# Write the code, then review it. A rejected review sends the work back to `code` up to 2 times.
+steps:
+  - { id: code, specialist: coder }
+  - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }

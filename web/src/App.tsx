@@ -9,6 +9,7 @@ import { RunsPage } from './components/runs/RunsPage.tsx';
 import { AppShell } from './components/shell/AppShell.tsx';
 import { CommandPalette } from './components/shell/CommandPalette.tsx';
 import { DaemonBanner } from './components/shell/DaemonBanner.tsx';
+import { SpecialistLoadBar } from './components/shell/SpecialistLoadBar.tsx';
 import { ShortcutsDialog } from './components/shell/ShortcutsDialog.tsx';
 import { ConfirmProvider, useConfirm } from './confirm.tsx';
 import { useHotkey } from './hotkeys.ts';
@@ -19,6 +20,7 @@ import { repositoryLabel, waitingByRepository } from './repositories.ts';
 import { sectionLabel } from './sections.ts';
 import { statusInfo } from './status.ts';
 import { browserEventSource, useRuns, type EventSourceFactory } from './store.ts';
+import { TagsProvider } from './tags.tsx';
 import { Skeleton } from './ui/skeleton.tsx';
 
 const TopologyPage = lazy(() => import('./components/TopologyPage.tsx'));
@@ -88,6 +90,8 @@ function Panel({
     selected,
     queue,
     setQueue,
+    tags,
+    setTags,
     daemon,
   } = useRuns(api, openStream, chosen);
   // Every request names its repository, so it never depends on the server's default.
@@ -251,122 +255,134 @@ function Panel({
   };
 
   return (
-    <AppShell
-      nav={{
-        view: route.view,
-        hrefFor: (view) => formatRoute(tabRoute(view)),
-        onNavigate: (view) => {
-          if (view === 'topology' && run && run.repository !== selected) setChosen(run.repository);
-          setRoute(tabRoute(view));
-        },
-        repository: {
-          repositories,
-          selected,
-          waiting: waitingRepositories,
-          home,
-          onSelect: (path) => void selectRepository(path),
-          onAdd: addRepository,
-          onRemove: (path) => void removeRepository(path),
-        },
-        working,
-        waiting,
-        queued: queue?.items.length ?? 0,
-        connection,
-        onPalette: () => setPalette(true),
-        onEnableNotifications:
-          typeof Notification !== 'undefined' && !notify
-            ? () =>
-                void Notification.requestPermission().then((result) =>
-                  setNotify(result === 'granted'),
-                )
-            : null,
-        collapsed,
-        onToggleCollapsed: () => setCollapsed(!collapsed),
-      }}
-    >
-      <CommandPalette
-        open={palette}
-        onOpenChange={setPalette}
-        api={scopedApi}
-        runs={runs}
-        route={route}
-        onRoute={setRoute}
-        onShortcuts={() => setShortcuts(true)}
-      />
-      <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
-      <DaemonBanner daemon={daemon} />
-      <h1 className="sr-only">{sectionLabel(route.view, t)}</h1>
-      {route.view === 'queue' ? (
-        <Suspense fallback={<Loading what={t('app.loadingQueue')} />}>
-          <QueuePage
-            key={pageKey}
-            api={scopedApi}
-            queue={queue}
-            now={now}
-            drafts={queueDrafts}
-            onDraft={onQueueDraft}
-            onQueue={setQueue}
-            onError={onError}
-          />
-        </Suspense>
-      ) : route.view === 'workflows' ? (
-        <Suspense fallback={<Loading what="workflow" />}>
-          <WorkflowsPage
-            key={pageKey}
-            dirty={dirty}
-            api={scopedApi}
+    <TagsProvider tags={tags} onTags={setTags}>
+      <AppShell
+        footer={
+          <SpecialistLoadBar
             runs={runs}
-            selected={route.run}
-            onSelect={(id) => setRoute({ view: 'workflows', run: id, group: null, step: null })}
-          />
-        </Suspense>
-      ) : route.view === 'specialists' ? (
-        <Suspense fallback={<Loading what={t('app.loadingSpecialists')} />}>
-          <SpecialistsPage
-            key={pageKey}
-            dirty={dirty}
-            api={scopedApi}
-            selected={route.run}
-            onSelect={(id) => setRoute({ view: 'specialists', run: id, group: null, step: null })}
-          />
-        </Suspense>
-      ) : route.view === 'topology' ? (
-        <Suspense fallback={<Loading what={t('app.loadingGraph')} />}>
-          <TopologyPage
-            key={pageKey}
-            api={scopedApi}
-            runs={runs}
-            workflow={route.run}
-            onSelectWorkflow={(id) =>
-              setRoute({ view: 'topology', run: id, group: null, step: null })
-            }
-            onEditWorkflow={(id) =>
-              setRoute({ view: 'workflows', run: id, group: null, step: null })
-            }
-            onOpenGroup={(target, step) =>
-              setRoute({ view: 'runs', run: target.runId, group: target.slug, step })
+            selected={selected}
+            onOpenGroup={(entry) =>
+              setRoute({ view: 'runs', run: entry.runId, group: entry.group, step: entry.step })
             }
           />
-        </Suspense>
-      ) : (
-        <RunsPage
-          api={api}
+        }
+        nav={{
+          view: route.view,
+          hrefFor: (view) => formatRoute(tabRoute(view)),
+          onNavigate: (view) => {
+            if (view === 'topology' && run && run.repository !== selected)
+              setChosen(run.repository);
+            setRoute(tabRoute(view));
+          },
+          repository: {
+            repositories,
+            selected,
+            waiting: waitingRepositories,
+            home,
+            onSelect: (path) => void selectRepository(path),
+            onAdd: addRepository,
+            onRemove: (path) => void removeRepository(path),
+          },
+          working,
+          waiting,
+          queued: queue?.items.length ?? 0,
+          connection,
+          onPalette: () => setPalette(true),
+          onEnableNotifications:
+            typeof Notification !== 'undefined' && !notify
+              ? () =>
+                  void Notification.requestPermission().then((result) =>
+                    setNotify(result === 'granted'),
+                  )
+              : null,
+          collapsed,
+          onToggleCollapsed: () => setCollapsed(!collapsed),
+        }}
+      >
+        <CommandPalette
+          open={palette}
+          onOpenChange={setPalette}
+          api={scopedApi}
           runs={runs}
-          loaded={loaded}
           route={route}
-          now={now}
-          drafts={drafts}
-          onDraft={onDraft}
-          onClearDrafts={onClearDrafts}
-          onError={onError}
-          onlyReplies={onlyReplies}
-          onOnlyReplies={setOnlyReplies}
           onRoute={setRoute}
-          repository={selected}
-          scope={scope}
-          onScope={setScope}
+          onShortcuts={() => setShortcuts(true)}
         />
-      )}
-    </AppShell>
+        <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
+        <DaemonBanner daemon={daemon} />
+        <h1 className="sr-only">{sectionLabel(route.view, t)}</h1>
+        {route.view === 'queue' ? (
+          <Suspense fallback={<Loading what={t('app.loadingQueue')} />}>
+            <QueuePage
+              key={pageKey}
+              api={scopedApi}
+              queue={queue}
+              now={now}
+              drafts={queueDrafts}
+              onDraft={onQueueDraft}
+              onQueue={setQueue}
+              onError={onError}
+            />
+          </Suspense>
+        ) : route.view === 'workflows' ? (
+          <Suspense fallback={<Loading what="workflow" />}>
+            <WorkflowsPage
+              key={pageKey}
+              dirty={dirty}
+              api={scopedApi}
+              runs={runs}
+              selected={route.run}
+              onSelect={(id) => setRoute({ view: 'workflows', run: id, group: null, step: null })}
+            />
+          </Suspense>
+        ) : route.view === 'specialists' ? (
+          <Suspense fallback={<Loading what={t('app.loadingSpecialists')} />}>
+            <SpecialistsPage
+              key={pageKey}
+              dirty={dirty}
+              api={scopedApi}
+              selected={route.run}
+              onSelect={(id) => setRoute({ view: 'specialists', run: id, group: null, step: null })}
+            />
+          </Suspense>
+        ) : route.view === 'topology' ? (
+          <Suspense fallback={<Loading what={t('app.loadingGraph')} />}>
+            <TopologyPage
+              key={pageKey}
+              api={scopedApi}
+              runs={runs}
+              workflow={route.run}
+              onSelectWorkflow={(id) =>
+                setRoute({ view: 'topology', run: id, group: null, step: null })
+              }
+              onEditWorkflow={(id) =>
+                setRoute({ view: 'workflows', run: id, group: null, step: null })
+              }
+              onOpenGroup={(target, step) =>
+                setRoute({ view: 'runs', run: target.runId, group: target.slug, step })
+              }
+            />
+          </Suspense>
+        ) : (
+          <RunsPage
+            api={api}
+            runs={runs}
+            loaded={loaded}
+            route={route}
+            now={now}
+            drafts={drafts}
+            onDraft={onDraft}
+            onClearDrafts={onClearDrafts}
+            onError={onError}
+            onlyReplies={onlyReplies}
+            onOnlyReplies={setOnlyReplies}
+            onRoute={setRoute}
+            repository={selected}
+            scope={scope}
+            onScope={setScope}
+          />
+        )}
+      </AppShell>
+    </TagsProvider>
   );
 }

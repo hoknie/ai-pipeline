@@ -40,6 +40,7 @@ export function run(
     split?: boolean;
     configText?: string;
     autoDeliver?: boolean;
+    skip?: string[];
   } = {},
 ): RunState {
   const resolved = config(options.configText);
@@ -58,6 +59,7 @@ export function run(
     split: options.split ?? false,
     now: options.now ?? 1000,
     autoDeliver: options.autoDeliver,
+    skip: options.skip,
   });
 }
 

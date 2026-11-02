@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { startDaemonPanel } from '../../src/cli/web/daemon-panel.ts';
+import { createDaemonPanel, startDaemonPanel } from '../../src/cli/web/daemon-panel.ts';
 import { readPanelState, writePanelState } from '../../src/cli/web/state.ts';
 import { startWebServer, webTokenFromEnv, type WebServer } from '../../src/cli/web/server.ts';
 import type { GroupView, QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
@@ -266,7 +266,7 @@ describe('aip web', () => {
     expect(text).toContain(`"id":"${runId}"`);
   });
 
-  it('skips the tags event and keeps relaying runs', async () => {
+  it('relays the tags event and keeps tags in the snapshot', async () => {
     const { h, web, base } = await setup();
     const controller = new AbortController();
     const response = await fetch(`${base}/api/events`, {
@@ -294,7 +294,79 @@ describe('aip web', () => {
     await read(runId);
     controller.abort();
     expect(text).toContain(`"id":"${runId}"`);
-    expect(text).not.toContain('"event":"tags"');
+    expect(text).toContain('"event":"tags"');
+    expect(text).toContain('"name":"auth"');
+  });
+
+  it('serves the tags API with the same protection as the rest', async () => {
+    const { h, web, base } = await setup();
+    const post = (path: string, body: unknown, headers = authed(web, JSON_TYPE)) =>
+      fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    const names = async () =>
+      (
+        (await (await fetch(`${base}/api/tags`, { headers: authed(web) })).json()) as {
+          name: string;
+          color: string;
+        }[]
+      ).map((tag) => `${tag.name}:${tag.color}`);
+    expect((await fetch(`${base}/api/tags`)).status).toBe(401);
+    expect((await post('/api/tags', { name: 'auth' }, JSON_TYPE)).status).toBe(401);
+    expect(await names()).toEqual([]);
+
+    expect((await post('/api/tags', { name: 'auth', color: 'red' })).status).toBe(200);
+    expect((await post('/api/tags', { name: 'AUTH' })).status).toBe(400);
+    expect((await post('/api/tags', { name: '  ' })).status).toBe(400);
+    expect(await names()).toEqual(['auth:red']);
+
+    expect(
+      (await post('/api/tags/edit', { tag: 'auth', name: 'login', color: 'blue' })).status,
+    ).toBe(200);
+    expect((await post('/api/tags/edit', { tag: 'nope', color: 'blue' })).status).toBe(400);
+    expect((await post('/api/tags/edit', { tag: 'login' })).status).toBe(400);
+    expect(await names()).toEqual(['login:blue']);
+
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    const set = await post(`/api/runs/${runId}/tags`, { add: ['login'] });
+    expect(set.status).toBe(200);
+    expect(((await set.json()) as { tags: { name: string }[] }).tags.map((t) => t.name)).toEqual([
+      'login',
+    ]);
+    expect((await post(`/api/runs/${runId}/tags`, { add: ['nope'] })).status).toBe(400);
+    expect((await post(`/api/runs/${runId}/tags`, {})).status).toBe(400);
+    expect((await post('/api/runs/unknown/tags', { add: ['login'] })).status).toBe(404);
+    const cleared = await post(`/api/runs/${runId}/tags`, { remove: ['login'] });
+    expect(((await cleared.json()) as { tags: unknown[] }).tags).toEqual([]);
+
+    expect((await post('/api/tags/remove', { tag: 'nope' })).status).toBe(400);
+    expect((await post('/api/tags/remove', { tag: 'login' })).status).toBe(200);
+    expect(await names()).toEqual([]);
+  });
+
+  it('passes tags of a queued task through the queue API', async () => {
+    const { web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    await post('/api/tags', { name: 'auth' });
+    await post('/api/tags', { name: 'ui' });
+    const added = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'x', tags: ['auth', 'ui'] })
+    ).json()) as QueueView & { item: string };
+    expect(added.items[0]?.tags.map((t) => t.name)).toEqual(['auth', 'ui']);
+    const edited = (await (
+      await post(`/api/queue/items/${added.item}`, { tags: [] })
+    ).json()) as QueueView;
+    expect(edited.items[0]?.tags).toEqual([]);
+    expect(
+      (await post('/api/queue/items', { workflow: 'feature', task: 'x', tags: ['nope'] })).status,
+    ).toBe(400);
   });
 
   it('serves the queue API with the same protection as the rest', async () => {
@@ -1222,5 +1294,136 @@ describe('startDaemonPanel', () => {
     });
     expect(await startDaemonPanel(badToken.options)).toBeNull();
     expect(badToken.lines.join('\n')).toContain('AIP_WEB_TOKEN');
+  });
+});
+
+describe('createDaemonPanel', () => {
+  async function setup(settings: string, extra: NodeJS.ProcessEnv = {}) {
+    h = await harness(MANUAL_CONFIG);
+    const config = mkdtempSync(join(tmpdir(), 'aip-panel-config-'));
+    mkdirSync(join(config, 'aip'));
+    const file = join(config, 'aip', 'settings.yaml');
+    writeFileSync(file, settings);
+    const lines: string[] = [];
+    const controller = createDaemonPanel({
+      stateDirectory: h.state,
+      socket: h.socket,
+      environment: { XDG_CONFIG_HOME: config, ...extra },
+      log: (line) => void lines.push(line),
+    });
+    return { controller, lines, file, state: h.state };
+  }
+
+  const up = (port: number) =>
+    fetch(`http://127.0.0.1:${port}/`).then(
+      () => true,
+      () => false,
+    );
+
+  it('starts on demand when web.autostart is false, and a second start changes nothing', async () => {
+    const port = await freePort();
+    const { controller, state } = await setup(`web: { port: ${port}, autostart: false }\n`);
+    try {
+      expect(await controller.autostart()).toBeNull();
+      expect(controller.status()).toMatchObject({ running: false, reason: null });
+      const first = await controller.start({});
+      expect(first.state).toBe('started');
+      expect(first.status).toMatchObject({ running: true, port, auth: 'token' });
+      expect(readPanelState(state)?.port).toBe(port);
+      const second = await controller.start({});
+      expect(second.state).toBe('already_running');
+      expect(second.status.url).toBe(first.status.url);
+    } finally {
+      await controller.close();
+    }
+  });
+
+  it('restarts on the new port with the same token and re-reads the settings', async () => {
+    const port = await freePort();
+    const { controller, file, state } = await setup(`web: { port: ${port} }\n`);
+    try {
+      const first = await controller.start({});
+      const token = new URL(first.status.url ?? '').searchParams.get('token');
+      const next = await freePort();
+      writeFileSync(file, `web: { port: ${next} }\n`);
+      const again = await controller.start({ restart: true });
+      expect(again.state).toBe('restarted');
+      expect(again.status.port).toBe(next);
+      expect(new URL(again.status.url ?? '').searchParams.get('token')).toBe(token);
+      expect(await up(port)).toBe(false);
+      expect(await up(next)).toBe(true);
+      expect(readPanelState(state)?.port).toBe(next);
+    } finally {
+      await controller.close();
+    }
+  });
+
+  it('takes the token of the call over the one it had', async () => {
+    const port = await freePort();
+    const { controller } = await setup(`web: { port: ${port} }\n`);
+    try {
+      await controller.start({});
+      const fixed = await controller.start({ restart: true, token: 'abcdefghijklmnop1234' });
+      expect(fixed.status.url).toContain('token=abcdefghijklmnop1234');
+    } finally {
+      await controller.close();
+    }
+  });
+
+  it('stops the panel, frees the port, removes web.json and stays stopped for autostart', async () => {
+    const port = await freePort();
+    const { controller, state } = await setup(`web: { port: ${port} }\n`);
+    await controller.start({});
+    expect(await controller.stop()).toEqual({ state: 'stopped' });
+    expect(await up(port)).toBe(false);
+    expect(readPanelState(state)).toBeNull();
+    expect(controller.status()).toMatchObject({ running: false, stopped: true });
+    expect(await controller.stop()).toEqual({ state: 'not_running' });
+    expect(await controller.autostart()).toBeNull();
+    expect((await controller.start({})).state).toBe('started');
+    await controller.close();
+  });
+
+  it('keeps the reason when the port is taken or the section is wrong', async () => {
+    const taken = createServer();
+    await new Promise<void>((resolve) => taken.listen(0, '127.0.0.1', resolve));
+    const port = (taken.address() as AddressInfo).port;
+    try {
+      const { controller, file } = await setup(`web: { port: ${port} }\n`);
+      await expect(controller.start({})).rejects.toThrow(
+        `port 127.0.0.1:${port} is already in use`,
+      );
+      expect(controller.status()).toMatchObject({
+        running: false,
+        reason: `port 127.0.0.1:${port} is already in use`,
+      });
+      writeFileSync(file, 'web: { host: 0.0.0.0 }\n');
+      await expect(controller.start({})).rejects.toThrow('swarm.web.host');
+      expect(controller.status().reason).toContain('swarm.web.host');
+      await controller.close();
+    } finally {
+      taken.close();
+    }
+  });
+
+  it('raises one server for parallel starts', async () => {
+    const port = await freePort();
+    const { controller } = await setup(`web: { port: ${port} }\n`);
+    try {
+      const [a, b, c, auto] = await Promise.all([
+        controller.start({}),
+        controller.start({}),
+        controller.start({}),
+        controller.autostart(),
+      ]);
+      expect([a.state, b.state, c.state]).toEqual([
+        'started',
+        'already_running',
+        'already_running',
+      ]);
+      expect(auto).not.toBeNull();
+    } finally {
+      await controller.close();
+    }
   });
 });

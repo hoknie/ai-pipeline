@@ -11,7 +11,9 @@ import { Skeleton } from '../ui/skeleton.tsx';
 import { ConfigErrors, EntryList, SplitPage } from './EntryList.tsx';
 import { StatusBadge } from './StatusBadge.tsx';
 import { WorkflowGraph } from './WorkflowGraph.tsx';
-import { liveState, type LiveGroup, type StageNode } from './topologyLayout.ts';
+import { repositoryLabel } from '../repositories.ts';
+import { machineLoad } from '../specialistLoad.ts';
+import { liveState, otherUse, type LiveGroup, type StageNode } from './topologyLayout.ts';
 
 export default function TopologyPage({
   api,
@@ -60,8 +62,10 @@ export default function TopologyPage({
     () => (workflow ? liveState(workflow, runs, view?.repository ?? null) : null),
     [workflow, runs, view],
   );
+  const load = useMemo(() => machineLoad(runs), [runs]);
   const [nodes, setNodes] = useState<StageNode[]>([]);
   const node = nodes.find((candidate) => candidate.id === selected) ?? null;
+  const others = node?.data.specialist && live ? otherUse(load, live, node.data.specialist) : null;
 
   return (
     <SplitPage
@@ -132,6 +136,7 @@ export default function TopologyPage({
               <WorkflowGraph
                 workflow={workflow}
                 live={live}
+                load={load}
                 selected={selected}
                 onSelect={setSelected}
                 onNodes={setNodes}
@@ -172,6 +177,46 @@ export default function TopologyPage({
                 ) : (
                   <p className="text-muted-foreground">{t('topology.selectNode')}</p>
                 )}
+                {others && (others.running.length > 0 || others.waiting.length > 0) ? (
+                  <>
+                    <h3 className="font-semibold">{t('topology.occupied')}</h3>
+                    <p className="text-muted-foreground">
+                      {t('topology.occupiedHint', { specialist: node?.data.specialist ?? '' })}
+                    </p>
+                    <ul className="flex flex-col gap-1.5" aria-label={t('topology.occupied')}>
+                      {[...others.running, ...others.waiting].map((entry) => (
+                        <li
+                          key={`${entry.runId}/${entry.group}/${entry.status}`}
+                          className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
+                        >
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto max-w-full min-w-0 shrink p-0 text-left whitespace-normal"
+                            onClick={() =>
+                              onOpenGroup(
+                                {
+                                  runId: entry.runId,
+                                  runTitle: entry.runTitle,
+                                  slug: entry.group,
+                                  title: entry.title,
+                                  status: entry.status,
+                                },
+                                entry.step,
+                              )
+                            }
+                          >
+                            {entry.title}
+                          </Button>
+                          <StatusBadge status={entry.status} />
+                          <span className="min-w-0 text-muted-foreground">
+                            {entry.step} · {entry.runTitle} · {repositoryLabel(entry.repository)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
                 {live.elsewhere.length > 0 ? (
                   <>
                     <h3 className="font-semibold">{t('topology.elsewhere')}</h3>

@@ -153,6 +153,7 @@ export default function QueuePage({
           idPrefix="new"
           draft={newDraft}
           workflows={workflows}
+          api={api}
           autoDeliverDefault={queue.autoDeliver}
           submitLabel={t('queue.add')}
           onDraft={(draft) => onDraft('new', draft)}

@@ -22,6 +22,8 @@ export type {
   RuntimeCatalog,
   StepGroup,
   StepTopology,
+  TagColor,
+  TagView,
   Topology,
   WorkflowTopology,
   WorkflowsView,
@@ -42,6 +44,10 @@ export interface QueueFields {
   title?: string;
   /** Absent: follow `delivery.auto` when the task starts. */
   autoDeliver?: boolean;
+  /** Tag names. */
+  tags?: string[];
+  /** Ids of workflow steps the task skips. */
+  skip?: string[];
 }
 
 /** Changes of a queued task; `title: null` removes the title. */
@@ -52,6 +58,10 @@ export interface QueuePatch {
   title?: string | null;
   /** `null`: follow `delivery.auto` again. */
   autoDeliver?: boolean | null;
+  /** Tag names; replaces the tags of the item. */
+  tags?: string[];
+  /** Ids of workflow steps to skip; replaces the list of the item. */
+  skip?: string[];
   position?: number;
 }
 export type {

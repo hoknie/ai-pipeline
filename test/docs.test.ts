@@ -129,7 +129,7 @@ describe('documentation examples', () => {
   });
 
   it('documents the tag commands and the flags', () => {
-    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const readme = readFileSync(join(root, 'docs/cli.md'), 'utf8');
     for (const text of [
       'aip tag add',
       'aip tag list',
@@ -143,6 +143,23 @@ describe('documentation examples', () => {
       'swarm_queue_add',
     ]) {
       expect(readme).toContain(text);
+    }
+  });
+
+  it('docs/install.md names every flag of aip setup', () => {
+    const install = readFileSync(join(root, 'docs/install.md'), 'utf8');
+    const setup = readFileSync(join(root, 'src/cli/commands.ts'), 'utf8');
+    const flags = [...setup.matchAll(/\.option\('(?:-\w, )?(--[\w-]+)/g)].map((m) => m[1]!);
+    for (const flag of [
+      '--yes',
+      '--dry-run',
+      '--force',
+      '--no-claude',
+      '--no-opencode',
+      '--no-plugin',
+    ]) {
+      expect(flags).toContain(flag);
+      expect(install).toContain(`\`${flag}\``);
     }
   });
 

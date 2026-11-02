@@ -69,6 +69,36 @@ describe('loading files', () => {
     expect(coder?.skills).toEqual([]);
   });
 
+  it('marks specialists by the level that defines them', () => {
+    const paths = temporaryPaths();
+    writeLevel(
+      paths.global,
+      'swarm:\n  specialists:\n    shared: { name: S }\n    both: { name: B, model: a }\n',
+    );
+    writeLevel(
+      paths.project,
+      'swarm:\n  specialists:\n    own: { name: O }\n    both: { name: B, model: b }\n',
+    );
+    const levels = Object.fromEntries(
+      loadConfig(paths).specialists.map((specialist) => [specialist.slug, specialist.level]),
+    );
+    expect(levels).toEqual({ shared: 'global', both: 'project', own: 'project' });
+  });
+
+  it('marks every specialist global when only the global level has files, project when only the project has', () => {
+    const globalOnly = temporaryPaths();
+    writeLevel(globalOnly.global, BASE);
+    expect(loadConfig(globalOnly).specialists.map((item) => item.level)).toEqual(['global']);
+    const projectOnly = temporaryPaths();
+    writeLevel(projectOnly.project, BASE);
+    expect(loadConfig(projectOnly).specialists.map((item) => item.level)).toEqual(['project']);
+    expect(
+      configFromFiles({ specialists: { coder: 'name: C\n' } }).specialists.map(
+        (item) => item.level,
+      ),
+    ).toEqual(['project']);
+  });
+
   it('names every expected path when no file exists, also with an empty specialists directory', () => {
     const paths = temporaryPaths();
     mkdirSync(join(paths.project.directory, 'specialists'), { recursive: true });
@@ -505,6 +535,19 @@ describe('specialist max', () => {
     expect(withConfigDefaults(stored).specialists.map((specialist) => specialist.max)).toEqual([
       null,
     ]);
+  });
+});
+
+describe('level of a stored specialist', () => {
+  it('is project for runs stored before the field existed', () => {
+    const stored = structuredClone(parseConfig(BASE));
+    for (const specialist of stored.specialists) delete (specialist as { level?: string }).level;
+    expect(withConfigDefaults(stored).specialists.map((specialist) => specialist.level)).toEqual([
+      'project',
+    ]);
+    const global = structuredClone(parseConfig(BASE));
+    global.specialists[0]!.level = 'global';
+    expect(withConfigDefaults(global).specialists[0]?.level).toBe('global');
   });
 });
 

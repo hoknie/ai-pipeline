@@ -16,6 +16,7 @@ import {
   type Size,
 } from '../src/components/topologyLayout.ts';
 import { formatRoute, parseRoute } from '../src/route.ts';
+import { machineLoad } from '../src/specialistLoad.ts';
 
 import {
   FakeEventSource,
@@ -24,6 +25,7 @@ import {
   groupView,
   openFake,
   runView,
+  specialistUse,
   topologyOf,
   workflowOf,
   workflowsView,
@@ -483,5 +485,123 @@ describe('stable topology page', () => {
     view.rerender(props([], 'epic'));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'epic' })).toBeTruthy());
     expect(screen.getByTestId('stage-code')).toBe(code);
+  });
+});
+
+describe('specialist occupancy', () => {
+  const workflow = workflowOf({ limits: { coder: 1 } });
+  const other = (overrides: Partial<ReturnType<typeof runView>> = {}) =>
+    runView({
+      id: 'x',
+      title: 'Чужой',
+      repository: '/other',
+      workflow: 'epic',
+      specialists: [specialistUse('coder', { level: 'global', running: ['api'] })],
+      ...overrides,
+    });
+  const busyOf = (runs: ReturnType<typeof runView>[], id = 'step:code') => {
+    const live = liveState(workflow, runs, '/repo');
+    const { nodes } = layout(workflow, live, i18next.t, new Map(), machineLoad(runs));
+    return nodes.find((node) => node.id === id)?.data.busy;
+  };
+
+  it('counts a specialist busy in another repository and another workflow', () => {
+    expect(busyOf([other()])).toEqual({ running: 1, elsewhere: 1, max: 1, full: true });
+    expect(busyOf([other({ repository: '/repo', workflow: 'epic' })])).toEqual({
+      running: 1,
+      elsewhere: 1,
+      max: 1,
+      full: true,
+    });
+  });
+
+  it('shows a free specialist and the own runs without elsewhere', () => {
+    expect(busyOf([])).toEqual({ running: 0, elsewhere: 0, max: 1, full: false });
+    const own = runView({
+      id: 'a',
+      specialists: [specialistUse('coder', { running: ['login'] })],
+    });
+    expect(busyOf([own])).toEqual({ running: 1, elsewhere: 0, max: 1, full: true });
+  });
+
+  it('takes the smallest limit of the runs and the workflow', () => {
+    const limited = other({
+      specialists: [specialistUse('coder', { max: 2, running: ['api'] })],
+    });
+    expect(busyOf([limited])?.max).toBe(1);
+    expect(
+      busyOf([
+        limited,
+        other({ id: 'y', specialists: [specialistUse('coder', { max: 1, running: ['z'] })] }),
+      ])?.max,
+    ).toBe(1);
+  });
+
+  it('has no busy state on the merge node', () => {
+    expect(busyOf([other()], 'merge')).toBeNull();
+  });
+
+  it('replaces only the node of the specialist when another run changes its load', () => {
+    const render1 = (runs: ReturnType<typeof runView>[]) => {
+      const live = liveState(workflow, runs, '/repo');
+      return layout(workflow, live, i18next.t, new Map(), machineLoad(runs)).nodes;
+    };
+    const first = stabilize([], render1([other()]), new Map(), null);
+    const unrelated = other({
+      title: 'Другое название',
+      specialists: [specialistUse('coder', { level: 'global', running: ['api'] })],
+    });
+    stabilize(first, render1([unrelated]), new Map(), null).forEach((node, index) =>
+      expect(node).toBe(first[index]),
+    );
+    const changed = stabilize(first, render1([other({ specialists: [] })]), new Map(), null)
+      .filter((node, index) => node !== first[index])
+      .map((node) => node.id);
+    expect(changed).toEqual(['step:code']);
+  });
+
+  it('renders the line on the node and lists the groups of other runs in the panel', async () => {
+    const workflows = workflowsView({ workflows: [workflow] });
+    const open = vi.fn();
+    const runs = [other()];
+    render(
+      <TopologyPage
+        api={fakeApi({ workflows: vi.fn(async () => workflows) })}
+        runs={runs}
+        workflow={null}
+        onSelectWorkflow={vi.fn()}
+        onOpenGroup={open}
+      />,
+    );
+    const code = await screen.findByTestId('stage-code');
+    expect(within(code).getByText('busy 1 of 1 · in other runs: 1')).toBeTruthy();
+    expect(code.className).toContain('border-status-warn');
+    expect(within(screen.getByTestId('stage-plan')).queryByText(/busy/)).toBeNull();
+    fireEvent.click(code);
+    const side = screen.getByRole('complementary', { name: 'node code' });
+    expect(within(side).getByText('Specialist busy in other runs')).toBeTruthy();
+    expect(within(side).getByText(/Чужой · other/)).toBeTruthy();
+    fireEvent.click(within(side).getByRole('button', { name: 'api' }));
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ runId: 'x', slug: 'api' }), 'code');
+  });
+
+  it('has no section about other runs when only the own runs use the specialist', async () => {
+    const own = runView({
+      id: 'a',
+      specialists: [specialistUse('coder', { running: ['login'] })],
+    });
+    render(
+      <TopologyPage
+        api={fakeApi({ workflows: vi.fn(async () => workflowsView({ workflows: [workflow] })) })}
+        runs={[own]}
+        workflow={null}
+        onSelectWorkflow={vi.fn()}
+        onOpenGroup={vi.fn()}
+      />,
+    );
+    const code = await screen.findByTestId('stage-code');
+    expect(within(code).getByText('busy 1 of 1')).toBeTruthy();
+    fireEvent.click(code);
+    expect(screen.queryByText('Specialist busy in other runs')).toBeNull();
   });
 });

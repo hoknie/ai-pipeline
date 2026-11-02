@@ -364,9 +364,15 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const tagText = labels === '' ? '' : `  ${labels}`;
     const delivery =
       item.autoDeliver === null ? '' : item.autoDeliver ? ' · auto delivery' : ' · manual delivery';
+    const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
+    const mark = item.readiness === 'ready' ? '' : ` (${item.readiness})`;
+    const after =
+      item.after.length === 0
+        ? ''
+        : ` · after ${item.after.map((dependency) => dependency.id).join(', ')}${mark}`;
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     lines.push(
-      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}  added ${addedAt(item.createdAt)}${error}`,
+      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}  added ${addedAt(item.createdAt)}${error}`,
     );
   }
   return lines.join('\n');

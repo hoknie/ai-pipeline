@@ -80,8 +80,8 @@ export class Store {
     const { run } = state;
     this.database
       .prepare(
-        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json`,
       )
       .run(
@@ -102,6 +102,7 @@ export class Store {
         json(run.namingUsage),
         run.fromQueue ? 1 : 0,
         JSON.stringify(run.tags),
+        run.queueItem,
       );
     const groupStatement = this.database.prepare(
       `INSERT OR REPLACE INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict, merge_commit, delivery_json, questions_json)
@@ -163,6 +164,14 @@ export class Store {
 
   loadRun(id: string): RunState | null {
     const row = this.database.prepare('SELECT * FROM runs WHERE id = ?').get(id) as Row | undefined;
+    return row ? this.hydrate(row) : null;
+  }
+
+  /** The run that started from queue item `item` in the repository, if any. */
+  runOfQueueItem(repository: string, item: string): RunState | null {
+    const row = this.database
+      .prepare('SELECT * FROM runs WHERE repository = ? AND queue_item = ? LIMIT 1')
+      .get(repository, item) as Row | undefined;
     return row ? this.hydrate(row) : null;
   }
 
@@ -297,8 +306,8 @@ export class Store {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -313,6 +322,8 @@ export class Store {
           item.createdAt,
           item.autoDeliver === null ? null : item.autoDeliver ? 1 : 0,
           JSON.stringify(item.tags),
+          JSON.stringify(item.skip),
+          JSON.stringify(item.after),
         ),
       );
     });
@@ -338,6 +349,8 @@ export class Store {
             ? null
             : Number(item.auto_deliver) === 1,
         tags: item.tags_json ? parse(item.tags_json) : [],
+        skip: item.skip_json ? parse(item.skip_json) : [],
+        after: item.after_json ? parse(item.after_json) : [],
         createdAt: Number(item.created_at),
         error: text(item.error ?? null),
       })),
@@ -375,6 +388,7 @@ export class Store {
         name: row.name === null || row.name === undefined ? null : String(row.name),
         namingUsage: nullable(row.naming_usage_json ?? null),
         fromQueue: Number(row.from_queue ?? 0) === 1,
+        queueItem: text(row.queue_item ?? null),
         tags: row.tags_json ? parse(row.tags_json) : [],
       },
       split: groups.find((group) => group.slug === SPLIT_GROUP) ?? null,

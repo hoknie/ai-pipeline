@@ -56,6 +56,8 @@ function list(runs: Parameters<typeof RunList>[0]['runs'], props: ListProps = {}
     scope: 'repository' as const,
     onScope: () => undefined,
     repository: null,
+    tagIds: [],
+    onTagIds: () => undefined,
   };
   return <RunList runs={runs} {...base} {...props} />;
 }
@@ -799,5 +801,55 @@ describe('useRuns stability', () => {
     const second = result.current.runs;
     act(() => source.send({ event: 'snapshot', seq: 4, runs: [{ ...a, title: 'Другое' }, b] }));
     expect(result.current.runs).toBe(second);
+  });
+});
+
+describe('tag catalog and filter', () => {
+  const auth = { id: 'ta', name: 'auth', color: 'red' as const };
+
+  it('keeps the catalog from the snapshot and updates it on the tags event', () => {
+    const api = fakeApi();
+    const { result } = renderHook(() => useRuns(api, openFake));
+    act(() => stream().send({ event: 'snapshot', seq: 1, runs: [], tags: [auth] }));
+    expect(result.current.tags).toEqual([auth]);
+    act(() => stream().send({ event: 'tags', seq: 2, tags: [{ ...auth, name: 'login' }] }));
+    expect(result.current.tags.map((tag) => tag.name)).toEqual(['login']);
+  });
+
+  it('keeps the tag filter after a reload, under the new name', async () => {
+    window.localStorage.setItem('aip.web.runTags', JSON.stringify(['ta', 'removed']));
+    const tagged = runView({ id: 'a', title: 'С тегом', tags: [auth] });
+    const plain = runView({ id: 'b', title: 'Без тега' });
+    render(
+      <App api={fakeApi({ runs: vi.fn(async () => [tagged, plain]) })} openStream={openFake} />,
+    );
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [tagged, plain],
+        tags: [{ ...auth, name: 'login' }],
+      });
+    });
+    const list = await screen.findByRole('list');
+    expect(within(list).getByText('С тегом')).toBeTruthy();
+    expect(within(list).queryByText('Без тега')).toBeNull();
+    expect(within(list).getByText('login')).toBeTruthy();
+    const field = screen.getByRole('combobox', { name: 'Tags' }).parentElement!;
+    expect(within(field).getByText('login')).toBeTruthy();
+  });
+
+  it('shows nothing found with a reset that clears the tags', async () => {
+    window.localStorage.setItem('aip.web.runTags', JSON.stringify(['ta']));
+    const plain = runView({ id: 'b', title: 'Без тега' });
+    render(<App api={fakeApi({ runs: vi.fn(async () => [plain]) })} openStream={openFake} />);
+    act(() => {
+      stream().open();
+      stream().send({ event: 'snapshot', seq: 1, runs: [plain], tags: [auth] });
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(document.querySelector('li[data-run="b"]')).toBeTruthy());
+    expect(window.localStorage.getItem('aip.web.runTags')).toBe('[]');
   });
 });

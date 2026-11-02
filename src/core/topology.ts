@@ -78,6 +78,8 @@ export interface WorkflowTopology {
   split: { specialist: string; maxGroups: number; workflow: string | null } | null;
   steps: StepInfo[];
   delivery: { mode: string; resolver: string | null };
+  /** `max` of the specialists of the split, the steps and the resolver, by slug. */
+  limits: Record<string, number | null>;
 }
 
 function stepInfo(config: ResolvedConfig, step: Step): StepInfo {
@@ -93,7 +95,23 @@ function stepInfo(config: ResolvedConfig, step: Step): StepInfo {
   };
 }
 
+function limitsOf(
+  config: ResolvedConfig,
+  workflow: Workflow,
+  steps: Step[],
+): Record<string, number | null> {
+  const slugs = [
+    ...(workflow.split ? [workflow.split.specialist] : []),
+    ...steps.map((step) => step.specialist),
+    ...(config.delivery.resolver ? [config.delivery.resolver] : []),
+  ];
+  const limits: Record<string, number | null> = {};
+  for (const slug of slugs) limits[slug] = findSpecialist(config, slug)?.max ?? null;
+  return limits;
+}
+
 function shape(config: ResolvedConfig, workflow: Workflow): WorkflowTopology {
+  const steps = groupWorkflow(config, workflow).steps;
   return {
     id: workflow.id,
     split: workflow.split
@@ -103,8 +121,9 @@ function shape(config: ResolvedConfig, workflow: Workflow): WorkflowTopology {
           workflow: workflow.split.workflow ?? null,
         }
       : null,
-    steps: groupWorkflow(config, workflow).steps.map((step) => stepInfo(config, step)),
+    steps: steps.map((step) => stepInfo(config, step)),
     delivery: { mode: config.delivery.mode, resolver: config.delivery.resolver },
+    limits: limitsOf(config, workflow, steps),
   };
 }
 

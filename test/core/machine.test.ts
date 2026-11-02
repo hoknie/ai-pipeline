@@ -17,6 +17,31 @@ function kinds(effects: Effect[]): string[] {
   return effects.map((effect) => effect.kind);
 }
 
+describe('skipped steps', () => {
+  it('goes to the merge after the last remaining step', () => {
+    const state = run(1, { skip: ['review', 'qa'] });
+    step(state);
+    finish(state, 'done');
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('code');
+    expect(kinds(finish(state, 'done'))).toEqual(['commit', 'merge']);
+    expect(group(state).status).toBe('merging');
+  });
+
+  it('keeps a rejection going back to code', () => {
+    const state = run(1, { skip: ['qa'] });
+    for (const _ of ['plan', 'code']) {
+      step(state);
+      finish(state, 'done');
+    }
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('review');
+    finish(state, 'rejected', { feedback: 'плохо' });
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('code');
+  });
+});
+
 describe('step order', () => {
   it('starts the next step of the same group after done', () => {
     const state = run(1);
