@@ -14,6 +14,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 
+import { workerQueueAddParams } from '../../src/protocol/messages.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { MANUAL_CONFIG, WORKFLOW_CONFIG, harness, startRun, type Harness } from './harness.ts';
 
@@ -1325,5 +1326,112 @@ describe('fixed run goes first', () => {
     const back = await waitQueue(h, (queue) => queue.skipped.length === 0);
     expect(back.runs.map((run) => run.id)).toContain(runId);
     await waitQueue(h, (queue) => queue.runs.length === 0);
+  });
+});
+
+describe('postponed items', () => {
+  it('skips a postponed item in a running queue and takes the next one', async () => {
+    const h = await start();
+    const a = await add(h, 'A', { postponed: true });
+    await add(h, 'B');
+    expect(a.items[0]).toMatchObject({ id: a.item, postponed: true });
+    await h.call('queue_start', { repository: h.repo });
+    const done = await waitQueue(
+      h,
+      (view) => view.status === 'stopped' && view.runs.length === 0 && view.items.length === 1,
+    );
+    expect(done.items[0]).toMatchObject({ id: a.item, postponed: true, title: 'A' });
+    expect(await allRuns(h)).toHaveLength(1);
+  });
+
+  it('starts the item at once when the flag is cleared in a running queue', async () => {
+    const h = await start();
+    h.script({ code: [{ delayMs: 1500 }, {}] });
+    const a = await add(h, 'A', { postponed: true });
+    await add(h, 'B');
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (view) => view.runs.length === 1);
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    const view = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: a.item,
+      postponed: false,
+    })) as QueueView;
+    expect(view.items).toEqual([]);
+    expect(view.runs).toHaveLength(2);
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.runs.length === 0);
+    expect(await allRuns(h)).toHaveLength(2);
+  });
+
+  it('runs a postponed item now', async () => {
+    const h = await start();
+    const a = await add(h, 'A', { postponed: true });
+    const created = (await h.call('queue_run_now', {
+      repository: h.repo,
+      item: a.item,
+    })) as RunCreated;
+    expect(created.runId).toBeTruthy();
+    expect((await queueOf(h)).items).toEqual([]);
+    await h.status(created.runId);
+  });
+
+  it('keeps the flag after the daemon restarts and rejects a non-boolean value', async () => {
+    const h = await start();
+    const a = await add(h, 'A');
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: a.item, postponed: 'yes' as never }),
+    ).rejects.toThrow();
+    expect((await queueOf(h)).items[0]).toMatchObject({ id: a.item, postponed: false });
+    const view = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: a.item,
+      postponed: true,
+    })) as QueueView;
+    expect(view.items[0]!.postponed).toBe(true);
+    await h.restart();
+    expect((await queueOf(h)).items[0]).toMatchObject({ id: a.item, postponed: true });
+  });
+
+  it('drops postponed from run and worker_queue_add', async () => {
+    const h = await start();
+    const a = await add(h, 'A');
+    const queued = (await h.call('run', {
+      repository: h.repo,
+      workflow: 'feature',
+      task: 'работа',
+      title: 'R',
+      after: [a.item],
+      ...({ postponed: true } as object),
+    })) as RunQueued;
+    expect(queued.item).toBeTruthy();
+    const view = await queueOf(h);
+    expect(view.items.length + view.runs.length).toBe(2);
+    expect(view.items.every((item) => !item.postponed)).toBe(true);
+    expect(view.items.find((item) => item.id === queued.item)?.postponed ?? false).toBe(false);
+    const parsed = workerQueueAddParams.parse({
+      token: 't',
+      workflow: 'feature',
+      task: 'x',
+      postponed: true,
+    });
+    expect('postponed' in parsed).toBe(false);
+  });
+
+  it('sends a queue event when the flag changes', async () => {
+    const h = await start();
+    const a = await add(h, 'A');
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await h.call('queue_edit', { repository: h.repo, item: a.item, postponed: true });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const queues = events.flatMap((event) =>
+      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    );
+    expect(queues.some((queue) => queue.items.some((item) => item.postponed))).toBe(true);
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
   });
 });

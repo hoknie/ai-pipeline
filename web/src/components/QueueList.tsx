@@ -22,6 +22,7 @@ import { Alert } from '../ui/alert.tsx';
 import { Badge, badgeVariants } from '../ui/badge.tsx';
 import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
+import { Switch } from '../ui/switch.tsx';
 
 import { TagChips } from './TagChip.tsx';
 import { WorkflowBadge } from './WorkflowBadge.tsx';
@@ -88,6 +89,8 @@ export function QueueList({
   const [message, setMessage] = useState<string | null>(null);
   const [started, setStarted] = useState<{ item: string; runId: string } | null>(null);
   const inFlight = useRef(false);
+  // the shown state of the switches while their request is on its way
+  const [pending, setPending] = useState<Record<string, boolean>>({});
 
   // a new queue (an event, another client) is the truth, except while our own move is on its way
   useEffect(() => {
@@ -180,6 +183,22 @@ export function QueueList({
     }
   };
 
+  const setPostponed = async (item: QueueItemView, postponed: boolean) => {
+    setPending((current) => ({ ...current, [item.id]: postponed }));
+    setMessage(null);
+    try {
+      onQueue(await api.queueEdit(item.id, { postponed }));
+    } catch (failure) {
+      setMessage((failure as Error).message);
+      void refresh();
+    } finally {
+      setPending((current) => {
+        const { [item.id]: _shown, ...rest } = current;
+        return rest;
+      });
+    }
+  };
+
   const onDragOver = (event: React.DragEvent<HTMLLIElement>, index: number) => {
     if (dragging === null) return;
     event.preventDefault();
@@ -236,6 +255,7 @@ export function QueueList({
         {shown.map((item, index) => {
           const editing = drafts[`edit:${item.id}`];
           const level = depth(queue, item.id);
+          const postponed = pending[item.id] ?? item.postponed === true;
           const linked = dragging === null && highlight?.has(item.id) === true;
           return (
             <li
@@ -246,6 +266,7 @@ export function QueueList({
                 item.readiness === 'blocked' && 'border-destructive',
                 linked && 'ring-2 ring-primary',
                 dragging === item.id && 'opacity-50',
+                postponed && 'opacity-60',
                 drop?.index === index &&
                   (drop.after ? 'border-b-2 border-b-primary' : 'border-t-2 border-t-primary'),
               )}
@@ -298,6 +319,17 @@ export function QueueList({
                   >
                     {t('queue.returning')}
                   </a>
+                ) : null}
+                <Switch
+                  checked={!postponed}
+                  aria-label={t('queue.list.active')}
+                  title={t('queue.list.activeHint')}
+                  onCheckedChange={(active) => void setPostponed(item, !active)}
+                />
+                {postponed ? (
+                  <Badge variant="warn" title={t('queue.list.activeHint')}>
+                    {t('queue.list.postponed')}
+                  </Badge>
                 ) : null}
                 <ReadinessBadge item={item} />
                 {item.after.map((ref) => (

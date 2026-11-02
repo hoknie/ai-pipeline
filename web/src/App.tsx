@@ -229,6 +229,8 @@ function Panel({
       list.find((entry) => !known.has(entry.path))?.path;
     if (root) await selectRepository(root);
   };
+  const latest = useRef({ chosen, selected });
+  latest.current = { chosen, selected };
   const removeRepository = async (path: string) => {
     const name = repositoryLabel(path);
     if (
@@ -246,7 +248,7 @@ function Panel({
       notifyError(error);
       return;
     }
-    if (path === selected) {
+    if (path === latest.current.selected || path === latest.current.chosen) {
       dirty.current = false;
       lastRun.current = null;
       setChosen(null);

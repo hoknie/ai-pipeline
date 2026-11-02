@@ -141,6 +141,7 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE queues ADD COLUMN on_limit TEXT NOT NULL DEFAULT 'wait';
   ALTER TABLE queue_items ADD COLUMN run_id TEXT;
   `,
+  `ALTER TABLE queue_items ADD COLUMN postponed INTEGER NOT NULL DEFAULT 0`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

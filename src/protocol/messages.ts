@@ -83,6 +83,7 @@ const queueAddParams = z
     tags: tagNames.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    postponed: z.boolean().optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -118,6 +119,7 @@ const queueEditParams = z
     tags: tagNames.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    postponed: z.boolean().optional(),
     position: z.number().int().min(1).optional(),
   })
   .refine((params) => params.task === undefined || params.groups === undefined, {

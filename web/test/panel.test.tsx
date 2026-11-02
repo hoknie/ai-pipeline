@@ -616,25 +616,30 @@ describe('attempts and transcript', () => {
     const list = Array.from({ length: 10 }, (_, index) => `docs/file-${index}.md`);
     panel(logApi({ outsideChanges: list }));
     const head = await screen.findByRole('button', {
-      name: 'Step plan (#1) changed 10 files outside its worktree',
+      name: '10 files in the working copy changed during step plan (#1)',
     });
     expect(head.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(head);
     expect(head.getAttribute('aria-expanded')).toBe('true');
     const block = head.parentElement!;
     expect([...block.querySelectorAll('li code')].map((item) => item.textContent)).toEqual(list);
-    expect(screen.getByText('outside worktree: 10')).toBeTruthy();
+    expect(screen.getByText(/may have changed them/)).toBeTruthy();
+    expect(screen.getByText('in working copy: 10')).toBeTruthy();
   });
 
   it('keeps a short list of outside changes open and shows nothing without them', async () => {
     panel(logApi({ outsideChanges: ['README.md'] }));
-    const head = await screen.findByRole('button', { name: /changed 1 file outside its worktree/ });
+    const head = await screen.findByRole('button', {
+      name: /1 file in the working copy changed during step/,
+    });
     expect(head.getAttribute('aria-expanded')).toBe('true');
     cleanup();
     panel(fakeApi());
     await screen.findByText('#1 code');
-    expect(screen.queryByRole('button', { name: /outside its worktree/ })).toBeNull();
-    expect(screen.queryByText(/outside worktree:/)).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /in the working copy changed during step/ }),
+    ).toBeNull();
+    expect(screen.queryByText(/in working copy:/)).toBeNull();
   });
 
   it('keeps the attempt open when a nested block is folded', async () => {

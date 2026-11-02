@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { claudeTranscript, opencodeTranscript, toolSummary } from '../../src/runtime/index.ts';
@@ -199,5 +202,42 @@ describe('tool summaries', () => {
     expect(toolSummary('Grep', { pattern: 'todo', path: '/w/src' }, '/w')).toBe('todo in src');
     expect(toolSummary('mcp__aip__swarm_report', { verdict: 'done', summary: 'x' })).toBe('done');
     expect(toolSummary('Other', { value: 'y'.repeat(200) })).toHaveLength(120);
+  });
+});
+
+describe('opencode transcript of a recorded run', () => {
+  const lines = readFileSync(
+    join(import.meta.dirname, '..', 'fixtures', 'opencode-run.jsonl'),
+    'utf8',
+  ).split('\n');
+
+  it('shows text, the tool call with its result and the totals of each step, without raw lines', () => {
+    const entries = opencodeTranscript(lines);
+    expect(entries.map((entry) => entry.kind)).toEqual([
+      'tool_call',
+      'tool_result',
+      'result',
+      'text',
+      'result',
+    ]);
+    expect(entries[0]).toMatchObject({ id: 'call-call1', name: 'bash', summary: 'ls' });
+    expect(entries[1]).toEqual({
+      kind: 'tool_result',
+      id: 'call-call1',
+      text: 'hello.txt\n',
+      error: false,
+    });
+    expect(entries[3]).toEqual({ kind: 'text', text: 'OK' });
+    expect(entries[4]).toMatchObject({ inputTokens: 19090, outputTokens: 3, costUsd: 0 });
+  });
+
+  it('writes the message of an error event', () => {
+    const [entry] = opencodeTranscript([
+      JSON.stringify({
+        type: 'error',
+        error: { name: 'APIError', data: { message: 'limit exceeded', statusCode: 402 } },
+      }),
+    ]);
+    expect(entry).toEqual({ kind: 'tool_result', id: null, text: 'limit exceeded', error: true });
   });
 });

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 
 import { findSpecialist } from '../config/index.ts';
 import {
@@ -25,6 +25,8 @@ import {
   attemptDirectory,
   changedFiles,
   changedPaths,
+  hashFiles,
+  under,
   cleanRun,
   commitAll,
   commitResolve,
@@ -65,7 +67,19 @@ interface Running {
   timer: NodeJS.Timeout;
 }
 
+interface Baseline {
+  repository: string;
+  exclude: string[];
+  snapshot: Snapshot;
+  /** Content of paths aip itself wrote into the working copy while the attempt ran. */
+  overrides: Map<string, string>;
+}
+
 export const NAMING_TIMEOUT_MS = 60_000;
+
+function deliveredPaths(result: DeliveryResult): string[] {
+  return result.kind === 'applied' ? [...new Set([...result.files, ...result.conflicts])] : [];
+}
 
 function keyOf(key: AttemptKey): string {
   return `${key.run}/${key.group}/${key.seq}`;
@@ -78,6 +92,8 @@ export class Executor {
   private readonly tokens = new Map<string, AttemptKey>();
   private readonly running = new Map<string, Running>();
   private readonly naming = new Set<SupervisedProcess>();
+  /** Working copy of the repository as it was when each running attempt started. */
+  private readonly baselines = new Map<string, Baseline>();
 
   constructor(options: { daemon: Daemon; entry: string[]; graceMs: number | undefined }) {
     this.daemon = options.daemon;
@@ -255,7 +271,16 @@ export class Executor {
     }
     const token = randomUUID();
     this.tokens.set(token, key);
-    const before = await this.snapshot(state);
+    const exclude = this.excluded(state);
+    const before = await this.snapshot(state, exclude);
+    if (before) {
+      this.baselines.set(keyOf(key), {
+        repository: state.run.repository,
+        exclude,
+        snapshot: before,
+        overrides: new Map(),
+      });
+    }
     const launch = runtime.buildLaunch({
       specialist,
       input: attempt.input,
@@ -299,8 +324,22 @@ export class Executor {
       this.tokens.delete(token);
       if (this.daemon.stopping) return undefined;
       return this.daemon.serial(async () => {
-        const after = before ? await this.snapshot(state) : null;
-        const outsideChanges = before && after ? changedPaths(before, after) : [];
+        const baseline = this.baselines.get(keyOf(key));
+        this.baselines.delete(keyOf(key));
+        const after = baseline ? await this.snapshot(state, baseline.exclude) : null;
+        let outsideChanges: string[] = [];
+        if (baseline && after) {
+          try {
+            outsideChanges = await changedPaths(
+              baseline.repository,
+              baseline.snapshot,
+              after,
+              baseline.overrides,
+            );
+          } catch {
+            outsideChanges = [];
+          }
+        }
         await this.daemon.apply(state, {
           kind: 'attempt_exited',
           group: slug,
@@ -322,12 +361,41 @@ export class Executor {
     });
   }
 
-  private async snapshot(state: RunState): Promise<Snapshot | null> {
+  /** The directory of the working copies, when it lies inside the repository. */
+  private excluded(state: RunState): string[] {
+    const path = relative(state.run.repository, this.workspace(state));
+    if (path === '' || path.startsWith('..') || isAbsolute(path)) return [];
+    return [path.split(sep).join('/')];
+  }
+
+  private async snapshot(state: RunState, exclude: string[]): Promise<Snapshot | null> {
     if (state.run.config.outsideChanges === 'off') return null;
     try {
-      return await snapshotWorkingCopy(state.run.repository);
+      return await snapshotWorkingCopy(state.run.repository, { exclude });
     } catch {
       return null;
+    }
+  }
+
+  /** Accepts what a delivery wrote into the working copy: it is not a change from outside. */
+  private async rebaseOutside(state: RunState, result: DeliveryResult): Promise<void> {
+    // The branch mode does not touch the working copy: nothing was written there.
+    if (state.run.config.delivery.mode === 'branch') return;
+    const repository = state.run.repository;
+    const paths = deliveredPaths(result);
+    const baselines = [...this.baselines.values()].filter(
+      (baseline) => baseline.repository === repository,
+    );
+    if (baselines.length === 0 || paths.length === 0) return;
+    try {
+      const current = await hashFiles(repository, paths);
+      for (const baseline of baselines) {
+        for (const [path, hash] of current) {
+          if (!under(path, baseline.exclude)) baseline.overrides.set(path, hash);
+        }
+      }
+    } catch {
+      // Without the content the paths stay as they are: at worst a warning is shown.
     }
   }
 
@@ -336,6 +404,7 @@ export class Executor {
     key: AttemptKey,
     failure: NonNullable<Attempt['reason']>,
   ): Promise<void> {
+    this.baselines.delete(keyOf(key));
     await this.daemon.apply(state, {
       kind: 'attempt_exited',
       group: key.group,
@@ -479,6 +548,7 @@ export class Executor {
     } catch (error) {
       result = { kind: 'failed', message: (error as Error).message };
     }
+    await this.rebaseOutside(state, result);
     await this.daemon.apply(state, { kind: 'delivery_finished', result });
   }
 
@@ -504,6 +574,7 @@ export class Executor {
     } catch (error) {
       result = { kind: 'failed', message: (error as Error).message };
     }
+    await this.rebaseOutside(state, result);
     await this.daemon.apply(state, { kind: 'delivery_finished', result });
   }
 

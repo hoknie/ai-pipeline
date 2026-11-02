@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import i18next from 'i18next';
+import { Loader2 } from 'lucide-react';
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -46,6 +47,32 @@ describe('status labels', () => {
     expect(connectionLabel('polling', t)).toBe('Polling');
     expect(queueStateLabel('running', t)).toBe('Running');
     expect(queueStateLabel('stopped', t)).toBe('Stopped');
+  });
+});
+
+describe('status spin flag', () => {
+  it('spins only the statuses in progress', () => {
+    expect(statusInfo('running', t).spin).toBe(true);
+    expect(statusInfo('active', t).spin).toBe(true);
+    expect(statusInfo('merging', t).spin).toBe(false);
+    expect(statusInfo('done', t).spin).toBe(false);
+    expect(statusInfo('brand_new', t).spin).toBe(false);
+    for (const [code, entry] of Object.entries(STATUS))
+      expect(entry.spin, code).toBe(entry.icon === Loader2);
+  });
+
+  it('rotates the badge icon of active and running only', () => {
+    for (const [status, spins] of [
+      ['active', true],
+      ['running', true],
+      ['merging', false],
+      ['done', false],
+    ] as const) {
+      const { container, unmount } = render(<StatusBadge status={status} />);
+      const svg = container.querySelector('svg');
+      expect(svg?.classList.contains('motion-safe:animate-spin'), status).toBe(spins);
+      unmount();
+    }
   });
 });
 

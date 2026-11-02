@@ -40,6 +40,8 @@ export interface QueueItem {
   skip: string[];
   /** Ids of queue items or runs of the repository that must be done first. */
   after: string[];
+  /** A running queue does not take a postponed item; the user starts it or clears the flag. */
+  postponed: boolean;
   createdAt: number;
   error: string | null;
   /** A returned run: taking the item retries this run instead of creating one. */
@@ -124,6 +126,7 @@ export interface ItemFields {
   tags?: string[] | undefined;
   skip?: string[] | undefined;
   after?: string[] | undefined;
+  postponed?: boolean | undefined;
 }
 
 export function emptyQueue(repository: string, now: number): Queue {
@@ -213,6 +216,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
     tags: [...new Set(fields.tags ?? [])],
     skip: cleanSkip(fields.skip ?? []),
     after,
+    postponed: fields.postponed ?? false,
     createdAt: now,
     error: null,
     run: null,
@@ -232,6 +236,7 @@ export interface ItemPatch {
   tags?: string[] | undefined;
   skip?: string[] | undefined;
   after?: string[] | undefined;
+  postponed?: boolean | undefined;
   position?: number | undefined;
 }
 
@@ -264,6 +269,7 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
   if (patch.tags !== undefined) item.tags = [...new Set(patch.tags)];
   if (patch.skip !== undefined) item.skip = cleanSkip(patch.skip);
   if (after !== undefined) item.after = after;
+  if (patch.postponed !== undefined) item.postponed = patch.postponed;
   const hadError = item.error !== null;
   item.error = null;
   if (patch.position !== undefined) placeItem(queue, item, patch.position);
@@ -667,11 +673,16 @@ export function advance(
     take = queue.items
       .filter(
         (item) =>
+          !item.postponed &&
           !(queue.skipFailed && item.error !== null) &&
           itemReadiness(queue, item, lookup) === 'ready',
       )
       .slice(0, Math.max(0, queue.parallel - queue.runs.length));
-    if (!queue.autopilot && queue.items.length === 0 && queue.runs.length === 0) {
+    if (
+      !queue.autopilot &&
+      !queue.items.some((item) => !item.postponed) &&
+      queue.runs.length === 0
+    ) {
       queue.status = 'stopped';
     }
   }
@@ -734,6 +745,7 @@ export function returnRun(queue: Queue, state: RunState, id: string, now: number
     createdAt: now,
     error: null,
     run,
+    postponed: false,
   };
   queue.items.unshift(item);
   queue.skipped = queue.skipped.filter((skipped) => skipped !== run);

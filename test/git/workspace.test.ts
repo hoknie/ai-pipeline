@@ -6,6 +6,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   RUN_WORKTREE,
   changedPaths,
+  hashFiles,
   cleanRun,
   hasRunLeftovers,
   commitAll,
@@ -212,10 +214,63 @@ describe('working copy snapshots', () => {
     writeFileSync(join(repo, 'draft.md'), 'mine\n');
     const before = await snapshotWorkingCopy(repo);
     const unchanged = await snapshotWorkingCopy(repo);
-    expect(changedPaths(before, unchanged)).toEqual([]);
+    expect(await changedPaths(repo, before, unchanged)).toEqual([]);
     writeFileSync(join(repo, 'lib.ts'), 'export const value = 3;\n');
     writeFileSync(join(repo, 'stray.ts'), 'x\n');
-    expect(changedPaths(before, await snapshotWorkingCopy(repo))).toEqual(['lib.ts', 'stray.ts']);
+    expect(await changedPaths(repo, before, await snapshotWorkingCopy(repo))).toEqual([
+      'lib.ts',
+      'stray.ts',
+    ]);
+  });
+
+  it('ignores committing a dirty file without editing it', async () => {
+    const { repo } = repository();
+    writeFileSync(join(repo, 'draft.md'), 'mine\n');
+    const before = await snapshotWorkingCopy(repo);
+    sh(repo, 'add', 'draft.md');
+    sh(repo, 'commit', '-m', 'draft');
+    expect(await changedPaths(repo, before, await snapshotWorkingCopy(repo))).toEqual([]);
+  });
+
+  it('ignores a change of only the modification time', async () => {
+    const { repo } = repository();
+    writeFileSync(join(repo, 'draft.md'), 'mine\n');
+    const before = await snapshotWorkingCopy(repo);
+    utimesSync(join(repo, 'draft.md'), new Date(2001, 1, 1), new Date(2001, 1, 1));
+    expect(await changedPaths(repo, before, await snapshotWorkingCopy(repo))).toEqual([]);
+  });
+
+  it('reports a deleted file and an edit of a committed file', async () => {
+    const { repo } = repository();
+    const before = await snapshotWorkingCopy(repo);
+    writeFileSync(join(repo, 'lib.ts'), 'changed\n');
+    expect(await changedPaths(repo, before, await snapshotWorkingCopy(repo))).toEqual(['lib.ts']);
+    rmSync(join(repo, 'lib.ts'));
+    const after = await snapshotWorkingCopy(repo);
+    expect(after.files.get('lib.ts')).toBe('missing');
+  });
+
+  it('leaves the excluded directory out of the snapshot', async () => {
+    const { repo } = repository();
+    mkdirSync(join(repo, '.work/logs'), { recursive: true });
+    writeFileSync(join(repo, '.work/logs/a.log'), 'x\n');
+    writeFileSync(join(repo, 'kept.md'), 'x\n');
+    const snapshot = await snapshotWorkingCopy(repo, { exclude: ['.work'] });
+    expect([...snapshot.files.keys()]).toEqual(['kept.md']);
+  });
+
+  it('accepts overrides and reports an edit made after them', async () => {
+    const { repo } = repository();
+    const before = await snapshotWorkingCopy(repo);
+    writeFileSync(join(repo, 'lib.ts'), 'delivered\n');
+    const overrides = await hashFiles(repo, ['lib.ts']);
+    expect(await changedPaths(repo, before, await snapshotWorkingCopy(repo), overrides)).toEqual(
+      [],
+    );
+    writeFileSync(join(repo, 'lib.ts'), 'edited after\n');
+    expect(await changedPaths(repo, before, await snapshotWorkingCopy(repo), overrides)).toEqual([
+      'lib.ts',
+    ]);
   });
 });
 

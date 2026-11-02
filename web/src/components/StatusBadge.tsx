@@ -23,7 +23,7 @@ export function StatusBadge({
     <Tooltip>
       <TooltipTrigger asChild>
         <Badge variant={info.tone} aria-label={`${text} (${status})`} tabIndex={0}>
-          <Icon aria-hidden className={cn(status === 'running' && 'motion-safe:animate-spin')} />
+          <Icon aria-hidden className={cn(info.spin && 'motion-safe:animate-spin')} />
           <span className="min-w-0 truncate" title={title}>
             {text}
           </span>

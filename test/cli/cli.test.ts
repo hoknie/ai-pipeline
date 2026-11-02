@@ -1632,6 +1632,27 @@ describe('cli', () => {
     expect(started.stderr).toContain('unknown step `nope` in skip');
   });
 
+  it('postpones queued tasks and takes them back, and refuses the flag on `run start`', async () => {
+    const box = sandbox();
+    const added = JSON.parse(
+      (await aip(box, 'queue', 'add', 'feature', '--task', 'later', '--postpone', '--json')).stdout,
+    ) as { item: string; items: { id: string; postponed: boolean }[] };
+    expect(added.items.find((item) => item.id === added.item)!.postponed).toBe(true);
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('· postponed');
+    const cleared = JSON.parse(
+      (await aip(box, 'queue', 'edit', added.item, '--no-postpone', '--json')).stdout,
+    ) as typeof added;
+    expect(cleared.items[0]!.postponed).toBe(false);
+    expect((await aip(box, 'queue', 'list')).stdout).not.toContain('postponed');
+    const again = JSON.parse(
+      (await aip(box, 'queue', 'edit', added.item, '--postpone', '--json')).stdout,
+    ) as typeof added;
+    expect(again.items[0]!.postponed).toBe(true);
+    const start = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--postpone');
+    expect(start.code).not.toBe(0);
+    expect(start.stderr).toContain('unknown option');
+  });
+
   it('queues a task after another one, clears the dependencies and refuses both flags', async () => {
     const box = sandbox();
     const first = JSON.parse(

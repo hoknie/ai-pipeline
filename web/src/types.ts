@@ -80,6 +80,8 @@ export interface QueuePatch {
   skip?: string[];
   /** Ids of queue items and runs the task waits for; replaces the list of the item. */
   after?: string[];
+  /** A running queue does not take a postponed task. */
+  postponed?: boolean;
   position?: number;
 }
 export type {

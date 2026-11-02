@@ -143,6 +143,7 @@ interface QueueTaskOptions {
   title?: string;
   autoDeliver?: boolean;
   deliveryMode?: string;
+  postpone?: boolean;
   repo: string;
   json?: boolean;
 }
@@ -209,7 +210,8 @@ function registerQueue(program: Command): void {
       queue
         .command('add')
         .description('Add a task to the end of the queue; it does not start the queue')
-        .argument('<workflow>', 'workflow id from swarm.yaml'),
+        .argument('<workflow>', 'workflow id from swarm.yaml')
+        .option('--postpone', 'postpone the task: a running queue does not take it'),
     ),
   )
     .addHelpText(
@@ -219,6 +221,7 @@ function registerQueue(program: Command): void {
         'aip queue add feature -g g.yaml',
         'aip queue add feature --task "Fix the typo" --skip review --skip qa',
         'aip queue add feature --task "Add the API" --after q1',
+        'aip queue add feature --task "Later" --postpone',
       ]),
     )
     .action(async (workflow: string, options: QueueTaskOptions) => {
@@ -237,6 +240,7 @@ function registerQueue(program: Command): void {
         ...(options.tag !== undefined ? { tags: options.tag } : {}),
         ...(options.skip !== undefined ? { skip: options.skip } : {}),
         ...(options.after !== undefined ? { after: options.after } : {}),
+        ...(options.postpone ? { postponed: true } : {}),
       })) as QueueView & { item: string };
       if (!options.json) print(`Added ${view.item}.`);
       showQueue(options.json, view);
@@ -257,7 +261,9 @@ function registerQueue(program: Command): void {
         .option('--default-delivery-mode', 'follow delivery.mode of the configuration again')
         .option('--no-tags', 'remove all tags of the task')
         .option('--no-skips', 'run every step of the workflow again')
-        .option('--no-after', 'remove all predecessors of the task'),
+        .option('--no-after', 'remove all predecessors of the task')
+        .option('--postpone', 'postpone the task: a running queue does not take it')
+        .option('--no-postpone', 'take the task into work again'),
     ),
   )
     .addHelpText(
@@ -269,6 +275,8 @@ function registerQueue(program: Command): void {
         'aip queue edit 1 --no-skips',
         'aip queue edit 2 --after q1',
         'aip queue edit 2 --no-after',
+        'aip queue edit 3 --postpone',
+        'aip queue edit 3 --no-postpone',
       ]),
     )
     .action(
@@ -326,6 +334,7 @@ function registerQueue(program: Command): void {
             ...(options.skip !== undefined ? { skip: options.skip } : {}),
             ...(editNoAfter ? { after: [] } : {}),
             ...(editAfter && options.after !== undefined ? { after: options.after } : {}),
+            ...(options.postpone !== undefined ? { postponed: options.postpone } : {}),
           })) as QueueView,
         );
       },

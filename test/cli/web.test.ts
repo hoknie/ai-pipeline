@@ -393,6 +393,26 @@ describe('aip web', () => {
     expect(read.items.find((item) => item.id === first.item)?.readiness).toBe('ready');
   });
 
+  it('passes postponed through the queue API and refuses a wrong value', async () => {
+    const { web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    const added = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'x' })
+    ).json()) as QueueView & { item: string };
+    const edited = await post(`/api/queue/items/${added.item}`, { postponed: true });
+    expect(edited.status).toBe(200);
+    const read = (await (
+      await fetch(`${base}/api/queue`, { headers: authed(web) })
+    ).json()) as QueueView;
+    expect(read.items[0]?.postponed).toBe(true);
+    expect((await post(`/api/queue/items/${added.item}`, { postponed: 'yes' })).status).toBe(400);
+  });
+
   it('answers 400 to a dependency cycle through the queue API', async () => {
     const { web, base } = await setup();
     const post = (path: string, body: unknown) =>

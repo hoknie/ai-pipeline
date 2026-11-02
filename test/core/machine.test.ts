@@ -205,6 +205,7 @@ describe('questions to a human', () => {
     exitWithOutsideChange(state);
     expect(group(state).status).toBe('needs_human');
     expect(group(state).question).toContain('README.md');
+    expect(group(state).question).not.toContain('The specialist changed');
     expect(group(state).attempts[0]?.outsideChanges).toEqual(['README.md']);
   });
 });

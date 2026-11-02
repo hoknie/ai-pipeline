@@ -273,6 +273,10 @@ export function createHostServer(options: HostOptions): McpServer {
         tags,
         skip,
         after,
+        postponed: z
+          .boolean()
+          .optional()
+          .describe('true: a running queue does not take the task until you clear the flag'),
         repo,
       },
     },
@@ -286,6 +290,7 @@ export function createHostServer(options: HostOptions): McpServer {
       tags: tagNames,
       skip: skipSteps,
       after: afterIds,
+      postponed,
       repo: where,
     }) =>
       attempt(() =>
@@ -301,6 +306,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...(postponed !== undefined ? { postponed } : {}),
           },
           where,
         ),
@@ -333,6 +339,10 @@ export function createHostServer(options: HostOptions): McpServer {
         tags,
         skip,
         after,
+        postponed: z
+          .boolean()
+          .optional()
+          .describe('true: a running queue does not take the task until you clear the flag'),
         repo,
       },
     },
@@ -348,6 +358,7 @@ export function createHostServer(options: HostOptions): McpServer {
       tags: tagNames,
       skip: skipSteps,
       after: afterIds,
+      postponed,
       repo: where,
     }) =>
       attempt(() =>
@@ -365,6 +376,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...(postponed !== undefined ? { postponed } : {}),
           },
           where,
         ),

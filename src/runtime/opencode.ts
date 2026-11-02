@@ -11,7 +11,7 @@ import {
   type OutputParser,
   type Runtime,
 } from './types.ts';
-import { opencodeTranscript } from './transcript.ts';
+import { opencodeErrorText, opencodeTranscript } from './transcript.ts';
 
 type Rule = 'allow' | 'deny' | 'ask';
 
@@ -172,7 +172,10 @@ export function createOpencodeRuntime(executable = 'opencode'): Runtime {
             value !== null &&
             (value as Record<string, unknown>).type === 'error'
           ) {
-            error = JSON.stringify((value as Record<string, unknown>).error ?? value).slice(0, 500);
+            error = opencodeErrorText((value as Record<string, unknown>).error ?? value).slice(
+              0,
+              500,
+            );
           }
         },
         outcome() {

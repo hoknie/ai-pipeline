@@ -1422,7 +1422,11 @@ describe('dependencies in the list', () => {
     await screen.findByRole('list', { name: 'tasks in the queue' });
     const li = row('Модель');
     expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
-    expect(li.querySelector('[data-state]:not([aria-label^="Workflow"])')).toBeNull();
+    expect(
+      [...li.querySelectorAll('[data-state]')].filter(
+        (node) => !node.matches('[aria-label^="Workflow"]') && !node.closest('[role="switch"]'),
+      ),
+    ).toEqual([]);
     expect(li.className).not.toContain('border-destructive');
   });
 
@@ -1642,7 +1646,7 @@ describe('queue settings block', () => {
     });
     const block = await settingsBlock();
     fireEvent.click(block.getByRole('switch', { name: 'Autopilot' }));
-    await screen.findByText('boom');
+    await screen.findAllByText('boom');
     expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
       'false',
     );
@@ -1914,6 +1918,51 @@ describe('delivery mode of a task', () => {
         deliveryMode: null,
         tags: [],
       }),
+    );
+  });
+});
+
+describe('postponed items', () => {
+  it('switches an item off, shows the badge, and sends only postponed', async () => {
+    const after = queueOf({ items: [queueItem('q1', 'A', 1, { postponed: true })] });
+    const api = show(queueOf({ items: [queueItem('q1', 'A', 1)] }), {
+      queueEdit: vi.fn(async () => after),
+    });
+    const toggle = await screen.findByRole('switch', { name: 'In work' });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByText('Postponed')).toBeNull();
+    fireEvent.click(toggle);
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalledWith('q1', { postponed: true }));
+    await screen.findByText('Postponed');
+    expect(screen.getByRole('switch', { name: 'In work' }).getAttribute('aria-checked')).toBe(
+      'false',
+    );
+  });
+
+  it('puts the switch back and shows the error when the request fails', async () => {
+    show(queueOf({ items: [queueItem('q1', 'A', 1)] }), {
+      queueEdit: vi.fn(async () => {
+        throw new ApiError(500, 'boom');
+      }),
+    });
+    fireEvent.click(await screen.findByRole('switch', { name: 'In work' }));
+    await screen.findAllByText('boom');
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'In work' }).getAttribute('aria-checked')).toBe(
+        'true',
+      ),
+    );
+    expect(screen.queryByText('Postponed')).toBeNull();
+  });
+
+  it('does not send postponed when the form is saved', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { postponed: true })] }));
+    await screen.findByText('Postponed');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
+    expect((api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).not.toHaveProperty(
+      'postponed',
     );
   });
 });

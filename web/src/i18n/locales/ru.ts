@@ -232,8 +232,8 @@ export const ru: Dictionary = {
       round: 'круг {{round}}',
       denialsTitle: 'команды, отклонённые правами специалиста',
       denials: 'отказов: {{n}}',
-      outsideTitle: 'файлы, изменённые вне worktree',
-      outside: 'вне worktree: {{n}}',
+      outsideTitle: 'файлы, изменённые в рабочей копии во время шага',
+      outside: 'в рабочей копии: {{n}}',
       retryStep: 'Повторить шаг',
       denialsLabel: 'отказы в правах',
       denialsHeading: 'Отказы в правах',
@@ -276,7 +276,11 @@ export const ru: Dictionary = {
       label: 'изменённые файлы',
     },
     outside: {
-      title: 'Шаг {{step}} (#{{seq}}) изменил {{files}} вне своего worktree',
+      title_one: 'Во время шага {{step}} (#{{seq}}) в рабочей копии изменился {{count}} файл',
+      title_few: 'Во время шага {{step}} (#{{seq}}) в рабочей копии изменились {{count}} файла',
+      title_many: 'Во время шага {{step}} (#{{seq}}) в рабочей копии изменились {{count}} файлов',
+      title_other: 'Во время шага {{step}} (#{{seq}}) в рабочей копии изменились {{count}} файла',
+      hint: 'Их мог изменить специалист, вы или другая программа. Доставки aip сюда не входят.',
     },
     config: {
       label: 'ошибки конфигурации',
@@ -407,6 +411,9 @@ export const ru: Dictionary = {
     list: {
       after: 'после: {{title}}',
       linked: 'связана с выбранной задачей',
+      active: 'В работе',
+      postponed: 'Отложена',
+      activeHint: 'Отложенная задача остаётся на месте, но работающая очередь её не берёт',
       readyHint: 'Ждать нечего: задача стартует, как только освободится место',
       unmetTitle: 'Зависимости не выполнены',
       unmetText: 'Задача ещё ждёт: {{items}}. Всё равно запустить?',

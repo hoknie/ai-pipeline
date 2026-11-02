@@ -304,6 +304,7 @@ export function queueItem(
     skip: [],
     readiness: 'ready' as const,
     after: [],
+    postponed: false,
     createdAt: 1,
     error: null,
     run: null,

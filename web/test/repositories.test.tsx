@@ -442,12 +442,15 @@ describe('repository registry in the panel', () => {
     await remove();
     expect(await screen.findByText('repository has unfinished runs: 1')).toBeTruthy();
     expect(removeRepository).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(trigger(), { key: 'Enter' });
+    await screen.findByRole('menuitemradio', { name: /app/ });
     expect(
       screen
         .getAllByRole('menuitemradio', { hidden: true })
         .some((item) => /lib/.test(item.textContent ?? '')),
     ).toBe(true);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
     await remove();
     await waitFor(() => expect(removeRepository).toHaveBeenCalledTimes(2));
     expect(removeRepository).toHaveBeenLastCalledWith(LIB);
@@ -468,6 +471,73 @@ describe('repository registry in the panel', () => {
       }),
     );
     await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: app'));
+    expect(window.localStorage.getItem('aip.web.repository')).toBe('null');
+  });
+
+  const pressRemove = async () => {
+    fireEvent.keyDown(trigger(), { key: 'Enter' });
+    const button = await screen.findByRole('button', { name: 'Remove from list' });
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
+    fireEvent.click(button);
+  };
+  const listed = () =>
+    screen
+      .queryAllByRole('menuitemradio', { hidden: true })
+      .some((item) => /lib/.test(item.textContent ?? ''));
+
+  it('remove button pressed with a pointer does not select the item', async () => {
+    const removeRepository = vi.fn(async () => [entry(APP)]);
+    const { api } = twoRepositories({ removeRepository });
+    await ready(api);
+    await pressRemove();
+    const dialog = await screen.findByRole('alertdialog');
+    expect(trigger().getAttribute('aria-label')).toBe('Repository: app');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove from list' }));
+    await waitFor(() => expect(removeRepository).toHaveBeenCalledWith(LIB));
+    expect(trigger().getAttribute('aria-label')).toBe('Repository: app');
+    fireEvent.keyDown(trigger(), { key: 'Enter' });
+    await screen.findByRole('menuitemradio', { name: /app/ });
+    expect(listed()).toBe(false);
+  });
+
+  it('keeps the repository when the removal is cancelled', async () => {
+    const removeRepository = vi.fn(async () => [entry(APP)]);
+    const { api } = twoRepositories({ removeRepository });
+    await ready(api);
+    await pressRemove();
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(removeRepository).not.toHaveBeenCalled();
+    expect(trigger().getAttribute('aria-label')).toBe('Repository: app');
+    fireEvent.keyDown(trigger(), { key: 'Enter' });
+    await screen.findByRole('menuitemradio', { name: /app/ });
+    expect(listed()).toBe(true);
+  });
+
+  it('a removed repository that returns to the registry is not selected again', async () => {
+    const removeRepository = vi.fn(async () => [entry(APP)]);
+    const { api } = twoRepositories({ removeRepository });
+    await ready(api);
+    fireEvent.keyDown(trigger(), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /lib/ }));
+    await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: lib'));
+    await pressRemove();
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: 'Remove from list',
+      }),
+    );
+    await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: app'));
+    act(() =>
+      FakeEventSource.last?.send({
+        event: 'repositories',
+        seq: 9,
+        repositories: [entry(APP), entry(LIB)],
+      }),
+    );
+    expect(trigger().getAttribute('aria-label')).toBe('Repository: app');
     expect(window.localStorage.getItem('aip.web.repository')).toBe('null');
   });
 });

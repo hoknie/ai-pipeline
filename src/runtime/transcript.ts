@@ -140,6 +140,17 @@ export function claudeTranscript(lines: string[]): TranscriptEntry[] {
   return entries;
 }
 
+/** Readable text of an `error` event of OpenCode: the message, not the response headers. */
+export function opencodeErrorText(error: unknown): string {
+  if (isObject(error)) {
+    const data = isObject(error.data) ? error.data : {};
+    for (const candidate of [data.message, error.message, error.name]) {
+      if (typeof candidate === 'string' && candidate !== '') return candidate;
+    }
+  }
+  return typeof error === 'string' ? error : JSON.stringify(error);
+}
+
 const OPENCODE_QUIET = new Set(['step_start', 'step-start']);
 
 /** Transcript of the `run --format json` log of OpenCode. */
@@ -191,7 +202,7 @@ export function opencodeTranscript(lines: string[]): TranscriptEntry[] {
       entries.push({
         kind: 'tool_result',
         id: null,
-        text: clip(text(event.error ?? part)),
+        text: clip(opencodeErrorText(event.error ?? part)),
         error: true,
       });
       continue;

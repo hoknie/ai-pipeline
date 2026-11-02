@@ -125,7 +125,7 @@ describe('text for people', () => {
     expect(view.warnings).toEqual([]);
     expect(view.attempts[0]?.outsideChanges).toEqual(['README.md', 'docs/a.md']);
     expect(formatGroup(view)).toContain(
-      'Warning: step plan changed files outside its worktree: README.md, docs/a.md',
+      'Warning: files in the working copy changed during step plan: README.md, docs/a.md',
     );
     expect(runView(state, 2000).groups[0]?.warnings).toBe(1);
     state.groups[0]!.warnings.push('other');
@@ -153,7 +153,7 @@ describe('text for people', () => {
     ]);
     expect(runView(state, 4000).groups[0]?.warnings).toBe(3);
     expect(formatGroup(view)).toContain(
-      'Warning: step plan changed files outside its worktree: swarm.yaml, README.md',
+      'Warning: files in the working copy changed during step plan: swarm.yaml, README.md',
     );
   });
 

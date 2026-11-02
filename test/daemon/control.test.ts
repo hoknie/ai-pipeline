@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -257,6 +257,80 @@ describe('failures and control', () => {
     const waiting = await stop.waitFor(stopRun, (view) => view.groups[0]?.status === 'needs_human');
     expect(waiting.groups[0]?.question).toContain('README.md');
     expect((await stop.group(stopRun, 'g1')).attempts[0]?.outsideChanges).toEqual(['README.md']);
+  });
+
+  it('does not count a delivery of another run as a change outside the worktree', async () => {
+    const h = await start();
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    h.script({
+      code: [{ outside: { [join(h.repo, 'README.md')]: 'stray\n' }, delayMs: 6000 }],
+    });
+    const first = (
+      (await startRun(h, {
+        repository: h.repo,
+        workflow: 'feature',
+        groups: [{ title: 'first', task: 'one' }],
+      })) as RunCreated
+    ).runId;
+    await h.waitFor(first, (view) => view.groups[0]?.status === 'running');
+    // the first agent has read its script once it wrote the stray file
+    for (let wait = 0; !existsSync(join(h.repo, 'README.md')) && wait < 100; wait += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect((await h.group(first, 'first')).status).toBe('running');
+    h.script({ code: [{ write: { 'shared.md': 'from b\n' } }] });
+    const second = (
+      (await startRun(h, {
+        repository: h.repo,
+        workflow: 'feature',
+        groups: [{ title: 'second', task: 'two' }],
+      })) as RunCreated
+    ).runId;
+    await h.waitFor(second, (view) => view.finished);
+    for (let wait = 0; !existsSync(join(h.repo, 'shared.md')) && wait < 100; wait += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(readFileSync(join(h.repo, 'shared.md'), 'utf8')).toBe('from b\n');
+    // the delivery came while the first step was still running
+    expect((await h.group(first, 'first')).status).toBe('running');
+    await h.waitFor(first, (view) => view.finished, 60_000);
+    expect((await h.group(first, 'first')).attempts[0]?.outsideChanges).toEqual(['README.md']);
+  });
+
+  it('keeps an outside change of a file that another run delivers to a branch', async () => {
+    const h = await start(
+      WORKFLOW_CONFIG.replace(
+        '  workflows:',
+        '  delivery: { mode: branch, auto: true }\n  workflows:',
+      ),
+    );
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    h.script({
+      code: [{ outside: { [join(h.repo, 'README.md')]: 'stray\n' }, delayMs: 6000 }],
+    });
+    const first = (
+      (await startRun(h, {
+        repository: h.repo,
+        workflow: 'feature',
+        groups: [{ title: 'first', task: 'one' }],
+      })) as RunCreated
+    ).runId;
+    await h.waitFor(first, (view) => view.groups[0]?.status === 'running');
+    for (let wait = 0; !existsSync(join(h.repo, 'README.md')) && wait < 100; wait += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    h.script({ code: [{ write: { 'README.md': 'from b\n' } }] });
+    const second = (
+      (await startRun(h, {
+        repository: h.repo,
+        workflow: 'feature',
+        groups: [{ title: 'second', task: 'two' }],
+      })) as RunCreated
+    ).runId;
+    await h.waitFor(second, (view) => view.finished);
+    expect((await h.group(first, 'first')).status).toBe('running');
+    await h.waitFor(first, (view) => view.finished, 60_000);
+    expect((await h.group(first, 'first')).attempts[0]?.outsideChanges).toEqual(['README.md']);
   });
 
   it('fails a step whose runtime is not installed', async () => {

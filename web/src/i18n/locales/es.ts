@@ -234,8 +234,8 @@ export const es: Dictionary = {
       round: 'ronda {{round}}',
       denialsTitle: 'comandos denegados por los permisos del especialista',
       denials: 'denegaciones: {{n}}',
-      outsideTitle: 'archivos cambiados fuera del worktree',
-      outside: 'fuera del worktree: {{n}}',
+      outsideTitle: 'archivos cambiados en la copia de trabajo durante el paso',
+      outside: 'en la copia de trabajo: {{n}}',
       retryStep: 'Reintentar paso',
       denialsLabel: 'denegaciones de permisos',
       denialsHeading: 'Denegaciones de permisos',
@@ -278,7 +278,13 @@ export const es: Dictionary = {
       label: 'archivos cambiados',
     },
     outside: {
-      title: 'El paso {{step}} (#{{seq}}) cambió {{files}} fuera de su worktree',
+      title_one:
+        'Durante el paso {{step}} (#{{seq}}) cambió {{count}} archivo de la copia de trabajo',
+      title_many:
+        'Durante el paso {{step}} (#{{seq}}) cambiaron {{count}} archivos de la copia de trabajo',
+      title_other:
+        'Durante el paso {{step}} (#{{seq}}) cambiaron {{count}} archivos de la copia de trabajo',
+      hint: 'Pudo cambiarlos el especialista, usted u otro programa. Las entregas de aip no cuentan.',
     },
     config: {
       label: 'errores de configuración',
@@ -407,6 +413,9 @@ export const es: Dictionary = {
     list: {
       after: 'después de: {{title}}',
       linked: 'relacionada con la tarea seleccionada',
+      active: 'En curso',
+      postponed: 'Aplazada',
+      activeHint: 'Una tarea aplazada se queda en su sitio, pero la cola en marcha no la toma',
       readyHint: 'Nada que esperar: la tarea empieza en cuanto haya una plaza libre',
       unmetTitle: 'Las dependencias no se han cumplido',
       unmetText: 'La tarea aún espera a: {{items}}. ¿Ejecutarla de todos modos?',

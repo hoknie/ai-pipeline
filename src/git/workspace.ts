@@ -269,37 +269,125 @@ export async function updateFromBranch(
   return { kind: 'conflict', files };
 }
 
-export type Snapshot = Map<string, string>;
+export interface Snapshot {
+  head: string;
+  /** Dirty paths of the working copy and the git blob hash of their content ('missing' if gone). */
+  files: Map<string, string>;
+}
 
-export async function snapshotWorkingCopy(repository: string): Promise<Snapshot> {
+export interface SnapshotOptions {
+  /** Path prefixes (relative to the repository) that are left out of the snapshot. */
+  exclude?: string[];
+}
+
+const HASH_BATCH = 100;
+
+export function under(path: string, prefixes: string[]): boolean {
+  return prefixes.some((prefix) => {
+    const clean = prefix.replace(/\/+$/, '');
+    return clean !== '' && (path === clean || path.startsWith(`${clean}/`));
+  });
+}
+
+/** Git blob hashes of the files' current content; 'missing' for what is not a file. */
+export async function hashFiles(repository: string, paths: string[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const present: string[] = [];
+  for (const path of paths) {
+    try {
+      if (statSync(join(repository, path)).isFile()) present.push(path);
+      else result.set(path, 'missing');
+    } catch {
+      result.set(path, 'missing');
+    }
+  }
+  for (let index = 0; index < present.length; index += HASH_BATCH) {
+    const batch = present.slice(index, index + HASH_BATCH);
+    const output = (await runGit(repository, ['hash-object', '--', ...batch])).stdout;
+    const hashes = output.split('\n');
+    batch.forEach((path, position) => result.set(path, hashes[position] ?? 'missing'));
+  }
+  return result;
+}
+
+export async function snapshotWorkingCopy(
+  repository: string,
+  options: SnapshotOptions = {},
+): Promise<Snapshot> {
+  const exclude = options.exclude ?? [];
+  const head = await git(repository, 'rev-parse', '--verify', 'HEAD^{commit}');
   const output = (
     await runGit(repository, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
   ).stdout;
-  const snapshot: Snapshot = new Map();
+  const paths: string[] = [];
   const entries = output.split('\0');
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index] ?? '';
     if (entry.length < 4) continue;
     const status = entry.slice(0, 2);
-    const path = entry.slice(3);
-    if (status.startsWith('R') || status.startsWith('C')) index += 1;
-    snapshot.set(path, `${status}:${fingerprint(join(repository, path))}`);
+    paths.push(entry.slice(3));
+    if (status.startsWith('R') || status.startsWith('C')) {
+      index += 1;
+      const source = entries[index];
+      if (source) paths.push(source);
+    }
   }
-  return snapshot;
+  const kept = [...new Set(paths)].filter((path) => !under(path, exclude));
+  return { head, files: await hashFiles(repository, kept) };
 }
 
-function fingerprint(path: string): string {
-  try {
-    const stat = statSync(path);
-    return `${stat.size}:${stat.mtimeMs}`;
-  } catch {
-    return 'missing';
+/** Blob hashes of `paths` as the snapshot saw them: dirty files from it, the rest from its HEAD. */
+export async function contentsAt(
+  repository: string,
+  snapshot: Snapshot,
+  paths: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const committed: string[] = [];
+  for (const path of paths) {
+    const dirty = snapshot.files.get(path);
+    if (dirty === undefined) committed.push(path);
+    else result.set(path, dirty);
   }
+  for (let index = 0; index < committed.length; index += HASH_BATCH) {
+    const batch = committed.slice(index, index + HASH_BATCH);
+    const output = (
+      await runGit(repository, ['ls-tree', '-r', '-z', snapshot.head, '--', ...batch])
+    ).stdout;
+    const found = new Map<string, string>();
+    for (const line of output.split('\0')) {
+      const tab = line.indexOf('\t');
+      if (tab < 0) continue;
+      const hash = line.slice(0, tab).split(' ')[2];
+      if (hash) found.set(line.slice(tab + 1), hash);
+    }
+    for (const path of batch) result.set(path, found.get(path) ?? 'missing');
+  }
+  return result;
 }
 
-export function changedPaths(before: Snapshot, after: Snapshot): string[] {
-  const paths = new Set([...before.keys(), ...after.keys()]);
-  return [...paths].filter((path) => before.get(path) !== after.get(path)).sort();
+/**
+ * Paths whose content differs between two snapshots. `overrides` replace the content of the
+ * `before` side for the paths they name (used to accept changes aip itself made).
+ */
+export async function changedPaths(
+  repository: string,
+  before: Snapshot,
+  after: Snapshot,
+  overrides: Map<string, string> = new Map(),
+): Promise<string[]> {
+  const candidates = new Set([...before.files.keys(), ...after.files.keys(), ...overrides.keys()]);
+  if (before.head !== after.head) {
+    const names = (await runGit(repository, ['diff', '--name-only', '-z', before.head, after.head]))
+      .stdout;
+    for (const name of names.split('\0')) if (name !== '') candidates.add(name);
+  }
+  const paths = [...candidates];
+  const [was, now] = await Promise.all([
+    contentsAt(repository, before, paths),
+    contentsAt(repository, after, paths),
+  ]);
+  return paths.filter((path) => (overrides.get(path) ?? was.get(path)) !== now.get(path)).sort();
 }
 
 export interface CleanPlan {

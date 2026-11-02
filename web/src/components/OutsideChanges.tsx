@@ -1,13 +1,12 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { files } from '../format.ts';
 import type { AttemptView } from '../types.ts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.tsx';
 
 const COLLAPSE_ABOVE = 5;
 
-/** Files a step changed outside its worktree; a long list starts collapsed. */
+/** Files of the main working copy that changed while a step ran; a long list starts collapsed. */
 export function OutsideChanges({ attempt }: { attempt: AttemptView }) {
   const { t } = useTranslation();
   const list = attempt.outsideChanges ?? [];
@@ -23,10 +22,11 @@ export function OutsideChanges({ attempt }: { attempt: AttemptView }) {
         {t('runs.outside.title', {
           step: attempt.stepId,
           seq: attempt.seq,
-          files: files(list.length, t),
+          count: list.length,
         })}
       </CollapsibleTrigger>
       <CollapsibleContent>
+        <p className="px-8 pb-1 text-xs">{t('runs.outside.hint')}</p>
         <ul className="px-8 pb-2">
           {list.map((file) => (
             <li key={file}>

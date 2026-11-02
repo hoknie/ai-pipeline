@@ -229,8 +229,8 @@ export const en = {
       round: 'round {{round}}',
       denialsTitle: 'commands denied by the specialist permissions',
       denials: 'denials: {{n}}',
-      outsideTitle: 'files changed outside the worktree',
-      outside: 'outside worktree: {{n}}',
+      outsideTitle: 'files changed in the working copy during the step',
+      outside: 'in working copy: {{n}}',
       retryStep: 'Retry step',
       denialsLabel: 'permission denials',
       denialsHeading: 'Permission denials',
@@ -273,7 +273,9 @@ export const en = {
       label: 'changed files',
     },
     outside: {
-      title: 'Step {{step}} (#{{seq}}) changed {{files}} outside its worktree',
+      title_one: '{{count}} file in the working copy changed during step {{step}} (#{{seq}})',
+      title_other: '{{count}} files in the working copy changed during step {{step}} (#{{seq}})',
+      hint: 'The specialist, you or another program may have changed them. aip deliveries are not counted.',
     },
     config: {
       label: 'configuration errors',
@@ -400,6 +402,9 @@ export const en = {
     list: {
       after: 'after: {{title}}',
       linked: 'linked to the selected task',
+      active: 'In work',
+      postponed: 'Postponed',
+      activeHint: 'A postponed task stays in place, but a running queue does not take it',
       readyHint: 'Nothing to wait for: the task starts as soon as a place is free',
       unmetTitle: 'Dependencies are not met',
       unmetText: 'The task still waits for: {{items}}. Run it anyway?',

@@ -101,6 +101,17 @@ Add the server to `~/.config/opencode/opencode.json` (or to the project's `openc
 
 To check, run `opencode mcp list`: it shows `aip`.
 
+### Verified
+
+Checked against OpenCode 1.18.35 on a live model (a free OpenRouter model), with a throwaway repository and a separate `XDG_CONFIG_HOME` and `XDG_STATE_HOME`:
+
+- `opencode mcp list` prints `aip` as `connected` for the configuration above.
+- From `opencode run --format json`, the model called `swarm_status` (answer: `No runs yet.`) and `swarm_run` (the run was started, reached `merged` and was delivered); `swarm_status` then showed the run as `finished`. In OpenCode the tools are named with the server prefix: `aip_swarm_status`, `aip_swarm_run`.
+- The agent that `aip` generates is applied: `bash` outside `allow_commands` is refused (the tool event has `status: error` with the text of the rule), allowed commands run, and `-s <session>` continues the same session (the model remembers the first request).
+- A workflow whose `coder` has `runtime: opencode` goes through `code` to `merged`; the specialist reports with `aip_swarm_report`, and `aip group show` prints the OpenCode log of the step with its tokens.
+
+If `opencode run` prints nothing for minutes, the cause is usually not the model but a global MCP server in your own OpenCode configuration that does not start or needs authorization: disable such servers (`"enabled": false`) or check them with `opencode mcp list`. A failed request ends with an `error` event; `aip` shows its `data.message` as the reason of the step.
+
 ## Tools
 
 | Tool | Parameters | What it does |
@@ -112,8 +123,8 @@ To check, run `opencode mcp list`: it shows `aip`.
 | `swarm_retry` | `run_id`, `group` | Retries a failed or cancelled step from where it stopped, or retries the merge after a conflict |
 | `swarm_answer` | `run_id`, `group`, `answer` | Answers a specialist who is waiting for a human decision |
 | `swarm_queue` | `repo?` | The repository's task queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order (each with its readiness `ready`, `waiting` or `blocked` and its predecessors with their state), and the runs that hold a place, with workflow, progress by group and by step (`steps` with `done`, `total` and, for a single group, `current`), active steps and problem |
-| `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `repo?` | Puts a task at the end of the queue; does not start the queue |
-| `swarm_queue_edit` | `item`, `workflow?`, `task?` or `groups?`, `title?`, `deliveryMode?` (`null` follows `delivery.mode` again), `tags?`, `skip?`, `after?`, `position?`, `repo?` | Changes a waiting task or moves it to a position (1 is first); `after` replaces the whole list of predecessors and `[]` clears it |
+| `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true` makes a running queue skip the task until the flag is cleared |
+| `swarm_queue_edit` | `item`, `workflow?`, `task?` or `groups?`, `title?`, `deliveryMode?` (`null` follows `delivery.mode` again), `tags?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it to a position (1 is first); `after` replaces the whole list of predecessors and `[]` clears it |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
 | `swarm_queue_parallel` | `parallel`, `repo?` | Changes the number of simultaneous runs in any queue state; tasks start at once, and running runs are not interrupted |

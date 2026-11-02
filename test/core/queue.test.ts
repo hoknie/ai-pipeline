@@ -1240,3 +1240,75 @@ describe('fixed runs go first', () => {
     expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
   });
 });
+
+describe('postponed items', () => {
+  it('is false by default, set by add and edit, and keeps position and order', () => {
+    const queue = queueOf('A', 'B');
+    expect(queue.items.every((item) => !item.postponed)).toBe(true);
+    addItem(queue, { workflow: 'feature', task: 'C', postponed: true }, 'q3', 3);
+    expect(queue.items[2]!.postponed).toBe(true);
+    editItem(queue, 'q1', { postponed: true }, 4);
+    expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
+    expect(queue.items[0]).toMatchObject({ postponed: true, after: [] });
+    editItem(queue, 'q1', { title: 'T' }, 5);
+    expect(queue.items[0]!.postponed).toBe(true);
+    editItem(queue, 'q1', { postponed: false }, 6);
+    expect(queue.items[0]!.postponed).toBe(false);
+  });
+
+  it('is skipped by a running queue, which takes the next item', () => {
+    const queue = queueOf('A', 'B');
+    editItem(queue, 'q1', { postponed: true }, 3);
+    startQueue(queue, [], 4);
+    expect(advance(queue, [], none, 5).take.map((item) => item.id)).toEqual(['q2']);
+  });
+
+  it('is taken as soon as the flag is cleared; starting the queue keeps the flag', () => {
+    const queue = queueOf('A');
+    queue.autopilot = true;
+    editItem(queue, 'q1', { postponed: true }, 3);
+    startQueue(queue, [], 4);
+    expect(queue.items[0]!.postponed).toBe(true);
+    expect(advance(queue, [], none, 5).take).toEqual([]);
+    editItem(queue, 'q1', { postponed: false }, 6);
+    expect(advance(queue, [], none, 7).take.map((item) => item.id)).toEqual(['q1']);
+  });
+
+  it('leaves dependants waiting and does not change readiness', () => {
+    const queue = queueOf('A');
+    addItem(queue, { workflow: 'feature', task: 'B', after: ['q1'] }, 'q2', 3);
+    editItem(queue, 'q1', { postponed: true }, 4);
+    startQueue(queue, [], 5);
+    expect(itemReadiness(queue, queue.items[0]!, none)).toBe('ready');
+    expect(itemReadiness(queue, queue.items[1]!, none)).toBe('waiting');
+    expect(advance(queue, [], none, 6).take).toEqual([]);
+  });
+
+  it('stays blocked after a failed run and is not taken', () => {
+    const queue = queueOf('A');
+    withAfter(queue, 'q1', ['r1']);
+    editItem(queue, 'q1', { postponed: true }, 4);
+    startQueue(queue, [], 5);
+    const failed = failedRun('r1');
+    expect(itemReadiness(queue, queue.items[0]!, lookupOf(failed))).toBe('blocked');
+    expect(advance(queue, [failed], lookupOf(failed), 6).take).toEqual([]);
+  });
+
+  it('stops a queue without autopilot that has only postponed items', () => {
+    const queue = queueOf('A');
+    editItem(queue, 'q1', { postponed: true }, 3);
+    startQueue(queue, [], 4);
+    advance(queue, [], none, 5);
+    expect(queue.status).toBe('stopped');
+    expect(queue.items).toHaveLength(1);
+  });
+
+  it('keeps a queue with autopilot running over postponed items', () => {
+    const queue = queueOf('A');
+    queue.autopilot = true;
+    editItem(queue, 'q1', { postponed: true }, 3);
+    startQueue(queue, [], 4);
+    advance(queue, [], none, 5);
+    expect(queue.status).toBe('running');
+  });
+});

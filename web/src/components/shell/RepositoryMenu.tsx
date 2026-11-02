@@ -128,6 +128,7 @@ export function RepositoryMenu({
   const { t } = useTranslation();
   const { repositories, selected, waiting, home, onSelect, onAdd, onRemove } = choice;
   const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState(false);
   if (selected === null) {
     return (
       <>
@@ -173,7 +174,7 @@ export function RepositoryMenu({
   );
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         {trigger}
         <DropdownMenuContent align="start" aria-label={t('nav.repository')}>
           <DropdownMenuRadioGroup value={selected} onValueChange={onSelect}>
@@ -199,9 +200,12 @@ export function RepositoryMenu({
                       title={t('nav.repositoryRemove')}
                       data-repository-remove={path}
                       onPointerDown={(event) => event.stopPropagation()}
+                      onPointerUp={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
+                        setOpen(false);
                         onRemove(path);
                       }}
                     >

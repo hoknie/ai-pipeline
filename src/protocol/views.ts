@@ -564,6 +564,8 @@ export interface QueueItemView {
   /** Whether the task can start now: its predecessors are done, still pending or blocked. */
   readiness: ItemReadiness;
   after: DependencyView[];
+  /** A running queue does not take the task; "run now" still starts it. */
+  postponed: boolean;
   createdAt: number;
   error: string | null;
   /** A returned run: taking the item retries it; null for a new task. */
@@ -714,6 +716,7 @@ export function queueView(
         const run = lookup(ref);
         return { kind: 'run', id: ref, title: run ? runTitle(run) : ref, state };
       }),
+      postponed: item.postponed,
       createdAt: item.createdAt,
       error: item.error,
       run: item.run,

@@ -256,7 +256,7 @@ class Machine {
       this.askHuman(
         group,
         attempt.stepIndex,
-        `The specialist changed files outside its worktree: ${files}. Check your working copy and answer to continue.`,
+        `Files in your working copy changed while step ${attempt.stepId} ran: ${files}. The specialist, you or another program may have changed them; aip deliveries are not counted. Check your working copy and answer to continue.`,
         null,
       );
       return;

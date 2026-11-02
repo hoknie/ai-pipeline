@@ -352,14 +352,43 @@ if (mode === 'claude') {
     }),
   );
 } else {
-  console.log(JSON.stringify({ type: 'step_start', sessionID: session }));
+  const message = 'msg_fake';
+  const timestamp = Date.now();
+  console.log(
+    JSON.stringify({
+      type: 'step_start',
+      timestamp,
+      sessionID: session,
+      part: { id: 'prt_fake1', messageID: message, sessionID: session, type: 'step-start' },
+    }),
+  );
+  console.log(
+    JSON.stringify({
+      type: 'text',
+      timestamp,
+      sessionID: session,
+      part: {
+        id: 'prt_fake2',
+        messageID: message,
+        sessionID: session,
+        type: 'text',
+        text: 'done',
+        time: { start: timestamp, end: timestamp },
+      },
+    }),
+  );
   console.log(
     JSON.stringify({
       type: 'step_finish',
+      timestamp,
       sessionID: session,
       part: {
+        id: 'prt_fake3',
+        reason: 'stop',
+        messageID: message,
+        sessionID: session,
         type: 'step-finish',
-        tokens: { input: 50, output: 10, cache: { read: 0, write: 0 } },
+        tokens: { total: 60, input: 50, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
         cost: 0.002,
       },
     }),

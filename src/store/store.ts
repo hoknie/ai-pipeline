@@ -328,8 +328,8 @@ export class Store {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -348,6 +348,7 @@ export class Store {
           JSON.stringify(item.after),
           item.deliveryMode,
           item.run,
+          item.postponed ? 1 : 0,
         ),
       );
     });
@@ -381,6 +382,7 @@ export class Store {
         tags: item.tags_json ? parse(item.tags_json) : [],
         skip: item.skip_json ? parse(item.skip_json) : [],
         after: item.after_json ? parse(item.after_json) : [],
+        postponed: Number(item.postponed ?? 0) === 1,
         createdAt: Number(item.created_at),
         error: text(item.error ?? null),
         run: text(item.run_id ?? null),

@@ -422,3 +422,54 @@ describe('claude tool set', () => {
     expect(launch.args).toContain('Bash(npm test*)');
   });
 });
+
+describe('opencode run --format json output', () => {
+  const runtime = createOpencodeRuntime('/bin/opencode');
+  const recorded = readFileSync(
+    join(import.meta.dirname, '..', 'fixtures', 'opencode-run.jsonl'),
+    'utf8',
+  ).split('\n');
+
+  it('reads the session and sums the tokens of every step of a recorded run', () => {
+    const parser = runtime.createParser();
+    for (const line of recorded) parser.push(line);
+    expect(parser.outcome()).toEqual({
+      sessionId: 'ses_ses1',
+      usage: { inputTokens: 19026 + 19090, outputTokens: 25 + 3, costUsd: 0 },
+      error: null,
+      denials: [],
+    });
+  });
+
+  it('sums the cost of steps', () => {
+    const parser = runtime.createParser();
+    const step = (cost: number) =>
+      JSON.stringify({
+        type: 'step_finish',
+        sessionID: 'ses_1',
+        part: { type: 'step-finish', tokens: { input: 1, output: 1 }, cost },
+      });
+    parser.push(step(0.25));
+    parser.push(step(0.5));
+    expect(parser.outcome().usage?.costUsd).toBeCloseTo(0.75);
+  });
+
+  it('reports the message of an error event, not its response headers', () => {
+    const parser = runtime.createParser();
+    parser.push(
+      JSON.stringify({
+        type: 'error',
+        sessionID: 'ses_1',
+        error: {
+          name: 'APIError',
+          data: {
+            message: 'Prompt tokens limit exceeded: 19662 > 18740',
+            statusCode: 402,
+            responseHeaders: { 'x-filler': 'x'.repeat(600) },
+          },
+        },
+      }),
+    );
+    expect(parser.outcome().error).toBe('Prompt tokens limit exceeded: 19662 > 18740');
+  });
+});

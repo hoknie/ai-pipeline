@@ -506,8 +506,18 @@ export class Daemon {
         case 'queue_add':
           return this.addQueueItem(repository, request.params);
         case 'queue_edit': {
-          const { item, workflow, task, groups, title, position, autoDeliver, deliveryMode, skip } =
-            request.params;
+          const {
+            item,
+            workflow,
+            task,
+            groups,
+            title,
+            position,
+            autoDeliver,
+            deliveryMode,
+            skip,
+            postponed,
+          } = request.params;
           if (workflow !== undefined || skip !== undefined) {
             const current = queue.items.find((candidate) => candidate.id === item);
             if (current) {
@@ -546,6 +556,7 @@ export class Daemon {
               tags,
               skip,
               after,
+              postponed,
             },
             now,
           );
@@ -1101,12 +1112,20 @@ export class Daemon {
     repository: string,
     params: Pick<
       ParamsOf<'queue_add'>,
-      'workflow' | 'task' | 'groups' | 'title' | 'autoDeliver' | 'deliveryMode' | 'skip' | 'after'
+      | 'workflow'
+      | 'task'
+      | 'groups'
+      | 'title'
+      | 'autoDeliver'
+      | 'deliveryMode'
+      | 'skip'
+      | 'after'
+      | 'postponed'
     > &
       Pick<ParamsOf<'queue_add'>, 'tags'>,
     inherited?: string[],
   ): Promise<unknown> {
-    const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
+    const { workflow, task, groups, title, autoDeliver, deliveryMode, skip, postponed } = params;
     const own = inherited ?? resolveTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
@@ -1115,7 +1134,7 @@ export class Daemon {
     const tags = this.inheritTags(queue, own, after);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
+      { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after, postponed },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -1430,6 +1449,6 @@ function queueSignature(view: QueueView): string {
     skipped: view.skipped,
     autoDeliver: view.autoDeliver,
     deliveryMode: view.deliveryMode,
-    items: view.items.map((item) => [item.id, item.readiness, item.after]),
+    items: view.items.map((item) => [item.id, item.readiness, item.after, item.postponed]),
   });
 }

@@ -233,7 +233,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     if (attempt.outsideChanges.length === 0) continue;
     lines.push(
       style.warning(
-        `Warning: step ${attempt.stepId} changed files outside its worktree: ${attempt.outsideChanges.join(', ')}`,
+        `Warning: files in the working copy changed during step ${attempt.stepId}: ${attempt.outsideChanges.join(', ')}`,
       ),
     );
   }
@@ -402,10 +402,11 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
       item.after.length === 0
         ? ''
         : ` · after ${item.after.map((dependency) => dependency.id).join(', ')}${mark}`;
+    const postponed = item.postponed ? ' · postponed' : '';
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     const returned = item.run === null ? '' : ` · returns ${style.accent(item.run)}`;
     lines.push(
-      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${returned}  added ${addedAt(item.createdAt)}${error}`,
+      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );
   }
   return lines.join('\n');

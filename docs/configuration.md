@@ -107,8 +107,8 @@ This section is set in the shared `settings.yaml` only: there is one panel per d
 
 ### `outside_changes`
 
-Before and after each step, `aip` compares the `git status` of your main working copy (`workspace_dir` is not part of the comparison):
-- `warn` (the default) shows the changed files as a warning in `aip group` and as a separate collapsible block in the `aip web` panel, and the work continues;
+Before and after each step, `aip` compares the content of the files that differ from `HEAD` in your main working copy (`workspace_dir` is not part of the comparison). A commit that does not edit a file, a change of only its modification time, and the deliveries `aip` itself makes do not count. The list means "changed while the step ran", not "changed by the specialist": you or another program may have changed those files.
+- `warn` (the default) shows the changed files as a warning (`Warning: files in the working copy changed during step <step>: …`) in `aip group` and as a separate collapsible block in the `aip web` panel, and the work continues;
 - `stop` stops the group in `needs_human`; continue with `aip group answer`;
 - `off` skips the comparison.
 

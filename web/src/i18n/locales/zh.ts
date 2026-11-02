@@ -229,8 +229,8 @@ export const zh: Dictionary = {
       round: '第 {{round}} 轮',
       denialsTitle: '被专员权限拒绝的命令',
       denials: '拒绝：{{n}}',
-      outsideTitle: '在 worktree 之外修改的文件',
-      outside: 'worktree 之外：{{n}}',
+      outsideTitle: '步骤期间工作副本中变化的文件',
+      outside: '工作副本：{{n}}',
       retryStep: '重试步骤',
       denialsLabel: '权限拒绝',
       denialsHeading: '权限拒绝',
@@ -273,7 +273,9 @@ export const zh: Dictionary = {
       label: '已修改的文件',
     },
     outside: {
-      title: '步骤 {{step}}（#{{seq}}）在其 worktree 之外修改了 {{files}}',
+      title_one: '步骤 {{step}}（#{{seq}}）期间工作副本中有 {{count}} 个文件发生了变化',
+      title_other: '步骤 {{step}}（#{{seq}}）期间工作副本中有 {{count}} 个文件发生了变化',
+      hint: '可能是专家、您或其他程序修改的。aip 的交付不计入。',
     },
     config: {
       label: '配置错误',
@@ -398,6 +400,9 @@ export const zh: Dictionary = {
     list: {
       after: '在此之后：{{title}}',
       linked: '与所选任务相关',
+      active: '进行中',
+      postponed: '已推迟',
+      activeHint: '已推迟的任务保留在原位，但运行中的队列不会领取它',
       readyHint: '无需等待：一有空位任务就会开始',
       unmetTitle: '依赖未满足',
       unmetText: '该任务仍在等待：{{items}}。仍要运行吗？',

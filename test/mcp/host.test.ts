@@ -32,6 +32,7 @@ const VIEW: QueueView & { item: string } = {
       skip: [],
       readiness: 'ready',
       after: [],
+      postponed: false,
       createdAt: 1,
       error: null,
       run: null,
@@ -130,6 +131,35 @@ describe('host MCP queue tools', () => {
         params: { repository: '/repo', workflow: 'feature', task: 'x', autoDeliver: true },
       },
       { method: 'queue_add', params: { repository: '/repo', workflow: 'feature', task: 'y' } },
+    ]);
+  });
+
+  it('passes postponed only when it is given and shows it in the answer', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return {
+        ...VIEW,
+        items: [{ ...VIEW.items[0]!, postponed: params.postponed === true }],
+      };
+    });
+    const edited = await client.callTool({
+      name: 'swarm_queue_edit',
+      arguments: { item: 'q1', postponed: true },
+    });
+    expect(textOf(edited)).toContain('postponed');
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'y', postponed: true },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 't' } });
+    expect(calls).toEqual([
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', postponed: true } },
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'y', postponed: true },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 't' } },
     ]);
   });
 
