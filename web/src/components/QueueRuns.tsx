@@ -2,25 +2,47 @@ import { Truck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
-import { duration } from '../format.ts';
+import { useState, type ReactNode } from 'react';
+
+import type { Api } from '../api.ts';
+import { clock, duration } from '../format.ts';
+import { notifySuccess } from '../notify.ts';
 import { cn } from '../lib/cn.ts';
 import { formatRoute } from '../route.ts';
 import type { QueueRunView, QueueView } from '../types.ts';
 
+import { Button } from '../ui/button.tsx';
 import { Card } from '../ui/card.tsx';
 
 import { StatusBadge } from './StatusBadge.tsx';
 import { TagChips } from './TagChip.tsx';
 import { WorkflowBadge } from './WorkflowBadge.tsx';
 
-const REASONS = ['needs_human', 'failed', 'conflict', 'cancelled', 'apply_failed'] as const;
+const REASONS = [
+  'needs_human',
+  'failed',
+  'conflict',
+  'cancelled',
+  'apply_failed',
+  'usage_limit',
+] as const;
 
 function reasonText(reason: string, t: TFunction): string {
   const known = REASONS.find((candidate) => candidate === reason);
   return known ? t(`queue.reasons.${known}`) : reason;
 }
 
-function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked: boolean }) {
+function RunCard({
+  run,
+  now,
+  linked,
+  action = null,
+}: {
+  run: QueueRunView;
+  now: number;
+  linked: boolean;
+  action?: ReactNode;
+}) {
   const { t } = useTranslation();
   const { total } = run.groups;
   const { steps } = run;
@@ -67,6 +89,11 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
       </div>
       <div className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
         <span>{t('format.running', { duration: duration(now - run.createdAt) })}</span>
+        {run.limitUntil !== null ? (
+          <span className="text-status-warn">
+            {t('runs.group.limitUntil', { time: clock(run.limitUntil) })}
+          </span>
+        ) : null}
       </div>
       {total === 0 ? (
         <span className="text-muted-foreground">{t('queue.splitting')}</span>
@@ -109,20 +136,60 @@ function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked:
           </a>
         </div>
       ) : null}
+      {action ? <div>{action}</div> : null}
     </Card>
   );
 }
 
 /** Runs taken off the places by a stopping problem; they do not count as places taken. */
-function SkippedRuns({ queue, now }: { queue: QueueView; now: number }) {
+function SkippedRuns({
+  queue,
+  now,
+  api,
+  onQueue,
+  onError,
+}: {
+  queue: QueueView;
+  now: number;
+  api: Api;
+  onQueue: (queue: QueueView) => void;
+  onError: (message: string) => void;
+}) {
   const { t } = useTranslation();
+  const [returning, setReturning] = useState<string | null>(null);
+  const putBack = async (run: string) => {
+    setReturning(run);
+    try {
+      onQueue(await api.queueReturn(run, queue.repository));
+      notifySuccess(t('queue.returned'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setReturning(null);
+    }
+  };
   return (
     <section aria-label={t('queue.skippedLabel')}>
       <h3 className="mb-2 font-semibold">{t('queue.skipped', { count: queue.skipped.length })}</h3>
       <ul className="grid gap-2 sm:grid-cols-2">
         {queue.skipped.map((run) => (
           <li key={run.id} className="min-w-0">
-            <RunCard run={run} now={now} linked={false} />
+            <RunCard
+              run={run}
+              now={now}
+              linked={false}
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={returning === run.id}
+                  disabled={returning !== null}
+                  onClick={() => void putBack(run.id)}
+                >
+                  {t('queue.returnRun')}
+                </Button>
+              }
+            />
           </li>
         ))}
       </ul>
@@ -134,16 +201,25 @@ function SkippedRuns({ queue, now }: { queue: QueueView; now: number }) {
 export function QueueRuns({
   queue,
   now,
+  api,
+  onQueue,
+  onError,
   highlight = null,
 }: {
   queue: QueueView;
   now: number;
+  api: Api;
+  onQueue: (queue: QueueView) => void;
+  onError: (message: string) => void;
   /** Ids linked to the item under the pointer or the focus. */
   highlight?: Set<string> | null;
 }) {
   const { t } = useTranslation();
   const running = queue.status === 'running';
-  const skipped = queue.skipped.length > 0 ? <SkippedRuns queue={queue} now={now} /> : null;
+  const skipped =
+    queue.skipped.length > 0 ? (
+      <SkippedRuns queue={queue} now={now} api={api} onQueue={onQueue} onError={onError} />
+    ) : null;
   if (queue.runs.length === 0 && !running) return skipped;
   const free = running ? Math.max(0, queue.parallel - queue.runs.length) : 0;
   return (

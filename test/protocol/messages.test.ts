@@ -169,7 +169,7 @@ describe('queue requests', () => {
     bad('queue_settings', { repository: '/r', skipFailed: 1 });
     const error = parse('queue_settings', { repository: '/r' });
     expect(JSON.stringify(error)).toContain(
-      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
     );
   });
 

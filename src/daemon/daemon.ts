@@ -41,6 +41,11 @@ import {
   mergeTags,
   moveItem,
   pauseQueue,
+  acknowledgeRun,
+  retryableGroups,
+  returnRun,
+  queueWakeAt,
+  limitHolds,
   queueItemId,
   removeItem,
   removeTag,
@@ -62,6 +67,7 @@ import {
   workflowTopology,
   type Event,
   type PermissionsRefresh,
+  type OnLimit,
   type Queue,
   type QueueItem,
   type RunState,
@@ -112,6 +118,10 @@ import { Executor, type AttemptKey } from './executor.ts';
 import { readLines, readTail } from './logs.ts';
 
 const NO_PANEL = 'this daemon serves no web panel';
+/** A timer fires this long after a usage limit resets, so the reset has surely passed. */
+const WAKE_MARGIN_MS = 1000;
+/** The longest delay `setTimeout` keeps. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /** The web panel the daemon serves; implemented outside the daemon layer and passed in. */
 export interface PanelControl {
@@ -155,6 +165,7 @@ export class Daemon {
   private readonly registry = new Map<string, KnownRepository>();
   private repositoriesJson = '';
   private catalog: Tag[] = [];
+  private wakeTimer: NodeJS.Timeout | null = null;
 
   constructor(options: DaemonOptions) {
     this.store = new Store(databasePath(options.stateDirectory));
@@ -174,6 +185,12 @@ export class Daemon {
     await this.serial(async () => {
       const recovered = this.store.recover(this.now());
       for (const { state } of recovered) this.states.set(state.run.id, state);
+      // Finished runs whose usage limit may still hold a runtime.
+      for (const id of this.store.limitedRunIds()) {
+        if (this.states.has(id)) continue;
+        const state = this.store.loadRun(id);
+        if (state && limitHolds([state], this.now()).size > 0) this.states.set(id, state);
+      }
       const latest = [...this.states.values()].sort((a, b) => b.run.createdAt - a.run.createdAt)[0];
       if (latest) this.max = latest.run.config.max;
       for (const queue of this.store.queues()) this.queues.set(queue.repository, queue);
@@ -183,7 +200,12 @@ export class Daemon {
       for (const { state, effects } of recovered) await this.executor.perform(state, effects);
       await this.schedule();
       for (const queue of [...this.queues.values()]) {
-        if (queue.status === 'running' || queue.runs.length > 0 || queue.skipped.length > 0) {
+        if (
+          queue.status === 'running' ||
+          queue.runs.length > 0 ||
+          queue.skipped.length > 0 ||
+          queue.stop?.kind === 'limit'
+        ) {
           await this.advanceQueue(queue.repository);
         }
       }
@@ -213,6 +235,11 @@ export class Daemon {
       this.advanceRequested.delete(repository);
       if (!this.stopping) await this.advanceQueue(repository);
     }).catch(() => undefined);
+  }
+
+  /** What a usage limit does to the groups of the repository's runs: the queue's setting. */
+  onLimitOf(repository: string): OnLimit {
+    return this.queueFor(repository).onLimit;
   }
 
   private queueFor(repository: string): Queue {
@@ -367,6 +394,12 @@ export class Daemon {
     let failed = false;
     for (const item of take) {
       try {
+        if (item.run !== null) {
+          await this.takeReturned(queue, item);
+          this.store.saveQueue(queue);
+          changed = true;
+          continue;
+        }
         const created = await this.createRun(
           itemParams(queue, item),
           knownTags(this.catalog, item.tags),
@@ -391,7 +424,56 @@ export class Daemon {
     if ((take.length > 0 && queue.runs.length > 0) || (failed && queue.status === 'running')) {
       this.requestAdvance(repository);
     }
+    this.armWake();
     return started;
+  }
+
+  /**
+   * Takes a returned run: retries its failed and cancelled groups, and the run holds a place in
+   * the queue instead of the item.
+   */
+  private async takeReturned(queue: Queue, item: QueueItem): Promise<RunCreated> {
+    const id = item.run as string;
+    const state = this.lookupState(id);
+    if (!state) throw new Rejection(`unknown run \`${id}\``);
+    const groups = retryableGroups(state);
+    if (groups.length === 0) throw new Rejection('run has no failed or cancelled groups');
+    for (const group of groups) {
+      await this.apply(state, {
+        kind: 'retry',
+        group,
+        permissions: this.currentPermissions(state),
+      });
+    }
+    acknowledgeRun(queue, state);
+    itemStarted(queue, item.id, id, this.now());
+    return {
+      runId: id,
+      branch: state.run.branch,
+      groups: state.groups.map((group) => ({ slug: group.slug, title: group.title })),
+      split: state.split !== null,
+      warnings: [],
+    };
+  }
+
+  /** `queue_return`: the run goes back to the queue as its first item. */
+  private returnToQueue(params: ParamsOf<'queue_return'>): Promise<unknown> {
+    return this.serial(async () => {
+      const state = this.state(params.runId);
+      if (params.repository !== undefined) {
+        const root = await this.rootOf(params.repository);
+        if (root !== state.run.repository) {
+          throw new Rejection('run belongs to another repository');
+        }
+      }
+      const queue = this.queueFor(state.run.repository);
+      const now = this.now();
+      const item = returnRun(queue, state, queueItemId(now, randomInt(36 ** 3)), now);
+      this.saveQueue(queue);
+      this.broadcast(state);
+      await this.advanceQueue(state.run.repository);
+      return { ...this.queueSnapshot(queue), item: item.id };
+    });
   }
 
   /** Rejects an unknown workflow or a `skip` that does not fit it. */
@@ -411,7 +493,9 @@ export class Daemon {
     if (error !== null) throw new Rejection(error);
   }
 
-  private queueRequest(request: Extract<Request, { method: `queue${string}` }>): Promise<unknown> {
+  private queueRequest(
+    request: Exclude<Extract<Request, { method: `queue${string}` }>, { method: 'queue_return' }>,
+  ): Promise<unknown> {
     return this.serial(async () => {
       const repository = await this.rootOf(request.params.repository);
       const queue = this.queueFor(repository);
@@ -499,8 +583,13 @@ export class Daemon {
           return this.saveQueue(queue);
         case 'queue_settings': {
           const { parallel, autopilot, skipFailed, autopilotAnswer } = request.params;
+          const onLimit = request.params.onLimit as OnLimit | undefined;
           const enablesAutopilot = autopilot === true && !queue.autopilot;
-          setQueueSettings(queue, { parallel, autopilot, skipFailed, autopilotAnswer }, now);
+          setQueueSettings(
+            queue,
+            { parallel, autopilot, skipFailed, autopilotAnswer, onLimit },
+            now,
+          );
           if (enablesAutopilot && queue.status === 'stopped' && queue.stop === null) {
             startQueue(
               queue,
@@ -515,6 +604,11 @@ export class Daemon {
         case 'queue_run_now': {
           const item = queue.items.find((candidate) => candidate.id === request.params.item);
           if (!item) throw new Rejection('unknown queue item');
+          if (item.run !== null) {
+            const resumed = await this.takeReturned(queue, item);
+            this.saveQueue(queue);
+            return resumed;
+          }
           const created = await this.createRun(
             itemParams(queue, item),
             knownTags(this.catalog, item.tags),
@@ -537,12 +631,22 @@ export class Daemon {
 
   private view(state: RunState, now = this.now()): RunView {
     this.ensureDiffs(state);
-    return runView(
+    const view = runView(
       state,
       now,
       (slug) => this.diffs.get(`${state.run.id}/${slug}`) ?? null,
       this.catalog,
     );
+    return { ...view, returnable: this.returnable(state) };
+  }
+
+  /** Whether `queue_return` would take the run: something to retry, and not in its queue yet. */
+  private returnable(state: RunState): boolean {
+    if (retryableGroups(state).length === 0) return false;
+    const queue = this.queues.get(state.run.repository);
+    if (!queue) return true;
+    const id = state.run.id;
+    return !queue.runs.includes(id) && !queue.items.some((item) => item.run === id);
   }
 
   /** Computes missing diff statistics of a run in the background, then publishes them. */
@@ -616,8 +720,42 @@ export class Daemon {
     return () => this.subscribers.delete(send);
   }
 
+  /**
+   * Sets the timer to the nearest moment a usage limit resets: a held runtime may start its
+   * steps again, a queue stopped by the limit may start by itself.
+   */
+  private armWake(): void {
+    if (this.wakeTimer) clearTimeout(this.wakeTimer);
+    this.wakeTimer = null;
+    if (this.stopping) return;
+    const now = this.now();
+    const moments = [
+      ...limitHolds(this.states.values(), now).values(),
+      ...[...this.queues.values()].flatMap((queue) => queueWakeAt(queue) ?? []),
+    ];
+    if (moments.length === 0) return;
+    const delay = Math.min(Math.max(Math.min(...moments) - now, 0) + WAKE_MARGIN_MS, MAX_TIMER_MS);
+    this.wakeTimer = setTimeout(() => {
+      this.wakeTimer = null;
+      void this.serial(() => this.wake()).catch(() => undefined);
+    }, delay);
+    this.wakeTimer.unref();
+  }
+
+  /** Starts the steps whose usage limit reset and the queues that resume after it. */
+  async wake(): Promise<void> {
+    if (this.stopping) return;
+    await this.schedule();
+    for (const queue of [...this.queues.values()]) {
+      if (queue.stop?.kind === 'limit') await this.advanceQueue(queue.repository);
+    }
+    this.armWake();
+  }
+
   async stop(): Promise<void> {
     this.stopping = true;
+    if (this.wakeTimer) clearTimeout(this.wakeTimer);
+    this.wakeTimer = null;
     await this.executor.stopAll();
     await this.queue.catch(() => undefined);
     this.store.close();
@@ -658,7 +796,9 @@ export class Daemon {
   async schedule(): Promise<void> {
     if (this.stopping) return;
     const active = [...this.states.values()].filter((state) => state.run.finishedAt === null);
-    const effects = dispatch(active, this.max, this.now());
+    // Finished runs too: a usage limit of a failed run still holds its runtime.
+    const effects = dispatch([...this.states.values()], this.max, this.now());
+    this.armWake();
     if (effects.length === 0) return;
     for (const state of active) this.save(state);
     for (const effect of effects) {
@@ -810,6 +950,8 @@ export class Daemon {
       case 'queue_settings':
       case 'queue_run_now':
         return this.queueRequest(request);
+      case 'queue_return':
+        return this.returnToQueue(request.params);
     }
   }
 

@@ -137,6 +137,10 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE queue_items ADD COLUMN delivery_mode TEXT;
   ALTER TABLE queues ADD COLUMN autopilot_answer TEXT;
   `,
+  `
+  ALTER TABLE queues ADD COLUMN on_limit TEXT NOT NULL DEFAULT 'wait';
+  ALTER TABLE queue_items ADD COLUMN run_id TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

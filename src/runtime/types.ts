@@ -48,6 +48,8 @@ export interface RunOutcome {
   error: string | null;
   /** Tool calls the agent CLI refused, each once. */
   denials: Denial[];
+  /** The agent CLI stopped because its usage limit ran out; `resetsAt` in ms or null. */
+  usageLimit?: { resetsAt: number | null } | null;
 }
 
 export interface OutputParser {

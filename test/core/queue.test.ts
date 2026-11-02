@@ -801,7 +801,7 @@ describe('queue settings', () => {
   it('refuses an empty patch and a wrong parallel without a change', () => {
     const queue = emptyQueue('/repo', 1);
     expect(() => setQueueSettings(queue, {}, 2)).toThrow(
-      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
     );
     expect(() => setQueueSettings(queue, { parallel: 0, autopilot: true }, 2)).toThrow(
       /parallel must be/,

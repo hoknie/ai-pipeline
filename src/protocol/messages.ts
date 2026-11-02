@@ -267,15 +267,22 @@ export const requestSchema = z.discriminatedUnion('method', [
         autopilot: z.boolean().optional(),
         skipFailed: z.boolean().optional(),
         autopilotAnswer: z.string().trim().min(1).max(RECOMMENDATION_LIMIT).nullable().optional(),
+        // Checked by the queue, so an unknown value gets its own error.
+        onLimit: z.string().optional(),
       })
       .refine(
         (params) =>
           params.parallel !== undefined ||
           params.autopilot !== undefined ||
           params.skipFailed !== undefined ||
-          params.autopilotAnswer !== undefined,
-        { message: 'pass parallel, autopilot, autopilotAnswer or skipFailed' },
+          params.autopilotAnswer !== undefined ||
+          params.onLimit !== undefined,
+        { message: 'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit' },
       ),
+  }),
+  z.object({
+    method: z.literal('queue_return'),
+    params: z.object({ runId: z.string().min(1), repository: queueRepository.optional() }),
   }),
   z.object({
     method: z.literal('queue_run_now'),

@@ -141,10 +141,13 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
+    expect(store.loadQueue('/repo')?.items[0]?.run).toBeNull();
     expect(store.loadRun('run000000001')?.run.queueItem).toBeNull();
     store.close();
   });
@@ -173,15 +176,36 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')).toMatchObject({
       autopilot: false,
       skipFailed: false,
       skipped: [],
+      onLimit: 'wait',
     });
     store.close();
+  });
+
+  it('keeps onLimit, a stop by a usage limit and a returned run', () => {
+    const store = temporaryStore();
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'первая' }, 'q1', 2);
+    queue.items[0]!.run = 'r1';
+    queue.onLimit = 'stop';
+    queue.stop = {
+      kind: 'limit',
+      run: 'r1',
+      group: 'a',
+      runtime: 'claude',
+      resetsAt: 50_000,
+      autoResume: true,
+    };
+    store.saveQueue(queue);
+    expect(store.loadQueue('/repo')).toEqual(queue);
   });
 
   it('keeps the queue origin of a run', () => {
@@ -376,7 +400,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-11)).toContain('denials_json');
+    expect(MIGRATIONS.at(-12)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -399,7 +423,7 @@ describe('refused tool calls', () => {
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-10)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-11)).toContain('outside_changes_json');
   });
 });
 
@@ -442,7 +466,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(14);
+    expect(SCHEMA_VERSION).toBe(15);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -512,7 +536,9 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -542,7 +568,9 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -622,7 +650,9 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);

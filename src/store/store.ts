@@ -8,6 +8,7 @@ import {
 } from '../config/index.ts';
 import {
   MESSAGE_GROUP,
+  ON_LIMIT_MODES,
   RESOLVE_GROUP,
   SPLIT_GROUP,
   allGroups,
@@ -226,6 +227,16 @@ export class Store {
     });
   }
 
+  /** Ids of the runs with an attempt that ran out of a usage limit. */
+  limitedRunIds(): string[] {
+    const rows = this.database
+      .prepare(
+        `SELECT DISTINCT run_id FROM attempts WHERE reason_json LIKE '%"usage_limit"%' ORDER BY run_id`,
+      )
+      .all() as Row[];
+    return rows.map((row) => String(row.run_id));
+  }
+
   loadQueue(repository: string): Queue | null {
     const row = this.database
       .prepare('SELECT * FROM queues WHERE repository = ?')
@@ -297,9 +308,9 @@ export class Store {
     this.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit`,
         )
         .run(
           queue.repository,
@@ -313,11 +324,12 @@ export class Store {
           queue.skipFailed ? 1 : 0,
           JSON.stringify(queue.skipped),
           queue.autopilotAnswer,
+          queue.onLimit,
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -335,6 +347,7 @@ export class Store {
           JSON.stringify(item.skip),
           JSON.stringify(item.after),
           item.deliveryMode,
+          item.run,
         ),
       );
     });
@@ -353,6 +366,7 @@ export class Store {
       skipFailed: Number(row.skip_failed ?? 0) === 1,
       skipped: row.skipped_json ? parse(row.skipped_json) : [],
       autopilotAnswer: text(row.autopilot_answer ?? null),
+      onLimit: ON_LIMIT_MODES.find((mode) => mode === row.on_limit) ?? 'wait',
       items: items.map((item): QueueItem => ({
         id: String(item.id),
         workflow: String(item.workflow),
@@ -369,6 +383,7 @@ export class Store {
         after: item.after_json ? parse(item.after_json) : [],
         createdAt: Number(item.created_at),
         error: text(item.error ?? null),
+        run: text(item.run_id ?? null),
       })),
       runs: parse(row.runs_json ?? null),
       acknowledged: parse(row.acknowledged_json ?? null),

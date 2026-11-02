@@ -86,3 +86,16 @@ export function questionKey(prefix: string, index: number, text: string): string
   }
   return `${prefix}/q${index}/${hash.toString(16).padStart(8, '0')}`;
 }
+
+/** Local `HH:MM` of a moment. */
+export function clock(timestamp: number): string {
+  const date = new Date(timestamp);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/** A group failure reason for people; a usage limit is translated, other reasons stay as they are. */
+export function reasonLabel(reason: string, t: TFunction): string {
+  const limit = /^usage limit(?:, resets (\d\d:\d\d))?$/.exec(reason);
+  if (!limit) return reason;
+  return limit[1] ? t('runs.group.limitReasonAt', { time: limit[1] }) : t('runs.group.limitReason');
+}

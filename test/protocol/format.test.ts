@@ -465,6 +465,7 @@ describe('colored text', () => {
       deliveryMode: 'worktree' as const,
       autopilotAnswer: null,
       autopilotAnswerDefault: 'default',
+      onLimit: 'wait' as const,
       updatedAt: 1,
     };
     expect(ansi(formatQueue(queue, style)).split('\n')[0]).toContain('◦ stopped');
@@ -597,5 +598,56 @@ describe('tags in text', () => {
     ]);
     expect(filterByTags([a, b, c], ['auth']).map((entry) => entry.id)).toEqual(['run00000000a']);
     expect(filterByTags([a, b, c], ['nope'])).toEqual([]);
+  });
+});
+
+describe('usage limit in the text output', () => {
+  const RESET = new Date(2026, 10, 2, 20, 50).getTime();
+
+  it('shows the stop by a usage limit and a returned run in the queue', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'работа' }, 'q1', 2);
+    queue.items[0]!.run = 'run000000001';
+    queue.stop = {
+      kind: 'limit',
+      run: 'A',
+      group: 'a',
+      runtime: 'claude',
+      resetsAt: RESET,
+      autoResume: true,
+    };
+    queue.onLimit = 'stop';
+    const text = formatQueue(queueView(queue, () => run(1)));
+    expect(text.split('\n')[0]).toMatch(/, on limit stop$/);
+    expect(text).toContain(
+      'Stopped: usage limit of claude in A, resets 20:50, resumes automatically',
+    );
+    expect(text).toContain('returns run000000001');
+    queue.stop.autoResume = false;
+    expect(formatQueue(queueView(queue, () => run(1)))).toContain(
+      'Stopped: usage limit of claude in A, resets 20:50\n',
+    );
+  });
+
+  it('shows a group waiting for the limit', () => {
+    const state = run(1);
+    step(state);
+    const seq = group(state).attempts[0]!.seq;
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq,
+        exit: {
+          sessionId: 's',
+          usage: null,
+          failure: { kind: 'usage_limit', resetsAt: RESET },
+          outsideChanges: [],
+        },
+      },
+      2000,
+    );
+    expect(formatRun(runView(state, 3000), 3000)).toContain('queued (usage limit, until 20:50)');
   });
 });

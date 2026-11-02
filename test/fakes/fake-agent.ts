@@ -32,6 +32,11 @@ interface Action {
   exitCode?: number;
   /** Refused shell commands, reported the way Claude Code does: as events and in the result. */
   denied?: string[];
+  /**
+   * The fake claude stops without a report the way Claude Code does when the usage limit ran out;
+   * `resetsAt` in seconds of the epoch, absent: no reset time.
+   */
+  usageLimit?: { resetsAt?: number };
 }
 
 const [mode, ...args] = process.argv.slice(2);
@@ -213,6 +218,40 @@ if (action.hang) await new Promise(() => setInterval(() => undefined, 1000));
 
 const session =
   mode === 'claude' ? (option('--session-id') ?? option('--resume') ?? 'none') : 'ses_fake';
+if (action.usageLimit && mode === 'claude') {
+  const info = {
+    status: 'rejected',
+    rateLimitType: 'five_hour',
+    ...(action.usageLimit.resetsAt === undefined ? {} : { resetsAt: action.usageLimit.resetsAt }),
+  };
+  const text = "You've hit your 5-hour limit";
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: session }));
+  console.log(
+    JSON.stringify({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text }] },
+      session_id: session,
+      error: 'rate_limit',
+      api_error_status: 429,
+      api_error: 'usage_limit_reached',
+      api_error_params: { rate_limit_info: info },
+    }),
+  );
+  console.log(
+    JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: true,
+      api_error_status: 429,
+      api_error: 'usage_limit_reached',
+      result: text,
+      session_id: session,
+      total_cost_usd: 0,
+    }),
+  );
+  process.exit(1);
+}
+
 if (!action.noReport) {
   const client = new Client({ name: 'fake-agent', version: '0' });
   await client.connect(

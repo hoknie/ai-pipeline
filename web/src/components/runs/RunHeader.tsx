@@ -45,6 +45,18 @@ export function RunHeader({
   const [retrying, setRetrying] = useState(false);
   const [applying, setApplying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [returning, setReturning] = useState(false);
+  const putBack = async () => {
+    setReturning(true);
+    try {
+      await api.queueReturn(run.id, run.repository);
+      notifySuccess(t('runs.header.returned'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setReturning(false);
+    }
+  };
   const [tagging, setTagging] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
   const { byId } = useTags();
@@ -199,6 +211,11 @@ export function RunHeader({
             <RotateCcw className={retrying ? 'motion-safe:animate-spin' : undefined} />
             {hasCancelled ? t('runs.header.retryFailedCancelled') : t('runs.header.retryFailed')} (
             {failed.length})
+          </Button>
+        ) : null}
+        {run.returnable ? (
+          <Button variant="outline" loading={returning} onClick={() => void putBack()}>
+            {t('runs.header.returnRun')}
           </Button>
         ) : null}
         <Button loading={applying} disabled={!deliverable} onClick={() => void apply(false)}>

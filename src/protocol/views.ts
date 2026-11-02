@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { DeliveryMode } from '../config/index.ts';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
+  allGroups,
   attemptVerdict,
   stepProgress,
   type StepProgress,
@@ -16,6 +17,7 @@ import {
   isSplitGroup,
   isTerminal,
   itemReadiness,
+  limitResetsAt,
   dependencyState,
   knownTags,
   occupiesSlot,
@@ -29,7 +31,9 @@ import {
   type Group,
   type ItemReadiness,
   type NewGroup,
+  type OnLimit,
   type Queue,
+  type QueueItem,
   type QueueStop,
   type ProblemReason,
   runProblems,
@@ -129,6 +133,8 @@ export interface GroupRow {
   warnings: number;
   delivery: GroupDelivery['state'];
   diff: DiffTotals | null;
+  /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
+  limitUntil: number | null;
 }
 
 export interface SplitRow {
@@ -169,6 +175,8 @@ export interface RunView {
   deliveryMode: DeliveryMode;
   /** Created by a task queue. */
   fromQueue: boolean;
+  /** The run can go back to its queue: it has failed or cancelled groups and is not in the queue. */
+  returnable: boolean;
   tags: TagView[];
   counts: string;
   total: number;
@@ -234,6 +242,8 @@ export interface GroupView {
   question: string | null;
   questions: HumanQuestion[] | null;
   reason: string | null;
+  /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
+  limitUntil: number | null;
   warnings: string[];
   conflictFiles: string[];
   delivery: GroupDelivery;
@@ -285,6 +295,12 @@ export function legacyOutsideChanges(group: Group): {
   return { warnings: kept, outside };
 }
 
+/** When a group waiting for a usage limit to reset may start again; null for other groups. */
+export function groupLimitUntil(group: Group): number | null {
+  const last = group.attempts.at(-1);
+  return group.status === 'queued' && last ? limitResetsAt(last) : null;
+}
+
 export function groupRow(group: Group, now: number, diffs: DiffLookup = NO_DIFFS): GroupRow {
   const legacy = legacyOutsideChanges(group);
   const last = group.attempts.at(-1);
@@ -305,6 +321,7 @@ export function groupRow(group: Group, now: number, diffs: DiffLookup = NO_DIFFS
       ).length,
     delivery: group.delivery.state,
     diff: totals(diffs(group.slug)),
+    limitUntil: groupLimitUntil(group),
   };
 }
 
@@ -353,6 +370,7 @@ export function runView(
     autoDeliver: state.run.config.delivery.auto,
     deliveryMode: state.run.config.delivery.mode,
     fromQueue: state.run.fromQueue,
+    returnable: false,
     tags: tagViews(catalog, state.run.tags),
     counts: formatCounts(summary),
     total: summary.total,
@@ -460,6 +478,7 @@ export function groupView(
     question: group.question,
     questions: group.questions,
     reason: group.reason,
+    limitUntil: groupLimitUntil(group),
     warnings: legacy.warnings,
     conflictFiles: [...group.conflictFiles],
     delivery: {
@@ -547,6 +566,8 @@ export interface QueueItemView {
   after: DependencyView[];
   createdAt: number;
   error: string | null;
+  /** A returned run: taking the item retries it; null for a new task. */
+  run: string | null;
 }
 
 export interface DependencyView {
@@ -573,6 +594,8 @@ export interface QueueRunView {
   delivering: boolean;
   /** Problem that keeps the user's attention, if any. */
   problem: { group: string | null; reason: ProblemReason } | null;
+  /** The latest moment a group of the run waits for its usage limit to reset; null when none waits. */
+  limitUntil: number | null;
 }
 
 export interface QueueView {
@@ -588,6 +611,8 @@ export interface QueueView {
   /** Text of the autopilot's answers; null: the default text. */
   autopilotAnswer: string | null;
   autopilotAnswerDefault: string;
+  /** What a usage limit does: the group waits for the reset, or fails. */
+  onLimit: OnLimit;
   stop: QueueStop | null;
   items: QueueItemView[];
   /** Runs of the queue that still occupy a place. */
@@ -619,6 +644,26 @@ function queueRunView(state: RunState, catalog: readonly Tag[], stopping: boolea
       .map((group) => ({ group: group.slug, step: group.attempts.at(-1)?.stepId ?? null })),
     delivering: isRunFinished(state) && occupiesSlot(state),
     problem: problem ? { group: problem.group, reason: problem.reason } : null,
+    limitUntil: allGroups(state).reduce<number | null>((latest, group) => {
+      const until = groupLimitUntil(group);
+      return until === null ? latest : Math.max(latest ?? 0, until);
+    }, null),
+  };
+}
+
+/** The task of an item; a returned run shows the task of the run. */
+function itemBody(
+  item: QueueItem,
+  lookup: (id: string) => RunState | undefined,
+): Pick<QueueItemView, 'task' | 'groups'> {
+  if (item.run === null) return { task: item.task, groups: item.groups };
+  const state = lookup(item.run);
+  if (!state) return { task: null, groups: null };
+  if (state.split) return { task: state.split.task, groups: null };
+  if (state.groups.length === 1) return { task: state.groups[0]!.task, groups: null };
+  return {
+    task: null,
+    groups: state.groups.map((group) => ({ title: group.title, task: group.task })),
   };
 }
 
@@ -646,13 +691,13 @@ export function queueView(
     deliveryMode,
     autopilotAnswer: queue.autopilotAnswer,
     autopilotAnswerDefault: DEFAULT_AUTOPILOT_ANSWER,
+    onLimit: queue.onLimit,
     stop: queue.stop,
     items: queue.items.map((item, index) => ({
       id: item.id,
       position: index + 1,
       workflow: item.workflow,
-      task: item.task,
-      groups: item.groups,
+      ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,
       deliveryMode: item.deliveryMode,
@@ -671,6 +716,7 @@ export function queueView(
       }),
       createdAt: item.createdAt,
       error: item.error,
+      run: item.run,
     })),
     runs,
     skipped,

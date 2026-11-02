@@ -59,7 +59,22 @@ export type FailReason =
   | { kind: 'no_groups' }
   | { kind: 'runtime_not_found'; runtime: string }
   | { kind: 'spawn'; message: string }
-  | { kind: 'git'; message: string };
+  | { kind: 'git'; message: string }
+  /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
+  | { kind: 'usage_limit'; resetsAt: number | null };
+
+/** What a usage limit does to a group: wait for the reset or fail. */
+export const ON_LIMIT_MODES = ['wait', 'stop'] as const;
+export type OnLimit = (typeof ON_LIMIT_MODES)[number];
+
+/** How long a usage limit holds when the runtime did not say when it resets. */
+export const USAGE_LIMIT_FALLBACK_MS = 15 * 60 * 1000;
+
+/** Local `HH:MM` of a moment. */
+export function clockTime(ms: number): string {
+  const date = new Date(ms);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
 
 export function describeFailReason(reason: FailReason): string {
   switch (reason.kind) {
@@ -77,6 +92,10 @@ export function describeFailReason(reason: FailReason): string {
       return `spawn error: ${reason.message}`;
     case 'git':
       return `git: ${reason.message}`;
+    case 'usage_limit':
+      return reason.resetsAt === null
+        ? 'usage limit'
+        : `usage limit, resets ${clockTime(reason.resetsAt)}`;
   }
 }
 

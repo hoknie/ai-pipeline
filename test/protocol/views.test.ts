@@ -326,3 +326,40 @@ describe('queueView delivery mode and autopilot answer', () => {
     expect(runView(run(1, { deliveryMode: 'commit' }), 2000).deliveryMode).toBe('commit');
   });
 });
+
+describe('a group waiting for a usage limit', () => {
+  function limited(onLimit: 'wait' | 'stop') {
+    const state = run(1);
+    step(state);
+    const seq = group(state).attempts.at(-1)!.seq;
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq,
+        exit: {
+          sessionId: 's',
+          usage: null,
+          failure: { kind: 'usage_limit', resetsAt: 50_000 },
+          outsideChanges: [],
+          onLimit,
+        },
+      },
+      2000,
+    );
+    return state;
+  }
+
+  it('shows when the waiting group may start again', () => {
+    const state = limited('wait');
+    const view = runView(state, 3000);
+    expect(view.groups[0]).toMatchObject({ status: 'queued', limitUntil: 50_000 });
+    expect(groupView(state, group(state), '/w', null, 3000).limitUntil).toBe(50_000);
+  });
+
+  it('shows no wait for a group failed on the limit', () => {
+    const state = limited('stop');
+    expect(runView(state, 3000).groups[0]).toMatchObject({ status: 'failed', limitUntil: null });
+  });
+});

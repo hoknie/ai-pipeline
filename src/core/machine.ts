@@ -35,6 +35,7 @@ import {
   type FailReason,
   type Group,
   type HumanQuestion,
+  type OnLimit,
   type ProposedGroup,
   type Report,
   type RunState,
@@ -61,6 +62,8 @@ export interface AttemptExit {
   outsideChanges: string[];
   /** Tool calls the agent CLI refused; absent when the runtime does not report them. */
   denials?: Denial[];
+  /** What a usage limit does to the group: `wait` (default) keeps it queued, `stop` fails it. */
+  onLimit?: OnLimit;
 }
 
 export type Event =
@@ -222,10 +225,18 @@ class Machine {
     attempt.usage = exit.usage;
     attempt.denials = exit.denials ?? [];
     attempt.outsideChanges = [...exit.outsideChanges];
-    const failure = exit.failure ?? (attempt.report === null ? { kind: 'no_report' } : null);
+    // A report sent before the limit ran out counts as usual.
+    const limited = exit.failure?.kind === 'usage_limit' && attempt.report !== null;
+    const failure = limited
+      ? null
+      : (exit.failure ?? (attempt.report === null ? { kind: 'no_report' } : null));
     if (failure !== null) {
       attempt.status = 'failed';
       attempt.reason = failure;
+      if (failure.kind === 'usage_limit' && (exit.onLimit ?? 'wait') === 'wait') {
+        this.waitForLimit(group, attempt);
+        return;
+      }
       this.failGroup(group, failure);
       return;
     }
@@ -377,6 +388,19 @@ class Machine {
         resume: false,
       };
     }
+  }
+
+  /** The group waits in `queued` for the same step; the scheduler holds it until the limit resets. */
+  private waitForLimit(group: Group, attempt: Attempt): void {
+    if (isTerminal(group.status)) return;
+    group.pending = {
+      stepIndex: attempt.stepIndex,
+      feedback: attempt.input.feedback,
+      humanAnswer: attempt.input.humanAnswer,
+      resume: attempt.sessionId !== null,
+    };
+    group.status = 'queued';
+    group.reason = null;
   }
 
   private failGroup(group: Group, reason: FailReason): void {

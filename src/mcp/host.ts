@@ -415,7 +415,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Change queue settings',
       description:
-        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once; turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting, cancelled or undelivered group leaves its place and goes to the skipped list, the queue keeps going. `autopilot_answer`: with the autopilot on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. Takes effect at once.',
+        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once; turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting or undelivered group leaves its place and goes to the skipped list, the queue keeps going; a cancelled run and a usage limit still stop the queue. `on_limit`: what a usage limit of an agent does: `wait` (default) keeps the group waiting for the reset and starts the queue again after it, `stop` fails the group and keeps the queue stopped until started. `autopilot_answer`: with the autopilot on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. Takes effect at once.',
       inputSchema: {
         parallel: z.number().int().min(1).max(20).optional().describe('Runs at the same time'),
         autopilot: z.boolean().optional().describe('Keep the running queue going when it is empty'),
@@ -430,10 +430,14 @@ export function createHostServer(options: HostOptions): McpServer {
           .describe(
             'Text the autopilot answers specialists questions with; null restores the default text',
           ),
+        on_limit: z
+          .enum(['wait', 'stop'])
+          .optional()
+          .describe('On a usage limit: wait for the reset and go on, or stop'),
         repo,
       },
     },
-    ({ parallel, autopilot, skip_failed, autopilot_answer, repo: where }) =>
+    ({ parallel, autopilot, skip_failed, autopilot_answer, on_limit, repo: where }) =>
       attempt(() =>
         showQueue(
           'queue_settings',
@@ -442,6 +446,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(autopilot !== undefined ? { autopilot } : {}),
             ...(skip_failed !== undefined ? { skipFailed: skip_failed } : {}),
             ...(autopilot_answer !== undefined ? { autopilotAnswer: autopilot_answer } : {}),
+            ...(on_limit !== undefined ? { onLimit: on_limit } : {}),
           },
           where,
         ),
@@ -456,6 +461,30 @@ export function createHostServer(options: HostOptions): McpServer {
       inputSchema: { repo },
     },
     ({ repo: where }) => attempt(() => showQueue('queue_pause', {}, where)),
+  );
+
+  server.registerTool(
+    'swarm_queue_return',
+    {
+      title: 'Return a run to the queue',
+      description:
+        'Put a run with failed or cancelled groups back into its queue as the first task. When the queue takes it (a free place in a running queue, or swarm_queue_run_now), the failed and cancelled groups are retried from where they stopped; the work already done is kept and no new run is created.',
+      inputSchema: {
+        run_id: runId,
+        repo: z
+          .string()
+          .optional()
+          .describe('Repository path; defaults to the repository of the run'),
+      },
+    },
+    ({ run_id, repo: where }) =>
+      attempt(async () => {
+        const view = (await options.send('queue_return', {
+          runId: run_id,
+          ...(where !== undefined ? { repository: where } : {}),
+        })) as QueueView & { item: string };
+        return withData(`Returned ${run_id} as item ${view.item}.\n${formatQueue(view)}`, view);
+      }),
   );
 
   server.registerTool(

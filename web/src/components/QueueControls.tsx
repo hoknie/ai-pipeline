@@ -32,7 +32,8 @@ export function QueueControls({
   const { t } = useTranslation();
   const parsed = parseParallel(parallel ?? String(queue.parallel));
   const invalid = parsed === null;
-  const busy = queue.status === 'running';
+  const busy =
+    queue.status === 'running' || (queue.stop?.kind === 'limit' && queue.stop.autoResume);
   const canStart = queue.status === 'stopped' && (queue.items.length > 0 || queue.runs.length > 0);
 
   const act = async (work: () => Promise<QueueView>, done: string) => {

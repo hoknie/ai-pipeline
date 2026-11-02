@@ -308,9 +308,14 @@ export class Executor {
           exit: {
             sessionId: exit.outcome.sessionId,
             usage: exit.outcome.usage,
-            failure: exit.spawnError ? { kind: 'spawn', message: exit.spawnError } : null,
+            failure: exit.spawnError
+              ? { kind: 'spawn', message: exit.spawnError }
+              : exit.outcome.usageLimit
+                ? { kind: 'usage_limit', resetsAt: exit.outcome.usageLimit.resetsAt }
+                : null,
             outsideChanges,
             denials: exit.outcome.denials,
+            onLimit: this.daemon.onLimitOf(state.run.repository),
           },
         });
       });

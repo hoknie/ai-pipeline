@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
-import { diffText, duration } from '../../format.ts';
+import { clock, diffText, duration, reasonLabel } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
 import type { GroupRow, GroupView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
@@ -185,6 +185,11 @@ export function GroupScreen({
           <span>{row.step ?? '—'}</span>
           {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
           <span>{duration(row.durationMs)}</span>
+          {row.limitUntil !== null ? (
+            <span className="text-status-warn">
+              {t('runs.group.limitUntil', { time: clock(row.limitUntil) })}
+            </span>
+          ) : null}
           {'diff' in row && row.diff ? <span>{diffText(row.diff, t)}</span> : null}
           {!('kind' in row) && row.status === 'merged' ? (
             <StatusBadge status={row.delivery} />
@@ -193,7 +198,7 @@ export function GroupScreen({
       </header>
 
       {row.reason && row.status !== 'needs_human' ? (
-        <Alert variant="destructive">{row.reason}</Alert>
+        <Alert variant="destructive">{reasonLabel(row.reason, t)}</Alert>
       ) : null}
       {row.status === 'needs_human' ? (
         row.questions && row.questions.length > 0 ? (

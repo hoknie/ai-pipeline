@@ -16,6 +16,7 @@ const VIEW: QueueView & { item: string } = {
   deliveryMode: 'worktree',
   autopilotAnswer: null,
   autopilotAnswerDefault: 'default',
+  onLimit: 'wait',
   stop: null,
   items: [
     {
@@ -33,6 +34,7 @@ const VIEW: QueueView & { item: string } = {
       after: [],
       createdAt: 1,
       error: null,
+      run: null,
     },
   ],
   runs: [],
@@ -371,15 +373,53 @@ describe('host MCP queue tools', () => {
     ]);
   });
 
+  it('sets the behaviour on a usage limit from Claude Code', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return { ...VIEW, onLimit: 'stop' };
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_settings',
+      arguments: { on_limit: 'stop' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('on limit stop');
+    expect(calls).toEqual([
+      { method: 'queue_settings', params: { repository: '/repo', onLimit: 'stop' } },
+    ]);
+  });
+
+  it('returns a run to the queue from Claude Code', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return {
+        ...VIEW,
+        items: [{ ...VIEW.items[0]!, id: 'q9', run: 'r1' }],
+        item: 'q9',
+      };
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_return',
+      arguments: { run_id: 'r1' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('returns r1');
+    expect(calls).toEqual([{ method: 'queue_return', params: { runId: 'r1' } }]);
+  });
+
   it('returns the daemon error of an empty settings call', async () => {
     const calls: unknown[] = [];
     const client = await connect(async (method, params) => {
       calls.push({ method, params });
-      throw new Error('pass parallel, autopilot, autopilotAnswer or skipFailed');
+      throw new Error('pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit');
     });
     const result = await client.callTool({ name: 'swarm_queue_settings', arguments: {} });
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('pass parallel, autopilot, autopilotAnswer or skipFailed');
+    expect(textOf(result)).toContain(
+      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+    );
     expect(calls).toEqual([{ method: 'queue_settings', params: { repository: '/repo' } }]);
   });
 

@@ -416,6 +416,39 @@ describe('aip web', () => {
     expect(read.items.find((item) => item.id === first.item)?.after).toEqual([]);
   });
 
+  it('returns a failed run to the queue through the API', async () => {
+    const { h, web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    h.script({ code: [{ noReport: true }, {}] });
+    await post('/api/queue/items', { workflow: 'feature', task: 'работа' });
+    await post('/api/queue/start', {});
+    let run = '';
+    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+      const queue = (await (
+        await fetch(`${base}/api/queue`, { headers: authed(web) })
+      ).json()) as QueueView;
+      if (queue.stop?.kind === 'problem') run = queue.stop.run;
+      else await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const before = (await (
+      await fetch(`${base}/api/runs/${run}`, { headers: authed(web) })
+    ).json()) as { returnable: boolean };
+    expect(before.returnable).toBe(true);
+    const returned = await post('/api/queue/return', { run });
+    expect(returned.status).toBe(200);
+    expect(((await returned.json()) as QueueView).items[0]).toMatchObject({ run });
+    const after = (await (
+      await fetch(`${base}/api/runs/${run}`, { headers: authed(web) })
+    ).json()) as { returnable: boolean };
+    expect(after.returnable).toBe(false);
+    expect((await post('/api/queue/return', { run })).status).toBe(400);
+  });
+
   it('serves the queue API with the same protection as the rest', async () => {
     const { h, web, base } = await setup();
     const post = (path: string, body: unknown, headers = authed(web, JSON_TYPE)) =>
@@ -493,8 +526,20 @@ describe('aip web', () => {
     const empty = await post('/api/queue/settings', {});
     expect(empty.status).toBe(400);
     expect(((await empty.json()) as { error: string }).error).toContain(
-      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
     );
+    const onLimit = await post('/api/queue/settings', { onLimit: 'stop' });
+    expect(onLimit.status).toBe(200);
+    expect(await onLimit.json()).toMatchObject({ onLimit: 'stop' });
+    const wrongLimit = await post('/api/queue/settings', { onLimit: 'retry' });
+    expect(wrongLimit.status).toBe(400);
+    expect(((await wrongLimit.json()) as { error: string }).error).toBe(
+      'onLimit must be one of: wait, stop',
+    );
+    const unknownRun = await post('/api/queue/return', { run: 'zzz' });
+    expect(unknownRun.status).toBe(404);
+    expect(((await unknownRun.json()) as { error: string }).error).toContain('unknown run');
+    expect((await post('/api/queue/return', {})).status).toBe(400);
     const removed = (await (
       await post(`/api/queue/items/${third.item}/remove`, {})
     ).json()) as QueueView;

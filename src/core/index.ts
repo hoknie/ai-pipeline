@@ -24,7 +24,13 @@ export * from './model.ts';
 export { stepProgress, type StepProgress } from './progress.ts';
 export { applySkip, checkSkip, cleanSkip } from './skip.ts';
 export { questionsText } from './questions.ts';
-export { dispatch, runningBySpecialist, runningCount } from './scheduler.ts';
+export {
+  dispatch,
+  limitHolds,
+  limitResetsAt,
+  runningBySpecialist,
+  runningCount,
+} from './scheduler.ts';
 export {
   deliveryCounts,
   renderCommitMessage,
@@ -74,7 +80,11 @@ export {
 } from './tags.ts';
 export {
   QUEUE_PARALLEL_MAX,
+  acknowledgeRun,
   addItem,
+  queueWakeAt,
+  retryableGroups,
+  returnRun,
   advance,
   checkDependencies,
   dependencyState,

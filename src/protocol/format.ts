@@ -1,4 +1,4 @@
-import type { Usage } from '../core/index.ts';
+import { clockTime, type Usage } from '../core/index.ts';
 
 import { plainStyle, statusBadge, visibleWidth, type Style } from './style.ts';
 
@@ -190,7 +190,7 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
       ['GROUP', 'STATUS', 'STEP', 'ROUND', 'TIME', 'CHANGES', 'DELIVERY', 'NOTE'],
       ...run.groups.map((group) => [
         group.slug,
-        statusBadge(group.status, style),
+        `${statusBadge(group.status, style)}${limitNote(group.limitUntil)}`,
         group.step ?? '—',
         group.round === null ? '—' : String(group.round),
         seconds(group.durationMs),
@@ -213,9 +213,14 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
   return `${header.join('\n')}\n\n${rows}`;
 }
 
+/** ` (usage limit, until HH:MM)` for a group waiting for a usage limit to reset. */
+function limitNote(limitUntil: number | null): string {
+  return limitUntil === null ? '' : ` (usage limit, until ${clockTime(limitUntil)})`;
+}
+
 export function formatGroup(group: GroupView, style: Style = plainStyle): string {
   const lines = [
-    `Group ${style.accent(group.slug)} (${group.title}) · ${statusBadge(group.status, style)} · run ${style.accent(group.runId)}`,
+    `Group ${style.accent(group.slug)} (${group.title}) · ${statusBadge(group.status, style)}${limitNote(group.limitUntil)} · run ${style.accent(group.runId)}`,
     `${style.muted('Ref:')} ${group.branch}`,
     `${style.muted('Worktree:')} ${group.worktree}`,
     `${style.muted('Usage:')} ${formatUsage(group.usage)}`,
@@ -319,6 +324,10 @@ function stopReason(view: QueueView): string | null {
   const stop = view.stop;
   if (!stop) return null;
   if (stop.kind === 'item') return `item ${stop.item}: ${stop.error}`;
+  if (stop.kind === 'limit') {
+    const resumes = stop.autoResume ? ', resumes automatically' : '';
+    return `usage limit of ${stop.runtime} in ${stop.run}, resets ${clockTime(stop.resetsAt)}${resumes}`;
+  }
   const where = stop.group ? `run ${stop.run}, group ${stop.group}` : `run ${stop.run}`;
   return `${where}: ${stop.reason}`;
 }
@@ -350,7 +359,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
 
 export function formatQueue(view: QueueView, style: Style = plainStyle): string {
   const lines = [
-    `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken), autopilot ${view.autopilot ? 'on' : 'off'}, skip failed ${view.skipFailed ? 'on' : 'off'}`,
+    `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken), autopilot ${view.autopilot ? 'on' : 'off'}, skip failed ${view.skipFailed ? 'on' : 'off'}${view.onLimit === 'stop' ? ', on limit stop' : ''}`,
   ];
   if (view.autopilotAnswer !== null) {
     lines.push(`${style.muted('Autopilot answer:')} ${firstLine(view.autopilotAnswer)}`);
@@ -394,8 +403,9 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
         ? ''
         : ` · after ${item.after.map((dependency) => dependency.id).join(', ')}${mark}`;
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
+    const returned = item.run === null ? '' : ` · returns ${style.accent(item.run)}`;
     lines.push(
-      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}  added ${addedAt(item.createdAt)}${error}`,
+      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );
   }
   return lines.join('\n');

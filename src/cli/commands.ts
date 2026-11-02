@@ -407,7 +407,8 @@ function registerQueue(program: Command): void {
       .description('Change queue settings; only the passed ones change, takes effect at once')
       .option('-p, --parallel <n>', 'runs at the same time (1-20)')
       .option('--autopilot <on|off>', 'a running queue does not stop when it becomes empty')
-      .option('--skip-failed <on|off>', 'a run with a stopping problem leaves its place')
+      .option('--skip-failed <on|off>', 'a failed or conflicting run leaves its place')
+      .option('--on-limit <wait|stop>', 'on a usage limit: wait for the reset, or stop')
       .option('--autopilot-answer <text>', 'text the autopilot answers specialists questions with')
       .option('--default-autopilot-answer', 'answer with the default text again'),
   )
@@ -416,6 +417,7 @@ function registerQueue(program: Command): void {
       examples([
         'aip queue settings --autopilot on',
         'aip queue settings --skip-failed on --parallel 2',
+        'aip queue settings --on-limit stop',
         'aip queue settings --autopilot-answer "Agree; pick the simplest option"',
       ]),
     )
@@ -425,10 +427,14 @@ function registerQueue(program: Command): void {
         parallel?: string;
         autopilot?: string;
         skipFailed?: string;
+        onLimit?: string;
         autopilotAnswer?: string;
         defaultAutopilotAnswer?: boolean;
         json?: boolean;
       }) => {
+        if (options.onLimit !== undefined && !['wait', 'stop'].includes(options.onLimit)) {
+          throw new Error('--on-limit must be wait or stop');
+        }
         if (options.defaultAutopilotAnswer && options.autopilotAnswer !== undefined) {
           throw new Error('--default-autopilot-answer cannot be combined with --autopilot-answer');
         }
@@ -441,6 +447,7 @@ function registerQueue(program: Command): void {
             ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
             ...(autopilot !== undefined ? { autopilot } : {}),
             ...(skipFailed !== undefined ? { skipFailed } : {}),
+            ...(options.onLimit !== undefined ? { onLimit: options.onLimit } : {}),
             ...(options.defaultAutopilotAnswer
               ? { autopilotAnswer: null }
               : options.autopilotAnswer !== undefined
@@ -458,6 +465,23 @@ function registerQueue(program: Command): void {
         options.json,
         (await call(context(), 'queue_pause', { repository: resolve(options.repo) })) as QueueView,
       );
+    });
+
+  queue
+    .command('return')
+    .description(
+      'Put a run with failed or cancelled groups back into its queue as the first task; when taken, it continues where it stopped',
+    )
+    .argument('<run-id>', 'run id')
+    .option('-r, --repo <path>', 'repository path; defaults to the repository of the run')
+    .option('--json', 'print JSON')
+    .addHelpText('after', examples(['aip queue return mvzh40j56lht']))
+    .action(async (run: string, options: { repo?: string; json?: boolean }) => {
+      const view = (await call(context(), 'queue_return', {
+        runId: run,
+        ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
+      })) as QueueView & { item: string };
+      showQueue(options.json, view);
     });
 
   common(

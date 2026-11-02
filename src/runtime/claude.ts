@@ -44,6 +44,31 @@ const resultEvent = z.looseObject({
     .optional(),
 });
 
+const rateLimitInfo = z.looseObject({
+  status: z.string().optional(),
+  resetsAt: z.number().optional(),
+});
+
+/** An API error of a message or a result: `usage_limit_reached` or a rejected `rate_limit`. */
+const apiError = z.looseObject({
+  error: z.string().optional(),
+  api_error: z.string().optional(),
+  api_error_params: z.looseObject({ rate_limit_info: rateLimitInfo.optional() }).optional(),
+});
+
+/** The usage limit of an event, if it says the limit ran out; `resetsAt` in ms. */
+function exhaustedLimit(value: unknown): { resetsAt: number | null } | null {
+  const parsed = apiError.safeParse(value);
+  if (!parsed.success) return null;
+  const event = parsed.data;
+  const info = event.api_error_params?.rate_limit_info;
+  const exhausted =
+    event.api_error === 'usage_limit_reached' ||
+    (event.error === 'rate_limit' && info?.status === 'rejected');
+  if (!exhausted) return null;
+  return { resetsAt: info?.resetsAt === undefined ? null : info.resetsAt * 1000 };
+}
+
 const sessionEvent = z.looseObject({ type: z.string(), session_id: z.string() });
 
 const deniedCall = z.looseObject({
@@ -246,6 +271,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
       let sessionId: string | null = null;
       let usage: Usage | null = null;
       let error: string | null = null;
+      let usageLimit: { resetsAt: number | null } | null = null;
       const denials = new Denials();
       return {
         push(line: string) {
@@ -255,6 +281,9 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
           } catch {
             return;
           }
+          const limit = exhaustedLimit(value);
+          if (limit !== null)
+            usageLimit = { resetsAt: limit.resetsAt ?? usageLimit?.resetsAt ?? null };
           const toolUse = toolUseMessage.safeParse(value);
           if (toolUse.success) {
             for (const block of toolUse.data.message.content) {
@@ -299,7 +328,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
           if (session.success) sessionId = session.data.session_id;
         },
         outcome() {
-          return { sessionId, usage, error, denials: denials.values() };
+          return { sessionId, usage, error, denials: denials.values(), usageLimit };
         },
       };
     },

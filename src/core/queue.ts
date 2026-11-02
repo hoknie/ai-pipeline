@@ -5,7 +5,15 @@ import { Rejection } from './errors.ts';
 import { RUN_TITLE_LIMIT } from './ids.ts';
 import { cleanSkip } from './skip.ts';
 import { mergeTags } from './tags.ts';
-import { RECOMMENDATION_LIMIT, allGroups, runPhase, type RunState } from './model.ts';
+import {
+  ON_LIMIT_MODES,
+  RECOMMENDATION_LIMIT,
+  allGroups,
+  runPhase,
+  type OnLimit,
+  type RunState,
+} from './model.ts';
+import { limitResetsAt } from './scheduler.ts';
 
 export const QUEUE_PARALLEL_MAX = 20;
 /** The most runs the queue remembers as skipped. */
@@ -34,16 +42,32 @@ export interface QueueItem {
   after: string[];
   createdAt: number;
   error: string | null;
+  /** A returned run: taking the item retries this run instead of creating one. */
+  run: string | null;
 }
 
-export type ProblemReason = 'needs_human' | 'failed' | 'conflict' | 'cancelled' | 'apply_failed';
+export type ProblemReason =
+  'needs_human' | 'failed' | 'conflict' | 'cancelled' | 'apply_failed' | 'usage_limit';
 
-/** Problems that stop the queue; a question to a human does not. */
+/** Problems that stop the queue; a question to a human does not, a usage limit stops it its own way. */
 const STOPPING_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason>([
   'failed',
   'conflict',
   'cancelled',
   'apply_failed',
+]);
+
+/** Problems that `skipFailed` takes off the places: neither a cancel nor a usage limit. */
+const SKIPPED_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason>([
+  'failed',
+  'conflict',
+  'apply_failed',
+]);
+
+/** Problems that block the tasks depending on the run. */
+const BLOCKING_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason>([
+  ...STOPPING_REASONS,
+  'usage_limit',
 ]);
 
 export interface Problem {
@@ -55,7 +79,17 @@ export interface Problem {
 
 export type QueueStop =
   | { kind: 'problem'; run: string; group: string | null; reason: ProblemReason }
-  | { kind: 'item'; item: string; error: string };
+  | { kind: 'item'; item: string; error: string }
+  | {
+      kind: 'limit';
+      run: string;
+      group: string;
+      runtime: string;
+      /** When the limit resets (ms). */
+      resetsAt: number;
+      /** The queue starts by itself at `resetsAt`. */
+      autoResume: boolean;
+    };
 
 export interface Queue {
   repository: string;
@@ -67,6 +101,8 @@ export interface Queue {
   skipFailed: boolean;
   /** Text the autopilot answers the questions of specialists with; `null`: the default text. */
   autopilotAnswer: string | null;
+  /** What a usage limit does: the group waits for the reset, or fails. */
+  onLimit: OnLimit;
   items: QueueItem[];
   /** Runs created by the queue that still occupy a place. */
   runs: string[];
@@ -98,6 +134,7 @@ export function emptyQueue(repository: string, now: number): Queue {
     autopilot: false,
     skipFailed: false,
     autopilotAnswer: null,
+    onLimit: 'wait',
     items: [],
     runs: [],
     acknowledged: [],
@@ -178,6 +215,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
     after,
     createdAt: now,
     error: null,
+    run: null,
   };
   queue.items.push(item);
   queue.updatedAt = now;
@@ -199,6 +237,12 @@ export interface ItemPatch {
 
 export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number): QueueItem {
   const item = find(queue, id);
+  if (item.run !== null) {
+    const { position: _position, after: _after, ...rest } = patch;
+    if (Object.values(rest).some((value) => value !== undefined)) {
+      throw new Rejection('a returned run keeps its own task');
+    }
+  }
   if (patch.task !== undefined && patch.groups !== undefined) {
     throw new Rejection('pass either task or groups');
   }
@@ -331,7 +375,7 @@ export function dependencyState(
   }
   const state = lookup(ref);
   if (!state) return 'blocked';
-  if (runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))) return 'blocked';
+  if (runProblems(state).some((problem) => BLOCKING_REASONS.has(problem.reason))) return 'blocked';
   return runDone(state) ? 'done' : 'waiting';
 }
 
@@ -378,6 +422,7 @@ export interface QueueSettingsPatch {
   skipFailed?: boolean | undefined;
   /** `null`: the default text. */
   autopilotAnswer?: string | null | undefined;
+  onLimit?: OnLimit | undefined;
 }
 
 function cleanAnswer(answer: string | null): string | null {
@@ -396,9 +441,13 @@ export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: n
     patch.parallel === undefined &&
     patch.autopilot === undefined &&
     patch.skipFailed === undefined &&
-    patch.autopilotAnswer === undefined
+    patch.autopilotAnswer === undefined &&
+    patch.onLimit === undefined
   ) {
-    throw new Rejection('pass parallel, autopilot, autopilotAnswer or skipFailed');
+    throw new Rejection('pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit');
+  }
+  if (patch.onLimit !== undefined && !ON_LIMIT_MODES.includes(patch.onLimit)) {
+    throw new Rejection(`onLimit must be one of: ${ON_LIMIT_MODES.join(', ')}`);
   }
   const answer =
     patch.autopilotAnswer === undefined ? undefined : cleanAnswer(patch.autopilotAnswer);
@@ -406,12 +455,58 @@ export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: n
   if (patch.autopilot !== undefined) queue.autopilot = patch.autopilot;
   if (patch.skipFailed !== undefined) queue.skipFailed = patch.skipFailed;
   if (answer !== undefined) queue.autopilotAnswer = answer;
+  if (patch.onLimit !== undefined) queue.onLimit = patch.onLimit;
   queue.updatedAt = now;
 }
 
+/** Stops the queue; a queue stopped by a usage limit no longer starts by itself. */
 export function pauseQueue(queue: Queue, now: number): void {
   queue.status = 'stopped';
+  if (queue.stop?.kind === 'limit') queue.stop = { ...queue.stop, autoResume: false };
   queue.updatedAt = now;
+}
+
+/** When a queue stopped by a usage limit starts by itself; null when it does not. */
+export function queueWakeAt(queue: Queue): number | null {
+  return queue.status === 'stopped' && queue.stop?.kind === 'limit' && queue.stop.autoResume
+    ? queue.stop.resetsAt
+    : null;
+}
+
+interface LimitHit {
+  key: string;
+  run: string;
+  group: string;
+  runtime: string;
+  resetsAt: number;
+}
+
+/** Attempts of a run that ran out of the usage limit, each a problem of its own. */
+function limitHits(state: RunState): LimitHit[] {
+  return allGroups(state).flatMap((group) =>
+    group.attempts.flatMap((attempt) => {
+      const resetsAt = limitResetsAt(attempt);
+      return resetsAt === null
+        ? []
+        : [
+            {
+              key: `${state.run.id}/${group.slug}/usage_limit/${attempt.seq}`,
+              run: state.run.id,
+              group: group.slug,
+              runtime: attempt.runtime,
+              resetsAt,
+            },
+          ];
+    }),
+  );
+}
+
+/** Keys of every problem and usage limit of a run now. */
+function currentKeys(state: RunState): string[] {
+  return [
+    ...runProblems(state).map((problem) => problem.key),
+    ...limitHits(state).map((hit) => hit.key),
+  ];
 }
 
 /**
@@ -429,11 +524,15 @@ export function runProblems(state: RunState): Problem[] {
       group.status === 'failed' ||
       group.status === 'conflict'
     ) {
+      const reason: ProblemReason =
+        group.status === 'failed' && group.attempts.at(-1)?.reason?.kind === 'usage_limit'
+          ? 'usage_limit'
+          : group.status;
       problems.push({
-        key: `${id}/${group.slug}/${group.status}/${attempts}`,
+        key: `${id}/${group.slug}/${reason}/${attempts}`,
         run: id,
         group: group.slug,
-        reason: group.status,
+        reason,
       });
     }
     if (group.status === 'merged' && group.delivery.state === 'apply_failed') {
@@ -479,10 +578,15 @@ export function startQueue(queue: Queue, states: Iterable<RunState>, now: number
   for (const item of queue.items) item.error = null;
   const known = new Set(queue.acknowledged);
   for (const state of queueStates(queue, states)) {
-    for (const problem of runProblems(state)) known.add(problem.key);
+    for (const key of currentKeys(state)) known.add(key);
   }
   queue.acknowledged = [...known];
   queue.updatedAt = now;
+}
+
+/** Makes the current problems and usage limits of a run known to the queue. */
+export function acknowledgeRun(queue: Queue, state: RunState): void {
+  queue.acknowledged = [...new Set([...queue.acknowledged, ...currentKeys(state)])];
 }
 
 /**
@@ -496,9 +600,11 @@ export function advance(
   now: number,
 ): { take: QueueItem[] } {
   let own = queueStates(queue, states);
+  const wake = queueWakeAt(queue);
+  if (wake !== null && now >= wake) startQueue(queue, own, now);
   if (queue.skipFailed) {
     const failed = own.filter((state) =>
-      runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason)),
+      runProblems(state).some((problem) => SKIPPED_REASONS.has(problem.reason)),
     );
     if (failed.length > 0) {
       const ids = new Set(failed.map((state) => state.run.id));
@@ -518,15 +624,19 @@ export function advance(
     .filter((id) => {
       const state = lookup(id);
       if (state === undefined) return false;
-      if (runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))) return true;
+      if (runProblems(state).some((problem) => BLOCKING_REASONS.has(problem.reason))) return true;
       if (occupiesSlot(state) && !queue.runs.includes(id)) returned.push(state);
       return false;
     })
     .slice(0, QUEUE_SKIPPED_MAX);
   if (returned.length > 0) {
     queue.runs = [...returned.map((state) => state.run.id), ...queue.runs];
+    for (const state of returned) {
+      for (const hit of limitHits(state)) queue.acknowledged.push(hit.key);
+    }
     own = [...returned, ...own];
   }
+  stopOnLimit(queue, own);
   const known = new Set(queue.acknowledged);
   if (queue.stop === null) {
     for (const state of own) {
@@ -567,6 +677,68 @@ export function advance(
   }
   queue.updatedAt = now;
   return { take };
+}
+
+/** A new usage limit of a run of the queue stops it; every such attempt counts once. */
+function stopOnLimit(queue: Queue, own: readonly RunState[]): void {
+  const known = new Set(queue.acknowledged);
+  const fresh = own.flatMap(limitHits).filter((hit) => !known.has(hit.key));
+  if (fresh.length === 0) return;
+  queue.acknowledged = [...queue.acknowledged, ...fresh.map((hit) => hit.key)];
+  const first = fresh[0]!;
+  const running = queue.status === 'running';
+  if (!running && queue.stop !== null) return;
+  queue.status = 'stopped';
+  queue.stop = {
+    kind: 'limit',
+    run: first.run,
+    group: first.group,
+    runtime: first.runtime,
+    resetsAt: Math.max(...fresh.map((hit) => hit.resetsAt)),
+    autoResume: running && queue.onLimit === 'wait',
+  };
+}
+
+/** Work groups and the split step of a run that a retry can continue. */
+export function retryableGroups(state: RunState): string[] {
+  const work = state.split ? [state.split, ...state.groups] : state.groups;
+  return work
+    .filter((group) => group.status === 'failed' || group.status === 'cancelled')
+    .map((group) => group.slug);
+}
+
+/**
+ * Puts a run back into the queue as its first item: taking the item retries the failed and
+ * cancelled groups of the run, which then holds a place.
+ */
+export function returnRun(queue: Queue, state: RunState, id: string, now: number): QueueItem {
+  const run = state.run.id;
+  if (retryableGroups(state).length === 0) {
+    throw new Rejection('run has no failed or cancelled groups');
+  }
+  if (queue.runs.includes(run)) throw new Rejection('run already holds a place in the queue');
+  if (queue.items.some((item) => item.run === run)) {
+    throw new Rejection('run is already in the queue');
+  }
+  const item: QueueItem = {
+    id,
+    workflow: state.run.workflow,
+    task: null,
+    groups: null,
+    title: state.run.title,
+    autoDeliver: null,
+    deliveryMode: null,
+    tags: [...state.run.tags],
+    skip: [],
+    after: [],
+    createdAt: now,
+    error: null,
+    run,
+  };
+  queue.items.unshift(item);
+  queue.skipped = queue.skipped.filter((skipped) => skipped !== run);
+  queue.updatedAt = now;
+  return item;
 }
 
 export interface AutopilotAnswer {

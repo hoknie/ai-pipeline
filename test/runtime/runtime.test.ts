@@ -238,6 +238,41 @@ describe('claude adapter', () => {
       usage: { inputTokens: 2 + 23287 + 11382, outputTokens: 4, costUsd: 0.00477342 },
       error: null,
       denials: [],
+      usageLimit: null,
+    });
+  });
+
+  describe('usage limit', () => {
+    it('reads the exhausted limit and its reset from recorded stream-json', () => {
+      const parser = runtime.createParser();
+      for (const line of readFileSync(join(fixtures, 'claude-usage-limit.jsonl'), 'utf8').split(
+        '\n',
+      ))
+        parser.push(line);
+      expect(parser.outcome().usageLimit).toEqual({ resetsAt: 1793641800000 });
+    });
+
+    it('reads a limit without a reset time from the result', () => {
+      const parser = runtime.createParser();
+      parser.push(
+        JSON.stringify({ type: 'result', is_error: true, api_error: 'usage_limit_reached' }),
+      );
+      expect(parser.outcome().usageLimit).toEqual({ resetsAt: null });
+    });
+
+    it('ignores a warning about the limit', () => {
+      const parser = runtime.createParser();
+      parser.push(
+        JSON.stringify({
+          type: 'rate_limit_event',
+          rate_limit_info: { status: 'allowed_warning', resetsAt: 1793641800 },
+        }),
+      );
+      parser.push(
+        JSON.stringify({ type: 'assistant', error: 'rate_limit', message: { content: [] } }),
+      );
+      parser.push(JSON.stringify({ type: 'result', is_error: false }));
+      expect(parser.outcome().usageLimit).toBeNull();
     });
   });
 

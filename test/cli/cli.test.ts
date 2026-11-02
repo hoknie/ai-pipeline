@@ -662,10 +662,46 @@ describe('cli', () => {
     const empty = await aip(box, 'queue', 'settings');
     expect(empty.code).not.toBe(0);
     expect(`${empty.stdout}${empty.stderr}`).toContain(
-      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
     );
     const view = await aip(box, 'queue', 'list', '--json');
     expect(JSON.parse(view.stdout)).toMatchObject({ autopilot: false, skipFailed: false });
+  });
+
+  it('sets the behaviour on a usage limit and refuses a wrong value', async () => {
+    const box = sandbox();
+    const wrong = await aip(box, 'queue', 'settings', '--on-limit', 'retry');
+    expect(wrong.code).toBe(1);
+    expect(`${wrong.stdout}${wrong.stderr}`).toContain('--on-limit must be wait or stop');
+    const stop = await aip(box, 'queue', 'settings', '--on-limit', 'stop');
+    expect(stop.code).toBe(0);
+    expect(stop.stdout.split('\n')[0]).toMatch(/, on limit stop$/);
+    const wait = await aip(box, 'queue', 'settings', '--on-limit', 'wait', '--json');
+    expect(JSON.parse(wait.stdout)).toMatchObject({ onLimit: 'wait' });
+  });
+
+  it('returns a failed run to the queue', async () => {
+    const box = sandbox();
+    writeFileSync(
+      join(box.repo, '..', 'script.json'),
+      JSON.stringify({ code: [{ noReport: true }, {}] }),
+    );
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
+    await aip(box, 'queue', 'start');
+    let run = '';
+    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+      const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+        stop: { kind: string; run?: string } | null;
+      };
+      if (view.stop?.kind === 'problem') run = view.stop.run ?? '';
+      else await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const returned = await aip(box, 'queue', 'return', run);
+    expect(returned.code).toBe(0);
+    expect(returned.stdout).toContain(`returns ${run}`);
+    const again = await aip(box, 'queue', 'return', run);
+    expect(again.code).toBe(1);
+    expect(`${again.stdout}${again.stderr}`).toContain('run is already in the queue');
   });
 
   it('sets automatic delivery of a run and of queued tasks from flags', async () => {
@@ -863,6 +899,7 @@ describe('cli', () => {
       'swarm_queue_parallel',
       'swarm_queue_pause',
       'swarm_queue_remove',
+      'swarm_queue_return',
       'swarm_queue_run_now',
       'swarm_queue_settings',
       'swarm_queue_start',

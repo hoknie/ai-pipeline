@@ -290,6 +290,15 @@ export function QueueList({
                   {itemLabel(item, t)}
                 </span>
                 <TagChips tags={item.tags ?? []} />
+                {item.run !== null ? (
+                  <a
+                    className="rounded bg-muted px-1.5 py-0.5 text-xs text-primary underline"
+                    title={t('queue.returnOf', { run: item.run })}
+                    href={formatRoute({ view: 'runs', run: item.run, group: null, step: null })}
+                  >
+                    {t('queue.returning')}
+                  </a>
+                ) : null}
                 <ReadinessBadge item={item} />
                 {item.after.map((ref) => (
                   <DependencyChip key={ref.id} dependency={ref} />
@@ -380,21 +389,27 @@ export function QueueList({
                   autoDeliverDefault={queue.autoDeliver}
                   deliveryModeDefault={queue.deliveryMode}
                   afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item)}
+                  locked={item.run !== null}
                   submitLabel={t('queue.list.save')}
                   onDraft={(draft) => onDraft(`edit:${item.id}`, draft)}
                   onCancel={() => onDraft(`edit:${item.id}`, null)}
                   onSubmit={async (fields) => {
                     try {
-                      const view = await api.queueEdit(item.id, {
-                        workflow: fields.workflow,
-                        ...(fields.task !== undefined ? { task: fields.task } : {}),
-                        ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
-                        title: fields.title ?? null,
-                        autoDeliver: fields.autoDeliver ?? null,
-                        deliveryMode: fields.deliveryMode ?? null,
-                        tags: fields.tags ?? [],
-                        ...(fields.after !== undefined ? { after: fields.after } : {}),
-                      });
+                      const view = await api.queueEdit(
+                        item.id,
+                        item.run !== null
+                          ? { ...(fields.after !== undefined ? { after: fields.after } : {}) }
+                          : {
+                              workflow: fields.workflow,
+                              ...(fields.task !== undefined ? { task: fields.task } : {}),
+                              ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
+                              title: fields.title ?? null,
+                              autoDeliver: fields.autoDeliver ?? null,
+                              deliveryMode: fields.deliveryMode ?? null,
+                              tags: fields.tags ?? [],
+                              ...(fields.after !== undefined ? { after: fields.after } : {}),
+                            },
+                      );
                       onQueue(view);
                       onDraft(`edit:${item.id}`, null);
                     } catch (failure) {

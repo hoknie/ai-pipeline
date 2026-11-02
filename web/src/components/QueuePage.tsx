@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import type { Api } from '../api.ts';
+import { clock } from '../format.ts';
 import { formatRoute } from '../route.ts';
 import type { QueueView, WorkflowsView } from '../types.ts';
 
@@ -18,7 +19,14 @@ import { QueueSettings } from './QueueSettings.tsx';
 
 export { parseParallel };
 
-const REASONS = ['needs_human', 'failed', 'conflict', 'cancelled', 'apply_failed'] as const;
+const REASONS = [
+  'needs_human',
+  'failed',
+  'conflict',
+  'cancelled',
+  'apply_failed',
+  'usage_limit',
+] as const;
 
 function reasonText(reason: string, t: TFunction): string {
   const known = REASONS.find((candidate) => candidate === reason);
@@ -37,6 +45,18 @@ function StopReason({ queue }: { queue: QueueView }) {
     );
   }
   const route = formatRoute({ view: 'runs', run: stop.run, group: stop.group, step: null });
+  if (stop.kind === 'limit') {
+    return (
+      <Alert variant="warn" role="status">
+        {t('queue.stopped')} {t('queue.limitStop', { runtime: stop.runtime })},{' '}
+        {t('queue.limitResets', { time: clock(stop.resetsAt) })}.{' '}
+        {stop.autoResume ? `${t('queue.limitResumes', { time: clock(stop.resetsAt) })} ` : null}
+        <a className="underline" href={route}>
+          {t('queue.openGroup', { group: stop.group })}
+        </a>
+      </Alert>
+    );
+  }
   return (
     <Alert variant="warn" role="status">
       {t('queue.stopped')} <code>{stop.reason}</code> — {reasonText(stop.reason, t)}.{' '}
@@ -98,7 +118,14 @@ export default function QueuePage({
       <QueueSettings api={api} queue={queue} onQueue={onQueue} onError={onError} />
       <div className="flex min-w-0 flex-col gap-4">
         <StopReason queue={queue} />
-        <QueueRuns queue={queue} now={now} highlight={linked} />
+        <QueueRuns
+          queue={queue}
+          now={now}
+          api={api}
+          onQueue={onQueue}
+          onError={onError}
+          highlight={linked}
+        />
         <section aria-label={t('queue.newTaskLabel')}>
           <h3 className="mb-2 font-semibold">{t('queue.newTask')}</h3>
           <QueueForm

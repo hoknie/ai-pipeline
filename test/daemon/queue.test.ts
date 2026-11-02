@@ -1172,7 +1172,7 @@ describe('queue settings', () => {
   it('rejects an empty settings request and leaves the queue unchanged', async () => {
     const h = await start();
     await expect(h.call('queue_settings', { repository: h.repo })).rejects.toThrow(
-      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
     );
     expect(await queueOf(h)).toMatchObject({ autopilot: false, skipFailed: false, parallel: 1 });
   });

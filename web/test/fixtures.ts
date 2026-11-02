@@ -77,6 +77,7 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     warnings: 0,
     delivery: 'pending',
     diff: null,
+    limitUntil: null,
     ...overrides,
   };
 }
@@ -107,6 +108,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     autoDeliver: true,
     deliveryMode: 'worktree',
     fromQueue: false,
+    returnable: false,
     tags: [],
     counts: 'running 1',
     total: 1,
@@ -135,6 +137,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
     question: null,
     questions: null,
     reason: null,
+    limitUntil: null,
     warnings: [],
     conflictFiles: [],
     delivery: { state: 'pending', reason: null, files: [], conflicts: [], userEdits: [] },
@@ -205,6 +208,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     active: [],
     delivering: false,
     problem: null,
+    limitUntil: null,
     ...overrides,
   };
 }
@@ -220,6 +224,7 @@ export function queueOf(overrides: Partial<QueueView> = {}): QueueView {
     deliveryMode: 'worktree',
     autopilotAnswer: null,
     autopilotAnswerDefault: 'I agree with your recommendations',
+    onLimit: 'wait',
     stop: null,
     items: [],
     runs: [],
@@ -301,6 +306,7 @@ export function queueItem(
     after: [],
     createdAt: 1,
     error: null,
+    run: null,
     ...extra,
   };
 }
@@ -414,6 +420,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     queueStart: vi.fn(async () => queueOf({ status: 'running' })),
     queuePause: vi.fn(async () => queueOf()),
     queueSettings: vi.fn(async () => queueOf()),
+    queueReturn: vi.fn(async () => ({ ...queueOf(), item: 'q9' })),
     config: vi.fn(async () => configView()),
     catalog: vi.fn(async () => catalogView()),
     writeSpecialist: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),

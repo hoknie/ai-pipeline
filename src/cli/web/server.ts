@@ -498,6 +498,14 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'POST',
+      pattern: /^\/api\/queue\/return$/,
+      handle: async (_, body, repository) => {
+        const { run } = parseBody(z.object({ run: z.string().min(1) }), body);
+        return call('queue_return', { runId: run, ...(repository ? { repository } : {}) });
+      },
+    },
+    {
+      method: 'POST',
       pattern: /^\/api\/queue\/settings$/,
       handle: async (_, body, repository) =>
         call('queue_settings', {
@@ -784,9 +792,13 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         body = transcriptQuery(url.searchParams);
       }
       // Runs belong to the daemon, not to a repository: they work without one.
-      const repository = url.pathname.startsWith('/api/runs')
-        ? ''
-        : await requestRepository(url.searchParams);
+      // A returned run belongs to its own repository unless the request names one.
+      const ownRepository =
+        url.pathname === '/api/queue/return' && !url.searchParams.get('repository');
+      const repository =
+        url.pathname.startsWith('/api/runs') || ownRepository
+          ? ''
+          : await requestRepository(url.searchParams);
       const result = await route.handle(parts, body, repository);
       if (result instanceof Reply) json(response, result.status, result.value);
       else json(response, 200, result);

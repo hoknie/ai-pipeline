@@ -73,7 +73,9 @@ export function QueueSettings({
   const [savingAnswer, setSavingAnswer] = useState(false);
 
   const parsed = parseParallel(parallel ?? String(queue.parallel));
-  const busy = queue.status === 'running';
+  // a queue waiting to resume after a usage limit can be paused, so it stays stopped
+  const busy =
+    queue.status === 'running' || (queue.stop?.kind === 'limit' && queue.stop.autoResume);
   const canStart = queue.status === 'stopped' && (queue.items.length > 0 || queue.runs.length > 0);
 
   const act = async (work: () => Promise<QueueView>, done: string) => {
@@ -83,6 +85,19 @@ export function QueueSettings({
       notifySuccess(done);
     } catch (error) {
       onError((error as Error).message);
+    }
+  };
+
+  const [pendingLimit, setPendingLimit] = useState<'wait' | 'stop' | null>(null);
+  const changeLimit = async (value: 'wait' | 'stop') => {
+    if (value === queue.onLimit) return;
+    setPendingLimit(value);
+    try {
+      onQueue(await api.queueSettings({ onLimit: value }));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setPendingLimit(null);
     }
   };
 
@@ -226,6 +241,27 @@ export function QueueSettings({
         {modeTitle ? <p className="text-xs text-muted-foreground">{modeTitle}</p> : null}
       </div>
       {mode.failure ? <Alert variant="destructive">{mode.failure}</Alert> : null}
+      <div className="flex flex-col gap-0.5">
+        <label htmlFor="queue-on-limit" className="text-sm font-medium">
+          {t('queue.settings.onLimit')}
+        </label>
+        <Select
+          value={pendingLimit ?? queue.onLimit}
+          disabled={pendingLimit !== null}
+          onValueChange={(value) => void changeLimit(value === 'stop' ? 'stop' : 'wait')}
+        >
+          <SelectTrigger id="queue-on-limit" aria-describedby="queue-on-limit-hint">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="wait">{t('queue.settings.onLimitWait')}</SelectItem>
+            <SelectItem value="stop">{t('queue.settings.onLimitStop')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <p id="queue-on-limit-hint" className="text-xs text-muted-foreground">
+          {t('queue.settings.onLimitHint')}
+        </p>
+      </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="queue-autopilot-answer" className="text-sm font-medium">
           {t('queue.settings.autopilotAnswer')}

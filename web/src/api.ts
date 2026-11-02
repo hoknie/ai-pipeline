@@ -31,6 +31,8 @@ export interface QueueSettingsPatch {
   skipFailed?: boolean;
   /** `null`: the default text. */
   autopilotAnswer?: string | null;
+  /** On a usage limit: wait for the reset, or stop. */
+  onLimit?: 'wait' | 'stop';
 }
 
 export interface Api {
@@ -72,6 +74,8 @@ export interface Api {
   queueStart(parallel?: number): Promise<QueueView>;
   queuePause(): Promise<QueueView>;
   queueSettings(patch: QueueSettingsPatch): Promise<QueueView>;
+  /** Puts a run back first in the queue of its repository; it continues where it stopped. */
+  queueReturn(run: string, repository: string): Promise<QueueView & { item: string }>;
   /** The configuration of the bound repository, for the editors. */
   config(): Promise<ConfigEditorResponse>;
   /** Tools and skills a specialist can name, per runtime. */
@@ -184,6 +188,8 @@ function bound(repository: string | null): Api {
       post(at('/api/queue/start'), parallel === undefined ? {} : { parallel }),
     queuePause: () => post(at('/api/queue/pause')),
     queueSettings: (patch) => post(at('/api/queue/settings'), patch),
+    queueReturn: (run, runRepository) =>
+      post(withRepository('/api/queue/return', runRepository), { run }),
     config: () => call(at('/api/config')),
     catalog: () => call(at('/api/config/catalog')),
     writeSpecialist: (id, value, revision, level) =>

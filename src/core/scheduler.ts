@@ -2,7 +2,37 @@ import { findSpecialist } from '../config/index.ts';
 
 import { buildInput } from './input.ts';
 import type { Effect } from './machine.ts';
-import { allGroups, stepsOf, type Attempt, type Group, type RunState } from './model.ts';
+import {
+  USAGE_LIMIT_FALLBACK_MS,
+  allGroups,
+  stepsOf,
+  type Attempt,
+  type Group,
+  type RunState,
+} from './model.ts';
+
+/** When the usage limit of an attempt that ran out of it resets; null for other attempts. */
+export function limitResetsAt(attempt: Attempt): number | null {
+  if (attempt.reason?.kind !== 'usage_limit') return null;
+  return (
+    attempt.reason.resetsAt ?? (attempt.finishedAt ?? attempt.startedAt) + USAGE_LIMIT_FALLBACK_MS
+  );
+}
+
+/** Runtimes held by a usage limit that has not reset at `now`, with the moment it resets. */
+export function limitHolds(states: Iterable<RunState>, now: number): Map<string, number> {
+  const holds = new Map<string, number>();
+  for (const state of states) {
+    for (const group of allGroups(state)) {
+      for (const attempt of group.attempts) {
+        const until = limitResetsAt(attempt);
+        if (until === null || until <= now) continue;
+        holds.set(attempt.runtime, Math.max(holds.get(attempt.runtime) ?? 0, until));
+      }
+    }
+  }
+  return holds;
+}
 
 export function runningCount(states: RunState[]): number {
   return states.reduce(
@@ -34,6 +64,7 @@ export function dispatch(states: RunState[], max: number, now: number): Effect[]
   const effects: Effect[] = [];
   let running = runningCount(states);
   const bySpecialist = runningBySpecialist(states);
+  const holds = limitHolds(states, now);
   const queue = states
     .filter((state) => state.run.finishedAt === null)
     .sort(
@@ -51,7 +82,9 @@ export function dispatch(states: RunState[], max: number, now: number): Effect[]
     const slug = group.pending
       ? stepsOf(state.run, group)[group.pending.stepIndex]?.specialist
       : undefined;
-    const limit = slug ? (findSpecialist(state.run.config, slug)?.max ?? null) : null;
+    const specialist = slug ? findSpecialist(state.run.config, slug) : undefined;
+    if (specialist && holds.has(specialist.runtime)) continue;
+    const limit = specialist?.max ?? null;
     if (slug && limit !== null && (bySpecialist.get(slug) ?? 0) >= limit) continue;
     const attempt = startAttempt(state, group, now);
     bySpecialist.set(attempt.specialist, (bySpecialist.get(attempt.specialist) ?? 0) + 1);
