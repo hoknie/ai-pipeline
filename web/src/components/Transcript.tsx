@@ -6,6 +6,7 @@ import { cn } from '../lib/cn.ts';
 import type { TranscriptEntry } from '../types.ts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.tsx';
 
+import { isJsonSummary, parseJson, readableJson, readableSummary } from './jsonText.ts';
 import { Markdown } from './Markdown.tsx';
 import { StatusBadge } from './StatusBadge.tsx';
 
@@ -65,8 +66,10 @@ function Fold({
   );
 }
 
-function Result({ result }: { result: ToolResult }) {
+function Result({ result, showJson }: { result: ToolResult; showJson: boolean }) {
   const { t } = useTranslation();
+  const value = showJson ? undefined : parseJson(result.text);
+  const text = value === undefined ? result.text : readableJson(value);
   if (result.error) {
     return (
       <Fold
@@ -74,11 +77,11 @@ function Result({ result }: { result: ToolResult }) {
         head={
           <span className="min-w-0 truncate">
             <span className="font-medium text-status-err">{t('runs.transcript.error')}</span>{' '}
-            {firstLine(result.text)}
+            {firstLine(text)}
           </span>
         }
       >
-        {result.text}
+        {text}
       </Fold>
     );
   }
@@ -86,17 +89,29 @@ function Result({ result }: { result: ToolResult }) {
     <Fold
       head={
         <span className="truncate">
-          {t('runs.transcript.result')} ·{' '}
-          {firstLine(result.text) || t('runs.transcript.emptyResult')}
+          {t('runs.transcript.result')} · {firstLine(text) || t('runs.transcript.emptyResult')}
         </span>
       }
     >
-      {result.text}
+      {text}
     </Fold>
   );
 }
 
-function Call({ call, results }: { call: ToolCall; results: ToolResult[] }) {
+function Call({
+  call,
+  results,
+  showJson,
+}: {
+  call: ToolCall;
+  results: ToolResult[];
+  showJson: boolean;
+}) {
+  const input = showJson ? undefined : parseJson(call.input);
+  const summary =
+    input !== undefined && isJsonSummary(call.summary, call.input)
+      ? readableSummary(input)
+      : call.summary;
   return (
     <div className="flex flex-col gap-1">
       <Fold
@@ -104,23 +119,23 @@ function Call({ call, results }: { call: ToolCall; results: ToolResult[] }) {
           <>
             <span className="font-medium">{call.name}</span>
             <code className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-              {call.summary}
+              {summary}
             </code>
           </>
         }
       >
-        {call.input}
+        {input === undefined ? call.input : readableJson(input)}
       </Fold>
       {results.map((result, index) => (
         <div key={index} className="ml-4">
-          <Result result={result} />
+          <Result result={result} showJson={showJson} />
         </div>
       ))}
     </div>
   );
 }
 
-function Entry({ entry }: { entry: TranscriptEntry }) {
+function Entry({ entry, showJson }: { entry: TranscriptEntry; showJson: boolean }) {
   const { t } = useTranslation();
   switch (entry.kind) {
     case 'text':
@@ -136,9 +151,9 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
         </section>
       );
     case 'tool_call':
-      return <Call call={entry} results={[]} />;
+      return <Call call={entry} results={[]} showJson={showJson} />;
     case 'tool_result':
-      return <Result result={entry} />;
+      return <Result result={entry} showJson={showJson} />;
     case 'result':
       return (
         <div
@@ -160,6 +175,7 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
         </div>
       );
     case 'raw':
+      if (!showJson && parseJson(entry.text) !== undefined) return null;
       return <pre className="font-mono text-xs whitespace-pre-wrap">{entry.text}</pre>;
   }
 }
@@ -167,10 +183,13 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
 export function Transcript({
   entries,
   onlyText = false,
+  showJson = true,
 }: {
   entries: TranscriptEntry[];
   /** Shows only the specialist's own messages. */
   onlyText?: boolean;
+  /** Shows inputs, results and unknown lines as JSON; off renders `key: value` and hides the unknown lines. */
+  showJson?: boolean;
 }) {
   const { t } = useTranslation();
   if (entries.length === 0)
@@ -182,9 +201,9 @@ export function Transcript({
     <div className="flex flex-col gap-2">
       {blocks(shown).map((block, index) =>
         block.kind === 'call' ? (
-          <Call key={index} call={block.call} results={block.results} />
+          <Call key={index} call={block.call} results={block.results} showJson={showJson} />
         ) : (
-          <Entry key={index} entry={block.entry} />
+          <Entry key={index} entry={block.entry} showJson={showJson} />
         ),
       )}
     </div>

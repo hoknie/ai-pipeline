@@ -14,6 +14,7 @@ export function AttemptTimeline({
   lastSeq,
   rawLog,
   onlyReplies,
+  showJson,
   retryable,
   onRetry,
 }: {
@@ -25,6 +26,7 @@ export function AttemptTimeline({
   lastSeq: number | null;
   rawLog: string[] | null;
   onlyReplies: boolean;
+  showJson: boolean;
   /** The last attempt of a failed group can be retried. */
   retryable: boolean;
   onRetry: () => void;
@@ -44,6 +46,7 @@ export function AttemptTimeline({
           initiallyOpen={attempt.seq === openSeq}
           rawLog={attempt.seq === lastSeq ? rawLog : null}
           onlyReplies={onlyReplies}
+          showJson={showJson}
           {...(attempt.seq === lastSeq && retryable ? { onRetry } : {})}
         />
       ))}

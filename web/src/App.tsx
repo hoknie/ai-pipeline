@@ -106,6 +106,7 @@ function Panel({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [queueDrafts, setQueueDrafts] = useState<Record<string, QueueDraft>>({});
   const [onlyReplies, setOnlyReplies] = usePreference('onlyReplies', false);
+  const [showJson, setShowJson] = usePreference('showJson', false);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [notify, setNotify] = useState(
@@ -373,6 +374,8 @@ function Panel({
             onError={onError}
             onlyReplies={onlyReplies}
             onOnlyReplies={setOnlyReplies}
+            showJson={showJson}
+            onShowJson={setShowJson}
             onRoute={setRoute}
             repository={selected}
             scope={scope}

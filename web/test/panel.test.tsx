@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App.tsx';
 import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
+import { Transcript } from '../src/components/Transcript.tsx';
 import { RunHeader } from '../src/components/runs/RunHeader.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
 import type { RunFilter } from '../src/components/runs/runFilter.ts';
@@ -673,6 +674,27 @@ describe('attempts and transcript', () => {
     expect(onOnlyReplies).toHaveBeenCalledWith(true);
   });
 
+  it('has the switch of JSON in the head of the log and none in the attempt', async () => {
+    const onShowJson = vi.fn();
+    render(
+      <GroupScreen
+        api={logApi()}
+        runId="run1"
+        row={groupRow()}
+        draftKey="run1/login"
+        drafts={{}}
+        onDraft={() => undefined}
+        onClearDrafts={() => undefined}
+        onError={() => undefined}
+        onShowJson={onShowJson}
+      />,
+    );
+    await screen.findByText('ответ специалиста');
+    expect(screen.getAllByRole('switch', { name: 'show JSON' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('switch', { name: 'show JSON' }));
+    expect(onShowJson).toHaveBeenCalledWith(true);
+  });
+
   it('says so when there are no specialist answers yet', async () => {
     const api = logApi();
     api.transcript = vi.fn(async () => ({
@@ -851,5 +873,75 @@ describe('tag catalog and filter', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
     await waitFor(() => expect(document.querySelector('li[data-run="b"]')).toBeTruthy());
     expect(window.localStorage.getItem('aip.web.runTags')).toBe('[]');
+  });
+});
+
+describe('JSON in the transcript', () => {
+  const entries = [
+    {
+      kind: 'tool_call' as const,
+      id: 'a',
+      name: 'mcp__aip__swarm_queue',
+      summary: '{"repo":"/w/app"}',
+      input: '{\n  "repo": "/w/app"\n}',
+    },
+    {
+      kind: 'tool_result' as const,
+      id: 'a',
+      error: false,
+      text: '{"status":"running","parallel":2}',
+    },
+    {
+      kind: 'tool_call' as const,
+      id: 'b',
+      name: 'TodoWrite',
+      summary: '{"todos":[{"content":"Спека","status":"done"}]}',
+      input: '{"todos":[{"content":"Спека","status":"done"}]}',
+    },
+    { kind: 'tool_call' as const, id: 'c', name: 'Edit', summary: 'src/app.ts', input: '{}' },
+    { kind: 'tool_call' as const, id: 'd', name: 'Bash', summary: 'npm test', input: '{}' },
+    { kind: 'tool_call' as const, id: 'e', name: 'Read', summary: 'a.ts', input: '{}' },
+    { kind: 'tool_result' as const, id: 'e', error: false, text: 'export const a = 1;' },
+    { kind: 'raw' as const, text: '{"type":"unknown_event"}' },
+    { kind: 'raw' as const, text: 'Killed: 9' },
+  ];
+
+  function expandAll() {
+    for (const button of screen.getAllByRole('button')) fireEvent.click(button);
+  }
+
+  it('renders JSON as key: value when it is off', () => {
+    const { container } = render(<Transcript entries={entries} showJson={false} />);
+    expandAll();
+    expect(screen.getAllByText('repo: /w/app').length).toBeGreaterThan(0);
+    expect(screen.getByText(/result · status: running/)).toBeTruthy();
+    expect(container.textContent).toContain('status: running');
+    expect(container.textContent).toContain('parallel: 2');
+    expect(container.textContent).not.toContain('{"');
+    expect(container.textContent).not.toContain('{\n');
+    expect(container.textContent).toContain('- content: Спека');
+    expect(container.textContent).toContain('status: done');
+    expect(screen.getByText('src/app.ts')).toBeTruthy();
+    expect(screen.getByText('npm test')).toBeTruthy();
+    expect(screen.getByText('Killed: 9')).toBeTruthy();
+    expect(screen.queryByText('{"type":"unknown_event"}')).toBeNull();
+    expect(container.textContent).toContain('export const a = 1;');
+  });
+
+  it('shows the transcript as before when JSON is on', () => {
+    const { container } = render(<Transcript entries={entries} />);
+    expandAll();
+    expect(screen.getAllByText('{"repo":"/w/app"}').length).toBeGreaterThan(0);
+    expect(screen.getByText('{"type":"unknown_event"}')).toBeTruthy();
+    expect(container.textContent).toContain('{"status":"running","parallel":2}');
+  });
+
+  it('keeps the raw log as it is', async () => {
+    const api = fakeApi({
+      group: vi.fn(async () => groupView({ log: { seq: 1, lines: ['{"type":"x"}'] } })),
+    });
+    panel(api);
+    fireEvent.click(await screen.findByLabelText(/raw log/));
+    expect(screen.getByText('{"type":"x"}')).toBeTruthy();
   });
 });

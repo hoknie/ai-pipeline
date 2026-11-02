@@ -207,6 +207,7 @@ export const en = {
       changes: 'Changes',
       task: 'Task',
       onlyReplies: 'only specialist replies',
+      showJson: 'show JSON',
       noChanges: 'No changes yet',
       noChangesText: 'The group has not changed any files yet.',
     },

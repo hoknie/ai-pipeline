@@ -42,6 +42,8 @@ export function RunsPage({
   onError,
   onlyReplies,
   onOnlyReplies,
+  showJson,
+  onShowJson,
   onRoute,
   repository,
   scope,
@@ -58,6 +60,8 @@ export function RunsPage({
   onError: (message: string) => void;
   onlyReplies: boolean;
   onOnlyReplies: (value: boolean) => void;
+  showJson: boolean;
+  onShowJson: (value: boolean) => void;
   onRoute: (route: Route) => void;
   /** The selected repository; null until known. */
   repository: string | null;
@@ -231,6 +235,8 @@ export function RunsPage({
           onError={onError}
           onlyReplies={onlyReplies}
           onOnlyReplies={onOnlyReplies}
+          showJson={showJson}
+          onShowJson={onShowJson}
         />
       ) : (
         <p className="p-4 text-sm text-muted-foreground">{t('runs.page.noGroups')}</p>

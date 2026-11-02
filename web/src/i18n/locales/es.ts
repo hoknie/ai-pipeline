@@ -212,6 +212,7 @@ export const es: Dictionary = {
       changes: 'Cambios',
       task: 'Tarea',
       onlyReplies: 'solo respuestas del especialista',
+      showJson: 'mostrar JSON',
       noChanges: 'Aún no hay cambios',
       noChangesText: 'El grupo aún no ha cambiado archivos.',
     },

@@ -81,6 +81,7 @@ export function Attempt({
   initiallyOpen,
   rawLog,
   onlyReplies = false,
+  showJson = true,
   onRetry,
 }: {
   api: Api;
@@ -92,6 +93,8 @@ export function Attempt({
   rawLog: string[] | null;
   /** Show only the texts of the specialist in the transcript; one switch for the whole run. */
   onlyReplies?: boolean;
+  /** Show JSON in the transcript as it is; one switch for the whole run. */
+  showJson?: boolean;
   /** Retries the step; given for the last attempt of a failed group only. */
   onRetry?: () => void;
 }) {
@@ -213,7 +216,11 @@ export function Attempt({
                   {rawLog.join('\n')}
                 </pre>
               ) : transcript ? (
-                <Transcript entries={transcript.entries} onlyText={onlyReplies} />
+                <Transcript
+                  entries={transcript.entries}
+                  onlyText={onlyReplies}
+                  showJson={showJson}
+                />
               ) : (
                 <Skeleton
                   role="status"

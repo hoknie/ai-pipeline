@@ -82,4 +82,18 @@ describe('answers-only switch of the run screen', () => {
     ).toBe('true');
     expect(screen.queryByText('Read')).toBeNull();
   });
+
+  it('keeps the JSON switch after the panel is opened again', async () => {
+    const first = open();
+    await screen.findByText('Read');
+    const toggle = screen.getByRole('switch', { name: 'show JSON' });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle);
+    first.unmount();
+    open();
+    await screen.findByText('Read');
+    expect(screen.getByRole('switch', { name: 'show JSON' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+  });
 });

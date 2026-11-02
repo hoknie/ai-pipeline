@@ -210,6 +210,7 @@ export const ru: Dictionary = {
       changes: 'Изменения',
       task: 'Задача',
       onlyReplies: 'только ответы специалиста',
+      showJson: 'показывать JSON',
       noChanges: 'Изменений пока нет',
       noChangesText: 'Группа пока не изменила файлы.',
     },

@@ -207,6 +207,7 @@ export const zh: Dictionary = {
       changes: '变更',
       task: '任务',
       onlyReplies: '仅显示专员回复',
+      showJson: '显示 JSON',
       noChanges: '暂无变更',
       noChangesText: '该分组尚未修改任何文件。',
     },

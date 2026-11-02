@@ -37,6 +37,8 @@ export function GroupScreen({
   onError,
   onlyReplies = false,
   onOnlyReplies,
+  showJson = false,
+  onShowJson,
 }: {
   api: Api;
   runId: string;
@@ -52,6 +54,8 @@ export function GroupScreen({
   /** Show only the texts of the specialist in every log. */
   onlyReplies?: boolean;
   onOnlyReplies?: (value: boolean) => void;
+  showJson?: boolean;
+  onShowJson?: (value: boolean) => void;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -219,10 +223,24 @@ export function GroupScreen({
             <TabsTrigger value="task">{t('runs.group.task')}</TabsTrigger>
           </TabsList>
           <TabsContent value="log" className="flex flex-col gap-3">
-            {onOnlyReplies ? (
-              <div className="flex items-center gap-2">
-                <Switch id="only-replies" checked={onlyReplies} onCheckedChange={onOnlyReplies} />
-                <Label htmlFor="only-replies">{t('runs.group.onlyReplies')}</Label>
+            {onOnlyReplies || onShowJson ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                {onOnlyReplies ? (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="only-replies"
+                      checked={onlyReplies}
+                      onCheckedChange={onOnlyReplies}
+                    />
+                    <Label htmlFor="only-replies">{t('runs.group.onlyReplies')}</Label>
+                  </div>
+                ) : null}
+                {onShowJson ? (
+                  <div className="flex items-center gap-2">
+                    <Switch id="show-json" checked={showJson} onCheckedChange={onShowJson} />
+                    <Label htmlFor="show-json">{t('runs.group.showJson')}</Label>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <AttemptTimeline
@@ -234,6 +252,7 @@ export function GroupScreen({
               lastSeq={lastSeq}
               rawLog={view.log ? view.log.lines : null}
               onlyReplies={onlyReplies}
+              showJson={showJson}
               retryable={row.status === 'failed' || row.status === 'cancelled'}
               onRetry={() =>
                 void act(
