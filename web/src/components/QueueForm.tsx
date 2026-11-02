@@ -201,6 +201,16 @@ export function QueueForm({
         void submit();
       }}
     >
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <Label htmlFor={`${idPrefix}-title`}>{t('queue.form.name')}</Label>
+        <Input
+          id={`${idPrefix}-title`}
+          value={effective.title}
+          maxLength={TITLE_LIMIT}
+          placeholder={t('queue.form.namePlaceholder')}
+          onChange={(event) => change({ title: event.target.value })}
+        />
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor={`${idPrefix}-workflow`}>Workflow</Label>
         <Select
@@ -279,6 +289,37 @@ export function QueueForm({
           </Button>
         </div>
       )}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Label htmlFor={`${idPrefix}-after`}>{t('queue.form.after')}</Label>
+          <ValuesPicker
+            id={`${idPrefix}-after`}
+            label={t('queue.form.after')}
+            values={effective.after}
+            onChange={(after) => change({ after, afterTouched: true })}
+            options={afterPick}
+            display={(id) => afterTitle.get(id) || id}
+            headings={{
+              builtin: t('queue.form.afterCurrent'),
+              project: t('queue.form.afterItems'),
+              global: t('queue.form.afterRuns'),
+            }}
+            creatable={false}
+            contentClassName="min-w-80"
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Label htmlFor={`${idPrefix}-tags`}>{t('queue.form.tags')}</Label>
+          <TagPicker
+            id={`${idPrefix}-tags`}
+            label={t('queue.form.tags')}
+            selected={effective.tags}
+            onChange={(tags) => change({ tags })}
+            api={api}
+            allowCreate={api !== undefined}
+          />
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Switch
           id={`${idPrefix}-auto-deliver`}
@@ -298,46 +339,6 @@ export function QueueForm({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={`${idPrefix}-tags`}>{t('queue.form.tags')}</Label>
-        <div className="min-w-0 max-w-xl">
-          <TagPicker
-            id={`${idPrefix}-tags`}
-            label={t('queue.form.tags')}
-            selected={effective.tags}
-            onChange={(tags) => change({ tags })}
-            api={api}
-            allowCreate={api !== undefined}
-          />
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={`${idPrefix}-after`}>{t('queue.form.after')}</Label>
-        <div className="min-w-0 max-w-xl">
-          <ValuesPicker
-            id={`${idPrefix}-after`}
-            label={t('queue.form.after')}
-            values={effective.after}
-            onChange={(after) => change({ after, afterTouched: true })}
-            options={afterPick}
-            display={(id) => afterTitle.get(id) || id}
-            headings={{
-              builtin: t('queue.form.afterCurrent'),
-              project: t('queue.form.afterItems'),
-              global: t('queue.form.afterRuns'),
-            }}
-            creatable={false}
-          />
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          aria-label={t('queue.form.name')}
-          className="max-w-xs flex-1"
-          value={effective.title}
-          maxLength={TITLE_LIMIT}
-          placeholder={t('queue.form.namePlaceholder')}
-          onChange={(event) => change({ title: event.target.value })}
-        />
         <Button type="submit" disabled={!valid || busy}>
           {submitLabel}
         </Button>

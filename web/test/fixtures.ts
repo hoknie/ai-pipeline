@@ -88,6 +88,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     workflow: 'feature',
     branch: 'refs/aip/run1/run',
     createdAt: 1_000,
+    startedAt: 1_000,
     finishedAt: null,
     finished: false,
     state: 'active',

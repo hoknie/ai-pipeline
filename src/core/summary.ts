@@ -42,6 +42,17 @@ export function summarize(state: RunState): RunSummary {
   };
 }
 
+/** When the run was taken into work: the earliest attempt start of any group; null before that. */
+export function runStartedAt(state: RunState): number | null {
+  let earliest: number | null = null;
+  for (const group of allGroups(state)) {
+    for (const attempt of group.attempts) {
+      if (earliest === null || attempt.startedAt < earliest) earliest = attempt.startedAt;
+    }
+  }
+  return earliest;
+}
+
 export function formatCounts(summary: RunSummary): string {
   return GROUP_STATUSES.filter((status) => summary.counts[status] > 0)
     .map((status) => `${status} ${summary.counts[status]}`)

@@ -6,6 +6,7 @@ import {
   advance,
   createRun,
   dependencyState,
+  dependencyTags,
   editItem,
   emptyQueue,
   itemFailed,
@@ -19,6 +20,7 @@ import {
   runProblems,
   setParallel,
   setQueueSettings,
+  spreadTags,
   startQueue,
   transition,
   type Queue,
@@ -993,5 +995,60 @@ describe('skip failed', () => {
     startQueue(queue, [], 3);
     itemFailed(queue, 'q1', 'boom', 5);
     expect(queue).toMatchObject({ status: 'stopped', stop: { kind: 'item', item: 'q1' } });
+  });
+});
+
+describe('tags along dependencies', () => {
+  function tagged(): Queue {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a', tags: ['tg-a'] }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
+    addItem(queue, { workflow: 'feature', task: 'c', after: ['q2'] }, 'q3', 2);
+    addItem(queue, { workflow: 'feature', task: 'd' }, 'q4', 2);
+    return queue;
+  }
+
+  it('dependencyTags takes the tags of items and runs in the order of references', () => {
+    const queue = tagged();
+    addItem(queue, { workflow: 'feature', task: 'e', tags: ['tg-b', 'tg-a'] }, 'q5', 2);
+    const runTags = (id: string) => (id === 'r1' ? ['tg-c', 'tg-b'] : undefined);
+    expect(dependencyTags(queue, ['q5', 'r1', 'q1', 'r-unknown'], runTags)).toEqual([
+      'tg-b',
+      'tg-a',
+      'tg-c',
+    ]);
+    expect(dependencyTags(queue, [], runTags)).toEqual([]);
+    expect(dependencyTags(queue, ['r-unknown'], runTags)).toEqual([]);
+  });
+
+  it('spreadTags appends to a direct dependent and along a chain, not to an independent item', () => {
+    const queue = tagged();
+    expect(spreadTags(queue, 'q1', ['tg-x'], 9)).toEqual(['q2', 'q3']);
+    expect(queue.items.map((item) => item.tags)).toEqual([['tg-a'], ['tg-x'], ['tg-x'], []]);
+    expect(queue.updatedAt).toBe(9);
+  });
+
+  it('spreadTags works from a run id and skips items that already have the tag', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a', after: ['r1'], tags: ['tg-x'] }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
+    expect(spreadTags(queue, 'r1', ['tg-x'], 9)).toEqual(['q2']);
+    expect(queue.items[1]?.tags).toEqual(['tg-x']);
+  });
+
+  it('spreadTags changes nothing for empty tags and leaves updatedAt alone', () => {
+    const queue = tagged();
+    expect(spreadTags(queue, 'q1', [], 9)).toEqual([]);
+    expect(spreadTags(queue, 'q4', ['tg-x'], 9)).toEqual([]);
+    expect(queue.updatedAt).toBe(2);
+  });
+
+  it('spreadTags does not loop on a cycle in the data', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a' }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
+    queue.items[0]!.after = ['q2'];
+    expect(spreadTags(queue, 'q1', ['tg-x'], 9).sort()).toEqual(['q2']);
+    expect(queue.items[0]?.tags).toEqual([]);
   });
 });

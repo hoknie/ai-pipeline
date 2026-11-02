@@ -159,6 +159,32 @@ describe('needs_human runs', () => {
     expect(sortRuns(runs).map((run) => run.id)).toEqual(['old-wait', 'new', 'old', 'fin']);
   });
 
+  it('sorts by start time, not by creation time', () => {
+    const runs = [
+      runView({ id: 'created-late', createdAt: 50, startedAt: 100 }),
+      runView({ id: 'created-early', createdAt: 10, startedAt: 200 }),
+    ];
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['created-early', 'created-late']);
+  });
+
+  it('puts an unfinished run that is not started above started ones', () => {
+    const runs = [
+      runView({ id: 'started', createdAt: 10, startedAt: 500 }),
+      runView({ id: 'queued', createdAt: 5, startedAt: null }),
+      runView({ id: 'queued-new', createdAt: 8, startedAt: null }),
+    ];
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['queued-new', 'queued', 'started']);
+  });
+
+  it('sorts finished runs by start time, falling back to creation time', () => {
+    const runs = [
+      runView({ id: 'a', finished: true, state: 'finished', createdAt: 5, startedAt: 100 }),
+      runView({ id: 'b', finished: true, state: 'finished', createdAt: 300, startedAt: null }),
+      runView({ id: 'c', finished: true, state: 'finished', createdAt: 1, startedAt: 200 }),
+    ];
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['b', 'c', 'a']);
+  });
+
   it('shows needs_human ×N in the list and header, and active after the answer', () => {
     const { rerender } = render(list([waiting()], { now: 1000 }));
     expect(screen.getByText('Needs answer ×3')).toBeTruthy();

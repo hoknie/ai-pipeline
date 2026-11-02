@@ -2,6 +2,7 @@ import type { NewGroup } from './create.ts';
 import { Rejection } from './errors.ts';
 import { RUN_TITLE_LIMIT } from './ids.ts';
 import { cleanSkip } from './skip.ts';
+import { mergeTags } from './tags.ts';
 import { allGroups, runPhase, type RunState } from './model.ts';
 
 export const QUEUE_PARALLEL_MAX = 20;
@@ -198,6 +199,52 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
   if (patch.position !== undefined) placeItem(queue, item, patch.position);
   queue.updatedAt = now;
   return item;
+}
+
+/**
+ * Tags of the predecessors in `after`, in the order of the references, without
+ * repeats: the tags of a queue item, or `runTags(id)` for a run (unknown: none).
+ */
+export function dependencyTags(
+  queue: Queue,
+  after: readonly string[],
+  runTags: (id: string) => readonly string[] | undefined,
+): string[] {
+  return mergeTags(
+    ...after.map((ref) => queue.items.find((item) => item.id === ref)?.tags ?? runTags(ref) ?? []),
+  );
+}
+
+/**
+ * Appends the tags `added` to every waiting item that depends on `source` (an
+ * item or a run) directly or through a chain of items. Returns the ids of the
+ * changed items; a cycle in the data does not loop.
+ */
+export function spreadTags(
+  queue: Queue,
+  source: string,
+  added: readonly string[],
+  now: number,
+): string[] {
+  if (added.length === 0) return [];
+  const reached = new Set([source]);
+  const changed: string[] = [];
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const item of queue.items) {
+      if (reached.has(item.id) || !item.after.some((ref) => reached.has(ref))) continue;
+      reached.add(item.id);
+      grew = true;
+      const next = mergeTags(item.tags, added);
+      if (next.length !== item.tags.length) {
+        item.tags = next;
+        changed.push(item.id);
+      }
+    }
+  }
+  if (changed.length > 0) queue.updatedAt = now;
+  return changed;
 }
 
 export function removeItem(queue: Queue, id: string, now: number): void {

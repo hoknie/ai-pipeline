@@ -135,4 +135,29 @@ describe('ValuesPicker', () => {
     expect(onChange).toHaveBeenLastCalledWith(['q2']);
     expect(screen.getByRole('button', { name: 'Remove API' })).toBeTruthy();
   });
+
+  it('keeps a long chosen value inside the field and a long option whole', async () => {
+    const long = 'д'.repeat(120);
+    render(
+      <Harness
+        start={['q1']}
+        options={[{ name: 'q1', source: 'project' }]}
+        creatable={false}
+        display={() => long}
+        contentClassName="min-w-80"
+      />,
+    );
+    const text = screen.getByTitle(long);
+    expect(text.className).toContain('truncate');
+    expect(screen.getByRole('button', { name: `Remove ${long}` })).toBeTruthy();
+    await search();
+    const option = screen.getByRole('option');
+    const label = option.querySelector(`[title="${long}"]`)!;
+    expect(label.textContent).toBe(long);
+    expect(label.className).not.toContain('truncate');
+    expect(label.className).toContain('line-clamp-3');
+    expect(document.querySelector('[data-radix-popper-content-wrapper] > *')?.className).toContain(
+      'min-w-80',
+    );
+  });
 });

@@ -17,6 +17,7 @@ import {
   knownTags,
   occupiesSlot,
   runPhase,
+  runStartedAt,
   suggestPatterns,
   summarize,
   type Attempt,
@@ -143,6 +144,8 @@ export interface RunView {
   workflow: string;
   branch: string;
   createdAt: number;
+  /** When the first attempt of any group started; null while the run waits for a free slot. */
+  startedAt: number | null;
   finishedAt: number | null;
   finished: boolean;
   state: RunPhase;
@@ -322,6 +325,7 @@ export function runView(
     workflow: state.run.workflow,
     branch: state.run.branch,
     createdAt: state.run.createdAt,
+    startedAt: runStartedAt(state),
     finishedAt: state.run.finishedAt,
     finished: summary.finished,
     state: summary.state,

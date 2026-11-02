@@ -6,6 +6,7 @@ import {
   addTag,
   editTag,
   knownTags,
+  mergeTags,
   removeTag,
   resolveTags,
   type Tag,
@@ -96,5 +97,12 @@ describe('resolveTags', () => {
 describe('knownTags', () => {
   it('drops ids that are not in the catalog and keeps the order', () => {
     expect(knownTags(catalogOf('a', 'b'), ['tg-1', 'gone', 'tg-0'])).toEqual(['tg-1', 'tg-0']);
+  });
+});
+
+describe('mergeTags', () => {
+  it('joins lists without repeats in the order of first appearance', () => {
+    expect(mergeTags(['a', 'b'], ['b', 'c'], [], ['a', 'd'])).toEqual(['a', 'b', 'c', 'd']);
+    expect(mergeTags()).toEqual([]);
   });
 });

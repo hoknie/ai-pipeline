@@ -31,7 +31,7 @@ export {
   type DeliveryEffect,
   type DeliveryResult,
 } from './delivery.ts';
-export { formatCounts, summarize, type RunSummary } from './summary.ts';
+export { formatCounts, runStartedAt, summarize, type RunSummary } from './summary.ts';
 export {
   specialistUse,
   type SpecialistRunning,
@@ -66,6 +66,7 @@ export {
   editTag,
   findTag,
   knownTags,
+  mergeTags,
   removeTag,
   resolveTags,
   type Tag,
@@ -77,7 +78,9 @@ export {
   advance,
   checkDependencies,
   dependencyState,
+  dependencyTags,
   editItem,
+  spreadTags,
   itemReadiness,
   runDone,
   emptyQueue,

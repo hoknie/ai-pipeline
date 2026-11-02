@@ -28,12 +28,15 @@ import {
   advance,
   allGroups,
   createRun,
+  dependencyTags,
   editItem,
+  spreadTags,
   editTag,
   emptyQueue,
   itemFailed,
   itemStarted,
   knownTags,
+  mergeTags,
   moveItem,
   pauseQueue,
   queueItemId,
@@ -407,16 +410,35 @@ export class Daemon {
             request.params.after === undefined
               ? undefined
               : this.resolveDependencies(queue, request.params.after);
-          const tags =
+          let tags =
             request.params.tags === undefined
               ? undefined
               : resolveTags(this.catalog, request.params.tags);
+          const existing = queue.items.find((candidate) => candidate.id === item);
+          const before = existing?.tags ?? [];
+          if (existing && after !== undefined) {
+            const fresh = after.filter((ref) => !existing.after.includes(ref));
+            const inherited = knownTags(
+              this.catalog,
+              dependencyTags(queue, fresh, (id) => this.lookupState(id)?.run.tags),
+            );
+            if (inherited.length > 0) tags = mergeTags(tags ?? existing.tags, inherited);
+          }
           editItem(
             queue,
             item,
             { workflow, task, groups, title, position, autoDeliver, tags, skip, after },
             now,
           );
+          const edited = queue.items.find((candidate) => candidate.id === item);
+          if (edited) {
+            spreadTags(
+              queue,
+              item,
+              edited.tags.filter((id) => !before.includes(id)),
+              now,
+            );
+          }
           this.saveQueue(queue);
           await this.advanceQueue(repository);
           return this.queueSnapshot(queue);
@@ -846,6 +868,12 @@ export class Daemon {
     return this.publishTags();
   }
 
+  /** Own tags plus the tags of the predecessors in `after`, only those still in the catalog. */
+  private inheritTags(queue: Queue, own: string[], after: string[]): string[] {
+    const inherited = dependencyTags(queue, after, (id) => this.lookupState(id)?.run.tags);
+    return knownTags(this.catalog, mergeTags(own, inherited));
+  }
+
   private async runTags(params: ParamsOf<'run_tags'>): Promise<RunView> {
     const state = this.state(params.runId);
     const add = resolveTags(this.catalog, params.add ?? []);
@@ -853,6 +881,11 @@ export class Daemon {
     const current = knownTags(this.catalog, state.run.tags).filter((id) => !remove.has(id));
     const tags = [...current, ...add.filter((id) => !current.includes(id) && !remove.has(id))];
     await this.apply(state, { kind: 'tags_set', tags });
+    const added = tags.filter((id) => !current.includes(id));
+    if (added.length > 0) {
+      const queue = this.queueFor(state.run.repository);
+      if (spreadTags(queue, state.run.id, added, this.now()).length > 0) this.saveQueue(queue);
+    }
     return this.view(state);
   }
 
@@ -862,9 +895,9 @@ export class Daemon {
     const queue = this.queueFor(repository);
     const now = this.now();
     const { workflow, task, groups, title, autoDeliver, skip } = params;
-    const tags = resolveTags(this.catalog, params.tags ?? []);
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
+    const tags = this.inheritTags(queue, resolveTags(this.catalog, params.tags ?? []), after);
     const item = addItem(
       queue,
       { workflow, task, groups, title, autoDeliver, tags, skip, after },
@@ -897,11 +930,12 @@ export class Daemon {
     inherited?: string[],
   ): Promise<unknown> {
     const { workflow, task, groups, title, autoDeliver, skip } = params;
-    const tags = inherited ?? resolveTags(this.catalog, params.tags ?? []);
+    const own = inherited ?? resolveTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
+    const tags = this.inheritTags(queue, own, after);
     const item = addItem(
       queue,
       { workflow, task, groups, title, autoDeliver, tags, skip, after },

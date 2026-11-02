@@ -256,3 +256,12 @@ describe('runView specialists', () => {
     ]);
   });
 });
+
+describe('runView startedAt', () => {
+  it('is null before the first attempt and the attempt start after it', () => {
+    const state = run(1);
+    expect(runView(state, 5000).startedAt).toBeNull();
+    step(state, 1500);
+    expect(runView(state, 5000).startedAt).toBe(1500);
+  });
+});

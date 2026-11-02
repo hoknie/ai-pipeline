@@ -36,7 +36,15 @@ export function sortRuns(runs: Iterable<RunView>): RunView[] {
   return [...runs].sort((left, right) => {
     const rank = (run: RunView) => (run.finished ? 2 : run.state === 'needs_human' ? 0 : 1);
     if (rank(left) !== rank(right)) return rank(left) - rank(right);
-    return right.createdAt - left.createdAt;
+    // A run that waits for a slot is not started yet: it goes first among the unfinished.
+    const waiting = (run: RunView) => !run.finished && run.startedAt === null;
+    if (waiting(left) !== waiting(right)) return waiting(left) ? -1 : 1;
+    const key = (run: RunView) => (waiting(run) ? run.createdAt : (run.startedAt ?? run.createdAt));
+    return (
+      key(right) - key(left) ||
+      right.createdAt - left.createdAt ||
+      (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+    );
   });
 }
 

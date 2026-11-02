@@ -1030,17 +1030,21 @@ describe('tags in the queue', () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
   };
 
-  it('centres the label on the compact field', async () => {
+  it('puts the label above the field in a column of the shared grid', async () => {
     withTags(queueOf());
-    const picker = (await screen.findByRole('combobox', { name: 'Tags' })).parentElement!;
-    const wrapper = picker.parentElement!.parentElement!;
-    const row = wrapper.parentElement!;
-    const label = row.querySelector('label')!;
-    expect(row.classList.contains('items-center')).toBe(true);
-    expect(row.classList.contains('items-start')).toBe(false);
-    expect(label.classList.contains('pt-1.5')).toBe(false);
-    expect(wrapper.classList.contains('max-w-xl')).toBe(true);
-    expect(wrapper.classList.contains('flex-1')).toBe(false);
+    const tags = await screen.findByRole('combobox', { name: 'Tags' });
+    const after = screen.getByRole('combobox', { name: 'Waits for' });
+    const column =
+      tags.closest('label')?.parentElement ??
+      screen.getByText('Tags', { selector: 'label' }).parentElement!;
+    const grid = column.parentElement!;
+    expect(grid.contains(after)).toBe(true);
+    expect(grid.className).toContain('grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]');
+    expect(column.className).toContain('flex-col');
+    expect(column.className).not.toContain('max-w-xl');
+    const label = screen.getByText('Tags', { selector: 'label' });
+    expect(label.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(after.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('adds a task with two tags', async () => {
@@ -1203,6 +1207,29 @@ describe('queue links', () => {
       'q2',
       'run1',
     ]);
+  });
+});
+
+describe('task form layout', () => {
+  it('has the name as the first field, before the workflow', async () => {
+    show(queueOf());
+    const name = await screen.findByLabelText('Name');
+    const workflow = screen.getByRole('combobox', { name: 'Workflow' });
+    expect(name.compareDocumentPosition(workflow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name.id).toBe('new-title');
+  });
+
+  it('shows a long task title whole in the list and in the chip', async () => {
+    const long = 'Очень длинное название задачи которое не помещается в строку'.slice(0, 60);
+    show(queueOf({ items: [{ ...queueItem('q1', 'x', 1), title: long }] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Waits for' }));
+    const option = await screen.findByRole('option', { name: new RegExp(long) });
+    expect(option.querySelector(`[title="${long}"]`)).toBeTruthy();
+    fireEvent.click(option);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    const chip = document.querySelector(`span.truncate[title="${long}"]`);
+    expect(chip).toBeTruthy();
   });
 });
 

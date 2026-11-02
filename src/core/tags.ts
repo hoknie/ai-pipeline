@@ -111,3 +111,8 @@ export function knownTags(catalog: readonly Tag[], ids: readonly string[]): stri
   const present = new Set(catalog.map((tag) => tag.id));
   return ids.filter((id) => present.has(id));
 }
+
+/** Union of tag id lists; no duplicates, order of first appearance. */
+export function mergeTags(...lists: readonly (readonly string[])[]): string[] {
+  return [...new Set(lists.flat())];
+}

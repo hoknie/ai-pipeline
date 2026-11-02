@@ -455,3 +455,109 @@ describe('tags of tasks from a specialist', () => {
     expect(names((await h.status(explore)).tags)).toEqual(['auth']);
   });
 });
+
+describe('tags along dependencies', () => {
+  const TASK = { workflow: 'feature', groups: [{ title: 'g', task: 't' }] };
+
+  async function add(h: Harness, extra: Record<string, unknown>): Promise<string> {
+    const added = (await h.call('queue_add', {
+      ...TASK,
+      repository: h.repo,
+      ...extra,
+    })) as QueueView & { item: string };
+    return added.item;
+  }
+
+  const tagsOfItem = async (h: Harness, id: string): Promise<string[]> =>
+    names((await queueOf(h)).items.find((item) => item.id === id)?.tags ?? []);
+
+  async function twoTags(): Promise<Harness> {
+    const h = await start();
+    await addTag(h, 'auth');
+    await addTag(h, 'v2');
+    await addTag(h, 'ui');
+    return h;
+  }
+
+  it('gives a task the tags of the item it waits for, after its own tags', async () => {
+    const h = await twoTags();
+    const first = await add(h, { tags: ['auth', 'v2'] });
+    const plain = await add(h, { after: [first] });
+    const own = await add(h, { after: [first], tags: ['ui'] });
+    expect(await tagsOfItem(h, plain)).toEqual(['auth', 'v2']);
+    expect(await tagsOfItem(h, own)).toEqual(['ui', 'auth', 'v2']);
+  });
+
+  it('gives a task the tags of a run it waits for, also when it was an item before', async () => {
+    const h = await twoTags();
+    const first = await add(h, { tags: ['auth'] });
+    const created = (await h.call('queue_run_now', { repository: h.repo, item: first })) as {
+      runId: string;
+    };
+    await h.call('run_tags', { runId: created.runId, add: ['v2'] });
+    const byRun = await add(h, { after: [created.runId] });
+    const byItem = await add(h, { after: [first] });
+    expect(await tagsOfItem(h, byRun)).toEqual(['auth', 'v2']);
+    expect(await tagsOfItem(h, byItem)).toEqual(['auth', 'v2']);
+    await h.waitFor(created.runId, (run) => run.finished);
+  });
+
+  it('passes inherited tags from a queued task to its run', async () => {
+    const h = await twoTags();
+    const first = await add(h, { tags: ['auth'] });
+    const second = await add(h, { after: [first] });
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    const runs = await allRuns(h);
+    expect(runs).toHaveLength(2);
+    for (const run of runs) expect(names(run.tags)).toEqual(['auth']);
+    expect(second).toBeTruthy();
+    for (const run of runs) await h.waitFor(run.id, (view) => view.finished);
+  });
+
+  it('adds the tags of new predecessors on edit, keeps a removed tag removed and keeps tags when the link goes', async () => {
+    const h = await twoTags();
+    const first = await add(h, { tags: ['auth'] });
+    const second = await add(h, {});
+    await h.call('queue_edit', { repository: h.repo, item: second, after: [first], tags: [] });
+    expect(await tagsOfItem(h, second)).toEqual(['auth']);
+    await h.call('queue_edit', { repository: h.repo, item: second, tags: [] });
+    expect(await tagsOfItem(h, second)).toEqual([]);
+    await h.call('queue_edit', { repository: h.repo, item: second, tags: ['auth'] });
+    await h.call('queue_edit', { repository: h.repo, item: second, after: [] });
+    expect(await tagsOfItem(h, second)).toEqual(['auth']);
+  });
+
+  it('spreads a tag added to an item along the chain, but not a removal', async () => {
+    const h = await twoTags();
+    const first = await add(h, {});
+    const second = await add(h, { after: [first] });
+    const third = await add(h, { after: [second] });
+    const loose = await add(h, {});
+    await h.call('queue_edit', { repository: h.repo, item: first, tags: ['auth'] });
+    expect(await tagsOfItem(h, second)).toEqual(['auth']);
+    expect(await tagsOfItem(h, third)).toEqual(['auth']);
+    expect(await tagsOfItem(h, loose)).toEqual([]);
+    await h.call('queue_edit', { repository: h.repo, item: first, tags: [] });
+    expect(await tagsOfItem(h, second)).toEqual(['auth']);
+  });
+
+  it('moves a tag of a run to the waiting task and sends a queue event', async () => {
+    const h = await twoTags();
+    const first = await add(h, {});
+    const created = (await h.call('queue_run_now', { repository: h.repo, item: first })) as {
+      runId: string;
+    };
+    const waiting = await add(h, { after: [created.runId] });
+    const loose = await add(h, {});
+    const events: StreamEvent[] = [];
+    subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await h.call('run_tags', { runId: created.runId, add: ['auth'] });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(await tagsOfItem(h, waiting)).toEqual(['auth']);
+    expect(await tagsOfItem(h, loose)).toEqual([]);
+    expect(events.some((event) => event.event === 'queue')).toBe(true);
+    await h.waitFor(created.runId, (run) => run.finished);
+  });
+});

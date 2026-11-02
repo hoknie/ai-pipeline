@@ -2,6 +2,7 @@ import { Check, Plus, X } from 'lucide-react';
 import { useId, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { cn } from '../lib/cn.ts';
 import { Badge } from '../ui/badge.tsx';
 import {
   Command,
@@ -51,6 +52,7 @@ export function ValuesPicker({
   creatable = true,
   disabled = false,
   invalid = false,
+  contentClassName,
 }: {
   id?: string;
   label: string;
@@ -68,6 +70,8 @@ export function ValuesPicker({
   creatable?: boolean;
   disabled?: boolean;
   invalid?: boolean;
+  /** Extra classes of the popover with the list. */
+  contentClassName?: string;
 }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -112,7 +116,7 @@ export function ValuesPicker({
       }}
     >
       <div
-        className="flex min-h-8 flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5 aria-invalid:border-destructive"
+        className="flex min-h-8 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5 aria-invalid:border-destructive"
         aria-invalid={invalid}
       >
         {inherited.map((value) => (
@@ -125,14 +129,16 @@ export function ValuesPicker({
           const note = mark?.(value) ?? null;
           const text = display?.(value) ?? value;
           return (
-            <Badge key={value} variant="outline" className="gap-1.5 pr-1">
-              <span>{text}</span>
+            <Badge key={value} variant="outline" className="min-w-0 max-w-full gap-1.5 pr-1">
+              <span className="min-w-0 truncate" title={text}>
+                {text}
+              </span>
               {note ? <span className="font-normal text-status-warn">{note}</span> : null}
               <button
                 type="button"
                 aria-label={t('picker.remove', { value: text })}
                 disabled={disabled}
-                className="rounded-full p-0.5 hover:bg-accent disabled:opacity-50"
+                className="shrink-0 rounded-full p-0.5 hover:bg-accent disabled:opacity-50"
                 onClick={() => onChange(values.filter((candidate) => candidate !== value))}
               >
                 <X />
@@ -157,7 +163,7 @@ export function ValuesPicker({
           </button>
         </PopoverTrigger>
       </div>
-      <PopoverContent className="p-0">
+      <PopoverContent className={cn('p-0', contentClassName)}>
         <Command shouldFilter={false} label={t('picker.search', { label })}>
           <CommandInput
             value={query}
@@ -191,7 +197,10 @@ export function ValuesPicker({
                       >
                         <Check className={chosen ? 'opacity-100' : 'opacity-0'} />
                         <span className="flex min-w-0 flex-col">
-                          <span className="truncate">
+                          <span
+                            className="line-clamp-3 whitespace-normal break-words"
+                            title={display?.(option.name) ?? option.name}
+                          >
                             {display?.(option.name) ?? option.name}
                             {note ? (
                               <span className="ml-2 text-xs text-status-warn">{note}</span>
