@@ -481,10 +481,19 @@ describe('aip web', () => {
       autopilot: false,
     });
     expect((await read()).skipFailed).toBe(true);
+    const answered = (await (
+      await post('/api/queue/settings', { autopilotAnswer: 'Согласен' })
+    ).json()) as QueueView;
+    expect(answered.autopilotAnswer).toBe('Согласен');
+    const restored = (await (
+      await post('/api/queue/settings', { autopilotAnswer: null })
+    ).json()) as QueueView;
+    expect(restored.autopilotAnswer).toBeNull();
+    expect((await post('/api/queue/settings', { autopilotAnswer: ' ' })).status).toBe(400);
     const empty = await post('/api/queue/settings', {});
     expect(empty.status).toBe(400);
     expect(((await empty.json()) as { error: string }).error).toContain(
-      'pass parallel, autopilot or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer or skipFailed',
     );
     const removed = (await (
       await post(`/api/queue/items/${third.item}/remove`, {})
@@ -1081,7 +1090,38 @@ describe('aip web repositories', () => {
   });
 });
 
+const putSettingTo = (web: WebServer, base: string, path: string, body: unknown) =>
+  fetch(`${base}/api/config/settings/${path}`, {
+    method: 'PUT',
+    headers: authed(web, JSON_TYPE),
+    body: JSON.stringify(body),
+  });
+
 describe('aip web general settings', () => {
+  it('writes delivery.mode and refuses a value of the wrong type with 400', async () => {
+    h = await harness(MANUAL_CONFIG);
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const file = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip', 'settings.yaml');
+    for (const value of [true, 'tar']) {
+      const wrong = await putSettingTo(web, base, 'delivery.mode', { value, revision: null });
+      expect(wrong.status).toBe(400);
+    }
+    const mistyped = await putSettingTo(web, base, 'delivery.auto', {
+      value: 'commit',
+      revision: null,
+    });
+    expect(mistyped.status).toBe(400);
+    const done = await putSettingTo(web, base, 'delivery.mode', {
+      value: 'commit',
+      revision: null,
+    });
+    expect(done.status).toBe(200);
+    expect(readFileSync(file, 'utf8')).toBe('delivery:\n  mode: commit\n');
+    const queue = (await h.call('queue', { repository: h.repo })) as QueueView;
+    expect(queue.deliveryMode).toBe('commit');
+  });
+
   const putSetting = (web: WebServer, base: string, path: string, body: unknown) =>
     fetch(`${base}/api/config/settings/${path}`, {
       method: 'PUT',

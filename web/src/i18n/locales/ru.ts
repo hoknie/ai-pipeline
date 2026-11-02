@@ -278,6 +278,11 @@ export const ru: Dictionary = {
       title: 'Конфигурация не проходит проверку',
     },
   },
+  deliveryMode: {
+    worktree: 'В рабочее дерево',
+    commit: 'Коммит',
+    branch: 'Ветка',
+  },
   queue: {
     settings: {
       title: 'Настройки очереди',
@@ -292,6 +297,15 @@ export const ru: Dictionary = {
       autoDeliverHint: 'Действует на задачи без своей автодоставки в момент их старта.',
       autoDeliverProject: 'Значение задаёт файл проекта',
       autoDeliverInvalid: 'Конфигурация не проходит проверку',
+      deliveryMode: 'Способ доставки',
+      deliveryModeHint:
+        'Куда попадает результат задачи: в рабочее дерево, коммитом в текущую ветку или в отдельную ветку aip/. Действует на задачи без своего способа в момент их старта.',
+      autopilotAnswer: 'Ответ на вопросы',
+      autopilotAnswerHint:
+        'Текст, которым автопилот отвечает на вопросы специалистов; не больше 3 ответов подряд на группу.',
+      autopilotAnswerSave: 'Сохранить ответ',
+      autopilotAnswerDefault: 'Ответ по умолчанию',
+      autopilotAnswerSaved: 'Ответ сохранён',
     },
     skipped: 'Пропущены с ошибкой ({{count}})',
     skippedLabel: 'пропущены с ошибкой',
@@ -351,6 +365,10 @@ export const ru: Dictionary = {
       autoDeliverBySetting: 'по настройке',
       autoDeliverForTask: 'для этой задачи',
       autoDeliverReset: 'как в настройке',
+      deliveryMode: 'Способ доставки',
+      deliveryModeBySetting: 'способ по настройке',
+      deliveryModeForTask: 'способ для этой задачи',
+      deliveryModeReset: 'способ как в настройке',
       noWorkflow: 'нет workflow',
       kind: 'вид задачи',
       task: 'Задача',
@@ -377,6 +395,7 @@ export const ru: Dictionary = {
       removeDependents: 'От неё зависят: {{items}}. Зависимость с них снимется.',
       autoDelivery: 'автодоставка',
       manualDelivery: 'без автодоставки',
+      deliveryMode: 'доставка: {{mode}}',
       groups_one: '{{count}} группа',
       groups_few: '{{count}} группы',
       groups_many: '{{count}} групп',

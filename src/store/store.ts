@@ -1,6 +1,11 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 
-import { withConfigDefaults, type ResolvedConfig, type Runtime } from '../config/index.ts';
+import {
+  DELIVERY_MODES,
+  withConfigDefaults,
+  type ResolvedConfig,
+  type Runtime,
+} from '../config/index.ts';
 import {
   MESSAGE_GROUP,
   RESOLVE_GROUP,
@@ -12,6 +17,7 @@ import {
   type AttemptStatus,
   type Effect,
   type Group,
+  type HumanDecision,
   type Queue,
   type QueueItem,
   type GroupStatus,
@@ -291,9 +297,9 @@ export class Store {
     this.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer`,
         )
         .run(
           queue.repository,
@@ -306,11 +312,12 @@ export class Store {
           queue.autopilot ? 1 : 0,
           queue.skipFailed ? 1 : 0,
           JSON.stringify(queue.skipped),
+          queue.autopilotAnswer,
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -327,6 +334,7 @@ export class Store {
           JSON.stringify(item.tags),
           JSON.stringify(item.skip),
           JSON.stringify(item.after),
+          item.deliveryMode,
         ),
       );
     });
@@ -344,6 +352,7 @@ export class Store {
       autopilot: Number(row.autopilot ?? 0) === 1,
       skipFailed: Number(row.skip_failed ?? 0) === 1,
       skipped: row.skipped_json ? parse(row.skipped_json) : [],
+      autopilotAnswer: text(row.autopilot_answer ?? null),
       items: items.map((item): QueueItem => ({
         id: String(item.id),
         workflow: String(item.workflow),
@@ -354,6 +363,7 @@ export class Store {
           item.auto_deliver === null || item.auto_deliver === undefined
             ? null
             : Number(item.auto_deliver) === 1,
+        deliveryMode: DELIVERY_MODES.find((mode) => mode === item.delivery_mode) ?? null,
         tags: item.tags_json ? parse(item.tags_json) : [],
         skip: item.skip_json ? parse(item.skip_json) : [],
         after: item.after_json ? parse(item.after_json) : [],
@@ -423,7 +433,12 @@ function hydrateGroup(group: Row, attemptRows: Row[]): Group {
     questions: nullable(group.questions_json ?? null),
     reason: text(group.reason ?? null),
     warnings: parse(group.warnings_json ?? null),
-    decisions: parse(group.decisions_json ?? null),
+    decisions: parse<(Omit<HumanDecision, 'by'> & { by?: unknown })[]>(
+      group.decisions_json ?? null,
+    ).map((decision) => ({
+      ...decision,
+      by: decision.by === 'autopilot' ? ('autopilot' as const) : ('human' as const),
+    })),
     conflictFiles: parse(group.conflict_files_json ?? null),
     mergeSeq: group.merge_seq === null ? null : Number(group.merge_seq),
     mergeInFlight: Number(group.merge_in_flight) === 1,

@@ -201,6 +201,12 @@ describe('automatic delivery of one run', () => {
     expect(state.groups[0]?.delivery.state).toBe('pending');
   });
 
+  it('takes the delivery mode of the run over the configuration', () => {
+    expect(run(1, { deliveryMode: 'commit' }).run.config.delivery.mode).toBe('commit');
+    expect(run(1, { deliveryMode: 'branch' }).run.config.delivery.mode).toBe('branch');
+    expect(run(1).run.config.delivery.mode).toBe('worktree');
+  });
+
   it('delivers a run with autoDeliver true although delivery.auto is off', () => {
     const state = run(1, { configText: undefined });
     const source = run(1);

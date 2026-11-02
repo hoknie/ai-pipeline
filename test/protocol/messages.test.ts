@@ -168,7 +168,9 @@ describe('queue requests', () => {
     bad('queue_settings', { repository: '/r', autopilot: 'on' });
     bad('queue_settings', { repository: '/r', skipFailed: 1 });
     const error = parse('queue_settings', { repository: '/r' });
-    expect(JSON.stringify(error)).toContain('pass parallel, autopilot or skipFailed');
+    expect(JSON.stringify(error)).toContain(
+      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+    );
   });
 
   it('takes skip as a list of non-empty step ids', () => {
@@ -198,6 +200,51 @@ describe('queue requests', () => {
     bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', autoDeliver: 1 });
     bad('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', autoDeliver: null });
     bad('queue_edit', { repository: '/r', item: 'q1', autoDeliver: 'yes' });
+  });
+
+  it('takes a delivery mode of a task, and null only when editing', () => {
+    ok('run', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'commit' });
+    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'branch' });
+    ok('worker_queue_add', {
+      token: 't',
+      workflow: 'feature',
+      task: 'x',
+      deliveryMode: 'worktree',
+    });
+    ok('queue_edit', { repository: '/r', item: 'q1', deliveryMode: null });
+    bad('run', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'patch' });
+    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: null });
+    bad('queue_edit', { repository: '/r', item: 'q1', deliveryMode: true });
+  });
+
+  it('takes the text of the autopilot answer, and null to reset it', () => {
+    ok('queue_settings', { repository: '/r', autopilotAnswer: 'Согласен' });
+    ok('queue_settings', { repository: '/r', autopilotAnswer: null });
+    bad('queue_settings', { repository: '/r', autopilotAnswer: '  ' });
+    bad('queue_settings', { repository: '/r', autopilotAnswer: 'x'.repeat(2001) });
+  });
+
+  it('checks the type of a setting value against its path', () => {
+    ok('config_setting', {
+      repository: '/r',
+      path: 'delivery.mode',
+      value: 'commit',
+      revision: null,
+    });
+    ok('config_setting', { repository: '/r', path: 'delivery.mode', value: null, revision: 'x' });
+    bad('config_setting', { repository: '/r', path: 'delivery.mode', value: true, revision: null });
+    bad('config_setting', {
+      repository: '/r',
+      path: 'delivery.mode',
+      value: 'tar',
+      revision: null,
+    });
+    bad('config_setting', {
+      repository: '/r',
+      path: 'delivery.auto',
+      value: 'commit',
+      revision: null,
+    });
   });
 
   it('takes a setting only from the whitelist', () => {

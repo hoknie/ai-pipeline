@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { mkdirSync, readFileSync } from 'node:fs';
 
@@ -1171,7 +1172,7 @@ describe('queue settings', () => {
   it('rejects an empty settings request and leaves the queue unchanged', async () => {
     const h = await start();
     await expect(h.call('queue_settings', { repository: h.repo })).rejects.toThrow(
-      'pass parallel, autopilot or skipFailed',
+      'pass parallel, autopilot, autopilotAnswer or skipFailed',
     );
     expect(await queueOf(h)).toMatchObject({ autopilot: false, skipFailed: false, parallel: 1 });
   });
@@ -1191,5 +1192,138 @@ describe('queue settings', () => {
       expect.stringContaining('unknown workflow'),
     ]);
     expect(await allRuns(h)).toEqual([]);
+  });
+});
+
+describe('delivery mode per task', () => {
+  it('keeps the mode of an item, resets it with null and shows the setting', async () => {
+    const h = await start();
+    const first = await add(h, 'A', { deliveryMode: 'branch' });
+    expect(first.deliveryMode).toBe('worktree');
+    expect(first.items[0]?.deliveryMode).toBe('branch');
+    expect((await add(h, 'B')).items[1]?.deliveryMode).toBeNull();
+    const reset = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: first.item,
+      deliveryMode: null,
+    })) as QueueView;
+    expect(reset.items[0]?.deliveryMode).toBeNull();
+  });
+
+  it('delivers an item with the branch mode as a branch and leaves the working tree', async () => {
+    const h = await start();
+    h.script({ code: [WRITE_LIB, {}] });
+    const { item } = await add(h, 'A', { deliveryMode: 'branch' });
+    expect(item).toBeTruthy();
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped');
+    const [created] = await allRuns(h);
+    expect(created?.deliveryMode).toBe('branch');
+    await h.waitFor(created!.id, (run) => run.finished);
+    expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 1;\n');
+    expect(
+      execFileSync('git', ['branch', '--list', 'aip/*'], { cwd: h.repo }).toString().trim(),
+    ).toBe(`aip/${created!.id}`);
+  });
+
+  it('takes the setting when the task without a mode starts', async () => {
+    const h = await start();
+    await add(h, 'A');
+    writeConfigDirectory(h.repo, `${WORKFLOW_CONFIG}  delivery: { mode: commit }\n`);
+    expect((await queueOf(h)).deliveryMode).toBe('commit');
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped');
+    expect((await allRuns(h)).map((run) => run.deliveryMode)).toEqual(['commit']);
+  });
+
+  it('sends a queue event after delivery.mode is written', async () => {
+    const h = await start();
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await add(h, 'A');
+    await h.call('config_setting', {
+      repository: h.repo,
+      path: 'delivery.mode',
+      value: 'commit',
+      revision: null,
+      level: 'global',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const queues = events.flatMap((event) =>
+      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    );
+    expect(queues.at(-1)?.deliveryMode).toBe('commit');
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
+});
+
+describe('autopilot answers', () => {
+  it('answers a question of a specialist and goes on, marking the decision', async () => {
+    const h = await start();
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}, {}] });
+    await h.call('queue_settings', { repository: h.repo, autopilot: true });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    const done = await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
+    expect(done.stop).toBeNull();
+    const [created] = await allRuns(h);
+    await h.waitFor(created!.id, (run) => run.finished);
+    const state = h.running.daemon.state(created!.id);
+    const decisions = state.groups.flatMap((group) => group.decisions);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]).toMatchObject({ question: 'OAuth или пароль?', by: 'autopilot' });
+    expect(decisions[0]?.answer).toContain('I agree with your recommendations');
+  });
+
+  it('answers with the text of the queue', async () => {
+    const h = await start();
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'q' }, {}, {}] });
+    await h.call('queue_settings', {
+      repository: h.repo,
+      autopilot: true,
+      autopilotAnswer: 'Делай как проще',
+    });
+    expect(await queueOf(h)).toMatchObject({ autopilotAnswer: 'Делай как проще' });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
+    const [created] = await allRuns(h);
+    await h.waitFor(created!.id, (run) => run.finished);
+    const decisions = h.running.daemon.state(created!.id).groups.flatMap((g) => g.decisions);
+    expect(decisions[0]?.answer).toBe('Делай как проще');
+    await h.call('queue_settings', { repository: h.repo, autopilotAnswer: null });
+    expect((await queueOf(h)).autopilotAnswer).toBeNull();
+  });
+
+  it('waits for a human without the autopilot', async () => {
+    const h = await start();
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'q' }, {}, {}] });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    const waiting = await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
+    expect(waiting.stop).toBeNull();
+  });
+});
+
+describe('fixed run goes first', () => {
+  it('keeps the place of a retried skipped run over the waiting tasks', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, {}, {}] });
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.skipped.length === 1);
+    const runId = (await allRuns(h))[0]!.id;
+    const view = await h.status(runId);
+    await h.call('retry', { runId, group: view.groups[0]!.slug });
+    const back = await waitQueue(h, (queue) => queue.skipped.length === 0);
+    expect(back.runs.map((run) => run.id)).toContain(runId);
+    await waitQueue(h, (queue) => queue.runs.length === 0);
   });
 });

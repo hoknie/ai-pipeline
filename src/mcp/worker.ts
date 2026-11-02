@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
+import { DELIVERY_MODES } from '../config/index.ts';
 import {
   FEEDBACK_LIMIT,
   OPTIONS_LIMIT,
@@ -124,6 +125,10 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             .boolean()
             .optional()
             .describe('Deliver merged groups automatically; omit to follow delivery.auto'),
+          deliveryMode: z
+            .enum(DELIVERY_MODES)
+            .optional()
+            .describe('worktree, commit or branch; omit to follow delivery.mode'),
           skip: z
             .array(z.string())
             .optional()
@@ -136,7 +141,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             ),
         },
       },
-      ({ workflow, task, groups, title, autoDeliver, skip, after }) =>
+      ({ workflow, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
         attempt(async () => {
           if ((task === undefined) === (groups === undefined)) {
             throw new Error('pass either task or groups');
@@ -148,6 +153,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+            ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(skip !== undefined ? { skip } : {}),
             ...(after !== undefined ? { after } : {}),
           })) as { item?: string };

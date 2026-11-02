@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_AUTOPILOT_ANSWER,
   QUEUE_PARALLEL_MAX,
   addItem,
   advance,
+  autopilotAnswers,
   createRun,
   dependencyState,
   dependencyTags,
@@ -798,7 +800,9 @@ describe('queue settings', () => {
 
   it('refuses an empty patch and a wrong parallel without a change', () => {
     const queue = emptyQueue('/repo', 1);
-    expect(() => setQueueSettings(queue, {}, 2)).toThrow('pass parallel, autopilot or skipFailed');
+    expect(() => setQueueSettings(queue, {}, 2)).toThrow(
+      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+    );
     expect(() => setQueueSettings(queue, { parallel: 0, autopilot: true }, 2)).toThrow(
       /parallel must be/,
     );
@@ -1050,5 +1054,189 @@ describe('tags along dependencies', () => {
     queue.items[0]!.after = ['q2'];
     expect(spreadTags(queue, 'q1', ['tg-x'], 9).sort()).toEqual(['q2']);
     expect(queue.items[0]?.tags).toEqual([]);
+  });
+});
+
+describe('delivery mode of an item', () => {
+  it('is null by default and stores a mode', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).deliveryMode).toBeNull();
+    expect(
+      addItem(queue, { workflow: 'feature', task: 'B', deliveryMode: 'commit' }, 'q2', 2)
+        .deliveryMode,
+    ).toBe('commit');
+  });
+
+  it('changes only when the patch names it, and null resets it', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'A', deliveryMode: 'branch' }, 'q1', 2);
+    editItem(queue, 'q1', { title: 'Имя' }, 3);
+    expect(queue.items[0]?.deliveryMode).toBe('branch');
+    editItem(queue, 'q1', { deliveryMode: 'commit' }, 4);
+    expect(queue.items[0]?.deliveryMode).toBe('commit');
+    editItem(queue, 'q1', { deliveryMode: null }, 5);
+    expect(queue.items[0]?.deliveryMode).toBeNull();
+  });
+
+  it('refuses an unknown mode', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(() =>
+      addItem(queue, { workflow: 'feature', task: 'A', deliveryMode: 'x' as never }, 'q1', 2),
+    ).toThrow('delivery mode must be one of');
+  });
+});
+
+describe('autopilot answer text', () => {
+  it('is null by default, trimmed when set, and null restores the default', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(queue.autopilotAnswer).toBeNull();
+    setQueueSettings(queue, { autopilotAnswer: '  Да, согласен  ' }, 2);
+    expect(queue.autopilotAnswer).toBe('Да, согласен');
+    setQueueSettings(queue, { autopilotAnswer: null }, 3);
+    expect(queue.autopilotAnswer).toBeNull();
+  });
+
+  it('refuses an empty and a too long text without a change', () => {
+    const queue = emptyQueue('/repo', 1);
+    expect(() => setQueueSettings(queue, { autopilotAnswer: '  ' }, 2)).toThrow(
+      'autopilot answer must not be empty',
+    );
+    expect(() => setQueueSettings(queue, { autopilotAnswer: 'x'.repeat(2001) }, 2)).toThrow(
+      'autopilot answer must be at most 2000 characters',
+    );
+    expect(queue.updatedAt).toBe(1);
+  });
+});
+
+describe('answers of the autopilot', () => {
+  function asking(id = 'a'): RunState {
+    const state = run(1, { id });
+    step(state);
+    finish(state, 'needs_human', { feedback: 'Какой вариант?' });
+    return state;
+  }
+
+  function running(autopilot = true): Queue {
+    const queue = queueOf('A');
+    queue.autopilot = autopilot;
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    return queue;
+  }
+
+  it('answers a question of a specialist with the default text', () => {
+    const queue = running();
+    const state = asking();
+    expect(autopilotAnswers(queue, [state])).toEqual([
+      { run: 'a', group: 'gruppa-1', answer: DEFAULT_AUTOPILOT_ANSWER },
+    ]);
+  });
+
+  it('uses the text of the queue', () => {
+    const queue = running();
+    queue.autopilotAnswer = 'Согласен';
+    expect(autopilotAnswers(queue, [asking()])[0]?.answer).toBe('Согласен');
+  });
+
+  it('does nothing with the autopilot off or the queue paused', () => {
+    expect(autopilotAnswers(running(false), [asking()])).toEqual([]);
+    const queue = running();
+    pauseQueue(queue, 5);
+    expect(autopilotAnswers(queue, [asking()])).toEqual([]);
+  });
+
+  it('does not answer a rejection without a way back, a run outside the queue or a working group', () => {
+    const queue = running();
+    const rejected = run(1, { id: 'a' });
+    step(rejected);
+    finish(rejected, 'rejected', { feedback: 'нет' });
+    expect(group(rejected).status).toBe('needs_human');
+    expect(autopilotAnswers(queue, [rejected])).toEqual([]);
+    expect(autopilotAnswers(queue, [asking('other')])).toEqual([]);
+    const working = run(1, { id: 'a' });
+    step(working);
+    expect(autopilotAnswers(queue, [working])).toEqual([]);
+  });
+
+  it('does not answer a stop for changes outside the worktree', () => {
+    const queue = running();
+    const state = asking();
+    group(state).attempts.at(-1)!.outsideChanges = ['/etc/hosts'];
+    expect(autopilotAnswers(queue, [state])).toEqual([]);
+  });
+
+  it('answers at most three times in a row, and a human answer resets the count', () => {
+    const queue = running();
+    const state = asking();
+    const decisions = group(state).decisions;
+    const decision = (by: 'human' | 'autopilot') => ({
+      stepId: 'code',
+      question: 'q',
+      answer: 'a',
+      by,
+    });
+    decisions.push(decision('autopilot'), decision('autopilot'));
+    expect(autopilotAnswers(queue, [state])).toHaveLength(1);
+    decisions.push(decision('autopilot'));
+    expect(autopilotAnswers(queue, [state])).toEqual([]);
+    decisions.push(decision('human'));
+    expect(autopilotAnswers(queue, [state])).toHaveLength(1);
+  });
+
+  it('records who answered', () => {
+    const state = asking();
+    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ok', by: 'autopilot' }, 5);
+    expect(group(state).decisions[0]?.by).toBe('autopilot');
+    const other = asking('b');
+    transition(other, { kind: 'answer', group: 'gruppa-1', answer: 'ok' }, 5);
+    expect(group(other).decisions[0]?.by).toBe('human');
+  });
+});
+
+describe('fixed runs go first', () => {
+  it('returns a skipped run that works again to the start of the places, over the parallel limit', () => {
+    const queue = queueOf('A', 'B', 'C');
+    queue.skipFailed = true;
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    const failed = failedRun('a');
+    expect(advance(queue, [failed], lookupOf(failed), 5).take.map((item) => item.id)).toEqual([
+      'q2',
+    ]);
+    itemStarted(queue, 'q2', 'b', 6);
+    expect(queue).toMatchObject({ runs: ['b'], skipped: ['a'] });
+    group(failed).status = 'running';
+    const other = run(1, { id: 'b' });
+    step(other);
+    const take = advance(queue, [other], lookupOf(failed, other), 7).take;
+    expect(take).toEqual([]);
+    expect(queue).toMatchObject({ runs: ['a', 'b'], skipped: [] });
+  });
+
+  it('only forgets a skipped run that no longer holds a place', () => {
+    const queue = queueOf('A');
+    queue.skipFailed = true;
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'a', 4);
+    const state = failedRun('a');
+    advance(queue, [state], lookupOf(state), 5);
+    state.run.finishedAt = 100;
+    state.run.config.delivery.auto = false;
+    group(state).status = 'merged';
+    group(state).delivery.state = 'applied';
+    advance(queue, [], lookupOf(state), 6);
+    expect(queue).toMatchObject({ runs: [], skipped: [] });
+  });
+
+  it('puts an item with an error first after an edit, unless a position is given', () => {
+    const queue = queueOf('A', 'B', 'C');
+    itemFailed(queue, 'q3', 'boom', 5);
+    editItem(queue, 'q3', { title: 'Имя' }, 6);
+    expect(ids(queue)).toEqual(['q3', 'q1', 'q2']);
+    itemFailed(queue, 'q3', 'boom', 7);
+    editItem(queue, 'q3', { position: 3 }, 8);
+    expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
+    editItem(queue, 'q3', { title: 'Ещё' }, 9);
+    expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
   });
 });

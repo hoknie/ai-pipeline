@@ -34,6 +34,7 @@ export type {
   TranscriptEntry,
 } from '../../src/protocol/index.ts';
 
+import type { DeliveryMode } from '../../src/config/index.ts';
 import type { DaemonCheck, DependencyView, QueueItemView } from '../../src/protocol/index.ts';
 
 /** State of a predecessor: done, still pending or blocked. */
@@ -53,6 +54,8 @@ export interface QueueFields {
   title?: string;
   /** Absent: follow `delivery.auto` when the task starts. */
   autoDeliver?: boolean;
+  /** Absent: follow `delivery.mode` when the task starts. */
+  deliveryMode?: DeliveryMode;
   /** Tag names. */
   tags?: string[];
   /** Ids of workflow steps the task skips. */
@@ -69,6 +72,8 @@ export interface QueuePatch {
   title?: string | null;
   /** `null`: follow `delivery.auto` again. */
   autoDeliver?: boolean | null;
+  /** `null`: follow `delivery.mode` again. */
+  deliveryMode?: DeliveryMode | null;
   /** Tag names; replaces the tags of the item. */
   tags?: string[];
   /** Ids of workflow steps to skip; replaces the list of the item. */

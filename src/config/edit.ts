@@ -25,7 +25,13 @@ import {
   type LevelFiles,
 } from './load.ts';
 import { isMapping, mergeConfigs, type ConfigSource } from './merge.ts';
-import { SLUG_PATTERN_TEXT, isValidSlug, type ResolvedConfig, type Specialist } from './model.ts';
+import {
+  DELIVERY_MODES,
+  SLUG_PATTERN_TEXT,
+  isValidSlug,
+  type ResolvedConfig,
+  type Specialist,
+} from './model.ts';
 import { validateConfig } from './validate.ts';
 
 export type EntryKind = 'specialist' | 'workflow';
@@ -408,13 +414,13 @@ export function planEdit(paths: ConfigPaths, edit: EditRequest): EditPlan {
 }
 
 /** Fields of settings.yaml the editor may write; the list grows deliberately. */
-export const SETTABLE_SETTINGS = ['delivery.auto'] as const;
+export const SETTABLE_SETTINGS = ['delivery.auto', 'delivery.mode'] as const;
 export type SettingPath = (typeof SETTABLE_SETTINGS)[number];
 
 export interface SettingRequest {
   path: string;
   /** New value; null removes the field. */
-  value: boolean | null;
+  value: boolean | string | null;
   /** Revision of settings.yaml the caller saw; null when it did not exist. */
   revision: string | null;
   level?: WriteLevel;
@@ -429,7 +435,11 @@ export function settingsFile(paths: ConfigPaths, level: WriteLevel = 'global'): 
 }
 
 /** Text of settings.yaml with one field set (or removed); comments and other keys survive. */
-export function editSetting(text: string | undefined, path: string, value: boolean | null): string {
+export function editSetting(
+  text: string | undefined,
+  path: string,
+  value: boolean | string | null,
+): string {
   const keys = path.split('.');
   if (text === undefined || text.trim() === '') {
     if (value === null) return text ?? '';
@@ -462,6 +472,17 @@ export function editSetting(text: string | undefined, path: string, value: boole
   return document.toString({ lineWidth: 0 });
 }
 
+/** Why the value does not fit the setting, or null. */
+function settingTypeError(path: string, value: boolean | string | null): string | null {
+  if (value === null) return null;
+  if (path === 'delivery.mode') {
+    return typeof value === 'string' && (DELIVERY_MODES as readonly string[]).includes(value)
+      ? null
+      : `must be one of: ${DELIVERY_MODES.join(', ')}`;
+  }
+  return typeof value === 'boolean' ? null : 'must be true or false';
+}
+
 /** Checks a write of one setting without writing: the revision, then the whole configuration. */
 export function planSetting(paths: ConfigPaths, request: SettingRequest): EditPlan {
   const level = request.level ?? 'global';
@@ -471,6 +492,14 @@ export function planSetting(paths: ConfigPaths, request: SettingRequest): EditPl
     );
   }
   const file = settingsFile(paths, level);
+  const typeError = settingTypeError(request.path, request.value);
+  if (typeError !== null) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      errors: [{ file, path: `swarm.${request.path}`, message: typeError }],
+    };
+  }
   const current = readText(file);
   if (revisionOf(current) !== request.revision) {
     return {

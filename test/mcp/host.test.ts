@@ -13,6 +13,9 @@ const VIEW: QueueView & { item: string } = {
   autopilot: false,
   skipFailed: false,
   autoDeliver: true,
+  deliveryMode: 'worktree',
+  autopilotAnswer: null,
+  autopilotAnswerDefault: 'default',
   stop: null,
   items: [
     {
@@ -23,6 +26,7 @@ const VIEW: QueueView & { item: string } = {
       groups: null,
       title: null,
       autoDeliver: null,
+      deliveryMode: null,
       tags: [],
       skip: [],
       readiness: 'ready',
@@ -124,6 +128,59 @@ describe('host MCP queue tools', () => {
         params: { repository: '/repo', workflow: 'feature', task: 'x', autoDeliver: true },
       },
       { method: 'queue_add', params: { repository: '/repo', workflow: 'feature', task: 'y' } },
+    ]);
+  });
+
+  it('passes deliveryMode only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'commit' },
+    });
+    await client.callTool({
+      name: 'swarm_queue_edit',
+      arguments: { item: 'q1', deliveryMode: null },
+    });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+    });
+    const wrong = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'tar' },
+    });
+    expect(wrong.isError).toBe(true);
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', deliveryMode: 'commit' },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', deliveryMode: null } },
+      {
+        method: 'run',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+      },
+    ]);
+  });
+
+  it('passes the autopilot answer of the queue settings', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_settings',
+      arguments: { autopilot_answer: 'Согласен' },
+    });
+    await client.callTool({ name: 'swarm_queue_settings', arguments: { autopilot_answer: null } });
+    expect(calls).toEqual([
+      { method: 'queue_settings', params: { repository: '/repo', autopilotAnswer: 'Согласен' } },
+      { method: 'queue_settings', params: { repository: '/repo', autopilotAnswer: null } },
     ]);
   });
 
@@ -318,11 +375,11 @@ describe('host MCP queue tools', () => {
     const calls: unknown[] = [];
     const client = await connect(async (method, params) => {
       calls.push({ method, params });
-      throw new Error('pass parallel, autopilot or skipFailed');
+      throw new Error('pass parallel, autopilot, autopilotAnswer or skipFailed');
     });
     const result = await client.callTool({ name: 'swarm_queue_settings', arguments: {} });
     expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('pass parallel, autopilot or skipFailed');
+    expect(textOf(result)).toContain('pass parallel, autopilot, autopilotAnswer or skipFailed');
     expect(calls).toEqual([{ method: 'queue_settings', params: { repository: '/repo' } }]);
   });
 

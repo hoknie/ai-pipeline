@@ -661,7 +661,9 @@ describe('cli', () => {
     expect(`${wrong.stdout}${wrong.stderr}`).toContain('--autopilot must be on or off');
     const empty = await aip(box, 'queue', 'settings');
     expect(empty.code).not.toBe(0);
-    expect(`${empty.stdout}${empty.stderr}`).toContain('pass parallel, autopilot or skipFailed');
+    expect(`${empty.stdout}${empty.stderr}`).toContain(
+      'pass parallel, autopilot, autopilotAnswer or skipFailed',
+    );
     const view = await aip(box, 'queue', 'list', '--json');
     expect(JSON.parse(view.stdout)).toMatchObject({ autopilot: false, skipFailed: false });
   });
@@ -698,6 +700,97 @@ describe('cli', () => {
     );
     expect(both.code).not.toBe(0);
     expect(both.stderr).toContain('--default-auto-deliver');
+  });
+
+  it('sets the delivery mode of queued tasks from flags and checks it before the call', async () => {
+    const box = sandbox();
+    const added = JSON.parse(
+      (
+        await aip(
+          box,
+          'queue',
+          'add',
+          'feature',
+          '--task',
+          'a',
+          '--delivery-mode',
+          'commit',
+          '--json',
+        )
+      ).stdout,
+    ) as { item: string; items: { deliveryMode: string | null }[] };
+    expect(added.items[0]?.deliveryMode).toBe('commit');
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('delivery: commit');
+    const wrong = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'b',
+      '--delivery-mode',
+      'tar',
+    );
+    expect(wrong.code).not.toBe(0);
+    expect(wrong.stderr).toContain('--delivery-mode must be one of: worktree, commit, branch');
+    const edited = JSON.parse(
+      (await aip(box, 'queue', 'edit', added.item, '--delivery-mode', 'branch', '--json')).stdout,
+    ) as { items: { deliveryMode: string | null }[] };
+    expect(edited.items[0]?.deliveryMode).toBe('branch');
+    const reset = JSON.parse(
+      (await aip(box, 'queue', 'edit', added.item, '--default-delivery-mode', '--json')).stdout,
+    ) as { items: { deliveryMode: string | null }[] };
+    expect(reset.items[0]?.deliveryMode).toBeNull();
+    const both = await aip(
+      box,
+      'queue',
+      'edit',
+      added.item,
+      '--delivery-mode',
+      'commit',
+      '--default-delivery-mode',
+    );
+    expect(both.code).not.toBe(0);
+    expect(both.stderr).toContain('--default-delivery-mode');
+    const run = JSON.parse(
+      (
+        await aip(
+          box,
+          'run',
+          'start',
+          'feature',
+          '--delivery-mode',
+          'branch',
+          '--task',
+          'x',
+          '--json',
+        )
+      ).stdout,
+    ) as { item: string };
+    expect(run.item).toBeTruthy();
+  });
+
+  it('sets and resets the autopilot answer from flags', async () => {
+    const box = sandbox();
+    const set = JSON.parse(
+      (await aip(box, 'queue', 'settings', '--autopilot-answer', 'Согласен', '--json')).stdout,
+    ) as { autopilotAnswer: string | null };
+    expect(set.autopilotAnswer).toBe('Согласен');
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('Autopilot answer: Согласен');
+    const reset = JSON.parse(
+      (await aip(box, 'queue', 'settings', '--default-autopilot-answer', '--json')).stdout,
+    ) as { autopilotAnswer: string | null };
+    expect(reset.autopilotAnswer).toBeNull();
+    const both = await aip(
+      box,
+      'queue',
+      'settings',
+      '--autopilot-answer',
+      'x',
+      '--default-autopilot-answer',
+    );
+    expect(both.code).not.toBe(0);
+    expect(both.stderr).toContain('--default-autopilot-answer');
   });
 
   it('rejects a wrong parallel limit and starts the queue', async () => {

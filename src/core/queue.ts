@@ -1,13 +1,20 @@
+import { DELIVERY_MODES, type DeliveryMode } from '../config/index.ts';
+
 import type { NewGroup } from './create.ts';
 import { Rejection } from './errors.ts';
 import { RUN_TITLE_LIMIT } from './ids.ts';
 import { cleanSkip } from './skip.ts';
 import { mergeTags } from './tags.ts';
-import { allGroups, runPhase, type RunState } from './model.ts';
+import { RECOMMENDATION_LIMIT, allGroups, runPhase, type RunState } from './model.ts';
 
 export const QUEUE_PARALLEL_MAX = 20;
 /** The most runs the queue remembers as skipped. */
 export const QUEUE_SKIPPED_MAX = 10;
+/** The most answers in a row the autopilot gives to one group. */
+export const AUTOPILOT_ANSWERS_MAX = 3;
+/** The answer of the autopilot when the queue has no text of its own. */
+export const DEFAULT_AUTOPILOT_ANSWER =
+  'I agree with your recommendations; go ahead with them. Where you gave no recommendation, choose the option you consider best and continue without asking again.';
 
 export interface QueueItem {
   id: string;
@@ -17,6 +24,8 @@ export interface QueueItem {
   title: string | null;
   /** `null`: follow `delivery.auto` when the task starts. */
   autoDeliver: boolean | null;
+  /** `null`: follow `delivery.mode` when the task starts. */
+  deliveryMode: DeliveryMode | null;
   /** Ids of catalog tags. */
   tags: string[];
   /** Ids of workflow steps the task skips. */
@@ -56,6 +65,8 @@ export interface Queue {
   autopilot: boolean;
   /** A run with a stopping problem leaves its place and the queue goes on. */
   skipFailed: boolean;
+  /** Text the autopilot answers the questions of specialists with; `null`: the default text. */
+  autopilotAnswer: string | null;
   items: QueueItem[];
   /** Runs created by the queue that still occupy a place. */
   runs: string[];
@@ -73,6 +84,7 @@ export interface ItemFields {
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;
   autoDeliver?: boolean | undefined;
+  deliveryMode?: DeliveryMode | undefined;
   tags?: string[] | undefined;
   skip?: string[] | undefined;
   after?: string[] | undefined;
@@ -85,6 +97,7 @@ export function emptyQueue(repository: string, now: number): Queue {
     parallel: 1,
     autopilot: false,
     skipFailed: false,
+    autopilotAnswer: null,
     items: [],
     runs: [],
     acknowledged: [],
@@ -136,6 +149,14 @@ function cleanWorkflow(workflow: string): string {
   return workflow;
 }
 
+function cleanDeliveryMode(mode: DeliveryMode | null | undefined): DeliveryMode | null | undefined {
+  if (mode === undefined || mode === null) return mode;
+  if (!DELIVERY_MODES.includes(mode)) {
+    throw new Rejection(`delivery mode must be one of: ${DELIVERY_MODES.join(', ')}`);
+  }
+  return mode;
+}
+
 function find(queue: Queue, id: string): QueueItem {
   const item = queue.items.find((candidate) => candidate.id === id);
   if (!item) throw new Rejection('unknown queue item');
@@ -151,6 +172,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
     ...cleanBody(fields),
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,
+    deliveryMode: cleanDeliveryMode(fields.deliveryMode) ?? null,
     tags: [...new Set(fields.tags ?? [])],
     skip: cleanSkip(fields.skip ?? []),
     after,
@@ -168,6 +190,7 @@ export interface ItemPatch {
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;
   autoDeliver?: boolean | null | undefined;
+  deliveryMode?: DeliveryMode | null | undefined;
   tags?: string[] | undefined;
   skip?: string[] | undefined;
   after?: string[] | undefined;
@@ -188,15 +211,19 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
   if (patch.position !== undefined) checkPosition(queue, patch.position);
   const after = patch.after === undefined ? undefined : [...new Set(patch.after)];
   if (after !== undefined) checkDependencies(queue, id, after);
+  const deliveryMode = cleanDeliveryMode(patch.deliveryMode);
   if (workflow !== null) item.workflow = workflow;
   if (body) Object.assign(item, body);
   if (title !== undefined) item.title = title;
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;
+  if (deliveryMode !== undefined) item.deliveryMode = deliveryMode;
   if (patch.tags !== undefined) item.tags = [...new Set(patch.tags)];
   if (patch.skip !== undefined) item.skip = cleanSkip(patch.skip);
   if (after !== undefined) item.after = after;
+  const hadError = item.error !== null;
   item.error = null;
   if (patch.position !== undefined) placeItem(queue, item, patch.position);
+  else if (hadError) placeItem(queue, item, 1);
   queue.updatedAt = now;
   return item;
 }
@@ -349,6 +376,18 @@ export interface QueueSettingsPatch {
   parallel?: number | undefined;
   autopilot?: boolean | undefined;
   skipFailed?: boolean | undefined;
+  /** `null`: the default text. */
+  autopilotAnswer?: string | null | undefined;
+}
+
+function cleanAnswer(answer: string | null): string | null {
+  if (answer === null) return null;
+  const trimmed = answer.trim();
+  if (trimmed === '') throw new Rejection('autopilot answer must not be empty');
+  if ([...trimmed].length > RECOMMENDATION_LIMIT) {
+    throw new Rejection(`autopilot answer must be at most ${RECOMMENDATION_LIMIT} characters`);
+  }
+  return trimmed;
 }
 
 /** Changes only the passed settings; the state of the queue stays as is. */
@@ -356,13 +395,17 @@ export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: n
   if (
     patch.parallel === undefined &&
     patch.autopilot === undefined &&
-    patch.skipFailed === undefined
+    patch.skipFailed === undefined &&
+    patch.autopilotAnswer === undefined
   ) {
-    throw new Rejection('pass parallel, autopilot or skipFailed');
+    throw new Rejection('pass parallel, autopilot, autopilotAnswer or skipFailed');
   }
+  const answer =
+    patch.autopilotAnswer === undefined ? undefined : cleanAnswer(patch.autopilotAnswer);
   if (patch.parallel !== undefined) setParallel(queue, patch.parallel, now);
   if (patch.autopilot !== undefined) queue.autopilot = patch.autopilot;
   if (patch.skipFailed !== undefined) queue.skipFailed = patch.skipFailed;
+  if (answer !== undefined) queue.autopilotAnswer = answer;
   queue.updatedAt = now;
 }
 
@@ -470,15 +513,20 @@ export function advance(
       own = own.filter((state) => !ids.has(state.run.id));
     }
   }
+  const returned: RunState[] = [];
   queue.skipped = queue.skipped
     .filter((id) => {
       const state = lookup(id);
-      return (
-        state !== undefined &&
-        runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))
-      );
+      if (state === undefined) return false;
+      if (runProblems(state).some((problem) => STOPPING_REASONS.has(problem.reason))) return true;
+      if (occupiesSlot(state) && !queue.runs.includes(id)) returned.push(state);
+      return false;
     })
     .slice(0, QUEUE_SKIPPED_MAX);
+  if (returned.length > 0) {
+    queue.runs = [...returned.map((state) => state.run.id), ...queue.runs];
+    own = [...returned, ...own];
+  }
   const known = new Set(queue.acknowledged);
   if (queue.stop === null) {
     for (const state of own) {
@@ -519,6 +567,44 @@ export function advance(
   }
   queue.updatedAt = now;
   return { take };
+}
+
+export interface AutopilotAnswer {
+  run: string;
+  group: string;
+  answer: string;
+}
+
+function autopilotStreak(decisions: readonly { by: string }[]): number {
+  let streak = 0;
+  for (let index = decisions.length - 1; index >= 0; index -= 1) {
+    if (decisions[index]?.by !== 'autopilot') break;
+    streak += 1;
+  }
+  return streak;
+}
+
+/**
+ * Questions the autopilot answers now: groups of the runs that hold a place in a
+ * running queue, waiting because the specialist reported `needs_human` (not
+ * because of a limit or a change outside the worktree), that got fewer than
+ * `AUTOPILOT_ANSWERS_MAX` autopilot answers in a row.
+ */
+export function autopilotAnswers(queue: Queue, states: Iterable<RunState>): AutopilotAnswer[] {
+  if (queue.status !== 'running' || !queue.autopilot) return [];
+  const answer = queue.autopilotAnswer ?? DEFAULT_AUTOPILOT_ANSWER;
+  const result: AutopilotAnswer[] = [];
+  for (const state of queueStates(queue, states)) {
+    const work = state.split ? [state.split, ...state.groups] : state.groups;
+    for (const group of work) {
+      if (group.status !== 'needs_human') continue;
+      const last = group.attempts.at(-1);
+      if (last?.report?.verdict !== 'needs_human' || last.outsideChanges.length > 0) continue;
+      if (autopilotStreak(group.decisions) >= AUTOPILOT_ANSWERS_MAX) continue;
+      result.push({ run: state.run.id, group: group.slug, answer });
+    }
+  }
+  return result;
 }
 
 export function itemStarted(queue: Queue, id: string, run: string, now: number): void {

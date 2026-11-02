@@ -7,7 +7,12 @@ import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
-import { SETTABLE_SETTINGS, SLUG_PATTERN_TEXT, isValidSlug } from '../../config/index.ts';
+import {
+  DELIVERY_MODES,
+  SETTABLE_SETTINGS,
+  SLUG_PATTERN_TEXT,
+  isValidSlug,
+} from '../../config/index.ts';
 import {
   IpcError,
   checkDaemon,
@@ -108,7 +113,7 @@ const writeBody = z.object({
 });
 
 const settingBody = z.object({
-  value: z.boolean().nullable(),
+  value: z.union([z.boolean(), z.enum(DELIVERY_MODES)]).nullable(),
   revision: z.string().min(1).nullable(),
   level: levelParam.optional(),
 });
@@ -536,6 +541,14 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           throw new HttpError(404, `setting \`${path ?? ''}\` cannot be written`);
         }
         const { value, revision, level } = parseBody(settingBody, body);
+        if (value !== null && (known === 'delivery.auto') !== (typeof value === 'boolean')) {
+          throw new HttpError(
+            400,
+            known === 'delivery.auto'
+              ? 'value must be true or false'
+              : `value must be one of: ${DELIVERY_MODES.join(', ')}`,
+          );
+        }
         return editReply(
           (await call('config_setting', {
             repository,

@@ -29,6 +29,8 @@ export interface QueueSettingsPatch {
   parallel?: number;
   autopilot?: boolean;
   skipFailed?: boolean;
+  /** `null`: the default text. */
+  autopilotAnswer?: string | null;
 }
 
 export interface Api {
@@ -85,7 +87,7 @@ export interface Api {
   /** Writes one general setting (`null` removes it); problems come back as a result. */
   writeSetting(
     path: string,
-    value: boolean | null,
+    value: boolean | string | null,
     revision: string | null,
     level?: WriteLevel,
   ): Promise<ConfigEditResult>;

@@ -624,6 +624,7 @@ describe('automatic delivery switch', () => {
         task: 'A',
         title: null,
         autoDeliver: null,
+        deliveryMode: null,
         tags: [],
       }),
     );
@@ -652,6 +653,7 @@ describe('items', () => {
         task: 'A2',
         title: null,
         autoDeliver: null,
+        deliveryMode: null,
         tags: [],
       }),
     );
@@ -1766,5 +1768,152 @@ describe('skipped runs', () => {
     show(queueOf({ skipped: [queueRun('run1', { title: 'Логин', state: 'failed' })] }));
     await screen.findByRole('region', { name: 'skipped with a problem' });
     expect(screen.queryByRole('region', { name: 'running from the queue' })).toBeNull();
+  });
+});
+
+describe('delivery mode in the queue settings', () => {
+  const settingsBlock = async () =>
+    within(await screen.findByRole('region', { name: 'queue settings' }));
+
+  it('shows the mode and writes delivery.mode to the global settings', async () => {
+    const api = show(queueOf({ deliveryMode: 'worktree' }));
+    const block = await settingsBlock();
+    const select = await waitFor(() => {
+      const found = block.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
+      expect(found.disabled).toBe(false);
+      return found;
+    });
+    expect(select.textContent).toBe('In the working tree');
+    fireEvent.keyDown(select, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Commit' }));
+    await waitFor(() =>
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'commit', 'g1', 'global'),
+    );
+    act(() => {
+      stream().open();
+      stream().send({ event: 'queue', seq: 5, queue: queueOf({ deliveryMode: 'commit' }) });
+    });
+    await waitFor(() =>
+      expect(block.getByRole('combobox', { name: 'Delivery mode' }).textContent).toBe('Commit'),
+    );
+  });
+
+  it('is unavailable when the project file sets the mode or the configuration is invalid', async () => {
+    show(queueOf({ deliveryMode: 'branch' }), {
+      config: vi.fn(async () =>
+        configView({
+          settings: settingsOf({
+            'delivery.mode': {
+              path: 'delivery.mode',
+              value: 'branch',
+              file: '/repo/aip/settings.yaml',
+            },
+          }),
+        }),
+      ),
+    });
+    const block = await settingsBlock();
+    const select = block.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
+    await waitFor(() => expect(select.disabled).toBe(true));
+    expect(block.getAllByText('The project file sets this value').length).toBeGreaterThan(0);
+    cleanup();
+    show(queueOf({ deliveryMode: null }));
+    const invalid = await settingsBlock();
+    expect(
+      invalid.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' }).disabled,
+    ).toBe(true);
+  });
+});
+
+describe('answer of the autopilot in the queue settings', () => {
+  const settingsBlock = async () =>
+    within(await screen.findByRole('region', { name: 'queue settings' }));
+
+  it('shows the default text, saves a text and resets it', async () => {
+    const api = show(queueOf({ autopilotAnswerDefault: 'Agree with all' }), {
+      queueSettings: vi.fn(async () => queueOf({ autopilotAnswer: 'Pick the simplest' })),
+    });
+    const block = await settingsBlock();
+    const field = block.getByRole<HTMLTextAreaElement>('textbox', { name: 'Answer to questions' });
+    expect(field.value).toBe('Agree with all');
+    const save = block.getByRole<HTMLButtonElement>('button', { name: 'Save answer' });
+    const reset = block.getByRole<HTMLButtonElement>('button', { name: 'Default answer' });
+    expect(save.disabled).toBe(true);
+    expect(reset.disabled).toBe(true);
+    fireEvent.change(field, { target: { value: '  Pick the simplest ' } });
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(api.queueSettings).toHaveBeenCalledWith({ autopilotAnswer: 'Pick the simplest' }),
+    );
+    await waitFor(() => expect(field.value).toBe('Pick the simplest'));
+    await waitFor(() => expect(reset.disabled).toBe(false));
+    fireEvent.click(reset);
+    await waitFor(() =>
+      expect(api.queueSettings).toHaveBeenLastCalledWith({ autopilotAnswer: null }),
+    );
+  });
+
+  it('keeps unsaved text over a queue event', async () => {
+    show(queueOf({ autopilotAnswerDefault: 'Agree with all' }));
+    const block = await settingsBlock();
+    const field = block.getByRole<HTMLTextAreaElement>('textbox', { name: 'Answer to questions' });
+    fireEvent.change(field, { target: { value: 'Мой текст' } });
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'queue',
+        seq: 5,
+        queue: queueOf({ autopilotAnswer: 'Другой', autopilotAnswerDefault: 'Agree with all' }),
+      });
+    });
+    expect(field.value).toBe('Мой текст');
+  });
+});
+
+describe('delivery mode of a task', () => {
+  it('sends the chosen mode only when it is chosen and shows it in the list', async () => {
+    const api = show(queueOf({ deliveryMode: 'worktree' }), {
+      queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
+    });
+    const text = await screen.findByLabelText('Task text');
+    const select = screen
+      .getAllByRole('combobox', { name: 'Delivery mode' })
+      .find((node) => node.id === 'new-delivery-mode')!;
+    expect(select.textContent).toBe('In the working tree');
+    expect(screen.getByText('mode as in the settings')).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    fireEvent.keyDown(select, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Branch' }));
+    expect(screen.getByText('mode for this task')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        workflow: 'feature',
+        task: 'Сделать вход',
+        deliveryMode: 'branch',
+      }),
+    );
+  });
+
+  it('marks a task with its own mode and sends null when an edit resets it', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { deliveryMode: 'commit' })] }));
+    expect(await screen.findByText('delivery: Commit')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'mode as in the settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', {
+        workflow: 'feature',
+        task: 'A',
+        title: null,
+        autoDeliver: null,
+        deliveryMode: null,
+        tags: [],
+      }),
+    );
   });
 });

@@ -6,11 +6,13 @@ import type { Command } from 'commander';
 import { parse as parseYaml } from 'yaml';
 
 import {
+  DELIVERY_MODES,
   configPaths,
   loadWebSettings,
   lockPath,
   socketPath,
   stateDirectoryFromEnvironment,
+  type DeliveryMode,
 } from '../config/index.ts';
 import { createHostServer, createWorkerServer } from '../mcp/index.ts';
 import {
@@ -140,8 +142,18 @@ interface QueueTaskOptions {
   groups?: string;
   title?: string;
   autoDeliver?: boolean;
+  deliveryMode?: string;
   repo: string;
   json?: boolean;
+}
+
+function parseDeliveryMode(value: string | undefined): DeliveryMode | undefined {
+  if (value === undefined) return undefined;
+  const mode = DELIVERY_MODES.find((candidate) => candidate === value);
+  if (mode === undefined) {
+    throw new Error(`--delivery-mode must be one of: ${DELIVERY_MODES.join(', ')}`);
+  }
+  return mode;
 }
 
 function parseSwitch(flag: string, value: string | undefined): boolean | undefined {
@@ -169,6 +181,10 @@ function registerQueue(program: Command): void {
         'deliver the merged groups automatically, whatever delivery.auto says',
       )
       .option('--no-auto-deliver', 'leave the merged groups for `aip apply`')
+      .option(
+        '--delivery-mode <mode>',
+        `how the merged result is delivered: ${DELIVERY_MODES.join(', ')}; whatever delivery.mode says`,
+      )
       .option('--tag <name>', 'tag of the task; repeat for several', collect)
       .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
       .option(
@@ -209,6 +225,7 @@ function registerQueue(program: Command): void {
       if ((options.task === undefined) === (options.groups === undefined)) {
         throw new Error('pass exactly one of --task and --groups');
       }
+      const deliveryMode = parseDeliveryMode(options.deliveryMode);
       const view = (await call(context(), 'queue_add', {
         repository: resolve(options.repo),
         workflow,
@@ -216,6 +233,7 @@ function registerQueue(program: Command): void {
         ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
         ...(options.title !== undefined ? { title: options.title } : {}),
         ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
+        ...(deliveryMode !== undefined ? { deliveryMode } : {}),
         ...(options.tag !== undefined ? { tags: options.tag } : {}),
         ...(options.skip !== undefined ? { skip: options.skip } : {}),
         ...(options.after !== undefined ? { after: options.after } : {}),
@@ -236,6 +254,7 @@ function registerQueue(program: Command): void {
         .argument('<item>', 'item id from `aip queue list`')
         .option('-w, --workflow <id>', 'new workflow id')
         .option('--default-auto-deliver', 'follow delivery.auto of the configuration again')
+        .option('--default-delivery-mode', 'follow delivery.mode of the configuration again')
         .option('--no-tags', 'remove all tags of the task')
         .option('--no-skips', 'run every step of the workflow again')
         .option('--no-after', 'remove all predecessors of the task'),
@@ -258,6 +277,7 @@ function registerQueue(program: Command): void {
         options: QueueTaskOptions & {
           workflow?: string;
           defaultAutoDeliver?: boolean;
+          defaultDeliveryMode?: boolean;
           tags?: boolean;
           skips?: boolean;
         },
@@ -277,6 +297,10 @@ function registerQueue(program: Command): void {
         if (options.defaultAutoDeliver && options.autoDeliver !== undefined) {
           throw new Error('--default-auto-deliver cannot be combined with --auto-deliver');
         }
+        if (options.defaultDeliveryMode && options.deliveryMode !== undefined) {
+          throw new Error('--default-delivery-mode cannot be combined with --delivery-mode');
+        }
+        const deliveryMode = parseDeliveryMode(options.deliveryMode);
         showQueue(
           options.json,
           (await call(context(), 'queue_edit', {
@@ -290,6 +314,11 @@ function registerQueue(program: Command): void {
               ? { autoDeliver: null }
               : options.autoDeliver !== undefined
                 ? { autoDeliver: options.autoDeliver }
+                : {}),
+            ...(options.defaultDeliveryMode
+              ? { deliveryMode: null }
+              : deliveryMode !== undefined
+                ? { deliveryMode }
                 : {}),
             ...(options.tags === false ? { tags: [] } : {}),
             ...(options.tag !== undefined ? { tags: options.tag } : {}),
@@ -378,13 +407,16 @@ function registerQueue(program: Command): void {
       .description('Change queue settings; only the passed ones change, takes effect at once')
       .option('-p, --parallel <n>', 'runs at the same time (1-20)')
       .option('--autopilot <on|off>', 'a running queue does not stop when it becomes empty')
-      .option('--skip-failed <on|off>', 'a run with a stopping problem leaves its place'),
+      .option('--skip-failed <on|off>', 'a run with a stopping problem leaves its place')
+      .option('--autopilot-answer <text>', 'text the autopilot answers specialists questions with')
+      .option('--default-autopilot-answer', 'answer with the default text again'),
   )
     .addHelpText(
       'after',
       examples([
         'aip queue settings --autopilot on',
         'aip queue settings --skip-failed on --parallel 2',
+        'aip queue settings --autopilot-answer "Agree; pick the simplest option"',
       ]),
     )
     .action(
@@ -393,8 +425,13 @@ function registerQueue(program: Command): void {
         parallel?: string;
         autopilot?: string;
         skipFailed?: string;
+        autopilotAnswer?: string;
+        defaultAutopilotAnswer?: boolean;
         json?: boolean;
       }) => {
+        if (options.defaultAutopilotAnswer && options.autopilotAnswer !== undefined) {
+          throw new Error('--default-autopilot-answer cannot be combined with --autopilot-answer');
+        }
         const autopilot = parseSwitch('--autopilot', options.autopilot);
         const skipFailed = parseSwitch('--skip-failed', options.skipFailed);
         showQueue(
@@ -404,6 +441,11 @@ function registerQueue(program: Command): void {
             ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
             ...(autopilot !== undefined ? { autopilot } : {}),
             ...(skipFailed !== undefined ? { skipFailed } : {}),
+            ...(options.defaultAutopilotAnswer
+              ? { autopilotAnswer: null }
+              : options.autopilotAnswer !== undefined
+                ? { autopilotAnswer: options.autopilotAnswer }
+                : {}),
           })) as QueueView,
         );
       },
@@ -587,6 +629,10 @@ function registerRun(program: Command): void {
       'deliver the merged groups automatically, whatever delivery.auto says',
     )
     .option('--no-auto-deliver', 'leave the merged groups for `aip apply`')
+    .option(
+      '--delivery-mode <mode>',
+      `how the merged result is delivered: ${DELIVERY_MODES.join(', ')}; whatever delivery.mode says`,
+    )
     .option('--tag <name>', 'tag of the task; repeat for several', collect)
     .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
     .option(
@@ -614,6 +660,7 @@ function registerRun(program: Command): void {
           repo: string;
           title?: string;
           autoDeliver?: boolean;
+          deliveryMode?: string;
           tag?: string[];
           skip?: string[];
           after?: string[];
@@ -624,6 +671,7 @@ function registerRun(program: Command): void {
           throw new Error('pass exactly one of --task and --groups');
         }
         const groups = options.groups ? readGroups(options.groups) : undefined;
+        const deliveryMode = parseDeliveryMode(options.deliveryMode);
         const queued = (await call(context(), 'run', {
           repository: resolve(options.repo),
           workflow,
@@ -631,6 +679,7 @@ function registerRun(program: Command): void {
           ...(groups ? { groups } : {}),
           ...(options.title !== undefined ? { title: options.title } : {}),
           ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
+          ...(deliveryMode !== undefined ? { deliveryMode } : {}),
           ...(options.tag !== undefined ? { tags: options.tag } : {}),
           ...(options.skip !== undefined ? { skip: options.skip } : {}),
           ...(options.after !== undefined ? { after: options.after } : {}),

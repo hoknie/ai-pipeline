@@ -275,6 +275,11 @@ export const en = {
       title: 'The configuration does not pass the check',
     },
   },
+  deliveryMode: {
+    worktree: 'In the working tree',
+    commit: 'Commit',
+    branch: 'Branch',
+  },
   queue: {
     settings: {
       title: 'Queue settings',
@@ -289,6 +294,15 @@ export const en = {
       autoDeliverHint: 'Applies to tasks without their own auto delivery, when they start.',
       autoDeliverProject: 'The project file sets this value',
       autoDeliverInvalid: 'The configuration is not valid',
+      deliveryMode: 'Delivery mode',
+      deliveryModeHint:
+        'Where the result of a task goes: the working tree, a commit on the current branch or a separate aip/ branch. Applies to tasks without their own mode, when they start.',
+      autopilotAnswer: 'Answer to questions',
+      autopilotAnswerHint:
+        'The text the autopilot answers the questions of specialists with; at most 3 answers in a row per group.',
+      autopilotAnswerSave: 'Save answer',
+      autopilotAnswerDefault: 'Default answer',
+      autopilotAnswerSaved: 'Answer saved',
     },
     skipped: 'Skipped with a problem ({{count}})',
     skippedLabel: 'skipped with a problem',
@@ -344,6 +358,10 @@ export const en = {
       autoDeliverBySetting: 'as in the settings',
       autoDeliverForTask: 'for this task',
       autoDeliverReset: 'as in the settings',
+      deliveryMode: 'Delivery mode',
+      deliveryModeBySetting: 'mode as in the settings',
+      deliveryModeForTask: 'mode for this task',
+      deliveryModeReset: 'mode as in the settings',
       noWorkflow: 'no workflow',
       kind: 'kind of task',
       task: 'Task',
@@ -370,6 +388,7 @@ export const en = {
       removeDependents: 'These tasks wait for it: {{items}}. They will stop waiting for it.',
       autoDelivery: 'auto delivery',
       manualDelivery: 'manual delivery',
+      deliveryMode: 'delivery: {{mode}}',
       groups_one: '{{count}} group',
       groups_other: '{{count}} groups',
       moveFailed: 'Could not reorder: {{error}}',

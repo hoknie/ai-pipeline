@@ -352,6 +352,9 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
   const lines = [
     `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken), autopilot ${view.autopilot ? 'on' : 'off'}, skip failed ${view.skipFailed ? 'on' : 'off'}`,
   ];
+  if (view.autopilotAnswer !== null) {
+    lines.push(`${style.muted('Autopilot answer:')} ${firstLine(view.autopilotAnswer)}`);
+  }
   const reason = stopReason(view);
   if (reason) lines.push(style.danger(`Stopped: ${reason}`));
   if (view.runs.length > 0) {
@@ -375,7 +378,12 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const labels = formatTagLabels(item.tags, style);
     const tagText = labels === '' ? '' : `  ${labels}`;
     const delivery =
-      item.autoDeliver === null ? '' : item.autoDeliver ? ' · auto delivery' : ' · manual delivery';
+      (item.autoDeliver === null
+        ? ''
+        : item.autoDeliver
+          ? ' · auto delivery'
+          : ' · manual delivery') +
+      (item.deliveryMode === null ? '' : ` · delivery: ${item.deliveryMode}`);
     const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
     const mark =
       item.readiness === 'ready'

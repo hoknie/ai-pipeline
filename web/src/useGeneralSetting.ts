@@ -6,28 +6,32 @@ import type { ConfigEditorResponse } from './types.ts';
 
 type Source = Pick<ConfigEditorResponse, 'settings' | 'settingsFiles'>;
 
-export interface GeneralSetting {
+export interface Setting<T extends boolean | string> {
   /** The configuration is read and the setting is known. */
   ready: boolean;
-  value: boolean;
+  /** `null`: the value is not of the expected kind. */
+  value: T | null;
   /** The project file sets the value: it cannot be changed here. */
   overridden: boolean;
   busy: boolean;
   failure: string | null;
-  set: (value: boolean) => Promise<void>;
+  set: (value: T) => Promise<void>;
 }
 
+export type GeneralSetting = Omit<Setting<boolean>, 'value'> & { value: boolean };
+
 /**
- * A boolean setting of the merged configuration that the panel writes to the global
+ * A setting of the merged configuration that the panel writes to the global
  * `settings.yaml`. With `source` the values come from the caller (who then reads them again in
  * `onChanged`); without it the hook reads the configuration itself.
  */
-export function useGeneralSetting(
+export function useSetting<T extends boolean | string>(
   api: Api | undefined,
   path: string,
+  kind: 'boolean' | 'string',
   source?: Source,
   onChanged?: () => Promise<void> | void,
-): GeneralSetting {
+): Setting<T> {
   const { t } = useTranslation();
   const [read, setRead] = useState<Source | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -46,8 +50,9 @@ export function useGeneralSetting(
   const view = source ?? read;
   const setting = view?.settings.find((candidate) => candidate.path === path);
   const files = view?.settingsFiles;
+  const raw: unknown = setting?.value;
 
-  const set = async (value: boolean) => {
+  const set = async (value: T) => {
     if (!api || !files) return;
     setBusy(true);
     setFailure(null);
@@ -70,10 +75,21 @@ export function useGeneralSetting(
 
   return {
     ready: setting !== undefined && files !== undefined,
-    value: setting?.value === true,
+    value: typeof raw === kind ? (raw as T) : null,
     overridden: setting !== undefined && files !== undefined && setting.file === files.project.file,
     busy,
     failure,
     set,
   };
+}
+
+/** A boolean setting; a missing or foreign value reads as false. */
+export function useGeneralSetting(
+  api: Api | undefined,
+  path: string,
+  source?: Source,
+  onChanged?: () => Promise<void> | void,
+): GeneralSetting {
+  const setting = useSetting<boolean>(api, path, 'boolean', source, onChanged);
+  return { ...setting, value: setting.value === true };
 }

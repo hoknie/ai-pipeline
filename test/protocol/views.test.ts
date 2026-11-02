@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { addItem, advance, emptyQueue, startQueue, transition } from '../../src/core/index.ts';
+import {
+  DEFAULT_AUTOPILOT_ANSWER,
+  addItem,
+  advance,
+  emptyQueue,
+  startQueue,
+  transition,
+} from '../../src/core/index.ts';
 import {
   formatRepositories,
   groupView,
@@ -297,5 +304,25 @@ describe('runView system steps', () => {
 
   it('is empty without service groups', () => {
     expect(runView(run(1), 5000).system).toEqual([]);
+  });
+});
+
+describe('queueView delivery mode and autopilot answer', () => {
+  it('shows the mode of the repository and of the items, and the answer text', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a', deliveryMode: 'commit' }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'b' }, 'q2', 2);
+    const view = queueView(queue, () => undefined, true, [], 'branch');
+    expect(view.deliveryMode).toBe('branch');
+    expect(view.items.map((item) => item.deliveryMode)).toEqual(['commit', null]);
+    expect(view.autopilotAnswer).toBeNull();
+    expect(view.autopilotAnswerDefault).toBe(DEFAULT_AUTOPILOT_ANSWER);
+    queue.autopilotAnswer = 'Согласен';
+    expect(queueView(queue, () => undefined).autopilotAnswer).toBe('Согласен');
+    expect(queueView(queue, () => undefined).deliveryMode).toBeNull();
+  });
+
+  it('shows the delivery mode of a run', () => {
+    expect(runView(run(1, { deliveryMode: 'commit' }), 2000).deliveryMode).toBe('commit');
   });
 });

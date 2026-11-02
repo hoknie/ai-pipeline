@@ -107,6 +107,7 @@ export default function QueuePage({
             workflows={workflows}
             api={api}
             autoDeliverDefault={queue.autoDeliver}
+            deliveryModeDefault={queue.deliveryMode}
             afterChoices={afterOptions(queue, (item) => itemLabel(item, t))}
             submitLabel={t('queue.add')}
             onDraft={(draft) => onDraft('new', draft)}

@@ -152,7 +152,7 @@ describe('questions to a human', () => {
     expect(attempt.stepId).toBe('code');
     expect(attempt.input.humanAnswer).toBeNull();
     expect(attempt.input.decisions).toEqual([
-      { stepId: 'code', question: 'Как назвать функцию?', answer: 'Name it double' },
+      { stepId: 'code', question: 'Как назвать функцию?', answer: 'Name it double', by: 'human' },
     ]);
   });
 

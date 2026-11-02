@@ -189,6 +189,28 @@ describe('worker MCP server', () => {
     ]);
   });
 
+  it('passes deliveryMode of a queued task from a specialist', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q-abc' };
+      },
+      true,
+    );
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+      },
+    ]);
+  });
+
   it('passes skip of a queued task from a specialist only when it is given', async () => {
     const calls: unknown[] = [];
     const client = await connect(

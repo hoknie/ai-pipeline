@@ -1,4 +1,4 @@
-import { findWorkflow, type ResolvedConfig } from '../config/index.ts';
+import { findWorkflow, type DeliveryMode, type ResolvedConfig } from '../config/index.ts';
 
 import { groupSlugs, runName } from './ids.ts';
 import { applySkip } from './skip.ts';
@@ -27,6 +27,8 @@ export interface NewRun {
   queueItem?: string | null;
   /** Overrides `delivery.auto` of the configuration for this run only. */
   autoDeliver?: boolean | undefined;
+  /** Overrides `delivery.mode` of the configuration for this run only. */
+  deliveryMode?: DeliveryMode | undefined;
   /** Ids of catalog tags. */
   tags?: string[] | undefined;
   /** Ids of workflow steps this run skips. */
@@ -45,9 +47,16 @@ export function createRun(input: NewRun): RunState {
   }
   const skipped = applySkip(input.config, input.workflow, input.skip ?? []);
   const config =
-    input.autoDeliver === undefined
+    input.autoDeliver === undefined && input.deliveryMode === undefined
       ? skipped
-      : { ...skipped, delivery: { ...skipped.delivery, auto: input.autoDeliver } };
+      : {
+          ...skipped,
+          delivery: {
+            ...skipped.delivery,
+            ...(input.autoDeliver !== undefined ? { auto: input.autoDeliver } : {}),
+            ...(input.deliveryMode !== undefined ? { mode: input.deliveryMode } : {}),
+          },
+        };
   const splitting = input.split && workflow.split !== null && input.groups.length === 1;
   const slugs = groupSlugs(input.groups.map((group) => group.title));
   const task = input.groups[0]?.task ?? '';

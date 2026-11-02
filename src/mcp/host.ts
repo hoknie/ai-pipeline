@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
+import { DELIVERY_MODES } from '../config/index.ts';
 import {
   formatApply,
   formatGroup,
@@ -80,6 +81,12 @@ export function createHostServer(options: HostOptions): McpServer {
           .describe(
             'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
           ),
+        deliveryMode: z
+          .enum(DELIVERY_MODES)
+          .optional()
+          .describe(
+            'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
+          ),
         tags,
         skip,
         after,
@@ -92,6 +99,7 @@ export function createHostServer(options: HostOptions): McpServer {
       repo,
       title,
       autoDeliver,
+      deliveryMode,
       tags: tagNames,
       skip: skipSteps,
       after: afterIds,
@@ -104,6 +112,7 @@ export function createHostServer(options: HostOptions): McpServer {
           ...(groups !== undefined ? { groups } : {}),
           ...(title !== undefined ? { title } : {}),
           ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+          ...(deliveryMode !== undefined ? { deliveryMode } : {}),
           ...(tagNames !== undefined ? { tags: tagNames } : {}),
           ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
           ...(afterIds !== undefined ? { after: afterIds } : {}),
@@ -255,6 +264,12 @@ export function createHostServer(options: HostOptions): McpServer {
           .describe(
             'Deliver merged groups automatically; omit to follow delivery.auto of the configuration',
           ),
+        deliveryMode: z
+          .enum(DELIVERY_MODES)
+          .optional()
+          .describe(
+            'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
+          ),
         tags,
         skip,
         after,
@@ -267,6 +282,7 @@ export function createHostServer(options: HostOptions): McpServer {
       groups,
       title,
       autoDeliver,
+      deliveryMode,
       tags: tagNames,
       skip: skipSteps,
       after: afterIds,
@@ -281,6 +297,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+            ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
@@ -308,6 +325,11 @@ export function createHostServer(options: HostOptions): McpServer {
           .nullable()
           .optional()
           .describe('Automatic delivery of this task; null follows delivery.auto again'),
+        deliveryMode: z
+          .enum(DELIVERY_MODES)
+          .nullable()
+          .optional()
+          .describe('Delivery mode of this task; null follows delivery.mode again'),
         tags,
         skip,
         after,
@@ -322,6 +344,7 @@ export function createHostServer(options: HostOptions): McpServer {
       title,
       position,
       autoDeliver,
+      deliveryMode,
       tags: tagNames,
       skip: skipSteps,
       after: afterIds,
@@ -338,6 +361,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(title !== undefined ? { title } : {}),
             ...(position !== undefined ? { position } : {}),
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
+            ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
@@ -391,7 +415,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Change queue settings',
       description:
-        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once; turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting, cancelled or undelivered group leaves its place and goes to the skipped list, the queue keeps going. Takes effect at once.',
+        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once; turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting, cancelled or undelivered group leaves its place and goes to the skipped list, the queue keeps going. `autopilot_answer`: with the autopilot on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. Takes effect at once.',
       inputSchema: {
         parallel: z.number().int().min(1).max(20).optional().describe('Runs at the same time'),
         autopilot: z.boolean().optional().describe('Keep the running queue going when it is empty'),
@@ -399,10 +423,17 @@ export function createHostServer(options: HostOptions): McpServer {
           .boolean()
           .optional()
           .describe('Skip runs with a stopping problem instead of stopping the queue'),
+        autopilot_answer: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            'Text the autopilot answers specialists questions with; null restores the default text',
+          ),
         repo,
       },
     },
-    ({ parallel, autopilot, skip_failed, repo: where }) =>
+    ({ parallel, autopilot, skip_failed, autopilot_answer, repo: where }) =>
       attempt(() =>
         showQueue(
           'queue_settings',
@@ -410,6 +441,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(parallel !== undefined ? { parallel } : {}),
             ...(autopilot !== undefined ? { autopilot } : {}),
             ...(skip_failed !== undefined ? { skipFailed: skip_failed } : {}),
+            ...(autopilot_answer !== undefined ? { autopilotAnswer: autopilot_answer } : {}),
           },
           where,
         ),

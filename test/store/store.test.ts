@@ -139,7 +139,9 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
     old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
@@ -169,7 +171,9 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
     old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')).toMatchObject({
@@ -372,7 +376,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-10)).toContain('denials_json');
+    expect(MIGRATIONS.at(-11)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -395,7 +399,7 @@ describe('refused tool calls', () => {
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-9)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-10)).toContain('outside_changes_json');
   });
 });
 
@@ -438,7 +442,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(13);
+    expect(SCHEMA_VERSION).toBe(14);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -463,6 +467,34 @@ describe('queue items and automatic delivery', () => {
     ]);
   });
 
+  it('keeps the delivery mode of an item and the autopilot answer of a queue', () => {
+    const store = temporaryStore();
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'a', deliveryMode: 'commit' }, 'q0', 1);
+    addItem(queue, { workflow: 'feature', task: 'b' }, 'q1', 1);
+    queue.autopilotAnswer = 'Согласен';
+    store.saveQueue(queue);
+    const loaded = store.loadQueue('/repo');
+    expect(loaded?.items.map((item) => item.deliveryMode)).toEqual(['commit', null]);
+    expect(loaded?.autopilotAnswer).toBe('Согласен');
+    store.database.exec("UPDATE queue_items SET delivery_mode = 'tar' WHERE id = 'q0'");
+    expect(store.loadQueue('/repo')?.items[0]?.deliveryMode).toBeNull();
+  });
+
+  it('keeps who answered a question and reads old decisions as human', () => {
+    const store = temporaryStore();
+    const state = run(1);
+    step(state);
+    finish(state, 'needs_human', { feedback: 'q' });
+    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ok', by: 'autopilot' }, 5);
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)?.groups[0]?.decisions[0]?.by).toBe('autopilot');
+    store.database.exec(
+      `UPDATE groups SET decisions_json = '[{"stepId":"s","question":"q","answer":"a"}]'`,
+    );
+    expect(store.loadRun(state.run.id)?.groups[0]?.decisions[0]?.by).toBe('human');
+  });
+
   it('reads items of an older database as following the setting', () => {
     const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
     const old = new Store(databasePath(directory));
@@ -478,7 +510,9 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
     old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -506,7 +540,9 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
     old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -584,7 +620,9 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN autopilot');
     old.database.exec('ALTER TABLE queues DROP COLUMN skip_failed');
     old.database.exec('ALTER TABLE queues DROP COLUMN skipped_json');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN autopilot_answer');
+    old.database.exec('ALTER TABLE queue_items DROP COLUMN delivery_mode');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);

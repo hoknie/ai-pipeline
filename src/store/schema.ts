@@ -133,6 +133,10 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE queues ADD COLUMN skip_failed INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE queues ADD COLUMN skipped_json TEXT NOT NULL DEFAULT '[]';
   `,
+  `
+  ALTER TABLE queue_items ADD COLUMN delivery_mode TEXT;
+  ALTER TABLE queues ADD COLUMN autopilot_answer TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

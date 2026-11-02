@@ -302,6 +302,11 @@ export function QueueList({
                       : t('queue.list.manualDelivery')}
                   </span>
                 )}
+                {item.deliveryMode === null || item.deliveryMode === undefined ? null : (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                    {t('queue.list.deliveryMode', { mode: t(`deliveryMode.${item.deliveryMode}`) })}
+                  </span>
+                )}
                 {item.title && item.groups ? (
                   <span className="text-muted-foreground">{groupsText(item.groups.length, t)}</span>
                 ) : null}
@@ -373,6 +378,7 @@ export function QueueList({
                   workflows={workflows}
                   api={api}
                   autoDeliverDefault={queue.autoDeliver}
+                  deliveryModeDefault={queue.deliveryMode}
                   afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item)}
                   submitLabel={t('queue.list.save')}
                   onDraft={(draft) => onDraft(`edit:${item.id}`, draft)}
@@ -385,6 +391,7 @@ export function QueueList({
                         ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
                         title: fields.title ?? null,
                         autoDeliver: fields.autoDeliver ?? null,
+                        deliveryMode: fields.deliveryMode ?? null,
                         tags: fields.tags ?? [],
                         ...(fields.after !== undefined ? { after: fields.after } : {}),
                       });

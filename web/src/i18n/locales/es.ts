@@ -280,6 +280,11 @@ export const es: Dictionary = {
       title: 'La configuración no pasa la validación',
     },
   },
+  deliveryMode: {
+    worktree: 'En el árbol de trabajo',
+    commit: 'Confirmación (commit)',
+    branch: 'Rama',
+  },
   queue: {
     settings: {
       title: 'Ajustes de la cola',
@@ -294,6 +299,15 @@ export const es: Dictionary = {
       autoDeliverHint: 'Se aplica a las tareas sin entrega automática propia cuando empiezan.',
       autoDeliverProject: 'El archivo del proyecto fija este valor',
       autoDeliverInvalid: 'La configuración no es válida',
+      deliveryMode: 'Modo de entrega',
+      deliveryModeHint:
+        'Dónde va el resultado de una tarea: el árbol de trabajo, un commit en la rama actual o una rama aip/ aparte. Se aplica a las tareas sin modo propio cuando empiezan.',
+      autopilotAnswer: 'Respuesta a las preguntas',
+      autopilotAnswerHint:
+        'El texto con el que el piloto automático responde a las preguntas de los especialistas; como máximo 3 respuestas seguidas por grupo.',
+      autopilotAnswerSave: 'Guardar respuesta',
+      autopilotAnswerDefault: 'Respuesta por defecto',
+      autopilotAnswerSaved: 'Respuesta guardada',
     },
     skipped: 'Omitidas con error ({{count}})',
     skippedLabel: 'omitidas con error',
@@ -351,6 +365,10 @@ export const es: Dictionary = {
       autoDeliverBySetting: 'según la configuración',
       autoDeliverForTask: 'para esta tarea',
       autoDeliverReset: 'como en la configuración',
+      deliveryMode: 'Modo de entrega',
+      deliveryModeBySetting: 'modo según la configuración',
+      deliveryModeForTask: 'modo para esta tarea',
+      deliveryModeReset: 'modo como en la configuración',
       noWorkflow: 'sin workflow',
       kind: 'tipo de tarea',
       task: 'Tarea',
@@ -377,6 +395,7 @@ export const es: Dictionary = {
       removeDependents: 'Estas tareas dependen de ella: {{items}}. Dejarán de esperarla.',
       autoDelivery: 'entrega automática',
       manualDelivery: 'entrega manual',
+      deliveryMode: 'entrega: {{mode}}',
       groups_one: '{{count}} grupo',
       groups_many: '{{count}} grupos',
       groups_other: '{{count}} grupos',

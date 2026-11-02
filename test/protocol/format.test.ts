@@ -377,6 +377,18 @@ describe('queue text', () => {
     expect(formatRun(runView(run(1), 2000), 2000)).not.toContain('manual delivery');
   });
 
+  it('marks the delivery mode of an item and a custom autopilot answer', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'x', deliveryMode: 'commit' }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 2);
+    const plain = formatQueue(queueView(queue, () => undefined)).split('\n');
+    expect(plain.find((line) => line.includes('q1'))).toContain('delivery: commit');
+    expect(plain.find((line) => line.includes('q2'))).not.toContain('delivery:');
+    expect(plain.join('\n')).not.toContain('Autopilot answer');
+    queue.autopilotAnswer = 'Согласен\nи точка';
+    expect(formatQueue(queueView(queue, () => undefined))).toContain('Autopilot answer: Согласен');
+  });
+
   it('shows an item error and an empty queue', () => {
     const queue = emptyQueue('/repo', 1);
     expect(formatQueue(queueView(queue, () => undefined))).toBe(
@@ -450,6 +462,9 @@ describe('colored text', () => {
       runs: [],
       skipped: [],
       autoDeliver: true,
+      deliveryMode: 'worktree' as const,
+      autopilotAnswer: null,
+      autopilotAnswerDefault: 'default',
       updatedAt: 1,
     };
     expect(ansi(formatQueue(queue, style)).split('\n')[0]).toContain('◦ stopped');

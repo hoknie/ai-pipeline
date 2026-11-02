@@ -19,6 +19,7 @@ import {
   loadConfig,
   planSetting,
   socketPath,
+  type DeliveryMode,
 } from '../config/index.ts';
 import {
   Rejection,
@@ -26,6 +27,7 @@ import {
   checkSkip,
   addTag,
   advance,
+  autopilotAnswers,
   allGroups,
   createRun,
   dependencyTags,
@@ -230,20 +232,26 @@ export class Daemon {
   }
 
   private queueSnapshot(queue: Queue): QueueView {
+    const delivery = this.deliverySettings(queue.repository);
     return queueView(
       queue,
       (id) => this.lookupState(id),
-      this.deliveryAuto(queue.repository),
+      delivery.auto,
       this.catalog,
+      delivery.mode,
     );
   }
 
-  /** `delivery.auto` of the repository now; null when its configuration cannot be loaded. */
-  private deliveryAuto(repository: string): boolean | null {
+  /** `delivery.auto` and `delivery.mode` of the repository now; null when its configuration cannot be loaded. */
+  private deliverySettings(repository: string): {
+    auto: boolean | null;
+    mode: DeliveryMode | null;
+  } {
     try {
-      return loadConfig(this.configPathsOf(repository)).delivery.auto;
+      const { delivery } = loadConfig(this.configPathsOf(repository));
+      return { auto: delivery.auto, mode: delivery.mode };
     } catch (error) {
-      if (error instanceof ConfigLoadError) return null;
+      if (error instanceof ConfigLoadError) return { auto: null, mode: null };
       throw error;
     }
   }
@@ -340,6 +348,22 @@ export class Daemon {
     });
     const { take } = advance(queue, states, (id) => this.lookupState(id), this.now());
     let changed = fingerprint() !== before;
+    const current = queue.runs.flatMap((id) => this.lookupState(id) ?? []);
+    for (const answer of autopilotAnswers(queue, current)) {
+      const state = this.lookupState(answer.run);
+      if (!state) continue;
+      try {
+        await this.apply(state, {
+          kind: 'answer',
+          group: answer.group,
+          answer: answer.answer,
+          by: 'autopilot',
+          permissions: this.currentPermissions(state),
+        });
+      } catch (error) {
+        if (!(error instanceof Rejection)) throw error;
+      }
+    }
     let failed = false;
     for (const item of take) {
       try {
@@ -398,7 +422,7 @@ export class Daemon {
         case 'queue_add':
           return this.addQueueItem(repository, request.params);
         case 'queue_edit': {
-          const { item, workflow, task, groups, title, position, autoDeliver, skip } =
+          const { item, workflow, task, groups, title, position, autoDeliver, deliveryMode, skip } =
             request.params;
           if (workflow !== undefined || skip !== undefined) {
             const current = queue.items.find((candidate) => candidate.id === item);
@@ -427,7 +451,18 @@ export class Daemon {
           editItem(
             queue,
             item,
-            { workflow, task, groups, title, position, autoDeliver, tags, skip, after },
+            {
+              workflow,
+              task,
+              groups,
+              title,
+              position,
+              autoDeliver,
+              deliveryMode,
+              tags,
+              skip,
+              after,
+            },
             now,
           );
           const edited = queue.items.find((candidate) => candidate.id === item);
@@ -463,9 +498,9 @@ export class Daemon {
           pauseQueue(queue, now);
           return this.saveQueue(queue);
         case 'queue_settings': {
-          const { parallel, autopilot, skipFailed } = request.params;
+          const { parallel, autopilot, skipFailed, autopilotAnswer } = request.params;
           const enablesAutopilot = autopilot === true && !queue.autopilot;
-          setQueueSettings(queue, { parallel, autopilot, skipFailed }, now);
+          setQueueSettings(queue, { parallel, autopilot, skipFailed, autopilotAnswer }, now);
           if (enablesAutopilot && queue.status === 'stopped' && queue.stop === null) {
             startQueue(
               queue,
@@ -894,13 +929,13 @@ export class Daemon {
     const repository = await this.rootOf(params.repository);
     const queue = this.queueFor(repository);
     const now = this.now();
-    const { workflow, task, groups, title, autoDeliver, skip } = params;
+    const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
     const tags = this.inheritTags(queue, resolveTags(this.catalog, params.tags ?? []), after);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, tags, skip, after },
+      { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -924,12 +959,12 @@ export class Daemon {
     repository: string,
     params: Pick<
       ParamsOf<'queue_add'>,
-      'workflow' | 'task' | 'groups' | 'title' | 'autoDeliver' | 'skip' | 'after'
+      'workflow' | 'task' | 'groups' | 'title' | 'autoDeliver' | 'deliveryMode' | 'skip' | 'after'
     > &
       Pick<ParamsOf<'queue_add'>, 'tags'>,
     inherited?: string[],
   ): Promise<unknown> {
-    const { workflow, task, groups, title, autoDeliver, skip } = params;
+    const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
     const own = inherited ?? resolveTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
@@ -938,7 +973,7 @@ export class Daemon {
     const tags = this.inheritTags(queue, own, after);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, tags, skip, after },
+      { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -1029,6 +1064,7 @@ export class Daemon {
       fromQueue: true,
       queueItem,
       autoDeliver: params.autoDeliver,
+      deliveryMode: params.deliveryMode,
       skip: params.skip,
       tags: tagIds,
       now: this.now(),
@@ -1225,6 +1261,7 @@ function itemParams(queue: Queue, item: QueueItem): ParamsOf<'run'> {
     ...(item.groups !== null ? { groups: item.groups } : {}),
     ...(item.title !== null ? { title: item.title } : {}),
     ...(item.autoDeliver !== null ? { autoDeliver: item.autoDeliver } : {}),
+    ...(item.deliveryMode !== null ? { deliveryMode: item.deliveryMode } : {}),
     ...(item.skip.length > 0 ? { skip: item.skip } : {}),
   };
 }
@@ -1250,6 +1287,7 @@ function queueSignature(view: QueueView): string {
     runs: view.runs,
     skipped: view.skipped,
     autoDeliver: view.autoDeliver,
+    deliveryMode: view.deliveryMode,
     items: view.items.map((item) => [item.id, item.readiness, item.after]),
   });
 }

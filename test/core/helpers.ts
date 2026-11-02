@@ -40,6 +40,7 @@ export function run(
     split?: boolean;
     configText?: string;
     autoDeliver?: boolean;
+    deliveryMode?: 'worktree' | 'commit' | 'branch';
     skip?: string[];
   } = {},
 ): RunState {
@@ -59,6 +60,7 @@ export function run(
     split: options.split ?? false,
     now: options.now ?? 1000,
     autoDeliver: options.autoDeliver,
+    deliveryMode: options.deliveryMode,
     skip: options.skip,
   });
 }

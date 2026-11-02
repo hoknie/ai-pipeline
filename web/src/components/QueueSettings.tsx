@@ -5,11 +5,14 @@ import type { Api, QueueSettingsPatch } from '../api.ts';
 import { notifySuccess } from '../notify.ts';
 import { queueStateLabel } from '../status.ts';
 import type { QueueView } from '../types.ts';
-import { useGeneralSetting } from '../useGeneralSetting.ts';
+import { DELIVERY_MODES, isDeliveryMode } from '../deliveryModes.ts';
+import { useGeneralSetting, useSetting } from '../useGeneralSetting.ts';
 
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.tsx';
 import { Switch } from '../ui/switch.tsx';
+import { Textarea } from '../ui/textarea.tsx';
 
 import { ParallelStepper, parseParallel } from './ParallelStepper.tsx';
 import { StatusBadge } from './StatusBadge.tsx';
@@ -65,6 +68,9 @@ export function QueueSettings({
   const [parallel, setParallel] = useState<string | null>(null);
   const [pending, setPending] = useState<Partial<Record<'autopilot' | 'skipFailed', boolean>>>({});
   const delivery = useGeneralSetting(api, 'delivery.auto');
+  const mode = useSetting<string>(api, 'delivery.mode', 'string');
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [savingAnswer, setSavingAnswer] = useState(false);
 
   const parsed = parseParallel(parallel ?? String(queue.parallel));
   const busy = queue.status === 'running';
@@ -102,6 +108,28 @@ export function QueueSettings({
       : delivery.overridden
         ? t('queue.settings.autoDeliverProject')
         : undefined;
+
+  const modeDisabled = queue.deliveryMode === null || !mode.ready || mode.overridden;
+  const modeTitle =
+    queue.deliveryMode === null
+      ? t('queue.settings.autoDeliverInvalid')
+      : mode.overridden
+        ? t('queue.settings.autoDeliverProject')
+        : undefined;
+
+  const shownAnswer = answer ?? queue.autopilotAnswer ?? queue.autopilotAnswerDefault;
+  const saveAnswer = async (value: string | null) => {
+    setSavingAnswer(true);
+    try {
+      onQueue(await api.queueSettings({ autopilotAnswer: value }));
+      setAnswer(null);
+      notifySuccess(t('queue.settings.autopilotAnswerSaved'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setSavingAnswer(false);
+    }
+  };
 
   return (
     <section
@@ -172,6 +200,68 @@ export function QueueSettings({
         onChange={(value) => void delivery.set(value)}
       />
       {delivery.failure ? <Alert variant="destructive">{delivery.failure}</Alert> : null}
+      <div className="flex flex-col gap-0.5" title={modeTitle}>
+        <label htmlFor="queue-delivery-mode" className="text-sm font-medium">
+          {t('queue.settings.deliveryMode')}
+        </label>
+        <Select
+          value={queue.deliveryMode ?? (isDeliveryMode(mode.value) ? mode.value : undefined)}
+          disabled={modeDisabled || mode.busy}
+          onValueChange={(value) => void mode.set(value)}
+        >
+          <SelectTrigger id="queue-delivery-mode">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DELIVERY_MODES.map((candidate) => (
+              <SelectItem key={candidate} value={candidate}>
+                {t(`deliveryMode.${candidate}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p id="queue-delivery-mode-hint" className="text-xs text-muted-foreground">
+          {t('queue.settings.deliveryModeHint')}
+        </p>
+        {modeTitle ? <p className="text-xs text-muted-foreground">{modeTitle}</p> : null}
+      </div>
+      {mode.failure ? <Alert variant="destructive">{mode.failure}</Alert> : null}
+      <div className="flex flex-col gap-1">
+        <label htmlFor="queue-autopilot-answer" className="text-sm font-medium">
+          {t('queue.settings.autopilotAnswer')}
+        </label>
+        <Textarea
+          id="queue-autopilot-answer"
+          value={shownAnswer}
+          maxLength={2000}
+          onChange={(event) => setAnswer(event.target.value)}
+        />
+        <p id="queue-autopilot-answer-hint" className="text-xs text-muted-foreground">
+          {t('queue.settings.autopilotAnswerHint')}
+        </p>
+        <span className="flex gap-2">
+          <Button
+            size="sm"
+            disabled={
+              savingAnswer ||
+              answer === null ||
+              answer.trim() === '' ||
+              answer.trim() === (queue.autopilotAnswer ?? queue.autopilotAnswerDefault)
+            }
+            onClick={() => void saveAnswer(answer === null ? null : answer.trim())}
+          >
+            {t('queue.settings.autopilotAnswerSave')}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={savingAnswer || (answer === null && queue.autopilotAnswer === null)}
+            onClick={() => void saveAnswer(null)}
+          >
+            {t('queue.settings.autopilotAnswerDefault')}
+          </Button>
+        </span>
+      </div>
     </section>
   );
 }

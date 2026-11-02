@@ -166,6 +166,8 @@ export interface HumanDecision {
   stepId: string;
   question: string;
   answer: string;
+  /** Who answered: a person or the autopilot of the queue. */
+  by: 'human' | 'autopilot';
 }
 
 export interface StepInput {

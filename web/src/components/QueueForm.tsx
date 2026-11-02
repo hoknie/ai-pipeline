@@ -12,6 +12,8 @@ import { Textarea } from '../ui/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
 import type { Api } from '../api.ts';
+import type { DeliveryMode } from '../../../src/config/index.ts';
+import { DELIVERY_MODES } from '../deliveryModes.ts';
 import { useTags } from '../tags.tsx';
 import type { QueueFields, WorkflowsView } from '../types.ts';
 import { TagPicker } from './TagPicker.tsx';
@@ -27,6 +29,8 @@ export interface QueueDraft {
   title: string;
   /** `null`: follow the setting. */
   autoDeliver: boolean | null;
+  /** `null`: follow the setting. */
+  deliveryMode: DeliveryMode | null;
   /** Ids of the chosen tags. */
   tags: string[];
   /** Ids of the items and runs the task waits for, in the order of choice. */
@@ -48,6 +52,7 @@ export function emptyDraft(workflow = ''): QueueDraft {
     groups: [{ title: '', task: '' }],
     title: '',
     autoDeliver: null,
+    deliveryMode: null,
     tags: [],
     after: [],
     afterTouched: false,
@@ -61,6 +66,7 @@ export function draftOf(item: {
   groups: { title: string; task: string }[] | null;
   title: string | null;
   autoDeliver: boolean | null;
+  deliveryMode?: DeliveryMode | null;
   tags?: { id: string }[];
   after?: { id: string }[];
 }): QueueDraft {
@@ -71,6 +77,7 @@ export function draftOf(item: {
     groups: item.groups ? item.groups.map((group) => ({ ...group })) : [{ title: '', task: '' }],
     title: item.title ?? '',
     autoDeliver: item.autoDeliver,
+    deliveryMode: item.deliveryMode ?? null,
     tags: (item.tags ?? []).map((tag) => tag.id),
     after: (item.after ?? []).map((ref) => ref.id),
     afterTouched: false,
@@ -110,6 +117,7 @@ export function fieldsOf(
         }),
     ...(title !== '' ? { title } : {}),
     ...(draft.autoDeliver !== null ? { autoDeliver: draft.autoDeliver } : {}),
+    ...(draft.deliveryMode !== null ? { deliveryMode: draft.deliveryMode } : {}),
     ...(allTags || tags.length > 0 ? { tags } : {}),
     ...(allTags
       ? draft.afterTouched
@@ -127,6 +135,7 @@ export function QueueForm({
   workflows,
   api,
   autoDeliverDefault = null,
+  deliveryModeDefault = null,
   afterChoices = [],
   submitLabel,
   onDraft,
@@ -140,6 +149,8 @@ export function QueueForm({
   api?: Api;
   /** `delivery.auto` of the repository now; null when it is not known. */
   autoDeliverDefault?: boolean | null;
+  /** `delivery.mode` of the repository now; null when it is not known. */
+  deliveryModeDefault?: DeliveryMode | null;
   /** What the task can wait for. */
   afterChoices?: AfterOption[];
   submitLabel: string;
@@ -335,6 +346,34 @@ export function QueueForm({
         {effective.autoDeliver !== null ? (
           <Button variant="ghost" size="sm" onClick={() => change({ autoDeliver: null })}>
             {t('queue.form.autoDeliverReset')}
+          </Button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor={`${idPrefix}-delivery-mode`}>{t('queue.form.deliveryMode')}</Label>
+        <Select
+          value={effective.deliveryMode ?? deliveryModeDefault ?? 'worktree'}
+          onValueChange={(deliveryMode) => change({ deliveryMode: deliveryMode as DeliveryMode })}
+        >
+          <SelectTrigger id={`${idPrefix}-delivery-mode`} className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DELIVERY_MODES.map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {t(`deliveryMode.${mode}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">
+          {effective.deliveryMode === null
+            ? t('queue.form.deliveryModeBySetting')
+            : t('queue.form.deliveryModeForTask')}
+        </span>
+        {effective.deliveryMode !== null ? (
+          <Button variant="ghost" size="sm" onClick={() => change({ deliveryMode: null })}>
+            {t('queue.form.deliveryModeReset')}
           </Button>
         ) : null}
       </div>

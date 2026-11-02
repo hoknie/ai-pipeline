@@ -36,7 +36,9 @@ const input: StepInput = {
   ],
   feedback: 'нет тестов',
   humanAnswer: 'используй OAuth',
-  decisions: [{ stepId: 'plan', question: 'OAuth или пароль?', answer: 'используй OAuth' }],
+  decisions: [
+    { stepId: 'plan', question: 'OAuth или пароль?', answer: 'используй OAuth', by: 'human' },
+  ],
 };
 
 function context(overrides: Partial<LaunchContext> = {}): LaunchContext {

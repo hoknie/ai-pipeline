@@ -863,10 +863,33 @@ describe('general settings', () => {
     expect(loadConfig(paths).delivery.auto).toBe(true);
   });
 
+  it('writes delivery.mode and refuses a value of the wrong type', () => {
+    const paths = levels(GLOBAL);
+    commitEdit(
+      accepted(
+        planSetting(paths, {
+          path: 'delivery.mode',
+          value: 'commit',
+          revision: revisionOf(GLOBAL),
+        }),
+      ),
+    );
+    expect(loadConfig(paths).delivery.mode).toBe('commit');
+    expect(loadConfig(paths).max).toBe(5);
+    for (const request of [
+      { path: 'delivery.mode', value: true },
+      { path: 'delivery.mode', value: 'tarball' },
+      { path: 'delivery.auto', value: 'commit' },
+    ]) {
+      const plan = planSetting(paths, { ...request, revision: revisionOf(GLOBAL) });
+      expect(plan).toMatchObject({ ok: false, reason: 'invalid' });
+    }
+  });
+
   it('refuses a path outside the list and names the allowed ones', () => {
     const paths = levels(GLOBAL);
     expect(() => planSetting(paths, { path: 'max', value: true, revision: null })).toThrow(
-      /delivery\.auto/,
+      /delivery\.auto, delivery\.mode/,
     );
   });
 

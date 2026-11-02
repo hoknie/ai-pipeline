@@ -11,6 +11,7 @@ import type {
   EntrySources,
   GroupRow,
   GroupView,
+  QueueItemView,
   QueueRunView,
   QueueView,
   RepositoryView,
@@ -104,6 +105,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     waiting: 0,
     dirtyWarning: false,
     autoDeliver: true,
+    deliveryMode: 'worktree',
     fromQueue: false,
     tags: [],
     counts: 'running 1',
@@ -215,6 +217,9 @@ export function queueOf(overrides: Partial<QueueView> = {}): QueueView {
     autopilot: false,
     skipFailed: false,
     autoDeliver: true,
+    deliveryMode: 'worktree',
+    autopilotAnswer: null,
+    autopilotAnswerDefault: 'I agree with your recommendations',
     stop: null,
     items: [],
     runs: [],
@@ -275,7 +280,12 @@ export function sourcesFor(
     : { project, global: { ...global, raw: globalRaw } };
 }
 
-export function queueItem(id: string, task: string, position: number, extra = {}) {
+export function queueItem(
+  id: string,
+  task: string,
+  position: number,
+  extra: Partial<QueueItemView> = {},
+) {
   return {
     id,
     position,
@@ -284,6 +294,7 @@ export function queueItem(id: string, task: string, position: number, extra = {}
     groups: null,
     title: null,
     autoDeliver: null,
+    deliveryMode: null,
     tags: [],
     skip: [],
     readiness: 'ready' as const,
@@ -308,6 +319,7 @@ export function settingsOf(overrides: Record<string, EditorSetting> = {}): Edito
   const base: EditorSetting[] = [
     { path: 'max', value: 3, file: null },
     { path: 'delivery.auto', value: true, file: null },
+    { path: 'delivery.mode', value: 'worktree', file: null },
     { path: 'defaults.runtime', value: 'claude', file: null },
     { path: 'defaults.permissions', value: 'edit', file: null },
     { path: 'defaults.timeout', value: '30m', file: null },

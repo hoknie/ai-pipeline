@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
+import type { DeliveryMode } from '../config/index.ts';
 import {
+  DEFAULT_AUTOPILOT_ANSWER,
   attemptVerdict,
   stepProgress,
   type StepProgress,
@@ -163,6 +165,8 @@ export interface RunView {
   dirtyWarning: boolean;
   /** Whether the run is delivered automatically once it is merged. */
   autoDeliver: boolean;
+  /** How the merged result is delivered. */
+  deliveryMode: DeliveryMode;
   /** Created by a task queue. */
   fromQueue: boolean;
   tags: TagView[];
@@ -347,6 +351,7 @@ export function runView(
     waiting: summary.waiting,
     dirtyWarning: state.run.dirtyWarning,
     autoDeliver: state.run.config.delivery.auto,
+    deliveryMode: state.run.config.delivery.mode,
     fromQueue: state.run.fromQueue,
     tags: tagViews(catalog, state.run.tags),
     counts: formatCounts(summary),
@@ -533,6 +538,8 @@ export interface QueueItemView {
   title: string | null;
   /** `null`: follows `delivery.auto` when the task starts. */
   autoDeliver: boolean | null;
+  /** `null`: follows `delivery.mode` when the task starts. */
+  deliveryMode: DeliveryMode | null;
   tags: TagView[];
   skip: string[];
   /** Whether the task can start now: its predecessors are done, still pending or blocked. */
@@ -576,6 +583,11 @@ export interface QueueView {
   skipFailed: boolean;
   /** `delivery.auto` of the repository now; null when its configuration is invalid. */
   autoDeliver: boolean | null;
+  /** `delivery.mode` of the repository now; null when its configuration is invalid. */
+  deliveryMode: DeliveryMode | null;
+  /** Text of the autopilot's answers; null: the default text. */
+  autopilotAnswer: string | null;
+  autopilotAnswerDefault: string;
   stop: QueueStop | null;
   items: QueueItemView[];
   /** Runs of the queue that still occupy a place. */
@@ -615,6 +627,7 @@ export function queueView(
   lookup: (id: string) => RunState | undefined,
   autoDeliver: boolean | null = null,
   catalog: readonly Tag[] = [],
+  deliveryMode: DeliveryMode | null = null,
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -630,6 +643,9 @@ export function queueView(
     autopilot: queue.autopilot,
     skipFailed: queue.skipFailed,
     autoDeliver,
+    deliveryMode,
+    autopilotAnswer: queue.autopilotAnswer,
+    autopilotAnswerDefault: DEFAULT_AUTOPILOT_ANSWER,
     stop: queue.stop,
     items: queue.items.map((item, index) => ({
       id: item.id,
@@ -639,6 +655,7 @@ export function queueView(
       groups: item.groups,
       title: item.title,
       autoDeliver: item.autoDeliver,
+      deliveryMode: item.deliveryMode,
       tags: tagViews(catalog, item.tags),
       skip: [...item.skip],
       readiness: itemReadiness(queue, item, lookup),

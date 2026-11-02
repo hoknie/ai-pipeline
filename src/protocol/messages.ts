@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { SETTABLE_SETTINGS, SLUG_PATTERN_TEXT, isValidSlug } from '../config/index.ts';
+import {
+  DELIVERY_MODES,
+  SETTABLE_SETTINGS,
+  SLUG_PATTERN_TEXT,
+  isValidSlug,
+} from '../config/index.ts';
 import {
   FEEDBACK_LIMIT,
   OPTIONS_LIMIT,
@@ -42,6 +47,8 @@ const skipSteps = z.array(z.string().trim().min(1)).max(50);
 /** Ids of queue items or runs a task waits for. */
 const afterIds = z.array(z.string().min(1)).max(50);
 
+const deliveryModeSchema = z.enum(DELIVERY_MODES);
+
 const runParams = z
   .object({
     repository: z.string().min(1),
@@ -50,6 +57,7 @@ const runParams = z
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),
     autoDeliver: z.boolean().optional(),
+    deliveryMode: deliveryModeSchema.optional(),
     tags: tagNames.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
@@ -71,6 +79,7 @@ const queueAddParams = z
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
     autoDeliver: z.boolean().optional(),
+    deliveryMode: deliveryModeSchema.optional(),
     tags: tagNames.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
@@ -88,6 +97,7 @@ export const workerQueueAddParams = z
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
     autoDeliver: z.boolean().optional(),
+    deliveryMode: deliveryModeSchema.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
   })
@@ -104,6 +114,7 @@ const queueEditParams = z
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.nullable().optional(),
     autoDeliver: z.boolean().nullable().optional(),
+    deliveryMode: deliveryModeSchema.nullable().optional(),
     tags: tagNames.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
@@ -162,13 +173,30 @@ export const requestSchema = z.discriminatedUnion('method', [
   }),
   z.object({
     method: z.literal('config_setting'),
-    params: z.object({
-      repository: z.string().min(1),
-      path: z.enum(SETTABLE_SETTINGS),
-      value: z.boolean().nullable(),
-      revision: z.string().min(1).nullable(),
-      level: writeLevelSchema.default('global'),
-    }),
+    params: z
+      .object({
+        repository: z.string().min(1),
+        path: z.enum(SETTABLE_SETTINGS),
+        value: z.union([z.boolean(), deliveryModeSchema]).nullable(),
+        revision: z.string().min(1).nullable(),
+        level: writeLevelSchema.default('global'),
+      })
+      .superRefine((params, context) => {
+        const value = params.value;
+        if (value === null) return;
+        const valid =
+          params.path === 'delivery.auto' ? typeof value === 'boolean' : typeof value === 'string';
+        if (!valid) {
+          context.addIssue({
+            code: 'custom',
+            path: ['value'],
+            message:
+              params.path === 'delivery.auto'
+                ? 'delivery.auto must be true or false'
+                : `delivery.mode must be one of: ${DELIVERY_MODES.join(', ')}`,
+          });
+        }
+      }),
   }),
   z.object({
     method: z.literal('config_preview'),
@@ -238,13 +266,15 @@ export const requestSchema = z.discriminatedUnion('method', [
         parallel: queueParallel.optional(),
         autopilot: z.boolean().optional(),
         skipFailed: z.boolean().optional(),
+        autopilotAnswer: z.string().trim().min(1).max(RECOMMENDATION_LIMIT).nullable().optional(),
       })
       .refine(
         (params) =>
           params.parallel !== undefined ||
           params.autopilot !== undefined ||
-          params.skipFailed !== undefined,
-        { message: 'pass parallel, autopilot or skipFailed' },
+          params.skipFailed !== undefined ||
+          params.autopilotAnswer !== undefined,
+        { message: 'pass parallel, autopilot, autopilotAnswer or skipFailed' },
       ),
   }),
   z.object({

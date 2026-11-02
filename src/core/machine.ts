@@ -70,7 +70,13 @@ export type Event =
   | { kind: 'timed_out'; group: string; seq: number }
   | { kind: 'cancel'; group: string | null }
   | { kind: 'retry'; group: string; permissions?: PermissionsRefresh }
-  | { kind: 'answer'; group: string; answer: string; permissions?: PermissionsRefresh }
+  | {
+      kind: 'answer';
+      group: string;
+      answer: string;
+      by?: 'human' | 'autopilot';
+      permissions?: PermissionsRefresh;
+    }
   | { kind: 'merge_finished'; group: string; outcome: MergeOutcome }
   | { kind: 'commit_failed'; group: string; message: string }
   | { kind: 'deliver_requested'; groups: string[] | null; force: boolean; files: string[] }
@@ -139,7 +145,7 @@ class Machine {
       case 'retry':
         return this.retry(event.group, event.permissions);
       case 'answer':
-        return this.answer(event.group, event.answer, event.permissions);
+        return this.answer(event.group, event.answer, event.by ?? 'human', event.permissions);
       case 'merge_finished':
         return this.mergeFinished(event.group, event.outcome);
       case 'deliver_requested':
@@ -475,7 +481,12 @@ class Machine {
     if (error !== null) group.warnings.push(`permissions not refreshed: ${error}`);
   }
 
-  private answer(slug: string, answer: string, permissions?: PermissionsRefresh): void {
+  private answer(
+    slug: string,
+    answer: string,
+    by: 'human' | 'autopilot',
+    permissions?: PermissionsRefresh,
+  ): void {
     if (answer.trim() === '') throw new Rejection('answer must not be empty');
     const group = this.group(slug);
     if (group.status !== 'needs_human') throw wrongStatus(group, 'answer', 'needs_human');
@@ -485,7 +496,7 @@ class Machine {
         ?.stepId ??
       group.attempts.at(-1)?.stepId ??
       '';
-    group.decisions.push({ stepId, question: group.question ?? '', answer });
+    group.decisions.push({ stepId, question: group.question ?? '', answer, by });
     group.status = 'queued';
     group.question = null;
     group.questions = null;
