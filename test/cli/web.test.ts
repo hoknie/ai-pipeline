@@ -369,6 +369,53 @@ describe('aip web', () => {
     ).toBe(400);
   });
 
+  it('passes a predecessor of a queued task through the queue API', async () => {
+    const { web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    const first = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'модель' })
+    ).json()) as QueueView & { item: string };
+    const second = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'api', after: [first.item] })
+    ).json()) as QueueView & { item: string };
+    const added = second.items.find((item) => item.id === second.item);
+    expect(added?.after.map((ref) => [ref.id, ref.state])).toEqual([[first.item, 'waiting']]);
+    expect(added?.readiness).toBe('waiting');
+    const read = (await (
+      await fetch(`${base}/api/queue`, { headers: authed(web) })
+    ).json()) as QueueView;
+    expect(read.items.find((item) => item.id === second.item)?.after[0]?.id).toBe(first.item);
+    expect(read.items.find((item) => item.id === first.item)?.readiness).toBe('ready');
+  });
+
+  it('answers 400 to a dependency cycle through the queue API', async () => {
+    const { web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    const first = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'модель' })
+    ).json()) as QueueView & { item: string };
+    const second = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'api', after: [first.item] })
+    ).json()) as QueueView & { item: string };
+    const cycle = await post(`/api/queue/items/${first.item}`, { after: [second.item] });
+    expect(cycle.status).toBe(400);
+    expect(((await cycle.json()) as { error: string }).error).toMatch(/^dependency cycle: /);
+    const read = (await (
+      await fetch(`${base}/api/queue`, { headers: authed(web) })
+    ).json()) as QueueView;
+    expect(read.items.find((item) => item.id === first.item)?.after).toEqual([]);
+  });
+
   it('serves the queue API with the same protection as the rest', async () => {
     const { h, web, base } = await setup();
     const post = (path: string, body: unknown, headers = authed(web, JSON_TYPE)) =>

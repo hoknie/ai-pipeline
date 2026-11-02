@@ -1,4 +1,4 @@
-import { GripVertical, ListOrdered } from 'lucide-react';
+import { Ban, CircleCheck, Clock, GripVertical, ListOrdered } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,15 +10,32 @@ import { notifySuccess } from '../notify.ts';
 import { when } from '../format.ts';
 import { useLocale } from '../i18n/index.ts';
 import { formatRoute } from '../route.ts';
-import type { QueueItemView, QueueView, WorkflowsView } from '../types.ts';
+import type {
+  DependencyState,
+  ItemReadiness,
+  QueueItemView,
+  QueueView,
+  WorkflowsView,
+} from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
+import { Badge, badgeVariants } from '../ui/badge.tsx';
 import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
 
 import { TagChips } from './TagChip.tsx';
 import { QueueForm, draftOf, type QueueDraft } from './QueueForm.tsx';
 import { dropPosition, dropSlot, moveId } from './queueOrder.ts';
+import { afterOptions, dependents, depth, unmet } from './queueLinks.ts';
+
+const STATE_ICON = { done: CircleCheck, waiting: Clock, blocked: Ban } as const;
+const STATE_TONE = { done: 'ok', waiting: 'warn', blocked: 'err' } as const;
+
+/** The icon and the tone of a predecessor state or a readiness; `ready` looks like `done`. */
+function stateLook(state: DependencyState | ItemReadiness) {
+  const key = state === 'ready' ? 'done' : state;
+  return { Icon: STATE_ICON[key], tone: STATE_TONE[key] };
+}
 
 /** `N groups` with the plural of the active language. */
 export function groupsText(count: number, t: TFunction): string {
@@ -46,6 +63,8 @@ export function QueueList({
   drafts,
   onDraft,
   onQueue,
+  highlight = null,
+  onHighlight = () => undefined,
 }: {
   api: Api;
   queue: QueueView;
@@ -54,6 +73,10 @@ export function QueueList({
   drafts: Record<string, QueueDraft>;
   onDraft: (key: string, draft: QueueDraft | null) => void;
   onQueue: (queue: QueueView) => void;
+  /** Ids to mark as linked to the item under the pointer or the focus; null for none. */
+  highlight?: Set<string> | null;
+  /** The item under the pointer or the focus, null when there is none. */
+  onHighlight?: (id: string | null) => void;
 }) {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -103,8 +126,16 @@ export function QueueList({
   };
 
   const remove = async (item: QueueItemView) => {
+    const waiting = dependents(queue, item.id);
     const yes = await confirm({
       title: t('queue.list.removeTitle', { item: itemLabel(item, t) }),
+      ...(waiting.length > 0
+        ? {
+            description: t('queue.list.removeDependents', {
+              items: waiting.map((other) => itemLabel(other, t)).join(', '),
+            }),
+          }
+        : {}),
       confirmLabel: t('queue.list.remove'),
       cancelLabel: t('queue.list.keep'),
       destructive: true,
@@ -122,6 +153,19 @@ export function QueueList({
   };
 
   const runNow = async (item: QueueItemView) => {
+    if (item.readiness !== 'ready') {
+      const yes = await confirm({
+        title: t('queue.list.unmetTitle'),
+        description: t('queue.list.unmetText', {
+          items: unmet(item)
+            .map((ref) => ref.title || ref.id)
+            .join(', '),
+        }),
+        confirmLabel: t('queue.list.runNow'),
+        cancelLabel: t('queue.list.keep'),
+      });
+      if (!yes) return;
+    }
     setMessage(null);
     try {
       const created = await api.queueRunNow(item.id);
@@ -190,22 +234,35 @@ export function QueueList({
       <ol className="flex flex-col gap-2" aria-label={t('queue.list.items')}>
         {shown.map((item, index) => {
           const editing = drafts[`edit:${item.id}`];
+          const level = depth(queue, item.id);
+          const linked = dragging === null && highlight?.has(item.id) === true;
           return (
             <li
               key={item.id}
               className={cn(
                 'rounded-lg border bg-card p-2.5',
+                level > 0 && 'border-l-4 border-l-primary/50',
+                item.readiness === 'blocked' && 'border-destructive',
+                linked && 'ring-2 ring-primary',
                 dragging === item.id && 'opacity-50',
                 drop?.index === index &&
                   (drop.after ? 'border-b-2 border-b-primary' : 'border-t-2 border-t-primary'),
               )}
               data-id={item.id}
+              data-depth={level}
+              data-highlighted={linked ? '' : undefined}
+              style={level > 0 ? { marginLeft: `${level * 1.25}rem` } : undefined}
               tabIndex={0}
+              onMouseEnter={() => dragging === null && onHighlight(item.id)}
+              onMouseLeave={() => onHighlight(null)}
+              onFocus={() => dragging === null && onHighlight(item.id)}
+              onBlur={() => onHighlight(null)}
               draggable={!editing}
               aria-label={`${index + 1}. ${itemLabel(item, t)}`}
               onDragStart={(event) => {
                 event.dataTransfer.setData('text/plain', item.id);
                 event.dataTransfer.effectAllowed = 'move';
+                onHighlight(null);
                 setDragging(item.id);
               }}
               onDragOver={(event) => onDragOver(event, index)}
@@ -231,6 +288,11 @@ export function QueueList({
                   {itemLabel(item, t)}
                 </span>
                 <TagChips tags={item.tags ?? []} />
+                <ReadinessBadge item={item} />
+                {item.after.map((ref) => (
+                  <DependencyChip key={ref.id} dependency={ref} />
+                ))}
+                {linked ? <span className="sr-only">{t('queue.list.linked')}</span> : null}
                 {item.autoDeliver === null ? null : (
                   <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                     {item.autoDeliver
@@ -309,6 +371,7 @@ export function QueueList({
                   workflows={workflows}
                   api={api}
                   autoDeliverDefault={queue.autoDeliver}
+                  afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item)}
                   submitLabel={t('queue.list.save')}
                   onDraft={(draft) => onDraft(`edit:${item.id}`, draft)}
                   onCancel={() => onDraft(`edit:${item.id}`, null)}
@@ -321,6 +384,7 @@ export function QueueList({
                         title: fields.title ?? null,
                         autoDeliver: fields.autoDeliver ?? null,
                         tags: fields.tags ?? [],
+                        ...(fields.after !== undefined ? { after: fields.after } : {}),
                       });
                       onQueue(view);
                       onDraft(`edit:${item.id}`, null);
@@ -340,5 +404,50 @@ export function QueueList({
         })}
       </ol>
     </>
+  );
+}
+
+function ReadinessBadge({ item }: { item: QueueItemView }) {
+  const { t } = useTranslation();
+  const { Icon, tone } = stateLook(item.readiness);
+  const label = t(`queue.readiness.${item.readiness}`);
+  const pending = unmet(item)
+    .map((ref) => ref.title || ref.id)
+    .join(', ');
+  const title =
+    pending === '' ? `${label} (${item.readiness})` : `${label} (${item.readiness}): ${pending}`;
+  return (
+    <Badge variant={tone} title={title} aria-label={title} data-readiness={item.readiness}>
+      <Icon aria-hidden />
+      {label}
+    </Badge>
+  );
+}
+
+function DependencyChip({ dependency }: { dependency: QueueItemView['after'][number] }) {
+  const { t } = useTranslation();
+  const { Icon, tone } = stateLook(dependency.state);
+  const name = dependency.title || dependency.id;
+  const state = t(`queue.dependency.${dependency.state}`);
+  const body = (
+    <>
+      <Icon aria-hidden />
+      <span className="min-w-0 truncate">{t('queue.list.after', { title: name })}</span>
+      <span className="sr-only">{state}</span>
+    </>
+  );
+  return dependency.kind === 'run' ? (
+    <a
+      className={cn(badgeVariants({ variant: tone }), 'underline')}
+      title={`${state}: ${name}`}
+      data-state={dependency.state}
+      href={formatRoute({ view: 'runs', run: dependency.id, group: null, step: null })}
+    >
+      {body}
+    </a>
+  ) : (
+    <Badge variant={tone} title={`${state}: ${name}`} data-state={dependency.state}>
+      {body}
+    </Badge>
   );
 }

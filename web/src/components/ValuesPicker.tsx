@@ -46,6 +46,8 @@ export function ValuesPicker({
   options = [],
   inherited = [],
   mark,
+  display,
+  headings,
   creatable = true,
   disabled = false,
   invalid = false,
@@ -59,6 +61,10 @@ export function ValuesPicker({
   inherited?: string[];
   /** A note shown next to a value, such as «not found»; null for none. */
   mark?: (value: string) => string | null;
+  /** The text of a chosen value in its chip and in the remove button; default: the value itself. */
+  display?: (value: string) => string;
+  /** Group headings instead of the names of the sources. */
+  headings?: Partial<Record<OptionSource, string>>;
   creatable?: boolean;
   disabled?: boolean;
   invalid?: boolean;
@@ -117,13 +123,14 @@ export function ValuesPicker({
         ))}
         {values.map((value) => {
           const note = mark?.(value) ?? null;
+          const text = display?.(value) ?? value;
           return (
             <Badge key={value} variant="outline" className="gap-1.5 pr-1">
-              <span>{value}</span>
+              <span>{text}</span>
               {note ? <span className="font-normal text-status-warn">{note}</span> : null}
               <button
                 type="button"
-                aria-label={t('picker.remove', { value })}
+                aria-label={t('picker.remove', { value: text })}
                 disabled={disabled}
                 className="rounded-full p-0.5 hover:bg-accent disabled:opacity-50"
                 onClick={() => onChange(values.filter((candidate) => candidate !== value))}
@@ -169,7 +176,10 @@ export function ValuesPicker({
               const group = visible.filter((option) => option.source === source);
               if (group.length === 0) return null;
               return (
-                <CommandGroup key={source} heading={t(`picker.groups.${source}`)}>
+                <CommandGroup
+                  key={source}
+                  heading={headings?.[source] ?? t(`picker.groups.${source}`)}
+                >
                   {group.map((option) => {
                     const chosen = values.includes(option.name);
                     const note = mark?.(option.name) ?? null;
@@ -182,12 +192,12 @@ export function ValuesPicker({
                         <Check className={chosen ? 'opacity-100' : 'opacity-0'} />
                         <span className="flex min-w-0 flex-col">
                           <span className="truncate">
-                            {option.name}
+                            {display?.(option.name) ?? option.name}
                             {note ? (
                               <span className="ml-2 text-xs text-status-warn">{note}</span>
                             ) : null}
                           </span>
-                          {option.description ? (
+                          {option.description && !display ? (
                             <span className="truncate text-xs text-muted-foreground">
                               {option.description}
                             </span>

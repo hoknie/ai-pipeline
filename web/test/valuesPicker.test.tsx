@@ -109,4 +109,30 @@ describe('ValuesPicker', () => {
     render(<Harness start={['x']} mark={(value) => (value === 'x' ? 'not found' : null)} />);
     expect(screen.getByText('not found')).toBeTruthy();
   });
+
+  it('shows the display text in the chip and the remove button, and in the list', async () => {
+    const onChange = vi.fn();
+    const options: PickerOption[] = [
+      { name: 'q1', source: 'project', description: 'Модель' },
+      { name: 'q2', source: 'project', description: 'API' },
+    ];
+    const titles: Record<string, string> = { q1: 'Модель', q2: 'API' };
+    render(
+      <Harness
+        options={options}
+        creatable={false}
+        display={(id) => titles[id] ?? id}
+        onChange={onChange}
+      />,
+    );
+    const input = await search();
+    fireEvent.change(input, { target: { value: 'api' } });
+    const found = screen.getAllByRole('option');
+    expect(found).toHaveLength(1);
+    expect(found[0]!.textContent).toContain('API');
+    expect(found[0]!.textContent).not.toContain('q2');
+    fireEvent.click(found[0]!);
+    expect(onChange).toHaveBeenLastCalledWith(['q2']);
+    expect(screen.getByRole('button', { name: 'Remove API' })).toBeTruthy();
+  });
 });

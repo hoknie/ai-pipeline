@@ -14,8 +14,9 @@ import { Skeleton } from '../ui/skeleton.tsx';
 
 import { StatusBadge } from './StatusBadge.tsx';
 import { QueueForm, emptyDraft, type QueueDraft } from './QueueForm.tsx';
-import { QueueList } from './QueueList.tsx';
+import { QueueList, itemLabel } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
+import { afterOptions, related } from './queueLinks.ts';
 import { ParallelStepper, parseParallel } from './ParallelStepper.tsx';
 
 export { parseParallel };
@@ -69,6 +70,7 @@ export default function QueuePage({
   const { t } = useTranslation();
   const [workflows, setWorkflows] = useState<WorkflowsView | null>(null);
   const [parallel, setParallel] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null);
 
   useEffect(() => {
     let closed = false;
@@ -106,6 +108,7 @@ export default function QueuePage({
     }
   };
 
+  const linked = highlight === null ? null : related(queue, highlight);
   const newDraft = drafts.new ?? emptyDraft();
 
   return (
@@ -146,7 +149,7 @@ export default function QueuePage({
         </span>
       </header>
       <StopReason queue={queue} />
-      <QueueRuns queue={queue} now={now} />
+      <QueueRuns queue={queue} now={now} highlight={linked} />
       <section aria-label={t('queue.newTaskLabel')}>
         <h3 className="mb-2 font-semibold">{t('queue.newTask')}</h3>
         <QueueForm
@@ -155,6 +158,7 @@ export default function QueuePage({
           workflows={workflows}
           api={api}
           autoDeliverDefault={queue.autoDeliver}
+          afterChoices={afterOptions(queue, (item) => itemLabel(item, t))}
           submitLabel={t('queue.add')}
           onDraft={(draft) => onDraft('new', draft)}
           onSubmit={async (fields) => {
@@ -174,6 +178,8 @@ export default function QueuePage({
           drafts={drafts}
           onDraft={onDraft}
           onQueue={onQueue}
+          highlight={linked}
+          onHighlight={setHighlight}
         />
       </section>
     </div>

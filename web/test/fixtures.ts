@@ -279,6 +279,16 @@ export function queueItem(id: string, task: string, position: number, extra = {}
   };
 }
 
+/** A predecessor of a queued task, as the daemon reports it. */
+export function dependency(
+  kind: 'item' | 'run',
+  id: string,
+  title: string,
+  state: 'done' | 'waiting' | 'blocked' = 'waiting',
+) {
+  return { kind, id, title, state };
+}
+
 export function settingsOf(overrides: Record<string, EditorSetting> = {}): EditorSetting[] {
   const base: EditorSetting[] = [
     { path: 'max', value: 3, file: null },

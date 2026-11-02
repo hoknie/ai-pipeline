@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { duration } from '../format.ts';
+import { cn } from '../lib/cn.ts';
 import { formatRoute } from '../route.ts';
 import type { QueueRunView, QueueView } from '../types.ts';
 
@@ -18,12 +19,17 @@ function reasonText(reason: string, t: TFunction): string {
   return known ? t(`queue.reasons.${known}`) : reason;
 }
 
-function RunCard({ run, now }: { run: QueueRunView; now: number }) {
+function RunCard({ run, now, linked }: { run: QueueRunView; now: number; linked: boolean }) {
   const { t } = useTranslation();
   const { done, total } = run.groups;
   const problem = run.problem;
   return (
-    <Card role="group" aria-label={run.title} className="flex min-w-0 flex-col gap-2 p-3 text-sm">
+    <Card
+      role="group"
+      aria-label={run.title}
+      data-highlighted={linked ? '' : undefined}
+      className={cn('flex min-w-0 flex-col gap-2 p-3 text-sm', linked && 'ring-2 ring-primary')}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <a
           className="min-w-0 truncate font-medium text-primary underline"
@@ -89,7 +95,16 @@ function RunCard({ run, now }: { run: QueueRunView; now: number }) {
 }
 
 /** Runs of the queue that hold a place, as cards, with the free places of a running queue. */
-export function QueueRuns({ queue, now }: { queue: QueueView; now: number }) {
+export function QueueRuns({
+  queue,
+  now,
+  highlight = null,
+}: {
+  queue: QueueView;
+  now: number;
+  /** Ids linked to the item under the pointer or the focus. */
+  highlight?: Set<string> | null;
+}) {
   const { t } = useTranslation();
   const running = queue.status === 'running';
   if (queue.runs.length === 0 && !running) return null;
@@ -106,7 +121,7 @@ export function QueueRuns({ queue, now }: { queue: QueueView; now: number }) {
       <ul className="grid gap-2 sm:grid-cols-2">
         {queue.runs.map((run) => (
           <li key={run.id} className="min-w-0">
-            <RunCard run={run} now={now} />
+            <RunCard run={run} now={now} linked={highlight?.has(run.id) === true} />
           </li>
         ))}
         {Array.from({ length: free }, (_, index) => (

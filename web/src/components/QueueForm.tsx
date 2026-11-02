@@ -15,6 +15,8 @@ import type { Api } from '../api.ts';
 import { useTags } from '../tags.tsx';
 import type { QueueFields, WorkflowsView } from '../types.ts';
 import { TagPicker } from './TagPicker.tsx';
+import type { AfterOption } from './queueLinks.ts';
+import { ValuesPicker, type PickerOption } from './ValuesPicker.tsx';
 
 /** What the user has typed into a task form; kept outside the form so updates do not erase it. */
 export interface QueueDraft {
@@ -27,6 +29,10 @@ export interface QueueDraft {
   autoDeliver: boolean | null;
   /** Ids of the chosen tags. */
   tags: string[];
+  /** Ids of the items and runs the task waits for, in the order of choice. */
+  after: string[];
+  /** The user changed the field: an edit sends `after` only then. */
+  afterTouched: boolean;
 }
 
 export const TITLE_LIMIT = 60;
@@ -40,6 +46,8 @@ export function emptyDraft(workflow = ''): QueueDraft {
     title: '',
     autoDeliver: null,
     tags: [],
+    after: [],
+    afterTouched: false,
   };
 }
 
@@ -51,6 +59,7 @@ export function draftOf(item: {
   title: string | null;
   autoDeliver: boolean | null;
   tags?: { id: string }[];
+  after?: { id: string }[];
 }): QueueDraft {
   return {
     workflow: item.workflow,
@@ -60,6 +69,8 @@ export function draftOf(item: {
     title: item.title ?? '',
     autoDeliver: item.autoDeliver,
     tags: (item.tags ?? []).map((tag) => tag.id),
+    after: (item.after ?? []).map((ref) => ref.id),
+    afterTouched: false,
   };
 }
 
@@ -97,6 +108,13 @@ export function fieldsOf(
     ...(title !== '' ? { title } : {}),
     ...(draft.autoDeliver !== null ? { autoDeliver: draft.autoDeliver } : {}),
     ...(allTags || tags.length > 0 ? { tags } : {}),
+    ...(allTags
+      ? draft.afterTouched
+        ? { after: draft.after }
+        : {}
+      : draft.after.length > 0
+        ? { after: draft.after }
+        : {}),
   };
 }
 
@@ -106,6 +124,7 @@ export function QueueForm({
   workflows,
   api,
   autoDeliverDefault = null,
+  afterChoices = [],
   submitLabel,
   onDraft,
   onSubmit,
@@ -118,6 +137,8 @@ export function QueueForm({
   api?: Api;
   /** `delivery.auto` of the repository now; null when it is not known. */
   autoDeliverDefault?: boolean | null;
+  /** What the task can wait for. */
+  afterChoices?: AfterOption[];
   submitLabel: string;
   onDraft: (draft: QueueDraft) => void;
   /** Rejects with the message to show next to the form; the draft is kept then. */
@@ -160,6 +181,12 @@ export function QueueForm({
     }
   };
 
+  const afterTitle = new Map(afterChoices.map((choice) => [choice.id, choice.title]));
+  const afterPick: PickerOption[] = afterChoices.map((choice) => ({
+    name: choice.id,
+    source: choice.kind === 'run' ? 'builtin' : 'project',
+    description: choice.title,
+  }));
   const options = [...ids];
   if (effective.workflow !== '' && !ids.includes(effective.workflow))
     options.push(effective.workflow);
@@ -277,6 +304,21 @@ export function QueueForm({
             onChange={(tags) => change({ tags })}
             api={api}
             allowCreate={api !== undefined}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Label htmlFor={`${idPrefix}-after`}>{t('queue.form.after')}</Label>
+        <div className="min-w-0 max-w-xl">
+          <ValuesPicker
+            id={`${idPrefix}-after`}
+            label={t('queue.form.after')}
+            values={effective.after}
+            onChange={(after) => change({ after, afterTouched: true })}
+            options={afterPick}
+            display={(id) => afterTitle.get(id) || id}
+            headings={{ project: t('queue.form.afterItems'), builtin: t('queue.form.afterRuns') }}
+            creatable={false}
           />
         </div>
       </div>

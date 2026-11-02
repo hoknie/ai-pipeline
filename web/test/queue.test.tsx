@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
 import { ApiError } from '../src/api.ts';
 import { dropPosition, dropSlot, moveId } from '../src/components/queueOrder.ts';
+import { afterOptions, dependents, depth, related, unmet } from '../src/components/queueLinks.ts';
 import { parseParallel } from '../src/components/QueuePage.tsx';
 import { formatRoute, parseRoute } from '../src/route.ts';
 import { useRuns } from '../src/store.ts';
 
 import {
   FakeEventSource,
+  dependency,
   fakeApi,
   openFake,
   queueItem,
@@ -969,5 +971,340 @@ describe('tags in the queue', () => {
     expect(within(list).getByText('v2')).toBeTruthy();
     const card = screen.getByRole('group', { name: 'r1' });
     expect(within(card).getByText('v2')).toBeTruthy();
+  });
+});
+
+const model = (extra = {}) => queueItem('q1', 'модель данных', 1, { title: 'Модель', ...extra });
+const apiItem = (extra = {}) =>
+  queueItem('q2', 'api', 2, {
+    title: 'API',
+    readiness: 'waiting',
+    after: [dependency('item', 'q1', 'Модель')],
+    ...extra,
+  });
+const uiItem = (extra = {}) =>
+  queueItem('q3', 'ui', 3, {
+    title: 'UI',
+    readiness: 'waiting',
+    after: [dependency('item', 'q2', 'API')],
+    ...extra,
+  });
+
+const row = (title: string) => {
+  const list = screen.getByRole('list', { name: 'tasks in the queue' });
+  const found = within(list)
+    .getAllByRole('listitem')
+    .find((node) => (node.getAttribute('aria-label') ?? '').endsWith(` ${title}`));
+  if (!found) throw new Error(`no row ${title}`);
+  return found;
+};
+
+const pick = async (picker: HTMLElement, title: string) => {
+  fireEvent.click(picker);
+  const option = await screen.findByRole('option', { name: new RegExp(title) });
+  fireEvent.click(option);
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+};
+
+const editRow = async (title: string) => {
+  fireEvent.click(within(row(title)).getByRole('button', { name: 'Edit' }));
+  await within(row(title))
+    .findByRole('form')
+    .catch(() => undefined);
+};
+
+describe('queue links', () => {
+  const chain = queueOf({
+    items: [model(), apiItem(), uiItem(), queueItem('q4', 'other', 4)],
+    runs: [queueRun('run1', { title: 'Запуск' })],
+  });
+
+  it('finds dependents, the related set and the depth of a chain', () => {
+    expect(dependents(chain, 'q1').map((item) => item.id)).toEqual(['q2']);
+    expect([...related(chain, 'q2')].sort()).toEqual(['q1', 'q2', 'q3']);
+    expect([...related(chain, 'q4')]).toEqual(['q4']);
+    expect([depth(chain, 'q1'), depth(chain, 'q2'), depth(chain, 'q3')]).toEqual([0, 1, 2]);
+  });
+
+  it('branches: one task waits for two, both are related', () => {
+    const queue = queueOf({
+      items: [
+        model(),
+        queueItem('q2', 'b', 2),
+        queueItem('q3', 'c', 3, {
+          after: [dependency('item', 'q1', 'Модель'), dependency('item', 'q2', 'b')],
+        }),
+      ],
+    });
+    expect([...related(queue, 'q3')].sort()).toEqual(['q1', 'q2', 'q3']);
+    expect([...related(queue, 'q1')].sort()).toEqual(['q1', 'q3']);
+    expect(depth(queue, 'q3')).toBe(1);
+  });
+
+  it('counts a run as related but not in the depth, and caps the depth at three', () => {
+    const queue = queueOf({
+      items: [
+        queueItem('q1', 'a', 1, { after: [dependency('run', 'run1', 'Запуск')] }),
+        queueItem('q2', 'b', 2, { after: [dependency('item', 'q1', 'a')] }),
+        queueItem('q3', 'c', 3, { after: [dependency('item', 'q2', 'b')] }),
+        queueItem('q4', 'd', 4, { after: [dependency('item', 'q3', 'c')] }),
+        queueItem('q5', 'e', 5, { after: [dependency('item', 'q4', 'd')] }),
+      ],
+    });
+    expect(related(queue, 'q1').has('run1')).toBe(true);
+    expect(depth(queue, 'q1')).toBe(0);
+    expect(depth(queue, 'q5')).toBe(3);
+  });
+
+  it('lists the unmet predecessors', () => {
+    const item = queueItem('q1', 'a', 1, {
+      after: [dependency('item', 'q0', 'x', 'done'), dependency('run', 'r', 'y', 'blocked')],
+    });
+    expect(unmet(item).map((ref) => ref.id)).toEqual(['r']);
+  });
+
+  it('offers items, runs and current predecessors once, without the edited item', () => {
+    const edited = apiItem({ after: [dependency('run', 'gone', 'Упавший', 'blocked')] });
+    const queue = queueOf({
+      items: [model(), edited],
+      runs: [queueRun('run1', { title: 'Запуск' })],
+    });
+    const options = afterOptions(queue, (item) => item.title ?? '', edited);
+    expect(options.map((option) => option.id)).toEqual(['q1', 'run1', 'gone']);
+    expect(options[2]!.title).toBe('Упавший');
+    expect(afterOptions(queue, (item) => item.title ?? '').map((option) => option.id)).toEqual([
+      'q1',
+      'q2',
+      'run1',
+    ]);
+  });
+});
+
+describe('dependencies in the form', () => {
+  it('adds a task after another', async () => {
+    const api = show(queueOf({ items: [model()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
+    await pick(screen.getByRole('combobox', { name: 'Waits for' }), 'Модель');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        workflow: 'feature',
+        task: 'API',
+        after: ['q1'],
+      }),
+    );
+  });
+
+  it('removes all predecessors with an empty list', async () => {
+    const api = show(queueOf({ items: [model(), apiItem()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    const chip = await screen.findByRole('button', { name: 'Remove Модель' });
+    fireEvent.click(chip);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
+    expect((api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
+      after: [],
+    });
+  });
+
+  it('does not send after when only the text changed', async () => {
+    const api = show(queueOf({ items: [model(), apiItem()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    const editor = (await screen.findAllByLabelText('Task text')).find(
+      (node) => (node as HTMLTextAreaElement).value === 'api',
+    )!;
+    fireEvent.change(editor, { target: { value: 'api 2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
+    const body = (api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1];
+    expect(body.task).toBe('api 2');
+    expect('after' in body).toBe(false);
+  });
+
+  it('offers a predecessor that no longer holds a place and removes it', async () => {
+    const failed = apiItem({
+      readiness: 'blocked',
+      after: [dependency('run', 'run7', 'Модель', 'blocked')],
+    });
+    const api = show(queueOf({ items: [failed] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove Модель' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
+    expect((api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
+      after: [],
+    });
+  });
+
+  it('keeps the choice over a queue event', async () => {
+    show(queueOf({ items: [model(), queueItem('q2', 'api', 2, { title: 'API' })] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    const pickers = await screen.findAllByRole('combobox', { name: 'Waits for' });
+    await pick(pickers[1]!, 'Модель');
+    expect(screen.getAllByRole('button', { name: 'Remove Модель' })).toHaveLength(1);
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'queue',
+        seq: 5,
+        queue: queueOf({ items: [model(), queueItem('q2', 'api', 2, { title: 'API' })] }),
+      });
+    });
+    expect(screen.getAllByRole('button', { name: 'Remove Модель' })).toHaveLength(1);
+  });
+
+  it('shows a cycle error at the form and keeps the choice', async () => {
+    const api = show(queueOf({ items: [model(), apiItem()] }), {
+      queueEdit: vi.fn(async () => {
+        throw new ApiError(400, 'dependency cycle: q1 -> q2 -> q1');
+      }),
+    });
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('Модель');
+    const pickers = await screen.findAllByRole('combobox', { name: 'Waits for' });
+    await pick(pickers[1]!, 'API');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('dependency cycle: q1 -> q2 -> q1');
+    expect(api.queueEdit).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Remove API' })).toBeTruthy();
+  });
+});
+
+describe('dependencies in the list', () => {
+  it('shows a label with a link for a running predecessor run', async () => {
+    show(
+      queueOf({
+        items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })],
+        runs: [queueRun('run1', { title: 'Модель' })],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const link = within(row('API')).getByRole('link', { name: /after: Модель/ });
+    expect(link.getAttribute('href')).toBe('#runs/run1');
+    expect(link.getAttribute('data-state')).toBe('waiting');
+    expect(link.textContent).toContain('waiting');
+  });
+
+  it('shows waiting readiness with the predecessor in the hint', async () => {
+    show(
+      queueOf({
+        items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })],
+        runs: [queueRun('run1', { title: 'Модель' })],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const badge = within(row('API')).getByText('waiting', {
+      selector: '[data-readiness] *, [data-readiness]',
+    });
+    const holder = badge.closest('[data-readiness]')!;
+    expect(holder.getAttribute('data-readiness')).toBe('waiting');
+    expect(holder.getAttribute('title')).toContain('Модель');
+  });
+
+  it('marks a blocked task and its failed predecessor', async () => {
+    show(
+      queueOf({
+        items: [
+          apiItem({
+            readiness: 'blocked',
+            after: [dependency('run', 'run1', 'Модель', 'blocked')],
+          }),
+        ],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const li = row('API');
+    expect(li.className).toContain('border-destructive');
+    expect(li.querySelector('[data-readiness="blocked"]')).toBeTruthy();
+    expect(li.querySelector('a[data-state="blocked"]')).toBeTruthy();
+  });
+
+  it('shows an independent task as ready and without labels', async () => {
+    show(queueOf({ items: [model()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const li = row('Модель');
+    expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
+    expect(li.querySelector('[data-state]')).toBeNull();
+    expect(li.className).not.toContain('border-destructive');
+  });
+
+  it('highlights the chain and indents branches by depth', async () => {
+    show(queueOf({ items: [model(), apiItem(), uiItem(), queueItem('q4', 'other', 4)] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    expect(row('API').getAttribute('data-depth')).toBe('1');
+    expect(row('UI').getAttribute('data-depth')).toBe('2');
+    expect(row('Модель').getAttribute('data-depth')).toBe('0');
+    fireEvent.mouseEnter(row('API'));
+    for (const title of ['Модель', 'API', 'UI'])
+      expect(row(title).hasAttribute('data-highlighted')).toBe(true);
+    expect(row('other').hasAttribute('data-highlighted')).toBe(false);
+    fireEvent.mouseLeave(row('API'));
+    expect(row('API').hasAttribute('data-highlighted')).toBe(false);
+  });
+
+  it('highlights the card of a predecessor run on focus and not while dragging', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        runs: [queueRun('run1', { title: 'Модель' })],
+        items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const card = screen.getByRole('group', { name: 'Модель' });
+    expect(card.hasAttribute('data-highlighted')).toBe(false);
+    fireEvent.focus(row('API'));
+    expect(card.hasAttribute('data-highlighted')).toBe(true);
+    fireEvent.blur(row('API'));
+    expect(card.hasAttribute('data-highlighted')).toBe(false);
+    fireEvent.dragStart(row('API'), { dataTransfer: { setData: vi.fn() } });
+    fireEvent.focus(row('API'));
+    expect(card.hasAttribute('data-highlighted')).toBe(false);
+  });
+});
+
+describe('confirmations with dependencies', () => {
+  const waiting = () =>
+    queueOf({ items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })] });
+
+  it('asks before running a waiting task, then runs it', async () => {
+    const api = show(waiting());
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('Dependencies are not met');
+    expect(dialog.textContent).toContain('Модель');
+    expect(api.queueRunNow).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Run now' }));
+    await waitFor(() => expect(api.queueRunNow).toHaveBeenCalledWith('q2'));
+    expect((await screen.findByRole('link', { name: 'run run9' })).getAttribute('href')).toBe(
+      '#runs/run9',
+    );
+  });
+
+  it('sends nothing when the dialog is refused', async () => {
+    const api = show(waiting());
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.queueRunNow).not.toHaveBeenCalled();
+    expect(labels()).toEqual(['1. API']);
+  });
+
+  it('names the dependents when a predecessor is removed', async () => {
+    const api = show(queueOf({ items: [model(), apiItem()] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(within(row('Модель')).getByRole('button', { name: 'Remove' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('API');
+    expect(dialog.textContent).toContain('will stop waiting');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep' }));
+    expect(api.queueRemove).not.toHaveBeenCalled();
   });
 });

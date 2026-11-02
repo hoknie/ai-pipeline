@@ -5,6 +5,7 @@ export type {
   ConfigEditResult,
   ConfigPreview,
   ConfigEditorResponse,
+  DependencyView,
   AttemptView,
   DaemonCheck,
   DiffStat,
@@ -31,7 +32,13 @@ export type {
   TranscriptEntry,
 } from '../../src/protocol/index.ts';
 
-import type { DaemonCheck } from '../../src/protocol/index.ts';
+import type { DaemonCheck, DependencyView, QueueItemView } from '../../src/protocol/index.ts';
+
+/** State of a predecessor: done, still pending or blocked. */
+export type DependencyState = DependencyView['state'];
+
+/** Whether a queued task can start now. */
+export type ItemReadiness = QueueItemView['readiness'];
 
 /** Build mismatch between the daemon and `aip web`; null when they run the same build. */
 export type DaemonMismatch = DaemonCheck['mismatch'];
@@ -48,6 +55,8 @@ export interface QueueFields {
   tags?: string[];
   /** Ids of workflow steps the task skips. */
   skip?: string[];
+  /** Ids of queue items and runs the task waits for. */
+  after?: string[];
 }
 
 /** Changes of a queued task; `title: null` removes the title. */
@@ -62,6 +71,8 @@ export interface QueuePatch {
   tags?: string[];
   /** Ids of workflow steps to skip; replaces the list of the item. */
   skip?: string[];
+  /** Ids of queue items and runs the task waits for; replaces the list of the item. */
+  after?: string[];
   position?: number;
 }
 export type {
