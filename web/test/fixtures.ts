@@ -15,6 +15,7 @@ import type {
   QueueView,
   RepositoryView,
   RunView,
+  SystemStepRow,
   TagColor,
   TagView,
   Topology,
@@ -79,6 +80,14 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
   };
 }
 
+export function systemRow(
+  kind: SystemStepRow['kind'],
+  overrides: Partial<SystemStepRow> = {},
+): SystemStepRow {
+  const row = groupRow({ status: 'running', step: kind });
+  return { ...row, kind, slug: `_${kind}`, title: `_${kind}`, ...overrides };
+}
+
 export function runView(overrides: Partial<RunView> = {}): RunView {
   return {
     id: 'run1',
@@ -107,6 +116,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     topology: topologyOf(),
     specialists: [],
     groups: [groupRow()],
+    system: [],
     ...overrides,
   };
 }

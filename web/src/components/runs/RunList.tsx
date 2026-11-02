@@ -10,7 +10,7 @@ import type { RunView } from '../../types.ts';
 import { useTags } from '../../tags.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
-import { orderGroups } from '../order.ts';
+import { orderEntries } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { TagChips } from '../TagChip.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
@@ -98,7 +98,7 @@ export function RunList({
         <ul className="flex flex-col gap-1.5">
           {shown.map((run) => {
             const open = run.id === selectedRun;
-            const groups = orderGroups(run.groups);
+            const groups = orderEntries(run);
             return (
               <li key={run.id} data-run={run.id}>
                 <button
@@ -150,7 +150,12 @@ export function RunList({
                           onClick={() => onSelect(run.id, group.slug)}
                         >
                           <span className="truncate" title={group.title}>
-                            {group.title}
+                            {'kind' in group ? t(`runs.system.${group.kind}`) : group.title}
+                            {'kind' in group ? (
+                              <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                {t('runs.system.badge')}
+                              </span>
+                            ) : null}
                           </span>
                           <StatusBadge status={group.status} />
                         </button>

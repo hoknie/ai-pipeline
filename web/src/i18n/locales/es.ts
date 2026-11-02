@@ -193,6 +193,14 @@ export const es: Dictionary = {
         'Las partes en conflicto quedan en los archivos con marcadores de git; no se crea ningún commit.',
       confirm: 'Entregar con --force',
     },
+    system: {
+      split: 'División en grupos',
+      message: 'Mensaje del commit',
+      resolve: 'Resolución de conflictos de entrega',
+      badge: 'paso del sistema',
+      retryDelivery: 'Reintentar la entrega',
+      deliveryStarted: 'Entrega iniciada',
+    },
     group: {
       label: 'grupo {{title}}',
       cancelTitle: '¿Cancelar el grupo «{{title}}»?',

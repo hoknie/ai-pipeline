@@ -12,6 +12,8 @@ export type {
   DiffTotals,
   FileStat,
   GroupRow,
+  SystemStepKind,
+  SystemStepRow,
   GroupView,
   QueueItemView,
   QueueRunView,

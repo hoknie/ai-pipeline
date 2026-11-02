@@ -6,7 +6,7 @@ import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
 import { diffText, duration } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
-import type { GroupRow, GroupView } from '../../types.ts';
+import type { GroupRow, GroupView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
@@ -25,6 +25,19 @@ import { QuestionsForm } from './QuestionsForm.tsx';
 
 type Tab = 'log' | 'changes' | 'task';
 
+/** What the screen of a group or a system step offers. */
+function capabilities(row: GroupRow | SystemStepRow, deliverable: boolean) {
+  const system = 'kind' in row;
+  const delivery = system && row.kind !== 'split';
+  const stopped = row.status === 'failed' || row.status === 'cancelled';
+  return {
+    retry: !delivery && ['failed', 'cancelled', 'conflict'].includes(row.status),
+    retryDelivery: delivery && stopped && deliverable,
+    cancel: !['merged', 'done', 'failed', 'cancelled'].includes(row.status),
+    changes: !system,
+  };
+}
+
 export function GroupScreen({
   api,
   runId,
@@ -39,10 +52,12 @@ export function GroupScreen({
   onOnlyReplies,
   showJson = false,
   onShowJson,
+  deliverable = false,
+  onDeliver,
 }: {
   api: Api;
   runId: string;
-  row: GroupRow;
+  row: GroupRow | SystemStepRow;
   /** Open the last attempt of this step instead of the last attempt of the group. */
   openStep?: string | null;
   /** Prefix of the keys of the drafts of this group: `<run>/<group>`. */
@@ -56,6 +71,9 @@ export function GroupScreen({
   onOnlyReplies?: (value: boolean) => void;
   showJson?: boolean;
   onShowJson?: (value: boolean) => void;
+  /** Whether delivery of the merged groups can be started now (for a failed delivery step). */
+  deliverable?: boolean;
+  onDeliver?: () => Promise<unknown>;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -63,6 +81,8 @@ export function GroupScreen({
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('log');
   const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}`;
+  const caps = capabilities(row, deliverable);
+  const title = 'kind' in row ? t(`runs.system.${row.kind}`) : row.title;
 
   useEffect(() => {
     let stopped = false;
@@ -87,15 +107,13 @@ export function GroupScreen({
     }
   };
 
-  const canCancel = !['merged', 'failed', 'cancelled'].includes(row.status);
-  const canRetry = ['failed', 'cancelled', 'conflict'].includes(row.status);
   const lastSeq = view?.attempts.at(-1)?.seq ?? null;
   const openSeq =
     (openStep ? view?.attempts.findLast((attempt) => attempt.stepId === openStep)?.seq : null) ??
     lastSeq;
   const cancelGroup = async () => {
     const yes = await confirm({
-      title: t('runs.group.cancelTitle', { title: row.title }),
+      title: t('runs.group.cancelTitle', { title }),
       description: t('runs.group.cancelDescription'),
       confirmLabel: t('runs.group.cancelGroup'),
       cancelLabel: t('runs.header.keep'),
@@ -110,17 +128,33 @@ export function GroupScreen({
   const hints = view?.permissionHints ?? [];
 
   return (
-    <section
-      aria-label={t('runs.group.label', { title: row.title })}
-      className="flex flex-col gap-3 p-4"
-    >
+    <section aria-label={t('runs.group.label', { title })} className="flex flex-col gap-3 p-4">
       <header className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="min-w-0 flex-1 truncate text-base font-semibold" title={row.title}>
-            {row.title}
+          <h2 className="min-w-0 flex-1 truncate text-base font-semibold" title={title}>
+            {title}
           </h2>
+          {'kind' in row ? (
+            <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
+          ) : null}
           <StatusBadge status={row.status} />
-          {canRetry ? (
+          {caps.retryDelivery ? (
+            <Button
+              variant="outline"
+              size="sm"
+              loading={busy}
+              onClick={() =>
+                void act(
+                  () => (onDeliver ? onDeliver() : Promise.resolve()),
+                  () => notifySuccess(t('runs.system.deliveryStarted')),
+                )
+              }
+            >
+              <RotateCcw />
+              {t('runs.system.retryDelivery')}
+            </Button>
+          ) : null}
+          {caps.retry ? (
             <Button
               variant="outline"
               size="sm"
@@ -136,7 +170,7 @@ export function GroupScreen({
               {t('runs.group.retry')}
             </Button>
           ) : null}
-          {canCancel ? (
+          {caps.cancel ? (
             <Button
               variant="destructive"
               size="sm"
@@ -151,8 +185,10 @@ export function GroupScreen({
           <span>{row.step ?? '—'}</span>
           {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
           <span>{duration(row.durationMs)}</span>
-          {row.diff ? <span>{diffText(row.diff, t)}</span> : null}
-          {row.status === 'merged' ? <StatusBadge status={row.delivery} /> : null}
+          {'diff' in row && row.diff ? <span>{diffText(row.diff, t)}</span> : null}
+          {!('kind' in row) && row.status === 'merged' ? (
+            <StatusBadge status={row.delivery} />
+          ) : null}
         </div>
       </header>
 
@@ -172,7 +208,7 @@ export function GroupScreen({
           />
         ) : (
           <QuestionCard
-            title={row.title}
+            title={title}
             question={row.question}
             draft={drafts[draftKey] ?? ''}
             busy={busy}
@@ -216,10 +252,12 @@ export function GroupScreen({
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
           <TabsList aria-label={t('runs.group.tabs')}>
             <TabsTrigger value="log">{t('runs.group.log')}</TabsTrigger>
-            <TabsTrigger value="changes">
-              {t('runs.group.changes')}
-              {view.diff ? ` · ${view.diff.files.length}` : ''}
-            </TabsTrigger>
+            {caps.changes ? (
+              <TabsTrigger value="changes">
+                {t('runs.group.changes')}
+                {view.diff ? ` · ${view.diff.files.length}` : ''}
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger value="task">{t('runs.group.task')}</TabsTrigger>
           </TabsList>
           <TabsContent value="log" className="flex flex-col gap-3">
@@ -253,7 +291,7 @@ export function GroupScreen({
               rawLog={view.log ? view.log.lines : null}
               onlyReplies={onlyReplies}
               showJson={showJson}
-              retryable={row.status === 'failed' || row.status === 'cancelled'}
+              retryable={caps.retry && (row.status === 'failed' || row.status === 'cancelled')}
               onRetry={() =>
                 void act(
                   () => api.retry(runId, row.slug),
@@ -262,13 +300,15 @@ export function GroupScreen({
               }
             />
           </TabsContent>
-          <TabsContent value="changes">
-            {view.diff && view.diff.files.length > 0 ? (
-              <FileTree files={view.diff.files} />
-            ) : (
-              <Empty title={t('runs.group.noChanges')}>{t('runs.group.noChangesText')}</Empty>
-            )}
-          </TabsContent>
+          {caps.changes ? (
+            <TabsContent value="changes">
+              {view.diff && view.diff.files.length > 0 ? (
+                <FileTree files={view.diff.files} />
+              ) : (
+                <Empty title={t('runs.group.noChanges')}>{t('runs.group.noChangesText')}</Empty>
+              )}
+            </TabsContent>
+          ) : null}
           <TabsContent value="task">
             <Markdown text={view.task} />
           </TabsContent>

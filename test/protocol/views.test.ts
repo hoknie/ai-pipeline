@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { addItem, advance, emptyQueue, startQueue, transition } from '../../src/core/index.ts';
 import {
   formatRepositories,
+  groupView,
   queueView,
   repositoryViews,
   runView,
@@ -263,5 +264,38 @@ describe('runView startedAt', () => {
     expect(runView(state, 5000).startedAt).toBeNull();
     step(state, 1500);
     expect(runView(state, 5000).startedAt).toBe(1500);
+  });
+});
+
+describe('runView system steps', () => {
+  it('lists the split and the merged message step as done, apart from the groups', () => {
+    const state = run(2);
+    const base = group(state);
+    state.split = { ...base, slug: '_split', status: 'merged', attempts: [] };
+    state.message = { ...base, slug: '_message', status: 'merged', attempts: [] };
+    const before = runView(run(2), 5000).counts;
+    const view = runView(state, 5000);
+    expect(view.groups).toHaveLength(2);
+    expect(view.system.map((row) => [row.kind, row.slug, row.status])).toEqual([
+      ['split', '_split', 'done'],
+      ['message', '_message', 'done'],
+    ]);
+    expect(view.split?.status).toBe('done');
+    expect(view.counts).toBe(before);
+    expect(groupView(state, state.message, '/w', null, 5000).status).toBe('done');
+  });
+
+  it('keeps a failed resolver with its reason, after the message step', () => {
+    const state = run(1);
+    const base = group(state);
+    state.resolve = { ...base, slug: '_resolve', status: 'failed', reason: 'boom', attempts: [] };
+    state.message = { ...base, slug: '_message', status: 'running', attempts: [] };
+    const view = runView(state, 5000);
+    expect(view.system.map((row) => row.kind)).toEqual(['message', 'resolve']);
+    expect(view.system[1]).toMatchObject({ status: 'failed', reason: 'boom' });
+  });
+
+  it('is empty without service groups', () => {
+    expect(runView(run(1), 5000).system).toEqual([]);
   });
 });

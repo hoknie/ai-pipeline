@@ -361,7 +361,9 @@ describe('cli', () => {
     await aip(box, 'run', 'watch', runId);
     const shown = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
       groups: { slug: string }[];
+      system: unknown[];
     };
+    expect(Array.isArray(shown.system)).toBe(true);
     const groupName = shown.groups[0]?.slug ?? '';
     const commands = [
       ['run', 'list', '--json'],

@@ -424,6 +424,7 @@ class Machine {
 
   private retry(slug: string, permissions?: PermissionsRefresh): void {
     const group = this.group(slug);
+    if (group.status === 'failed' || group.status === 'cancelled') this.rejectDeliveryRetry(group);
     if (group.status === 'failed') {
       group.status = 'queued';
       group.reason = null;
@@ -438,12 +439,15 @@ class Machine {
     this.refresh(group, permissions);
   }
 
-  private retryCancelled(group: Group): void {
+  private rejectDeliveryRetry(group: Group): void {
     if (isMessageGroup(group) || isResolveGroup(group)) {
       throw new Rejection(
-        `group ${group.slug} is cancelled; delivery is retried with \`aip run apply\``,
+        `group ${group.slug} is ${group.status}; delivery is retried with \`aip run apply\``,
       );
     }
+  }
+
+  private retryCancelled(group: Group): void {
     group.reason = null;
     if (group.question !== null) {
       group.status = 'needs_human';

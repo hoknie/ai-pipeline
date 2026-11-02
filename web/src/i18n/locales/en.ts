@@ -188,6 +188,14 @@ export const en = {
       description: 'Conflicting places stay in the files with git markers, no commit is made.',
       confirm: 'Deliver with --force',
     },
+    system: {
+      split: 'Split into groups',
+      message: 'Commit message',
+      resolve: 'Delivery conflict resolution',
+      badge: 'system step',
+      retryDelivery: 'Retry delivery',
+      deliveryStarted: 'Delivery started',
+    },
     group: {
       label: 'group {{title}}',
       cancelTitle: 'Cancel the group «{{title}}»?',

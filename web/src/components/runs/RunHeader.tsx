@@ -22,6 +22,7 @@ import { StatusBadge } from '../StatusBadge.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
+import { canDeliver } from './delivery.ts';
 import { ApplyDialog } from './ApplyDialog.tsx';
 
 export function RunHeader({
@@ -29,11 +30,14 @@ export function RunHeader({
   api,
   now,
   onError,
+  onSelect,
 }: {
   run: RunView;
   api: Api;
   now: number;
   onError: (message: string) => void;
+  /** Opens a group or a system step of the run. */
+  onSelect?: (slug: string) => void;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
@@ -87,7 +91,7 @@ export function RunHeader({
     else notifySuccess(t('runs.header.retryStarted'));
   };
   const { delivery } = run;
-  const deliverable = delivery.merged > delivery.applied && !delivery.inProgress;
+  const deliverable = canDeliver(run);
   const apply = async (force: boolean) => {
     setForcing(false);
     setApplying(true);
@@ -160,7 +164,13 @@ export function RunHeader({
       </div>
       {run.resolver ? (
         <div className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
-          <span>{t('runs.header.resolver')}</span>
+          <button
+            type="button"
+            className="underline-offset-2 hover:underline"
+            onClick={() => onSelect?.('_resolve')}
+          >
+            {t('runs.header.resolver')}
+          </button>
           <StatusBadge status={run.resolver.status} />
           <span>
             {t('runs.header.round', { round: run.resolver.round, rounds: run.resolver.rounds })}
@@ -173,7 +183,13 @@ export function RunHeader({
       {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
       {run.split && run.split.status !== 'done' ? (
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span>{t('runs.header.split')}</span>
+          <button
+            type="button"
+            className="underline-offset-2 hover:underline"
+            onClick={() => onSelect?.('_split')}
+          >
+            {t('runs.header.split')}
+          </button>
           <StatusBadge status={run.split.status} />
         </div>
       ) : null}

@@ -136,4 +136,14 @@ describe('retry of a cancelled group', () => {
     withCancelledMessage(state);
     expect(() => retry(state, '_message')).toThrow('aip run apply');
   });
+
+  it.each(['_message', '_resolve'] as const)('refuses a failed %s group', (slug) => {
+    const state = run(1);
+    withCancelledMessage(state);
+    const delivery = { ...state.message!, slug, status: 'failed' as const };
+    if (slug === '_message') state.message = delivery;
+    else state.resolve = delivery;
+    expect(() => retry(state, slug)).toThrow('is failed; delivery is retried with `aip run apply`');
+    expect(delivery.status).toBe('failed');
+  });
 });

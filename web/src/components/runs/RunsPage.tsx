@@ -21,9 +21,10 @@ import {
   SheetTrigger,
 } from '../../ui/sheet.tsx';
 import { Skeleton } from '../../ui/skeleton.tsx';
-import { needsAttention, orderGroups } from '../order.ts';
+import { defaultEntry, orderEntries } from '../order.ts';
 
 import { GroupScreen } from './GroupScreen.tsx';
+import { canDeliver } from './delivery.ts';
 import { RunHeader } from './RunHeader.tsx';
 import { RunFilters } from './RunFilters.tsx';
 import { RunList } from './RunList.tsx';
@@ -80,12 +81,9 @@ export function RunsPage({
   const [screen, setScreen] = useState<'list' | 'detail'>(route.group ? 'detail' : 'list');
 
   const run = runs.find((candidate) => candidate.id === route.run) ?? null;
-  const ordered = run ? orderGroups(run.groups) : [];
+  const ordered = run ? orderEntries(run) : [];
   const group =
-    ordered.find((candidate) => candidate.slug === route.group) ??
-    ordered.find(needsAttention) ??
-    ordered[0] ??
-    null;
+    ordered.find((candidate) => candidate.slug === route.group) ?? (run ? defaultEntry(run) : null);
 
   const select = (runId: string, slug: string | null) => {
     setScreen('detail');
@@ -220,7 +218,13 @@ export function RunsPage({
 
   const detail = run ? (
     <>
-      <RunHeader run={run} api={api} now={now} onError={onError} />
+      <RunHeader
+        run={run}
+        api={api}
+        now={now}
+        onError={onError}
+        onSelect={(slug) => select(run.id, slug)}
+      />
       {group ? (
         <GroupScreen
           key={`${run.id}/${group.slug}/${route.step ?? ''}`}
@@ -237,6 +241,8 @@ export function RunsPage({
           onOnlyReplies={onOnlyReplies}
           showJson={showJson}
           onShowJson={onShowJson}
+          deliverable={canDeliver(run)}
+          onDeliver={() => api.apply(run.id, false)}
         />
       ) : (
         <p className="p-4 text-sm text-muted-foreground">{t('runs.page.noGroups')}</p>

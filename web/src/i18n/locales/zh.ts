@@ -189,6 +189,14 @@ export const zh: Dictionary = {
       description: '冲突部分将以 git 标记保留在文件中，不会创建提交。',
       confirm: '使用 --force 交付',
     },
+    system: {
+      split: '拆分为分组',
+      message: '提交信息',
+      resolve: '交付冲突解决',
+      badge: '系统步骤',
+      retryDelivery: '重试交付',
+      deliveryStarted: '已开始交付',
+    },
     group: {
       label: '分组 {{title}}',
       cancelTitle: '取消分组「{{title}}」？',

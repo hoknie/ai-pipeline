@@ -192,6 +192,14 @@ export const ru: Dictionary = {
       description: 'Конфликтующие места останутся в файлах с маркерами git, коммит не создаётся.',
       confirm: 'Доставить с --force',
     },
+    system: {
+      split: 'Деление на группы',
+      message: 'Сообщение коммита',
+      resolve: 'Разрешение конфликтов доставки',
+      badge: 'системный шаг',
+      retryDelivery: 'Повторить доставку',
+      deliveryStarted: 'Доставка запущена',
+    },
     group: {
       label: 'группа {{title}}',
       cancelTitle: 'Отменить группу «{{title}}»?',

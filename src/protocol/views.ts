@@ -10,6 +10,7 @@ import {
   groupRef,
   groupUsage,
   isRunFinished,
+  isServiceGroup,
   isSplitGroup,
   isTerminal,
   itemReadiness,
@@ -135,6 +136,14 @@ export interface SplitRow {
   reason: string | null;
 }
 
+export type SystemStepKind = 'split' | 'message' | 'resolve';
+
+/** A service step of the run (split, commit message, delivery resolver). */
+export interface SystemStepRow extends Omit<GroupRow, 'status'> {
+  kind: SystemStepKind;
+  status: GroupStatus | 'done';
+}
+
 export interface RunView {
   id: string;
   title: string;
@@ -170,6 +179,8 @@ export interface RunView {
   /** Specialists that run or are waited for in the run, for the load across the machine. */
   specialists: SpecialistUse[];
   groups: GroupRow[];
+  /** Service steps in the order split, message, resolve; absent steps are left out. */
+  system: SystemStepRow[];
 }
 
 export interface ResolverRow {
@@ -293,8 +304,12 @@ export function groupRow(group: Group, now: number, diffs: DiffLookup = NO_DIFFS
   };
 }
 
-function splitStatus(group: Group): GroupStatus | 'done' {
+function serviceStatus(group: Group): GroupStatus | 'done' {
   return group.status === 'merged' ? 'done' : group.status;
+}
+
+export function systemRow(group: Group, kind: SystemStepKind, now: number): SystemStepRow {
+  return { ...groupRow(group, now), kind, status: serviceStatus(group) };
 }
 
 function runDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
@@ -339,7 +354,7 @@ export function runView(
     usage: summary.usage,
     split: state.split
       ? {
-          status: splitStatus(state.split),
+          status: serviceStatus(state.split),
           question: state.split.question,
           questions: state.split.questions,
           reason: state.split.reason,
@@ -359,6 +374,11 @@ export function runView(
     topology: topology(state),
     specialists: specialistUse(state),
     groups: state.groups.map((group) => groupRow(group, now, diffs)),
+    system: [
+      ...(state.split ? [systemRow(state.split, 'split', now)] : []),
+      ...(state.message ? [systemRow(state.message, 'message', now)] : []),
+      ...(state.resolve ? [systemRow(state.resolve, 'resolve', now)] : []),
+    ],
   };
 }
 
@@ -429,7 +449,7 @@ export function groupView(
     slug: group.slug,
     title: group.title,
     task: group.task,
-    status: isSplitGroup(group) ? splitStatus(group) : group.status,
+    status: isServiceGroup(group) ? serviceStatus(group) : group.status,
     branch: isSplitGroup(group) ? state.run.branch : groupRef(state.run, group.slug),
     worktree,
     question: group.question,
