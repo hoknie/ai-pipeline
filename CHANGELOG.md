@@ -8,6 +8,7 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ### Features
 
+- Run steps are shown as a «Steps» button with a list of checkboxes instead of switches
 - Task removed from run list if task was requeue ([1941511](https://github.com/hoknie/ai-pipeline/commit/19415112d726809c02e4bd7638979cf99fb55c6a))
 - Speed up tests ([26bc1c1](https://github.com/hoknie/ai-pipeline/commit/26bc1c11319feedf86f5e6fd2e9d018bd0870479))
 - Removed from run list queue texts ([4b80102](https://github.com/hoknie/ai-pipeline/commit/4b801024cd4dd87438d2d62dc47cfdcb1fdbab6b))

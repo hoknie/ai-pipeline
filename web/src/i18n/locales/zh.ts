@@ -225,7 +225,8 @@ export const zh: Dictionary = {
     },
     steps: {
       title: '步骤',
-      skip: '跳过',
+      button: '步骤：{{active}}/{{total}}',
+      checkboxLabel: '执行步骤 {{name}}（{{step}}）',
       skipped: '已跳过',
       done: '已完成',
       active: '进行中',
@@ -236,7 +237,6 @@ export const zh: Dictionary = {
       keep: '不跳过',
       doneSkip: '步骤已跳过',
       doneUnskip: '步骤已恢复',
-      switchLabel: '跳过步骤 {{step}}',
       confirmAllGroups: '该步骤将对运行中的所有分组跳过。',
     },
     system: {

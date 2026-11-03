@@ -230,7 +230,8 @@ export const ru: Dictionary = {
     },
     steps: {
       title: 'Шаги',
-      skip: 'Пропустить',
+      button: 'Шаги: {{active}} из {{total}}',
+      checkboxLabel: 'Выполнять шаг {{name}} ({{step}})',
       skipped: 'пропущен',
       done: 'пройден',
       active: 'идёт',
@@ -242,7 +243,6 @@ export const ru: Dictionary = {
       keep: 'Не пропускать',
       doneSkip: 'Шаг пропущен',
       doneUnskip: 'Шаг возвращён',
-      switchLabel: 'Пропустить шаг {{step}}',
       confirmAllGroups: 'Шаг будет пропущен для всех групп запуска.',
     },
     system: {

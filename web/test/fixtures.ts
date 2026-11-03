@@ -147,9 +147,9 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     diff: null,
     topology: topologyOf(),
     steps: [
-      { id: 'plan', specialist: 'plan', skipped: false, state: 'done' },
-      { id: 'code', specialist: 'coder', skipped: false, state: 'active' },
-      { id: 'review', specialist: 'reviewer', skipped: false, state: 'upcoming' },
+      { id: 'plan', specialist: 'plan', name: 'Planner', skipped: false, state: 'done' },
+      { id: 'code', specialist: 'coder', name: 'Coder', skipped: false, state: 'active' },
+      { id: 'review', specialist: 'reviewer', name: 'Reviewer', skipped: false, state: 'upcoming' },
     ],
     specialists: [],
     groups: [groupRow()],

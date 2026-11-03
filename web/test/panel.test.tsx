@@ -1021,68 +1021,158 @@ describe('run steps', () => {
   const header = (api = fakeApi(), onError: (message: string) => void = () => undefined) =>
     render(<RunHeader run={runView()} api={api} now={0} onError={onError} />);
 
-  it('offers a switch only for steps that are not finished', () => {
+  const open = () => fireEvent.click(screen.getByRole('button', { name: /^Steps: / }));
+  const box = (name: string) => screen.getByRole('checkbox', { name });
+
+  it('shows the summary on the button and opens the list on click', () => {
     header();
-    expect(screen.queryByRole('switch', { name: 'Skip step plan' })).toBeNull();
-    expect(screen.getByRole('switch', { name: 'Skip step code' })).toBeTruthy();
-    expect(screen.getByRole('switch', { name: 'Skip step review' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Steps: 3 of 3' })).toBeTruthy();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    open();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    expect(box('Run step Coder (code)').getAttribute('aria-checked')).toBe('true');
   });
 
-  it('skips an upcoming step at once', async () => {
+  const upcoming = (skipped: Record<string, boolean>) =>
+    runView({
+      steps: [
+        {
+          id: 'plan',
+          specialist: 'plan',
+          name: 'Planner',
+          skipped: !!skipped.plan,
+          state: 'upcoming',
+        },
+        {
+          id: 'code',
+          specialist: 'coder',
+          name: 'Coder',
+          skipped: !!skipped.code,
+          state: 'upcoming',
+        },
+        {
+          id: 'review',
+          specialist: 'reviewer',
+          name: 'Reviewer',
+          skipped: !!skipped.review,
+          state: 'upcoming',
+        },
+      ],
+    });
+
+  it('disables a finished step', () => {
+    header();
+    open();
+    expect(box('Run step Planner (plan)').hasAttribute('disabled')).toBe(true);
+    expect(box('Run step Coder (code)').hasAttribute('disabled')).toBe(false);
+  });
+
+  it('disables the last step that is not skipped', () => {
+    const run = upcoming({ plan: true, code: true });
+    render(<RunHeader run={run} api={fakeApi()} now={0} onError={() => undefined} />);
+    open();
+    expect(box('Run step Reviewer (review)').getAttribute('aria-checked')).toBe('true');
+    expect(box('Run step Reviewer (review)').hasAttribute('disabled')).toBe(true);
+    expect(box('Run step Planner (plan)').hasAttribute('disabled')).toBe(false);
+    expect(box('Run step Coder (code)').hasAttribute('disabled')).toBe(false);
+  });
+
+  it('disables every box while a request is running', async () => {
+    let finish: () => void = () => undefined;
+    const api = fakeApi();
+    api.skipStep = vi.fn(
+      () => new Promise<never>((resolve) => (finish = () => resolve(undefined as never))),
+    );
+    header(api);
+    open();
+    fireEvent.click(box('Run step Reviewer (review)'));
+    await waitFor(() => expect(box('Run step Coder (code)').hasAttribute('disabled')).toBe(true));
+    for (const cb of screen.getAllByRole('checkbox'))
+      expect(cb.hasAttribute('disabled')).toBe(true);
+    finish();
+    await waitFor(() => expect(box('Run step Coder (code)').hasAttribute('disabled')).toBe(false));
+  });
+
+  it('closes the list on Escape and returns focus to the button', async () => {
+    header();
+    open();
+    fireEvent.keyDown(screen.getAllByRole('checkbox')[0]!, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Steps: / }));
+  });
+
+  it('skips an upcoming step at once when its box is cleared', async () => {
     const api = fakeApi();
     header(api);
-    fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
+    open();
+    fireEvent.click(box('Run step Reviewer (review)'));
     await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'review', true));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
   });
 
   it('asks before skipping a running step and keeps it when declined', async () => {
     const api = fakeApi();
     header(api);
-    fireEvent.click(screen.getByRole('switch', { name: 'Skip step code' }));
+    open();
+    fireEvent.click(box('Run step Coder (code)'));
     const dialog = await screen.findByRole('alertdialog');
     expect(api.skipStep).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByText('Do not skip'));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(api.skipStep).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('switch', { name: 'Skip step code' }));
+    expect(box('Run step Coder (code)').getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(box('Run step Coder (code)'));
     fireEvent.click(await within(await screen.findByRole('alertdialog')).findByText('Skip step'));
     await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'code', true));
   });
 
-  it('shows the error and leaves the switch off when the request fails', async () => {
+  it('shows the error and keeps the box checked when the request fails', async () => {
     const api = fakeApi();
     api.skipStep = vi.fn(async () => {
       throw new Error('step `review` is refused');
     });
     const onError = vi.fn();
     header(api, onError);
-    fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
+    open();
+    fireEvent.click(box('Run step Reviewer (review)'));
     await waitFor(() => expect(onError).toHaveBeenCalledWith('step `review` is refused'));
-    expect(
-      screen.getByRole('switch', { name: 'Skip step review' }).getAttribute('aria-checked'),
-    ).toBe('false');
+    expect(box('Run step Reviewer (review)').getAttribute('aria-checked')).toBe('true');
   });
 
   it('brings a skipped step back', async () => {
     const api = fakeApi();
     const run = runView({
       steps: [
-        { id: 'plan', specialist: 'plan', skipped: false, state: 'done' },
-        { id: 'code', specialist: 'coder', skipped: false, state: 'active' },
-        { id: 'review', specialist: 'reviewer', skipped: true, state: 'upcoming' },
+        { id: 'plan', specialist: 'plan', name: 'Planner', skipped: false, state: 'done' },
+        { id: 'code', specialist: 'coder', name: 'Coder', skipped: false, state: 'active' },
+        {
+          id: 'review',
+          specialist: 'reviewer',
+          name: 'Reviewer',
+          skipped: true,
+          state: 'upcoming',
+        },
       ],
     });
     render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
-    fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
+    open();
+    fireEvent.click(box('Run step Reviewer (review)'));
     await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'review', false));
   });
 });
 
 describe('skip step on the group screen', () => {
   const steps = (skippedReview = false) => [
-    { id: 'plan', specialist: 'plan', skipped: false, state: 'done' as const },
-    { id: 'code', specialist: 'coder', skipped: false, state: 'active' as const },
-    { id: 'review', specialist: 'reviewer', skipped: skippedReview, state: 'upcoming' as const },
+    { id: 'plan', specialist: 'plan', name: 'Planner', skipped: false, state: 'done' as const },
+    { id: 'code', specialist: 'coder', name: 'Coder', skipped: false, state: 'active' as const },
+    {
+      id: 'review',
+      specialist: 'reviewer',
+      name: 'Reviewer',
+      skipped: skippedReview,
+      state: 'upcoming' as const,
+    },
   ];
   const onStep = (stepId: string, status: 'running' | 'queued' = 'queued') => {
     const base = topologyOf();
@@ -1114,11 +1204,6 @@ describe('skip step on the group screen', () => {
       />,
     );
   const button = () => screen.queryByRole('button', { name: 'Skip step' });
-
-  it('shows a visible label next to the switches of the run header', () => {
-    render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
-    expect(screen.getAllByText('Skip')).toHaveLength(2);
-  });
 
   it('skips a running step after the confirmation', async () => {
     const api = fakeApi();

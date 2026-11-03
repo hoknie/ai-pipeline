@@ -2,6 +2,7 @@ import { findWorkflow, groupWorkflow, type ResolvedConfig } from '../config/inde
 
 import { Rejection } from './errors.ts';
 import { runWorkflow, stepsOf, type Group, type Run, type RunState } from './model.ts';
+import { stepName } from './topology.ts';
 
 /** Collapses repeats, keeping the order. */
 export function cleanSkip(skip: readonly string[]): string[] {
@@ -89,6 +90,7 @@ export type StepPhase = 'done' | 'active' | 'upcoming';
 export interface StepState {
   id: string;
   specialist: string;
+  name: string;
   skipped: boolean;
   state: StepPhase;
 }
@@ -115,6 +117,7 @@ export function stepStates(state: RunState): StepState[] {
     return {
       id: step.id,
       specialist: step.specialist,
+      name: stepName(state.run.config, step),
       skipped: isSkipped(state.run, step.id),
       state: progress,
     };

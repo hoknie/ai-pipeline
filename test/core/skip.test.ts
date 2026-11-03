@@ -129,6 +129,19 @@ describe('stepStates', () => {
     expect(states.map((entry) => entry.skipped)).toEqual([false, false, false, true]);
   });
 
+  it('names a step after its specialist, or by the slug without a name', () => {
+    const state = run(1);
+    expect(stepStates(state).map((entry) => entry.name)).toEqual([
+      'Планировщик',
+      'Кодировщик',
+      'Ревьюер',
+      'Тестировщик',
+    ]);
+    (state.run.config.specialists.find((item) => item.slug === 'qa') as { name?: string }).name =
+      undefined;
+    expect(stepStates(state)[3]!.name).toBe('qa');
+  });
+
   it('keeps a failed group on its step', () => {
     const state = run(1);
     step(state);

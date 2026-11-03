@@ -88,12 +88,17 @@ export interface WorkflowTopology {
   limits: Record<string, number | null>;
 }
 
+/** The human name of a step: the name of its specialist, or the specialist slug without one. */
+export function stepName(config: ResolvedConfig, step: Step): string {
+  return findSpecialist(config, step.specialist)?.name ?? step.specialist;
+}
+
 function stepInfo(config: ResolvedConfig, step: Step): StepInfo {
   const specialist = findSpecialist(config, step.specialist);
   return {
     id: step.id,
     specialist: step.specialist,
-    name: specialist?.name ?? step.specialist,
+    name: stepName(config, step),
     runtime: specialist?.runtime ?? config.defaults.runtime,
     model: specialist?.model ?? null,
     permissions: specialist?.permissions ?? config.defaults.permissions,

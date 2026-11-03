@@ -550,10 +550,10 @@ describe('run steps', () => {
     step(state);
     finish(state, 'done');
     expect(runView(state, 1000).steps).toEqual([
-      { id: 'plan', specialist: 'plan', skipped: false, state: 'done' },
-      { id: 'code', specialist: 'coder', skipped: false, state: 'active' },
-      { id: 'review', specialist: 'reviewer', skipped: false, state: 'upcoming' },
-      { id: 'qa', specialist: 'qa', skipped: true, state: 'upcoming' },
+      { id: 'plan', specialist: 'plan', name: 'Планировщик', skipped: false, state: 'done' },
+      { id: 'code', specialist: 'coder', name: 'Кодировщик', skipped: false, state: 'active' },
+      { id: 'review', specialist: 'reviewer', name: 'Ревьюер', skipped: false, state: 'upcoming' },
+      { id: 'qa', specialist: 'qa', name: 'Тестировщик', skipped: true, state: 'upcoming' },
     ]);
   });
 });

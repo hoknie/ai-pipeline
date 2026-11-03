@@ -55,6 +55,7 @@ export {
   type SpecialistWaiting,
 } from './occupancy.ts';
 export {
+  stepName,
   topology,
   workflowTopologies,
   workflowTopology,

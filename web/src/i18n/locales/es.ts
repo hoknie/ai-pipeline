@@ -231,7 +231,8 @@ export const es: Dictionary = {
     },
     steps: {
       title: 'Pasos',
-      skip: 'Omitir',
+      button: 'Pasos: {{active}} de {{total}}',
+      checkboxLabel: 'Ejecutar el paso {{name}} ({{step}})',
       skipped: 'omitido',
       done: 'hecho',
       active: 'en curso',
@@ -243,7 +244,6 @@ export const es: Dictionary = {
       keep: 'No omitir',
       doneSkip: 'Paso omitido',
       doneUnskip: 'Paso restaurado',
-      switchLabel: 'Omitir el paso {{step}}',
       confirmAllGroups: 'El paso se omitirá para todos los grupos del lanzamiento.',
     },
     system: {

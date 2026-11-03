@@ -224,7 +224,8 @@ export const en = {
     },
     steps: {
       title: 'Steps',
-      skip: 'Skip',
+      button: 'Steps: {{active}} of {{total}}',
+      checkboxLabel: 'Run step {{name}} ({{step}})',
       skipped: 'skipped',
       done: 'done',
       active: 'running',
@@ -236,7 +237,6 @@ export const en = {
       keep: 'Do not skip',
       doneSkip: 'Step skipped',
       doneUnskip: 'Step brought back',
-      switchLabel: 'Skip step {{step}}',
       confirmAllGroups: 'The step will be skipped for all groups of the run.',
     },
     system: {
