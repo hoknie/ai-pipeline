@@ -734,9 +734,57 @@ describe('form layout', () => {
     render(<Page api={fakeApi()} start="coder" />);
     const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
     expect(header.className).toContain('sticky');
+    expect(header.className).toContain('-top-4');
+    expect(header.className).toContain('-mt-4');
     expect(within(header).getByRole('button', { name: 'Save' })).toBeTruthy();
     expect(within(header).getByText('project')).toBeTruthy();
     expect(within(header).getByRole('heading', { name: 'coder' })).toBeTruthy();
+  });
+
+  it('puts the level toggle on its own row above the buttons', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        specialists: [
+          specialistEntry('qa', {
+            level: 'project_over_global',
+            raw: { name: 'Проект' },
+            sources: {
+              project: { file: '/repo/aip/specialists/qa.yaml', revision: 'p', raw: { name: 'П' } },
+              global: { file: '/xdg/aip/specialists/qa.yaml', revision: 'g', raw: { name: 'О' } },
+            },
+          }),
+        ],
+      }),
+    );
+    render(<Page api={fakeApi({ config })} start="qa" />);
+    const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
+    const radio = within(header).getByRole('radio', { name: 'Project' });
+    const heading = within(header).getByRole('heading', { name: 'qa' });
+    const save = within(header).getByRole('button', { name: 'Save' });
+    expect(heading.parentElement?.contains(radio)).toBe(false);
+    expect(save.parentElement?.contains(radio)).toBe(false);
+    expect(radio.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows the file path as a code chip with the full path in the title', async () => {
+    render(<Page api={fakeApi()} start="coder" />);
+    const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
+    const chip = header.querySelector('code');
+    expect(chip).toBeTruthy();
+    expect(chip?.textContent).toBe('/repo/aip/specialists/coder.yaml');
+    expect(chip?.getAttribute('title')).toBe('/repo/aip/specialists/coder.yaml');
+    expect(chip?.className).toContain('bg-muted');
+  });
+
+  it('renders no level toggle for a specialist with a single level', async () => {
+    render(<Page api={fakeApi()} start="coder" />);
+    const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
+    expect(within(header).queryByRole('radio')).toBeNull();
+    expect(within(header).queryByRole('radiogroup')).toBeNull();
+    const heading = within(header).getByRole('heading', { name: 'coder' });
+    const save = within(header).getByRole('button', { name: 'Save' });
+    expect(heading.parentElement?.contains(save)).toBe(false);
+    expect(save.parentElement?.previousElementSibling).toBe(heading.parentElement);
   });
 });
 

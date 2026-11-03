@@ -460,7 +460,8 @@ export function SpecialistForm({
         role="toolbar"
         aria-label={t('specialists.header')}
         data-sticky
-        className="sticky top-0 z-10 flex flex-col gap-2 border-b bg-background py-2"
+        // -top-4/-mt-4/-mx-4 cancel the p-4 of <main> in SplitPage, so no strip of scrolled content shows above the header
+        className="sticky -top-4 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background px-4 py-2"
       >
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold">
@@ -470,12 +471,15 @@ export function SpecialistForm({
             {t(`settings.editor.levels.${specialist ? specialist.level : level}`)}
           </Badge>
           {specialist ? (
-            <span className="min-w-0 truncate text-sm text-muted-foreground">
-              <code>{source?.file ?? specialist.file}</code>
-            </span>
+            <code
+              title={source?.file ?? specialist.file}
+              className="block min-w-0 truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground"
+            >
+              {source?.file ?? specialist.file}
+            </code>
           ) : null}
-          {levelToggle}
         </div>
+        {levelToggle ? <div className="flex">{levelToggle}</div> : null}
         <div className="flex flex-wrap gap-2">
           <Button disabled={busy || (!specialist && !slug)} onClick={() => void save()}>
             {t('settings.editor.save')}
