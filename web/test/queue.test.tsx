@@ -1701,27 +1701,40 @@ describe('queue settings block', () => {
     );
   });
 
-  it('shows the value from the project file as unavailable with a hint', async () => {
-    show(queueOf({ autoDeliver: false }), {
-      config: vi.fn(async () =>
-        configView({
-          settings: settingsOf({
-            'delivery.auto': {
-              path: 'delivery.auto',
-              value: false,
-              file: '/repo/aip/settings.yaml',
-            },
-          }),
-        }),
-      ),
+  const projectSetting = (path: string, value: boolean | string) =>
+    configView({
+      settingsFiles: {
+        global: { file: '/xdg/aip/settings.yaml', revision: 'g1' },
+        project: { file: '/repo/aip/settings.yaml', revision: 'p1' },
+      },
+      settings: settingsOf({ [path]: { path, value, file: '/repo/aip/settings.yaml' } }),
+    });
+
+  it('writes the value set in the project file back to the project file', async () => {
+    const api = show(queueOf({ autoDeliver: true }), {
+      config: vi.fn(async () => projectSetting('delivery.auto', true)),
     });
     const block = await settingsBlock();
-    const toggle = block.getByRole<HTMLButtonElement>('switch', {
-      name: 'Auto delivery by default',
+    const toggle = await waitFor(() => {
+      const found = block.getByRole<HTMLButtonElement>('switch', {
+        name: 'Auto delivery by default',
+      });
+      expect(found.disabled).toBe(false);
+      return found;
     });
-    await waitFor(() => expect(toggle.disabled).toBe(true));
-    expect(toggle.getAttribute('aria-checked')).toBe('false');
-    expect(block.getByText('The project file sets this value')).toBeTruthy();
+    expect(block.getByText('Saved to the project file: /repo/aip/settings.yaml')).toBeTruthy();
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'p1', 'project'),
+    );
+  });
+
+  it('shows the shared file for a value that is not in the project file', async () => {
+    show(queueOf({ autoDeliver: true }));
+    const block = await settingsBlock();
+    await waitFor(() =>
+      expect(block.getAllByText('Saved to the shared file: /xdg/aip/settings.yaml').length).toBe(2),
+    );
   });
 
   it('disables auto delivery while the configuration is invalid', async () => {
@@ -1802,14 +1815,30 @@ describe('delivery mode in the queue settings', () => {
     );
   });
 
-  it('is unavailable when the project file sets the mode or the configuration is invalid', async () => {
-    show(queueOf({ deliveryMode: 'branch' }), {
+  const settingsFiles = {
+    global: { file: '/xdg/aip/settings.yaml', revision: 'g1' },
+    project: { file: '/repo/aip/settings.yaml', revision: 'p1' },
+  };
+  const pick = async (name: string) => {
+    const block = await settingsBlock();
+    const select = await waitFor(() => {
+      const found = block.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
+      expect(found.disabled).toBe(false);
+      return found;
+    });
+    fireEvent.keyDown(select, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name }));
+  };
+
+  it('writes the mode set in the project file back to the project file', async () => {
+    const api = show(queueOf({ deliveryMode: 'worktree' }), {
       config: vi.fn(async () =>
         configView({
+          settingsFiles,
           settings: settingsOf({
             'delivery.mode': {
               path: 'delivery.mode',
-              value: 'branch',
+              value: 'worktree',
               file: '/repo/aip/settings.yaml',
             },
           }),
@@ -1817,15 +1846,91 @@ describe('delivery mode in the queue settings', () => {
       ),
     });
     const block = await settingsBlock();
-    const select = block.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
-    await waitFor(() => expect(select.disabled).toBe(true));
-    expect(block.getAllByText('The project file sets this value').length).toBeGreaterThan(0);
-    cleanup();
+    await pick('Commit');
+    await waitFor(() =>
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'commit', 'p1', 'project'),
+    );
+    expect(block.getByText('Saved to the project file: /repo/aip/settings.yaml')).toBeTruthy();
+  });
+
+  it('is unavailable while the configuration is invalid', async () => {
     show(queueOf({ deliveryMode: null }));
     const invalid = await settingsBlock();
     expect(
       invalid.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' }).disabled,
     ).toBe(true);
+    expect(invalid.getAllByText('The configuration is not valid').length).toBeGreaterThan(0);
+  });
+
+  it('shows an error when the configuration cannot be read', async () => {
+    show(queueOf({}), {
+      config: vi.fn(async () => {
+        throw new Error('config unreadable');
+      }),
+    });
+    const block = await settingsBlock();
+    expect((await block.findAllByText('config unreadable')).length).toBeGreaterThan(0);
+  });
+
+  it('toggling auto delivery then choosing a mode writes both without conflict', async () => {
+    let revision = 'g1';
+    const api = show(queueOf({ autoDeliver: true, deliveryMode: 'worktree' }), {
+      config: vi.fn(async () =>
+        configView({
+          settingsFiles: { ...settingsFiles, global: { ...settingsFiles.global, revision } },
+        }),
+      ),
+      writeSetting: vi.fn(async () => {
+        revision = 'g2';
+        return { ok: true as const, revision: 'g2' };
+      }),
+    });
+    const block = await settingsBlock();
+    const toggle = await waitFor(() => {
+      const found = block.getByRole<HTMLButtonElement>('switch', {
+        name: 'Auto delivery by default',
+      });
+      expect(found.disabled).toBe(false);
+      return found;
+    });
+    const reads = vi.mocked(api.config).mock.calls.length;
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
+    );
+    await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
+    await pick('Branch');
+    await waitFor(() =>
+      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'branch', 'g2', 'global'),
+    );
+  });
+
+  it('shows a write conflict and writes the next time with the re-read revision', async () => {
+    let revision = 'g1';
+    const writeSetting = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        revision = 'g3';
+        return { ok: false as const, reason: 'conflict' as const, message: 'changed' };
+      })
+      .mockImplementation(async () => ({ ok: true as const, revision: 'g4' }));
+    const api = show(queueOf({ deliveryMode: 'worktree' }), {
+      config: vi.fn(async () =>
+        configView({
+          settingsFiles: { ...settingsFiles, global: { ...settingsFiles.global, revision } },
+        }),
+      ),
+      writeSetting,
+    });
+    const block = await settingsBlock();
+    const reads = vi.mocked(api.config).mock.calls.length;
+    await pick('Commit');
+    await waitFor(() => expect(block.getByText('Not saved: changed')).toBeTruthy());
+    await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
+    await pick('Branch');
+    await waitFor(() =>
+      expect(writeSetting).toHaveBeenLastCalledWith('delivery.mode', 'branch', 'g3', 'global'),
+    );
   });
 });
 
@@ -1964,5 +2069,55 @@ describe('postponed items', () => {
     expect((api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).not.toHaveProperty(
       'postponed',
     );
+  });
+});
+
+describe('system stages and waiting in the cards of the queue', () => {
+  const card = (overrides = {}) =>
+    show(
+      queueOf({
+        status: 'running',
+        runs: [queueRun('run1', { title: 'Вход', ...overrides })],
+      }),
+    );
+
+  it('shows a group that waits for a specialist with the reason', async () => {
+    card({
+      waiting: [
+        {
+          group: 'signup',
+          step: 'code',
+          wait: { reason: 'specialist', specialist: 'coder', max: 1 },
+        },
+      ],
+    });
+    expect(await screen.findByText('signup')).toBeTruthy();
+    expect(screen.getByText('Waiting for coder: 1 of 1 busy')).toBeTruthy();
+  });
+
+  it('shows the commit message step as active and the system stages row', async () => {
+    card({
+      active: [{ group: '_message', step: 'message' }],
+      system: [
+        { kind: 'split', status: 'done' },
+        { kind: 'message', status: 'running' },
+      ],
+      delivery: 'pending',
+    });
+    const row = await screen.findByLabelText('System stages');
+    expect(within(row).getByText('Split into groups')).toBeTruthy();
+    expect(within(row).getByText('Commit message')).toBeTruthy();
+    expect(within(row).getByText('Delivery')).toBeTruthy();
+  });
+
+  it('shows a failed delivery of the run', async () => {
+    card({ delivery: 'apply_failed' });
+    const row = await screen.findByLabelText('System stages');
+    expect(within(row).getByText('Delivery failed')).toBeTruthy();
+  });
+
+  it('keeps the splitting text while there are no groups', async () => {
+    card({ groups: { done: 0, total: 0 }, system: [{ kind: 'split', status: 'running' }] });
+    expect(await screen.findByText('splitting the task')).toBeTruthy();
   });
 });

@@ -1,5 +1,6 @@
 import { cn } from '../lib/cn.ts';
-import { statusInfo } from '../status.ts';
+import { statusInfo, waitText } from '../status.ts';
+import type { GroupWait } from '../types.ts';
 import { Badge } from '../ui/badge.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +10,14 @@ export function StatusBadge({
   status,
   label,
   title,
+  wait,
 }: {
   status: string;
   label?: string;
   /** Full text shown on hover when the label is cut. */
   title?: string;
+  /** Why the group waits; shown on hover. */
+  wait?: GroupWait | null;
 }) {
   const { t } = useTranslation();
   const info = statusInfo(status, t);
@@ -29,7 +33,7 @@ export function StatusBadge({
           </span>
         </Badge>
       </TooltipTrigger>
-      <TooltipContent>{status}</TooltipContent>
+      <TooltipContent>{wait ? `${waitText(wait, t)} (${status})` : status}</TooltipContent>
     </Tooltip>
   );
 }

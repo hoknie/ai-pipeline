@@ -11,6 +11,7 @@ import {
   runStatusLabel,
   STATUS,
   statusInfo,
+  waitText,
 } from '../src/status.ts';
 
 import { cleanup, fireEvent, render, screen } from './render.tsx';
@@ -97,5 +98,23 @@ describe('status badge', () => {
     const text = screen.getByText(/a very long/);
     expect(text.className).toContain('truncate');
     expect(text.parentElement?.className).toContain('max-w-full');
+  });
+});
+
+describe('waiting', () => {
+  it('has its own status and explains the reason', () => {
+    expect(statusInfo('waiting', t)).toMatchObject({
+      label: 'Waiting for specialist',
+      tone: 'mute',
+    });
+    expect(waitText({ reason: 'specialist', specialist: 'coder', max: 1 }, t)).toBe(
+      'Waiting for coder: 1 of 1 busy',
+    );
+    expect(waitText({ reason: 'capacity', max: 3 }, t)).toBe(
+      'Waiting for a free place: swarm.max is 3',
+    );
+    expect(waitText({ reason: 'limit', runtime: 'claude', until: 0 }, t)).toMatch(
+      /^Waiting for the claude usage limit to reset, until \d\d:\d\d$/,
+    );
   });
 });

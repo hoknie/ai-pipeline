@@ -35,6 +35,10 @@ describe('theme', () => {
     expect(DELIVERY.applied.icon).toBe('✓');
   });
 
+  test('a group held back by the scheduler has its own muted status', () => {
+    expect(STATUS.waiting).toMatchObject({ icon: '◷', label: 'waiting', color: 'inactive' });
+  });
+
   test('the progress bar is ten cells by default', () => {
     expect(progressBar(3, 5)).toBe('▰▰▰▰▰▰▱▱▱▱');
     expect(progressBar(0, 5)).toBe('▱▱▱▱▱▱▱▱▱▱');

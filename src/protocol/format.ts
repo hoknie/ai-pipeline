@@ -1,4 +1,4 @@
-import { clockTime, type Usage } from '../core/index.ts';
+import { clockTime, type GroupWait, type Usage } from '../core/index.ts';
 
 import { plainStyle, statusBadge, visibleWidth, type Style } from './style.ts';
 
@@ -178,19 +178,17 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
     header.push('Mode: manual delivery (merged groups wait for `aip run apply`)');
   if (run.dirtyWarning)
     header.push(style.warning('Warning: uncommitted changes were not included in this run.'));
-  if (run.split) {
-    header.push(
-      `${style.muted('Split:')} ${statusBadge(run.split.status, style)}${run.split.reason ? ` (${style.danger(run.split.reason)})` : ''}`,
-    );
-    if (run.split.question) header.push(style.warning(`  question: ${run.split.question}`));
-  }
+  const system = systemLine(run, style);
+  if (system) header.push(system);
+  const asked = run.system.find((step) => step.question);
+  if (asked?.question) header.push(style.warning(`  question: ${asked.question}`));
   if (run.groups.length === 0) return header.join('\n');
   const rows = table(
     [
       ['GROUP', 'STATUS', 'STEP', 'ROUND', 'TIME', 'CHANGES', 'DELIVERY', 'NOTE'],
       ...run.groups.map((group) => [
         group.slug,
-        `${statusBadge(group.status, style)}${limitNote(group.limitUntil)}`,
+        `${statusBadge(group.status, style)}${group.wait ? '' : limitNote(group.limitUntil)}`,
         group.step ?? '—',
         group.round === null ? '—' : String(group.round),
         seconds(group.durationMs),
@@ -202,6 +200,7 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
             : group.reason
               ? style.danger(group.reason)
               : '',
+          waitNote(group.wait),
           group.warnings ? `${group.warnings} warning(s)` : '',
         ]
           .filter(Boolean)
@@ -211,6 +210,34 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
     style,
   );
   return `${header.join('\n')}\n\n${rows}`;
+}
+
+/** What a waiting group waits for, for the NOTE column. */
+export function waitNote(wait: GroupWait | null | undefined): string {
+  if (!wait) return '';
+  if (wait.reason === 'limit')
+    return `waiting for ${wait.runtime} usage limit, until ${clockTime(wait.until)}`;
+  if (wait.reason === 'specialist') return `waiting for ${wait.specialist}`;
+  return `waiting for a free place (swarm.max ${wait.max})`;
+}
+
+const SYSTEM_NAMES = { split: 'split', message: 'message', resolve: 'resolver' } as const;
+
+/** `System:` line: split, commit message, resolver and delivery in this order; null when none. */
+function systemLine(run: RunView, style: Style): string | null {
+  const parts = (run.system ?? []).map((step) => {
+    const detail = step.reason ? style.danger(step.reason) : waitNote(step.wait);
+    return `${SYSTEM_NAMES[step.kind]} ${statusBadge(step.status, style)}${detail ? ` (${detail})` : ''}`;
+  });
+  const stage = run.deliveryStage;
+  if (stage) {
+    const detail =
+      stage.status === 'apply_failed' && stage.reason
+        ? style.danger(stage.reason.split('\n')[0] ?? '')
+        : '';
+    parts.push(`delivery ${statusBadge(stage.status, style)}${detail ? ` (${detail})` : ''}`);
+  }
+  return parts.length === 0 ? null : `${style.muted('System:')} ${parts.join(' · ')}`;
 }
 
 /** ` (usage limit, until HH:MM)` for a group waiting for a usage limit to reset. */
@@ -345,6 +372,9 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
     );
     for (const active of run.active) {
       lines.push(`    ${active.group}${active.step ? `: ${active.step}` : ''}`);
+    }
+    for (const held of run.waiting ?? []) {
+      lines.push(`    ${held.group}${held.step ? `: ${held.step}` : ''} (${waitNote(held.wait)})`);
     }
     if (run.problem) {
       lines.push(

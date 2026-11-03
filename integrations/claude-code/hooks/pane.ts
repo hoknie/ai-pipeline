@@ -123,6 +123,7 @@ const RUN_STATE_ORDER: readonly AipGroupStatus[] = [
   'failed',
   'running',
   'merging',
+  'waiting',
   'queued',
 ];
 
@@ -143,6 +144,7 @@ const GROUP_RANK: Readonly<Record<AipGroupStatus, number>> = {
   running: 2,
   merging: 2,
   queued: 3,
+  waiting: 3,
   merged: 4,
   cancelled: 4,
 };
@@ -201,6 +203,24 @@ function costOf(run: AipRun): string | null {
   return run.usage && run.usage.costUsd !== null ? `$${run.usage.costUsd.toFixed(2)}` : null;
 }
 
+function compactTokens(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return String(value);
+}
+
+/** Cost when known and tokens as `in/out` when any; null without both. */
+export function usageLabel(usage: AipRun['usage']): string | null {
+  if (!usage) return null;
+  const parts = [
+    usage.costUsd !== null ? `$${usage.costUsd.toFixed(4)}` : null,
+    usage.inputTokens > 0 || usage.outputTokens > 0
+      ? `${compactTokens(usage.inputTokens)}/${compactTokens(usage.outputTokens)}`
+      : null,
+  ].filter((part) => part !== null);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function runRow(
   run: AipRun,
   isSelected: boolean,
@@ -244,7 +264,7 @@ export function runHeader(run: AipRun, options: PanelOptions): RunHeader {
         `delivered ${run.delivery.applied}/${run.delivery.merged}${
           run.delivery.failed > 0 ? ` · ${run.delivery.failed} failed` : ''
         }${run.delivery.inProgress ? ' · in progress' : ''}`,
-        run.usage && run.usage.costUsd !== null ? `$${run.usage.costUsd.toFixed(4)}` : null,
+        usageLabel(run.usage),
       ];
   return {
     id: run.id,

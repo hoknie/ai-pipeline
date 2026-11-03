@@ -9,7 +9,6 @@ import {
   type StepProgress,
   describeFailReason,
   deliveryCounts,
-  formatCounts,
   groupRef,
   groupUsage,
   isRunFinished,
@@ -37,6 +36,7 @@ import {
   type QueueStop,
   type ProblemReason,
   runProblems,
+  stepsOf,
   type GroupDelivery,
   type HumanQuestion,
   type RunPhase,
@@ -50,6 +50,8 @@ import {
   type SpecialistUse,
   type Topology,
   type WorkflowTopology,
+  GROUP_STATUSES,
+  type GroupWait,
 } from '../core/index.ts';
 import type { ConfigEditorView, EntryReference, FieldError } from '../config/index.ts';
 
@@ -120,10 +122,30 @@ export function runTitle(state: RunState): string {
   return line.length > 80 ? `${line.slice(0, 79)}…` : line;
 }
 
+export type { GroupWait } from '../core/index.ts';
+
+/** Status of a row: the stored one, `done` for a merged service step, or the derived `waiting`. */
+export type RowStatus = GroupStatus | 'done' | 'waiting';
+
+/** Why a queued group is not started yet, by run and group slug; null when it is not held back. */
+export type WaitLookup = (run: string, slug: string) => GroupWait | null;
+
+const NO_WAITS: WaitLookup = () => null;
+
+/** `waiting` for a queued group that the scheduler does not take; the stored status otherwise. */
+export function displayStatus<S extends GroupStatus | 'done'>(
+  status: S,
+  wait: GroupWait | null,
+): S | 'waiting' {
+  return status === 'queued' && wait !== null ? 'waiting' : status;
+}
+
 export interface GroupRow {
   slug: string;
   title: string;
-  status: GroupStatus;
+  status: Exclude<RowStatus, 'done'>;
+  /** Why the group is `waiting`; null for other statuses. */
+  wait: GroupWait | null;
   step: string | null;
   round: number | null;
   durationMs: number;
@@ -135,10 +157,13 @@ export interface GroupRow {
   diff: DiffTotals | null;
   /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
   limitUntil: number | null;
+  /** Tokens and cost of all attempts of the group so far, live ones included. */
+  usage: Usage | null;
 }
 
 export interface SplitRow {
-  status: GroupStatus | 'done';
+  status: RowStatus;
+  wait: GroupWait | null;
   question: string | null;
   questions: HumanQuestion[] | null;
   reason: string | null;
@@ -149,8 +174,15 @@ export type SystemStepKind = 'split' | 'message' | 'resolve';
 /** A service step of the run (split, commit message, delivery resolver). */
 export interface SystemStepRow extends Omit<GroupRow, 'status'> {
   kind: SystemStepKind;
-  status: GroupStatus | 'done';
+  status: RowStatus;
 }
+
+/** Delivery of the merged result as the last system stage of a run; derived, not a group. */
+export type DeliveryStage =
+  | { status: 'pending' }
+  | { status: 'delivering' }
+  | { status: 'applied' }
+  | { status: 'apply_failed'; reason: string | null; groups: string[] };
 
 export interface RunView {
   id: string;
@@ -184,6 +216,8 @@ export interface RunView {
   split: SplitRow | null;
   delivery: { applied: number; merged: number; failed: number; inProgress: boolean };
   resolver: ResolverRow | null;
+  /** Delivery as a system stage; null while nothing is merged and nothing is delivered. */
+  deliveryStage: DeliveryStage | null;
   /** Totals over the merged groups. */
   diff: DiffTotals | null;
   /** Steps of the workflow with the groups on them, for the topology view. */
@@ -196,7 +230,8 @@ export interface RunView {
 }
 
 export interface ResolverRow {
-  status: GroupStatus;
+  status: GroupStatus | 'waiting';
+  wait: GroupWait | null;
   round: number;
   rounds: number;
   conflicts: string[];
@@ -236,7 +271,9 @@ export interface GroupView {
   slug: string;
   title: string;
   task: string;
-  status: GroupStatus | 'done';
+  status: RowStatus;
+  /** Why the group is `waiting`; null for other statuses. */
+  wait: GroupWait | null;
   branch: string;
   worktree: string;
   question: string | null;
@@ -301,13 +338,19 @@ export function groupLimitUntil(group: Group): number | null {
   return group.status === 'queued' && last ? limitResetsAt(last) : null;
 }
 
-export function groupRow(group: Group, now: number, diffs: DiffLookup = NO_DIFFS): GroupRow {
+export function groupRow(
+  group: Group,
+  now: number,
+  diffs: DiffLookup = NO_DIFFS,
+  wait: GroupWait | null = null,
+): GroupRow {
   const legacy = legacyOutsideChanges(group);
   const last = group.attempts.at(-1);
   return {
     slug: group.slug,
     title: group.title,
-    status: group.status,
+    status: displayStatus(group.status, wait),
+    wait: group.status === 'queued' ? wait : null,
     step: last?.stepId ?? null,
     round: last?.round ?? null,
     durationMs: groupDuration(group, now),
@@ -322,6 +365,7 @@ export function groupRow(group: Group, now: number, diffs: DiffLookup = NO_DIFFS
     delivery: group.delivery.state,
     diff: totals(diffs(group.slug)),
     limitUntil: groupLimitUntil(group),
+    usage: groupUsage(group),
   };
 }
 
@@ -329,8 +373,50 @@ function serviceStatus(group: Group): GroupStatus | 'done' {
   return group.status === 'merged' ? 'done' : group.status;
 }
 
-export function systemRow(group: Group, kind: SystemStepKind, now: number): SystemStepRow {
-  return { ...groupRow(group, now), kind, status: serviceStatus(group) };
+export function systemRow(
+  group: Group,
+  kind: SystemStepKind,
+  now: number,
+  wait: GroupWait | null = null,
+): SystemStepRow {
+  return {
+    ...groupRow(group, now, NO_DIFFS, wait),
+    kind,
+    status: displayStatus(serviceStatus(group), wait),
+  };
+}
+
+/** Delivery as a system stage, by the merged groups and the delivery in progress. */
+export function deliveryStage(state: RunState): DeliveryStage | null {
+  const counts = deliveryCounts(state);
+  if (state.run.pendingDelivery !== null) return { status: 'delivering' };
+  if (counts.merged === 0) return null;
+  const failed = state.groups.filter(
+    (group) => group.status === 'merged' && group.delivery.state === 'apply_failed',
+  );
+  if (failed.length > 0) {
+    return {
+      status: 'apply_failed',
+      reason: failed[0]?.delivery.reason ?? null,
+      groups: failed.map((group) => group.slug),
+    };
+  }
+  return counts.applied === counts.merged ? { status: 'applied' } : { status: 'pending' };
+}
+
+/** Status counts with the groups held back by the scheduler moved from `queued` to `waiting`. */
+function countsLine(state: RunState, waiting: number): string {
+  const summary = summarize(state);
+  const counts: Record<string, number> = { ...summary.counts };
+  counts['queued'] = (counts['queued'] ?? 0) - waiting;
+  counts['waiting'] = waiting;
+  const order = GROUP_STATUSES.flatMap((status) =>
+    status === 'queued' ? ['queued', 'waiting'] : [status],
+  );
+  return order
+    .filter((status) => (counts[status] ?? 0) > 0)
+    .map((status) => `${status} ${counts[status]}`)
+    .join(' · ');
 }
 
 function runDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
@@ -351,8 +437,27 @@ export function runView(
   now: number,
   diffs: DiffLookup = NO_DIFFS,
   catalog: readonly Tag[] = [],
+  waits: WaitLookup = NO_WAITS,
 ): RunView {
   const summary = summarize(state);
+  const waitOf = (group: Group): GroupWait | null =>
+    group.status === 'queued' ? waits(state.run.id, group.slug) : null;
+  const waitingGroups = state.groups.filter((group) => waitOf(group) !== null).length;
+  const stages = {
+    split: state.split ? displayStatus(serviceStatus(state.split), waitOf(state.split)) : null,
+    resolve: state.resolve ? displayStatus(state.resolve.status, waitOf(state.resolve)) : null,
+  };
+  const waitingTopology = topology(state);
+  for (const step of waitingTopology.steps) {
+    for (const group of step.groups) {
+      const found = state.groups.find((candidate) => candidate.slug === group.slug);
+      if (found && waitOf(found) !== null && group.status === 'queued') group.status = 'waiting';
+    }
+  }
+  if (waitingTopology.split && stages.split === 'waiting') waitingTopology.split.status = 'waiting';
+  if (waitingTopology.delivery.resolverStatus && stages.resolve === 'waiting') {
+    waitingTopology.delivery.resolverStatus = 'waiting';
+  }
   return {
     id: state.run.id,
     title: runTitle(state),
@@ -372,12 +477,13 @@ export function runView(
     fromQueue: state.run.fromQueue,
     returnable: false,
     tags: tagViews(catalog, state.run.tags),
-    counts: formatCounts(summary),
+    counts: countsLine(state, waitingGroups),
     total: summary.total,
     usage: summary.usage,
     split: state.split
       ? {
-          status: serviceStatus(state.split),
+          status: stages.split ?? 'queued',
+          wait: waitOf(state.split),
           question: state.split.question,
           questions: state.split.questions,
           reason: state.split.reason,
@@ -386,21 +492,23 @@ export function runView(
     delivery: { ...deliveryCounts(state), inProgress: state.run.pendingDelivery !== null },
     resolver: state.resolve
       ? {
-          status: state.resolve.status,
+          status: stages.resolve ?? state.resolve.status,
+          wait: waitOf(state.resolve),
           round: state.run.pendingDelivery?.round ?? state.resolve.attempts.length,
           rounds: state.run.config.delivery.resolverRounds,
           conflicts: [...(state.run.pendingDelivery?.conflicts ?? [])],
           reason: state.resolve.reason,
         }
       : null,
+    deliveryStage: deliveryStage(state),
     diff: runDiff(state, diffs),
-    topology: topology(state),
+    topology: waitingTopology,
     specialists: specialistUse(state),
-    groups: state.groups.map((group) => groupRow(group, now, diffs)),
+    groups: state.groups.map((group) => groupRow(group, now, diffs, waitOf(group))),
     system: [
-      ...(state.split ? [systemRow(state.split, 'split', now)] : []),
-      ...(state.message ? [systemRow(state.message, 'message', now)] : []),
-      ...(state.resolve ? [systemRow(state.resolve, 'resolve', now)] : []),
+      ...(state.split ? [systemRow(state.split, 'split', now, waitOf(state.split))] : []),
+      ...(state.message ? [systemRow(state.message, 'message', now, waitOf(state.message))] : []),
+      ...(state.resolve ? [systemRow(state.resolve, 'resolve', now, waitOf(state.resolve))] : []),
     ],
   };
 }
@@ -460,7 +568,9 @@ export function groupView(
   log: { seq: number; lines: string[] } | null,
   now: number,
   diff: DiffStat | null = null,
+  waits: WaitLookup = NO_WAITS,
 ): GroupView {
+  const wait = group.status === 'queued' ? waits(state.run.id, group.slug) : null;
   const legacy = legacyOutsideChanges(group);
   const attempts = group.attempts.map((attempt) => {
     const view = attemptView(attempt, now, allowCommandsOf(state, attempt.specialist));
@@ -472,7 +582,8 @@ export function groupView(
     slug: group.slug,
     title: group.title,
     task: group.task,
-    status: isServiceGroup(group) ? serviceStatus(group) : group.status,
+    status: displayStatus(isServiceGroup(group) ? serviceStatus(group) : group.status, wait),
+    wait,
     branch: isSplitGroup(group) ? state.run.branch : groupRef(state.run, group.slug),
     worktree,
     question: group.question,
@@ -590,14 +701,22 @@ export interface QueueRunView {
   groups: { done: number; total: number };
   /** Steps passed by the groups out of all their steps, and the step of a single group. */
   steps: StepProgress;
-  /** Groups that run or merge now, with the step of their last attempt. */
+  /** Groups (service steps included) that run or merge now, with the step of their last attempt. */
   active: { group: string; step: string | null }[];
+  /** Service steps of the run in the order split, message, resolve. */
+  system: { kind: SystemStepKind; status: RowStatus }[];
+  /** Delivery as the last system stage; null while nothing is merged. */
+  delivery: DeliveryStage['status'] | null;
+  /** Groups the scheduler holds back, with the step they wait to run. */
+  waiting: { group: string; step: string | null; wait: GroupWait }[];
   /** The run is finished and waits for its automatic delivery. */
   delivering: boolean;
   /** Problem that keeps the user's attention, if any. */
   problem: { group: string | null; reason: ProblemReason } | null;
   /** The latest moment a group of the run waits for its usage limit to reset; null when none waits. */
   limitUntil: number | null;
+  /** Tokens and cost of the run so far, live attempts included; null before any usage. */
+  usage: Usage | null;
 }
 
 export interface QueueView {
@@ -625,7 +744,14 @@ export interface QueueView {
 }
 
 /** Card of a run of the queue; `stopping`: the problem shown is the one that stops a queue. */
-function queueRunView(state: RunState, catalog: readonly Tag[], stopping: boolean): QueueRunView {
+function queueRunView(
+  state: RunState,
+  catalog: readonly Tag[],
+  stopping: boolean,
+  waits: WaitLookup,
+): QueueRunView {
+  const waitOf = (group: Group): GroupWait | null =>
+    group.status === 'queued' ? waits(state.run.id, group.slug) : null;
   const problems = runProblems(state);
   const problem =
     (stopping ? problems.find((p) => p.reason !== 'needs_human') : undefined) ?? problems[0];
@@ -641,10 +767,27 @@ function queueRunView(state: RunState, catalog: readonly Tag[], stopping: boolea
       total: state.groups.length,
     },
     steps: stepProgress(state),
-    active: state.groups
+    system: [
+      ...(state.split ? [{ kind: 'split' as const, group: state.split }] : []),
+      ...(state.message ? [{ kind: 'message' as const, group: state.message }] : []),
+      ...(state.resolve ? [{ kind: 'resolve' as const, group: state.resolve }] : []),
+    ].map(({ kind, group }) => ({
+      kind,
+      status: displayStatus(serviceStatus(group), waitOf(group)),
+    })),
+    delivery: deliveryStage(state)?.status ?? null,
+    waiting: allGroups(state).flatMap((group) => {
+      const wait = waitOf(group);
+      if (wait === null) return [];
+      const index = group.pending?.stepIndex;
+      const step = index === undefined ? null : (stepsOf(state.run, group)[index]?.id ?? null);
+      return [{ group: group.slug, step, wait }];
+    }),
+    active: allGroups(state)
       .filter((group) => group.status === 'running' || group.status === 'merging')
       .map((group) => ({ group: group.slug, step: group.attempts.at(-1)?.stepId ?? null })),
     delivering: isRunFinished(state) && occupiesSlot(state),
+    usage: summarize(state).usage,
     problem: problem ? { group: problem.group, reason: problem.reason } : null,
     limitUntil: allGroups(state).reduce<number | null>((latest, group) => {
       const until = groupLimitUntil(group);
@@ -675,11 +818,12 @@ export function queueView(
   autoDeliver: boolean | null = null,
   catalog: readonly Tag[] = [],
   deliveryMode: DeliveryMode | null = null,
+  waits: WaitLookup = NO_WAITS,
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
       const state = lookup(id);
-      return state ? [queueRunView(state, catalog, stopping)] : [];
+      return state ? [queueRunView(state, catalog, stopping, waits)] : [];
     });
   const runs = cards(queue.runs, false);
   const skipped = cards(queue.skipped, true);

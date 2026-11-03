@@ -5,6 +5,7 @@ import {
   Circle,
   CircleDashed,
   GitMerge,
+  Hourglass,
   Loader2,
   MessageCircleQuestion,
   PackageCheck,
@@ -16,6 +17,8 @@ import {
 
 import type { TFunction } from 'i18next';
 
+import { clock } from './format.ts';
+import type { GroupWait } from './types.ts';
 import type { en } from './i18n/locales/en.ts';
 import type { Connection } from './store.ts';
 
@@ -42,6 +45,7 @@ export interface StatusInfo {
 /** Every status the panel shows: the key of its label in the dictionaries, tone and icon. */
 export const STATUS: Record<string, StatusEntry> = {
   queued: { labelKey: 'queued', tone: 'mute', icon: CircleDashed, spin: false },
+  waiting: { labelKey: 'waiting', tone: 'mute', icon: Hourglass, spin: false },
   running: { labelKey: 'running', tone: 'run', icon: Loader2, spin: true },
   merging: { labelKey: 'merging', tone: 'run', icon: GitMerge, spin: false },
   active: { labelKey: 'active', tone: 'run', icon: Loader2, spin: true },
@@ -70,6 +74,18 @@ export function statusInfo(code: string, t: TFunction): StatusInfo {
     icon: entry.icon,
     spin: entry.spin,
   };
+}
+
+/** Why a group waits, for people: the busy specialist, the full swarm or the usage limit. */
+export function waitText(wait: GroupWait, t: TFunction): string {
+  switch (wait.reason) {
+    case 'specialist':
+      return t('wait.specialist', { specialist: wait.specialist, max: wait.max });
+    case 'capacity':
+      return t('wait.capacity', { max: wait.max });
+    case 'limit':
+      return t('wait.limit', { runtime: wait.runtime, time: clock(wait.until) });
+  }
 }
 
 export function statusTone(code: string): Tone {

@@ -5,6 +5,7 @@ import {
   dispatch,
   formatCounts,
   groupSlugs,
+  planDispatch,
   RUN_ID_LENGTH,
   runId,
   runningBySpecialist,
@@ -343,5 +344,28 @@ describe('identifiers', () => {
     expect(earlier).toHaveLength(RUN_ID_LENGTH);
     expect(earlier < later).toBe(true);
     expect(earlier).toMatch(/^[0-9a-z]+$/);
+  });
+});
+
+describe('dispatch and the plan', () => {
+  it('starts exactly the groups of the plan and leaves the waiting ones queued', () => {
+    const first = run(3, {
+      id: 'run000000001',
+      configText: CONFIG_TEXT.replace(
+        'coder: { name: Кодировщик,',
+        'coder: { name: Кодировщик, max: 1,',
+      ),
+    });
+    step(first);
+    for (let index = 1; index <= 3; index++) finish(first, 'done', { slug: `gruppa-${index}` });
+    const plan = planDispatch([first], 5, 1500);
+    const effects = dispatch([first], 5, 1500);
+    expect(effects.map((effect) => (effect.kind === 'start_attempt' ? effect.group : ''))).toEqual(
+      plan.start.map((entry) => entry.group.slug),
+    );
+    for (const key of plan.waits.keys()) {
+      const slug = key.split('/')[1];
+      expect(first.groups.find((entry) => entry.slug === slug)?.status).toBe('queued');
+    }
   });
 });

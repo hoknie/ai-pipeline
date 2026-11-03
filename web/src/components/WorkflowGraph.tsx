@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { WorkflowTopology } from '../types.ts';
 
+import { usageText } from '../format.ts';
 import { cn } from '../lib/cn.ts';
 import type { MachineLoad } from '../specialistLoad.ts';
 import { useTheme } from '../theme.ts';
@@ -104,6 +105,9 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
       {data.attempts !== null ? (
         <div className="truncate text-muted-foreground">
           {t('topology.attempts', { n: data.attempts })}
+          {usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 })
+            ? ` · ${usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 })}`
+            : ''}
           {data.costUsd ? ` · $${data.costUsd.toFixed(2)}` : ''}
         </div>
       ) : null}

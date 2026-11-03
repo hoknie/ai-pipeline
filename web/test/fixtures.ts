@@ -78,6 +78,8 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     delivery: 'pending',
     diff: null,
     limitUntil: null,
+    usage: null,
+    wait: null,
     ...overrides,
   };
 }
@@ -116,6 +118,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     split: null,
     delivery: { applied: 0, merged: 0, failed: 0, inProgress: false },
     resolver: null,
+    deliveryStage: null,
     diff: null,
     topology: topologyOf(),
     specialists: [],
@@ -132,6 +135,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
     title: 'Вход',
     task: 'сделать **вход**',
     status: 'running',
+    wait: null,
     branch: 'refs/aip/run1/groups/login',
     worktree: '/w',
     question: null,
@@ -206,9 +210,13 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     groups: { done: 0, total: 1 },
     steps: { done: 0, total: 4, current: { step: 'plan', number: 1 } },
     active: [],
+    system: [],
+    delivery: null,
+    waiting: [],
     delivering: false,
     problem: null,
     limitUntil: null,
+    usage: null,
     ...overrides,
   };
 }

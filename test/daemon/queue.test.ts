@@ -1435,3 +1435,71 @@ describe('postponed items', () => {
     expect(await ended).toBe('closed');
   });
 });
+
+describe('retried runs join the queue', () => {
+  it('shows a retried run of a stopped queue among the places and keeps waiting tasks', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, { delayMs: 1500 }] });
+    await add(h, 'A');
+    await add(h, 'B');
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitQueue(h, (queue) => queue.stop?.kind === 'problem');
+    const runId = (stopped.stop as { run: string }).run;
+    expect(stopped.runs).toEqual([]);
+    await h.call('retry', { runId, group: (await h.status(runId)).groups[0]!.slug });
+    const view = await queueOf(h);
+    expect(view.runs.map((card) => card.id)).toEqual([runId]);
+    expect(view).toMatchObject({ status: 'stopped', stop: { kind: 'problem', run: runId } });
+    expect(view.items).toHaveLength(1);
+    await h.waitFor(runId, (run) => run.state === 'finished');
+    await waitQueue(h, (queue) => queue.runs.length === 0);
+    expect(await allRuns(h)).toHaveLength(1);
+  });
+
+  it('keeps both retried runs among the places and does not take tasks meanwhile', async () => {
+    const h = await start();
+    h.script({
+      code: [{ noReport: true }, { noReport: true }, { delayMs: 1500 }, { delayMs: 1500 }],
+    });
+    await add(h, 'A');
+    await add(h, 'B');
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    await h.call('queue_start', { repository: h.repo });
+    const failed = await waitQueue(
+      h,
+      (queue) => queue.runs.length === 0 && queue.items.length === 0 && queue.stop !== undefined,
+    );
+    expect(failed.runs).toEqual([]);
+    expect(failed.skipped).toEqual([]);
+    const runs = await allRuns(h);
+    expect(runs).toHaveLength(2);
+    await h.call('queue_settings', { repository: h.repo, parallel: 1 });
+    await add(h, 'C');
+    for (const run of runs) {
+      await h.call('retry', { runId: run.id, group: (await h.status(run.id)).groups[0]!.slug });
+    }
+    const started = (await h.call('queue_start', { repository: h.repo })) as QueueView;
+    expect(started.status).toBe('running');
+    const view = await queueOf(h);
+    expect(view.status).toBe('running');
+    expect(view.runs.map((card) => card.id).sort()).toEqual(runs.map((run) => run.id).sort());
+    expect(view.items).toHaveLength(1);
+    expect(await allRuns(h)).toHaveLength(2);
+    for (const run of runs) await h.waitFor(run.id, (item) => item.state === 'finished');
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.runs.length === 0);
+    expect(await allRuns(h)).toHaveLength(3);
+  });
+
+  it('leaves the queue as it is when the retry is rejected', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }] });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitQueue(h, (queue) => queue.stop?.kind === 'problem');
+    const runId = (stopped.stop as { run: string }).run;
+    await expect(h.call('retry', { runId, group: 'no-such-group' })).rejects.toThrow();
+    const after = await queueOf(h);
+    expect(after.runs).toEqual([]);
+    expect(after.updatedAt).toBe(stopped.updatedAt);
+  });
+});

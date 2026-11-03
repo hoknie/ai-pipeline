@@ -10,6 +10,7 @@ import {
   type Group,
   type RunState,
 } from './model.ts';
+import { planDispatch } from './plan.ts';
 
 /** When the usage limit of an attempt that ran out of it resets; null for other attempts. */
 export function limitResetsAt(attempt: Attempt): number | null {
@@ -61,37 +62,10 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
 }
 
 export function dispatch(states: RunState[], max: number, now: number): Effect[] {
-  const effects: Effect[] = [];
-  let running = runningCount(states);
-  const bySpecialist = runningBySpecialist(states);
-  const holds = limitHolds(states, now);
-  const queue = states
-    .filter((state) => state.run.finishedAt === null)
-    .sort(
-      (left, right) =>
-        left.run.createdAt - right.run.createdAt || left.run.id.localeCompare(right.run.id),
-    )
-    .flatMap((state) =>
-      [...allGroups(state)]
-        .sort((left, right) => left.position - right.position)
-        .filter((group) => group.status === 'queued' && group.pending !== null)
-        .map((group) => ({ state, group })),
-    );
-  for (const { state, group } of queue) {
-    if (running >= max) break;
-    const slug = group.pending
-      ? stepsOf(state.run, group)[group.pending.stepIndex]?.specialist
-      : undefined;
-    const specialist = slug ? findSpecialist(state.run.config, slug) : undefined;
-    if (specialist && holds.has(specialist.runtime)) continue;
-    const limit = specialist?.max ?? null;
-    if (slug && limit !== null && (bySpecialist.get(slug) ?? 0) >= limit) continue;
+  return planDispatch(states, max, now).start.map(({ state, group }) => {
     const attempt = startAttempt(state, group, now);
-    bySpecialist.set(attempt.specialist, (bySpecialist.get(attempt.specialist) ?? 0) + 1);
-    effects.push({ kind: 'start_attempt', run: state.run.id, group: group.slug, seq: attempt.seq });
-    running += 1;
-  }
-  return effects;
+    return { kind: 'start_attempt', run: state.run.id, group: group.slug, seq: attempt.seq };
+  });
 }
 
 function startAttempt(state: RunState, group: Group, now: number): Attempt {

@@ -89,7 +89,7 @@ describe('statusBadge', () => {
   it('uses one-column badges from the approved set', () => {
     for (const { badge } of Object.values(STATUS_BADGES)) {
       expect([...badge]).toHaveLength(1);
-      expect('✓✗?▸◦⊘').toContain(badge);
+      expect('✓✗?▸◦◷⊘').toContain(badge);
     }
   });
 });

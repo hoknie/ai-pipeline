@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
-import { cost, diffText, duration, runTitle } from '../../format.ts';
+import { cost, diffText, duration, runTitle, usageText } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
 import { runStatusLabel } from '../../status.ts';
 import type { RunView, TagView } from '../../types.ts';
@@ -80,6 +80,7 @@ export function RunHeader({
       setTagging(false);
     }
   };
+  const stages = run.system.filter((step) => step.kind !== 'resolve');
   const retryable = (status: string) => status === 'failed' || status === 'cancelled';
   const failed: { slug: string; title: string; status: string }[] = run.groups.filter((group) =>
     retryable(group.status),
@@ -157,6 +158,7 @@ export function RunHeader({
         <RunWarningsBadge run={run} />
         <WorkflowBadge id={run.workflow} />
         <span>{duration((run.finishedAt ?? now) - run.createdAt)}</span>
+        {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
         {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
         {run.diff ? <span>{diffText(run.diff, t)}</span> : null}
         {delivery.merged > 0 ? (
@@ -193,16 +195,39 @@ export function RunHeader({
         </div>
       ) : null}
       {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
-      {run.split && run.split.status !== 'done' ? (
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <button
-            type="button"
-            className="underline-offset-2 hover:underline"
-            onClick={() => onSelect?.('_split')}
-          >
-            {t('runs.header.split')}
-          </button>
-          <StatusBadge status={run.split.status} />
+      {stages.length > 0 || run.deliveryStage ? (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"
+          aria-label={t('runs.system.stages')}
+        >
+          <span>{t('runs.system.stages')}:</span>
+          {stages.map((step) => (
+            <span key={step.kind} className="inline-flex items-center gap-1.5">
+              <button
+                type="button"
+                className="underline-offset-2 hover:underline"
+                onClick={() => onSelect?.(step.slug)}
+              >
+                {t(`runs.system.${step.kind}`)}
+              </button>
+              <StatusBadge status={step.status} wait={step.wait} />
+            </span>
+          ))}
+          {run.deliveryStage ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span>{t('runs.system.delivery')}</span>
+              <StatusBadge
+                status={
+                  run.deliveryStage.status === 'delivering' ? 'running' : run.deliveryStage.status
+                }
+                title={
+                  run.deliveryStage.status === 'apply_failed'
+                    ? (run.deliveryStage.reason ?? undefined)
+                    : undefined
+                }
+              />
+            </span>
+          ) : null}
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">

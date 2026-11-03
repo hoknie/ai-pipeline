@@ -473,3 +473,105 @@ describe('opencode run --format json output', () => {
     expect(parser.outcome().error).toBe('Prompt tokens limit exceeded: 19662 > 18740');
   });
 });
+
+describe('live usage', () => {
+  const assistant = (
+    id: string | undefined,
+    input: number,
+    output: number,
+    cacheRead = 0,
+    cacheCreation = 0,
+  ) =>
+    JSON.stringify({
+      type: 'assistant',
+      message: {
+        ...(id === undefined ? {} : { id }),
+        role: 'assistant',
+        content: [{ type: 'text', text: 'x' }],
+        usage: {
+          input_tokens: input,
+          cache_creation_input_tokens: cacheCreation,
+          cache_read_input_tokens: cacheRead,
+          output_tokens: output,
+        },
+      },
+    });
+  const result = JSON.stringify({
+    type: 'result',
+    is_error: false,
+    session_id: 's1',
+    total_cost_usd: 0.5,
+    usage: { input_tokens: 900, output_tokens: 90 },
+  });
+
+  it('has no usage before the first message', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    expect(parser.usage()).toBeNull();
+    parser.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 's1' }));
+    expect(parser.usage()).toBeNull();
+  });
+
+  it('sums the messages of the assistant without a cost', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    parser.push(assistant('m1', 100, 10, 50, 5));
+    expect(parser.usage()).toEqual({ inputTokens: 155, outputTokens: 10, costUsd: null });
+    parser.push(assistant('m2', 200, 20));
+    expect(parser.usage()).toEqual({ inputTokens: 355, outputTokens: 30, costUsd: null });
+  });
+
+  it('counts a message of several events once, by the last event', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    parser.push(assistant('m1', 100, 1));
+    parser.push(assistant('m1', 100, 5));
+    parser.push(assistant('m1', 100, 12));
+    expect(parser.usage()).toEqual({ inputTokens: 100, outputTokens: 12, costUsd: null });
+  });
+
+  it('adds messages without an id each time', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    parser.push(assistant(undefined, 10, 1));
+    parser.push(assistant(undefined, 10, 1));
+    expect(parser.usage()).toEqual({ inputTokens: 20, outputTokens: 2, costUsd: null });
+  });
+
+  it('lets the result override the sum and the cost, and later messages change nothing', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    parser.push(assistant('m1', 100, 10));
+    parser.push(result);
+    expect(parser.usage()).toEqual({ inputTokens: 900, outputTokens: 90, costUsd: 0.5 });
+    parser.push(assistant('m2', 5000, 500));
+    expect(parser.usage()).toEqual({ inputTokens: 900, outputTokens: 90, costUsd: 0.5 });
+    expect(parser.outcome().usage).toEqual(parser.usage());
+  });
+
+  it('keeps the sum as the usage of an outcome when the result never came', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    parser.push(assistant('m1', 100, 10));
+    parser.push(assistant('m2', 200, 20));
+    expect(parser.outcome().usage).toEqual({ inputTokens: 300, outputTokens: 30, costUsd: null });
+  });
+
+  it('ignores assistant events without usage', () => {
+    const parser = createClaudeRuntime('/bin/claude').createParser();
+    parser.push(
+      JSON.stringify({ type: 'assistant', message: { id: 'm1', content: [{ type: 'text' }] } }),
+    );
+    expect(parser.usage()).toBeNull();
+  });
+
+  it('gives the usage of opencode after every finished step', () => {
+    const parser = createOpencodeRuntime('/bin/opencode').createParser();
+    expect(parser.usage()).toBeNull();
+    const step = (input: number, output: number) =>
+      JSON.stringify({
+        type: 'step_finish',
+        sessionID: 'ses_1',
+        part: { type: 'step-finish', tokens: { input, output }, cost: 0.25 },
+      });
+    parser.push(step(10, 1));
+    expect(parser.usage()).toEqual({ inputTokens: 10, outputTokens: 1, costUsd: 0.25 });
+    parser.push(step(20, 2));
+    expect(parser.usage()).toEqual({ inputTokens: 30, outputTokens: 3, costUsd: 0.5 });
+    expect(parser.outcome().usage).toEqual(parser.usage());
+  });
+});

@@ -42,6 +42,8 @@ import {
   moveItem,
   pauseQueue,
   acknowledgeRun,
+  adoptRun,
+  problemKeys,
   retryableGroups,
   returnRun,
   queueWakeAt,
@@ -72,6 +74,9 @@ import {
   type QueueItem,
   type RunState,
   type Tag,
+  type GroupWait,
+  planDispatch,
+  waitKey,
 } from '../core/index.ts';
 import {
   diffStat,
@@ -162,6 +167,10 @@ export class Daemon {
   private readonly queues = new Map<string, Queue>();
   private readonly advanceRequested = new Set<string>();
   private readonly queueRuns = new Map<string, string>();
+  /** Queued groups the scheduler holds back, by `waitKey`; recomputed after each `schedule()`. */
+  private waits = new Map<string, GroupWait>();
+  /** Waits of each unfinished run as text, to tell subscribers when they change. */
+  private readonly waitSignature = new Map<string, string>();
   private readonly registry = new Map<string, KnownRepository>();
   private repositoriesJson = '';
   private catalog: Tag[] = [];
@@ -266,6 +275,7 @@ export class Daemon {
       delivery.auto,
       this.catalog,
       delivery.mode,
+      this.waitLookup,
     );
   }
 
@@ -647,6 +657,7 @@ export class Daemon {
       now,
       (slug) => this.diffs.get(`${state.run.id}/${slug}`) ?? null,
       this.catalog,
+      this.waitLookup,
     );
     return { ...view, returnable: this.returnable(state) };
   }
@@ -806,17 +817,55 @@ export class Daemon {
 
   async schedule(): Promise<void> {
     if (this.stopping) return;
-    const active = [...this.states.values()].filter((state) => state.run.finishedAt === null);
-    // Finished runs too: a usage limit of a failed run still holds its runtime.
-    const effects = dispatch([...this.states.values()], this.max, this.now());
-    this.armWake();
-    if (effects.length === 0) return;
-    for (const state of active) this.save(state);
-    for (const effect of effects) {
-      const state = this.states.get(effect.run);
-      if (state) await this.executor.perform(state, [effect]);
+    try {
+      const active = [...this.states.values()].filter((state) => state.run.finishedAt === null);
+      // Finished runs too: a usage limit of a failed run still holds its runtime.
+      const effects = dispatch([...this.states.values()], this.max, this.now());
+      this.armWake();
+      if (effects.length === 0) return;
+      for (const state of active) this.save(state);
+      for (const effect of effects) {
+        const state = this.states.get(effect.run);
+        if (state) await this.executor.perform(state, [effect]);
+      }
+    } finally {
+      this.refreshWaits();
     }
   }
+
+  /** Recomputes which queued groups wait, and tells subscribers about runs whose waits changed. */
+  private refreshWaits(): void {
+    const states = [...this.states.values()];
+    this.waits = planDispatch(states, this.max, this.now()).waits;
+    const repositories = new Set<string>();
+    for (const state of states) {
+      const id = state.run.id;
+      const prefix = `${id}/`;
+      const signature =
+        state.run.finishedAt === null
+          ? [...this.waits]
+              .filter(([key]) => key.startsWith(prefix))
+              .map(([key, wait]) => `${key}:${JSON.stringify(wait)}`)
+              .sort()
+              .join('|')
+          : '';
+      const known = this.waitSignature.get(id) ?? '';
+      if (signature === known) continue;
+      if (signature === '') this.waitSignature.delete(id);
+      else this.waitSignature.set(id, signature);
+      this.broadcast(state);
+      repositories.add(state.run.repository);
+    }
+    for (const repository of repositories) {
+      const queue = this.queues.get(repository);
+      if (queue && this.queueRuns.get(repository) !== queueSignature(this.queueSnapshot(queue))) {
+        this.publishQueue(queue);
+      }
+    }
+  }
+
+  private waitLookup = (run: string, slug: string): GroupWait | null =>
+    this.waits.get(waitKey(run, slug)) ?? null;
 
   handle(request: Request): Promise<unknown> {
     switch (request.method) {
@@ -906,11 +955,7 @@ export class Daemon {
           group: request.params.group ?? null,
         });
       case 'retry':
-        return this.event(request.params.runId, (state) => ({
-          kind: 'retry',
-          group: request.params.group,
-          permissions: this.currentPermissions(state),
-        }));
+        return this.retryGroup(request.params);
       case 'answer': {
         const { runId: id, group, answer } = request.params;
         return this.event(id, (state) => ({
@@ -973,6 +1018,25 @@ export class Daemon {
     return this.serial(async () => {
       const state = this.state(runIdentifier);
       await this.apply(state, typeof event === 'function' ? event(state) : event);
+      return this.view(state);
+    });
+  }
+
+  /** A direct retry works at once, and the revived run holds a place in the queue. */
+  private retryGroup(params: ParamsOf<'retry'>): Promise<unknown> {
+    return this.serial(async () => {
+      const state = this.state(params.runId);
+      const keys = problemKeys(state);
+      await this.apply(state, {
+        kind: 'retry',
+        group: params.group,
+        permissions: this.currentPermissions(state),
+      });
+      const queue = this.queueFor(state.run.repository);
+      if (adoptRun(queue, state, keys, this.now())) {
+        this.saveQueue(queue);
+        this.requestAdvance(state.run.repository);
+      }
       return this.view(state);
     });
   }
@@ -1409,6 +1473,7 @@ export class Daemon {
       log,
       this.now(),
       this.diffs.get(`${state.run.id}/${group.slug}`) ?? null,
+      this.waitLookup,
     );
   }
 }

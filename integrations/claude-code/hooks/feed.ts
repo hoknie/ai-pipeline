@@ -18,6 +18,7 @@ const SUMMARY_ORDER: readonly AipGroupStatus[] = ['running', 'needs_human', 'fai
 
 const UNFINISHED: readonly AipGroupStatus[] = [
   'queued',
+  'waiting',
   'running',
   'needs_human',
   'merging',
@@ -523,6 +524,7 @@ const RUN_STATUS_ORDER: readonly AipGroupStatus[] = [
   'failed',
   'running',
   'merging',
+  'waiting',
   'queued',
 ];
 

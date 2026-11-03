@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -7,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -34,6 +35,38 @@ function dedent(block: string): string {
 function yamlBlocks(file: string): string[] {
   const text = readFileSync(join(root, file), 'utf8');
   return [...text.matchAll(/```yaml\n([\s\S]*?)```/g)].map((match) => dedent(match[1] ?? ''));
+}
+
+/** Lines of a file with their numbers, without fenced code blocks. */
+function proseLines(file: string): { line: number; text: string }[] {
+  const result: { line: number; text: string }[] = [];
+  let fenced = false;
+  readFileSync(join(root, file), 'utf8')
+    .split('\n')
+    .forEach((text, index) => {
+      if (/^\s*```/.test(text)) {
+        fenced = !fenced;
+        return;
+      }
+      if (!fenced) result.push({ line: index + 1, text });
+    });
+  return result;
+}
+
+const docsPages = readdirSync(join(root, 'docs'))
+  .filter((name) => name.endsWith('.md'))
+  .sort()
+  .map((name) => `docs/${name}`);
+const userPages = ['README.md', ...docsPages];
+
+/** The anchor GitHub gives to a heading. */
+function anchor(heading: string): string {
+  return heading
+    .trim()
+    .toLowerCase()
+    .replace(/`/g, '')
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .replace(/\s/g, '-');
 }
 
 describe('documentation examples', () => {
@@ -129,7 +162,9 @@ describe('documentation examples', () => {
   });
 
   it('documents the tag commands and the flags', () => {
-    const readme = readFileSync(join(root, 'docs/cli.md'), 'utf8');
+    const readme =
+      readFileSync(join(root, 'docs/queue.md'), 'utf8') +
+      readFileSync(join(root, 'docs/hosts.md'), 'utf8');
     for (const text of [
       'aip tag add',
       'aip tag list',
@@ -189,32 +224,117 @@ describe('documentation examples', () => {
   });
 
   it('document the queue settings', () => {
-    const cli = readFileSync(join(root, 'docs/cli.md'), 'utf8');
+    const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
     for (const text of [
       'aip queue settings',
-      '--autopilot on|off',
-      '--skip-failed on|off',
+      '--autopilot on\\|off',
+      '--skip-failed on\\|off',
       'Skipped with a problem:',
     ]) {
-      expect(cli).toContain(text);
+      expect(queue).toContain(text);
     }
     const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
     expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_settings`'))).toContain(
       'skip_failed?',
     );
-    expect(hosts).toContain('"Queue settings"');
-    expect(hosts).toContain('"Skipped with a problem"');
+    const web = readFileSync(join(root, 'docs/web.md'), 'utf8');
+    expect(web).toContain('"Queue settings"');
+    expect(web).toContain('"Skipped with a problem"');
   });
 
   it('document the dependencies of queue tasks', () => {
-    const cli = readFileSync(join(root, 'docs/cli.md'), 'utf8');
-    expect(cli).toContain('--after <id>');
-    expect(cli).toContain('--no-after');
+    const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
+    expect(queue).toContain('--after <id>');
+    expect(queue).toContain('--no-after');
+    const web = readFileSync(join(root, 'docs/web.md'), 'utf8');
+    expect(web).toContain('"Waits for"');
+    expect(web).toContain('Dependencies are not met');
     const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
-    expect(hosts).toContain('"Waits for"');
-    expect(hosts).toContain('Dependencies are not met');
     expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_add`'))).toContain(
       'after?',
     );
+  });
+});
+
+describe('documentation structure', () => {
+  it('proseLines skips fenced code blocks', () => {
+    const lines = proseLines('docs/queue.md').map((entry) => entry.text);
+    expect(lines).toContain('## Tags');
+    expect(lines).not.toContain('aip tag list                             # the catalog (--json)');
+    expect(lines.some((line) => line.startsWith('```'))).toBe(false);
+  });
+
+  it('links and anchors resolve', () => {
+    const problems: string[] = [];
+    for (const file of userPages) {
+      for (const { line, text } of proseLines(file)) {
+        for (const match of text.matchAll(/\]\(([^)\s]+)\)/g)) {
+          const target = match[1]!;
+          if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
+          const [path = '', hash] = target.split('#');
+          const targetFile = path === '' ? file : join(dirname(file), path);
+          if (!existsSync(join(root, targetFile))) {
+            problems.push(`${file}:${line}: ${target} (no such file)`);
+            continue;
+          }
+          if (hash === undefined || !targetFile.endsWith('.md')) continue;
+          const anchors = proseLines(targetFile)
+            .filter((entry) => /^#{1,6} /.test(entry.text))
+            .map((entry) => anchor(entry.text.replace(/^#+ /, '')));
+          if (!anchors.includes(hash))
+            problems.push(`${file}:${line}: ${target} (no such heading)`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('every docs page is listed in README', () => {
+    const readme = readFileSync(join(root, 'README.md'), 'utf8');
+    const learnMore = readme.slice(readme.indexOf('## Learn more'));
+    for (const page of docsPages) expect(learnMore).toContain(`(${page})`);
+  });
+
+  it('every docs page is named in the help footer', () => {
+    const help = readFileSync(join(root, 'src/cli/help.ts'), 'utf8');
+    for (const page of docsPages) expect(help).toContain(page);
+  });
+
+  it('prose lines are short', () => {
+    const problems: string[] = [];
+    for (const file of userPages) {
+      for (const { line, text } of proseLines(file)) {
+        if (text.length > 400) problems.push(`${file}:${line}: ${text.length} characters`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('has no comparative phrases', () => {
+    const phrases = [
+      'the old way',
+      'unlike',
+      'as before',
+      'the same as',
+      'the same way',
+      'the same path',
+      'the former',
+      'as with',
+      ' like `',
+      'does the same',
+      'work the same',
+      'by the same',
+      'the same graph',
+    ];
+    const problems: string[] = [];
+    for (const file of userPages) {
+      for (const { line, text } of proseLines(file)) {
+        const lower = text.toLowerCase();
+        for (const phrase of phrases) {
+          if (lower.includes(phrase)) problems.push(`${file}:${line}: "${phrase}"`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
   });
 });

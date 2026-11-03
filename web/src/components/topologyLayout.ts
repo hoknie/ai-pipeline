@@ -17,6 +17,8 @@ export interface Live {
   steps: Map<string, LiveGroup[]>;
   attempts: Map<string, number>;
   cost: Map<string, number>;
+  inputTokens: Map<string, number>;
+  outputTokens: Map<string, number>;
   merging: LiveGroup[];
   merged: LiveGroup[];
   splitting: LiveGroup[];
@@ -37,6 +39,8 @@ export function liveState(
     steps: new Map(),
     attempts: new Map(),
     cost: new Map(),
+    inputTokens: new Map(),
+    outputTokens: new Map(),
     merging: [],
     merged: [],
     splitting: [],
@@ -71,6 +75,14 @@ export function liveState(
         live.steps.set(step.id, target);
         live.attempts.set(step.id, (live.attempts.get(step.id) ?? 0) + step.attempts);
         live.cost.set(step.id, (live.cost.get(step.id) ?? 0) + (step.usage?.costUsd ?? 0));
+        live.inputTokens.set(
+          step.id,
+          (live.inputTokens.get(step.id) ?? 0) + (step.usage?.inputTokens ?? 0),
+        );
+        live.outputTokens.set(
+          step.id,
+          (live.outputTokens.get(step.id) ?? 0) + (step.usage?.outputTokens ?? 0),
+        );
       }
     }
     live.merging.push(...(run.topology?.merging ?? []).map(place));
@@ -98,6 +110,8 @@ export interface StageData extends Record<string, unknown> {
   groups: LiveGroup[];
   attempts: number | null;
   costUsd: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
   active: boolean;
   /** Step id, for steps. */
   step: string | null;
@@ -225,7 +239,15 @@ export function layout(
     }
     x += GAP;
   };
-  const empty = { attempts: null, costUsd: null, step: null, specialist: null, busy: null };
+  const empty = {
+    attempts: null,
+    costUsd: null,
+    inputTokens: null,
+    outputTokens: null,
+    step: null,
+    specialist: null,
+    busy: null,
+  };
   if (workflow.split) {
     place('split', {
       kind: 'split',
@@ -254,6 +276,8 @@ export function layout(
       groups,
       attempts: live.attempts.get(step.id) ?? 0,
       costUsd: live.cost.get(step.id) ?? 0,
+      inputTokens: live.inputTokens.get(step.id) ?? 0,
+      outputTokens: live.outputTokens.get(step.id) ?? 0,
       active: active(groups),
       step: step.id,
       specialist: step.specialist,

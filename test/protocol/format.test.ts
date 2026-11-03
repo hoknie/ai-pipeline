@@ -13,8 +13,15 @@ import {
   groupView,
   queueView,
   runView,
+  waitNote,
 } from '../../src/protocol/index.ts';
-import { addItem, emptyQueue, itemStarted, transition } from '../../src/core/index.ts';
+import {
+  addItem,
+  emptyQueue,
+  itemStarted,
+  transition,
+  type GroupWait,
+} from '../../src/core/index.ts';
 import { CONFIG_TEXT, finish, group, run, step } from '../core/helpers.ts';
 
 describe('text for people', () => {
@@ -649,5 +656,105 @@ describe('usage limit in the text output', () => {
       2000,
     );
     expect(formatRun(runView(state, 3000), 3000)).toContain('queued (usage limit, until 20:50)');
+  });
+});
+
+describe('live usage in text', () => {
+  it('shows the usage of a running attempt in the status of a run and of a group', () => {
+    const state = run(1);
+    step(state, 1000);
+    transition(
+      state,
+      {
+        kind: 'attempt_usage',
+        updates: [
+          {
+            group: 'gruppa-1',
+            seq: 1,
+            usage: { inputTokens: 1200, outputTokens: 300, costUsd: null },
+          },
+        ],
+      },
+      2000,
+    );
+    expect(formatRun(runView(state, 3000), 3000)).toContain('usage 1200 in / 300 out');
+    const text = formatGroup(groupView(state, state.groups[0]!, '/w', null, 3000));
+    expect(text).toContain('Usage: 1200 in / 300 out');
+    expect(text).toContain('running');
+  });
+});
+
+describe('system stages and waiting in text', () => {
+  const specialistWait: GroupWait = { reason: 'specialist', specialist: 'coder', max: 1 };
+
+  it('prints a System line instead of Split with the delivery stage last', () => {
+    const state = run(1, { split: true, configText: CONFIG_TEXT });
+    const base = group(state);
+    state.split = { ...base, slug: '_split', status: 'merged', attempts: [] };
+    state.message = { ...base, slug: '_message', status: 'running', attempts: [] };
+    base.status = 'merged';
+    const text = formatRun(runView(state, 3000), 3000);
+    expect(text).toContain('System: split done · message running · delivery pending');
+    expect(text).not.toContain('Split:');
+  });
+
+  it('prints the reason of a failed delivery', () => {
+    const state = run(1);
+    const first = group(state);
+    first.status = 'merged';
+    first.delivery = {
+      ...first.delivery,
+      state: 'apply_failed',
+      reason: 'does not exist in index',
+    };
+    expect(formatRun(runView(state, 3000), 3000)).toContain(
+      'System: delivery apply_failed (does not exist in index)',
+    );
+  });
+
+  it('has no System line without system stages', () => {
+    expect(formatRun(runView(run(1), 3000), 3000)).not.toContain('System:');
+  });
+
+  it('shows a waiting group in the table with the reason', () => {
+    const state = run(1);
+    const text = formatRun(
+      runView(
+        state,
+        3000,
+        () => null,
+        [],
+        () => specialistWait,
+      ),
+      3000,
+    );
+    expect(text).toContain('waiting for coder');
+    expect(text).toMatch(/gruppa-1\s+waiting/);
+    expect(text).toContain('waiting 1');
+  });
+
+  it('shows the swarm capacity and the usage limit in the note', () => {
+    expect(waitNote({ reason: 'capacity', max: 2 })).toBe('waiting for a free place (swarm.max 2)');
+    expect(waitNote({ reason: 'limit', runtime: 'claude', until: 0 })).toMatch(
+      /^waiting for claude usage limit, until \d\d:\d\d$/,
+    );
+    expect(waitNote(null)).toBe('');
+  });
+
+  it('lists the waiting groups on the line of the run of the queue', () => {
+    const state = run(1);
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    const text = formatQueue(
+      queueView(
+        queue,
+        () => state,
+        null,
+        [],
+        null,
+        () => specialistWait,
+      ),
+    );
+    expect(text).toContain('gruppa-1: plan (waiting for coder)');
   });
 });

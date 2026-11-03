@@ -44,6 +44,21 @@ const resultEvent = z.looseObject({
     .optional(),
 });
 
+const assistantUsage = z.looseObject({
+  type: z.literal('assistant'),
+  message: z.looseObject({
+    id: z.string().optional(),
+    usage: z
+      .looseObject({
+        input_tokens: z.number().optional(),
+        cache_creation_input_tokens: z.number().optional(),
+        cache_read_input_tokens: z.number().optional(),
+        output_tokens: z.number().optional(),
+      })
+      .optional(),
+  }),
+});
+
 const rateLimitInfo = z.looseObject({
   status: z.string().optional(),
   resetsAt: z.number().optional(),
@@ -269,10 +284,24 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
     transcript: claudeTranscript,
     createParser(): OutputParser {
       let sessionId: string | null = null;
-      let usage: Usage | null = null;
+      /** Final usage of the `result` event; overrides the sum of messages. */
+      let finalUsage: Usage | null = null;
+      /** Usage by assistant message id: a message arrives in several events, the last is full. */
+      const messages = new Map<string, Usage>();
+      const anonymous: Usage[] = [];
       let error: string | null = null;
       let usageLimit: { resetsAt: number | null } | null = null;
       const denials = new Denials();
+      const current = (): Usage | null => {
+        if (finalUsage !== null) return { ...finalUsage };
+        const all = [...messages.values(), ...anonymous];
+        if (all.length === 0) return null;
+        return {
+          inputTokens: all.reduce((sum, item) => sum + item.inputTokens, 0),
+          outputTokens: all.reduce((sum, item) => sum + item.outputTokens, 0),
+          costUsd: null,
+        };
+      };
       return {
         push(line: string) {
           let value: unknown;
@@ -284,6 +313,21 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
           const limit = exhaustedLimit(value);
           if (limit !== null)
             usageLimit = { resetsAt: limit.resetsAt ?? usageLimit?.resetsAt ?? null };
+          const assistant = assistantUsage.safeParse(value);
+          if (assistant.success && assistant.data.message.usage && finalUsage === null) {
+            const tokens = assistant.data.message.usage;
+            const entry: Usage = {
+              inputTokens:
+                (tokens.input_tokens ?? 0) +
+                (tokens.cache_creation_input_tokens ?? 0) +
+                (tokens.cache_read_input_tokens ?? 0),
+              outputTokens: tokens.output_tokens ?? 0,
+              costUsd: null,
+            };
+            const id = assistant.data.message.id;
+            if (id === undefined) anonymous.push(entry);
+            else messages.set(id, entry);
+          }
           const toolUse = toolUseMessage.safeParse(value);
           if (toolUse.success) {
             for (const block of toolUse.data.message.content) {
@@ -311,7 +355,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
             sessionId = event.session_id ?? sessionId;
             const tokens = event.usage;
             if (tokens || event.total_cost_usd !== undefined) {
-              usage = {
+              finalUsage = {
                 inputTokens:
                   (tokens?.input_tokens ?? 0) +
                   (tokens?.cache_creation_input_tokens ?? 0) +
@@ -327,8 +371,9 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
           const session = sessionEvent.safeParse(value);
           if (session.success) sessionId = session.data.session_id;
         },
+        usage: current,
         outcome() {
-          return { sessionId, usage, error, denials: denials.values(), usageLimit };
+          return { sessionId, usage: current(), error, denials: denials.values(), usageLimit };
         },
       };
     },

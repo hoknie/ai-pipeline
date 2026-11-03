@@ -19,6 +19,7 @@ import {
   type Group,
   type MergeOutcome,
   type RunState,
+  type Usage,
 } from '../core/index.ts';
 import {
   RUN_WORKTREE,
@@ -76,6 +77,14 @@ interface Baseline {
 }
 
 export const NAMING_TIMEOUT_MS = 60_000;
+/** The live usage of a run reaches its state at most once per interval. */
+export const USAGE_INTERVAL_MS = 1_000;
+
+interface UsageBuffer {
+  state: RunState;
+  pending: Map<string, { group: string; seq: number; usage: Usage }>;
+  timer: NodeJS.Timeout | null;
+}
 
 function deliveredPaths(result: DeliveryResult): string[] {
   return result.kind === 'applied' ? [...new Set([...result.files, ...result.conflicts])] : [];
@@ -94,6 +103,8 @@ export class Executor {
   private readonly naming = new Set<SupervisedProcess>();
   /** Working copy of the repository as it was when each running attempt started. */
   private readonly baselines = new Map<string, Baseline>();
+  /** Live usage of running attempts waiting for the next flush, by run. */
+  private readonly usageBuffers = new Map<string, UsageBuffer>();
 
   constructor(options: { daemon: Daemon; entry: string[]; graceMs: number | undefined }) {
     this.daemon = options.daemon;
@@ -127,7 +138,51 @@ export class Executor {
     return this.running.size > 0 || this.naming.size > 0;
   }
 
+  private reportUsage(state: RunState, key: AttemptKey, usage: Usage): void {
+    if (this.daemon.stopping) return;
+    let buffer = this.usageBuffers.get(key.run);
+    if (!buffer) {
+      buffer = { state, pending: new Map(), timer: null };
+      this.usageBuffers.set(key.run, buffer);
+    }
+    buffer.pending.set(keyOf(key), { group: key.group, seq: key.seq, usage });
+    // Leading edge: with no timer running the value goes at once; the timer holds back the rest.
+    if (buffer.timer === null) this.flushUsage(key.run);
+  }
+
+  private flushUsage(run: string): void {
+    const buffer = this.usageBuffers.get(run);
+    if (!buffer) return;
+    if (buffer.timer !== null) {
+      clearTimeout(buffer.timer);
+      buffer.timer = null;
+    }
+    if (buffer.pending.size === 0) {
+      this.usageBuffers.delete(run);
+      return;
+    }
+    const updates = [...buffer.pending.values()];
+    buffer.pending.clear();
+    buffer.timer = setTimeout(() => this.flushUsage(run), USAGE_INTERVAL_MS);
+    buffer.timer.unref();
+    void this.daemon
+      .serial(() => {
+        if (this.daemon.stopping) return Promise.resolve();
+        return this.daemon.apply(buffer.state, { kind: 'attempt_usage', updates });
+      })
+      .catch(() => undefined);
+  }
+
+  private dropUsage(key: AttemptKey): void {
+    const buffer = this.usageBuffers.get(key.run);
+    buffer?.pending.delete(keyOf(key));
+  }
+
   async stopAll(): Promise<void> {
+    for (const buffer of this.usageBuffers.values()) {
+      if (buffer.timer !== null) clearTimeout(buffer.timer);
+    }
+    this.usageBuffers.clear();
     const exits = [...this.running.values()].map((running) => {
       clearTimeout(running.timer);
       running.process.stop();
@@ -310,6 +365,7 @@ export class Executor {
       parser: runtime.createParser(),
       environment: this.daemon.environment,
       graceMs: this.graceMs,
+      onUsage: (usage) => this.reportUsage(state, key, usage),
     });
     const timer = setTimeout(() => {
       if (this.daemon.stopping) return;
@@ -320,6 +376,7 @@ export class Executor {
     this.running.set(keyOf(key), { process, timer });
     void process.exited.then((exit) => {
       clearTimeout(timer);
+      this.dropUsage(key);
       this.running.delete(keyOf(key));
       this.tokens.delete(token);
       if (this.daemon.stopping) return undefined;

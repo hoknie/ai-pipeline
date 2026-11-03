@@ -47,8 +47,14 @@ export const zh: Dictionary = {
     waiting: '等待回答：{{count}}',
     queued: '队列中：{{count}}',
   },
+  wait: {
+    specialist: '等待 {{specialist}}：{{max}}/{{max}} 已占用',
+    capacity: '等待空位：swarm.max 为 {{max}}',
+    limit: '等待 {{runtime}} 用量限制重置，直到 {{time}}',
+  },
   status: {
     queued: '排队中',
+    waiting: '等待专家',
     running: '进行中',
     merging: '合并中',
     active: '活动',
@@ -198,6 +204,12 @@ export const zh: Dictionary = {
       badge: '系统步骤',
       retryDelivery: '重试交付',
       deliveryStarted: '已开始交付',
+      stages: '系统阶段',
+      delivery: '交付',
+      deliveryFailed: '交付失败',
+      showAll: '显示全部',
+      showLess: '收起',
+      forceDeliver: '使用 --force 交付…',
     },
     group: {
       label: '分组 {{title}}',
@@ -298,7 +310,8 @@ export const zh: Dictionary = {
         '含失败、冲突或未交付分组的运行会释放名额，队列继续运行。取消和用量限额仍会停止队列。',
       autoDeliver: '自动交付',
       autoDeliverHint: '对没有自己自动交付设置的任务在其启动时生效。',
-      autoDeliverProject: '此值由项目文件设定',
+      savedToProject: '保存到项目文件：{{file}}',
+      savedToGlobal: '保存到共享文件：{{file}}',
       autoDeliverInvalid: '配置无效',
       deliveryMode: '交付方式',
       deliveryModeHint:

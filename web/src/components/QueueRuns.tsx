@@ -5,7 +5,8 @@ import type { TFunction } from 'i18next';
 import { useState, type ReactNode } from 'react';
 
 import type { Api } from '../api.ts';
-import { clock, duration } from '../format.ts';
+import { clock, duration, usageText } from '../format.ts';
+import { waitText } from '../status.ts';
 import { notifySuccess } from '../notify.ts';
 import { cn } from '../lib/cn.ts';
 import { formatRoute } from '../route.ts';
@@ -87,8 +88,25 @@ function RunCard({
           </span>
         ) : null}
       </div>
+      {run.system.length > 0 || run.delivery ? (
+        <div className="flex flex-wrap items-center gap-2" aria-label={t('runs.system.stages')}>
+          {run.system.map((step) => (
+            <span key={step.kind} className="inline-flex items-center gap-1 text-muted-foreground">
+              {t(`runs.system.${step.kind}`)}
+              <StatusBadge status={step.status} />
+            </span>
+          ))}
+          {run.delivery ? (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              {t('runs.system.delivery')}
+              <StatusBadge status={run.delivery === 'delivering' ? 'running' : run.delivery} />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
         <span>{t('format.running', { duration: duration(now - run.createdAt) })}</span>
+        {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
         {run.limitUntil !== null ? (
           <span className="text-status-warn">
             {t('runs.group.limitUntil', { time: clock(run.limitUntil) })}
@@ -119,8 +137,20 @@ function RunCard({
         <ul className="flex flex-col gap-0.5">
           {run.active.map((active) => (
             <li key={active.group}>
-              <code>{active.group}</code>
+              {groupLabel(active.group, t)}
               {active.step ? <> · {active.step}</> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {run.waiting.length > 0 ? (
+        <ul className="flex flex-col gap-0.5 text-muted-foreground">
+          {run.waiting.map((held) => (
+            <li key={held.group} className="flex flex-wrap items-center gap-1">
+              {groupLabel(held.group, t)}
+              {held.step ? <> · {held.step}</> : null}
+              <StatusBadge status="waiting" wait={held.wait} />
+              <span>{waitText(held.wait, t)}</span>
             </li>
           ))}
         </ul>
@@ -198,6 +228,13 @@ function SkippedRuns({
 }
 
 /** Runs of the queue that hold a place, as cards, with the free places of a running queue. */
+/** A group slug; the slug of a system step (`_split`, `_message`, `_resolve`) becomes its name. */
+function groupLabel(slug: string, t: TFunction) {
+  const kind = /^_(split|message|resolve)$/.exec(slug)?.[1] as
+    'split' | 'message' | 'resolve' | undefined;
+  return kind ? <span>{t(`runs.system.${kind}`)}</span> : <code>{slug}</code>;
+}
+
 export function QueueRuns({
   queue,
   now,

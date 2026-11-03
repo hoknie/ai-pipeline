@@ -4,9 +4,11 @@ import {
   DEFAULT_AUTOPILOT_ANSWER,
   addItem,
   advance,
+  dispatch,
   emptyQueue,
   startQueue,
   transition,
+  type GroupWait,
 } from '../../src/core/index.ts';
 import {
   formatRepositories,
@@ -361,5 +363,165 @@ describe('a group waiting for a usage limit', () => {
   it('shows no wait for a group failed on the limit', () => {
     const state = limited('stop');
     expect(runView(state, 3000).groups[0]).toMatchObject({ status: 'failed', limitUntil: null });
+  });
+});
+
+describe('live usage in views', () => {
+  const live = { inputTokens: 1200, outputTokens: 300, costUsd: null };
+
+  it('counts the usage of a running attempt in the queue card, the run and the group row', () => {
+    const state = run(1);
+    step(state);
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    expect(queueView(queue, () => state).runs[0]!.usage).toBeNull();
+    transition(
+      state,
+      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      2000,
+    );
+    expect(queueView(queue, () => state).runs[0]!.usage).toEqual(live);
+    const view = runView(state, 3000);
+    expect(view.usage).toEqual(live);
+    expect(view.groups[0]!.usage).toEqual(live);
+  });
+});
+
+describe('waiting groups in views', () => {
+  const specialistWait: GroupWait = { reason: 'specialist', specialist: 'coder', max: 1 };
+  const only =
+    (slug: string, wait: GroupWait) =>
+    (_run: string, candidate: string): GroupWait | null =>
+      candidate === slug ? wait : null;
+
+  it('shows a group waiting for a busy specialist as waiting, the run stays active', () => {
+    const state = run(2);
+    dispatch([state], 1, 1500);
+    const view = runView(state, 5000, () => null, [], only('gruppa-2', specialistWait));
+    expect(view.groups[1]).toMatchObject({ status: 'waiting', wait: specialistWait });
+    expect(view.groups[0]).toMatchObject({ status: 'running', wait: null });
+    expect(view.state).toBe('active');
+    expect(view.counts).toBe('waiting 1 · running 1');
+    expect(groupView(state, group(state, 'gruppa-1'), '/w', null, 5000).wait).toBeNull();
+  });
+
+  it('shows the full swarm as capacity', () => {
+    const state = run(2);
+    const wait: GroupWait = { reason: 'capacity', max: 1 };
+    const view = runView(
+      state,
+      5000,
+      () => null,
+      [],
+      () => wait,
+    );
+    expect(view.groups.map((row) => row.status)).toEqual(['waiting', 'waiting']);
+    expect(view.counts).toBe('waiting 2');
+    const single = groupView(state, group(state), '/w', null, 5000, null, () => wait);
+    expect(single).toMatchObject({ status: 'waiting', wait });
+  });
+
+  it('shows a waiting system step and puts it on the topology', () => {
+    const state = run(1, { split: true, configText: SPLIT_CONFIG });
+    const wait: GroupWait = { reason: 'capacity', max: 0 };
+    const view = runView(state, 5000, () => null, [], only('_split', wait));
+    expect(view.system[0]).toMatchObject({ kind: 'split', status: 'waiting', wait });
+    expect(view.split).toMatchObject({ status: 'waiting', wait });
+    expect(view.topology.split?.status).toBe('waiting');
+  });
+
+  it('puts the waiting group on the step of the topology', () => {
+    const state = run(1);
+    const view = runView(
+      state,
+      5000,
+      () => null,
+      [],
+      () => specialistWait,
+    );
+    expect(view.topology.steps.flatMap((entry) => entry.groups.map((g) => g.status))).toEqual([
+      'waiting',
+    ]);
+  });
+
+  it('is unchanged without waits', () => {
+    const state = run(2);
+    expect(runView(state, 5000).groups.map((row) => row.status)).toEqual(['queued', 'queued']);
+    expect(runView(state, 5000).counts).toBe('queued 2');
+  });
+
+  it('shows waiting and system steps on the card of a run of the queue', () => {
+    const state = run(1, { split: true, configText: SPLIT_CONFIG });
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    const card = queueView(
+      queue,
+      () => state,
+      null,
+      [],
+      null,
+      () => ({ reason: 'specialist', specialist: 'plan', max: 1 }),
+    ).runs[0]!;
+    expect(card.system).toEqual([{ kind: 'split', status: 'waiting' }]);
+    expect(card.waiting).toEqual([
+      {
+        group: '_split',
+        step: 'split',
+        wait: { reason: 'specialist', specialist: 'plan', max: 1 },
+      },
+    ]);
+  });
+});
+
+describe('the delivery stage', () => {
+  function merged(failedReason: string | null) {
+    const state = run(1);
+    const first = group(state);
+    first.status = 'merged';
+    if (failedReason !== null) {
+      first.delivery = { ...first.delivery, state: 'apply_failed', reason: failedReason };
+    }
+    return state;
+  }
+
+  it('is null while nothing is merged', () => {
+    expect(runView(run(1), 5000).deliveryStage).toBeNull();
+    expect(
+      queueView(
+        (() => {
+          const queue = emptyQueue('/repo', 1);
+          queue.runs.push('run000000001');
+          return queue;
+        })(),
+        () => run(1),
+      ).runs[0]!.delivery,
+    ).toBeNull();
+  });
+
+  it('is failed with the reason when a patch does not apply and no resolver ran', () => {
+    const state = merged('does not exist in index');
+    const view = runView(state, 5000);
+    expect(view.system).toEqual([]);
+    expect(view.deliveryStage).toEqual({
+      status: 'apply_failed',
+      reason: 'does not exist in index',
+      groups: ['gruppa-1'],
+    });
+  });
+
+  it('is pending for a merged group, applied once delivered and delivering meanwhile', () => {
+    const state = merged(null);
+    expect(runView(state, 5000).deliveryStage).toEqual({ status: 'pending' });
+    group(state).delivery = { ...group(state).delivery, state: 'applied' };
+    expect(runView(state, 5000).deliveryStage).toEqual({ status: 'applied' });
+    state.run.pendingDelivery = { round: 1, conflicts: [] } as never;
+    expect(runView(state, 5000).deliveryStage).toEqual({ status: 'delivering' });
+  });
+
+  it('shows the failed delivery on the card of the run of the queue', () => {
+    const state = merged('boom');
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    expect(queueView(queue, () => state).runs[0]!.delivery).toBe('apply_failed');
   });
 });

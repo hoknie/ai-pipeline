@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
-import { clock, diffText, duration, reasonLabel } from '../../format.ts';
+import { clock, cost, diffText, duration, reasonLabel, usageText } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
-import type { GroupRow, GroupView, SystemStepRow } from '../../types.ts';
+import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
@@ -21,9 +21,13 @@ import { StatusBadge } from '../StatusBadge.tsx';
 import { AttemptTimeline } from './AttemptTimeline.tsx';
 import { FileTree } from './FileTree.tsx';
 import { QuestionCard } from './QuestionCard.tsx';
+import { ApplyDialog } from './ApplyDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
 
 type Tab = 'log' | 'changes' | 'task';
+
+/** Lines of a delivery failure shown before «Show all». */
+const REASON_LINES = 6;
 
 /** What the screen of a group or a system step offers. */
 function capabilities(row: GroupRow | SystemStepRow, deliverable: boolean) {
@@ -54,6 +58,8 @@ export function GroupScreen({
   onShowJson,
   deliverable = false,
   onDeliver,
+  run,
+  onForceDeliver,
 }: {
   api: Api;
   runId: string;
@@ -74,13 +80,18 @@ export function GroupScreen({
   /** Whether delivery of the merged groups can be started now (for a failed delivery step). */
   deliverable?: boolean;
   onDeliver?: () => Promise<unknown>;
+  /** The run of the group, for the `--force` delivery dialog. */
+  run?: RunView;
+  onForceDeliver?: () => Promise<unknown>;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [view, setView] = useState<GroupView | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('log');
-  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}`;
+  const [forcing, setForcing] = useState(false);
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}`;
   const caps = capabilities(row, deliverable);
   const title = 'kind' in row ? t(`runs.system.${row.kind}`) : row.title;
 
@@ -126,6 +137,9 @@ export function GroupScreen({
       );
   };
   const hints = view?.permissionHints ?? [];
+  const deliveryFailed =
+    !('kind' in row) && row.status === 'merged' && row.delivery === 'apply_failed';
+  const reason = view?.delivery.reason ?? null;
 
   return (
     <section aria-label={t('runs.group.label', { title })} className="flex flex-col gap-3 p-4">
@@ -137,7 +151,7 @@ export function GroupScreen({
           {'kind' in row ? (
             <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
           ) : null}
-          <StatusBadge status={row.status} />
+          <StatusBadge status={row.status} wait={row.wait} />
           {caps.retryDelivery ? (
             <Button
               variant="outline"
@@ -185,6 +199,8 @@ export function GroupScreen({
           <span>{row.step ?? '—'}</span>
           {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
           <span>{duration(row.durationMs)}</span>
+          {usageText(row.usage) ? <span>{usageText(row.usage)}</span> : null}
+          {cost(row.usage) ? <span>{cost(row.usage)}</span> : null}
           {row.limitUntil !== null ? (
             <span className="text-status-warn">
               {t('runs.group.limitUntil', { time: clock(row.limitUntil) })}
@@ -196,6 +212,66 @@ export function GroupScreen({
           ) : null}
         </div>
       </header>
+      {deliveryFailed ? (
+        <Alert variant="destructive" className="flex flex-col gap-2">
+          <b>{t('runs.system.deliveryFailed')}</b>
+          {reason ? (
+            <>
+              <pre className="font-mono text-xs break-words whitespace-pre-wrap">
+                {reasonOpen ? reason : reason.split('\n').slice(0, REASON_LINES).join('\n')}
+              </pre>
+              {reason.split('\n').length > REASON_LINES ? (
+                <button
+                  type="button"
+                  className="self-start text-xs underline"
+                  onClick={() => setReasonOpen(!reasonOpen)}
+                >
+                  {reasonOpen ? t('runs.system.showLess') : t('runs.system.showAll')}
+                </button>
+              ) : null}
+            </>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              loading={busy}
+              disabled={!deliverable}
+              onClick={() =>
+                void act(
+                  () => (onDeliver ? onDeliver() : Promise.resolve()),
+                  () => notifySuccess(t('runs.system.deliveryStarted')),
+                )
+              }
+            >
+              <RotateCcw />
+              {t('runs.system.retryDelivery')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!deliverable || !run}
+              onClick={() => setForcing(true)}
+            >
+              {t('runs.system.forceDeliver')}
+            </Button>
+          </div>
+        </Alert>
+      ) : null}
+      {forcing && run ? (
+        <ApplyDialog
+          run={run}
+          api={api}
+          onConfirm={() => {
+            setForcing(false);
+            void act(
+              () => (onForceDeliver ? onForceDeliver() : api.apply(run.id, true)),
+              () => notifySuccess(t('runs.system.deliveryStarted')),
+            );
+          }}
+          onClose={() => setForcing(false)}
+        />
+      ) : null}
 
       {row.reason && row.status !== 'needs_human' ? (
         <Alert variant="destructive">{reasonLabel(row.reason, t)}</Alert>

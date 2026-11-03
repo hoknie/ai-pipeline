@@ -243,6 +243,8 @@ export function RunsPage({
           onShowJson={onShowJson}
           deliverable={canDeliver(run)}
           onDeliver={() => api.apply(run.id, false)}
+          run={run}
+          onForceDeliver={() => api.apply(run.id, true)}
         />
       ) : (
         <p className="p-4 text-sm text-muted-foreground">{t('runs.page.noGroups')}</p>

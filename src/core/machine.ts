@@ -70,6 +70,7 @@ export type Event =
   | { kind: 'report'; group: string; seq: number; report: Report }
   | { kind: 'split_proposed'; seq: number; groups: ProposedGroup[] }
   | { kind: 'attempt_exited'; group: string; seq: number; exit: AttemptExit }
+  | { kind: 'attempt_usage'; updates: { group: string; seq: number; usage: Usage }[] }
   | { kind: 'timed_out'; group: string; seq: number }
   | { kind: 'cancel'; group: string | null }
   | { kind: 'retry'; group: string; permissions?: PermissionsRefresh }
@@ -141,6 +142,13 @@ class Machine {
         return this.proposeSplit(event.seq, event.groups);
       case 'attempt_exited':
         return this.exited(event.group, event.seq, event.exit);
+      case 'attempt_usage':
+        for (const update of event.updates) {
+          const group = findGroup(this.state, update.group);
+          const attempt = group ? this.running(group, update.seq) : undefined;
+          if (attempt) attempt.usage = update.usage;
+        }
+        return;
       case 'timed_out':
         return this.timedOut(event.group, event.seq);
       case 'cancel':
@@ -219,10 +227,15 @@ class Machine {
   private exited(slug: string, seq: number, exit: AttemptExit): void {
     const group = this.group(slug);
     const attempt = this.running(group, seq);
-    if (!attempt) return;
+    if (!attempt) {
+      // Cancelled or timed out before the process ended: only the usage is still unknown.
+      const stopped = group.attempts.find((item) => item.seq === seq);
+      if (stopped && exit.usage !== null && stopped.finishedAt !== null) stopped.usage = exit.usage;
+      return;
+    }
     attempt.finishedAt = this.now;
     if (exit.sessionId !== null) attempt.sessionId = exit.sessionId;
-    attempt.usage = exit.usage;
+    attempt.usage = exit.usage ?? attempt.usage;
     attempt.denials = exit.denials ?? [];
     attempt.outsideChanges = [...exit.outsideChanges];
     // A report sent before the limit ran out counts as usual.

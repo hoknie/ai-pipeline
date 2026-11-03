@@ -59,6 +59,8 @@ This installs the `aip` command and connects it to Claude Code and OpenCode. Det
 
 - [docs/install.md](docs/install.md): installation, update, removal, common problems;
 - [docs/configuration.md](docs/configuration.md): every field of `aip/`;
-- [docs/cli.md](docs/cli.md): commands, the task queue, tags, the daemon;
-- [docs/hosts.md](docs/hosts.md): Claude Code, OpenCode, MCP tools, the web panel;
+- [docs/cli.md](docs/cli.md): commands and the daemon;
+- [docs/queue.md](docs/queue.md): task queue, autopilot, tags;
+- [docs/hosts.md](docs/hosts.md): Claude Code, OpenCode, MCP tools;
+- [docs/web.md](docs/web.md): the web panel;
 - [docs/development.md](docs/development.md): working on `aip` itself (`npm run check`).

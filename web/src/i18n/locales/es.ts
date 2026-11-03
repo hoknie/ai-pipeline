@@ -48,8 +48,14 @@ export const es: Dictionary = {
     waiting: 'esperan respuesta: {{count}}',
     queued: 'en la cola: {{count}}',
   },
+  wait: {
+    specialist: 'Espera a {{specialist}}: {{max}} de {{max}} ocupados',
+    capacity: 'Espera un lugar libre: swarm.max es {{max}}',
+    limit: 'Espera el reinicio del límite de {{runtime}}, hasta {{time}}',
+  },
   status: {
     queued: 'En cola',
+    waiting: 'Espera al especialista',
     running: 'En curso',
     merging: 'Fusionando',
     active: 'Activa',
@@ -202,6 +208,12 @@ export const es: Dictionary = {
       badge: 'paso del sistema',
       retryDelivery: 'Reintentar la entrega',
       deliveryStarted: 'Entrega iniciada',
+      stages: 'Etapas del sistema',
+      delivery: 'Entrega',
+      deliveryFailed: 'La entrega falló',
+      showAll: 'Mostrar todo',
+      showLess: 'Contraer',
+      forceDeliver: 'Entregar con --force…',
     },
     group: {
       label: 'grupo {{title}}',
@@ -308,7 +320,8 @@ export const es: Dictionary = {
         'Una ejecución con un grupo fallido, en conflicto o sin entregar libera su plaza y la cola sigue. Una cancelación y un límite de uso siguen deteniendo la cola.',
       autoDeliver: 'Entrega automática',
       autoDeliverHint: 'Se aplica a las tareas sin entrega automática propia cuando empiezan.',
-      autoDeliverProject: 'El archivo del proyecto fija este valor',
+      savedToProject: 'Se guarda en el archivo del proyecto: {{file}}',
+      savedToGlobal: 'Se guarda en el archivo compartido: {{file}}',
       autoDeliverInvalid: 'La configuración no es válida',
       deliveryMode: 'Modo de entrega',
       deliveryModeHint:

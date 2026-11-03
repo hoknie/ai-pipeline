@@ -92,8 +92,38 @@ describe('pane', () => {
     const meta = runHeader(one, COMPACT).meta;
     expect(meta).toBe('r1 · feature · active');
     const full = runHeader(one, FULL).meta;
-    expect(full).toContain('$0.0123');
+    expect(full).toContain('$0.0123 · 1.2k/300');
     expect(full).not.toContain('1200 in');
+  });
+
+  test('the header shows tokens without the cost while it is unknown', () => {
+    const one = run('r1', [group('a', { status: 'running' })], {
+      usage: { inputTokens: 1200, outputTokens: 300, costUsd: null },
+    });
+    const meta = runHeader(one, FULL).meta;
+    expect(meta).toContain('1.2k/300');
+    expect(meta).not.toContain('$');
+  });
+
+  test('the header shows the cost without zero tokens', () => {
+    const one = run('r1', [group('a', { status: 'merged' })], {
+      usage: { inputTokens: 0, outputTokens: 0, costUsd: 0.0123 },
+    });
+    const meta = runHeader(one, FULL).meta;
+    expect(meta).toContain('$0.0123');
+    expect(meta).not.toContain('0/0');
+  });
+
+  test('the header has no usage part without usage', () => {
+    const none = runHeader(run('r1', [group('a')], { usage: null }), FULL).meta;
+    const zero = runHeader(
+      run('r1', [group('a')], { usage: { inputTokens: 0, outputTokens: 0, costUsd: null } }),
+      FULL,
+    ).meta;
+    for (const meta of [none, zero]) {
+      expect(meta).not.toContain('$');
+      expect(meta).not.toMatch(/\d\/\d/);
+    }
   });
 
   test('the header phase of a failed run is failed, without state it follows finished', () => {

@@ -55,6 +55,8 @@ export interface RunOutcome {
 export interface OutputParser {
   push(line: string): void;
   outcome(): RunOutcome;
+  /** Usage so far; the same value `outcome().usage` has at the end. */
+  usage(): Usage | null;
 }
 
 export interface Runtime {

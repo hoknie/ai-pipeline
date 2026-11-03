@@ -508,7 +508,7 @@ function limitHits(state: RunState): LimitHit[] {
 }
 
 /** Keys of every problem and usage limit of a run now. */
-function currentKeys(state: RunState): string[] {
+export function problemKeys(state: RunState): string[] {
   return [
     ...runProblems(state).map((problem) => problem.key),
     ...limitHits(state).map((hit) => hit.key),
@@ -584,7 +584,7 @@ export function startQueue(queue: Queue, states: Iterable<RunState>, now: number
   for (const item of queue.items) item.error = null;
   const known = new Set(queue.acknowledged);
   for (const state of queueStates(queue, states)) {
-    for (const key of currentKeys(state)) known.add(key);
+    for (const key of problemKeys(state)) known.add(key);
   }
   queue.acknowledged = [...known];
   queue.updatedAt = now;
@@ -592,7 +592,30 @@ export function startQueue(queue: Queue, states: Iterable<RunState>, now: number
 
 /** Makes the current problems and usage limits of a run known to the queue. */
 export function acknowledgeRun(queue: Queue, state: RunState): void {
-  queue.acknowledged = [...new Set([...queue.acknowledged, ...currentKeys(state)])];
+  queue.acknowledged = [...new Set([...queue.acknowledged, ...problemKeys(state)])];
+}
+
+/**
+ * A run revived by a direct retry joins the places of the queue, as with "run now". Returns
+ * false and changes nothing for a run of another repository, a run that already holds a place or
+ * is skipped, and a run that does not occupy a place. The queue state and its stop stay as they
+ * are; `known` (problem keys from before the retry) and the current ones do not stop the queue.
+ */
+export function adoptRun(
+  queue: Queue,
+  state: RunState,
+  known: readonly string[],
+  now: number,
+): boolean {
+  const id = state.run.id;
+  if (state.run.repository !== queue.repository) return false;
+  if (queue.runs.includes(id) || queue.skipped.includes(id)) return false;
+  if (!occupiesSlot(state)) return false;
+  queue.items = queue.items.filter((item) => item.run !== id);
+  queue.runs.push(id);
+  queue.acknowledged = [...new Set([...queue.acknowledged, ...known, ...problemKeys(state)])];
+  queue.updatedAt = now;
+  return true;
 }
 
 /**

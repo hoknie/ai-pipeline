@@ -1,7 +1,7 @@
 import { SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { cost, diffText, runTime, runTitle } from '../../format.ts';
+import { cost, diffText, runTime, runTitle, usageText } from '../../format.ts';
 import { useLocale } from '../../i18n/index.ts';
 import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
@@ -129,6 +129,7 @@ export function RunList({
                     <WorkflowBadge id={run.workflow} focusable={false} />
                     {run.fromQueue ? <span>{t('runs.list.fromQueue')}</span> : null}
                     <span>{runTime(run, now, t, locale)}</span>
+                    {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
                     {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
                     {run.diff ? <span>{diffText(run.diff, t)}</span> : null}
                   </span>
@@ -157,7 +158,7 @@ export function RunList({
                               </span>
                             ) : null}
                           </span>
-                          <StatusBadge status={group.status} />
+                          <StatusBadge status={group.status} wait={group.wait} />
                         </button>
                       </li>
                     ))}

@@ -867,6 +867,7 @@ test('only fitting actions per status', SLOW, async ($, on) => {
   await started($, aip, [
     run('r1', [
       group('q', { status: 'queued' }),
+      group('w', { status: 'waiting' }),
       group('r', { status: 'running' }),
       group('f', { status: 'failed', reason: 'boom' }),
       group('c', { status: 'conflict' }),
@@ -889,6 +890,7 @@ test('only fitting actions per status', SLOW, async ($, on) => {
       'cancel:r1/c',
       'cancel:r1/q',
       'cancel:r1/r',
+      'cancel:r1/w',
       'retry:r1/c',
       'retry:r1/f',
     ].sort(),

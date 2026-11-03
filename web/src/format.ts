@@ -22,6 +22,14 @@ export function tokens(value: number | null | undefined): string {
   return String(value);
 }
 
+/** Tokens of a usage as `in/out` (`12.3k/1.1k`); empty without usage. */
+export function usageText(
+  usage: { inputTokens: number; outputTokens: number } | null | undefined,
+): string {
+  if (!usage || (usage.inputTokens === 0 && usage.outputTokens === 0)) return '';
+  return `${tokens(usage.inputTokens)}/${tokens(usage.outputTokens)}`;
+}
+
 export function files(count: number, t: TFunction): string {
   return t('format.files', { count });
 }

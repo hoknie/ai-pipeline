@@ -24,6 +24,7 @@ export * from './model.ts';
 export { stepProgress, type StepProgress } from './progress.ts';
 export { applySkip, checkSkip, cleanSkip } from './skip.ts';
 export { questionsText } from './questions.ts';
+export { planDispatch, waitKey, type DispatchPlan, type GroupWait } from './plan.ts';
 export {
   dispatch,
   limitHolds,
@@ -83,6 +84,8 @@ export {
   acknowledgeRun,
   addItem,
   queueWakeAt,
+  adoptRun,
+  problemKeys,
   retryableGroups,
   returnRun,
   advance,

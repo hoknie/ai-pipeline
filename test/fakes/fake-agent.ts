@@ -37,6 +37,15 @@ interface Action {
    * `resetsAt` in seconds of the epoch, absent: no reset time.
    */
   usageLimit?: { resetsAt?: number };
+  /**
+   * Usage the agent reports as it works, before `delayMs`: `claude` prints `assistant` events with
+   * `message.usage` (the same `id` repeats a message), `opencode` prints `step-finish` events.
+   * The final `result` carries the sum, unless `noResult` is set.
+   */
+  usage?: { id?: string; input: number; output: number; cacheRead?: number }[];
+  /** Pause between the calls of `usage`. */
+  usageGapMs?: number;
+  noResult?: boolean;
 }
 
 const [mode, ...args] = process.argv.slice(2);
@@ -213,6 +222,44 @@ if (action.child) {
   const child = spawn('sleep', ['300'], { stdio: 'ignore' });
   appendFileSync(join(state, 'children'), `${child.pid}\n`);
 }
+const liveUsage = action.usage ?? [];
+for (const [index, call] of liveUsage.entries()) {
+  if (index > 0 && action.usageGapMs) {
+    await new Promise((resolve) => setTimeout(resolve, action.usageGapMs));
+  }
+  if (mode === 'claude') {
+    console.log(
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          id: call.id ?? `msg_live_${index}`,
+          role: 'assistant',
+          content: [{ type: 'text', text: 'working' }],
+          usage: {
+            input_tokens: call.input,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: call.cacheRead ?? 0,
+            output_tokens: call.output,
+          },
+        },
+      }),
+    );
+  } else {
+    console.log(
+      JSON.stringify({
+        type: 'step_finish',
+        part: {
+          type: 'step-finish',
+          tokens: {
+            input: call.input,
+            output: call.output,
+            cache: { read: call.cacheRead ?? 0, write: 0 },
+          },
+        },
+      }),
+    );
+  }
+}
 if (action.delayMs) await new Promise((resolve) => setTimeout(resolve, action.delayMs));
 if (action.hang) await new Promise(() => setInterval(() => undefined, 1000));
 
@@ -335,22 +382,38 @@ if (mode === 'claude') {
       }),
     );
   }
-  console.log(
-    JSON.stringify({
-      type: 'result',
-      subtype: 'success',
-      is_error: false,
-      session_id: session,
-      total_cost_usd: 0.01,
-      permission_denials: denied,
-      usage: {
-        input_tokens: 100,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0,
-        output_tokens: 20,
-      },
-    }),
+  // The same message id repeats one message: the last call of an id counts.
+  const finalCalls = new Map(
+    liveUsage.map((call, index) => [call.id ?? `msg_live_${index}`, call]),
   );
+  const sum = (pick: (call: (typeof liveUsage)[number]) => number): number =>
+    [...finalCalls.values()].reduce((total, call) => total + pick(call), 0);
+  if (!action.noResult) {
+    console.log(
+      JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        session_id: session,
+        total_cost_usd: 0.01,
+        permission_denials: denied,
+        usage:
+          liveUsage.length > 0
+            ? {
+                input_tokens: sum((call) => call.input),
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: sum((call) => call.cacheRead ?? 0),
+                output_tokens: sum((call) => call.output),
+              }
+            : {
+                input_tokens: 100,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
+                output_tokens: 20,
+              },
+      }),
+    );
+  }
 } else {
   const message = 'msg_fake';
   const timestamp = Date.now();

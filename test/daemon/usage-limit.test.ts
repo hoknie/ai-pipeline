@@ -82,7 +82,7 @@ describe('a usage limit in the queue', () => {
     const runId = (stopped.stop as { run: string }).run;
     const waiting = await h.status(runId);
     expect(waiting.state).toBe('active');
-    expect(waiting.groups[0]).toMatchObject({ status: 'queued' });
+    expect(waiting.groups[0]).toMatchObject({ status: 'waiting', wait: { reason: 'limit' } });
     expect(waiting.groups[0]?.limitUntil).toBeGreaterThan(Date.now() - 1000);
     const done = await h.waitFor(runId, (view) => view.state === 'finished');
     expect(done.groups[0]?.status).toBe('merged');
@@ -165,15 +165,35 @@ describe('return a run to the queue', () => {
     expect((await queueOf(h)).status).toBe('stopped');
   });
 
-  it('gives the item an error when nothing is left to retry', async () => {
+  it('removes the return item when the run is retried by hand before it is taken', async () => {
     const h = await start();
+    h.script({ code: [{ noReport: true }, { delayMs: 1500 }] });
     const runId = await failedRun(h);
     const returned = (await h.call('queue_return', { runId })) as QueueView & { item: string };
     await h.call('retry', { runId, group: (await h.status(runId)).groups[0]!.slug });
-    await h.waitFor(runId, (view) => view.state === 'finished');
+    const view = await queueOf(h);
+    expect(view.items.map((item) => item.id)).not.toContain(returned.item);
+    expect(view.runs.map((card) => card.id)).toEqual([runId]);
+    expect((await h.status(runId)).returnable).toBe(false);
     await expect(
       h.call('queue_run_now', { repository: h.repo, item: returned.item }),
-    ).rejects.toThrow('run has no failed or cancelled groups');
+    ).rejects.toThrow('unknown queue item');
+    await h.waitFor(runId, (run) => run.state === 'finished');
+  });
+
+  it('moves a skipped run back to the places once, not twice, after a retry', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, { delayMs: 1500 }] });
+    await add(h, 'A');
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (view) => view.skipped.length === 1);
+    const runId = (await allRuns(h))[0]!.id;
+    await h.call('retry', { runId, group: (await h.status(runId)).groups[0]!.slug });
+    const view = await waitQueue(h, (queue) => queue.skipped.length === 0);
+    expect(view.runs.map((card) => card.id)).toEqual([runId]);
+    await h.waitFor(runId, (run) => run.state === 'finished');
+    await waitQueue(h, (queue) => queue.runs.length === 0);
   });
 });
 

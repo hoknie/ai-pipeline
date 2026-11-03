@@ -88,6 +88,8 @@ describe('grouped help', () => {
     const { stdout } = await aip(['--help']);
     expect(stdout).toContain('aip <command> --help');
     expect(stdout).toContain('docs/');
+    expect(stdout).toContain('docs/queue.md');
+    expect(stdout).toContain('docs/web.md');
   });
 
   it('keeps lines within 80 characters', async () => {

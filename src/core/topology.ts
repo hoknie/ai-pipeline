@@ -22,7 +22,7 @@ import {
 export interface StepGroup {
   slug: string;
   title: string;
-  status: GroupStatus;
+  status: GroupStatus | 'waiting';
 }
 
 export interface StepInfo {
@@ -48,14 +48,18 @@ export interface Topology {
     specialist: string;
     maxGroups: number;
     workflow: string | null;
-    status: GroupStatus | null;
+    status: GroupStatus | 'waiting' | null;
   } | null;
   steps: StepTopology[];
   /** Groups waiting for or in the merge queue, or in conflict. */
   merging: StepGroup[];
   /** Merged groups. */
   merged: StepGroup[];
-  delivery: { mode: string; resolver: string | null; resolverStatus: GroupStatus | null };
+  delivery: {
+    mode: string;
+    resolver: string | null;
+    resolverStatus: GroupStatus | 'waiting' | null;
+  };
 }
 
 const AT_MERGE: GroupStatus[] = ['merging', 'conflict'];

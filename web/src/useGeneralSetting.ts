@@ -11,8 +11,12 @@ export interface Setting<T extends boolean | string> {
   ready: boolean;
   /** `null`: the value is not of the expected kind. */
   value: T | null;
-  /** The project file sets the value: it cannot be changed here. */
+  /** The project file sets the value. */
   overridden: boolean;
+  /** The file a write goes to: the one the value comes from. */
+  level: 'global' | 'project';
+  /** Path of that file, once the configuration is read. */
+  file: string | null;
   busy: boolean;
   failure: string | null;
   set: (value: T) => Promise<void>;
@@ -21,8 +25,8 @@ export interface Setting<T extends boolean | string> {
 export type GeneralSetting = Omit<Setting<boolean>, 'value'> & { value: boolean };
 
 /**
- * A setting of the merged configuration that the panel writes to the global
- * `settings.yaml`. With `source` the values come from the caller (who then reads them again in
+ * A setting of the merged configuration. A write goes to the file the value comes from: the
+ * project `settings.yaml` when it sets the value, otherwise the global one. With `source` the values come from the caller (who then reads them again in
  * `onChanged`); without it the hook reads the configuration itself.
  */
 export function useSetting<T extends boolean | string>(
@@ -51,13 +55,16 @@ export function useSetting<T extends boolean | string>(
   const setting = view?.settings.find((candidate) => candidate.path === path);
   const files = view?.settingsFiles;
   const raw: unknown = setting?.value;
+  const overridden =
+    setting !== undefined && files !== undefined && setting.file === files.project.file;
+  const level = overridden ? 'project' : 'global';
 
   const set = async (value: T) => {
     if (!api || !files) return;
     setBusy(true);
     setFailure(null);
     try {
-      const result = await api.writeSetting(path, value, files.global.revision, 'global');
+      const result = await api.writeSetting(path, value, files[level].revision, level);
       if (!result.ok) {
         setFailure(
           result.reason === 'conflict'
@@ -76,7 +83,9 @@ export function useSetting<T extends boolean | string>(
   return {
     ready: setting !== undefined && files !== undefined,
     value: typeof raw === kind ? (raw as T) : null,
-    overridden: setting !== undefined && files !== undefined && setting.file === files.project.file,
+    overridden,
+    level,
+    file: files ? files[level].file : null,
     busy,
     failure,
     set,

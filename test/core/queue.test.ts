@@ -4,6 +4,7 @@ import {
   DEFAULT_AUTOPILOT_ANSWER,
   QUEUE_PARALLEL_MAX,
   addItem,
+  adoptRun,
   advance,
   autopilotAnswers,
   createRun,
@@ -17,6 +18,7 @@ import {
   moveItem,
   occupiesSlot,
   pauseQueue,
+  problemKeys,
   removeItem,
   runPhase,
   runProblems,
@@ -1310,5 +1312,119 @@ describe('postponed items', () => {
     startQueue(queue, [], 4);
     advance(queue, [], none, 5);
     expect(queue.status).toBe('running');
+  });
+});
+
+describe('adopting a retried run', () => {
+  /** A run that failed and finished, then is retried: the group works again. */
+  function retried(id: string): { state: RunState; keys: string[] } {
+    const state = failedRun(id);
+    state.run.config.delivery.auto = false;
+    state.run.finishedAt = 10;
+    const keys = problemKeys(state);
+    state.run.finishedAt = null;
+    group(state).status = 'running';
+    return { state, keys };
+  }
+
+  function stoppedQueue(): Queue {
+    const queue = queueOf('W');
+    startQueue(queue, [], 3);
+    queue.status = 'stopped';
+    queue.stop = { kind: 'problem', run: 'a', group: 'gruppa-1', reason: 'failed' };
+    return queue;
+  }
+
+  it('adds a revived run and learns the keys, leaving the state and the stop', () => {
+    const queue = stoppedQueue();
+    const { state, keys } = retried('a');
+    expect(keys.length).toBe(1);
+    expect(adoptRun(queue, state, keys, 9)).toBe(true);
+    expect(queue.runs).toEqual(['a']);
+    expect(queue.acknowledged).toEqual(expect.arrayContaining(keys));
+    expect(queue).toMatchObject({
+      status: 'stopped',
+      stop: { kind: 'problem', run: 'a' },
+      updatedAt: 9,
+    });
+  });
+
+  it('removes the return item of the run', () => {
+    const queue = stoppedQueue();
+    addItem(queue, { workflow: 'feature', task: 't' }, 'ret', 4).run = 'a';
+    const { state, keys } = retried('a');
+    expect(adoptRun(queue, state, keys, 9)).toBe(true);
+    expect(ids(queue)).toEqual(['q1']);
+  });
+
+  it('does nothing for a run that holds a place, a skipped one, a finished one or a foreign one', () => {
+    const { state, keys } = retried('a');
+    const held = stoppedQueue();
+    held.runs.push('a');
+    const skipped = stoppedQueue();
+    skipped.skipped.push('a');
+    const finished = stoppedQueue();
+    const done = failedRun('b');
+    done.run.finishedAt = 10;
+    const foreign = emptyQueue('/other', 1);
+    for (const [queue, target] of [
+      [held, state],
+      [skipped, state],
+      [finished, done],
+      [foreign, state],
+    ] as const) {
+      const before = JSON.stringify(queue);
+      expect(adoptRun(queue, target, keys, 9)).toBe(false);
+      expect(JSON.stringify(queue)).toBe(before);
+    }
+  });
+
+  it('keeps waiting items until both adopted runs release their places', () => {
+    const queue = queueOf('W');
+    queue.parallel = 1;
+    startQueue(queue, [], 3);
+    const a = retried('a');
+    const b = retried('b');
+    adoptRun(queue, a.state, a.keys, 4);
+    adoptRun(queue, b.state, b.keys, 4);
+    const lookup = lookupOf(a.state, b.state);
+    expect(advance(queue, [a.state, b.state], lookup, 5).take).toEqual([]);
+    a.state.run.finishedAt = 10;
+    group(a.state).status = 'merged';
+    expect(advance(queue, [a.state, b.state], lookup, 6).take).toEqual([]);
+    expect(queue.runs).toEqual(['b']);
+    b.state.run.finishedAt = 10;
+    group(b.state).status = 'merged';
+    expect(advance(queue, [a.state, b.state], lookup, 7).take.map((item) => item.id)).toEqual([
+      'q1',
+    ]);
+  });
+
+  it('does not stop a running queue for the remaining failed group', () => {
+    const queue = queueOf('W');
+    startQueue(queue, [], 3);
+    const state = run(2, { id: 'a' });
+    step(state);
+    group(state, 'gruppa-1').status = 'failed';
+    group(state, 'gruppa-2').status = 'failed';
+    const keys = problemKeys(state);
+    group(state, 'gruppa-1').status = 'running';
+    expect(adoptRun(queue, state, keys, 4)).toBe(true);
+    advance(queue, [state], lookupOf(state), 5);
+    expect(queue).toMatchObject({ status: 'running', stop: null });
+  });
+
+  it('stops a running queue for a new problem of the retried group', () => {
+    const queue = queueOf('W');
+    startQueue(queue, [], 3);
+    const { state, keys } = retried('a');
+    adoptRun(queue, state, keys, 4);
+    group(state).attempts.push(structuredClone(group(state).attempts[0]!));
+    group(state).status = 'failed';
+    advance(queue, [state], lookupOf(state), 5);
+    expect(queue).toMatchObject({
+      status: 'stopped',
+      stop: { kind: 'problem', run: 'a', group: 'gruppa-1' },
+    });
   });
 });

@@ -15,6 +15,7 @@ export {
   formatApply,
   formatDiff,
   formatGroup,
+  waitNote,
   formatQueue,
   formatRepositories,
   formatRun,

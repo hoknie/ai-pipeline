@@ -1,5 +1,13 @@
 export type AipGroupStatus =
-  'queued' | 'running' | 'needs_human' | 'merging' | 'merged' | 'conflict' | 'failed' | 'cancelled';
+  | 'queued'
+  | 'waiting'
+  | 'running'
+  | 'needs_human'
+  | 'merging'
+  | 'merged'
+  | 'conflict'
+  | 'failed'
+  | 'cancelled';
 
 export type AipDeliveryState = 'pending' | 'applied' | 'apply_failed';
 

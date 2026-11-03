@@ -121,7 +121,14 @@ describe('system steps in the runs section', () => {
     mount([
       runView({
         groups: [groupRow({ status: 'merged' })],
-        resolver: { status: 'running', round: 1, rounds: 2, conflicts: [], reason: null },
+        resolver: {
+          status: 'running',
+          wait: null,
+          round: 1,
+          rounds: 2,
+          conflicts: [],
+          reason: null,
+        },
         system: [systemRow('resolve')],
       }),
     ]);
@@ -183,7 +190,7 @@ describe('opening a split from the topology', () => {
       split: { specialist: 'plan', maxGroups: 3, workflow: null },
     });
     const run = runView({
-      split: { status: 'running', question: null, questions: null, reason: null },
+      split: { status: 'running', wait: null, question: null, questions: null, reason: null },
       groups: [],
       system: [systemRow('split')],
       topology: topologyOf(),
@@ -203,5 +210,124 @@ describe('opening a split from the topology', () => {
     );
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_split'));
     expect(await screen.findByRole('region', { name: 'group Split into groups' })).toBeTruthy();
+  });
+});
+
+describe('system stages in the run header', () => {
+  const stages = () => screen.getByLabelText('System stages');
+
+  it('shows the finished split, the commit message and the delivery as one row', async () => {
+    mount([
+      runView({
+        groups: [groupRow({ status: 'merged' })],
+        split: { status: 'done', wait: null, question: null, questions: null, reason: null },
+        system: [systemRow('split', { status: 'done' }), systemRow('message')],
+        deliveryStage: { status: 'pending' },
+      }),
+    ]);
+    await screen.findByLabelText('System stages');
+    expect(within(stages()).getByRole('button', { name: 'Split into groups' })).toBeTruthy();
+    expect(within(stages()).getByText('Commit message')).toBeTruthy();
+    expect(within(stages()).getByText('Delivery')).toBeTruthy();
+    expect(screen.queryByText('splitting into groups')).toBeNull();
+  });
+
+  it('opens a system step from the row', async () => {
+    mount([
+      runView({
+        groups: [groupRow({ status: 'merged' })],
+        system: [systemRow('message')],
+        deliveryStage: { status: 'pending' },
+      }),
+    ]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit message' }));
+    await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_message'));
+  });
+
+  it('shows a failed delivery without a resolver', async () => {
+    mount([
+      runView({
+        groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
+        deliveryStage: {
+          status: 'apply_failed',
+          reason: 'does not exist in index',
+          groups: ['login'],
+        },
+      }),
+    ]);
+    await screen.findByLabelText('System stages');
+    expect(within(stages()).getByText('Delivery failed')).toBeTruthy();
+    expect(within(stages()).getByTitle('does not exist in index')).toBeTruthy();
+  });
+
+  it('has no row without system stages', async () => {
+    mount([runView()]);
+    await screen.findByRole('region', { name: /group/ });
+    expect(screen.queryByLabelText('System stages')).toBeNull();
+  });
+});
+
+describe('a failed delivery on the group screen', () => {
+  const failed = (deliverable = true) => {
+    const api = fakeApi({
+      group: vi.fn(async () =>
+        groupView({
+          status: 'merged',
+          delivery: {
+            state: 'apply_failed',
+            reason: 'does not exist in index',
+            files: [],
+            conflicts: [],
+            userEdits: [],
+          },
+        }),
+      ),
+    });
+    const run = runView({ groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })] });
+    render(
+      <GroupScreen
+        api={api}
+        runId="run1"
+        row={run.groups[0]!}
+        draftKey="run1/login"
+        drafts={{}}
+        onDraft={() => {}}
+        onClearDrafts={() => {}}
+        onError={() => {}}
+        deliverable={deliverable}
+        onDeliver={() => api.apply('run1', false)}
+        run={run}
+        onForceDeliver={() => api.apply('run1', true)}
+      />,
+    );
+    return api;
+  };
+
+  it('shows the reason and retries the delivery', async () => {
+    const api = failed();
+    expect(await screen.findByText('does not exist in index')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
+    await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', false));
+    await screen.findByText('Delivery started');
+  });
+
+  it('delivers with --force after the dialog', async () => {
+    const api = failed();
+    await screen.findByText('does not exist in index');
+    fireEvent.click(screen.getByRole('button', { name: 'Deliver with --force…' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /Deliver/ }));
+    await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', true));
+  });
+
+  it('disables both buttons while a delivery is in progress', async () => {
+    failed(false);
+    await screen.findByText('does not exist in index');
+    expect(
+      (screen.getByRole('button', { name: 'Retry delivery' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Deliver with --force…' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 });

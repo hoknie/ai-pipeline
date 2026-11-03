@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api, QueueSettingsPatch } from '../api.ts';
 import { notifySuccess } from '../notify.ts';
 import { queueStateLabel } from '../status.ts';
-import type { QueueView } from '../types.ts';
+import type { ConfigEditorResponse, QueueView } from '../types.ts';
 import { DELIVERY_MODES, isDeliveryMode } from '../deliveryModes.ts';
 import { useGeneralSetting, useSetting } from '../useGeneralSetting.ts';
 
@@ -67,8 +67,17 @@ export function QueueSettings({
   const { t } = useTranslation();
   const [parallel, setParallel] = useState<string | null>(null);
   const [pending, setPending] = useState<Partial<Record<'autopilot' | 'skipFailed', boolean>>>({});
-  const delivery = useGeneralSetting(api, 'delivery.auto');
-  const mode = useSetting<string>(api, 'delivery.mode', 'string');
+  const [config, setConfig] = useState<ConfigEditorResponse | null>(null);
+  const [configFailure, setConfigFailure] = useState<string | null>(null);
+  const reload = useCallback(async () => {
+    setConfig(await api.config());
+    setConfigFailure(null);
+  }, [api]);
+  useEffect(() => {
+    reload().catch((error: Error) => setConfigFailure(error.message));
+  }, [reload]);
+  const delivery = useGeneralSetting(api, 'delivery.auto', config ?? undefined, reload);
+  const mode = useSetting<string>(api, 'delivery.mode', 'string', config ?? undefined, reload);
   const [answer, setAnswer] = useState<string | null>(null);
   const [savingAnswer, setSavingAnswer] = useState(false);
 
@@ -116,21 +125,21 @@ export function QueueSettings({
     }
   };
 
-  const deliveryDisabled = queue.autoDeliver === null || !delivery.ready || delivery.overridden;
+  const deliveryDisabled = queue.autoDeliver === null || !delivery.ready;
   const deliveryTitle =
-    queue.autoDeliver === null
-      ? t('queue.settings.autoDeliverInvalid')
-      : delivery.overridden
-        ? t('queue.settings.autoDeliverProject')
-        : undefined;
-
-  const modeDisabled = queue.deliveryMode === null || !mode.ready || mode.overridden;
+    queue.autoDeliver === null ? t('queue.settings.autoDeliverInvalid') : undefined;
+  const modeDisabled = queue.deliveryMode === null || !mode.ready;
   const modeTitle =
-    queue.deliveryMode === null
-      ? t('queue.settings.autoDeliverInvalid')
-      : mode.overridden
-        ? t('queue.settings.autoDeliverProject')
-        : undefined;
+    queue.deliveryMode === null ? t('queue.settings.autoDeliverInvalid') : undefined;
+  const savedTo = (setting: { level: 'global' | 'project'; file: string | null }) =>
+    setting.file
+      ? t(
+          setting.level === 'project'
+            ? 'queue.settings.savedToProject'
+            : 'queue.settings.savedToGlobal',
+          { file: setting.file },
+        )
+      : null;
 
   const shownAnswer = answer ?? queue.autopilotAnswer ?? queue.autopilotAnswerDefault;
   const saveAnswer = async (value: string | null) => {
@@ -211,9 +220,10 @@ export function QueueSettings({
         checked={queue.autoDeliver === true}
         disabled={deliveryDisabled || delivery.busy}
         title={deliveryTitle}
-        note={deliveryTitle}
+        note={deliveryTitle ?? savedTo(delivery)}
         onChange={(value) => void delivery.set(value)}
       />
+      {configFailure ? <Alert variant="destructive">{configFailure}</Alert> : null}
       {delivery.failure ? <Alert variant="destructive">{delivery.failure}</Alert> : null}
       <div className="flex flex-col gap-0.5" title={modeTitle}>
         <label htmlFor="queue-delivery-mode" className="text-sm font-medium">
@@ -238,7 +248,9 @@ export function QueueSettings({
         <p id="queue-delivery-mode-hint" className="text-xs text-muted-foreground">
           {t('queue.settings.deliveryModeHint')}
         </p>
-        {modeTitle ? <p className="text-xs text-muted-foreground">{modeTitle}</p> : null}
+        {(modeTitle ?? savedTo(mode)) ? (
+          <p className="text-xs text-muted-foreground">{modeTitle ?? savedTo(mode)}</p>
+        ) : null}
       </div>
       {mode.failure ? <Alert variant="destructive">{mode.failure}</Alert> : null}
       <div className="flex flex-col gap-0.5">

@@ -45,8 +45,14 @@ export const en = {
     waiting: 'waiting for an answer: {{count}}',
     queued: 'in the queue: {{count}}',
   },
+  wait: {
+    specialist: 'Waiting for {{specialist}}: {{max}} of {{max}} busy',
+    capacity: 'Waiting for a free place: swarm.max is {{max}}',
+    limit: 'Waiting for the {{runtime}} usage limit to reset, until {{time}}',
+  },
   status: {
     queued: 'Queued',
+    waiting: 'Waiting for specialist',
     running: 'Running',
     merging: 'Merging',
     active: 'Active',
@@ -197,6 +203,12 @@ export const en = {
       badge: 'system step',
       retryDelivery: 'Retry delivery',
       deliveryStarted: 'Delivery started',
+      stages: 'System stages',
+      delivery: 'Delivery',
+      deliveryFailed: 'Delivery failed',
+      showAll: 'Show all',
+      showLess: 'Collapse',
+      forceDeliver: 'Deliver with --force…',
     },
     group: {
       label: 'group {{title}}',
@@ -299,7 +311,8 @@ export const en = {
         'A run with a failed, conflicting or undelivered group leaves its place, and the queue goes on. A cancel and a usage limit still stop the queue.',
       autoDeliver: 'Auto delivery by default',
       autoDeliverHint: 'Applies to tasks without their own auto delivery, when they start.',
-      autoDeliverProject: 'The project file sets this value',
+      savedToProject: 'Saved to the project file: {{file}}',
+      savedToGlobal: 'Saved to the shared file: {{file}}',
       autoDeliverInvalid: 'The configuration is not valid',
       deliveryMode: 'Delivery mode',
       deliveryModeHint:

@@ -47,8 +47,14 @@ export const ru: Dictionary = {
     waiting: 'ждут ответа: {{count}}',
     queued: 'в очереди: {{count}}',
   },
+  wait: {
+    specialist: 'Ждёт {{specialist}}: занято {{max}} из {{max}}',
+    capacity: 'Ждёт свободного места: swarm.max равен {{max}}',
+    limit: 'Ждёт сброса лимита подписки {{runtime}}, до {{time}}',
+  },
   status: {
     queued: 'В очереди',
+    waiting: 'Ждёт специалиста',
     running: 'В работе',
     merging: 'Слияние',
     active: 'Идёт',
@@ -201,6 +207,12 @@ export const ru: Dictionary = {
       badge: 'системный шаг',
       retryDelivery: 'Повторить доставку',
       deliveryStarted: 'Доставка запущена',
+      stages: 'Системные этапы',
+      delivery: 'Доставка',
+      deliveryFailed: 'Доставка не удалась',
+      showAll: 'Показать полностью',
+      showLess: 'Свернуть',
+      forceDeliver: 'Доставить с --force…',
     },
     group: {
       label: 'группа {{title}}',
@@ -304,7 +316,8 @@ export const ru: Dictionary = {
         'Запуск с упавшей, конфликтной или недоставленной группой освобождает место, и очередь идёт дальше. Отмена и лимит всё равно останавливают очередь.',
       autoDeliver: 'Автодоставка',
       autoDeliverHint: 'Действует на задачи без своей автодоставки в момент их старта.',
-      autoDeliverProject: 'Значение задаёт файл проекта',
+      savedToProject: 'Сохраняется в файл проекта: {{file}}',
+      savedToGlobal: 'Сохраняется в общий файл: {{file}}',
       autoDeliverInvalid: 'Конфигурация не проходит проверку',
       deliveryMode: 'Способ доставки',
       deliveryModeHint:

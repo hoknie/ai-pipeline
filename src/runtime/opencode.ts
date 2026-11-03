@@ -178,8 +178,11 @@ export function createOpencodeRuntime(executable = 'opencode'): Runtime {
             );
           }
         },
+        usage() {
+          return usage === null ? null : { ...usage };
+        },
         outcome() {
-          return { sessionId, usage, error, denials: [] };
+          return { sessionId, usage: usage === null ? null : { ...usage }, error, denials: [] };
         },
       };
     },

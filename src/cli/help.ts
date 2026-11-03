@@ -16,8 +16,12 @@ export const HELP_GROUPS: HelpGroup[] = [
   { heading: 'Plumbing (started by hosts and aip itself):', commands: ['daemon', 'mcp'] },
 ];
 
-export const HELP_FOOTER =
-  "Run 'aip <command> --help' for details.\nDocs: README.md, docs/install.md, docs/cli.md, docs/hosts.md,\ndocs/configuration.md";
+export const HELP_FOOTER = [
+  "Run 'aip <command> --help' for details.",
+  'Docs: README.md and docs/install.md, docs/configuration.md,',
+  'docs/cli.md, docs/queue.md, docs/hosts.md, docs/web.md,',
+  'docs/development.md',
+].join('\n');
 
 /** The `Examples:` block of a command; every line is a full command starting with `aip`. */
 export function examples(lines: string[], style: Style): string {

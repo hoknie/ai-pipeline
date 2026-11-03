@@ -16,6 +16,7 @@ export type StatusStyle = { icon: string; label: string; color: ThemeKey };
 
 export const STATUS: Readonly<Record<AipGroupStatus, StatusStyle>> = {
   queued: { icon: '○', label: 'queued', color: 'inactive' },
+  waiting: { icon: '◷', label: 'waiting', color: 'inactive' },
   running: { icon: '◐', label: 'running', color: 'suggestion' },
   needs_human: { icon: '?', label: 'needs you', color: 'warning' },
   merging: { icon: '⇄', label: 'merging', color: 'suggestion' },

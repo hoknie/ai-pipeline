@@ -3,6 +3,7 @@ import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 
+import type { Usage } from '../core/index.ts';
 import type { Launch, OutputParser, RunOutcome } from '../runtime/index.ts';
 
 export const STOP_GRACE_MS = 10_000;
@@ -29,6 +30,8 @@ export function launchProcess(
     parser: OutputParser;
     environment: NodeJS.ProcessEnv;
     graceMs?: number;
+    /** Called when the usage of the parser changed after a line of output. */
+    onUsage?: (usage: Usage) => void;
   },
 ): SupervisedProcess {
   for (const file of launch.files) {
@@ -61,9 +64,23 @@ export function launchProcess(
     };
   }
   const stdout = createInterface({ input: child.stdout! });
+  let reported: Usage | null = null;
   stdout.on('line', (line) => {
     log.write(`${line}\n`);
     options.parser.push(line);
+    if (options.onUsage) {
+      const usage = options.parser.usage();
+      if (
+        usage !== null &&
+        (reported === null ||
+          reported.inputTokens !== usage.inputTokens ||
+          reported.outputTokens !== usage.outputTokens ||
+          reported.costUsd !== usage.costUsd)
+      ) {
+        reported = usage;
+        options.onUsage(usage);
+      }
+    }
   });
   child.stderr!.on('data', (chunk: Buffer) => log.write(chunk));
   let killTimer: NodeJS.Timeout | null = null;
