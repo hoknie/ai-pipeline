@@ -168,11 +168,65 @@ describe('background processes tab', () => {
   it('lists a process with its time, CPU and memory', async () => {
     await open();
     const row = (await screen.findByText('4242')).closest('tr')!;
-    expect(within(row).getByText('node').getAttribute('title')).toContain('vite');
+    const command = within(row).getByText('node /repo/node_modules/.bin/vite --port 5173');
+    expect(command.tagName).toBe('CODE');
+    expect(command.getAttribute('title')).toBeNull();
     expect(within(row).getByText('2 min 5 s')).toBeTruthy();
     expect(within(row).getByText('12.0 %')).toBeTruthy();
     expect(within(row).getByText('120 MB')).toBeTruthy();
     expect(screen.getByRole('columnheader', { name: 'PID' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Command' })).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: 'Name' })).toBeNull();
+  });
+
+  it('shows the whole command in a tooltip on focus', async () => {
+    await open();
+    const row = (await screen.findByText('4242')).closest('tr')!;
+    act(() =>
+      within(row)
+        .getByText(/vite --port/)
+        .focus(),
+    );
+    expect((await screen.findByRole('tooltip')).textContent).toBe(
+      'node /repo/node_modules/.bin/vite --port 5173',
+    );
+  });
+
+  it('shows the name when the command is empty', async () => {
+    await open(
+      fakeApi({ processes: vi.fn(async () => ({ processes: [processView({ command: '' })] })) }),
+    );
+    const row = (await screen.findByText('4242')).closest('tr')!;
+    expect(within(row).getByText('node').tagName).toBe('CODE');
+  });
+
+  it('copies the command', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy command' }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith('node /repo/node_modules/.bin/vite --port 5173'),
+    );
+    expect(await screen.findByText('Command copied')).toBeTruthy();
+  });
+
+  it('reports a clipboard that refuses', async () => {
+    const writeText = vi.fn(async () => {
+      throw new Error('denied');
+    });
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy command' }));
+    expect(await screen.findByText('The clipboard is not available')).toBeTruthy();
+  });
+
+  it('terminates with an icon button that has no text and a tooltip', async () => {
+    await open();
+    const button = await screen.findByRole('button', { name: 'Terminate node (4242)' });
+    expect(button.textContent).toBe('');
+    act(() => button.focus());
+    expect((await screen.findByRole('tooltip')).textContent).toBe('Terminate');
   });
 
   it('terminates a process after the confirmation and drops its row', async () => {
@@ -217,6 +271,73 @@ describe('background processes tab', () => {
     const { onOpenGroup } = await open();
     fireEvent.click(await screen.findByRole('button', { name: 'Логин · Первый' }));
     expect(onOpenGroup).toHaveBeenCalledWith({ runId: 'run1', group: 'login', step: 'code' });
+  });
+});
+
+describe('status bar height', () => {
+  const content = () => screen.getByTestId('status-bar-content');
+  const handle = () => screen.getByRole('separator', { name: 'Resize the Status strip' });
+  const many = () =>
+    fakeApi({
+      processes: vi.fn(async () => ({
+        processes: Array.from({ length: 20 }, (_, i) => processView({ pid: 5000 + i })),
+      })),
+    });
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
+  });
+
+  it('keeps 256 px when switching tabs', async () => {
+    bar(many());
+    fireEvent.click(toggle());
+    expect(content().style.height).toBe('256px');
+    openTab('Background processes');
+    await screen.findByText('5019');
+    expect(content().style.height).toBe('256px');
+    openTab('Specialists');
+    expect(content().style.height).toBe('256px');
+  });
+
+  it('is changed by dragging the top edge and remembered', () => {
+    bar();
+    fireEvent.click(toggle());
+    fireEvent.pointerDown(handle(), { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(handle(), { clientY: 400, pointerId: 1 });
+    fireEvent.pointerUp(handle(), { clientY: 400, pointerId: 1 });
+    expect(content().style.height).toBe('356px');
+    expect(window.localStorage.getItem('aip.web.statusBar.height')).toBe('356');
+  });
+
+  it('stays between 160 px and 80 % of the window', () => {
+    bar();
+    fireEvent.click(toggle());
+    fireEvent.pointerDown(handle(), { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(handle(), { clientY: 0, pointerId: 1 });
+    fireEvent.pointerUp(handle(), { clientY: 0, pointerId: 1 });
+    expect(content().style.height).toBe('720px');
+    fireEvent.pointerDown(handle(), { clientY: 0, pointerId: 1 });
+    fireEvent.pointerMove(handle(), { clientY: 5000, pointerId: 1 });
+    fireEvent.pointerUp(handle(), { clientY: 5000, pointerId: 1 });
+    expect(content().style.height).toBe('160px');
+  });
+
+  it('is changed by the arrow keys', () => {
+    bar();
+    fireEvent.click(toggle());
+    fireEvent.keyDown(handle(), { key: 'ArrowUp' });
+    expect(content().style.height).toBe('272px');
+    fireEvent.keyDown(handle(), { key: 'ArrowDown' });
+    fireEvent.keyDown(handle(), { key: 'ArrowDown' });
+    expect(content().style.height).toBe('240px');
+  });
+
+  it('restores the remembered height and has no handle when collapsed', () => {
+    window.localStorage.setItem('aip.web.statusBar.height', '400');
+    bar();
+    expect(screen.queryByRole('separator')).toBeNull();
+    fireEvent.click(toggle());
+    expect(content().style.height).toBe('400px');
   });
 });
 

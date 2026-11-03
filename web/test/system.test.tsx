@@ -173,11 +173,20 @@ describe('retry of system steps', () => {
     await waitFor(() => expect(api.retry).toHaveBeenCalledWith('run1', '_split'));
   });
 
+  it('retries a failed split with the current config', async () => {
+    const api = screenOf(systemRow('split', { status: 'failed' }), false);
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry with current config' }));
+    await waitFor(() =>
+      expect(api.retry).toHaveBeenCalledWith('run1', '_split', { refreshConfig: true }),
+    );
+  });
+
   it('offers a failed resolver only the retry of the delivery', async () => {
     const api = screenOf(systemRow('resolve', { status: 'failed', reason: 'boom' }), true);
     await screen.findByText('boom');
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry step' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
     await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', false));
     expect(api.retry).not.toHaveBeenCalled();
@@ -187,6 +196,7 @@ describe('retry of system steps', () => {
     screenOf(systemRow('message', { status: 'failed' }), false);
     await screen.findByRole('region', { name: 'group Commit message' });
     expect(screen.queryByRole('button', { name: 'Retry delivery' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
   });
 });
 

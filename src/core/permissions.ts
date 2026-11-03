@@ -3,6 +3,7 @@ import type {
   ClaudeSettingsSource,
   Permissions,
   ResolvedConfig,
+  Specialist,
 } from '../config/index.ts';
 
 /** Permissions of one specialist as the current configuration defines them. */
@@ -63,6 +64,102 @@ export function refreshPermissions(
   config.claude.editMode = refresh.claudeEditMode;
   config.claude.settings = refresh.claudeSettings;
   return null;
+}
+
+/** Whole definitions of the specialists of the current configuration, for a retry with it. */
+export interface SpecialistsRefresh {
+  specialists: Specialist[];
+  claudeEditMode: ClaudeEditMode;
+  claudeSettings: ClaudeSettingsSource;
+}
+
+function copySpecialist(specialist: Specialist): Specialist {
+  return {
+    ...specialist,
+    allowCommands: [...specialist.allowCommands],
+    tools: [...specialist.tools],
+    skills: [...specialist.skills],
+  };
+}
+
+/** Specialists of a configuration, for a retry with the current configuration. */
+export function specialistsOf(config: ResolvedConfig): SpecialistsRefresh {
+  return {
+    specialists: config.specialists.map(copySpecialist),
+    claudeEditMode: config.claude.editMode,
+    claudeSettings: config.claude.settings,
+  };
+}
+
+const SCALAR_FIELDS = [
+  ['model', 'model'],
+  ['runtime', 'runtime'],
+  ['permissions', 'permissions'],
+  ['timeoutSeconds', 'timeout'],
+  ['max', 'max'],
+  ['queue', 'queue'],
+  ['level', 'level'],
+] as const;
+
+const LIST_FIELDS = [
+  ['allowCommands', 'allow_commands'],
+  ['tools', 'tools'],
+  ['skills', 'skills'],
+] as const;
+
+function shown(value: unknown): string {
+  return value === null || value === undefined ? 'none' : String(value);
+}
+
+function listChange(before: readonly string[], after: readonly string[]): string | null {
+  const added = after.filter((item) => !before.includes(item)).map((item) => `+${item}`);
+  const removed = before.filter((item) => !after.includes(item)).map((item) => `−${item}`);
+  const parts = [...added, ...removed];
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
+function specialistChanges(before: Specialist, after: Specialist): string[] {
+  const changes: string[] = [];
+  for (const [field, label] of SCALAR_FIELDS) {
+    // Snapshots made before `queue` and `level` existed have no value: not a change.
+    if (before[field] === undefined) continue;
+    if (before[field] !== after[field]) {
+      changes.push(`${before.slug} ${label} ${shown(before[field])} → ${shown(after[field])}`);
+    }
+  }
+  if (before.prompt !== after.prompt) changes.push(`${before.slug} prompt`);
+  for (const [field, label] of LIST_FIELDS) {
+    const change = listChange(before[field] ?? [], after[field] ?? []);
+    if (change !== null) changes.push(`${before.slug} ${label} ${change}`);
+  }
+  return changes;
+}
+
+/**
+ * Replaces the definitions of the snapshot's specialists with the current ones; specialists missing
+ * from the refresh keep theirs, and no specialist is added. The workflow and the rest of the
+ * snapshot stay. Returns the changes, empty when nothing changed.
+ */
+export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsRefresh): string[] {
+  const changes: string[] = [];
+  config.specialists = config.specialists.map((specialist) => {
+    const fresh = refresh.specialists.find((candidate) => candidate.slug === specialist.slug);
+    if (!fresh) {
+      changes.push(`${specialist.slug} kept from snapshot`);
+      return specialist;
+    }
+    changes.push(...specialistChanges(specialist, fresh));
+    return copySpecialist(fresh);
+  });
+  if (config.claude.editMode !== refresh.claudeEditMode) {
+    changes.push(`claude.edit_mode ${config.claude.editMode} → ${refresh.claudeEditMode}`);
+  }
+  if (config.claude.settings !== refresh.claudeSettings) {
+    changes.push(`claude.settings ${config.claude.settings} → ${refresh.claudeSettings}`);
+  }
+  config.claude.editMode = refresh.claudeEditMode;
+  config.claude.settings = refresh.claudeSettings;
+  return changes;
 }
 
 /** A tool call refused by the agent CLI; `command` is set for shell commands. */

@@ -176,10 +176,24 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Retry a group',
       description:
-        'Retry a failed or cancelled group from where it stopped, or its merge after a conflict.',
-      inputSchema: { run_id: runId, group },
+        'Retry a failed or cancelled group from where it stopped, or its merge after a conflict. With refresh_config=true the run first takes the whole specialists (model, runtime, prompt, permissions) from the current configuration; the workflow stays as it started.',
+      inputSchema: {
+        run_id: runId,
+        group,
+        refresh_config: z
+          .boolean()
+          .optional()
+          .describe('Take the specialists of the current configuration before the retry'),
+      },
     },
-    ({ run_id, group: slug }) => attempt(() => showRun('retry', { runId: run_id, group: slug })),
+    ({ run_id, group: slug, refresh_config }) =>
+      attempt(() =>
+        showRun('retry', {
+          runId: run_id,
+          group: slug,
+          ...(refresh_config ? { refreshConfig: true } : {}),
+        }),
+      ),
   );
 
   server.registerTool(

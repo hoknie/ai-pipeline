@@ -4,12 +4,14 @@ import {
   commandParts,
   matchesPattern,
   permissionsOf,
+  refreshSpecialists,
+  specialistsOf,
   suggestPatterns,
   transition,
   type PermissionsRefresh,
 } from '../../src/core/index.ts';
 
-import { config, finish, group, run, runningAttempt, step } from './helpers.ts';
+import { CONFIG_TEXT, config, finish, group, run, runningAttempt, step } from './helpers.ts';
 
 function specialist(state: ReturnType<typeof run>, slug: string) {
   const found = state.run.config.specialists.find((candidate) => candidate.slug === slug);
@@ -147,5 +149,61 @@ describe('suggested allow_commands patterns', () => {
     expect(matchesPattern('npm run check -- --watch', 'npm run check*')).toBe(true);
     expect(matchesPattern('npm run build', 'npm run check*')).toBe(false);
     expect(matchesPattern('git status', 'git status')).toBe(true);
+  });
+});
+
+describe('specialists refresh', () => {
+  const NEW_CONFIG = CONFIG_TEXT.replace(
+    'reviewer: { name: Ревьюер, permissions: read }',
+    'reviewer: { name: Ревьюер, permissions: read, model: opus, allow_commands: ["ls *"] }',
+  ).replace(
+    'coder: { name: Кодировщик, runtime: opencode, model: anthropic/sonnet }',
+    'coder: { name: Кодировщик, model: anthropic/sonnet, prompt: "Код: %s" }',
+  );
+
+  it('reports the changed fields and replaces the definitions', () => {
+    const snapshot = config();
+    const reviewer = snapshot.specialists.find((candidate) => candidate.slug === 'reviewer')!;
+    reviewer.model = 'opsu';
+    const fresh = specialistsOf(config(NEW_CONFIG));
+    fresh.specialists = fresh.specialists.filter((specialist) => specialist.slug !== 'qa');
+    const changes = refreshSpecialists(snapshot, fresh);
+    expect(changes).toEqual([
+      'coder runtime opencode → claude',
+      'coder prompt',
+      'reviewer model opsu → opus',
+      'reviewer allow_commands +ls *',
+      'qa kept from snapshot',
+    ]);
+    const after = snapshot.specialists.find((candidate) => candidate.slug === 'reviewer')!;
+    expect(after.model).toBe('opus');
+    expect(snapshot.specialists.map((specialist) => specialist.slug)).toEqual([
+      'plan',
+      'coder',
+      'reviewer',
+      'qa',
+    ]);
+    // The snapshot does not share lists with the refresh.
+    after.allowCommands.push('cat *');
+    expect(
+      fresh.specialists.find((candidate) => candidate.slug === 'reviewer')!.allowCommands,
+    ).toEqual(['ls *']);
+  });
+
+  it('reports the claude settings and nothing for an unchanged config', () => {
+    const snapshot = config();
+    expect(refreshSpecialists(snapshot, specialistsOf(config()))).toEqual([]);
+    const fresh = { ...specialistsOf(config()), claudeEditMode: 'accept_edits' as const };
+    expect(refreshSpecialists(snapshot, fresh)).toEqual([
+      `claude.edit_mode ${config().claude.editMode} → accept_edits`,
+    ]);
+  });
+
+  it('does not report fields absent from an old snapshot', () => {
+    const snapshot = config();
+    for (const specialist of snapshot.specialists) {
+      delete (specialist as Partial<typeof specialist>).level;
+    }
+    expect(refreshSpecialists(snapshot, specialistsOf(config()))).toEqual([]);
   });
 });

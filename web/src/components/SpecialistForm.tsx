@@ -569,34 +569,41 @@ export function SpecialistForm({
           />
         </p>
       ) : null}
-      {SECTIONS.map((section) => (
-        <Card key={section.key}>
-          <section aria-labelledby={`section-${section.key}`} className="flex flex-col gap-3 p-4">
-            <h3 id={`section-${section.key}`} className="text-sm font-semibold">
-              {t(`specialists.sections.${section.key}`)}
-            </h3>
-            {section.key === 'main' && !specialist ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="field-slug">Slug</Label>
-                <Input
-                  id="field-slug"
-                  type="text"
-                  value={slug}
-                  disabled={busy}
-                  placeholder="coder"
-                  onChange={(event) => setSlug(event.target.value)}
-                />
-              </div>
-            ) : null}
-            {section.key === 'tools' && catalogError ? (
-              <Alert variant="destructive">
-                {t('specialists.catalogError', { message: catalogError })}
-              </Alert>
-            ) : null}
-            {section.fields.map(renderField)}
-          </section>
-        </Card>
-      ))}
+      <div className="@container">
+        <div className="grid gap-3 @3xl:grid-cols-2">
+          {SECTIONS.map((section) => (
+            <Card key={section.key}>
+              <section
+                aria-labelledby={`section-${section.key}`}
+                className="flex flex-col gap-3 p-4"
+              >
+                <h3 id={`section-${section.key}`} className="text-sm font-semibold">
+                  {t(`specialists.sections.${section.key}`)}
+                </h3>
+                {section.key === 'main' && !specialist ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="field-slug">Slug</Label>
+                    <Input
+                      id="field-slug"
+                      type="text"
+                      value={slug}
+                      disabled={busy}
+                      placeholder="coder"
+                      onChange={(event) => setSlug(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+                {section.key === 'tools' && catalogError ? (
+                  <Alert variant="destructive">
+                    {t('specialists.catalogError', { message: catalogError })}
+                  </Alert>
+                ) : null}
+                {section.fields.map(renderField)}
+              </section>
+            </Card>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

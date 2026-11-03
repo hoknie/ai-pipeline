@@ -54,6 +54,36 @@ describe('cli', () => {
     );
   });
 
+  it('retries with the current specialists after --refresh-config', async () => {
+    const typo = WORKFLOW_CONFIG.replace(
+      'reviewer: { name: Ревьюер, permissions: read }',
+      'reviewer: { name: Ревьюер, permissions: read, model: opsu }',
+    );
+    const box = sandbox(typo);
+    writeFileSync(
+      box.env.AIP_FAKE_SCRIPT!,
+      JSON.stringify({ review: [{ exitCode: 1, noReport: true }, {}] }),
+    );
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'вход', '--json')).stdout,
+    );
+    await waitUntil('the failed review', async () =>
+      (await aip(box, 'run', 'show', runId)).stdout.includes('failed'),
+    );
+    writeConfigDirectory(box.repo, WORKFLOW_CONFIG.replace('max: 3', 'max: 100'));
+    const broken = await aip(box, 'group', 'retry', runId, 'vhod', '--refresh-config');
+    expect(broken.code).toBe(1);
+    expect(broken.stderr).toContain('configuration not loaded: swarm.max');
+    writeConfigDirectory(box.repo, typo.replace('model: opsu', 'model: opus'));
+    const retried = await aip(box, 'group', 'retry', runId, 'vhod', '--refresh-config');
+    expect(retried.code).toBe(0);
+    await aip(box, 'run', 'watch', runId);
+    const group = await aip(box, 'group', 'show', runId, 'vhod', '--json');
+    expect(JSON.parse(group.stdout).warnings).toContain(
+      'config refreshed: reviewer model opsu → opus',
+    );
+  });
+
   it('answers a question and cancels a run', async () => {
     const box = sandbox();
     writeFileSync(

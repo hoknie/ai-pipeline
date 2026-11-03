@@ -232,7 +232,10 @@ export const requestSchema = z.discriminatedUnion('method', [
     method: z.literal('cancel'),
     params: z.object({ runId: z.string().min(1), group: z.string().min(1).optional() }),
   }),
-  z.object({ method: z.literal('retry'), params: z.object(target) }),
+  z.object({
+    method: z.literal('retry'),
+    params: z.object({ ...target, refreshConfig: z.boolean().optional() }),
+  }),
   z.object({
     method: z.literal('run_skip'),
     params: z.object({

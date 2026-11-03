@@ -342,6 +342,17 @@ A run works from the configuration snapshot taken when it starts. On `aip group 
 - Prompts, models, workflows and other settings stay as in the snapshot.
 - If the configuration does not pass validation, the retry or the answer goes ahead with the old permissions, and the group gets the warning `permissions not refreshed: …`.
 
+### Retry with the current configuration
+
+An ordinary retry keeps the model, the runtime and the prompt of the snapshot, so a mistake there (a model name with a typo fails every attempt with `model_not_found`) survives every retry. Fix the specialist and retry with the current configuration: `aip group retry <run-id> <group> --refresh-config`, `swarm_retry` with `refresh_config: true`, or "Retry with current config" in the panel.
+
+- Every specialist of the snapshot that is also in the current configuration takes its whole definition from it: `model`, `runtime`, `prompt`, `skills`, `timeout`, `max`, `permissions`, `allow_commands`, `tools`, `queue`. `claude.edit_mode` and `claude.settings` are taken too.
+- A specialist removed from the configuration keeps its snapshot definition.
+- The workflow (steps, `on_reject`, `additional_prompt`, the split), the delivery settings and skipped steps stay as in the snapshot. Passed steps are not repeated.
+- The new definitions apply to all following steps of all groups of the run.
+- The retried group gets a warning with the changes, for example `config refreshed: reviewer model opsu → opus`. A changed prompt is listed as `reviewer prompt`, without its text. Nothing changed gives `config refreshed: no changes`.
+- If the configuration does not load or pass validation, the retry is refused with `configuration not loaded: …`, and the run does not change.
+
 Commands that Claude Code rejected are shown in `aip group` under the attempt (`denied: …`) and in the panel, each with a pattern for `allow_commands`.
 
 A compound command (`a && b`, `a | b`, `a; b`) passes only if every part matches a pattern, so a pattern is suggested for every part that is not allowed. The `Permission hints:` line of a group collects the patterns that the specialists' permissions do not have yet:

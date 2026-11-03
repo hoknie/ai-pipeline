@@ -69,11 +69,13 @@ import {
   runRef,
   tagId,
   permissionsOf,
+  specialistsOf,
   transition,
   workflowTopologies,
   workflowTopology,
   type Event,
   type PermissionsRefresh,
+  type SpecialistsRefresh,
   type OnLimit,
   type Queue,
   type QueueItem,
@@ -1158,11 +1160,12 @@ export class Daemon {
     return this.serial(async () => {
       const state = this.state(params.runId);
       const keys = problemKeys(state);
-      await this.apply(state, {
-        kind: 'retry',
-        group: params.group,
-        permissions: this.currentPermissions(state),
-      });
+      // Loaded before the event: a broken configuration refuses the retry with nothing changed.
+      const refresh =
+        params.refreshConfig === true
+          ? { specialists: this.currentSpecialists(state) }
+          : { permissions: this.currentPermissions(state) };
+      await this.apply(state, { kind: 'retry', group: params.group, ...refresh });
       const queue = this.queueFor(state.run.repository);
       if (adoptRun(queue, state, keys, this.now())) {
         this.saveQueue(queue);
@@ -1465,6 +1468,23 @@ export class Daemon {
     return this.store
       .recentRuns()
       .map((stored) => this.view(this.states.get(stored.run.id) ?? stored, now));
+  }
+
+  /**
+   * Whole specialists of the current configuration of the run's repository; a configuration that
+   * does not load or pass validation refuses the request.
+   */
+  private currentSpecialists(state: RunState): SpecialistsRefresh {
+    try {
+      return specialistsOf(loadConfig(this.configPathsOf(state.run.repository)));
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw new Rejection((error as Error).message);
+      const { detail } = error;
+      const first = detail.kind === 'invalid' ? detail.errors[0] : undefined;
+      throw new Rejection(
+        `configuration not loaded: ${first ? `${first.path}: ${first.message}` : error.message}`,
+      );
+    }
   }
 
   /** Permissions of the specialists in the current configuration of the run's repository. */

@@ -70,9 +70,12 @@ export {
   matchesPattern,
   permissionsOf,
   refreshPermissions,
+  refreshSpecialists,
+  specialistsOf,
   suggestPatterns,
   type Denial,
   type PermissionsRefresh,
+  type SpecialistsRefresh,
   type SpecialistPermissions,
   type Suggestion,
 } from './permissions.ts';

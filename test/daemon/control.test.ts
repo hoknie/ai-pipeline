@@ -244,4 +244,52 @@ describe('failures and control', () => {
       expect.stringMatching(/^permissions not refreshed: swarm\.max/),
     ]);
   });
+
+  it('retries with the current specialists only when asked to', async () => {
+    const h = await start(
+      WORKFLOW_CONFIG.replace(
+        'reviewer: { name: Ревьюер, permissions: read }',
+        'reviewer: { name: Ревьюер, permissions: read, model: opsu }',
+      ),
+    );
+    h.script({ review: [{ exitCode: 1, noReport: true }, { exitCode: 1, noReport: true }, {}] });
+    const runId = await run(h);
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'failed');
+    writeConfigDirectory(
+      h.repo,
+      WORKFLOW_CONFIG.replace(
+        'reviewer: { name: Ревьюер, permissions: read }',
+        'reviewer: { name: Ревьюер, permissions: read, model: opus }',
+      ),
+    );
+    await h.call('retry', { runId, group: 'g1' });
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'failed');
+    await h.call('retry', { runId, group: 'g1', refreshConfig: true });
+    await h.waitFor(runId, (view) => view.finished);
+    const models = calls(h)
+      .filter((call) => call.step === 'review')
+      .map((call) => call.args[call.args.indexOf('--model') + 1]);
+    expect(models).toEqual(['opsu', 'opsu', 'opus']);
+    expect(calls(h).filter((call) => call.step === 'code')).toHaveLength(1);
+    const detail = await h.group(runId, 'g1');
+    expect(detail.status).toBe('merged');
+    expect(detail.warnings).toContain('config refreshed: reviewer model opsu → opus');
+  });
+
+  it('refuses a retry with the current configuration when it is broken', async () => {
+    const h = await start();
+    h.script({ code: [{ exitCode: 1, noReport: true }] });
+    const runId = await run(h);
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'failed');
+    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('max: 3', 'max: 100'));
+    await expect(h.call('retry', { runId, group: 'g1', refreshConfig: true })).rejects.toThrow(
+      /^configuration not loaded: swarm\.max/,
+    );
+    const detail = await h.group(runId, 'g1');
+    expect(detail.status).toBe('failed');
+    expect(detail.warnings).toEqual([]);
+    expect(
+      ((await h.call('queue', { repository: h.repo })) as { runs: string[] }).runs,
+    ).not.toContain(runId);
+  });
 });

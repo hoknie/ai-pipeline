@@ -929,11 +929,25 @@ function registerGroup(program: Command): void {
     )
     .argument('<run-id>', 'run id')
     .argument('<group>', 'group slug')
-    .addHelpText('after', examples(['aip group retry 0mh3k2ab1x9z login']))
-    .action(async (runId: string, name: string) => {
+    .option(
+      '--refresh-config',
+      'take the specialists (model, runtime, prompt, permissions) of the current configuration first',
+    )
+    .addHelpText(
+      'after',
+      examples([
+        'aip group retry 0mh3k2ab1x9z login',
+        'aip group retry 0mh3k2ab1x9z login --refresh-config',
+      ]),
+    )
+    .action(async (runId: string, name: string, options: { refreshConfig?: boolean }) => {
       print(
         formatRun(
-          (await call(context(), 'retry', { runId, group: name })) as RunView,
+          (await call(context(), 'retry', {
+            runId,
+            group: name,
+            ...(options.refreshConfig ? { refreshConfig: true } : {}),
+          })) as RunView,
           Date.now(),
           activeStyle,
         ),

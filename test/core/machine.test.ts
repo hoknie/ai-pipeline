@@ -5,6 +5,7 @@ import {
   lastUnskipped,
   questionsText,
   runName,
+  specialistsOf,
   summarize,
   transition,
   validateReport,
@@ -12,7 +13,7 @@ import {
   type HumanQuestion,
 } from '../../src/core/index.ts';
 
-import { finish, group, run, runningAttempt, step } from './helpers.ts';
+import { CONFIG_TEXT, config, finish, group, run, runningAttempt, step } from './helpers.ts';
 
 function kinds(effects: Effect[]): string[] {
   return effects.map((effect) => effect.kind);
@@ -586,5 +587,114 @@ describe('step_skip', () => {
     skip(state, 'qa');
     expect(state.run.skippedSteps).toEqual(['qa']);
     expect(lastUnskipped(state.run, group(state))).toBe(2);
+  });
+});
+
+describe('retry with the current config', () => {
+  const FIXED = (text: string) =>
+    text.replace(
+      'reviewer: { name: Ревьюер, permissions: read }',
+      'reviewer: { name: Ревьюер, permissions: read, model: opus }',
+    );
+
+  function failedAtReview() {
+    const state = run(1);
+    state.run.config.specialists.find((candidate) => candidate.slug === 'reviewer')!.model = 'opsu';
+    step(state);
+    finish(state, 'done');
+    step(state);
+    finish(state, 'done');
+    step(state);
+    transition(
+      state,
+      { kind: 'timed_out', group: 'gruppa-1', seq: runningAttempt(state).seq },
+      2000,
+    );
+    expect(group(state).status).toBe('failed');
+    return state;
+  }
+
+  it('takes the fixed model and keeps the passed steps', () => {
+    const state = failedAtReview();
+    transition(
+      state,
+      { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config(FIXED(CONFIG_TEXT))) },
+      2500,
+    );
+    expect(group(state).status).toBe('queued');
+    expect(group(state).warnings).toContain('config refreshed: reviewer model opsu → opus');
+    const effects = step(state);
+    expect(runningAttempt(state).stepId).toBe('review');
+    expect(effects).toBeDefined();
+    expect(
+      state.run.config.specialists.find((candidate) => candidate.slug === 'reviewer')!.model,
+    ).toBe('opus');
+  });
+
+  it('warns about no changes', () => {
+    const state = run(1);
+    step(state);
+    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 2000);
+    transition(
+      state,
+      { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config()) },
+      2500,
+    );
+    expect(group(state).warnings).toContain('config refreshed: no changes');
+  });
+
+  it('keeps the workflow and the skipped steps of the snapshot', () => {
+    const state = failedAtReview();
+    state.run.skippedSteps = ['qa'];
+    const workflows = structuredClone(state.run.config.workflows);
+    const text = FIXED(CONFIG_TEXT).replace(
+      '        - { id: qa, specialist: qa }\n',
+      '        - { id: qa, specialist: qa }\n        - { id: qa2, specialist: qa }\n',
+    );
+    transition(
+      state,
+      { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config(text)) },
+      2500,
+    );
+    expect(state.run.config.workflows).toEqual(workflows);
+    expect(state.run.skippedSteps).toEqual(['qa']);
+  });
+
+  it('leaves the snapshot alone when the retry is refused', () => {
+    const state = run(1);
+    step(state);
+    const before = structuredClone(state.run.config);
+    expect(() =>
+      transition(
+        state,
+        {
+          kind: 'retry',
+          group: 'gruppa-1',
+          specialists: specialistsOf(config(FIXED(CONFIG_TEXT))),
+        },
+        2500,
+      ),
+    ).toThrow();
+    expect(state.run.config).toEqual(before);
+    expect(group(state).warnings).toEqual([]);
+  });
+
+  it('refuses a delivery group as before', () => {
+    const state = run(1);
+    group(state).status = 'merged';
+    state.message = { ...group(state), slug: '_message', status: 'failed', attempts: [] };
+    const before = structuredClone(state.run.config);
+    expect(() =>
+      transition(
+        state,
+        {
+          kind: 'retry',
+          group: '_message',
+          specialists: specialistsOf(config(FIXED(CONFIG_TEXT))),
+        },
+        1,
+      ),
+    ).toThrow('aip run apply');
+    expect(state.run.config).toEqual(before);
   });
 });

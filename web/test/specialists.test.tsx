@@ -648,6 +648,21 @@ describe('form layout', () => {
     expect(screen.getByText('How long one attempt may take, such as 90s, 30m or 2h.')).toBeTruthy();
   });
 
+  it('lays the sections out two per row on a wide form', async () => {
+    render(<Page api={fakeApi()} start="coder" />);
+    await screen.findByLabelText('Model');
+    const names = ['Basics', 'Permissions and limits', 'Tools and skills', 'Prompt'];
+    const cards = names.map((n) => screen.getByRole('region', { name: n }).parentElement!);
+    const grid = cards[0]!.parentElement!;
+    expect(cards.every((c) => c.parentElement === grid)).toBe(true);
+    expect(Array.from(grid.children)).toEqual(cards);
+    expect(grid.className).toContain('grid');
+    expect(grid.className).toContain('@3xl:grid-cols-2');
+    expect(grid.parentElement!.className).toContain('@container');
+    expect(cards.some((c) => c.className.includes('col-span'))).toBe(false);
+    expect(grid.contains(screen.getByRole('toolbar', { name: 'specialist actions' }))).toBe(false);
+  });
+
   it('keeps the actions and the level in the sticky header', async () => {
     render(<Page api={fakeApi()} start="coder" />);
     const header = await screen.findByRole('toolbar', { name: 'specialist actions' });

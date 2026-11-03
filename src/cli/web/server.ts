@@ -99,6 +99,7 @@ const COOKIE = 'aip_token';
 const BODY_LIMIT = 64 * 1024;
 const skipBody = z.object({ step: z.string().trim().min(1), skip: z.boolean() });
 const answerBody = z.object({ answer: z.string().trim().min(1) });
+const retryBody = z.object({ refreshConfig: z.boolean().optional() });
 const applyBody = z.object({
   groups: z.array(z.string().min(1)).optional(),
   force: z.boolean().optional(),
@@ -706,10 +707,15 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     {
       method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/(cancel|retry)$`),
-      handle: ([runId, group, action]) =>
-        action === 'retry'
-          ? call('retry', { runId: runId ?? '', group: group ?? '' })
-          : call('cancel', { runId: runId ?? '', group: group ?? '' }),
+      handle: ([runId, group, action], body) => {
+        if (action !== 'retry') return call('cancel', { runId: runId ?? '', group: group ?? '' });
+        const { refreshConfig } = parseBody(retryBody, body);
+        return call('retry', {
+          runId: runId ?? '',
+          group: group ?? '',
+          ...(refreshConfig ? { refreshConfig: true } : {}),
+        });
+      },
     },
     {
       method: 'POST',

@@ -1,4 +1,4 @@
-import { MoreHorizontal, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -43,7 +43,7 @@ export function RunHeader({
 }) {
   const { t } = useTranslation();
   const [forcing, setForcing] = useState(false);
-  const [retrying, setRetrying] = useState(false);
+  const [retrying, setRetrying] = useState<'plain' | 'refresh' | null>(null);
   const [applying, setApplying] = useState(false);
   const [returning, setReturning] = useState(false);
   const putBack = async () => {
@@ -88,17 +88,18 @@ export function RunHeader({
     failed.unshift({ slug: '_split', title: t('runs.header.split'), status: run.split.status });
   }
   const hasCancelled = failed.some((group) => group.status === 'cancelled');
-  const retryFailed = async () => {
-    setRetrying(true);
+  const retryFailed = async (refreshConfig: boolean) => {
+    setRetrying(refreshConfig ? 'refresh' : 'plain');
     const refused: string[] = [];
     for (const group of failed) {
       try {
-        await api.retry(run.id, group.slug);
+        if (refreshConfig) await api.retry(run.id, group.slug, { refreshConfig: true });
+        else await api.retry(run.id, group.slug);
       } catch (error) {
         refused.push(`${group.title}: ${(error as Error).message}`);
       }
     }
-    setRetrying(false);
+    setRetrying(null);
     if (refused.length > 0) onError(t('runs.header.retryRefused', { list: refused.join('; ') }));
     else notifySuccess(t('runs.header.retryStarted'));
   };
@@ -183,12 +184,30 @@ export function RunHeader({
           <RunSteps run={run} api={api} onError={onError} />
           <div className="flex flex-wrap items-center gap-2">
             {failed.length > 0 ? (
-              <Button variant="outline" disabled={retrying} onClick={() => void retryFailed()}>
-                <RotateCcw className={retrying ? 'motion-safe:animate-spin' : undefined} />
+              <Button
+                variant="outline"
+                disabled={retrying !== null}
+                onClick={() => void retryFailed(false)}
+              >
+                <RotateCcw
+                  className={retrying === 'plain' ? 'motion-safe:animate-spin' : undefined}
+                />
                 {hasCancelled
                   ? t('runs.header.retryFailedCancelled')
                   : t('runs.header.retryFailed')}{' '}
                 ({failed.length})
+              </Button>
+            ) : null}
+            {failed.length > 0 ? (
+              <Button
+                variant="outline"
+                disabled={retrying !== null}
+                onClick={() => void retryFailed(true)}
+              >
+                <RefreshCw
+                  className={retrying === 'refresh' ? 'motion-safe:animate-spin' : undefined}
+                />
+                {t('runs.header.retryRefreshConfig')} ({failed.length})
               </Button>
             ) : null}
             {run.returnable ? (

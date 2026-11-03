@@ -58,7 +58,9 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Workflow" and "Set
 
 - Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
 - A run card shows the first line of the task, the status, workflow, time, cost and a summary of changes (`2 files +367 −0`).
-- The run header has "Deliver", "Cancel run" and "Retry failed (N)". The "More" menu has "Deliver with --force…" and "Copy run id".
+- The run header has "Deliver", "Cancel run", "Retry failed (N)" and "Retry with current config (N)". The "More" menu has "Deliver with --force…" and "Copy run id".
+- "Retry with current config" is in the header for every failed or cancelled group, and next to "Retry" of a failed or cancelled group or split step. It retries as `aip group retry --refresh-config`: the run first takes the specialists (model, runtime, prompt, permissions) from the current configuration, and the workflow stays as it started.
+- The retried group shows the warning `config refreshed: …` with the changes. A broken configuration refuses the retry with its error. Commit message and resolver steps do not have this button.
 - The run header has a "Steps" block: each step of the workflow with its state (done, running, upcoming) and a "Skip" switch with a visible label for steps that are not finished yet.
   - Skipping a running step asks for confirmation: the specialist is stopped without a commit.
   - Its partial changes stay uncommitted in the group worktree.
@@ -160,9 +162,10 @@ Under every section is a collapsible "Status" strip with the current load across
 - Each specialist shows its limit (`of N`) and the groups running on it or waiting for it, with the step and the run title. A click on a group opens it in "Runs".
 - A project specialist that overrides a global one counts as a project specialist.
 - "Background processes" lists what the agents of the daemon started: their child processes and the members of their process groups, including those left after the agent exited, while they live.
+- The open strip has a constant height, the same on both tabs: 256 px by default. Drag its top edge, or press the up and down arrows on it (16 px a step), to change it, from 160 px to 80 % of the window height. The height is remembered in the browser; when the window gets smaller the strip shrinks and returns to the chosen height when the window grows.
 - The agent itself and its `aip mcp --worker` server are not listed.
-- A row has the PID, the name (the full command line is in the tooltip), the owner group (a link to it), the uptime, the average CPU (CPU time over uptime, percent of one core) and the memory (resident set).
-- "Terminate" asks for confirmation, then sends `SIGTERM` to the process and its children and, after 5 seconds, `SIGKILL` to those still alive. The group keeps running. The daemon ends only processes from its own list; any other PID is refused.
+- A row has the PID, the command with its arguments (a long one is cut with an ellipsis, the full line is in the tooltip, and a button copies it), the owner group (a link to it), the uptime, the average CPU (CPU time over uptime, percent of one core) and the memory (resident set).
+- "Terminate" is an icon button with a tooltip. It asks for confirmation, then sends `SIGTERM` to the process and its children and, after 5 seconds, `SIGKILL` to those still alive. The group keeps running. The daemon ends only processes from its own list; any other PID is refused.
 - Processes that left the process tree and group of the agent (`setsid`, a double fork) are not listed.
 
 ## Keyboard and look

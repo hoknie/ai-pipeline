@@ -209,9 +209,37 @@ describe('aip web', () => {
     expect(((await retry.json()) as { error: string }).error).toContain(
       'retry needs failed, cancelled or conflict',
     );
+    expect((await post('/groups/login/retry', { refreshConfig: 'yes' })).status).toBe(400);
+    const refreshed = await post('/groups/login/retry', { refreshConfig: true });
+    expect(refreshed.status).toBe(400);
+    expect(((await refreshed.json()) as { error: string }).error).toContain(
+      'retry needs failed, cancelled or conflict',
+    );
     const missing = await post('/groups/nope/retry', {});
     expect(missing.status).toBe(404);
     expect(((await missing.json()) as { error: string }).error).toContain('unknown group');
+  });
+
+  it('passes refreshConfig of a retry to the daemon', async () => {
+    const { h, web, base } = await setup();
+    h.script({ code: [{ exitCode: 1, noReport: true }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.groups[0]?.status === 'failed');
+    writeConfigDirectory(h.repo, MANUAL_CONFIG.replace('max: 3', 'max: 100'));
+    const retry = await fetch(`${base}/api/runs/${runId}/groups/login/retry`, {
+      method: 'POST',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ refreshConfig: true }),
+    });
+    expect(retry.status).toBe(400);
+    expect(((await retry.json()) as { error: string }).error).toMatch(
+      /^configuration not loaded: swarm\.max/,
+    );
+    expect((await h.status(runId)).groups[0]?.status).toBe('failed');
   });
 
   it('streams a snapshot over SSE', async () => {

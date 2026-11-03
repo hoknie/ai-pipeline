@@ -18,6 +18,14 @@ import {
 } from '../../src/protocol/index.ts';
 
 describe('requests', () => {
+  it('takes an optional refreshConfig flag on a retry', () => {
+    const target = { runId: 'r', group: 'g' };
+    const parse = (params: object) => requestSchema.safeParse({ method: 'retry', params }).success;
+    expect(parse(target)).toBe(true);
+    expect(parse({ ...target, refreshConfig: true })).toBe(true);
+    expect(parse({ ...target, refreshConfig: 'yes' })).toBe(false);
+  });
+
   it('parses a valid request and survives a round trip', () => {
     const line = JSON.stringify({
       id: 7,

@@ -60,7 +60,8 @@ export interface Api {
   group(runId: string, group: string): Promise<GroupView>;
   transcript(runId: string, group: string, seq: number, after: number): Promise<Transcript>;
   answer(runId: string, group: string, answer: string): Promise<unknown>;
-  retry(runId: string, group: string): Promise<unknown>;
+  /** `refreshConfig` first takes the specialists of the current configuration into the run. */
+  retry(runId: string, group: string, options?: { refreshConfig?: boolean }): Promise<unknown>;
   /** Skips a step of the run (or brings it back with `skip=false`); returns the run. */
   skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
   cancel(runId: string, group?: string): Promise<unknown>;
@@ -192,7 +193,11 @@ function bound(repository: string | null): Api {
     answer: (runId, group, answer) =>
       post(`/api/runs/${enc(runId)}/groups/${enc(group)}/answer`, { answer }),
     skipStep: (runId, step, skip) => post(`/api/runs/${enc(runId)}/skip`, { step, skip }),
-    retry: (runId, group) => post(`/api/runs/${enc(runId)}/groups/${enc(group)}/retry`),
+    retry: (runId, group, options) =>
+      post(
+        `/api/runs/${enc(runId)}/groups/${enc(group)}/retry`,
+        options?.refreshConfig ? { refreshConfig: true } : {},
+      ),
     cancel: (runId, group) =>
       group
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)

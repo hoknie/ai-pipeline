@@ -79,6 +79,67 @@ describe('retry a failed step', () => {
   });
 });
 
+describe('retry with the current config', () => {
+  it('offers it next to the retry of a failed group and sends refreshConfig', async () => {
+    const api = panel('failed');
+    await screen.findByText('#2 code');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry with current config' }));
+    await waitFor(() =>
+      expect(api.retry).toHaveBeenCalledWith('run1', 'login', { refreshConfig: true }),
+    );
+  });
+
+  it('shows the refusal as an error', async () => {
+    const onError = vi.fn();
+    const api = fakeApi({
+      group: vi.fn(async () => groupView({ attempts })),
+      retry: vi.fn(async () => {
+        throw new Error('configuration not loaded: swarm.max: must be 1-50');
+      }),
+    });
+    render(
+      <GroupScreen
+        api={api}
+        runId="run1"
+        row={groupRow({ status: 'failed', reason: 'interrupted' })}
+        draftKey="run1/login"
+        drafts={{}}
+        onDraft={() => undefined}
+        onClearDrafts={() => undefined}
+        onError={onError}
+      />,
+    );
+    await screen.findByText('#2 code');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry with current config' }));
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith('configuration not loaded: swarm.max: must be 1-50'),
+    );
+  });
+
+  it('is not offered for a merged group', async () => {
+    panel('merged');
+    await screen.findByText('#2 code');
+    expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
+  });
+
+  it('retries every failed group from the header with refreshConfig', async () => {
+    const api = fakeApi();
+    const run = runView({
+      finished: true,
+      groups: [
+        groupRow({ slug: 'a', title: 'A', status: 'failed' }),
+        groupRow({ slug: 'b', title: 'B', status: 'failed' }),
+      ],
+    });
+    render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Retry failed (2)' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry with current config (2)' }));
+    await waitFor(() => expect(api.retry).toHaveBeenCalledTimes(2));
+    expect(api.retry).toHaveBeenCalledWith('run1', 'a', { refreshConfig: true });
+    expect(api.retry).toHaveBeenCalledWith('run1', 'b', { refreshConfig: true });
+  });
+});
+
 describe('retry every failed group', () => {
   const run = runView({
     finished: true,

@@ -1,4 +1,4 @@
-import { RotateCcw, SkipForward } from 'lucide-react';
+import { RefreshCw, RotateCcw, SkipForward } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -192,6 +192,22 @@ export function GroupScreen({
             >
               <RotateCcw />
               {t('runs.group.retry')}
+            </Button>
+          ) : null}
+          {caps.retry && row.status !== 'conflict' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              loading={busy}
+              onClick={() =>
+                void act(
+                  () => api.retry(runId, row.slug, { refreshConfig: true }),
+                  () => notifySuccess(t('runs.header.retryStarted')),
+                )
+              }
+            >
+              <RefreshCw />
+              {t('runs.group.retryRefreshConfig')}
             </Button>
           ) : null}
           {canSkip && run && skippable ? (

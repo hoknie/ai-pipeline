@@ -594,6 +594,30 @@ describe('host MCP swarm_skip_step', () => {
     ]);
   });
 
+  it('sends refreshConfig of swarm_retry only when it is given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return runView(run(1), 1000);
+    });
+    await client.callTool({
+      name: 'swarm_retry',
+      arguments: { run_id: 'run000000001', group: 'gruppa-1' },
+    });
+    const refreshed = await client.callTool({
+      name: 'swarm_retry',
+      arguments: { run_id: 'run000000001', group: 'gruppa-1', refresh_config: true },
+    });
+    expect(refreshed.isError).toBeFalsy();
+    expect(calls).toEqual([
+      { method: 'retry', params: { runId: 'run000000001', group: 'gruppa-1' } },
+      {
+        method: 'retry',
+        params: { runId: 'run000000001', group: 'gruppa-1', refreshConfig: true },
+      },
+    ]);
+  });
+
   it('reports a refusal of the daemon as a tool error', async () => {
     const client = await connect(async () => {
       throw new Error('step `plan` is already passed by every group');

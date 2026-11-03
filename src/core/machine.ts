@@ -12,7 +12,13 @@ import {
 } from './delivery.ts';
 import { Rejection } from './errors.ts';
 import { checkSkip, lastUnskipped, nextUnskipped, stepStates } from './skip.ts';
-import { refreshPermissions, type Denial, type PermissionsRefresh } from './permissions.ts';
+import {
+  refreshPermissions,
+  refreshSpecialists,
+  type Denial,
+  type PermissionsRefresh,
+  type SpecialistsRefresh,
+} from './permissions.ts';
 import { groupSlugs } from './ids.ts';
 import { questionsText } from './questions.ts';
 import {
@@ -74,7 +80,13 @@ export type Event =
   | { kind: 'attempt_usage'; updates: { group: string; seq: number; usage: Usage }[] }
   | { kind: 'timed_out'; group: string; seq: number }
   | { kind: 'cancel'; group: string | null }
-  | { kind: 'retry'; group: string; permissions?: PermissionsRefresh }
+  | {
+      kind: 'retry';
+      group: string;
+      permissions?: PermissionsRefresh;
+      /** The whole specialists of the current configuration; replaces `permissions` when set. */
+      specialists?: SpecialistsRefresh;
+    }
   | {
       kind: 'answer';
       group: string;
@@ -157,7 +169,7 @@ class Machine {
       case 'cancel':
         return this.cancel(event.group);
       case 'retry':
-        return this.retry(event.group, event.permissions);
+        return this.retry(event.group, event.permissions, event.specialists);
       case 'answer':
         return this.answer(event.group, event.answer, event.by ?? 'human', event.permissions);
       case 'merge_finished':
@@ -545,7 +557,11 @@ class Machine {
     }
   }
 
-  private retry(slug: string, permissions?: PermissionsRefresh): void {
+  private retry(
+    slug: string,
+    permissions?: PermissionsRefresh,
+    specialists?: SpecialistsRefresh,
+  ): void {
     const group = this.group(slug);
     if (group.status === 'failed' || group.status === 'cancelled') this.rejectDeliveryRetry(group);
     if (group.status === 'failed') {
@@ -559,7 +575,14 @@ class Machine {
       throw wrongStatus(group, 'retry', 'failed, cancelled or conflict');
     }
     // After every check: a refused retry leaves the snapshot as it was.
-    this.refresh(group, permissions);
+    if (specialists) {
+      const changes = refreshSpecialists(this.state.run.config, specialists);
+      group.warnings.push(
+        `config refreshed: ${changes.length > 0 ? changes.join('; ') : 'no changes'}`,
+      );
+    } else {
+      this.refresh(group, permissions);
+    }
   }
 
   private rejectDeliveryRetry(group: Group): void {

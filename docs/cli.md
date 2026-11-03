@@ -43,7 +43,7 @@ git diff                          # review and commit it yourself
 | `aip web …` | The web panel: see [web.md](web.md) |
 | `aip repo list\|add <path>\|remove <path> [--json]` | Lists the repositories the daemon knows (`REPOSITORY`, `UNFINISHED`, `WAITING`, `QUEUED`). `add` finds the git root from a subdirectory. `remove` refuses while the repository has unfinished runs or queued tasks |
 | `aip group answer <run-id> <group> <text>` | Answers a specialist's question (a group in `needs_human`) |
-| `aip group retry <run-id> <group>` | Retries a failed or cancelled step from where it stopped, or retries the merge after a conflict |
+| `aip group retry <run-id> <group> [--refresh-config]` | Retries a failed or cancelled step from where it stopped, or retries the merge after a conflict. `--refresh-config` first takes the whole specialists from the current configuration (see [configuration.md](configuration.md#retry-with-the-current-configuration)) |
 | `aip run cancel <run-id>` / `aip group cancel <run-id> <group>` | Stops a whole run or a group |
 | `aip run skip <run-id> <step> [--off] [--json]` | Skips a step that is running or still ahead for the whole run, or brings it back with `--off`. A running step is stopped without a commit; its partial changes stay uncommitted in the group worktree. A step every group has passed cannot be skipped |
 | `aip run apply <run-id> [group...] [--force]` | Delivers ready groups to the working tree (or as a commit, or as a branch) |

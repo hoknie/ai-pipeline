@@ -1,10 +1,11 @@
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { useBackgroundProcesses } from '../../backgroundProcesses.ts';
 import { usePreference } from '../../preferences.ts';
+import { useStatusBarHeight } from '../../statusBarHeight.ts';
 import { loadSections, machineLoad } from '../../specialistLoad.ts';
 import type { Connection } from '../../store.ts';
 import type { RunView } from '../../types.ts';
@@ -15,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs.tsx';
 import { BackgroundProcesses } from './BackgroundProcesses.tsx';
 import { ConnectionIndicator } from './ConnectionIndicator.tsx';
 import { SpecialistLoadPanel } from './SpecialistLoadPanel.tsx';
+import { StatusBarResizeHandle } from './StatusBarResizeHandle.tsx';
 
 /** Where a click on a group of the strip leads. */
 export interface GroupTarget {
@@ -43,6 +45,8 @@ export function StatusBar({
   const { t } = useTranslation();
   const [open, setOpen] = usePreference('specialistLoad.open', false);
   const [tab, setTab] = usePreference<StatusTab>('statusBar.tab', 'specialists');
+  const size = useStatusBarHeight();
+  const [preview, setPreview] = useState<number | null>(null);
   const polled = useBackgroundProcesses(api);
   const sections = useMemo(() => loadSections(machineLoad(runs), selected), [runs, selected]);
   const processes = polled.processes === null ? '—' : String(polled.processes.length);
@@ -53,6 +57,14 @@ export function StatusBar({
       className="sticky bottom-0 shrink-0 border-t bg-card text-xs"
       data-testid="status-bar"
     >
+      {open ? (
+        <StatusBarResizeHandle
+          height={preview ?? size.height}
+          viewportHeight={size.viewportHeight}
+          onPreview={setPreview}
+          onCommit={size.setChosen}
+        />
+      ) : null}
       <div className="flex items-center gap-2">
         <CollapsibleTrigger asChild>
           <Button
@@ -75,16 +87,24 @@ export function StatusBar({
           <ConnectionIndicator connection={connection} />
         </div>
       </div>
-      <CollapsibleContent className="max-h-64 overflow-y-auto px-4 pb-3">
-        <Tabs value={tab} onValueChange={(value) => setTab(value as StatusTab)}>
-          <TabsList>
+      <CollapsibleContent
+        className="flex flex-col px-4 pb-3"
+        style={{ height: preview ?? size.height }}
+        data-testid="status-bar-content"
+      >
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTab(value as StatusTab)}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <TabsList className="shrink-0">
             <TabsTrigger value="specialists">{t('statusBar.tabSpecialists')}</TabsTrigger>
             <TabsTrigger value="processes">{t('statusBar.tabProcesses')}</TabsTrigger>
           </TabsList>
-          <TabsContent value="specialists">
+          <TabsContent value="specialists" className="min-h-0 flex-1 overflow-y-auto">
             <SpecialistLoadPanel runs={runs} selected={selected} onOpenGroup={onOpenGroup} />
           </TabsContent>
-          <TabsContent value="processes">
+          <TabsContent value="processes" className="min-h-0 flex-1 overflow-y-auto">
             <BackgroundProcesses api={api} polled={polled} onOpenGroup={onOpenGroup} />
           </TabsContent>
         </Tabs>
