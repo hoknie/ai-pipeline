@@ -26,6 +26,8 @@ interface Action {
    */
   queueChain?: Record<string, unknown>[];
   delayMs?: number;
+  /** Waits until this file exists, after `delayMs`: the test decides when the agent goes on. */
+  waitFor?: string;
   noReport?: boolean;
   hang?: boolean;
   child?: boolean;
@@ -261,6 +263,8 @@ for (const [index, call] of liveUsage.entries()) {
   }
 }
 if (action.delayMs) await new Promise((resolve) => setTimeout(resolve, action.delayMs));
+while (action.waitFor && !existsSync(action.waitFor))
+  await new Promise((resolve) => setTimeout(resolve, 20));
 if (action.hang) await new Promise(() => setInterval(() => undefined, 1000));
 
 const session =

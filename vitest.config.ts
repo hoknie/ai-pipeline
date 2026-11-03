@@ -8,7 +8,7 @@ export default defineConfig({
     include: ['test/**/*.test.ts', 'web/**/*.test.tsx'],
     exclude: [...configDefaults.exclude, 'integrations/**'],
     globalSetup: ['test/global-setup.ts'],
-    setupFiles: ['web/test/setup.ts'],
+    setupFiles: ['test/setup.ts', 'web/test/setup.ts'],
     testTimeout: 30_000,
   },
 });

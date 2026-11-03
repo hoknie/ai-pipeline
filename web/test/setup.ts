@@ -29,6 +29,10 @@ if (typeof window !== 'undefined') {
 
 // Every test starts in English with nothing chosen: tests of other languages set them up themselves.
 if (typeof window !== 'undefined') {
+  // `findBy…` and `waitFor` give up after one second by default; the suite often runs next to other
+  // test runs, and a loaded machine renders slower than that. Passing tests do not wait longer.
+  const { configure } = await import('@testing-library/react');
+  configure({ asyncUtilTimeout: 5_000 });
   const { beforeEach } = await import('vitest');
   const { default: i18next } = await import('i18next');
   await import('../src/i18n/index.ts');

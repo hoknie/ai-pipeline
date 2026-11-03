@@ -139,7 +139,10 @@ describe('groups waiting for a specialist', () => {
 
   it('tells the run of another task when a specialist of the first run is freed', async () => {
     const h = (current = await harness(LIMITED));
-    h.script({ code: [{ delayMs: 1500 }, {}, {}] });
+    // The first coder works until the test lets it go: a fixed delay may end inside the quiet window
+    // below on a loaded machine and send a real event for the waiting run.
+    const release = join(h.repo, '..', 'release');
+    h.script({ code: [{ waitFor: release }, {}, {}] });
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
@@ -175,7 +178,12 @@ describe('groups waiting for a specialist', () => {
     });
     const secondId = second.runId;
     await h.waitFor(secondId, (view) => row(view, 'signup')?.status === 'waiting');
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // The diff statistics of a run arrive later and send one more event; on a loaded machine that
+    // takes longer than any fixed pause, so wait until the stream stays quiet.
+    for (let seen = -1; seen !== events.length;) {
+      seen = events.length;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
     const statusesOfSecond = () =>
       events.flatMap((event) =>
         event.event === 'run' && (event.run as { id: string }).id === secondId
@@ -192,6 +200,7 @@ describe('groups waiting for a specialist', () => {
     await h.call('status', { runId: first.runId });
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(statusesOfSecond()).toHaveLength(before);
+    writeFileSync(release, '');
     await h.waitFor(secondId, (view) => row(view, 'signup')?.status === 'running');
     await new Promise((resolve) => setTimeout(resolve, 100));
     const seen = statusesOfSecond();
