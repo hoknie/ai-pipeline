@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
-import { clock, cost, diffText, duration, reasonLabel, usageText } from '../../format.ts';
+import { clock, cost, duration, reasonLabel, usageText } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
 import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
@@ -21,6 +21,7 @@ import { StatusBadge } from '../StatusBadge.tsx';
 import { AttemptTimeline } from './AttemptTimeline.tsx';
 import { FileTree } from './FileTree.tsx';
 import { QuestionCard } from './QuestionCard.tsx';
+import { DiffStat } from './DiffStat.tsx';
 import { FilePath } from '../FilePath.tsx';
 import { ApplyDialog } from './ApplyDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
@@ -62,7 +63,10 @@ export function GroupScreen({
   onDeliver,
   run,
   onForceDeliver,
+  showUsage = false,
 }: {
+  /** Show duration, tokens and cost in the header (the run header is scrolled out of view). */
+  showUsage?: boolean;
   api: Api;
   runId: string;
   row: GroupRow | SystemStepRow;
@@ -210,24 +214,28 @@ export function GroupScreen({
               loading={busy}
               onClick={() => void cancelGroup()}
             >
-              {t('runs.group.cancelGroup')}
+              {t('runs.group.cancel')}
             </Button>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-          <span>{row.step ?? '—'}</span>
+          <span className="font-medium text-foreground">{row.step ?? '—'}</span>
           {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
-          <span>{duration(row.durationMs)}</span>
-          {usageText(row.usage) ? <span>{usageText(row.usage)}</span> : null}
-          {cost(row.usage) ? <span>{cost(row.usage)}</span> : null}
           {row.limitUntil !== null ? (
             <span className="text-status-warn">
               {t('runs.group.limitUntil', { time: clock(row.limitUntil) })}
             </span>
           ) : null}
-          {'diff' in row && row.diff ? <span>{diffText(row.diff, t)}</span> : null}
+          {'diff' in row && row.diff ? <DiffStat diff={row.diff} /> : null}
           {!('kind' in row) && row.status === 'merged' ? (
             <StatusBadge status={row.delivery} />
+          ) : null}
+          {showUsage ? (
+            <>
+              <span>{duration(row.durationMs)}</span>
+              {usageText(row.usage) ? <span>{usageText(row.usage)}</span> : null}
+              {cost(row.usage) ? <span>{cost(row.usage)}</span> : null}
+            </>
           ) : null}
         </div>
       </header>

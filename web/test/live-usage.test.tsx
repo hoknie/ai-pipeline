@@ -103,16 +103,48 @@ describe('live update', () => {
     const api = fakeApi({ group: vi.fn(async () => groupView()) });
     render(<App api={api} openStream={openFake} />);
     act(() => stream().send({ event: 'snapshot', seq: 1, runs: [first] }));
-    // the list, the header and the group header
-    expect(await screen.findAllByText('12.3k/1.1k')).toHaveLength(3);
+    // the list and the summary of the run; the group header shows them only on scroll
+    expect(await screen.findAllByText('12.3k/1.1k')).toHaveLength(2);
     const next = runView({
       id: 'run1',
       usage: usage(22_300, 1_100),
       groups: [{ ...row, usage: usage(22_300, 1_100) }],
     });
     act(() => stream().send({ event: 'run', seq: 2, run: next }));
-    await waitFor(() => expect(screen.getAllByText('22.3k/1.1k')).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByText('22.3k/1.1k')).toHaveLength(2));
     expect(screen.queryByText('12.3k/1.1k')).toBeNull();
+  });
+
+  it('adds the usage to the group header while the run header is scrolled out of view', async () => {
+    let callbacks: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(cb: (entries: { isIntersecting: boolean }[]) => void) {
+          callbacks.push(cb);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    try {
+      window.location.hash = '#runs/run1/login';
+      const row = groupRow({ usage: usage(12_300, 1_100) });
+      const run = runView({ id: 'run1', usage: usage(12_300, 1_100), groups: [row] });
+      const api = fakeApi({ group: vi.fn(async () => groupView()) });
+      render(<App api={api} openStream={openFake} />);
+      act(() => stream().send({ event: 'snapshot', seq: 1, runs: [run] }));
+      expect(await screen.findAllByText('12.3k/1.1k')).toHaveLength(2);
+      const scroll = (isIntersecting: boolean) =>
+        act(() => callbacks.forEach((cb) => cb([{ isIntersecting }])));
+      scroll(false);
+      await waitFor(() => expect(screen.getAllByText('12.3k/1.1k')).toHaveLength(3));
+      scroll(true);
+      await waitFor(() => expect(screen.getAllByText('12.3k/1.1k')).toHaveLength(2));
+    } finally {
+      callbacks = [];
+      vi.unstubAllGlobals();
+    }
   });
 });
 

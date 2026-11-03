@@ -341,6 +341,8 @@ export interface Run {
   fromQueue: boolean;
   /** Id of the queue item the run started from; null for a run outside the queue. */
   queueItem: string | null;
+  /** Number of the task the run was created for. */
+  number: number;
   /** Ids of catalog tags. */
   tags: string[];
   /** Steps skipped after the start; the step list of the snapshot is unchanged. */

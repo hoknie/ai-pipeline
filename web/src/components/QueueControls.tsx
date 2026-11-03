@@ -1,7 +1,9 @@
+import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api.ts';
 import { notifySuccess } from '../notify.ts';
+import { formatRoute } from '../route.ts';
 import { queueStateLabel } from '../status.ts';
 import type { QueueView } from '../types.ts';
 import { Button } from '../ui/button.tsx';
@@ -18,6 +20,7 @@ export function QueueControls({
   onQueue,
   onError,
   onDone,
+  onNewTask,
 }: {
   api: Api;
   queue: QueueView;
@@ -28,6 +31,7 @@ export function QueueControls({
   onError: (message: string) => void;
   /** Called after an action succeeded, so the page drops the edited text. */
   onDone: () => void;
+  onNewTask: () => void;
 }) {
   const { t } = useTranslation();
   const parsed = parseParallel(parallel ?? String(queue.parallel));
@@ -48,10 +52,10 @@ export function QueueControls({
 
   return (
     <section
-      aria-label={t('queue.title')}
-      className="flex flex-wrap items-center gap-3 lg:flex-col lg:items-stretch"
+      aria-label={t('queue.controls.label')}
+      className="flex flex-col gap-3 rounded-xl border bg-card p-3"
     >
-      <h2 className="text-lg font-semibold">{t('queue.title')}</h2>
+      <h3 className="font-semibold">{t('queue.controls.title')}</h3>
       <div>
         <StatusBadge
           status={queue.status === 'running' ? 'running' : 'stopped'}
@@ -66,7 +70,11 @@ export function QueueControls({
         onQueue={onQueue}
         onError={onError}
       />
-      <span className="flex gap-2">
+      <span className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={onNewTask}>
+          <Plus className="size-4" aria-hidden="true" />
+          {t('queue.newTask')}
+        </Button>
         <Button
           disabled={!canStart || invalid}
           onClick={() =>
@@ -86,6 +94,12 @@ export function QueueControls({
           {t('queue.pause')}
         </Button>
       </span>
+      <a
+        className="text-sm underline"
+        href={formatRoute({ view: 'settings', run: 'queue', group: null, step: null })}
+      >
+        {t('queue.controls.settings')}
+      </a>
     </section>
   );
 }

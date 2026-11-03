@@ -220,6 +220,7 @@ const DICTIONARIES = { es, ru, zh } as Record<string, Tree>;
 // Words that read the same in the language: names of languages, product and protocol terms.
 const SAME_AS_ENGLISH = new Set([
   'Workflow',
+  'Tokens',
   'workflow {{id}}',
   'Workflow: {{id}}',
   '{{action}} «{{id}}»?',
@@ -231,6 +232,7 @@ const SAME_AS_ENGLISH = new Set([
   'Error',
   'Global',
   'global',
+  'General',
   // Units and abbreviations written the same way in several languages.
   'PID',
   's',
@@ -240,6 +242,8 @@ const SAME_AS_ENGLISH = new Set([
   'MB',
   'GB',
   '{{group}} · {{run}}',
+  // The name of the agent.
+  'Claude',
 ]);
 
 describe.each(Object.keys(DICTIONARIES))('dictionary %s', (language) => {

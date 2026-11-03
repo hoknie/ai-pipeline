@@ -24,8 +24,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function showQueue(queue = queueOf(), overrides: Parameters<typeof fakeApi>[0] = {}) {
-  window.location.hash = '#queue';
+function showQueue(
+  queue = queueOf(),
+  overrides: Parameters<typeof fakeApi>[0] = {},
+  hash = '#queue',
+) {
+  window.location.hash = hash;
   const api = fakeApi({ queue: vi.fn(async () => queue), ...overrides });
   render(<App api={api} openStream={openFake} />);
   return api;
@@ -40,6 +44,8 @@ function showRun(run = runView(), overrides: Parameters<typeof fakeApi>[0] = {})
 
 const settingsBlock = async () =>
   within(await screen.findByRole('region', { name: 'queue settings' }));
+const controlsBlock = async () =>
+  within(await screen.findByRole('region', { name: 'queue controls' }));
 
 const limitStop = (autoResume: boolean) =>
   ({
@@ -53,9 +59,11 @@ const limitStop = (autoResume: boolean) =>
 
 describe('on a usage limit setting', () => {
   it('sends only onLimit when the user picks Stop', async () => {
-    const api = showQueue(queueOf(), {
-      queueSettings: vi.fn(async () => queueOf({ onLimit: 'stop' })),
-    });
+    const api = showQueue(
+      queueOf(),
+      { queueSettings: vi.fn(async () => queueOf({ onLimit: 'stop' })) },
+      '#settings/queue',
+    );
     const block = await settingsBlock();
     const select = block.getByRole<HTMLButtonElement>('combobox', { name: 'On a usage limit' });
     expect(select.textContent).toBe('Wait for the reset');
@@ -78,7 +86,7 @@ describe('a queue stopped by a usage limit', () => {
     expect(alert.textContent).toContain(`resets at ${clock(RESET)}`);
     expect(alert.textContent).toContain(`Resumes by itself at ${clock(RESET)}`);
     expect(within(alert).getByRole('link', { name: 'Open group login' })).toBeTruthy();
-    const block = await settingsBlock();
+    const block = await controlsBlock();
     const pause = block.getByRole<HTMLButtonElement>('button', { name: 'Pause' });
     expect(pause.disabled).toBe(false);
     fireEvent.click(pause);

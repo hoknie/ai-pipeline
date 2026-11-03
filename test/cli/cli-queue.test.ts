@@ -361,9 +361,11 @@ describe('cli', () => {
     });
     const text = (created.content as { text: string }[])[0]!.text;
     expect(text).toContain('started (refs/aip/');
-    const runId = /Run (\w+) started/.exec(text)?.[1] ?? '';
+    const runId = /Run #\d+ (\w+) started/.exec(text)?.[1] ?? '';
     const status = await client.callTool({ name: 'swarm_status', arguments: { run_id: runId } });
-    expect((status.content as { text: string }[])[0]!.text).toContain(`Run ${runId}`);
+    expect((status.content as { text: string }[])[0]!.text).toMatch(
+      new RegExp(`Run #\\d+ ${runId}`),
+    );
     expect((status.content as { text: string }[])[0]!.text).toContain(
       'Title: Вход в систему (vhod-v-sistemu)',
     );

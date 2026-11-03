@@ -272,7 +272,9 @@ export class Daemon {
   private queueFor(repository: string): Queue {
     const cached = this.queues.get(repository);
     if (cached) return cached;
-    const queue = this.store.loadQueue(repository) ?? emptyQueue(repository, this.now());
+    const queue =
+      this.store.loadQueue(repository) ??
+      emptyQueue(repository, this.now(), this.store.maxTaskNumber(repository) + 1);
     this.queues.set(repository, queue);
     return queue;
   }
@@ -445,7 +447,7 @@ export class Daemon {
         const created = await this.createRun(
           itemParams(queue, item),
           knownTags(this.catalog, item.tags),
-          item.id,
+          item,
         );
         itemStarted(queue, item.id, created.runId, this.now());
         started.set(item.id, created);
@@ -491,6 +493,7 @@ export class Daemon {
     itemStarted(queue, item.id, id, this.now());
     return {
       runId: id,
+      number: state.run.number,
       branch: state.run.branch,
       groups: state.groups.map((group) => ({ slug: group.slug, title: group.title })),
       split: state.split !== null,
@@ -664,7 +667,7 @@ export class Daemon {
           const created = await this.createRun(
             itemParams(queue, item),
             knownTags(this.catalog, item.tags),
-            item.id,
+            item,
           );
           itemStarted(queue, item.id, created.runId, this.now());
           this.saveQueue(queue);
@@ -1279,7 +1282,7 @@ export class Daemon {
     if (!run && queue.stop?.kind === 'item' && queue.stop.item === item.id) {
       throw new Rejection(queue.stop.error);
     }
-    return { item: item.id, run, queue: this.queueSnapshot(queue) };
+    return { item: item.id, number: item.number, run, queue: this.queueSnapshot(queue) };
   }
 
   private async addQueueItem(
@@ -1376,7 +1379,7 @@ export class Daemon {
   private async createRun(
     params: ParamsOf<'run'>,
     tagIds: string[],
-    queueItem: string | null = null,
+    queueItem: { id: string; number: number },
   ): Promise<RunCreated> {
     const repository = await this.rootOf(params.repository);
     const config = loadConfig(
@@ -1406,7 +1409,8 @@ export class Daemon {
       groups: params.groups ?? groupsFromTask(params.task ?? ''),
       split: fromTask,
       fromQueue: true,
-      queueItem,
+      queueItem: queueItem.id,
+      number: queueItem.number,
       autoDeliver: params.autoDeliver,
       deliveryMode: params.deliveryMode,
       skip: params.skip,
@@ -1424,6 +1428,7 @@ export class Daemon {
       : [];
     return {
       runId: id,
+      number: state.run.number,
       branch: state.run.branch,
       groups: state.groups.map((group) => ({ slug: group.slug, title: group.title })),
       split: state.split !== null,

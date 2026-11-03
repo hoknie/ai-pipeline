@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { NotificationCenterState } from '../src/notifications.ts';
 import { NavSidebar, type NavProps } from '../src/components/shell/NavSidebar.tsx';
 import { MobileNav } from '../src/components/shell/MobileNav.tsx';
 import { AppShell } from '../src/components/shell/AppShell.tsx';
@@ -11,6 +12,22 @@ import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 
 afterEach(() => cleanup());
 
+export function centre(extra: Partial<NotificationCenterState> = {}): NotificationCenterState {
+  return {
+    items: [],
+    unread: 0,
+    unreadTone: 'err',
+    isRead: () => false,
+    permission: 'default',
+    open: () => {},
+    enable: () => {},
+    hide: () => {},
+    hideAll: () => {},
+    select: () => {},
+    ...extra,
+  };
+}
+
 function props(extra: Partial<NavProps> = {}): NavProps {
   return {
     view: 'runs',
@@ -20,7 +37,7 @@ function props(extra: Partial<NavProps> = {}): NavProps {
     waiting: 0,
     queued: 0,
     onPalette: () => {},
-    onEnableNotifications: () => {},
+    notifications: centre(),
     repository: {
       repositories: [],
       selected: null,
@@ -53,7 +70,7 @@ describe('top navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Runs', 'Queue', 'Topology', 'Specialists', 'Workflow']);
+    ).toEqual(['Runs', 'Queue', 'Topology', 'Specialists', 'Workflow', 'Settings']);
     expect(within(bar!).getByText('web')).toBeTruthy();
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])
@@ -71,6 +88,15 @@ describe('top navigation', () => {
       expect(link.querySelector('span.sr-only')?.textContent).toBe(link.textContent);
     }
     expect(within(nav).getByRole('link', { name: 'Queue' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Runs' }).getAttribute('aria-current')).toBeNull();
+  });
+
+  it('marks the settings section as current', () => {
+    mount({ view: 'settings' });
+    const nav = screen.getByRole('navigation', { name: 'sections' });
+    expect(within(nav).getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe(
       'page',
     );
     expect(within(nav).getByRole('link', { name: 'Runs' }).getAttribute('aria-current')).toBeNull();
@@ -156,9 +182,29 @@ describe('top navigation', () => {
     }
   });
 
-  it('hides the notifications button once they are on', () => {
-    mount({ onEnableNotifications: null });
-    expect(screen.queryByRole('button', { name: 'Notifications' })).toBeNull();
+  it.each(['default', 'granted', 'denied', 'unsupported'] as const)(
+    'always shows the notifications button (permission %s)',
+    (permission) => {
+      mount({ notifications: centre({ permission }) });
+      expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
+    },
+  );
+
+  it('puts the unread count on the bell and into its name', () => {
+    const { container } = mount({ notifications: centre({ unread: 3, unreadTone: 'warn' }) });
+    expect(screen.getByRole('button', { name: 'Notifications, 3 unread' })).toBeTruthy();
+    expect(container.querySelector('[data-notification-count]')!.textContent).toBe('3');
+  });
+
+  it('shortens a large count to 99+', () => {
+    const { container } = mount({ notifications: centre({ unread: 150 }) });
+    expect(container.querySelector('[data-notification-count]')!.textContent).toBe('99+');
+    expect(screen.getByRole('button', { name: 'Notifications, 150 unread' })).toBeTruthy();
+  });
+
+  it('shows no count when everything is read', () => {
+    const { container } = mount();
+    expect(container.querySelector('[data-notification-count]')).toBeNull();
   });
 
   it('opens the theme menu', async () => {

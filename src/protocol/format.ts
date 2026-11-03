@@ -52,8 +52,15 @@ export function table(rows: string[][], style: Style = plainStyle): string {
     .join('\n');
 }
 
+/** `#7`: how a task number is shown. */
+export function taskNumber(number: number): string {
+  return `#${number}`;
+}
+
 export function formatRunCreated(created: RunCreated, style: Style = plainStyle): string {
-  const lines = [`Run ${style.accent(created.runId)} started (${created.branch}).`];
+  const lines = [
+    `Run ${taskNumber(created.number)} ${style.accent(created.runId)} started (${created.branch}).`,
+  ];
   if (created.split) lines.push('The task is being split into groups first (group `_split`).');
   else
     lines.push(
@@ -67,7 +74,7 @@ export function formatRunQueued(result: RunQueued, style: Style = plainStyle): s
   if (result.run) return formatRunCreated(result.run, style);
   const position = result.queue.items.find((item) => item.id === result.item)?.position ?? 0;
   const { status, parallel, runs } = result.queue;
-  return `Task ${result.item} queued at position ${position} (queue ${status}, ${runs.length} of ${parallel} places taken).`;
+  return `Task ${taskNumber(result.number)} ${result.item} queued at position ${position} (queue ${status}, ${runs.length} of ${parallel} places taken).`;
 }
 
 /** Local date and time of the moment, `YYYY-MM-DD HH:MM`. */
@@ -127,8 +134,9 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
   if (runs.length === 0) return 'No runs yet.';
   return table(
     [
-      ['RUN', 'STATE', 'WORKFLOW', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
+      ['#', 'RUN', 'STATE', 'WORKFLOW', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
       ...runs.map((run) => [
+        taskNumber(run.number),
         style.accent(run.id),
         statusBadge(run.state, style),
         run.workflow,
@@ -152,7 +160,7 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
 
 export function formatRun(run: RunView, now: number, style: Style = plainStyle): string {
   const header = [
-    `Run ${style.accent(run.id)} · ${run.workflow} · ${statusBadge(run.state, style)} · ${run.branch}`,
+    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${run.workflow} · ${statusBadge(run.state, style)} · ${run.branch}`,
     ...(run.title
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
       : []),
@@ -376,7 +384,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
         : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
     const delivering = run.delivering ? ' · delivering' : '';
     lines.push(
-      `  ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
+      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
     );
     for (const active of run.active) {
       lines.push(`    ${active.group}${active.step ? `: ${active.step}` : ''}`);
@@ -439,12 +447,18 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const after =
       item.after.length === 0
         ? ''
-        : ` · after ${item.after.map((dependency) => dependency.id).join(', ')}${mark}`;
+        : ` · after ${item.after
+            .map((dependency) =>
+              dependency.number === null
+                ? dependency.id
+                : `${taskNumber(dependency.number)} ${dependency.id}`,
+            )
+            .join(', ')}${mark}`;
     const postponed = item.postponed ? ' · postponed' : '';
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     const returned = item.run === null ? '' : ` · returns ${style.accent(item.run)}`;
     lines.push(
-      `  ${item.position}. ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
+      `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );
   }
   return lines.join('\n');

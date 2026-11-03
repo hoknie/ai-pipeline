@@ -26,6 +26,8 @@ export const DEFAULT_AUTOPILOT_ANSWER =
 
 export interface QueueItem {
   id: string;
+  /** Integer number of the task within the repository; never reused. */
+  number: number;
   workflow: string;
   task: string | null;
   groups: NewGroup[] | null;
@@ -106,6 +108,8 @@ export interface Queue {
   /** What a usage limit does: the group waits for the reset, or fails. */
   onLimit: OnLimit;
   items: QueueItem[];
+  /** The number the next added task gets. */
+  nextNumber: number;
   /** Runs created by the queue that still occupy a place. */
   runs: string[];
   /** Keys of the problems the user already knows about. */
@@ -129,7 +133,7 @@ export interface ItemFields {
   postponed?: boolean | undefined;
 }
 
-export function emptyQueue(repository: string, now: number): Queue {
+export function emptyQueue(repository: string, now: number, nextNumber = 1): Queue {
   return {
     repository,
     status: 'stopped',
@@ -139,6 +143,7 @@ export function emptyQueue(repository: string, now: number): Queue {
     autopilotAnswer: null,
     onLimit: 'wait',
     items: [],
+    nextNumber,
     runs: [],
     acknowledged: [],
     skipped: [],
@@ -208,6 +213,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
   checkDependencies(queue, id, after);
   const item: QueueItem = {
     id,
+    number: queue.nextNumber,
     workflow: cleanWorkflow(fields.workflow),
     ...cleanBody(fields),
     title: cleanTitle(fields.title),
@@ -222,6 +228,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
     run: null,
   };
   queue.items.push(item);
+  queue.nextNumber += 1;
   queue.updatedAt = now;
   return item;
 }
@@ -761,6 +768,7 @@ export function returnRun(queue: Queue, state: RunState, id: string, now: number
   }
   const item: QueueItem = {
     id,
+    number: state.run.number,
     workflow: state.run.workflow,
     task: null,
     groups: null,

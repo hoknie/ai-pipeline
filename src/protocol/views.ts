@@ -191,6 +191,8 @@ export type RunViewState = RunPhase | 'queued';
 
 export interface RunView {
   id: string;
+  /** Integer number of the task within the repository. */
+  number: number;
   title: string;
   /** English kebab-case name; null until the run is named. */
   name: string | null;
@@ -475,6 +477,7 @@ export function runView(
   }
   return {
     id: state.run.id,
+    number: state.run.number,
     title: runTitle(state),
     name: state.run.name ?? null,
     repository: state.run.repository,
@@ -626,6 +629,8 @@ export function groupView(
 
 export interface RunCreated {
   runId: string;
+  /** Number of the task of the run. */
+  number: number;
   branch: string;
   groups: { slug: string; title: string }[];
   split: boolean;
@@ -635,6 +640,8 @@ export interface RunCreated {
 /** Answer to `run`: the task goes to the queue; the run exists once the queue takes the task. */
 export interface RunQueued {
   item: string;
+  /** Number given to the task. */
+  number: number;
   run: RunCreated | null;
   queue: QueueView;
 }
@@ -680,6 +687,8 @@ export interface ConfigPreview {
 
 export interface QueueItemView {
   id: string;
+  /** Integer number of the task within the repository. */
+  number: number;
   position: number;
   workflow: string;
   task: string | null;
@@ -705,12 +714,16 @@ export interface QueueItemView {
 export interface DependencyView {
   kind: 'item' | 'run';
   id: string;
+  /** Number of the predecessor task; null when the run is unknown. */
+  number: number | null;
   title: string;
   state: DependencyState;
 }
 
 export interface QueueRunView {
   id: string;
+  /** Number of the task of the run. */
+  number: number;
   title: string;
   state: RunPhase;
   workflow: string;
@@ -776,6 +789,7 @@ function queueRunView(
     (stopping ? problems.find((p) => p.reason !== 'needs_human') : undefined) ?? problems[0];
   return {
     id: state.run.id,
+    number: state.run.number,
     title: runTitle(state),
     state: summarize(state).state,
     workflow: state.run.workflow,
@@ -860,6 +874,7 @@ export function queueView(
     stop: queue.stop,
     items: queue.items.map((item, index) => ({
       id: item.id,
+      number: item.number,
       position: index + 1,
       workflow: item.workflow,
       ...itemBody(item, lookup),
@@ -874,10 +889,22 @@ export function queueView(
         const state = dependencyState(queue, ref, lookup);
         if (other) {
           const label = other.title ?? (other.task ? other.task.trim().split('\n')[0] : null);
-          return { kind: 'item', id: ref, title: label ?? other.workflow, state };
+          return {
+            kind: 'item',
+            id: ref,
+            number: other.number,
+            title: label ?? other.workflow,
+            state,
+          };
         }
         const run = lookup(ref);
-        return { kind: 'run', id: ref, title: run ? runTitle(run) : ref, state };
+        return {
+          kind: 'run',
+          id: ref,
+          number: run ? run.run.number : null,
+          title: run ? runTitle(run) : ref,
+          state,
+        };
       }),
       postponed: item.postponed,
       createdAt: item.createdAt,

@@ -906,3 +906,48 @@ describe('general settings', () => {
     expect(editorView(setup()).settingsFiles.global.revision).toBeNull();
   });
 });
+
+describe('web and runtimes in the editor view', () => {
+  const find = (view: ReturnType<typeof editorView>, path: string) =>
+    view.settings.find((setting) => setting.path === path);
+
+  it('shows the defaults with no file', () => {
+    const view = editorView(setup());
+    expect(find(view, 'web.port')).toEqual({ path: 'web.port', value: 7341, file: null });
+    expect(find(view, 'web.auth')?.value).toBe('token');
+    expect(find(view, 'runtimes.claude.command')).toEqual({
+      path: 'runtimes.claude.command',
+      value: 'claude',
+      file: null,
+    });
+    expect(find(view, 'runtimes.opencode.env')?.value).toEqual([]);
+  });
+
+  it('takes the values and the file from the global settings.yaml', () => {
+    const paths = setup();
+    const file = join(paths.global.directory, 'settings.yaml');
+    write(file, 'web:\n  port: 8000\nruntimes:\n  claude:\n    command: /bin/claude\n');
+    const view = editorView(paths);
+    expect(find(view, 'web.port')).toEqual({ path: 'web.port', value: 8000, file });
+    expect(find(view, 'web.host')?.file).toBeNull();
+    expect(find(view, 'runtimes.claude.command')).toMatchObject({ value: '/bin/claude', file });
+    expect(find(view, 'runtimes.claude.args')?.file).toBeNull();
+  });
+
+  it('ignores the project level', () => {
+    const paths = setup();
+    write(join(paths.project.directory, 'settings.yaml'), 'web:\n  port: 9000\n');
+    expect(find(editorView(paths), 'web.port')?.value).toBe(7341);
+  });
+
+  it('gives only the names of the environment variables', () => {
+    const paths = setup();
+    write(
+      join(paths.global.directory, 'settings.yaml'),
+      'runtimes:\n  claude:\n    env:\n      ZED: z\n      ANTHROPIC_API_KEY: secret\n',
+    );
+    const view = editorView(paths);
+    expect(find(view, 'runtimes.claude.env')?.value).toEqual(['ANTHROPIC_API_KEY', 'ZED']);
+    expect(JSON.stringify(view)).not.toContain('secret');
+  });
+});

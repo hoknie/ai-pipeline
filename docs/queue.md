@@ -22,6 +22,15 @@ aip queue return <run-id>                            # put a failed or cancelled
 
 Delivery for one task is set with `--auto-deliver`, `--delivery-mode` and their `--default-*` flags (see [`delivery`](configuration.md#delivery)).
 
+### Task numbers
+
+Every task gets an integer number within its repository when it is added to the queue: 1, 2, 3, and so on. The number never changes and is never given to another task, so it stays the same when tasks are removed or moved. A task that was refused does not take a number.
+
+- The run created from a task keeps its number. A run returned to the queue (see below) keeps the number it already has.
+- The numbers do not close up after tasks are removed, and they survive a daemon restart.
+- `aip queue list` prints the number as `#N` after the position (`1. #7 q…`), and in the lines of running runs and predecessors (`after #5 q…`). `aip run list` has a `#` column; `aip run show` and `aip run start` print `Run #N <run-id>`. The web panel shows `#N` next to the task and the run, and the run search finds `#N` exactly (`#7` does not find 17 or 70).
+- A task is still addressed by its id in commands; the number is for reading.
+
 ### Postponed tasks
 
 - `--postpone` on `aip queue add` and `aip queue edit` postpones a task. It keeps its place, but a running queue does not take it, and `aip queue list` shows `· postponed`.

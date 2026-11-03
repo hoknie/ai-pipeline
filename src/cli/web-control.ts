@@ -104,8 +104,17 @@ async function panelOf(
   }
 }
 
-async function startPanel(restart: boolean, open: boolean | undefined): Promise<void> {
-  const client = restart ? 'aip web restart' : 'aip web start';
+/**
+ * Starts the web panel of the daemon (`restart` re-reads the web settings). A failure is reported
+ * on stderr with exit code 1; the daemon keeps running.
+ */
+export async function startPanel(options: {
+  restart: boolean;
+  open: boolean | undefined;
+  client?: string;
+}): Promise<void> {
+  const { restart, open } = options;
+  const client = options.client ?? (restart ? 'aip web restart' : 'aip web start');
   const settings = loadWebSettings(
     configPaths(process.cwd(), process.env.XDG_CONFIG_HOME, process.env.HOME),
   );
@@ -137,7 +146,7 @@ async function startPanel(restart: boolean, open: boolean | undefined): Promise<
       : result.state === 'restarted'
         ? 'restarted'
         : 'started';
-  print(`aip web: ${word} (pid ${ping?.pid ?? 'unknown'})`);
+  if (options.client === undefined) print(`aip web: ${word} (pid ${ping?.pid ?? 'unknown'})`);
   const url = result.status.url;
   if (url !== null) {
     print(`aip web: ${url}`);
@@ -151,7 +160,9 @@ export function registerWebControl(web: Command, style: Style): void {
     .description('Start the web panel of the daemon (nothing happens if it runs)')
     .option('--open', 'open the dashboard in the default browser')
     .addHelpText('after', examples(['aip web start', 'aip web start --open'], style))
-    .action(async (options: { open?: boolean }) => startPanel(false, options.open));
+    .action(async (options: { open?: boolean }) =>
+      startPanel({ restart: false, open: options.open }),
+    );
 
   web
     .command('stop')
@@ -181,7 +192,9 @@ export function registerWebControl(web: Command, style: Style): void {
     .description('Stop the web panel and start it again, re-reading the web settings')
     .option('--open', 'open the dashboard in the default browser')
     .addHelpText('after', examples(['aip web restart', 'aip web restart --open'], style))
-    .action(async (options: { open?: boolean }) => startPanel(true, options.open));
+    .action(async (options: { open?: boolean }) =>
+      startPanel({ restart: true, open: options.open }),
+    );
 
   web
     .command('status')

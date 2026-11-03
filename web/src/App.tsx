@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import i18next from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from './api.ts';
@@ -14,11 +13,12 @@ import { ShortcutsDialog } from './components/shell/ShortcutsDialog.tsx';
 import { ConfirmProvider, useConfirm } from './confirm.tsx';
 import { useHotkey } from './hotkeys.ts';
 import { notifyError } from './notify.ts';
+import { useNotificationCenter } from './notifications.ts';
 import { usePreference } from './preferences.ts';
 import { formatRoute, parseRoute, type Route, type View } from './route.ts';
 import { repositoryLabel, waitingByRepository } from './repositories.ts';
 import { sectionLabel } from './sections.ts';
-import { statusInfo } from './status.ts';
+import { settingsGroupOf } from './settingsGroups.ts';
 import { browserEventSource, useRuns, type EventSourceFactory } from './store.ts';
 import { TagsProvider } from './tags.tsx';
 import { Skeleton } from './ui/skeleton.tsx';
@@ -27,6 +27,7 @@ const TopologyPage = lazy(() => import('./components/TopologyPage.tsx'));
 const QueuePage = lazy(() => import('./components/QueuePage.tsx'));
 const SpecialistsPage = lazy(() => import('./components/SpecialistsPage.tsx'));
 const WorkflowsPage = lazy(() => import('./components/WorkflowsPage.tsx'));
+const SettingsPage = lazy(() => import('./components/settings/SettingsPage.tsx'));
 
 function readRoute(): Route {
   return parseRoute(window.location.hash);
@@ -46,8 +47,6 @@ function useNow(): number {
   }, []);
   return now;
 }
-
-const ALERT_STATUSES = new Set(['needs_human', 'failed']);
 
 function Loading({ what }: { what: string }) {
   const { t } = useTranslation();
@@ -109,10 +108,6 @@ function Panel({
   const [showJson, setShowJson] = usePreference('showJson', false);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
-  const [notify, setNotify] = useState(
-    () => typeof Notification !== 'undefined' && Notification.permission === 'granted',
-  );
-  const seen = useRef(new Map<string, string>());
   const lastRun = useRef<string | null>(null);
   const now = useNow();
 
@@ -147,25 +142,11 @@ function Panel({
     if (routedRepository !== null && routedRepository !== selected) setChosen(routedRepository);
   }, [routedRepository, selected, setChosen]);
 
-  useEffect(() => {
-    for (const run of runs) {
-      for (const group of run.groups) {
-        const key = `${run.id}/${group.slug}`;
-        const before = seen.current.get(key);
-        seen.current.set(key, group.status);
-        if (
-          notify &&
-          before !== undefined &&
-          before !== group.status &&
-          ALERT_STATUSES.has(group.status)
-        ) {
-          new Notification(`aip: ${group.title}`, {
-            body: statusInfo(group.status, i18next.t).label,
-          });
-        }
-      }
-    }
-  }, [runs, notify]);
+  const notifications = useNotificationCenter(
+    runs,
+    (item) => setRoute({ view: 'runs', run: item.runId, group: item.slug, step: null }),
+    loaded,
+  );
 
   const onDraft = useCallback((key: string, text: string) => {
     setDrafts((current) => ({ ...current, [key]: text }));
@@ -192,6 +173,7 @@ function Panel({
     if (view === route.view) return route;
     if (view === 'queue' || view === 'specialists' || view === 'workflows')
       return { view, run: null, group: null, step: null };
+    if (view === 'settings') return { view, run: 'general', group: null, step: null };
     if (view === 'topology') return { view, run: run?.workflow ?? null, group: null, step: null };
     return { view, run: lastRun.current, group: null, step: null };
   };
@@ -291,13 +273,7 @@ function Panel({
           waiting,
           queued: queue?.items.length ?? 0,
           onPalette: () => setPalette(true),
-          onEnableNotifications:
-            typeof Notification !== 'undefined' && !notify
-              ? () =>
-                  void Notification.requestPermission().then((result) =>
-                    setNotify(result === 'granted'),
-                  )
-              : null,
+          notifications,
         }}
       >
         <CommandPalette
@@ -321,6 +297,18 @@ function Panel({
               now={now}
               drafts={queueDrafts}
               onDraft={onQueueDraft}
+              onQueue={setQueue}
+              onError={onError}
+            />
+          </Suspense>
+        ) : route.view === 'settings' ? (
+          <Suspense fallback={<Loading what={t('app.loadingSettings')} />}>
+            <SettingsPage
+              key={pageKey}
+              api={scopedApi}
+              group={settingsGroupOf(route.run)}
+              repository={selected}
+              queue={queue}
               onQueue={setQueue}
               onError={onError}
             />

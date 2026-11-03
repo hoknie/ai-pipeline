@@ -5,7 +5,7 @@ import type { TFunction } from 'i18next';
 import { useState, type ReactNode } from 'react';
 
 import type { Api } from '../api.ts';
-import { clock, cost, duration, usageText } from '../format.ts';
+import { clock, cost, duration, taskNumber, usageText } from '../format.ts';
 import { waitText } from '../status.ts';
 import { notifySuccess } from '../notify.ts';
 import { cn } from '../lib/cn.ts';
@@ -70,13 +70,18 @@ function RunCard({
       data-highlighted={linked ? '' : undefined}
       className={cn('flex min-w-0 flex-col gap-2 p-3 text-sm', linked && 'ring-2 ring-primary')}
     >
-      <a
-        className="block min-w-0 truncate font-medium text-primary underline"
-        title={run.title}
-        href={formatRoute({ view: 'runs', run: run.id, group: null, step: null })}
-      >
-        {run.title}
-      </a>
+      <div className="flex min-w-0 items-baseline gap-1.5">
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">
+          {taskNumber(run.number)}
+        </span>
+        <a
+          className="min-w-0 truncate font-medium text-primary underline"
+          title={run.title}
+          href={formatRoute({ view: 'runs', run: run.id, group: null, step: null })}
+        >
+          {run.title}
+        </a>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={run.state} />
         <WorkflowBadge id={run.workflow} />

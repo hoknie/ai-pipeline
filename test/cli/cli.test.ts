@@ -41,7 +41,7 @@ describe('cli', () => {
     writeFileSync(file, '- { title: Один, task: первое }\n- { title: Два, task: второе }\n');
     const started = await aip(box, 'run', 'start', 'feature', '--groups', file);
     expect(started.stdout).toContain('Groups: odin (Один), dva (Два)');
-    const runId = /Run (\w+) started/.exec(started.stdout)?.[1] ?? '';
+    const runId = /Run #\d+ (\w+) started/.exec(started.stdout)?.[1] ?? '';
     await aip(box, 'run', 'watch', runId);
     const retry = await aip(box, 'group', 'retry', runId, 'odin');
     expect(retry.code).toBe(1);

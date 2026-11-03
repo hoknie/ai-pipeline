@@ -48,6 +48,7 @@ export function run(
   if (options.max !== undefined) resolved.max = options.max;
   return createRun({
     id: options.id ?? 'run000000001',
+    number: 1,
     repository: '/repo',
     workflow: 'feature',
     baseCommit: 'abc',

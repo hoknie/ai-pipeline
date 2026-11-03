@@ -213,6 +213,7 @@ describe('automatic delivery of one run', () => {
     source.run.config.delivery.auto = false;
     const overridden = createRun({
       id: 'run000000002',
+      number: 1,
       repository: '/repo',
       workflow: 'feature',
       baseCommit: 'abc',
@@ -235,6 +236,7 @@ describe('automatic delivery of one run', () => {
     const base = run(1);
     const copy = createRun({
       id: 'run000000003',
+      number: 1,
       repository: '/repo',
       workflow: 'feature',
       baseCommit: 'abc',

@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 import type { Api } from '../api.ts';
 import type { DeliveryMode } from '../../../src/config/index.ts';
 import { DELIVERY_MODES } from '../deliveryModes.ts';
+import { taskNumber } from '../format.ts';
 import { useTags } from '../tags.tsx';
 import type { QueueFields, WorkflowsView } from '../types.ts';
 import { SkipSteps, pruneSkip } from './SkipSteps.tsx';
@@ -204,7 +205,8 @@ export function QueueForm({
   const afterPick: PickerOption[] = afterChoices.map((choice) => ({
     name: choice.id,
     source: SOURCE_OF[choice.kind],
-    description: choice.title,
+    description:
+      choice.number === null ? choice.title : `${taskNumber(choice.number)} ${choice.title}`,
   }));
   const options = [...ids];
   if (effective.workflow !== '' && !ids.includes(effective.workflow))

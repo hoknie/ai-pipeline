@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { requestFocus } from '../../hotkeys.ts';
-import { runTitle } from '../../format.ts';
+import { runTitle, taskNumber } from '../../format.ts';
 import { LANGUAGES, useLanguage, type LanguageChoice } from '../../i18n/index.ts';
 import { SECTIONS } from '../../sections.ts';
 import type { Route } from '../../route.ts';
@@ -95,10 +95,15 @@ export function CommandPalette({
           {sorted.map((run) => (
             <CommandItem
               key={run.id}
-              value={`${t('palette.run')} ${runTitle(run)} ${run.id}`}
+              value={`${t('palette.run')} ${taskNumber(run.number)} ${runTitle(run)} ${run.id}`}
               onSelect={() => go({ view: 'runs', run: run.id, group: null, step: null })}
             >
-              <span className="truncate">{runTitle(run)}</span>
+              <span className="truncate">
+                <span className="font-mono text-xs text-muted-foreground">
+                  {taskNumber(run.number)}
+                </span>{' '}
+                {runTitle(run)}
+              </span>
               <span className="ml-auto flex items-center gap-2">
                 <WorkflowBadge id={run.workflow} focusable={false} />
                 <span className="text-xs text-muted-foreground">{runStatusLabel(run, t)}</span>

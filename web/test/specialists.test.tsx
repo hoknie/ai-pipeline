@@ -67,78 +67,6 @@ describe('routes', () => {
   });
 });
 
-describe('general settings switch', () => {
-  const viewWith = (file: string | null) =>
-    configView({
-      settings: settingsOf({ 'delivery.auto': { path: 'delivery.auto', value: true, file } }),
-    });
-
-  it('writes delivery.auto to the global level with the revision and reads the view again', async () => {
-    const config = vi
-      .fn()
-      .mockResolvedValueOnce(viewWith(null))
-      .mockResolvedValue(
-        configView({
-          settings: settingsOf({
-            'delivery.auto': {
-              path: 'delivery.auto',
-              value: false,
-              file: '/xdg/aip/settings.yaml',
-            },
-          }),
-        }),
-      );
-    const api = fakeApi({ config });
-    render(<Page api={api} start="_settings" />);
-    const toggle = await screen.findByRole('switch', { name: 'delivery.auto' });
-    expect(toggle.getAttribute('aria-checked')).toBe('true');
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole('switch', { name: 'delivery.auto' }).getAttribute('aria-checked'),
-      ).toBe('false'),
-    );
-  });
-
-  it('is disabled when the project file sets the value', async () => {
-    render(
-      <Page
-        api={fakeApi({ config: vi.fn(async () => viewWith('/repo/aip/settings.yaml')) })}
-        start="_settings"
-      />,
-    );
-    const toggle = await screen.findByRole<HTMLButtonElement>('switch', { name: 'delivery.auto' });
-    expect(toggle.disabled).toBe(true);
-    expect(screen.getByText('set by the project file')).toBeTruthy();
-  });
-
-  it('shows the conflict and keeps the previous value', async () => {
-    const api = fakeApi({
-      config: vi.fn(async () => viewWith(null)),
-      writeSetting: vi.fn(async () => ({
-        ok: false as const,
-        reason: 'conflict' as const,
-        message: 'settings.yaml was changed after it was read',
-      })),
-    });
-    render(<Page api={api} start="_settings" />);
-    fireEvent.click(await screen.findByRole('switch', { name: 'delivery.auto' }));
-    await screen.findByText(/was changed after it was read/);
-    expect(screen.getByRole('switch', { name: 'delivery.auto' }).getAttribute('aria-checked')).toBe(
-      'true',
-    );
-  });
-
-  it('does not make other settings switchable', async () => {
-    render(<Page api={fakeApi({ config: vi.fn(async () => twoLevels()) })} start="_settings" />);
-    await screen.findByTestId('setting-max');
-    expect(screen.queryByRole('switch', { name: 'max' })).toBeNull();
-  });
-});
-
 describe('specialists list', () => {
   it('shows the level of each specialist', async () => {
     render(<Page api={fakeApi({ config: vi.fn(async () => twoLevels()) })} />);
@@ -164,18 +92,6 @@ describe('specialists list', () => {
     const errors = await screen.findByRole('region', { name: 'configuration errors' });
     expect(within(errors).getByText('/repo/aip/workflows/feature.yaml')).toBeTruthy();
     expect(within(errors).getByText('swarm.workflows.feature.steps[0].specialist')).toBeTruthy();
-  });
-
-  it('shows the settings read only with the file of each field', async () => {
-    render(<Page api={fakeApi({ config: vi.fn(async () => twoLevels()) })} start="_settings" />);
-    const max = await screen.findByTestId('setting-max');
-    expect(within(max).getByText('5')).toBeTruthy();
-    const file = within(max).getByText('/xdg/aip/settings.yaml');
-    expect(file.className).toContain('bg-muted');
-    expect(file.getAttribute('title')).toBe('/xdg/aip/settings.yaml');
-    expect(screen.getByTestId('setting-defaults.timeout').textContent).toContain('default');
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 });
 

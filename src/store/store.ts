@@ -87,8 +87,8 @@ export class Store {
     const { run } = state;
     this.database
       .prepare(
-        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json`,
       )
       .run(
@@ -111,6 +111,7 @@ export class Store {
         JSON.stringify(run.tags),
         run.queueItem,
         JSON.stringify(run.skippedSteps),
+        run.number,
       );
     const groupStatement = this.database.prepare(
       `INSERT OR REPLACE INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict, merge_commit, delivery_json, questions_json)
@@ -238,6 +239,19 @@ export class Store {
     return rows.map((row) => String(row.run_id));
   }
 
+  /** The largest task number of the repository among its runs and queue items; 0 when none. */
+  maxTaskNumber(repository: string): number {
+    const row = this.database
+      .prepare(
+        `SELECT MAX(
+           (SELECT COALESCE(MAX(number), 0) FROM runs WHERE repository = ?),
+           (SELECT COALESCE(MAX(number), 0) FROM queue_items WHERE repository = ?)
+         ) AS max`,
+      )
+      .get(repository, repository) as { max: number };
+    return Number(row.max);
+  }
+
   loadQueue(repository: string): Queue | null {
     const row = this.database
       .prepare('SELECT * FROM queues WHERE repository = ?')
@@ -309,9 +323,9 @@ export class Store {
     this.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number`,
         )
         .run(
           queue.repository,
@@ -326,11 +340,12 @@ export class Store {
           JSON.stringify(queue.skipped),
           queue.autopilotAnswer,
           queue.onLimit,
+          queue.nextNumber,
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -350,6 +365,7 @@ export class Store {
           item.deliveryMode,
           item.run,
           item.postponed ? 1 : 0,
+          item.number,
         ),
       );
     });
@@ -369,8 +385,10 @@ export class Store {
       skipped: row.skipped_json ? parse(row.skipped_json) : [],
       autopilotAnswer: text(row.autopilot_answer ?? null),
       onLimit: ON_LIMIT_MODES.find((mode) => mode === row.on_limit) ?? 'wait',
+      nextNumber: Number(row.next_number ?? 1),
       items: items.map((item): QueueItem => ({
         id: String(item.id),
+        number: Number(item.number),
         workflow: String(item.workflow),
         task: text(item.task ?? null),
         groups: nullable(item.groups_json ?? null),
@@ -423,6 +441,7 @@ export class Store {
         namingUsage: nullable(row.naming_usage_json ?? null),
         fromQueue: Number(row.from_queue ?? 0) === 1,
         queueItem: text(row.queue_item ?? null),
+        number: Number(row.number ?? 0),
         tags: row.tags_json ? parse(row.tags_json) : [],
         skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],
       },

@@ -20,6 +20,7 @@ export {
   formatRepositories,
   formatRun,
   formatRunCreated,
+  taskNumber,
   formatRunQueued,
   formatRunList,
   formatTagLabels,

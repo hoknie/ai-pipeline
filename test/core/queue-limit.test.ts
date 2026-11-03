@@ -242,6 +242,15 @@ describe('return a run to the queue', () => {
     expect(group(a).status).toBe('failed');
   });
 
+  it('keeps the number of the run and does not spend a new one', () => {
+    const { queue, a } = skippedRun();
+    a.run.number = 5;
+    const before = queue.nextNumber;
+    const item = returnRun(queue, a, 'q9', 10);
+    expect(item.number).toBe(5);
+    expect(queue.nextNumber).toBe(before);
+  });
+
   it('refuses a run without failed or cancelled groups, one holding a place and a repeat', () => {
     const queue = queueOf();
     const a = queueRun(queue);

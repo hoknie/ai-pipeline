@@ -1,4 +1,12 @@
-import { Activity, GitBranch, ListOrdered, Users, Workflow, type LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  GitBranch,
+  ListOrdered,
+  Settings,
+  Users,
+  Workflow,
+  type LucideIcon,
+} from 'lucide-react';
 
 import type { TFunction } from 'i18next';
 
@@ -6,7 +14,7 @@ import type { View } from './route.ts';
 
 export interface Section {
   view: View;
-  labelKey: 'runs' | 'queue' | 'topology' | 'specialists' | 'workflows';
+  labelKey: 'runs' | 'queue' | 'topology' | 'specialists' | 'workflows' | 'settings';
   icon: LucideIcon;
 }
 
@@ -17,6 +25,7 @@ export const SECTIONS: Section[] = [
   { view: 'topology', labelKey: 'topology', icon: Workflow },
   { view: 'specialists', labelKey: 'specialists', icon: Users },
   { view: 'workflows', labelKey: 'workflows', icon: GitBranch },
+  { view: 'settings', labelKey: 'settings', icon: Settings },
 ];
 
 export function sectionLabel(view: View, t: TFunction): string {

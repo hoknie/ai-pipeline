@@ -1,7 +1,7 @@
 import { SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { cost, diffText, runTime, runTitle, usageText } from '../../format.ts';
+import { cost, diffText, runTime, runTitle, taskNumber, usageText } from '../../format.ts';
 import { useLocale } from '../../i18n/index.ts';
 import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
@@ -111,7 +111,12 @@ export function RunList({
                   title={`${runTitle(run)}\n${run.id}`}
                   onClick={() => onSelect(run.id, null)}
                 >
-                  <span className="line-clamp-2 text-sm font-medium">{runTitle(run)}</span>
+                  <span className="line-clamp-2 text-sm font-medium">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {taskNumber(run.number)}
+                    </span>{' '}
+                    {runTitle(run)}
+                  </span>
                   {run.name ? (
                     <span className="truncate font-mono text-xs text-muted-foreground">
                       {run.name}

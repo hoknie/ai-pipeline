@@ -2,6 +2,11 @@ import type { TFunction } from 'i18next';
 
 import type { DiffTotals, RunView } from './types.ts';
 
+/** `#7`: how a task number is shown. */
+export function taskNumber(number: number): string {
+  return `#${number}`;
+}
+
 export function duration(milliseconds: number): string {
   const total = Math.max(0, Math.round(milliseconds / 1000));
   if (total < 60) return `${total}s`;

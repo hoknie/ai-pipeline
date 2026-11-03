@@ -12,6 +12,7 @@ import type {
   RepositoryView,
   RunCreated,
   RunView,
+  SystemView,
   TagView,
   Transcript,
   WorkflowsView,
@@ -20,9 +21,12 @@ import type {
 
 export class ApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** Machine-readable reason of the refusal, such as `daemon_busy`. */
+  readonly code: string | undefined;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -83,6 +87,12 @@ export interface Api {
   queueSettings(patch: QueueSettingsPatch): Promise<QueueView>;
   /** Puts a run back first in the queue of its repository; it continues where it stopped. */
   queueReturn(run: string, repository: string): Promise<QueueView & { item: string }>;
+  /** State of the daemon and of the panel itself. */
+  system(): Promise<SystemView>;
+  /** Restarts the panel; the answer comes before it goes down. */
+  restartWeb(): Promise<void>;
+  /** Restarts the daemon; refused with code `daemon_busy` while agents run, unless `force`. */
+  restartDaemon(force: boolean): Promise<void>;
   /** The configuration of the bound repository, for the editors. */
   config(): Promise<ConfigEditorResponse>;
   /** Tools and skills a specialist can name, per runtime. */
@@ -119,8 +129,9 @@ export interface Api {
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: 'same-origin', ...init });
-  const body = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new ApiError(response.status, body.error ?? response.statusText);
+  const body = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+  if (!response.ok)
+    throw new ApiError(response.status, body.error ?? response.statusText, body.code);
   return body as T;
 }
 
@@ -200,6 +211,10 @@ function bound(repository: string | null): Api {
     queueSettings: (patch) => post(at('/api/queue/settings'), patch),
     queueReturn: (run, runRepository) =>
       post(withRepository('/api/queue/return', runRepository), { run }),
+    system: () => call('/api/system'),
+    restartWeb: async () => void (await post('/api/system/web/restart')),
+    restartDaemon: async (force) =>
+      void (await post('/api/system/daemon/restart', force ? { force: true } : {})),
     config: () => call(at('/api/config')),
     catalog: () => call(at('/api/config/catalog')),
     writeSpecialist: (id, value, revision, level) =>

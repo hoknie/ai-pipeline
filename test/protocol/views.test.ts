@@ -65,6 +65,22 @@ describe('repositoryViews', () => {
   });
 });
 
+describe('task numbers in views', () => {
+  it('carries the number of the run, of the queue item and of the predecessors', () => {
+    const queue = emptyQueue('/repo', 1, 5);
+    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
+    addItem(queue, { workflow: 'feature', task: 'B', after: ['q1', 'r'] }, 'q2', 2);
+    const working = run(1, { id: 'r' });
+    working.run.number = 3;
+    const view = queueView(queue, (id) => (id === 'r' ? working : undefined));
+    expect(view.items.map((item) => item.number)).toEqual([5, 6]);
+    expect(view.items[1]!.after.map((dependency) => dependency.number)).toEqual([5, 3]);
+    expect(runView(working, 1).number).toBe(3);
+    const lost = queueView(queue, () => undefined);
+    expect(lost.items[1]!.after[1]!.number).toBeNull();
+  });
+});
+
 describe('queueView dependencies', () => {
   it('shows the readiness and the predecessors with their state', () => {
     const queue = emptyQueue('/repo', 1);
@@ -75,8 +91,8 @@ describe('queueView dependencies', () => {
     const view = queueView(queue, (id) => (id === working.run.id ? working : undefined));
     expect(view.items.map((item) => item.readiness)).toEqual(['ready', 'waiting', 'ready']);
     expect(view.items[1]!.after).toEqual([
-      { kind: 'item', id: 'q1', title: 'API', state: 'waiting' },
-      { kind: 'run', id: 'run00000000a', title: 'задача 1', state: 'waiting' },
+      { kind: 'item', id: 'q1', number: 1, title: 'API', state: 'waiting' },
+      { kind: 'run', id: 'run00000000a', number: 1, title: 'задача 1', state: 'waiting' },
     ]);
     expect(view.items[2]!.after).toEqual([]);
     const lost = queueView(queue, () => undefined);

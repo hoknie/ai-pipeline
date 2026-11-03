@@ -329,15 +329,16 @@ describe('runs from the queue', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { title })],
+        runs: [queueRun('run1', { title, number: 12 })],
       }),
     );
     const card = await screen.findByRole('group', { name: title });
+    expect(within(card).getByText('#12')).toBeTruthy();
     const link = within(card).getByRole('link', { name: title });
     expect(link.getAttribute('title')).toBe(title);
     expect(link.className).toContain('truncate');
     const badge = within(card).getByText('Active');
-    expect(link.parentElement).toBe(card);
+    expect(link.parentElement?.parentElement).toBe(card);
     expect(badge.parentElement).not.toBe(link.parentElement);
     expect(badge.closest('div')!.contains(link)).toBe(false);
   });
@@ -466,6 +467,28 @@ describe('workflow badge in the queue', () => {
     show(queueOf({ items: [queueItem('q1', 'A', 1, { workflow: 'epic', readiness: 'waiting' })] }));
     const row = await screen.findByRole('listitem', { name: /A/ });
     expect(within(row).getByLabelText('Workflow: epic')).toBeTruthy();
+  });
+});
+
+describe('task numbers', () => {
+  it('shows the number of a waiting task and of its predecessor', async () => {
+    show(
+      queueOf({
+        items: [
+          queueItem('q1', 'A', 1, { number: 7 }),
+          queueItem('q2', 'B', 2, {
+            number: 8,
+            readiness: 'waiting',
+            after: [{ ...dependency('item', 'q1', 'A'), number: 7 }],
+          }),
+        ],
+      }),
+    );
+    const first = await screen.findByRole('listitem', { name: /A/ });
+    expect(within(first).getByText('#7')).toBeTruthy();
+    const second = await screen.findByRole('listitem', { name: /B/ });
+    expect(within(second).getByText('#8')).toBeTruthy();
+    expect(within(second).getAllByText(/#7/).length).toBeGreaterThan(0);
   });
 });
 
@@ -1578,7 +1601,7 @@ describe('queue layout', () => {
   it('puts the controls in a column and the runs in a grid in a wide window', async () => {
     restore = setWindowWidth(1600);
     show(running());
-    const controls = await screen.findByRole('region', { name: 'queue settings' });
+    const controls = await screen.findByRole('region', { name: 'queue controls' });
     expect(controls.parentElement?.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]');
     expect(controls.parentElement?.previousElementSibling).toBeNull();
     expect(within(controls).getByRole('button', { name: 'Start' })).toBeTruthy();
@@ -1597,60 +1620,56 @@ describe('queue layout', () => {
   it('stacks the controls over the content in a narrow window', async () => {
     restore = setWindowWidth(600);
     show(running());
-    const controls = await screen.findByRole('region', { name: 'queue settings' });
+    const controls = await screen.findByRole('region', { name: 'queue controls' });
     const runs = screen.getByRole('region', { name: 'running from the queue' });
     expect(controls.compareDocumentPosition(runs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(runs).getByRole('list').className).toContain('grid-cols-1');
   });
 });
 
-describe('queue settings block', () => {
-  const settingsBlock = async () =>
-    within(await screen.findByRole('region', { name: 'queue settings' }));
+describe('queue controls block', () => {
+  const controlsBlock = async () =>
+    within(await screen.findByRole('region', { name: 'queue controls' }));
 
-  it('shows the badge, start, pause, parallelism and three switches with hints', async () => {
+  it('shows the badge, start, pause, parallelism and the link to the settings', async () => {
     show(queueOf({ items: items('A') }));
-    const block = await settingsBlock();
-    expect(block.getByRole('heading', { name: 'Controls' })).toBeTruthy();
-    expect(block.getByRole('heading', { name: 'Settings' })).toBeTruthy();
-    const controls = within(block.getByRole('group', { name: 'Controls' }));
-    expect(controls.getByText('Stopped')).toBeTruthy();
-    expect(controls.getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'New task',
-      'Start',
-      'Pause',
-    ]);
-    expect(controls.queryByLabelText('Parallelism')).toBeNull();
+    const block = await controlsBlock();
+    expect(block.getByText('Stopped')).toBeTruthy();
+    expect(
+      block
+        .getAllByRole('button')
+        .map((b) => b.textContent)
+        .filter((text) => text !== ''),
+    ).toEqual(['New task', 'Start', 'Pause']);
     expect(block.getByLabelText('Parallelism')).toBeTruthy();
-    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default']) {
-      expect(block.getByRole('switch', { name })).toBeTruthy();
-    }
-    expect(block.getByText(/does not stop when it becomes empty/)).toBeTruthy();
-    expect(block.getByText(/leaves its place/)).toBeTruthy();
-    expect(block.getByText(/tasks without their own auto delivery/)).toBeTruthy();
+    expect(block.getByRole('link', { name: 'Queue settings' }).getAttribute('href')).toBe(
+      '#settings/queue',
+    );
   });
 
-  it('sends only skipFailed when the switch is turned on', async () => {
-    const api = show(queueOf({ parallel: 2 }), {
-      queueSettings: vi.fn(async () => queueOf({ parallel: 2, skipFailed: true })),
-    });
-    const block = await settingsBlock();
-    const toggle = block.getByRole('switch', { name: 'Skip failed' });
-    expect(toggle.getAttribute('aria-checked')).toBe('false');
-    fireEvent.click(toggle);
-    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ skipFailed: true }));
-    await waitFor(() =>
-      expect(block.getByRole('switch', { name: 'Skip failed' }).getAttribute('aria-checked')).toBe(
-        'true',
-      ),
-    );
-    expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
-      'false',
-    );
-    expect(api.queueSettings).toHaveBeenCalledTimes(1);
+  it('has none of the modes of the queue', async () => {
+    show(queueOf({ items: items('A') }));
+    await controlsBlock();
+    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default'])
+      expect(screen.queryByRole('switch', { name })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Delivery mode' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'On a usage limit' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Answer to questions' })).toBeNull();
   });
 
-  it('turns the autopilot on in a stopped queue and moves the task to the running block', async () => {
+  it('opens the group Queue of the settings from the link', async () => {
+    show(queueOf());
+    const block = await controlsBlock();
+    fireEvent.click(block.getByRole('link', { name: 'Queue settings' }));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/queue'));
+    const modes = within(await screen.findByRole('region', { name: 'queue settings' }));
+    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default'])
+      expect(modes.getByRole('switch', { name })).toBeTruthy();
+    expect(modes.getByRole('combobox', { name: 'Delivery mode' })).toBeTruthy();
+    expect(modes.getByRole('combobox', { name: 'On a usage limit' })).toBeTruthy();
+  });
+
+  it('shows the running queue after the autopilot is turned on in the settings', async () => {
     const api = show(queueOf({ items: items('A') }), {
       queueSettings: vi.fn(async () =>
         queueOf({
@@ -1660,120 +1679,17 @@ describe('queue settings block', () => {
         }),
       ),
     });
-    const block = await settingsBlock();
-    fireEvent.click(block.getByRole('switch', { name: 'Autopilot' }));
+    window.location.hash = '#settings/queue';
+    fireEvent.click(await screen.findByRole('switch', { name: 'Autopilot' }));
     await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ autopilot: true }));
-    await screen.findByRole('region', { name: 'running from the queue' });
-    expect(block.getByText('Running')).toBeTruthy();
-    expect(screen.getByRole('group', { name: 'Вход' })).toBeTruthy();
-  });
-
-  it('returns the switch and shows the error when the server refuses', async () => {
-    show(queueOf(), {
-      queueSettings: vi.fn(async () => {
-        throw new Error('boom');
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'sections' })).getByRole('link', {
+        name: 'Queue',
       }),
-    });
-    const block = await settingsBlock();
-    fireEvent.click(block.getByRole('switch', { name: 'Autopilot' }));
-    await screen.findAllByText('boom');
-    expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
-      'false',
     );
-  });
-
-  it('follows the queue event', async () => {
-    show(queueOf());
-    const block = await settingsBlock();
-    act(() => {
-      stream().open();
-      stream().send({
-        event: 'queue',
-        seq: 5,
-        queue: queueOf({ autopilot: true, skipFailed: true }),
-      });
-    });
-    await waitFor(() =>
-      expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
-        'true',
-      ),
-    );
-    expect(block.getByRole('switch', { name: 'Skip failed' }).getAttribute('aria-checked')).toBe(
-      'true',
-    );
-  });
-
-  it('writes delivery.auto to the global settings when auto delivery is turned off', async () => {
-    const api = show(queueOf({ autoDeliver: true }));
-    const block = await settingsBlock();
-    const toggle = await waitFor(() => {
-      const found = block.getByRole<HTMLButtonElement>('switch', {
-        name: 'Auto delivery by default',
-      });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-    expect(toggle.getAttribute('aria-checked')).toBe('true');
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
-    );
-    act(() => {
-      stream().open();
-      stream().send({ event: 'queue', seq: 5, queue: queueOf({ autoDeliver: false }) });
-    });
-    await waitFor(() =>
-      expect(
-        block
-          .getByRole('switch', { name: 'Auto delivery by default' })
-          .getAttribute('aria-checked'),
-      ).toBe('false'),
-    );
-  });
-
-  const projectSetting = (path: string, value: boolean | string) =>
-    configView({
-      settingsFiles: {
-        global: { file: '/xdg/aip/settings.yaml', revision: 'g1' },
-        project: { file: '/repo/aip/settings.yaml', revision: 'p1' },
-      },
-      settings: settingsOf({ [path]: { path, value, file: '/repo/aip/settings.yaml' } }),
-    });
-
-  it('writes the value set in the project file back to the project file', async () => {
-    const api = show(queueOf({ autoDeliver: true }), {
-      config: vi.fn(async () => projectSetting('delivery.auto', true)),
-    });
-    const block = await settingsBlock();
-    const toggle = await waitFor(() => {
-      const found = block.getByRole<HTMLButtonElement>('switch', {
-        name: 'Auto delivery by default',
-      });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-    expect(block.getByText('Saved to the project file: /repo/aip/settings.yaml')).toBeTruthy();
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'p1', 'project'),
-    );
-  });
-
-  it('shows the shared file for a value that is not in the project file', async () => {
-    show(queueOf({ autoDeliver: true }));
-    const block = await settingsBlock();
-    await waitFor(() =>
-      expect(block.getAllByText('Saved to the shared file: /xdg/aip/settings.yaml').length).toBe(2),
-    );
-  });
-
-  it('disables auto delivery while the configuration is invalid', async () => {
-    show(queueOf({ autoDeliver: null }));
-    const block = await settingsBlock();
-    expect(
-      block.getByRole<HTMLButtonElement>('switch', { name: 'Auto delivery by default' }).disabled,
-    ).toBe(true);
-    expect(block.getByText('The configuration is not valid')).toBeTruthy();
+    await screen.findByRole('region', { name: 'running from the queue' });
+    expect((await controlsBlock()).getByText('Running')).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Вход' })).toBeTruthy();
   });
 });
 
@@ -1807,7 +1723,7 @@ describe('skipped runs', () => {
 
   it('has no block without skipped runs', async () => {
     show(queueOf({ status: 'running' }));
-    await screen.findByRole('region', { name: 'queue settings' });
+    await screen.findByRole('region', { name: 'queue controls' });
     expect(screen.queryByRole('region', { name: 'skipped with a problem' })).toBeNull();
   });
 
@@ -1815,198 +1731,6 @@ describe('skipped runs', () => {
     show(queueOf({ skipped: [queueRun('run1', { title: 'Логин', state: 'failed' })] }));
     await screen.findByRole('region', { name: 'skipped with a problem' });
     expect(screen.queryByRole('region', { name: 'running from the queue' })).toBeNull();
-  });
-});
-
-describe('delivery mode in the queue settings', () => {
-  const settingsBlock = async () =>
-    within(await screen.findByRole('region', { name: 'queue settings' }));
-
-  it('shows the mode and writes delivery.mode to the global settings', async () => {
-    const api = show(queueOf({ deliveryMode: 'worktree' }));
-    const block = await settingsBlock();
-    const select = await waitFor(() => {
-      const found = block.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-    expect(select.textContent).toBe('In the working tree');
-    fireEvent.keyDown(select, { key: 'Enter' });
-    fireEvent.click(await screen.findByRole('option', { name: 'Commit' }));
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'commit', 'g1', 'global'),
-    );
-    act(() => {
-      stream().open();
-      stream().send({ event: 'queue', seq: 5, queue: queueOf({ deliveryMode: 'commit' }) });
-    });
-    await waitFor(() =>
-      expect(block.getByRole('combobox', { name: 'Delivery mode' }).textContent).toBe('Commit'),
-    );
-  });
-
-  const settingsFiles = {
-    global: { file: '/xdg/aip/settings.yaml', revision: 'g1' },
-    project: { file: '/repo/aip/settings.yaml', revision: 'p1' },
-  };
-  const pick = async (name: string) => {
-    const block = await settingsBlock();
-    const select = await waitFor(() => {
-      const found = block.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-    fireEvent.keyDown(select, { key: 'Enter' });
-    fireEvent.click(await screen.findByRole('option', { name }));
-  };
-
-  it('writes the mode set in the project file back to the project file', async () => {
-    const api = show(queueOf({ deliveryMode: 'worktree' }), {
-      config: vi.fn(async () =>
-        configView({
-          settingsFiles,
-          settings: settingsOf({
-            'delivery.mode': {
-              path: 'delivery.mode',
-              value: 'worktree',
-              file: '/repo/aip/settings.yaml',
-            },
-          }),
-        }),
-      ),
-    });
-    const block = await settingsBlock();
-    await pick('Commit');
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'commit', 'p1', 'project'),
-    );
-    expect(block.getByText('Saved to the project file: /repo/aip/settings.yaml')).toBeTruthy();
-  });
-
-  it('is unavailable while the configuration is invalid', async () => {
-    show(queueOf({ deliveryMode: null }));
-    const invalid = await settingsBlock();
-    expect(
-      invalid.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' }).disabled,
-    ).toBe(true);
-    expect(invalid.getAllByText('The configuration is not valid').length).toBeGreaterThan(0);
-  });
-
-  it('shows an error when the configuration cannot be read', async () => {
-    show(queueOf({}), {
-      config: vi.fn(async () => {
-        throw new Error('config unreadable');
-      }),
-    });
-    const block = await settingsBlock();
-    expect((await block.findAllByText('config unreadable')).length).toBeGreaterThan(0);
-  });
-
-  it('toggling auto delivery then choosing a mode writes both without conflict', async () => {
-    let revision = 'g1';
-    const api = show(queueOf({ autoDeliver: true, deliveryMode: 'worktree' }), {
-      config: vi.fn(async () =>
-        configView({
-          settingsFiles: { ...settingsFiles, global: { ...settingsFiles.global, revision } },
-        }),
-      ),
-      writeSetting: vi.fn(async () => {
-        revision = 'g2';
-        return { ok: true as const, revision: 'g2' };
-      }),
-    });
-    const block = await settingsBlock();
-    const toggle = await waitFor(() => {
-      const found = block.getByRole<HTMLButtonElement>('switch', {
-        name: 'Auto delivery by default',
-      });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-    const reads = vi.mocked(api.config).mock.calls.length;
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
-    );
-    await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
-    await pick('Branch');
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'branch', 'g2', 'global'),
-    );
-  });
-
-  it('shows a write conflict and writes the next time with the re-read revision', async () => {
-    let revision = 'g1';
-    const writeSetting = vi
-      .fn()
-      .mockImplementationOnce(async () => {
-        revision = 'g3';
-        return { ok: false as const, reason: 'conflict' as const, message: 'changed' };
-      })
-      .mockImplementation(async () => ({ ok: true as const, revision: 'g4' }));
-    const api = show(queueOf({ deliveryMode: 'worktree' }), {
-      config: vi.fn(async () =>
-        configView({
-          settingsFiles: { ...settingsFiles, global: { ...settingsFiles.global, revision } },
-        }),
-      ),
-      writeSetting,
-    });
-    const block = await settingsBlock();
-    const reads = vi.mocked(api.config).mock.calls.length;
-    await pick('Commit');
-    await waitFor(() => expect(block.getByText('Not saved: changed')).toBeTruthy());
-    await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
-    await pick('Branch');
-    await waitFor(() =>
-      expect(writeSetting).toHaveBeenLastCalledWith('delivery.mode', 'branch', 'g3', 'global'),
-    );
-  });
-});
-
-describe('answer of the autopilot in the queue settings', () => {
-  const settingsBlock = async () =>
-    within(await screen.findByRole('region', { name: 'queue settings' }));
-
-  it('shows the default text, saves a text and resets it', async () => {
-    const api = show(queueOf({ autopilotAnswerDefault: 'Agree with all' }), {
-      queueSettings: vi.fn(async () => queueOf({ autopilotAnswer: 'Pick the simplest' })),
-    });
-    const block = await settingsBlock();
-    const field = block.getByRole<HTMLTextAreaElement>('textbox', { name: 'Answer to questions' });
-    expect(field.value).toBe('Agree with all');
-    const save = block.getByRole<HTMLButtonElement>('button', { name: 'Save answer' });
-    const reset = block.getByRole<HTMLButtonElement>('button', { name: 'Default answer' });
-    expect(save.disabled).toBe(true);
-    expect(reset.disabled).toBe(true);
-    fireEvent.change(field, { target: { value: '  Pick the simplest ' } });
-    expect(save.disabled).toBe(false);
-    fireEvent.click(save);
-    await waitFor(() =>
-      expect(api.queueSettings).toHaveBeenCalledWith({ autopilotAnswer: 'Pick the simplest' }),
-    );
-    await waitFor(() => expect(field.value).toBe('Pick the simplest'));
-    await waitFor(() => expect(reset.disabled).toBe(false));
-    fireEvent.click(reset);
-    await waitFor(() =>
-      expect(api.queueSettings).toHaveBeenLastCalledWith({ autopilotAnswer: null }),
-    );
-  });
-
-  it('keeps unsaved text over a queue event', async () => {
-    show(queueOf({ autopilotAnswerDefault: 'Agree with all' }));
-    const block = await settingsBlock();
-    const field = block.getByRole<HTMLTextAreaElement>('textbox', { name: 'Answer to questions' });
-    fireEvent.change(field, { target: { value: 'Мой текст' } });
-    act(() => {
-      stream().open();
-      stream().send({
-        event: 'queue',
-        seq: 5,
-        queue: queueOf({ autopilotAnswer: 'Другой', autopilotAnswerDefault: 'Agree with all' }),
-      });
-    });
-    expect(field.value).toBe('Мой текст');
   });
 });
 
@@ -2175,8 +1899,7 @@ describe('new task dialog', () => {
     show(queueOf());
     const button = await screen.findByRole('button', { name: 'New task' });
     expect(screen.getAllByRole('button', { name: 'New task' })).toHaveLength(1);
-    const controls = screen.getByRole('group', { name: 'Controls' });
-    expect(screen.getByRole('region', { name: 'queue settings' }).contains(controls)).toBe(true);
+    const controls = screen.getByRole('region', { name: 'queue controls' });
     expect(controls.contains(button)).toBe(true);
     expect(
       button.compareDocumentPosition(within(controls).getByRole('button', { name: 'Start' })) &

@@ -31,7 +31,7 @@ describe('text for people', () => {
     finish(state, 'needs_human', { feedback: 'OAuth или пароль?\nподробности', now: 61_000 });
     expect(formatRun(runView(state, 121_000), 121_000)).toBe(
       [
-        'Run run000000001 · feature · needs_human · refs/aip/run000000001/run',
+        'Run #1 run000000001 · feature · needs_human · refs/aip/run000000001/run',
         'Title: Группа 1, Группа 2',
         'Repository: /repo',
         'Groups: running 1 · needs_human 1 (2) · usage — · started 2m00s ago',
@@ -298,11 +298,11 @@ describe('queue text', () => {
         'Queue: stopped, parallel 2 (1 of 2 places taken), autopilot off, skip failed off',
         'Stopped: run run000000001, group gruppa-1: needs_human',
         'Runs holding a place:',
-        '  run000000001  needs_human  feature  задача 1  0/1 groups · steps 0/4',
+        '  #1 run000000001  needs_human  feature  задача 1  0/1 groups · steps 0/4',
         '    problem: needs_human in gruppa-1',
         'Waiting:',
-        '  1. q1  feature  первая строка  added 2026-11-01 14:32',
-        '  2. q2  feature  2 groups [Пара]  added 2026-12-03 09:05',
+        '  1. #1 q1  feature  первая строка  added 2026-11-01 14:32',
+        '  2. #2 q2  feature  2 groups [Пара]  added 2026-12-03 09:05',
       ].join('\n'),
     );
   });
@@ -356,7 +356,7 @@ describe('queue text', () => {
     addItem(queue, { workflow: 'feature', task: 'y', after: ['q1', 'gone'] }, 'q2', 2);
     addItem(queue, { workflow: 'feature', task: 'z' }, 'q3', 2);
     const text = formatQueue(queueView(queue, () => undefined));
-    expect(text).toMatch(/q2 {2}feature {2}y · after q1, gone \(blocked\) {2}added/);
+    expect(text).toMatch(/q2 {2}feature {2}y · after #1 q1, gone \(blocked\) {2}added/);
     expect(text).not.toMatch(/q1.*after/);
     expect(text).not.toMatch(/q3.*after/);
   });
@@ -492,7 +492,7 @@ describe('colored text', () => {
       [
         'Queue: stopped, parallel 1 (0 of 1 places taken), autopilot on, skip failed on',
         'Skipped with a problem:',
-        `  ${state.run.id}  failed  feature  задача 1  1/1 groups · steps 0/4 · delivering`,
+        `  #1 ${state.run.id}  failed  feature  задача 1  1/1 groups · steps 0/4 · delivering`,
         '    problem: failed in gruppa-1',
         'No tasks waiting.',
       ].join('\n'),
@@ -530,6 +530,7 @@ describe('colored text', () => {
 describe('formatRunQueued', () => {
   const created = {
     runId: 'run1',
+    number: 1,
     branch: 'aip/run1',
     groups: [{ slug: 'a', title: 'A' }],
     split: false,
@@ -547,14 +548,14 @@ describe('formatRunQueued', () => {
   }
 
   it('prints the created run as before', () => {
-    expect(formatRunQueued({ item: 'q1', run: created, queue: queueWith(1, 2) })).toContain(
-      'Run run1 started (aip/run1).',
-    );
+    expect(
+      formatRunQueued({ item: 'q1', number: 1, run: created, queue: queueWith(1, 2) }),
+    ).toContain('Run #1 run1 started (aip/run1).');
   });
 
   it('prints the position of a waiting task and the taken places', () => {
-    expect(formatRunQueued({ item: 'q1', run: null, queue: queueWith(1, 1) })).toBe(
-      'Task q1 queued at position 1 (queue running, 1 of 1 places taken).',
+    expect(formatRunQueued({ item: 'q1', number: 1, run: null, queue: queueWith(1, 1) })).toBe(
+      'Task #1 q1 queued at position 1 (queue running, 1 of 1 places taken).',
     );
   });
 
@@ -577,7 +578,7 @@ describe('tags in text', () => {
     const tagged = runWith('run00000000a', tags);
     expect(formatRunList([tagged])).toContain('#auth #v2');
     expect(formatRun(tagged, 2000)).toContain('Tags: #auth #v2');
-    expect(formatRunList([runWith('run00000000b', [])])).not.toContain('#');
+    expect(formatRunList([runWith('run00000000b', [])])).not.toContain('#a');
     expect(formatRun(runWith('run00000000b', []), 2000)).not.toContain('Tags:');
   });
 

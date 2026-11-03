@@ -7,7 +7,7 @@ import type { Api } from '../api.ts';
 import { useConfirm } from '../confirm.tsx';
 import { cn } from '../lib/cn.ts';
 import { notifySuccess } from '../notify.ts';
-import { when } from '../format.ts';
+import { taskNumber, when } from '../format.ts';
 import { useLocale } from '../i18n/index.ts';
 import { formatRoute } from '../route.ts';
 import type {
@@ -306,6 +306,9 @@ export function QueueList({
                   <title>{t('queue.list.drag')}</title>
                 </GripVertical>
                 <span className="w-5 text-muted-foreground tabular-nums">{index + 1}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {taskNumber(item.number)}
+                </span>
                 <WorkflowBadge id={item.workflow} />
                 <span className="min-w-0 flex-1 truncate" title={itemLabel(item, t)}>
                   {itemLabel(item, t)}
@@ -498,7 +501,12 @@ function DependencyChip({ dependency }: { dependency: QueueItemView['after'][num
   const body = (
     <>
       <Icon aria-hidden />
-      <span className="min-w-0 truncate">{t('queue.list.after', { title: name })}</span>
+      <span className="min-w-0 truncate">
+        {dependency.number !== null ? (
+          <span className="font-mono">{taskNumber(dependency.number)} </span>
+        ) : null}
+        {t('queue.list.after', { title: name })}
+      </span>
       <span className="sr-only">{state}</span>
     </>
   );

@@ -18,7 +18,7 @@ import { QueueList, itemLabel } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
 import { afterOptions, related } from './queueLinks.ts';
 import { parseParallel } from './ParallelStepper.tsx';
-import { QueueSettings } from './QueueSettings.tsx';
+import { QueueControls } from './QueueControls.tsx';
 
 export { parseParallel };
 
@@ -91,6 +91,7 @@ export default function QueuePage({
   const [workflows, setWorkflows] = useState<WorkflowsView | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [parallel, setParallel] = useState<string | null>(null);
   const mode = useRef<'task' | 'groups'>('task');
   mode.current = (drafts.new ?? emptyDraft()).mode;
 
@@ -154,11 +155,14 @@ export default function QueuePage({
         </DialogContent>
       </Dialog>
       <div className="grid w-full gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <QueueSettings
+        <QueueControls
           api={api}
           queue={queue}
+          parallel={parallel}
+          onParallel={setParallel}
           onQueue={onQueue}
           onError={onError}
+          onDone={() => setParallel(null)}
           onNewTask={() => setOpen(true)}
         />
         <div className="flex min-w-0 flex-col gap-4">

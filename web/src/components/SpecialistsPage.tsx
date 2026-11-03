@@ -18,10 +18,8 @@ import type {
 } from '../types.ts';
 
 import { ConfigErrors, EntryList, SplitPage } from './EntryList.tsx';
-import { SettingsView } from './SettingsView.tsx';
 import { SpecialistForm } from './SpecialistForm.tsx';
 
-export const SETTINGS_ID = '_settings';
 export const NEW_ID = 'new';
 
 /** Key of the label of a level in the dictionaries, under `settings.editor.levels`. */
@@ -108,22 +106,19 @@ export default function SpecialistsPage({
             label={t('specialists.list')}
             selected={selected}
             onSelect={(id) => void go(id)}
-            entries={[
-              ...(view?.specialists ?? []).map((entry) => ({
-                id: entry.slug,
-                title: entry.slug,
-                subtitle: [
-                  entry.effective?.name ?? entry.raw.name?.toString(),
-                  entry.effective
-                    ? `${entry.effective.runtime}${entry.effective.model ? ` · ${entry.effective.model}` : ''}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · '),
-                tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
-              })),
-              { id: SETTINGS_ID, title: t('settings.title') },
-            ]}
+            entries={(view?.specialists ?? []).map((entry) => ({
+              id: entry.slug,
+              title: entry.slug,
+              subtitle: [
+                entry.effective?.name ?? entry.raw.name?.toString(),
+                entry.effective
+                  ? `${entry.effective.runtime}${entry.effective.model ? ` · ${entry.effective.model}` : ''}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · '),
+              tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
+            }))}
           />
         </>
       }
@@ -134,13 +129,6 @@ export default function SpecialistsPage({
             <Skeleton className="h-40" />
           </div>
         )
-      ) : selected === SETTINGS_ID ? (
-        <SettingsView
-          settings={view.settings}
-          settingsFiles={view.settingsFiles}
-          api={api}
-          onChanged={load}
-        />
       ) : selected === NEW_ID ? (
         <SpecialistForm
           key="new"

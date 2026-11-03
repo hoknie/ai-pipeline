@@ -110,14 +110,14 @@ describe('system steps in the runs section', () => {
       runView({ groups: [groupRow({ status: 'merged' })], system: [systemRow('resolve')] }),
     ]);
     fireEvent.click(await screen.findByRole('button', { name: /Delivery conflict resolution/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel group' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     fireEvent.click(
       within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel group' }),
     );
     await waitFor(() => expect(api.cancel).toHaveBeenCalledWith('run1', '_resolve'));
   });
 
-  it('opens the resolver from the header row', async () => {
+  it('opens the resolver from the delivery badge', async () => {
     mount([
       runView({
         groups: [groupRow({ status: 'merged' })],
@@ -126,13 +126,20 @@ describe('system steps in the runs section', () => {
           wait: null,
           round: 1,
           rounds: 2,
-          conflicts: [],
+          conflicts: ['src/app.ts'],
           reason: null,
         },
+        delivery: { applied: 0, merged: 1, failed: 0, inProgress: true },
         system: [systemRow('resolve')],
       }),
     ]);
-    fireEvent.click(await screen.findByRole('button', { name: 'resolver' }));
+    const badge = await screen.findByRole('button', { name: /Delivering/ });
+    expect(badge.querySelector('[tabindex], button')).toBeNull();
+    act(() => badge.focus());
+    const tip = await screen.findByRole('tooltip');
+    expect(tip.textContent).toContain('round 1/2');
+    expect(tip.textContent).toContain('src/app.ts');
+    fireEvent.click(badge);
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_resolve'));
     expect(
       await screen.findByRole('region', { name: 'group Delivery conflict resolution' }),
@@ -214,40 +221,41 @@ describe('opening a split from the topology', () => {
 });
 
 describe('system stages in the run header', () => {
-  const stages = () => screen.getByLabelText('System stages');
-
-  it('shows the finished split, the commit message and the delivery as one row', async () => {
+  it('has only the run and delivery badges and no stages or resolver row', async () => {
     mount([
       runView({
+        state: 'finished',
         groups: [groupRow({ status: 'merged' })],
         split: { status: 'done', wait: null, question: null, questions: null, reason: null },
         system: [systemRow('split', { status: 'done' }), systemRow('message')],
         deliveryStage: { status: 'pending' },
+        delivery: { applied: 1, merged: 1, failed: 0, inProgress: false },
+        resolver: {
+          status: 'running',
+          wait: null,
+          round: 1,
+          rounds: 2,
+          conflicts: [],
+          reason: null,
+        },
       }),
     ]);
-    await screen.findByLabelText('System stages');
-    expect(within(stages()).getByRole('button', { name: 'Split into groups' })).toBeTruthy();
-    expect(within(stages()).getByText('Commit message')).toBeTruthy();
-    expect(within(stages()).getByText('Delivery')).toBeTruthy();
-    expect(screen.queryByText('splitting into groups')).toBeNull();
+    const header = await screen.findByRole('banner', { name: 'run' });
+    expect(screen.queryByLabelText('System stages')).toBeNull();
+    expect(within(header).queryByText(/resolver/i)).toBeNull();
+    expect(within(header).queryByText('Commit message')).toBeNull();
+    expect(
+      Array.from(header.querySelectorAll('[aria-label$=")"]')).map((node) =>
+        node.getAttribute('aria-label'),
+      ),
+    ).toEqual([expect.stringMatching(/\(finished\)$/), 'Delivered (applied)']);
   });
 
-  it('opens a system step from the row', async () => {
-    mount([
-      runView({
-        groups: [groupRow({ status: 'merged' })],
-        system: [systemRow('message')],
-        deliveryStage: { status: 'pending' },
-      }),
-    ]);
-    fireEvent.click(await screen.findByRole('button', { name: 'Commit message' }));
-    await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_message'));
-  });
-
-  it('shows a failed delivery without a resolver', async () => {
+  it('shows the reason of a failed delivery in the badge tooltip', async () => {
     mount([
       runView({
         groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
+        delivery: { applied: 0, merged: 1, failed: 1, inProgress: false },
         deliveryStage: {
           status: 'apply_failed',
           reason: 'does not exist in index',
@@ -255,15 +263,23 @@ describe('system stages in the run header', () => {
         },
       }),
     ]);
-    await screen.findByLabelText('System stages');
-    expect(within(stages()).getByText('Delivery failed')).toBeTruthy();
-    expect(within(stages()).getByTitle('does not exist in index')).toBeTruthy();
+    const header = await screen.findByRole('banner', { name: 'run' });
+    expect(within(header).getByText('Delivery failed 1')).toBeTruthy();
+    expect(within(header).getByTitle('does not exist in index')).toBeTruthy();
   });
 
-  it('has no row without system stages', async () => {
-    mount([runView()]);
-    await screen.findByRole('region', { name: /group/ });
-    expect(screen.queryByLabelText('System stages')).toBeNull();
+  it('keeps the delivery badge a plain badge without a resolver', async () => {
+    mount([
+      runView({
+        groups: [groupRow({ status: 'merged' })],
+        delivery: { applied: 0, merged: 1, failed: 0, inProgress: false },
+      }),
+    ]);
+    const header = await screen.findByRole('banner', { name: 'run' });
+    expect(within(header).getByText('delivery 0/1')).toBeTruthy();
+    expect(within(header).queryByRole('button', { name: /delivery 0\/1/ })).toBeNull();
+    fireEvent.click(within(header).getByText('delivery 0/1'));
+    expect(window.location.hash).not.toContain('_resolve');
   });
 });
 

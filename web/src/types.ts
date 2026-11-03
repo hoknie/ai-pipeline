@@ -103,3 +103,30 @@ export type {
   FieldError,
   WriteLevel,
 } from '../../src/config/index.ts';
+
+/** What `GET /api/system` answers: the daemon, the panel and the daemon log. */
+export interface SystemView {
+  daemon: {
+    running: boolean;
+    pid: number | null;
+    version: string | null;
+    build: string | null;
+    busy: boolean | null;
+    /** The side that runs the older build when the builds differ. */
+    mismatch: 'daemon' | 'client' | null;
+  };
+  web: {
+    running: true;
+    pid: number;
+    /** Address without the access token. */
+    url: string;
+    host: string;
+    port: number;
+    auth: 'token' | 'none';
+    version: string;
+    build: string;
+    /** `standalone`: started by `aip web`, it cannot restart itself. */
+    servedBy: 'daemon' | 'standalone';
+  };
+  logPath: string | null;
+}

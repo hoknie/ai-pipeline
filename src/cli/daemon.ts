@@ -13,6 +13,7 @@ import {
 
 import { context, daemon } from './commands.ts';
 import { examples } from './help.ts';
+import { startPanel } from './web-control.ts';
 
 /** Exit code of `aip daemon status` when no daemon runs. */
 export const EXIT_NOT_RUNNING = 3;
@@ -82,6 +83,7 @@ export function registerDaemon(program: Command, style: Style): void {
         const panel = createDaemonPanel({
           stateDirectory: ctx.stateDirectory,
           socket: ctx.socket,
+          entry: ctx.entry,
         });
         const running = await startDaemon({
           stateDirectory: ctx.stateDirectory,
@@ -135,8 +137,15 @@ export function registerDaemon(program: Command, style: Style): void {
     .command('restart')
     .description('Stop the daemon and start it again; refuses while agents run unless --force')
     .option('--force', 'stop the daemon together with its running agents')
-    .addHelpText('after', examples(['aip daemon restart', 'aip daemon restart --force'], style))
-    .action(async (options: { force?: boolean }) => {
+    .option('--web', 'also start the web panel of the new daemon, whatever web.autostart says')
+    .addHelpText(
+      'after',
+      examples(
+        ['aip daemon restart', 'aip daemon restart --force', 'aip daemon restart --web'],
+        style,
+      ),
+    )
+    .action(async (options: { force?: boolean; web?: boolean }) => {
       const ctx = context();
       const result = await stopDaemon(ctx.socket, {
         force: options.force,
@@ -150,6 +159,8 @@ export function registerDaemon(program: Command, style: Style): void {
       const ping = await pingDaemon(ctx.socket);
       const word = result.state === 'stopped' ? 'restarted' : 'started';
       print(`aip daemon: ${word} (pid ${ping?.pid ?? 'unknown'})`);
+      if (options.web)
+        await startPanel({ restart: false, open: false, client: 'aip daemon restart' });
     });
 
   command

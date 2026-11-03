@@ -36,7 +36,7 @@ git diff                          # review and commit it yourself
 
 | Command | What it does |
 |---|---|
-| `aip run list [run-id]` | Active and recent runs, each with the first line of its task and a summary of changes (`2 files +367 −0`); with a run id, the table of that run's groups |
+| `aip run list [run-id]` | Active and recent runs, each with its task number (`#` column), with the first line of its task and a summary of changes (`2 files +367 −0`); with a run id, the table of that run's groups |
 | `aip group show <run-id> <group>` | All step attempts of a group, verdicts, remarks, tokens, changed files with `+N −M`, and the tail of the log |
 | `aip run watch [run-id]` | Refreshes the state of a run until it finishes |
 | `aip queue …`, `aip tag …` | The task queue and tags: see [queue.md](queue.md) |
@@ -70,11 +70,12 @@ The daemon starts automatically on the first request. To control the background 
 ```sh
 aip daemon start          # does nothing if it runs
 aip daemon stop
-aip daemon restart
+aip daemon restart [--force] [--web]
 aip daemon status [--json]
 ```
 
 - `stop` and `restart` refuse with code 1 while agents work or a merge runs. `--force` stops the daemon together with its agents, and their steps become `failed` with the reason `interrupted` at the next start.
+- `restart --web` also raises the web panel of the new daemon, even with `web.autostart: false`, and prints `aip web: <url>`. If the panel cannot start (a busy port, an error in the `web` section), the reason goes to stderr, the exit code is 1 and the daemon keeps running.
 - `status` starts and stops nothing. It exits with code 3 when no daemon runs.
 - Bare `aip daemon` runs the daemon in the foreground.
 

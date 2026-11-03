@@ -24,6 +24,7 @@ import type {
   Transcript,
   WorkflowTopology,
   WorkflowsView,
+  SystemView,
 } from '../src/types.ts';
 
 export function topologyOf(overrides: Partial<Topology> = {}): Topology {
@@ -134,6 +135,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     fromQueue: false,
     returnable: false,
     queueItem: null,
+    number: 1,
     tags: [],
     counts: 'running 1',
     total: 1,
@@ -230,6 +232,7 @@ export function tagView(
 export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): QueueRunView {
   return {
     id,
+    number: 1,
     title: id,
     state: 'active',
     workflow: 'feature',
@@ -329,6 +332,7 @@ export function queueItem(
 ) {
   return {
     id,
+    number: position,
     position,
     workflow: 'feature',
     task,
@@ -355,7 +359,7 @@ export function dependency(
   title: string,
   state: 'done' | 'waiting' | 'blocked' = 'waiting',
 ) {
-  return { kind, id, title, state };
+  return { kind, id, number: null, title, state };
 }
 
 export function settingsOf(overrides: Record<string, EditorSetting> = {}): EditorSetting[] {
@@ -368,8 +372,48 @@ export function settingsOf(overrides: Record<string, EditorSetting> = {}): Edito
     { path: 'defaults.timeout', value: '30m', file: null },
     { path: 'defaults.allow_commands', value: [], file: null },
     { path: 'defaults.tools', value: [], file: null },
+    { path: 'delivery.keep', value: false, file: null },
+    { path: 'workspace_dir', value: '.aip/worktrees', file: null },
+    { path: 'workspace.base', value: 'HEAD', file: null },
+    { path: 'naming.enabled', value: true, file: null },
+    { path: 'naming.runtime', value: 'claude', file: null },
+    { path: 'claude.edit_mode', value: 'default', file: null },
+    { path: 'web.autostart', value: true, file: null },
+    { path: 'web.auth', value: 'token', file: null },
+    { path: 'web.host', value: '127.0.0.1', file: null },
+    { path: 'web.port', value: 7341, file: null },
+    { path: 'runtimes.claude.command', value: 'claude', file: null },
+    { path: 'runtimes.claude.args', value: [], file: null },
+    { path: 'runtimes.claude.env', value: ['ANTHROPIC_API_KEY'], file: null },
+    { path: 'runtimes.opencode.command', value: 'opencode', file: null },
   ];
   return base.map((setting) => overrides[setting.path] ?? setting);
+}
+
+export function systemView(overrides: Partial<SystemView> = {}): SystemView {
+  return {
+    daemon: {
+      running: true,
+      pid: 100,
+      version: '1.2.3',
+      build: 'abc123',
+      busy: false,
+      mismatch: null,
+    },
+    web: {
+      running: true,
+      pid: 100,
+      url: 'http://127.0.0.1:7341/',
+      host: '127.0.0.1',
+      port: 7341,
+      auth: 'token',
+      version: '1.2.3',
+      build: 'abc123',
+      servedBy: 'daemon',
+    },
+    logPath: '/state/daemon.log',
+    ...overrides,
+  };
 }
 
 export function catalogView(overrides: Partial<ConfigCatalogResponse> = {}): ConfigCatalogResponse {
@@ -438,7 +482,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     retry: vi.fn(async () => ({})),
     skipStep: vi.fn(async () => ({})),
     cancel: vi.fn(async () => ({})),
-    apply: vi.fn(async () => ({ runId: 'run1', pending: false, groups: [] })),
+    apply: vi.fn(async () => ({ runId: 'run1', number: 1, pending: false, groups: [] })),
     processes: vi.fn(async () => ({ processes: [] })),
     killProcess: vi.fn(async () => ({ ok: true })),
     tags: vi.fn(async () => []),
@@ -452,6 +496,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     queueRemove: vi.fn(async () => queueOf()),
     queueRunNow: vi.fn(async () => ({
       runId: 'run9',
+      number: 9,
       branch: 'refs/aip/run9/run',
       groups: [],
       split: true,
@@ -461,6 +506,9 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     queuePause: vi.fn(async () => queueOf()),
     queueSettings: vi.fn(async () => queueOf()),
     queueReturn: vi.fn(async () => ({ ...queueOf(), item: 'q9' })),
+    system: vi.fn(async () => systemView()),
+    restartWeb: vi.fn(async () => undefined),
+    restartDaemon: vi.fn(async () => undefined),
     config: vi.fn(async () => configView()),
     catalog: vi.fn(async () => catalogView()),
     writeSpecialist: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),

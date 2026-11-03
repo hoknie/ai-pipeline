@@ -22,6 +22,8 @@ import {
   readLevel,
   resolveLevels,
   type Level,
+  loadRuntimeSettings,
+  loadWebSettings,
   type LevelFiles,
 } from './load.ts';
 import { isMapping, mergeConfigs, type ConfigSource } from './merge.ts';
@@ -29,6 +31,8 @@ import {
   DELIVERY_MODES,
   SLUG_PATTERN_TEXT,
   isValidSlug,
+  defaultRuntimes,
+  defaultWeb,
   type ResolvedConfig,
   type Specialist,
 } from './model.ts';
@@ -694,6 +698,61 @@ function settingsOf(config: ResolvedConfig): [string, unknown][] {
   ];
 }
 
+/**
+ * `web.*` and `runtimes.*` as the daemon reads them: from the global settings.yaml only. The value
+ * of `env` never leaves the config layer: only the sorted names of the variables do.
+ */
+function globalSectionSettings(paths: ConfigPaths, global: LevelFiles): EditorSetting[] {
+  const file = global.settings?.path ?? null;
+  const root = isMapping(global.settings?.value) ? global.settings.value : {};
+  const has = (section: string, ...keys: string[]): boolean => {
+    let node: unknown = root[section];
+    for (const key of keys) {
+      if (!isMapping(node) || !(key in node)) return false;
+      node = node[key];
+    }
+    return true;
+  };
+  const originOf = (section: string, ...keys: string[]) => (has(section, ...keys) ? file : null);
+  const safe = <T>(read: () => T, fallback: () => T): T => {
+    try {
+      return read();
+    } catch (error) {
+      if (error instanceof ConfigLoadError) return fallback();
+      throw error;
+    }
+  };
+  const web = safe(() => loadWebSettings(paths), defaultWeb);
+  const runtimes = safe(() => loadRuntimeSettings(paths), defaultRuntimes);
+  const result: EditorSetting[] = [
+    { path: 'web.autostart', value: web.autostart, file: originOf('web', 'autostart') },
+    { path: 'web.auth', value: web.auth, file: originOf('web', 'auth') },
+    { path: 'web.host', value: web.host, file: originOf('web', 'host') },
+    { path: 'web.port', value: web.port, file: originOf('web', 'port') },
+  ];
+  for (const runtime of ['claude', 'opencode'] as const) {
+    const command = runtimes[runtime];
+    result.push(
+      {
+        path: `runtimes.${runtime}.command`,
+        value: command.command,
+        file: originOf('runtimes', runtime, 'command'),
+      },
+      {
+        path: `runtimes.${runtime}.args`,
+        value: command.args,
+        file: originOf('runtimes', runtime, 'args'),
+      },
+      {
+        path: `runtimes.${runtime}.env`,
+        value: Object.keys(command.env).sort(),
+        file: originOf('runtimes', runtime, 'env'),
+      },
+    );
+  }
+  return result;
+}
+
 /** Settings that are not valid are shown with the defaults, the errors say what is wrong. */
 function configOrDefaults(config: ResolvedConfig | null): ResolvedConfig {
   if (config) return config;
@@ -763,11 +822,12 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
       };
     });
   const origins = mergeOrigins(global, project);
-  const settings = settingsOf(configOrDefaults(config)).map(([path, value]) => ({
+  const settings: EditorSetting[] = settingsOf(configOrDefaults(config)).map(([path, value]) => ({
     path,
     value,
     file: origins.get(`swarm.${path}`) ?? null,
   }));
+  settings.push(...globalSectionSettings(paths, files.global));
   const settingsView = (level: WriteLevel): SettingsFileView => ({
     file: settingsFile(paths, level),
     revision: revisionOf(files[level].settings?.text),

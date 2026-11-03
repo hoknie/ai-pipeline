@@ -1,4 +1,4 @@
-import { Bell, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip.tsx';
 
 import { LanguageMenu } from './LanguageMenu.tsx';
 import { NavCounter } from './NavCounter.tsx';
+import { NotificationCenter } from './NotificationCenter.tsx';
 import type { NavProps } from './NavSidebar.tsx';
 import { RepositoryMenu } from './RepositoryMenu.tsx';
 import { ThemeMenu } from './ThemeMenu.tsx';
@@ -39,7 +40,7 @@ export function TopNav({
   waiting,
   queued,
   onPalette,
-  onEnableNotifications,
+  notifications,
   repository,
 }: NavProps) {
   const { t } = useTranslation();
@@ -131,19 +132,11 @@ export function TopNav({
             <Kbd className="hidden lg:inline-flex">{modLabel()}K</Kbd>
           </Button>
         </Tip>
-        {onEnableNotifications ? (
-          <Tip label={t('nav.notifications')}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0"
-              onClick={onEnableNotifications}
-              aria-label={t('nav.notifications')}
-            >
-              <Bell />
-            </Button>
-          </Tip>
-        ) : null}
+        <NotificationCenter
+          state={notifications}
+          compact
+          showRepository={repository.repositories.length > 1}
+        />
         <LanguageMenu compact />
         <ThemeMenu compact />
       </div>

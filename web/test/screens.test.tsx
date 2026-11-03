@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { App } from '../src/App.tsx';
 import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
+import { DiffStat } from '../src/components/runs/DiffStat.tsx';
 import { RunHeader } from '../src/components/runs/RunHeader.tsx';
 
 import { FakeEventSource, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
@@ -92,13 +93,13 @@ describe('group screen', () => {
 
   it('cancels a group only after the confirmation', async () => {
     const api = mount();
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel group' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog.textContent).toContain('Вход');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Do not cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(api.cancel).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     fireEvent.click(
       within(await screen.findByRole('alertdialog')).getByRole('button', {
         name: 'Cancel group',
@@ -172,22 +173,78 @@ describe('group screen', () => {
 });
 
 describe('run header', () => {
-  it('cancels a run after the confirmation that names it', async () => {
-    const api = fakeApi();
-    render(<RunHeader run={runView()} api={api} now={0} onError={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel run' }));
-    const dialog = await screen.findByRole('alertdialog');
-    expect(dialog.textContent).toContain('добавить вход');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Do not cancel' }));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    expect(api.cancel).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel run' }));
-    fireEvent.click(
-      within(await screen.findByRole('alertdialog')).getByRole('button', {
-        name: 'Cancel run',
-      }),
+  it('has no «Cancel run» button on a running run', () => {
+    render(
+      <RunHeader
+        run={runView({ state: 'active', finished: false })}
+        api={fakeApi()}
+        now={0}
+        onError={() => undefined}
+      />,
     );
-    await waitFor(() => expect(api.cancel).toHaveBeenCalledWith('run1'));
+    expect(screen.queryByRole('button', { name: 'Cancel run' })).toBeNull();
+  });
+
+  it('shows the summary block: path, time, tokens, cost and type, in this order', () => {
+    render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    expect(summary.className).toContain('border-l');
+    expect(summary.className).toContain('@3xl:w-96');
+    expect([...summary.querySelectorAll('dt')].map((node) => node.textContent)).toEqual([
+      'Path',
+      'Time',
+      'Tokens',
+      'Cost',
+      'Type',
+    ]);
+    const values = [...summary.querySelectorAll('dd')].map((node) => node.textContent);
+    expect(values[0]).toBe('/repo');
+    expect(values[2]).toBe('1.0k/100');
+    expect(values[3]).toBe('$0.42');
+    expect(values[4]).toContain('feature');
+  });
+
+  it('has no tokens and cost rows without usage or price', () => {
+    render(
+      <RunHeader
+        run={runView({ usage: null })}
+        api={fakeApi()}
+        now={0}
+        onError={() => undefined}
+      />,
+    );
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    expect(within(summary).queryByText('Tokens')).toBeNull();
+    expect(within(summary).queryByText('Cost')).toBeNull();
+    cleanup();
+    render(
+      <RunHeader
+        run={runView({ usage: { inputTokens: 1000, outputTokens: 100, costUsd: null } })}
+        api={fakeApi()}
+        now={0}
+        onError={() => undefined}
+      />,
+    );
+    const next = screen.getByRole('complementary', { name: 'Run summary' });
+    expect(within(next).getByText('Tokens')).toBeTruthy();
+    expect(within(next).queryByText('Cost')).toBeNull();
+  });
+
+  it('puts the state badge on the line of the title and drops the sum of changes', () => {
+    render(
+      <RunHeader
+        run={runView({ diff: { files: 3, added: 10, removed: 2 } })}
+        api={fakeApi()}
+        now={0}
+        onError={() => undefined}
+      />,
+    );
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(
+      title.parentElement!.querySelector('[aria-label^="Active"], [aria-label*="("]'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/3 files/)).toBeNull();
+    expect(screen.getAllByLabelText('Workflow: feature')).toHaveLength(1);
   });
 
   it('disables «Deliver» while the delivery is requested', async () => {
@@ -253,15 +310,11 @@ describe('workflow badge in runs', () => {
     expect(plain).toHaveLength(0);
   });
 
-  it('shows the badge in the run header next to the state badge', () => {
+  it('shows the badge once in the run header, inside the summary block', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
     const badge = screen.getByLabelText('Workflow: feature');
     expect(badge.hasAttribute('tabindex')).toBe(true);
-    const row = badge.parentElement!;
-    const state = row.firstElementChild!;
-    expect(state).not.toBe(badge);
-    expect(state.textContent).not.toContain('feature');
-    expect(state.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(badge.closest('aside')).toBe(screen.getByRole('complementary', { name: 'Run summary' }));
   });
 });
 
@@ -526,6 +579,19 @@ describe('run state badges', () => {
     expect((await screen.findAllByText('Warnings: 1')).length).toBeGreaterThan(0);
   });
 
+  it('keeps the warnings out of the run header', async () => {
+    mount([
+      runView({
+        state: 'finished',
+        finished: true,
+        groups: [groupRow({ status: 'merged', warnings: 1 })],
+      }),
+    ]);
+    const header = await screen.findByRole('banner', { name: 'run' });
+    expect(within(header).queryByText('Warnings: 1')).toBeNull();
+    expect(screen.getAllByText('Warnings: 1').length).toBeGreaterThan(0);
+  });
+
   it('has no warnings badge without warnings or while the run is active', async () => {
     mount([
       runView({ state: 'finished', finished: true, groups: [groupRow({ status: 'merged' })] }),
@@ -603,5 +669,84 @@ describe('runs section columns', () => {
       ).toBe(''),
     );
     expect(screen.getAllByText('Первый').length).toBeGreaterThan(0);
+  });
+});
+
+describe('notification centre in the panel', () => {
+  it('counts a live transition and opens the group of another repository', async () => {
+    const quiet = runView({ id: 'a', repository: '/work/app' });
+    const other = (status: 'running' | 'needs_human') =>
+      runView({
+        id: 'b',
+        repository: '/work/lib',
+        title: 'чужой запуск',
+        groups: [
+          groupRow({
+            slug: 'ask',
+            title: 'Вопрос чужого',
+            status,
+            question: status === 'needs_human' ? 'Какой тип?' : null,
+          }),
+        ],
+      });
+    const api = mount([quiet, other('running')], {
+      group: vi.fn(async () => groupView({ runId: 'b', slug: 'ask', status: 'needs_human' })),
+    });
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
+    act(() => FakeEventSource.last!.send({ event: 'run', seq: 2, run: other('needs_human') }));
+    const bell = screen.getByRole('button', { name: 'Notifications, 1 unread' });
+    expect(bell.textContent).toBe('1');
+    fireEvent.click(bell);
+    fireEvent.click(await screen.findByText('Вопрос чужого'));
+    await waitFor(() => expect(window.location.hash).toContain('b'));
+    await waitFor(() => expect(api.group).toHaveBeenCalledWith('b', 'ask'));
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
+  });
+});
+
+describe('diff stat', () => {
+  it('shows the files in bold, added lines green and removed lines red', () => {
+    render(<DiffStat diff={{ files: 2, added: 367, removed: 4 }} />);
+    const strong = document.querySelector('strong')!;
+    expect(strong.textContent).toBe('2 files');
+    expect(strong.parentElement!.textContent).toBe('2 files +367 −4');
+    expect(screen.getByText('+367').className).toContain('text-status-ok');
+    expect(screen.getByText('−4').className).toContain('text-status-err');
+  });
+});
+
+describe('usage in the group header', () => {
+  const row = groupRow({
+    durationMs: 65_000,
+    usage: { inputTokens: 1000, outputTokens: 100, costUsd: 0.42 },
+  });
+  const show = (showUsage?: boolean) =>
+    render(
+      <GroupScreen
+        api={fakeApi({ group: vi.fn(async () => groupView()) })}
+        runId="run1"
+        row={row}
+        draftKey="run1/login"
+        drafts={{}}
+        onDraft={() => undefined}
+        onClearDrafts={() => undefined}
+        onError={() => undefined}
+        run={runView()}
+        {...(showUsage === undefined ? {} : { showUsage })}
+      />,
+    );
+
+  it('hides duration, tokens and cost by default', () => {
+    show();
+    expect(screen.queryByText('1.0k/100')).toBeNull();
+    expect(screen.queryByText('$0.42')).toBeNull();
+    expect(screen.queryByText('1m05s')).toBeNull();
+  });
+
+  it('shows them when the run header is scrolled out of view', () => {
+    show(true);
+    expect(screen.getByText('1.0k/100')).toBeTruthy();
+    expect(screen.getByText('$0.42')).toBeTruthy();
+    expect(screen.getByText('1m05s')).toBeTruthy();
   });
 });

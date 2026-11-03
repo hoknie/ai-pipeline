@@ -23,6 +23,7 @@ import {
 import { Skeleton } from '../../ui/skeleton.tsx';
 import { defaultEntry, orderEntries } from '../order.ts';
 
+import { useOutOfView } from '../../useOutOfView.ts';
 import { GroupScreen } from './GroupScreen.tsx';
 import { canDeliver } from './delivery.ts';
 import { RunHeader } from './RunHeader.tsx';
@@ -73,6 +74,8 @@ export function RunsPage({
   const wide = useMediaQuery('(min-width: 768px)');
   const columns = useMediaQuery('(min-width: 1280px)');
   const [query, setQuery] = useState('');
+  const [headerElement, setHeaderElement] = useState<HTMLElement | null>(null);
+  const headerOut = useOutOfView(headerElement);
   const [filter, setFilter] = usePreference<RunFilter>('runFilter', 'all');
   const { byId } = useTags();
   const [storedTags, setStoredTags] = usePreference<string[]>('runTags', []);
@@ -224,6 +227,7 @@ export function RunsPage({
         now={now}
         onError={onError}
         onSelect={(slug) => select(run.id, slug)}
+        headerRef={setHeaderElement}
       />
       {group ? (
         <GroupScreen
@@ -245,6 +249,7 @@ export function RunsPage({
           onDeliver={() => api.apply(run.id, false)}
           run={run}
           onForceDeliver={() => api.apply(run.id, true)}
+          showUsage={headerOut}
         />
       ) : (
         <p className="p-4 text-sm text-muted-foreground">{t('runs.page.noGroups')}</p>

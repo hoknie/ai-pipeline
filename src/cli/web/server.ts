@@ -16,6 +16,8 @@ import {
 import {
   IpcError,
   checkDaemon,
+  currentBuild,
+  pingDaemon,
   request,
   streamEventSchema,
   subscribe,
@@ -24,6 +26,8 @@ import {
   type Method,
   type ParamsOf,
 } from '../../protocol/index.ts';
+
+import { systemView } from './system.ts';
 
 export interface WebOptions {
   socket: string;
@@ -46,6 +50,18 @@ export interface WebOptions {
    * {@link RECHECK_MS}; defaults to comparing the builds without starting or restarting it.
    */
   ensureDaemon?: () => Promise<DaemonCheck>;
+  /**
+   * Set by the daemon that serves this panel: restarts of the panel and of the daemon. Without it
+   * (`aip web` on its own) both restarts answer 409 `web_standalone`.
+   */
+  system?: SystemHooks;
+}
+
+export interface SystemHooks {
+  restartWeb(): Promise<void>;
+  restartDaemon(force: boolean): Promise<void>;
+  /** The daemon log, shown in the system view. */
+  logPath?: string;
 }
 
 /** How often a daemon older than the panel is checked again, so it is replaced once idle. */
@@ -113,6 +129,8 @@ const writeBody = z.object({
   level: levelParam.optional(),
 });
 
+const restartDaemonBody = z.object({ force: z.boolean().optional() });
+
 const settingBody = z.object({
   value: z.union([z.boolean(), z.enum(DELIVERY_MODES)]).nullable(),
   revision: z.string().min(1).nullable(),
@@ -144,9 +162,11 @@ function entryId(value: string | undefined): string {
 
 class HttpError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  readonly code: string | undefined;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -709,6 +729,81 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     }
   }
 
+  /** Runs `action` once the response is on its way: the restart closes this very server. */
+  function afterResponse(response: ServerResponse, action: () => Promise<void>): void {
+    response.once('finish', () => {
+      setImmediate(() => {
+        action().catch((error: unknown) => {
+          process.stderr.write(`aip web: restart failed: ${(error as Error).message}\n`);
+        });
+      });
+    });
+  }
+
+  async function handleSystem(
+    incoming: IncomingMessage,
+    response: ServerResponse,
+    path: string,
+    verb: string,
+  ): Promise<void> {
+    const hooks = options.system;
+    if (path === '/api/system') {
+      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      const ping = await pingDaemon(options.socket).catch(() => null);
+      const check =
+        ping === null
+          ? null
+          : await (options.ensureDaemon ?? (() => checkDaemon(options.socket)))().catch(() => null);
+      return json(
+        response,
+        200,
+        systemView({
+          ping,
+          check,
+          panelBuild: currentBuild(),
+          servedBy: hooks === undefined ? 'standalone' : 'daemon',
+          panel: { pid: process.pid, host, port, auth: open ? 'none' : 'token' },
+          logPath: hooks?.logPath ?? null,
+        }),
+      );
+    }
+    const action =
+      path === '/api/system/web/restart'
+        ? 'web'
+        : path === '/api/system/daemon/restart'
+          ? 'daemon'
+          : null;
+    if (action === null) throw new HttpError(404, 'not found');
+    if (verb !== 'POST') throw new HttpError(405, 'method not allowed');
+    const body =
+      action === 'daemon'
+        ? parseBody(restartDaemonBody, await readJson(incoming))
+        : parseBody(z.object({}), await readJson(incoming));
+    if (hooks === undefined) {
+      throw new HttpError(
+        409,
+        'this panel was started by `aip web`: restart it in the terminal',
+        'web_standalone',
+      );
+    }
+    if (action === 'web') {
+      afterResponse(response, () => hooks.restartWeb());
+    } else {
+      const force = (body as { force?: boolean }).force === true;
+      if (!force) {
+        const ping = await pingDaemon(options.socket).catch(() => null);
+        if (ping?.busy === true)
+          throw new HttpError(
+            409,
+            'agents are running: restart anyway to stop them',
+            'daemon_busy',
+          );
+      }
+      afterResponse(response, () => hooks.restartDaemon(force));
+    }
+    json(response, 202, { state: 'restarting' });
+  }
+
   async function handle(incoming: IncomingMessage, response: ServerResponse): Promise<void> {
     if (!hostAllowed(incoming)) throw new HttpError(403, 'forbidden host or origin');
     const url = new URL(incoming.url ?? '/', `http://${incoming.headers.host}`);
@@ -782,6 +877,11 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       throw new HttpError(405, 'method not allowed');
     }
 
+    if (url.pathname.startsWith('/api/system')) {
+      await handleSystem(incoming, response, url.pathname, verb);
+      return;
+    }
+
     let wrongMethod = false;
     for (const route of routes) {
       const match = route.pattern.exec(url.pathname);
@@ -838,7 +938,11 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         response.end();
         return;
       }
-      if (error instanceof HttpError) json(response, error.status, { error: error.message });
+      if (error instanceof HttpError)
+        json(response, error.status, {
+          error: error.message,
+          ...(error.code === undefined ? {} : { code: error.code }),
+        });
       else if (error instanceof IpcError) {
         const status = /^(unknown (run|group|attempt|queue item)\b|not a background process)/.test(
           error.message,

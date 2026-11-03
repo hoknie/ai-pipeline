@@ -1,4 +1,4 @@
-import { runTitle } from '../../format.ts';
+import { runTitle, taskNumber } from '../../format.ts';
 import type { RunView, TagView } from '../../types.ts';
 
 /** Whose runs the list shows: those of the selected repository or of every repository. */
@@ -41,6 +41,7 @@ function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
     run.name,
     run.workflow,
     run.id,
+    taskNumber(run.number),
     ...run.groups.map((group) => group.title),
     ...tagNames,
   ]
@@ -67,11 +68,12 @@ export function filterRuns(
   catalog: ReadonlyMap<string, TagView> = new Map(),
 ): RunView[] {
   const needle = query.trim().toLowerCase();
+  // `#7` is the number of a task and matches it exactly (not 17 or 70).
+  const numeric = /^#(\d+)$/.exec(needle);
+  const matches = (run: RunView): boolean =>
+    numeric ? run.number === Number(numeric[1]) : haystack(run, catalog).includes(needle);
   return runsOf(runs, repository).filter(
-    (run) =>
-      inFilter(run, filter) &&
-      inTags(run, tagIds) &&
-      (needle === '' || haystack(run, catalog).includes(needle)),
+    (run) => inFilter(run, filter) && inTags(run, tagIds) && (needle === '' || matches(run)),
   );
 }
 

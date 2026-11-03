@@ -206,20 +206,22 @@ describe('tags of a run', () => {
   });
 });
 
-describe('tags in the general settings', () => {
+describe('tags on the settings page', () => {
+  // The page can mount again when the repository becomes known: look the section up each time.
+  const tags = () => screen.getByRole('region', { name: 'Tags' });
   const settings = (tags: TagView[], overrides: Partial<Api> = {}) =>
-    boot('#specialists/_settings', tags, [runView()], overrides);
+    boot('#settings/tags', tags, [runView()], overrides);
 
   it('recolors a tag', async () => {
     const api = settings([tagView('auth', 'blue', 'a')], {
       editTag: vi.fn(async () => [tagView('auth', 'green', 'a')]),
     });
-    const section = await screen.findByRole('region', { name: 'Tags' });
-    choose(within(section).getByRole('combobox', { name: 'Color of tag auth' }), 'Green');
+    await screen.findByRole('region', { name: 'Tags' });
+    choose(within(tags()).getByRole('combobox', { name: 'Color of tag auth' }), 'Green');
     await waitFor(() => expect(api.editTag).toHaveBeenCalledWith('auth', { color: 'green' }));
     await waitFor(() =>
       expect(
-        within(section)
+        within(tags())
           .getAllByText('auth')
           .find((node) => node.closest('[data-tag]'))!
           .closest('[data-tag]')!.className,
@@ -229,14 +231,14 @@ describe('tags in the general settings', () => {
 
   it('asks before deleting and then drops the tag', async () => {
     const api = settings([tagView('auth', 'blue', 'a')], { removeTag: vi.fn(async () => []) });
-    const section = await screen.findByRole('region', { name: 'Tags' });
-    fireEvent.click(within(section).getByRole('button', { name: 'Delete tag auth' }));
+    await screen.findByRole('region', { name: 'Tags' });
+    fireEvent.click(within(tags()).getByRole('button', { name: 'Delete tag auth' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(within(dialog).getByText(/removed from all tasks and runs/)).toBeTruthy();
     expect(api.removeTag).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(api.removeTag).toHaveBeenCalledWith('auth'));
-    await waitFor(() => expect(within(section).queryByLabelText('Name of tag auth')).toBeNull());
+    await waitFor(() => expect(within(tags()).queryByLabelText('Name of tag auth')).toBeNull());
   });
 
   it('shows the error of a taken name and restores the field', async () => {
@@ -245,12 +247,12 @@ describe('tags in the general settings', () => {
         throw new ApiError(400, 'tag `auth` already exists');
       }),
     });
-    const section = await screen.findByRole('region', { name: 'Tags' });
-    const field = within(section).getByLabelText<HTMLInputElement>('Name of tag v2');
+    await screen.findByRole('region', { name: 'Tags' });
+    const field = within(tags()).getByLabelText<HTMLInputElement>('Name of tag v2');
     fireEvent.change(field, { target: { value: 'Auth' } });
     fireEvent.blur(field);
     await waitFor(() => expect(api.editTag).toHaveBeenCalledWith('v2', { name: 'Auth' }));
-    expect(await within(section).findByText('tag `auth` already exists')).toBeTruthy();
+    expect(await within(tags()).findByText('tag `auth` already exists')).toBeTruthy();
     await waitFor(() => expect(field.value).toBe('v2'));
   });
 });

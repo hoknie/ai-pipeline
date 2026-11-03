@@ -21,6 +21,7 @@ const VIEW: QueueView & { item: string } = {
   items: [
     {
       id: 'q1',
+      number: 1,
       position: 1,
       workflow: 'feature',
       task: 'Сделать вход',
@@ -89,7 +90,7 @@ describe('host MCP queue tools', () => {
     });
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('Added item q1.');
-    expect(textOf(result)).toContain('1. q1  feature  Сделать вход');
+    expect(textOf(result)).toContain('1. #1 q1  feature  Сделать вход');
     expect(calls).toEqual([
       {
         method: 'queue_add',
@@ -321,13 +322,21 @@ describe('host MCP queue tools', () => {
         {
           ...VIEW.items[0]!,
           readiness: 'waiting' as const,
-          after: [{ kind: 'item' as const, id: 'q0', title: 'модель', state: 'waiting' as const }],
+          after: [
+            {
+              kind: 'item' as const,
+              id: 'q0',
+              number: 5,
+              title: 'модель',
+              state: 'waiting' as const,
+            },
+          ],
         },
       ],
     };
     const client = await connect(async () => waiting);
     const result = await client.callTool({ name: 'swarm_queue', arguments: {} });
-    expect(textOf(result)).toContain('after q0 (waiting)');
+    expect(textOf(result)).toContain('after #5 q0 (waiting)');
     expect(JSON.stringify(result.content)).toContain('readiness');
   });
 
@@ -470,12 +479,19 @@ describe('host MCP queue tools', () => {
   it('returns the run and the daemon errors', async () => {
     const client = await connect(async (method) => {
       if (method === 'queue_run_now') {
-        return { runId: 'r1', branch: 'refs/aip/r1/run', groups: [], split: true, warnings: [] };
+        return {
+          runId: 'r1',
+          number: 1,
+          branch: 'refs/aip/r1/run',
+          groups: [],
+          split: true,
+          warnings: [],
+        };
       }
       throw new Error('unknown queue item');
     });
     const run = await client.callTool({ name: 'swarm_queue_run_now', arguments: { item: 'q1' } });
-    expect(textOf(run)).toContain('Run r1 started');
+    expect(textOf(run)).toContain('Run #1 r1 started');
     const failed = await client.callTool({ name: 'swarm_queue', arguments: {} });
     expect(failed.isError).toBe(true);
     expect(textOf(failed)).toContain('unknown queue item');
@@ -484,13 +500,14 @@ describe('host MCP queue tools', () => {
   it('queues a task with swarm_run and shows whether the run exists', async () => {
     const created = {
       runId: 'r1',
+      number: 1,
       branch: 'refs/aip/r1/run',
       groups: [],
       split: true,
       warnings: [],
     };
     const sent: string[] = [];
-    let answer: unknown = { item: 'q1', run: created, queue: VIEW };
+    let answer: unknown = { item: 'q1', number: 1, run: created, queue: VIEW };
     const client = await connect(async (method) => {
       sent.push(method);
       return answer;
@@ -500,14 +517,14 @@ describe('host MCP queue tools', () => {
       arguments: { workflow: 'feature', task: 'x' },
     });
     expect(sent).toEqual(['run']);
-    expect(textOf(started)).toContain('Run r1 started');
-    answer = { item: 'q1', run: null, queue: { ...VIEW, status: 'running' } };
+    expect(textOf(started)).toContain('Run #1 r1 started');
+    answer = { item: 'q1', number: 1, run: null, queue: { ...VIEW, status: 'running' } };
     const waiting = await client.callTool({
       name: 'swarm_run',
       arguments: { workflow: 'feature', task: 'x' },
     });
     expect(textOf(waiting)).toContain(
-      'Task q1 queued at position 1 (queue running, 0 of 1 places taken).',
+      'Task #1 q1 queued at position 1 (queue running, 0 of 1 places taken).',
     );
     expect(textOf(waiting)).toContain('"run": null');
   });

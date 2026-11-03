@@ -46,7 +46,28 @@ describe('workflow badge in the palette', () => {
   });
 });
 
+describe('task number in the palette', () => {
+  it('shows the number of a run and finds the run by it', async () => {
+    mount([
+      runView({ id: 'a', title: 'First run', number: 4 }),
+      runView({ id: 'b', title: 'Second run', number: 5 }),
+    ]);
+    openPalette();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('#4')).toBeTruthy();
+    expect(within(dialog).getByText('#5')).toBeTruthy();
+  });
+});
+
 describe('command palette', () => {
+  it('opens the settings page from the palette', async () => {
+    mount();
+    openPalette();
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('option', { name: 'Settings' }));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/general'));
+  });
+
   it('opens a run chosen from the palette', async () => {
     mount([runView({ id: 'a', title: 'First run' }), runView({ id: 'b', title: 'Second run' })]);
     openPalette();

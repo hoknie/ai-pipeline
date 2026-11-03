@@ -1,16 +1,18 @@
-import { Bell, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { modLabel } from '../../hotkeys.ts';
 import { cn } from '../../lib/cn.ts';
 import type { View } from '../../route.ts';
 import { SECTIONS } from '../../sections.ts';
+import type { NotificationCenterState } from '../../notifications.ts';
 import { Badge } from '../../ui/badge.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Kbd } from '../../ui/kbd.tsx';
 
 import { RepositoryMenu, type RepositoryChoice } from './RepositoryMenu.tsx';
 import { NavCounter } from './NavCounter.tsx';
+import { NotificationCenter } from './NotificationCenter.tsx';
 import { navRowClass } from './navRow.ts';
 import { LanguageMenu } from './LanguageMenu.tsx';
 import { ThemeMenu } from './ThemeMenu.tsx';
@@ -26,8 +28,8 @@ export interface NavProps {
   /** Tasks in the queue. */
   queued: number;
   onPalette: () => void;
-  /** Offers browser notifications; null when they are on or unsupported. */
-  onEnableNotifications: (() => void) | null;
+  /** The notification centre: the list, the unread counter and the browser permission. */
+  notifications: NotificationCenterState;
   /** The repository selector. */
   repository: RepositoryChoice;
 }
@@ -41,7 +43,7 @@ export function NavSidebar({
   waiting,
   queued,
   onPalette,
-  onEnableNotifications,
+  notifications,
   repository,
 }: NavProps) {
   const { t } = useTranslation();
@@ -111,18 +113,10 @@ export function NavSidebar({
         })}
       </nav>
       <div className="mt-auto flex flex-col gap-1">
-        {onEnableNotifications ? (
-          <Button
-            variant="ghost"
-            data-nav-row
-            className={navRowClass()}
-            onClick={onEnableNotifications}
-            aria-label={t('nav.notifications')}
-          >
-            <Bell />
-            <span>{t('nav.notifications')}</span>
-          </Button>
-        ) : null}
+        <NotificationCenter
+          state={notifications}
+          showRepository={repository.repositories.length > 1}
+        />
         <ThemeMenu />
         <LanguageMenu />
       </div>

@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
-import { useConfirm } from '../../confirm.tsx';
-import { cost, diffText, duration, runTitle, usageText } from '../../format.ts';
+import { runTitle, taskNumber } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
 import { runStatusLabel } from '../../status.ts';
 import type { RunView, TagView } from '../../types.ts';
@@ -19,11 +18,10 @@ import {
 import { useTags } from '../../tags.tsx';
 import { TagPicker } from '../TagPicker.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
-import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunSteps } from './RunSteps.tsx';
-import { RunWarningsBadge } from './RunWarningsBadge.tsx';
+import { RunSummary } from './RunSummary.tsx';
 
-import { canDeliver } from './delivery.ts';
+import { canDeliver, deliveryBadge } from './delivery.ts';
 import { ApplyDialog } from './ApplyDialog.tsx';
 
 export function RunHeader({
@@ -32,6 +30,7 @@ export function RunHeader({
   now,
   onError,
   onSelect,
+  headerRef,
 }: {
   run: RunView;
   api: Api;
@@ -39,13 +38,13 @@ export function RunHeader({
   onError: (message: string) => void;
   /** Opens a group or a system step of the run. */
   onSelect?: (slug: string) => void;
+  /** Receives the header element, to know when it is scrolled out of view. */
+  headerRef?: (element: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
-  const confirm = useConfirm();
   const [forcing, setForcing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
   const [returning, setReturning] = useState(false);
   const putBack = async () => {
     setReturning(true);
@@ -81,7 +80,6 @@ export function RunHeader({
       setTagging(false);
     }
   };
-  const stages = run.system.filter((step) => step.kind !== 'resolve');
   const retryable = (status: string) => status === 'failed' || status === 'cancelled';
   const failed: { slug: string; title: string; status: string }[] = run.groups.filter((group) =>
     retryable(group.status),
@@ -106,6 +104,38 @@ export function RunHeader({
   };
   const { delivery } = run;
   const deliverable = canDeliver(run);
+  const badge = deliveryBadge(run);
+  const resolver = run.resolver;
+  const resolverTip = resolver
+    ? [
+        t('runs.header.resolver'),
+        t(`status.${resolver.status}`, { defaultValue: resolver.status }),
+        t('runs.header.round', { round: resolver.round, rounds: resolver.rounds }),
+        resolver.conflicts.length > 0
+          ? t('runs.header.conflicts', { list: resolver.conflicts.join(', ') })
+          : null,
+        badge?.reason,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
+  const badgeNode = badge ? (
+    <StatusBadge
+      status={badge.status}
+      title={badge.reason ?? undefined}
+      tip={resolverTip}
+      onClick={resolver ? () => onSelect?.('_resolve') : undefined}
+      label={
+        badge.label === 'delivering'
+          ? t('runs.header.delivering')
+          : badge.label === 'deliveryFailed'
+            ? t('runs.header.deliveryFailed', { n: delivery.failed })
+            : badge.label === 'delivery'
+              ? t('runs.header.delivery', { applied: delivery.applied, merged: delivery.merged })
+              : undefined
+      }
+    />
+  ) : null;
   const apply = async (force: boolean) => {
     setForcing(false);
     setApplying(true);
@@ -118,168 +148,81 @@ export function RunHeader({
       setApplying(false);
     }
   };
-  const cancel = async () => {
-    const yes = await confirm({
-      title: t('runs.header.cancelTitle', { title: runTitle(run) }),
-      description: t('runs.header.cancelDescription'),
-      confirmLabel: t('runs.header.cancelRun'),
-      cancelLabel: t('runs.header.keep'),
-      destructive: true,
-    });
-    if (!yes) return;
-    setCancelling(true);
-    try {
-      await api.cancel(run.id);
-      notifySuccess(t('runs.header.cancelled'));
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setCancelling(false);
-    }
-  };
   return (
-    <header aria-label={t('runs.header.label')} className="flex flex-col gap-2 border-b p-4">
-      <h1 className="text-lg font-semibold" title={`${runTitle(run)}\n${run.id}`}>
-        {runTitle(run)}
-      </h1>
-      {run.name ? <div className="font-mono text-xs text-muted-foreground">{run.name}</div> : null}
-      <div className="flex flex-col gap-1">
-        <TagPicker
-          label={t('runs.header.tags')}
-          selected={runTagIds}
-          onChange={(ids, fresh) => void changeTags(ids, fresh)}
-          api={api}
-          allowCreate
-          disabled={tagging}
-        />
-        {tagError ? <Alert variant="destructive">{tagError}</Alert> : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
-        <RunWarningsBadge run={run} />
-        <WorkflowBadge id={run.workflow} />
-        <span>{duration((run.finishedAt ?? now) - run.createdAt)}</span>
-        {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
-        {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
-        {run.diff ? <span>{diffText(run.diff, t)}</span> : null}
-        {delivery.merged > 0 ? (
-          <span>
-            {t('runs.header.delivery', { applied: delivery.applied, merged: delivery.merged })}
-          </span>
-        ) : null}
-        {delivery.failed > 0 ? (
-          <StatusBadge
-            status="apply_failed"
-            label={t('runs.header.deliveryFailed', { n: delivery.failed })}
-          />
-        ) : null}
-        {delivery.inProgress ? (
-          <StatusBadge status="running" label={t('runs.header.delivering')} />
-        ) : null}
-      </div>
-      {run.resolver ? (
-        <div className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
-          <button
-            type="button"
-            className="underline-offset-2 hover:underline"
-            onClick={() => onSelect?.('_resolve')}
-          >
-            {t('runs.header.resolver')}
-          </button>
-          <StatusBadge status={run.resolver.status} />
-          <span>
-            {t('runs.header.round', { round: run.resolver.round, rounds: run.resolver.rounds })}
-          </span>
-          {run.resolver.conflicts.length > 0 ? (
-            <span>{t('runs.header.conflicts', { list: run.resolver.conflicts.join(', ') })}</span>
-          ) : null}
-        </div>
-      ) : null}
-      {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
-      {stages.length > 0 || run.deliveryStage ? (
-        <div
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"
-          aria-label={t('runs.system.stages')}
-        >
-          <span>{t('runs.system.stages')}:</span>
-          {stages.map((step) => (
-            <span key={step.kind} className="inline-flex items-center gap-1.5">
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline"
-                onClick={() => onSelect?.(step.slug)}
-              >
-                {t(`runs.system.${step.kind}`)}
-              </button>
-              <StatusBadge status={step.status} wait={step.wait} />
-            </span>
-          ))}
-          {run.deliveryStage ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span>{t('runs.system.delivery')}</span>
-              <StatusBadge
-                status={
-                  run.deliveryStage.status === 'delivering' ? 'running' : run.deliveryStage.status
-                }
-                title={
-                  run.deliveryStage.status === 'apply_failed'
-                    ? (run.deliveryStage.reason ?? undefined)
-                    : undefined
-                }
-              />
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-      <RunSteps run={run} api={api} onError={onError} />
-      <div className="flex flex-wrap items-center gap-2">
-        {failed.length > 0 ? (
-          <Button variant="outline" disabled={retrying} onClick={() => void retryFailed()}>
-            <RotateCcw className={retrying ? 'motion-safe:animate-spin' : undefined} />
-            {hasCancelled ? t('runs.header.retryFailedCancelled') : t('runs.header.retryFailed')} (
-            {failed.length})
-          </Button>
-        ) : null}
-        {run.returnable ? (
-          <Button variant="outline" loading={returning} onClick={() => void putBack()}>
-            {t('runs.header.returnRun')}
-          </Button>
-        ) : null}
-        <Button loading={applying} disabled={!deliverable} onClick={() => void apply(false)}>
-          {t('runs.header.deliver')}
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" aria-label={t('runs.header.more')}>
-              <MoreHorizontal />
-              {t('runs.header.more')}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem disabled={!deliverable} onSelect={() => setForcing(true)}>
-              {t('runs.header.forceDeliver')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                void navigator.clipboard?.writeText(run.id);
-                notifySuccess(t('runs.header.copied'));
-              }}
+    <header ref={headerRef} aria-label={t('runs.header.label')} className="@container border-b p-4">
+      <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-start">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1
+              className="min-w-0 flex-1 truncate text-lg font-semibold"
+              title={`${runTitle(run)}\n${run.id}`}
             >
-              {t('runs.header.copyId')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {!run.finished ? (
-          <Button variant="destructive" loading={cancelling} onClick={() => void cancel()}>
-            {t('runs.header.cancelRun')}
-          </Button>
-        ) : null}
-        <span
-          className="truncate text-xs text-muted-foreground"
-          title={`${run.id} · ${run.branch}`}
-        >
-          {run.repository}
-        </span>
+              <span className="font-mono text-base font-normal text-muted-foreground">
+                {taskNumber(run.number)}
+              </span>{' '}
+              {runTitle(run)}
+            </h1>
+            <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
+            {badgeNode}
+          </div>
+          {run.name ? (
+            <div className="font-mono text-xs text-muted-foreground">{run.name}</div>
+          ) : null}
+          <div className="flex flex-col gap-1">
+            <TagPicker
+              label={t('runs.header.tags')}
+              selected={runTagIds}
+              onChange={(ids, fresh) => void changeTags(ids, fresh)}
+              api={api}
+              allowCreate
+              disabled={tagging}
+            />
+            {tagError ? <Alert variant="destructive">{tagError}</Alert> : null}
+          </div>
+          {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
+          <RunSteps run={run} api={api} onError={onError} />
+          <div className="flex flex-wrap items-center gap-2">
+            {failed.length > 0 ? (
+              <Button variant="outline" disabled={retrying} onClick={() => void retryFailed()}>
+                <RotateCcw className={retrying ? 'motion-safe:animate-spin' : undefined} />
+                {hasCancelled
+                  ? t('runs.header.retryFailedCancelled')
+                  : t('runs.header.retryFailed')}{' '}
+                ({failed.length})
+              </Button>
+            ) : null}
+            {run.returnable ? (
+              <Button variant="outline" loading={returning} onClick={() => void putBack()}>
+                {t('runs.header.returnRun')}
+              </Button>
+            ) : null}
+            <Button loading={applying} disabled={!deliverable} onClick={() => void apply(false)}>
+              {t('runs.header.deliver')}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" aria-label={t('runs.header.more')}>
+                  <MoreHorizontal />
+                  {t('runs.header.more')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem disabled={!deliverable} onSelect={() => setForcing(true)}>
+                  {t('runs.header.forceDeliver')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void navigator.clipboard?.writeText(run.id);
+                    notifySuccess(t('runs.header.copied'));
+                  }}
+                >
+                  {t('runs.header.copyId')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+        <RunSummary run={run} now={now} />
       </div>
       {forcing ? (
         <ApplyDialog

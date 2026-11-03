@@ -143,6 +143,31 @@ export const MIGRATIONS: string[] = [
   `,
   `ALTER TABLE queue_items ADD COLUMN postponed INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE runs ADD COLUMN skipped_steps_json TEXT NOT NULL DEFAULT '[]'`,
+  `
+  ALTER TABLE runs ADD COLUMN number INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE queue_items ADD COLUMN number INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE queues ADD COLUMN next_number INTEGER NOT NULL DEFAULT 1;
+  UPDATE runs SET number = (
+    SELECT COUNT(*) FROM runs other
+    WHERE other.repository = runs.repository
+      AND (other.created_at < runs.created_at OR (other.created_at = runs.created_at AND other.id <= runs.id))
+  );
+  UPDATE queue_items SET number = (SELECT runs.number FROM runs WHERE runs.id = queue_items.run_id)
+  WHERE run_id IS NOT NULL AND EXISTS (SELECT 1 FROM runs WHERE runs.id = queue_items.run_id);
+  UPDATE queue_items SET number = (
+    SELECT COALESCE(MAX(runs.number), 0) FROM runs WHERE runs.repository = queue_items.repository
+  ) + (
+    SELECT COUNT(*) FROM queue_items other
+    WHERE other.repository = queue_items.repository
+      AND (other.run_id IS NULL OR NOT EXISTS (SELECT 1 FROM runs WHERE runs.id = other.run_id))
+      AND (other.position < queue_items.position OR (other.position = queue_items.position AND other.id <= queue_items.id))
+  )
+  WHERE run_id IS NULL OR NOT EXISTS (SELECT 1 FROM runs WHERE runs.id = queue_items.run_id);
+  UPDATE queues SET next_number = 1 + MAX(
+    (SELECT COALESCE(MAX(number), 0) FROM runs WHERE runs.repository = queues.repository),
+    (SELECT COALESCE(MAX(number), 0) FROM queue_items WHERE queue_items.repository = queues.repository)
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

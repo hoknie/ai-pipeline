@@ -30,6 +30,22 @@ const runs = [
   }),
 ];
 
+describe('search by task number', () => {
+  const numbered = [7, 17, 70].map((number) =>
+    runView({ id: `n${number}`, title: 'Задача', number }),
+  );
+
+  it('finds the run by #N exactly, not the numbers that contain it', () => {
+    expect(filterRuns(numbered, '#7', 'all').map((run) => run.id)).toEqual(['n7']);
+    expect(filterRuns(numbered, '#17', 'all').map((run) => run.id)).toEqual(['n17']);
+    expect(filterRuns(numbered, '#8', 'all')).toEqual([]);
+  });
+
+  it('keeps the text search for other queries', () => {
+    expect(filterRuns(numbered, 'задача', 'all')).toHaveLength(3);
+  });
+});
+
 describe('navRunCounts', () => {
   it('counts the unfinished runs and those waiting for an answer', () => {
     expect(navRunCounts(runs)).toEqual({ working: 3, waiting: 1 });
@@ -114,6 +130,19 @@ function Harness({ initial = 'all' as RunFilter }) {
 }
 
 describe('run list', () => {
+  it('shows the task number of each run and finds a run by #N', () => {
+    render(<Harness />);
+    expect(screen.getAllByText('#1')).toHaveLength(runs.length);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {
+      target: { value: '#1' },
+    });
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(runs.length);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {
+      target: { value: '#10' },
+    });
+    expect(screen.queryAllByRole('button', { expanded: false })).toHaveLength(0);
+  });
+
   it('finds a run by its title', () => {
     render(<Harness />);
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {

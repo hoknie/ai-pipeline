@@ -222,6 +222,18 @@ describe('needs_human runs', () => {
     expect(screen.getByLabelText('Needs answer (needs_human)')).toBeTruthy();
   });
 
+  it('shows the task number in the run header', () => {
+    render(
+      <RunHeader
+        run={{ ...waiting(), number: 12 }}
+        api={fakeApi()}
+        now={0}
+        onError={() => undefined}
+      />,
+    );
+    expect(screen.getByText('#12')).toBeTruthy();
+  });
+
   it('shows needs_human ×N in the run header', () => {
     render(<RunHeader run={waiting()} api={fakeApi()} now={0} onError={() => undefined} />);
     expect(screen.getByText('Needs answer ×3')).toBeTruthy();
@@ -347,7 +359,7 @@ describe('run page', () => {
     );
     fireEvent.click(within(tree).getByText('Вход'));
     const login = screen.getByRole('region', { name: 'group Вход' });
-    expect(within(login).getByText('2 files +3 −1')).toBeTruthy();
+    expect(login.querySelector('header')!.textContent).toContain('2 files +3 −1');
     expect(within(login).getByLabelText('Merged (merged)').className).toContain('bg-status-ok-bg');
     expect(window.location.hash).toBe('#runs/run1/login');
     fireEvent.click(within(tree).getByText('Регистрация'));

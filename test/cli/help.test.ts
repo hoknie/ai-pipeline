@@ -161,6 +161,13 @@ describe('grouped help', () => {
     expect(stdout).toContain('aip daemon status');
   });
 
+  it('documents --web of aip daemon restart with an example', async () => {
+    const { stdout, code } = await aip(['daemon', 'restart', '--help']);
+    expect(code).toBe(0);
+    expect(stdout).toContain('--web');
+    expect(stdout).toContain('aip daemon restart --web');
+  });
+
   it('lists the subcommands of aip web', async () => {
     const { stdout, code } = await aip(['web', '--help']);
     expect(code).toBe(0);

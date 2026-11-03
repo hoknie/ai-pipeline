@@ -25,6 +25,8 @@ export interface NewRun {
   fromQueue?: boolean;
   /** Id of the queue item the run starts from. */
   queueItem?: string | null;
+  /** Number of the task the run is created for. */
+  number: number;
   /** Overrides `delivery.auto` of the configuration for this run only. */
   autoDeliver?: boolean | undefined;
   /** Overrides `delivery.mode` of the configuration for this run only. */
@@ -79,6 +81,7 @@ export function createRun(input: NewRun): RunState {
       namingUsage: null,
       fromQueue: input.fromQueue ?? false,
       queueItem: input.queueItem ?? null,
+      number: input.number,
       tags: [...(input.tags ?? [])],
       skippedSteps: [],
     },

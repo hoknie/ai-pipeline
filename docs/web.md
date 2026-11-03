@@ -52,7 +52,7 @@ The repository picker lists the repositories of the daemon (see [Multiple reposi
 
 ## Sections
 
-The sections are "Runs", "Queue", "Topology", "Specialists" and "Workflow". The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. Runs waiting for an answer come first in the list, then the other unfinished runs, then finished ones.
+The sections are "Runs", "Queue", "Topology", "Specialists", "Workflow" and "Settings". The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. Runs waiting for an answer come first in the list, then the other unfinished runs, then finished ones.
 
 ### Runs
 
@@ -87,9 +87,9 @@ A specialist can ask structured questions (`questions` in `swarm_report`). They 
 
 The queue settings are in [queue.md](queue.md).
 
-- The "Queue settings" block has two sections. "Controls" holds the state and the buttons "New task", "Start" and "Pause". "Settings" holds the parallelism, the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector and the autopilot's answer text.
-  - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`.
-  - The file is shown under the control. The general settings screen does not change a value set in the project file.
+- The "Queue controls" block on the left holds the state, the buttons "New task", "Start" and "Pause", the parallelism and the link "Queue settings".
+- The modes of the queue are in the group "Queue" of [Settings](#settings) (`#settings/queue`): the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector, the autopilot's answer text and the "On a usage limit" selector.
+  - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`. The file is shown under the control. The group "Delivery" writes to the same file.
 - The "On a usage limit" selector chooses `wait` or `stop`. A queue stopped by a usage limit shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
 - "Return to the queue" is on every skipped run and in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
 - The "In work" switch of a row postpones the task or puts it back.
@@ -132,6 +132,22 @@ The tab edits the `aip/workflows/<id>.yaml` files of the project and of the shar
 - Running runs continue from their snapshot after the workflow is deleted. A new run of a deleted workflow is rejected.
 - The addresses are `#workflows`, `#workflows/<id>` and `#workflows/new`.
 
+### Settings
+
+The section shows the settings of the selected repository in groups. The groups are listed on the left, in this order: "General", "Defaults", "Delivery", "Working copy", "Naming", "Claude", "Runtimes", "Web panel", "Queue", "Tags" and "System".
+
+The address is `#settings/<group>`; an unknown group opens "General", and the address `#specialists/_settings` of earlier versions opens `#settings/general`.
+
+- The groups from "General" to "Web panel" are the sections of `settings.yaml`, shown as a result of the shared and the project levels, with the file each value comes from. Only "Auto delivery" and "Delivery mode" (group "Delivery") can be changed here; the others are edited in the files.
+- `web.*` and `runtimes.*` are read from the shared `settings.yaml` only. Of the runtime environment only the names of the variables are shown, never their values. A change takes effect after the restart: see "System".
+- A group with configuration errors gets a mark; the errors are shown in the group. Errors of specialists and workflows are shown in "General".
+- "Queue" holds the modes of the queue (see [Queue](#queue)), "Tags" the tag catalog shared by all repositories.
+- "System" shows the state of the daemon (pid, version, build, whether agents work) and of the web panel (pid, address without the token, access, build), refreshed every 3 seconds, and the path of the daemon log.
+  - "Restart panel" restarts the panel on the same address with the same token; the page comes back by itself. The daemon and its agents keep running.
+  - "Restart daemon" runs `aip daemon restart --web` as a separate process. While agents work the panel asks again, and "Restart, stopping the agents" runs it with `--force`.
+  - A panel started by `aip web` itself cannot restart itself or the daemon: restart it in the terminal.
+  - The page waits up to 30 seconds for the restarted part to answer (for the daemon, with a new pid) and otherwise points to the daemon log.
+
 ## Status
 
 Under every section is a collapsible "Status" strip with the current load across all repositories. Whether it is open and which tab is selected are remembered in the browser. The specialists update with every run event, the background processes every 3 seconds while the page is visible.
@@ -173,3 +189,5 @@ Under every section is a collapsible "Status" strip with the current load across
 - A relative path and a path outside a git repository are rejected with code 400. A `repository` field in the request body is ignored.
 - `POST /api/queue/settings` takes `parallel`, `autopilot`, `skipFailed`, `autopilotAnswer` and `onLimit`, all optional. An empty body is answered with 400.
 - `PUT /api/config/settings/<path>` writes the general settings.
+- `GET /api/system` returns the state of the daemon and of the panel (the address has no token).
+- `POST /api/system/web/restart` and `POST /api/system/daemon/restart` (body `{"force": true}` optional) answer 202 `{"state": "restarting"}` and restart after the answer is sent. The answer is 409 with `code` `daemon_busy` for a busy daemon without `force`, and `web_standalone` for a panel started by `aip web`.

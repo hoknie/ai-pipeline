@@ -4,6 +4,7 @@ import { configPaths, loadWebSettings } from '../../config/index.ts';
 import { latestRepository } from './default-repository.ts';
 import { previousPanelToken, removePanelState, writePanelState } from './state.ts';
 import { startWebServer, webTokenFromEnv, type WebServer } from './server.ts';
+import { spawnDaemonRestart, type SpawnRestartOptions } from './system.ts';
 
 export interface DaemonPanelOptions {
   stateDirectory: string;
@@ -11,6 +12,10 @@ export interface DaemonPanelOptions {
   environment?: NodeJS.ProcessEnv;
   /** Where reasons for not starting go; defaults to stderr (the daemon log). */
   log?: (line: string) => void;
+  /** Command that runs `aip` (node and the script); restarting the daemon from the panel needs it. */
+  entry?: string[];
+  /** Starts the process that restarts the daemon; replaced in tests. */
+  spawnRestart?: (options: SpawnRestartOptions) => void;
 }
 
 export interface DaemonPanel {
@@ -95,6 +100,24 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
         auth: settings.auth,
         ...(token === undefined ? {} : { token }),
         defaultRepository: () => latestRepository(options.socket),
+        system: {
+          restartWeb: async () => {
+            await controller.start({ restart: true });
+          },
+          restartDaemon: async (force) => {
+            if (options.entry === undefined) throw new Error('the command to run aip is unknown');
+            // The old daemon removes web.json on stop, so the new one gets the token through the
+            // environment and the browser keeps its access.
+            const token = auth === 'token' ? (web?.token ?? lastToken) : null;
+            (options.spawnRestart ?? spawnDaemonRestart)({
+              entry: options.entry,
+              stateDirectory: options.stateDirectory,
+              force,
+              environment: token === null ? env : { ...env, AIP_WEB_TOKEN: token },
+            });
+          },
+          logPath: `${options.stateDirectory}/daemon.log`,
+        },
       });
       try {
         writePanelState(options.stateDirectory, {

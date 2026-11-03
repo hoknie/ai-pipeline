@@ -161,6 +161,51 @@ describe('items', () => {
   });
 });
 
+describe('task numbers', () => {
+  const numbers = (queue: Queue) => queue.items.map((item) => item.number);
+
+  it('gives the tasks the numbers 1, 2, 3 in the order they were added', () => {
+    const queue = queueOf('A', 'B', 'C');
+    expect(numbers(queue)).toEqual([1, 2, 3]);
+    expect(queue.nextNumber).toBe(4);
+  });
+
+  it('starts from the given number', () => {
+    const queue = emptyQueue('/repo', 1, 10);
+    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).number).toBe(10);
+    expect(queue.nextNumber).toBe(11);
+  });
+
+  it('does not give a number of a removed task again', () => {
+    const queue = queueOf('A', 'B', 'C');
+    removeItem(queue, 'q3', 3);
+    expect(addItem(queue, { workflow: 'feature', task: 'D' }, 'q4', 4).number).toBe(4);
+    expect(numbers(queue)).toEqual([1, 2, 4]);
+  });
+
+  it('does not spend a number on a refused task', () => {
+    const queue = queueOf('A');
+    expect(() => addItem(queue, { workflow: 'feature', task: ' ' }, 'q2', 3)).toThrow();
+    expect(() =>
+      addItem(queue, { workflow: 'feature', task: 'B', after: ['q2'] }, 'q2', 3),
+    ).toThrow('a task cannot depend on itself');
+    expect(queue.nextNumber).toBe(2);
+    expect(addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3).number).toBe(2);
+  });
+
+  it('keeps the number when the task is moved, edited or postponed', () => {
+    const queue = queueOf('A', 'B', 'C');
+    moveItem(queue, 'q3', 1, 9);
+    editItem(queue, 'q2', { task: 'changed', title: 'T', postponed: true }, 10);
+    expect(queue.items.map((item) => [item.id, item.number])).toEqual([
+      ['q3', 3],
+      ['q1', 1],
+      ['q2', 2],
+    ]);
+    expect(queue.nextNumber).toBe(4);
+  });
+});
+
 describe('problems', () => {
   it('finds needs_human, failed and conflict with the attempt number in the key', () => {
     const state = run(3);
@@ -571,6 +616,7 @@ describe('run origin', () => {
   it('marks a run created by the queue', () => {
     const state = createRun({
       id: 'r',
+      number: 1,
       repository: '/repo',
       workflow: 'feature',
       baseCommit: 'c',
@@ -620,6 +666,7 @@ function runInput() {
   const state = run(1);
   return {
     id: 'run000000009',
+    number: 1,
     repository: '/repo',
     workflow: 'feature',
     baseCommit: 'abc',
