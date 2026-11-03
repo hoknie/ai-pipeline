@@ -139,6 +139,36 @@ describe('cli', () => {
     expect(`${again.stdout}${again.stderr}`).toContain('run is already in the queue');
   });
 
+  it('removes a skipped run from the skipped list', async () => {
+    const box = sandbox();
+    writeFileSync(
+      join(box.repo, '..', 'script.json'),
+      JSON.stringify({ code: [{ noReport: true }, {}] }),
+    );
+    await aip(box, 'queue', 'settings', '--skip-failed', 'on');
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
+    await aip(box, 'queue', 'start');
+    let run = '';
+    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+      const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+        skipped: { id: string }[];
+      };
+      if (view.skipped.length > 0) run = view.skipped[0]!.id;
+      else await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(run).not.toBe('');
+    const dismissed = await aip(box, 'queue', 'dismiss', run, '--json');
+    expect(dismissed.code).toBe(0);
+    expect(JSON.parse(dismissed.stdout)).toMatchObject({ skipped: [] });
+    const listed = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      skipped: unknown[];
+    };
+    expect(listed.skipped).toEqual([]);
+    const again = await aip(box, 'queue', 'dismiss', run);
+    expect(again.code).toBe(1);
+    expect(`${again.stdout}${again.stderr}`).toContain('run is not in the skipped list');
+  });
+
   it('sets automatic delivery of a run and of queued tasks from flags', async () => {
     const box = sandbox();
     const run = JSON.parse(
@@ -330,6 +360,7 @@ describe('cli', () => {
       'swarm_group',
       'swarm_queue',
       'swarm_queue_add',
+      'swarm_queue_dismiss',
       'swarm_queue_edit',
       'swarm_queue_parallel',
       'swarm_queue_pause',

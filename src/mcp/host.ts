@@ -512,6 +512,30 @@ export function createHostServer(options: HostOptions): McpServer {
   );
 
   server.registerTool(
+    'swarm_queue_dismiss',
+    {
+      title: 'Remove a skipped run from the queue',
+      description:
+        'Remove a run from the skipped list of its queue. The run itself does not change: it keeps its status and can still be opened and delivered. Use it for a skipped run that cannot be returned, for example when its delivery failed.',
+      inputSchema: {
+        run_id: runId,
+        repo: z
+          .string()
+          .optional()
+          .describe('Repository path; defaults to the repository of the run'),
+      },
+    },
+    ({ run_id, repo: where }) =>
+      attempt(async () => {
+        const view = (await options.send('queue_dismiss', {
+          runId: run_id,
+          ...(where !== undefined ? { repository: where } : {}),
+        })) as QueueView;
+        return withData(`Dismissed ${run_id}.\n${formatQueue(view)}`, view);
+      }),
+  );
+
+  server.registerTool(
     'swarm_queue_run_now',
     {
       title: 'Run a queued task now',

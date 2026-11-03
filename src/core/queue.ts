@@ -789,6 +789,25 @@ export function returnRun(queue: Queue, state: RunState, id: string, now: number
   return item;
 }
 
+/** Whether `returnRun` would take the run: something to retry, and not in the queue yet. */
+export function canReturn(queue: Queue, state: RunState): boolean {
+  const id = state.run.id;
+  return (
+    retryableGroups(state).length > 0 &&
+    !queue.runs.includes(id) &&
+    !queue.items.some((item) => item.run === id)
+  );
+}
+
+/** Removes a skipped run from the skipped list; the run itself is not changed. */
+export function dismissRun(queue: Queue, state: RunState, now: number): void {
+  const id = state.run.id;
+  if (!queue.skipped.includes(id)) throw new Rejection('run is not in the skipped list');
+  queue.skipped = queue.skipped.filter((skipped) => skipped !== id);
+  queue.acknowledged = queue.acknowledged.filter((key) => !key.startsWith(`${id}/`));
+  queue.updatedAt = now;
+}
+
 export interface AutopilotAnswer {
   run: string;
   group: string;

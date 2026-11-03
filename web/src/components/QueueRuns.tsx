@@ -12,6 +12,7 @@ import { cn } from '../lib/cn.ts';
 import { formatRoute } from '../route.ts';
 import type { QueueRunView, QueueView } from '../types.ts';
 
+import { useConfirm } from '../confirm.tsx';
 import { Button } from '../ui/button.tsx';
 import { Card } from '../ui/card.tsx';
 
@@ -192,7 +193,9 @@ function SkippedRuns({
   onError: (message: string) => void;
 }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [returning, setReturning] = useState<string | null>(null);
+  const [dismissing, setDismissing] = useState<string | null>(null);
   const putBack = async (run: string) => {
     setReturning(run);
     try {
@@ -204,6 +207,26 @@ function SkippedRuns({
       setReturning(null);
     }
   };
+  const dismiss = async (run: QueueRunView) => {
+    const yes = await confirm({
+      title: t('queue.dismissTitle', { run: run.title }),
+      description: t('queue.dismissDescription'),
+      confirmLabel: t('queue.dismissRun'),
+      cancelLabel: t('queue.list.keep'),
+      destructive: true,
+    });
+    if (!yes) return;
+    setDismissing(run.id);
+    try {
+      onQueue(await api.queueDismiss(run.id, queue.repository));
+      notifySuccess(t('queue.dismissed'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setDismissing(null);
+    }
+  };
+  const busy = returning !== null || dismissing !== null;
   return (
     <section aria-label={t('queue.skippedLabel')}>
       <h3 className="mb-2 font-semibold">{t('queue.skipped', { count: queue.skipped.length })}</h3>
@@ -215,15 +238,28 @@ function SkippedRuns({
               now={now}
               linked={false}
               action={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={returning === run.id}
-                  disabled={returning !== null}
-                  onClick={() => void putBack(run.id)}
-                >
-                  {t('queue.returnRun')}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {run.returnable ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={returning === run.id}
+                      disabled={busy}
+                      onClick={() => void putBack(run.id)}
+                    >
+                      {t('queue.returnRun')}
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={dismissing === run.id}
+                    disabled={busy}
+                    onClick={() => void dismiss(run)}
+                  >
+                    {t('queue.dismissRun')}
+                  </Button>
+                </div>
               }
             />
           </li>

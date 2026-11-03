@@ -91,7 +91,8 @@ The queue settings are in [queue.md](queue.md).
 - The modes of the queue are in the group "Queue" of [Settings](#settings) (`#settings/queue`): the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector, the autopilot's answer text and the "On a usage limit" selector.
   - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`. The file is shown under the control. The group "Delivery" writes to the same file.
 - The "On a usage limit" selector chooses `wait` or `stop`. A queue stopped by a usage limit shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
-- "Return to the queue" is on every skipped run and in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
+- "Return to the queue" is on a skipped run only when it has failed or cancelled groups to retry. It is also in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
+- "Remove from list" is on every skipped run in the block "Skipped with a problem". After a confirmation the card disappears; the run itself does not change.
 - The "In work" switch of a row postpones the task or puts it back.
 - A running run's card shows its duration, tokens and cost.
 - "New task" opens a dialog with two halves: the task (title, workflow, text or groups) on the left and the settings (predecessors, tags, delivery, "Skip steps") on the right. "Skip steps" is a row of segments: a pressed segment is a skipped step, and the last unpressed one stays disabled. Below the controls are the running runs and the waiting tasks.
@@ -178,6 +179,7 @@ Under every section is a collapsible "Status" strip with the current load across
 ## HTTP API
 
 - `POST /api/runs/<id>/skip` with the body `{"step": "<step id>", "skip": true}` skips a step of the run (`false` brings it back) and returns the run. A refusal of the daemon (unknown step, a step every group has passed) comes back with code 400.
+- `POST /api/queue/dismiss` with the body `{"run": "<run id>"}` removes a skipped run from the skipped list and returns the queue. A run that is not skipped comes back with code 400, an unknown run with code 404.
 - `GET /api/processes` returns the background processes of the agents (`{"processes": [...]}`). `POST /api/processes/<pid>/kill` terminates one; a PID that is not a number comes back with code 400, a PID that is not in the list with code 404.
 - `GET /api/repositories` returns the repositories with counters.
 - `POST /api/repositories` with the body `{"path": "<absolute path>"}` adds one.

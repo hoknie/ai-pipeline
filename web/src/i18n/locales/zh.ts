@@ -419,6 +419,10 @@ export const zh: Dictionary = {
     limitResumes: '将于 {{time}} 自动继续。',
     returnRun: '放回队列',
     returned: '运行将回到队列',
+    dismissRun: '从列表移除',
+    dismissTitle: '从跳过列表移除 {{run}}？',
+    dismissDescription: '运行本身不会改变。',
+    dismissed: '已从跳过列表移除',
     returning: '放回',
     returnOf: '放回运行 {{run}}',
     reasons: {

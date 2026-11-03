@@ -54,6 +54,7 @@ import {
   type WorkflowTopology,
   GROUP_STATUSES,
   type GroupWait,
+  canReturn,
 } from '../core/index.ts';
 import type { ConfigEditorView, EntryReference, FieldError } from '../config/index.ts';
 
@@ -722,6 +723,8 @@ export interface DependencyView {
 
 export interface QueueRunView {
   id: string;
+  /** The run can go back to the queue: it has failed or cancelled groups and is not in it. */
+  returnable: boolean;
   /** Number of the task of the run. */
   number: number;
   title: string;
@@ -777,6 +780,7 @@ export interface QueueView {
 
 /** Card of a run of the queue; `stopping`: the problem shown is the one that stops a queue. */
 function queueRunView(
+  queue: Queue,
   state: RunState,
   catalog: readonly Tag[],
   stopping: boolean,
@@ -789,6 +793,7 @@ function queueRunView(
     (stopping ? problems.find((p) => p.reason !== 'needs_human') : undefined) ?? problems[0];
   return {
     id: state.run.id,
+    returnable: canReturn(queue, state),
     number: state.run.number,
     title: runTitle(state),
     state: summarize(state).state,
@@ -856,7 +861,7 @@ export function queueView(
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
       const state = lookup(id);
-      return state ? [queueRunView(state, catalog, stopping, waits)] : [];
+      return state ? [queueRunView(queue, state, catalog, stopping, waits)] : [];
     });
   const runs = cards(queue.runs, false);
   const skipped = cards(queue.skipped, true);

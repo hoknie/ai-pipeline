@@ -48,6 +48,8 @@ import {
   problemKeys,
   retryableGroups,
   returnRun,
+  canReturn,
+  dismissRun,
   returnItemOf,
   queueWakeAt,
   limitHolds,
@@ -520,6 +522,24 @@ export class Daemon {
     });
   }
 
+  /** `queue_dismiss`: a skipped run leaves the skipped list. */
+  private dismissFromQueue(params: ParamsOf<'queue_dismiss'>): Promise<unknown> {
+    return this.serial(async () => {
+      const state = this.state(params.runId);
+      if (params.repository !== undefined) {
+        const root = await this.rootOf(params.repository);
+        if (root !== state.run.repository) {
+          throw new Rejection('run belongs to another repository');
+        }
+      }
+      const queue = this.queueFor(state.run.repository);
+      dismissRun(queue, state, this.now());
+      this.saveQueue(queue);
+      await this.advanceQueue(state.run.repository);
+      return this.queueSnapshot(queue);
+    });
+  }
+
   /** Rejects an unknown workflow or a `skip` that does not fit it. */
   private async ensureItem(
     repository: string,
@@ -538,7 +558,10 @@ export class Daemon {
   }
 
   private queueRequest(
-    request: Exclude<Extract<Request, { method: `queue${string}` }>, { method: 'queue_return' }>,
+    request: Exclude<
+      Extract<Request, { method: `queue${string}` }>,
+      { method: 'queue_return' | 'queue_dismiss' }
+    >,
   ): Promise<unknown> {
     return this.serial(async () => {
       const repository = await this.rootOf(request.params.repository);
@@ -700,11 +723,9 @@ export class Daemon {
 
   /** Whether `queue_return` would take the run: something to retry, and not in its queue yet. */
   private returnable(state: RunState): boolean {
-    if (retryableGroups(state).length === 0) return false;
     const queue = this.queues.get(state.run.repository);
-    if (!queue) return true;
-    const id = state.run.id;
-    return !queue.runs.includes(id) && !queue.items.some((item) => item.run === id);
+    if (!queue) return retryableGroups(state).length > 0;
+    return canReturn(queue, state);
   }
 
   /** Computes missing diff statistics of a run in the background, then publishes them. */
@@ -1116,6 +1137,8 @@ export class Daemon {
         return this.queueRequest(request);
       case 'queue_return':
         return this.returnToQueue(request.params);
+      case 'queue_dismiss':
+        return this.dismissFromQueue(request.params);
     }
   }
 

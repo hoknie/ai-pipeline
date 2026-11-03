@@ -99,6 +99,8 @@ export {
   problemKeys,
   retryableGroups,
   returnRun,
+  canReturn,
+  dismissRun,
   returnItemOf,
   advance,
   checkDependencies,

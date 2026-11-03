@@ -508,6 +508,39 @@ describe('aip web', () => {
     expect((await post('/api/queue/return', { run })).status).toBe(400);
   });
 
+  it('removes a skipped run through the API', async () => {
+    const { h, web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    h.script({ code: [{ noReport: true }, {}] });
+    await post('/api/queue/settings', { skipFailed: true });
+    await post('/api/queue/items', { workflow: 'feature', task: 'работа' });
+    await post('/api/queue/start', {});
+    let run = '';
+    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+      const queue = (await (
+        await fetch(`${base}/api/queue`, { headers: authed(web) })
+      ).json()) as QueueView;
+      if (queue.skipped.length > 0) run = queue.skipped[0]!.id;
+      else await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(run).not.toBe('');
+    const dismissed = await post('/api/queue/dismiss', { run });
+    expect(dismissed.status).toBe(200);
+    expect(((await dismissed.json()) as QueueView).skipped).toEqual([]);
+    const again = await post('/api/queue/dismiss', { run });
+    expect(again.status).toBe(400);
+    expect(((await again.json()) as { error: string }).error).toContain(
+      'run is not in the skipped list',
+    );
+    expect((await post('/api/queue/dismiss', { run: 'zzz' })).status).toBe(404);
+    expect((await post('/api/queue/dismiss', {})).status).toBe(400);
+  });
+
   it('serves the queue API with the same protection as the rest', async () => {
     const { h, web, base } = await setup();
     const post = (path: string, body: unknown, headers = authed(web, JSON_TYPE)) =>

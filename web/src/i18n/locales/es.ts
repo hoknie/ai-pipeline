@@ -435,6 +435,10 @@ export const es: Dictionary = {
     limitResumes: 'Seguirá sola a las {{time}}.',
     returnRun: 'Devolver a la cola',
     returned: 'La ejecución volverá a la cola',
+    dismissRun: 'Quitar de la lista',
+    dismissTitle: '¿Quitar {{run}} de las omitidas?',
+    dismissDescription: 'La ejecución en sí no cambia.',
+    dismissed: 'Ejecución quitada de las omitidas',
     returning: 'Devolución',
     returnOf: 'devuelve la ejecución {{run}}',
     reasons: {

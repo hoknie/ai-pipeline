@@ -1721,6 +1721,35 @@ describe('skipped runs', () => {
     expect(within(running).queryByText('Логин')).toBeNull();
   });
 
+  it('offers the return only for a returnable run and removes after the confirmation', async () => {
+    const api = show(
+      queueOf({
+        skipped: [
+          queueRun('run1', { title: 'Логин', state: 'failed', returnable: false }),
+          queueRun('run2', { title: 'Вход', state: 'failed', returnable: true }),
+        ],
+      }),
+      { queueDismiss: vi.fn(async () => queueOf()) },
+    );
+    const skipped = within(await screen.findByRole('region', { name: 'skipped with a problem' }));
+    const first = within(skipped.getByRole('group', { name: 'Логин' }));
+    const second = within(skipped.getByRole('group', { name: 'Вход' }));
+    expect(first.queryByRole('button', { name: 'Return to the queue' })).toBeNull();
+    expect(second.getByRole('button', { name: 'Return to the queue' })).toBeTruthy();
+    fireEvent.click(first.getByRole('button', { name: 'Remove from list' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.queueDismiss).not.toHaveBeenCalled();
+    fireEvent.click(first.getByRole('button', { name: 'Remove from list' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('Remove Логин from the skipped list?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove from list' }));
+    await waitFor(() => expect(api.queueDismiss).toHaveBeenCalledWith('run1', '/repo'));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'skipped with a problem' })).toBeNull(),
+    );
+  });
+
   it('has no block without skipped runs', async () => {
     show(queueOf({ status: 'running' }));
     await screen.findByRole('region', { name: 'queue controls' });

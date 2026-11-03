@@ -433,6 +433,10 @@ export const ru: Dictionary = {
     limitResumes: 'Продолжит сама в {{time}}.',
     returnRun: 'Вернуть в очередь',
     returned: 'Запуск вернётся в очередь',
+    dismissRun: 'Убрать из списка',
+    dismissTitle: 'Убрать {{run}} из пропущенных?',
+    dismissDescription: 'Сам запуск не изменится.',
+    dismissed: 'Запуск убран из пропущенных',
     returning: 'Возврат',
     returnOf: 'возврат запуска {{run}}',
     reasons: {

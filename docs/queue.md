@@ -18,6 +18,7 @@ aip queue move <item> 1                              # make the task first
 aip queue edit <item> --task "New text"              # or: remove <item>
 aip queue add feature --task "Later" --postpone      # postponed: a running queue does not take it
 aip queue return <run-id>                            # put a failed or cancelled run back first in the queue
+aip queue dismiss <run-id>                           # remove a skipped run from the skipped list
 ```
 
 Delivery for one task is set with `--auto-deliver`, `--delivery-mode` and their `--default-*` flags (see [`delivery`](configuration.md#delivery)).
@@ -46,7 +47,8 @@ Every task gets an integer number within its repository when it is added to the 
 - The run does not change until the queue takes the task on a free place (or `aip queue run <item>`). Then its failed and cancelled groups are retried from where they stopped, the work already done is kept, and the run holds a place again.
 - While the task waits, `aip run list`, `aip run show`, `swarm_status` and the web panel show the run as `queued` (the field `queueItem` holds the task id; the statuses of the groups do not change). Once the task is taken or removed, the run shows its own state again.
 - `aip queue list` marks the task `returns <run-id>`. It can be moved, removed or given `--after`, but not edited otherwise.
-- A run that is already in the queue, holds a place or has nothing to retry is refused.
+- A run that is already in the queue, holds a place or has nothing to retry is refused. A skipped run whose groups are merged but whose delivery failed has nothing to retry.
+- `aip queue dismiss <run-id>` removes a skipped run from the skipped list; `--repo` defaults to the repository of the run. The run itself does not change: it keeps its status and stays in the run list, and it can still be delivered. A run that is not in the skipped list is refused. A task that waits for the removed run (`--after`) stays blocked.
 
 A task that has become a run can no longer be edited or removed from the queue. Manage the run with `aip run list` and `aip run cancel`.
 

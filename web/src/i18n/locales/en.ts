@@ -422,6 +422,10 @@ export const en = {
     limitResumes: 'Resumes by itself at {{time}}.',
     returnRun: 'Return to the queue',
     returned: 'The run will return to the queue',
+    dismissRun: 'Remove from list',
+    dismissTitle: 'Remove {{run}} from the skipped list?',
+    dismissDescription: 'The run itself does not change.',
+    dismissed: 'Run removed from skipped',
     returning: 'Return',
     returnOf: 'returns run {{run}}',
     reasons: {

@@ -6,6 +6,8 @@ import {
   addItem,
   adoptRun,
   advance,
+  canReturn,
+  dismissRun,
   autopilotAnswers,
   createRun,
   dependencyState,
@@ -1473,5 +1475,82 @@ describe('adopting a retried run', () => {
       status: 'stopped',
       stop: { kind: 'problem', run: 'a', group: 'gruppa-1' },
     });
+  });
+});
+
+describe('dismiss of a skipped run', () => {
+  function skippedQueue(state: RunState): Queue {
+    const queue = queueOf('A', 'B');
+    queue.skipFailed = true;
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', state.run.id, 4);
+    advance(queue, [state], lookupOf(state), 5);
+    return queue;
+  }
+
+  function applyFailedRun(id: string): RunState {
+    const state = mergedRun(id, false);
+    group(state).delivery = { ...group(state).delivery, state: 'apply_failed' };
+    return state;
+  }
+
+  it('removes a skipped run with a failed delivery and leaves the run as it was', () => {
+    const state = applyFailedRun('a');
+    const queue = skippedQueue(state);
+    expect(queue.skipped).toEqual(['a']);
+    expect(canReturn(queue, state)).toBe(false);
+    dismissRun(queue, state, 9);
+    expect(queue).toMatchObject({ skipped: [], runs: [], updatedAt: 9 });
+    expect(queue.acknowledged.filter((key) => key.startsWith('a/'))).toEqual([]);
+    expect(group(state)).toMatchObject({ status: 'merged', delivery: { state: 'apply_failed' } });
+  });
+
+  it('refuses a run that is not skipped', () => {
+    const state = failedRun('a');
+    const queue = queueOf('A');
+    expect(() => dismissRun(queue, state, 9)).toThrow('run is not in the skipped list');
+  });
+
+  it('does not bring the dismissed run back on the next advance', () => {
+    const state = applyFailedRun('a');
+    const queue = skippedQueue(state);
+    dismissRun(queue, state, 9);
+    advance(queue, [state], lookupOf(state), 10);
+    expect(queue).toMatchObject({ skipped: [], runs: [] });
+  });
+
+  it('keeps a task that waits for the dismissed run blocked', () => {
+    const state = failedRun('a');
+    const queue = skippedQueue(state);
+    withAfter(queue, 'q2', ['a']);
+    const waiting = queue.items.find((item) => item.id === 'q2')!;
+    expect(itemReadiness(queue, waiting, lookupOf(state))).toBe('blocked');
+    dismissRun(queue, state, 9);
+    advance(queue, [state], lookupOf(state), 10);
+    expect(queue.skipped).toEqual([]);
+    const after = queue.items.find((item) => item.id === 'q2')!;
+    expect(itemReadiness(queue, after, lookupOf(state))).toBe('blocked');
+  });
+});
+
+describe('can return', () => {
+  it('is false without failed groups and true for a failed skipped run', () => {
+    const failed = failedRun('a');
+    const queue = emptyQueue('/repo', 1);
+    queue.skipped = ['a'];
+    expect(canReturn(queue, failed)).toBe(true);
+    const merged = mergedRun('b', false);
+    group(merged).delivery = { ...group(merged).delivery, state: 'apply_failed' };
+    expect(canReturn(queue, merged)).toBe(false);
+  });
+
+  it('is false for a run that holds a place or is already an item', () => {
+    const failed = failedRun('a');
+    const queue = emptyQueue('/repo', 1);
+    queue.runs = ['a'];
+    expect(canReturn(queue, failed)).toBe(false);
+    queue.runs = [];
+    queue.items.push({ ...queueOf('A').items[0]!, run: 'a' });
+    expect(canReturn(queue, failed)).toBe(false);
   });
 });

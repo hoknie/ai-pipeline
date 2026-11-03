@@ -429,6 +429,21 @@ describe('host MCP queue tools', () => {
     ]);
   });
 
+  it('removes a skipped run from the queue from Claude Code', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_dismiss',
+      arguments: { run_id: 'r1', repo: '/r' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('Dismissed r1.');
+    expect(calls).toEqual([{ method: 'queue_dismiss', params: { runId: 'r1', repository: '/r' } }]);
+  });
+
   it('returns a run to the queue from Claude Code', async () => {
     const calls: unknown[] = [];
     const client = await connect(async (method, params) => {

@@ -232,6 +232,7 @@ export function tagView(
 export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): QueueRunView {
   return {
     id,
+    returnable: true,
     number: 1,
     title: id,
     state: 'active',
@@ -509,6 +510,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     queuePause: vi.fn(async () => queueOf()),
     queueSettings: vi.fn(async () => queueOf()),
     queueReturn: vi.fn(async () => ({ ...queueOf(), item: 'q9' })),
+    queueDismiss: vi.fn(async () => queueOf()),
     system: vi.fn(async () => systemView()),
     restartWeb: vi.fn(async () => undefined),
     restartDaemon: vi.fn(async () => undefined),

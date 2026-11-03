@@ -155,6 +155,7 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
 | `swarm_queue_parallel` | `parallel`, `repo?` | Changes the number of simultaneous runs in any queue state |
 | `swarm_queue_settings` | `parallel?`, `autopilot?`, `skip_failed?`, `autopilot_answer?`, `on_limit?`, `repo?` | Changes only the passed queue settings (at least one is required). `autopilot_answer: null` restores the default. `on_limit` is `wait` (the group waits for the usage limit to reset and the queue starts again by itself) or `stop` (the group fails and the queue waits for a start) |
+| `swarm_queue_dismiss` | `run_id`, `repo?` | Removes a skipped run from the skipped list of its queue; the run itself does not change. `repo` defaults to the repository of the run |
 | `swarm_queue_return` | `run_id`, `repo?` | Puts a run with failed or cancelled groups back first in its queue; those groups are retried from where they stopped. `repo` defaults to the repository of the run |
 | `swarm_queue_pause` | `repo?` | Stops taking tasks; running runs keep working |
 | `swarm_queue_run_now` | `item`, `repo?` | Turns a task into a queue run at once, beyond the limit |

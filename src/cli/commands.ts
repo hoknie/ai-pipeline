@@ -487,6 +487,23 @@ function registerQueue(program: Command): void {
       showQueue(options.json, view);
     });
 
+  queue
+    .command('dismiss')
+    .description(
+      'Remove a skipped run from the skipped list of its queue; the run itself does not change',
+    )
+    .argument('<run-id>', 'run id')
+    .option('-r, --repo <path>', 'repository path; defaults to the repository of the run')
+    .option('--json', 'print JSON')
+    .addHelpText('after', examples(['aip queue dismiss mvzh40j56lht']))
+    .action(async (run: string, options: { repo?: string; json?: boolean }) => {
+      const view = (await call(context(), 'queue_dismiss', {
+        runId: run,
+        ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
+      })) as QueueView;
+      showQueue(options.json, view);
+    });
+
   common(
     queue
       .command('run')

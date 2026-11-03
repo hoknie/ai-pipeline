@@ -208,6 +208,23 @@ describe('queueView settings and skipped runs', () => {
     });
   });
 
+  it('marks a skipped run returnable only when something can be retried', () => {
+    const failed = run(1, { id: 'a' });
+    step(failed);
+    group(failed).status = 'failed';
+    const merged = run(1, { id: 'b' });
+    step(merged);
+    group(merged).status = 'merged';
+    group(merged).delivery = { ...group(merged).delivery, state: 'apply_failed' };
+    const queue = emptyQueue('/repo', 1);
+    queue.skipped = ['a', 'b'];
+    const view = queueView(queue, (id) => (id === 'a' ? failed : id === 'b' ? merged : undefined));
+    expect(view.skipped.map((card) => [card.id, card.returnable])).toEqual([
+      ['a', true],
+      ['b', false],
+    ]);
+  });
+
   it('shows the stopping problem of a skipped run before a question to a human', () => {
     const state = run(2, { id: 'a' });
     step(state);
