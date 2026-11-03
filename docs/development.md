@@ -1,11 +1,13 @@
 # Development
 
+How to check and build `aip` itself. For using `aip` see [README.md](../README.md).
+
 ```sh
 npm run check     # prettier --check → tsc → vitest
 npm run build
 ```
 
-The same steps and the panel controls are available through [just](https://github.com/casey/just) (1.27 or newer, needs `bash`; Windows is not supported). The recipes call the npm scripts, so the gate stays the same: `npm run check`.
+These steps and the panel controls are also available through [just](https://github.com/casey/just) (1.27 or newer, needs `bash`; Windows is not supported). The recipes call the npm scripts, so the gate stays the same: `npm run check`.
 
 ```sh
 just                # list the recipes
@@ -19,5 +21,20 @@ just web-log        # aip web log
 just web-dev        # Vite dev server proxying to the running aip web
 ```
 
-`just web` keeps `aip web` running in the background on port 7341 (`AIP_WEB_PORT` or a recipe argument). The pid, the log and the token live in `.aip/web/`, so the link does not change between restarts and an open tab keeps working. A restart stops only its own process and an `aip web` you started by hand on that port; a foreign process on the port is left alone. `just web-stop` stops its own process and the `aip web` on the port from `.aip/web/port`. If the recipes did not start the panel, it does not touch processes on the port; to stop someone else's `aip web`, use `scripts/aip-web.sh stop <port>`. The recipes do not restart the `aip` daemon: if it is already running, `aip web` connects to it (and replaces it only if it is older and idle).
+`just web` keeps `aip web` running in the background on port 7341 (`AIP_WEB_PORT` or a recipe argument).
 
+- The pid, the log and the token live in `.aip/web/`, so the link does not change between restarts and an open tab keeps working.
+- A restart stops only its own process and an `aip web` you started by hand on that port. A foreign process on the port is left alone.
+- `just web-stop` stops its own process and the `aip web` on the port from `.aip/web/port`.
+- If the recipes did not start the panel, they do not touch processes on the port. To stop someone else's `aip web`, use `scripts/aip-web.sh stop <port>`.
+- The recipes do not restart the `aip` daemon. If it is already running, `aip web` connects to it and replaces it only if it is older and idle.
+
+## Web panel from source
+
+The panel is a React application in the `web/` directory. `npm run build` builds it into `dist/web`, from where `aip web` serves it. Without a build, the page tells you to run `npm run build`.
+
+For development, run `aip web` and, in another terminal, the Vite dev server with a proxy to it. Pass the token from the printed link:
+
+```sh
+AIP_WEB_URL=http://127.0.0.1:7341 AIP_WEB_TOKEN=<token> npx vite --config web/vite.config.ts
+```

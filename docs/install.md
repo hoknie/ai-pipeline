@@ -1,5 +1,7 @@
 # Installation
 
+How to install `aip`, connect it to Claude Code and OpenCode, update and remove it.
+
 ## One command
 
 ```sh
@@ -74,7 +76,7 @@ npm install -g @hoknie/aip@latest
 aip setup
 ```
 
-A running daemon of the old build is replaced when it has nothing to do.
+A running daemon of an older build is replaced when it has nothing to do.
 
 ## Remove
 
