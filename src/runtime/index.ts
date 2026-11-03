@@ -1,5 +1,9 @@
 import type { ConfigCatalogResponse } from '../protocol/index.ts';
-import type { Runtime as RuntimeName } from '../config/index.ts';
+import {
+  defaultRuntimes,
+  type Runtime as RuntimeName,
+  type RuntimeSettings,
+} from '../config/index.ts';
 
 import { createClaudeRuntime } from './claude.ts';
 import { mcpServers, skillCatalog, sortEntries } from './catalog.ts';
@@ -23,10 +27,12 @@ export { findExecutable } from './which.ts';
 export function runtimeFor(
   name: RuntimeName,
   environment: NodeJS.ProcessEnv = process.env,
+  settings: RuntimeSettings = defaultRuntimes(),
 ): Runtime {
+  const { command, args, env } = settings[name];
   return name === 'claude'
-    ? createClaudeRuntime(environment.AIP_CLAUDE_BIN || 'claude')
-    : createOpencodeRuntime(environment.AIP_OPENCODE_BIN || 'opencode');
+    ? createClaudeRuntime(environment.AIP_CLAUDE_BIN || command, { args, env })
+    : createOpencodeRuntime(environment.AIP_OPENCODE_BIN || command, { args, env });
 }
 
 export { mcpServers, skillCatalog } from './catalog.ts';

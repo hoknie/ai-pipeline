@@ -3,7 +3,13 @@ import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
-import { findSpecialist } from '../config/index.ts';
+import {
+  ConfigLoadError,
+  configPaths,
+  findSpecialist,
+  loadRuntimeSettings,
+  type RuntimeSettings,
+} from '../config/index.ts';
 import {
   RESOLVE_GROUP,
   SPLIT_GROUP,
@@ -236,7 +242,9 @@ export class Executor {
   /** Asks a cheap model for the title and the name of a run, in the background. */
   async nameRun(state: RunState): Promise<void> {
     const { naming } = state.run.config;
-    const runtime = runtimeFor(naming.runtime, this.daemon.environment);
+    const settings = this.runtimeSettings(state);
+    if (typeof settings === 'string') return;
+    const runtime = runtimeFor(naming.runtime, this.daemon.environment, settings);
     if (!findExecutable(runtime.executable, this.daemon.environment.PATH)) return;
     const directory = join(this.workspace(state), 'logs', state.run.id, '_naming');
     const logPath = join(directory, 'output.log');
@@ -296,12 +304,28 @@ export class Executor {
     );
   }
 
+  /** Current `runtimes` of the shared settings.yaml, or the text of the error in it. */
+  private runtimeSettings(state: RunState): RuntimeSettings | string {
+    const { XDG_CONFIG_HOME, HOME } = this.daemon.environment;
+    try {
+      return loadRuntimeSettings(configPaths(state.run.repository, XDG_CONFIG_HOME, HOME));
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw error;
+      return `invalid swarm.runtimes: ${error.message}`;
+    }
+  }
+
   private async start(state: RunState, slug: string, seq: number): Promise<void> {
     const group = findGroup(state, slug);
     const attempt = group?.attempts.find((candidate) => candidate.seq === seq);
     if (!group || !attempt) return;
     const key = { run: state.run.id, group: slug, seq };
-    const runtime = runtimeFor(attempt.runtime, this.daemon.environment);
+    const settings = this.runtimeSettings(state);
+    if (typeof settings === 'string') {
+      await this.exit(state, key, { kind: 'spawn', message: settings });
+      return;
+    }
+    const runtime = runtimeFor(attempt.runtime, this.daemon.environment, settings);
     if (!findExecutable(runtime.executable, this.daemon.environment.PATH)) {
       await this.exit(state, key, { kind: 'runtime_not_found', runtime: attempt.runtime });
       return;

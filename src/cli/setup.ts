@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
+import { configPaths, defaultRuntimes, loadRuntimeSettings } from '../config/index.ts';
 import { findExecutable } from '../runtime/index.ts';
 import type { Style } from '../protocol/index.ts';
 
@@ -122,9 +123,18 @@ function failure(result: ExecResult): string {
 function hostBinary(
   deps: SetupDeps,
   variable: 'AIP_CLAUDE_BIN' | 'AIP_OPENCODE_BIN',
-  name: string,
+  name: 'claude' | 'opencode',
 ): string | null {
-  return deps.find(deps.env[variable] || name);
+  if (deps.env[variable]) return deps.find(deps.env[variable]);
+  let command = name as string;
+  try {
+    command = loadRuntimeSettings(configPaths(deps.root, deps.env.XDG_CONFIG_HOME, deps.env.HOME))[
+      name
+    ].command;
+  } catch {
+    command = defaultRuntimes()[name].command;
+  }
+  return deps.find(command);
 }
 
 function prerequisites(deps: SetupDeps): SetupAction {

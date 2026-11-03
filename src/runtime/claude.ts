@@ -12,6 +12,7 @@ import {
   type LaunchContext,
   type OutputParser,
   type Runtime,
+  type RuntimeExtra,
 } from './types.ts';
 import { claudeTranscript } from './transcript.ts';
 
@@ -210,7 +211,10 @@ const CLAUDE_BUILTIN_TOOLS = [
   'Bash',
 ];
 
-export function createClaudeRuntime(executable = 'claude'): Runtime {
+export function createClaudeRuntime(
+  executable = 'claude',
+  extra: RuntimeExtra = { args: [], env: {} },
+): Runtime {
   return {
     name: 'claude',
     executable,
@@ -219,6 +223,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
       return {
         command: executable,
         args: [
+          ...extra.args,
           '-p',
           request.prompt,
           '--output-format',
@@ -234,7 +239,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
           mcpConfigPath,
           '--strict-mcp-config',
         ],
-        env: {},
+        env: { ...extra.env },
         files: [{ path: mcpConfigPath, content: JSON.stringify({ mcpServers: {} }) }],
         sessionId: null,
       };
@@ -256,6 +261,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
       return {
         command: executable,
         args: [
+          ...extra.args,
           '-p',
           userMessage(context.input),
           '--output-format',
@@ -276,7 +282,7 @@ export function createClaudeRuntime(executable = 'claude'): Runtime {
           ...disallowed,
         ],
         // The report tool is loaded at once instead of through a tool search.
-        env: { ENABLE_TOOL_SEARCH: 'false' },
+        env: { ...extra.env, ENABLE_TOOL_SEARCH: 'false' },
         files: [{ path: mcpConfigPath, content: JSON.stringify(mcpConfig, null, 2) }],
         sessionId: context.resumeSession ?? context.sessionId,
       };

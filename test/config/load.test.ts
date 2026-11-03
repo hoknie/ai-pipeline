@@ -13,6 +13,7 @@ import {
   groupWorkflow,
   loadConfig,
   loadConfigSources,
+  loadRuntimeSettings,
   loadWebSettings,
   parseConfig,
   withConfigDefaults,
@@ -876,6 +877,111 @@ describe('web settings', () => {
     expect(error.detail).toMatchObject({
       kind: 'invalid',
       errors: [{ file, path: 'swarm.web.port' }],
+    });
+  });
+});
+
+describe('runtimes settings', () => {
+  const runtimes = (text: string) => parseConfig(`${BASE}${text}`).runtimes;
+
+  it('default to the names of the CLIs without arguments', () => {
+    expect(runtimes('')).toEqual({
+      claude: { command: 'claude', args: [], env: {} },
+      opencode: { command: 'opencode', args: [], env: {} },
+    });
+  });
+
+  it('take a path, arguments and variables of one runtime and leave the other', () => {
+    const result = runtimes(
+      '  runtimes:\n    opencode: { command: npx, args: [-y, opencode-ai], env: { A_B: "1" } }\n    claude: { command: /opt/claude }\n',
+    );
+    expect(result.opencode).toEqual({
+      command: 'npx',
+      args: ['-y', 'opencode-ai'],
+      env: { A_B: '1' },
+    });
+    expect(result.claude).toEqual({ command: '/opt/claude', args: [], env: {} });
+  });
+
+  it('reject an unknown runtime, wrong types, a relative path and a bad variable name', () => {
+    expectError(
+      errorsOf(`${BASE}  runtimes: { codex: {} }\n`),
+      'swarm.runtimes.codex',
+      'unknown key',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { opencode: { args: -y } }\n`),
+      'swarm.runtimes.opencode.args',
+      'list of strings',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { claude: { command: bin/claude } }\n`),
+      'swarm.runtimes.claude.command',
+      'absolute path',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { claude: { env: { A-B: x } } }\n`),
+      'swarm.runtimes.claude.env.A-B',
+      'variable name',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { claude: { env: { A: 1 } } }\n`),
+      'swarm.runtimes.claude.env.A',
+      'must be a string',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { claude: { shell: x } }\n`),
+      'swarm.runtimes.claude.shell',
+      'unknown key',
+    );
+  });
+
+  it('fill the defaults of a stored snapshot without them', () => {
+    const stored = structuredClone(parseConfig(BASE)) as { runtimes?: unknown };
+    delete stored.runtimes;
+    expect(
+      withConfigDefaults(stored as Parameters<typeof withConfigDefaults>[0]).runtimes.claude,
+    ).toEqual({ command: 'claude', args: [], env: {} });
+  });
+
+  it('are an error in the project settings, naming the project file', () => {
+    const paths = temporaryPaths();
+    write(join(paths.global.directory, 'specialists', 'coder.yaml'), 'name: C\n');
+    write(join(paths.project.directory, 'settings.yaml'), 'runtimes: { claude: { command: x } }\n');
+    const error = thrown(() => loadConfigSources(paths));
+    const errors = error.detail.kind === 'invalid' ? error.detail.errors : [];
+    expect(errors).toContainEqual({
+      file: join(paths.project.directory, 'settings.yaml'),
+      path: 'swarm.runtimes',
+      message: 'runtimes is set only in the global aip/ directory',
+    });
+  });
+
+  it('are read from the global file alone, whatever else is wrong', () => {
+    const paths = temporaryPaths();
+    write(
+      join(paths.global.directory, 'settings.yaml'),
+      'runtimes: { claude: { args: [--debug] } }\nmax: 100\n',
+    );
+    expect(loadRuntimeSettings(paths).claude.args).toEqual(['--debug']);
+    expect(() => loadConfig(paths)).toThrow(ConfigLoadError);
+  });
+
+  it('are the defaults without the file or the section', () => {
+    const paths = temporaryPaths();
+    expect(loadRuntimeSettings(paths).opencode.command).toBe('opencode');
+    write(join(paths.global.directory, 'settings.yaml'), 'max: 2\n');
+    expect(loadRuntimeSettings(paths).claude).toEqual({ command: 'claude', args: [], env: {} });
+  });
+
+  it('fail to load with the global file and the field path when wrong', () => {
+    const paths = temporaryPaths();
+    const file = join(paths.global.directory, 'settings.yaml');
+    write(file, 'runtimes: { claude: { args: 1 } }\n');
+    const error = thrown(() => loadRuntimeSettings(paths));
+    expect(error.detail).toMatchObject({
+      kind: 'invalid',
+      errors: [{ file, path: 'swarm.runtimes.claude.args' }],
     });
   });
 });

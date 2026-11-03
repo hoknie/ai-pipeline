@@ -85,3 +85,9 @@ export function describePermissions(permissions: Permissions): string {
       return 'You may edit files inside the current directory and run shell commands.';
   }
 }
+
+/** Extra arguments and environment from the settings, put under those of aip. */
+export interface RuntimeExtra {
+  args: string[];
+  env: Record<string, string>;
+}

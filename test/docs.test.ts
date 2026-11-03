@@ -17,6 +17,7 @@ import {
   configPaths,
   findSpecialist,
   findWorkflow,
+  loadRuntimeSettings,
   loadWebSettings,
 } from '../src/config/index.ts';
 
@@ -116,6 +117,18 @@ describe('documentation examples', () => {
       workflows: { epic, explore: 'steps:\n  - { id: research, specialist: coder }\n' },
     });
     expect(findWorkflow(config, 'epic')?.split).toMatchObject({ workflow: 'explore' });
+  });
+
+  it('the runtimes example of docs/configuration.md is valid in the global settings', () => {
+    const block = yamlBlocks('docs/configuration.md').find((b) => b.startsWith('runtimes:')) ?? '';
+    const root = mkdtempSync(join(tmpdir(), 'aip-docs-runtimes-'));
+    mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
+    writeFileSync(join(root, 'xdg', 'aip', 'settings.yaml'), block);
+    const runtimes = loadRuntimeSettings(
+      configPaths(join(root, 'repo'), join(root, 'xdg'), undefined),
+    );
+    expect(runtimes.opencode).toEqual({ command: 'npx', args: ['-y', 'opencode-ai'], env: {} });
+    expect(runtimes.claude.args).toEqual(['--debug']);
   });
 
   it('the web example of docs/configuration.md is valid in the global settings', () => {

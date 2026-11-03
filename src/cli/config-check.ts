@@ -22,6 +22,16 @@ export function presentConfig(config: ResolvedConfig): unknown {
       runtime: config.naming.runtime,
       model: config.naming.model,
     },
+    runtimes: Object.fromEntries(
+      Object.entries(config.runtimes).map(([name, runtime]) => [
+        name,
+        {
+          command: runtime.command,
+          ...(runtime.args.length > 0 ? { args: runtime.args } : {}),
+          ...(Object.keys(runtime.env).length > 0 ? { env: runtime.env } : {}),
+        },
+      ]),
+    ),
     outside_changes: config.outsideChanges,
     claude: {
       edit_mode: config.claude.editMode,
@@ -138,7 +148,7 @@ export async function checkConfig(directory: string, environment = process.env):
   for (const file of files) process.stdout.write(`  ${file}\n`);
   process.stdout.write('\nAgent CLIs:\n');
   for (const name of runtimes) {
-    const runtime = runtimeFor(name, environment);
+    const runtime = runtimeFor(name, environment, config.runtimes);
     const path = findExecutable(runtime.executable, environment.PATH);
     process.stdout.write(
       `  ${name}: ${path ? `${await probeVersion(path)} (${path})` : 'not found in PATH'}\n`,

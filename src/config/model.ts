@@ -143,6 +143,22 @@ export function defaultWeb(): WebSettings {
   return { autostart: true, auth: 'token', port: DEFAULT_WEB_PORT, host: '127.0.0.1' };
 }
 
+/** How an agent CLI is started: the command, extra leading arguments and extra environment. */
+export interface RuntimeCommand {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
+export type RuntimeSettings = Record<Runtime, RuntimeCommand>;
+
+export function defaultRuntimes(): RuntimeSettings {
+  return {
+    claude: { command: 'claude', args: [], env: {} },
+    opencode: { command: 'opencode', args: [], env: {} },
+  };
+}
+
 export function defaultNaming(): NamingSettings {
   return { enabled: true, runtime: 'claude', model: 'haiku' };
 }
@@ -170,12 +186,18 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     delivery: Partial<DeliverySettings>;
     naming?: Partial<NamingSettings>;
     web?: Partial<WebSettings>;
+    runtimes?: Partial<RuntimeSettings>;
   };
   // Runs stored before these settings existed started from HEAD and were delivered by hand.
   const workspace: WorkspaceSettings = { base: 'head', include: [], ...stored.workspace };
   const delivery: DeliverySettings = { ...defaultDelivery(), auto: false, ...stored.delivery };
   const naming: NamingSettings = { ...defaultNaming(), ...stored.naming };
   const web: WebSettings = { ...defaultWeb(), ...stored.web };
+  const defaults = defaultRuntimes();
+  const runtimes: RuntimeSettings = {
+    claude: { ...defaults.claude, ...stored.runtimes?.claude },
+    opencode: { ...defaults.opencode, ...stored.runtimes?.opencode },
+  };
   const specialists = stored.specialists.map((specialist) => ({
     ...specialist,
     max: specialist.max ?? null,
@@ -186,7 +208,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     ...stored.claude,
     settings: (stored.claude as Partial<ClaudeSettings>).settings ?? 'isolated',
   };
-  return { ...stored, workspace, delivery, naming, web, specialists, claude };
+  return { ...stored, workspace, delivery, naming, web, runtimes, specialists, claude };
 }
 
 export interface ResolvedConfig {
@@ -196,6 +218,8 @@ export interface ResolvedConfig {
   naming: NamingSettings;
   /** Web panel settings; read from the global level only. */
   web: WebSettings;
+  /** Agent CLI commands; read from the global level only. */
+  runtimes: RuntimeSettings;
   outsideChanges: OutsideChanges;
   claude: ClaudeSettings;
   delivery: DeliverySettings;

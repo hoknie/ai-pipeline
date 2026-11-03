@@ -1,3 +1,5 @@
+import { isAbsolute } from 'node:path';
+
 import { parseDuration } from './duration.ts';
 import type { FieldError } from './errors.ts';
 import { isMapping } from './merge.ts';
@@ -8,7 +10,9 @@ import {
   DELIVERY_MODES,
   defaultDelivery,
   defaultNaming,
+  defaultRuntimes,
   defaultWeb,
+  type RuntimeSettings,
   WEB_AUTH_MODES,
   WEB_HOSTS,
   type WebAuth,
@@ -55,6 +59,7 @@ const SWARM_KEYS = [
   'workspace',
   'naming',
   'web',
+  'runtimes',
   'outside_changes',
   'claude',
   'delivery',
@@ -75,6 +80,8 @@ const DELIVERY_KEYS = [
 const WORKSPACE_KEYS = ['base', 'include'];
 const WEB_KEYS = ['autostart', 'auth', 'port', 'host'];
 const WEB_PORT_RANGE: Range = [1, 65535];
+const RUNTIME_COMMAND_KEYS = ['command', 'args', 'env'];
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NAMING_KEYS = ['enabled', 'runtime', 'model'];
 const RESOLVER_ROUNDS_RANGE: Range = [1, 10];
 const SPLIT_KEYS = ['specialist', 'max_groups', 'additional_prompt', 'workflow'];
@@ -108,6 +115,17 @@ export function validateWebSection(value: unknown): { web: WebSettings; errors: 
   const web = defaultWeb();
   if (value !== undefined) validator.web(value, web);
   return { web, errors: validator.errors };
+}
+
+/** Checks the `runtimes` section alone; `value` is the content of `swarm.runtimes`. */
+export function validateRuntimesSection(value: unknown): {
+  runtimes: RuntimeSettings;
+  errors: FieldError[];
+} {
+  const validator = new Validator();
+  const runtimes = defaultRuntimes();
+  if (value !== undefined) validator.runtimes(value, runtimes);
+  return { runtimes, errors: validator.errors };
 }
 
 export function validateConfig(root: unknown): ValidationResult {
@@ -194,6 +212,7 @@ class Validator {
       workspace: defaultWorkspace(),
       naming: defaultNaming(),
       web: defaultWeb(),
+      runtimes: defaultRuntimes(),
       outsideChanges: 'warn',
       claude: { editMode: 'allowlist', mcp: 'isolated', settings: 'isolated' },
       delivery: defaultDelivery(),
@@ -222,6 +241,7 @@ class Validator {
       this.workspace(swarm.workspace, config.workspace, config.workspaceDir);
     if ('naming' in swarm) this.naming(swarm.naming, config.naming);
     if ('web' in swarm) this.web(swarm.web, config.web);
+    if ('runtimes' in swarm) this.runtimes(swarm.runtimes, config.runtimes);
     if ('outside_changes' in swarm) {
       config.outsideChanges =
         this.choice<OutsideChanges>(
@@ -340,6 +360,45 @@ class Validator {
       if (key === 'port') web.port = this.integer(field, path, WEB_PORT_RANGE) ?? web.port;
       if (key === 'host') web.host = this.choice<WebHost>(field, path, WEB_HOSTS) ?? web.host;
     }
+  }
+
+  runtimes(value: unknown, runtimes: RuntimeSettings): void {
+    const mapping = this.mapping(value, 'swarm.runtimes');
+    if (!mapping) return;
+    for (const [name, section] of this.entries(mapping, 'swarm.runtimes', [...RUNTIMES])) {
+      const base = join('swarm.runtimes', name);
+      const entry = this.mapping(section, base);
+      if (!entry) continue;
+      const target = runtimes[name as Runtime];
+      for (const [key, field] of this.entries(entry, base, RUNTIME_COMMAND_KEYS)) {
+        const path = join(base, key);
+        if (key === 'command') {
+          const command = this.string(field, path);
+          if (command === null) continue;
+          if (command.includes('/') && !isAbsolute(command)) {
+            this.error(path, 'must be a command name or an absolute path');
+          } else target.command = command;
+        }
+        if (key === 'args') target.args = this.strings(field, path);
+        if (key === 'env') target.env = this.environment(field, path);
+      }
+    }
+  }
+
+  environment(value: unknown, path: string): Record<string, string> {
+    const result: Record<string, string> = {};
+    const mapping = this.mapping(value, path);
+    if (!mapping) return result;
+    for (const [name, field] of Object.entries(mapping)) {
+      const fieldPath = join(path, name);
+      if (!ENV_NAME.test(name)) {
+        this.error(fieldPath, 'must be a valid variable name');
+        continue;
+      }
+      if (typeof field !== 'string') this.error(fieldPath, 'must be a string');
+      else result[name] = field;
+    }
+    return result;
   }
 
   naming(value: unknown, naming: NamingSettings): void {

@@ -35,7 +35,7 @@ Every specialist and every workflow has exactly one file.
 All files are optional, but at least one must exist on one of the levels. The project level overrides the shared one:
 - `max`, `workspace_dir` and `outside_changes` as a whole;
 - `defaults`, `claude`, `delivery`, `workspace` and `naming` field by field;
-- `web` is read from the shared level only;
+- `web` and `runtimes` are read from the shared level only;
 - specialists and workflows as a whole, by name: a project file `coder.yaml` replaces the shared one.
 
 Unknown keys are an error. `aip config check` prints all errors at once, each with the file and the path to the field.
@@ -54,7 +54,7 @@ A running run keeps a snapshot of the configuration, so editing the files does n
 
 | In `swarm.yaml` | Now |
 |---|---|
-| `swarm.max`, `workspace_dir`, `outside_changes`, `workspace`, `naming`, `web`, `claude`, `delivery`, `defaults` | `aip/settings.yaml`, without the `swarm:` root |
+| `swarm.max`, `workspace_dir`, `outside_changes`, `workspace`, `naming`, `web`, `runtimes`, `claude`, `delivery`, `defaults` | `aip/settings.yaml`, without the `swarm:` root |
 | `swarm.specialists.<slug>` | `aip/specialists/<slug>.yaml` |
 | `swarm.workflows.<id>` | `aip/workflows/<id>.yaml` |
 | shared `~/.config/aip/swarm.yaml` | the same files in `~/.config/aip/` |
@@ -68,6 +68,7 @@ outside_changes: warn     # warn | stop | off
 workspace: { ... }
 naming: { ... }
 web: { ... }         # shared directory only
+runtimes: { ... }    # shared directory only
 claude:
   edit_mode: allowlist    # allowlist | accept_edits | auto
   mcp: isolated           # isolated | inherit
@@ -134,6 +135,32 @@ web:
 - **`port`** and **`host`** are the address of the daemon's panel. `aip web` uses the same values when you pass no `--port` and `--host`.
 
 This section is set in the shared `settings.yaml` only: there is one panel per daemon, and one daemon per user. In a project `aip/settings.yaml` it is a validation error (`swarm.web`). Errors in other fields do not prevent reading the `web` section. A change takes effect after the daemon restarts.
+
+### `runtimes`
+
+```yaml
+runtimes:
+  claude:
+    command: /opt/claude/bin/claude   # a name from PATH or an absolute path
+    args: [--debug]                   # put right after the command, before the arguments of aip
+    env: { HTTPS_PROXY: "http://127.0.0.1:3128" }
+  opencode:
+    command: npx
+    args: [-y, opencode-ai]
+```
+
+- **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is `claude` and `opencode`.
+  - The order of choice is: `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` from the daemon's environment, then `command`, then `PATH`.
+- **`args`** are put right after the command, before the arguments `aip` builds, for every start of the agent: a step, a retry, an answer and the request for a run name. A wrapper such as `npx -y opencode-ai` works this way: `npx -y opencode-ai run --format json …`.
+  - `args` are also added when the command comes from `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN`.
+  - `aip` does not filter `args`: a flag such as `--dangerously-skip-permissions` weakens the limits of a specialist.
+- **`env`** is added to the environment of the daemon for the agent process. The variables `aip` sets itself (`ENABLE_TOOL_SEARCH` for Claude Code, `OPENCODE_CONFIG` for OpenCode) win.
+
+This section is set in the shared `settings.yaml` only. In a project `aip/settings.yaml` it is a validation error (`swarm.runtimes`).
+
+- The daemon reads it on every start of an agent, so a change takes effect without restarting the daemon, also in runs that are already under way.
+- If the section is wrong, the step fails with `spawn error: invalid swarm.runtimes: …`.
+- `aip setup` and `aip config check` use `command` only, not `args` and `env`.
 
 ### `outside_changes`
 

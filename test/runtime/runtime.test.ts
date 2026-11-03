@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { findSpecialist, type Specialist } from '../../src/config/index.ts';
+import { defaultRuntimes, findSpecialist, type Specialist } from '../../src/config/index.ts';
 import type { StepInput } from '../../src/core/index.ts';
 import {
   createClaudeRuntime,
@@ -385,6 +385,60 @@ describe('installation checks', () => {
       '/fake/claude',
     );
     expect(runtimeFor('opencode', {}).executable).toBe('opencode');
+  });
+
+  it('takes the command in the order: variable, settings, default name', () => {
+    const settings = defaultRuntimes();
+    settings.claude = { command: '/opt/claude', args: ['--debug'], env: { A: '1' } };
+    expect(runtimeFor('claude', {}, settings).executable).toBe('/opt/claude');
+    expect(runtimeFor('claude', { AIP_CLAUDE_BIN: '/fake/claude' }, settings).executable).toBe(
+      '/fake/claude',
+    );
+    // arguments of the settings go with a command from the variable too
+    const launch = runtimeFor('claude', { AIP_CLAUDE_BIN: '/fake/claude' }, settings).buildLaunch(
+      context(),
+    );
+    expect(launch.command).toBe('/fake/claude');
+    expect(launch.args[0]).toBe('--debug');
+    expect(runtimeFor('opencode', {}, settings).executable).toBe('opencode');
+  });
+});
+
+describe('extra arguments and variables of the settings', () => {
+  const extra = { args: ['--add-dir', '/data'], env: { ENABLE_TOOL_SEARCH: 'true', KEEP: 'yes' } };
+
+  it('go before the arguments of claude, and the variables of aip win', () => {
+    const runtime = createClaudeRuntime('claude', extra);
+    const launch = runtime.buildLaunch(context());
+    expect(launch.args.slice(0, 4)).toEqual(['--add-dir', '/data', '-p', userMessage(input)]);
+    expect(launch.args.filter((arg) => arg === '--disallowedTools')).toHaveLength(1);
+    expect(launch.args.at(-1)).toMatch(/^Bash\(git /);
+    expect(launch.env).toEqual({ ENABLE_TOOL_SEARCH: 'false', KEEP: 'yes' });
+    const oneShot = runtime.buildOneShot({ prompt: 'q', model: 'haiku', directory: '/tmp/x' });
+    expect(oneShot.args.slice(0, 3)).toEqual(['--add-dir', '/data', '-p']);
+    expect(oneShot.env).toEqual({ ENABLE_TOOL_SEARCH: 'true', KEEP: 'yes' });
+  });
+
+  it('go before `run` of opencode, and OPENCODE_CONFIG wins', () => {
+    const runtime = createOpencodeRuntime('npx', {
+      args: ['-y', 'opencode-ai'],
+      env: { OPENCODE_CONFIG: '/mine', KEEP: 'yes' },
+    });
+    const launch = runtime.buildLaunch(context());
+    expect(launch.command).toBe('npx');
+    expect(launch.args.slice(0, 5)).toEqual(['-y', 'opencode-ai', 'run', '--format', 'json']);
+    expect(launch.env.OPENCODE_CONFIG).toBe('/state/logs/run/login/3/opencode.json');
+    expect(launch.env.KEEP).toBe('yes');
+    const oneShot = runtime.buildOneShot({ prompt: 'q', model: 'm', directory: '/tmp/x' });
+    expect(oneShot.args.slice(0, 3)).toEqual(['-y', 'opencode-ai', 'run']);
+  });
+
+  it('change nothing without them', () => {
+    const plain = createClaudeRuntime('claude').buildLaunch(context());
+    expect(createClaudeRuntime('claude', { args: [], env: {} }).buildLaunch(context())).toEqual(
+      plain,
+    );
+    expect(plain.args[0]).toBe('-p');
   });
 });
 

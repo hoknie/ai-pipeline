@@ -105,6 +105,14 @@ async function connectWorker(command: string, commandArgs: string[]) {
 
 const [mode, ...args] = process.argv.slice(2);
 
+// AIP_FAKE_ARGV_LOG: a file that gets a JSON line with the arguments and the variables named in
+// AIP_FAKE_ENV_KEYS (comma-separated) of every call.
+if (process.env.AIP_FAKE_ARGV_LOG) {
+  const keys = (process.env.AIP_FAKE_ENV_KEYS ?? '').split(',').filter(Boolean);
+  const env = Object.fromEntries(keys.map((key) => [key, process.env[key] ?? null]));
+  appendFileSync(process.env.AIP_FAKE_ARGV_LOG, `${JSON.stringify({ mode, argv: args, env })}\n`);
+}
+
 if (args[0] === '--version') {
   console.log(`fake ${mode} 0.0.0`);
   process.exit(0);

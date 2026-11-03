@@ -10,6 +10,7 @@ import {
   type LaunchContext,
   type OutputParser,
   type Runtime,
+  type RuntimeExtra,
 } from './types.ts';
 import { opencodeErrorText, opencodeTranscript } from './transcript.ts';
 
@@ -75,7 +76,10 @@ function findStepFinish(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
-export function createOpencodeRuntime(executable = 'opencode'): Runtime {
+export function createOpencodeRuntime(
+  executable = 'opencode',
+  extra: RuntimeExtra = { args: [], env: {} },
+): Runtime {
   return {
     name: 'opencode',
     executable,
@@ -95,8 +99,18 @@ export function createOpencodeRuntime(executable = 'opencode'): Runtime {
       };
       return {
         command: executable,
-        args: ['run', '--format', 'json', '--agent', agent, '-m', request.model, request.prompt],
-        env: { OPENCODE_CONFIG: configPath },
+        args: [
+          ...extra.args,
+          'run',
+          '--format',
+          'json',
+          '--agent',
+          agent,
+          '-m',
+          request.model,
+          request.prompt,
+        ],
+        env: { ...extra.env, OPENCODE_CONFIG: configPath },
         files: [{ path: configPath, content: JSON.stringify(config, null, 2) }],
         sessionId: null,
       };
@@ -119,6 +133,7 @@ export function createOpencodeRuntime(executable = 'opencode'): Runtime {
       return {
         command: executable,
         args: [
+          ...extra.args,
           'run',
           '--format',
           'json',
@@ -131,7 +146,7 @@ export function createOpencodeRuntime(executable = 'opencode'): Runtime {
           ...(context.specialist.permissions === 'full' ? ['--auto'] : []),
           userMessage(context.input),
         ],
-        env: { OPENCODE_CONFIG: configPath },
+        env: { ...extra.env, OPENCODE_CONFIG: configPath },
         files: [{ path: configPath, content: JSON.stringify(config, null, 2) }],
         sessionId: context.resumeSession,
       };

@@ -12,8 +12,14 @@ import {
 } from './discover.ts';
 import { ConfigLoadError, type FieldError } from './errors.ts';
 import { isMapping, KEYED_SECTIONS, mergeConfigs, type ConfigSource } from './merge.ts';
-import { defaultWeb, type ResolvedConfig, type WebSettings } from './model.ts';
-import { validateConfig, validateWebSection } from './validate.ts';
+import {
+  defaultRuntimes,
+  defaultWeb,
+  type ResolvedConfig,
+  type RuntimeSettings,
+  type WebSettings,
+} from './model.ts';
+import { validateConfig, validateRuntimesSection, validateWebSection } from './validate.ts';
 
 export interface LoadedConfig {
   config: ResolvedConfig;
@@ -216,17 +222,21 @@ function fileOf(origins: Map<string, string>, path: string): string | undefined 
   return best;
 }
 
+/** Sections that only the global level may set. */
+const GLOBAL_ONLY_SECTIONS = ['web', 'runtimes'];
+
 /** Merges the global level with the project one and validates the result. */
 export function resolveLevels(global: Level, project: Level): LoadedConfig {
   const origins = mergeOrigins(global, project);
   const problems = [...global.problems, ...project.problems];
   const projectSwarm = isMapping(project.tree) ? project.tree.swarm : undefined;
-  if (isMapping(projectSwarm) && 'web' in projectSwarm) {
-    const file = project.origins.get('swarm.web');
+  for (const section of GLOBAL_ONLY_SECTIONS) {
+    if (!isMapping(projectSwarm) || !(section in projectSwarm)) continue;
+    const file = project.origins.get(`swarm.${section}`);
     problems.push({
       ...(file === undefined ? {} : { file }),
-      path: 'swarm.web',
-      message: 'web is set only in the global aip/ directory',
+      path: `swarm.${section}`,
+      message: `${section} is set only in the global aip/ directory`,
     });
   }
   const result = validateConfig(mergeConfigs(global.tree, project.tree) ?? null);
@@ -253,10 +263,15 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
 }
 
 /**
- * Web panel settings from the global settings.yaml only; errors in other fields and files do not
- * matter. Without the file or the section the defaults apply.
+ * One section of the global settings.yaml, validated alone; errors in other fields and files do
+ * not matter. Without the file or the section the defaults apply.
  */
-export function loadWebSettings(paths: ConfigPaths): WebSettings {
+function loadGlobalSection<T>(
+  paths: ConfigPaths,
+  section: string,
+  defaults: () => T,
+  validate: (value: unknown) => { value: T; errors: FieldError[] },
+): T {
   const directory = paths.global.directory;
   const names = listYaml(directory, SETTINGS_NAME);
   const [first, second] = names;
@@ -272,19 +287,34 @@ export function loadWebSettings(paths: ConfigPaths): WebSettings {
       ],
     });
   }
-  if (first === undefined) return defaultWeb();
+  if (first === undefined) return defaults();
   const file = join(directory, first);
   const read = readYaml(file);
-  if (!read.found || !isMapping(read.value)) return defaultWeb();
-  const settings = { path: file, value: read.value };
-  const { web, errors } = validateWebSection(settings.value.web);
+  if (!read.found || !isMapping(read.value)) return defaults();
+  const { value, errors } = validate(read.value[section]);
   if (errors.length > 0) {
     throw new ConfigLoadError({
       kind: 'invalid',
-      errors: errors.map((error) => ({ file: settings.path, ...error })),
+      errors: errors.map((error) => ({ file, ...error })),
     });
   }
-  return web;
+  return value;
+}
+
+/** Web panel settings from the global settings.yaml only. */
+export function loadWebSettings(paths: ConfigPaths): WebSettings {
+  return loadGlobalSection(paths, 'web', defaultWeb, (value) => {
+    const { web, errors } = validateWebSection(value);
+    return { value: web, errors };
+  });
+}
+
+/** Agent CLI commands from the global settings.yaml only. */
+export function loadRuntimeSettings(paths: ConfigPaths): RuntimeSettings {
+  return loadGlobalSection(paths, 'runtimes', defaultRuntimes, (value) => {
+    const { runtimes, errors } = validateRuntimesSection(value);
+    return { value: runtimes, errors };
+  });
 }
 
 /** Reads settings.yaml, specialists/*.yaml and workflows/*.yaml of a level directory. */

@@ -91,6 +91,20 @@ describe('aip setup', () => {
     expect(readFileSync(m.opencodeConfig, 'utf8')).toBe(configBefore);
   });
 
+  it('finds Claude Code by the command of runtimes and does not pass its arguments', () => {
+    const m = machine({ AIP_CLAUDE_BIN: '' });
+    const directory = join(m.dir, 'config', 'aip');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'settings.yaml'),
+      `runtimes:\n  claude:\n    command: ${join(fakes, 'claude')}\n    args: [--debug]\n`,
+    );
+    const result = setup(m, ['--yes']);
+    expect(result.code, result.stdout + result.stderr).toBe(0);
+    expect(Object.keys(state(m).mcp)).toEqual(['aip']);
+    expect(state(m).mcp.aip!.args).not.toContain('--debug');
+  });
+
   it('skips OpenCode when it is not installed and exits with 0', () => {
     const m = machine({ AIP_OPENCODE_BIN: join(tmpdir(), 'no-such-opencode') });
     const result = setup(m);

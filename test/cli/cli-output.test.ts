@@ -1,12 +1,12 @@
 import { spawn } from 'node:child_process';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
 import { MANUAL_CONFIG, WORKFLOW_CONFIG } from '../daemon/harness.ts';
-import { aip, main, root, runOf, sandbox, waitUntil } from './sandbox.ts';
+import { aip, fakes, main, root, runOf, sandbox, waitUntil } from './sandbox.ts';
 
 describe('cli', () => {
   it('delivers with aip run apply, refuses with exit code 1 and forces with markers', async () => {
@@ -190,6 +190,23 @@ describe('cli', () => {
     expect(result.stdout).toContain(
       'Warning: claude.edit_mode: auto lets the Claude Code classifier decide on commands outside allow_commands',
     );
+  });
+
+  it('shows runtimes and finds the command of the settings in config check', async () => {
+    const box = sandbox();
+    box.env.AIP_CLAUDE_BIN = '';
+    const directory = join(box.env.XDG_CONFIG_HOME!, 'aip');
+    mkdirSync(directory, { recursive: true });
+    const command = join(fakes, 'claude');
+    writeFileSync(
+      join(directory, 'settings.yaml'),
+      `runtimes:\n  claude:\n    command: ${command}\n    args: [--debug]\n`,
+    );
+    const result = await aip(box, 'config', 'check');
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain(`command: ${command}`);
+    expect(result.stdout).toContain('- --debug');
+    expect(result.stdout).toContain(`claude: fake claude 0.0.0 (${command})`);
   });
 
   it('shows split.workflow and no steps for such a workflow in config check', async () => {

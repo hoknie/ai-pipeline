@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -84,5 +84,19 @@ describe('run names', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(existsSync(join(h.fakeState, 'oneshots.jsonl'))).toBe(false);
     expect(existsSync(join(off.fakeState, 'oneshots.jsonl'))).toBe(false);
+  });
+
+  it('passes the arguments of the runtime settings to the naming request', async () => {
+    const h = await start({ naming: { answer: '{"title": "x", "name": "x"}' } });
+    const directory = join(h.environment.XDG_CONFIG_HOME!, 'aip');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'settings.yaml'),
+      `runtimes:\n  claude:\n    command: ${join(import.meta.dirname, '..', 'fakes', 'claude')}\n    args: [--add-dir, /data]\n`,
+    );
+    h.environment.AIP_CLAUDE_BIN = '';
+    await h.waitFor(await create(h), (run) => run.name !== null);
+    const calls = readFileSync(join(h.fakeState, 'oneshots.jsonl'), 'utf8').trim().split('\n');
+    expect(JSON.parse(calls[0] ?? '{}').args.slice(0, 3)).toEqual(['--add-dir', '/data', '-p']);
   });
 });
