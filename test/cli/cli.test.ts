@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { request } from '../../src/protocol/index.ts';
 import { WORKFLOW_CONFIG } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { aip, fakes, runOf, sandbox, waitUntil } from './sandbox.ts';
+import { aip, runOf, sandbox, waitUntil } from './sandbox.ts';
 
 describe('cli', () => {
   it('starts the daemon on first use and shows that there are no runs', async () => {
