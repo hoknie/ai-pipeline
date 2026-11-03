@@ -127,7 +127,6 @@ export function RunList({
                       </span>
                     ) : null}
                     <WorkflowBadge id={run.workflow} focusable={false} />
-                    {run.fromQueue ? <span>{t('runs.list.fromQueue')}</span> : null}
                     <span>{runTime(run, now, t, locale)}</span>
                     {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
                     {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}

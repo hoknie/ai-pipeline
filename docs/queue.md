@@ -187,7 +187,10 @@ aip run list --tag auth --tag v2         # runs with at least one of the tags
 Tags of tasks that a specialist queues:
 
 - A task that a specialist puts in the queue with `swarm_queue_add` gets all the tags its run has at that moment.
-- A specialist cannot set tags itself, and no new tags are created.
+- A specialist cannot set tags itself.
+- When the run has no tags, the first `swarm_queue_add` creates a tag for the chain and puts it on the run and on the task. Later tasks of the chain get it by the rules above, so no second tag appears.
+- The name of that tag is the name of the run (without a name: the transliterated title, without a title: the run id). It is cut to 30 characters at the last whole word; when the name is taken, `-2`, `-3`, … is added. An existing tag with the same name is not reused.
+- When the workflow or `after` of the task is wrong, the call fails and no tag is created.
 - Tags added to a run later do not move to tasks that were already queued, except tasks that wait for that run with `after`.
 
 Tags of tasks with `after`:

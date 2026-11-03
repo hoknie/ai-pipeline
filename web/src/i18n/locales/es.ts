@@ -151,7 +151,6 @@ export const es: Dictionary = {
       done: 'Terminadas',
       empty: 'No se encontró nada',
       reset: 'Restablecer',
-      fromQueue: 'de la cola',
       filters: 'Filtros',
       filtersCount: 'Filtros ({{count}})',
       groups: 'grupos de la ejecución',

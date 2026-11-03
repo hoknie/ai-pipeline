@@ -151,7 +151,6 @@ export const ru: Dictionary = {
       done: 'Завершённые',
       empty: 'Ничего не найдено',
       reset: 'Сбросить',
-      fromQueue: 'из очереди',
       filters: 'Фильтры',
       filtersCount: 'Фильтры ({{count}})',
       groups: 'группы запуска',

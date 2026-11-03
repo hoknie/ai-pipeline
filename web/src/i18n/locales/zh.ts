@@ -148,7 +148,6 @@ export const zh: Dictionary = {
       done: '已结束',
       empty: '未找到结果',
       reset: '重置',
-      fromQueue: '来自队列',
       filters: '筛选',
       filtersCount: '筛选（{{count}}）',
       groups: '运行的分组',

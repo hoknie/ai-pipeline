@@ -79,6 +79,7 @@ export {
   TAG_COLORS,
   TAG_NAME_LIMIT,
   addTag,
+  autoTagName,
   editTag,
   findTag,
   knownTags,

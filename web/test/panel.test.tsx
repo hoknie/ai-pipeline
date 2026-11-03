@@ -207,7 +207,7 @@ describe('needs_human runs', () => {
 });
 
 describe('run tree', () => {
-  it('marks a run created by the queue', () => {
+  it('does not mark runs created by the queue', () => {
     render(
       list(
         [
@@ -217,9 +217,9 @@ describe('run tree', () => {
         { now: 61_000 },
       ),
     );
-    const marks = screen.getAllByText('from the queue');
-    expect(marks).toHaveLength(1);
-    expect(marks[0]?.closest('li')?.textContent).toContain('из очереди тест');
+    expect(screen.queryByText('from the queue')).toBeNull();
+    expect(screen.getByText('из очереди тест')).toBeTruthy();
+    expect(screen.getByText('вручную')).toBeTruthy();
   });
 
   it('labels runs by their tasks and lists the groups of the selected run', () => {

@@ -26,6 +26,8 @@ import {
   addItem,
   checkSkip,
   addTag,
+  autoTagName,
+  runName,
   advance,
   autopilotAnswers,
   allGroups,
@@ -1087,13 +1089,18 @@ export class Daemon {
     return tags;
   }
 
-  private tagAdd(params: ParamsOf<'tag_add'>): TagView[] {
+  private createTag(input: { name: string; color?: string | undefined }): Tag {
     const now = this.now();
     let id = tagId(now, randomInt(36 ** 3));
     while (this.catalog.some((tag) => tag.id === id)) id = tagId(now, randomInt(36 ** 3));
-    const tag = addTag(this.catalog, params, id, now);
+    const tag = addTag(this.catalog, input, id, now);
     this.store.saveTag(tag);
     this.catalog = [...this.catalog, tag];
+    return tag;
+  }
+
+  private tagAdd(params: ParamsOf<'tag_add'>): TagView[] {
+    this.createTag(params);
     return this.publishTags();
   }
 
@@ -1228,11 +1235,20 @@ export class Daemon {
       if (findSpecialist(state.run.config, attempt.specialist)?.queue !== true) {
         throw new Rejection(`specialist \`${attempt.specialist}\` may not add tasks to the queue`);
       }
-      return this.addQueueItem(
-        state.run.repository,
-        params,
-        knownTags(this.catalog, state.run.tags),
-      );
+      const own = knownTags(this.catalog, state.run.tags);
+      if (own.length > 0) return this.addQueueItem(state.run.repository, params, own);
+      // A run without tags starts a chain: its tag is created now and goes to the run and the task.
+      const repository = state.run.repository;
+      await this.ensureItem(repository, params.workflow, params.skip);
+      this.resolveDependencies(this.queueFor(repository), params.after ?? []);
+      const run = state.run;
+      const base = run.name ?? (run.title ? runName(run.title) : run.id);
+      const tag = this.createTag({ name: autoTagName(this.catalog, base) });
+      await this.apply(state, { kind: 'tags_set', tags: [tag.id] });
+      const queue = this.queueFor(repository);
+      if (spreadTags(queue, run.id, [tag.id], this.now()).length > 0) this.saveQueue(queue);
+      this.publishTags();
+      return this.addQueueItem(repository, params, [tag.id]);
     });
   }
 

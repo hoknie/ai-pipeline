@@ -147,7 +147,6 @@ export const en = {
       done: 'Finished',
       empty: 'Nothing found',
       reset: 'Reset',
-      fromQueue: 'from the queue',
       filters: 'Filters',
       filtersCount: 'Filters ({{count}})',
       groups: 'run groups',

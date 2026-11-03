@@ -42,6 +42,16 @@ async function addTag(h: Harness, name: string, color?: string): Promise<TagView
   return (await h.call('tag_add', { name, ...(color ? { color } : {}) })) as TagView[];
 }
 
+async function tagsWhen(h: Harness, done: (tags: TagView[]) => boolean): Promise<TagView[]> {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const tags = await tagsOf(h);
+    if (done(tags)) return tags;
+    if (Date.now() > deadline) throw new Error('timed out waiting for tags');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
 async function waitQueue(h: Harness, done: (queue: QueueView) => boolean): Promise<QueueView> {
   const deadline = Date.now() + 30_000;
   for (;;) {
@@ -395,10 +405,15 @@ describe('tags of tasks from a specialist', () => {
     ],
   };
 
-  async function exploreNow(h: Harness, tags: string[] | undefined): Promise<string> {
+  async function exploreNow(
+    h: Harness,
+    tags: string[] | undefined,
+    title?: string,
+  ): Promise<string> {
     const added = (await h.call('queue_add', {
       ...EXPLORE,
       repository: h.repo,
+      ...(title ? { title } : {}),
       ...(tags ? { tags } : {}),
     })) as QueueView & { item: string };
     const created = (await h.call('queue_run_now', {
@@ -421,6 +436,7 @@ describe('tags of tasks from a specialist', () => {
     const waiting = await queueOf(h);
     expect(waiting.items).toHaveLength(2);
     for (const item of waiting.items) expect(names(item.tags)).toEqual(['auth', 'v2']);
+    expect(names(await tagsOf(h))).toEqual(['auth', 'v2']);
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
     const runs = await allRuns(h);
@@ -429,30 +445,172 @@ describe('tags of tasks from a specialist', () => {
     for (const run of runs) await h.waitFor(run.id, (view) => view.finished);
   });
 
-  it('queues tasks without tags when the run has none, and creates no tags', async () => {
+  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+
+  it('creates one tag for a run without tags and gives it to the run and both tasks', async () => {
     const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
+    const explore = await exploreNow(h, undefined, 'Fix login');
+    await h.waitFor(explore, (run) => run.finished);
+    const catalog = await tagsOf(h);
+    expect(names(catalog)).toEqual(['fix-login']);
+    const waiting = await queueOf(h);
+    expect(waiting.items).toHaveLength(2);
+    for (const item of waiting.items) expect(names(item.tags)).toEqual(names(catalog));
+    expect(names((await h.status(explore)).tags)).toEqual(names(catalog));
+  });
+
+  it('sends tags, run and queue events when the tag is created', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
+    const events: StreamEvent[] = [];
+    subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const explore = await exploreNow(h, undefined);
+    await h.waitFor(explore, (run) => run.finished);
+    const kinds = new Set(events.map((event) => event.event));
+    for (const kind of ['tags', 'run', 'queue']) expect(kinds.has(kind as never)).toBe(true);
+  });
+
+  it('carries the automatic tag along the chain without creating another', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
+    const explore = await exploreNow(h, undefined);
+    await h.waitFor(explore, (run) => run.finished);
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    const catalog = await tagsOf(h);
+    expect(catalog).toHaveLength(1);
+    const runs = await allRuns(h);
+    expect(runs).toHaveLength(3);
+    for (const run of runs) expect(names(run.tags)).toEqual(names(catalog));
+    for (const run of runs) await h.waitFor(run.id, (view) => view.finished);
+  });
+
+  it('adds a suffix when the name of the run is taken by an existing tag', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
+    await addTag(h, 'Fix-Login');
+    const added = (await h.call('queue_add', {
+      ...EXPLORE,
+      repository: h.repo,
+      title: 'Fix login',
+    })) as QueueView & { item: string };
+    const created = (await h.call('queue_run_now', {
+      repository: h.repo,
+      item: added.item,
+    })) as { runId: string };
+    await h.waitFor(created.runId, (run) => run.finished);
+    expect(names(await tagsOf(h))).toContain('fix-login-2');
+    expect(names((await h.status(created.runId)).tags)).toEqual(['fix-login-2']);
+    for (const item of (await queueOf(h)).items)
+      expect(names(item.tags)).not.toContain('Fix-Login');
+    for (const run of await allRuns(h)) expect(names(run.tags)).not.toContain('Fix-Login');
+  });
+
+  it('puts the automatic tag before the tags of a predecessor', async () => {
+    const h = await start(SCOUT_CONFIG);
+    await addTag(h, 'v2');
+    const before = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'g', task: 't' }],
+      tags: ['v2'],
+    })) as QueueView & { item: string };
     h.script({
-      explore: [{ queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } }],
+      explore: [{ queue: { ...ONE.queue, after: [before.item] } }],
     });
     const explore = await exploreNow(h, undefined);
     await h.waitFor(explore, (run) => run.finished);
-    const waiting = await queueOf(h);
-    expect(waiting.items).toHaveLength(2);
-    for (const item of waiting.items) expect(item.tags).toEqual([]);
-    expect(await tagsOf(h)).toEqual([]);
+    const catalog = await tagsOf(h);
+    const auto = catalog.find((tag) => tag.name !== 'v2');
+    expect(auto).toBeDefined();
+    const queued = (await queueOf(h)).items.find((item) => item.id !== before.item);
+    expect(names(queued?.tags ?? [])).toEqual([auto?.name, 'v2']);
   });
 
-  it('does not pass tags added to a run after its task was queued', async () => {
+  it('does not bring back an automatic tag that was removed', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
+    const explore = await exploreNow(h, undefined);
+    await h.waitFor(explore, (run) => run.finished);
+    const [auto] = await tagsOf(h);
+    await h.call('tag_remove', { tag: auto?.name ?? '' });
+    expect(await tagsOf(h)).toEqual([]);
+    for (const item of (await queueOf(h)).items) expect(item.tags).toEqual([]);
+    expect((await h.status(explore)).tags).toEqual([]);
+  });
+
+  it('creates a new tag when a run calls the queue again after its tag was removed', async () => {
+    const config = SCOUT_CONFIG.replace(
+      '  workflows:\n',
+      '  workflows:\n    twice:\n      steps:\n        - { id: first, specialist: scout }\n        - { id: second, specialist: scout }\n',
+    );
+    const h = await start(config);
+    h.script({ first: [ONE], second: [{ delayMs: 2500, ...ONE }] });
+    const added = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'twice',
+      title: 'Fix login',
+      groups: [{ title: 'g', task: 'a' }],
+    })) as QueueView & { item: string };
+    const created = (await h.call('queue_run_now', {
+      repository: h.repo,
+      item: added.item,
+    })) as { runId: string };
+    const first = await tagsWhen(h, (tags) => tags.length === 1);
+    expect(names(first)).toEqual(['fix-login']);
+    await h.call('tag_remove', { tag: 'fix-login' });
+    await h.waitFor(created.runId, (run) => run.finished);
+    const catalog = await tagsOf(h);
+    expect(names(catalog)).toEqual(['fix-login']);
+    expect(catalog[0]?.id).not.toBe(first[0]?.id);
+    expect(names((await h.status(created.runId)).tags)).toEqual(['fix-login']);
+    const items = (await queueOf(h)).items;
+    expect(items).toHaveLength(2);
+    expect(names(items.at(-1)?.tags ?? [])).toEqual(['fix-login']);
+  });
+
+  it('gives the automatic tag to tasks that already wait for the run', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [{ delayMs: 1500, ...ONE }] });
+    const explore = await exploreNow(h, undefined);
+    const waiter = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'g', task: 'w' }],
+      after: [explore],
+    })) as QueueView & { item: string };
+    await h.waitFor(explore, (run) => run.finished);
+    const [auto] = await tagsOf(h);
+    expect(auto).toBeDefined();
+    const items = (await queueOf(h)).items;
+    expect(items).toHaveLength(3);
+    expect(names(items.find((item) => item.id === waiter.item)?.tags ?? [])).toEqual([auto?.name]);
+  });
+
+  it('creates no tag when the workflow of the task is unknown', async () => {
     const h = await start(SCOUT_CONFIG);
     h.script({
-      explore: [{ queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } }],
+      explore: [{ queue: { workflow: 'missing', groups: [{ title: 'g', task: 't' }] } }],
     });
+    const explore = await exploreNow(h, undefined);
+    await h.waitFor(explore, (run) => run.finished);
+    expect(await tagsOf(h)).toEqual([]);
+    expect((await queueOf(h)).items).toHaveLength(0);
+    expect((await h.status(explore)).tags).toEqual([]);
+  });
+
+  it('gives only the automatic tag to a task when a tag is added to the run later', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
     await addTag(h, 'auth');
     const explore = await exploreNow(h, undefined);
     await h.waitFor(explore, (run) => run.finished);
+    const auto = (await tagsOf(h)).find((tag) => tag.name !== 'auth');
     await h.call('run_tags', { runId: explore, add: ['auth'] });
-    for (const item of (await queueOf(h)).items) expect(item.tags).toEqual([]);
-    expect(names((await h.status(explore)).tags)).toEqual(['auth']);
+    for (const item of (await queueOf(h)).items) expect(names(item.tags)).toEqual([auto?.name]);
+    expect(names((await h.status(explore)).tags).sort()).toEqual([auto?.name, 'auth'].sort());
   });
 });
 

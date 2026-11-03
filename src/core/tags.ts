@@ -116,3 +116,27 @@ export function knownTags(catalog: readonly Tag[], ids: readonly string[]): stri
 export function mergeTags(...lists: readonly (readonly string[])[]): string[] {
   return [...new Set(lists.flat())];
 }
+
+function shorten(name: string, limit: number): string {
+  const chars = [...name];
+  if (chars.length <= limit) return name;
+  const cut = chars.slice(0, limit).join('');
+  const dash = cut.lastIndexOf('-');
+  const word = chars[limit] === '-' ? cut : dash > 0 ? cut.slice(0, dash) : cut;
+  return word.replace(/-+$/, '');
+}
+
+/**
+ * A free tag name made from `base`: cut to the limit at the last whole word (split by `-`),
+ * with `-2`, `-3`, … added while the name is taken (case does not matter).
+ */
+export function autoTagName(catalog: readonly Tag[], base: string): string {
+  const clean = shorten(base.replace(/\s+/g, ' ').trim(), TAG_NAME_LIMIT).trim() || 'tag';
+  const taken = new Set(catalog.map((tag) => fold(tag.name)));
+  if (!taken.has(fold(clean))) return clean;
+  for (let n = 2; ; n += 1) {
+    const suffix = `-${n}`;
+    const name = `${shorten(clean, TAG_NAME_LIMIT - suffix.length)}${suffix}`;
+    if (!taken.has(fold(name))) return name;
+  }
+}

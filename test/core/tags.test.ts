@@ -4,6 +4,7 @@ import {
   Rejection,
   TAG_COLORS,
   addTag,
+  autoTagName,
   editTag,
   knownTags,
   mergeTags,
@@ -104,5 +105,33 @@ describe('mergeTags', () => {
   it('joins lists without repeats in the order of first appearance', () => {
     expect(mergeTags(['a', 'b'], ['b', 'c'], [], ['a', 'd'])).toEqual(['a', 'b', 'c', 'd']);
     expect(mergeTags()).toEqual([]);
+  });
+});
+
+describe('autoTagName', () => {
+  it('keeps a short name', () => {
+    expect(autoTagName([], 'fix-login')).toBe('fix-login');
+  });
+
+  it('cuts a long name at the last whole word', () => {
+    const name = autoTagName([], 'archive-queue-usage-limit-guard-change');
+    expect(name).toBe('archive-queue-usage-limit');
+  });
+
+  it('cuts a word longer than the limit hard', () => {
+    const name = autoTagName([], 'a'.repeat(45));
+    expect(name).toBe('a'.repeat(30));
+  });
+
+  it('adds a suffix while the name is taken, ignoring case', () => {
+    expect(autoTagName(catalogOf('Fix-Login'), 'fix-login')).toBe('fix-login-2');
+    expect(autoTagName(catalogOf('Fix-Login', 'fix-login-2'), 'fix-login')).toBe('fix-login-3');
+  });
+
+  it('keeps the name with a suffix within the limit', () => {
+    const base = 'a'.repeat(30);
+    const name = autoTagName(catalogOf(base), base);
+    expect(name).toBe(`${'a'.repeat(28)}-2`);
+    expect([...name].length).toBeLessThanOrEqual(30);
   });
 });
