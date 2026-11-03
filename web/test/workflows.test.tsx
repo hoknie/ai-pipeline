@@ -103,6 +103,24 @@ describe('routes and the tab', () => {
     );
   });
 
+  it('shows the file of a workflow as a chip under the heading, none for a new one', async () => {
+    window.location.hash = '#workflows/feature';
+    render(<App api={api()} openStream={openFake} />);
+    const heading = await screen.findByRole('heading', { name: 'feature' });
+    const section = heading.closest('section')!;
+    const chip = section.querySelector('code')!;
+    expect(chip.getAttribute('title')).toBe(chip.textContent);
+    expect(chip.textContent).toMatch(/\.yaml$/);
+    expect(chip.className).toContain('bg-muted');
+    expect(heading.contains(chip)).toBe(false);
+    expect(heading.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    cleanup();
+    window.location.hash = '#workflows/new';
+    render(<App api={api()} openStream={openFake} />);
+    const created = await screen.findByRole('heading', { name: 'New workflow' });
+    expect(created.closest('section')!.querySelector('code')).toBeNull();
+  });
+
   it('opens the form of the workflow from the address', async () => {
     window.location.hash = '#workflows/feature';
     render(<App api={api()} openStream={openFake} />);

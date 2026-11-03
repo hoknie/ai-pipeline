@@ -6,6 +6,7 @@ import { Switch } from '../ui/switch.tsx';
 
 import type { Api } from '../api.ts';
 import { useGeneralSetting } from '../useGeneralSetting.ts';
+import { FilePath } from './FilePath.tsx';
 import { TagsSettings } from './TagsSettings.tsx';
 import type { ConfigEditorResponse, EditorSetting } from '../types.ts';
 
@@ -85,7 +86,7 @@ export function SettingsView({
               </td>
               <td className="p-2 align-top">
                 {setting.file ? (
-                  <code>{setting.file}</code>
+                  <FilePath path={setting.file} />
                 ) : (
                   <span className="text-muted-foreground">{t('settings.byDefault')}</span>
                 )}

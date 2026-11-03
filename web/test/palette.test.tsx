@@ -81,6 +81,7 @@ describe('command palette', () => {
     openPalette();
     fireEvent.click(await screen.findByText('New task in the queue'));
     await waitFor(() => expect(window.location.hash).toBe('#queue'));
+    await screen.findByRole('dialog', { name: 'New task' });
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Task text')));
   });
 

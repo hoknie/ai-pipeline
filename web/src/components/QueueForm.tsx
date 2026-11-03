@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { takeFocusRequest } from '../hotkeys.ts';
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
 import { Input } from '../ui/input.tsx';
@@ -16,6 +15,7 @@ import type { DeliveryMode } from '../../../src/config/index.ts';
 import { DELIVERY_MODES } from '../deliveryModes.ts';
 import { useTags } from '../tags.tsx';
 import type { QueueFields, WorkflowsView } from '../types.ts';
+import { SkipSteps, pruneSkip } from './SkipSteps.tsx';
 import { TagPicker } from './TagPicker.tsx';
 import type { AfterOption } from './queueLinks.ts';
 import { ValuesPicker, type PickerOption } from './ValuesPicker.tsx';
@@ -35,6 +35,8 @@ export interface QueueDraft {
   tags: string[];
   /** Ids of the items and runs the task waits for, in the order of choice. */
   after: string[];
+  /** Ids of the workflow steps the task skips. */
+  skip: string[];
   /** The user changed the field: an edit sends `after` only then. */
   afterTouched: boolean;
 }
@@ -43,6 +45,10 @@ export const TITLE_LIMIT = 60;
 
 /** Picker group of each kind of predecessor. */
 const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global' } as const;
+
+function stepsOf(workflow: { steps: { id: string }[] } | undefined): string[] {
+  return workflow?.steps.map((step) => step.id) ?? [];
+}
 
 export function emptyDraft(workflow = ''): QueueDraft {
   return {
@@ -55,6 +61,7 @@ export function emptyDraft(workflow = ''): QueueDraft {
     deliveryMode: null,
     tags: [],
     after: [],
+    skip: [],
     afterTouched: false,
   };
 }
@@ -69,6 +76,7 @@ export function draftOf(item: {
   deliveryMode?: DeliveryMode | null;
   tags?: { id: string }[];
   after?: { id: string }[];
+  skip?: string[];
 }): QueueDraft {
   return {
     workflow: item.workflow,
@@ -80,6 +88,7 @@ export function draftOf(item: {
     deliveryMode: item.deliveryMode ?? null,
     tags: (item.tags ?? []).map((tag) => tag.id),
     after: (item.after ?? []).map((ref) => ref.id),
+    skip: [...(item.skip ?? [])],
     afterTouched: false,
   };
 }
@@ -119,6 +128,7 @@ export function fieldsOf(
     ...(draft.autoDeliver !== null ? { autoDeliver: draft.autoDeliver } : {}),
     ...(draft.deliveryMode !== null ? { deliveryMode: draft.deliveryMode } : {}),
     ...(allTags || tags.length > 0 ? { tags } : {}),
+    ...(allTags || draft.skip.length > 0 ? { skip: draft.skip } : {}),
     ...(allTags
       ? draft.afterTouched
         ? { after: draft.after }
@@ -166,14 +176,6 @@ export function QueueForm({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const catalog = useTags();
-  const taskField = useRef<HTMLTextAreaElement>(null);
-  useEffect(
-    () =>
-      idPrefix === 'new'
-        ? takeFocusRequest('queue-task', () => taskField.current?.focus())
-        : undefined,
-    [idPrefix],
-  );
   const ids = workflows?.workflows.map((workflow) => workflow.id) ?? [];
   // a draft started before the workflows were known takes the first one
   const effective: QueueDraft =
@@ -209,183 +211,204 @@ export function QueueForm({
     options.push(effective.workflow);
   return (
     <form
-      className="flex flex-col gap-3 rounded-lg border bg-card p-3"
+      className="@container flex flex-col gap-3 rounded-lg border bg-card p-3"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
       }}
     >
-      <fieldset disabled={locked} className="contents">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor={`${idPrefix}-title`}>{t('queue.form.name')}</Label>
-          <Input
-            id={`${idPrefix}-title`}
-            value={effective.title}
-            maxLength={TITLE_LIMIT}
-            placeholder={t('queue.form.namePlaceholder')}
-            onChange={(event) => change({ title: event.target.value })}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor={`${idPrefix}-workflow`}>Workflow</Label>
-          <Select
-            value={effective.workflow === '' ? undefined : effective.workflow}
-            onValueChange={(workflow) => change({ workflow })}
-            disabled={options.length === 0}
-          >
-            <SelectTrigger id={`${idPrefix}-workflow`} className="w-48">
-              <SelectValue placeholder={t('queue.form.noWorkflow')} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((id) => (
-                <SelectItem key={id} value={id}>
-                  {id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <ToggleGroup
-            type="single"
-            aria-label={t('queue.form.kind')}
-            value={effective.mode}
-            onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
-          >
-            <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
-            <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
-          </ToggleGroup>
-        </div>
-        {effective.mode === 'task' ? (
-          <Textarea
-            ref={taskField}
-            aria-label={t('queue.form.taskText')}
-            rows={3}
-            value={effective.task}
-            placeholder={t('queue.form.taskPlaceholder')}
-            onChange={(event) => change({ task: event.target.value })}
-          />
-        ) : (
-          <div className="flex flex-col gap-2">
-            {effective.groups.map((group, index) => (
-              <fieldset key={index} className="flex flex-col gap-2 rounded-md border p-2">
-                <legend className="px-1 text-xs text-muted-foreground">
-                  {t('queue.form.group', { n: index + 1 })}
-                </legend>
-                <Input
-                  aria-label={t('queue.form.groupTitle', { n: index + 1 })}
-                  value={group.title}
-                  placeholder={t('queue.form.titlePlaceholder')}
-                  onChange={(event) => setGroup(index, { title: event.target.value })}
-                />
-                <Textarea
-                  aria-label={t('queue.form.groupText', { n: index + 1 })}
-                  rows={2}
-                  value={group.task}
-                  placeholder={t('queue.form.groupTaskPlaceholder')}
-                  onChange={(event) => setGroup(index, { task: event.target.value })}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-fit"
-                  disabled={effective.groups.length <= 1}
-                  onClick={() =>
-                    change({ groups: effective.groups.filter((_, at) => at !== index) })
-                  }
-                >
-                  {t('queue.form.removeGroup', { n: index + 1 })}
-                </Button>
-              </fieldset>
-            ))}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-fit"
-              onClick={() => change({ groups: [...effective.groups, { title: '', task: '' }] })}
-            >
-              {t('queue.form.addGroup')}
-            </Button>
+      <div className="grid gap-4 @3xl:grid-cols-2">
+        <fieldset disabled={locked} className="flex min-w-0 flex-col gap-3 border-0 p-0">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor={`${idPrefix}-title`}>{t('queue.form.name')}</Label>
+            <Input
+              id={`${idPrefix}-title`}
+              value={effective.title}
+              maxLength={TITLE_LIMIT}
+              placeholder={t('queue.form.namePlaceholder')}
+              onChange={(event) => change({ title: event.target.value })}
+            />
           </div>
-        )}
-      </fieldset>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor={`${idPrefix}-after`}>{t('queue.form.after')}</Label>
-          <ValuesPicker
-            id={`${idPrefix}-after`}
-            label={t('queue.form.after')}
-            values={effective.after}
-            onChange={(after) => change({ after, afterTouched: true })}
-            options={afterPick}
-            display={(id) => afterTitle.get(id) || id}
-            headings={{
-              builtin: t('queue.form.afterCurrent'),
-              project: t('queue.form.afterItems'),
-              global: t('queue.form.afterRuns'),
-            }}
-            creatable={false}
-            contentClassName="min-w-80"
-          />
-        </div>
-        <fieldset disabled={locked} className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor={`${idPrefix}-tags`}>{t('queue.form.tags')}</Label>
-          <TagPicker
-            id={`${idPrefix}-tags`}
-            label={t('queue.form.tags')}
-            selected={effective.tags}
-            onChange={(tags) => change({ tags })}
-            api={api}
-            allowCreate={api !== undefined}
-          />
-        </fieldset>
-      </div>
-      <fieldset disabled={locked} className="contents">
-        <div className="flex flex-wrap items-center gap-2">
-          <Switch
-            id={`${idPrefix}-auto-deliver`}
-            checked={effective.autoDeliver ?? autoDeliverDefault ?? true}
-            onCheckedChange={(autoDeliver) => change({ autoDeliver })}
-          />
-          <Label htmlFor={`${idPrefix}-auto-deliver`}>{t('queue.form.autoDeliver')}</Label>
-          <span className="text-xs text-muted-foreground">
-            {effective.autoDeliver === null
-              ? t('queue.form.autoDeliverBySetting')
-              : t('queue.form.autoDeliverForTask')}
-          </span>
-          {effective.autoDeliver !== null ? (
-            <Button variant="ghost" size="sm" onClick={() => change({ autoDeliver: null })}>
-              {t('queue.form.autoDeliverReset')}
-            </Button>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor={`${idPrefix}-delivery-mode`}>{t('queue.form.deliveryMode')}</Label>
-          <Select
-            value={effective.deliveryMode ?? deliveryModeDefault ?? 'worktree'}
-            onValueChange={(deliveryMode) => change({ deliveryMode: deliveryMode as DeliveryMode })}
-          >
-            <SelectTrigger id={`${idPrefix}-delivery-mode`} className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DELIVERY_MODES.map((mode) => (
-                <SelectItem key={mode} value={mode}>
-                  {t(`deliveryMode.${mode}`)}
-                </SelectItem>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={`${idPrefix}-workflow`}>Workflow</Label>
+            <Select
+              value={effective.workflow === '' ? undefined : effective.workflow}
+              onValueChange={(workflow) =>
+                change({
+                  workflow,
+                  skip: pruneSkip(
+                    effective.skip,
+                    stepsOf(workflows?.workflows.find((candidate) => candidate.id === workflow)),
+                  ),
+                })
+              }
+              disabled={options.length === 0}
+            >
+              <SelectTrigger id={`${idPrefix}-workflow`} className="w-48">
+                <SelectValue placeholder={t('queue.form.noWorkflow')} />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    {id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ToggleGroup
+              type="single"
+              aria-label={t('queue.form.kind')}
+              value={effective.mode}
+              onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
+            >
+              <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
+              <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          {effective.mode === 'task' ? (
+            <Textarea
+              id={`${idPrefix}-task`}
+              aria-label={t('queue.form.taskText')}
+              rows={9}
+              value={effective.task}
+              placeholder={t('queue.form.taskPlaceholder')}
+              onChange={(event) => change({ task: event.target.value })}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {effective.groups.map((group, index) => (
+                <fieldset key={index} className="flex flex-col gap-2 rounded-md border p-2">
+                  <legend className="px-1 text-xs text-muted-foreground">
+                    {t('queue.form.group', { n: index + 1 })}
+                  </legend>
+                  <Input
+                    id={`${idPrefix}-group-${index}-title`}
+                    aria-label={t('queue.form.groupTitle', { n: index + 1 })}
+                    value={group.title}
+                    placeholder={t('queue.form.titlePlaceholder')}
+                    onChange={(event) => setGroup(index, { title: event.target.value })}
+                  />
+                  <Textarea
+                    aria-label={t('queue.form.groupText', { n: index + 1 })}
+                    rows={2}
+                    value={group.task}
+                    placeholder={t('queue.form.groupTaskPlaceholder')}
+                    onChange={(event) => setGroup(index, { task: event.target.value })}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-fit"
+                    disabled={effective.groups.length <= 1}
+                    onClick={() =>
+                      change({ groups: effective.groups.filter((_, at) => at !== index) })
+                    }
+                  >
+                    {t('queue.form.removeGroup', { n: index + 1 })}
+                  </Button>
+                </fieldset>
               ))}
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {effective.deliveryMode === null
-              ? t('queue.form.deliveryModeBySetting')
-              : t('queue.form.deliveryModeForTask')}
-          </span>
-          {effective.deliveryMode !== null ? (
-            <Button variant="ghost" size="sm" onClick={() => change({ deliveryMode: null })}>
-              {t('queue.form.deliveryModeReset')}
-            </Button>
-          ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                onClick={() => change({ groups: [...effective.groups, { title: '', task: '' }] })}
+              >
+                {t('queue.form.addGroup')}
+              </Button>
+            </div>
+          )}
+        </fieldset>
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor={`${idPrefix}-after`}>{t('queue.form.after')}</Label>
+            <ValuesPicker
+              id={`${idPrefix}-after`}
+              label={t('queue.form.after')}
+              values={effective.after}
+              onChange={(after) => change({ after, afterTouched: true })}
+              options={afterPick}
+              display={(id) => afterTitle.get(id) || id}
+              headings={{
+                builtin: t('queue.form.afterCurrent'),
+                project: t('queue.form.afterItems'),
+                global: t('queue.form.afterRuns'),
+              }}
+              creatable={false}
+              contentClassName="min-w-80"
+            />
+          </div>
+          <fieldset disabled={locked} className="flex min-w-0 flex-col gap-1.5 border-0 p-0">
+            <Label htmlFor={`${idPrefix}-tags`}>{t('queue.form.tags')}</Label>
+            <TagPicker
+              id={`${idPrefix}-tags`}
+              label={t('queue.form.tags')}
+              selected={effective.tags}
+              onChange={(tags) => change({ tags })}
+              api={api}
+              allowCreate={api !== undefined}
+            />
+          </fieldset>
+          <fieldset disabled={locked} className="contents">
+            <div className="flex flex-wrap items-center gap-2">
+              <Switch
+                id={`${idPrefix}-auto-deliver`}
+                checked={effective.autoDeliver ?? autoDeliverDefault ?? true}
+                onCheckedChange={(autoDeliver) => change({ autoDeliver })}
+              />
+              <Label htmlFor={`${idPrefix}-auto-deliver`}>{t('queue.form.autoDeliver')}</Label>
+              <span className="text-xs text-muted-foreground">
+                {effective.autoDeliver === null
+                  ? t('queue.form.autoDeliverBySetting')
+                  : t('queue.form.autoDeliverForTask')}
+              </span>
+              {effective.autoDeliver !== null ? (
+                <Button variant="ghost" size="sm" onClick={() => change({ autoDeliver: null })}>
+                  {t('queue.form.autoDeliverReset')}
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor={`${idPrefix}-delivery-mode`}>{t('queue.form.deliveryMode')}</Label>
+              <Select
+                value={effective.deliveryMode ?? deliveryModeDefault ?? 'worktree'}
+                onValueChange={(deliveryMode) =>
+                  change({ deliveryMode: deliveryMode as DeliveryMode })
+                }
+              >
+                <SelectTrigger id={`${idPrefix}-delivery-mode`} className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DELIVERY_MODES.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {t(`deliveryMode.${mode}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {effective.deliveryMode === null
+                  ? t('queue.form.deliveryModeBySetting')
+                  : t('queue.form.deliveryModeForTask')}
+              </span>
+              {effective.deliveryMode !== null ? (
+                <Button variant="ghost" size="sm" onClick={() => change({ deliveryMode: null })}>
+                  {t('queue.form.deliveryModeReset')}
+                </Button>
+              ) : null}
+            </div>
+            <SkipSteps
+              idPrefix={idPrefix}
+              steps={stepsOf(
+                workflows?.workflows.find((candidate) => candidate.id === effective.workflow),
+              )}
+              skip={effective.skip}
+              onChange={(skip) => change({ skip })}
+            />
+          </fieldset>
         </div>
-      </fieldset>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={!valid || busy}>
           {submitLabel}

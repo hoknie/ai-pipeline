@@ -348,6 +348,11 @@ export function QueueList({
                     {t('queue.list.deliveryMode', { mode: t(`deliveryMode.${item.deliveryMode}`) })}
                   </span>
                 )}
+                {item.skip && item.skip.length > 0 ? (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                    {t('queue.list.skips', { steps: item.skip.join(', ') })}
+                  </span>
+                ) : null}
                 {item.title && item.groups ? (
                   <span className="text-muted-foreground">{groupsText(item.groups.length, t)}</span>
                 ) : null}
@@ -439,6 +444,7 @@ export function QueueList({
                               autoDeliver: fields.autoDeliver ?? null,
                               deliveryMode: fields.deliveryMode ?? null,
                               tags: fields.tags ?? [],
+                              skip: fields.skip ?? [],
                               ...(fields.after !== undefined ? { after: fields.after } : {}),
                             },
                       );

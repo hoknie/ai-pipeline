@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -58,11 +59,13 @@ export function QueueSettings({
   queue,
   onQueue,
   onError,
+  onNewTask,
 }: {
   api: Api;
   queue: QueueView;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
+  onNewTask: () => void;
 }) {
   const { t } = useTranslation();
   const [parallel, setParallel] = useState<string | null>(null);
@@ -160,33 +163,42 @@ export function QueueSettings({
       aria-label={t('queue.settings.label')}
       className="flex flex-col gap-3 rounded-xl border bg-card p-3"
     >
-      <h3 className="font-semibold">{t('queue.settings.title')}</h3>
-      <div>
-        <StatusBadge
-          status={queue.status === 'running' ? 'running' : 'stopped'}
-          label={queueStateLabel(queue.status, t)}
-        />
+      <div role="group" aria-labelledby="queue-controls-title" className="flex flex-col gap-2">
+        <h3 id="queue-controls-title" className="font-semibold">
+          {t('queue.controls.title')}
+        </h3>
+        <div>
+          <StatusBadge
+            status={queue.status === 'running' ? 'running' : 'stopped'}
+            label={queueStateLabel(queue.status, t)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onNewTask}>
+            <Plus className="size-4" aria-hidden="true" />
+            {t('queue.newTask')}
+          </Button>
+          <Button
+            disabled={!canStart || parsed === null}
+            onClick={() =>
+              void act(
+                () => api.queueStart(parsed !== queue.parallel ? (parsed ?? undefined) : undefined),
+                t('queue.started'),
+              )
+            }
+          >
+            {t('queue.start')}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!busy}
+            onClick={() => void act(() => api.queuePause(), t('queue.paused'))}
+          >
+            {t('queue.pause')}
+          </Button>
+        </div>
       </div>
-      <span className="flex gap-2">
-        <Button
-          disabled={!canStart || parsed === null}
-          onClick={() =>
-            void act(
-              () => api.queueStart(parsed !== queue.parallel ? (parsed ?? undefined) : undefined),
-              t('queue.started'),
-            )
-          }
-        >
-          {t('queue.start')}
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!busy}
-          onClick={() => void act(() => api.queuePause(), t('queue.paused'))}
-        >
-          {t('queue.pause')}
-        </Button>
-      </span>
+      <h3 className="font-semibold">{t('queue.settings.section')}</h3>
       <div className="flex flex-wrap items-center gap-2">
         <ParallelStepper
           api={api}

@@ -321,8 +321,11 @@ export const ru: Dictionary = {
     branch: 'Ветка',
   },
   queue: {
+    controls: {
+      title: 'Управление',
+    },
     settings: {
-      title: 'Настройки очереди',
+      section: 'Настройки',
       label: 'настройки очереди',
       autopilot: 'Автопилот',
       autopilotHint:
@@ -381,7 +384,6 @@ export const ru: Dictionary = {
     running: 'Выполняются из очереди',
     runningLabel: 'выполняются из очереди',
     newTask: 'Новая задача',
-    newTaskLabel: 'новая задача',
     add: 'Добавить',
     waiting: 'Ждут запуска',
     waitingLabel: 'ждут запуска',
@@ -416,6 +418,8 @@ export const ru: Dictionary = {
       autoDeliverBySetting: 'по настройке',
       autoDeliverForTask: 'для этой задачи',
       autoDeliverReset: 'как в настройке',
+      skip: 'Пропустить этапы',
+      skipNoSteps: 'У workflow нет этапов',
       deliveryMode: 'Способ доставки',
       deliveryModeBySetting: 'способ по настройке',
       deliveryModeForTask: 'способ для этой задачи',
@@ -448,6 +452,7 @@ export const ru: Dictionary = {
       unmetText: 'Задача ещё ждёт: {{items}}. Всё равно запустить?',
       removeDependents: 'От неё зависят: {{items}}. Зависимость с них снимется.',
       autoDelivery: 'автодоставка',
+      skips: 'без этапов: {{steps}}',
       manualDelivery: 'без автодоставки',
       deliveryMode: 'доставка: {{mode}}',
       groups_one: '{{count}} группа',

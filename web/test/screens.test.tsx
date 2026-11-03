@@ -231,7 +231,11 @@ describe('run header', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'Enter' });
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Deliver with --force…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Deliver with --force?' });
-    expect(await within(dialog).findByText('a.ts')).toBeTruthy();
+    const file = await within(dialog).findByText('a.ts');
+    expect(file.tagName).toBe('CODE');
+    expect(file.className).toContain('bg-muted');
+    expect(file.className).toContain('break-all');
+    expect(file.getAttribute('title')).toBe('a.ts');
     expect(within(dialog).getByText('Вход')).toBeTruthy();
   });
 });

@@ -100,7 +100,12 @@ describe('tag chips', () => {
 });
 
 describe('tag picker in the task form', () => {
+  const openForm = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'New task' }));
+    await screen.findByRole('dialog', { name: 'New task' });
+  };
   const openPicker = async () => {
+    await openForm();
     fireEvent.click(await screen.findByRole('combobox', { name: 'Tags' }));
     return screen.findByRole('combobox', { name: 'Search in Tags' });
   };
@@ -123,6 +128,7 @@ describe('tag picker in the task form', () => {
 
   it('sizes the field by its content instead of stretching it', async () => {
     boot('#queue', [tagView('auth')], [runView()], queueApi());
+    await openForm();
     const field = (await screen.findByRole('combobox', { name: 'Tags' })).parentElement!;
     expect(field.classList.contains('w-fit')).toBe(true);
     expect(field.classList.contains('max-w-full')).toBe(true);

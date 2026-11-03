@@ -631,7 +631,13 @@ describe('attempts and transcript', () => {
     fireEvent.click(head);
     expect(head.getAttribute('aria-expanded')).toBe('true');
     const block = head.parentElement!;
-    expect([...block.querySelectorAll('li code')].map((item) => item.textContent)).toEqual(list);
+    const chips = [...block.querySelectorAll('li code')];
+    expect(chips.map((item) => item.textContent)).toEqual(list);
+    chips.forEach((chip, index) => {
+      expect(chip.className).toContain('bg-muted');
+      expect(chip.className).toContain('break-all');
+      expect(chip.getAttribute('title')).toBe(list[index]);
+    });
     expect(screen.getByText(/may have changed them/)).toBeTruthy();
     expect(screen.getByText('in working copy: 10')).toBeTruthy();
   });

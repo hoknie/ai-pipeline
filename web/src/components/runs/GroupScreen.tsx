@@ -21,6 +21,7 @@ import { StatusBadge } from '../StatusBadge.tsx';
 import { AttemptTimeline } from './AttemptTimeline.tsx';
 import { FileTree } from './FileTree.tsx';
 import { QuestionCard } from './QuestionCard.tsx';
+import { FilePath } from '../FilePath.tsx';
 import { ApplyDialog } from './ApplyDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
 
@@ -318,7 +319,7 @@ export function GroupScreen({
                   <code>{pattern}</code>
                 </span>
               ))}
-              {t('runs.group.hintsAfter')} <code>aip/specialists/</code>.
+              {t('runs.group.hintsAfter')} <FilePath path="aip/specialists/" />.
             </p>
           </Alert>
         </section>

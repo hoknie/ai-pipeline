@@ -170,7 +170,9 @@ describe('specialists list', () => {
     render(<Page api={fakeApi({ config: vi.fn(async () => twoLevels()) })} start="_settings" />);
     const max = await screen.findByTestId('setting-max');
     expect(within(max).getByText('5')).toBeTruthy();
-    expect(within(max).getByText('/xdg/aip/settings.yaml')).toBeTruthy();
+    const file = within(max).getByText('/xdg/aip/settings.yaml');
+    expect(file.className).toContain('bg-muted');
+    expect(file.getAttribute('title')).toBe('/xdg/aip/settings.yaml');
     expect(screen.getByTestId('setting-defaults.timeout').textContent).toContain('default');
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
@@ -776,6 +778,24 @@ describe('form layout', () => {
     expect(chip?.className).toContain('bg-muted');
   });
 
+  it('puts the file path on its own line under the heading, before the buttons', async () => {
+    render(<Page api={fakeApi()} start="coder" />);
+    const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
+    const heading = within(header).getByRole('heading', { name: 'coder' });
+    const chip = header.querySelector('code')!;
+    expect(heading.parentElement!.contains(chip)).toBe(false);
+    expect(heading.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const save = within(header).getByRole('button', { name: 'Save' });
+    expect(chip.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chip.className).toContain('truncate');
+  });
+
+  it('shows no file path for a new specialist', async () => {
+    render(<Page api={fakeApi()} start="new" />);
+    const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
+    expect(header.querySelector('code')).toBeNull();
+  });
+
   it('renders no level toggle for a specialist with a single level', async () => {
     render(<Page api={fakeApi()} start="coder" />);
     const header = await screen.findByRole('toolbar', { name: 'specialist actions' });
@@ -784,7 +804,7 @@ describe('form layout', () => {
     const heading = within(header).getByRole('heading', { name: 'coder' });
     const save = within(header).getByRole('button', { name: 'Save' });
     expect(heading.parentElement?.contains(save)).toBe(false);
-    expect(save.parentElement?.previousElementSibling).toBe(heading.parentElement);
+    expect(save.parentElement?.previousElementSibling).toBe(header.querySelector('code'));
   });
 });
 

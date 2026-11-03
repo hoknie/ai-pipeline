@@ -316,8 +316,11 @@ export const en = {
     branch: 'Branch',
   },
   queue: {
+    controls: {
+      title: 'Controls',
+    },
     settings: {
-      title: 'Queue settings',
+      section: 'Settings',
       label: 'queue settings',
       autopilot: 'Autopilot',
       autopilotHint:
@@ -372,7 +375,6 @@ export const en = {
     running: 'Running from the queue',
     runningLabel: 'running from the queue',
     newTask: 'New task',
-    newTaskLabel: 'new task',
     add: 'Add',
     waiting: 'Waiting to start',
     waitingLabel: 'waiting to start',
@@ -407,6 +409,8 @@ export const en = {
       autoDeliverBySetting: 'as in the settings',
       autoDeliverForTask: 'for this task',
       autoDeliverReset: 'as in the settings',
+      skip: 'Skip steps',
+      skipNoSteps: 'The workflow has no steps',
       deliveryMode: 'Delivery mode',
       deliveryModeBySetting: 'mode as in the settings',
       deliveryModeForTask: 'mode for this task',
@@ -439,6 +443,7 @@ export const en = {
       unmetText: 'The task still waits for: {{items}}. Run it anyway?',
       removeDependents: 'These tasks wait for it: {{items}}. They will stop waiting for it.',
       autoDelivery: 'auto delivery',
+      skips: 'skips: {{steps}}',
       manualDelivery: 'manual delivery',
       deliveryMode: 'delivery: {{mode}}',
       groups_one: '{{count}} group',

@@ -325,8 +325,11 @@ export const es: Dictionary = {
     branch: 'Rama',
   },
   queue: {
+    controls: {
+      title: 'Control',
+    },
     settings: {
-      title: 'Ajustes de la cola',
+      section: 'Ajustes',
       label: 'ajustes de la cola',
       autopilot: 'Piloto automático',
       autopilotHint:
@@ -383,7 +386,6 @@ export const es: Dictionary = {
     running: 'En curso desde la cola',
     runningLabel: 'en curso desde la cola',
     newTask: 'Nueva tarea',
-    newTaskLabel: 'nueva tarea',
     add: 'Añadir',
     waiting: 'Esperan inicio',
     waitingLabel: 'esperan inicio',
@@ -418,6 +420,8 @@ export const es: Dictionary = {
       autoDeliverBySetting: 'según la configuración',
       autoDeliverForTask: 'para esta tarea',
       autoDeliverReset: 'como en la configuración',
+      skip: 'Omitir etapas',
+      skipNoSteps: 'El workflow no tiene etapas',
       deliveryMode: 'Modo de entrega',
       deliveryModeBySetting: 'modo según la configuración',
       deliveryModeForTask: 'modo para esta tarea',
@@ -450,6 +454,7 @@ export const es: Dictionary = {
       unmetText: 'La tarea aún espera a: {{items}}. ¿Ejecutarla de todos modos?',
       removeDependents: 'Estas tareas dependen de ella: {{items}}. Dejarán de esperarla.',
       autoDelivery: 'entrega automática',
+      skips: 'sin etapas: {{steps}}',
       manualDelivery: 'entrega manual',
       deliveryMode: 'entrega: {{mode}}',
       groups_one: '{{count}} grupo',

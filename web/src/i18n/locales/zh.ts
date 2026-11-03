@@ -315,8 +315,11 @@ export const zh: Dictionary = {
     branch: '分支',
   },
   queue: {
+    controls: {
+      title: '控制',
+    },
     settings: {
-      title: '队列设置',
+      section: '设置',
       label: '队列设置',
       autopilot: '自动驾驶',
       autopilotHint: '运行中的队列清空后不会停止，会立即接收新添加的任务。暂停的队列保持暂停。',
@@ -369,7 +372,6 @@ export const zh: Dictionary = {
     running: '正在从队列运行',
     runningLabel: '正在从队列运行',
     newTask: '新任务',
-    newTaskLabel: '新任务',
     add: '添加',
     waiting: '等待启动',
     waitingLabel: '等待启动',
@@ -404,6 +406,8 @@ export const zh: Dictionary = {
       autoDeliverBySetting: '按设置',
       autoDeliverForTask: '仅此任务',
       autoDeliverReset: '恢复为设置值',
+      skip: '跳过步骤',
+      skipNoSteps: '该 workflow 没有步骤',
       deliveryMode: '交付方式',
       deliveryModeBySetting: '方式按设置',
       deliveryModeForTask: '方式仅此任务',
@@ -436,6 +440,7 @@ export const zh: Dictionary = {
       unmetText: '该任务仍在等待：{{items}}。仍要运行吗？',
       removeDependents: '以下任务依赖它：{{items}}。它们将不再等待它。',
       autoDelivery: '自动交付',
+      skips: '跳过：{{steps}}',
       manualDelivery: '手动交付',
       deliveryMode: '交付：{{mode}}',
       groups_one: '{{count}} 个分组',

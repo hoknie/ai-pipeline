@@ -24,6 +24,7 @@ import type {
   WriteLevel,
 } from '../types.ts';
 
+import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
 import { stepIds } from './stepIds.ts';
 import { WorkflowGraph } from './WorkflowGraph.tsx';
 
@@ -440,13 +441,9 @@ export function WorkflowForm({
       className="flex flex-col gap-3"
       aria-label={t('workflows.section', { id: id || t('workflows.newName') })}
     >
-      <div className="flex items-baseline gap-3">
+      <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">{workflow ? workflow.id : t('workflows.new')}</h2>
-        {workflow ? (
-          <span className="text-sm text-muted-foreground">
-            <code>{source?.file ?? workflow.file}</code>
-          </span>
-        ) : null}
+        {workflow ? <FilePath variant="line" path={source?.file ?? workflow.file} /> : null}
       </div>
       {notice ? <Alert role="status">{notice}</Alert> : null}
       {problem ? <Alert variant="destructive">{problem}</Alert> : null}
@@ -494,7 +491,7 @@ export function WorkflowForm({
           <Trans
             i18nKey="settings.editor.projectOverrides"
             values={{ file: sources.global.file }}
-            components={{ code: <code /> }}
+            components={{ code: <code className={FILE_PATH_CLASS} title={sources.global.file} /> }}
           />
         </p>
       ) : null}

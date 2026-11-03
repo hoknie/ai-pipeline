@@ -5,6 +5,7 @@ import { cn } from '../lib/cn.ts';
 import { Alert } from '../ui/alert.tsx';
 import { Badge } from '../ui/badge.tsx';
 
+import { FilePath } from './FilePath.tsx';
 import type { FieldError } from '../types.ts';
 
 export interface Entry {
@@ -80,7 +81,7 @@ export function ConfigErrors({ errors }: { errors: FieldError[] }) {
             <li key={`${error.file ?? ''}:${error.path}:${error.message}`}>
               {error.file ? (
                 <>
-                  <code>{error.file}</code>:{' '}
+                  <FilePath path={error.file} />:{' '}
                 </>
               ) : null}
               <code>{error.path}</code>: {error.message}

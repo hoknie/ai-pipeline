@@ -249,7 +249,10 @@ describe('topology page', () => {
     );
     const errors = await screen.findByRole('region', { name: 'configuration errors' });
     expect(within(errors).getByText('swarm.max')).toBeTruthy();
-    expect(within(errors).getByText('/repo/aip/settings.yaml')).toBeTruthy();
+    const file = within(errors).getByText('/repo/aip/settings.yaml');
+    expect(file.tagName).toBe('CODE');
+    expect(file.className).toContain('bg-muted');
+    expect(file.getAttribute('title')).toBe('/repo/aip/settings.yaml');
   });
 });
 

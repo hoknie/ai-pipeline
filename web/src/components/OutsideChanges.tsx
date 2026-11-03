@@ -1,6 +1,7 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { FilePath } from './FilePath.tsx';
 import type { AttemptView } from '../types.ts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.tsx';
 
@@ -30,7 +31,7 @@ export function OutsideChanges({ attempt }: { attempt: AttemptView }) {
         <ul className="px-8 pb-2">
           {list.map((file) => (
             <li key={file}>
-              <code className="font-mono text-xs">{file}</code>
+              <FilePath path={file} />
             </li>
           ))}
         </ul>

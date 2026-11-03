@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FilePath } from '../FilePath.tsx';
 import type { Api } from '../../api.ts';
 import type { GroupView, RunView } from '../../types.ts';
 import { Button } from '../../ui/button.tsx';
@@ -53,7 +54,7 @@ export function ApplyDialog({
             <ul className="mt-1 list-disc pl-5">
               {group.delivery.files.map((file) => (
                 <li key={file}>
-                  <code className="font-mono text-xs">{file}</code>
+                  <FilePath path={file} />
                 </li>
               ))}
             </ul>

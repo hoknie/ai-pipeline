@@ -86,14 +86,14 @@ A specialist can ask structured questions (`questions` in `swarm_report`). They 
 
 The queue settings are in [queue.md](queue.md).
 
-- The "Queue settings" block holds the state, "Start" and "Pause", the parallelism, the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector and the autopilot's answer text.
+- The "Queue settings" block has two sections. "Controls" holds the state and the buttons "New task", "Start" and "Pause". "Settings" holds the parallelism, the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector and the autopilot's answer text.
   - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`.
   - The file is shown under the control. The general settings screen does not change a value set in the project file.
 - The "On a usage limit" selector chooses `wait` or `stop`. A queue stopped by a usage limit shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
 - "Return to the queue" is on every skipped run and in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
 - The "In work" switch of a row postpones the task or puts it back.
 - A running run's card shows its duration, tokens and cost.
-- Below are the running runs, the waiting tasks and the new task form (workflow, task or groups, title).
+- "New task" opens a dialog with two halves: the task (title, workflow, text or groups) on the left and the settings (predecessors, tags, delivery, "Skip steps") on the right. "Skip steps" is a row of segments: a pressed segment is a skipped step, and the last unpressed one stays disabled. Below the controls are the running runs and the waiting tasks.
 - Runs the queue skipped because of a problem are in the "Skipped with a problem" block. They do not count as taken places.
 - Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. Every waiting task has "Edit", "Delete" and "Run now".
 - The "Waits for" field of the task form chooses the predecessors. A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).

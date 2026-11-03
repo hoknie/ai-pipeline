@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../ui/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
+import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
 import { ValuesPicker } from './ValuesPicker.tsx';
 import type {
   CatalogEntry,
@@ -470,15 +471,8 @@ export function SpecialistForm({
           <Badge variant="outline">
             {t(`settings.editor.levels.${specialist ? specialist.level : level}`)}
           </Badge>
-          {specialist ? (
-            <code
-              title={source?.file ?? specialist.file}
-              className="block min-w-0 truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground"
-            >
-              {source?.file ?? specialist.file}
-            </code>
-          ) : null}
         </div>
+        {specialist ? <FilePath variant="line" path={source?.file ?? specialist.file} /> : null}
         {levelToggle ? <div className="flex">{levelToggle}</div> : null}
         <div className="flex flex-wrap gap-2">
           <Button disabled={busy || (!specialist && !slug)} onClick={() => void save()}>
@@ -571,7 +565,7 @@ export function SpecialistForm({
           <Trans
             i18nKey="settings.editor.projectOverrides"
             values={{ file: sources.global.file }}
-            components={{ code: <code /> }}
+            components={{ code: <code className={FILE_PATH_CLASS} title={sources.global.file} /> }}
           />
         </p>
       ) : null}

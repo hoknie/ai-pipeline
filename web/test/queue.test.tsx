@@ -8,6 +8,8 @@ import { ApiError } from '../src/api.ts';
 import { dropPosition, dropSlot, moveId } from '../src/components/queueOrder.ts';
 import { afterOptions, dependents, depth, related, unmet } from '../src/components/queueLinks.ts';
 import { parseParallel } from '../src/components/QueuePage.tsx';
+import { draftOf, emptyDraft, fieldsOf } from '../src/components/QueueForm.tsx';
+import { pruneSkip } from '../src/components/SkipSteps.tsx';
 import { formatRoute, parseRoute } from '../src/route.ts';
 import { useRuns } from '../src/store.ts';
 
@@ -23,6 +25,7 @@ import {
   runView,
   configView,
   settingsOf,
+  workflowOf,
   workflowsView,
 } from './fixtures.ts';
 
@@ -43,6 +46,11 @@ function show(queue = queueOf({ items: items('A', 'B', 'C') }), overrides = {}) 
   const api = fakeApi({ queue: vi.fn(async () => queue), ...overrides });
   render(<App api={api} openStream={openFake} />);
   return api;
+}
+
+async function openNewTask(): Promise<HTMLElement> {
+  fireEvent.click(await screen.findByRole('button', { name: 'New task' }));
+  return screen.findByRole('dialog', { name: 'New task' });
 }
 
 function labels(): string[] {
@@ -466,6 +474,7 @@ describe('new task form', () => {
     const api = show(queueOf(), {
       queueAdd: vi.fn(async () => ({ ...queueOf({ items: items('Сделать вход') }), item: 'q1' })),
     });
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
     await waitFor(() =>
@@ -479,12 +488,14 @@ describe('new task form', () => {
       expect(api.queueAdd).toHaveBeenCalledWith({ workflow: 'feature', task: 'Сделать вход' }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
+    await openNewTask();
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
     expect(api.queueStart).not.toHaveBeenCalled();
   });
 
   it('adds a task made of two groups', async () => {
     const api = show(queueOf());
+    await openNewTask();
     await screen.findByLabelText('Task text');
     fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
@@ -512,6 +523,7 @@ describe('new task form', () => {
 
   it('removes a group but keeps at least one', async () => {
     show(queueOf());
+    await openNewTask();
     await screen.findByLabelText('Task text');
     fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
@@ -528,6 +540,7 @@ describe('new task form', () => {
         throw new ApiError(400, 'unknown workflow `feature`; known: none');
       }),
     });
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
@@ -541,6 +554,7 @@ describe('new task form', () => {
 
   it('keeps the typed text when a queue or run event arrives and when the tab changes', async () => {
     show(queueOf({ items: items('A') }));
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
@@ -551,10 +565,13 @@ describe('new task form', () => {
       stream().send({ event: 'queue', seq: 5, queue: queueOf({ items: items('A', 'Z') }) });
       stream().send({ event: 'run', seq: 6, run: runView() });
     });
-    await waitFor(() => expect(labels()).toEqual(['1. A', '2. Z']));
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('черновик');
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(labels()).toEqual(['1. A', '2. Z']));
     fireEvent.click(screen.getByRole('link', { name: /Runs/ }));
     fireEvent.click(await screen.findByRole('link', { name: /Queue/ }));
+    await openNewTask();
     expect(((await screen.findByLabelText('Task text')) as HTMLTextAreaElement).value).toBe(
       'черновик',
     );
@@ -562,6 +579,7 @@ describe('new task form', () => {
 
   it('keeps the typed text when the language changes and shows the labels in the new one', async () => {
     show(queueOf({ items: items('A') }));
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     fireEvent.change(text, { target: { value: 'черновик' } });
     act(() => {
@@ -582,6 +600,7 @@ describe('automatic delivery switch', () => {
         item: 'q1',
       })),
     });
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     const toggle = screen.getByRole('switch', { name: 'Auto delivery' });
     expect(toggle.getAttribute('aria-checked')).toBe('true');
@@ -605,6 +624,7 @@ describe('automatic delivery switch', () => {
 
   it('shows the setting of the repository as the state of an untouched switch', async () => {
     show(queueOf({ autoDeliver: false }));
+    await openNewTask();
     const toggle = await screen.findByRole('switch', { name: 'Auto delivery' });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
@@ -613,8 +633,7 @@ describe('automatic delivery switch', () => {
     const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { autoDeliver: true })] }));
     await screen.findByText('auto delivery');
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    const toggles = await screen.findAllByRole('switch', { name: 'Auto delivery' });
-    expect(toggles).toHaveLength(2);
+    expect(await screen.findAllByRole('switch', { name: 'Auto delivery' })).toHaveLength(1);
     const resets = screen.getAllByRole('button', { name: 'as in the settings' });
     fireEvent.click(resets[0]!);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -626,6 +645,7 @@ describe('automatic delivery switch', () => {
         autoDeliver: null,
         deliveryMode: null,
         tags: [],
+        skip: [],
       }),
     );
   });
@@ -655,6 +675,7 @@ describe('items', () => {
         autoDeliver: null,
         deliveryMode: null,
         tags: [],
+        skip: [],
       }),
     );
   });
@@ -1003,6 +1024,7 @@ describe('workflows', () => {
         }),
       ),
     });
+    await openNewTask();
     const trigger = await screen.findByRole('combobox', { name: 'Workflow' });
     fireEvent.keyDown(trigger, { key: 'Enter' });
     await screen.findByRole('option', { name: 'fix' });
@@ -1032,16 +1054,15 @@ describe('tags in the queue', () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
   };
 
-  it('puts the label above the field in a column of the shared grid', async () => {
+  it('puts the label above the tags field in the settings half next to "Waits for"', async () => {
     withTags(queueOf());
+    await openNewTask();
     const tags = await screen.findByRole('combobox', { name: 'Tags' });
     const after = screen.getByRole('combobox', { name: 'Waits for' });
-    const column =
-      tags.closest('label')?.parentElement ??
-      screen.getByText('Tags', { selector: 'label' }).parentElement!;
-    const grid = column.parentElement!;
-    expect(grid.contains(after)).toBe(true);
-    expect(grid.className).toContain('grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]');
+    const column = screen.getByText('Tags', { selector: 'label' }).parentElement!;
+    const half = column.parentElement!;
+    expect(half.contains(after)).toBe(true);
+    expect(half.className).not.toContain('order-');
     expect(column.className).toContain('flex-col');
     expect(column.className).not.toContain('max-w-xl');
     const label = screen.getByText('Tags', { selector: 'label' });
@@ -1051,6 +1072,7 @@ describe('tags in the queue', () => {
 
   it('adds a task with two tags', async () => {
     const api = withTags(queueOf());
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
@@ -1080,6 +1102,7 @@ describe('tags in the queue', () => {
 
   it('keeps the chosen tags of a draft over queue events', async () => {
     withTags(queueOf());
+    await openNewTask();
     await screen.findByLabelText('Task text');
     await pick('auth');
     act(() => stream().send({ event: 'queue', seq: 5, queue: queueOf() }));
@@ -1213,6 +1236,7 @@ describe('queue links', () => {
 describe('task form layout', () => {
   it('has the name as the first field, before the workflow', async () => {
     show(queueOf());
+    await openNewTask();
     const name = await screen.findByLabelText('Name');
     const workflow = screen.getByRole('combobox', { name: 'Workflow' });
     expect(name.compareDocumentPosition(workflow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1222,7 +1246,7 @@ describe('task form layout', () => {
   it('shows a long task title whole in the list and in the chip', async () => {
     const long = 'Очень длинное название задачи которое не помещается в строку'.slice(0, 60);
     show(queueOf({ items: [{ ...queueItem('q1', 'x', 1), title: long }] }));
-    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await openNewTask();
     fireEvent.click(screen.getByRole('combobox', { name: 'Waits for' }));
     const option = await screen.findByRole('option', { name: new RegExp(long) });
     expect(option.querySelector(`[title="${long}"]`)).toBeTruthy();
@@ -1236,7 +1260,7 @@ describe('task form layout', () => {
 describe('dependencies in the form', () => {
   it('adds a task after another', async () => {
     const api = show(queueOf({ items: [model()] }));
-    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await openNewTask();
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
     await pick(screen.getByRole('combobox', { name: 'Waits for' }), 'Модель');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -1279,7 +1303,7 @@ describe('dependencies in the form', () => {
 
   it('does not send after when nothing is chosen', async () => {
     const api = show(queueOf({ items: [model()] }));
-    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await openNewTask();
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
@@ -1294,7 +1318,7 @@ describe('dependencies in the form', () => {
     show(queueOf({ items: [model(), failed] }));
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
-    const picker = (await screen.findAllByRole('combobox', { name: 'Waits for' }))[1]!;
+    const picker = await screen.findByRole('combobox', { name: 'Waits for' });
     fireEvent.click(picker);
     await screen.findByRole('option', { name: /Модель/ });
     expect(screen.getByText('Current predecessors')).toBeTruthy();
@@ -1309,7 +1333,7 @@ describe('dependencies in the form', () => {
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
-    const picker = (await screen.findAllByRole('combobox', { name: 'Waits for' }))[1]!;
+    const picker = await screen.findByRole('combobox', { name: 'Waits for' });
     fireEvent.click(picker);
     await screen.findAllByRole('option');
     expect(screen.queryByText('Current predecessors')).toBeNull();
@@ -1335,8 +1359,8 @@ describe('dependencies in the form', () => {
     show(queueOf({ items: [model(), queueItem('q2', 'api', 2, { title: 'API' })] }));
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
-    const pickers = await screen.findAllByRole('combobox', { name: 'Waits for' });
-    await pick(pickers[1]!, 'Модель');
+    const picker = await screen.findByRole('combobox', { name: 'Waits for' });
+    await pick(picker, 'Модель');
     expect(screen.getAllByRole('button', { name: 'Remove Модель' })).toHaveLength(1);
     act(() => {
       stream().open();
@@ -1357,8 +1381,8 @@ describe('dependencies in the form', () => {
     });
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('Модель');
-    const pickers = await screen.findAllByRole('combobox', { name: 'Waits for' });
-    await pick(pickers[1]!, 'API');
+    const picker = await screen.findByRole('combobox', { name: 'Waits for' });
+    await pick(picker, 'API');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('dependency cycle: q1 -> q2 -> q1');
     expect(api.queueEdit).toHaveBeenCalled();
@@ -1556,6 +1580,7 @@ describe('queue layout', () => {
     show(running());
     const controls = await screen.findByRole('region', { name: 'queue settings' });
     expect(controls.parentElement?.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]');
+    expect(controls.parentElement?.previousElementSibling).toBeNull();
     expect(within(controls).getByRole('button', { name: 'Start' })).toBeTruthy();
     expect(within(controls).getByRole('button', { name: 'Pause' })).toBeTruthy();
     expect(within(controls).getByLabelText('Parallelism')).toBeTruthy();
@@ -1586,9 +1611,16 @@ describe('queue settings block', () => {
   it('shows the badge, start, pause, parallelism and three switches with hints', async () => {
     show(queueOf({ items: items('A') }));
     const block = await settingsBlock();
-    expect(block.getByText('Stopped')).toBeTruthy();
-    expect(block.getByRole('button', { name: 'Start' })).toBeTruthy();
-    expect(block.getByRole('button', { name: 'Pause' })).toBeTruthy();
+    expect(block.getByRole('heading', { name: 'Controls' })).toBeTruthy();
+    expect(block.getByRole('heading', { name: 'Settings' })).toBeTruthy();
+    const controls = within(block.getByRole('group', { name: 'Controls' }));
+    expect(controls.getByText('Stopped')).toBeTruthy();
+    expect(controls.getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'New task',
+      'Start',
+      'Pause',
+    ]);
+    expect(controls.queryByLabelText('Parallelism')).toBeNull();
     expect(block.getByLabelText('Parallelism')).toBeTruthy();
     for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default']) {
       expect(block.getByRole('switch', { name })).toBeTruthy();
@@ -1983,6 +2015,7 @@ describe('delivery mode of a task', () => {
     const api = show(queueOf({ deliveryMode: 'worktree' }), {
       queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
     });
+    await openNewTask();
     const text = await screen.findByLabelText('Task text');
     const select = screen
       .getAllByRole('combobox', { name: 'Delivery mode' })
@@ -2020,6 +2053,7 @@ describe('delivery mode of a task', () => {
         autoDeliver: null,
         deliveryMode: null,
         tags: [],
+        skip: [],
       }),
     );
   });
@@ -2117,5 +2151,229 @@ describe('system stages and waiting in the cards of the queue', () => {
   it('keeps the splitting text while there are no groups', async () => {
     card({ groups: { done: 0, total: 0 }, system: [{ kind: 'split', status: 'running' }] });
     expect(await screen.findByText('splitting the task')).toBeTruthy();
+  });
+});
+
+const stepOf = (id: string) => ({ ...workflowOf().steps[0]!, id });
+const skipGroup = () => screen.getByText('Skip steps', { selector: 'legend' }).parentElement!;
+const skipStep = (name: string) =>
+  within(skipGroup()).getByRole<HTMLButtonElement>('button', { name });
+const skipStepAsync = async (name: string) => {
+  await waitFor(() => skipStep(name));
+  return skipStep(name);
+};
+
+const fiveSteps = workflowsView({
+  workflows: [
+    workflowOf({ steps: ['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf) }),
+    workflowOf({ id: 'small', steps: ['code', 'review'].map(stepOf) }),
+  ],
+});
+
+describe('new task dialog', () => {
+  it('has one button inside the controls before Start and no form before it is opened', async () => {
+    show(queueOf());
+    const button = await screen.findByRole('button', { name: 'New task' });
+    expect(screen.getAllByRole('button', { name: 'New task' })).toHaveLength(1);
+    const controls = screen.getByRole('group', { name: 'Controls' });
+    expect(screen.getByRole('region', { name: 'queue settings' }).contains(controls)).toBe(true);
+    expect(controls.contains(button)).toBe(true);
+    expect(
+      button.compareDocumentPosition(within(controls).getByRole('button', { name: 'Start' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByLabelText('Task text')).toBeNull();
+  });
+
+  it('opens a large dialog with the focus in the task field', async () => {
+    show(queueOf());
+    const dialog = await openNewTask();
+    expect(dialog.className).toContain('md:max-h-[90vh]');
+    expect(dialog.className).not.toContain('md:h-[75vh]');
+    expect(dialog.className.split(' ')).not.toContain('h-[calc(100dvh-2rem)]');
+    expect(dialog.className).toContain('md:w-[75vw]');
+    expect(dialog.className).toContain('content-start');
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Task text')));
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').rows).toBe(9);
+    expect(screen.getByLabelText('Task text').id).toBe('new-task');
+  });
+
+  it('focuses the title of the first group in the groups mode', async () => {
+    show(queueOf());
+    await openNewTask();
+    fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await openNewTask();
+    await waitFor(() => expect(document.activeElement?.id).toBe('new-group-0-title'));
+  });
+
+  it('closes after the task is added and stays open on an error', async () => {
+    const queueAdd = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(400, 'unknown workflow `feature`; known: none'))
+      .mockResolvedValueOnce({ ...queueOf({ items: items('X') }), item: 'q1' });
+    show(queueOf(), { queueAdd });
+    await openNewTask();
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'X' } });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/unknown workflow/);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('keeps the draft after Esc and does not close on events', async () => {
+    show(queueOf());
+    await openNewTask();
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'черновик' } });
+    act(() => {
+      stream().open();
+      stream().send({ event: 'queue', seq: 5, queue: queueOf() });
+      stream().send({ event: 'run', seq: 6, run: runView() });
+    });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await openNewTask();
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('черновик');
+  });
+});
+
+describe('two halves of the task form', () => {
+  it('puts the task half first in the DOM and on a wide form', async () => {
+    show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    const dialog = await openNewTask();
+    await skipStepAsync('plan');
+    const order = [
+      screen.getByLabelText('Name'),
+      screen.getByRole('combobox', { name: 'Workflow' }),
+      screen.getByLabelText('Task text'),
+      screen.getByRole('combobox', { name: 'Waits for' }),
+      screen.getByRole('combobox', { name: 'Tags' }),
+      screen.getByRole('switch', { name: 'Auto delivery' }),
+      screen.getByRole('combobox', { name: 'Delivery mode' }),
+      screen.getByText('Skip steps'),
+      screen.getByRole('button', { name: 'Add' }),
+    ];
+    for (let i = 1; i < order.length; i++)
+      expect(
+        order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    const grid = screen.getByLabelText('Task text').closest('.\\@3xl\\:grid-cols-2')!;
+    expect(grid).toBeTruthy();
+    expect(grid.className).not.toMatch(/(^| )(@3xl:)?order-/);
+    expect(dialog.querySelector('.\\@3xl\\:order-first')).toBeNull();
+    expect(grid.children[0]!.contains(order[2]!)).toBe(true);
+    expect(grid.children[1]!.contains(order[3]!)).toBe(true);
+  });
+
+  it('offers a segment for every step in order', async () => {
+    show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    await skipStepAsync('plan');
+    expect(
+      within(skipGroup())
+        .getAllByRole('button')
+        .map((box) => box.id),
+    ).toEqual(['plan', 'code', 'review', 'qa', 'deliver'].map((step) => `new-skip-${step}`));
+  });
+
+  it('does not let the last step be skipped', async () => {
+    show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    for (const step of ['plan', 'code', 'review', 'qa']) fireEvent.click(await skipStepAsync(step));
+    expect(skipStep('deliver').disabled).toBe(true);
+    expect(skipStep('plan').disabled).toBe(false);
+  });
+
+  it('sends the skipped steps on create', async () => {
+    const api = show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    fireEvent.click(await skipStepAsync('review'));
+    fireEvent.click(skipStep('qa'));
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        workflow: 'feature',
+        task: 'T',
+        skip: ['review', 'qa'],
+      }),
+    );
+  });
+
+  it('drops marks the new workflow does not have', async () => {
+    const api = show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    fireEvent.click(await skipStepAsync('qa'));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Workflow' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'small' }));
+    await waitFor(() => expect(within(skipGroup()).getAllByRole('button')).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({ workflow: 'small', task: 'T' }),
+    );
+  });
+
+  it('shows the skipped steps of an item and edits them', async () => {
+    const api = show(
+      queueOf({
+        items: [queueItem('q1', 'A', 1, { skip: ['review', 'qa'] }), queueItem('q2', 'B', 2)],
+      }),
+      { workflows: vi.fn(async () => fiveSteps) },
+    );
+    await screen.findByText('skips: review, qa');
+    expect(screen.getAllByText(/^skips:/)).toHaveLength(1);
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    const review = await skipStepAsync('review');
+    expect(review.getAttribute('aria-pressed')).toBe('true');
+    expect(skipStep('qa').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ skip: ['qa'] })),
+    );
+  });
+
+  it('clears the skip of an item with an empty list', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { skip: ['review'] })] }), {
+      workflows: vi.fn(async () => fiveSteps),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.click(await skipStepAsync('review'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ skip: [] })),
+    );
+  });
+});
+
+describe('skip in the draft', () => {
+  it('sends skip on create only when it is not empty and always on edit', () => {
+    const draft = emptyDraft('feature');
+    draft.task = 'T';
+    expect('skip' in fieldsOf(draft)).toBe(false);
+    expect(fieldsOf(draft, undefined, true).skip).toEqual([]);
+    expect(fieldsOf({ ...draft, skip: ['qa'] }).skip).toEqual(['qa']);
+  });
+
+  it('copies the skip of an item into its draft', () => {
+    const item = queueItem('q1', 'A', 1, { skip: ['qa'] });
+    const draft = draftOf(item);
+    expect(draft.skip).toEqual(['qa']);
+    expect(draft.skip).not.toBe(item.skip);
+    expect(draftOf(queueItem('q2', 'B', 2)).skip).toEqual([]);
+  });
+
+  it('prunes marks to the steps in their order', () => {
+    expect(pruneSkip(['qa', 'plan', 'x'], ['plan', 'code', 'qa'])).toEqual(['plan', 'qa']);
+    expect(pruneSkip(['qa'], [])).toEqual([]);
   });
 });
