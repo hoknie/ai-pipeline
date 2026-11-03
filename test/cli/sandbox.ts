@@ -112,7 +112,7 @@ export function aip(
 }
 
 /**
- * Polls `check` every 100 ms until it holds; fails after `timeoutMs`, well inside the test
+ * Polls `check` every 25 ms until it holds; fails after `timeoutMs`, well inside the test
  * timeout, so a stuck wait reports what it waited for instead of timing the test out.
  */
 export async function waitUntil(
@@ -124,7 +124,7 @@ export async function waitUntil(
   while (!(await check())) {
     if (Date.now() >= deadline)
       throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
 

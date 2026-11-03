@@ -7,7 +7,7 @@ import { databasePath } from '../../src/config/index.ts';
 import type { ApplyResult, RunCreated } from '../../src/protocol/index.ts';
 import { Store } from '../../src/store/index.ts';
 
-import { WORKFLOW_CONFIG, git, harness, startRun, type Harness } from './harness.ts';
+import { POLL_MS, WORKFLOW_CONFIG, git, harness, startRun, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -201,7 +201,7 @@ describe('runs from the working tree', () => {
     expect(git(h.repo, 'diff', '--cached', '--name-only')).toBe('');
     expect(git(h.repo, 'status', '--porcelain')).toBe('M lib.ts\n?? feature.ts\n?? notes.md');
     for (let tries = 0; tries < 50 && git(h.repo, 'for-each-ref', 'refs/aip/') !== ''; tries += 1)
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toBe('');
   });
 
@@ -230,7 +230,8 @@ describe('runs from the working tree', () => {
 describe('delivery resolver', () => {
   async function conflictingRun(h: Harness, resolve: unknown[]): Promise<string> {
     h.script({
-      code: [{ delayMs: 400, write: { 'lib.ts': 'export const value = 2;\n' } }],
+      // the coder goes on once the user's edit below is in the working tree
+      code: [{ waitFor: h.gate('code'), write: { 'lib.ts': 'export const value = 2;\n' } }],
       resolve,
     });
     const { runId } = (await startRun(h, {
@@ -239,6 +240,7 @@ describe('delivery resolver', () => {
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     writeFileSync(join(h.repo, 'lib.ts'), 'export const value = 9;\n');
+    h.open('code');
     await h.waitFor(
       runId,
       (view) => view.finished && !view.delivery.inProgress && view.delivery.merged === 1,

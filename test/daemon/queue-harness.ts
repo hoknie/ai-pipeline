@@ -1,7 +1,7 @@
 import { afterEach } from 'vitest';
 
 import type { QueueView, RunQueued, RunView } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, harness, type Harness } from './harness.ts';
+import { POLL_MS, WORKFLOW_CONFIG, harness, type Harness } from './harness.ts';
 
 // Shared by the queue test files; importing this module stops the daemon a test left running.
 let current: Harness | null = null;
@@ -47,7 +47,7 @@ export async function waitQueue(
     const queue = await queueOf(h);
     if (done(queue)) return queue;
     if (Date.now() > deadline) throw new Error(`timed out; queue: ${JSON.stringify(queue)}`);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
 }
 

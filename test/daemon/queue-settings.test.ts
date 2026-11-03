@@ -11,13 +11,14 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { WORKFLOW_CONFIG } from './harness.ts';
+import { POLL_MS, WORKFLOW_CONFIG } from './harness.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
 
 describe('queue settings', () => {
   it('starts a new queue with a waiting task when the autopilot is turned on', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 3000 }] });
+    // the run stays running while the test looks at the queue
+    h.script({ code: [{ waitFor: h.gate('a') }] });
     await add(h, 'A');
     const view = (await h.call('queue_settings', {
       repository: h.repo,
@@ -180,11 +181,15 @@ describe('delivery mode per task', () => {
       revision: null,
       level: 'global',
     });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const queues = events.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
-    );
-    expect(queues.at(-1)?.deliveryMode).toBe('commit');
+    const queues = () =>
+      events.flatMap((event) =>
+        event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+      );
+    // the event arrives a little after the call
+    const deadline = Date.now() + 10_000;
+    while (!queues().some((queue) => queue.deliveryMode === 'commit') && Date.now() < deadline)
+      await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    expect(queues().at(-1)?.deliveryMode).toBe('commit');
     await stop(h);
     expect(await ended).toBe('closed');
   });
@@ -234,7 +239,7 @@ describe('autopilot answers', () => {
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const waiting = await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
     expect(waiting.stop).toBeNull();
   });

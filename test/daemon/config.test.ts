@@ -360,7 +360,6 @@ describe('general setting', () => {
       task: 'y',
     })) as RunCreated;
     expect((await h.status(next.runId)).autoDeliver).toBe(false);
-    await h.waitFor(next.runId, (run) => run.finished);
   });
 
   it('refuses a stale revision', async () => {

@@ -171,7 +171,7 @@ export async function spawnDaemon(
   child.unref();
   const deadline = Date.now() + (options.timeoutMs ?? 5000);
   while (Date.now() < deadline) {
-    await sleep(100);
+    await sleep(POLL_MS);
     if ((await pingDaemon(socket)) !== null) return;
   }
   throw new Error(
@@ -193,7 +193,7 @@ async function waitGone(
     // A daemon that is shutting down may stop answering before it exits.
     const unreachable = (await pingDaemon(socket).catch(() => undefined)) === null;
     if (unreachable && (pid === null || !holdsLock(pid, options.lockPath))) return;
-    await sleep(100);
+    await sleep(POLL_MS);
   }
   throw new Error(`the old aip daemon${pid === null ? '' : ` (pid ${pid})`} did not stop in time`);
 }
@@ -216,6 +216,9 @@ function alive(pid: number): boolean {
     return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
+
+/** How often the client checks a daemon it starts or stops: the socket is cheap to ping. */
+const POLL_MS = 25;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

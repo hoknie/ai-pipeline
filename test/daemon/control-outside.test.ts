@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { startDaemon } from '../../src/daemon/index.ts';
 import type { RunCreated, Transcript } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, startRun, statuses } from './harness.ts';
+import { WORKFLOW_CONFIG, startRun, statuses, until } from './harness.ts';
 import { calls, run, start } from './control-harness.ts';
 
 describe('failures and control', () => {
@@ -35,7 +35,7 @@ describe('failures and control', () => {
     const h = await start();
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
     h.script({
-      code: [{ outside: { [join(h.repo, 'README.md')]: 'stray\n' }, delayMs: 6000 }],
+      code: [{ outside: { [join(h.repo, 'README.md')]: 'stray\n' }, waitFor: h.gate('first') }],
     });
     const first = (
       (await startRun(h, {
@@ -46,9 +46,7 @@ describe('failures and control', () => {
     ).runId;
     await h.waitFor(first, (view) => view.groups[0]?.status === 'running');
     // the first agent has read its script once it wrote the stray file
-    for (let wait = 0; !existsSync(join(h.repo, 'README.md')) && wait < 100; wait += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    await until('the stray file', () => existsSync(join(h.repo, 'README.md')));
     expect((await h.group(first, 'first')).status).toBe('running');
     h.script({ code: [{ write: { 'shared.md': 'from b\n' } }] });
     const second = (
@@ -59,13 +57,12 @@ describe('failures and control', () => {
       })) as RunCreated
     ).runId;
     await h.waitFor(second, (view) => view.finished);
-    for (let wait = 0; !existsSync(join(h.repo, 'shared.md')) && wait < 100; wait += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    await until('the delivery of the second run', () => existsSync(join(h.repo, 'shared.md')));
     expect(readFileSync(join(h.repo, 'shared.md'), 'utf8')).toBe('from b\n');
     // the delivery came while the first step was still running
     expect((await h.group(first, 'first')).status).toBe('running');
-    await h.waitFor(first, (view) => view.finished, 60_000);
+    h.open('first');
+    await h.waitFor(first, (view) => view.finished);
     expect((await h.group(first, 'first')).attempts[0]?.outsideChanges).toEqual(['README.md']);
   });
 
@@ -78,7 +75,7 @@ describe('failures and control', () => {
     );
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
     h.script({
-      code: [{ outside: { [join(h.repo, 'README.md')]: 'stray\n' }, delayMs: 6000 }],
+      code: [{ outside: { [join(h.repo, 'README.md')]: 'stray\n' }, waitFor: h.gate('first') }],
     });
     const first = (
       (await startRun(h, {
@@ -88,9 +85,7 @@ describe('failures and control', () => {
       })) as RunCreated
     ).runId;
     await h.waitFor(first, (view) => view.groups[0]?.status === 'running');
-    for (let wait = 0; !existsSync(join(h.repo, 'README.md')) && wait < 100; wait += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    await until('the stray file', () => existsSync(join(h.repo, 'README.md')));
     h.script({ code: [{ write: { 'README.md': 'from b\n' } }] });
     const second = (
       (await startRun(h, {
@@ -101,7 +96,8 @@ describe('failures and control', () => {
     ).runId;
     await h.waitFor(second, (view) => view.finished);
     expect((await h.group(first, 'first')).status).toBe('running');
-    await h.waitFor(first, (view) => view.finished, 60_000);
+    h.open('first');
+    await h.waitFor(first, (view) => view.finished);
     expect((await h.group(first, 'first')).attempts[0]?.outsideChanges).toEqual(['README.md']);
   });
 
@@ -245,18 +241,19 @@ describe('failures and control', () => {
 describe('transcripts', () => {
   it('reads the log of a running attempt incrementally and of each attempt by seq', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }] });
+    h.script({ code: [{ waitFor: h.gate('code') }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       workflow: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     let running = (await h.call('transcript', { runId, group: 'vhod' })) as Transcript;
-    for (let tries = 0; tries < 50 && running.seq === null; tries += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the attempt started', async () => {
       running = (await h.call('transcript', { runId, group: 'vhod' })) as Transcript;
-    }
+      return running.seq !== null;
+    });
     expect(running).toMatchObject({ seq: 1, running: true, entries: [] });
+    h.open('code');
     await h.waitFor(runId, (view) => view.finished);
     const done = (await h.call('transcript', {
       runId,

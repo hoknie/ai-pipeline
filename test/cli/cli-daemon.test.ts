@@ -812,34 +812,19 @@ describe('cli', () => {
       ) as { run: { runId: string } | null };
       return queued.run!.runId;
     };
+    // Three places: the runs go at once instead of one after another.
+    await aip(box, 'queue', 'settings', '--parallel', '3');
     const a = await started('first', 'auth');
-    await waitUntil('first run is finished', async () => {
-      const runs = JSON.parse((await aip(box, 'run', 'list', '--json')).stdout) as {
-        id: string;
-        finished: boolean;
-      }[];
-      return runs.find((run) => run.id === a)?.finished === true;
-    });
     const b = await started('second');
-    await waitUntil('second run is finished', async () => {
-      const runs = JSON.parse((await aip(box, 'run', 'list', '--json')).stdout) as {
-        id: string;
-        finished: boolean;
-      }[];
-      return runs.find((run) => run.id === b)?.finished === true;
+    const c = await started('third');
+    await waitUntil('the runs are finished', async () => {
+      const runs = (await request(box.socket, 'status', {})) as { finished: boolean }[];
+      return runs.length === 3 && runs.every((run) => run.finished);
     });
     const tagged = await aip(box, 'run', 'tag', b, 'v2');
     expect(tagged.code).toBe(0);
     expect(tagged.stdout).toContain('#v2');
     expect((await aip(box, 'run', 'show', b)).stdout).toContain('#v2');
-    const c = await started('third');
-    await waitUntil('third run is finished', async () => {
-      const runs = JSON.parse((await aip(box, 'run', 'list', '--json')).stdout) as {
-        id: string;
-        finished: boolean;
-      }[];
-      return runs.find((run) => run.id === c)?.finished === true;
-    });
     const filtered = await aip(box, 'run', 'list', '--tag', 'AUTH', '--tag', 'v2');
     expect(filtered.stdout).toContain(a);
     expect(filtered.stdout).toContain(b);

@@ -61,7 +61,8 @@ describe('live usage', () => {
             { id: 'm1', input: 1000, output: 100 },
             { id: 'm2', input: 2000, output: 200, cacheRead: 500 },
           ],
-          delayMs: 3000,
+          // the attempt stays running while the test looks at it
+          waitFor: h.gate('done'),
         },
       ],
     });
@@ -119,13 +120,21 @@ describe('live usage', () => {
             output: 1,
           })),
           usageGapMs: 50,
-          delayMs: 1500,
+          waitFor: h.gate('done'),
         },
       ],
     });
     const views = listen(h);
     await sleep(100);
     const runId = await run(h);
+    // the agent goes on once the live usage of all twenty updates reached the stream
+    await h.waitFor(runId, () =>
+      views.some(
+        (view) =>
+          view.id === runId && view.usage?.costUsd === null && view.usage.inputTokens === 200,
+      ),
+    );
+    h.open('done');
     await h.waitFor(runId, (view) => view.finished);
     const live = new Set(
       views

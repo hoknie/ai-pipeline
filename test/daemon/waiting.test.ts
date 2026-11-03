@@ -13,7 +13,7 @@ import {
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
 
-import { WORKFLOW_CONFIG, harness, startRun, type Harness } from './harness.ts';
+import { WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -32,7 +32,7 @@ const row = (view: RunView, slug: string) => view.groups.find((group) => group.s
 describe('groups waiting for a specialist', () => {
   it('shows the second group as waiting while the only coder works, then runs it', async () => {
     const h = (current = await harness(LIMITED));
-    h.script({ code: [{ delayMs: 1500 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('login') }, {}] });
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
@@ -56,6 +56,7 @@ describe('groups waiting for a specialist', () => {
     expect(waiting.counts).toContain('waiting 1');
     const group = await h.group(runId, 'signup');
     expect(group).toMatchObject({ status: 'waiting', wait: { reason: 'specialist' } });
+    h.open('login');
 
     const running = await h.waitFor(runId, (view) => row(view, 'signup')?.status === 'running');
     expect(row(running, 'signup')?.wait).toBeNull();
@@ -63,15 +64,17 @@ describe('groups waiting for a specialist', () => {
     expect(done.groups.every((entry) => entry.wait === null)).toBe(true);
 
     // subscribers saw the run change to waiting and back
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const seen = events.flatMap((event) =>
-      event.event === 'run'
-        ? [
-            (event.run as unknown as RunView).groups.find((entry) => entry.slug === 'signup')
-              ?.status,
-          ]
-        : [],
-    );
+    const signupEvents = () =>
+      events.flatMap((event) =>
+        event.event === 'run'
+          ? [
+              (event.run as unknown as RunView).groups.find((entry) => entry.slug === 'signup')
+                ?.status,
+            ]
+          : [],
+      );
+    await until('the event of the finished run', () => signupEvents().includes('merged'));
+    const seen = signupEvents();
     expect(seen).toContain('waiting');
     expect(seen.indexOf('waiting')).toBeLessThan(seen.lastIndexOf('running'));
     await h.close();
@@ -81,7 +84,7 @@ describe('groups waiting for a specialist', () => {
 
   it('sends queue events when the waiting set of a run changes, and nothing else', async () => {
     const h = (current = await harness(LIMITED));
-    h.script({ code: [{ delayMs: 1500 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('login') }, {}] });
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
@@ -95,7 +98,6 @@ describe('groups waiting for a specialist', () => {
       ],
     });
     await h.waitFor(runId, (view) => row(view, 'signup')?.status === 'waiting');
-    await new Promise((resolve) => setTimeout(resolve, 100));
     const queueWaits = () =>
       events.flatMap((event) =>
         event.event === 'queue'
@@ -110,24 +112,26 @@ describe('groups waiting for a specialist', () => {
             ]
           : [],
       );
-    const withWait = queueWaits().findIndex((list) =>
-      list.some(
-        (entry) =>
-          entry.group === 'signup' && (entry.wait as { reason: string }).reason === 'specialist',
-      ),
-    );
+    const firstWait = () =>
+      queueWaits().findIndex((list) =>
+        list.some(
+          (entry) =>
+            entry.group === 'signup' && (entry.wait as { reason: string }).reason === 'specialist',
+        ),
+      );
+    await until('a queue event with the waiting group', () => firstWait() >= 0);
+    const withWait = firstWait();
     expect(withWait).toBeGreaterThanOrEqual(0);
 
+    h.open('login');
     await h.waitFor(runId, (view) => row(view, 'signup')?.status === 'running');
-    for (let attempt = 0; attempt < 50; attempt++) {
-      if (
+    await until(
+      'a queue event without the waiting group',
+      () =>
         queueWaits()
           .at(-1)
-          ?.some((entry) => entry.group === 'signup') === false
-      )
-        break;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+          ?.some((entry) => entry.group === 'signup') === false,
+    );
     const lists = queueWaits();
     const last = lists.findLastIndex((list) => list.some((entry) => entry.group === 'signup'));
     expect(last).toBeGreaterThanOrEqual(withWait);
@@ -141,8 +145,7 @@ describe('groups waiting for a specialist', () => {
     const h = (current = await harness(LIMITED));
     // The first coder works until the test lets it go: a fixed delay may end inside the quiet window
     // below on a loaded machine and send a real event for the waiting run.
-    const release = join(h.repo, '..', 'release');
-    h.script({ code: [{ waitFor: release }, {}, {}] });
+    h.script({ code: [{ waitFor: h.gate('first') }, {}, {}] });
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
@@ -200,9 +203,12 @@ describe('groups waiting for a specialist', () => {
     await h.call('status', { runId: first.runId });
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(statusesOfSecond()).toHaveLength(before);
-    writeFileSync(release, '');
+    h.open('first');
     await h.waitFor(secondId, (view) => row(view, 'signup')?.status === 'running');
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // the request answers before the event reaches the subscriber: wait for the event itself
+    await until('the event of the second run running', () =>
+      statusesOfSecond().includes('running'),
+    );
     const seen = statusesOfSecond();
     expect(seen.indexOf('waiting')).toBeLessThan(seen.lastIndexOf('running'));
     await h.close();

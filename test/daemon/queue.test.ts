@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -107,7 +107,6 @@ describe('running the queue', () => {
     await h.call('queue_start', { repository: h.repo });
     const [runId] = (await queueOf(h)).runs.map((run) => run.id);
     await h.waitFor(runId!, (view) => view.finished);
-    await new Promise((resolve) => setTimeout(resolve, 500));
     // delivery.auto is false: the place is free once the run is finished
     const queue = await waitQueue(h, (view) => view.items.length === 0);
     expect(queue.items).toEqual([]);
@@ -115,7 +114,8 @@ describe('running the queue', () => {
 
   it('starts two runs at once with parallel 2', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, { delayMs: 1500 }, {}] });
+    const hold = { waitFor: h.gate('ab') };
+    h.script({ code: [hold, hold, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await add(h, 'C');
@@ -124,13 +124,14 @@ describe('running the queue', () => {
     const queue = await queueOf(h);
     expect(queue.runs).toHaveLength(2);
     expect(queue.items.map((item) => item.title)).toEqual(['C']);
+    h.open('ab');
     await waitQueue(h, (view) => view.status === 'stopped');
     expect(await allRuns(h)).toHaveLength(3);
   });
 
   it('takes an added task at once when a place is free in a running queue', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 2000 }, { delayMs: 2000 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('a') }, {}] });
     await add(h, 'A');
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
     await h.call('queue_start', { repository: h.repo });
@@ -138,22 +139,25 @@ describe('running the queue', () => {
     const queue = await add(h, 'B');
     expect(queue.runs).toHaveLength(2);
     expect(queue.items).toEqual([]);
+    h.open('a');
     await waitQueue(h, (view) => view.status === 'stopped');
   });
 
   it('does not run while paused, and does not interrupt a running run', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 800 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('a') }, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
     const paused = (await h.call('queue_pause', { repository: h.repo })) as QueueView;
     expect(paused.status).toBe('stopped');
     const [runId] = paused.runs.map((run) => run.id);
+    h.open('a');
     const final = await h.waitFor(runId!, (view) => view.finished);
     expect(final.state).toBe('finished');
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const queue = await queueOf(h);
+    // the run left its place: a running queue would take B now
+    const queue = await waitQueue(h, (view) => !view.runs.some((run) => run.id === runId));
+    expect(queue.runs).toEqual([]);
     expect(queue.items).toHaveLength(1);
     expect(await allRuns(h)).toHaveLength(1);
   });
@@ -210,7 +214,8 @@ describe('running the queue', () => {
 
   it('runs an item now over the limit and the run holds a place of the queue', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, { delayMs: 1500 }, {}] });
+    const hold = { waitFor: h.gate('ab') };
+    h.script({ code: [hold, hold, {}] });
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
     await add(h, 'A');
     await add(h, 'B');
@@ -234,6 +239,12 @@ describe('running the queue', () => {
     );
     // C starts only when two of the three runs have left their places
     const sizes = new Set<number>([queue.runs.length]);
+    const two = await waitQueue(h, (view) => {
+      sizes.add(view.runs.length);
+      return view.runs.length === 2;
+    });
+    expect(two.items.map((item) => item.id)).toEqual([c.item]);
+    h.open('ab');
     await waitQueue(h, (view) => {
       sizes.add(view.runs.length);
       if (view.runs.length >= 3) {
@@ -262,12 +273,16 @@ describe('running the queue', () => {
 
   it('stops the queue when a run started now fails', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 3000 }, { noReport: true }] });
+    h.script({ code: [{ waitFor: h.gate('never') }, { noReport: true }] });
     await add(h, 'A');
     await add(h, 'B');
     const c = await add(h, 'C');
     await h.call('queue_start', { repository: h.repo });
-    await waitQueue(h, (view) => view.runs.length === 1);
+    // the held agent of A has started, so the run started now takes the failing action
+    await waitQueue(
+      h,
+      (view) => view.runs.length === 1 && existsSync(join(h.fakeState, 'calls.jsonl')),
+    );
     const now = (await h.call('queue_run_now', {
       repository: h.repo,
       item: c.item,
@@ -279,11 +294,15 @@ describe('running the queue', () => {
 
   it('restores the queue after the daemon restarts and keeps watching its runs', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 5000 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('never') }, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
-    await waitQueue(h, (queue) => queue.runs.length === 1);
+    // the agent of A has started and is held: the restart interrupts it
+    await waitQueue(
+      h,
+      (queue) => queue.runs.length === 1 && existsSync(join(h.fakeState, 'calls.jsonl')),
+    );
     await h.restart();
     // the interrupted attempt of A is a new problem: the queue stops, B still waits
     const stopped = await waitQueue(h, (queue) => queue.stop !== null);

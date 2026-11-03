@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Command } from 'commander';
 import { parse as parseYaml } from 'yaml';
 
@@ -14,7 +13,6 @@ import {
   stateDirectoryFromEnvironment,
   type DeliveryMode,
 } from '../config/index.ts';
-import { createHostServer, createWorkerServer } from '../mcp/index.ts';
 import {
   daemonMismatchMessage,
   ensureDaemon,
@@ -49,14 +47,10 @@ import {
 } from '../protocol/index.ts';
 
 import { examples as renderExamples, HELP_GROUPS } from './help.ts';
-import { checkConfig } from './config-check.ts';
-import { initConfig } from './init.ts';
-import { setupCommand } from './setup.ts';
-import { cleanRun, cleanableRuns, formatCleanable } from './clean.ts';
 import { VERSION } from './version.ts';
 import { latestRepository } from './web/default-repository.ts';
 import { registerDaemon } from './daemon.ts';
-import { assertLoopbackHost, startWebServer, webTokenFromEnv } from './web/server.ts';
+import type { WebServer } from './web/server.ts';
 import { openBrowser } from './web/open.ts';
 import { readPanelState } from './web/state.ts';
 import { registerWebControl } from './web-control.ts';
@@ -871,11 +865,13 @@ function registerRun(program: Command): void {
     .action(async (runId: string | undefined, options: { all?: boolean; json?: boolean }) => {
       if (runId === undefined) {
         if (options.all) throw new Error('--all needs a <run-id>');
+        const { cleanableRuns, formatCleanable } = await import('./clean.ts');
         const runs = await cleanableRuns(context());
         output(options.json, formatCleanable(runs, activeStyle), runs);
         return;
       }
       if (options.json) throw new Error('--json lists runs and cannot be used with a <run-id>');
+      const { cleanRun } = await import('./clean.ts');
       for (const removed of await cleanRun(context(), runId, options.all ?? false))
         print(`removed ${removed}`);
     });
@@ -991,6 +987,8 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       const port = options.port === undefined ? settings.port : Number(options.port);
       if (!Number.isInteger(port) || port < 0 || port > 65535)
         throw new Error('--port must be an integer from 0 to 65535');
+      const { assertLoopbackHost, startWebServer, webTokenFromEnv } =
+        await import('./web/server.ts');
       assertLoopbackHost(host);
       let token: string | undefined;
       if (settings.auth === 'none') {
@@ -1029,7 +1027,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
         if (options.open) openBrowser(url);
         return;
       }
-      let web: Awaited<ReturnType<typeof startWebServer>>;
+      let web: WebServer;
       try {
         web = await startWebServer({
           socket: ctx.socket,
@@ -1103,6 +1101,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
         opencode: boolean;
         plugin: boolean;
       }) => {
+        const { setupCommand } = await import('./setup.ts');
         process.exitCode = await setupCommand(
           {
             yes: options.yes ?? false,
@@ -1124,6 +1123,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
     .addHelpText('after', examples(['aip init', 'aip init --shared']))
     .action(async (options: { shared?: boolean }) => {
       try {
+        const { initConfig } = await import('./init.ts');
         const result = await initConfig({
           cwd: process.cwd(),
           shared: options.shared ?? false,
@@ -1151,6 +1151,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
     .option('-r, --repo <path>', 'repository path', '.')
     .addHelpText('after', examples(['aip config check', 'aip config check --repo ~/projects/app']))
     .action(async (options: { repo: string }) => {
+      const { checkConfig } = await import('./config-check.ts');
       process.exitCode = await checkConfig(resolve(options.repo));
     });
 
@@ -1178,6 +1179,12 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
     .addHelpText('after', examples(['aip mcp', 'aip mcp --queue']))
     .action(
       async (options: { worker?: string; socket?: string; split?: boolean; queue?: boolean }) => {
+        // Imported on demand: every attempt of a specialist starts a worker server.
+        const [{ createHostServer, createWorkerServer }, { StdioServerTransport }] =
+          await Promise.all([
+            import('../mcp/index.ts'),
+            import('@modelcontextprotocol/sdk/server/stdio.js'),
+          ]);
         if (options.worker) {
           const socket = options.socket;
           if (!socket) throw new Error('--worker needs --socket');

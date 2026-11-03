@@ -32,18 +32,22 @@ async function create(h: Harness, extra: Record<string, unknown> = {}): Promise<
 
 describe('run names', () => {
   it('names the run in the background while its steps already run', async () => {
-    const h = await start({
+    const h = await start({});
+    h.script({
       naming: {
         delayMs: 800,
         answer: '{"title": "Флаг --json для version", "name": "add-version-json-flag"}',
       },
-      code: [{ delayMs: 1500 }],
+      code: [{ waitFor: h.gate('code') }],
     });
     const runId = await create(h);
     const early = await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     expect(early.name).toBeNull();
     expect(early.title).toBe('Добавить флаг --json к команде aip version');
     const named = await h.waitFor(runId, (view) => view.name !== null);
+    // the step still runs: the name came in the background
+    expect(named.groups[0]?.status).toBe('running');
+    h.open('code');
     expect(named).toMatchObject({
       title: 'Флаг --json для version',
       name: 'add-version-json-flag',
@@ -57,11 +61,9 @@ describe('run names', () => {
   it('keeps the first line of the task when the answer is not usable', async () => {
     const h = await start({ naming: { answer: 'sure, here: Flag' } });
     const runId = await create(h);
-    await h.waitFor(runId, (view) => view.finished);
-    for (let tries = 0; tries < 30 && !existsSync(join(h.fakeState, 'oneshots.jsonl')); tries += 1)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const view = await h.status(runId);
+    // the naming answer is applied with its usage (0.002 on top of the two steps), named or not
+    const view = await h.waitFor(runId, (run) => run.finished && (run.usage?.costUsd ?? 0) > 0.021);
+    expect(existsSync(join(h.fakeState, 'oneshots.jsonl'))).toBe(true);
     expect(view).toMatchObject({ name: null, title: 'Добавить флаг --json к команде aip version' });
   });
 
@@ -78,7 +80,8 @@ describe('run names', () => {
     );
     const second = await create(off);
     await off.waitFor(second, (run) => run.finished);
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // naming starts with the run, before its steps: by the end of the run it would have shown
+    await new Promise((resolve) => setTimeout(resolve, 100));
     expect(existsSync(join(h.fakeState, 'oneshots.jsonl'))).toBe(false);
     expect(existsSync(join(off.fakeState, 'oneshots.jsonl'))).toBe(false);
   });

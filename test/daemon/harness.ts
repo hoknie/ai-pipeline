@@ -39,6 +39,12 @@ export interface Harness {
   running: RunningDaemon;
   environment: NodeJS.ProcessEnv;
   script(steps: Record<string, unknown>): void;
+  /**
+   * Path of a gate: an action `{ waitFor: h.gate('a') }` holds the agent until the test calls
+   * `h.open('a')`. Holds an agent exactly as long as the test needs, instead of a fixed `delayMs`.
+   */
+  gate(name: string): string;
+  open(name: string): void;
   call<M extends Parameters<typeof request>[1]>(method: M, params: ParamsOf<M>): Promise<unknown>;
   status(runId: string): Promise<RunView>;
   group(runId: string, group: string): Promise<GroupView>;
@@ -46,6 +52,22 @@ export interface Harness {
   /** Stops the daemon, runs `between` while it is down, starts it again. */
   restart(between?: () => void): Promise<void>;
   close(): Promise<void>;
+}
+
+/** Interval of the polling helpers: short, so a test goes on as soon as its condition holds. */
+export const POLL_MS = 20;
+
+/** Polls `check` until it holds; fails after `timeoutMs` naming what it waited for. */
+export async function until(
+  what: string,
+  check: () => boolean | Promise<boolean>,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
 }
 
 function sh(cwd: string, ...args: string[]): string {
@@ -69,6 +91,8 @@ export async function harness(
   writeConfigDirectory(repo, config);
   sh(repo, 'add', '-A');
   sh(repo, 'commit', '-q', '-m', 'initial');
+  const gates = join(base, 'gates');
+  mkdirSync(gates);
   const scriptPath = join(base, 'script.json');
   writeFileSync(scriptPath, '{}');
   const env: NodeJS.ProcessEnv = {
@@ -105,6 +129,10 @@ export async function harness(
     script(steps) {
       writeFileSync(scriptPath, JSON.stringify(steps));
     },
+    gate: (name) => join(gates, name),
+    open(name) {
+      writeFileSync(join(gates, name), '');
+    },
     call,
     status,
     async group(runId, group) {
@@ -117,7 +145,7 @@ export async function harness(
         if (done(view)) return view;
         if (Date.now() > deadline)
           throw new Error(`timed out waiting; last status: ${JSON.stringify(view)}`);
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
       }
     },
     async restart(between) {

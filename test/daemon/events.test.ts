@@ -7,7 +7,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 
-import { harness, startRun, type Harness } from './harness.ts';
+import { harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -19,12 +19,11 @@ afterEach(async () => {
 describe('event stream', () => {
   it('sends a snapshot, then every change of a run with growing seq', async () => {
     const h = (current = await harness());
-    h.script({ code: [{ delayMs: 300 }] });
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     expect(events[0]).toMatchObject({ event: 'snapshot', runs: [] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
@@ -32,7 +31,12 @@ describe('event stream', () => {
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.finished);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the event of the finished run', () =>
+      events.some(
+        (event) =>
+          event.event === 'run' && (event.run as unknown as { finished: boolean }).finished,
+      ),
+    );
     const runEvents = events.filter((event) => event.event === 'run');
     expect(runEvents.length).toBeGreaterThan(3);
     const steps = runEvents.map((event) =>
@@ -57,7 +61,7 @@ describe('event stream', () => {
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     const snapshot = events[0];
     expect(snapshot).toMatchObject({ event: 'snapshot' });
     expect(
@@ -69,7 +73,9 @@ describe('event stream', () => {
       task: 'B',
     })) as { item: string };
     await h.call('queue_edit', { repository: h.repo, item: second.item, position: 1 });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // a tags event comes after every event of the calls before it
+    await h.call('tag_add', { name: 'marker' });
+    await until('the marker', () => events.some((event) => event.event === 'tags'));
     const queueEvents = events.filter((event) => event.event === 'queue');
     expect(queueEvents).toHaveLength(2);
     const last = queueEvents.at(-1);
@@ -92,7 +98,7 @@ describe('repositories event', () => {
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     const snapshot = events[0];
     expect(snapshot?.event === 'snapshot' ? snapshot.repositories : null).toEqual([]);
     const repositories = () =>
@@ -101,11 +107,13 @@ describe('repositories event', () => {
           event.event === 'repositories',
       );
     await h.call('repository_add', { path: h.repo });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('a repositories event', () => repositories().length > 0);
     expect(repositories()).toHaveLength(1);
     expect(repositories()[0]?.repositories).toMatchObject([{ path: h.repo, waiting: 0 }]);
     await h.call('repository_add', { path: h.repo });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // a tags event comes after every event of the calls before it
+    await h.call('tag_add', { name: 'marker' });
+    await until('the marker', () => events.some((event) => event.event === 'tags'));
     expect(repositories()).toHaveLength(1);
     const { runId } = (await startRun(h, {
       repository: h.repo,
@@ -113,7 +121,9 @@ describe('repositories event', () => {
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the waiting repository', () =>
+      repositories().some((event) => event.repositories.some((entry) => entry.waiting === 1)),
+    );
     expect(repositories().at(-1)?.repositories).toMatchObject([
       { path: h.repo, unfinished: 1, waiting: 1 },
     ]);

@@ -1,7 +1,6 @@
 import type { Command } from 'commander';
 
 import { lockPath } from '../config/index.ts';
-import { AlreadyRunning, startDaemon } from '../daemon/index.ts';
 import {
   checkDaemon,
   daemonMismatchMessage,
@@ -14,7 +13,6 @@ import {
 
 import { context, daemon } from './commands.ts';
 import { examples } from './help.ts';
-import { createDaemonPanel } from './web/daemon-panel.ts';
 
 /** Exit code of `aip daemon status` when no daemon runs. */
 export const EXIT_NOT_RUNNING = 3;
@@ -75,6 +73,11 @@ export function registerDaemon(program: Command, style: Style): void {
     .addHelpText('after', examples(['aip daemon', 'aip daemon status'], style))
     .action(async () => {
       const ctx = context();
+      // Imported on demand: the other daemon subcommands and every other command stay light.
+      const [{ AlreadyRunning, startDaemon }, { createDaemonPanel }] = await Promise.all([
+        import('../daemon/index.ts'),
+        import('./web/daemon-panel.ts'),
+      ]);
       try {
         const panel = createDaemonPanel({
           stateDirectory: ctx.stateDirectory,

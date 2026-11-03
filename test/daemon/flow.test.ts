@@ -67,12 +67,18 @@ describe('specialist limit', () => {
     const h = await start(
       WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
     );
-    h.script({ code: [{ delayMs: 300 }] });
+    // the coders wait until the test has seen the other groups wait for the limited specialist
+    h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, [
       { title: 'Первая', task: 'один' },
       { title: 'Вторая', task: 'два' },
       { title: 'Третья', task: 'три' },
     ]);
+    const held = await h.waitFor(runId, (view) =>
+      view.specialists.some((use) => use.running.length === 1 && use.waiting.length === 2),
+    );
+    expect(held.groups.filter((group) => group.status === 'running')).toHaveLength(1);
+    h.open('code');
     let peak = 0;
     const final = await h.waitFor(runId, (view) => {
       const coding = view.groups.filter(
@@ -89,7 +95,7 @@ describe('specialist limit', () => {
     const h = await start(
       WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
     );
-    h.script({ code: [{ delayMs: 600 }] });
+    h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, [
       { title: 'Первая', task: 'один' },
       { title: 'Вторая', task: 'два' },
@@ -106,6 +112,7 @@ describe('specialist limit', () => {
         waiting: [{ slug: 'vtoraya', step: 'code' }],
       },
     ]);
+    h.open('code');
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(final.specialists).toEqual([]);
   });

@@ -45,7 +45,7 @@ describe('postponed items', () => {
 
   it('starts the item at once when the flag is cleared in a running queue', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('b') }, {}] });
     const a = await add(h, 'A', { postponed: true });
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -58,6 +58,7 @@ describe('postponed items', () => {
     })) as QueueView;
     expect(view.items).toEqual([]);
     expect(view.runs).toHaveLength(2);
+    h.open('b');
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.runs.length === 0);
     expect(await allRuns(h)).toHaveLength(2);
   });
@@ -124,11 +125,11 @@ describe('postponed items', () => {
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
     await h.call('queue_edit', { repository: h.repo, item: a.item, postponed: true });
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const queues = events.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
-    );
-    expect(queues.some((queue) => queue.items.some((item) => item.postponed))).toBe(true);
+    const queues = () =>
+      events.flatMap((event) =>
+        event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+      );
+    await waitQueue(h, () => queues().some((queue) => queue.items.some((item) => item.postponed)));
     await stop(h);
     expect(await ended).toBe('closed');
   });
@@ -137,7 +138,7 @@ describe('postponed items', () => {
 describe('retried runs join the queue', () => {
   it('shows a retried run of a stopped queue among the places and keeps waiting tasks', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, { delayMs: 1500 }] });
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('retry') }] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -149,6 +150,7 @@ describe('retried runs join the queue', () => {
     expect(view.runs.map((card) => card.id)).toEqual([runId]);
     expect(view).toMatchObject({ status: 'stopped', stop: { kind: 'problem', run: runId } });
     expect(view.items).toHaveLength(1);
+    h.open('retry');
     await h.waitFor(runId, (run) => run.state === 'finished');
     await waitQueue(h, (queue) => queue.runs.length === 0);
     expect(await allRuns(h)).toHaveLength(1);
@@ -157,7 +159,7 @@ describe('retried runs join the queue', () => {
   it('keeps both retried runs among the places and does not take tasks meanwhile', async () => {
     const h = await start();
     h.script({
-      code: [{ noReport: true }, { noReport: true }, { delayMs: 1500 }, { delayMs: 1500 }],
+      code: [{ noReport: true }, { noReport: true }, { waitFor: h.gate('retries') }],
     });
     await add(h, 'A');
     await add(h, 'B');
@@ -183,6 +185,7 @@ describe('retried runs join the queue', () => {
     expect(view.runs.map((card) => card.id).sort()).toEqual(runs.map((run) => run.id).sort());
     expect(view.items).toHaveLength(1);
     expect(await allRuns(h)).toHaveLength(2);
+    h.open('retries');
     for (const run of runs) await h.waitFor(run.id, (item) => item.state === 'finished');
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.runs.length === 0);
     expect(await allRuns(h)).toHaveLength(3);

@@ -46,5 +46,5 @@ export function alive(pid: number): boolean {
 
 export const SHORT_TIMEOUT = WORKFLOW_CONFIG.replace(
   'coder: { name: Кодировщик }',
-  'coder: { name: Кодировщик, timeout: 2s }',
+  'coder: { name: Кодировщик, timeout: 1s }',
 );

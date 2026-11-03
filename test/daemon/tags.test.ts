@@ -14,7 +14,7 @@ import {
   type TagView,
 } from '../../src/protocol/index.ts';
 
-import { WORKFLOW_CONFIG, harness, startRun, type Harness } from './harness.ts';
+import { POLL_MS, WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -48,7 +48,7 @@ async function tagsWhen(h: Harness, done: (tags: TagView[]) => boolean): Promise
     const tags = await tagsOf(h);
     if (done(tags)) return tags;
     if (Date.now() > deadline) throw new Error('timed out waiting for tags');
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
 }
 
@@ -58,7 +58,7 @@ async function waitQueue(h: Harness, done: (queue: QueueView) => boolean): Promi
     const queue = await queueOf(h);
     if (done(queue)) return queue;
     if (Date.now() > deadline) throw new Error(`timed out; queue: ${JSON.stringify(queue)}`);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
 }
 
@@ -205,7 +205,7 @@ describe('tag events', () => {
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     const snapshot = events[0];
     expect(
       snapshot?.event === 'snapshot' ? names(snapshot.tags as unknown as TagView[]) : null,
@@ -213,7 +213,7 @@ describe('tag events', () => {
     await addTag(h, 'auth');
     await h.call('tag_edit', { tag: 'auth', color: 'teal' });
     await h.call('tag_remove', { tag: 'old' });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('three tags events', () => events.filter((e) => e.event === 'tags').length >= 3);
     const tagEvents = events.filter((event) => event.event === 'tags');
     expect(
       tagEvents.map((event) =>
@@ -236,9 +236,9 @@ describe('tag events', () => {
     await h.waitFor(created.runId, (run) => run.finished);
     const events: StreamEvent[] = [];
     subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     await h.call('run_tags', { runId: created.runId, add: ['auth'] });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('a run event', () => events.some((event) => event.event === 'run'));
     const run = events.find((event) => event.event === 'run');
     expect(run?.event === 'run' ? (run.run as unknown as RunView).tags : null).toMatchObject([
       { name: 'auth' },
@@ -465,9 +465,12 @@ describe('tags of tasks from a specialist', () => {
     h.script({ explore: [ONE] });
     const events: StreamEvent[] = [];
     subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     const explore = await exploreNow(h, undefined);
     await h.waitFor(explore, (run) => run.finished);
+    await until('tags, run and queue events', () =>
+      ['tags', 'run', 'queue'].every((kind) => events.some((event) => event.event === kind)),
+    );
     const kinds = new Set(events.map((event) => event.event));
     for (const kind of ['tags', 'run', 'queue']) expect(kinds.has(kind as never)).toBe(true);
   });
@@ -547,7 +550,8 @@ describe('tags of tasks from a specialist', () => {
       '  workflows:\n    twice:\n      steps:\n        - { id: first, specialist: scout }\n        - { id: second, specialist: scout }\n',
     );
     const h = await start(config);
-    h.script({ first: [ONE], second: [{ delayMs: 2500, ...ONE }] });
+    // the second step calls the queue only after the test removed the tag
+    h.script({ first: [ONE], second: [{ waitFor: h.gate('second'), ...ONE }] });
     const added = (await h.call('queue_add', {
       repository: h.repo,
       workflow: 'twice',
@@ -561,6 +565,7 @@ describe('tags of tasks from a specialist', () => {
     const first = await tagsWhen(h, (tags) => tags.length === 1);
     expect(names(first)).toEqual(['fix-login']);
     await h.call('tag_remove', { tag: 'fix-login' });
+    h.open('second');
     await h.waitFor(created.runId, (run) => run.finished);
     const catalog = await tagsOf(h);
     expect(names(catalog)).toEqual(['fix-login']);
@@ -573,7 +578,8 @@ describe('tags of tasks from a specialist', () => {
 
   it('gives the automatic tag to tasks that already wait for the run', async () => {
     const h = await start(SCOUT_CONFIG);
-    h.script({ explore: [{ delayMs: 1500, ...ONE }] });
+    // the explore run calls the queue only after the waiting task is added
+    h.script({ explore: [{ waitFor: h.gate('explore'), ...ONE }] });
     const explore = await exploreNow(h, undefined);
     const waiter = (await h.call('queue_add', {
       repository: h.repo,
@@ -581,6 +587,7 @@ describe('tags of tasks from a specialist', () => {
       groups: [{ title: 'g', task: 'w' }],
       after: [explore],
     })) as QueueView & { item: string };
+    h.open('explore');
     await h.waitFor(explore, (run) => run.finished);
     const [auto] = await tagsOf(h);
     expect(auto).toBeDefined();
@@ -710,9 +717,9 @@ describe('tags along dependencies', () => {
     const loose = await add(h, {});
     const events: StreamEvent[] = [];
     subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('the snapshot', () => events.length > 0);
     await h.call('run_tags', { runId: created.runId, add: ['auth'] });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await until('a queue event', () => events.some((event) => event.event === 'queue'));
     expect(await tagsOfItem(h, waiting)).toEqual(['auth']);
     expect(await tagsOfItem(h, loose)).toEqual([]);
     expect(events.some((event) => event.event === 'queue')).toBe(true);

@@ -18,7 +18,7 @@ import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queu
 describe('live parallel', () => {
   it('takes waiting tasks at once when parallel grows in a running queue', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, { delayMs: 1500 }, { delayMs: 1500 }] });
+    h.script({ code: [{ waitFor: h.gate('all') }] });
     await add(h, 'A');
     await add(h, 'B');
     await add(h, 'C');
@@ -31,12 +31,14 @@ describe('live parallel', () => {
     expect(grown.parallel).toBe(3);
     expect(grown.runs).toHaveLength(3);
     expect(grown.items).toEqual([]);
+    h.open('all');
     await waitQueue(h, (view) => view.status === 'stopped');
   });
 
   it('does not interrupt runs when parallel shrinks and holds the next task', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, { delayMs: 1500 }, {}] });
+    const hold = { waitFor: h.gate('ab') };
+    h.script({ code: [hold, hold, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await add(h, 'C');
@@ -48,10 +50,12 @@ describe('live parallel', () => {
     })) as QueueView;
     expect(shrunk.runs).toHaveLength(2);
     expect(shrunk.items.map((item) => item.title)).toEqual(['C']);
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // both runs are held: neither is interrupted, and C keeps waiting
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const waiting = await queueOf(h);
     expect(waiting.runs).toHaveLength(2);
     expect(waiting.items).toHaveLength(1);
+    h.open('ab');
     await waitQueue(h, (view) => view.status === 'stopped' && view.items.length === 0);
     expect(await allRuns(h)).toHaveLength(3);
   });
@@ -80,18 +84,28 @@ describe('live parallel', () => {
 
   it('sends a queue event when the step of a queue run changes, and none without changes', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 600 }] });
+    h.script({ code: [{ waitFor: h.gate('code') }] });
     await add(h, 'A');
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
+    const queueEvents = () =>
+      events.flatMap((event) =>
+        event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+      );
     await h.call('queue_start', { repository: h.repo });
-    await waitQueue(h, (view) => view.status === 'stopped' && view.runs.length === 0);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const queues = events.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    await waitQueue(h, () =>
+      queueEvents().some((queue) => queue.runs.some((run) => run.active.length > 0)),
     );
+    h.open('code');
+    await waitQueue(h, () => {
+      const last = queueEvents().at(-1);
+      return last?.status === 'stopped' && last.runs.length === 0;
+    });
+    // a moment for events without changes, which must not come
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const queues = queueEvents();
     const steps = queues.flatMap((queue) =>
       queue.runs.flatMap((run) => run.active.map((a) => a.step)),
     );
@@ -230,7 +244,7 @@ describe('run goes through the queue', () => {
 
   it('starts a stopped empty queue and creates a run of the queue', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }] });
+    h.script({ code: [{ waitFor: h.gate('never') }] });
     const queued = await run(h);
     expect(queued.run).not.toBeNull();
     expect(queued.queue.status).toBe('running');
@@ -241,7 +255,7 @@ describe('run goes through the queue', () => {
 
   it('puts the task last when the places are taken and starts it later', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('first') }, {}] });
     const first = await run(h);
     await add(h, 'X');
     const second = await run(h);
@@ -250,13 +264,14 @@ describe('run goes through the queue', () => {
     expect(second.queue.items.at(-1)?.id).toBe(second.item);
     expect(second.queue.items).toHaveLength(2);
     expect(second.queue.runs).toHaveLength(1);
+    h.open('first');
     await waitQueue(h, (view) => view.status === 'stopped' && view.items.length === 0);
     expect(await allRuns(h)).toHaveLength(3);
   });
 
   it('continues a paused queue: the waiting task goes first, the new one waits', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 1500 }, {}] });
+    h.script({ code: [{ waitFor: h.gate('never') }, {}] });
     const a = await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     await h.call('queue_pause', { repository: h.repo });

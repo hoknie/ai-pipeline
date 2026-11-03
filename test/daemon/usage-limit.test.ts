@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
 
-import { harness, type Harness } from './harness.ts';
+import { POLL_MS, harness, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -32,7 +32,7 @@ async function waitQueue(
     const queue = await queueOf(h);
     if (done(queue)) return queue;
     if (Date.now() > deadline) throw new Error(`timed out; queue: ${JSON.stringify(queue)}`);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
 }
 
@@ -62,7 +62,15 @@ describe('a usage limit in the queue', () => {
     await h.call('queue_settings', { repository: h.repo, skipFailed: true, parallel: 2 });
     await h.call('queue_start', { repository: h.repo });
     const queue = await waitQueue(h, (view) => view.stop?.kind === 'limit');
-    await pause(1000);
+    // both places hit the limit; nothing is taken after them
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const runs = await allRuns(h);
+      if (runs.length === 2 && runs.every((run) => run.groups[0]?.status === 'waiting')) break;
+      if (Date.now() > deadline) throw new Error(`timed out; runs: ${JSON.stringify(runs)}`);
+      await pause(POLL_MS);
+    }
+    await pause(200);
     const after = await queueOf(h);
     expect(after.status).toBe('stopped');
     expect(after.stop).toMatchObject({ kind: 'limit', runtime: 'claude', autoResume: true });
@@ -115,11 +123,13 @@ describe('a usage limit in the queue', () => {
 
   it('resumes a queue whose reset passed while the daemon was down', async () => {
     const h = await start();
-    h.script({ code: [{ usageLimit: { resetsAt: resetIn(2) } }, {}] });
+    const resetsAt = resetIn(2);
+    h.script({ code: [{ usageLimit: { resetsAt } }, {}] });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const stopped = await waitQueue(h, (view) => view.stop?.kind === 'limit');
-    await h.restart(() => execSleep(3000));
+    // down until the reset has passed; the daemon itself would wake a second after it
+    await h.restart(() => execSleep(Math.max(0, resetsAt * 1000 - Date.now() + 100)));
     const runId = (stopped.stop as { run: string }).run;
     await h.waitFor(runId, (view) => view.state === 'finished');
     expect((await queueOf(h)).stop?.kind).not.toBe('limit');
@@ -167,7 +177,7 @@ describe('return a run to the queue', () => {
 
   it('removes the return item when the run is retried by hand before it is taken', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, { delayMs: 1500 }] });
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('retry') }] });
     const runId = await failedRun(h);
     const returned = (await h.call('queue_return', { runId })) as QueueView & { item: string };
     await h.call('retry', { runId, group: (await h.status(runId)).groups[0]!.slug });
@@ -178,12 +188,13 @@ describe('return a run to the queue', () => {
     await expect(
       h.call('queue_run_now', { repository: h.repo, item: returned.item }),
     ).rejects.toThrow('unknown queue item');
+    h.open('retry');
     await h.waitFor(runId, (run) => run.state === 'finished');
   });
 
   it('moves a skipped run back to the places once, not twice, after a retry', async () => {
     const h = await start();
-    h.script({ code: [{ noReport: true }, { delayMs: 1500 }] });
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('retry') }] });
     await add(h, 'A');
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await h.call('queue_start', { repository: h.repo });
@@ -192,6 +203,7 @@ describe('return a run to the queue', () => {
     await h.call('retry', { runId, group: (await h.status(runId)).groups[0]!.slug });
     const view = await waitQueue(h, (queue) => queue.skipped.length === 0);
     expect(view.runs.map((card) => card.id)).toEqual([runId]);
+    h.open('retry');
     await h.waitFor(runId, (run) => run.state === 'finished');
     await waitQueue(h, (queue) => queue.runs.length === 0);
   });

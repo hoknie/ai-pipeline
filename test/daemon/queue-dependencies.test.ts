@@ -10,7 +10,7 @@ import {
   type RunCreated,
   type StreamEvent,
 } from '../../src/protocol/index.ts';
-import { MANUAL_CONFIG, WORKFLOW_CONFIG, startRun } from './harness.ts';
+import { MANUAL_CONFIG, WORKFLOW_CONFIG, startRun, until } from './harness.ts';
 import {
   start,
   stop,
@@ -24,10 +24,14 @@ import {
   run_,
 } from './queue-harness.ts';
 
+const queuesOf = (events: StreamEvent[]): QueueView[] =>
+  events.flatMap((event) => (event.event === 'queue' ? [event.queue as unknown as QueueView] : []));
+
 describe('dependencies of queue items', () => {
   it('resolves ids of items, started items and runs, and rejects unknown ones', async () => {
     const h = await start();
-    h.script({ code: [WRITE_LIB, {}] });
+    // A holds its run: the ids are checked while it runs
+    h.script({ code: [{ waitFor: h.gate('a') }] });
     const first = await add(h, 'A');
     const second = await add(h, 'B', { after: [first.item, first.item] });
     expect(itemById(second, second.item)?.after).toEqual([
@@ -51,13 +55,12 @@ describe('dependencies of queue items', () => {
     // the id of an item that became a run still works
     const third = await add(h, 'C', { after: [first.item] });
     expect(itemById(third, third.item)?.after.map((dependency) => dependency.id)).toEqual([runId]);
-    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
     expect((await allRuns(h)).map((run) => run.id)).toContain(runId);
   });
 
   it('queues a run with an unfinished dependency and starts the stopped queue', async () => {
     const h = await start();
-    h.script({ code: [{ ...WRITE_LIB, delayMs: 1500 }, {}] });
+    h.script({ code: [{ ...WRITE_LIB, waitFor: h.gate('a') }, {}] });
     const first = await add(h, 'A');
     const queued = await run_(h, 'B', [first.item]);
     expect(queued.run).toBeNull();
@@ -65,6 +68,7 @@ describe('dependencies of queue items', () => {
     expect(queued.queue.runs).toHaveLength(1);
     expect(queued.queue.items).toHaveLength(1);
     expect(queued.queue.items[0]).toMatchObject({ readiness: 'waiting' });
+    h.open('a');
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
     expect(await allRuns(h)).toHaveLength(2);
   });
@@ -86,7 +90,14 @@ describe('dependencies of queue items', () => {
 
   it('starts an independent task before a dependent one and the dependent one after delivery', async () => {
     const h = await start();
-    h.script({ code: [{ ...WRITE_LIB, delayMs: 1200 }, { delayMs: 2500 }, { read: ['lib.ts'] }] });
+    // A and C both run; whichever took the first action finishes first, the other one after it
+    h.script({
+      code: [
+        { ...WRITE_LIB, waitFor: h.gate('first') },
+        { waitFor: h.gate('second') },
+        { read: ['lib.ts'] },
+      ],
+    });
     const a = await add(h, 'A');
     const b = await add(h, 'B', { after: [a.item] });
     await add(h, 'C');
@@ -96,6 +107,9 @@ describe('dependencies of queue items', () => {
     expect(first.runs).toHaveLength(2);
     expect(first.items.map((item) => item.id)).toEqual([b.item]);
     expect(first.items[0]).toMatchObject({ readiness: 'waiting' });
+    h.open('first');
+    await waitQueue(h, (queue) => queue.runs.length < 2);
+    h.open('second');
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
     const runs = await allRuns(h);
     expect(runs.map((run) => run.title)).toEqual(['A', 'C', 'B']);
@@ -114,7 +128,8 @@ describe('dependencies of queue items', () => {
       (run) => run.id,
     );
     await h.waitFor(runId!, (view) => view.finished);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    // nothing starts B while A waits for apply
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const waiting = await queueOf(h);
     expect(waiting.status).toBe('running');
     expect(waiting.items).toHaveLength(1);
@@ -149,17 +164,15 @@ describe('dependencies of queue items', () => {
     const ready = await waitQueue(h, (queue) => itemById(queue, b.item)?.readiness === 'ready');
     expect(ready.status).toBe('stopped');
     expect(ready.stop).toMatchObject({ kind: 'problem', reason: 'failed' });
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    expect(await allRuns(h)).toHaveLength(1);
     // the stopped queue changed only in readiness: subscribers still get a queue event
-    const readyEvent = retryEvents.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
-    );
-    expect(
-      readyEvent.some(
+    await until('a queue event with B ready', () =>
+      queuesOf(retryEvents).some(
         (queue) => queue.status === 'stopped' && itemById(queue, b.item)?.readiness === 'ready',
       ),
-    ).toBe(true);
+    );
+    // a ready item does not start a stopped queue
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(await allRuns(h)).toHaveLength(1);
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
     expect(await allRuns(h)).toHaveLength(2);
@@ -284,12 +297,13 @@ describe('dependencies of queue items', () => {
     );
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const queues = events.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
-    );
-    expect(queues.some((queue) => itemById(queue, b.item)?.readiness === 'waiting')).toBe(true);
-    expect(queues.some((queue) => itemById(queue, b.item)?.after[0]?.kind === 'run')).toBe(true);
+    await until('queue events with B waiting on a run', () => {
+      const queues = queuesOf(events);
+      return (
+        queues.some((queue) => itemById(queue, b.item)?.readiness === 'waiting') &&
+        queues.some((queue) => itemById(queue, b.item)?.after[0]?.kind === 'run')
+      );
+    });
     await stop(h);
     expect(await ended).toBe('closed');
   });
@@ -309,11 +323,9 @@ describe('dependencies of queue items', () => {
     );
     await h.call('retry', { runId, group: view.groups[0]!.slug });
     await waitQueue(h, (queue) => queue.skipped.length === 0);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const queues = events.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    await until('a queue event without skipped runs', () =>
+      queuesOf(events).some((queue) => queue.skipped.length === 0),
     );
-    expect(queues.some((queue) => queue.skipped.length === 0)).toBe(true);
     await stop(h);
     expect(await ended).toBe('closed');
   });
@@ -334,11 +346,10 @@ describe('dependencies of queue items', () => {
       revision: null,
       level: 'global',
     });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const queues = events.flatMap((event) =>
-      event.event === 'queue' ? [event.queue as unknown as QueueView] : [],
+    await until('a queue event with the new autoDeliver', () =>
+      queuesOf(events).some((queue) => queue.autoDeliver === value),
     );
-    expect(queues.at(-1)?.autoDeliver).toBe(value);
+    expect(queuesOf(events).at(-1)?.autoDeliver).toBe(value);
     await stop(h);
     expect(await ended).toBe('closed');
   });

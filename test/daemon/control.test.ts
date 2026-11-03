@@ -1,10 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { WORKFLOW_CONFIG, statuses } from './harness.ts';
+import type { RunView } from '../../src/protocol/index.ts';
+import { WORKFLOW_CONFIG, statuses, until } from './harness.ts';
 import { SHORT_TIMEOUT, alive, calls, run, start } from './control-harness.ts';
 
 describe('failures and control', () => {
@@ -21,16 +22,14 @@ describe('failures and control', () => {
     h.script({ code: [{ child: true, hang: true }] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const children = readFileSync(join(h.fakeState, 'children'), 'utf8')
-      .trim()
-      .split('\n')
-      .map(Number);
+    const childrenFile = join(h.fakeState, 'children');
+    await until('the child of the agent', () => existsSync(childrenFile));
+    const children = readFileSync(childrenFile, 'utf8').trim().split('\n').map(Number);
     expect(children.filter(alive)).toHaveLength(1);
     await h.call('cancel', { runId });
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['cancelled']);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await until('the child stopped', () => children.filter(alive).length === 0);
     expect(children.filter(alive)).toEqual([]);
   });
 
@@ -39,7 +38,8 @@ describe('failures and control', () => {
     h.script({ code: [{ hang: true }, {}] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // the agent process runs: the cancel stops it, not a launch still in progress
+    await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
     await h.call('cancel', { runId });
     const cancelled = await h.waitFor(runId, (view) => view.finished);
     expect(cancelled.state).toBe('cancelled');
@@ -51,13 +51,14 @@ describe('failures and control', () => {
 
   it('skips an upcoming step: the step never runs', async () => {
     const h = await start();
-    h.script({ code: [{ delayMs: 600 }] });
+    h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     const skipped = (await h.call('run_skip', { runId, step: 'review', skip: true })) as {
       steps: { id: string; skipped: boolean }[];
     };
     expect(skipped.steps.find((entry) => entry.id === 'review')?.skipped).toBe(true);
+    h.open('code');
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged']);
     expect(calls(h).map((call) => call.step)).toEqual(['code']);
@@ -106,9 +107,16 @@ describe('failures and control', () => {
 
   it('never runs more than max specialists at once', async () => {
     const h = await start(WORKFLOW_CONFIG.replace('max: 3', 'max: 2'));
-    h.script({ code: [{ delayMs: 600 }], review: [{ delayMs: 300 }] });
+    h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, 4);
     let peak = 0;
+    const running = (view: RunView) =>
+      view.groups.filter((group) => group.status === 'running').length;
+    // two coders hold their places; the other two groups must wait however long they work
+    await h.waitFor(runId, (view) => running(view) === 2);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(running(await h.status(runId))).toBe(2);
+    h.open('code');
     const final = await h.waitFor(runId, (view) => {
       peak = Math.max(peak, view.groups.filter((group) => group.status === 'running').length);
       return view.finished;

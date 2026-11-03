@@ -2,9 +2,6 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-
 interface Action {
   verdict?: 'done' | 'rejected' | 'needs_human';
   summary?: string;
@@ -48,6 +45,62 @@ interface Action {
   /** Pause between the calls of `usage`. */
   usageGapMs?: number;
   noResult?: boolean;
+}
+
+/**
+ * A minimal MCP client over stdio (newline-delimited JSON-RPC): enough to call the tools of the
+ * worker server. The SDK client costs a noticeable import on every start of the fake agent.
+ */
+async function connectWorker(command: string, commandArgs: string[]) {
+  const child = spawn(command, commandArgs, { stdio: ['pipe', 'pipe', 'inherit'] });
+  const pending = new Map<number, (message: Record<string, unknown>) => void>();
+  let buffer = '';
+  let nextId = 1;
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => {
+    buffer += chunk;
+    for (let end = buffer.indexOf('\n'); end !== -1; end = buffer.indexOf('\n')) {
+      const line = buffer.slice(0, end).trim();
+      buffer = buffer.slice(end + 1);
+      if (!line) continue;
+      const message = JSON.parse(line) as Record<string, unknown>;
+      const id = message.id as number | undefined;
+      if (id !== undefined && pending.has(id)) {
+        pending.get(id)!(message);
+        pending.delete(id);
+      }
+    }
+  });
+  const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
+  const send = (message: Record<string, unknown>) =>
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', ...message })}\n`);
+  const call = (method: string, params: Record<string, unknown>) =>
+    new Promise<unknown>((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, (message) =>
+        message.error
+          ? reject(new Error((message.error as { message: string }).message))
+          : resolve(message.result),
+      );
+      send({ id, method, params });
+    });
+  child.once('exit', () => {
+    for (const settle of pending.values()) settle({ error: { message: 'worker exited' } });
+  });
+  await call('initialize', {
+    protocolVersion: '2025-06-18',
+    capabilities: {},
+    clientInfo: { name: 'fake-agent', version: '0' },
+  });
+  send({ method: 'notifications/initialized' });
+  return {
+    callTool: (request: { name: string; arguments: Record<string, unknown> }) =>
+      call('tools/call', request),
+    async close() {
+      child.stdin.end();
+      await closed;
+    },
+  };
 }
 
 const [mode, ...args] = process.argv.slice(2);
@@ -304,10 +357,7 @@ if (action.usageLimit && mode === 'claude') {
 }
 
 if (!action.noReport) {
-  const client = new Client({ name: 'fake-agent', version: '0' });
-  await client.connect(
-    new StdioClientTransport({ command: worker.command, args: worker.args, stderr: 'inherit' }),
-  );
+  const client = await connectWorker(worker.command, worker.args);
   if (action.split)
     await client.callTool({ name: 'swarm_split', arguments: { groups: action.split } });
   if (action.queue) {
