@@ -30,6 +30,8 @@ import {
   openFake,
   repositoryView,
   runView,
+  systemRow,
+  topologyOf,
 } from './fixtures.ts';
 
 beforeEach(() => {
@@ -1050,5 +1052,128 @@ describe('run steps', () => {
     render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
     fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
     await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'review', false));
+  });
+});
+
+describe('skip step on the group screen', () => {
+  const steps = (skippedReview = false) => [
+    { id: 'plan', specialist: 'plan', skipped: false, state: 'done' as const },
+    { id: 'code', specialist: 'coder', skipped: false, state: 'active' as const },
+    { id: 'review', specialist: 'reviewer', skipped: skippedReview, state: 'upcoming' as const },
+  ];
+  const onStep = (stepId: string, status: 'running' | 'queued' = 'queued') => {
+    const base = topologyOf();
+    return {
+      ...base,
+      steps: base.steps.map((step) => ({
+        ...step,
+        groups: step.id === stepId ? [{ slug: 'login', title: 'Вход', status }] : [],
+      })),
+    };
+  };
+  const screenOf = (
+    run: ReturnType<typeof runView>,
+    api = fakeApi(),
+    row: Parameters<typeof GroupScreen>[0]['row'] = groupRow(),
+    onError: (message: string) => void = () => undefined,
+  ) =>
+    render(
+      <GroupScreen
+        api={api}
+        runId="run1"
+        row={row}
+        run={run}
+        draftKey="run1/login"
+        drafts={{}}
+        onDraft={() => undefined}
+        onClearDrafts={() => undefined}
+        onError={onError}
+      />,
+    );
+  const button = () => screen.queryByRole('button', { name: 'Skip step' });
+
+  it('shows a visible label next to the switches of the run header', () => {
+    render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
+    expect(screen.getAllByText('Skip')).toHaveLength(2);
+  });
+
+  it('skips a running step after the confirmation', async () => {
+    const api = fakeApi();
+    screenOf(runView(), api);
+    fireEvent.click(button()!);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(api.skipStep).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByText('Skip step'));
+    await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'code', true));
+  });
+
+  it('does not skip when the confirmation is declined', async () => {
+    const api = fakeApi();
+    screenOf(runView(), api);
+    fireEvent.click(button()!);
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByText('Do not skip'));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.skipStep).not.toHaveBeenCalled();
+  });
+
+  it('skips the step the group waits for, not the step of its last attempt, without a dialog', async () => {
+    const api = fakeApi();
+    screenOf(
+      runView({ topology: onStep('review'), steps: steps() }),
+      api,
+      groupRow({ status: 'queued' }),
+    );
+    fireEvent.click(button()!);
+    await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'review', true));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('warns that the step is skipped for all groups when the run has several', async () => {
+    const api = fakeApi();
+    const run = runView({
+      topology: onStep('review'),
+      steps: steps(),
+      groups: [groupRow({ status: 'queued' }), groupRow({ slug: 'other', title: 'Другая' })],
+    });
+    screenOf(run, api, groupRow({ status: 'queued' }));
+    fireEvent.click(button()!);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/for all groups of the run/)).toBeTruthy();
+    expect(api.skipStep).not.toHaveBeenCalled();
+  });
+
+  it('has no button for a merged group, a skipped step or a system step', () => {
+    const merged = runView({
+      topology: { ...onStep('none'), merged: [{ slug: 'login', title: 'Вход', status: 'merged' }] },
+    });
+    screenOf(merged, fakeApi(), groupRow({ status: 'merged' }));
+    expect(button()).toBeNull();
+    cleanup();
+    screenOf(
+      runView({ topology: onStep('review'), steps: steps(true) }),
+      fakeApi(),
+      groupRow({ status: 'failed' }),
+    );
+    expect(button()).toBeNull();
+    cleanup();
+    screenOf(runView({ groups: [], system: [systemRow('split')] }), fakeApi(), systemRow('split'));
+    expect(button()).toBeNull();
+  });
+
+  it('shows the refusal of the daemon and enables the button again', async () => {
+    const api = fakeApi();
+    api.skipStep = vi.fn(async () => {
+      throw new Error('step `code` is refused');
+    });
+    const onError = vi.fn();
+    screenOf(
+      runView({ topology: onStep('code', 'queued'), steps: steps() }),
+      api,
+      groupRow(),
+      onError,
+    );
+    fireEvent.click(button()!);
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('step `code` is refused'));
+    await waitFor(() => expect((button() as HTMLButtonElement).disabled).toBe(false));
   });
 });

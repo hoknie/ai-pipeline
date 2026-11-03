@@ -210,6 +210,7 @@ export const en = {
       doneSkip: 'Step skipped',
       doneUnskip: 'Step brought back',
       switchLabel: 'Skip step {{step}}',
+      confirmAllGroups: 'The step will be skipped for all groups of the run.',
     },
     system: {
       split: 'Split into groups',
@@ -232,6 +233,7 @@ export const en = {
       cancelGroup: 'Cancel group',
       cancelled: 'Group cancelled',
       retry: 'Retry',
+      skipStep: 'Skip step',
       limitUntil: 'Limit until {{time}}',
       limitReason: 'The usage limit ran out',
       limitReasonAt: 'The usage limit ran out, resets at {{time}}',

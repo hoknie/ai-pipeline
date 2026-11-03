@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
-import { useConfirm } from '../../confirm.tsx';
-import { notifySuccess } from '../../notify.ts';
 import type { RunView } from '../../types.ts';
 import { Switch } from '../../ui/switch.tsx';
+
+import { useSkipStep } from './skipStep.tsx';
 
 /** The steps of the group workflow; steps that are not finished can be skipped for the run. */
 export function RunSteps({
@@ -18,33 +17,8 @@ export function RunSteps({
   onError: (message: string) => void;
 }) {
   const { t } = useTranslation();
-  const confirm = useConfirm();
-  const [pending, setPending] = useState<string | null>(null);
+  const { pending, toggle } = useSkipStep(run, api, onError);
   if (!run.steps || run.steps.length === 0) return null;
-  const toggle = async (id: string, skip: boolean) => {
-    const busy = run.topology.steps
-      .find((step) => step.id === id)
-      ?.groups.some((group) => group.status === 'running' || group.status === 'needs_human');
-    if (skip && busy) {
-      const yes = await confirm({
-        title: t('runs.steps.confirmTitle', { step: id }),
-        description: t('runs.steps.confirmDescription'),
-        confirmLabel: t('runs.steps.confirmLabel'),
-        cancelLabel: t('runs.steps.keep'),
-        destructive: true,
-      });
-      if (!yes) return;
-    }
-    setPending(id);
-    try {
-      await api.skipStep(run.id, id, skip);
-      notifySuccess(t(skip ? 'runs.steps.doneSkip' : 'runs.steps.doneUnskip'));
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setPending(null);
-    }
-  };
   return (
     <ol
       aria-label={t('runs.steps.title')}
@@ -58,12 +32,15 @@ export function RunSteps({
             {step.skipped ? t('runs.steps.skipped') : t(`runs.steps.${step.state}`)}
           </span>
           {step.state !== 'done' ? (
-            <Switch
-              checked={step.skipped}
-              disabled={pending !== null}
-              aria-label={t('runs.steps.switchLabel', { step: step.id })}
-              onCheckedChange={(checked) => void toggle(step.id, checked)}
-            />
+            <label className="inline-flex items-center gap-1 text-xs">
+              <Switch
+                checked={step.skipped}
+                disabled={pending !== null}
+                aria-label={t('runs.steps.switchLabel', { step: step.id })}
+                onCheckedChange={(checked) => void toggle(step.id, checked)}
+              />
+              {t('runs.steps.skip')}
+            </label>
           ) : null}
         </li>
       ))}

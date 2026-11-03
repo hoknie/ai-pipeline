@@ -59,7 +59,7 @@ The sections are "Runs", "Queue", "Topology", "Specialists" and "Workflow". The 
 - Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
 - A run card shows the first line of the task, the status, workflow, time, cost and a summary of changes (`2 files +367 −0`).
 - The run header has "Deliver", "Cancel run" and "Retry failed (N)". The "More" menu has "Deliver with --force…" and "Copy run id".
-- The run header has a "Steps" block: each step of the workflow with its state (done, running, upcoming) and a "Skip" switch for steps that are not finished yet.
+- The run header has a "Steps" block: each step of the workflow with its state (done, running, upcoming) and a "Skip" switch with a visible label for steps that are not finished yet.
   - Skipping a running step asks for confirmation: the specialist is stopped without a commit.
   - Its partial changes stay uncommitted in the group worktree.
   - Turning the switch off brings the step back.
@@ -68,7 +68,8 @@ The sections are "Runs", "Queue", "Topology", "Specialists" and "Workflow". The 
 
 ### Group
 
-- The header has the step, round, time, changes, delivery, "Retry step" and "Cancel group".
+- The header has the step, round, time, changes, delivery, "Retry step", "Skip step" and "Cancel group".
+  - "Skip step" is shown for the step the group stands on, unless that step is skipped or finished. It skips the step for the whole run. The panel asks for confirmation when an attempt is running on the step or the run has more than one group.
 - Above the tabs are the question to a human, warnings and files outside the worktree.
 - "Log" shows the attempts of the group: specialist, runtime, verdict, tokens and cost. The log of a running attempt keeps loading by itself.
 - "Changes" is a file tree with `+N −M`. "Task" shows the task text.

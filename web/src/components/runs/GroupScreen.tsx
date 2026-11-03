@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, SkipForward } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +24,7 @@ import { QuestionCard } from './QuestionCard.tsx';
 import { FilePath } from '../FilePath.tsx';
 import { ApplyDialog } from './ApplyDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
+import { stepOfGroup, useSkipStep } from './skipStep.tsx';
 
 type Tab = 'log' | 'changes' | 'task';
 
@@ -94,6 +95,10 @@ export function GroupScreen({
   const [reasonOpen, setReasonOpen] = useState(false);
   const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}`;
   const caps = capabilities(row, deliverable);
+  const skipper = useSkipStep(run, api, onError);
+  const skippable = run && !('kind' in row) ? stepOfGroup(run, row.slug) : null;
+  const skipState = skippable ? run?.steps?.find((step) => step.id === skippable) : undefined;
+  const canSkip = !!run && !!skipState && skipState.state !== 'done' && !skipState.skipped;
   const title = 'kind' in row ? t(`runs.system.${row.kind}`) : row.title;
 
   useEffect(() => {
@@ -183,6 +188,19 @@ export function GroupScreen({
             >
               <RotateCcw />
               {t('runs.group.retry')}
+            </Button>
+          ) : null}
+          {canSkip && run && skippable ? (
+            <Button
+              variant="outline"
+              size="sm"
+              loading={skipper.pending !== null}
+              onClick={() =>
+                void skipper.toggle(skippable, true, { allGroups: run.groups.length > 1 })
+              }
+            >
+              <SkipForward />
+              {t('runs.group.skipStep')}
             </Button>
           ) : null}
           {caps.cancel ? (

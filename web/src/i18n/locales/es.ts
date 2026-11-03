@@ -215,6 +215,7 @@ export const es: Dictionary = {
       doneSkip: 'Paso omitido',
       doneUnskip: 'Paso restaurado',
       switchLabel: 'Omitir el paso {{step}}',
+      confirmAllGroups: 'El paso se omitirá para todos los grupos del lanzamiento.',
     },
     system: {
       split: 'División en grupos',
@@ -237,6 +238,7 @@ export const es: Dictionary = {
       cancelGroup: 'Cancelar grupo',
       cancelled: 'Grupo cancelado',
       retry: 'Reintentar',
+      skipStep: 'Omitir paso',
       limitUntil: 'Límite hasta las {{time}}',
       limitReason: 'Se agotó el límite de uso',
       limitReasonAt: 'Se agotó el límite de uso, se reinicia a las {{time}}',

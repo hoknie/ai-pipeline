@@ -210,6 +210,7 @@ export const zh: Dictionary = {
       doneSkip: '步骤已跳过',
       doneUnskip: '步骤已恢复',
       switchLabel: '跳过步骤 {{step}}',
+      confirmAllGroups: '该步骤将对运行中的所有分组跳过。',
     },
     system: {
       split: '拆分为分组',
@@ -232,6 +233,7 @@ export const zh: Dictionary = {
       cancelGroup: '取消分组',
       cancelled: '分组已取消',
       retry: '重试',
+      skipStep: '跳过步骤',
       limitUntil: '限额至 {{time}}',
       limitReason: '用量限额已用完',
       limitReasonAt: '用量限额已用完，{{time}} 重置',

@@ -214,6 +214,7 @@ export const ru: Dictionary = {
       doneSkip: 'Шаг пропущен',
       doneUnskip: 'Шаг возвращён',
       switchLabel: 'Пропустить шаг {{step}}',
+      confirmAllGroups: 'Шаг будет пропущен для всех групп запуска.',
     },
     system: {
       split: 'Деление на группы',
@@ -236,6 +237,7 @@ export const ru: Dictionary = {
       cancelGroup: 'Отменить группу',
       cancelled: 'Группа отменена',
       retry: 'Повторить',
+      skipStep: 'Пропустить шаг',
       limitUntil: 'Лимит до {{time}}',
       limitReason: 'Кончился лимит',
       limitReasonAt: 'Кончился лимит, сброс в {{time}}',
