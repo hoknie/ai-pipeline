@@ -118,6 +118,8 @@ import {
   type WorkflowsView,
   type WebStartResult,
   type WebStatusResult,
+  type BackgroundProcessesView,
+  runTitle,
   type WebStopResult,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
@@ -125,6 +127,13 @@ import { Store, type KnownRepository } from '../store/index.ts';
 
 import { Executor, type AttemptKey } from './executor.ts';
 import { readLines, readTail } from './logs.ts';
+import {
+  selectBackground,
+  snapshotProcesses,
+  terminateTree,
+  type AgentRoot,
+  type PsRow,
+} from './processes.ts';
 
 const NO_PANEL = 'this daemon serves no web panel';
 /** A timer fires this long after a usage limit resets, so the reset has surely passed. */
@@ -181,6 +190,9 @@ export class Daemon {
   private repositoriesJson = '';
   private catalog: Tag[] = [];
   private wakeTimer: NodeJS.Timeout | null = null;
+  /** Agents that exited, by PID; their process group is background while it has members. */
+  private readonly departed = new Map<number, AgentRoot>();
+  private psCache: { at: number; rows: PsRow[] } | null = null;
 
   constructor(options: DaemonOptions) {
     this.store = new Store(databasePath(options.stateDirectory));
@@ -804,6 +816,68 @@ export class Daemon {
     this.store.close();
   }
 
+  /** An agent exited; what it left in its process group is still shown as background. */
+  agentGone(root: AgentRoot): void {
+    this.departed.set(root.pid, root);
+  }
+
+  private async processRows(fresh: boolean): Promise<PsRow[]> {
+    const now = Date.now();
+    if (!fresh && this.psCache && now - this.psCache.at < 1_000) return this.psCache.rows;
+    const rows = await snapshotProcesses();
+    this.psCache = { at: now, rows };
+    return rows;
+  }
+
+  private async backgroundProcesses(fresh: boolean) {
+    const rows = await this.processRows(fresh);
+    for (const pid of [...this.departed.keys()]) {
+      if (!rows.some((row) => row.pgid === pid)) this.departed.delete(pid);
+    }
+    const roots = [...this.executor.agentRoots(), ...this.departed.values()];
+    return { rows, found: selectBackground(rows, roots) };
+  }
+
+  private async processList(): Promise<BackgroundProcessesView> {
+    const { found } = await this.backgroundProcesses(false);
+    return {
+      processes: found.map(({ root, ...process }) => {
+        let state: RunState | null = null;
+        try {
+          state = this.state(root.run);
+        } catch {
+          state = null;
+        }
+        const group = state && root.group !== null ? findGroup(state, root.group) : null;
+        const attempt = group?.attempts.find((candidate) => candidate.seq === root.seq);
+        return {
+          ...process,
+          owner: {
+            runId: root.run,
+            runTitle: state ? runTitle(state) : root.run,
+            repository: state?.run.repository ?? '',
+            group: root.group,
+            groupTitle: group?.title ?? null,
+            step: attempt?.stepId ?? null,
+          },
+        };
+      }),
+    };
+  }
+
+  private async processKill(pid: number): Promise<{ ok: true }> {
+    const { rows, found } = await this.backgroundProcesses(true);
+    if (!found.some((process) => process.pid === pid)) {
+      throw new Rejection(`not a background process: ${pid}`);
+    }
+    void terminateTree(pid, {
+      rows,
+      stillBackground: async () =>
+        new Set((await this.backgroundProcesses(true)).found.map((process) => process.pid)),
+    }).catch(() => undefined);
+    return { ok: true };
+  }
+
   /** An agent runs (a step or the naming of a run) or a group merges. */
   busy(): boolean {
     if (this.executor.busy()) return true;
@@ -909,6 +983,10 @@ export class Daemon {
         });
       case 'subscribe':
         return Promise.reject(new Rejection('subscribe is served on its own connection'));
+      case 'processes':
+        return this.processList();
+      case 'process_kill':
+        return this.processKill(request.params.pid);
       case 'web_status':
         return Promise.resolve(
           this.panel?.status() ?? {

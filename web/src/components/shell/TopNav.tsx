@@ -10,7 +10,6 @@ import { Button } from '../../ui/button.tsx';
 import { Kbd } from '../../ui/kbd.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip.tsx';
 
-import { ConnectionIndicator } from './ConnectionIndicator.tsx';
 import { LanguageMenu } from './LanguageMenu.tsx';
 import { NavCounter } from './NavCounter.tsx';
 import type { NavProps } from './NavSidebar.tsx';
@@ -39,7 +38,6 @@ export function TopNav({
   working,
   waiting,
   queued,
-  connection,
   onPalette,
   onEnableNotifications,
   repository,
@@ -148,7 +146,6 @@ export function TopNav({
         ) : null}
         <LanguageMenu compact />
         <ThemeMenu compact />
-        <ConnectionIndicator connection={connection} compact />
       </div>
     </header>
   );

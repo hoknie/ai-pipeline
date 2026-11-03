@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 import type { Api } from '../src/api.ts';
 import type { EventSourceLike } from '../src/store.ts';
 import type {
+  BackgroundProcessView,
   ConfigCatalogResponse,
   ConfigEditorResponse,
   EditorSetting,
@@ -91,6 +92,26 @@ export function systemRow(
 ): SystemStepRow {
   const row = groupRow({ status: 'running', step: kind });
   return { ...row, kind, slug: `_${kind}`, title: `_${kind}`, ...overrides };
+}
+
+export function processView(overrides: Partial<BackgroundProcessView> = {}): BackgroundProcessView {
+  return {
+    pid: 4242,
+    name: 'node',
+    command: 'node /repo/node_modules/.bin/vite --port 5173',
+    uptimeSeconds: 125,
+    cpuPercent: 12,
+    memoryBytes: 120 * 1024 * 1024,
+    owner: {
+      runId: 'run1',
+      runTitle: 'Первый',
+      repository: '/work/app',
+      group: 'login',
+      groupTitle: 'Логин',
+      step: 'code',
+    },
+    ...overrides,
+  };
 }
 
 export function runView(overrides: Partial<RunView> = {}): RunView {
@@ -418,6 +439,8 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     skipStep: vi.fn(async () => ({})),
     cancel: vi.fn(async () => ({})),
     apply: vi.fn(async () => ({ runId: 'run1', pending: false, groups: [] })),
+    processes: vi.fn(async () => ({ processes: [] })),
+    killProcess: vi.fn(async () => ({ ok: true })),
     tags: vi.fn(async () => []),
     addTag: vi.fn(async (name: string) => [tagView(name)]),
     editTag: vi.fn(async () => []),

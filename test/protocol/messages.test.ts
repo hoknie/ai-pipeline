@@ -518,3 +518,21 @@ describe('web panel control', () => {
     expect(webStopResultSchema.safeParse({ state: 'gone' }).success).toBe(false);
   });
 });
+
+describe('background processes', () => {
+  it('parses processes and process_kill', () => {
+    expect(parseRequest(JSON.stringify({ id: 1, method: 'processes' }))).toEqual({
+      id: 1,
+      request: { method: 'processes', params: {} },
+    });
+    expect(
+      parseRequest(JSON.stringify({ id: 2, method: 'process_kill', params: { pid: 4242 } })),
+    ).toEqual({ id: 2, request: { method: 'process_kill', params: { pid: 4242 } } });
+  });
+
+  it.each([0, -1, '1', 1.5])('rejects the pid %j', (pid) => {
+    expect(
+      'error' in parseRequest(JSON.stringify({ id: 3, method: 'process_kill', params: { pid } })),
+    ).toBe(true);
+  });
+});

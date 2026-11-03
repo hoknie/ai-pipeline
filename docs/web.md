@@ -132,14 +132,21 @@ The tab edits the `aip/workflows/<id>.yaml` files of the project and of the shar
 - Running runs continue from their snapshot after the workflow is deleted. A new run of a deleted workflow is rejected.
 - The addresses are `#workflows`, `#workflows/<id>` and `#workflows/new`.
 
-## Specialist load
+## Status
 
-Under every section is a collapsible "Specialist load" strip with the current load across all repositories. Whether it is open is remembered in the browser, and it updates with every run event.
+Under every section is a collapsible "Status" strip with the current load across all repositories. Whether it is open and which tab is selected are remembered in the browser. The specialists update with every run event, the background processes every 3 seconds while the page is visible.
 
-- Collapsed, it shows "running N · waiting M", or "All specialists are free".
-- Expanded, it has "Global" (specialists defined only in the global `aip/` directory, with the repositories that use them) and "Project" (by repository, the selected one first).
+- Collapsed, it shows "Status: specialists — running N · waiting M | background processes — running K". Zeros are shown. Before the first answer about processes, or when it fails, K is "—".
+- On the right of the strip is the connection indicator: "Connected", "Reconnecting" or "Polling". A click on it does not open the strip.
+- Expanded, it has two tabs: "Specialists" and "Background processes".
+- "Specialists" has "Global" (specialists defined only in the global `aip/` directory, with the repositories that use them) and "Project" (by repository, the selected one first).
 - Each specialist shows its limit (`of N`) and the groups running on it or waiting for it, with the step and the run title. A click on a group opens it in "Runs".
 - A project specialist that overrides a global one counts as a project specialist.
+- "Background processes" lists what the agents of the daemon started: their child processes and the members of their process groups, including those left after the agent exited, while they live.
+- The agent itself and its `aip mcp --worker` server are not listed.
+- A row has the PID, the name (the full command line is in the tooltip), the owner group (a link to it), the uptime, the average CPU (CPU time over uptime, percent of one core) and the memory (resident set).
+- "Terminate" asks for confirmation, then sends `SIGTERM` to the process and its children and, after 5 seconds, `SIGKILL` to those still alive. The group keeps running. The daemon ends only processes from its own list; any other PID is refused.
+- Processes that left the process tree and group of the agent (`setsid`, a double fork) are not listed.
 
 ## Keyboard and look
 
@@ -148,7 +155,6 @@ Under every section is a collapsible "Specialist load" strip with the current lo
 - Cancelling a run or a group, removing from the queue, leaving an unsaved form and rereading the configuration ask for confirmation. Focus is on the refusal, and `Esc` refuses.
 - Results of actions are notifications. Errors stay until you dismiss them.
 - Themes are "System", "Light" and "Dark". The choice is remembered.
-- The connection indicator shows "Connected", "Reconnecting" or "Polling".
 - The notifications button turns on browser notifications for `needs_human` and `failed`.
 - The interface is in English, Spanish, Russian and Chinese. The browser language chooses it, and the "Language" menu changes it.
 - The panel needs a current browser: Chrome 111, Safari 16.4 or Firefox 128 and newer.
@@ -156,6 +162,7 @@ Under every section is a collapsible "Specialist load" strip with the current lo
 ## HTTP API
 
 - `POST /api/runs/<id>/skip` with the body `{"step": "<step id>", "skip": true}` skips a step of the run (`false` brings it back) and returns the run. A refusal of the daemon (unknown step, a step every group has passed) comes back with code 400.
+- `GET /api/processes` returns the background processes of the agents (`{"processes": [...]}`). `POST /api/processes/<pid>/kill` terminates one; a PID that is not a number comes back with code 400, a PID that is not in the list with code 404.
 - `GET /api/repositories` returns the repositories with counters.
 - `POST /api/repositories` with the body `{"path": "<absolute path>"}` adds one.
 - `DELETE /api/repositories?repository=<absolute path>` removes one.

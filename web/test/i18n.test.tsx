@@ -231,6 +231,15 @@ const SAME_AS_ENGLISH = new Set([
   'Error',
   'Global',
   'global',
+  // Units and abbreviations written the same way in several languages.
+  'PID',
+  's',
+  'min',
+  'h',
+  'KB',
+  'MB',
+  'GB',
+  '{{group}} · {{run}}',
 ]);
 
 describe.each(Object.keys(DICTIONARIES))('dictionary %s', (language) => {

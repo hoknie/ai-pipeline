@@ -108,3 +108,27 @@ export function reasonLabel(reason: string, t: TFunction): string {
   if (!limit) return reason;
   return limit[1] ? t('runs.group.limitReasonAt', { time: limit[1] }) : t('runs.group.limitReason');
 }
+
+/** Uptime of a process: `45 s`, `2 min 5 s`, `3 h 2 min`. */
+export function formatUptime(seconds: number, t: TFunction): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const sec = t('format.unitSec');
+  const min = t('format.unitMin');
+  if (total < 60) return `${total} ${sec}`;
+  if (total < 3600) return `${Math.floor(total / 60)} ${min} ${total % 60} ${sec}`;
+  return `${Math.floor(total / 3600)} ${t('format.unitHour')} ${Math.floor((total % 3600) / 60)} ${min}`;
+}
+
+/** Average CPU of a process in percent of one core, with one decimal in the language's style. */
+export function formatCpu(percent: number, locale: string): string {
+  return `${new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(percent)} %`;
+}
+
+/** Resident memory in KB, MB or GB (1024-based). */
+export function formatMemory(bytes: number, t: TFunction, locale: string): string {
+  const number = (value: number, digits: number) =>
+    new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+  if (bytes >= 1024 ** 3) return `${number(bytes / 1024 ** 3, 1)} ${t('format.unitGb')}`;
+  if (bytes >= 1024 ** 2) return `${number(bytes / 1024 ** 2, 0)} ${t('format.unitMb')}`;
+  return `${number(bytes / 1024, 0)} ${t('format.unitKb')}`;
+}

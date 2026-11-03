@@ -98,6 +98,17 @@ describe('top bar and connection', () => {
       stream().send({ event: 'snapshot', seq: 1, runs: [runView()] });
     });
     expect(screen.getByRole('status', { name: 'link with the daemon: Connected' })).toBeTruthy();
+    // the link indicator lives in the status strip, not in the header
+    expect(
+      screen
+        .getByRole('status', { name: 'link with the daemon: Connected' })
+        .closest('[data-testid="status-bar"]'),
+    ).not.toBeNull();
+    expect(
+      within(document.querySelector('header')!).queryByRole('status', {
+        name: /link with the daemon/,
+      }),
+    ).toBeNull();
     act(() => stream().fail());
     expect(screen.getByRole('status', { name: 'link with the daemon: Reconnecting' })).toBeTruthy();
     await act(async () => {

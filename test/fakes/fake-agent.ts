@@ -28,6 +28,8 @@ interface Action {
   noReport?: boolean;
   hang?: boolean;
   child?: boolean;
+  /** A child that ignores SIGTERM, so it outlives the agent's process group signal. */
+  stubbornChild?: boolean;
   exitCode?: number;
   /** Refused shell commands, reported the way Claude Code does: as events and in the result. */
   denied?: string[];
@@ -283,6 +285,10 @@ for (const [path, content] of Object.entries(action.write ?? {})) {
 for (const [path, content] of Object.entries(action.outside ?? {})) writeFileSync(path, content);
 if (action.child) {
   const child = spawn('sleep', ['300'], { stdio: 'ignore' });
+  appendFileSync(join(state, 'children'), `${child.pid}\n`);
+}
+if (action.stubbornChild) {
+  const child = spawn('sh', ['-c', 'trap "" TERM; while :; do sleep 1; done'], { stdio: 'ignore' });
   appendFileSync(join(state, 'children'), `${child.pid}\n`);
 }
 const liveUsage = action.usage ?? [];

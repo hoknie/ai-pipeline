@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { NavSidebar, type NavProps } from '../src/components/shell/NavSidebar.tsx';
 import { MobileNav } from '../src/components/shell/MobileNav.tsx';
+import { AppShell } from '../src/components/shell/AppShell.tsx';
 import { TopNav } from '../src/components/shell/TopNav.tsx';
 import { TooltipProvider } from '../src/ui/tooltip.tsx';
 
@@ -18,7 +19,6 @@ function props(extra: Partial<NavProps> = {}): NavProps {
     working: 0,
     waiting: 0,
     queued: 0,
-    connection: 'live',
     onPalette: () => {},
     onEnableNotifications: () => {},
     repository: {
@@ -58,7 +58,7 @@ describe('top navigation', () => {
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])
       expect(within(bar!).getByRole('button', { name })).toBeTruthy();
-    expect(within(bar!).getByRole('status', { name: /link with the daemon/ })).toBeTruthy();
+    expect(within(bar!).queryByRole('status', { name: /link with the daemon/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /navigation/i })).toBeNull();
     expect(bar!.className).not.toContain('flex-wrap');
   });
@@ -220,9 +220,26 @@ describe('menu on a phone', () => {
     expect(within(dialog).getByLabelText('in the queue: 1')).toBeTruthy();
     for (const name of [/^Notifications$/, /^Language/, /^Theme/])
       expect(within(dialog).getByRole('button', { name })).toBeTruthy();
-    expect(within(dialog).getByRole('status', { name: /link with the daemon/ })).toBeTruthy();
+    expect(within(dialog).queryByRole('status', { name: /link with the daemon/ })).toBeNull();
     expect(within(dialog).queryByRole('button', { name: /navigation/i })).toBeNull();
     fireEvent.click(within(dialog).getByRole('link', { name: /Queue/ }));
     expect(onNavigate).toHaveBeenCalledWith('queue');
+  });
+});
+
+describe('scrolling of the shell', () => {
+  it('keeps the page from scrolling under the footer', () => {
+    render(
+      <AppShell nav={props()} footer={<div data-testid="footer" />}>
+        <div data-testid="content" />
+      </AppShell>,
+    );
+    const root = screen.getByTestId('content').closest('.h-dvh');
+    expect(root?.classList.contains('overflow-hidden')).toBe(true);
+    expect(root?.classList.contains('relative')).toBe(true);
+    const area = screen.getByTestId('content').parentElement!;
+    expect(area.classList.contains('relative')).toBe(true);
+    expect(area.classList.contains('overflow-y-auto')).toBe(true);
+    expect(area.classList.contains('overscroll-contain')).toBe(true);
   });
 });

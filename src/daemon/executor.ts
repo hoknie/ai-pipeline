@@ -61,6 +61,7 @@ import {
 } from '../runtime/index.ts';
 
 import type { Daemon } from './daemon.ts';
+import type { AgentRoot } from './processes.ts';
 import { launchProcess, type SupervisedProcess } from './supervisor.ts';
 
 export interface AttemptKey {
@@ -106,7 +107,8 @@ export class Executor {
   private readonly graceMs: number | undefined;
   private readonly tokens = new Map<string, AttemptKey>();
   private readonly running = new Map<string, Running>();
-  private readonly naming = new Set<SupervisedProcess>();
+  private readonly keys = new Map<string, AttemptKey>();
+  private readonly naming = new Map<SupervisedProcess, string>();
   /** Working copy of the repository as it was when each running attempt started. */
   private readonly baselines = new Map<string, Baseline>();
   /** Live usage of running attempts waiting for the next flush, by run. */
@@ -116,6 +118,21 @@ export class Executor {
     this.daemon = options.daemon;
     this.entry = options.entry;
     this.graceMs = options.graceMs;
+  }
+
+  /** Agents that run now: running attempts and the naming of runs. */
+  agentRoots(): AgentRoot[] {
+    const roots: AgentRoot[] = [];
+    for (const [id, running] of this.running) {
+      const pid = running.process.pid;
+      if (pid === undefined) continue;
+      const key = this.keys.get(id);
+      if (key) roots.push({ pid, run: key.run, group: key.group, seq: key.seq });
+    }
+    for (const [process, run] of this.naming) {
+      if (process.pid !== undefined) roots.push({ pid: process.pid, run, group: null, seq: null });
+    }
+    return roots;
   }
 
   attemptFor(token: string): AttemptKey | undefined {
@@ -194,7 +211,7 @@ export class Executor {
       running.process.stop();
       return running.process.exited;
     });
-    for (const process of this.naming) {
+    for (const process of this.naming.keys()) {
       process.stop();
       exits.push(process.exited);
     }
@@ -262,11 +279,14 @@ export class Executor {
       environment: this.daemon.environment,
       graceMs: this.graceMs,
     });
-    this.naming.add(process);
+    this.naming.set(process, state.run.id);
     const timer = setTimeout(() => process.stop(), NAMING_TIMEOUT_MS);
     const exit = await process.exited;
     clearTimeout(timer);
     this.naming.delete(process);
+    if (process.pid !== undefined) {
+      this.daemon.agentGone({ pid: process.pid, run: state.run.id, group: null, seq: null });
+    }
     if (this.daemon.stopping) return;
     let lines: string[] = [];
     try {
@@ -398,10 +418,15 @@ export class Executor {
       );
     }, specialist.timeoutSeconds * 1000);
     this.running.set(keyOf(key), { process, timer });
+    this.keys.set(keyOf(key), key);
     void process.exited.then((exit) => {
       clearTimeout(timer);
       this.dropUsage(key);
       this.running.delete(keyOf(key));
+      this.keys.delete(keyOf(key));
+      if (process.pid !== undefined) {
+        this.daemon.agentGone({ pid: process.pid, run: key.run, group: key.group, seq: key.seq });
+      }
       this.tokens.delete(token);
       if (this.daemon.stopping) return undefined;
       return this.daemon.serial(async () => {

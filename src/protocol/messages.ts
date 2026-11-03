@@ -328,6 +328,11 @@ export const requestSchema = z.discriminatedUnion('method', [
         message: 'pass tags to add or remove',
       }),
   }),
+  z.object({ method: z.literal('processes'), params: z.object({}).default({}) }),
+  z.object({
+    method: z.literal('process_kill'),
+    params: z.object({ pid: z.number().int().positive() }),
+  }),
   z.object({ method: z.literal('web_status'), params: z.object({}).default({}) }),
   z.object({
     method: z.literal('web_start'),

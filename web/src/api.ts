@@ -1,5 +1,6 @@
 import type {
   ApplyResult,
+  BackgroundProcessesView,
   ConfigCatalogResponse,
   ConfigEditResult,
   ConfigEditorResponse,
@@ -58,6 +59,10 @@ export interface Api {
   skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
   cancel(runId: string, group?: string): Promise<unknown>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
+  /** Processes started by agents of the daemon (all repositories). */
+  processes(): Promise<BackgroundProcessesView>;
+  /** Terminates a background process and its children; the daemon refuses any other PID. */
+  killProcess(pid: number): Promise<unknown>;
   /** The tag catalog (shared by all repositories). */
   tags(): Promise<TagView[]>;
   /** Creates a tag (the daemon picks the color when none is given); returns the catalog. */
@@ -177,6 +182,8 @@ function bound(repository: string | null): Api {
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)
         : post(`/api/runs/${enc(runId)}/cancel`),
     apply: (runId, force) => post(`/api/runs/${enc(runId)}/apply`, force ? { force: true } : {}),
+    processes: () => call('/api/processes'),
+    killProcess: (pid) => post(`/api/processes/${pid}/kill`),
     tags: () => call('/api/tags'),
     addTag: (name, color) => post('/api/tags', color ? { name, color } : { name }),
     editTag: (tag, patch) => post('/api/tags/edit', { tag, ...patch }),

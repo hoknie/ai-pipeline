@@ -638,6 +638,19 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         call('run_tags', { runId: runId ?? '', ...parseBody(runTagsBody, body) }),
     },
     {
+      method: 'GET',
+      pattern: /^\/api\/processes$/,
+      handle: () => call('processes', {}),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/processes\/([^/]+)\/kill$/,
+      handle: ([pid]) => {
+        if (!/^\d+$/.test(pid ?? '')) throw new HttpError(400, 'pid must be a positive integer');
+        return call('process_kill', { pid: Number(pid) });
+      },
+    },
+    {
       method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/cancel$`),
       handle: ([runId]) => call('cancel', { runId: runId ?? '' }),
@@ -805,7 +818,9 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       const ownRepository =
         url.pathname === '/api/queue/return' && !url.searchParams.get('repository');
       const repository =
-        url.pathname.startsWith('/api/runs') || ownRepository
+        url.pathname.startsWith('/api/runs') ||
+        url.pathname.startsWith('/api/processes') ||
+        ownRepository
           ? ''
           : await requestRepository(url.searchParams);
       const result = await route.handle(parts, body, repository);
@@ -825,7 +840,9 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       }
       if (error instanceof HttpError) json(response, error.status, { error: error.message });
       else if (error instanceof IpcError) {
-        const status = /^unknown (run|group|attempt|queue item)\b/.test(error.message)
+        const status = /^(unknown (run|group|attempt|queue item)\b|not a background process)/.test(
+          error.message,
+        )
           ? 404
           : /^aip daemon did not answer/.test(error.message)
             ? 504

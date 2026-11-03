@@ -9,7 +9,7 @@ import { RunsPage } from './components/runs/RunsPage.tsx';
 import { AppShell } from './components/shell/AppShell.tsx';
 import { CommandPalette } from './components/shell/CommandPalette.tsx';
 import { DaemonBanner } from './components/shell/DaemonBanner.tsx';
-import { SpecialistLoadBar } from './components/shell/SpecialistLoadBar.tsx';
+import { StatusBar } from './components/shell/StatusBar.tsx';
 import { ShortcutsDialog } from './components/shell/ShortcutsDialog.tsx';
 import { ConfirmProvider, useConfirm } from './confirm.tsx';
 import { useHotkey } from './hotkeys.ts';
@@ -260,9 +260,11 @@ function Panel({
     <TagsProvider tags={tags} onTags={setTags}>
       <AppShell
         footer={
-          <SpecialistLoadBar
+          <StatusBar
             runs={runs}
             selected={selected}
+            connection={connection}
+            api={api}
             onOpenGroup={(entry) =>
               setRoute({ view: 'runs', run: entry.runId, group: entry.group, step: entry.step })
             }
@@ -288,7 +290,6 @@ function Panel({
           working,
           waiting,
           queued: queue?.items.length ?? 0,
-          connection,
           onPalette: () => setPalette(true),
           onEnableNotifications:
             typeof Notification !== 'undefined' && !notify

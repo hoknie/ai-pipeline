@@ -111,6 +111,23 @@ describe('aip web', () => {
     expect(response).toBe(403);
   });
 
+  it('lists background processes without a repository and refuses foreign PIDs', async () => {
+    const { web, base } = await setup();
+    expect((await fetch(`${base}/api/processes`)).status).toBe(401);
+    const list = await fetch(`${base}/api/processes`, { headers: authed(web) });
+    expect(list.status).toBe(200);
+    expect(await list.json()).toEqual({ processes: [] });
+    const kill = (pid: string, headers = authed(web, JSON_TYPE)) =>
+      fetch(`${base}/api/processes/${pid}/kill`, { method: 'POST', headers });
+    expect((await kill('1', {})).status).toBe(401);
+    expect((await kill('abc')).status).toBe(400);
+    const foreign = await kill(String(process.pid));
+    expect(foreign.status).toBe(404);
+    expect(((await foreign.json()) as { error: string }).error).toContain(
+      'not a background process',
+    );
+  });
+
   it('lists runs and shows a group', async () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {

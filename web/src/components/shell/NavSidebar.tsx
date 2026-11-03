@@ -5,13 +5,11 @@ import { modLabel } from '../../hotkeys.ts';
 import { cn } from '../../lib/cn.ts';
 import type { View } from '../../route.ts';
 import { SECTIONS } from '../../sections.ts';
-import type { Connection } from '../../store.ts';
 import { Badge } from '../../ui/badge.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Kbd } from '../../ui/kbd.tsx';
 
 import { RepositoryMenu, type RepositoryChoice } from './RepositoryMenu.tsx';
-import { ConnectionIndicator } from './ConnectionIndicator.tsx';
 import { NavCounter } from './NavCounter.tsx';
 import { navRowClass } from './navRow.ts';
 import { LanguageMenu } from './LanguageMenu.tsx';
@@ -27,7 +25,6 @@ export interface NavProps {
   waiting: number;
   /** Tasks in the queue. */
   queued: number;
-  connection: Connection;
   onPalette: () => void;
   /** Offers browser notifications; null when they are on or unsupported. */
   onEnableNotifications: (() => void) | null;
@@ -43,7 +40,6 @@ export function NavSidebar({
   working,
   waiting,
   queued,
-  connection,
   onPalette,
   onEnableNotifications,
   repository,
@@ -129,7 +125,6 @@ export function NavSidebar({
         ) : null}
         <ThemeMenu />
         <LanguageMenu />
-        <ConnectionIndicator connection={connection} />
       </div>
     </div>
   );

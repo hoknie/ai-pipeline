@@ -22,10 +22,12 @@ export function AppShell({
   const wide = useMediaQuery('(min-width: 768px)');
   return (
     <TooltipProvider>
-      <div className="flex h-dvh flex-col">
+      <div className="relative flex h-dvh flex-col overflow-hidden">
         {wide ? <TopNav {...nav} /> : <MobileNav {...nav} />}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+            {children}
+          </div>
           {footer}
         </div>
       </div>
