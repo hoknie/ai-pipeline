@@ -180,6 +180,7 @@ export const en = {
       openQueue: 'Open the queue',
       noGroups: 'The run has no groups yet.',
       choose: 'Choose a run',
+      notFound: 'Run not found',
       chooseHint: 'Choose a run on the left or open the command palette:',
       back: 'Back to the list',
     },

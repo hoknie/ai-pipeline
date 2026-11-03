@@ -47,6 +47,8 @@ export interface Api {
    */
   forRepository(repository: string | null): Api;
   runs(): Promise<RunView[]>;
+  /** One run by id, also one the list no longer carries; 404 when the daemon does not know it. */
+  run(runId: string): Promise<RunView>;
   /** The daemon's list of repositories with counters. */
   repositories(): Promise<RepositoryView[]>;
   /** Adds the git repository of a path to the daemon's list; returns the new list. */
@@ -176,6 +178,7 @@ function bound(repository: string | null): Api {
   const api: Api = {
     forRepository: (next) => (next === repository ? api : bound(next)),
     runs: () => call('/api/runs'),
+    run: (runId) => call(`/api/runs/${enc(runId)}`),
     repositories: () => call('/api/repositories'),
     addRepository: (path) => post('/api/repositories', { path }),
     removeRepository: (path) =>

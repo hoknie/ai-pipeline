@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Api } from './api.ts';
+import { ApiError, type Api } from './api.ts';
 import { repositoryList } from './repositories.ts';
 import type { DaemonMismatch, QueueView, RepositoryView, RunView, TagView } from './types.ts';
+
+export type OpenedState = 'listed' | 'loading' | 'missing' | null;
 
 export type Connection = 'live' | 'reconnecting' | 'polling';
 
@@ -66,6 +68,13 @@ function mergeRuns(current: Map<string, RunView>, list: RunView[]): Map<string, 
   return changed ? next : current;
 }
 
+/** The map with the run replaced; an unchanged run keeps its object. */
+function putRun(current: Map<string, RunView>, run: RunView): Map<string, RunView> {
+  const previous = current.get(run.id);
+  if (previous && JSON.stringify(previous) === JSON.stringify(run)) return current;
+  return new Map(current).set(run.id, run);
+}
+
 /** The map with the queue of its repository replaced; an unchanged queue keeps its object. */
 function putQueue(current: Map<string, QueueView>, view: QueueView): Map<string, QueueView> {
   const previous = current.get(view.repository);
@@ -93,8 +102,14 @@ export function useRuns(
   openStream: EventSourceFactory = browserEventSource,
   /** The repository the person chose, if any; it is used only when the panel knows it. */
   wanted: string | null = null,
+  /** The run of the address, if any: when the list lacks it, it is fetched by id. */
+  opened: string | null = null,
+  /** Receives the message of a failed fetch of the opened run. */
+  onError: (message: string) => void = () => undefined,
 ): {
   runs: RunView[];
+  /** Where the opened run came from: the list, a fetch in flight, or unknown to the daemon. */
+  openedState: OpenedState;
   connection: Connection;
   loaded: boolean;
   /** The repository `aip web` runs in; null until known. */
@@ -126,12 +141,35 @@ export function useRuns(
   const [loaded, setLoaded] = useState(false);
   const [daemon, setDaemon] = useState<DaemonMismatch>(null);
   const [tags, setTags] = useState<TagView[]>([]);
+  // Runs fetched by id because the list (active and recent finished) lacks them.
+  const [extra, setExtra] = useState<Map<string, RunView>>(new Map());
+  const [unknown, setUnknown] = useState<Set<string>>(new Set());
+  const inFlight = useRef<Set<string>>(new Set());
+  const openedRef = useRef(opened);
+  openedRef.current = opened;
+  const extraRef = useRef(extra);
+  extraRef.current = extra;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     let closed = false;
     let poller: ReturnType<typeof setInterval> | null = null;
     let fallback: ReturnType<typeof setTimeout> | null = null;
 
+    /** Fetches the opened run again when only the by-id copy of it exists. */
+    const refreshOpened = (listed: RunView[]) => {
+      const id = openedRef.current;
+      if (id === null || !extraRef.current.has(id) || listed.some((run) => run.id === id)) return;
+      api
+        .run(id)
+        .then((run) => {
+          if (!closed) setExtra((current) => putRun(current, run));
+        })
+        .catch(() => {
+          // the previous copy stays
+        });
+    };
     const loadQueue = async () => {
       try {
         const view = await api.queue();
@@ -148,6 +186,7 @@ export function useRuns(
         if (closed) return;
         setRuns((current) => mergeRuns(current, list));
         setLoaded(true);
+        refreshOpened(list);
         const known = await api.repositories();
         if (closed) return;
         setRegistryState((current) => sameRepositories(current, known));
@@ -198,6 +237,7 @@ export function useRuns(
         setDaemon(event.daemon ?? null);
         const list = event.runs;
         setRuns((current) => mergeRuns(current, list));
+        refreshOpened(list);
         const catalog = event.tags;
         if (catalog) setTags((current) => sameTags(current, catalog));
         const known = event.repositories;
@@ -222,6 +262,7 @@ export function useRuns(
           if (previous && JSON.stringify(previous) === JSON.stringify(run)) return current;
           return new Map(current).set(run.id, run);
         });
+        setExtra((current) => (current.has(run.id) ? putRun(current, run) : current));
       }
     };
     source.onerror = () => {
@@ -235,7 +276,31 @@ export function useRuns(
     };
   }, [api, openStream]);
 
-  const sorted = useMemo(() => sortRuns(runs.values()), [runs]);
+  const sorted = useMemo(() => {
+    const all = new Map(extra);
+    for (const [id, run] of runs) all.set(id, run);
+    return sortRuns(all.values());
+  }, [runs, extra]);
+  const listed = opened !== null && runs.has(opened);
+  const known = opened !== null && (listed || extra.has(opened));
+  const gone = opened !== null && unknown.has(opened);
+  const openedState: OpenedState =
+    opened === null ? null : known ? 'listed' : gone ? 'missing' : loaded ? 'loading' : null;
+  useEffect(() => {
+    if (!loaded || opened === null || known || gone || inFlight.current.has(opened)) return;
+    inFlight.current.add(opened);
+    api
+      .run(opened)
+      .then((run) => setExtra((current) => putRun(current, run)))
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 404) {
+          setUnknown((current) => new Set(current).add(opened));
+        } else {
+          onErrorRef.current(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => inFlight.current.delete(opened));
+  }, [api, loaded, opened, known, gone]);
   const setQueue = useCallback((view: QueueView) => {
     setQueues((current) => putQueue(current, view));
   }, []);
@@ -269,6 +334,7 @@ export function useRuns(
   }, [api, missing, selected]);
   return {
     runs: sorted,
+    openedState,
     connection,
     loaded,
     home,

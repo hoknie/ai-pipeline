@@ -78,6 +78,7 @@ function Panel({
   const confirm = useConfirm();
   const [chosen, setChosen] = usePreference<string | null>('repository', null);
   const [scope, setScope] = usePreference<RunScope>('runs.scope', 'repository');
+  const [route, setRoute] = useState<Route>(readRoute);
   const {
     runs,
     connection,
@@ -92,13 +93,13 @@ function Panel({
     tags,
     setTags,
     daemon,
-  } = useRuns(api, openStream, chosen);
+    openedState,
+  } = useRuns(api, openStream, chosen, route.view === 'runs' ? route.run : null, notifyError);
   // Every request names its repository, so it never depends on the server's default.
   const scopedApi = useMemo(() => api.forRepository(selected), [api, selected]);
   const pageKey = selected ?? '';
   /** Whether the open specialist or workflow form has unsaved edits. */
   const dirty = useRef(false);
-  const [route, setRoute] = useState<Route>(readRoute);
   useEffect(() => {
     dirty.current = false;
   }, [route.view]);
@@ -357,6 +358,7 @@ function Panel({
             api={api}
             runs={runs}
             loaded={loaded}
+            openedState={openedState}
             route={route}
             now={now}
             drafts={drafts}

@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-import type { Api } from '../src/api.ts';
+import { ApiError, type Api } from '../src/api.ts';
 import type { EventSourceLike } from '../src/store.ts';
 import type {
   BackgroundProcessView,
@@ -472,6 +472,9 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
   };
   const base: Omit<Api, 'forRepository'> = {
     runs: vi.fn(async () => [runView()]),
+    run: vi.fn(async () => {
+      throw new ApiError(404, 'unknown run');
+    }),
     repositories: vi.fn(async () => []),
     addRepository: vi.fn(async () => []),
     removeRepository: vi.fn(async () => []),

@@ -186,6 +186,7 @@ export const es: Dictionary = {
       openQueue: 'Abrir la cola',
       noGroups: 'La ejecución aún no tiene grupos.',
       choose: 'Elija una ejecución',
+      notFound: 'Ejecución no encontrada',
       chooseHint: 'Elija una ejecución a la izquierda o abra la paleta de comandos:',
       back: 'Volver a la lista',
     },

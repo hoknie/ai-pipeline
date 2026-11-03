@@ -28,6 +28,7 @@ import { GroupScreen } from './GroupScreen.tsx';
 import { canDeliver } from './delivery.ts';
 import { RunHeader } from './RunHeader.tsx';
 import { RunFilters } from './RunFilters.tsx';
+import type { OpenedState } from '../../store.ts';
 import { RunList } from './RunList.tsx';
 import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
 
@@ -36,6 +37,7 @@ export function RunsPage({
   api,
   runs,
   loaded,
+  openedState = null,
   route,
   now,
   drafts,
@@ -54,6 +56,8 @@ export function RunsPage({
   api: Api;
   runs: RunView[];
   loaded: boolean;
+  /** Whether the run of the address is listed, being fetched by id, or unknown to the daemon. */
+  openedState?: OpenedState;
   route: Route;
   now: number;
   drafts: Record<string, string>;
@@ -255,6 +259,15 @@ export function RunsPage({
         <p className="p-4 text-sm text-muted-foreground">{t('runs.page.noGroups')}</p>
       )}
     </>
+  ) : openedState === 'loading' ? (
+    <div role="status" aria-label={t('runs.page.connecting')} className="flex flex-col gap-2 p-4">
+      <Skeleton className="h-16" />
+      <Skeleton className="h-40" />
+    </div>
+  ) : openedState === 'missing' ? (
+    <Empty icon={<Inbox />} title={t('runs.page.notFound')} className="m-auto">
+      <p className="font-mono">{route.run}</p>
+    </Empty>
   ) : loaded ? (
     <Empty icon={<MousePointerClick />} title={t('runs.page.choose')} className="m-auto">
       <p>
@@ -264,7 +277,8 @@ export function RunsPage({
   ) : null;
 
   if (!wide) {
-    return screen === 'detail' && run ? (
+    return screen === 'detail' &&
+      (run || openedState === 'loading' || openedState === 'missing') ? (
       <div className="flex min-w-0 flex-col">
         <Button variant="ghost" size="sm" className="m-2 w-fit" onClick={() => setScreen('list')}>
           <ArrowLeft />

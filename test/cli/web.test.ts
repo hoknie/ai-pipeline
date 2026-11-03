@@ -159,6 +159,28 @@ describe('aip web', () => {
     expect((await fetch(`${base}/api/runs?tail=x`, { headers: authed(web) })).status).toBe(200);
   });
 
+  it('serves a run by id after it left the list of the 10 recent finished runs', async () => {
+    const { h, web, base } = await setup();
+    const ids: string[] = [];
+    for (let index = 0; index < 11; index++) {
+      const { runId } = (await startRun(h, {
+        repository: h.repo,
+        workflow: 'feature',
+        groups: [{ title: 'login', task: 'x' }],
+      })) as RunCreated;
+      await h.waitFor(runId, (run) => run.finished);
+      ids.push(runId);
+    }
+    const oldest = ids[0]!;
+    const listed = (await (
+      await fetch(`${base}/api/runs`, { headers: authed(web) })
+    ).json()) as RunView[];
+    expect(listed.map((run) => run.id)).not.toContain(oldest);
+    const response = await fetch(`${base}/api/runs/${oldest}`, { headers: authed(web) });
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as RunView).id).toBe(oldest);
+  });
+
   it('routes retry and apply with validation', async () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {

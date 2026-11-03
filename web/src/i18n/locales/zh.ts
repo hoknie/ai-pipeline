@@ -181,6 +181,7 @@ export const zh: Dictionary = {
       openQueue: '打开队列',
       noGroups: '该运行暂无分组。',
       choose: '选择一个运行',
+      notFound: '未找到运行',
       chooseHint: '在左侧选择一个运行，或打开命令面板：',
       back: '返回列表',
     },
