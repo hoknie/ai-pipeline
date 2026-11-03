@@ -92,6 +92,7 @@ The queue settings are in [queue.md](queue.md).
 - The "On a usage limit" selector chooses `wait` or `stop`. A queue stopped by a usage limit shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
 - "Return to the queue" is on every skipped run and in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
 - The "In work" switch of a row postpones the task or puts it back.
+- A running run's card shows its duration, tokens and cost.
 - Below are the running runs, the waiting tasks and the new task form (workflow, task or groups, title).
 - Runs the queue skipped because of a problem are in the "Skipped with a problem" block. They do not count as taken places.
 - Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. Every waiting task has "Edit", "Delete" and "Run now".
@@ -104,6 +105,7 @@ The queue settings are in [queue.md](queue.md).
 - Dashed arcs are `on_reject` returns with their round limit.
 - The groups of active runs sit at their current step. A click on a group opens it in "Runs".
 - A node whose specialist has a limit shows "busy N of M · in other runs: K". It is highlighted when the limit is reached.
+- A step node shows "attempts N" and, on a line of its own, the tokens and cost of the active runs: `in/out · $cost`. Until a cost is known only tokens are shown, and "—" when there is no usage.
 - The address `#topology/<workflow>` opens a workflow.
 
 ### Specialists

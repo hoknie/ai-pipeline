@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { WorkflowTopology } from '../types.ts';
 
-import { usageText } from '../format.ts';
+import { cost, usageText } from '../format.ts';
 import { cn } from '../lib/cn.ts';
 import type { MachineLoad } from '../specialistLoad.ts';
 import { useTheme } from '../theme.ts';
@@ -53,6 +53,13 @@ function FitOnSwitch({ workflow }: { workflow: string }) {
 
 function Stage({ data, selected }: NodeProps<StageNode>) {
   const { t } = useTranslation();
+  const usageLine =
+    [
+      usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 }),
+      cost({ costUsd: data.costUsd }),
+    ]
+      .filter(Boolean)
+      .join(' · ') || '—';
   return (
     <Card
       className={cn(
@@ -103,13 +110,18 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
         </div>
       ) : null}
       {data.attempts !== null ? (
-        <div className="truncate text-muted-foreground">
-          {t('topology.attempts', { n: data.attempts })}
-          {usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 })
-            ? ` · ${usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 })}`
-            : ''}
-          {data.costUsd ? ` · $${data.costUsd.toFixed(2)}` : ''}
-        </div>
+        <>
+          <div className="truncate text-muted-foreground">
+            {t('topology.attempts', { n: data.attempts })}
+          </div>
+          <div
+            className="truncate text-muted-foreground tabular-nums"
+            data-testid={`usage-${data.step}`}
+            title={usageLine}
+          >
+            {usageLine}
+          </div>
+        </>
       ) : null}
     </Card>
   );

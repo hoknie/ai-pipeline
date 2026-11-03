@@ -127,6 +127,23 @@ describe('queue card', () => {
     render(<App api={api} openStream={openFake} />);
     const card = await screen.findByRole('group', { name: 'run1' });
     expect(within(card).getByText('2.5k/130')).toBeTruthy();
+    expect(within(card).queryByText(/\$/)).toBeNull();
+  });
+
+  it('shows the cost next to the tokens', async () => {
+    window.location.hash = '#queue';
+    const api = fakeApi({
+      queue: vi.fn(async () =>
+        queueOf({
+          status: 'running',
+          runs: [queueRun('run1', { usage: usage(2_500, 130, 0.42) })],
+        }),
+      ),
+    });
+    render(<App api={api} openStream={openFake} />);
+    const card = await screen.findByRole('group', { name: 'run1' });
+    expect(within(card).getByText('2.5k/130')).toBeTruthy();
+    expect(within(card).getByText('$0.42')).toBeTruthy();
   });
 
   it('shows none for a run without usage', async () => {
@@ -173,7 +190,57 @@ describe('tokens of a step node', () => {
       />,
     );
     const code = await screen.findByTestId('stage-code');
-    expect(within(code).getByText(/attempts 2/).textContent).toContain('12.0k/1.0k');
+    expect(within(code).getByText(/attempts 2/).textContent).toBe('attempts 2');
+    expect(within(code).getByTestId('usage-code').textContent).toBe('12.0k/1.0k');
+    expect(within(code).queryByText(/\$/)).toBeNull();
+  });
+
+  it('sums the known costs and keeps null when none is known', () => {
+    const withCost = (id: string, c: number | null) => {
+      const base = topologyOf();
+      return runView({
+        id,
+        topology: {
+          ...base,
+          steps: base.steps.map((step) =>
+            step.id === 'code' ? { ...step, attempts: 1, usage: usage(1_000, 100, c) } : step,
+          ),
+        },
+      });
+    };
+    const costOf = (runs: ReturnType<typeof runView>[]) =>
+      layout(workflow, liveState(workflow, runs, '/repo'), i18next.t).nodes.find(
+        (node) => node.id === 'step:code',
+      )!.data.costUsd;
+    expect(costOf([withCost('a', 0.4), withCost('b', 0.5)])).toBeCloseTo(0.9);
+    expect(costOf([withCost('a', null), withCost('b', null)])).toBeNull();
+    expect(costOf([withCost('a', 0.4), withCost('b', null)])).toBeCloseTo(0.4);
+  });
+
+  it('shows tokens and cost in the usage line', async () => {
+    const withCost = (id: string, input: number, c: number) => {
+      const base = topologyOf();
+      return runView({
+        id,
+        topology: {
+          ...base,
+          steps: base.steps.map((step) =>
+            step.id === 'code' ? { ...step, attempts: 1, usage: usage(input, 500, c) } : step,
+          ),
+        },
+      });
+    };
+    render(
+      <TopologyPage
+        api={fakeApi({ workflows: vi.fn(async () => workflowsView({ workflows: [workflow] })) })}
+        runs={[withCost('a', 5_000, 0.4), withCost('b', 7_000, 0.5)]}
+        workflow="feature"
+        onSelectWorkflow={vi.fn()}
+        onOpenGroup={vi.fn()}
+      />,
+    );
+    const code = await screen.findByTestId('stage-code');
+    expect(within(code).getByTestId('usage-code').textContent).toBe('12.0k/1.0k · $0.90');
   });
 
   it('leaves the line of a step without usage as it was', async () => {
@@ -188,5 +255,6 @@ describe('tokens of a step node', () => {
     );
     const code = await screen.findByTestId('stage-code');
     expect(within(code).getByText('attempts 0').textContent).toBe('attempts 0');
+    expect(within(code).getByTestId('usage-code').textContent).toBe('—');
   });
 });

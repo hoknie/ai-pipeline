@@ -1140,9 +1140,7 @@ const pick = async (picker: HTMLElement, title: string) => {
 
 const editRow = async (title: string) => {
   fireEvent.click(within(row(title)).getByRole('button', { name: 'Edit' }));
-  await within(row(title))
-    .findByRole('form')
-    .catch(() => undefined);
+  await screen.findByRole('button', { name: 'Save' });
 };
 
 describe('queue links', () => {

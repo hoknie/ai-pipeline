@@ -74,7 +74,9 @@ export function liveState(
       if (known.has(step.id)) {
         live.steps.set(step.id, target);
         live.attempts.set(step.id, (live.attempts.get(step.id) ?? 0) + step.attempts);
-        live.cost.set(step.id, (live.cost.get(step.id) ?? 0) + (step.usage?.costUsd ?? 0));
+        if (step.usage?.costUsd != null) {
+          live.cost.set(step.id, (live.cost.get(step.id) ?? 0) + step.usage.costUsd);
+        }
         live.inputTokens.set(
           step.id,
           (live.inputTokens.get(step.id) ?? 0) + (step.usage?.inputTokens ?? 0),
@@ -275,7 +277,7 @@ export function layout(
       detail: `${step.runtime}${step.model ? ` ${step.model}` : ''} · ${step.permissions}`,
       groups,
       attempts: live.attempts.get(step.id) ?? 0,
-      costUsd: live.cost.get(step.id) ?? 0,
+      costUsd: live.cost.get(step.id) ?? null,
       inputTokens: live.inputTokens.get(step.id) ?? 0,
       outputTokens: live.outputTokens.get(step.id) ?? 0,
       active: active(groups),

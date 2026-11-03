@@ -5,7 +5,7 @@ import type { TFunction } from 'i18next';
 import { useState, type ReactNode } from 'react';
 
 import type { Api } from '../api.ts';
-import { clock, duration, usageText } from '../format.ts';
+import { clock, cost, duration, usageText } from '../format.ts';
 import { waitText } from '../status.ts';
 import { notifySuccess } from '../notify.ts';
 import { cn } from '../lib/cn.ts';
@@ -107,6 +107,7 @@ function RunCard({
       <div className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
         <span>{t('format.running', { duration: duration(now - run.createdAt) })}</span>
         {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
+        {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
         {run.limitUntil !== null ? (
           <span className="text-status-warn">
             {t('runs.group.limitUntil', { time: clock(run.limitUntil) })}
