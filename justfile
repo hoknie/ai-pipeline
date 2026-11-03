@@ -11,3 +11,4 @@ default:
 import 'env/justice/quality.just'
 import 'env/justice/build.just'
 import 'env/justice/web.just'
+import 'env/justice/release.just'

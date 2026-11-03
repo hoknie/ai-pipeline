@@ -1,0 +1,46 @@
+# Every push to main and every pull request: the gate (prettier --check, tsc, vitest) and the build.
+# release.yml calls it for the release commit before packing anything.
+# Actions are pinned to a commit SHA with the version in a comment.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'The commit, branch or tag to check (default: the ref of the event)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: A git identity for the test repositories
+        run: |
+          git config --global user.name 'aip ci'
+          git config --global user.email 'ci@aip.invalid'
+      - run: npm ci
+      - name: npm run check (prettier --check, tsc, vitest)
+        run: npm run check
+      - name: npm run build, and the built CLI starts
+        run: |
+          npm run build
+          node dist/cli/main.js --help

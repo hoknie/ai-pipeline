@@ -38,3 +38,29 @@ For development, run `aip web` and, in another terminal, the Vite dev server wit
 ```sh
 AIP_WEB_URL=http://127.0.0.1:7341 AIP_WEB_TOKEN=<token> npx vite --config web/vite.config.ts
 ```
+
+## Releases
+
+CI (`.github/workflows/ci.yml`) runs `npm run check` and the build on every push to `main` and on every pull request.
+
+A release publishes `@hoknie/aip` to npm and creates a GitHub Release with the npm tarball, `SHA256SUMS` and the version's section of `CHANGELOG.md`. `CHANGELOG.md` is written from [Conventional Commits](https://www.conventionalcommits.org/) between `v*` tags: `feat` goes to Features, `fix` to Fixes, `type!:` or a `BREAKING CHANGE:` footer to Breaking changes. While the major version is 0, a breaking change bumps the minor and a feature bumps the patch.
+
+There are two ways to start a release:
+
+- **From GitHub:** Actions → release → Run workflow on `main`, with a level: `auto` (from the commits), `patch`, `minor`, `major` or an exact `X.Y.Z`. The workflow bumps the version, writes its changelog section, commits `chore(release): release vX.Y.Z`, tags it, pushes both to `main` and publishes. `main` must accept pushes from `github-actions[bot]`.
+- **Locally:**
+
+  ```sh
+  just next-version   # the version the next release takes
+  just release        # bump package.json, package-lock.json and the plugin manifest, write CHANGELOG.md
+  git commit -am "chore(release): release vX.Y.Z"
+  git tag vX.Y.Z && git push origin main vX.Y.Z
+  ```
+
+  The pushed tag starts the same workflow. It fails if the tag does not name the version in `package.json`.
+
+Other recipes: `just version`, `just check-tag vX.Y.Z`, `just pack` (the tarball and `SHA256SUMS` in `dist/release`) and `just changelog` (rewrites `CHANGELOG.md` from all tags).
+
+The gate and the install check of the packed tarball must pass before anything is published. A tag with a `-` (`v1.2.0-rc.1`) is a prerelease: npm dist-tag `next` and a GitHub prerelease. Re-running a release does not publish to npm again; it updates the GitHub Release.
+
+npm publishing uses trusted publishing: on npmjs.com, configure `@hoknie/aip` to trust the workflow `release.yml` of `hoknie/ai-pipeline` with the environment `release`. Without it, set the secret `NPM_TOKEN` (an npm automation token) in the environment `release`.
