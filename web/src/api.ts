@@ -54,6 +54,8 @@ export interface Api {
   transcript(runId: string, group: string, seq: number, after: number): Promise<Transcript>;
   answer(runId: string, group: string, answer: string): Promise<unknown>;
   retry(runId: string, group: string): Promise<unknown>;
+  /** Skips a step of the run (or brings it back with `skip=false`); returns the run. */
+  skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
   cancel(runId: string, group?: string): Promise<unknown>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
   /** The tag catalog (shared by all repositories). */
@@ -168,6 +170,7 @@ function bound(repository: string | null): Api {
       call(`/api/runs/${enc(runId)}/groups/${enc(group)}/transcript?seq=${seq}&after=${after}`),
     answer: (runId, group, answer) =>
       post(`/api/runs/${enc(runId)}/groups/${enc(group)}/answer`, { answer }),
+    skipStep: (runId, step, skip) => post(`/api/runs/${enc(runId)}/skip`, { step, skip }),
     retry: (runId, group) => post(`/api/runs/${enc(runId)}/groups/${enc(group)}/retry`),
     cancel: (runId, group) =>
       group

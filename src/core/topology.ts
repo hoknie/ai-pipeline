@@ -41,6 +41,8 @@ export interface StepTopology extends StepInfo {
   attempts: number;
   rejections: number;
   usage: Usage | null;
+  /** The run skips this step. */
+  skipped: boolean;
 }
 
 export interface Topology {
@@ -165,6 +167,7 @@ export function topology(state: RunState): Topology {
       attempts,
       rejections,
       usage,
+      skipped: state.run.skippedSteps.includes(step.id),
     };
   });
   return {

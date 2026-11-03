@@ -27,6 +27,7 @@ export type {
   RunView,
   RuntimeCatalog,
   StepGroup,
+  StepState,
   StepTopology,
   TagColor,
   TagView,

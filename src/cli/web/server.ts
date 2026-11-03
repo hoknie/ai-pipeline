@@ -81,6 +81,7 @@ export interface WebServer {
 
 const COOKIE = 'aip_token';
 const BODY_LIMIT = 64 * 1024;
+const skipBody = z.object({ step: z.string().trim().min(1), skip: z.boolean() });
 const answerBody = z.object({ answer: z.string().trim().min(1) });
 const applyBody = z.object({
   groups: z.array(z.string().min(1)).optional(),
@@ -640,6 +641,14 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/cancel$`),
       handle: ([runId]) => call('cancel', { runId: runId ?? '' }),
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/skip$`),
+      handle: async ([runId], body) => {
+        const { step, skip } = parseBody(skipBody, body);
+        return call('run_skip', { runId: runId ?? '', step, skip });
+      },
     },
     {
       method: 'POST',

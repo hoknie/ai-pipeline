@@ -976,3 +976,64 @@ describe('JSON in the transcript', () => {
     expect(screen.getByText('{"type":"x"}')).toBeTruthy();
   });
 });
+
+describe('run steps', () => {
+  const header = (api = fakeApi(), onError: (message: string) => void = () => undefined) =>
+    render(<RunHeader run={runView()} api={api} now={0} onError={onError} />);
+
+  it('offers a switch only for steps that are not finished', () => {
+    header();
+    expect(screen.queryByRole('switch', { name: 'Skip step plan' })).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Skip step code' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Skip step review' })).toBeTruthy();
+  });
+
+  it('skips an upcoming step at once', async () => {
+    const api = fakeApi();
+    header(api);
+    fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
+    await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'review', true));
+  });
+
+  it('asks before skipping a running step and keeps it when declined', async () => {
+    const api = fakeApi();
+    header(api);
+    fireEvent.click(screen.getByRole('switch', { name: 'Skip step code' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(api.skipStep).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByText('Do not skip'));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.skipStep).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('switch', { name: 'Skip step code' }));
+    fireEvent.click(await within(await screen.findByRole('alertdialog')).findByText('Skip step'));
+    await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'code', true));
+  });
+
+  it('shows the error and leaves the switch off when the request fails', async () => {
+    const api = fakeApi();
+    api.skipStep = vi.fn(async () => {
+      throw new Error('step `review` is refused');
+    });
+    const onError = vi.fn();
+    header(api, onError);
+    fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('step `review` is refused'));
+    expect(
+      screen.getByRole('switch', { name: 'Skip step review' }).getAttribute('aria-checked'),
+    ).toBe('false');
+  });
+
+  it('brings a skipped step back', async () => {
+    const api = fakeApi();
+    const run = runView({
+      steps: [
+        { id: 'plan', specialist: 'plan', skipped: false, state: 'done' },
+        { id: 'code', specialist: 'coder', skipped: false, state: 'active' },
+        { id: 'review', specialist: 'reviewer', skipped: true, state: 'upcoming' },
+      ],
+    });
+    render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
+    fireEvent.click(screen.getByRole('switch', { name: 'Skip step review' }));
+    await waitFor(() => expect(api.skipStep).toHaveBeenCalledWith('run1', 'review', false));
+  });
+});

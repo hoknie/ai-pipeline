@@ -1,4 +1,4 @@
-import { stepIndex } from '../config/index.ts';
+import { groupWorkflow } from '../config/index.ts';
 
 import {
   cancelDelivery,
@@ -11,6 +11,7 @@ import {
   type DeliveryResult,
 } from './delivery.ts';
 import { Rejection } from './errors.ts';
+import { checkSkip, lastUnskipped, nextUnskipped, stepStates } from './skip.ts';
 import { refreshPermissions, type Denial, type PermissionsRefresh } from './permissions.ts';
 import { groupSlugs } from './ids.ts';
 import { questionsText } from './questions.ts';
@@ -88,6 +89,7 @@ export type Event =
   | { kind: 'resolve_prepared'; conflicts: string[] }
   | { kind: 'run_named'; title: string | null; name: string | null; usage: Usage | null }
   | { kind: 'tags_set'; tags: string[] }
+  | { kind: 'step_skip'; step: string; skip: boolean }
   | { kind: 'interrupted' };
 
 export { Rejection };
@@ -105,6 +107,7 @@ export function transition(state: RunState, event: Event, now: number): Effect[]
   const machine = new Machine(state, now);
   const wasFinished = state.run.finishedAt !== null;
   machine.apply(event);
+  machine.skipAhead();
   machine.startNextMerge();
   updateFinished(state, now);
   if (!wasFinished && state.run.finishedAt !== null && state.run.config.delivery.auto) {
@@ -182,6 +185,8 @@ class Machine {
       case 'tags_set':
         this.state.run.tags = [...event.tags];
         return;
+      case 'step_skip':
+        return this.stepSkip(event.step, event.skip);
       case 'resolve_prepared':
         this.effects.push(...resolvePrepared(this.state, event.conflicts));
         return;
@@ -465,6 +470,81 @@ class Machine {
     }
   }
 
+  private stepSkip(step: string, skip: boolean): void {
+    const { run } = this.state;
+    const steps = groupWorkflow(run.config, runWorkflow(run)).steps;
+    const index = steps.findIndex((candidate) => candidate.id === step);
+    if (index === -1) {
+      throw new Rejection(
+        `unknown step \`${step}\`; steps: ${steps.map((candidate) => candidate.id).join(', ')}`,
+      );
+    }
+    if (stepStates(this.state)[index]?.state === 'done') {
+      throw new Rejection(`step \`${step}\` is already passed by every group`);
+    }
+    const current = run.skippedSteps.includes(step);
+    if (skip === current) return;
+    const wanted = skip
+      ? [...run.skippedSteps, step]
+      : run.skippedSteps.filter((item) => item !== step);
+    if (skip) {
+      const error = checkSkip(run.config, run.workflow, wanted);
+      if (error !== null) throw new Rejection(error);
+    }
+    run.skippedSteps = steps.map((item) => item.id).filter((id) => wanted.includes(id));
+    if (!skip) return;
+    for (const group of this.state.groups) {
+      const running = group.attempts.find(
+        (attempt) => attempt.status === 'running' && attempt.stepIndex === index,
+      );
+      if (running) {
+        running.status = 'cancelled';
+        running.reason = { kind: 'skipped' };
+        running.finishedAt = this.now;
+        this.effects.push({
+          kind: 'stop_attempt',
+          run: run.id,
+          group: group.slug,
+          seq: running.seq,
+        });
+        group.status = 'queued';
+        group.pending = {
+          stepIndex: index,
+          feedback: running.input.feedback,
+          humanAnswer: null,
+          resume: false,
+        };
+      } else if (group.status === 'needs_human' && group.pending?.stepIndex === index) {
+        group.status = 'queued';
+        group.question = null;
+        group.questions = null;
+        group.pending = { ...group.pending, humanAnswer: null, resume: false };
+      }
+    }
+  }
+
+  /** A queued group never waits on a skipped step: it moves on, or goes to the merge. */
+  skipAhead(): void {
+    const { run } = this.state;
+    if (run.skippedSteps.length === 0) return;
+    for (const group of this.state.groups) {
+      if (group.status !== 'queued' || group.pending === null) continue;
+      const step = stepsOf(run, group)[group.pending.stepIndex];
+      if (!step || !run.skippedSteps.includes(step.id)) continue;
+      const next = nextUnskipped(run, group, group.pending.stepIndex + 1);
+      if (next === null) {
+        this.enqueueMerge(group, false);
+      } else {
+        group.pending = {
+          stepIndex: next,
+          feedback: group.pending.feedback,
+          humanAnswer: null,
+          resume: false,
+        };
+      }
+    }
+  }
+
   private retry(slug: string, permissions?: PermissionsRefresh): void {
     const group = this.group(slug);
     if (group.status === 'failed' || group.status === 'cancelled') this.rejectDeliveryRetry(group);
@@ -571,7 +651,7 @@ class Machine {
         group.conflictFiles = outcome.files;
         group.reason = null;
         group.pending = {
-          stepIndex: stepsOf(this.state.run, group).length - 1,
+          stepIndex: lastUnskipped(this.state.run, group),
           feedback: `The branch of this group was updated from the run branch and has merge conflicts in: ${outcome.files.join(', ')}. Resolve every conflict, keep the intent of both sides, and report done.`,
           humanAnswer: null,
           resume: false,

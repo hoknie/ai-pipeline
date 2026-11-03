@@ -956,6 +956,12 @@ export class Daemon {
         });
       case 'retry':
         return this.retryGroup(request.params);
+      case 'run_skip':
+        return this.event(request.params.runId, {
+          kind: 'step_skip',
+          step: request.params.step,
+          skip: request.params.skip,
+        });
       case 'answer': {
         const { runId: id, group, answer } = request.params;
         return this.event(id, (state) => ({

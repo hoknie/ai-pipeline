@@ -38,6 +38,7 @@ export function topologyOf(overrides: Partial<Topology> = {}): Topology {
     attempts: 0,
     rejections: 0,
     usage: null,
+    skipped: false,
     ...extra,
   });
   return {
@@ -121,6 +122,11 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     deliveryStage: null,
     diff: null,
     topology: topologyOf(),
+    steps: [
+      { id: 'plan', specialist: 'plan', skipped: false, state: 'done' },
+      { id: 'code', specialist: 'coder', skipped: false, state: 'active' },
+      { id: 'review', specialist: 'reviewer', skipped: false, state: 'upcoming' },
+    ],
     specialists: [],
     groups: [groupRow()],
     system: [],
@@ -178,7 +184,7 @@ export function workflowOf(overrides: Partial<WorkflowTopology> = {}): WorkflowT
     id: 'feature',
     split: null,
     steps: topologyOf().steps.map(
-      ({ groups: _g, attempts: _a, rejections: _r, usage: _u, ...step }) => step,
+      ({ groups: _g, attempts: _a, rejections: _r, usage: _u, skipped: _s, ...step }) => step,
     ),
     delivery: { mode: 'worktree', resolver: null },
     limits: {},
@@ -408,6 +414,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     transcript: vi.fn(async () => transcript),
     answer: vi.fn(async () => ({})),
     retry: vi.fn(async () => ({})),
+    skipStep: vi.fn(async () => ({})),
     cancel: vi.fn(async () => ({})),
     apply: vi.fn(async () => ({ runId: 'run1', pending: false, groups: [] })),
     tags: vi.fn(async () => []),

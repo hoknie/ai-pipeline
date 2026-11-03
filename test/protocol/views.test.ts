@@ -525,3 +525,18 @@ describe('the delivery stage', () => {
     expect(queueView(queue, () => state).runs[0]!.delivery).toBe('apply_failed');
   });
 });
+
+describe('run steps', () => {
+  it('lists the steps with their state and skip flag', () => {
+    const state = run(1);
+    state.run.skippedSteps = ['qa'];
+    step(state);
+    finish(state, 'done');
+    expect(runView(state, 1000).steps).toEqual([
+      { id: 'plan', specialist: 'plan', skipped: false, state: 'done' },
+      { id: 'code', specialist: 'coder', skipped: false, state: 'active' },
+      { id: 'review', specialist: 'reviewer', skipped: false, state: 'upcoming' },
+      { id: 'qa', specialist: 'qa', skipped: true, state: 'upcoming' },
+    ]);
+  });
+});

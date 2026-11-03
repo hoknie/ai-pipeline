@@ -22,7 +22,16 @@ export {
 } from './machine.ts';
 export * from './model.ts';
 export { stepProgress, type StepProgress } from './progress.ts';
-export { applySkip, checkSkip, cleanSkip } from './skip.ts';
+export {
+  applySkip,
+  checkSkip,
+  cleanSkip,
+  isSkipped,
+  lastUnskipped,
+  nextUnskipped,
+  stepStates,
+} from './skip.ts';
+export type { StepPhase as StepStatePhase, StepState } from './skip.ts';
 export { questionsText } from './questions.ts';
 export { planDispatch, waitKey, type DispatchPlan, type GroupWait } from './plan.ts';
 export {

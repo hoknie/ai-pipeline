@@ -45,6 +45,7 @@ git diff                          # review and commit it yourself
 | `aip group answer <run-id> <group> <text>` | Answers a specialist's question (a group in `needs_human`) |
 | `aip group retry <run-id> <group>` | Retries a failed or cancelled step from where it stopped, or retries the merge after a conflict |
 | `aip run cancel <run-id>` / `aip group cancel <run-id> <group>` | Stops a whole run or a group |
+| `aip run skip <run-id> <step> [--off] [--json]` | Skips a step that is running or still ahead for the whole run, or brings it back with `--off`. A running step is stopped without a commit; its partial changes stay uncommitted in the group worktree. A step every group has passed cannot be skipped |
 | `aip run apply <run-id> [group...] [--force]` | Delivers ready groups to the working tree (or as a commit, or as a branch) |
 | `aip run clean [run-id] [--all] [--json]` | Without an id, lists finished runs that can be cleaned up (id, title, finish time) and suggests `aip run clean <run-id>`; `--json` prints the list as JSON. With an id, removes the worktrees and internal refs of a finished run. This happens automatically after delivery |
 | `aip version [--json]` | The aip version, also printed by `aip --version`; with `--json`, `{"version":"…"}` on one line |

@@ -16,6 +16,19 @@ describe('topology of a run with skipped steps', () => {
   });
 });
 
+describe('topology skipped flag', () => {
+  it('marks steps skipped after the start', () => {
+    const state = run(1);
+    state.run.skippedSteps = ['qa'];
+    expect(topology(state).steps.map((entry) => entry.skipped)).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+  });
+});
+
 describe('topology', () => {
   it('places groups on steps and sums attempts, rejections and usage per step', () => {
     const state = run(2);

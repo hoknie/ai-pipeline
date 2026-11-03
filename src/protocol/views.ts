@@ -46,6 +46,8 @@ import {
   type TagColor,
   type Usage,
   topology,
+  stepStates,
+  type StepState,
   specialistUse,
   type SpecialistUse,
   type Topology,
@@ -222,6 +224,8 @@ export interface RunView {
   diff: DiffTotals | null;
   /** Steps of the workflow with the groups on them, for the topology view. */
   topology: Topology;
+  /** Each step of the group workflow: passed, under way or ahead, and whether it is skipped. */
+  steps: StepState[];
   /** Specialists that run or are waited for in the run, for the load across the machine. */
   specialists: SpecialistUse[];
   groups: GroupRow[];
@@ -503,6 +507,7 @@ export function runView(
     deliveryStage: deliveryStage(state),
     diff: runDiff(state, diffs),
     topology: waitingTopology,
+    steps: stepStates(state),
     specialists: specialistUse(state),
     groups: state.groups.map((group) => groupRow(group, now, diffs, waitOf(group))),
     system: [
@@ -631,6 +636,7 @@ export type {
   SpecialistUse,
   StepGroup,
   StepInfo,
+  StepState,
   StepTopology,
   Topology,
   WorkflowTopology,

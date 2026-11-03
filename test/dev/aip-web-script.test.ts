@@ -37,10 +37,16 @@ async function setup(): Promise<void> {
   command = `${process.execPath} ${join(base, 'bin', 'main.ts')} web`;
 }
 
-function run(args: string[], extra: Record<string, string> = {}) {
-  const result = spawnSync('bash', [script, ...args], {
+/**
+ * Runs the script without blocking the event loop: a blocked loop cannot reap an `aip web` that
+ * this process started and the script stopped, and the script would wait for the zombie.
+ */
+function run(
+  args: string[],
+  extra: Record<string, string> = {},
+): Promise<{ code: number | null; out: string }> {
+  const child = spawn('bash', [script, ...args], {
     cwd: base,
-    encoding: 'utf8',
     env: {
       ...process.env,
       AIP_WEB_PORT: String(port),
@@ -51,7 +57,10 @@ function run(args: string[], extra: Record<string, string> = {}) {
       ...extra,
     },
   });
-  return { code: result.status, out: `${result.stdout}${result.stderr}` };
+  let out = '';
+  child.stdout.on('data', (chunk: Buffer) => (out += chunk.toString()));
+  child.stderr.on('data', (chunk: Buffer) => (out += chunk.toString()));
+  return new Promise((done) => child.on('close', (code) => done({ code, out })));
 }
 
 async function freePort(): Promise<number> {
@@ -79,7 +88,7 @@ async function waitDead(pid: number): Promise<void> {
 
 afterEach(async () => {
   manual?.kill('SIGKILL');
-  if (base) run(['stop', String(port)]);
+  if (base) await run(['stop', String(port)]);
   manual = null;
   await new Promise<void>((done) => (foreign ? foreign.close(() => done()) : done()));
   foreign = null;
@@ -90,7 +99,7 @@ describe('scripts/aip-web.sh', () => {
     'restart prints the link, keeps it on a second restart and stops the old process',
     async () => {
       await setup();
-      const first = run(['restart', String(port)]);
+      const first = await run(['restart', String(port)]);
       expect(first.code).toBe(0);
       const link = /^aip web: (http\S+)$/m.exec(first.out)?.[1] ?? '';
       expect(link).toContain(`:${port}/?token=`);
@@ -98,14 +107,14 @@ describe('scripts/aip-web.sh', () => {
       expect((await fetch(link)).status).toBe(200);
       expect(statSync(join(state, 'token')).mode & 0o777).toBe(0o600);
 
-      const second = run(['restart', String(port)]);
+      const second = await run(['restart', String(port)]);
       expect(second.code).toBe(0);
       expect(second.out).toContain(link);
       expect(pidOf()).not.toBe(oldPid);
       expect(alive(oldPid)).toBe(false);
       expect((await fetch(link)).status).toBe(200);
 
-      const status = run(['status']);
+      const status = await run(['status']);
       expect(status.out).toContain(link);
       expect(status.out).toContain(`pid ${pidOf()}`);
     },
@@ -113,21 +122,21 @@ describe('scripts/aip-web.sh', () => {
 
   portIt('stop kills the server and is idempotent', async () => {
     await setup();
-    expect(run(['restart', String(port)]).code).toBe(0);
+    expect((await run(['restart', String(port)])).code).toBe(0);
     const pid = pidOf();
-    const stopped = run(['stop']);
+    const stopped = await run(['stop']);
     expect(stopped.code).toBe(0);
     await waitDead(pid);
     expect(alive(pid)).toBe(false);
-    const again = run(['stop']);
+    const again = await run(['stop']);
     expect(again.code).toBe(0);
     expect(again.out).toContain('aip web is not running');
-    expect(run(['status']).out).toContain('aip web is not running');
+    expect((await run(['status'])).out).toContain('aip web is not running');
   });
 
   portIt('restart returns the link of a panel served by the daemon', async () => {
     await setup();
-    const result = run(['restart', String(port)], { FAKE_WEB_DAEMON: '1' });
+    const result = await run(['restart', String(port)], { FAKE_WEB_DAEMON: '1' });
     expect(result.code).toBe(0);
     expect(result.out).toContain(`aip web: http://127.0.0.1:${port}/?token=daemontoken1234567`);
     expect(existsSync(join(state, 'pid'))).toBe(false);
@@ -147,7 +156,7 @@ describe('scripts/aip-web.sh', () => {
         url: `http://127.0.0.1:${port}/`,
       }),
     );
-    const result = run(['status']);
+    const result = await run(['status']);
     expect(result.code).toBe(0);
     expect(result.out).toContain(`aip web: http://127.0.0.1:${port}/`);
     expect(result.out).toContain('served by the aip daemon');
@@ -157,7 +166,7 @@ describe('scripts/aip-web.sh', () => {
     await setup();
     mkdirSync(state, { recursive: true });
     writeFileSync(join(state, 'pid'), '99999999\n');
-    const result = run(['stop', String(5)]);
+    const result = await run(['stop', String(5)]);
     expect(result.code).toBe(0);
     expect(result.out).toContain('aip web is not running');
     expect(existsSync(join(state, 'pid'))).toBe(false);
@@ -186,7 +195,7 @@ describe('scripts/aip-web.sh', () => {
   portIt('restart stops an aip web started by hand on the port', async () => {
     await setup();
     const manualPid = await startManual();
-    const result = run(['restart', String(port)]);
+    const result = await run(['restart', String(port)]);
     expect(result.code).toBe(0);
     await waitDead(manualPid);
     expect(alive(manualPid)).toBe(false);
@@ -196,7 +205,7 @@ describe('scripts/aip-web.sh', () => {
   portIt('stop without a port and a port file leaves aip web on AIP_WEB_PORT alone', async () => {
     await setup();
     const manualPid = await startManual();
-    const result = run(['stop']);
+    const result = await run(['stop']);
     expect(result.code).toBe(0);
     expect(result.out).toContain('aip web is not running');
     expect(alive(manualPid)).toBe(true);
@@ -206,7 +215,7 @@ describe('scripts/aip-web.sh', () => {
   portIt('stop with an explicit port stops aip web started by hand', async () => {
     await setup();
     const manualPid = await startManual();
-    const result = run(['stop', String(port)]);
+    const result = await run(['stop', String(port)]);
     expect(result.code).toBe(0);
     expect(result.out).toContain('aip web stopped');
     await waitDead(manualPid);
@@ -218,7 +227,7 @@ describe('scripts/aip-web.sh', () => {
     foreign = createServer((_request, response) => response.end('x'));
     await new Promise<void>((done) => foreign!.listen(0, '127.0.0.1', done));
     const foreignPort = (foreign.address() as AddressInfo).port;
-    const result = run(['restart', String(foreignPort)]);
+    const result = await run(['restart', String(foreignPort)]);
     expect(result.code).toBe(1);
     expect(result.out).toContain(`pid ${process.pid}`);
     expect(alive(process.pid)).toBe(true);
@@ -227,16 +236,19 @@ describe('scripts/aip-web.sh', () => {
 
   it('shows the log tail and fails when the server dies at start', async () => {
     await setup();
-    const result = run(['restart', String(port)], { FAKE_WEB_FAIL: '1' });
+    const result = await run(['restart', String(port)], { FAKE_WEB_FAIL: '1' });
     expect(result.code).toBe(1);
     expect(result.out).toContain('EADDRINUSE');
     expect(existsSync(join(state, 'pid'))).toBe(false);
-    expect(run(['status']).out).toContain('aip web is not running');
+    expect((await run(['status'])).out).toContain('aip web is not running');
   });
 
   it('kills a server that does not print its link in time', async () => {
     await setup();
-    const result = run(['restart', String(port)], { FAKE_WEB_SILENT: '1', AIP_WEB_TIMEOUT: '1' });
+    const result = await run(['restart', String(port)], {
+      FAKE_WEB_SILENT: '1',
+      AIP_WEB_TIMEOUT: '1',
+    });
     expect(result.code).toBe(1);
     expect(result.out).toContain('did not print its link');
     expect(existsSync(join(state, 'pid'))).toBe(false);

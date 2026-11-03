@@ -7,6 +7,7 @@ export default defineConfig({
     // Tests of the web panel under web/ declare `@vitest-environment jsdom` themselves.
     include: ['test/**/*.test.ts', 'web/**/*.test.tsx'],
     exclude: [...configDefaults.exclude, 'integrations/**'],
+    globalSetup: ['test/global-setup.ts'],
     setupFiles: ['web/test/setup.ts'],
     testTimeout: 30_000,
   },

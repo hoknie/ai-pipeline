@@ -59,6 +59,11 @@ The sections are "Runs", "Queue", "Topology", "Specialists" and "Workflow". The 
 - Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
 - A run card shows the first line of the task, the status, workflow, time, cost and a summary of changes (`2 files +367 −0`).
 - The run header has "Deliver", "Cancel run" and "Retry failed (N)". The "More" menu has "Deliver with --force…" and "Copy run id".
+- The run header has a "Steps" block: each step of the workflow with its state (done, running, upcoming) and a "Skip" switch for steps that are not finished yet.
+  - Skipping a running step asks for confirmation: the specialist is stopped without a commit.
+  - Its partial changes stay uncommitted in the group worktree.
+  - Turning the switch off brings the step back.
+  - Steps skipped when the run was created are not shown.
 - A finished run with group warnings has a yellow "Warnings: N" badge.
 
 ### Group
@@ -147,6 +152,7 @@ Under every section is a collapsible "Specialist load" strip with the current lo
 
 ## HTTP API
 
+- `POST /api/runs/<id>/skip` with the body `{"step": "<step id>", "skip": true}` skips a step of the run (`false` brings it back) and returns the run. A refusal of the daemon (unknown step, a step every group has passed) comes back with code 400.
 - `GET /api/repositories` returns the repositories with counters.
 - `POST /api/repositories` with the body `{"path": "<absolute path>"}` adds one.
 - `DELETE /api/repositories?repository=<absolute path>` removes one.

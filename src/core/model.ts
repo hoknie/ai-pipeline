@@ -60,6 +60,8 @@ export type FailReason =
   | { kind: 'runtime_not_found'; runtime: string }
   | { kind: 'spawn'; message: string }
   | { kind: 'git'; message: string }
+  /** The step was skipped while its attempt ran. */
+  | { kind: 'skipped' }
   /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
   | { kind: 'usage_limit'; resetsAt: number | null };
 
@@ -92,6 +94,8 @@ export function describeFailReason(reason: FailReason): string {
       return `spawn error: ${reason.message}`;
     case 'git':
       return `git: ${reason.message}`;
+    case 'skipped':
+      return 'step skipped';
     case 'usage_limit':
       return reason.resetsAt === null
         ? 'usage limit'
@@ -339,6 +343,8 @@ export interface Run {
   queueItem: string | null;
   /** Ids of catalog tags. */
   tags: string[];
+  /** Steps skipped after the start; the step list of the snapshot is unchanged. */
+  skippedSteps: string[];
 }
 
 export interface PendingDelivery {

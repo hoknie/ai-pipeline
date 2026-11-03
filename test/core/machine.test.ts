@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   QUESTIONS_LIMIT,
+  lastUnskipped,
   questionsText,
   runName,
   summarize,
@@ -490,5 +491,100 @@ describe('tags_set', () => {
     expect(JSON.stringify(state.groups)).toBe(groups);
     transition(state, { kind: 'tags_set', tags: [] }, 30);
     expect(state.run.tags).toEqual([]);
+  });
+});
+
+describe('step_skip', () => {
+  const skip = (state: ReturnType<typeof run>, stepId: string, on = true) =>
+    transition(state, { kind: 'step_skip', step: stepId, skip: on }, 3000);
+
+  it('skips an upcoming step: it is never started', () => {
+    const state = run(1);
+    step(state);
+    skip(state, 'review');
+    expect(state.run.skippedSteps).toEqual(['review']);
+    finish(state, 'done');
+    step(state);
+    finish(state, 'done');
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('qa');
+  });
+
+  it('stops a running step without a commit and moves on', () => {
+    const state = run(1);
+    for (const _ of ['plan', 'code']) {
+      step(state);
+      finish(state, 'done');
+    }
+    step(state);
+    const attempt = runningAttempt(state);
+    expect(attempt.stepId).toBe('review');
+    const effects = skip(state, 'review');
+    expect(kinds(effects)).toContain('stop_attempt');
+    expect(kinds(effects)).not.toContain('commit');
+    const stopped = group(state).attempts.find((candidate) => candidate.seq === attempt.seq)!;
+    expect(stopped.status).toBe('cancelled');
+    expect(stopped.reason).toEqual({ kind: 'skipped' });
+    expect(group(state).pending?.stepIndex).toBe(3);
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('qa');
+  });
+
+  it('goes to the merge when the remaining steps are skipped', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'done');
+    step(state);
+    finish(state, 'done');
+    skip(state, 'review');
+    const effects = skip(state, 'qa');
+    expect(kinds(effects)).toContain('merge');
+    expect(group(state).status).toBe('merging');
+  });
+
+  it('drops the question of a step skipped while it waits for a human', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'needs_human', { questions: [{ text: 'Что?' }] as HumanQuestion[] });
+    expect(group(state).status).toBe('needs_human');
+    skip(state, 'plan');
+    expect(group(state).question).toBeNull();
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('code');
+  });
+
+  it('refuses a step every group has passed, without changing the state', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'done');
+    const before = JSON.stringify(state);
+    expect(() => skip(state, 'plan')).toThrow('already passed');
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('refuses an unknown step, a goto target and skipping everything', () => {
+    const state = run(1);
+    expect(() => skip(state, 'nope')).toThrow('unknown step');
+    expect(() => skip(state, 'code')).toThrow('returns to skipped step');
+    skip(state, 'qa');
+    skip(state, 'review');
+    skip(state, 'code', false);
+    expect(state.run.skippedSteps).toEqual(['review', 'qa']);
+  });
+
+  it('is idempotent and can be turned off', () => {
+    const state = run(1);
+    skip(state, 'qa');
+    skip(state, 'qa');
+    expect(state.run.skippedSteps).toEqual(['qa']);
+    skip(state, 'qa', false);
+    expect(state.run.skippedSteps).toEqual([]);
+  });
+
+  it('puts a conflict update on the last unskipped step', () => {
+    const state = run(1);
+    skip(state, 'qa');
+    expect(state.run.skippedSteps).toEqual(['qa']);
+    expect(lastUnskipped(state.run, group(state))).toBe(2);
   });
 });

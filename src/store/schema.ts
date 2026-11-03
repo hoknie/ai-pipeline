@@ -142,6 +142,7 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE queue_items ADD COLUMN run_id TEXT;
   `,
   `ALTER TABLE queue_items ADD COLUMN postponed INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE runs ADD COLUMN skipped_steps_json TEXT NOT NULL DEFAULT '[]'`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

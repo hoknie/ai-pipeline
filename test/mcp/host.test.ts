@@ -537,3 +537,40 @@ describe('host MCP texts', () => {
     }
   });
 });
+
+describe('host MCP swarm_skip_step', () => {
+  it('sends run_skip, skipping by default and bringing back with skip=false', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return runView(run(1), 1000);
+    });
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names).toContain('swarm_skip_step');
+    const skipped = await client.callTool({
+      name: 'swarm_skip_step',
+      arguments: { run_id: 'run000000001', step: 'qa' },
+    });
+    expect(skipped.isError).toBeFalsy();
+    await client.callTool({
+      name: 'swarm_skip_step',
+      arguments: { run_id: 'run000000001', step: 'qa', skip: false },
+    });
+    expect(calls).toEqual([
+      { method: 'run_skip', params: { runId: 'run000000001', step: 'qa', skip: true } },
+      { method: 'run_skip', params: { runId: 'run000000001', step: 'qa', skip: false } },
+    ]);
+  });
+
+  it('reports a refusal of the daemon as a tool error', async () => {
+    const client = await connect(async () => {
+      throw new Error('step `plan` is already passed by every group');
+    });
+    const result = await client.callTool({
+      name: 'swarm_skip_step',
+      arguments: { run_id: 'run000000001', step: 'plan' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('already passed');
+  });
+});

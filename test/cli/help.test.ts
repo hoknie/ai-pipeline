@@ -100,8 +100,19 @@ describe('grouped help', () => {
   });
 
   it('gives every leaf command an Examples block with its full path', async () => {
-    for (const path of leaves(tree())) {
-      const { stdout } = await aip([...path, '--help']);
+    const paths = leaves(tree());
+    const helps: string[] = [];
+    // A few processes at a time: one by one, the start-up of each `aip` adds up to most of a minute.
+    for (let index = 0; index < paths.length; index += 8)
+      helps.push(
+        ...(await Promise.all(
+          paths
+            .slice(index, index + 8)
+            .map(async (path) => (await aip([...path, '--help'])).stdout),
+        )),
+      );
+    for (const [index, path] of paths.entries()) {
+      const stdout = helps[index]!;
       expect(stdout, path.join(' ')).toContain('Examples:');
       const lines = stdout
         .slice(stdout.indexOf('Examples:'))

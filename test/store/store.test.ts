@@ -112,6 +112,16 @@ describe('queues', () => {
     expect(store.loadQueue('/repo')?.items[0]?.skip).toEqual([]);
   });
 
+  it('keeps the skipped steps of a run and reads an old row as empty', () => {
+    const store = temporaryStore();
+    const state = run(1);
+    state.run.skippedSteps = ['qa'];
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)?.run.skippedSteps).toEqual(['qa']);
+    store.database.prepare("UPDATE runs SET skipped_steps_json = ''").run();
+    expect(store.loadRun(state.run.id)?.run.skippedSteps).toEqual([]);
+  });
+
   it('keeps the dependencies of an item and the queue item of a run', () => {
     const store = temporaryStore();
     const queue = emptyQueue('/repo', 1);
@@ -144,7 +154,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
     old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN skipped_steps_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
@@ -180,7 +191,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
     old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN skipped_steps_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')).toMatchObject({
@@ -219,7 +231,8 @@ describe('queues', () => {
     old.saveQueue(queue);
     expect(old.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([true, false]);
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN skipped_steps_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([false, false]);
@@ -408,7 +421,7 @@ describe('refused tool calls', () => {
     store.saveRun(state);
     // As a database written before the column existed.
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; PRAGMA user_version = 3',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; PRAGMA user_version = 3',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
@@ -418,7 +431,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-13)).toContain('denials_json');
+    expect(MIGRATIONS.at(-14)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -435,13 +448,13 @@ describe('refused tool calls', () => {
     ]);
     // As a database written before the column existed.
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; PRAGMA user_version = 4',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; PRAGMA user_version = 4',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-12)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-13)).toContain('outside_changes_json');
   });
 });
 
@@ -484,7 +497,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(16);
+    expect(SCHEMA_VERSION).toBe(17);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -557,7 +570,8 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
     old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN skipped_steps_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -590,7 +604,8 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
     old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN skipped_steps_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -673,7 +688,8 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
     old.database.exec('ALTER TABLE queues DROP COLUMN on_limit');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN run_id');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN skipped_steps_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);

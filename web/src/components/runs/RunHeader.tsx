@@ -20,6 +20,7 @@ import { useTags } from '../../tags.tsx';
 import { TagPicker } from '../TagPicker.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
+import { RunSteps } from './RunSteps.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
 import { canDeliver } from './delivery.ts';
@@ -230,6 +231,7 @@ export function RunHeader({
           ) : null}
         </div>
       ) : null}
+      <RunSteps run={run} api={api} onError={onError} />
       <div className="flex flex-wrap items-center gap-2">
         {failed.length > 0 ? (
           <Button variant="outline" disabled={retrying} onClick={() => void retryFailed()}>

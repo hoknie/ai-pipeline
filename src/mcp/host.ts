@@ -183,6 +183,18 @@ export function createHostServer(options: HostOptions): McpServer {
   );
 
   server.registerTool(
+    'swarm_skip_step',
+    {
+      title: 'Skip a step of a run',
+      description:
+        'Skip a step that is running or still ahead, or pass skip=false to bring it back. A running step is stopped without a commit. Steps already passed by every group cannot be skipped.',
+      inputSchema: { run_id: runId, step: z.string().min(1), skip: z.boolean().optional() },
+    },
+    ({ run_id, step, skip }) =>
+      attempt(() => showRun('run_skip', { runId: run_id, step, skip: skip ?? true })),
+  );
+
+  server.registerTool(
     'swarm_answer',
     {
       title: 'Answer a question from a specialist',

@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { applySkip, checkSkip, cleanSkip, stepsOf } from '../../src/core/index.ts';
+import {
+  applySkip,
+  checkSkip,
+  cleanSkip,
+  isSkipped,
+  lastUnskipped,
+  nextUnskipped,
+  stepStates,
+  stepsOf,
+} from '../../src/core/index.ts';
 import { findWorkflow } from '../../src/config/index.ts';
 
-import { CONFIG_TEXT, config, run } from './helpers.ts';
+import { CONFIG_TEXT, config, finish, group, run, step } from './helpers.ts';
 
 const EPIC_CONFIG = `${CONFIG_TEXT.trimEnd()}
     explore:
@@ -82,5 +91,66 @@ describe('applySkip', () => {
     const state = run(1, { skip: ['review', 'qa'] });
     expect(stepsOf(state.run, state.groups[0]!).map((step) => step.id)).toEqual(['plan', 'code']);
     expect(() => run(1, { skip: ['deploy'] })).toThrow(/unknown step/);
+  });
+});
+
+describe('stepStates', () => {
+  it('marks the first step active and the rest upcoming for a fresh run', () => {
+    const state = run(1);
+    expect(stepStates(state).map((entry) => entry.state)).toEqual([
+      'active',
+      'upcoming',
+      'upcoming',
+      'upcoming',
+    ]);
+  });
+
+  it('marks passed steps done and follows the slowest group', () => {
+    const state = run(2);
+    step(state);
+    finish(state, 'done');
+    finish(state, 'done', { slug: 'gruppa-2' });
+    step(state);
+    finish(state, 'done');
+    expect(stepStates(state).map((entry) => entry.state)).toEqual([
+      'done',
+      'active',
+      'active',
+      'upcoming',
+    ]);
+  });
+
+  it('marks every step done after the merge and flags skipped steps', () => {
+    const state = run(1);
+    state.run.skippedSteps = ['qa'];
+    for (const item of state.groups) item.status = 'merged';
+    const states = stepStates(state);
+    expect(states.every((entry) => entry.state === 'done')).toBe(true);
+    expect(states.map((entry) => entry.skipped)).toEqual([false, false, false, true]);
+  });
+
+  it('keeps a failed group on its step', () => {
+    const state = run(1);
+    step(state);
+    group(state).status = 'failed';
+    expect(stepStates(state)[0]?.state).toBe('active');
+  });
+
+  it('treats a run without groups as not started', () => {
+    const state = run(1);
+    state.groups = [];
+    expect(stepStates(state).every((entry) => entry.state === 'upcoming')).toBe(true);
+  });
+});
+
+describe('nextUnskipped and lastUnskipped', () => {
+  it('walks over skipped steps', () => {
+    const state = run(1);
+    state.run.skippedSteps = ['review', 'qa'];
+    const group = state.groups[0]!;
+    expect(nextUnskipped(state.run, group, 2)).toBeNull();
+    expect(nextUnskipped(state.run, group, 1)).toBe(1);
+    expect(lastUnskipped(state.run, group)).toBe(1);
+    expect(isSkipped(state.run, 'qa')).toBe(true);
   });
 });

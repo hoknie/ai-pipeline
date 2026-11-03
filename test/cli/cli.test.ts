@@ -232,6 +232,24 @@ describe('cli', () => {
     ).toBe('');
   });
 
+  it('skips a step of a running run, brings it back with --off and refuses a passed step', async () => {
+    const box = sandbox();
+    writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'x', '--json')).stdout,
+    );
+    const skipped = await aip(box, 'run', 'skip', runId, 'review');
+    expect(skipped.code).toBe(0);
+    expect(skipped.stdout).toContain('Skipped steps: review');
+    const back = await aip(box, 'run', 'skip', runId, 'review', '--off', '--json');
+    const view = JSON.parse(back.stdout) as { steps: { id: string; skipped: boolean }[] };
+    expect(view.steps.find((entry) => entry.id === 'review')?.skipped).toBe(false);
+    const unknown = await aip(box, 'run', 'skip', runId, 'nope');
+    expect(unknown.code).toBe(1);
+    expect(unknown.stderr).toContain('unknown step');
+    await aip(box, 'run', 'cancel', runId);
+  });
+
   it('lists finished runs to clean', async () => {
     const box = sandbox();
     const empty = await aip(box, 'run', 'clean');
@@ -907,6 +925,7 @@ describe('cli', () => {
       'swarm_queue_start',
       'swarm_retry',
       'swarm_run',
+      'swarm_skip_step',
       'swarm_status',
     ]);
     const added = await client.callTool({

@@ -160,6 +160,14 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
     ...(run.tags && run.tags.length > 0
       ? [`${style.muted('Tags:')} ${formatTagLabels(run.tags, style)}`]
       : []),
+    ...(run.steps.some((step) => step.skipped)
+      ? [
+          `${style.muted('Skipped steps:')} ${run.steps
+            .filter((step) => step.skipped)
+            .map((step) => step.id)
+            .join(', ')}`,
+        ]
+      : []),
     `${style.muted('Groups:')} ${run.counts || '—'} (${run.total}) · usage ${formatUsage(run.usage)} · started ${seconds(now - run.createdAt)} ago`,
   ];
   const delivery = deliveryText(run);

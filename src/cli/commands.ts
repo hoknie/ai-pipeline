@@ -830,6 +830,28 @@ function registerRun(program: Command): void {
     );
 
   run
+    .command('skip')
+    .description(
+      'Skip a step of a run that is not finished yet, or bring it back with --off; a running step is stopped without a commit',
+    )
+    .argument('<run-id>', 'run id')
+    .argument('<step>', 'step id')
+    .option('--off', 'do not skip the step any more')
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples(['aip run skip 0mh3k2ab1x9z review', 'aip run skip 0mh3k2ab1x9z review --off']),
+    )
+    .action(async (runId: string, step: string, options: { off?: boolean; json?: boolean }) => {
+      const view = (await call(context(), 'run_skip', {
+        runId,
+        step,
+        skip: options.off !== true,
+      })) as RunView;
+      output(options.json, formatRun(view, Date.now(), activeStyle), view);
+    });
+
+  run
     .command('clean')
     .description(
       'List finished runs that can be cleaned, or remove the worktrees and group branches of one',

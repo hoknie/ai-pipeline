@@ -103,6 +103,7 @@ export function clock(timestamp: number): string {
 
 /** A group failure reason for people; a usage limit is translated, other reasons stay as they are. */
 export function reasonLabel(reason: string, t: TFunction): string {
+  if (reason === 'step skipped') return t('runs.group.skippedReason');
   const limit = /^usage limit(?:, resets (\d\d:\d\d))?$/.exec(reason);
   if (!limit) return reason;
   return limit[1] ? t('runs.group.limitReasonAt', { time: limit[1] }) : t('runs.group.limitReason');

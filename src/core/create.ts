@@ -80,6 +80,7 @@ export function createRun(input: NewRun): RunState {
       fromQueue: input.fromQueue ?? false,
       queueItem: input.queueItem ?? null,
       tags: [...(input.tags ?? [])],
+      skippedSteps: [],
     },
     split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,
     groups: splitting

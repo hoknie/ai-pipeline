@@ -94,6 +94,50 @@ describe('failures and control', () => {
     expect(final.state).toBe('finished');
   });
 
+  it('skips an upcoming step: the step never runs', async () => {
+    const h = await start();
+    h.script({ code: [{ delayMs: 600 }] });
+    const runId = await run(h);
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
+    const skipped = (await h.call('run_skip', { runId, step: 'review', skip: true })) as {
+      steps: { id: string; skipped: boolean }[];
+    };
+    expect(skipped.steps.find((entry) => entry.id === 'review')?.skipped).toBe(true);
+    const final = await h.waitFor(runId, (view) => view.finished);
+    expect(statuses(final)).toEqual(['merged']);
+    expect(calls(h).map((call) => call.step)).toEqual(['code']);
+  });
+
+  it('skips a running step: it is stopped and the group is merged', async () => {
+    const h = await start();
+    h.script({ review: [{ hang: true }] });
+    const runId = await run(h);
+    await h.waitFor(runId, (view) => view.steps[1]?.state === 'active');
+    await h.waitFor(runId, (view) => view.groups[0]?.step === 'review');
+    await h.call('run_skip', { runId, step: 'review', skip: true });
+    const final = await h.waitFor(runId, (view) => view.finished);
+    expect(statuses(final)).toEqual(['merged']);
+    const group = await h.group(runId, 'g1');
+    const review = group.attempts.filter((attempt) => attempt.stepId === 'review');
+    expect(review).toHaveLength(1);
+    expect(review[0]).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('keeps the skipped steps after a restart and refuses a passed step', async () => {
+    const h = await start();
+    h.script({ review: [{ hang: true }] });
+    const runId = await run(h);
+    await h.waitFor(runId, (view) => view.groups[0]?.step === 'review');
+    await expect(h.call('run_skip', { runId, step: 'code', skip: true })).rejects.toThrow(
+      'already passed',
+    );
+    await h.call('run_skip', { runId, step: 'review', skip: true });
+    await h.waitFor(runId, (view) => view.finished);
+    await h.restart();
+    const view = await h.status(runId);
+    expect(view.steps.find((entry) => entry.id === 'review')?.skipped).toBe(true);
+  });
+
   it('refuses to retry a merged group', async () => {
     const h = await start();
     const runId = await run(h);

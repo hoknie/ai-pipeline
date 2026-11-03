@@ -609,6 +609,31 @@ describe('aip web', () => {
     expect(text).toMatch(/"queues":\[\{[^]*из терминала/);
   });
 
+  it('skips a step through POST with validation', async () => {
+    const { h, web, base } = await setup();
+    h.script({ code: [{ delayMs: 20_000 }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.groups.some((group) => group.status === 'running'));
+    const post = (body: unknown) =>
+      fetch(`${base}/api/runs/${runId}/skip`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    expect((await post({ step: 'review' })).status).toBe(400);
+    const ok = await post({ step: 'review', skip: true });
+    expect(ok.status).toBe(200);
+    const view = (await ok.json()) as RunView;
+    expect(view.steps.find((entry) => entry.id === 'review')?.skipped).toBe(true);
+    const refused = await post({ step: 'nope', skip: true });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: string }).error).toContain('unknown step');
+  });
+
   it('answers a question and cancels through POST', async () => {
     const { h, web, base } = await setup();
     h.script({ code: [{ verdict: 'needs_human', feedback: 'Which auth?' }, { delayMs: 20_000 }] });

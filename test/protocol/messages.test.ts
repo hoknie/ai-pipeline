@@ -418,6 +418,11 @@ describe('tag requests', () => {
     bad('tag_remove', {});
   });
 
+  it('accepts run_skip only with a boolean skip', () => {
+    ok('run_skip', { runId: 'r', step: 'qa', skip: true });
+    bad('run_skip', { runId: 'r', step: 'qa' });
+  });
+
   it('needs something to add or remove in run_tags', () => {
     ok('run_tags', { runId: 'r', add: ['auth'] });
     ok('run_tags', { runId: 'r', remove: ['auth'] });

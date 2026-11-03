@@ -758,3 +758,12 @@ describe('system stages and waiting in text', () => {
     expect(text).toContain('gruppa-1: plan (waiting for coder)');
   });
 });
+
+describe('skipped steps in text', () => {
+  it('names the steps skipped after the start, and says nothing otherwise', () => {
+    const state = run(1);
+    expect(formatRun(runView(state, 1000), 1000)).not.toContain('Skipped steps');
+    state.run.skippedSteps = ['review', 'qa'];
+    expect(formatRun(runView(state, 1000), 1000)).toContain('Skipped steps: review, qa');
+  });
+});
