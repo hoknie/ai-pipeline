@@ -186,6 +186,9 @@ export type DeliveryStage =
   | { status: 'applied' }
   | { status: 'apply_failed'; reason: string | null; groups: string[] };
 
+/** The state of a run in a view: its phase, or `queued` for a finished run waiting as a return item. */
+export type RunViewState = RunPhase | 'queued';
+
 export interface RunView {
   id: string;
   title: string;
@@ -199,7 +202,7 @@ export interface RunView {
   startedAt: number | null;
   finishedAt: number | null;
   finished: boolean;
-  state: RunPhase;
+  state: RunViewState;
   /** Groups waiting for a human answer. */
   waiting: number;
   dirtyWarning: boolean;
@@ -211,6 +214,8 @@ export interface RunView {
   fromQueue: boolean;
   /** The run can go back to its queue: it has failed or cancelled groups and is not in the queue. */
   returnable: boolean;
+  /** Id of the queue item that retries the run when taken; null when the run has none. */
+  queueItem: string | null;
   tags: TagView[];
   counts: string;
   total: number;
@@ -436,6 +441,12 @@ function runDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
   };
 }
 
+/** Marks the view with its return item; a finished run with one shows as `queued`. */
+export function withQueue(view: RunView, item: string | null): RunView {
+  if (item === null) return view;
+  return { ...view, queueItem: item, state: view.finished ? 'queued' : view.state };
+}
+
 export function runView(
   state: RunState,
   now: number,
@@ -480,6 +491,8 @@ export function runView(
     deliveryMode: state.run.config.delivery.mode,
     fromQueue: state.run.fromQueue,
     returnable: false,
+    // The queue is unknown here: the daemon fills it in with `withQueue`.
+    queueItem: null,
     tags: tagViews(catalog, state.run.tags),
     counts: countsLine(state, waitingGroups),
     total: summary.total,

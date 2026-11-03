@@ -48,6 +48,7 @@ import {
   problemKeys,
   retryableGroups,
   returnRun,
+  returnItemOf,
   queueWakeAt,
   limitHolds,
   queueItemId,
@@ -97,6 +98,7 @@ import {
   queueView,
   repositoryViews,
   runView,
+  withQueue,
   type BuildInfo,
   type PingResult,
   type RepositoryView,
@@ -169,6 +171,8 @@ export class Daemon {
   private readonly queues = new Map<string, Queue>();
   private readonly advanceRequested = new Set<string>();
   private readonly queueRuns = new Map<string, string>();
+  /** Per repository: return item of each returned run, as subscribers last saw it. */
+  private readonly returnItems = new Map<string, Map<string, string>>();
   /** Queued groups the scheduler holds back, by `waitKey`; recomputed after each `schedule()`. */
   private waits = new Map<string, GroupWait>();
   /** Waits of each unfinished run as text, to tell subscribers when they change. */
@@ -316,7 +320,21 @@ export class Daemon {
       for (const send of this.subscribers) send(line);
     }
     this.publishRepositories();
+    this.publishReturned(queue);
     return view;
+  }
+
+  /** Sends a `run` event to every run whose return item appeared, changed or went away. */
+  private publishReturned(queue: Queue): void {
+    const before = this.returnItems.get(queue.repository) ?? new Map<string, string>();
+    const after = new Map<string, string>();
+    for (const item of queue.items) if (item.run !== null) after.set(item.run, item.id);
+    this.returnItems.set(queue.repository, after);
+    for (const run of new Set([...before.keys(), ...after.keys()])) {
+      if (before.get(run) === after.get(run)) continue;
+      const state = this.lookupState(run);
+      if (state) this.broadcast(state);
+    }
   }
 
   private repositoryList(): RepositoryView[] {
@@ -482,7 +500,6 @@ export class Daemon {
       const now = this.now();
       const item = returnRun(queue, state, queueItemId(now, randomInt(36 ** 3)), now);
       this.saveQueue(queue);
-      this.broadcast(state);
       await this.advanceQueue(state.run.repository);
       return { ...this.queueSnapshot(queue), item: item.id };
     });
@@ -661,7 +678,9 @@ export class Daemon {
       this.catalog,
       this.waitLookup,
     );
-    return { ...view, returnable: this.returnable(state) };
+    const queue = this.queues.get(state.run.repository);
+    const item = queue ? returnItemOf(queue, state.run.id) : null;
+    return withQueue({ ...view, returnable: this.returnable(state) }, item?.id ?? null);
   }
 
   /** Whether `queue_return` would take the run: something to retry, and not in its queue yet. */

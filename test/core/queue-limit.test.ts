@@ -9,6 +9,7 @@ import {
   pauseQueue,
   queueWakeAt,
   removeItem,
+  returnItemOf,
   returnRun,
   setQueueSettings,
   startQueue,
@@ -274,5 +275,19 @@ describe('return a run to the queue', () => {
     itemStarted(queue, 'q9', a.run.id, 21);
     expect(queue.runs).toEqual([a.run.id]);
     expect(queue.items).toEqual([]);
+  });
+
+  it('finds the return item of a run until it leaves the queue', () => {
+    const { queue, a } = skippedRun();
+    expect(returnItemOf(queue, a.run.id)).toBeNull();
+    returnRun(queue, a, 'q9', 10);
+    expect(returnItemOf(queue, a.run.id)?.id).toBe('q9');
+    expect(returnItemOf(queue, 'other')).toBeNull();
+    removeItem(queue, 'q9', 11);
+    expect(returnItemOf(queue, a.run.id)).toBeNull();
+    returnRun(queue, a, 'q8', 12);
+    queue.runs = [];
+    itemStarted(queue, 'q8', a.run.id, 13);
+    expect(returnItemOf(queue, a.run.id)).toBeNull();
   });
 });

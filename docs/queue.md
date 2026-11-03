@@ -35,6 +35,7 @@ Delivery for one task is set with `--auto-deliver`, `--delivery-mode` and their 
 
 - `aip queue return <run-id>` puts a run with failed or cancelled groups back in the queue as its first task. `--repo` defaults to the repository of the run. A skipped run leaves the skipped list.
 - The run does not change until the queue takes the task on a free place (or `aip queue run <item>`). Then its failed and cancelled groups are retried from where they stopped, the work already done is kept, and the run holds a place again.
+- While the task waits, `aip run list`, `aip run show`, `swarm_status` and the web panel show the run as `queued` (the field `queueItem` holds the task id; the statuses of the groups do not change). Once the task is taken or removed, the run shows its own state again.
 - `aip queue list` marks the task `returns <run-id>`. It can be moved, removed or given `--after`, but not edited otherwise.
 - A run that is already in the queue, holds a place or has nothing to retry is refused.
 

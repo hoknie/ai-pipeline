@@ -10,7 +10,7 @@ import {
   type RunCreated,
   type StreamEvent,
 } from '../../src/protocol/index.ts';
-import { MANUAL_CONFIG, WORKFLOW_CONFIG, startRun, until } from './harness.ts';
+import { MANUAL_CONFIG, POLL_MS, WORKFLOW_CONFIG, startRun, until } from './harness.ts';
 import {
   start,
   stop,

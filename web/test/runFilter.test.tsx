@@ -63,6 +63,15 @@ describe('filterRuns', () => {
     expect(filterRuns([failed], '', 'active')).toEqual([]);
   });
 
+  it('counts a run waiting in the queue as active, not as done', () => {
+    const queued = runView({ id: 'q', state: 'queued', finished: true, queueItem: 'q1' });
+    const all = [...runs, queued];
+    expect(filterRuns(all, '', 'active').map((run) => run.id)).toEqual(['a', 'g', 'q']);
+    expect(filterRuns(all, '', 'done').map((run) => run.id)).toEqual(['f', 'c']);
+    expect(filterCounts(all)).toEqual({ all: 6, waiting: 1, active: 3, done: 2 });
+    expect(navRunCounts(all)).toEqual(navRunCounts(runs));
+  });
+
   it('keeps the order of the runs and combines the query with the filter', () => {
     expect(filterRuns(runs, 'готовый', 'active')).toEqual([]);
     expect(filterRuns(runs, 'о', 'all').map((run) => run.id)).toEqual(['w', 'a', 'f', 'c', 'g']);

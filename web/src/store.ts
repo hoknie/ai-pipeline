@@ -34,10 +34,13 @@ type StreamEvent =
 
 export function sortRuns(runs: Iterable<RunView>): RunView[] {
   return [...runs].sort((left, right) => {
-    const rank = (run: RunView) => (run.finished ? 2 : run.state === 'needs_human' ? 0 : 1);
+    // A finished run waiting in the queue as a return item counts as unfinished.
+    const rank = (run: RunView) =>
+      run.state === 'queued' ? 1 : run.finished ? 2 : run.state === 'needs_human' ? 0 : 1;
     if (rank(left) !== rank(right)) return rank(left) - rank(right);
     // A run that waits for a slot is not started yet: it goes first among the unfinished.
-    const waiting = (run: RunView) => !run.finished && run.startedAt === null;
+    const waiting = (run: RunView) =>
+      run.state === 'queued' || (!run.finished && run.startedAt === null);
     if (waiting(left) !== waiting(right)) return waiting(left) ? -1 : 1;
     const key = (run: RunView) => (waiting(run) ? run.createdAt : (run.startedAt ?? run.createdAt));
     return (

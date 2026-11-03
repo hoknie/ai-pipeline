@@ -141,6 +141,38 @@ describe('return to the queue', () => {
   });
 });
 
+describe('a returned run on the run screen', () => {
+  it('shows Queued without the return button and goes back to Failed on the event', async () => {
+    window.location.hash = '#runs/run1';
+    showRun(
+      runView({
+        state: 'queued',
+        finished: true,
+        returnable: false,
+        queueItem: 'q1',
+        groups: [groupRow({ status: 'failed' })],
+      }),
+    );
+    expect((await screen.findAllByText('Queued')).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Return to the queue' })).toBeNull();
+    act(() =>
+      FakeEventSource.last!.send({
+        event: 'run',
+        seq: 2,
+        run: runView({
+          state: 'failed',
+          finished: true,
+          returnable: true,
+          queueItem: null,
+          groups: [groupRow({ status: 'failed' })],
+        }),
+      }),
+    );
+    await screen.findByRole('button', { name: 'Return to the queue' });
+    expect(screen.queryByText('Queued')).toBeNull();
+  });
+});
+
 describe('a group waiting for a usage limit', () => {
   it('shows until when it waits on the group screen', async () => {
     window.location.hash = '#runs/run1/login';

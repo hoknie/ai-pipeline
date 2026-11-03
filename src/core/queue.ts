@@ -324,6 +324,11 @@ export function spreadTags(
   return changed;
 }
 
+/** The return item of a run: the queue item that retries it when taken; null when there is none. */
+export function returnItemOf(queue: Queue, run: string): QueueItem | null {
+  return queue.items.find((item) => item.run === run) ?? null;
+}
+
 export function removeItem(queue: Queue, id: string, now: number): void {
   const item = find(queue, id);
   queue.items = queue.items.filter((candidate) => candidate !== item);

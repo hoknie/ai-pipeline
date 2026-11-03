@@ -16,6 +16,7 @@ import {
   queueView,
   repositoryViews,
   runView,
+  withQueue,
 } from '../../src/protocol/index.ts';
 import { CONFIG_TEXT, finish, group, run, step } from '../core/helpers.ts';
 
@@ -538,5 +539,34 @@ describe('run steps', () => {
       { id: 'review', specialist: 'reviewer', skipped: false, state: 'upcoming' },
       { id: 'qa', specialist: 'qa', skipped: true, state: 'upcoming' },
     ]);
+  });
+});
+
+describe('a run waiting in the queue', () => {
+  const view = (finished: boolean, state: 'failed' | 'active') => ({
+    ...runView(run(1), 1000),
+    finished,
+    state,
+  });
+
+  it('shows a finished run as queued and keeps the item', () => {
+    expect(withQueue(view(true, 'failed'), 'q9')).toMatchObject({
+      state: 'queued',
+      queueItem: 'q9',
+      finished: true,
+    });
+  });
+
+  it('keeps the state of an unfinished run', () => {
+    expect(withQueue(view(false, 'active'), 'q9')).toMatchObject({
+      state: 'active',
+      queueItem: 'q9',
+    });
+  });
+
+  it('changes nothing without an item', () => {
+    const failed = view(true, 'failed');
+    expect(withQueue(failed, null)).toEqual(failed);
+    expect(failed.queueItem).toBeNull();
   });
 });

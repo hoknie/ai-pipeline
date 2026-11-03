@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { afterEach } from 'vitest';
 
 import type { RunCreated } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, harness, startRun, type Harness } from './harness.ts';
+import { POLL_MS, WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
+
+export { until };
 
 // Shared by the control test files; importing this module stops the daemon a test left running.
 let current: Harness | null = null;

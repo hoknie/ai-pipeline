@@ -112,6 +112,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     deliveryMode: 'worktree',
     fromQueue: false,
     returnable: false,
+    queueItem: null,
     tags: [],
     counts: 'running 1',
     total: 1,

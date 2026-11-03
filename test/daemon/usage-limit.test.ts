@@ -3,9 +3,15 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
+import {
+  streamEventSchema,
+  subscribe,
+  type QueueView,
+  type RunCreated,
+  type RunView,
+} from '../../src/protocol/index.ts';
 
-import { POLL_MS, harness, type Harness } from './harness.ts';
+import { POLL_MS, harness, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -157,6 +163,82 @@ describe('return a run to the queue', () => {
     await h.waitFor(runId, (view) => view.state === 'finished');
     await waitQueue(h, (view) => view.items.length === 0);
     expect(await allRuns(h)).toHaveLength(2);
+  });
+
+  it('shows a returned run as queued until the item leaves the queue', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('taken') }] });
+    const runId = await failedRun(h);
+    expect((await h.status(runId)).state).toBe('failed');
+    const returned = (await h.call('queue_return', { runId })) as QueueView & { item: string };
+    const queued = await h.status(runId);
+    expect(queued).toMatchObject({
+      state: 'queued',
+      queueItem: returned.item,
+      finished: true,
+      returnable: false,
+    });
+    expect(queued.groups[0]?.status).toBe('failed');
+    await h.call('queue_start', { repository: h.repo });
+    const taken = await h.waitFor(runId, (view) => view.state === 'active');
+    expect(taken.queueItem).toBeNull();
+    h.open('taken');
+    await h.waitFor(runId, (view) => view.state === 'finished');
+  });
+
+  it('sends a run event when the return item is removed or run now takes it', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('taken') }] });
+    const runId = await failedRun(h);
+    const events: RunView[] = [];
+    const ended = subscribe(h.socket, (line) => {
+      const event = streamEventSchema.parse(JSON.parse(line));
+      if (event.event === 'run' && event.run.id === runId)
+        events.push(event.run as unknown as RunView);
+    });
+    const last = () => events.at(-1);
+    const first = (await h.call('queue_return', { runId })) as QueueView & { item: string };
+    await until('the queued event', () => last()?.state === 'queued');
+    await h.call('queue_remove', { repository: h.repo, item: first.item });
+    await until('the event after remove', () => last()?.queueItem === null);
+    expect(last()).toMatchObject({ state: 'failed', returnable: true });
+
+    const second = (await h.call('queue_return', { runId })) as QueueView & { item: string };
+    await until('queued again', () => last()?.queueItem === second.item);
+    await h.call('queue_run_now', { repository: h.repo, item: second.item });
+    await until(
+      'the event after run now',
+      () => last()?.queueItem === null && last()?.state === 'active',
+    );
+    h.open('taken');
+    await h.waitFor(runId, (view) => view.state === 'finished');
+    await h.close();
+    current = null;
+    await ended;
+  });
+
+  it('sends a run event when a direct retry takes the return item', async () => {
+    const h = await start();
+    h.script({ code: [{ noReport: true }, { waitFor: h.gate('retried') }] });
+    const runId = await failedRun(h);
+    const events: RunView[] = [];
+    const ended = subscribe(h.socket, (line) => {
+      const event = streamEventSchema.parse(JSON.parse(line));
+      if (event.event === 'run' && event.run.id === runId)
+        events.push(event.run as unknown as RunView);
+    });
+    await h.call('queue_return', { runId });
+    await until('queued', () => events.at(-1)?.state === 'queued');
+    await h.call('retry', { runId, group: (await h.status(runId)).groups[0]!.slug });
+    await until(
+      'the event after retry',
+      () => events.at(-1)?.queueItem === null && events.at(-1)?.state === 'active',
+    );
+    h.open('retried');
+    await h.waitFor(runId, (view) => view.state === 'finished');
+    await h.close();
+    current = null;
+    await ended;
   });
 
   it('retries the run at once with run now and refuses a run of another repository', async () => {

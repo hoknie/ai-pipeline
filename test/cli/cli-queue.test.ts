@@ -122,6 +122,18 @@ describe('cli', () => {
     const returned = await aip(box, 'queue', 'return', run);
     expect(returned.code).toBe(0);
     expect(returned.stdout).toContain(`returns ${run}`);
+    const listed = await aip(box, 'run', 'list');
+    expect(listed.stdout).toContain('queued');
+    expect(listed.stdout).toMatch(/queued\s+feature/);
+    expect((await aip(box, 'run', 'show', run)).stdout).toContain('· queued ·');
+    const json = JSON.parse((await aip(box, 'run', 'show', run, '--json')).stdout) as {
+      run?: { state: string; queueItem: string | null };
+      state?: string;
+      queueItem?: string | null;
+    };
+    const shown = json.run ?? json;
+    expect(shown.state).toBe('queued');
+    expect(shown.queueItem).toEqual(expect.any(String));
     const again = await aip(box, 'queue', 'return', run);
     expect(again.code).toBe(1);
     expect(`${again.stdout}${again.stderr}`).toContain('run is already in the queue');

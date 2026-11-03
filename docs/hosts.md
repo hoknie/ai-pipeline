@@ -180,7 +180,10 @@ Specialists inside a run get their own MCP server (`aip mcp --worker`) with othe
 - `active`: work is in progress;
 - `finished`: everything is complete;
 - `failed`: the split step or a work group failed, or the delivery of a merged group ended in `apply_failed`. The state is recalculated after a retry or a successful delivery;
-- `cancelled`: the run was cancelled. This takes precedence over `failed`.
+- `cancelled`: the run was cancelled. This takes precedence over `failed`;
+- `queued`: a finished run waits in its queue as a returned task (see [queue.md](queue.md#returning-a-run)). The statuses of its groups stay `failed` or `cancelled` and `finished` stays `true` until the queue takes the task; then the state follows the groups again. A run that still has working groups keeps `active` or `needs_human`.
+
+`queueItem` is the id of the queue task that retries the run, or `null` when the run has none.
 
 A queued group that the scheduler holds back has the status `waiting`.
 Its `wait` object has `reason` (`specialist`, `capacity` or `limit`) and the details of the reason; `wait` is `null` for other groups.

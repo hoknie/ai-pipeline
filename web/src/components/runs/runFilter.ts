@@ -21,9 +21,9 @@ function inFilter(run: RunView, filter: RunFilter): boolean {
     case 'waiting':
       return run.state === 'needs_human';
     case 'active':
-      return !run.finished && run.state !== 'needs_human';
+      return run.state === 'queued' || (!run.finished && run.state !== 'needs_human');
     case 'done':
-      return run.finished || run.state === 'cancelled';
+      return run.state !== 'queued' && (run.finished || run.state === 'cancelled');
   }
 }
 

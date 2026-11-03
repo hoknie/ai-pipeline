@@ -159,6 +159,15 @@ describe('needs_human runs', () => {
     expect(sortRuns(runs).map((run) => run.id)).toEqual(['old-wait', 'new', 'old', 'fin']);
   });
 
+  it('puts a run waiting in the queue among the unfinished, above started ones', () => {
+    const runs = [
+      runView({ id: 'fin', finished: true, state: 'finished', createdAt: 9 }),
+      runView({ id: 'active', createdAt: 8, startedAt: 80 }),
+      runView({ id: 'queued', finished: true, state: 'queued', queueItem: 'q1', createdAt: 1 }),
+    ];
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['queued', 'active', 'fin']);
+  });
+
   it('sorts by start time, not by creation time', () => {
     const runs = [
       runView({ id: 'created-late', createdAt: 50, startedAt: 100 }),

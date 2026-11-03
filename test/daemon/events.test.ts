@@ -7,7 +7,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 
-import { harness, startRun, until, type Harness } from './harness.ts';
+import { POLL_MS, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
