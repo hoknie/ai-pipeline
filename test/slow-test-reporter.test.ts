@@ -7,6 +7,7 @@ import SlowTestReporter, {
   TEST_LIMIT_MS,
   effectiveLimit,
   formatSlowTests,
+  isCi,
   projectLimit,
 } from './slow-test-reporter.ts';
 
@@ -68,6 +69,27 @@ describe('slow test reporter', () => {
     printing.record(fakeCase('slow', 450));
     printing.report();
     expect(process.exitCode).toBe(exitCode);
+  });
+
+  it('only lists slow tests under CI and fails the run elsewhere', () => {
+    expect(isCi({ CI: 'true' })).toBe(true);
+    expect(isCi({ CI: '1' })).toBe(true);
+    expect(isCi({})).toBe(false);
+    expect(isCi({ CI: '' })).toBe(false);
+    expect(isCi({ CI: 'false' })).toBe(false);
+    expect(isCi({ CI: '0' })).toBe(false);
+
+    const lines: string[] = [];
+    const ci = new SlowTestReporter({ env: { CI: 'true' }, write: (l) => lines.push(l) });
+    ci.record(fakeCase('slow', 450));
+    ci.report();
+    expect(lines.join('\n')).toContain('slow: 450 ms (limit 400 ms)');
+    expect(process.exitCode).toBe(exitCode);
+
+    const local = new SlowTestReporter({ env: {}, write: () => undefined });
+    local.record(fakeCase('slow', 450));
+    local.report();
+    expect(process.exitCode).toBe(1);
   });
 
   describe('limits of the projects', () => {

@@ -36,6 +36,12 @@ export function projectLimit(
   );
 }
 
+/** True under CI (`CI` set and not `false`/`0`): there slow tests are only listed, the run does not fail. */
+export function isCi(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.CI?.trim().toLowerCase();
+  return raw !== undefined && raw !== '' && raw !== 'false' && raw !== '0';
+}
+
 export function formatSlowTests(slow: SlowTest[], limitMs: number): string[] {
   return [...slow]
     .sort((a, b) => b.durationMs - a.durationMs)
@@ -46,7 +52,7 @@ export function formatSlowTests(slow: SlowTest[], limitMs: number): string[] {
 }
 
 export interface SlowTestReporterOptions {
-  /** When true a slow test makes the run fail. */
+  /** When true a slow test makes the run fail; by default everywhere but CI. */
   enforce?: boolean;
   env?: NodeJS.ProcessEnv;
   write?: (line: string) => void;
@@ -60,8 +66,8 @@ export default class SlowTestReporter implements Reporter {
   private readonly write: (line: string) => void;
 
   constructor(options: SlowTestReporterOptions = {}) {
-    this.enforce = options.enforce ?? true;
     this.env = options.env ?? process.env;
+    this.enforce = options.enforce ?? !isCi(this.env);
     this.limitMs = effectiveLimit(this.env);
     this.write = options.write ?? ((line) => process.stderr.write(`${line}\n`));
   }
