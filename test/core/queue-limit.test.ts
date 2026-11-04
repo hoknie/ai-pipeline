@@ -99,18 +99,21 @@ describe('onLimit setting', () => {
   });
 });
 
-describe('a cancel stops the queue', () => {
-  it('stops even with skipFailed and does not skip the run', () => {
-    const queue = queueOf('b');
-    queue.skipFailed = true;
-    startQueue(queue, [], 3);
-    const a = queueRun(queue);
-    transition(a, { kind: 'cancel', group: null }, 2500);
-    expect(tick(queue, [a])).toEqual([]);
-    expect(queue.status).toBe('stopped');
-    expect(queue.stop).toMatchObject({ kind: 'problem', run: a.run.id, reason: 'cancelled' });
-    expect(queue.skipped).toEqual([]);
-  });
+describe('a manual cancel does not stop the queue', () => {
+  for (const skipFailed of [true, false]) {
+    it(`keeps running and takes the next task, skipFailed=${skipFailed}`, () => {
+      const queue = queueOf('b');
+      queue.skipFailed = skipFailed;
+      startQueue(queue, [], 3);
+      const a = queueRun(queue);
+      transition(a, { kind: 'cancel', group: null }, 2500);
+      const take = tick(queue, [a]);
+      expect(queue.status).toBe('running');
+      expect(queue.stop).toBeNull();
+      expect(queue.skipped).toEqual([]);
+      expect(take).toHaveLength(1);
+    });
+  }
 });
 
 describe('stop on a usage limit', () => {

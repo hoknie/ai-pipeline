@@ -130,7 +130,7 @@ A call without settings is refused with `pass parallel, autopilot, autopilotAnsw
 - A task that waits for a skipped run is blocked.
 - A task that cannot start (for example, its workflow was removed) stays in the queue with the error. It is not taken again until it is edited or the queue is started. The queue goes on with the other tasks.
 
-Cancelling a run of the queue always stops the queue, with or without skip failed. The queue does not take the next task in its place. Continue with `aip queue start`.
+A manual cancel of a run never stops the queue, with or without skip failed. The cancelled run frees its place, the next task takes it, and the run does not go into Skipped. Tasks that depend on the cancelled run are blocked.
 
 ## Usage limit
 
@@ -145,7 +145,7 @@ When an agent (`claude`) runs out of its subscription limit, the step stops with
 
 ## When the queue stops
 
-- The queue stops when one of its runs gets a problem: a group in `failed` or `conflict`, a cancelled run, or a delivery error (`apply_failed`), or a usage limit. The reason is visible in `aip queue list`.
+- The queue stops when one of its runs gets a problem: a group in `failed` or `conflict`, or a delivery error (`apply_failed`), or a usage limit. The reason is visible in `aip queue list`.
 - A run with a problem keeps its place.
 - `aip queue start` marks the current problems as known and continues the queue. A new problem stops it again.
 - A question for a human (`needs_human`) does not stop the queue. The run with the question keeps its place (with `parallel: 1` the next task waits). Once the question is answered, the queue goes on by itself.

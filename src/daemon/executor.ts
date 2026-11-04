@@ -60,7 +60,7 @@ import {
   runtimeFor,
 } from '../runtime/index.ts';
 
-import type { Daemon } from './daemon.ts';
+import type { Daemon, DaemonTimings } from './daemon.ts';
 import type { AgentRoot } from './processes.ts';
 import { launchProcess, type SupervisedProcess } from './supervisor.ts';
 
@@ -105,6 +105,7 @@ export class Executor {
   private readonly daemon: Daemon;
   private readonly entry: string[];
   private readonly graceMs: number | undefined;
+  private readonly timings: DaemonTimings;
   private readonly tokens = new Map<string, AttemptKey>();
   private readonly running = new Map<string, Running>();
   private readonly keys = new Map<string, AttemptKey>();
@@ -114,10 +115,16 @@ export class Executor {
   /** Live usage of running attempts waiting for the next flush, by run. */
   private readonly usageBuffers = new Map<string, UsageBuffer>();
 
-  constructor(options: { daemon: Daemon; entry: string[]; graceMs: number | undefined }) {
+  constructor(options: {
+    daemon: Daemon;
+    entry: string[];
+    graceMs: number | undefined;
+    timings: DaemonTimings;
+  }) {
     this.daemon = options.daemon;
     this.entry = options.entry;
     this.graceMs = options.graceMs;
+    this.timings = options.timings;
   }
 
   /** Agents that run now: running attempts and the naming of runs. */
@@ -186,7 +193,7 @@ export class Executor {
     }
     const updates = [...buffer.pending.values()];
     buffer.pending.clear();
-    buffer.timer = setTimeout(() => this.flushUsage(run), USAGE_INTERVAL_MS);
+    buffer.timer = setTimeout(() => this.flushUsage(run), this.timings.usageIntervalMs);
     buffer.timer.unref();
     void this.daemon
       .serial(() => {
@@ -278,9 +285,10 @@ export class Executor {
       parser: runtime.createParser(),
       environment: this.daemon.environment,
       graceMs: this.graceMs,
+      drainMs: this.timings.drainMs,
     });
     this.naming.set(process, state.run.id);
-    const timer = setTimeout(() => process.stop(), NAMING_TIMEOUT_MS);
+    const timer = setTimeout(() => process.stop(), this.timings.namingTimeoutMs);
     const exit = await process.exited;
     clearTimeout(timer);
     this.naming.delete(process);
@@ -409,6 +417,7 @@ export class Executor {
       parser: runtime.createParser(),
       environment: this.daemon.environment,
       graceMs: this.graceMs,
+      drainMs: this.timings.drainMs,
       onUsage: (usage) => this.reportUsage(state, key, usage),
     });
     const timer = setTimeout(() => {
@@ -416,7 +425,7 @@ export class Executor {
       void this.daemon.serial(() =>
         this.daemon.apply(state, { kind: 'timed_out', group: slug, seq }),
       );
-    }, specialist.timeoutSeconds * 1000);
+    }, specialist.timeoutSeconds * this.timings.timeoutUnitMs);
     this.running.set(keyOf(key), { process, timer });
     this.keys.set(keyOf(key), key);
     void process.exited.then((exit) => {

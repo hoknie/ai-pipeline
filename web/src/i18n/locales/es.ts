@@ -806,6 +806,8 @@ export const es: Dictionary = {
     project: 'Proyecto',
     noProjects: 'Aún no hay repositorios: añada uno en el menú de repositorios.',
     writesTo: 'Se guarda en',
+    target: 'Dónde se guardan los ajustes',
+    globalNote: 'Se aplica a todos los repositorios',
     save: 'Guardar',
     discard: 'Descartar cambios',
     saved: 'Ajustes guardados',

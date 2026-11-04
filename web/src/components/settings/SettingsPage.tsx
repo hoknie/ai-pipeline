@@ -16,14 +16,13 @@ import {
 import type { ConfigEditorResponse, QueueView } from '../../types.ts';
 
 import { Alert } from '../../ui/alert.tsx';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select.tsx';
 import { Skeleton } from '../../ui/skeleton.tsx';
 
 import { ConfigErrors } from '../EntryList.tsx';
-import { FilePath } from '../FilePath.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
 import { QueueModes } from './QueueModes.tsx';
 import { SettingsForm } from './SettingsForm.tsx';
+import { SettingsTarget } from './SettingsTarget.tsx';
 import { SystemGroup } from './SystemGroup.tsx';
 
 /** Where the state and the restarts of the panel and the daemon are. */
@@ -103,11 +102,12 @@ export default function SettingsPage({
   const tabGroup = (target: SettingsScope): SettingsGroup =>
     (SETTINGS_GROUPS_BY_SCOPE[target] as readonly string[]).includes(group) ? group : 'general';
   const file = config?.settingsFiles[scope].file ?? null;
+  const noProjects = scope === 'project' && repositories.length === 0;
   const isForm = group !== 'tags' && group !== 'queue';
 
   return (
     <div className="flex w-full flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2 border-b">
+      <div className="border-b">
         <div role="tablist" aria-label={t('settingsPage.tabs')} className="flex gap-1">
           {SETTINGS_SCOPES.map((tab) => (
             <a
@@ -125,118 +125,99 @@ export default function SettingsPage({
             </a>
           ))}
         </div>
-        {scope === 'project' ? (
-          <div className="flex items-center gap-2 pb-1.5">
-            <label htmlFor="settings-project" className="text-sm font-medium">
-              {t('settingsPage.project')}
-            </label>
-            {repositories.length === 0 ? (
-              <span className="text-sm text-muted-foreground">{t('settingsPage.noProjects')}</span>
+      </div>
+      <SettingsTarget
+        scope={scope}
+        repository={repository}
+        repositories={repositories}
+        onSelectRepository={onSelectRepository}
+        file={isForm ? file : null}
+      />
+      {noProjects ? null : (
+        <div className="grid w-full gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
+          <nav aria-label={t('settingsPage.groups')}>
+            <ul className="flex flex-wrap gap-1 lg:flex-col">
+              {groups.map((key) => (
+                <li key={key}>
+                  <a
+                    href={hrefOf(scope, key)}
+                    onClick={leave(hrefOf(scope, key))}
+                    aria-current={key === group ? 'page' : undefined}
+                    className={cn(
+                      'flex items-center justify-between gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-sm font-medium hover:bg-accent',
+                      key === group && 'border-border bg-accent',
+                    )}
+                  >
+                    {t(`settingsPage.group.${key}`)}
+                    {errors.has(key) ? (
+                      <span
+                        className="rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"
+                        title={t('settingsPage.hasErrors')}
+                      >
+                        !<span className="sr-only">{t('settingsPage.hasErrors')}</span>
+                      </span>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="flex min-w-0 flex-col gap-3" data-group={group} data-scope={scope}>
+            <h2 className="text-lg font-semibold">{t(`settingsPage.group.${group}`)}</h2>
+            <p className="text-sm text-muted-foreground">{t(`settingsPage.about.${group}`)}</p>
+            {group === 'runtimes' || group === 'system' ? (
+              <p className="text-sm text-muted-foreground">
+                <Trans
+                  i18nKey="settingsPage.restartNote"
+                  components={{ link: <a className="underline" href={SYSTEM_LINK} /> }}
+                />
+              </p>
+            ) : null}
+            {failure ? <Alert variant="destructive">{failure}</Alert> : null}
+            {group !== 'tags' && config ? <ConfigErrors errors={errors.get(group) ?? []} /> : null}
+            {group === 'tags' ? (
+              <TagsSettings api={api} />
+            ) : group === 'queue' ? (
+              queue ? (
+                <QueueModes
+                  api={api}
+                  queue={queue}
+                  repositoryName={repository === null ? null : repositoryLabel(repository)}
+                  config={config}
+                  onReload={reload}
+                  onQueue={onQueue}
+                  onError={onError}
+                />
+              ) : (
+                <div role="status" aria-label={t('queue.loading')}>
+                  <Skeleton className="h-24" />
+                </div>
+              )
             ) : (
-              <Select value={repository ?? undefined} onValueChange={onSelectRepository}>
-                <SelectTrigger id="settings-project" className="w-56" title={repository ?? ''}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {repositories.map((path) => (
-                    <SelectItem key={path} value={path} title={path}>
-                      {repositoryLabel(path)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <>
+                {config ? (
+                  <SettingsForm
+                    key={`${scope}/${group}`}
+                    api={api}
+                    config={config}
+                    scope={scope}
+                    group={group}
+                    onSaved={reload}
+                    onDirty={setDirty}
+                  />
+                ) : failure ? null : (
+                  <div role="status" aria-label={t('settings.editor.loading')}>
+                    <Skeleton className="h-40" />
+                  </div>
+                )}
+                {group === 'system' ? (
+                  <SystemGroup api={api} onRestarted={() => void reload().catch(() => undefined)} />
+                ) : null}
+              </>
             )}
           </div>
-        ) : null}
-        {file && isForm ? (
-          <p className="flex items-center gap-2 pb-1.5 text-xs text-muted-foreground">
-            {t('settingsPage.writesTo')} <FilePath path={file} />
-          </p>
-        ) : null}
-      </div>
-      <div className="grid w-full gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
-        <nav aria-label={t('settingsPage.groups')}>
-          <ul className="flex flex-wrap gap-1 lg:flex-col">
-            {groups.map((key) => (
-              <li key={key}>
-                <a
-                  href={hrefOf(scope, key)}
-                  onClick={leave(hrefOf(scope, key))}
-                  aria-current={key === group ? 'page' : undefined}
-                  className={cn(
-                    'flex items-center justify-between gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-sm font-medium hover:bg-accent',
-                    key === group && 'border-border bg-accent',
-                  )}
-                >
-                  {t(`settingsPage.group.${key}`)}
-                  {errors.has(key) ? (
-                    <span
-                      className="rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"
-                      title={t('settingsPage.hasErrors')}
-                    >
-                      !<span className="sr-only">{t('settingsPage.hasErrors')}</span>
-                    </span>
-                  ) : null}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="flex min-w-0 flex-col gap-3" data-group={group} data-scope={scope}>
-          <h2 className="text-lg font-semibold">{t(`settingsPage.group.${group}`)}</h2>
-          <p className="text-sm text-muted-foreground">{t(`settingsPage.about.${group}`)}</p>
-          {group === 'runtimes' || group === 'system' ? (
-            <p className="text-sm text-muted-foreground">
-              <Trans
-                i18nKey="settingsPage.restartNote"
-                components={{ link: <a className="underline" href={SYSTEM_LINK} /> }}
-              />
-            </p>
-          ) : null}
-          {failure ? <Alert variant="destructive">{failure}</Alert> : null}
-          {group !== 'tags' && config ? <ConfigErrors errors={errors.get(group) ?? []} /> : null}
-          {group === 'tags' ? (
-            <TagsSettings api={api} />
-          ) : group === 'queue' ? (
-            queue ? (
-              <QueueModes
-                api={api}
-                queue={queue}
-                repositoryName={repository === null ? null : repositoryLabel(repository)}
-                config={config}
-                onReload={reload}
-                onQueue={onQueue}
-                onError={onError}
-              />
-            ) : (
-              <div role="status" aria-label={t('queue.loading')}>
-                <Skeleton className="h-24" />
-              </div>
-            )
-          ) : (
-            <>
-              {config ? (
-                <SettingsForm
-                  key={`${scope}/${group}`}
-                  api={api}
-                  config={config}
-                  scope={scope}
-                  group={group}
-                  onSaved={reload}
-                  onDirty={setDirty}
-                />
-              ) : failure ? null : (
-                <div role="status" aria-label={t('settings.editor.loading')}>
-                  <Skeleton className="h-40" />
-                </div>
-              )}
-              {group === 'system' ? (
-                <SystemGroup api={api} onRestarted={() => void reload().catch(() => undefined)} />
-              ) : null}
-            </>
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

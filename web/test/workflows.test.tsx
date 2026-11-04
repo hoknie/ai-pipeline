@@ -772,23 +772,27 @@ describe('step ids follow the specialist', () => {
 
   it('shows the id of a new step in the preview after its specialist changes', async () => {
     const previewWorkflow = vi.fn(async () => ({ topology: workflowOf(), errors: [] }));
+    const lastPreviewId = () => {
+      const last = previewWorkflow.mock.calls.at(-1) as unknown as [
+        string,
+        { steps: { id: string }[] },
+      ];
+      return last[1].steps[3]?.id;
+    };
+    // the preview of a draft waits for the end of the edits: a fake clock instead of the real delay
+    vi.useFakeTimers();
     render(<Page api={api({ previewWorkflow })} start="feature" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Add step' }));
-    choose(within(await stepBox(3)).getByRole('combobox', { name: 'step specialist' }), 'writer');
-    await waitFor(() => {
-      const last = previewWorkflow.mock.calls.at(-1) as unknown as [
-        string,
-        { steps: { id: string }[] },
-      ];
-      expect(last[1].steps[3]?.id).toBe('writer');
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
+    choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), 'writer');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
+    expect(lastPreviewId()).toBe('writer');
     choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), 'reviewer');
-    await waitFor(() => {
-      const last = previewWorkflow.mock.calls.at(-1) as unknown as [
-        string,
-        { steps: { id: string }[] },
-      ];
-      expect(last[1].steps[3]?.id).toBe('reviewer');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
+    expect(lastPreviewId()).toBe('reviewer');
   });
 });

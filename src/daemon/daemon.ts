@@ -133,11 +133,13 @@ import {
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import { Store, type KnownRepository } from '../store/index.ts';
 
-import { Executor, type AttemptKey } from './executor.ts';
+import { Executor, NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS, type AttemptKey } from './executor.ts';
 import { readLines, readTail } from './logs.ts';
+import { DRAIN_MS, STOP_GRACE_MS } from './supervisor.ts';
 import {
   selectBackground,
   snapshotProcesses,
+  KILL_GRACE_MS,
   terminateTree,
   type AgentRoot,
   type PsRow,
@@ -160,12 +162,53 @@ export interface PanelControl {
   stop(): Promise<WebStopResult>;
 }
 
+/** Every duration the daemon waits for; tests shorten them. */
+export interface DaemonTimings {
+  /** Length of one second of a step's `timeout`. */
+  timeoutUnitMs: number;
+  /** How long the output of an agent is drained after it exited. */
+  drainMs: number;
+  /** Time between the stop signal and SIGKILL for an agent. */
+  stopGraceMs: number;
+  /** Time between SIGTERM and SIGKILL when a background process is killed. */
+  killGraceMs: number;
+  /** A timer fires this long after a usage limit resets. */
+  wakeMarginMs: number;
+  /** How often the usage of a running step is saved. */
+  usageIntervalMs: number;
+  /** The longest the naming agent may run. */
+  namingTimeoutMs: number;
+  /** How often subscribers get the background processes. */
+  processStreamMs: number;
+  /** Pause between a SIGTERM and the extra look at background processes. */
+  processKillLookMs: number;
+  /** How long a snapshot of the process table answers `processes` requests. */
+  processCacheMs: number;
+}
+
+/** The durations of a daemon without overrides. */
+export const DEFAULT_TIMINGS: DaemonTimings = {
+  timeoutUnitMs: 1000,
+  drainMs: DRAIN_MS,
+  stopGraceMs: STOP_GRACE_MS,
+  killGraceMs: KILL_GRACE_MS,
+  wakeMarginMs: WAKE_MARGIN_MS,
+  usageIntervalMs: USAGE_INTERVAL_MS,
+  namingTimeoutMs: NAMING_TIMEOUT_MS,
+  processStreamMs: PROCESS_STREAM_MS,
+  processKillLookMs: PROCESS_KILL_LOOK_MS,
+  processCacheMs: 1_000,
+};
+
 export interface DaemonOptions {
   stateDirectory: string;
   entry: string[];
   environment?: NodeJS.ProcessEnv;
   now?: () => number;
+  /** Time between the stop signal and SIGKILL for an agent; overrides `timings.stopGraceMs`. */
   graceMs?: number;
+  /** Overrides of the durations the daemon waits for. */
+  timings?: Partial<DaemonTimings>;
   /** Build the daemon reports to its clients; defaults to the build of this process. */
   build?: BuildInfo;
   /** Serves `web_status`, `web_start` and `web_stop`; without it the daemon refuses them. */
@@ -211,6 +254,7 @@ export class Daemon {
   /** Agents that exited, by PID; their process group is background while it has members. */
   private readonly departed = new Map<number, AgentRoot>();
   private psCache: { at: number; rows: PsRow[] } | null = null;
+  readonly timings: DaemonTimings;
   private readonly processesIntervalMs: number;
   private readonly takeProcesses: () => Promise<PsRow[]>;
   private processTimer: NodeJS.Timeout | null = null;
@@ -226,12 +270,14 @@ export class Daemon {
     this.now = options.now ?? Date.now;
     this.build = options.build ?? currentBuild();
     this.panel = options.panel;
-    this.processesIntervalMs = options.processesIntervalMs ?? PROCESS_STREAM_MS;
+    this.timings = { ...DEFAULT_TIMINGS, ...options.timings };
+    this.processesIntervalMs = options.processesIntervalMs ?? this.timings.processStreamMs;
     this.takeProcesses = options.snapshotProcesses ?? (() => snapshotProcesses());
     this.executor = new Executor({
       daemon: this,
       entry: options.entry,
-      graceMs: options.graceMs,
+      graceMs: options.graceMs ?? this.timings.stopGraceMs,
+      timings: this.timings,
     });
   }
 
@@ -936,7 +982,10 @@ export class Daemon {
       ...[...this.queues.values()].flatMap((queue) => queueWakeAt(queue) ?? []),
     ];
     if (moments.length === 0) return;
-    const delay = Math.min(Math.max(Math.min(...moments) - now, 0) + WAKE_MARGIN_MS, MAX_TIMER_MS);
+    const delay = Math.min(
+      Math.max(Math.min(...moments) - now, 0) + this.timings.wakeMarginMs,
+      MAX_TIMER_MS,
+    );
     this.wakeTimer = setTimeout(() => {
       this.wakeTimer = null;
       void this.serial(() => this.wake()).catch(() => undefined);
@@ -972,7 +1021,8 @@ export class Daemon {
 
   private async processRows(fresh: boolean): Promise<PsRow[]> {
     const now = Date.now();
-    if (!fresh && this.psCache && now - this.psCache.at < 1_000) return this.psCache.rows;
+    if (!fresh && this.psCache && now - this.psCache.at < this.timings.processCacheMs)
+      return this.psCache.rows;
     const rows = await this.takeProcesses();
     this.psCache = { at: now, rows };
     return rows;
@@ -1020,11 +1070,12 @@ export class Daemon {
       throw new Rejection(`not a background process: ${pid}`);
     }
     const look = (): void => void this.lookAtProcesses(true);
-    setTimeout(look, PROCESS_KILL_LOOK_MS).unref();
+    setTimeout(look, this.timings.processKillLookMs).unref();
     void terminateTree(pid, {
       rows,
       stillBackground: async () =>
         new Set((await this.backgroundProcesses(true)).found.map((process) => process.pid)),
+      graceMs: this.timings.killGraceMs,
     })
       .catch(() => undefined)
       .then(look);

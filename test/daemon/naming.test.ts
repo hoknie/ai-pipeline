@@ -35,7 +35,7 @@ describe('run names', () => {
     const h = await start({});
     h.script({
       naming: {
-        delayMs: 800,
+        waitFor: h.gate('naming'),
         answer: '{"title": "Флаг --json для version", "name": "add-version-json-flag"}',
       },
       code: [{ waitFor: h.gate('code') }],
@@ -44,6 +44,7 @@ describe('run names', () => {
     const early = await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     expect(early.name).toBeNull();
     expect(early.title).toBe('Добавить флаг --json к команде aip version');
+    h.open('naming');
     const named = await h.waitFor(runId, (view) => view.name !== null);
     // the step still runs: the name came in the background
     expect(named.groups[0]?.status).toBe('running');

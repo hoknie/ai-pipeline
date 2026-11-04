@@ -1,0 +1,75 @@
+import { useTranslation } from 'react-i18next';
+
+import { repositoryLabel } from '../../repositories.ts';
+import type { SettingsScope } from '../../settingsGroups.ts';
+import { Card } from '../../ui/card.tsx';
+import { Label } from '../../ui/label.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select.tsx';
+import { FilePath } from '../FilePath.tsx';
+
+/**
+ * The block under the tabs: the project of the «Project» tab and the file the open group saves
+ * to. Renders nothing when there is nothing to show.
+ */
+export function SettingsTarget({
+  scope,
+  repository,
+  repositories,
+  onSelectRepository,
+  file,
+}: {
+  scope: SettingsScope;
+  repository: string | null;
+  repositories: string[];
+  onSelectRepository: (path: string) => void;
+  /** The file the open group saves to; null when the group does not show it. */
+  file: string | null;
+}) {
+  const { t } = useTranslation();
+  if (scope === 'global' && !file) return null;
+  const empty = scope === 'project' && repositories.length === 0;
+
+  return (
+    <Card
+      role="region"
+      aria-label={t('settingsPage.target')}
+      className="flex min-w-0 flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between"
+    >
+      {scope === 'project' ? (
+        empty ? (
+          <p className="text-sm text-muted-foreground">{t('settingsPage.noProjects')}</p>
+        ) : (
+          <div className="flex min-w-0 flex-col gap-1.5 sm:w-72 sm:shrink-0">
+            <Label htmlFor="settings-project">{t('settingsPage.project')}</Label>
+            <Select value={repository ?? undefined} onValueChange={onSelectRepository}>
+              <SelectTrigger id="settings-project" className="w-full" title={repository ?? ''}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {repositories.map((path) => (
+                  <SelectItem key={path} value={path} title={path}>
+                    {repositoryLabel(path)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {repository ? (
+              <p className="truncate text-xs text-muted-foreground" title={repository}>
+                {repository}
+              </p>
+            ) : null}
+          </div>
+        )
+      ) : null}
+      {file && !empty ? (
+        <div className="flex min-w-0 flex-col gap-1.5 sm:items-end">
+          <span className="text-sm font-medium">{t('settingsPage.writesTo')}</span>
+          <FilePath path={file} variant="line" />
+          {scope === 'global' ? (
+            <p className="text-xs text-muted-foreground">{t('settingsPage.globalNote')}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </Card>
+  );
+}

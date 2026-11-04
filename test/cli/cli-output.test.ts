@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
 import { MANUAL_CONFIG, WORKFLOW_CONFIG } from '../daemon/harness.ts';
-import { aip, fakes, main, root, runOf, sandbox, waitUntil } from './sandbox.ts';
+import { aip, fakes, main, ownDaemon, root, runOf, sandbox, waitUntil } from './sandbox.ts';
 
 describe('cli', () => {
-  it('delivers with aip run apply, refuses with exit code 1 and forces with markers', async () => {
+  it('delivers with aip run apply', async () => {
     const box = sandbox(MANUAL_CONFIG);
     writeFileSync(
       box.env.AIP_FAKE_SCRIPT!,
@@ -23,6 +23,10 @@ describe('cli', () => {
     expect(applied).toMatchObject({ code: 0 });
     expect(applied.stdout).toContain('pervoe: applied (feature.ts)');
     expect(readFileSync(join(box.repo, 'feature.ts'), 'utf8')).toBe('export const on = true;\n');
+  });
+
+  it('refuses a conflicting aip run apply with exit code 1 and forces with markers', async () => {
+    const box = sandbox(MANUAL_CONFIG);
     writeFileSync(
       box.env.AIP_FAKE_SCRIPT!,
       JSON.stringify({ code: [{ write: { 'feature.ts': 'export const on = false;\n' } }] }),
@@ -43,6 +47,7 @@ describe('cli', () => {
 
   it('streams events with aip events and exits with 1 when the daemon stops', async () => {
     const box = sandbox();
+    await ownDaemon(box);
     const events = spawn(process.execPath, [main, 'events', '--json'], {
       env: box.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -127,6 +132,7 @@ describe('cli', () => {
 
   it('prints the first line of events --json without ANSI under FORCE_COLOR=1', async () => {
     const box = sandbox();
+    await ownDaemon(box);
     const events = spawn(process.execPath, [main, 'events', '--json'], {
       env: { ...box.env, FORCE_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],

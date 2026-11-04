@@ -137,7 +137,11 @@ The tab edits the `aip/workflows/<id>.yaml` files of the project and of the shar
 
 ### Settings
 
-The section is a set of forms in two tabs. "Shared" edits the shared `settings.yaml`, "Project" edits the `aip/settings.yaml` of the selected repository; the file of the tab is shown above the groups. On "Project" a "Project" selector lists the repositories of the panel; choosing one switches the repository of the whole panel, as the repository menu does.
+The section is a set of forms in two tabs. "Shared" edits the shared `settings.yaml`, "Project" edits the `aip/settings.yaml` of the selected repository; a block under the tabs, "Where the settings are saved", shows the file the open group saves to.
+On "Project" the block also has a "Project" selector with the full path of the repository under it; it lists the repositories of the panel, and choosing one switches the repository of the whole panel, as the repository menu does.
+On "Shared" the block shows the shared file and a note that it applies to every repository.
+The groups "Queue" and "Tags" show no file.
+Without repositories "Project" shows only a note and no groups.
 
 The groups of "Shared" are "General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", "System" and "Tags". The groups of "Project" are "General", "Agents", "Delivery" and "Queue". Fields of `web.*` and `runtimes.*` exist only on "Shared".
 

@@ -51,7 +51,8 @@ function show(queue = queueOf({ items: items('A', 'B', 'C') }), overrides = {}) 
 }
 
 async function openNewTask(): Promise<HTMLElement> {
-  const controls = await screen.findByRole('region', { name: 'queue controls' });
+  // Queries by label: a query by role walks the accessibility tree of the whole page.
+  const controls = await screen.findByLabelText('queue controls');
   fireEvent.click(within(controls).getByRole('button', { name: 'New task' }));
   return screen.findByRole('dialog', { name: 'New task' });
 }
@@ -525,7 +526,7 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({ workflow: 'feature', task: 'Сделать вход' }),
     );
-    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await screen.findByLabelText('tasks in the queue');
     await openNewTask();
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
     expect(api.queueStart).not.toHaveBeenCalled();
