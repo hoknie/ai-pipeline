@@ -220,6 +220,7 @@ const DICTIONARIES = { es, ru, zh } as Record<string, Tree>;
 // Words that read the same in the language: names of languages, product and protocol terms.
 const SAME_AS_ENGLISH = new Set([
   'Workflow',
+  'OpenCode',
   'Tokens',
   'workflow {{id}}',
   'Workflow: {{id}}',

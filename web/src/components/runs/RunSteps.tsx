@@ -38,7 +38,7 @@ export function RunSteps({
   return (
     <Popover open={open} onOpenChange={(next) => setOpen(next || confirming || pending !== null)}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="w-fit">
+        <Button variant="outline">
           {t('runs.steps.button', { active: active.length, total: run.steps.length })}
           <ChevronDown />
         </Button>
@@ -51,11 +51,18 @@ export function RunSteps({
                 id={`run-step-${step.id}`}
                 checked={!step.skipped}
                 disabled={pending !== null || step.state === 'done' || last?.id === step.id}
-                aria-label={t('runs.steps.checkboxLabel', { name: step.name, step: step.id })}
+                aria-label={t('runs.steps.checkboxLabel', {
+                  name: step.name.endsWith(` (${step.id})`)
+                    ? step.name.slice(0, -` (${step.id})`.length)
+                    : step.name,
+                  step: step.id,
+                })}
                 onCheckedChange={(checked) => void change(step.id, checked !== true)}
               />
               <span className={step.skipped ? 'line-through' : undefined}>{step.name}</span>
-              <code className="text-xs text-muted-foreground">{step.id}</code>
+              {step.name.endsWith(` (${step.id})`) ? null : (
+                <code className="text-xs text-muted-foreground">{step.id}</code>
+              )}
               <span className="ml-auto pl-3 text-xs text-muted-foreground">
                 {step.skipped ? t('runs.steps.skipped') : t(`runs.steps.${step.state}`)}
               </span>

@@ -11,6 +11,7 @@ import type {
   QueueView,
   RepositoryView,
   RunCreated,
+  SettingValue,
   RunView,
   SystemView,
   TagView,
@@ -113,7 +114,13 @@ export interface Api {
   /** Writes one general setting (`null` removes it); problems come back as a result. */
   writeSetting(
     path: string,
-    value: boolean | string | null,
+    value: SettingValue,
+    revision: string | null,
+    level?: WriteLevel,
+  ): Promise<ConfigEditResult>;
+  /** Writes several settings of one level in one go (`null` removes a field). */
+  writeSettings(
+    values: Record<string, SettingValue>,
     revision: string | null,
     level?: WriteLevel,
   ): Promise<ConfigEditResult>;
@@ -240,6 +247,12 @@ function bound(repository: string | null): Api {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ value, revision, ...(level ? { level } : {}) }),
+      }),
+    writeSettings: (values, revision, level) =>
+      edit(at('/api/config/settings'), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ values, revision, ...(level ? { level } : {}) }),
       }),
     deleteSpecialist: (id, revision, level) =>
       edit(at(`/api/config/specialists/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {

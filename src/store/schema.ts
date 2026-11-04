@@ -168,6 +168,10 @@ export const MIGRATIONS: string[] = [
     (SELECT COALESCE(MAX(number), 0) FROM queue_items WHERE queue_items.repository = queues.repository)
   );
   `,
+  `
+  ALTER TABLE tags ADD COLUMN task_run TEXT;
+  ALTER TABLE tags ADD COLUMN task_number INTEGER;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

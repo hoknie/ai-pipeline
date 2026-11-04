@@ -137,6 +137,13 @@ describe('stream events', () => {
       streamEventSchema.parse({ event: 'run', seq: 2, run: { id: 'r', extra: 1 } }).event,
     ).toBe('run');
     expect(streamEventSchema.safeParse({ event: 'tick', seq: 3 }).success).toBe(false);
+    expect(
+      streamEventSchema.parse({ event: 'processes', seq: 4, processes: [{ pid: 7, name: 'sh' }] }),
+    ).toMatchObject({ event: 'processes', processes: [{ pid: 7 }] });
+    expect(streamEventSchema.parse({ event: 'processes', seq: 5, error: 'no ps' })).toMatchObject({
+      error: 'no ps',
+    });
+    expect(streamEventSchema.safeParse({ event: 'processes', processes: [] }).success).toBe(false);
     expect(streamEventSchema.safeParse({ event: 'run', seq: 'x', run: { id: 'r' } }).success).toBe(
       false,
     );
@@ -235,7 +242,7 @@ describe('queue requests', () => {
     bad('queue_settings', { repository: '/r', autopilotAnswer: 'x'.repeat(2001) });
   });
 
-  it('checks the type of a setting value against its path', () => {
+  it('takes a setting of the catalog with a value of any kind', () => {
     ok('config_setting', {
       repository: '/r',
       path: 'delivery.mode',
@@ -243,31 +250,41 @@ describe('queue requests', () => {
       revision: null,
     });
     ok('config_setting', { repository: '/r', path: 'delivery.mode', value: null, revision: 'x' });
-    bad('config_setting', { repository: '/r', path: 'delivery.mode', value: true, revision: null });
-    bad('config_setting', {
+    ok('config_setting', { repository: '/r', path: 'max', value: 4, revision: null });
+    ok('config_setting', {
       repository: '/r',
-      path: 'delivery.mode',
-      value: 'tar',
+      path: 'workspace.include',
+      value: ['a'],
       revision: null,
     });
+    ok('config_setting', {
+      repository: '/r',
+      path: 'runtimes.claude.env.KEY',
+      value: 'v',
+      revision: null,
+    });
+    bad('config_setting', { repository: '/r', path: 'delivery.mode', value: {}, revision: null });
+  });
+
+  it('takes a setting only from the catalog', () => {
+    bad('config_setting', { repository: '/r', path: 'specialists.x', value: 'a', revision: null });
     bad('config_setting', {
       repository: '/r',
-      path: 'delivery.auto',
-      value: 'commit',
+      path: 'runtimes.claude.env.1BAD',
+      value: 'a',
       revision: null,
     });
   });
 
-  it('takes a setting only from the whitelist', () => {
-    ok('config_setting', {
+  it('parses config_settings and refuses an empty or unknown set', () => {
+    ok('config_settings', {
       repository: '/r',
-      path: 'delivery.auto',
-      value: false,
+      values: { max: 4, 'delivery.auto': false },
       revision: null,
     });
-    ok('config_setting', { repository: '/r', path: 'delivery.auto', value: null, revision: 'x' });
-    bad('config_setting', { repository: '/r', path: 'max', value: false, revision: null });
-    bad('config_setting', { repository: '/r', path: 'delivery.auto', value: 'no', revision: null });
+    bad('config_settings', { repository: '/r', values: {}, revision: null });
+    bad('config_settings', { repository: '/r', values: { nope: 1 }, revision: null });
+    bad('config_settings', { repository: '/r', values: { max: 1 } });
   });
 
   it('rejects both a task and groups, neither, an empty task and a long title', () => {

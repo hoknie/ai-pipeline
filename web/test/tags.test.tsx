@@ -5,7 +5,7 @@ import { App } from '../src/App.tsx';
 import type { Api } from '../src/api.ts';
 import { TAG_CLASSES } from '../src/tagColors.ts';
 import { ApiError } from '../src/api.ts';
-import { TAG_COLORS } from '../../src/core/tags.ts';
+import { CHAIN_TAG_COLOR, TAG_COLORS } from '../../src/core/tags.ts';
 
 import { act, cleanup, choose, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import {
@@ -62,7 +62,7 @@ const contrast = (a: string, b: string) => {
 
 describe('tag colors', () => {
   it('has a light and a dark pair for every palette color with contrast of at least 4.5:1', () => {
-    expect(Object.keys(TAG_CLASSES).sort()).toEqual([...TAG_COLORS].sort());
+    expect(Object.keys(TAG_CLASSES).sort()).toEqual([...TAG_COLORS, CHAIN_TAG_COLOR].sort());
     for (const [color, classes] of Object.entries(TAG_CLASSES)) {
       const pick = (prefix: string) =>
         new RegExp(`(?:^| )${prefix}-\\[(#[0-9a-f]{6})\\]`).exec(classes)![1]!;
@@ -254,5 +254,72 @@ describe('tags on the settings page', () => {
     await waitFor(() => expect(api.editTag).toHaveBeenCalledWith('v2', { name: 'Auth' }));
     expect(await within(tags()).findByText('tag `auth` already exists')).toBeTruthy();
     await waitFor(() => expect(field.value).toBe('v2'));
+  });
+});
+
+const linkedTag = (name = 'cards-half-width', number = 115, run = 'run9'): TagView => ({
+  ...tagView(name, 'indigo', `l-${name}`),
+  task: { run, number },
+});
+
+describe('tags of linked tasks', () => {
+  it('shows #N: name as a link to the source task', async () => {
+    const linked = linkedTag();
+    const done = runView({ finished: true, state: 'finished', tags: [linked] });
+    boot('#runs/run1', [linked], [done]);
+    const header = (await screen.findAllByText('#115: cards-half-width'))[0]!;
+    const chip = header.closest('[data-tag]') as HTMLElement;
+    expect(chip.className).toContain('bg-[#e0e7ff]');
+    expect(chip.title).toBe('#115: cards-half-width');
+    const link = within(document.querySelector('header[aria-label]') as HTMLElement).getByRole(
+      'link',
+      { name: '#115: cards-half-width' },
+    );
+    expect(link.getAttribute('href')).toBe('#runs/run9');
+  });
+
+  it('opens the source task from the run list, not the run of the row', async () => {
+    const linked = linkedTag();
+    const row = runView({ id: 'run1', finished: true, state: 'finished', tags: [linked] });
+    boot('#runs', [linked], [row]);
+    const item = await screen.findByRole('link', { name: '#115: cards-half-width' });
+    expect(item.tagName).toBe('SPAN');
+    fireEvent.click(item);
+    expect(window.location.hash).toBe('#runs/run9');
+  });
+
+  it('does not offer the tag in the picker or for creation', async () => {
+    const linked = linkedTag();
+    const done = runView({ finished: true, state: 'finished', tags: [linked] });
+    boot('#runs/run1', [linked, tagView('auth')], [done]);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Run tags' }));
+    expect(await screen.findByRole('option', { name: 'auth' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /cards-half-width/ })).toBeNull();
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Search in Run tags' }), {
+      target: { value: 'cards-half-width' },
+    });
+    expect(screen.queryByRole('option', { name: /Create tag/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remove tag/ })).toBeNull();
+  });
+
+  it('does not send the tag when other tags change', async () => {
+    const linked = linkedTag();
+    const done = runView({ finished: true, state: 'finished', tags: [linked] });
+    const api = boot('#runs/run1', [linked, tagView('auth')], [done]);
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Run tags' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'auth' }));
+    await waitFor(() => expect(api.setRunTags).toHaveBeenCalledWith('run1', { add: ['auth'] }));
+  });
+
+  it('lists them in a separate section of the settings without a color choice', async () => {
+    const linked = linkedTag();
+    boot('#settings/tags', [linked, tagView('auth', 'blue', 'a')]);
+    const section = await screen.findByRole('region', { name: 'Linked task tags' });
+    expect(within(section).getByRole('link', { name: '#115: cards-half-width' })).toBeTruthy();
+    expect(within(section).queryByRole('combobox')).toBeNull();
+    expect(
+      within(section).getByRole('textbox', { name: 'Name of tag cards-half-width' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Color of tag auth' })).toBeTruthy();
   });
 });

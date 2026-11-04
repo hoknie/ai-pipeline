@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiError, type Api } from './api.ts';
 import { repositoryList } from './repositories.ts';
-import type { DaemonMismatch, QueueView, RepositoryView, RunView, TagView } from './types.ts';
+import type {
+  BackgroundProcessView,
+  DaemonMismatch,
+  QueueView,
+  RepositoryView,
+  RunView,
+  TagView,
+} from './types.ts';
 
 export type OpenedState = 'listed' | 'loading' | 'missing' | null;
 
@@ -32,7 +39,14 @@ type StreamEvent =
   | { event: 'repositories'; repositories: RepositoryView[] }
   | { event: 'tags'; tags: TagView[] }
   | { event: 'run'; run: RunView }
-  | { event: 'queue'; queue: QueueView };
+  | { event: 'queue'; queue: QueueView }
+  | { event: 'processes'; processes?: BackgroundProcessView[]; error?: string };
+
+/** What the stream last said about background processes. */
+export interface StreamedProcesses {
+  processes: BackgroundProcessView[] | null;
+  error: string | null;
+}
 
 export function sortRuns(runs: Iterable<RunView>): RunView[] {
   return [...runs].sort((left, right) => {
@@ -132,7 +146,10 @@ export function useRuns(
   setTags: (tags: TagView[]) => void;
   /** The daemon runs another build than `aip web`; null when the builds match or unknown. */
   daemon: DaemonMismatch;
+  /** The last `processes` event of the stream; null until one arrives. */
+  streamedProcesses: StreamedProcesses | null;
 } {
+  const [streamedProcesses, setStreamedProcesses] = useState<StreamedProcesses | null>(null);
   const [runs, setRuns] = useState<Map<string, RunView>>(new Map());
   const [queues, setQueues] = useState<Map<string, QueueView>>(new Map());
   const [registry, setRegistryState] = useState<RepositoryView[]>([]);
@@ -252,6 +269,8 @@ export function useRuns(
       } else if (event.event === 'repositories') {
         const known = event.repositories;
         setRegistryState((current) => sameRepositories(current, known));
+      } else if (event.event === 'processes') {
+        setStreamedProcesses({ processes: event.processes ?? null, error: event.error ?? null });
       } else if (event.event === 'queue') {
         const view = event.queue;
         setQueues((current) => putQueue(current, view));
@@ -335,6 +354,7 @@ export function useRuns(
   return {
     runs: sorted,
     openedState,
+    streamedProcesses,
     connection,
     loaded,
     home,

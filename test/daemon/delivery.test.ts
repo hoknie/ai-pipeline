@@ -52,6 +52,7 @@ describe('delivery through the daemon', () => {
           files: ['lib.ts'],
           conflicts: [],
           userEdits: [],
+          finishedAt: expect.any(Number),
         },
       },
     ]);
@@ -69,8 +70,18 @@ describe('delivery through the daemon', () => {
     h.script(WRITE_LIB);
     const runId = await finishedRun(h);
     writeFileSync(join(h.repo, 'lib.ts'), 'export const value = 9;\n');
+    expect((await h.status(runId)).delivery.finishedAt).toBeNull();
     const refused = (await h.call('apply', { runId })) as ApplyResult;
+    expect(refused.pending).toBe(false);
     expect(refused.groups[0]?.delivery).toMatchObject({ state: 'apply_failed', files: ['lib.ts'] });
+    const first = refused.groups[0]!.delivery.finishedAt!;
+    expect(typeof first).toBe('number');
+    expect((await h.status(runId)).delivery.finishedAt).toBe(first);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const again = (await h.call('apply', { runId })) as ApplyResult;
+    expect(again.groups[0]?.delivery.reason).toBe(refused.groups[0]?.delivery.reason);
+    expect(again.groups[0]!.delivery.finishedAt!).toBeGreaterThan(first);
+    expect((await h.status(runId)).delivery.finishedAt).toBe(again.groups[0]!.delivery.finishedAt);
     expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 9;\n');
     const forced = (await h.call('apply', { runId, force: true })) as ApplyResult;
     expect(forced.groups[0]?.delivery).toMatchObject({ state: 'applied', conflicts: ['lib.ts'] });

@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHAIN_TAG_COLOR,
   Rejection,
   TAG_COLORS,
+  addLinkedTag,
   addTag,
   autoTagName,
   editTag,
+  keepLinkedTags,
   knownTags,
   mergeTags,
   removeTag,
+  resolveManualTags,
   resolveTags,
   type Tag,
 } from '../../src/core/index.ts';
@@ -133,5 +137,52 @@ describe('autoTagName', () => {
     const name = autoTagName(catalogOf(base), base);
     expect(name).toBe(`${'a'.repeat(28)}-2`);
     expect([...name].length).toBeLessThanOrEqual(30);
+  });
+});
+
+describe('linked task tags', () => {
+  it('rejects the reserved color for ordinary tags', () => {
+    expect(() => addTag([], { name: 'a', color: 'indigo' }, 'a', 1)).toThrow(
+      'color `indigo` is reserved for linked task tags',
+    );
+    expect(() => addTag([], { name: 'a', color: 'nope' }, 'a', 1)).toThrow('unknown color');
+    const catalog = catalogOf('a');
+    expect(() => editTag(catalog, 'a', { color: 'indigo' })).toThrow('reserved');
+    expect(catalog[0]!.task).toBeNull();
+    expect(addTag(catalogOf('a', 'b'), { name: 'c' }, 'c', 1).color).toBe(TAG_COLORS[2]);
+  });
+
+  it('adds a linked tag, allows a rename but not a color change', () => {
+    const linked = addLinkedTag([], { name: 'cards', task: { run: 'r1', number: 115 } }, 'l', 1);
+    expect(linked).toMatchObject({ color: CHAIN_TAG_COLOR, task: { run: 'r1', number: 115 } });
+    expect(() => addLinkedTag([linked], { name: 'CARDS', task: linked.task! }, 'm', 2)).toThrow(
+      'already exists',
+    );
+    expect(() => editTag([linked], 'cards', { color: 'red' })).toThrow(
+      'linked task tag color cannot be changed',
+    );
+    expect(editTag([linked], 'cards', { name: 'cards2' })).toMatchObject({
+      name: 'cards2',
+      task: { run: 'r1', number: 115 },
+    });
+  });
+
+  it('refuses a linked tag by hand, naming its task', () => {
+    const plain = catalogOf('auth');
+    const linked = addLinkedTag(plain, { name: 'cards', task: { run: 'r1', number: 7 } }, 'l', 1);
+    const catalog = [...plain, linked];
+    expect(resolveManualTags(catalog, ['auth'])).toEqual(['tg-0']);
+    expect(() => resolveManualTags(catalog, ['auth', 'cards'])).toThrow(
+      'tag `cards` belongs to task #7 and is set automatically',
+    );
+    expect(resolveTags(catalog, ['cards'])).toEqual(['l']);
+  });
+
+  it('keeps linked tags first in their order', () => {
+    const plain = catalogOf('auth', 'v2');
+    const a = addLinkedTag(plain, { name: 'a', task: { run: 'r1', number: 1 } }, 'la', 1);
+    const catalog = [...plain, a];
+    expect(keepLinkedTags(catalog, ['tg-0', 'la'], ['tg-1', 'tg-1', 'la'])).toEqual(['la', 'tg-1']);
+    expect(keepLinkedTags(catalog, ['tg-0', 'la'], [])).toEqual(['la']);
   });
 });

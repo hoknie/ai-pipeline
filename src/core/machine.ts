@@ -20,6 +20,7 @@ import {
   type SpecialistsRefresh,
 } from './permissions.ts';
 import { groupSlugs } from './ids.ts';
+import { attemptStepLabel } from './topology.ts';
 import { questionsText } from './questions.ts';
 import {
   addUsage,
@@ -185,7 +186,7 @@ class Machine {
         );
         return;
       case 'delivery_finished':
-        this.effects.push(...finishDelivery(this.state, event.result));
+        this.effects.push(...finishDelivery(this.state, event.result, this.now));
         return;
       case 'run_named':
         if (this.state.run.title === null && event.title !== null) {
@@ -286,7 +287,7 @@ class Machine {
       this.askHuman(
         group,
         attempt.stepIndex,
-        `Files in your working copy changed while step ${attempt.stepId} ran: ${files}. The specialist, you or another program may have changed them; aip deliveries are not counted. Check your working copy and answer to continue.`,
+        `Files in your working copy changed while step ${attemptStepLabel(this.state, group, attempt)} ran: ${files}. The specialist, you or another program may have changed them; aip deliveries are not counted. Check your working copy and answer to continue.`,
         null,
       );
       return;
@@ -327,10 +328,14 @@ class Machine {
     group.status = 'failed';
     group.reason = `resolver reported ${report.verdict}`;
     this.effects.push(
-      ...finishDelivery(this.state, {
-        kind: 'failed',
-        message: `the resolver reported ${report.verdict}${detail ? `: ${detail}` : ''}`,
-      }),
+      ...finishDelivery(
+        this.state,
+        {
+          kind: 'failed',
+          message: `the resolver reported ${report.verdict}${detail ? `: ${detail}` : ''}`,
+        },
+        this.now,
+      ),
     );
   }
 
@@ -381,7 +386,7 @@ class Machine {
       this.askHuman(
         group,
         attempt.stepIndex,
-        `Step \`${attempt.stepId}\` rejected the work ${rounds} times (limit ${onReject.maxRounds}). Last feedback:\n${feedback}`,
+        `Step \`${attemptStepLabel(this.state, group, attempt)}\` rejected the work ${rounds} times (limit ${onReject.maxRounds}). Last feedback:\n${feedback}`,
         null,
       );
       return;
@@ -442,10 +447,14 @@ class Machine {
     if (isResolveGroup(group)) {
       group.pending = null;
       this.effects.push(
-        ...finishDelivery(this.state, {
-          kind: 'failed',
-          message: `the resolver failed: ${describeFailReason(reason)}`,
-        }),
+        ...finishDelivery(
+          this.state,
+          {
+            kind: 'failed',
+            message: `the resolver failed: ${describeFailReason(reason)}`,
+          },
+          this.now,
+        ),
       );
     }
   }

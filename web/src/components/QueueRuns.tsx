@@ -60,7 +60,7 @@ function RunCard({
         ? t('queue.stepOf', {
             number: steps.current.number,
             count: steps.total,
-            step: steps.current.step,
+            step: steps.current.name ?? steps.current.step,
           })
         : t('queue.stepsAll', { count: steps.total });
   const problem = run.problem;
@@ -145,7 +145,7 @@ function RunCard({
           {run.active.map((active) => (
             <li key={active.group}>
               {groupLabel(active.group, t)}
-              {active.step ? <> · {active.step}</> : null}
+              {(active.stepName ?? active.step) ? <> · {active.stepName ?? active.step}</> : null}
             </li>
           ))}
         </ul>
@@ -155,7 +155,7 @@ function RunCard({
           {run.waiting.map((held) => (
             <li key={held.group} className="flex flex-wrap items-center gap-1">
               {groupLabel(held.group, t)}
-              {held.step ? <> · {held.step}</> : null}
+              {(held.stepName ?? held.step) ? <> · {held.stepName ?? held.step}</> : null}
               <StatusBadge status="waiting" wait={held.wait} />
               <span>{waitText(held.wait, t)}</span>
             </li>

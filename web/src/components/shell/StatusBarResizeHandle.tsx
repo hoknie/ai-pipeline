@@ -1,20 +1,25 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
   STATUS_BAR_HEIGHT_STEP,
   STATUS_BAR_MIN_HEIGHT,
   clampStatusBarHeight,
+  nextChosenHeight,
+  statusBarMaxHeight,
 } from '../../statusBarHeight.ts';
 
 /** The top edge of the open strip: drag it or use the arrow keys to change the strip's height. */
 export function StatusBarResizeHandle({
   height,
+  chosen,
   viewportHeight,
   onPreview,
   onCommit,
 }: {
   height: number;
+  /** The remembered height, which may be larger than the shown one in a shrunk window. */
+  chosen: number;
   viewportHeight: number;
   /** The height while dragging, not yet remembered; null when the drag ends. */
   onPreview: (height: number | null) => void;
@@ -23,7 +28,20 @@ export function StatusBarResizeHandle({
   const { t } = useTranslation();
   const drag = useRef<{ startY: number; startHeight: number; last: number } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const max = Math.floor(viewportHeight * 0.8);
+  const max = statusBarMaxHeight(viewportHeight);
+
+  const onPreviewRef = useRef(onPreview);
+  onPreviewRef.current = onPreview;
+  // Unmounting (the strip was collapsed) cancels a drag in progress without remembering it.
+  useEffect(
+    () => () => {
+      if (drag.current === null) return;
+      drag.current = null;
+      document.body.classList.remove('select-none');
+      onPreviewRef.current(null);
+    },
+    [],
+  );
 
   const finish = () => {
     const current = drag.current;
@@ -32,7 +50,7 @@ export function StatusBarResizeHandle({
     setDragging(false);
     document.body.classList.remove('select-none');
     onPreview(null);
-    onCommit(current.last);
+    onCommit(nextChosenHeight(chosen, current.last, viewportHeight));
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -59,7 +77,13 @@ export function StatusBarResizeHandle({
           : 0;
     if (delta === 0) return;
     event.preventDefault();
-    onCommit(clampStatusBarHeight(height + delta, viewportHeight));
+    onCommit(
+      nextChosenHeight(
+        chosen,
+        clampStatusBarHeight(height + delta, viewportHeight),
+        viewportHeight,
+      ),
+    );
   };
 
   return (

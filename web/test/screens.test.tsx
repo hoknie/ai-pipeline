@@ -87,8 +87,15 @@ describe('group screen', () => {
     const tab = await screen.findByRole('tab', { name: 'Log' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
     expect(
-      screen.getByRole('button', { name: /^attempt 1 code/ }).getAttribute('aria-expanded'),
+      screen.getByRole('button', { name: /^attempt 1 Кодер/ }).getAttribute('aria-expanded'),
     ).toBe('true');
+  });
+
+  it('shows the step by its name in the head of the group and keeps the id in the hint', async () => {
+    window.location.hash = '#runs/run1/login';
+    mount([runView({ groups: [groupRow({ step: 'plan', stepName: 'Планировщик' })] })]);
+    const name = await screen.findByText('Планировщик', { selector: 'span.font-medium' });
+    expect(name.getAttribute('title')).toBe('plan');
   });
 
   it('cancels a group only after the confirmation', async () => {
@@ -247,11 +254,42 @@ describe('run header', () => {
     expect(screen.getAllByLabelText('Workflow: feature')).toHaveLength(1);
   });
 
+  it('reports a refused first delivery from the header as "Delivery failed", not "again"', async () => {
+    const apply = vi.fn(async () => ({
+      runId: 'run1',
+      pending: false,
+      groups: [
+        {
+          slug: 'login',
+          delivery: {
+            ...groupView().delivery,
+            state: 'apply_failed' as const,
+            reason: 'patch does not apply',
+            finishedAt: 2000,
+          },
+        },
+      ],
+    }));
+    mount(
+      [
+        runView({
+          delivery: { applied: 0, merged: 1, failed: 0, inProgress: false, finishedAt: null },
+          groups: [groupRow({ status: 'merged' })],
+        }),
+      ],
+      { apply } as never,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Deliver' }));
+    await expectOneNotice('Delivery failed: patch does not apply');
+    expect(screen.queryByText(/Delivery started/)).toBeNull();
+    expect(screen.queryByText(/failed again/)).toBeNull();
+  });
+
   it('disables «Deliver» while the delivery is requested', async () => {
     let done: (value: unknown) => void = () => undefined;
     const apply = vi.fn(() => new Promise((resolve) => (done = resolve)));
     const run = runView({
-      delivery: { applied: 0, merged: 1, failed: 0, inProgress: false },
+      delivery: { applied: 0, merged: 1, failed: 0, inProgress: false, finishedAt: null },
       groups: [groupRow({ status: 'merged' })],
     });
     render(
@@ -275,13 +313,14 @@ describe('run header', () => {
             files: ['a.ts'],
             conflicts: [],
             userEdits: [],
+            finishedAt: null,
           },
         }),
       ),
     });
     const run = runView({
       finished: true,
-      delivery: { applied: 0, merged: 1, failed: 1, inProgress: false },
+      delivery: { applied: 0, merged: 1, failed: 1, inProgress: false, finishedAt: null },
       groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
     });
     render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
@@ -558,7 +597,7 @@ describe('run state badges', () => {
         state: 'failed',
         finished: true,
         groups: [groupRow({ status: 'failed' })],
-        delivery: { applied: 0, merged: 0, failed: 1, inProgress: false },
+        delivery: { applied: 0, merged: 0, failed: 1, inProgress: false, finishedAt: null },
       }),
     ]);
     const badges = await screen.findAllByLabelText('Failed (failed)');

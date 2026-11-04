@@ -367,6 +367,72 @@ describe('general setting', () => {
     expect(await setting(h, false, null)).toMatchObject({ ok: true });
     expect(await setting(h, true, null)).toMatchObject({ ok: false, reason: 'conflict' });
   });
+
+  const settings = async (
+    h: Harness,
+    values: Record<string, string | number | boolean | string[] | null>,
+    level: 'global' | 'project',
+    revision: string | null = null,
+  ) =>
+    (await h.call('config_settings', {
+      repository: h.repo,
+      values,
+      revision,
+      level,
+    })) as ConfigEditResult;
+
+  it('writes two fields in one request on the project and the global level', async () => {
+    const h = await start();
+    const projectFile = join(h.repo, 'aip', 'settings.yaml');
+    const project = await settings(
+      h,
+      { max: 6, 'delivery.keep': true },
+      'project',
+      revisionOf(readFileSync(projectFile, 'utf8')),
+    );
+    expect(project).toMatchObject({ ok: true, file: join(h.repo, 'aip', 'settings.yaml') });
+    expect(readFileSync(join(h.repo, 'aip', 'settings.yaml'), 'utf8')).toContain('keep: true');
+    const global = await settings(
+      h,
+      { 'naming.enabled': false, 'defaults.tools': ['Read'] },
+      'global',
+    );
+    expect(global).toMatchObject({ ok: true, file: globalFile(h) });
+    const after = await view(h);
+    expect(after.settings.find((entry) => entry.path === 'max')).toMatchObject({
+      value: 6,
+      written: { project: 6 },
+    });
+    expect(after.settings.find((entry) => entry.path === 'naming.enabled')).toMatchObject({
+      value: false,
+      globalValue: false,
+    });
+  });
+
+  it('refuses the port of the panel on the project level', async () => {
+    const h = await start();
+    expect(await settings(h, { 'web.port': 8200 }, 'project')).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+    });
+    await expect(
+      h.call('config_settings', {
+        repository: h.repo,
+        values: {},
+        revision: null,
+        level: 'global',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('writes the variable of a runtime without its value in the answer or the view', async () => {
+    const h = await start();
+    const result = await settings(h, { 'runtimes.claude.env.API_KEY': 'topsecret' }, 'global');
+    expect(result).toMatchObject({ ok: true });
+    expect(JSON.stringify(result)).not.toContain('topsecret');
+    expect(JSON.stringify(await view(h))).not.toContain('topsecret');
+    expect(readFileSync(globalFile(h), 'utf8')).toContain('API_KEY: topsecret');
+  });
 });
 
 describe('config catalog', () => {

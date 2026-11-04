@@ -5,6 +5,7 @@ import type { TagColor } from './types.ts';
  * written out in full so Tailwind finds them; the text/background contrast is at least 4.5:1.
  */
 export const TAG_CLASSES: Record<TagColor, string> = {
+  indigo: 'bg-[#e0e7ff] text-[#312e81] dark:bg-[#312e81] dark:text-[#e0e7ff]',
   gray: 'bg-[#f3f4f6] text-[#111827] dark:bg-[#111827] dark:text-[#f3f4f6]',
   red: 'bg-[#fee2e2] text-[#7f1d1d] dark:bg-[#7f1d1d] dark:text-[#fee2e2]',
   orange: 'bg-[#ffedd5] text-[#7c2d12] dark:bg-[#7c2d12] dark:text-[#ffedd5]',
@@ -17,4 +18,9 @@ export const TAG_CLASSES: Record<TagColor, string> = {
   brown: 'bg-[#fef3c7] text-[#78350f] dark:bg-[#78350f] dark:text-[#fef3c7]',
 };
 
-export const TAG_COLOR_NAMES = Object.keys(TAG_CLASSES) as TagColor[];
+/** The color reserved for tags of linked tasks; it is not offered when choosing a color. */
+export const LINKED_TAG_COLOR: TagColor = 'indigo';
+
+export const TAG_COLOR_NAMES = (Object.keys(TAG_CLASSES) as TagColor[]).filter(
+  (color) => color !== LINKED_TAG_COLOR,
+);

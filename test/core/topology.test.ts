@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { findGroup } from '../../src/core/index.ts';
 import {
+  attemptStepLabel,
+  stepLabel,
+  stepName,
   topology,
   transition,
   workflowTopologies,
@@ -150,5 +154,66 @@ describe('topology of a workflow that splits into another', () => {
     const view = topology(state);
     expect(view.split?.workflow).toBe('explore');
     expect(view.steps[0]).toMatchObject({ id: 'research', groups: [{ slug: 'gruppa-1' }] });
+  });
+});
+
+const TWINS = `swarm:
+  specialists:
+    coder: { name: Кодер }
+    reviewer: { name: Ревьюер }
+    mute: { name: Тихий }
+  workflows:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+        - { id: review, specialist: reviewer }
+        - { id: review-2, specialist: reviewer }
+        - { id: silent, specialist: mute }
+`;
+
+function twins() {
+  const state = run(1, { configText: TWINS });
+  (state.run.config.specialists.find((item) => item.slug === 'mute') as { name: string }).name =
+    '  ';
+  return state;
+}
+
+describe('human names of steps', () => {
+  it('names a step after its specialist, or by the specialist slug when the name is empty', () => {
+    const state = twins();
+    const steps = state.run.config.workflows[0]!.steps;
+    expect(stepName(state.run.config, steps[0]!)).toBe('Кодер');
+    expect(stepName(state.run.config, steps[3]!)).toBe('mute');
+  });
+
+  it('adds the id to a name that another step of the workflow has', () => {
+    const state = twins();
+    const steps = state.run.config.workflows[0]!.steps;
+    expect(steps.map((item) => stepLabel(state.run.config, steps, item))).toEqual([
+      'Кодер',
+      'Ревьюер (review)',
+      'Ревьюер (review-2)',
+      'mute',
+    ]);
+    expect(topology(state).steps.map((item) => item.name)).toEqual([
+      'Кодер',
+      'Ревьюер (review)',
+      'Ревьюер (review-2)',
+      'mute',
+    ]);
+  });
+
+  it('names the step of an attempt, falling back to the specialist of the attempt and the id', () => {
+    const state = run(1);
+    step(state);
+    const group = findGroup(state, 'gruppa-1')!;
+    const attempt = group.attempts[0]!;
+    expect(attemptStepLabel(state, group, attempt)).toBe('Планировщик');
+    expect(
+      attemptStepLabel(state, group, { ...attempt, stepId: 'gone', specialist: 'coder' }),
+    ).toBe('Кодировщик');
+    expect(
+      attemptStepLabel(state, group, { ...attempt, stepId: 'gone', specialist: 'nobody' }),
+    ).toBe('gone');
   });
 });

@@ -129,7 +129,7 @@ describe('system steps in the runs section', () => {
           conflicts: ['src/app.ts'],
           reason: null,
         },
-        delivery: { applied: 0, merged: 1, failed: 0, inProgress: true },
+        delivery: { applied: 0, merged: 1, failed: 0, inProgress: true, finishedAt: null },
         system: [systemRow('resolve')],
       }),
     ]);
@@ -239,7 +239,7 @@ describe('system stages in the run header', () => {
         split: { status: 'done', wait: null, question: null, questions: null, reason: null },
         system: [systemRow('split', { status: 'done' }), systemRow('message')],
         deliveryStage: { status: 'pending' },
-        delivery: { applied: 1, merged: 1, failed: 0, inProgress: false },
+        delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: null },
         resolver: {
           status: 'running',
           wait: null,
@@ -265,7 +265,7 @@ describe('system stages in the run header', () => {
     mount([
       runView({
         groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
-        delivery: { applied: 0, merged: 1, failed: 1, inProgress: false },
+        delivery: { applied: 0, merged: 1, failed: 1, inProgress: false, finishedAt: null },
         deliveryStage: {
           status: 'apply_failed',
           reason: 'does not exist in index',
@@ -282,7 +282,7 @@ describe('system stages in the run header', () => {
     mount([
       runView({
         groups: [groupRow({ status: 'merged' })],
-        delivery: { applied: 0, merged: 1, failed: 0, inProgress: false },
+        delivery: { applied: 0, merged: 1, failed: 0, inProgress: false, finishedAt: null },
       }),
     ]);
     const header = await screen.findByRole('banner', { name: 'run' });
@@ -305,6 +305,7 @@ describe('a failed delivery on the group screen', () => {
             files: [],
             conflicts: [],
             userEdits: [],
+            finishedAt: null,
           },
         }),
       ),
@@ -334,7 +335,6 @@ describe('a failed delivery on the group screen', () => {
     expect(await screen.findByText('does not exist in index')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
     await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', false));
-    await screen.findByText('Delivery started');
   });
 
   it('delivers with --force after the dialog', async () => {
@@ -355,5 +355,145 @@ describe('a failed delivery on the group screen', () => {
     expect(
       (screen.getByRole('button', { name: 'Deliver with --force…' }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+describe('the outcome of a delivery started in the panel', () => {
+  type Delivery = ReturnType<typeof groupView>['delivery'];
+  const attempt = (overrides: Partial<Delivery>): Delivery => ({
+    state: 'apply_failed',
+    reason: 'patch does not apply',
+    files: [],
+    conflicts: [],
+    userEdits: [],
+    finishedAt: 1000,
+    ...overrides,
+  });
+  const stuck = (overrides: Parameters<typeof runView>[0] = {}) =>
+    runView({
+      groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
+      system: [systemRow('message', { status: 'failed' })],
+      delivery: { applied: 0, merged: 1, failed: 1, inProgress: false, finishedAt: 1000 },
+      deliveryStage: { status: 'apply_failed', reason: 'patch does not apply', groups: ['login'] },
+      ...overrides,
+    });
+  const result = (pending: boolean, delivery: Delivery) => ({
+    runId: 'run1',
+    pending,
+    groups: [{ slug: 'login', delivery }],
+  });
+  const open = (apply: ReturnType<typeof vi.fn>, extra = {}) => {
+    window.location.hash = '#runs/run1/_message';
+    const api = mount([stuck()], { apply, ...extra } as never);
+    return api;
+  };
+  const send = (run: ReturnType<typeof runView>, seq: number) =>
+    act(() => FakeEventSource.last!.send({ event: 'run', seq, run }));
+  const toasts = () => [
+    ...new Set(
+      Array.from(document.querySelectorAll('[data-sonner-toast]')).map((node) => node.textContent),
+    ),
+  ];
+  const retry = async () =>
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry delivery' }));
+
+  it('reports a repeated failure at once instead of "Delivery started"', async () => {
+    const apply = vi.fn(async () =>
+      result(false, attempt({ reason: 'patch does not apply\nsecond line', finishedAt: 2000 })),
+    );
+    open(apply);
+    await retry();
+    expect(await screen.findByText('Delivery failed again: patch does not apply')).toBeTruthy();
+    expect(screen.queryByText('Delivery started')).toBeNull();
+  });
+
+  it('reports a finished delivery', async () => {
+    open(vi.fn(async () => result(false, attempt({ state: 'applied', reason: null }))));
+    await retry();
+    expect(await screen.findByText('Delivered')).toBeTruthy();
+    expect(screen.queryByText('Delivery started')).toBeNull();
+  });
+
+  it('reports a delivery that goes on once the run gets a new delivery time', async () => {
+    open(vi.fn(async () => result(true, attempt({}))));
+    await retry();
+    expect(await screen.findByText('Delivery started')).toBeTruthy();
+    send(
+      stuck({
+        delivery: { applied: 0, merged: 1, failed: 1, inProgress: true, finishedAt: 1000 },
+        deliveryStage: { status: 'delivering' },
+      }),
+      2,
+    );
+    expect(toasts()).not.toContain('Delivered');
+    send(
+      stuck({
+        groups: [groupRow({ status: 'merged', delivery: 'applied' })],
+        delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: 3000 },
+        deliveryStage: { status: 'applied' },
+      }),
+      3,
+    );
+    await waitFor(() => expect(toasts()).toContain('Delivered'));
+  });
+
+  it('says nothing about the outcome when the delivery is cancelled', async () => {
+    open(vi.fn(async () => result(true, attempt({}))));
+    await retry();
+    await screen.findByText('Delivery started');
+    send(
+      stuck({
+        delivery: { applied: 0, merged: 1, failed: 1, inProgress: true, finishedAt: 1000 },
+        deliveryStage: { status: 'delivering' },
+      }),
+      2,
+    );
+    send(stuck(), 3);
+    await act(async () => undefined);
+    expect(toasts()).toEqual(['Delivery started']);
+  });
+
+  it('keeps the retry button on the step, disabled and loading, while delivering', async () => {
+    open(vi.fn());
+    send(
+      stuck({
+        delivery: { applied: 0, merged: 1, failed: 1, inProgress: true, finishedAt: 1000 },
+        deliveryStage: { status: 'delivering' },
+      }),
+      2,
+    );
+    const button = (await screen.findByRole('button', {
+      name: 'Retry delivery',
+    })) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(
+      within(await screen.findByRole('status', { name: 'Delivery' })).getByText('Delivering…'),
+    ).toBeTruthy();
+  });
+
+  it('shows the last attempt on the step line and rereads the reason of a new attempt', async () => {
+    const group = vi
+      .fn()
+      .mockResolvedValueOnce(
+        groupView({ status: 'merged', delivery: attempt({ reason: 'reason A' }) }),
+      )
+      .mockResolvedValue(
+        groupView({
+          status: 'merged',
+          delivery: attempt({ reason: 'reason B', finishedAt: 5000 }),
+        }),
+      );
+    window.location.hash = '#runs/run1/login';
+    mount([stuck()], { group } as never);
+    expect(await screen.findByText('reason A')).toBeTruthy();
+    send(
+      stuck({
+        delivery: { applied: 0, merged: 1, failed: 1, inProgress: false, finishedAt: 5000 },
+        deliveryStage: { status: 'apply_failed', reason: 'reason B', groups: ['login'] },
+      }),
+      2,
+    );
+    expect(await screen.findByText('reason B')).toBeTruthy();
+    expect(screen.queryByText('reason A')).toBeNull();
   });
 });

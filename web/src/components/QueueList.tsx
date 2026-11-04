@@ -353,7 +353,16 @@ export function QueueList({
                 )}
                 {item.skip && item.skip.length > 0 ? (
                   <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                    {t('queue.list.skips', { steps: item.skip.join(', ') })}
+                    {t('queue.list.skips', {
+                      steps: item.skip
+                        .map(
+                          (id) =>
+                            workflows?.workflows
+                              .find((candidate) => candidate.id === item.workflow)
+                              ?.steps.find((step) => step.id === id)?.name ?? id,
+                        )
+                        .join(', '),
+                    })}
                   </span>
                 ) : null}
                 {item.title && item.groups ? (

@@ -12,7 +12,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { Document, Scalar, isMap, isScalar, parseDocument, visit } from 'yaml';
 
 import { SETTINGS_NAME, SPECIALISTS_DIR, WORKFLOWS_DIR, type ConfigPaths } from './discover.ts';
-import { formatDuration } from './duration.ts';
+import { formatDuration, parseDuration } from './duration.ts';
 import { ConfigLoadError, type FieldError } from './errors.ts';
 import {
   assembleLevel,
@@ -28,15 +28,28 @@ import {
 } from './load.ts';
 import { isMapping, mergeConfigs, type ConfigSource } from './merge.ts';
 import {
+  CLAUDE_EDIT_MODES,
+  CLAUDE_MCP_MODES,
+  CLAUDE_SETTINGS_SOURCES,
   DELIVERY_MODES,
+  MAX_RANGE,
+  MAX_ROUNDS_RANGE,
+  OUTSIDE_CHANGES,
+  PERMISSIONS,
+  RUNTIMES,
+  WEB_AUTH_MODES,
+  WEB_HOSTS,
+  WORKSPACE_BASES,
   SLUG_PATTERN_TEXT,
   isValidSlug,
   defaultRuntimes,
   defaultWeb,
   type ResolvedConfig,
+  type RuntimeSettings,
   type Specialist,
+  type WebSettings,
 } from './model.ts';
-import { validateConfig } from './validate.ts';
+import { validateConfig, validateRuntimesSection, validateWebSection } from './validate.ts';
 
 export type EntryKind = 'specialist' | 'workflow';
 
@@ -417,14 +430,103 @@ export function planEdit(paths: ConfigPaths, edit: EditRequest): EditPlan {
   return { ok: true, file, text: draft.text, revision: revisionOf(draft.text ?? undefined) };
 }
 
-/** Fields of settings.yaml the editor may write; the list grows deliberately. */
-export const SETTABLE_SETTINGS = ['delivery.auto', 'delivery.mode'] as const;
-export type SettingPath = (typeof SETTABLE_SETTINGS)[number];
+export type SettingKind =
+  'boolean' | 'choice' | 'integer' | 'string' | 'duration' | 'strings' | 'specialist' | 'env';
+
+/** A value the editor writes into settings.yaml; null removes the field. */
+export type SettingValue = boolean | number | string | string[] | null;
+
+/** One field of settings.yaml the editor may write. */
+export interface SettingField {
+  /** Key path in settings.yaml, such as `delivery.mode`. */
+  path: string;
+  kind: SettingKind;
+  /** Allowed values of a `choice`. */
+  options?: readonly string[];
+  /** Inclusive bounds of an `integer`. */
+  range?: readonly [number, number];
+  /** Read only from the shared settings.yaml (`web.*`, `runtimes.*`). */
+  globalOnly: boolean;
+}
+
+const WEB_PORT_RANGE = [1, 65535] as const;
+const RESOLVER_ROUNDS_RANGE = MAX_ROUNDS_RANGE;
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function field(
+  path: string,
+  kind: SettingKind,
+  extra: {
+    options?: readonly string[];
+    range?: readonly [number, number];
+    globalOnly?: boolean;
+  } = {},
+): SettingField {
+  return { path, kind, ...extra, globalOnly: extra.globalOnly ?? false };
+}
+
+/** Every field of settings.yaml the editor writes, in the order the editor shows them. */
+export const SETTING_FIELDS: readonly SettingField[] = [
+  field('max', 'integer', { range: MAX_RANGE }),
+  field('workspace_dir', 'string'),
+  field('outside_changes', 'choice', { options: OUTSIDE_CHANGES }),
+  field('defaults.runtime', 'choice', { options: RUNTIMES }),
+  field('defaults.permissions', 'choice', { options: PERMISSIONS }),
+  field('defaults.timeout', 'duration'),
+  field('defaults.allow_commands', 'strings'),
+  field('defaults.tools', 'strings'),
+  field('claude.edit_mode', 'choice', { options: CLAUDE_EDIT_MODES }),
+  field('claude.mcp', 'choice', { options: CLAUDE_MCP_MODES }),
+  field('claude.settings', 'choice', { options: CLAUDE_SETTINGS_SOURCES }),
+  field('delivery.mode', 'choice', { options: DELIVERY_MODES }),
+  field('delivery.auto', 'boolean'),
+  field('delivery.keep', 'boolean'),
+  field('delivery.commit_message', 'string'),
+  field('delivery.message_specialist', 'specialist'),
+  field('delivery.resolver', 'specialist'),
+  field('delivery.resolver_rounds', 'integer', { range: RESOLVER_ROUNDS_RANGE }),
+  field('workspace.base', 'choice', { options: WORKSPACE_BASES }),
+  field('workspace.include', 'strings'),
+  field('naming.enabled', 'boolean'),
+  field('naming.runtime', 'choice', { options: RUNTIMES }),
+  field('naming.model', 'string'),
+  field('web.autostart', 'boolean', { globalOnly: true }),
+  field('web.auth', 'choice', { options: WEB_AUTH_MODES, globalOnly: true }),
+  field('web.host', 'choice', { options: WEB_HOSTS, globalOnly: true }),
+  field('web.port', 'integer', { range: WEB_PORT_RANGE, globalOnly: true }),
+  ...RUNTIMES.flatMap((runtime) => [
+    field(`runtimes.${runtime}.command`, 'string', { globalOnly: true }),
+    field(`runtimes.${runtime}.args`, 'strings', { globalOnly: true }),
+    field(`runtimes.${runtime}.env`, 'env', { globalOnly: true }),
+  ]),
+];
+
+const ENV_VARIABLE_PATH = /^runtimes\.([a-z]+)\.env\.(.+)$/;
+
+/** The field for a path, also a single variable `runtimes.<runtime>.env.<NAME>`; undefined for any other path. */
+export function settingFieldOf(path: string): SettingField | undefined {
+  const known = SETTING_FIELDS.find((candidate) => candidate.path === path);
+  if (known) return known;
+  const match = ENV_VARIABLE_PATH.exec(path);
+  if (
+    match &&
+    (RUNTIMES as readonly string[]).includes(match[1] as string) &&
+    ENV_NAME.test(match[2] as string)
+  ) {
+    return field(path, 'env', { globalOnly: true });
+  }
+  return undefined;
+}
+
+/** A variable of `runtimes.<runtime>.env` (a string), as opposed to the whole `env` section. */
+function isEnvVariable(path: string): boolean {
+  return ENV_VARIABLE_PATH.test(path);
+}
 
 export interface SettingRequest {
   path: string;
   /** New value; null removes the field. */
-  value: boolean | string | null;
+  value: SettingValue;
   /** Revision of settings.yaml the caller saw; null when it did not exist. */
   revision: string | null;
   level?: WriteLevel;
@@ -439,11 +541,7 @@ export function settingsFile(paths: ConfigPaths, level: WriteLevel = 'global'): 
 }
 
 /** Text of settings.yaml with one field set (or removed); comments and other keys survive. */
-export function editSetting(
-  text: string | undefined,
-  path: string,
-  value: boolean | string | null,
-): string {
+export function editSetting(text: string | undefined, path: string, value: SettingValue): string {
   const keys = path.split('.');
   if (text === undefined || text.trim() === '') {
     if (value === null) return text ?? '';
@@ -476,34 +574,101 @@ export function editSetting(
   return document.toString({ lineWidth: 0 });
 }
 
-/** Why the value does not fit the setting, or null. */
-function settingTypeError(path: string, value: boolean | string | null): string | null {
-  if (value === null) return null;
-  if (path === 'delivery.mode') {
-    return typeof value === 'string' && (DELIVERY_MODES as readonly string[]).includes(value)
-      ? null
-      : `must be one of: ${DELIVERY_MODES.join(', ')}`;
-  }
-  return typeof value === 'boolean' ? null : 'must be true or false';
+function textError(value: unknown): string | null {
+  if (typeof value !== 'string') return 'must be a string';
+  return value.trim() === '' ? 'must not be empty' : null;
 }
 
-/** Checks a write of one setting without writing: the revision, then the whole configuration. */
-export function planSetting(paths: ConfigPaths, request: SettingRequest): EditPlan {
+/** Why the value does not fit the field: the message and the path suffix (`[1]` for a list item), or null. */
+function settingTypeError(
+  setting: SettingField,
+  value: SettingValue,
+): { message: string; suffix: string } | null {
+  if (value === null) return null;
+  const fail = (message: string, suffix = '') => ({ message, suffix });
+  switch (setting.kind) {
+    case 'boolean':
+      return typeof value === 'boolean' ? null : fail('must be true or false');
+    case 'choice': {
+      const options = setting.options ?? [];
+      const message = textError(value);
+      if (message !== null) return fail(message);
+      return options.includes(value as string)
+        ? null
+        : fail(`must be one of ${options.join(', ')}`);
+    }
+    case 'integer': {
+      const [low, high] = setting.range ?? [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
+      return typeof value === 'number' && Number.isInteger(value) && value >= low && value <= high
+        ? null
+        : fail(`must be an integer from ${low} to ${high}`);
+    }
+    case 'duration': {
+      const message = textError(value);
+      if (message !== null) return fail(message);
+      return parseDuration(value as string) === null
+        ? fail('must be a positive duration such as 90s, 30m or 2h')
+        : null;
+    }
+    case 'strings': {
+      if (!Array.isArray(value)) return fail('must be a list of strings');
+      for (const [index, item] of value.entries()) {
+        const message = textError(item);
+        if (message !== null) return fail(message, `[${index}]`);
+      }
+      return null;
+    }
+    case 'env':
+      if (!isEnvVariable(setting.path)) return fail('cannot be written as a whole');
+      return typeof value === 'string' ? null : fail('must be a string');
+    case 'string':
+    case 'specialist': {
+      const message = textError(value);
+      return message === null ? null : fail(message);
+    }
+  }
+}
+
+export interface SettingsRequest {
+  /** New values by path; null removes the field. */
+  values: Record<string, SettingValue>;
+  /** Revision of settings.yaml the caller saw; null when it did not exist. */
+  revision: string | null;
+  level?: WriteLevel;
+}
+
+/**
+ * Checks a write of several settings without writing: the types of all values, the revision, then
+ * the whole configuration with all of the edits applied to one text.
+ */
+export function planSettings(paths: ConfigPaths, request: SettingsRequest): EditPlan {
   const level = request.level ?? 'global';
-  if (!(SETTABLE_SETTINGS as readonly string[]).includes(request.path)) {
+  const entries = Object.entries(request.values);
+  if (entries.length === 0) throw new ConfigEditError('there is nothing to write');
+  const unknown = entries.filter(([path]) => settingFieldOf(path) === undefined).map(([p]) => p);
+  if (unknown.length > 0) {
     throw new ConfigEditError(
-      `\`${request.path}\` cannot be written; allowed: ${SETTABLE_SETTINGS.join(', ')}`,
+      `${unknown.map((path) => `\`${path}\``).join(', ')} cannot be written; allowed: ${SETTING_FIELDS.map((setting) => setting.path).join(', ')}`,
     );
   }
   const file = settingsFile(paths, level);
-  const typeError = settingTypeError(request.path, request.value);
-  if (typeError !== null) {
-    return {
-      ok: false,
-      reason: 'invalid',
-      errors: [{ file, path: `swarm.${request.path}`, message: typeError }],
-    };
+  const typeErrors: FieldError[] = [];
+  for (const [path, value] of entries) {
+    const setting = settingFieldOf(path) as SettingField;
+    if (setting.globalOnly && level === 'project') {
+      typeErrors.push({
+        file,
+        path: `swarm.${path}`,
+        message: 'is read only from the shared settings.yaml',
+      });
+      continue;
+    }
+    const problem = settingTypeError(setting, value);
+    if (problem !== null) {
+      typeErrors.push({ file, path: `swarm.${path}${problem.suffix}`, message: problem.message });
+    }
   }
+  if (typeErrors.length > 0) return { ok: false, reason: 'invalid', errors: typeErrors };
   const current = readText(file);
   if (revisionOf(current) !== request.revision) {
     return {
@@ -517,26 +682,54 @@ export function planSetting(paths: ConfigPaths, request: SettingRequest): EditPl
             : `${file} was changed after it was read`,
     };
   }
-  let text: string;
+  let text = current;
   try {
-    text = editSetting(current, request.path, request.value);
+    for (const [path, value] of entries) text = editSetting(text, path, value);
   } catch (error) {
     if (!(error instanceof ConfigEditError)) throw error;
     return {
       ok: false,
       reason: 'invalid',
-      errors: [{ file, path: `swarm.${request.path}`, message: error.message }],
+      errors: [{ file, path: `swarm.${entries[0]?.[0] ?? ''}`, message: error.message }],
     };
   }
+  const written = text ?? '';
   const files = readLevels(paths);
   const before = resolution(assembleLevel(files.global), assembleLevel(files.project));
-  const settings: ConfigSource = { path: file, value: parseYaml(text, file), text };
+  const settings: ConfigSource = { path: file, value: parseYaml(written, file), text: written };
   const drafted = { ...files, [level]: { ...files[level], settings } };
   const after = resolution(assembleLevel(drafted.global), assembleLevel(drafted.project));
   const known = new Set(before.errors.map(key));
   const added = after.errors.filter((error) => !known.has(key(error)));
+  if (
+    level === 'global' &&
+    entries.some(([path]) => (settingFieldOf(path) as SettingField).globalOnly)
+  ) {
+    const sectionErrors = (source: ConfigSource | undefined): FieldError[] => {
+      const root = isMapping(source?.value) ? source.value : {};
+      return [
+        ...validateWebSection(root.web).errors,
+        ...validateRuntimesSection(root.runtimes).errors,
+      ];
+    };
+    const sectionKnown = new Set(sectionErrors(files.global.settings).map(key));
+    const seen = new Set([...known, ...added.map(key)]);
+    for (const error of sectionErrors(settings)) {
+      if (sectionKnown.has(key(error)) || seen.has(key(error))) continue;
+      added.push({ ...error, file });
+    }
+  }
   if (added.length > 0) return { ok: false, reason: 'invalid', errors: added };
-  return { ok: true, file, text, revision: revisionOf(text) };
+  return { ok: true, file, text: written, revision: revisionOf(written) };
+}
+
+/** Checks a write of one setting without writing: the revision, then the whole configuration. */
+export function planSetting(paths: ConfigPaths, request: SettingRequest): EditPlan {
+  return planSettings(paths, {
+    values: { [request.path]: request.value },
+    revision: request.revision,
+    ...(request.level ? { level: request.level } : {}),
+  });
 }
 
 export interface EditCommitted {
@@ -638,6 +831,17 @@ export interface EditorSetting {
   value: unknown;
   /** File the value comes from; null for a built-in default. */
   file: string | null;
+  kind: SettingKind;
+  options?: readonly string[];
+  range?: readonly [number, number];
+  /** Read only from the shared settings.yaml. */
+  globalOnly: boolean;
+  /** The built-in default. */
+  defaultValue: unknown;
+  /** The value of the global level alone, without the project. */
+  globalValue: unknown;
+  /** What each settings.yaml says itself; a key that is not there is absent. For `env`, only names. */
+  written: { global?: unknown; project?: unknown };
 }
 
 export interface SettingsFileView {
@@ -702,7 +906,10 @@ function settingsOf(config: ResolvedConfig): [string, unknown][] {
  * `web.*` and `runtimes.*` as the daemon reads them: from the global settings.yaml only. The value
  * of `env` never leaves the config layer: only the sorted names of the variables do.
  */
-function globalSectionSettings(paths: ConfigPaths, global: LevelFiles): EditorSetting[] {
+function globalSectionSettings(
+  paths: ConfigPaths,
+  global: LevelFiles,
+): { path: string; value: unknown; file: string | null }[] {
   const file = global.settings?.path ?? null;
   const root = isMapping(global.settings?.value) ? global.settings.value : {};
   const has = (section: string, ...keys: string[]): boolean => {
@@ -724,30 +931,27 @@ function globalSectionSettings(paths: ConfigPaths, global: LevelFiles): EditorSe
   };
   const web = safe(() => loadWebSettings(paths), defaultWeb);
   const runtimes = safe(() => loadRuntimeSettings(paths), defaultRuntimes);
-  const result: EditorSetting[] = [
-    { path: 'web.autostart', value: web.autostart, file: originOf('web', 'autostart') },
-    { path: 'web.auth', value: web.auth, file: originOf('web', 'auth') },
-    { path: 'web.host', value: web.host, file: originOf('web', 'host') },
-    { path: 'web.port', value: web.port, file: originOf('web', 'port') },
+  return sectionValues(web, runtimes).map(([path, value]) => ({
+    path,
+    value,
+    file: originOf(...(path.split('.') as [string, ...string[]])),
+  }));
+}
+
+/** `web.*` and `runtimes.*` values as pairs; the value of `env` is reduced to the sorted names. */
+function sectionValues(web: WebSettings, runtimes: RuntimeSettings): [string, unknown][] {
+  const result: [string, unknown][] = [
+    ['web.autostart', web.autostart],
+    ['web.auth', web.auth],
+    ['web.host', web.host],
+    ['web.port', web.port],
   ];
-  for (const runtime of ['claude', 'opencode'] as const) {
+  for (const runtime of RUNTIMES) {
     const command = runtimes[runtime];
     result.push(
-      {
-        path: `runtimes.${runtime}.command`,
-        value: command.command,
-        file: originOf('runtimes', runtime, 'command'),
-      },
-      {
-        path: `runtimes.${runtime}.args`,
-        value: command.args,
-        file: originOf('runtimes', runtime, 'args'),
-      },
-      {
-        path: `runtimes.${runtime}.env`,
-        value: Object.keys(command.env).sort(),
-        file: originOf('runtimes', runtime, 'env'),
-      },
+      [`runtimes.${runtime}.command`, command.command],
+      [`runtimes.${runtime}.args`, command.args],
+      [`runtimes.${runtime}.env`, Object.keys(command.env).sort()],
     );
   }
   return result;
@@ -822,12 +1026,48 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
       };
     });
   const origins = mergeOrigins(global, project);
-  const settings: EditorSetting[] = settingsOf(configOrDefaults(config)).map(([path, value]) => ({
-    path,
-    value,
-    file: origins.get(`swarm.${path}`) ?? null,
-  }));
-  settings.push(...globalSectionSettings(paths, files.global));
+  const base = [
+    ...settingsOf(configOrDefaults(config)).map(([path, value]) => ({
+      path,
+      value,
+      file: origins.get(`swarm.${path}`) ?? null,
+    })),
+    ...globalSectionSettings(paths, files.global),
+  ];
+  const defaultValues = new Map<string, unknown>([
+    ...settingsOf(configOrDefaults(null)),
+    ...sectionValues(defaultWeb(), defaultRuntimes()),
+  ]);
+  const aloneConfig = resolution(global, emptyLevel()).config;
+  const globalValues = new Map<string, unknown>(settingsOf(configOrDefaults(aloneConfig)));
+  const writtenOf = (source: ConfigSource | undefined, path: string, kind: SettingKind) => {
+    let node: unknown = source?.value;
+    for (const part of path.split('.')) {
+      if (!isMapping(node) || !(part in node)) return undefined;
+      node = node[part];
+    }
+    return kind === 'env' && isMapping(node) ? Object.keys(node).sort() : node;
+  };
+  const settings: EditorSetting[] = base.map((entry) => {
+    const setting = settingFieldOf(entry.path) as SettingField;
+    const written: EditorSetting['written'] = {};
+    const inGlobal = writtenOf(files.global.settings, entry.path, setting.kind);
+    const inProject = setting.globalOnly
+      ? undefined
+      : writtenOf(files.project.settings, entry.path, setting.kind);
+    if (inGlobal !== undefined) written.global = inGlobal;
+    if (inProject !== undefined) written.project = inProject;
+    return {
+      ...entry,
+      kind: setting.kind,
+      ...(setting.options ? { options: setting.options } : {}),
+      ...(setting.range ? { range: setting.range } : {}),
+      globalOnly: setting.globalOnly,
+      defaultValue: defaultValues.get(entry.path),
+      globalValue: setting.globalOnly ? entry.value : globalValues.get(entry.path),
+      written,
+    };
+  });
   const settingsView = (level: WriteLevel): SettingsFileView => ({
     file: settingsFile(paths, level),
     revision: revisionOf(files[level].settings?.text),

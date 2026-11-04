@@ -167,7 +167,7 @@ This section is set in the shared `settings.yaml` only. In a project `aip/settin
 Before and after each step, `aip` compares the content of the files that differ from `HEAD` in your main working copy (`workspace_dir` is not part of the comparison).
 
 A commit that does not edit a file, a change of only its modification time, and the deliveries `aip` itself makes do not count. The list means "changed while the step ran", not "changed by the specialist": you or another program may have changed those files.
-- `warn` (the default) shows the changed files as a warning (`Warning: files in the working copy changed during step <step>: …`) in `aip group` and as a separate collapsible block in the `aip web` panel, and the work continues;
+- `warn` (the default) shows the changed files as a warning (`Warning: files in the working copy changed during step <step name>: …`) in `aip group` and as a separate collapsible block in the `aip web` panel, and the work continues;
 - `stop` stops the group in `needs_human`; continue with `aip group answer`;
 - `off` skips the comparison.
 
@@ -210,7 +210,8 @@ delivery:
   - With `auto: false`, delivery happens only through `aip run apply`. A run without auto-delivery frees its queue place as soon as it finishes.
   - For one task use `--auto-deliver` / `--no-auto-deliver` on `aip run start`, `aip queue add` and `aip queue edit` (`--default-auto-deliver` returns to the setting's value), the `autoDeliver` parameter of the MCP tools, or the "Auto delivery" switch in the panel's queue form.
   - A task without a value takes `delivery.auto` at the moment it starts.
-  - The "Queue settings" block of the panel switches `delivery.auto` and writes it to the file the value comes from (the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`), showing that file under the switch. The general settings screen does not change a value set in the project file.
+  - The "Queue settings" block of the panel switches `delivery.auto` and writes it to the file the value comes from (the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`), showing that file under the switch.
+  - The settings screen writes to the file of its tab: "Shared" does not change a value set in the project file, "Project" does not change the shared file.
 - **`resolver`**: when delivery hits a conflict, `aip` resolves it with a step of this specialist.
   - `aip` snapshots your current working tree and applies the run's changes to the snapshot with conflict markers in a separate worktree.
   - The specialist gets the task, the group summaries and the list of conflicting files.

@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,7 +29,7 @@ function Tip({ label, children }: { label: string; children: ReactElement }) {
 
 /**
  * The navigation strip over the content: name and repository on the left, sections in the middle,
- * search, notifications, language, theme and the link state on the right. Below 1024 px sections
+ * new task, search, notifications, language, theme and the link state on the right. Below 1024 px sections
  * and search show icons only.
  */
 export function TopNav({
@@ -40,6 +40,7 @@ export function TopNav({
   waiting,
   queued,
   onPalette,
+  onNewTask,
   notifications,
   repository,
 }: NavProps) {
@@ -119,6 +120,18 @@ export function TopNav({
         })}
       </nav>
       <div className="flex min-w-0 items-center justify-end gap-1">
+        <Tip label={t('nav.newTask')}>
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0 text-muted-foreground"
+            onClick={onNewTask}
+            disabled={!onNewTask}
+            aria-label={t('nav.newTask')}
+          >
+            <Plus />
+          </Button>
+        </Tip>
         <Tip label={t('nav.search')}>
           <Button
             variant="outline"

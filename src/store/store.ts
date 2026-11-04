@@ -280,23 +280,43 @@ export class Store {
 
   tags(): Tag[] {
     const rows = this.database
-      .prepare('SELECT id, name, color, created_at FROM tags ORDER BY created_at, id')
-      .all() as { id: string; name: string; color: string; created_at: number }[];
+      .prepare(
+        'SELECT id, name, color, created_at, task_run, task_number FROM tags ORDER BY created_at, id',
+      )
+      .all() as {
+      id: string;
+      name: string;
+      color: string;
+      created_at: number;
+      task_run: string | null;
+      task_number: number | null;
+    }[];
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
       color: row.color as TagColor,
       createdAt: row.created_at,
+      task:
+        row.task_run !== null && row.task_number !== null
+          ? { run: row.task_run, number: row.task_number }
+          : null,
     }));
   }
 
   saveTag(tag: Tag): void {
     this.database
       .prepare(
-        `INSERT INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)
+        `INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, color = excluded.color`,
       )
-      .run(tag.id, tag.name, tag.color, tag.createdAt);
+      .run(
+        tag.id,
+        tag.name,
+        tag.color,
+        tag.createdAt,
+        tag.task?.run ?? null,
+        tag.task?.number ?? null,
+      );
   }
 
   /** Deletes the tag and takes its id off every run and queue item, in one transaction. */

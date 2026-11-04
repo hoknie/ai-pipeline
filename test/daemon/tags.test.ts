@@ -726,3 +726,102 @@ describe('tags along dependencies', () => {
     await h.waitFor(created.runId, (run) => run.finished);
   });
 });
+
+describe('tags of linked tasks', () => {
+  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+
+  /** An explore run puts two tasks in the queue and gets the tag `fix-login` of a linked task. */
+  async function chain(): Promise<{ h: Harness; explore: RunView }> {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [ONE] });
+    const added = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'explore',
+      groups: [
+        { title: 'один', task: 'a' },
+        { title: 'два', task: 'b' },
+      ],
+      title: 'Fix login',
+    })) as QueueView & { item: string };
+    const created = (await h.call('queue_run_now', { repository: h.repo, item: added.item })) as {
+      runId: string;
+    };
+    await h.waitFor(created.runId, (run) => run.finished);
+    return { h, explore: await h.status(created.runId) };
+  }
+
+  it('makes the automatic tag indigo with the source task, and keeps it after a restart', async () => {
+    const { h, explore } = await chain();
+    const [tag] = await tagsOf(h);
+    expect(tag).toMatchObject({
+      name: 'fix-login',
+      color: 'indigo',
+      task: { run: explore.id, number: explore.number },
+    });
+    expect((await queueOf(h)).items[0]!.tags[0]!.task).toEqual(tag!.task);
+    await h.restart();
+    expect((await tagsOf(h))[0]).toEqual(tag);
+  });
+
+  it('refuses to assign the tag by hand and changes nothing', async () => {
+    const { h, explore } = await chain();
+    const message = `tag \`fix-login\` belongs to task #${explore.number} and is set automatically`;
+    const before = await queueOf(h);
+    await expect(
+      h.call('queue_add', {
+        repository: h.repo,
+        workflow: 'feature',
+        task: 'x',
+        tags: ['fix-login'],
+      }),
+    ).rejects.toThrow(message);
+    await expect(
+      h.call('run', { repository: h.repo, workflow: 'feature', task: 'x', tags: ['fix-login'] }),
+    ).rejects.toThrow(message);
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item: before.items[0]!.id,
+        tags: ['fix-login'],
+      }),
+    ).rejects.toThrow(message);
+    await expect(h.call('run_tags', { runId: explore.id, add: ['fix-login'] })).rejects.toThrow(
+      message,
+    );
+    expect(await queueOf(h)).toEqual(before);
+  });
+
+  it('keeps the tag on queue_edit and lets run_tags remove it', async () => {
+    const { h, explore } = await chain();
+    await addTag(h, 'v2');
+    const item = (await queueOf(h)).items[0]!;
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: item.id,
+      tags: ['v2'],
+    })) as QueueView;
+    expect(names(edited.items[0]!.tags)).toEqual(['fix-login', 'v2']);
+    const cleared = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: item.id,
+      tags: [],
+    })) as QueueView;
+    expect(names(cleared.items[0]!.tags)).toEqual(['fix-login']);
+    const run = (await h.call('run_tags', { runId: explore.id, remove: ['fix-login'] })) as RunView;
+    expect(run.tags).toEqual([]);
+  });
+
+  it('refuses reserved color and a color change of the tag', async () => {
+    const { h } = await chain();
+    await expect(addTag(h, 'x', 'indigo')).rejects.toThrow('reserved for linked task tags');
+    await addTag(h, 'plain');
+    await expect(h.call('tag_edit', { tag: 'plain', color: 'indigo' })).rejects.toThrow(
+      'reserved for linked task tags',
+    );
+    await expect(h.call('tag_edit', { tag: 'fix-login', color: 'red' })).rejects.toThrow(
+      'linked task tag color cannot be changed',
+    );
+    const renamed = (await h.call('tag_edit', { tag: 'fix-login', name: 'login' })) as TagView[];
+    expect(renamed.find((tag) => tag.name === 'login')).toMatchObject({ color: 'indigo' });
+  });
+});

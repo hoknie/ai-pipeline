@@ -13,6 +13,8 @@ export interface LoadEntry {
   group: string;
   title: string;
   step: string;
+  /** The human name of the step. */
+  stepName: string;
   status: 'running' | 'queued';
 }
 
@@ -53,6 +55,7 @@ export function machineLoad(runs: readonly RunView[]): MachineLoad {
           group: item.slug,
           title: item.title,
           step: item.step,
+          stepName: item.stepName ?? item.step,
           status: 'running',
         });
       }
@@ -62,6 +65,7 @@ export function machineLoad(runs: readonly RunView[]): MachineLoad {
           group: item.slug,
           title: item.title,
           step: item.step,
+          stepName: item.stepName ?? item.step,
           status: 'queued',
         });
       }

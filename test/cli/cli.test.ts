@@ -27,9 +27,9 @@ describe('cli', () => {
     expect(watched.code).toBe(0);
     expect(watched.stdout).toContain('finished');
     const status = await aip(box, 'run', 'show', runId);
-    expect(status.stdout).toMatch(/dobavit-login\s+merged\s+review/);
+    expect(status.stdout).toMatch(/dobavit-login\s+merged\s+Ревьюер/);
     const group = await aip(box, 'group', 'show', runId, 'dobavit-login', '--tail', '5');
-    expect(group.stdout).toContain('#2 review r1');
+    expect(group.stdout).toContain('#2 Ревьюер r1');
     expect(group.stdout).toContain('Log of attempt #2');
     const list = await aip(box, 'run', 'list');
     expect(list.stdout).toContain(runId);
@@ -134,7 +134,7 @@ describe('cli', () => {
     );
     const skipped = await aip(box, 'run', 'skip', runId, 'review');
     expect(skipped.code).toBe(0);
-    expect(skipped.stdout).toContain('Skipped steps: review');
+    expect(skipped.stdout).toContain('Skipped steps: Ревьюер (review)');
     const back = await aip(box, 'run', 'skip', runId, 'review', '--off', '--json');
     const view = JSON.parse(back.stdout) as { steps: { id: string; skipped: boolean }[] };
     expect(view.steps.find((entry) => entry.id === 'review')?.skipped).toBe(false);

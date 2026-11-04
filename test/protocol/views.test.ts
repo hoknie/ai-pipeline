@@ -13,6 +13,7 @@ import {
 import {
   formatRepositories,
   groupView,
+  catalogView,
   queueView,
   repositoryViews,
   runView,
@@ -151,7 +152,7 @@ describe('queueView', () => {
     expect(queueView(queue, lookup(state)).runs[0]!.steps).toEqual({
       done: 1,
       total: 4,
-      current: { step: 'code', number: 2 },
+      current: { step: 'code', name: 'Кодировщик', number: 2 },
     });
     state.groups = [];
     expect(queueView(queue, lookup(state)).runs[0]!.steps).toEqual({
@@ -251,18 +252,41 @@ describe('automatic delivery in views', () => {
 
 describe('tags in views', () => {
   const catalog = [
-    { id: 'tg-a', name: 'auth', color: 'blue' as const, createdAt: 1 },
-    { id: 'tg-b', name: 'v2', color: 'red' as const, createdAt: 2 },
+    { id: 'tg-a', name: 'auth', color: 'blue' as const, createdAt: 1, task: null },
+    { id: 'tg-b', name: 'v2', color: 'red' as const, createdAt: 2, task: null },
   ];
 
   it('shows the tags of a run in order and drops dangling ids', () => {
     const state = run(1);
     state.run.tags = ['tg-b', 'gone', 'tg-a'];
     expect(runView(state, 1000, undefined, catalog).tags).toEqual([
-      { id: 'tg-b', name: 'v2', color: 'red' },
-      { id: 'tg-a', name: 'auth', color: 'blue' },
+      { id: 'tg-b', name: 'v2', color: 'red', task: null },
+      { id: 'tg-a', name: 'auth', color: 'blue', task: null },
     ]);
     expect(runView(state, 1000).tags).toEqual([]);
+  });
+
+  it('shows the source task of a linked tag in every view', () => {
+    const linked = {
+      id: 'tg-l',
+      name: 'cards',
+      color: 'indigo' as const,
+      createdAt: 3,
+      task: { run: 'r1', number: 115 },
+    };
+    const state = run(1);
+    state.run.tags = ['tg-l'];
+    const expected = {
+      id: 'tg-l',
+      name: 'cards',
+      color: 'indigo',
+      task: { run: 'r1', number: 115 },
+    };
+    expect(runView(state, 1000, undefined, [linked]).tags).toEqual([expected]);
+    expect(catalogView([linked])).toEqual([expected]);
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-l'] }, 'q1', 2);
+    expect(queueView(queue, () => undefined, null, [linked]).items[0]!.tags).toEqual([expected]);
   });
 
   it('shows the tags of queue items and of queue runs', () => {
@@ -272,8 +296,8 @@ describe('tags in views', () => {
     started.run.tags = ['tg-b'];
     queue.runs.push(started.run.id);
     const view = queueView(queue, () => started, null, catalog);
-    expect(view.items[0]!.tags).toEqual([{ id: 'tg-a', name: 'auth', color: 'blue' }]);
-    expect(view.runs[0]!.tags).toEqual([{ id: 'tg-b', name: 'v2', color: 'red' }]);
+    expect(view.items[0]!.tags).toEqual([{ id: 'tg-a', name: 'auth', color: 'blue', task: null }]);
+    expect(view.runs[0]!.tags).toEqual([{ id: 'tg-b', name: 'v2', color: 'red', task: null }]);
   });
 });
 
@@ -294,8 +318,16 @@ describe('runView specialists', () => {
         specialist: 'coder',
         level: 'project',
         max: 1,
-        running: [{ slug: 'gruppa-1', title: 'Группа 1', step: 'code', startedAt: 1500 }],
-        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code' }],
+        running: [
+          {
+            slug: 'gruppa-1',
+            title: 'Группа 1',
+            step: 'code',
+            stepName: 'Кодировщик',
+            startedAt: 1500,
+          },
+        ],
+        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code', stepName: 'Кодировщик' }],
       },
     ]);
   });
@@ -501,6 +533,7 @@ describe('waiting groups in views', () => {
       {
         group: '_split',
         step: 'split',
+        stepName: 'Планировщик',
         wait: { reason: 'specialist', specialist: 'plan', max: 1 },
       },
     ]);
@@ -552,6 +585,14 @@ describe('the delivery stage', () => {
     expect(runView(state, 5000).deliveryStage).toEqual({ status: 'delivering' });
   });
 
+  it('gives the time of the last delivery attempt of the run and of the group', () => {
+    const state = merged('boom');
+    expect(runView(state, 5000).delivery.finishedAt).toBeNull();
+    group(state).delivery = { ...group(state).delivery, finishedAt: 4200 };
+    expect(runView(state, 5000).delivery.finishedAt).toBe(4200);
+    expect(groupView(state, group(state), '/w', null, 5000).delivery.finishedAt).toBe(4200);
+  });
+
   it('shows the failed delivery on the card of the run of the queue', () => {
     const state = merged('boom');
     const queue = emptyQueue('/repo', 1);
@@ -601,5 +642,37 @@ describe('a run waiting in the queue', () => {
     const failed = view(true, 'failed');
     expect(withQueue(failed, null)).toEqual(failed);
     expect(failed.queueItem).toBeNull();
+  });
+});
+
+describe('human names of steps in views', () => {
+  const lookup = (state: ReturnType<typeof run>) => (id: string) =>
+    id === state.run.id ? state : undefined;
+
+  it('names the step in the row of a group, the attempt and the active group of the queue', () => {
+    const state = run(1);
+    step(state);
+    const view = runView(state, 2000);
+    expect(view.groups[0]).toMatchObject({ step: 'plan', stepName: 'Планировщик' });
+    const detail = groupView(state, state.groups[0]!, '/w', null, 2000);
+    expect(detail.attempts[0]).toMatchObject({ stepId: 'plan', stepName: 'Планировщик' });
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    expect(queueView(queue, lookup(state)).runs[0]!.active).toEqual([
+      { group: 'gruppa-1', step: 'plan', stepName: 'Планировщик' },
+    ]);
+  });
+
+  it('has no name for a group without attempts', () => {
+    const state = run(1);
+    expect(runView(state, 2000).groups[0]).toMatchObject({ step: null, stepName: null });
+  });
+
+  it('takes the name from the configuration of the run, not from a later one', () => {
+    const state = run(1);
+    step(state);
+    (state.run.config.specialists.find((item) => item.slug === 'plan') as { name: string }).name =
+      'Аналитик';
+    expect(runView(state, 2000).groups[0]?.stepName).toBe('Аналитик');
   });
 });

@@ -26,6 +26,7 @@ import { defaultEntry, orderEntries } from '../order.ts';
 import { useOutOfView } from '../../useOutOfView.ts';
 import { GroupScreen } from './GroupScreen.tsx';
 import { canDeliver } from './delivery.ts';
+import { useDeliveryOutcome } from './useDeliveryOutcome.ts';
 import { RunHeader } from './RunHeader.tsx';
 import { RunFilters } from './RunFilters.tsx';
 import type { OpenedState } from '../../store.ts';
@@ -87,6 +88,7 @@ export function RunsPage({
   const tagIds = storedTags.filter((id) => byId.has(id));
   const [screen, setScreen] = useState<'list' | 'detail'>(route.group ? 'detail' : 'list');
 
+  const deliver = useDeliveryOutcome(api, runs);
   const run = runs.find((candidate) => candidate.id === route.run) ?? null;
   const ordered = run ? orderEntries(run) : [];
   const group =
@@ -230,6 +232,7 @@ export function RunsPage({
         api={api}
         now={now}
         onError={onError}
+        onDeliver={(force) => deliver(run, force)}
         onSelect={(slug) => select(run.id, slug)}
         headerRef={setHeaderElement}
       />
@@ -250,9 +253,9 @@ export function RunsPage({
           showJson={showJson}
           onShowJson={onShowJson}
           deliverable={canDeliver(run)}
-          onDeliver={() => api.apply(run.id, false)}
+          onDeliver={() => deliver(run, false)}
           run={run}
-          onForceDeliver={() => api.apply(run.id, true)}
+          onForceDeliver={() => deliver(run, true)}
           showUsage={headerOut}
         />
       ) : (

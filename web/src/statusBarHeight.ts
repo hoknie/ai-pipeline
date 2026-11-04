@@ -7,9 +7,19 @@ export const STATUS_BAR_MIN_HEIGHT = 160;
 export const STATUS_BAR_MAX_SHARE = 0.8;
 export const STATUS_BAR_HEIGHT_STEP = 16;
 
+/** The tallest the strip may be in a window of this height. */
+export function statusBarMaxHeight(viewportHeight: number): number {
+  return Math.floor(viewportHeight * STATUS_BAR_MAX_SHARE);
+}
+
+/** The height to remember after a user action: an action that only hit the shrunk window's limit keeps the larger chosen height. */
+export function nextChosenHeight(chosen: number, next: number, viewportHeight: number): number {
+  return next >= statusBarMaxHeight(viewportHeight) && chosen > next ? chosen : next;
+}
+
 /** The height of the open Status strip kept between 160 px and 80 % of the window (the window wins when it is smaller). */
 export function clampStatusBarHeight(height: number, viewportHeight: number): number {
-  const max = Math.floor(viewportHeight * STATUS_BAR_MAX_SHARE);
+  const max = statusBarMaxHeight(viewportHeight);
   return Math.max(Math.min(height, max), Math.min(STATUS_BAR_MIN_HEIGHT, max));
 }
 

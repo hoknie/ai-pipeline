@@ -122,7 +122,7 @@ export function RunList({
                       {run.name}
                     </span>
                   ) : null}
-                  <TagChips tags={run.tags ?? []} />
+                  <TagChips tags={run.tags ?? []} nested />
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
                     <RunWarningsBadge run={run} />

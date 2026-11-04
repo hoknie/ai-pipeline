@@ -101,7 +101,9 @@ export function formatTagLabels(
   tags: readonly TagView[] | undefined,
   style: Style = plainStyle,
 ): string {
-  return (tags ?? []).map((tag) => style.argument(`#${tag.name}`)).join(' ');
+  return (tags ?? [])
+    .map((tag) => style.argument(tag.task ? `#${tag.task.number}:${tag.name}` : `#${tag.name}`))
+    .join(' ');
 }
 
 /** Keeps the runs that have at least one of the tags; names compare ignoring case. */
@@ -115,7 +117,14 @@ export function filterByTags(runs: readonly RunView[], names: readonly string[])
 export function formatTagList(tags: readonly TagView[], style: Style = plainStyle): string {
   if (tags.length === 0) return 'No tags yet.';
   return table(
-    [['NAME', 'COLOR'], ...tags.map((tag) => [style.argument(tag.name), tag.color])],
+    [
+      ['NAME', 'COLOR', 'TASK'],
+      ...tags.map((tag) => [
+        style.argument(tag.name),
+        tag.color,
+        tag.task ? `#${tag.task.number}` : '—',
+      ]),
+    ],
     style,
   );
 }
@@ -172,7 +181,9 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
       ? [
           `${style.muted('Skipped steps:')} ${run.steps
             .filter((step) => step.skipped)
-            .map((step) => step.id)
+            .map((step) =>
+              step.name.endsWith(` (${step.id})`) ? step.name : `${step.name} (${step.id})`,
+            )
             .join(', ')}`,
         ]
       : []),
@@ -205,7 +216,7 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
       ...run.groups.map((group) => [
         group.slug,
         `${statusBadge(group.status, style)}${group.wait ? '' : limitNote(group.limitUntil)}`,
-        group.step ?? '—',
+        group.stepName ?? group.step ?? '—',
         group.round === null ? '—' : String(group.round),
         seconds(group.durationMs),
         formatDiff(group.diff, style),
@@ -276,7 +287,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     if (attempt.outsideChanges.length === 0) continue;
     lines.push(
       style.warning(
-        `Warning: files in the working copy changed during step ${attempt.stepId}: ${attempt.outsideChanges.join(', ')}`,
+        `Warning: files in the working copy changed during step ${attempt.stepName}: ${attempt.outsideChanges.join(', ')}`,
       ),
     );
   }
@@ -298,7 +309,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
   lines.push('', style.muted('Attempts:'));
   for (const attempt of group.attempts) {
     lines.push(
-      `  #${attempt.seq} ${attempt.stepId} r${attempt.round} · ${attempt.specialist} (${attempt.runtime}${attempt.model ? ` ${attempt.model}` : ''}) · ${statusBadge(attempt.status, style)}${attempt.verdict ? ` ${attempt.verdict}` : ''} · ${seconds(attempt.durationMs)} · ${formatUsage(attempt.usage)}`,
+      `  #${attempt.seq} ${attempt.stepName} r${attempt.round} · ${attempt.specialist} (${attempt.runtime}${attempt.model ? ` ${attempt.model}` : ''}) · ${statusBadge(attempt.status, style)}${attempt.verdict ? ` ${attempt.verdict}` : ''} · ${seconds(attempt.durationMs)} · ${formatUsage(attempt.usage)}`,
     );
     if (attempt.summary) lines.push(`     summary: ${attempt.summary}`);
     if (attempt.feedback) lines.push(`     feedback: ${attempt.feedback}`);
@@ -387,10 +398,14 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
       `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
     );
     for (const active of run.active) {
-      lines.push(`    ${active.group}${active.step ? `: ${active.step}` : ''}`);
+      lines.push(
+        `    ${active.group}${(active.stepName ?? active.step) ? `: ${active.stepName ?? active.step}` : ''}`,
+      );
     }
     for (const held of run.waiting ?? []) {
-      lines.push(`    ${held.group}${held.step ? `: ${held.step}` : ''} (${waitNote(held.wait)})`);
+      lines.push(
+        `    ${held.group}${(held.stepName ?? held.step) ? `: ${held.stepName ?? held.step}` : ''} (${waitNote(held.wait)})`,
+      );
     }
     if (run.problem) {
       lines.push(

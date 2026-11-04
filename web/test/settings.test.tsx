@@ -385,113 +385,180 @@ const FILES = {
   project: { file: PROJECT_FILE, revision: 'p1' },
 };
 
-const GROUP_NAMES = [
-  'General',
-  'Defaults',
-  'Delivery',
-  'Working copy',
-  'Naming',
-  'Claude',
-  'Runtimes',
-  'Web panel',
-  'Queue',
-  'Tags',
-  'System',
-];
+const GLOBAL_GROUPS = ['General', 'Agents', 'Delivery', 'Runtimes', 'System', 'Tags'];
+const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue'];
+
+const groupNav = () => screen.getByRole('navigation', { name: 'groups of settings' });
+const groupNames = () =>
+  within(groupNav())
+    .getAllByRole('link')
+    .map((link) => link.textContent);
 
 describe('settings page', () => {
-  it('lists eleven groups in the left column and opens General by default', async () => {
+  it('has the tabs Shared and Project and opens General of Shared by default', async () => {
     show(queueOf(), {}, '#settings');
-    const nav = await screen.findByRole('navigation', { name: 'groups of settings' });
+    await screen.findByTestId('setting-max');
+    const tabs = within(screen.getByRole('tablist', { name: 'level of settings' }));
+    expect(tabs.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Shared', 'Project']);
+    expect(tabs.getByRole('tab', { name: 'Shared' }).getAttribute('aria-selected')).toBe('true');
+    expect(groupNames()).toEqual(GLOBAL_GROUPS);
     expect(
-      within(nav)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(GROUP_NAMES);
-    expect(within(nav).getByRole('link', { name: 'General' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
-    await waitFor(() => expect(window.location.hash).toBe('#settings/general'));
+      within(groupNav()).getByRole('link', { name: 'General' }).getAttribute('aria-current'),
+    ).toBe('page');
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
     expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('aria-current')).toBe(
       'page',
     );
+    expect(screen.getByText(GLOBAL_FILE)).toBeTruthy();
   });
 
-  it('shows a value read only with the file it comes from', async () => {
+  it('has other groups on the Project tab and a selector of the project only there', async () => {
+    show(queueOf(), {}, '#settings/project/general');
+    await screen.findByTestId('setting-max');
+    expect(groupNames()).toEqual(PROJECT_GROUPS);
+    expect(screen.getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    expect(screen.getByText(PROJECT_FILE)).toBeTruthy();
+    cleanup();
+    show(queueOf(), {}, '#settings/global/general');
+    await screen.findByTestId('setting-max');
+    expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
+  });
+
+  it('shows forms and no table on every group', async () => {
+    for (const hash of [
+      '#settings/global/general',
+      '#settings/global/agents',
+      '#settings/global/delivery',
+      '#settings/global/runtimes',
+      '#settings/global/system',
+      '#settings/project/delivery',
+    ]) {
+      show(queueOf(), {}, hash);
+      await screen.findByRole('button', { name: 'Save' });
+      expect(document.querySelector('table')).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('opens a group by its address and shows only its fields', async () => {
+    show(queueOf(), {}, '#settings/global/system');
+    const port = await screen.findByTestId('setting-web.port');
+    expect(within(port).getByLabelText<HTMLInputElement>('Port').value).toBe('7341');
+    expect(port.textContent).toContain('default');
+    expect(screen.queryByTestId('setting-max')).toBeNull();
+  });
+
+  it('opens General for a group the tab does not have', async () => {
+    show(queueOf(), {}, '#settings/project/nope');
+    await screen.findByTestId('setting-max');
+    await waitFor(() => expect(window.location.hash).toBe('#settings/project/general'));
+    cleanup();
+    show(queueOf(), {}, '#settings/global/queue');
+    await screen.findByTestId('setting-max');
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
+  });
+
+  it('leads the addresses of earlier versions to the new groups', async () => {
+    for (const [old, now] of [
+      ['#settings/delivery', '#settings/global/delivery'],
+      ['#settings/web', '#settings/global/system'],
+      ['#settings/naming', '#settings/global/general'],
+      ['#settings/claude', '#settings/global/agents'],
+      ['#settings/queue', '#settings/project/queue'],
+      ['#specialists/_settings', '#settings/global/general'],
+    ] as const) {
+      show(queueOf(), {}, old);
+      await screen.findByRole('navigation', { name: 'groups of settings' });
+      await waitFor(() => expect(window.location.hash).toBe(now));
+      cleanup();
+    }
+  });
+
+  it('shows the default on the Shared tab and where it comes from', async () => {
+    show(queueOf(), {}, '#settings/global/general');
+    const max = await screen.findByTestId('setting-max');
+    expect(within(max).getByLabelText<HTMLInputElement>('Parallel groups').value).toBe('3');
+    expect(max.textContent).toContain('default');
+  });
+
+  it('shows the shared level on Shared and the result on Project', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settings: settingsOf({
+          max: {
+            path: 'max',
+            value: 5,
+            globalValue: 3,
+            file: PROJECT_FILE,
+            written: { project: 5 },
+          },
+        }),
+      }),
+    );
+    show(queueOf(), { config }, '#settings/global/general');
+    const max = await screen.findByTestId('setting-max');
+    expect(within(max).getByLabelText<HTMLInputElement>('Parallel groups').value).toBe('3');
+    cleanup();
+    show(queueOf(), { config }, '#settings/project/general');
+    const own = await screen.findByTestId('setting-max');
+    expect(within(own).getByLabelText<HTMLInputElement>('Parallel groups').value).toBe('5');
+    expect(own.textContent).toContain('set in the project');
+    expect(within(own).getByRole('button', { name: 'Inherit' })).toBeTruthy();
+  });
+
+  it('marks a value inherited from the shared settings in the project', async () => {
     show(
       queueOf(),
       {
         config: vi.fn(async () =>
           configView({
-            settings: settingsOf({ max: { path: 'max', value: 5, file: GLOBAL_FILE } }),
+            settings: settingsOf({
+              max: { path: 'max', value: 7, file: GLOBAL_FILE, written: { global: 7 } },
+            }),
           }),
         ),
       },
-      '#settings/general',
+      '#settings/project/general',
     );
     const max = await screen.findByTestId('setting-max');
-    expect(within(max).getByText('5')).toBeTruthy();
-    const file = within(max).getByText(GLOBAL_FILE);
-    expect(file.className).toContain('bg-muted');
-    expect(file.getAttribute('title')).toBe(GLOBAL_FILE);
-    expect(screen.queryByRole('switch')).toBeNull();
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByTestId('setting-defaults.timeout')).toBeNull();
+    expect(max.textContent).toContain('inherited from the shared settings');
+    expect(within(max).queryByRole('button', { name: 'Inherit' })).toBeNull();
   });
 
-  it('opens a group by its address and shows only its fields', async () => {
-    show(queueOf(), {}, '#settings/web');
-    const port = await screen.findByTestId('setting-web.port');
-    expect(port.textContent).toContain('7341');
-    expect(port.textContent).toContain('default');
-    expect(screen.queryByTestId('setting-max')).toBeNull();
+  it('has no fields of the web panel and runtimes in the project', async () => {
+    show(queueOf(), {}, '#settings/project/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    expect(screen.queryByTestId('setting-web.port')).toBeNull();
+    expect(screen.queryByTestId('setting-runtimes.claude.command')).toBeNull();
   });
 
-  it('falls back to General for an unknown group', async () => {
-    show(queueOf(), {}, '#settings/nowhere');
-    await screen.findByTestId('setting-max');
-    await waitFor(() => expect(window.location.hash).toBe('#settings/general'));
-  });
-
-  it('explains Runtimes and Web panel and links to System', async () => {
-    for (const group of ['runtimes', 'web']) {
-      show(queueOf(), {}, `#settings/${group}`);
-      const link = await screen.findByRole('link', { name: 'System' });
-      expect(link.getAttribute('href')).toBe('#settings/system');
-      expect(screen.getByText(/Changes take effect after the restart/)).toBeTruthy();
-      cleanup();
-    }
-  });
-
-  it('shows the environment of a runtime by names', async () => {
-    show(queueOf(), {}, '#settings/runtimes');
-    const env = await screen.findByTestId('setting-runtimes.claude.env');
-    expect(env.textContent).toContain('ANTHROPIC_API_KEY');
-    expect(screen.getByTestId('setting-runtimes.claude.command').textContent).toContain('claude');
+  it('explains Runtimes and System and links to System', async () => {
+    show(queueOf(), {}, '#settings/global/runtimes');
+    const link = await screen.findByRole('link', { name: 'System' });
+    expect(link.getAttribute('href')).toBe('#settings/global/system');
+    expect(screen.getByText(/Changes take effect after the restart/)).toBeTruthy();
   });
 
   it('marks the group of a configuration error and shows the error in it', async () => {
     const config = vi.fn(async () =>
       configView({
-        errors: [{ file: PROJECT_FILE, path: 'swarm.naming.runtime', message: 'unknown runtime' }],
+        errors: [
+          { file: PROJECT_FILE, path: 'swarm.delivery.keep', message: 'must be true or false' },
+        ],
       }),
     );
-    show(queueOf(), { config }, '#settings/general');
-    const naming = () =>
-      within(screen.getByRole('navigation', { name: 'groups of settings' })).getByRole('link', {
-        name: /^Naming/,
-      });
+    show(queueOf(), { config }, '#settings/global/general');
+    const delivery = () => within(groupNav()).getByRole('link', { name: /^Delivery/ });
     await waitFor(() =>
-      expect(within(naming()).getByText('the group has configuration errors')).toBeTruthy(),
+      expect(within(delivery()).getByText('the group has configuration errors')).toBeTruthy(),
     );
-    expect(
-      within(screen.getByRole('navigation', { name: 'groups of settings' })).getByRole('link', {
-        name: 'General',
-      }).textContent,
-    ).toBe('General');
-    fireEvent.click(naming());
+    expect(within(groupNav()).getByRole('link', { name: 'General' }).textContent).toBe('General');
+    fireEvent.click(delivery());
     const errors = await screen.findByRole('region', { name: 'configuration errors' });
-    expect(within(errors).getByText('swarm.naming.runtime')).toBeTruthy();
+    expect(within(errors).getByText('swarm.delivery.keep')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('setting-delivery.keep')).getByText('must be true or false'),
+    ).toBeTruthy();
   });
 
   it('shows the error of a specialist in General', async () => {
@@ -504,21 +571,15 @@ describe('settings page', () => {
           }),
         ),
       },
-      '#settings/general',
+      '#settings/global/general',
     );
     const errors = await screen.findByRole('region', { name: 'configuration errors' });
     expect(within(errors).getByText('swarm.specialists.coder.model')).toBeTruthy();
   });
 
   it('shows the catalog of tags in the Tags group', async () => {
-    show(queueOf(), {}, '#settings/tags');
+    show(queueOf(), {}, '#settings/global/tags');
     expect(await screen.findByText('The tag catalog is shared by all repositories.')).toBeTruthy();
-  });
-
-  it('redirects the old address of the general settings', async () => {
-    show(queueOf(), {}, '#specialists/_settings');
-    await screen.findByRole('navigation', { name: 'groups of settings' });
-    await waitFor(() => expect(window.location.hash).toBe('#settings/general'));
   });
 
   it('has no General settings entry in the list of specialists', async () => {
@@ -528,133 +589,413 @@ describe('settings page', () => {
   });
 });
 
-describe('delivery fields', () => {
-  const viewWith = (file: string | null, revisions = FILES) =>
-    configView({
-      settingsFiles: revisions,
-      settings: settingsOf({ 'delivery.auto': { path: 'delivery.auto', value: true, file } }),
-    });
-  const autoSwitch = () =>
-    waitFor(() => {
-      const found = screen.getByRole<HTMLButtonElement>('switch', {
-        name: 'Auto delivery by default',
-      });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-  const pickMode = async (name: string) => {
-    const select = await waitFor(() => {
-      const found = screen.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' });
-      expect(found.disabled).toBe(false);
-      return found;
-    });
-    fireEvent.keyDown(select, { key: 'Enter' });
-    fireEvent.click(await screen.findByRole('option', { name }));
-  };
+describe('settings form', () => {
+  const saveButton = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Save' });
+  const toggleOf = (name: string) => screen.getByRole('switch', { name });
 
-  it('writes delivery.auto to the global file with its revision and reads the view again', async () => {
-    const config = vi
-      .fn()
-      .mockResolvedValueOnce(viewWith(null))
-      .mockResolvedValue(viewWith(GLOBAL_FILE));
-    const api = show(queueOf(), { config }, '#settings/delivery');
-    const toggle = await autoSwitch();
-    expect(toggle.getAttribute('aria-checked')).toBe('true');
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
+  it('writes several fields of a group in one request', async () => {
+    const api = show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    expect(saveButton().disabled).toBe(true);
+    fireEvent.click(toggleOf('Auto delivery'));
+    fireEvent.click(toggleOf('Keep the result'));
+    fireEvent.change(screen.getByLabelText('Commit message'), { target: { value: 'wip' } });
+    fireEvent.change(screen.getByLabelText('Resolver rounds'), { target: { value: '5' } });
+    expect(saveButton().disabled).toBe(false);
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(api.writeSettings).toHaveBeenCalledTimes(1));
+    expect(api.writeSettings).toHaveBeenCalledWith(
+      {
+        'delivery.auto': false,
+        'delivery.keep': true,
+        'delivery.commit_message': 'wip',
+        'delivery.resolver_rounds': 5,
+      },
+      'g1',
+      'global',
     );
     await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(1));
+    await waitFor(() => expect(saveButton().disabled).toBe(true));
   });
 
-  it('writes a value of the project file back to the project file', async () => {
-    const api = show(
-      queueOf(),
-      { config: vi.fn(async () => viewWith(PROJECT_FILE)) },
-      '#settings/delivery',
-    );
-    const toggle = await autoSwitch();
-    expect(screen.getByText(`Saved to the project file: ${PROJECT_FILE}`)).toBeTruthy();
-    fireEvent.click(toggle);
+  it('writes a choice and a specialist reference', async () => {
+    const api = show(queueOf(), {}, '#settings/global/delivery');
+    const mode = await screen.findByRole('combobox', { name: 'Delivery mode' });
+    fireEvent.keyDown(mode, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Branch' }));
+    const resolver = screen.getByRole('combobox', { name: 'Conflict resolver' });
+    fireEvent.keyDown(resolver, { key: 'Enter' });
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'not set',
+      'coder',
+    ]);
+    fireEvent.click(screen.getByRole('option', { name: 'coder' }));
+    fireEvent.click(saveButton());
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'p1', 'project'),
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'delivery.mode': 'branch', 'delivery.resolver': 'coder' },
+        'g1',
+        'global',
+      ),
     );
   });
 
-  it('writes two settings in a row with the re-read revision', async () => {
-    let revision = 'g1';
-    const api = show(
-      queueOf(),
-      {
-        config: vi.fn(async () =>
-          viewWith(null, { ...FILES, global: { ...FILES.global, revision } }),
-        ),
-        writeSetting: vi.fn(async () => {
-          revision = 'g2';
-          return { ok: true as const, revision: 'g2' };
+  it('discards the changes', async () => {
+    const api = show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    fireEvent.click(toggleOf('Keep the result'));
+    expect(toggleOf('Keep the result').getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(toggleOf('Keep the result').getAttribute('aria-checked')).toBe('false');
+    expect(saveButton().disabled).toBe(true);
+    expect(api.writeSettings).not.toHaveBeenCalled();
+  });
+
+  it('is no change when a field returns to its saved value', async () => {
+    show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    fireEvent.click(toggleOf('Keep the result'));
+    fireEvent.click(toggleOf('Keep the result'));
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it('writes a list of strings and removes the key of an empty one', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settings: settingsOf({
+          'defaults.tools': {
+            path: 'defaults.tools',
+            value: ['Read', 'Edit'],
+            written: { global: ['Read', 'Edit'] },
+          },
         }),
-      },
-      '#settings/delivery',
+      }),
     );
-    const reads = vi.mocked(api.config).mock.calls.length;
-    fireEvent.click(await autoSwitch());
+    const api = show(queueOf(), { config }, '#settings/global/agents');
+    await screen.findByTestId('setting-defaults.tools');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Read' }));
+    fireEvent.click(saveButton());
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.auto', false, 'g1', 'global'),
+      expect(api.writeSettings).toHaveBeenLastCalledWith(
+        { 'defaults.tools': ['Edit'] },
+        'g1',
+        'global',
+      ),
     );
-    await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
-    await pickMode('Branch');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Read' }));
+    fireEvent.click(saveButton());
     await waitFor(() =>
-      expect(api.writeSetting).toHaveBeenCalledWith('delivery.mode', 'branch', 'g2', 'global'),
+      expect(api.writeSettings).toHaveBeenLastCalledWith(
+        { 'defaults.tools': null },
+        'g1',
+        'global',
+      ),
     );
   });
 
-  it('shows a write conflict and keeps the previous value', async () => {
-    show(
+  it('does not treat clearing an inherited field of the project as a change', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settings: settingsOf({
+          'naming.model': {
+            path: 'naming.model',
+            value: 'haiku',
+            written: { global: 'haiku' },
+          },
+        }),
+      }),
+    );
+    const api = show(queueOf(), { config }, '#settings/project/general');
+    const model = await screen.findByLabelText('Naming model');
+    fireEvent.change(model, { target: { value: '' } });
+    expect(saveButton().disabled).toBe(true);
+    expect(api.writeSettings).not.toHaveBeenCalled();
+  });
+
+  it('removes the key of a cleared field', async () => {
+    const api = show(queueOf(), {}, '#settings/global/general');
+    const model = await screen.findByLabelText('Naming model');
+    fireEvent.change(model, { target: { value: '' } });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith({ 'naming.model': null }, 'g1', 'global'),
+    );
+  });
+
+  it('returns a field of the project to the shared value with Inherit', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settingsFiles: FILES,
+        settings: settingsOf({
+          'delivery.keep': {
+            path: 'delivery.keep',
+            value: true,
+            globalValue: false,
+            file: PROJECT_FILE,
+            written: { project: true },
+          },
+        }),
+      }),
+    );
+    const api = show(queueOf(), { config }, '#settings/project/delivery');
+    await screen.findByTestId('setting-delivery.keep');
+    expect(toggleOf('Keep the result').getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(
+      within(screen.getByTestId('setting-delivery.keep')).getByRole('button', { name: 'Inherit' }),
+    );
+    expect((toggleOf('Keep the result') as HTMLButtonElement).disabled).toBe(true);
+    expect(toggleOf('Keep the result').getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith({ 'delivery.keep': null }, 'p1', 'project'),
+    );
+  });
+
+  it('writes to the project file on the Project tab', async () => {
+    const api = show(
+      queueOf(),
+      { config: vi.fn(async () => configView({ settingsFiles: FILES })) },
+      '#settings/project/general',
+    );
+    fireEvent.change(await screen.findByLabelText('Parallel groups'), { target: { value: '4' } });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith({ max: 4 }, 'p1', 'project'),
+    );
+  });
+
+  it('shows a conflict and reads the file again with Reload', async () => {
+    const api = show(
       queueOf(),
       {
-        config: vi.fn(async () => viewWith(null)),
-        writeSetting: vi.fn(async () => ({
+        writeSettings: vi.fn(async () => ({
           ok: false as const,
           reason: 'conflict' as const,
           message: 'settings.yaml was changed after it was read',
         })),
       },
-      '#settings/delivery',
+      '#settings/global/delivery',
     );
-    fireEvent.click(await autoSwitch());
-    await screen.findByText(/was changed after it was read/);
-    expect(
-      screen.getByRole('switch', { name: 'Auto delivery by default' }).getAttribute('aria-checked'),
-    ).toBe('true');
+    await screen.findByTestId('setting-delivery.mode');
+    fireEvent.click(toggleOf('Keep the result'));
+    fireEvent.click(saveButton());
+    const alert = await screen.findByText(/was changed after it was read/);
+    expect(toggleOf('Keep the result').getAttribute('aria-checked')).toBe('true');
+    const reads = vi.mocked(api.config).mock.calls.length;
+    fireEvent.click(
+      within(alert.closest('[role="alert"]') as HTMLElement).getByRole('button', {
+        name: 'Reload',
+      }),
+    );
+    await waitFor(() => expect(vi.mocked(api.config).mock.calls.length).toBeGreaterThan(reads));
+    await waitFor(() =>
+      expect(toggleOf('Keep the result').getAttribute('aria-checked')).toBe('false'),
+    );
   });
 
-  it('is unavailable while the configuration has errors', async () => {
+  it('shows the errors of validation at the fields', async () => {
     show(
       queueOf(),
       {
-        config: vi.fn(async () =>
-          configView({ errors: [{ file: PROJECT_FILE, path: 'swarm.max', message: 'bad' }] }),
-        ),
+        writeSettings: vi.fn(async () => ({
+          ok: false as const,
+          reason: 'invalid' as const,
+          errors: [
+            { file: GLOBAL_FILE, path: 'swarm.max', message: 'must be an integer from 1 to 32' },
+            { file: GLOBAL_FILE, path: 'swarm.specialists.x', message: 'elsewhere' },
+          ],
+        })),
       },
-      '#settings/delivery',
+      '#settings/global/general',
     );
-    await screen.findByRole('switch', { name: 'Auto delivery by default' });
-    await waitFor(() =>
-      expect(
-        screen.getByRole<HTMLButtonElement>('switch', { name: 'Auto delivery by default' })
-          .disabled,
-      ).toBe(true),
-    );
-    expect(
-      screen.getByRole<HTMLButtonElement>('combobox', { name: 'Delivery mode' }).disabled,
-    ).toBe(true);
+    fireEvent.change(await screen.findByLabelText('Parallel groups'), { target: { value: '99' } });
+    fireEvent.click(saveButton());
+    const max = await screen.findByTestId('setting-max');
+    expect(await within(max).findByText('must be an integer from 1 to 32')).toBeTruthy();
+    expect(screen.getByText(/elsewhere/)).toBeTruthy();
+    expect(within(max).getByLabelText('Parallel groups').getAttribute('aria-invalid')).toBe('true');
   });
 
-  it('does not make the other fields of the group writable', async () => {
-    show(queueOf(), {}, '#settings/delivery');
-    await screen.findByTestId('setting-delivery.keep');
-    expect(screen.queryByTestId('setting-delivery.auto')).toBeNull();
-    expect(screen.getAllByRole('switch')).toHaveLength(1);
+  it('puts the sections in cards, two in a row on a wide window', async () => {
+    show(queueOf(), {}, '#settings/global/general');
+    await screen.findByTestId('setting-max');
+    const grid = screen.getByTestId('settings-sections');
+    expect(grid.className).toContain('@3xl:grid-cols-2');
+    expect(grid.parentElement?.className).toContain('@container');
+    expect(
+      within(grid)
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual(['Runs', 'Working copy', 'Naming']);
+  });
+
+  it('groups the runtimes by the agent and shows only the names of the variables', async () => {
+    show(queueOf(), {}, '#settings/global/runtimes');
+    const env = await screen.findByTestId('setting-runtimes.claude.env');
+    expect(env.textContent).toContain('ANTHROPIC_API_KEY');
+    expect(env.textContent).toContain('value is hidden');
+    expect(screen.getByTestId('setting-runtimes.claude.command')).toBeTruthy();
+    expect(
+      within(
+        screen.getByTestId('setting-runtimes.claude.command'),
+      ).getByLabelText<HTMLInputElement>('Command').value,
+    ).toBe('claude');
+    expect(
+      within(screen.getByRole('region', { name: 'OpenCode' })).getByLabelText<HTMLInputElement>(
+        'Command',
+      ).value,
+    ).toBe('opencode');
+  });
+
+  it('adds, replaces and deletes variables with values only on write', async () => {
+    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.env');
+    const claude = within(screen.getByRole('region', { name: 'Claude' }));
+    fireEvent.change(claude.getByLabelText('Variable name of claude'), {
+      target: { value: 'NEW_KEY' },
+    });
+    fireEvent.change(claude.getByLabelText('Variable value of claude'), {
+      target: { value: 's3cret' },
+    });
+    fireEvent.click(claude.getByRole('button', { name: 'Add to claude' }));
+    expect(claude.getByText('will be added')).toBeTruthy();
+    fireEvent.click(claude.getByRole('button', { name: /^Replace value ANTHROPIC_API_KEY/ }));
+    fireEvent.change(claude.getByLabelText('New value of ANTHROPIC_API_KEY'), {
+      target: { value: 'fresh' },
+    });
+    expect(document.body.innerHTML).not.toContain('s3cret');
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        {
+          'runtimes.claude.env.NEW_KEY': 's3cret',
+          'runtimes.claude.env.ANTHROPIC_API_KEY': 'fresh',
+        },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('deletes a variable and can undo it', async () => {
+    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.env');
+    const claude = within(screen.getByRole('region', { name: 'Claude' }));
+    fireEvent.click(claude.getByRole('button', { name: /^Delete ANTHROPIC_API_KEY/ }));
+    expect(claude.getByText('will be deleted')).toBeTruthy();
+    fireEvent.click(claude.getByRole('button', { name: /^Undo ANTHROPIC_API_KEY/ }));
+    expect(saveButton().disabled).toBe(true);
+    fireEvent.click(claude.getByRole('button', { name: /^Delete ANTHROPIC_API_KEY/ }));
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'runtimes.claude.env.ANTHROPIC_API_KEY': null },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('refuses a name that is not a variable name', async () => {
+    show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.env');
+    const claude = within(screen.getByRole('region', { name: 'Claude' }));
+    fireEvent.change(claude.getByLabelText('Variable name of claude'), {
+      target: { value: '1BAD' },
+    });
+    expect(claude.getByText('Not a valid variable name.')).toBeTruthy();
+    expect(claude.getByRole<HTMLButtonElement>('button', { name: 'Add to claude' }).disabled).toBe(
+      true,
+    );
+  });
+
+  it('asks before leaving a group with unsaved changes', async () => {
+    show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    fireEvent.click(toggleOf('Keep the result'));
+    fireEvent.click(within(groupNav()).getByRole('link', { name: 'General' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Leave without saving?')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    expect(window.location.hash).toBe('#settings/global/delivery');
+    fireEvent.click(within(groupNav()).getByRole('link', { name: 'General' }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Leave' }),
+    );
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
+  });
+
+  it('asks before leaving for the other tab and not when nothing changed', async () => {
+    show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    fireEvent.click(screen.getByRole('tab', { name: 'Project' }));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/project/delivery'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    fireEvent.click(toggleOf('Keep the result'));
+    fireEvent.click(screen.getByRole('tab', { name: 'Shared' }));
+    expect(await screen.findByRole('alertdialog')).toBeTruthy();
+  });
+});
+
+describe('project of the settings', () => {
+  const APP = '/work/app';
+  const LIB = '/work/lib';
+  const entry = (path: string) => ({ path, addedAt: 1, unfinished: 0, waiting: 0, queued: 0 });
+
+  function open(hash: string, repositories = [entry(APP), entry(LIB)]) {
+    const api = show(queueOf({ repository: APP }), {}, hash);
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [],
+        queues: [queueOf({ repository: APP }), queueOf({ repository: LIB })],
+        repositories,
+      });
+    });
+    return api;
+  }
+
+  /** Waits until the selector shows a project and opens the list; returns the other project. */
+  async function openOther() {
+    const select = await screen.findByRole('combobox', { name: 'Project' });
+    await waitFor(() => expect(select.textContent).toMatch(/app|lib/));
+    const other = select.textContent?.includes('app') ? 'lib' : 'app';
+    return {
+      other: other === 'lib' ? LIB : APP,
+      choose: async () => {
+        fireEvent.keyDown(select, { key: 'Enter' });
+        fireEvent.click(await screen.findByRole('option', { name: other }));
+      },
+    };
+  }
+
+  it('shows the settings of another project when it is chosen', async () => {
+    const api = open('#settings/project/general');
+    await screen.findByTestId('setting-max');
+    const { other, choose } = await openOther();
+    await choose();
+    await waitFor(() => expect(api.calls).toContainEqual(['config', other]));
+    expect(window.location.hash).toBe('#settings/project/general');
+  });
+
+  it('asks about unsaved changes when the project is changed', async () => {
+    const api = open('#settings/project/general');
+    const { other, choose } = await openOther();
+    fireEvent.change(await screen.findByLabelText('Parallel groups'), { target: { value: '9' } });
+    await choose();
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    expect(api.calls).not.toContainEqual(['config', other]);
+  });
+
+  it('says there is no project while the list of repositories is empty', async () => {
+    show(queueOf(), {}, '#settings/project/general');
+    expect(
+      await screen.findByText('No repositories yet: add one in the repository menu.'),
+    ).toBeTruthy();
   });
 });
 

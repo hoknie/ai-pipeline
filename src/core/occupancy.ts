@@ -1,11 +1,13 @@
-import { findSpecialist, type SpecialistLevel } from '../config/index.ts';
+import { findSpecialist, type SpecialistLevel, type Step } from '../config/index.ts';
 
 import { allGroups, stepsOf, type RunState } from './model.ts';
+import { attemptStepLabel, stepLabel } from './topology.ts';
 
 export interface SpecialistRunning {
   slug: string;
   title: string;
   step: string;
+  stepName: string;
   startedAt: number;
 }
 
@@ -13,6 +15,7 @@ export interface SpecialistWaiting {
   slug: string;
   title: string;
   step: string;
+  stepName: string;
 }
 
 /** What one run does with one specialist now: attempts it runs and groups waiting for it. */
@@ -51,13 +54,16 @@ export function specialistUse(state: RunState): SpecialistUse[] {
         slug: group.slug,
         title: group.title,
         step: attempt.stepId,
+        stepName: attemptStepLabel(state, group, attempt),
         startedAt: attempt.startedAt,
       });
     }
     if (group.status === 'queued' && group.pending !== null) {
       let step;
+      let steps: Step[] = [];
       try {
-        step = stepsOf(state.run, group)[group.pending.stepIndex];
+        steps = stepsOf(state.run, group);
+        step = steps[group.pending.stepIndex];
       } catch {
         step = undefined;
       }
@@ -66,6 +72,7 @@ export function specialistUse(state: RunState): SpecialistUse[] {
           slug: group.slug,
           title: group.title,
           step: step.id,
+          stepName: stepLabel(state.run.config, steps, step),
         });
       }
     }

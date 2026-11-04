@@ -1,49 +1,69 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type RefObject } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
+import { useConfirm } from '../../confirm.tsx';
 import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
 import { formatRoute } from '../../route.ts';
 import {
-  SETTINGS_GROUPS,
+  SETTINGS_GROUPS_BY_SCOPE,
+  SETTINGS_SCOPES,
   errorsByGroup,
-  groupOf,
-  type SettingsGroup as GroupKey,
+  type SettingsGroup,
+  type SettingsScope,
 } from '../../settingsGroups.ts';
 import type { ConfigEditorResponse, QueueView } from '../../types.ts';
 
 import { Alert } from '../../ui/alert.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select.tsx';
 import { Skeleton } from '../../ui/skeleton.tsx';
 
 import { ConfigErrors } from '../EntryList.tsx';
+import { FilePath } from '../FilePath.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
-import { DeliveryFields } from './DeliveryFields.tsx';
 import { QueueModes } from './QueueModes.tsx';
-import { SettingsFields } from './SettingsGroup.tsx';
+import { SettingsForm } from './SettingsForm.tsx';
 import { SystemGroup } from './SystemGroup.tsx';
 
 /** Where the state and the restarts of the panel and the daemon are. */
-const SYSTEM_LINK = formatRoute({ view: 'settings', run: 'system', group: null, step: null });
+const SYSTEM_LINK = formatRoute({ view: 'settings', run: 'system', group: 'global', step: null });
 
-/** The settings page: groups in the column on the left, the fields of the open group beside it. */
+const hrefOf = (scope: SettingsScope, group: SettingsGroup) =>
+  formatRoute({ view: 'settings', run: group, group: scope, step: null });
+
+/**
+ * The settings page: tabs «Shared» and «Project», the groups of the tab in the column on the
+ * left, the form of the open group beside it.
+ */
 export default function SettingsPage({
   api,
+  scope,
   group,
   repository,
+  repositories,
+  onSelectRepository,
   queue,
   onQueue,
   onError,
+  dirty,
 }: {
   api: Api;
-  group: GroupKey;
+  scope: SettingsScope;
+  group: SettingsGroup;
   /** The selected repository; null while none is known. */
   repository: string | null;
+  /** The repositories of the panel, the choices of «Project». */
+  repositories: string[];
+  onSelectRepository: (path: string) => void;
   queue: QueueView | null;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
+  /** Whether a form has unsaved changes; leaving then asks first. */
+  dirty: RefObject<boolean>;
 }) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const [config, setConfig] = useState<ConfigEditorResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -54,95 +74,168 @@ export default function SettingsPage({
   useEffect(() => {
     reload().catch((error: Error) => setFailure(error.message));
   }, [reload]);
+  const setDirty = useCallback(
+    (value: boolean) => {
+      dirty.current = value;
+    },
+    [dirty],
+  );
 
   const errors = useMemo(() => errorsByGroup(config?.errors ?? []), [config]);
-  const fields = (config?.settings ?? []).filter((setting) => groupOf(setting.path) === group);
+  const groups = SETTINGS_GROUPS_BY_SCOPE[scope];
+
+  /** A link that leaves the form: with unsaved changes it asks first. */
+  const leave = (href: string) => async (event: MouseEvent) => {
+    if (!dirty.current) return;
+    event.preventDefault();
+    const leaving = await confirm({
+      title: t('settings.editor.leaveTitle'),
+      description: t('settings.editor.leaveDescription'),
+      confirmLabel: t('settings.editor.leave'),
+      cancelLabel: t('settings.editor.stay'),
+      destructive: true,
+    });
+    if (!leaving) return;
+    dirty.current = false;
+    window.location.hash = href;
+  };
+
+  const tabGroup = (target: SettingsScope): SettingsGroup =>
+    (SETTINGS_GROUPS_BY_SCOPE[target] as readonly string[]).includes(group) ? group : 'general';
+  const file = config?.settingsFiles[scope].file ?? null;
+  const isForm = group !== 'tags' && group !== 'queue';
 
   return (
-    <div className="grid w-full gap-4 p-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
-      <nav aria-label={t('settingsPage.groups')}>
-        <ul className="flex flex-wrap gap-1 lg:flex-col">
-          {SETTINGS_GROUPS.map((key) => (
-            <li key={key}>
-              <a
-                href={formatRoute({ view: 'settings', run: key, group: null, step: null })}
-                aria-current={key === group ? 'page' : undefined}
-                className={cn(
-                  'flex items-center justify-between gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-sm font-medium hover:bg-accent',
-                  key === group && 'border-border bg-accent',
-                )}
-              >
-                {t(`settingsPage.group.${key}`)}
-                {errors.has(key) ? (
-                  <span
-                    className="rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"
-                    title={t('settingsPage.hasErrors')}
-                  >
-                    !<span className="sr-only">{t('settingsPage.hasErrors')}</span>
-                  </span>
-                ) : null}
-              </a>
-            </li>
+    <div className="flex w-full flex-col gap-4 p-4">
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2 border-b">
+        <div role="tablist" aria-label={t('settingsPage.tabs')} className="flex gap-1">
+          {SETTINGS_SCOPES.map((tab) => (
+            <a
+              key={tab}
+              role="tab"
+              aria-selected={tab === scope}
+              href={hrefOf(tab, tabGroup(tab))}
+              onClick={leave(hrefOf(tab, tabGroup(tab)))}
+              className={cn(
+                '-mb-px border-b-2 border-transparent px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground',
+                tab === scope && 'border-primary text-foreground',
+              )}
+            >
+              {t(`settingsPage.scope.${tab}`)}
+            </a>
           ))}
-        </ul>
-      </nav>
-      <div className="flex min-w-0 flex-col gap-3" data-group={group}>
-        <h2 className="text-lg font-semibold">{t(`settingsPage.group.${group}`)}</h2>
-        <p className="text-sm text-muted-foreground">{t(`settingsPage.about.${group}`)}</p>
-        {group === 'runtimes' || group === 'web' ? (
-          <p className="text-sm text-muted-foreground">
-            <Trans
-              i18nKey="settingsPage.restartNote"
-              components={{ link: <a className="underline" href={SYSTEM_LINK} /> }}
-            />
+        </div>
+        {scope === 'project' ? (
+          <div className="flex items-center gap-2 pb-1.5">
+            <label htmlFor="settings-project" className="text-sm font-medium">
+              {t('settingsPage.project')}
+            </label>
+            {repositories.length === 0 ? (
+              <span className="text-sm text-muted-foreground">{t('settingsPage.noProjects')}</span>
+            ) : (
+              <Select value={repository ?? undefined} onValueChange={onSelectRepository}>
+                <SelectTrigger id="settings-project" className="w-56" title={repository ?? ''}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {repositories.map((path) => (
+                    <SelectItem key={path} value={path} title={path}>
+                      {repositoryLabel(path)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        ) : null}
+        {file && isForm ? (
+          <p className="flex items-center gap-2 pb-1.5 text-xs text-muted-foreground">
+            {t('settingsPage.writesTo')} <FilePath path={file} />
           </p>
         ) : null}
-        {group !== 'system' && failure ? <Alert variant="destructive">{failure}</Alert> : null}
-        {group !== 'system' && group !== 'tags' && config ? (
-          <ConfigErrors errors={errors.get(group) ?? []} />
-        ) : null}
-        {group === 'system' ? (
-          <SystemGroup api={api} onRestarted={() => void reload().catch(() => undefined)} />
-        ) : group === 'tags' ? (
-          <TagsSettings api={api} />
-        ) : group === 'queue' ? (
-          queue ? (
-            <QueueModes
-              api={api}
-              queue={queue}
-              repositoryName={repository === null ? null : repositoryLabel(repository)}
-              config={config}
-              onReload={reload}
-              onQueue={onQueue}
-              onError={onError}
-            />
-          ) : (
-            <div role="status" aria-label={t('queue.loading')}>
-              <Skeleton className="h-24" />
-            </div>
-          )
-        ) : !config ? (
-          failure ? null : (
-            <div role="status" aria-label={t('settings.editor.loading')}>
-              <Skeleton className="h-40" />
-            </div>
-          )
-        ) : (
-          <>
-            {group === 'delivery' ? (
-              <div className="flex max-w-xl flex-col gap-3 rounded-xl border bg-card p-3">
-                <DeliveryFields api={api} config={config} onReload={reload} idPrefix="settings" />
+      </div>
+      <div className="grid w-full gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
+        <nav aria-label={t('settingsPage.groups')}>
+          <ul className="flex flex-wrap gap-1 lg:flex-col">
+            {groups.map((key) => (
+              <li key={key}>
+                <a
+                  href={hrefOf(scope, key)}
+                  onClick={leave(hrefOf(scope, key))}
+                  aria-current={key === group ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center justify-between gap-2 rounded-md border border-transparent px-2.5 py-1.5 text-sm font-medium hover:bg-accent',
+                    key === group && 'border-border bg-accent',
+                  )}
+                >
+                  {t(`settingsPage.group.${key}`)}
+                  {errors.has(key) ? (
+                    <span
+                      className="rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"
+                      title={t('settingsPage.hasErrors')}
+                    >
+                      !<span className="sr-only">{t('settingsPage.hasErrors')}</span>
+                    </span>
+                  ) : null}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="flex min-w-0 flex-col gap-3" data-group={group} data-scope={scope}>
+          <h2 className="text-lg font-semibold">{t(`settingsPage.group.${group}`)}</h2>
+          <p className="text-sm text-muted-foreground">{t(`settingsPage.about.${group}`)}</p>
+          {group === 'runtimes' || group === 'system' ? (
+            <p className="text-sm text-muted-foreground">
+              <Trans
+                i18nKey="settingsPage.restartNote"
+                components={{ link: <a className="underline" href={SYSTEM_LINK} /> }}
+              />
+            </p>
+          ) : null}
+          {failure ? <Alert variant="destructive">{failure}</Alert> : null}
+          {group !== 'tags' && config ? <ConfigErrors errors={errors.get(group) ?? []} /> : null}
+          {group === 'tags' ? (
+            <TagsSettings api={api} />
+          ) : group === 'queue' ? (
+            queue ? (
+              <QueueModes
+                api={api}
+                queue={queue}
+                repositoryName={repository === null ? null : repositoryLabel(repository)}
+                config={config}
+                onReload={reload}
+                onQueue={onQueue}
+                onError={onError}
+              />
+            ) : (
+              <div role="status" aria-label={t('queue.loading')}>
+                <Skeleton className="h-24" />
               </div>
-            ) : null}
-            <SettingsFields
-              settings={
-                group === 'delivery'
-                  ? fields.filter((s) => s.path !== 'delivery.auto' && s.path !== 'delivery.mode')
-                  : fields
-              }
-            />
-          </>
-        )}
+            )
+          ) : (
+            <>
+              {config ? (
+                <SettingsForm
+                  key={`${scope}/${group}`}
+                  api={api}
+                  config={config}
+                  scope={scope}
+                  group={group}
+                  onSaved={reload}
+                  onDirty={setDirty}
+                />
+              ) : failure ? null : (
+                <div role="status" aria-label={t('settings.editor.loading')}>
+                  <Skeleton className="h-40" />
+                </div>
+              )}
+              {group === 'system' ? (
+                <SystemGroup api={api} onRestarted={() => void reload().catch(() => undefined)} />
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

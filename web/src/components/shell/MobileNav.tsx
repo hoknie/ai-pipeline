@@ -1,4 +1,4 @@
-import { Menu } from 'lucide-react';
+import { Menu, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -43,6 +43,16 @@ export function MobileNav(props: NavProps) {
         </SheetContent>
       </Sheet>
       <span className="text-sm font-semibold">{sectionLabel(props.view, t)}</span>
+      <Button
+        variant="outline"
+        size="icon"
+        className="ml-auto"
+        onClick={props.onNewTask}
+        disabled={!props.onNewTask}
+        aria-label={t('nav.newTask')}
+      >
+        <Plus />
+      </Button>
     </header>
   );
 }

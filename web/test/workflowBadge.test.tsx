@@ -21,7 +21,7 @@ describe('workflow badge', () => {
     render(
       <>
         <WorkflowBadge id="feature" />
-        <TagLabel tag={{ id: 'auth', name: 'auth', color: 'blue' }} />
+        <TagLabel tag={{ id: 'auth', name: 'auth', color: 'blue', task: null }} />
       </>,
     );
     const badge = screen.getByLabelText('Workflow: feature');

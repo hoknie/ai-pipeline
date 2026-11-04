@@ -10,7 +10,7 @@ export {
 } from './discover.ts';
 export {
   ConfigEditError,
-  SETTABLE_SETTINGS,
+  SETTING_FIELDS,
   commitEdit,
   draftConfig,
   editDocument,
@@ -19,7 +19,9 @@ export {
   entryFile,
   planEdit,
   planSetting,
+  planSettings,
   revisionOf,
+  settingFieldOf,
   settingsFile,
   specialistReferences,
   type ConfigEditorView,
@@ -35,8 +37,11 @@ export {
   type EntryReference,
   type EntrySource,
   type EntrySources,
-  type SettingPath,
+  type SettingField,
+  type SettingKind,
   type SettingRequest,
+  type SettingValue,
+  type SettingsRequest,
   type SettingsFileView,
   type WriteLevel,
 } from './edit.ts';

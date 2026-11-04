@@ -38,8 +38,16 @@ describe('specialistUse', () => {
         specialist: 'coder',
         level: 'project',
         max: 1,
-        running: [{ slug: 'gruppa-1', title: 'Группа 1', step: 'code', startedAt: 1500 }],
-        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code' }],
+        running: [
+          {
+            slug: 'gruppa-1',
+            title: 'Группа 1',
+            step: 'code',
+            stepName: 'Кодировщик',
+            startedAt: 1500,
+          },
+        ],
+        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code', stepName: 'Кодировщик' }],
       },
     ]);
   });

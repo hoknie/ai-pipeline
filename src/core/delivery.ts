@@ -218,7 +218,11 @@ export function resolverDone(state: RunState): DeliveryEffect[] {
   return pending ? [finishResolveEffect(state, pending)] : [];
 }
 
-export function finishDelivery(state: RunState, result: DeliveryResult): DeliveryEffect[] {
+export function finishDelivery(
+  state: RunState,
+  result: DeliveryResult,
+  now: number,
+): DeliveryEffect[] {
   const pending = state.run.pendingDelivery;
   if (!pending) return [];
   if (shouldResolve(state, pending, result)) {
@@ -234,7 +238,7 @@ export function finishDelivery(state: RunState, result: DeliveryResult): Deliver
       ? { kind: 'refused' as const, reason: result.message, files: pending.conflicts ?? [] }
       : result;
   for (const group of state.groups.filter((candidate) => pending.groups.includes(candidate.slug))) {
-    group.delivery = deliveryOf(outcome);
+    group.delivery = deliveryOf(outcome, now);
   }
   const merged = state.groups.filter((group) => group.status === 'merged');
   const everything =
@@ -247,7 +251,7 @@ export function finishDelivery(state: RunState, result: DeliveryResult): Deliver
   return [];
 }
 
-function deliveryOf(result: DeliveryResult): GroupDelivery {
+function deliveryOf(result: DeliveryResult, now: number): GroupDelivery {
   switch (result.kind) {
     case 'applied':
       return {
@@ -256,6 +260,7 @@ function deliveryOf(result: DeliveryResult): GroupDelivery {
         files: result.files,
         conflicts: result.conflicts,
         userEdits: result.userEdits ?? [],
+        finishedAt: now,
       };
     case 'refused':
       return {
@@ -264,6 +269,7 @@ function deliveryOf(result: DeliveryResult): GroupDelivery {
         files: result.files,
         conflicts: [],
         userEdits: [],
+        finishedAt: now,
       };
     case 'failed':
       return {
@@ -272,6 +278,7 @@ function deliveryOf(result: DeliveryResult): GroupDelivery {
         files: [],
         conflicts: [],
         userEdits: [],
+        finishedAt: now,
       };
   }
 }

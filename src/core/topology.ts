@@ -13,6 +13,8 @@ import {
 import {
   addUsage,
   runWorkflow,
+  stepsOf,
+  type Attempt,
   type Group,
   type GroupStatus,
   type RunState,
@@ -90,15 +92,41 @@ export interface WorkflowTopology {
 
 /** The human name of a step: the name of its specialist, or the specialist slug without one. */
 export function stepName(config: ResolvedConfig, step: Step): string {
-  return findSpecialist(config, step.specialist)?.name ?? step.specialist;
+  return specialistName(config, step.specialist);
 }
 
-function stepInfo(config: ResolvedConfig, step: Step): StepInfo {
+function specialistName(config: ResolvedConfig, slug: string): string {
+  const name = findSpecialist(config, slug)?.name.trim();
+  return name ? name : slug;
+}
+
+/** The name of a step among the steps of its workflow: the id is added when another step has the same name. */
+export function stepLabel(config: ResolvedConfig, steps: readonly Step[], step: Step): string {
+  const name = stepName(config, step);
+  const same = steps.some((other) => other.id !== step.id && stepName(config, other) === name);
+  return same ? `${name} (${step.id})` : name;
+}
+
+/** The name of the step of an attempt: by the workflow of the group, else by the specialist of the attempt. */
+export function attemptStepLabel(state: RunState, group: Group, attempt: Attempt): string {
+  const { config } = state.run;
+  try {
+    const steps = stepsOf(state.run, group);
+    const step = steps.find((candidate) => candidate.id === attempt.stepId);
+    if (step) return stepLabel(config, steps, step);
+  } catch {
+    // a split group of a workflow without a split: fall back to the specialist
+  }
+  if (findSpecialist(config, attempt.specialist)) return specialistName(config, attempt.specialist);
+  return attempt.stepId;
+}
+
+function stepInfo(config: ResolvedConfig, steps: readonly Step[], step: Step): StepInfo {
   const specialist = findSpecialist(config, step.specialist);
   return {
     id: step.id,
     specialist: step.specialist,
-    name: stepName(config, step),
+    name: stepLabel(config, steps, step),
     runtime: specialist?.runtime ?? config.defaults.runtime,
     model: specialist?.model ?? null,
     permissions: specialist?.permissions ?? config.defaults.permissions,
@@ -132,7 +160,7 @@ function shape(config: ResolvedConfig, workflow: Workflow): WorkflowTopology {
           workflow: workflow.split.workflow ?? null,
         }
       : null,
-    steps: steps.map((step) => stepInfo(config, step)),
+    steps: steps.map((step) => stepInfo(config, steps, step)),
     delivery: { mode: config.delivery.mode, resolver: config.delivery.resolver },
     limits: limitsOf(config, workflow, steps),
   };
@@ -167,7 +195,7 @@ export function topology(state: RunState): Topology {
       }
     }
     return {
-      ...stepInfo(config, step),
+      ...stepInfo(config, target.steps, step),
       groups: state.groups.filter((group) => stepOf(group, ids) === step.id).map(brief),
       attempts,
       rejections,

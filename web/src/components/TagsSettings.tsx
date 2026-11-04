@@ -72,67 +72,79 @@ export function TagsSettings({ api }: { api: Api }) {
     }
   };
 
+  const row = (tag: TagView, withColor: boolean) => (
+    <li key={tag.id} data-tag-row={tag.id} className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <TagLabel tag={tag} />
+        <Input
+          aria-label={t('tags.settings.name', { name: tag.name })}
+          className="max-w-48"
+          value={names[tag.id] ?? tag.name}
+          disabled={busy === tag.id}
+          onChange={(event) => setNames({ ...names, [tag.id]: event.target.value })}
+          onBlur={() => saveName(tag)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') saveName(tag);
+          }}
+        />
+        {withColor ? (
+          <Select
+            value={tag.color}
+            disabled={busy === tag.id}
+            onValueChange={(color) => void edit(tag, { color: color as TagColor })}
+          >
+            <SelectTrigger
+              aria-label={t('tags.settings.color', { name: tag.name })}
+              className="w-36"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TAG_COLOR_NAMES.map((color) => (
+                <SelectItem key={color} value={color}>
+                  {t(`tags.colors.${color}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busy === tag.id}
+          aria-label={t('tags.settings.removeLabel', { name: tag.name })}
+          onClick={() => void remove(tag)}
+        >
+          {t('tags.settings.remove')}
+        </Button>
+      </div>
+      {errors[tag.id] ? (
+        <p role="alert" className="text-xs text-destructive">
+          {errors[tag.id]}
+        </p>
+      ) : null}
+    </li>
+  );
+
+  const ordinary = catalog.tags.filter((tag) => !tag.task);
+  const linked = catalog.tags.filter((tag) => tag.task);
+
   return (
     <section aria-label={t('tags.settings.label')} className="flex flex-col gap-3">
       <h3 className="text-base font-semibold">{t('tags.settings.title')}</h3>
       <p className="text-sm text-muted-foreground">{t('tags.settings.hint')}</p>
-      {catalog.tags.length === 0 ? (
+      {ordinary.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('tags.none')}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {catalog.tags.map((tag) => (
-            <li key={tag.id} data-tag-row={tag.id} className="flex flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <TagLabel tag={tag} />
-                <Input
-                  aria-label={t('tags.settings.name', { name: tag.name })}
-                  className="max-w-48"
-                  value={names[tag.id] ?? tag.name}
-                  disabled={busy === tag.id}
-                  onChange={(event) => setNames({ ...names, [tag.id]: event.target.value })}
-                  onBlur={() => saveName(tag)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') saveName(tag);
-                  }}
-                />
-                <Select
-                  value={tag.color}
-                  disabled={busy === tag.id}
-                  onValueChange={(color) => void edit(tag, { color: color as TagColor })}
-                >
-                  <SelectTrigger
-                    aria-label={t('tags.settings.color', { name: tag.name })}
-                    className="w-36"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TAG_COLOR_NAMES.map((color) => (
-                      <SelectItem key={color} value={color}>
-                        {t(`tags.colors.${color}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy === tag.id}
-                  aria-label={t('tags.settings.removeLabel', { name: tag.name })}
-                  onClick={() => void remove(tag)}
-                >
-                  {t('tags.settings.remove')}
-                </Button>
-              </div>
-              {errors[tag.id] ? (
-                <p role="alert" className="text-xs text-destructive">
-                  {errors[tag.id]}
-                </p>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <ul className="flex flex-col gap-2">{ordinary.map((tag) => row(tag, true))}</ul>
       )}
+      {linked.length > 0 ? (
+        <section aria-label={t('tags.settings.linkedTitle')} className="flex flex-col gap-2">
+          <h4 className="text-sm font-semibold">{t('tags.settings.linkedTitle')}</h4>
+          <p className="text-sm text-muted-foreground">{t('tags.settings.linkedHint')}</p>
+          <ul className="flex flex-col gap-2">{linked.map((tag) => row(tag, false))}</ul>
+        </section>
+      ) : null}
     </section>
   );
 }

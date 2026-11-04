@@ -101,6 +101,8 @@ export type {
   EntrySource,
   EntrySources,
   FieldError,
+  SettingKind,
+  SettingValue,
   WriteLevel,
 } from '../../src/config/index.ts';
 

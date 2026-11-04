@@ -86,7 +86,7 @@ export default function TopologyPage({
             entries={(view?.workflows ?? []).map((candidate) => ({
               id: candidate.id,
               title: candidate.id,
-              subtitle: candidate.steps.map((step) => step.id).join(' → '),
+              subtitle: candidate.steps.map((step) => step.name).join(' → '),
               extra: counts.get(candidate.id) ? (
                 <StatusBadge
                   status="running"
@@ -210,7 +210,8 @@ export default function TopologyPage({
                           </Button>
                           <StatusBadge status={entry.status} />
                           <span className="min-w-0 text-muted-foreground">
-                            {entry.step} · {entry.runTitle} · {repositoryLabel(entry.repository)}
+                            {entry.stepName} · {entry.runTitle} ·{' '}
+                            {repositoryLabel(entry.repository)}
                           </span>
                         </li>
                       ))}

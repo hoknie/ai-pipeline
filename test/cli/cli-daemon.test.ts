@@ -643,6 +643,20 @@ describe('cli', () => {
     );
   });
 
+  it('keeps the color indigo for linked task tags and shows the TASK column', async () => {
+    const box = sandbox();
+    const refused = await aip(box, 'tag', 'add', 'auth', '--color', 'indigo');
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('reserved for linked task tags');
+    await aip(box, 'tag', 'add', 'auth');
+    const list = await aip(box, 'tag', 'list');
+    expect(list.stdout).toMatch(/NAME\s+COLOR\s+TASK/);
+    expect(list.stdout).toMatch(/auth\s+gray\s+—/);
+    const edit = await aip(box, 'tag', 'edit', 'auth', '--color', 'indigo');
+    expect(edit.code).not.toBe(0);
+    expect((await aip(box, 'tag', '--help')).stdout).not.toContain('indigo');
+  });
+
   it('puts tags on queued tasks and edits them', async () => {
     const box = sandbox();
     await aip(box, 'tag', 'add', 'auth');

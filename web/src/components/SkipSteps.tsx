@@ -15,12 +15,13 @@ export function SkipSteps({
   onChange,
 }: {
   idPrefix: string;
-  steps: string[];
+  steps: { id: string; name: string }[];
   skip: string[];
   onChange: (skip: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const marked = pruneSkip(skip, steps);
+  const ids = steps.map((step) => step.id);
+  const marked = pruneSkip(skip, ids);
   return (
     <fieldset className="flex min-w-0 flex-col gap-1.5">
       <legend className="mb-1.5 text-sm leading-none font-medium">{t('queue.form.skip')}</legend>
@@ -31,17 +32,18 @@ export function SkipSteps({
           type="multiple"
           className="h-auto flex-wrap"
           value={marked}
-          onValueChange={(value) => onChange(pruneSkip(value, steps))}
+          onValueChange={(value) => onChange(pruneSkip(value, ids))}
         >
           {steps.map((step) => (
             <ToggleGroupItem
-              key={step}
-              id={`${idPrefix}-skip-${step}`}
-              value={step}
-              disabled={!marked.includes(step) && marked.length === steps.length - 1}
+              key={step.id}
+              id={`${idPrefix}-skip-${step.id}`}
+              value={step.id}
+              title={step.id}
+              disabled={!marked.includes(step.id) && marked.length === steps.length - 1}
               className="data-[state=on]:line-through"
             >
-              {step}
+              {step.name}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>

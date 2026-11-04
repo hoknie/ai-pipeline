@@ -7,7 +7,7 @@ import { useBackgroundProcesses } from '../../backgroundProcesses.ts';
 import { usePreference } from '../../preferences.ts';
 import { useStatusBarHeight } from '../../statusBarHeight.ts';
 import { loadSections, machineLoad } from '../../specialistLoad.ts';
-import type { Connection } from '../../store.ts';
+import type { Connection, StreamedProcesses } from '../../store.ts';
 import type { RunView } from '../../types.ts';
 import { Button } from '../../ui/button.tsx';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible.tsx';
@@ -32,6 +32,7 @@ export function StatusBar({
   runs,
   selected,
   connection,
+  streamedProcesses = null,
   api,
   onOpenGroup,
 }: {
@@ -39,6 +40,8 @@ export function StatusBar({
   /** The repository selected in the panel; its rows come first. */
   selected: string | null;
   connection: Connection;
+  /** What the event stream last said about background processes. */
+  streamedProcesses?: StreamedProcesses | null;
   api: Api;
   onOpenGroup: (target: GroupTarget) => void;
 }) {
@@ -47,7 +50,7 @@ export function StatusBar({
   const [tab, setTab] = usePreference<StatusTab>('statusBar.tab', 'specialists');
   const size = useStatusBarHeight();
   const [preview, setPreview] = useState<number | null>(null);
-  const polled = useBackgroundProcesses(api);
+  const polled = useBackgroundProcesses(api, streamedProcesses, connection);
   const sections = useMemo(() => loadSections(machineLoad(runs), selected), [runs, selected]);
   const processes = polled.processes === null ? '—' : String(polled.processes.length);
   return (
@@ -60,6 +63,7 @@ export function StatusBar({
       {open ? (
         <StatusBarResizeHandle
           height={preview ?? size.height}
+          chosen={size.chosen}
           viewportHeight={size.viewportHeight}
           onPreview={setPreview}
           onCommit={size.setChosen}

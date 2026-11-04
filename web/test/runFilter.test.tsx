@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TagsProvider } from '../src/tags.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
 import {
   activeFilters,
@@ -13,7 +14,7 @@ import {
 } from '../src/components/runs/runFilter.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
-import { groupRow, runView } from './fixtures.ts';
+import { groupRow, runView, tagView } from './fixtures.ts';
 
 beforeEach(() => window.localStorage.clear());
 afterEach(() => cleanup());
@@ -180,8 +181,8 @@ describe('run list', () => {
 });
 
 describe('filter by tags', () => {
-  const auth = { id: 'ta', name: 'auth', color: 'red' as const };
-  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const };
+  const auth = { id: 'ta', name: 'auth', color: 'red' as const, task: null };
+  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const, task: null };
   const catalog = new Map([auth, v2].map((tag) => [tag.id, tag]));
   const tagged = [
     runView({ id: 'A', title: 'Веб-панель', tags: [auth], state: 'needs_human' }),
@@ -245,5 +246,51 @@ describe('activeFilters', () => {
     expect(activeFilters('', 'waiting', [])).toBe(1);
     expect(activeFilters('', 'all', ['ta', 'tv'])).toBe(2);
     expect(activeFilters('x', 'done', ['ta'])).toBe(3);
+  });
+});
+
+describe('filter by the tag of a linked task', () => {
+  const linked = {
+    ...tagView('cards-half-width', 'indigo', 'l1'),
+    task: { run: 'run9', number: 115 },
+  };
+  const rows = [
+    runView({ id: 'A', title: 'Первый', tags: [linked] }),
+    runView({ id: 'B', title: 'Второй' }),
+  ];
+
+  function Filtered() {
+    const [tagIds, setTagIds] = useState<string[]>([]);
+    const shown = filterRuns(rows, '', 'all', null, tagIds, new Map([[linked.id, linked]]));
+    return (
+      <TagsProvider tags={[linked]}>
+        <RunList
+          runs={shown}
+          selectedRun={null}
+          selectedGroup={null}
+          now={0}
+          query=""
+          onQuery={() => undefined}
+          filter="all"
+          onFilter={() => undefined}
+          onSelect={() => undefined}
+          scope="repository"
+          onScope={() => undefined}
+          repository={null}
+          tagIds={tagIds}
+          onTagIds={setTagIds}
+        />
+      </TagsProvider>
+    );
+  }
+
+  it('offers, applies and removes it like an ordinary tag', () => {
+    render(<Filtered />);
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Tags' }));
+    fireEvent.click(screen.getByRole('option', { name: /cards-half-width/ }));
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag cards-half-width' }));
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
   });
 });

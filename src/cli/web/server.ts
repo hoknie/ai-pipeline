@@ -7,18 +7,14 @@ import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
-import {
-  DELIVERY_MODES,
-  SETTABLE_SETTINGS,
-  SLUG_PATTERN_TEXT,
-  isValidSlug,
-} from '../../config/index.ts';
+import { settingFieldOf, SLUG_PATTERN_TEXT, isValidSlug } from '../../config/index.ts';
 import {
   IpcError,
   checkDaemon,
   currentBuild,
   pingDaemon,
   request,
+  settingValueSchema,
   streamEventSchema,
   subscribe,
   type ConfigEditResult,
@@ -133,7 +129,13 @@ const writeBody = z.object({
 const restartDaemonBody = z.object({ force: z.boolean().optional() });
 
 const settingBody = z.object({
-  value: z.union([z.boolean(), z.enum(DELIVERY_MODES)]).nullable(),
+  value: settingValueSchema,
+  revision: z.string().min(1).nullable(),
+  level: levelParam.optional(),
+});
+
+const settingsBody = z.object({
+  values: z.record(z.string(), settingValueSchema),
   revision: z.string().min(1).nullable(),
   level: levelParam.optional(),
 });
@@ -238,6 +240,8 @@ class Hub {
   private queues = new Map<string, unknown>();
   private repositories: unknown[] = [];
   private tags: unknown[] = [];
+  /** The last `processes` event of the daemon, without `seq`; null until it sends one. */
+  private processes: { event: 'processes'; processes?: unknown[]; error?: string } | null = null;
   private seq = 0;
   private ready = false;
   private stopped = false;
@@ -312,6 +316,7 @@ class Hub {
       this.runs = new Map(event.runs.map((run) => [run.id, run]));
       this.queues = new Map((event.queues ?? []).map((queue) => [queue.repository, queue]));
       this.repositories = event.repositories ?? [];
+      this.processes = null;
       this.ready = true;
       this.seq = event.seq;
       this.broadcast(this.snapshot());
@@ -330,6 +335,11 @@ class Hub {
     } else if (event.event === 'tags') {
       this.tags = event.tags;
       this.seq = event.seq;
+      this.broadcast(event);
+    } else if (event.event === 'processes') {
+      const { seq, ...rest } = event;
+      this.processes = rest;
+      this.seq = seq;
       this.broadcast(event);
     }
   }
@@ -360,7 +370,12 @@ class Hub {
     });
     response.write('retry: 2000\n\n');
     this.clients.add(response);
-    if (this.ready) response.write(`data: ${JSON.stringify(this.snapshot())}\n\n`);
+    if (this.ready) {
+      response.write(`data: ${JSON.stringify(this.snapshot())}\n\n`);
+      if (this.processes) {
+        response.write(`data: ${JSON.stringify({ ...this.processes, seq: this.seq })}\n\n`);
+      }
+    }
     const beat = setInterval(() => response.write(': ping\n\n'), 15_000);
     incoming.on('close', () => {
       clearInterval(beat);
@@ -572,21 +587,33 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'PUT',
+      pattern: /^\/api\/config\/settings$/,
+      handle: async (_match, body, repository) => {
+        const { values, revision, level } = parseBody(settingsBody, body);
+        const unknown = Object.keys(values).filter((path) => settingFieldOf(path) === undefined);
+        if (unknown.length > 0) {
+          throw new HttpError(404, `setting \`${unknown.join('`, `')}\` cannot be written`);
+        }
+        if (Object.keys(values).length === 0) throw new HttpError(400, 'values must not be empty');
+        return editReply(
+          (await call('config_settings', {
+            repository,
+            values,
+            revision,
+            level: level ?? 'global',
+          })) as ConfigEditResult,
+        );
+      },
+    },
+    {
+      method: 'PUT',
       pattern: new RegExp(`^/api/config/settings/${segment}$`),
       handle: async ([path], body, repository) => {
-        const known = SETTABLE_SETTINGS.find((candidate) => candidate === path);
+        const known = path !== undefined && settingFieldOf(path) !== undefined ? path : undefined;
         if (known === undefined) {
           throw new HttpError(404, `setting \`${path ?? ''}\` cannot be written`);
         }
         const { value, revision, level } = parseBody(settingBody, body);
-        if (value !== null && (known === 'delivery.auto') !== (typeof value === 'boolean')) {
-          throw new HttpError(
-            400,
-            known === 'delivery.auto'
-              ? 'value must be true or false'
-              : `value must be one of: ${DELIVERY_MODES.join(', ')}`,
-          );
-        }
         return editReply(
           (await call('config_setting', {
             repository,

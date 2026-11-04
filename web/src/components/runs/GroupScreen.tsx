@@ -33,13 +33,13 @@ type Tab = 'log' | 'changes' | 'task';
 const REASON_LINES = 6;
 
 /** What the screen of a group or a system step offers. */
-function capabilities(row: GroupRow | SystemStepRow, deliverable: boolean) {
+function capabilities(row: GroupRow | SystemStepRow, deliverable: boolean, inProgress: boolean) {
   const system = 'kind' in row;
   const delivery = system && row.kind !== 'split';
   const stopped = row.status === 'failed' || row.status === 'cancelled';
   return {
     retry: !delivery && ['failed', 'cancelled', 'conflict'].includes(row.status),
-    retryDelivery: delivery && stopped && deliverable,
+    retryDelivery: delivery && stopped && (deliverable || inProgress),
     cancel: !['merged', 'done', 'failed', 'cancelled'].includes(row.status),
     changes: !system,
   };
@@ -97,8 +97,9 @@ export function GroupScreen({
   const [tab, setTab] = useState<Tab>('log');
   const [forcing, setForcing] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
-  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}`;
-  const caps = capabilities(row, deliverable);
+  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}`;
+  const delivering = run?.delivery.inProgress ?? false;
+  const caps = capabilities(row, deliverable, delivering);
   const skipper = useSkipStep(run, api, onError);
   const skippable = run && !('kind' in row) ? stepOfGroup(run, row.slug) : null;
   const skipState = skippable ? run?.steps?.find((step) => step.id === skippable) : undefined;
@@ -150,6 +151,8 @@ export function GroupScreen({
   const deliveryFailed =
     !('kind' in row) && row.status === 'merged' && row.delivery === 'apply_failed';
   const reason = view?.delivery.reason ?? null;
+  const stage = run?.deliveryStage ?? null;
+  const attemptAt = run?.delivery.finishedAt ?? null;
 
   return (
     <section aria-label={t('runs.group.label', { title })} className="flex flex-col gap-3 p-4">
@@ -166,13 +169,9 @@ export function GroupScreen({
             <Button
               variant="outline"
               size="sm"
-              loading={busy}
-              onClick={() =>
-                void act(
-                  () => (onDeliver ? onDeliver() : Promise.resolve()),
-                  () => notifySuccess(t('runs.system.deliveryStarted')),
-                )
-              }
+              loading={busy || delivering}
+              disabled={delivering}
+              onClick={() => void act(() => (onDeliver ? onDeliver() : Promise.resolve()))}
             >
               <RotateCcw />
               {t('runs.system.retryDelivery')}
@@ -235,7 +234,9 @@ export function GroupScreen({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{row.step ?? '—'}</span>
+          <span className="font-medium text-foreground" title={row.step ?? undefined}>
+            {row.stepName ?? row.step ?? '—'}
+          </span>
           {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
           {row.limitUntil !== null ? (
             <span className="text-status-warn">
@@ -244,7 +245,34 @@ export function GroupScreen({
           ) : null}
           {'diff' in row && row.diff ? <DiffStat diff={row.diff} /> : null}
           {!('kind' in row) && row.status === 'merged' ? (
-            <StatusBadge status={row.delivery} />
+            delivering ? (
+              <StatusBadge status="running" label={t('runs.system.delivering')} />
+            ) : (
+              <StatusBadge status={row.delivery} />
+            )
+          ) : null}
+          {'kind' in row && row.kind !== 'split' && stage ? (
+            <span
+              role="status"
+              aria-label={t('runs.system.delivery')}
+              className="flex flex-wrap items-center gap-x-2"
+            >
+              {stage.status === 'delivering' ? (
+                <StatusBadge status="running" label={t('runs.system.delivering')} />
+              ) : stage.status === 'applied' || stage.status === 'apply_failed' ? (
+                <>
+                  <StatusBadge status={stage.status} />
+                  {attemptAt !== null ? (
+                    <span>{t('runs.system.lastAttempt', { time: clock(attemptAt) })}</span>
+                  ) : null}
+                  {stage.status === 'apply_failed' && stage.reason ? (
+                    <span className="min-w-0 truncate" title={stage.reason}>
+                      {stage.reason.split('\n')[0]}
+                    </span>
+                  ) : null}
+                </>
+              ) : null}
+            </span>
           ) : null}
           {showUsage ? (
             <>
@@ -258,6 +286,11 @@ export function GroupScreen({
       {deliveryFailed ? (
         <Alert variant="destructive" className="flex flex-col gap-2">
           <b>{t('runs.system.deliveryFailed')}</b>
+          {view?.delivery.finishedAt != null ? (
+            <span className="text-xs">
+              {t('runs.system.lastAttempt', { time: clock(view.delivery.finishedAt) })}
+            </span>
+          ) : null}
           {reason ? (
             <>
               <pre className="font-mono text-xs break-words whitespace-pre-wrap">
@@ -278,14 +311,9 @@ export function GroupScreen({
             <Button
               variant="outline"
               size="sm"
-              loading={busy}
-              disabled={!deliverable}
-              onClick={() =>
-                void act(
-                  () => (onDeliver ? onDeliver() : Promise.resolve()),
-                  () => notifySuccess(t('runs.system.deliveryStarted')),
-                )
-              }
+              loading={busy || delivering}
+              disabled={!deliverable || delivering}
+              onClick={() => void act(() => (onDeliver ? onDeliver() : Promise.resolve()))}
             >
               <RotateCcw />
               {t('runs.system.retryDelivery')}
@@ -293,7 +321,7 @@ export function GroupScreen({
             <Button
               variant="outline"
               size="sm"
-              disabled={!deliverable || !run}
+              disabled={!deliverable || delivering || !run}
               onClick={() => setForcing(true)}
             >
               {t('runs.system.forceDeliver')}
@@ -307,10 +335,7 @@ export function GroupScreen({
           api={api}
           onConfirm={() => {
             setForcing(false);
-            void act(
-              () => (onForceDeliver ? onForceDeliver() : api.apply(run.id, true)),
-              () => notifySuccess(t('runs.system.deliveryStarted')),
-            );
+            void act(() => (onForceDeliver ? onForceDeliver() : api.apply(run.id, true)));
           }}
           onClose={() => setForcing(false)}
         />

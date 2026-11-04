@@ -17,7 +17,7 @@ import {
   findSpecialist,
   findWorkflow,
   loadConfig,
-  planSetting,
+  planSettings,
   socketPath,
   type DeliveryMode,
 } from '../config/index.ts';
@@ -25,6 +25,7 @@ import {
   Rejection,
   addItem,
   checkSkip,
+  addLinkedTag,
   addTag,
   autoTagName,
   runName,
@@ -56,6 +57,8 @@ import {
   queueItemId,
   removeItem,
   removeTag,
+  keepLinkedTags,
+  resolveManualTags,
   resolveTags,
   setParallel,
   setQueueSettings,
@@ -144,6 +147,10 @@ const NO_PANEL = 'this daemon serves no web panel';
 const WAKE_MARGIN_MS = 1000;
 /** The longest delay `setTimeout` keeps. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
+/** How often the daemon looks at background processes while someone is subscribed. */
+const PROCESS_STREAM_MS = 2000;
+/** Pause between a SIGTERM and the extra look at background processes. */
+const PROCESS_KILL_LOOK_MS = 250;
 
 /** The web panel the daemon serves; implemented outside the daemon layer and passed in. */
 export interface PanelControl {
@@ -162,6 +169,12 @@ export interface DaemonOptions {
   build?: BuildInfo;
   /** Serves `web_status`, `web_start` and `web_stop`; without it the daemon refuses them. */
   panel?: PanelControl;
+  /** How often subscribers get the background processes; defaults to 2 s. */
+  processesIntervalMs?: number;
+  /** Takes the process table; defaults to `ps`. */
+  snapshotProcesses?: () => Promise<PsRow[]>;
+  /** How often the daemon checks that its socket file is in place; defaults to 5 s. */
+  socketCheckMs?: number;
 }
 
 export class Daemon {
@@ -197,6 +210,13 @@ export class Daemon {
   /** Agents that exited, by PID; their process group is background while it has members. */
   private readonly departed = new Map<number, AgentRoot>();
   private psCache: { at: number; rows: PsRow[] } | null = null;
+  private readonly processesIntervalMs: number;
+  private readonly takeProcesses: () => Promise<PsRow[]>;
+  private processTimer: NodeJS.Timeout | null = null;
+  private processLooking = false;
+  /** The list (JSON) subscribers last got, or null. */
+  private sentProcesses: string | null = null;
+  private sentProcessesError: string | null = null;
 
   constructor(options: DaemonOptions) {
     this.store = new Store(databasePath(options.stateDirectory));
@@ -205,6 +225,8 @@ export class Daemon {
     this.now = options.now ?? Date.now;
     this.build = options.build ?? currentBuild();
     this.panel = options.panel;
+    this.processesIntervalMs = options.processesIntervalMs ?? PROCESS_STREAM_MS;
+    this.takeProcesses = options.snapshotProcesses ?? (() => snapshotProcesses());
     this.executor = new Executor({
       daemon: this,
       entry: options.entry,
@@ -600,9 +622,12 @@ export class Daemon {
           let tags =
             request.params.tags === undefined
               ? undefined
-              : resolveTags(this.catalog, request.params.tags);
+              : resolveManualTags(this.catalog, request.params.tags);
           const existing = queue.items.find((candidate) => candidate.id === item);
           const before = existing?.tags ?? [];
+          if (existing && tags !== undefined) {
+            tags = keepLinkedTags(this.catalog, knownTags(this.catalog, existing.tags), tags);
+          }
           if (existing && after !== undefined) {
             const fresh = after.filter((ref) => !existing.after.includes(ref));
             const inherited = knownTags(
@@ -797,8 +822,72 @@ export class Daemon {
         tags: catalogView(this.catalog),
       }),
     );
+    if (this.sentProcesses !== null) {
+      this.seq += 1;
+      send(
+        JSON.stringify({
+          event: 'processes',
+          seq: this.seq,
+          processes: JSON.parse(this.sentProcesses) as unknown[],
+        }),
+      );
+    }
     this.subscribers.add(send);
-    return () => this.subscribers.delete(send);
+    this.watchProcesses();
+    return () => {
+      this.subscribers.delete(send);
+      if (this.subscribers.size === 0) this.unwatchProcesses();
+    };
+  }
+
+  private watchProcesses(): void {
+    if (this.processTimer || this.stopping) return;
+    this.processTimer = setInterval(() => void this.lookAtProcesses(), this.processesIntervalMs);
+    this.processTimer.unref();
+    void this.lookAtProcesses();
+  }
+
+  private unwatchProcesses(): void {
+    if (this.processTimer) clearInterval(this.processTimer);
+    this.processTimer = null;
+    this.sentProcesses = null;
+    this.sentProcessesError = null;
+  }
+
+  /** One look at background processes; tells subscribers when the list or the error changed. */
+  private async lookAtProcesses(fresh = false): Promise<void> {
+    if (this.processLooking || this.stopping || this.subscribers.size === 0) return;
+    if (
+      !fresh &&
+      this.executor.agentRoots().length === 0 &&
+      this.departed.size === 0 &&
+      this.sentProcesses === '[]'
+    ) {
+      return;
+    }
+    this.processLooking = true;
+    try {
+      const { processes } = await this.processList(fresh);
+      const json = JSON.stringify(processes);
+      this.sentProcessesError = null;
+      if (json === this.sentProcesses || this.subscribers.size === 0) return;
+      this.sentProcesses = json;
+      this.publishProcesses({ processes });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === this.sentProcessesError || this.subscribers.size === 0) return;
+      this.sentProcessesError = message;
+      this.sentProcesses = null;
+      this.publishProcesses({ error: message });
+    } finally {
+      this.processLooking = false;
+    }
+  }
+
+  private publishProcesses(payload: { processes: unknown[] } | { error: string }): void {
+    this.seq += 1;
+    const line = JSON.stringify({ event: 'processes', seq: this.seq, ...payload });
+    for (const send of this.subscribers) send(line);
   }
 
   /**
@@ -837,6 +926,8 @@ export class Daemon {
     this.stopping = true;
     if (this.wakeTimer) clearTimeout(this.wakeTimer);
     this.wakeTimer = null;
+    if (this.processTimer) clearInterval(this.processTimer);
+    this.processTimer = null;
     await this.executor.stopAll();
     await this.queue.catch(() => undefined);
     this.store.close();
@@ -850,7 +941,7 @@ export class Daemon {
   private async processRows(fresh: boolean): Promise<PsRow[]> {
     const now = Date.now();
     if (!fresh && this.psCache && now - this.psCache.at < 1_000) return this.psCache.rows;
-    const rows = await snapshotProcesses();
+    const rows = await this.takeProcesses();
     this.psCache = { at: now, rows };
     return rows;
   }
@@ -864,8 +955,8 @@ export class Daemon {
     return { rows, found: selectBackground(rows, roots) };
   }
 
-  private async processList(): Promise<BackgroundProcessesView> {
-    const { found } = await this.backgroundProcesses(false);
+  private async processList(fresh = false): Promise<BackgroundProcessesView> {
+    const { found } = await this.backgroundProcesses(fresh);
     return {
       processes: found.map(({ root, ...process }) => {
         let state: RunState | null = null;
@@ -896,11 +987,15 @@ export class Daemon {
     if (!found.some((process) => process.pid === pid)) {
       throw new Rejection(`not a background process: ${pid}`);
     }
+    const look = (): void => void this.lookAtProcesses(true);
+    setTimeout(look, PROCESS_KILL_LOOK_MS).unref();
     void terminateTree(pid, {
       rows,
       stillBackground: async () =>
         new Set((await this.backgroundProcesses(true)).found.map((process) => process.pid)),
-    }).catch(() => undefined);
+    })
+      .catch(() => undefined)
+      .then(look);
     return { ok: true };
   }
 
@@ -1064,6 +1159,8 @@ export class Daemon {
         });
       case 'config_setting':
         return this.configSetting(request.params);
+      case 'config_settings':
+        return this.configSettings(request.params);
       case 'config_preview':
         return this.configPreview(request.params);
       case 'config_delete':
@@ -1215,11 +1312,17 @@ export class Daemon {
     return tags;
   }
 
-  private createTag(input: { name: string; color?: string | undefined }): Tag {
+  private createTag(input: {
+    name: string;
+    color?: string | undefined;
+    task?: { run: string; number: number } | undefined;
+  }): Tag {
     const now = this.now();
     let id = tagId(now, randomInt(36 ** 3));
     while (this.catalog.some((tag) => tag.id === id)) id = tagId(now, randomInt(36 ** 3));
-    const tag = addTag(this.catalog, input, id, now);
+    const tag = input.task
+      ? addLinkedTag(this.catalog, { name: input.name, task: input.task }, id, now)
+      : addTag(this.catalog, input, id, now);
     this.store.saveTag(tag);
     this.catalog = [...this.catalog, tag];
     return tag;
@@ -1267,7 +1370,7 @@ export class Daemon {
 
   private async runTags(params: ParamsOf<'run_tags'>): Promise<RunView> {
     const state = this.state(params.runId);
-    const add = resolveTags(this.catalog, params.add ?? []);
+    const add = resolveManualTags(this.catalog, params.add ?? []);
     const remove = new Set(resolveTags(this.catalog, params.remove ?? []));
     const current = knownTags(this.catalog, state.run.tags).filter((id) => !remove.has(id));
     const tags = [...current, ...add.filter((id) => !current.includes(id) && !remove.has(id))];
@@ -1288,7 +1391,7 @@ export class Daemon {
     const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
-    const tags = this.inheritTags(queue, resolveTags(this.catalog, params.tags ?? []), after);
+    const tags = this.inheritTags(queue, resolveManualTags(this.catalog, params.tags ?? []), after);
     const item = addItem(
       queue,
       { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
@@ -1329,7 +1432,7 @@ export class Daemon {
     inherited?: string[],
   ): Promise<unknown> {
     const { workflow, task, groups, title, autoDeliver, deliveryMode, skip, postponed } = params;
-    const own = inherited ?? resolveTags(this.catalog, params.tags ?? []);
+    const own = inherited ?? resolveManualTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
     await this.ensureItem(repository, workflow, skip);
@@ -1369,7 +1472,10 @@ export class Daemon {
       this.resolveDependencies(this.queueFor(repository), params.after ?? []);
       const run = state.run;
       const base = run.name ?? (run.title ? runName(run.title) : run.id);
-      const tag = this.createTag({ name: autoTagName(this.catalog, base) });
+      const tag = this.createTag({
+        name: autoTagName(this.catalog, base),
+        task: { run: run.id, number: run.number },
+      });
       await this.apply(state, { kind: 'tags_set', tags: [tag.id] });
       const queue = this.queueFor(repository);
       if (spreadTags(queue, run.id, [tag.id], this.now()).length > 0) this.saveQueue(queue);
@@ -1543,12 +1649,20 @@ export class Daemon {
   }
 
   private async configSetting(params: ParamsOf<'config_setting'>): Promise<ConfigEditResult> {
+    return this.configSettings({
+      repository: params.repository,
+      values: { [params.path]: params.value },
+      revision: params.revision,
+      level: params.level,
+    });
+  }
+
+  private async configSettings(params: ParamsOf<'config_settings'>): Promise<ConfigEditResult> {
     const repository = await this.rootOf(params.repository);
     let plan;
     try {
-      plan = planSetting(this.configPathsOf(repository), {
-        path: params.path,
-        value: params.value,
+      plan = planSettings(this.configPathsOf(repository), {
+        values: params.values,
         revision: params.revision,
         level: params.level,
       });

@@ -1,3 +1,4 @@
+import { stepLabel } from './topology.ts';
 import { stepsOf, type Group, type RunState } from './model.ts';
 
 export interface StepProgress {
@@ -6,7 +7,7 @@ export interface StepProgress {
   /** Steps of all work groups; 0 while the task is split. */
   total: number;
   /** Step of the only group, counted from one; null with several groups or when all steps are passed. */
-  current: { step: string; number: number } | null;
+  current: { step: string; name: string; number: number } | null;
 }
 
 const ALL_STEPS = new Set(['merged', 'merging', 'conflict']);
@@ -29,7 +30,13 @@ export function stepProgress(state: RunState): StepProgress {
       done += passed;
       total += steps.length;
       const step = steps[passed];
-      if (state.groups.length === 1 && step) current = { step: step.id, number: passed + 1 };
+      if (state.groups.length === 1 && step) {
+        current = {
+          step: step.id,
+          name: stepLabel(state.run.config, steps, step),
+          number: passed + 1,
+        };
+      }
     }
   } catch {
     return { done: 0, total: 0, current: null };

@@ -47,6 +47,8 @@ import {
   type Usage,
   topology,
   stepStates,
+  stepLabel,
+  attemptStepLabel,
   type StepState,
   specialistUse,
   type SpecialistUse,
@@ -63,13 +65,14 @@ export interface TagView {
   id: string;
   name: string;
   color: TagColor;
+  task: { run: string; number: number } | null;
 }
 
 export function tagViews(catalog: readonly Tag[], ids: readonly string[]): TagView[] {
   const byId = new Map(catalog.map((tag) => [tag.id, tag]));
   return knownTags(catalog, ids).flatMap((id) => {
     const tag = byId.get(id);
-    return tag ? [{ id: tag.id, name: tag.name, color: tag.color }] : [];
+    return tag ? [{ id: tag.id, name: tag.name, color: tag.color, task: tag.task }] : [];
   });
 }
 
@@ -81,7 +84,7 @@ export function catalogView(catalog: readonly Tag[]): TagView[] {
         a.name.toLocaleLowerCase('und').localeCompare(b.name.toLocaleLowerCase('und')) ||
         a.id.localeCompare(b.id),
     )
-    .map(({ id, name, color }) => ({ id, name, color }));
+    .map(({ id, name, color, task }) => ({ id, name, color, task }));
 }
 
 export interface FileStat {
@@ -150,6 +153,8 @@ export interface GroupRow {
   /** Why the group is `waiting`; null for other statuses. */
   wait: GroupWait | null;
   step: string | null;
+  /** The human name of `step`; null with `step`. */
+  stepName: string | null;
   round: number | null;
   durationMs: number;
   question: string | null;
@@ -224,7 +229,14 @@ export interface RunView {
   total: number;
   usage: Usage | null;
   split: SplitRow | null;
-  delivery: { applied: number; merged: number; failed: number; inProgress: boolean };
+  delivery: {
+    applied: number;
+    merged: number;
+    failed: number;
+    inProgress: boolean;
+    /** When the last delivery attempt of the merged groups ended (ms); null before the first. */
+    finishedAt: number | null;
+  };
   resolver: ResolverRow | null;
   /** Delivery as a system stage; null while nothing is merged and nothing is delivered. */
   deliveryStage: DeliveryStage | null;
@@ -253,6 +265,8 @@ export interface ResolverRow {
 export interface AttemptView {
   seq: number;
   stepId: string;
+  /** The human name of the step. */
+  stepName: string;
   round: number;
   specialist: string;
   runtime: string;
@@ -351,6 +365,7 @@ export function groupLimitUntil(group: Group): number | null {
 }
 
 export function groupRow(
+  state: RunState,
   group: Group,
   now: number,
   diffs: DiffLookup = NO_DIFFS,
@@ -364,6 +379,7 @@ export function groupRow(
     status: displayStatus(group.status, wait),
     wait: group.status === 'queued' ? wait : null,
     step: last?.stepId ?? null,
+    stepName: last ? attemptStepLabel(state, group, last) : null,
     round: last?.round ?? null,
     durationMs: groupDuration(group, now),
     question: group.question,
@@ -386,16 +402,25 @@ function serviceStatus(group: Group): GroupStatus | 'done' {
 }
 
 export function systemRow(
+  state: RunState,
   group: Group,
   kind: SystemStepKind,
   now: number,
   wait: GroupWait | null = null,
 ): SystemStepRow {
   return {
-    ...groupRow(group, now, NO_DIFFS, wait),
+    ...groupRow(state, group, now, NO_DIFFS, wait),
     kind,
     status: displayStatus(serviceStatus(group), wait),
   };
+}
+
+function lastDeliveryAt(state: RunState): number | null {
+  const times = state.groups
+    .filter((group) => group.status === 'merged')
+    .map((group) => group.delivery.finishedAt)
+    .filter((time): time is number => time !== null);
+  return times.length > 0 ? Math.max(...times) : null;
 }
 
 /** Delivery as a system stage, by the merged groups and the delivery in progress. */
@@ -510,7 +535,11 @@ export function runView(
           reason: state.split.reason,
         }
       : null,
-    delivery: { ...deliveryCounts(state), inProgress: state.run.pendingDelivery !== null },
+    delivery: {
+      ...deliveryCounts(state),
+      inProgress: state.run.pendingDelivery !== null,
+      finishedAt: lastDeliveryAt(state),
+    },
     resolver: state.resolve
       ? {
           status: stages.resolve ?? state.resolve.status,
@@ -526,16 +555,22 @@ export function runView(
     topology: waitingTopology,
     steps: stepStates(state),
     specialists: specialistUse(state),
-    groups: state.groups.map((group) => groupRow(group, now, diffs, waitOf(group))),
+    groups: state.groups.map((group) => groupRow(state, group, now, diffs, waitOf(group))),
     system: [
-      ...(state.split ? [systemRow(state.split, 'split', now, waitOf(state.split))] : []),
-      ...(state.message ? [systemRow(state.message, 'message', now, waitOf(state.message))] : []),
-      ...(state.resolve ? [systemRow(state.resolve, 'resolve', now, waitOf(state.resolve))] : []),
+      ...(state.split ? [systemRow(state, state.split, 'split', now, waitOf(state.split))] : []),
+      ...(state.message
+        ? [systemRow(state, state.message, 'message', now, waitOf(state.message))]
+        : []),
+      ...(state.resolve
+        ? [systemRow(state, state.resolve, 'resolve', now, waitOf(state.resolve))]
+        : []),
     ],
   };
 }
 
 export function attemptView(
+  state: RunState,
+  group: Group,
   attempt: Attempt,
   now: number,
   allowCommands: readonly string[] = [],
@@ -543,6 +578,7 @@ export function attemptView(
   return {
     seq: attempt.seq,
     stepId: attempt.stepId,
+    stepName: attemptStepLabel(state, group, attempt),
     round: attempt.round,
     specialist: attempt.specialist,
     runtime: attempt.runtime,
@@ -595,7 +631,13 @@ export function groupView(
   const wait = group.status === 'queued' ? waits(state.run.id, group.slug) : null;
   const legacy = legacyOutsideChanges(group);
   const attempts = group.attempts.map((attempt) => {
-    const view = attemptView(attempt, now, allowCommandsOf(state, attempt.specialist));
+    const view = attemptView(
+      state,
+      group,
+      attempt,
+      now,
+      allowCommandsOf(state, attempt.specialist),
+    );
     const restored = legacy.outside.get(attempt.seq);
     return restored ? { ...view, outsideChanges: restored } : view;
   });
@@ -737,13 +779,13 @@ export interface QueueRunView {
   /** Steps passed by the groups out of all their steps, and the step of a single group. */
   steps: StepProgress;
   /** Groups (service steps included) that run or merge now, with the step of their last attempt. */
-  active: { group: string; step: string | null }[];
+  active: { group: string; step: string | null; stepName: string | null }[];
   /** Service steps of the run in the order split, message, resolve. */
   system: { kind: SystemStepKind; status: RowStatus }[];
   /** Delivery as the last system stage; null while nothing is merged. */
   delivery: DeliveryStage['status'] | null;
   /** Groups the scheduler holds back, with the step they wait to run. */
-  waiting: { group: string; step: string | null; wait: GroupWait }[];
+  waiting: { group: string; step: string | null; stepName: string | null; wait: GroupWait }[];
   /** The run is finished and waits for its automatic delivery. */
   delivering: boolean;
   /** Problem that keeps the user's attention, if any. */
@@ -818,12 +860,27 @@ function queueRunView(
       const wait = waitOf(group);
       if (wait === null) return [];
       const index = group.pending?.stepIndex;
-      const step = index === undefined ? null : (stepsOf(state.run, group)[index]?.id ?? null);
-      return [{ group: group.slug, step, wait }];
+      const steps = stepsOf(state.run, group);
+      const found = index === undefined ? undefined : steps[index];
+      return [
+        {
+          group: group.slug,
+          step: found?.id ?? null,
+          stepName: found ? stepLabel(state.run.config, steps, found) : null,
+          wait,
+        },
+      ];
     }),
     active: allGroups(state)
       .filter((group) => group.status === 'running' || group.status === 'merging')
-      .map((group) => ({ group: group.slug, step: group.attempts.at(-1)?.stepId ?? null })),
+      .map((group) => {
+        const last = group.attempts.at(-1);
+        return {
+          group: group.slug,
+          step: last?.stepId ?? null,
+          stepName: last ? attemptStepLabel(state, group, last) : null,
+        };
+      }),
     delivering: isRunFinished(state) && occupiesSlot(state),
     usage: summarize(state).usage,
     problem: problem ? { group: problem.group, reason: problem.reason } : null,

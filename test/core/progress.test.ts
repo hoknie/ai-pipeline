@@ -27,7 +27,7 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({
       done: 1,
       total: 4,
-      current: { step: 'code', number: 2 },
+      current: { step: 'code', name: 'Кодировщик', number: 2 },
     });
   });
 
@@ -49,12 +49,15 @@ describe('stepProgress', () => {
       finish(state, 'done');
     }
     step(state);
-    expect(stepProgress(state)).toMatchObject({ done: 2, current: { step: 'review', number: 3 } });
+    expect(stepProgress(state)).toMatchObject({
+      done: 2,
+      current: { step: 'review', name: 'Ревьюер', number: 3 },
+    });
     finish(state, 'rejected', { feedback: 'переделать' });
     expect(stepProgress(state)).toEqual({
       done: 1,
       total: 4,
-      current: { step: 'code', number: 2 },
+      current: { step: 'code', name: 'Кодировщик', number: 2 },
     });
   });
 
@@ -63,13 +66,13 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({
       done: 0,
       total: 3,
-      current: { step: 'plan', number: 1 },
+      current: { step: 'plan', name: 'Планировщик', number: 1 },
     });
   });
 
   it('sets the current step only for a single group', () => {
     expect(stepProgress(run(2)).current).toBeNull();
-    expect(stepProgress(run(1)).current).toEqual({ step: 'plan', number: 1 });
+    expect(stepProgress(run(1)).current).toEqual({ step: 'plan', name: 'Планировщик', number: 1 });
   });
 
   it('has no current step when the single group passed all steps', () => {

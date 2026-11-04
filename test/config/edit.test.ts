@@ -24,8 +24,11 @@ import {
   planEdit,
   planSetting,
   revisionOf,
+  planSettings,
+  settingFieldOf,
   settingsFile,
   specialistReferences,
+  SETTING_FIELDS,
   type ConfigPaths,
   type EditPlan,
 } from '../../src/config/index.ts';
@@ -381,7 +384,7 @@ describe('editorView', () => {
     const qa = view.specialists.find((s) => s.slug === 'qa');
     expect(qa).toMatchObject({ file: specialistFile(paths, 'qa', paths.global), revision: null });
     const max = view.settings.find((setting) => setting.path === 'max');
-    expect(max).toEqual({
+    expect(max).toMatchObject({
       path: 'max',
       value: 5,
       file: join(paths.global.directory, 'settings.yaml'),
@@ -888,9 +891,9 @@ describe('general settings', () => {
 
   it('refuses a path outside the list and names the allowed ones', () => {
     const paths = levels(GLOBAL);
-    expect(() => planSetting(paths, { path: 'max', value: true, revision: null })).toThrow(
-      /delivery\.auto, delivery\.mode/,
-    );
+    expect(() =>
+      planSetting(paths, { path: 'specialists.coder.model', value: 'x', revision: null }),
+    ).toThrow(/cannot be written; allowed: max, /);
   });
 
   it('shows the files and revisions of both levels in the editor view', () => {
@@ -913,9 +916,9 @@ describe('web and runtimes in the editor view', () => {
 
   it('shows the defaults with no file', () => {
     const view = editorView(setup());
-    expect(find(view, 'web.port')).toEqual({ path: 'web.port', value: 7341, file: null });
+    expect(find(view, 'web.port')).toMatchObject({ path: 'web.port', value: 7341, file: null });
     expect(find(view, 'web.auth')?.value).toBe('token');
-    expect(find(view, 'runtimes.claude.command')).toEqual({
+    expect(find(view, 'runtimes.claude.command')).toMatchObject({
       path: 'runtimes.claude.command',
       value: 'claude',
       file: null,
@@ -928,7 +931,7 @@ describe('web and runtimes in the editor view', () => {
     const file = join(paths.global.directory, 'settings.yaml');
     write(file, 'web:\n  port: 8000\nruntimes:\n  claude:\n    command: /bin/claude\n');
     const view = editorView(paths);
-    expect(find(view, 'web.port')).toEqual({ path: 'web.port', value: 8000, file });
+    expect(find(view, 'web.port')).toMatchObject({ path: 'web.port', value: 8000, file });
     expect(find(view, 'web.host')?.file).toBeNull();
     expect(find(view, 'runtimes.claude.command')).toMatchObject({ value: '/bin/claude', file });
     expect(find(view, 'runtimes.claude.args')?.file).toBeNull();
@@ -949,5 +952,219 @@ describe('web and runtimes in the editor view', () => {
     const view = editorView(paths);
     expect(find(view, 'runtimes.claude.env')?.value).toEqual(['ANTHROPIC_API_KEY', 'ZED']);
     expect(JSON.stringify(view)).not.toContain('secret');
+  });
+});
+
+describe('catalog of setting fields', () => {
+  it('finds every catalog path and a variable of the environment', () => {
+    for (const field of SETTING_FIELDS) expect(settingFieldOf(field.path)).toBe(field);
+    expect(settingFieldOf('runtimes.claude.env.FOO')).toMatchObject({
+      kind: 'env',
+      globalOnly: true,
+    });
+    expect(settingFieldOf('delivery.mode')).toMatchObject({ kind: 'choice' });
+    expect(settingFieldOf('web.port')).toMatchObject({ range: [1, 65535], globalOnly: true });
+  });
+
+  it('rejects paths outside of the catalog', () => {
+    for (const path of [
+      'specialists.coder.model',
+      'runtimes.claude.env.1BAD',
+      'runtimes.nope.env.FOO',
+      'runtimes.claude.env.',
+      'nothing',
+    ]) {
+      expect(settingFieldOf(path)).toBeUndefined();
+    }
+  });
+});
+
+describe('batch write of settings', () => {
+  const GLOBAL = '# общие\nmax: 5 # параллельно\ndelivery:\n  mode: commit\n';
+  function levels(globalText: string | null) {
+    const paths = setup();
+    write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
+    if (globalText !== null) write(join(paths.global.directory, 'settings.yaml'), globalText);
+    return paths;
+  }
+  const reject = (plan: EditPlan) => {
+    if (plan.ok) throw new Error('the plan must be rejected');
+    return plan;
+  };
+
+  it('writes a number and a list and keeps the comments', () => {
+    const paths = levels(GLOBAL);
+    commitEdit(
+      accepted(
+        planSettings(paths, {
+          values: { max: 8, 'workspace.include': ['.env', 'secrets/*'] },
+          revision: revisionOf(GLOBAL),
+        }),
+      ),
+    );
+    const text = readFileSync(settingsFile(paths, 'global'), 'utf8');
+    expect(text).toContain('# общие');
+    expect(text).toContain('max: 8 # параллельно');
+    expect(loadConfig(paths).max).toBe(8);
+    expect(loadConfig(paths).workspace.include).toEqual(['.env', 'secrets/*']);
+  });
+
+  it('writes two fields in one go, and an empty list removes the key', () => {
+    const paths = levels(GLOBAL);
+    const plan = accepted(
+      planSettings(paths, {
+        values: { 'delivery.auto': false, 'delivery.mode': null, 'naming.enabled': false },
+        revision: revisionOf(GLOBAL),
+      }),
+    );
+    commitEdit(plan);
+    const config = loadConfig(paths);
+    expect(config.delivery.auto).toBe(false);
+    expect(config.delivery.mode).toBe('worktree');
+    expect(config.naming.enabled).toBe(false);
+  });
+
+  it('reports every wrong field at once and writes nothing', () => {
+    const paths = levels(GLOBAL);
+    const plan = reject(
+      planSettings(paths, {
+        values: {
+          max: 99,
+          'delivery.mode': 'tar',
+          'defaults.timeout': 'soon',
+          'defaults.tools': ['ok', ''],
+          'delivery.auto': 'yes' as never,
+        },
+        revision: revisionOf(GLOBAL),
+      }),
+    );
+    expect(plan).toMatchObject({ reason: 'invalid' });
+    const errors = (plan as { errors: { path: string; message: string }[] }).errors;
+    expect(errors.map((error) => error.path).sort()).toEqual(
+      [
+        'swarm.defaults.timeout',
+        'swarm.defaults.tools[1]',
+        'swarm.delivery.auto',
+        'swarm.delivery.mode',
+        'swarm.max',
+      ].sort(),
+    );
+    expect(errors.find((error) => error.path === 'swarm.max')?.message).toBe(
+      'must be an integer from 1 to 32',
+    );
+    expect(readFileSync(settingsFile(paths, 'global'), 'utf8')).toBe(GLOBAL);
+  });
+
+  it('reports a conflict for an old revision of the batch', () => {
+    const paths = levels(GLOBAL);
+    expect(planSettings(paths, { values: { max: 2 }, revision: 'old' })).toMatchObject({
+      ok: false,
+      reason: 'conflict',
+    });
+  });
+
+  it('refuses an empty batch and a path outside of the catalog', () => {
+    const paths = levels(GLOBAL);
+    expect(() => planSettings(paths, { values: {}, revision: null })).toThrow(ConfigEditError);
+    expect(() =>
+      planSettings(paths, { values: { max: 2, 'specialists.x.model': 'y' }, revision: null }),
+    ).toThrow(/specialists\.x\.model/);
+  });
+
+  it('writes the port of the panel only to the global level', () => {
+    const paths = levels(GLOBAL);
+    const plan = planSettings(paths, {
+      values: { 'web.port': 8100 },
+      revision: null,
+      level: 'project',
+    });
+    expect(plan).toMatchObject({ ok: false, reason: 'invalid' });
+    expect((plan as { errors: { message: string }[] }).errors[0]?.message).toMatch(/read only/);
+    commitEdit(
+      accepted(planSettings(paths, { values: { 'web.port': 8100 }, revision: revisionOf(GLOBAL) })),
+    );
+    expect(readFileSync(settingsFile(paths, 'global'), 'utf8')).toContain('port: 8100');
+  });
+
+  it('writes the command, the arguments and a new variable of a runtime', () => {
+    const paths = levels(GLOBAL);
+    commitEdit(
+      accepted(
+        planSettings(paths, {
+          values: {
+            'runtimes.claude.command': '/usr/bin/claude',
+            'runtimes.claude.args': ['--verbose'],
+            'runtimes.claude.env.API_KEY': 'secret',
+          },
+          revision: revisionOf(GLOBAL),
+        }),
+      ),
+    );
+    const text = readFileSync(settingsFile(paths, 'global'), 'utf8');
+    expect(text).toContain('API_KEY: secret');
+    const view = editorView(paths);
+    expect(view.settings.find((setting) => setting.path === 'runtimes.claude.env')?.value).toEqual([
+      'API_KEY',
+    ]);
+    expect(JSON.stringify(view)).not.toContain('secret');
+  });
+
+  it('refuses a wrong command and a name that is not a variable', () => {
+    const paths = levels(GLOBAL);
+    const relative = reject(
+      planSettings(paths, {
+        values: { 'runtimes.claude.command': 'bin/claude' },
+        revision: revisionOf(GLOBAL),
+      }),
+    );
+    expect(relative).toMatchObject({ reason: 'invalid' });
+    expect(() =>
+      planSettings(paths, { values: { 'runtimes.claude.env.1BAD': 'x' }, revision: null }),
+    ).toThrow(ConfigEditError);
+    expect(
+      planSettings(paths, {
+        values: { 'runtimes.claude.env': 'x' },
+        revision: revisionOf(GLOBAL),
+      }),
+    ).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+
+  it('takes a specialist for the resolver and refuses an unknown one', () => {
+    const paths = levels(GLOBAL);
+    commitEdit(
+      accepted(
+        planSettings(paths, {
+          values: { 'delivery.resolver': 'reviewer' },
+          revision: revisionOf(GLOBAL),
+        }),
+      ),
+    );
+    expect(loadConfig(paths).delivery.resolver).toBe('reviewer');
+    const current = readFileSync(settingsFile(paths, 'global'), 'utf8');
+    expect(
+      planSettings(paths, {
+        values: { 'delivery.resolver': 'ghost' },
+        revision: revisionOf(current),
+      }),
+    ).toMatchObject({ ok: false, reason: 'invalid' });
+  });
+
+  it('gives the values of a field by level in the editor view', () => {
+    const paths = levels(GLOBAL);
+    write(join(paths.project.directory, 'settings.yaml'), 'max: 2\n');
+    const field = editorView(paths).settings.find((setting) => setting.path === 'max');
+    expect(field).toMatchObject({
+      kind: 'integer',
+      range: [1, 32],
+      globalOnly: false,
+      value: 2,
+      globalValue: 5,
+      defaultValue: 3,
+      written: { global: 5, project: 2 },
+    });
+    const none = editorView(setup()).settings.find((setting) => setting.path === 'naming.model');
+    expect(none?.written).toEqual({});
+    const port = editorView(paths).settings.find((setting) => setting.path === 'web.port');
+    expect(port).toMatchObject({ globalOnly: true, defaultValue: 7341, value: 7341 });
   });
 });

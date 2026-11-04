@@ -255,10 +255,19 @@ export interface GroupDelivery {
   conflicts: string[];
   /** Files committed whole together with uncommitted edits the user had in them. */
   userEdits: string[];
+  /** When the last delivery attempt of the group ended (ms); null before the first attempt. */
+  finishedAt: number | null;
 }
 
 export function pendingDelivery(): GroupDelivery {
-  return { state: 'pending', reason: null, files: [], conflicts: [], userEdits: [] };
+  return {
+    state: 'pending',
+    reason: null,
+    files: [],
+    conflicts: [],
+    userEdits: [],
+    finishedAt: null,
+  };
 }
 
 export interface Group {

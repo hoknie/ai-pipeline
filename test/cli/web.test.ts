@@ -333,6 +333,44 @@ describe('aip web', () => {
     expect(text).toContain(`"id":"${runId}"`);
   });
 
+  it('relays the processes event and gives the last one to a new client', async () => {
+    h = await harness(MANUAL_CONFIG, {}, { processesIntervalMs: 60_000 });
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const open = async () => {
+      const controller = new AbortController();
+      const response = await fetch(`${base}/api/events`, {
+        headers: authed(web!),
+        signal: controller.signal,
+      });
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      const client = { text: '', controller };
+      const read = async (until: string) => {
+        const deadline = Date.now() + 10_000;
+        while (!client.text.includes(until) && Date.now() < deadline) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          client.text += decoder.decode(value);
+        }
+      };
+      return { client, read };
+    };
+    const first = await open();
+    await first.read('"event":"processes"');
+    expect(first.client.text).toContain('"event":"processes"');
+    const second = await open();
+    await second.read('"event":"processes"');
+    const text = second.client.text;
+    expect(text.indexOf('"event":"snapshot"')).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf('"event":"processes"')).toBeGreaterThan(text.indexOf('"event":"snapshot"'));
+    await h.call('tag_add', { name: 'later' });
+    await second.read('"name":"later"');
+    first.client.controller.abort();
+    second.client.controller.abort();
+    expect(second.client.text).toContain('"name":"later"');
+  });
+
   it('relays the tags event and keeps tags in the snapshot', async () => {
     const { h, web, base } = await setup();
     const controller = new AbortController();
@@ -1288,20 +1326,20 @@ const putSettingTo = (web: WebServer, base: string, path: string, body: unknown)
   });
 
 describe('aip web general settings', () => {
-  it('writes delivery.mode and refuses a value of the wrong type with 400', async () => {
+  it('writes delivery.mode and refuses a value of the wrong kind with 422', async () => {
     h = await harness(MANUAL_CONFIG);
     web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
     const base = `http://127.0.0.1:${web.port}`;
     const file = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip', 'settings.yaml');
     for (const value of [true, 'tar']) {
       const wrong = await putSettingTo(web, base, 'delivery.mode', { value, revision: null });
-      expect(wrong.status).toBe(400);
+      expect(wrong.status).toBe(422);
     }
     const mistyped = await putSettingTo(web, base, 'delivery.auto', {
       value: 'commit',
       revision: null,
     });
-    expect(mistyped.status).toBe(400);
+    expect(mistyped.status).toBe(422);
     const done = await putSettingTo(web, base, 'delivery.mode', {
       value: 'commit',
       revision: null,
@@ -1339,9 +1377,15 @@ describe('aip web general settings', () => {
     expect(view.settingsFiles.global.file).toBe(file);
     expect(view.settingsFiles.global.revision).not.toBeNull();
 
-    expect((await putSetting(web, base, 'max', { value: true, revision: null })).status).toBe(404);
+    expect(
+      (await putSetting(web, base, 'specialists.coder.model', { value: 'x', revision: null }))
+        .status,
+    ).toBe(404);
     expect(
       (await putSetting(web, base, 'delivery.auto', { value: 'yes', revision: null })).status,
+    ).toBe(422);
+    expect(
+      (await putSetting(web, base, 'delivery.auto', { value: { a: 1 }, revision: null })).status,
     ).toBe(400);
     const anonymous = await fetch(`${base}/api/config/settings/delivery.auto`, {
       method: 'PUT',
@@ -1349,6 +1393,59 @@ describe('aip web general settings', () => {
       body: JSON.stringify({ value: true, revision: null }),
     });
     expect(anonymous.status).toBe(401);
+  });
+});
+
+describe('aip web batch settings', () => {
+  const putSettings = (web: WebServer, base: string, body: unknown) =>
+    fetch(`${base}/api/config/settings`, {
+      method: 'PUT',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify(body),
+    });
+
+  it('writes several fields at once, refuses a wrong kind and an unknown path', async () => {
+    h = await harness(MANUAL_CONFIG);
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const file = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip', 'settings.yaml');
+
+    const done = await putSettings(web, base, {
+      values: { max: 4, 'delivery.auto': true, 'workspace.include': ['.env'] },
+      revision: null,
+    });
+    expect(done.status).toBe(200);
+    const text = readFileSync(file, 'utf8');
+    expect(text).toContain('max: 4');
+    expect(text).toContain('auto: true');
+    expect(text).toContain('.env');
+
+    const wrong = await putSettings(web, base, { values: { max: 'many' }, revision: 'x' });
+    expect(wrong.status).toBe(422);
+    const foreign = await putSettings(web, base, {
+      values: { 'specialists.coder.model': 'x' },
+      revision: null,
+    });
+    expect(foreign.status).toBe(404);
+    const empty = await putSettings(web, base, { values: {}, revision: null });
+    expect(empty.status).toBe(400);
+    expect(readFileSync(file, 'utf8')).toBe(text);
+  });
+
+  it('writes a variable of a runtime and never returns its value', async () => {
+    h = await harness(MANUAL_CONFIG);
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const done = await putSettings(web, base, {
+      values: { 'runtimes.claude.env.API_KEY': 'topsecret' },
+      revision: null,
+    });
+    expect(done.status).toBe(200);
+    expect(await done.text()).not.toContain('topsecret');
+    const view = await fetch(`${base}/api/config`, { headers: authed(web) });
+    const body = await view.text();
+    expect(body).not.toContain('topsecret');
+    expect(body).toContain('API_KEY');
   });
 });
 

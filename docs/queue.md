@@ -194,6 +194,7 @@ aip run list --tag auth --tag v2         # runs with at least one of the tags
 - The tags of a task move to the run when the run is created from the task.
 - An unknown tag name rejects the whole request. Create the tag with `aip tag add`.
 - Tags appear as `#name` in `aip run list`, `aip run show` and `aip queue list`. In JSON they are a `tags` field with a list of `{id, name, color}`.
+- A tag of a linked task (see below) shows as `#N:name` and in JSON has `task: {run, number}`; ordinary tags have `task: null`.
 - The `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` tools accept an optional `tags`. The catalog cannot be managed through MCP.
 
 Tags of tasks that a specialist queues:
@@ -202,6 +203,10 @@ Tags of tasks that a specialist queues:
 - A specialist cannot set tags itself.
 - When the run has no tags, the first `swarm_queue_add` creates a tag for the chain and puts it on the run and on the task. Later tasks of the chain get it by the rules above, so no second tag appears.
 - The name of that tag is the name of the run (without a name: the transliterated title, without a title: the run id). It is cut to 30 characters at the last whole word; when the name is taken, `-2`, `-3`, … is added. An existing tag with the same name is not reused.
+- That tag is a tag of a linked task: it belongs to the task `N` that created it, has the reserved color `indigo` and shows as `#N:name` (in the web panel `#N: name`, a link to that task). `aip tag list` has a `TASK` column with `#N`; ordinary tags have `—`.
+- `indigo` is not one of the ten colors: `aip tag add --color indigo` and `aip tag edit --color indigo` are refused, and the color of a tag of a linked task cannot be changed. Renaming and removing it work as for any tag.
+- Such a tag cannot be set by hand: `--tag`, `swarm_run`, `swarm_queue_add`, `swarm_queue_edit` and `aip run tag` refuse it with `tag … belongs to task #N and is set automatically`. `aip queue edit --tag` and `--no-tags` replace only ordinary tags and keep it. `aip run untag` can still remove it.
+- Tags of runs that were created before this rule stay ordinary tags.
 - When the workflow or `after` of the task is wrong, the call fails and no tag is created.
 - Tags added to a run later do not move to tasks that were already queued, except tasks that wait for that run with `after`.
 

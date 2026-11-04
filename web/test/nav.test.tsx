@@ -167,9 +167,33 @@ describe('top navigation', () => {
     expect(container.querySelectorAll('[data-nav-icon] .absolute')).toHaveLength(0);
   });
 
+  it('puts the new task button right before the search and disables it without a handler', () => {
+    const onNewTask = vi.fn();
+    const { rerender } = mount({ onNewTask });
+    const bar = screen.getByRole('banner');
+    const button = within(bar).getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    const palette = within(bar).getByRole('button', { name: 'Command palette' });
+    expect(button.compareDocumentPosition(palette) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(button.parentElement).toBe(palette.parentElement);
+    expect(button.nextElementSibling).toBe(palette);
+    fireEvent.click(button);
+    expect(onNewTask).toHaveBeenCalledTimes(1);
+    rerender(
+      <TooltipProvider>
+        <TopNav {...props()} />
+      </TooltipProvider>,
+    );
+    expect(
+      within(screen.getByRole('banner')).getByRole<HTMLButtonElement>('button', {
+        name: 'New task',
+      }).disabled,
+    ).toBe(true);
+  });
+
   it('names the icon buttons in tooltips', async () => {
     mount();
     for (const [name, text] of [
+      [/^New task$/, 'New task'],
       [/Command palette/, 'Search and commands'],
       [/^Notifications$/, 'Notifications'],
       [/^Language/, /Language: /],
@@ -250,6 +274,18 @@ describe('navigation panel of a narrow window', () => {
 });
 
 describe('menu on a phone', () => {
+  it('has the new task button in the menu row, outside the sliding panel', () => {
+    const onNewTask = vi.fn();
+    render(
+      <TooltipProvider>
+        <MobileNav {...props({ onNewTask })} />
+      </TooltipProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'New task' }));
+    expect(onNewTask).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('opens the navigation panel with every control and closes it on a jump', async () => {
     const onNavigate = vi.fn();
     render(

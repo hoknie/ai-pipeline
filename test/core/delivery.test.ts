@@ -95,11 +95,44 @@ describe('delivery requests', () => {
       files: ['a.ts'],
       conflicts: [],
       userEdits: [],
+      finishedAt: 7000,
     });
     expect(deliveryCounts(state).failed).toBe(1);
     expect(request(state, null, true)).toEqual([
       expect.objectContaining({ kind: 'deliver', force: true }),
     ]);
+  });
+
+  it('records when each delivery attempt ended, also a repeated refusal with the same reason', () => {
+    const state = mergedRun(1);
+    expect(state.groups[0]?.delivery.finishedAt).toBeNull();
+    const refused = { kind: 'refused' as const, reason: 'same', files: [] };
+    request(state);
+    transition(state, { kind: 'delivery_finished', result: refused }, 7000);
+    expect(state.groups[0]?.delivery.finishedAt).toBe(7000);
+    request(state);
+    transition(state, { kind: 'delivery_finished', result: refused }, 9000);
+    expect(state.groups[0]?.delivery).toMatchObject({
+      state: 'apply_failed',
+      reason: 'same',
+      finishedAt: 9000,
+    });
+    request(state);
+    transition(state, { kind: 'delivery_finished', result: applied }, 9500);
+    expect(state.groups[0]?.delivery.finishedAt).toBe(9500);
+  });
+
+  it('keeps the time of the last attempt when a delivery is interrupted', () => {
+    const state = mergedRun(1);
+    request(state);
+    transition(
+      state,
+      { kind: 'delivery_finished', result: { kind: 'failed', message: 'x' } },
+      7000,
+    );
+    request(state);
+    transition(state, { kind: 'interrupted' }, 8000);
+    expect(state.groups[0]?.delivery.finishedAt).toBe(7000);
   });
 
   it('points runs from before hidden refs to git merge', () => {

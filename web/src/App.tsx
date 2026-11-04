@@ -18,12 +18,13 @@ import { usePreference } from './preferences.ts';
 import { formatRoute, parseRoute, type Route, type View } from './route.ts';
 import { repositoryLabel, waitingByRepository } from './repositories.ts';
 import { sectionLabel } from './sections.ts';
-import { settingsGroupOf } from './settingsGroups.ts';
+import { settingsLocationOf } from './settingsGroups.ts';
 import { browserEventSource, useRuns, type EventSourceFactory } from './store.ts';
 import { TagsProvider } from './tags.tsx';
 import { Skeleton } from './ui/skeleton.tsx';
 
 const TopologyPage = lazy(() => import('./components/TopologyPage.tsx'));
+const NewTaskDialog = lazy(() => import('./components/NewTaskDialog.tsx'));
 const QueuePage = lazy(() => import('./components/QueuePage.tsx'));
 const SpecialistsPage = lazy(() => import('./components/SpecialistsPage.tsx'));
 const WorkflowsPage = lazy(() => import('./components/WorkflowsPage.tsx'));
@@ -94,6 +95,7 @@ function Panel({
     setTags,
     daemon,
     openedState,
+    streamedProcesses,
   } = useRuns(api, openStream, chosen, route.view === 'runs' ? route.run : null, notifyError);
   // Every request names its repository, so it never depends on the server's default.
   const scopedApi = useMemo(() => api.forRepository(selected), [api, selected]);
@@ -109,6 +111,12 @@ function Panel({
   const [showJson, setShowJson] = usePreference('showJson', false);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
+  const [newTask, setNewTask] = useState(false);
+  const [newTaskOpened, setNewTaskOpened] = useState(false);
+  const openNewTask = useCallback(() => {
+    setNewTaskOpened(true);
+    setNewTask(true);
+  }, []);
   const lastRun = useRef<string | null>(null);
   const now = useNow();
 
@@ -174,7 +182,7 @@ function Panel({
     if (view === route.view) return route;
     if (view === 'queue' || view === 'specialists' || view === 'workflows')
       return { view, run: null, group: null, step: null };
-    if (view === 'settings') return { view, run: 'general', group: null, step: null };
+    if (view === 'settings') return { view, run: 'general', group: 'global', step: null };
     if (view === 'topology') return { view, run: run?.workflow ?? null, group: null, step: null };
     return { view, run: lastRun.current, group: null, step: null };
   };
@@ -247,6 +255,7 @@ function Panel({
             runs={runs}
             selected={selected}
             connection={connection}
+            streamedProcesses={streamedProcesses}
             api={api}
             onOpenGroup={(entry) =>
               setRoute({ view: 'runs', run: entry.runId, group: entry.group, step: entry.step })
@@ -274,6 +283,7 @@ function Panel({
           waiting,
           queued: queue?.items.length ?? 0,
           onPalette: () => setPalette(true),
+          onNewTask: queue ? openNewTask : undefined,
           notifications,
         }}
       >
@@ -286,6 +296,20 @@ function Panel({
           onRoute={setRoute}
           onShortcuts={() => setShortcuts(true)}
         />
+        {queue !== null && newTaskOpened ? (
+          <Suspense fallback={null}>
+            <NewTaskDialog
+              key={pageKey}
+              api={scopedApi}
+              queue={queue}
+              open={newTask}
+              onOpenChange={setNewTask}
+              draft={queueDrafts.new}
+              onDraft={(draft) => onQueueDraft('new', draft)}
+              onQueue={setQueue}
+            />
+          </Suspense>
+        ) : null}
         <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
         <DaemonBanner daemon={daemon} />
         <h1 className="sr-only">{sectionLabel(route.view, t)}</h1>
@@ -300,6 +324,7 @@ function Panel({
               onDraft={onQueueDraft}
               onQueue={setQueue}
               onError={onError}
+              onNewTask={openNewTask}
             />
           </Suspense>
         ) : route.view === 'settings' ? (
@@ -307,8 +332,12 @@ function Panel({
             <SettingsPage
               key={pageKey}
               api={scopedApi}
-              group={settingsGroupOf(route.run)}
+              scope={settingsLocationOf(route.group, route.run).scope}
+              group={settingsLocationOf(route.group, route.run).group}
               repository={selected}
+              repositories={repositories}
+              onSelectRepository={(path) => void selectRepository(path)}
+              dirty={dirty}
               queue={queue}
               onQueue={setQueue}
               onError={onError}

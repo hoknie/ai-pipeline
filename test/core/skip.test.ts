@@ -52,6 +52,12 @@ describe('checkSkip', () => {
     );
   });
 
+  it('does not accept the name of a step in place of its id', () => {
+    expect(checkSkip(config(CONFIG_TEXT), 'feature', ['Планировщик'])).toMatch(
+      /^unknown step `Планировщик` in skip/,
+    );
+  });
+
   it('refuses to skip every step', () => {
     expect(checkSkip(resolved, 'feature', ['plan', 'code', 'review', 'qa'])).toBe(
       'skip leaves no steps',
@@ -137,9 +143,30 @@ describe('stepStates', () => {
       'Ревьюер',
       'Тестировщик',
     ]);
-    (state.run.config.specialists.find((item) => item.slug === 'qa') as { name?: string }).name =
-      undefined;
+    (state.run.config.specialists.find((item) => item.slug === 'qa') as { name: string }).name =
+      '  ';
     expect(stepStates(state)[3]!.name).toBe('qa');
+  });
+
+  it('adds the id to the names that two steps of a workflow share', () => {
+    const state = run(1, {
+      configText: `swarm:
+  specialists:
+    coder: { name: Кодер }
+    reviewer: { name: Ревьюер }
+  workflows:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+        - { id: review, specialist: reviewer }
+        - { id: review-2, specialist: reviewer }
+`,
+    });
+    expect(stepStates(state).map((entry) => entry.name)).toEqual([
+      'Кодер',
+      'Ревьюер (review)',
+      'Ревьюер (review-2)',
+    ]);
   });
 
   it('keeps a failed group on its step', () => {

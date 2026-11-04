@@ -228,7 +228,7 @@ describe('topology page', () => {
   it('lists the groups of a clicked step and opens one with that step', async () => {
     const { open } = page([runView({ id: 'a', title: 'Первый' })]);
     fireEvent.click(await screen.findByTestId('stage-code'));
-    const side = screen.getByRole('complementary', { name: 'node code' });
+    const side = screen.getByRole('complementary', { name: 'node coder' });
     expect(within(side).getByText('Первый')).toBeTruthy();
     fireEvent.click(within(side).getByRole('button', { name: 'Вход' }));
     expect(open).toHaveBeenCalledWith(
@@ -284,6 +284,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 1,
               stepId: 'code',
+              stepName: 'Кодер',
               status: 'finished',
               verdict: 'done',
             },
@@ -291,6 +292,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 2,
               stepId: 'review',
+              stepName: 'Ревьюер',
               status: 'finished',
               verdict: 'rejected',
             },
@@ -298,6 +300,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 3,
               stepId: 'code',
+              stepName: 'Кодер',
               status: 'running',
               verdict: null,
             },
@@ -323,11 +326,11 @@ describe('tabs', () => {
     );
     fireEvent.click(screen.getByTestId('stage-code'));
     fireEvent.click(
-      within(screen.getByRole('complementary', { name: 'node code' })).getByRole('button', {
+      within(screen.getByRole('complementary', { name: 'node coder' })).getByRole('button', {
         name: 'Вход',
       }),
     );
-    await screen.findByText('#3 code');
+    await screen.findByText('#3 Кодер');
     expect(window.location.hash).toBe('#runs/run1/login/code');
     expect(expanded()).toEqual([false, false, true]);
     expect(screen.getByRole('tab', { name: 'Log' }).getAttribute('aria-selected')).toBe('true');
@@ -342,6 +345,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 1,
               stepId: 'code',
+              stepName: 'Кодер',
               status: 'finished',
               verdict: 'done',
             },
@@ -349,6 +353,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 2,
               stepId: 'review',
+              stepName: 'Ревьюер',
               status: 'finished',
               verdict: 'rejected',
             },
@@ -356,6 +361,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 3,
               stepId: 'code',
+              stepName: 'Кодер',
               status: 'running',
               verdict: null,
             },
@@ -376,7 +382,7 @@ describe('tabs', () => {
         onError={() => undefined}
       />,
     );
-    await screen.findByText('#2 review');
+    await screen.findByText('#2 Ревьюер');
     await waitFor(() => expect(expanded()).toEqual([false, true, false]));
   });
 
@@ -581,7 +587,7 @@ describe('specialist occupancy', () => {
     expect(code.className).toContain('border-status-warn');
     expect(within(screen.getByTestId('stage-plan')).queryByText(/busy/)).toBeNull();
     fireEvent.click(code);
-    const side = screen.getByRole('complementary', { name: 'node code' });
+    const side = screen.getByRole('complementary', { name: 'node coder' });
     expect(within(side).getByText('Specialist busy in other runs')).toBeTruthy();
     expect(within(side).getByText(/Чужой · other/)).toBeTruthy();
     fireEvent.click(within(side).getByRole('button', { name: 'api' }));

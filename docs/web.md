@@ -90,8 +90,8 @@ A specialist can ask structured questions (`questions` in `swarm_report`). They 
 The queue settings are in [queue.md](queue.md).
 
 - The "Queue controls" block on the left holds the state, the buttons "New task", "Start" and "Pause", the parallelism and the link "Queue settings".
-- The modes of the queue are in the group "Queue" of [Settings](#settings) (`#settings/queue`): the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector, the autopilot's answer text and the "On a usage limit" selector.
-  - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`. The file is shown under the control. The group "Delivery" writes to the same file.
+- The modes of the queue are in the group "Queue" of [Settings](#settings) (`#settings/project/queue`): the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector, the autopilot's answer text and the "On a usage limit" selector.
+  - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`. The file is shown under the control.
 - The "On a usage limit" selector chooses `wait` or `stop`. A queue stopped by a usage limit shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
 - "Return to the queue" is on a skipped run only when it has failed or cancelled groups to retry. It is also in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
 - "Remove from list" is on every skipped run in the block "Skipped with a problem". After a confirmation the card disappears; the run itself does not change.
@@ -137,14 +137,25 @@ The tab edits the `aip/workflows/<id>.yaml` files of the project and of the shar
 
 ### Settings
 
-The section shows the settings of the selected repository in groups. The groups are listed on the left, in this order: "General", "Defaults", "Delivery", "Working copy", "Naming", "Claude", "Runtimes", "Web panel", "Queue", "Tags" and "System".
+The section is a set of forms in two tabs. "Shared" edits the shared `settings.yaml`, "Project" edits the `aip/settings.yaml` of the selected repository; the file of the tab is shown above the groups. On "Project" a "Project" selector lists the repositories of the panel; choosing one switches the repository of the whole panel, as the repository menu does.
 
-The address is `#settings/<group>`; an unknown group opens "General", and the address `#specialists/_settings` of earlier versions opens `#settings/general`.
+The groups of "Shared" are "General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", "System" and "Tags". The groups of "Project" are "General", "Agents", "Delivery" and "Queue". Fields of `web.*` and `runtimes.*` exist only on "Shared".
 
-- The groups from "General" to "Web panel" are the sections of `settings.yaml`, shown as a result of the shared and the project levels, with the file each value comes from. Only "Auto delivery" and "Delivery mode" (group "Delivery") can be changed here; the others are edited in the files.
-- `web.*` and `runtimes.*` are read from the shared `settings.yaml` only. Of the runtime environment only the names of the variables are shown, never their values. A change takes effect after the restart: see "System".
+The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery` or `#settings/project/queue`. An unknown group opens "General" of the tab. The addresses of earlier versions (`#settings/<group>`, `#specialists/_settings`) open the matching group of the new layout.
+
+- Every field of `settings.yaml` that the panel shows is a form control: a switch, a selector, a number, a text, a duration (`30m`) or a list of strings. The sections of a group are cards, two in a row on a wide window.
+- "Save" writes all changed fields of the group to the file of the tab in one write; comments and other keys of the file stay. "Discard changes" returns the form to the saved values. An empty field removes the key.
+- On "Project" a field set in the project has the button "Inherit", which removes the key from the project file. A field without a project value shows the shared (or built-in) value with a mark of where it comes from.
+- Errors of validation are shown at the fields. If the file was changed after it was read, the form offers "Reload".
+- Leaving a group, a tab or a project with unsaved changes asks for confirmation.
+- `web.*` and `runtimes.*` are read from the shared `settings.yaml` only. Of the runtime environment only the names of the variables are shown, never their values: a value can be added or replaced, not read. A change takes effect after the restart: see "System".
 - A group with configuration errors gets a mark; the errors are shown in the group. Errors of specialists and workflows are shown in "General".
-- "Queue" holds the modes of the queue (see [Queue](#queue)), "Tags" the tag catalog shared by all repositories.
+- "Queue" holds the modes of the queue (see [Queue](#queue)), which switch at once without "Save"; "Tags" the tag catalog shared by all repositories.
+
+Tags of linked tasks (made automatically for a chain of tasks) are shown as `#115: name` in the color `indigo`, which no other tag can have.
+The label is a link to the task that created the tag; in the run list a click on it opens that task, not the run of the row.
+These tags are not offered in the tag pickers, cannot be created or removed there, and are never sent when other tags of a task or run change; a task edit keeps them.
+"Tags" in the settings shows them in a separate section "Linked task tags" with a name field and "Delete", without a color choice.
 - "System" shows the state of the daemon (pid, version, build, whether agents work) and of the web panel (pid, address without the token, access, build), refreshed every 3 seconds, and the path of the daemon log.
   - "Restart panel" restarts the panel on the same address with the same token; the page comes back by itself. The daemon and its agents keep running.
   - "Restart daemon" runs `aip daemon restart --web` as a separate process. While agents work the panel asks again, and "Restart, stopping the agents" runs it with `--force`.
@@ -153,7 +164,9 @@ The address is `#settings/<group>`; an unknown group opens "General", and the ad
 
 ## Status
 
-Under every section is a collapsible "Status" strip with the current load across all repositories. Whether it is open and which tab is selected are remembered in the browser. The specialists update with every run event, the background processes every 3 seconds while the page is visible.
+Under every section is a collapsible "Status" strip with the current load across all repositories. Whether it is open and which tab is selected are remembered in the browser. The specialists update with every run event.
+
+The background processes arrive in the `processes` event of `/api/events`: the daemon looks at them every 2 seconds while someone is subscribed and sends the list when it changes. The panel asks `GET /api/processes` once on opening and then every 3 seconds only while the page is visible and the stream is down or has sent no list.
 
 - Collapsed, it shows "Status: specialists — running N · waiting M | background processes — running K". Zeros are shown. Before the first answer about processes, or when it fails, K is "—".
 - On the right of the strip is the connection indicator: "Connected", "Reconnecting" or "Polling". A click on it does not open the strip.
@@ -188,11 +201,16 @@ Under every section is a collapsible "Status" strip with the current load across
 - `POST /api/repositories` with the body `{"path": "<absolute path>"}` adds one.
 - `DELETE /api/repositories?repository=<absolute path>` removes one.
 - A relative path is rejected with code 400 without contacting the daemon. Daemon errors also come back with code 400 and the error text.
-- The list and its changes also arrive in `/api/events` (the `repositories` event).
+- The list and its changes also arrive in `/api/events` (the `repositories` event); background processes arrive there as the `processes` event.
+- `/api/events` is a one-way stream of server-sent events (`text/event-stream`), not a WebSocket; commands go as the requests above.
 - The queue requests, `/api/config…` and `/api/workflows` accept `repository=<absolute path>`.
 - Without it the most recently added repository is used. While the list is empty, the answer is 409.
 - A relative path and a path outside a git repository are rejected with code 400. A `repository` field in the request body is ignored.
 - `POST /api/queue/settings` takes `parallel`, `autopilot`, `skipFailed`, `autopilotAnswer` and `onLimit`, all optional. An empty body is answered with 400.
-- `PUT /api/config/settings/<path>` writes the general settings.
+- `PUT /api/config/settings/<path>` writes one field of `settings.yaml`, `PUT /api/config/settings` writes several in one write.
+  - The bodies are `{"value": …, "revision": …, "level": …}` and `{"values": {"<path>": …}, "revision": …, "level": …}`.
+  - `level` is `global` (default) or `project`; `revision` is the one from `GET /api/config`; a value `null` removes the key.
+  - A path outside the list of fields is answered with 404, a value of a wrong kind with 422, an old revision with 409.
+  - `web.*` and `runtimes.*` are written on `global` only.
 - `GET /api/system` returns the state of the daemon and of the panel (the address has no token).
 - `POST /api/system/web/restart` and `POST /api/system/daemon/restart` (body `{"force": true}` optional) answer 202 `{"state": "restarting"}` and restart after the answer is sent. The answer is 409 with `code` `daemon_busy` for a busy daemon without `force`, and `web_standalone` for a panel started by `aip web`.

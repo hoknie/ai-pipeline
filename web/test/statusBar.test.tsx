@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { App } from '../src/App.tsx';
 import { StatusBar } from '../src/components/shell/StatusBar.tsx';
+import type { StreamedProcesses } from '../src/store.ts';
 
 import {
   FakeEventSource,
@@ -55,13 +56,18 @@ const summary = (running: number, waiting: number, processes: number | string) =
 
 function bar(
   api = fakeApi(),
-  options: { runs?: ReturnType<typeof runs>; onOpenGroup?: () => void } = {},
+  options: {
+    runs?: ReturnType<typeof runs>;
+    onOpenGroup?: () => void;
+    streamed?: StreamedProcesses | null;
+  } = {},
 ) {
   render(
     <StatusBar
       runs={options.runs ?? runs()}
       selected={APP}
       connection="live"
+      streamedProcesses={options.streamed ?? null}
       api={api}
       onOpenGroup={options.onOpenGroup ?? vi.fn()}
     />,
@@ -103,6 +109,32 @@ describe('status bar', () => {
     });
     bar(api);
     expect(await within(toggle()).findByText(summary(1, 2, 3))).toBeTruthy();
+  });
+
+  it('counts the processes of the stream without asking on a timer', async () => {
+    const api = fakeApi({ processes: vi.fn(async () => ({ processes: [] })) });
+    const view = (streamed: StreamedProcesses | null) => (
+      <StatusBar
+        runs={runs()}
+        selected={APP}
+        connection="live"
+        streamedProcesses={streamed}
+        api={api}
+        onOpenGroup={vi.fn()}
+      />
+    );
+    const { rerender } = render(view({ processes: [processView()], error: null }));
+    expect(await within(toggle()).findByText(summary(1, 2, 1))).toBeTruthy();
+    rerender(view({ processes: [processView(), processView({ pid: 4243 })], error: null }));
+    expect(await within(toggle()).findByText(summary(1, 2, 2))).toBeTruthy();
+    expect(api.processes).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a dash when the stream sends an error before any list', async () => {
+    bar(fakeApi({ processes: vi.fn(() => new Promise<never>(() => undefined)) }), {
+      streamed: { processes: null, error: 'no ps' },
+    });
+    expect(await within(toggle()).findByText(summary(1, 2, '—'))).toBeTruthy();
   });
 
   it('shows a dash instead of the number before the first answer and on an error', async () => {
@@ -330,6 +362,67 @@ describe('status bar height', () => {
     fireEvent.keyDown(handle(), { key: 'ArrowDown' });
     fireEvent.keyDown(handle(), { key: 'ArrowDown' });
     expect(content().style.height).toBe('240px');
+  });
+
+  it('has aria-valuemax of 80 % of the window', () => {
+    bar();
+    fireEvent.click(toggle());
+    expect(handle().getAttribute('aria-valuemax')).toBe('720');
+  });
+
+  it('cancels a drag when the strip is collapsed', () => {
+    bar();
+    fireEvent.click(toggle());
+    fireEvent.pointerDown(handle(), { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(handle(), { clientY: 400, pointerId: 1 });
+    expect(content().style.height).toBe('356px');
+    expect(document.body.classList.contains('select-none')).toBe(true);
+    fireEvent.click(toggle());
+    expect(document.body.classList.contains('select-none')).toBe(false);
+    expect(window.localStorage.getItem('aip.web.statusBar.height')).toBeNull();
+    fireEvent.click(toggle());
+    expect(content().style.height).toBe('256px');
+  });
+
+  describe('in a shrunk window', () => {
+    const resize = (height: number) =>
+      act(() => {
+        Object.defineProperty(window, 'innerHeight', { value: height, configurable: true });
+        window.dispatchEvent(new Event('resize'));
+      });
+    const stored = () => window.localStorage.getItem('aip.web.statusBar.height');
+    const openShrunk = () => {
+      window.localStorage.setItem('aip.web.statusBar.height', '700');
+      bar();
+      fireEvent.click(toggle());
+      resize(600);
+      expect(content().style.height).toBe('480px');
+    };
+
+    it('keeps the chosen height after ArrowUp', () => {
+      openShrunk();
+      fireEvent.keyDown(handle(), { key: 'ArrowUp' });
+      expect(content().style.height).toBe('480px');
+      expect(stored()).toBe('700');
+      resize(900);
+      expect(content().style.height).toBe('700px');
+    });
+
+    it('keeps the chosen height after dragging up to the limit', () => {
+      openShrunk();
+      fireEvent.pointerDown(handle(), { clientY: 500, pointerId: 1 });
+      fireEvent.pointerMove(handle(), { clientY: 0, pointerId: 1 });
+      fireEvent.pointerUp(handle(), { clientY: 0, pointerId: 1 });
+      expect(content().style.height).toBe('480px');
+      expect(stored()).toBe('700');
+    });
+
+    it('remembers a real decrease', () => {
+      openShrunk();
+      fireEvent.keyDown(handle(), { key: 'ArrowDown' });
+      expect(content().style.height).toBe('464px');
+      expect(stored()).toBe('464');
+    });
   });
 
   it('restores the remembered height and has no handle when collapsed', () => {

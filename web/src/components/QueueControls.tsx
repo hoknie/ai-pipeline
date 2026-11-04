@@ -70,12 +70,15 @@ export function QueueControls({
         onQueue={onQueue}
         onError={onError}
       />
-      <span className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={onNewTask}>
+      <div>
+        <Button onClick={onNewTask}>
           <Plus className="size-4" aria-hidden="true" />
           {t('queue.newTask')}
         </Button>
+      </div>
+      <span className="flex flex-wrap gap-2">
         <Button
+          variant="secondary"
           disabled={!canStart || invalid}
           onClick={() =>
             void act(
@@ -96,7 +99,7 @@ export function QueueControls({
       </span>
       <a
         className="text-sm underline"
-        href={formatRoute({ view: 'settings', run: 'queue', group: null, step: null })}
+        href={formatRoute({ view: 'settings', run: 'queue', group: 'project', step: null })}
       >
         {t('queue.controls.settings')}
       </a>

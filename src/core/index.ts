@@ -55,6 +55,8 @@ export {
   type SpecialistWaiting,
 } from './occupancy.ts';
 export {
+  attemptStepLabel,
+  stepLabel,
   stepName,
   topology,
   workflowTopologies,
@@ -80,18 +82,23 @@ export {
   type Suggestion,
 } from './permissions.ts';
 export {
+  CHAIN_TAG_COLOR,
   TAG_COLORS,
   TAG_NAME_LIMIT,
+  addLinkedTag,
   addTag,
   autoTagName,
   editTag,
   findTag,
+  keepLinkedTags,
   knownTags,
   mergeTags,
   removeTag,
+  resolveManualTags,
   resolveTags,
   type Tag,
   type TagColor,
+  type TagTask,
 } from './tags.ts';
 export {
   QUEUE_PARALLEL_MAX,

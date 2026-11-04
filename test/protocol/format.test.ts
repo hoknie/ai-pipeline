@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createStyle,
   filterByTags,
+  formatTagLabels,
   formatTagList,
   formatGroup,
   formatQueue,
@@ -36,9 +37,9 @@ describe('text for people', () => {
         'Repository: /repo',
         'Groups: running 1 · needs_human 1 (2) · usage — · started 2m00s ago',
         '',
-        'GROUP     STATUS       STEP  ROUND  TIME   CHANGES  DELIVERY  NOTE',
-        'gruppa-1  needs_human  plan  1      1m00s  —        —         question: OAuth или пароль?',
-        'gruppa-2  running      plan  1      2m00s  —        —',
+        'GROUP     STATUS       STEP         ROUND  TIME   CHANGES  DELIVERY  NOTE',
+        'gruppa-1  needs_human  Планировщик  1      1m00s  —        —         question: OAuth или пароль?',
+        'gruppa-2  running      Планировщик  1      2m00s  —        —',
       ].join('\n'),
     );
   });
@@ -77,7 +78,7 @@ describe('text for people', () => {
     expect(text).toContain('Group gruppa-1 (Группа 1) · queued · run run000000001');
     expect(text).toContain('Ref: refs/aip/run000000001/groups/gruppa-1');
     expect(text).toContain(
-      '#1 plan r1 · plan (claude) · finished done · 3s · 10 in / 2 out · $0.5000',
+      '#1 Планировщик r1 · plan (claude) · finished done · 3s · 10 in / 2 out · $0.5000',
     );
     expect(text).toContain('summary: план готов');
     expect(text).toContain('Log of attempt #1:\n  line');
@@ -132,7 +133,7 @@ describe('text for people', () => {
     expect(view.warnings).toEqual([]);
     expect(view.attempts[0]?.outsideChanges).toEqual(['README.md', 'docs/a.md']);
     expect(formatGroup(view)).toContain(
-      'Warning: files in the working copy changed during step plan: README.md, docs/a.md',
+      'Warning: files in the working copy changed during step Планировщик: README.md, docs/a.md',
     );
     expect(runView(state, 2000).groups[0]?.warnings).toBe(1);
     state.groups[0]!.warnings.push('other');
@@ -160,7 +161,7 @@ describe('text for people', () => {
     ]);
     expect(runView(state, 4000).groups[0]?.warnings).toBe(3);
     expect(formatGroup(view)).toContain(
-      'Warning: files in the working copy changed during step plan: swarm.yaml, README.md',
+      'Warning: files in the working copy changed during step Планировщик: swarm.yaml, README.md',
     );
   });
 
@@ -325,7 +326,7 @@ describe('queue text', () => {
     const text = formatQueue(view);
     expect(text).toContain('Queue: running, parallel 2 (2 of 2 places taken)');
     expect(text).toContain(
-      'feature  Группа 1, Группа 2, Группа 3  1/3 groups · steps 4/12\n    gruppa-2: plan',
+      'feature  Группа 1, Группа 2, Группа 3  1/3 groups · steps 4/12\n    gruppa-2: Планировщик',
     );
     expect(text).toContain('1/1 groups · steps 4/4 · delivering');
     const splitting = {
@@ -566,8 +567,8 @@ describe('formatRunQueued', () => {
 
 describe('tags in text', () => {
   const tags = [
-    { id: 'tg-a', name: 'auth', color: 'blue' as const },
-    { id: 'tg-b', name: 'v2', color: 'red' as const },
+    { id: 'tg-a', name: 'auth', color: 'blue' as const, task: null },
+    { id: 'tg-b', name: 'v2', color: 'red' as const, task: null },
   ];
   const runWith = (id: string, own: typeof tags) => ({
     ...runView(run(1, { id }), 1000),
@@ -594,6 +595,20 @@ describe('tags in text', () => {
     const text = formatTagList(tags);
     expect(text).toContain('auth');
     expect(text).toContain('blue');
+  });
+
+  it('labels a linked task tag with the task number and lists it in TASK', () => {
+    const linked = {
+      id: 'tg-l',
+      name: 'cards',
+      color: 'indigo' as const,
+      task: { run: 'r1', number: 115 },
+    };
+    expect(formatTagLabels([linked, tags[0]!])).toBe('#115:cards #auth');
+    const text = formatTagList([linked, tags[0]!]);
+    expect(text).toContain('TASK');
+    expect(text).toContain('#115');
+    expect(text).toContain('—');
   });
 
   it('keeps runs with any of the tags, ignoring case', () => {
@@ -756,7 +771,7 @@ describe('system stages and waiting in text', () => {
         () => specialistWait,
       ),
     );
-    expect(text).toContain('gruppa-1: plan (waiting for coder)');
+    expect(text).toContain('gruppa-1: Планировщик (waiting for coder)');
   });
 });
 
@@ -765,6 +780,29 @@ describe('skipped steps in text', () => {
     const state = run(1);
     expect(formatRun(runView(state, 1000), 1000)).not.toContain('Skipped steps');
     state.run.skippedSteps = ['review', 'qa'];
-    expect(formatRun(runView(state, 1000), 1000)).toContain('Skipped steps: review, qa');
+    expect(formatRun(runView(state, 1000), 1000)).toContain(
+      'Skipped steps: Ревьюер (review), Тестировщик (qa)',
+    );
+  });
+
+  it('does not repeat the id of a step whose name already carries it', () => {
+    const view = runView(run(1), 1000);
+    view.steps = [
+      {
+        id: 'review',
+        specialist: 'reviewer',
+        name: 'Ревьюер (review)',
+        skipped: true,
+        state: 'upcoming',
+      },
+      {
+        id: 'review-2',
+        specialist: 'reviewer',
+        name: 'Ревьюер (review-2)',
+        skipped: true,
+        state: 'upcoming',
+      },
+    ];
+    expect(formatRun(view, 1000)).toContain('Skipped steps: Ревьюер (review), Ревьюер (review-2)');
   });
 });

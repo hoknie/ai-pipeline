@@ -12,9 +12,14 @@ import {
   type AgentRoot,
   type PsRow,
 } from '../../src/daemon/processes.ts';
-import type { BackgroundProcessesView } from '../../src/protocol/index.ts';
+import {
+  streamEventSchema,
+  subscribe,
+  type BackgroundProcessesView,
+  type StreamEvent,
+} from '../../src/protocol/index.ts';
 import { alive, run, start } from './control-harness.ts';
-import { until, type Harness } from './harness.ts';
+import { harness, until, type Harness } from './harness.ts';
 
 const MAC = `  100     1   100     05:10   0:01.50  20480 /usr/local/bin/claude --print
   101   100   100     05:09   0:00.03   4096 node /opt/aip/main.ts mcp --worker abc
@@ -214,5 +219,129 @@ describe('background processes of a daemon', () => {
     });
     process.kill(child, 'SIGKILL');
     await until('the orphan gone from the list', async () => !(await listed()));
+  });
+});
+
+type ProcessesEvent = Extract<StreamEvent, { event: 'processes' }>;
+
+function watch(h: Harness): { events: StreamEvent[]; stop: () => void } {
+  const events: StreamEvent[] = [];
+  const abort = new AbortController();
+  void subscribe(
+    h.socket,
+    (line) => events.push(streamEventSchema.parse(JSON.parse(line))),
+    abort.signal,
+  ).catch(() => undefined);
+  return { events, stop: () => abort.abort() };
+}
+
+const processEvents = (events: StreamEvent[]): ProcessesEvent[] =>
+  events.filter((event): event is ProcessesEvent => event.event === 'processes');
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe('background processes in the event stream', () => {
+  it('sends the child of an agent and then the list without it', async () => {
+    const h = (current = await harness(undefined, {}, { processesIntervalMs: 100 }));
+    h.script({ code: [{ child: true, hang: true }] });
+    const stream = watch(h);
+    const runId = await run(h);
+    const childrenFile = join(h.fakeState, 'children');
+    await until('the child of the agent', () => existsSync(childrenFile));
+    const child = Number(readFileSync(childrenFile, 'utf8').trim().split('\n')[0]);
+    const has = (event: ProcessesEvent) =>
+      (event.processes ?? []).some((process) => process.pid === child);
+    await until('the event with the child', () => processEvents(stream.events).some(has));
+    process.kill(child, 'SIGKILL');
+    await until('the event without the child', () => {
+      const all = processEvents(stream.events);
+      const last = all[all.length - 1];
+      return all.some(has) && last !== undefined && !has(last);
+    });
+    stream.stop();
+    await h.call('cancel', { runId });
+  });
+
+  it('does not look without subscribers, once when idle, and says an error once', async () => {
+    let calls = 0;
+    const h = (current = await harness(
+      undefined,
+      {},
+      {
+        processesIntervalMs: 30,
+        snapshotProcesses: () => {
+          calls += 1;
+          return Promise.resolve([]);
+        },
+      },
+    ));
+    await pause(150);
+    expect(calls).toBe(0);
+    const first = watch(h);
+    await until('the first list', () => processEvents(first.events).length === 1);
+    const second = watch(h);
+    await until(
+      'the list for the second subscriber',
+      () => processEvents(second.events).length === 1,
+    );
+    expect(second.events[0]?.event).toBe('snapshot');
+    await pause(200);
+    expect(calls).toBe(1);
+    expect(processEvents(first.events)).toHaveLength(1);
+    first.stop();
+    second.stop();
+  });
+
+  it('sends the same error once', async () => {
+    let calls = 0;
+    const h = (current = await harness(
+      undefined,
+      {},
+      {
+        processesIntervalMs: 30,
+        snapshotProcesses: () => {
+          calls += 1;
+          return Promise.reject(new Error('no ps'));
+        },
+      },
+    ));
+    const stream = watch(h);
+    await until('the error', () => processEvents(stream.events).length === 1);
+    await until('more looks', () => calls >= 3);
+    expect(processEvents(stream.events)).toMatchObject([{ error: 'no ps' }]);
+    stream.stop();
+  });
+
+  it('sends the list without a killed process within a second', async () => {
+    const h = (current = await harness(undefined, {}, { processesIntervalMs: 60_000 }));
+    h.script({ code: [{ child: true, hang: true }] });
+    const stream = watch(h);
+    const runId = await run(h);
+    const childrenFile = join(h.fakeState, 'children');
+    await until('the child of the agent', () => existsSync(childrenFile));
+    const child = Number(readFileSync(childrenFile, 'utf8').trim().split('\n')[0]);
+    // The interval is long: the first look found nothing, so ask for a fresh one by listing.
+    await until('the child listed', async () => {
+      const view = (await h.call('processes', {})) as BackgroundProcessesView;
+      return view.processes.some((process) => process.pid === child);
+    });
+    stream.stop();
+    const later = watch(h);
+    await until('the list with the child', () =>
+      processEvents(later.events).some((event) =>
+        (event.processes ?? []).some((process) => process.pid === child),
+      ),
+    );
+    const before = later.events.length;
+    await h.call('process_kill', { pid: child });
+    const started = Date.now();
+    await until('the list without the child', () =>
+      processEvents(later.events.slice(before)).some(
+        (event) => !(event.processes ?? []).some((process) => process.pid === child),
+      ),
+    );
+    expect(Date.now() - started).toBeLessThan(1_000);
+    later.stop();
+    await h.call('cancel', { runId });
   });
 });

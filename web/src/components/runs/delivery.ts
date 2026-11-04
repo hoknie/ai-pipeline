@@ -1,4 +1,4 @@
-import type { RunView } from '../../types.ts';
+import type { ApplyResult, RunView } from '../../types.ts';
 
 /** Whether merged groups wait for delivery and none is being delivered now. */
 export function canDeliver(run: RunView): boolean {
@@ -30,4 +30,42 @@ export function deliveryBadge(run: RunView): DeliveryBadge | null {
   }
   if (delivery.merged > 0) return { status: 'applied', label: null, reason: null };
   return null;
+}
+
+/** What the answer of `apply` says about the delivery. */
+export type ApplyOutcome =
+  { kind: 'pending' } | { kind: 'applied' } | { kind: 'failed'; reason: string | null };
+
+/** The outcome of a delivery from the answer of `apply`; `pending` while it still goes on. */
+export function applyOutcome(result: ApplyResult): ApplyOutcome {
+  if (result.pending) return { kind: 'pending' };
+  const failed = result.groups.find((group) => group.delivery.state === 'apply_failed');
+  if (failed) return { kind: 'failed', reason: failed.delivery.reason };
+  if (result.groups.some((group) => group.delivery.state === 'applied')) {
+    return { kind: 'applied' };
+  }
+  return { kind: 'pending' };
+}
+
+/** A delivery the panel started and waits for. */
+export interface DeliveryWatch {
+  /** `run.delivery.finishedAt` before the request. */
+  since: number | null;
+  /** Whether groups of the run were in `apply_failed` before the request. */
+  failedBefore: boolean;
+  /** The panel has seen the delivery in progress; only then an unchanged time means a cancel. */
+  busy: boolean;
+}
+
+export type SettledOutcome = ApplyOutcome | { kind: 'cancelled' };
+
+/** The outcome of a watched delivery by the run now; `null` while it goes on. */
+export function settledOutcome(run: RunView, watch: DeliveryWatch): SettledOutcome | null {
+  if (run.delivery.inProgress) return null;
+  if (run.delivery.finishedAt === watch.since) return watch.busy ? { kind: 'cancelled' } : null;
+  if (run.deliveryStage?.status === 'applied') return { kind: 'applied' };
+  if (run.deliveryStage?.status === 'apply_failed') {
+    return { kind: 'failed', reason: run.deliveryStage.reason ?? null };
+  }
+  return { kind: 'cancelled' };
 }

@@ -36,7 +36,7 @@ function Entries({
           </Button>
           <StatusBadge status={entry.status} />
           <span className="text-muted-foreground">
-            {entry.step} · {entry.runTitle}
+            {entry.stepName} · {entry.runTitle}
           </span>
         </li>
       ))}

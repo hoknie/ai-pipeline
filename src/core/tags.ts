@@ -13,7 +13,16 @@ export const TAG_COLORS = [
   'brown',
 ] as const;
 
-export type TagColor = (typeof TAG_COLORS)[number];
+/** The 11th color, reserved for tags of linked tasks; it is not in the palette. */
+export const CHAIN_TAG_COLOR = 'indigo';
+
+export type TagColor = (typeof TAG_COLORS)[number] | typeof CHAIN_TAG_COLOR;
+
+/** The task a tag was made for: the run id and its number in the repository. */
+export interface TagTask {
+  run: string;
+  number: number;
+}
 
 export const TAG_NAME_LIMIT = 30;
 
@@ -22,6 +31,7 @@ export interface Tag {
   name: string;
   color: TagColor;
   createdAt: number;
+  task: TagTask | null;
 }
 
 function fold(name: string): string {
@@ -39,6 +49,9 @@ function cleanName(name: string): string {
 }
 
 function cleanColor(color: string): TagColor {
+  if (color === CHAIN_TAG_COLOR) {
+    throw new Rejection(`color \`${CHAIN_TAG_COLOR}\` is reserved for linked task tags`);
+  }
   if (!(TAG_COLORS as readonly string[]).includes(color)) {
     throw new Rejection(`unknown color \`${color}\`; known: ${TAG_COLORS.join(', ')}`);
   }
@@ -72,7 +85,19 @@ export function addTag(
       ? (TAG_COLORS[catalog.length % TAG_COLORS.length] ?? 'gray')
       : cleanColor(input.color);
   checkUnique(catalog, name, null);
-  return { id, name, color, createdAt: now };
+  return { id, name, color, createdAt: now, task: null };
+}
+
+/** A tag of a linked task: the reserved color, the source task is fixed. */
+export function addLinkedTag(
+  catalog: readonly Tag[],
+  input: { name: string; task: TagTask },
+  id: string,
+  now: number,
+): Tag {
+  const name = cleanName(input.name);
+  checkUnique(catalog, name, null);
+  return { id, name, color: CHAIN_TAG_COLOR, createdAt: now, task: { ...input.task } };
 }
 
 /** Returns the changed copy of the tag; the catalog itself is not modified. */
@@ -84,6 +109,9 @@ export function editTag(
   const tag = findTag(catalog, name);
   if (patch.name === undefined && patch.color === undefined) {
     throw new Rejection('pass a new name or a new color');
+  }
+  if (tag.task !== null && patch.color !== undefined) {
+    throw new Rejection('linked task tag color cannot be changed');
   }
   const next = patch.name === undefined ? tag.name : cleanName(patch.name);
   const color = patch.color === undefined ? tag.color : cleanColor(patch.color);
@@ -104,6 +132,34 @@ export function resolveTags(catalog: readonly Tag[], names: readonly string[]): 
     if (!ids.includes(id)) ids.push(id);
   }
   return ids;
+}
+
+/** Like `resolveTags` for names given by a person: a tag of a linked task is refused. */
+export function resolveManualTags(catalog: readonly Tag[], names: readonly string[]): string[] {
+  const ids: string[] = [];
+  for (const name of names) {
+    const tag = findTag(catalog, name);
+    if (tag.task !== null) {
+      throw new Rejection(
+        `tag \`${tag.name}\` belongs to task #${tag.task.number} and is set automatically`,
+      );
+    }
+    if (!ids.includes(tag.id)) ids.push(tag.id);
+  }
+  return ids;
+}
+
+/** Linked task tags of `current` first in their order, then `next` without repeats. */
+export function keepLinkedTags(
+  catalog: readonly Tag[],
+  current: readonly string[],
+  next: readonly string[],
+): string[] {
+  const linked = new Set(catalog.filter((tag) => tag.task !== null).map((tag) => tag.id));
+  return mergeTags(
+    current.filter((id) => linked.has(id)),
+    next,
+  );
 }
 
 /** Drops ids that are no longer in the catalog. */

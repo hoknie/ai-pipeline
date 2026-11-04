@@ -1,4 +1,13 @@
-import { chmodSync, existsSync, linkSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  type Stats,
+} from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
 
 import { ensureDirectory, lockPath as daemonLockPath } from '../config/index.ts';
@@ -7,6 +16,27 @@ import { parseRequest, type Response } from '../protocol/index.ts';
 import { Daemon, type DaemonOptions } from './daemon.ts';
 
 const SUBSCRIBER_BUFFER_LIMIT = 4 * 1024 * 1024;
+/** How often the daemon checks that its socket file and its lock are still in place. */
+export const SOCKET_CHECK_MS = 5_000;
+
+/** The file at `path` is the socket the daemon listens on (not removed, not replaced). */
+function sameFile(path: string, own: Stats): boolean {
+  try {
+    const current = statSync(path);
+    return current.dev === own.dev && current.ino === own.ino;
+  } catch {
+    return false;
+  }
+}
+
+/** The lock at `path` holds the pid of this process. */
+function ownLock(path: string): boolean {
+  try {
+    return readFileSync(path, 'utf8').trim() === String(process.pid);
+  } catch {
+    return false;
+  }
+}
 
 export class AlreadyRunning extends Error {
   constructor(pid: number) {
@@ -69,8 +99,10 @@ export async function startDaemon(options: DaemonOptions): Promise<RunningDaemon
   });
   let closing: Promise<void> | null = null;
   const subscriptions = new Set<Socket>();
+  let socketCheck: NodeJS.Timeout | null = null;
   const close = (): Promise<void> => {
     closing ??= (async () => {
+      if (socketCheck) clearInterval(socketCheck);
       for (const connection of subscriptions) connection.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await daemon.stop();
@@ -133,7 +165,23 @@ export async function startDaemon(options: DaemonOptions): Promise<RunningDaemon
       server.listen(daemon.socket, () => resolve());
     });
     chmodSync(daemon.socket, 0o600);
+    const own = statSync(daemon.socket);
     await daemon.start();
+    // Without its socket nobody can reach the daemon; without its lock the next client starts
+    // another one. Either is gone when the state directory is removed (the socket may live in the
+    // temporary directory, see `socketPath`): the daemon then stops by itself.
+    socketCheck = setInterval(() => {
+      if (closing) return;
+      const lost = !sameFile(daemon.socket, own)
+        ? `socket ${daemon.socket}`
+        : !ownLock(lockPath)
+          ? `lock ${lockPath}`
+          : null;
+      if (lost === null) return;
+      process.stderr.write(`aip daemon: ${lost} is gone; stopping\n`);
+      void close();
+    }, options.socketCheckMs ?? SOCKET_CHECK_MS);
+    socketCheck.unref();
   } catch (error) {
     server.close();
     await daemon.stop().catch(() => undefined);

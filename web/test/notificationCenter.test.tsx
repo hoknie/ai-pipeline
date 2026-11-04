@@ -89,6 +89,26 @@ describe('notification centre', () => {
     expect(screen.queryByRole('button', { name: 'Hide all' })).toBeNull();
   });
 
+  it('drops an item once its group leaves needs_human while the list is open', () => {
+    stub('granted');
+    const { rerender } = render(<Harness />);
+    fireEvent.click(bell());
+    expect(screen.getByText('Вопрос')).toBeTruthy();
+    const moved = [
+      runView({
+        id: 'r1',
+        repository: '/work/app',
+        groups: [
+          groupRow({ slug: 'q', title: 'Вопрос', status: 'running' }),
+          groupRow({ slug: 'f', title: 'Падение', status: 'failed', reason: 'boom' }),
+        ],
+      }),
+    ];
+    rerender(<Harness list={moved} />);
+    expect(screen.queryByText('Вопрос')).toBeNull();
+    expect(screen.getByText('Падение')).toBeTruthy();
+  });
+
   it('closes on Escape and returns focus to the bell', async () => {
     stub('granted');
     render(<Harness />);

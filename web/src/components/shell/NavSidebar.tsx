@@ -28,6 +28,8 @@ export interface NavProps {
   /** Tasks in the queue. */
   queued: number;
   onPalette: () => void;
+  /** Opens the new task dialog; absent while the queue is not loaded, then the button is disabled. */
+  onNewTask?: () => void;
   /** The notification centre: the list, the unread counter and the browser permission. */
   notifications: NotificationCenterState;
   /** The repository selector. */

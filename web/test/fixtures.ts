@@ -72,6 +72,7 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     title: 'Вход',
     status: 'running',
     step: 'code',
+    stepName: 'Кодер',
     round: 1,
     durationMs: 65_000,
     question: null,
@@ -141,7 +142,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     total: 1,
     usage: { inputTokens: 1000, outputTokens: 100, costUsd: 0.42 },
     split: null,
-    delivery: { applied: 0, merged: 0, failed: 0, inProgress: false },
+    delivery: { applied: 0, merged: 0, failed: 0, inProgress: false, finishedAt: null },
     resolver: null,
     deliveryStage: null,
     diff: null,
@@ -174,13 +175,21 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
     limitUntil: null,
     warnings: [],
     conflictFiles: [],
-    delivery: { state: 'pending', reason: null, files: [], conflicts: [], userEdits: [] },
+    delivery: {
+      state: 'pending',
+      reason: null,
+      files: [],
+      conflicts: [],
+      userEdits: [],
+      finishedAt: null,
+    },
     usage: null,
     diff: null,
     attempts: [
       {
         seq: 1,
         stepId: 'code',
+        stepName: 'Кодер',
         round: 1,
         specialist: 'coder',
         runtime: 'claude',
@@ -226,7 +235,7 @@ export function tagView(
   color: TagColor = 'blue',
   id = `t-${name.toLowerCase()}`,
 ): TagView {
-  return { id, name, color };
+  return { id, name, color, task: null };
 }
 
 export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): QueueRunView {
@@ -240,7 +249,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
-    steps: { done: 0, total: 4, current: { step: 'plan', number: 1 } },
+    steps: { done: 0, total: 4, current: { step: 'plan', name: 'Планировщик', number: 1 } },
     active: [],
     system: [],
     delivery: null,
@@ -363,32 +372,88 @@ export function dependency(
   return { kind, id, number: null, title, state };
 }
 
-export function settingsOf(overrides: Record<string, EditorSetting> = {}): EditorSetting[] {
-  const base: EditorSetting[] = [
-    { path: 'max', value: 3, file: null },
-    { path: 'delivery.auto', value: true, file: null },
-    { path: 'delivery.mode', value: 'worktree', file: null },
-    { path: 'defaults.runtime', value: 'claude', file: null },
-    { path: 'defaults.permissions', value: 'edit', file: null },
-    { path: 'defaults.timeout', value: '30m', file: null },
-    { path: 'defaults.allow_commands', value: [], file: null },
-    { path: 'defaults.tools', value: [], file: null },
-    { path: 'delivery.keep', value: false, file: null },
-    { path: 'workspace_dir', value: '.aip/worktrees', file: null },
-    { path: 'workspace.base', value: 'HEAD', file: null },
-    { path: 'naming.enabled', value: true, file: null },
-    { path: 'naming.runtime', value: 'claude', file: null },
-    { path: 'claude.edit_mode', value: 'default', file: null },
-    { path: 'web.autostart', value: true, file: null },
-    { path: 'web.auth', value: 'token', file: null },
-    { path: 'web.host', value: '127.0.0.1', file: null },
-    { path: 'web.port', value: 7341, file: null },
-    { path: 'runtimes.claude.command', value: 'claude', file: null },
-    { path: 'runtimes.claude.args', value: [], file: null },
-    { path: 'runtimes.claude.env', value: ['ANTHROPIC_API_KEY'], file: null },
-    { path: 'runtimes.opencode.command', value: 'opencode', file: null },
-  ];
-  return base.map((setting) => overrides[setting.path] ?? setting);
+type SettingSpec = [
+  path: string,
+  kind: EditorSetting['kind'],
+  value: unknown,
+  extra?: Pick<EditorSetting, 'options' | 'range'> & { globalOnly?: boolean },
+];
+
+const OPTIONS = {
+  runtime: ['claude', 'opencode'],
+  permissions: ['read', 'edit', 'full'],
+};
+
+const SETTING_SPECS: SettingSpec[] = [
+  ['max', 'integer', 3, { range: [1, 32] }],
+  ['workspace_dir', 'string', '.aip'],
+  ['outside_changes', 'choice', 'warn', { options: ['warn', 'stop', 'off'] }],
+  ['defaults.runtime', 'choice', 'claude', { options: OPTIONS.runtime }],
+  ['defaults.permissions', 'choice', 'edit', { options: OPTIONS.permissions }],
+  ['defaults.timeout', 'duration', '30m'],
+  ['defaults.allow_commands', 'strings', []],
+  ['defaults.tools', 'strings', []],
+  ['claude.edit_mode', 'choice', 'allowlist', { options: ['allowlist', 'accept_edits', 'auto'] }],
+  ['claude.mcp', 'choice', 'isolated', { options: ['isolated', 'inherit'] }],
+  ['claude.settings', 'choice', 'isolated', { options: ['isolated', 'inherit'] }],
+  ['delivery.mode', 'choice', 'worktree', { options: ['worktree', 'commit', 'branch'] }],
+  ['delivery.auto', 'boolean', true],
+  ['delivery.keep', 'boolean', false],
+  ['delivery.commit_message', 'string', '{title}\n\n{groups}'],
+  ['delivery.message_specialist', 'specialist', null],
+  ['delivery.resolver', 'specialist', null],
+  ['delivery.resolver_rounds', 'integer', 3, { range: [1, 10] }],
+  ['workspace.base', 'choice', 'working_tree', { options: ['working_tree', 'head'] }],
+  ['workspace.include', 'strings', []],
+  ['naming.enabled', 'boolean', true],
+  ['naming.runtime', 'choice', 'claude', { options: OPTIONS.runtime }],
+  ['naming.model', 'string', 'haiku'],
+  ['web.autostart', 'boolean', true, { globalOnly: true }],
+  ['web.auth', 'choice', 'token', { options: ['token', 'none'], globalOnly: true }],
+  [
+    'web.host',
+    'choice',
+    '127.0.0.1',
+    { options: ['127.0.0.1', 'localhost', '::1'], globalOnly: true },
+  ],
+  ['web.port', 'integer', 7341, { range: [1, 65535], globalOnly: true }],
+  ['runtimes.claude.command', 'string', 'claude', { globalOnly: true }],
+  ['runtimes.claude.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.claude.env', 'env', ['ANTHROPIC_API_KEY'], { globalOnly: true }],
+  ['runtimes.opencode.command', 'string', 'opencode', { globalOnly: true }],
+  ['runtimes.opencode.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.opencode.env', 'env', [], { globalOnly: true }],
+];
+
+/**
+ * The settings of the editor view with their defaults. An override is the part of a setting that
+ * changes: a test names `value`, `file`, `written` and so on, and the rest stays as it was.
+ */
+export function settingsOf(
+  overrides: Record<string, Partial<EditorSetting> & { path: string }> = {},
+): EditorSetting[] {
+  return SETTING_SPECS.map(([path, kind, value, extra]) => {
+    const base: EditorSetting = {
+      path,
+      kind,
+      value,
+      file: null,
+      ...(extra?.options ? { options: extra.options } : {}),
+      ...(extra?.range ? { range: extra.range } : {}),
+      globalOnly: extra?.globalOnly ?? false,
+      defaultValue: value,
+      globalValue: value,
+      written: {},
+    };
+    const override = overrides[path];
+    if (!override) return base;
+    const merged = { ...base, ...override };
+    // a value that changes also changes what the shared level says, unless the test says otherwise
+    if (override.value !== undefined && override.globalValue === undefined) {
+      merged.globalValue = override.value;
+    }
+    return merged;
+  });
 }
 
 export function systemView(overrides: Partial<SystemView> = {}): SystemView {
@@ -519,6 +584,11 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     writeSpecialist: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteSpecialist: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
     writeWorkflow: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
+    writeSettings: vi.fn(async () => ({
+      ok: true as const,
+      revision: 'g2',
+      file: '/xdg/aip/settings.yaml',
+    })),
     writeSetting: vi.fn(async () => ({
       ok: true as const,
       revision: 'g2',
@@ -592,7 +662,7 @@ export function specialistUse(
     waiting?: string[];
   } = {},
 ): Use {
-  const item = (slug: string) => ({ slug, title: slug, step: 'code' });
+  const item = (slug: string) => ({ slug, title: slug, step: 'code', stepName: 'Кодер' });
   return {
     specialist,
     level: overrides.level ?? 'project',

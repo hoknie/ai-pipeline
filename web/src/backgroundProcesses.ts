@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Api } from './api.ts';
+import type { Connection, StreamedProcesses } from './store.ts';
 import type { BackgroundProcessView } from './types.ts';
 
 /** How often the list of background processes is asked for while the page is visible. */
@@ -13,11 +14,20 @@ export interface BackgroundProcesses {
   refresh: () => Promise<void>;
 }
 
-/** Polls the background processes of the daemon; stops while the page is hidden. */
-export function useBackgroundProcesses(api: Api): BackgroundProcesses {
+/**
+ * Background processes of the daemon: the event stream brings them; the list is asked for once
+ * on mount and then repeatedly only while the stream is down or has sent none (an older daemon).
+ * Asking stops while the page is hidden.
+ */
+export function useBackgroundProcesses(
+  api: Api,
+  streamed: StreamedProcesses | null = null,
+  connection: Connection = 'reconnecting',
+): BackgroundProcesses {
   const [processes, setProcesses] = useState<BackgroundProcessView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const live = useRef(true);
+  const askedOnce = useRef(false);
   const refresh = useCallback(async () => {
     try {
       const view = await api.processes();
@@ -30,6 +40,16 @@ export function useBackgroundProcesses(api: Api): BackgroundProcesses {
     }
   }, [api]);
   useEffect(() => {
+    if (!streamed) return;
+    if (streamed.processes) {
+      setProcesses(streamed.processes);
+      setError(null);
+    } else if (streamed.error) {
+      setError(streamed.error);
+    }
+  }, [streamed]);
+  const polling = connection !== 'live' || streamed === null;
+  useEffect(() => {
     live.current = true;
     let timer: ReturnType<typeof setInterval> | null = null;
     const stop = () => {
@@ -38,8 +58,11 @@ export function useBackgroundProcesses(api: Api): BackgroundProcesses {
     };
     const start = () => {
       stop();
-      void refresh();
-      timer = setInterval(() => void refresh(), PROCESS_POLL_MS);
+      if (!askedOnce.current) {
+        askedOnce.current = true;
+        void refresh();
+      } else if (polling) void refresh();
+      if (polling) timer = setInterval(() => void refresh(), PROCESS_POLL_MS);
     };
     const onVisibility = () => {
       if (document.visibilityState === 'visible') start();
@@ -52,6 +75,6 @@ export function useBackgroundProcesses(api: Api): BackgroundProcesses {
       stop();
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refresh]);
+  }, [refresh, polling]);
   return { processes, error, refresh };
 }

@@ -10,11 +10,19 @@ import { fakeApi, groupRow, groupView, runView } from './fixtures.ts';
 afterEach(() => cleanup());
 
 const attempts = [
-  { ...groupView().attempts[0]!, seq: 1, stepId: 'plan', status: 'finished', verdict: 'done' },
+  {
+    ...groupView().attempts[0]!,
+    seq: 1,
+    stepId: 'plan',
+    stepName: 'Планировщик',
+    status: 'finished',
+    verdict: 'done',
+  },
   {
     ...groupView().attempts[0]!,
     seq: 2,
     stepId: 'code',
+    stepName: 'Кодер',
     status: 'failed',
     verdict: null,
     reason: 'interrupted',
@@ -43,7 +51,7 @@ function panel(
 describe('retry a failed step', () => {
   it('offers the retry in the last attempt of a failed group and keeps it open', async () => {
     const api = panel('failed');
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     const blocks = screen.getAllByRole('listitem').filter((item) => item.closest('ol'));
     expect(within(blocks[0]!).queryByText('Retry step')).toBeNull();
     const buttons = within(blocks[1]!).getAllByRole('button', { name: 'Retry step' });
@@ -59,7 +67,7 @@ describe('retry a failed step', () => {
 
   it('offers the retry for a cancelled group, in the panel and in the last attempt', async () => {
     const api = panel('cancelled');
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(api.retry).toHaveBeenCalledWith('run1', 'login'));
     expect(screen.getAllByRole('button', { name: 'Retry step' }).length).toBeGreaterThan(0);
@@ -67,14 +75,14 @@ describe('retry a failed step', () => {
 
   it('offers no retry for a merged group', async () => {
     panel('merged');
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     expect(screen.queryByText('Retry step')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
 
   it('offers no retry for a group that did not fail', async () => {
     panel('running');
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     expect(screen.queryByText('Retry step')).toBeNull();
   });
 });
@@ -82,7 +90,7 @@ describe('retry a failed step', () => {
 describe('retry with the current config', () => {
   it('offers it next to the retry of a failed group and sends refreshConfig', async () => {
     const api = panel('failed');
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     fireEvent.click(screen.getByRole('button', { name: 'Retry with current config' }));
     await waitFor(() =>
       expect(api.retry).toHaveBeenCalledWith('run1', 'login', { refreshConfig: true }),
@@ -109,7 +117,7 @@ describe('retry with the current config', () => {
         onError={onError}
       />,
     );
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     fireEvent.click(screen.getByRole('button', { name: 'Retry with current config' }));
     await waitFor(() =>
       expect(onError).toHaveBeenCalledWith('configuration not loaded: swarm.max: must be 1-50'),
@@ -118,7 +126,7 @@ describe('retry with the current config', () => {
 
   it('is not offered for a merged group', async () => {
     panel('merged');
-    await screen.findByText('#2 code');
+    await screen.findByText('#2 Кодер');
     expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
   });
 

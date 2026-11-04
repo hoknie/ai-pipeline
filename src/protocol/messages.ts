@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  DELIVERY_MODES,
-  SETTABLE_SETTINGS,
-  SLUG_PATTERN_TEXT,
-  isValidSlug,
-} from '../config/index.ts';
+import { DELIVERY_MODES, SLUG_PATTERN_TEXT, isValidSlug, settingFieldOf } from '../config/index.ts';
 import {
   FEEDBACK_LIMIT,
   OPTIONS_LIMIT,
@@ -48,6 +43,17 @@ const skipSteps = z.array(z.string().trim().min(1)).max(50);
 const afterIds = z.array(z.string().min(1)).max(50);
 
 const deliveryModeSchema = z.enum(DELIVERY_MODES);
+
+/** A value of a field of settings.yaml; null removes the field. */
+export const settingValueSchema = z
+  .union([z.boolean(), z.number(), z.string(), z.array(z.string())])
+  .nullable();
+
+/** A path of the catalog of writable fields, also `runtimes.<runtime>.env.<NAME>`. */
+const settingPathSchema = z
+  .string()
+  .min(1)
+  .refine((path) => settingFieldOf(path) !== undefined, { message: 'unknown setting' });
 
 const runParams = z
   .object({
@@ -175,30 +181,26 @@ export const requestSchema = z.discriminatedUnion('method', [
   }),
   z.object({
     method: z.literal('config_setting'),
-    params: z
-      .object({
-        repository: z.string().min(1),
-        path: z.enum(SETTABLE_SETTINGS),
-        value: z.union([z.boolean(), deliveryModeSchema]).nullable(),
-        revision: z.string().min(1).nullable(),
-        level: writeLevelSchema.default('global'),
-      })
-      .superRefine((params, context) => {
-        const value = params.value;
-        if (value === null) return;
-        const valid =
-          params.path === 'delivery.auto' ? typeof value === 'boolean' : typeof value === 'string';
-        if (!valid) {
-          context.addIssue({
-            code: 'custom',
-            path: ['value'],
-            message:
-              params.path === 'delivery.auto'
-                ? 'delivery.auto must be true or false'
-                : `delivery.mode must be one of: ${DELIVERY_MODES.join(', ')}`,
-          });
-        }
-      }),
+    params: z.object({
+      repository: z.string().min(1),
+      path: settingPathSchema,
+      value: settingValueSchema,
+      revision: z.string().min(1).nullable(),
+      level: writeLevelSchema.default('global'),
+    }),
+  }),
+  z.object({
+    method: z.literal('config_settings'),
+    params: z.object({
+      repository: z.string().min(1),
+      values: z
+        .record(settingPathSchema, settingValueSchema)
+        .refine((values) => Object.keys(values).length > 0, {
+          message: 'values must not be empty',
+        }),
+      revision: z.string().min(1).nullable(),
+      level: writeLevelSchema.default('global'),
+    }),
   }),
   z.object({
     method: z.literal('config_preview'),
@@ -466,6 +468,13 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     seq: z.number().int(),
     run: z.looseObject({ id: z.string() }),
   }),
+  z.object({
+    event: z.literal('processes'),
+    seq: z.number().int(),
+    processes: z.array(z.looseObject({ pid: z.number() })).optional(),
+    error: z.string().optional(),
+  }),
 ]);
 
 export type StreamEvent = z.infer<typeof streamEventSchema>;
+export type BackgroundProcessesStreamEvent = Extract<StreamEvent, { event: 'processes' }>;

@@ -118,12 +118,15 @@ export function Attempt({
       <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border bg-card">
         <div className="flex items-center gap-2 pr-2">
           <CollapsibleTrigger
-            aria-label={t('runs.attempt.label', { seq: attempt.seq, step: attempt.stepId })}
+            aria-label={t('runs.attempt.label', {
+              seq: attempt.seq,
+              step: attempt.stepName ?? attempt.stepId,
+            })}
             className="group flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left text-sm"
           >
             <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
             <span className="font-medium">
-              #{attempt.seq} {attempt.stepId}
+              #{attempt.seq} {attempt.stepName ?? attempt.stepId}
               {attempt.round > 1 ? ` · ${t('runs.attempt.round', { round: attempt.round })}` : ''}
             </span>
             <span

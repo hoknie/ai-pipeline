@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import i18next from 'i18next';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App.tsx';
@@ -30,6 +31,7 @@ import {
 } from './fixtures.ts';
 
 beforeEach(() => {
+  toast.dismiss();
   window.location.hash = '#queue';
 });
 
@@ -49,7 +51,8 @@ function show(queue = queueOf({ items: items('A', 'B', 'C') }), overrides = {}) 
 }
 
 async function openNewTask(): Promise<HTMLElement> {
-  fireEvent.click(await screen.findByRole('button', { name: 'New task' }));
+  const controls = await screen.findByRole('region', { name: 'queue controls' });
+  fireEvent.click(within(controls).getByRole('button', { name: 'New task' }));
   return screen.findByRole('dialog', { name: 'New task' });
 }
 
@@ -275,7 +278,7 @@ describe('runs from the queue', () => {
             title: 'Вход',
             groups: { done: 1, total: 3 },
             steps: { done: 2, total: 6, current: null },
-            active: [{ group: 'signup', step: 'coder' }],
+            active: [{ group: 'signup', step: 'coder', stepName: 'Кодер' }],
           }),
         ],
       }),
@@ -284,7 +287,7 @@ describe('runs from the queue', () => {
     expect(within(card).getByText('feature')).toBeTruthy();
     expect(within(card).getByText('1 of 3 groups · steps 2 of 6')).toBeTruthy();
     expect(within(card).getByText('signup', { selector: 'code' })).toBeTruthy();
-    expect(within(card).getByText(/coder/)).toBeTruthy();
+    expect(within(card).getByText(/Кодер/)).toBeTruthy();
     const bar = within(card).getByRole('progressbar');
     expect(bar.getAttribute('aria-valuenow')).toBe('2');
     expect(bar.getAttribute('aria-valuemax')).toBe('6');
@@ -350,13 +353,13 @@ describe('runs from the queue', () => {
         runs: [
           queueRun('run1', {
             title: 'Один',
-            steps: { done: 1, total: 4, current: { step: 'coder', number: 2 } },
+            steps: { done: 1, total: 4, current: { step: 'coder', name: 'Кодер', number: 2 } },
           }),
         ],
       }),
     );
     const card = await screen.findByRole('group', { name: 'Один' });
-    expect(within(card).getByText('step 2 of 4 · coder')).toBeTruthy();
+    expect(within(card).getByText('step 2 of 4 · Кодер')).toBeTruthy();
     expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
   });
 
@@ -367,7 +370,7 @@ describe('runs from the queue', () => {
         runs: [
           queueRun('run1', {
             title: 'Один',
-            steps: { done: 1, total: 3, current: { step: 'review', number: 2 } },
+            steps: { done: 1, total: 3, current: { step: 'review', name: 'Ревьюер', number: 2 } },
           }),
         ],
       }),
@@ -384,13 +387,13 @@ describe('runs from the queue', () => {
           runs: [
             queueRun('run1', {
               title: 'Один',
-              steps: { done: 0, total: 3, current: { step: 'coder', number: 1 } },
+              steps: { done: 0, total: 3, current: { step: 'coder', name: 'Кодер', number: 1 } },
             }),
           ],
         }),
       });
     });
-    await screen.findByText('step 1 of 3 · coder');
+    await screen.findByText('step 1 of 3 · Кодер');
     expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0');
   });
 
@@ -432,10 +435,10 @@ describe('runs from the queue', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { active: [{ group: 'g', step: 'code' }] })],
+        runs: [queueRun('run1', { active: [{ group: 'g', step: 'code', stepName: 'Кодер' }] })],
       }),
     );
-    await screen.findByText(/code/);
+    await screen.findByText(/Кодер/);
     act(() => {
       stream().open();
       stream().send({
@@ -443,11 +446,13 @@ describe('runs from the queue', () => {
         seq: 5,
         queue: queueOf({
           status: 'running',
-          runs: [queueRun('run1', { active: [{ group: 'g', step: 'review' }] })],
+          runs: [
+            queueRun('run1', { active: [{ group: 'g', step: 'review', stepName: 'Ревьюер' }] }),
+          ],
         }),
       });
     });
-    await screen.findByText(/review/);
+    await screen.findByText(/Ревьюер/);
   });
 });
 
@@ -514,6 +519,53 @@ describe('new task form', () => {
     await openNewTask();
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
     expect(api.queueStart).not.toHaveBeenCalled();
+  });
+
+  it('announces the created task with its number', async () => {
+    show(queueOf(), {
+      queueAdd: vi.fn(async () => ({
+        ...queueOf({ items: [queueItem('q7', 'Сделать вход', 7)] }),
+        item: 'q7',
+      })),
+    });
+    await openNewTask();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(await screen.findByLabelText('Task text'), {
+      target: { value: 'Сделать вход' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
+  });
+
+  it('announces a created task that is not in the answer without a number', async () => {
+    show(queueOf(), {
+      queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'gone' })),
+    });
+    await openNewTask();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.getAllByText('Task created').length).toBeGreaterThan(0));
+  });
+
+  it('does not announce anything when the queue refuses the task', async () => {
+    show(queueOf(), {
+      queueAdd: vi.fn(async () => {
+        throw new ApiError(400, 'unknown workflow');
+      }),
+    });
+    await openNewTask();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/unknown workflow/);
+    expect(screen.queryAllByText(/^Task (#\d+ )?created$/)).toHaveLength(0);
   });
 
   it('adds a task made of two groups', async () => {
@@ -1059,8 +1111,8 @@ describe('workflows', () => {
 });
 
 describe('tags in the queue', () => {
-  const auth = { id: 'ta', name: 'auth', color: 'red' as const };
-  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const };
+  const auth = { id: 'ta', name: 'auth', color: 'red' as const, task: null };
+  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const, task: null };
 
   /** Shows the queue page; the first snapshot brings the catalog. */
   function withTags(queue = queueOf({ items: items('A', 'B') }), overrides = {}) {
@@ -1117,6 +1169,29 @@ describe('tags in the queue', () => {
     await screen.findByRole('list', { name: 'tasks in the queue' });
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Remove tag auth' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ tags: [] })),
+    );
+  });
+
+  it('sends only ordinary tags when an item with a linked task tag is edited', async () => {
+    const linked = {
+      id: 'tl',
+      name: 'cards',
+      color: 'indigo' as const,
+      task: { run: 'run9', number: 115 },
+    };
+    const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { tags: [linked, auth] })] }));
+    act(() => {
+      stream().open();
+      stream().send({ event: 'snapshot', seq: 1, runs: [], tags: [linked, auth, v2] });
+    });
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Remove tag auth' });
+    expect(screen.queryByRole('button', { name: 'Remove tag cards' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag auth' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ tags: [] })),
@@ -1643,8 +1718,17 @@ describe('queue controls block', () => {
     ).toEqual(['New task', 'Start', 'Pause']);
     expect(block.getByLabelText('Parallelism')).toBeTruthy();
     expect(block.getByRole('link', { name: 'Queue settings' }).getAttribute('href')).toBe(
-      '#settings/queue',
+      '#settings/project/queue',
     );
+  });
+
+  it('puts the primary «New task» button alone on its row', async () => {
+    show(queueOf({ items: items('A') }));
+    const block = await controlsBlock();
+    const button = block.getByRole('button', { name: 'New task' });
+    expect(button.parentElement?.querySelectorAll('button').length).toBe(1);
+    expect(button.className).toContain('bg-primary');
+    expect(block.getByRole('button', { name: 'Start' }).className).not.toContain('bg-primary');
   });
 
   it('has none of the modes of the queue', async () => {
@@ -1661,7 +1745,7 @@ describe('queue controls block', () => {
     show(queueOf());
     const block = await controlsBlock();
     fireEvent.click(block.getByRole('link', { name: 'Queue settings' }));
-    await waitFor(() => expect(window.location.hash).toBe('#settings/queue'));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/project/queue'));
     const modes = within(await screen.findByRole('region', { name: 'queue settings' }));
     for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default'])
       expect(modes.getByRole('switch', { name })).toBeTruthy();
@@ -1907,10 +1991,18 @@ describe('system stages and waiting in the cards of the queue', () => {
   });
 });
 
-const stepOf = (id: string) => ({ ...workflowOf().steps[0]!, id });
+const STEP_NAMES: Record<string, string> = {
+  plan: 'Планировщик',
+  code: 'Кодер',
+  review: 'Ревьюер',
+  qa: 'Тестировщик',
+  deliver: 'Доставщик',
+};
+const stepOf = (id: string) => ({ ...workflowOf().steps[0]!, id, name: STEP_NAMES[id] ?? id });
 const skipGroup = () => screen.getByText('Skip steps', { selector: 'legend' }).parentElement!;
-const skipStep = (name: string) =>
-  within(skipGroup()).getByRole<HTMLButtonElement>('button', { name });
+/** The segment of a step by its id; it is labelled with the name of the step. */
+const skipStep = (id: string) =>
+  within(skipGroup()).getByRole<HTMLButtonElement>('button', { name: STEP_NAMES[id] ?? id });
 const skipStepAsync = async (name: string) => {
   await waitFor(() => skipStep(name));
   return skipStep(name);
@@ -1926,9 +2018,9 @@ const fiveSteps = workflowsView({
 describe('new task dialog', () => {
   it('has one button inside the controls before Start and no form before it is opened', async () => {
     show(queueOf());
-    const button = await screen.findByRole('button', { name: 'New task' });
-    expect(screen.getAllByRole('button', { name: 'New task' })).toHaveLength(1);
-    const controls = screen.getByRole('region', { name: 'queue controls' });
+    const controls = await screen.findByRole('region', { name: 'queue controls' });
+    const button = within(controls).getByRole('button', { name: 'New task' });
+    expect(within(controls).getAllByRole('button', { name: 'New task' })).toHaveLength(1);
     expect(controls.contains(button)).toBe(true);
     expect(
       button.compareDocumentPosition(within(controls).getByRole('button', { name: 'Start' })) &
@@ -2079,7 +2171,7 @@ describe('two halves of the task form', () => {
       }),
       { workflows: vi.fn(async () => fiveSteps) },
     );
-    await screen.findByText('skips: review, qa');
+    await screen.findByText('skips: Ревьюер, Тестировщик');
     expect(screen.getAllByText(/^skips:/)).toHaveLength(1);
     fireEvent.click(
       within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),

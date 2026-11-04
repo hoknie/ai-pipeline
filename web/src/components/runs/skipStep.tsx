@@ -40,7 +40,9 @@ export function useSkipStep(
         .filter(Boolean)
         .join(' ');
       const yes = await confirm({
-        title: t('runs.steps.confirmTitle', { step }),
+        title: t('runs.steps.confirmTitle', {
+          step: run.steps.find((candidate) => candidate.id === step)?.name ?? step,
+        }),
         description,
         confirmLabel: t('runs.steps.confirmLabel'),
         cancelLabel: t('runs.steps.keep'),

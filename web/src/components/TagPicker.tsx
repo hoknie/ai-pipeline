@@ -32,6 +32,7 @@ export function TagPicker({
   allowCreate = false,
   disabled = false,
   chips = true,
+  hideLinked = false,
 }: {
   id?: string;
   label: string;
@@ -43,6 +44,8 @@ export function TagPicker({
   disabled?: boolean;
   /** Show the chips of the selection next to the button. */
   chips?: boolean;
+  /** Hide the tags of linked tasks (set automatically) and forbid removing them. */
+  hideLinked?: boolean;
 }) {
   const { t } = useTranslation();
   const catalog = useTags();
@@ -55,8 +58,10 @@ export function TagPicker({
   const typed = query.trim();
   const needle = typed.toLowerCase();
   const visible = catalog.tags.filter(
-    (tag) => needle === '' || tag.name.toLowerCase().includes(needle),
+    (tag) =>
+      !(hideLinked && tag.task) && (needle === '' || tag.name.toLowerCase().includes(needle)),
   );
+  const pickable = catalog.tags.filter((tag) => !(hideLinked && tag.task));
   const canCreate =
     allowCreate &&
     api !== undefined &&
@@ -105,15 +110,17 @@ export function TagPicker({
             ? chosen.map((tag) => (
                 <span key={tag.id} className="inline-flex items-center gap-0.5">
                   <TagLabel tag={tag} />
-                  <button
-                    type="button"
-                    aria-label={t('tags.remove', { name: tag.name })}
-                    disabled={disabled}
-                    className="rounded-full p-0.5 hover:bg-accent disabled:opacity-50"
-                    onClick={() => toggle(tag.id)}
-                  >
-                    <X className="size-3" />
-                  </button>
+                  {hideLinked && tag.task ? null : (
+                    <button
+                      type="button"
+                      aria-label={t('tags.remove', { name: tag.name })}
+                      disabled={disabled}
+                      className="rounded-full p-0.5 hover:bg-accent disabled:opacity-50"
+                      onClick={() => toggle(tag.id)}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
                 </span>
               ))
             : null}
@@ -144,7 +151,7 @@ export function TagPicker({
             <CommandList id={listId}>
               {visible.length === 0 && !canCreate ? (
                 <CommandEmpty>
-                  {catalog.tags.length === 0 ? t('tags.none') : t('picker.nothing')}
+                  {pickable.length === 0 ? t('tags.none') : t('picker.nothing')}
                 </CommandEmpty>
               ) : null}
               {visible.length > 0 ? (

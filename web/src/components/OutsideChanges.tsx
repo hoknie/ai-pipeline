@@ -21,7 +21,7 @@ export function OutsideChanges({ attempt }: { attempt: AttemptView }) {
         <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
         <TriangleAlert className="size-4" aria-hidden />
         {t('runs.outside.title', {
-          step: attempt.stepId,
+          step: attempt.stepName ?? attempt.stepId,
           seq: attempt.seq,
           count: list.length,
         })}

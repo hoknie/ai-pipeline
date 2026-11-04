@@ -34,7 +34,7 @@ The header is `aip · 2 active · 1 needs you`, with a connection indicator: `�
 
 The status icons are `○` queued, `◐` running, `?` waiting for you, `⇄` merging, `●` merged, `⚠` conflict, `✕` failure, `⊘` cancelled. Colors come from the Claude Code theme.
 
-The panel updates from the `aip events --json` stream. If the stream breaks, it polls every 2 seconds and reconnects by itself.
+The panel updates from the `aip events --json` stream. Besides runs, queues, repositories and tags it carries the `processes` event with the `processes` list of background processes of the agents (or an `error` string when the process table cannot be read); the daemon sends it when the list changes. If the stream breaks, it polls every 2 seconds and reconnects by itself.
 
 ### Status line
 

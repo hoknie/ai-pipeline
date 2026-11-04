@@ -17,6 +17,17 @@ describe('machineLoad', () => {
     expect(machineLoad([finished]).size).toBe(0);
   });
 
+  it('keeps the name of the step of a running and a waiting group', () => {
+    const load = machineLoad([
+      runView({
+        specialists: [specialistUse('coder', { running: ['login'], waiting: ['api'] })],
+      }),
+    ]);
+    const coder = load.get('coder')!;
+    expect(coder.running[0]).toMatchObject({ step: 'code', stepName: 'Кодер' });
+    expect(coder.waiting[0]).toMatchObject({ step: 'code', stepName: 'Кодер' });
+  });
+
   it('adds up one global specialist over two repositories', () => {
     const load = machineLoad([
       runView({

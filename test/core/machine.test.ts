@@ -109,6 +109,7 @@ describe('rejections', () => {
     finish(state, 'rejected', { feedback: 'опять' });
     expect(group(state).status).toBe('needs_human');
     expect(group(state).question).toContain('4 times (limit 3)');
+    expect(group(state).question).toMatch(/^Step `Ревьюер` rejected the work 4 times/);
     expect(step(state)).toEqual([]);
   });
 
@@ -207,6 +208,7 @@ describe('questions to a human', () => {
     exitWithOutsideChange(state);
     expect(group(state).status).toBe('needs_human');
     expect(group(state).question).toContain('README.md');
+    expect(group(state).question).toContain('while step Планировщик ran');
     expect(group(state).question).not.toContain('The specialist changed');
     expect(group(state).attempts[0]?.outsideChanges).toEqual(['README.md']);
   });

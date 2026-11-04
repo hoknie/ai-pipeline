@@ -272,8 +272,8 @@ export function layout(
     const groups = live.steps.get(step.id) ?? [];
     place(`step:${step.id}`, {
       kind: 'step',
-      title: step.id,
-      subtitle: step.name,
+      title: step.name,
+      subtitle: step.specialist,
       detail: `${step.runtime}${step.model ? ` ${step.model}` : ''} · ${step.permissions}`,
       groups,
       attempts: live.attempts.get(step.id) ?? 0,

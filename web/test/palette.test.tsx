@@ -65,7 +65,7 @@ describe('command palette', () => {
     openPalette();
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('option', { name: 'Settings' }));
-    await waitFor(() => expect(window.location.hash).toBe('#settings/general'));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
   });
 
   it('opens a run chosen from the palette', async () => {

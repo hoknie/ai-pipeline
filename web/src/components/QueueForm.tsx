@@ -47,8 +47,11 @@ export const TITLE_LIMIT = 60;
 /** Picker group of each kind of predecessor. */
 const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global' } as const;
 
-function stepsOf(workflow: { steps: { id: string }[] } | undefined): string[] {
-  return workflow?.steps.map((step) => step.id) ?? [];
+function stepsOf(workflow: { steps: { id: string; name?: string }[] } | undefined): {
+  id: string;
+  name: string;
+}[] {
+  return workflow?.steps.map((step) => ({ id: step.id, name: step.name ?? step.id })) ?? [];
 }
 
 export function emptyDraft(workflow = ''): QueueDraft {
@@ -193,7 +196,16 @@ export function QueueForm({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit(fieldsOf(effective, (id) => catalog.byId.get(id)?.name, idPrefix !== 'new'));
+      await onSubmit(
+        fieldsOf(
+          effective,
+          (id) => {
+            const tag = catalog.byId.get(id);
+            return tag && !tag.task ? tag.name : undefined;
+          },
+          idPrefix !== 'new',
+        ),
+      );
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
@@ -240,7 +252,9 @@ export function QueueForm({
                   workflow,
                   skip: pruneSkip(
                     effective.skip,
-                    stepsOf(workflows?.workflows.find((candidate) => candidate.id === workflow)),
+                    stepsOf(
+                      workflows?.workflows.find((candidate) => candidate.id === workflow),
+                    ).map((step) => step.id),
                   ),
                 })
               }
@@ -349,6 +363,7 @@ export function QueueForm({
               onChange={(tags) => change({ tags })}
               api={api}
               allowCreate={api !== undefined}
+              hideLinked
             />
           </fieldset>
           <fieldset disabled={locked} className="contents">

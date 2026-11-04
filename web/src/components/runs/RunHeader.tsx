@@ -30,6 +30,7 @@ export function RunHeader({
   now,
   onError,
   onSelect,
+  onDeliver,
   headerRef,
 }: {
   run: RunView;
@@ -38,6 +39,8 @@ export function RunHeader({
   onError: (message: string) => void;
   /** Opens a group or a system step of the run. */
   onSelect?: (slug: string) => void;
+  /** Delivers the run and reports the outcome; without it the header only calls `apply`. */
+  onDeliver?: (force: boolean) => Promise<unknown>;
   /** Receives the header element, to know when it is scrolled out of view. */
   headerRef?: (element: HTMLElement | null) => void;
 }) {
@@ -63,7 +66,11 @@ export function RunHeader({
   const runTagIds = (run.tags ?? []).map((tag) => tag.id);
   const changeTags = async (ids: string[], fresh?: TagView[]) => {
     const lookup = fresh ? new Map(fresh.map((tag) => [tag.id, tag])) : byId;
-    const names = (list: string[]) => list.flatMap((id) => lookup.get(id)?.name ?? []);
+    const names = (list: string[]) =>
+      list.flatMap((id) => {
+        const tag = lookup.get(id);
+        return tag && !tag.task ? tag.name : [];
+      });
     const add = names(ids.filter((id) => !runTagIds.includes(id)));
     const remove = names(runTagIds.filter((id) => !ids.includes(id)));
     if (add.length === 0 && remove.length === 0) return;
@@ -141,8 +148,7 @@ export function RunHeader({
     setForcing(false);
     setApplying(true);
     try {
-      await api.apply(run.id, force);
-      notifySuccess(t('runs.header.applyStarted'));
+      await (onDeliver ? onDeliver(force) : api.apply(run.id, force));
     } catch (error) {
       onError((error as Error).message);
     } finally {
@@ -177,11 +183,11 @@ export function RunHeader({
               api={api}
               allowCreate
               disabled={tagging}
+              hideLinked
             />
             {tagError ? <Alert variant="destructive">{tagError}</Alert> : null}
           </div>
           {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
-          <RunSteps run={run} api={api} onError={onError} />
           <div className="flex flex-wrap items-center gap-2">
             {failed.length > 0 ? (
               <Button
@@ -218,6 +224,7 @@ export function RunHeader({
             <Button loading={applying} disabled={!deliverable} onClick={() => void apply(false)}>
               {t('runs.header.deliver')}
             </Button>
+            <RunSteps run={run} api={api} onError={onError} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" aria-label={t('runs.header.more')}>

@@ -76,6 +76,7 @@ function attempt(seq: number, overrides: Record<string, unknown> = {}) {
     ...groupView().attempts[0]!,
     seq,
     stepId: ['plan', 'code', 'review'][seq - 1] ?? 'qa',
+    stepName: ['Планировщик', 'Кодер', 'Ревьюер'][seq - 1] ?? 'qa',
     status: 'finished',
     verdict: 'done',
     ...overrides,
@@ -374,7 +375,7 @@ describe('run page', () => {
     const api = fakeApi();
     const run = runView({
       finished: true,
-      delivery: { applied: 0, merged: 1, failed: 1, inProgress: false },
+      delivery: { applied: 0, merged: 1, failed: 1, inProgress: false, finishedAt: null },
       groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
     });
     api.group = vi.fn(async () =>
@@ -386,6 +387,7 @@ describe('run page', () => {
           files: ['src/app.ts'],
           conflicts: [],
           userEdits: [],
+          finishedAt: null,
         },
       }),
     );
@@ -436,7 +438,7 @@ describe('attempts and transcript', () => {
       ),
     });
     panel(api);
-    await screen.findByText('#3 review');
+    await screen.findByText('#3 Ревьюер');
     const heads = () => screen.getAllByRole('button', { name: /^attempt \d+/ });
     expect(heads().map((head) => head.getAttribute('aria-expanded'))).toEqual([
       'false',
@@ -501,13 +503,13 @@ describe('attempts and transcript', () => {
     delete legacy.permissionHints;
     for (const item of legacy.attempts ?? []) delete (item as Partial<typeof item>).denials;
     panel(fakeApi({ group: vi.fn(async () => legacy as ReturnType<typeof groupView>) }));
-    expect(await screen.findByText('#1 code')).toBeTruthy();
+    expect(await screen.findByText('#1 Кодер')).toBeTruthy();
     expect(screen.queryByText(/denials:/)).toBeNull();
   });
 
   it('shows no refused commands for a group without them', async () => {
     panel(fakeApi());
-    await screen.findByText('#1 code');
+    await screen.findByText('#1 Кодер');
     expect(screen.queryByText(/denials:/)).toBeNull();
     expect(screen.queryByRole('region', { name: 'permissions hint' })).toBeNull();
   });
@@ -650,7 +652,7 @@ describe('attempts and transcript', () => {
     const list = Array.from({ length: 10 }, (_, index) => `docs/file-${index}.md`);
     panel(logApi({ outsideChanges: list }));
     const head = await screen.findByRole('button', {
-      name: '10 files in the working copy changed during step plan (#1)',
+      name: '10 files in the working copy changed during step Планировщик (#1)',
     });
     expect(head.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(head);
@@ -675,7 +677,7 @@ describe('attempts and transcript', () => {
     expect(head.getAttribute('aria-expanded')).toBe('true');
     cleanup();
     panel(fakeApi());
-    await screen.findByText('#1 code');
+    await screen.findByText('#1 Кодер');
     expect(
       screen.queryByRole('button', { name: /in the working copy changed during step/ }),
     ).toBeNull();
@@ -898,7 +900,7 @@ describe('useRuns stability', () => {
 });
 
 describe('tag catalog and filter', () => {
-  const auth = { id: 'ta', name: 'auth', color: 'red' as const };
+  const auth = { id: 'ta', name: 'auth', color: 'red' as const, task: null };
 
   it('keeps the catalog from the snapshot and updates it on the tags event', () => {
     const api = fakeApi();
@@ -1024,6 +1026,16 @@ describe('run steps', () => {
   const open = () => fireEvent.click(screen.getByRole('button', { name: /^Steps: / }));
   const box = (name: string) => screen.getByRole('checkbox', { name });
 
+  it('places the steps button between Deliver and More, in the size of its neighbours', () => {
+    header();
+    const steps = screen.getByRole('button', { name: 'Steps: 3 of 3' });
+    const deliver = screen.getByRole('button', { name: 'Deliver' });
+    const more = screen.getByRole('button', { name: 'More' });
+    expect(deliver.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(steps.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(steps.className).toBe(more.className);
+  });
+
   it('shows the summary on the button and opens the list on click', () => {
     header();
     expect(screen.getByRole('button', { name: 'Steps: 3 of 3' })).toBeTruthy();
@@ -1138,6 +1150,31 @@ describe('run steps', () => {
     fireEvent.click(box('Run step Reviewer (review)'));
     await waitFor(() => expect(onError).toHaveBeenCalledWith('step `review` is refused'));
     expect(box('Run step Reviewer (review)').getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('does not repeat the id of a step whose name already carries it', () => {
+    const run = runView({
+      steps: [
+        {
+          id: 'review',
+          specialist: 'reviewer',
+          name: 'Reviewer (review)',
+          skipped: false,
+          state: 'upcoming',
+        },
+        {
+          id: 'review-2',
+          specialist: 'reviewer',
+          name: 'Reviewer (review-2)',
+          skipped: false,
+          state: 'upcoming',
+        },
+      ],
+    });
+    render(<RunHeader run={run} api={fakeApi()} now={0} onError={() => undefined} />);
+    open();
+    expect(box('Run step Reviewer (review-2)').getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByText('review-2', { selector: 'code' })).toBeNull();
   });
 
   it('brings a skipped step back', async () => {

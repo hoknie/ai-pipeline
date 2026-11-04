@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
@@ -10,13 +10,12 @@ import type { QueueView, WorkflowsView } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
-import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.tsx';
 import { Skeleton } from '../ui/skeleton.tsx';
 
-import { QueueForm, emptyDraft, type QueueDraft } from './QueueForm.tsx';
-import { QueueList, itemLabel } from './QueueList.tsx';
+import type { QueueDraft } from './QueueForm.tsx';
+import { QueueList } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
-import { afterOptions, related } from './queueLinks.ts';
+import { related } from './queueLinks.ts';
 import { parseParallel } from './ParallelStepper.tsx';
 import { QueueControls } from './QueueControls.tsx';
 
@@ -78,6 +77,7 @@ export default function QueuePage({
   onDraft,
   onQueue,
   onError,
+  onNewTask,
 }: {
   api: Api;
   queue: QueueView | null;
@@ -86,16 +86,14 @@ export default function QueuePage({
   onDraft: (key: string, draft: QueueDraft | null) => void;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
+  onNewTask: () => void;
 }) {
   const { t } = useTranslation();
   const [workflows, setWorkflows] = useState<WorkflowsView | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
   const [parallel, setParallel] = useState<string | null>(null);
-  const mode = useRef<'task' | 'groups'>('task');
-  mode.current = (drafts.new ?? emptyDraft()).mode;
 
-  useEffect(() => takeFocusRequest('queue-task', () => setOpen(true)), []);
+  useEffect(() => takeFocusRequest('queue-task', onNewTask), [onNewTask]);
 
   useEffect(() => {
     let closed = false;
@@ -120,40 +118,9 @@ export default function QueuePage({
   const chain = highlight === null ? null : related(queue, highlight);
   // a task without links has nothing to light up
   const linked = chain !== null && chain.size > 1 ? chain : null;
-  const newDraft = drafts.new ?? emptyDraft();
 
   return (
     <div className="flex w-full flex-col gap-4 p-4">
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          className="max-h-[calc(100dvh-2rem)] max-w-none content-start md:max-h-[90vh] md:w-[75vw]"
-          aria-describedby={undefined}
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-            const field = mode.current === 'task' ? '#new-task' : '#new-group-0-title';
-            document.querySelector<HTMLElement>(field)?.focus();
-          }}
-        >
-          <DialogTitle>{t('queue.newTask')}</DialogTitle>
-          <QueueForm
-            idPrefix="new"
-            draft={newDraft}
-            workflows={workflows}
-            api={api}
-            autoDeliverDefault={queue.autoDeliver}
-            deliveryModeDefault={queue.deliveryMode}
-            afterChoices={afterOptions(queue, (item) => itemLabel(item, t))}
-            submitLabel={t('queue.add')}
-            onDraft={(draft) => onDraft('new', draft)}
-            onSubmit={async (fields) => {
-              const view = await api.queueAdd(fields);
-              onQueue(view);
-              onDraft('new', emptyDraft(fields.workflow));
-              setOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
       <div className="grid w-full gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
         <QueueControls
           api={api}
@@ -163,7 +130,7 @@ export default function QueuePage({
           onQueue={onQueue}
           onError={onError}
           onDone={() => setParallel(null)}
-          onNewTask={() => setOpen(true)}
+          onNewTask={onNewTask}
         />
         <div className="flex min-w-0 flex-col gap-4">
           <StopReason queue={queue} />

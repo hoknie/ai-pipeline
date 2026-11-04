@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PROCESS_POLL_MS, useBackgroundProcesses } from '../src/backgroundProcesses.ts';
 import { formatCpu, formatMemory, formatUptime } from '../src/format.ts';
+import type { StreamedProcesses } from '../src/store.ts';
 import { en } from '../src/i18n/locales/en.ts';
 import { ru } from '../src/i18n/locales/ru.ts';
 
@@ -36,6 +37,52 @@ describe('useBackgroundProcesses', () => {
       await vi.advanceTimersByTimeAsync(PROCESS_POLL_MS * 2);
     });
     expect(api.processes).toHaveBeenCalledTimes(3);
+  });
+
+  it('asks once while the stream is live and has sent the list', async () => {
+    const api = fakeApi({ processes: vi.fn(async () => ({ processes: [] })) });
+    const { result, rerender } = renderHook(
+      ({ streamed }) => useBackgroundProcesses(api, streamed, 'live'),
+      { initialProps: { streamed: null as StreamedProcesses | null } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    rerender({ streamed: { processes: [processView()], error: null } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESS_POLL_MS * 3);
+    });
+    expect(api.processes).toHaveBeenCalledTimes(1);
+    expect(result.current.processes).toHaveLength(1);
+  });
+
+  it('asks every interval while the stream reconnects', async () => {
+    const api = fakeApi({ processes: vi.fn(async () => ({ processes: [] })) });
+    const streamed: StreamedProcesses = { processes: [processView()], error: null };
+    renderHook(() => useBackgroundProcesses(api, streamed, 'reconnecting'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESS_POLL_MS * 2);
+    });
+    expect(api.processes).toHaveBeenCalledTimes(3);
+  });
+
+  it('asks every interval while a live stream has sent no list (an older daemon)', async () => {
+    const api = fakeApi({ processes: vi.fn(async () => ({ processes: [] })) });
+    renderHook(() => useBackgroundProcesses(api, null, 'live'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESS_POLL_MS * 2);
+    });
+    expect(api.processes).toHaveBeenCalledTimes(3);
+  });
+
+  it('shows the error of the stream', async () => {
+    const api = fakeApi({ processes: vi.fn(() => new Promise<never>(() => undefined)) });
+    const streamed: StreamedProcesses = { processes: null, error: 'no ps' };
+    const { result } = renderHook(() => useBackgroundProcesses(api, streamed, 'live'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.error).toBe('no ps');
   });
 
   it('stops while the page is hidden and asks at once when it is visible again', async () => {
