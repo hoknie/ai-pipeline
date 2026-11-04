@@ -67,9 +67,9 @@ describe('message to the specialist', () => {
       [
         'Сделай: добавить логин',
         '## Previous steps\n- plan (plan, done): план готов\n- review (reviewer, rejected): есть ошибки',
-        '## Decisions made by a human in this group\n- plan: Q: OAuth или пароль? A: используй OAuth',
+        '## Accepted answers to questions in this group (do not ask them again)\n- plan: Q: OAuth или пароль? A: используй OAuth (by human)',
         '## Feedback to address\nнет тестов',
-        '## Answer from a human\nиспользуй OAuth',
+        '## Latest accepted answer\nиспользуй OAuth',
       ].join('\n\n'),
     );
   });

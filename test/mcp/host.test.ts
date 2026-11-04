@@ -63,6 +63,77 @@ async function connect(
 const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string =>
   (result.content as { text: string }[])[0]?.text ?? '';
 
+describe('host MCP parent of a task', () => {
+  const LINKED = {
+    id: 'tg1',
+    name: 'cards-half-width',
+    color: 'indigo' as const,
+    task: { run: 'r115', number: 115 },
+  };
+  const WITH_PARENT: QueueView & { item: string } = {
+    ...VIEW,
+    items: [{ ...VIEW.items[0]!, tags: [LINKED] }],
+  };
+
+  it('passes parent of swarm_run, swarm_queue_add and swarm_queue_edit, also null', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', parent: 115 },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', parent: '#115' } });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', parent: null } });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { workflow: 'feature', task: 'x', parent: 'r115' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', parent: 115 },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', parent: '#115' } },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', parent: null } },
+      {
+        method: 'run',
+        params: { repository: '/repo', workflow: 'feature', task: 'x', parent: 'r115' },
+      },
+    ]);
+  });
+
+  it('shows where the linked task tag leads in the text and the JSON of swarm_queue', async () => {
+    const client = await connect(async () => WITH_PARENT);
+    const result = await client.callTool({ name: 'swarm_queue', arguments: {} });
+    const text = textOf(result);
+    expect(text).toContain('#cards-half-width→#115');
+    expect(text).toContain('"task": {\n            "run": "r115",\n            "number": 115');
+  });
+
+  it('shows the same label in swarm_status', async () => {
+    const view = { ...runView(run(1), 1000), tags: [LINKED] };
+    const client = await connect(async () => [view]);
+    const text = textOf(await client.callTool({ name: 'swarm_status', arguments: {} }));
+    expect(text).toContain('#cards-half-width→#115');
+    expect(text).toContain('"number": 115');
+  });
+
+  it('reports an unknown parent as a tool error', async () => {
+    const client = await connect(async () => {
+      throw new Error('unknown parent `nope`');
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x', parent: 'nope' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('unknown parent `nope`');
+  });
+});
+
 describe('host MCP queue tools', () => {
   it('lists the queue tools', async () => {
     const client = await connect(async () => VIEW);

@@ -40,6 +40,7 @@ import {
   runProblems,
   stepsOf,
   type GroupDelivery,
+  type HumanDecision,
   type HumanQuestion,
   type RunPhase,
   type GroupStatus,
@@ -169,7 +170,12 @@ export interface GroupRow {
   limitUntil: number | null;
   /** Tokens and cost of all attempts of the group so far, live ones included. */
   usage: Usage | null;
+  /** Answers accepted for the group, oldest first. */
+  decisions: HumanDecision[];
 }
+
+/** An accepted answer in the overview of a run, with the slug of its group. */
+export type RunDecision = HumanDecision & { group: string };
 
 export interface SplitRow {
   status: RowStatus;
@@ -253,6 +259,11 @@ export interface RunView {
   deliveryStage: DeliveryStage | null;
   /** Totals over the merged groups. */
   diff: DiffTotals | null;
+  /**
+   * Changes of all working groups except cancelled ones whose statistics are known; a file
+   * shared by several groups counts once. Null when no group has statistics yet.
+   */
+  liveDiff: DiffTotals | null;
   /** Steps of the workflow with the groups on them, for the topology view. */
   topology: Topology;
   /** Each step of the group workflow: passed, under way or ahead, and whether it is skipped. */
@@ -262,6 +273,8 @@ export interface RunView {
   groups: GroupRow[];
   /** Service steps in the order split, message, resolve; absent steps are left out. */
   system: SystemStepRow[];
+  /** Answers accepted in the run (human and autopilot): split, work groups, message, resolve. */
+  decisions: RunDecision[];
 }
 
 export interface ResolverRow {
@@ -271,6 +284,12 @@ export interface ResolverRow {
   rounds: number;
   conflicts: string[];
   reason: string | null;
+}
+
+export interface AttemptDecision {
+  question: string;
+  answer: string;
+  by: 'human' | 'autopilot';
 }
 
 export interface AttemptView {
@@ -286,6 +305,8 @@ export interface AttemptView {
   verdict: string | null;
   summary: string | null;
   feedback: string | null;
+  /** The accepted answer to the question this attempt asked (verdict needs_human), if any. */
+  decision: AttemptDecision | null;
   reason: string | null;
   startedAt: number;
   durationMs: number;
@@ -315,6 +336,8 @@ export interface GroupView {
   worktree: string;
   question: string | null;
   questions: HumanQuestion[] | null;
+  /** Accepted answers to the questions of the group, a person's and the autopilot's, oldest first. */
+  decisions: HumanDecision[];
   reason: string | null;
   /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
   limitUntil: number | null;
@@ -405,6 +428,7 @@ export function groupRow(
     diff: totals(diffs(group.slug)),
     limitUntil: groupLimitUntil(group),
     usage: groupUsage(group),
+    decisions: group.decisions.map((decision) => ({ ...decision })),
   };
 }
 
@@ -477,6 +501,20 @@ function runDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
     files: files.size,
     added: merged.reduce((sum, diff) => sum + (diff?.added ?? 0), 0),
     removed: merged.reduce((sum, diff) => sum + (diff?.removed ?? 0), 0),
+  };
+}
+
+function runLiveDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
+  const stats = state.groups
+    .filter((group) => !isServiceGroup(group) && group.status !== 'cancelled')
+    .map((group) => diffs(group.slug))
+    .filter((diff): diff is DiffStat => diff !== null);
+  if (stats.length === 0) return null;
+  const files = new Set(stats.flatMap((diff) => diff.files.map((file) => file.path)));
+  return {
+    files: files.size,
+    added: stats.reduce((sum, diff) => sum + diff.added, 0),
+    removed: stats.reduce((sum, diff) => sum + diff.removed, 0),
   };
 }
 
@@ -572,6 +610,7 @@ export function runView(
       : null,
     deliveryStage: deliveryStage(state),
     diff: runDiff(state, diffs),
+    liveDiff: runLiveDiff(state, diffs),
     progress: runProgress(state),
     topology: waitingTopology,
     steps: stepStates(state),
@@ -586,7 +625,30 @@ export function runView(
         ? [systemRow(state, state.resolve, 'resolve', now, waitOf(state.resolve))]
         : []),
     ],
+    decisions: allGroups(state).flatMap((group) =>
+      group.decisions.map((decision) => ({ ...decision, group: group.slug })),
+    ),
   };
+}
+
+/**
+ * The answer given to the question of an attempt: the N-th decision of a step belongs to the
+ * N-th attempt of that step that ended with needs_human.
+ */
+function attemptDecision(group: Group, attempt: Attempt): AttemptDecision | null {
+  if (attempt.status !== 'finished' || attempt.report?.verdict !== 'needs_human') return null;
+  const asked = group.attempts.filter(
+    (candidate) =>
+      candidate.stepId === attempt.stepId &&
+      candidate.status === 'finished' &&
+      candidate.report?.verdict === 'needs_human',
+  );
+  const decision = group.decisions.filter((d) => d.stepId === attempt.stepId)[
+    asked.indexOf(attempt)
+  ];
+  return decision
+    ? { question: decision.question, answer: decision.answer, by: decision.by }
+    : null;
 }
 
 export function attemptView(
@@ -608,6 +670,7 @@ export function attemptView(
     verdict: attemptVerdict(attempt),
     summary: attempt.report?.summary ?? null,
     feedback: attempt.report?.feedback ?? null,
+    decision: attemptDecision(group, attempt),
     reason: attempt.reason ? describeFailReason(attempt.reason) : null,
     startedAt: attempt.startedAt,
     durationMs: duration(attempt.startedAt, attempt.finishedAt, now),
@@ -673,6 +736,7 @@ export function groupView(
     worktree,
     question: group.question,
     questions: group.questions,
+    decisions: group.decisions.map((decision) => ({ ...decision })),
     reason: group.reason,
     limitUntil: groupLimitUntil(group),
     warnings: legacy.warnings,

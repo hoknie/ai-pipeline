@@ -67,10 +67,11 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Set
   - Turning the switch off brings the step back.
   - Steps skipped when the run was created are not shown.
 - A finished run with group warnings has a yellow "Warnings: N" badge.
+- The statuses of a run stand in the first row ("Status") of the summary block of the header: the state of the run, its delivery and the status of the open group or step. A long title wraps onto several lines. The list shows no progress bar for a "Finished" run.
 
 ### Group
 
-- The header has the step, round, time, changes, delivery, "Retry step", "Skip step" and "Cancel group".
+- The header has the step, round, time, changes, "Retry step", "Skip step" and "Cancel group". While the header of the run is scrolled out of view, the group header also shows the statuses of the run.
   - "Skip step" is shown for the step the group stands on, unless that step is skipped or finished. It skips the step for the whole run. The panel asks for confirmation when an attempt is running on the step or the run has more than one group.
 - Above the tabs are the question to a human, warnings and files outside the worktree.
 - "Log" shows the attempts of the group: specialist, runtime, verdict, tokens and cost. The log of a running attempt keeps loading by itself.
@@ -100,6 +101,7 @@ The queue settings are in [queue.md](queue.md).
 - "New task" opens a dialog with two halves: the task (title, workflow, text or groups) on the left and the settings (predecessors, tags, delivery, "Skip steps") on the right. "Skip steps" is a row of segments: a pressed segment is a skipped step, and the last unpressed one stays disabled. Below the controls are the running runs and the waiting tasks.
 - Runs the queue skipped because of a problem are in the "Skipped with a problem" block. They do not count as taken places.
 - Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. Every waiting task has "Edit", "Delete" and "Run now".
+- The "Parent task" field of the task form chooses one run of the queue as the parent: the task gets the tag of a linked task of that run. An edit sends the field only after it was changed; "No parent task" removes the linked task tags of the task.
 - The "Waits for" field of the task form chooses the predecessors. A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).
 - "Run now" on a task that is not ready asks to confirm "Dependencies are not met" and lists them.
 

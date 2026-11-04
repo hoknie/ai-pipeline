@@ -148,6 +148,51 @@ describe('live update', () => {
   });
 });
 
+describe('statuses in the group header', () => {
+  it('shows the statuses of the run in the group header only while the run header is scrolled out', async () => {
+    let callbacks: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(cb: (entries: { isIntersecting: boolean }[]) => void) {
+          callbacks.push(cb);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    try {
+      window.location.hash = '#runs/run1/login';
+      const row = groupRow({ status: 'merged' });
+      const run = runView({
+        id: 'run1',
+        state: 'finished',
+        finished: true,
+        groups: [row],
+        delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: null },
+      });
+      const api = fakeApi({ group: vi.fn(async () => groupView()) });
+      render(<App api={api} openStream={openFake} />);
+      act(() => stream().send({ event: 'snapshot', seq: 1, runs: [run] }));
+      const region = await screen.findByRole('region', { name: 'group Вход' });
+      const inGroup = () => region.querySelector('header h2')!.parentElement!;
+      expect(within(inGroup()).queryByLabelText(/\(finished\)$/)).toBeNull();
+      expect(within(inGroup()).queryByLabelText('Merged (merged)')).toBeNull();
+      const scroll = (isIntersecting: boolean) =>
+        act(() => callbacks.forEach((cb) => cb([{ isIntersecting }])));
+      scroll(false);
+      await waitFor(() => expect(within(inGroup()).getByLabelText('Merged (merged)')).toBeTruthy());
+      expect(within(inGroup()).getByLabelText(/\(finished\)$/)).toBeTruthy();
+      expect(within(inGroup()).getByLabelText('Delivered (applied)')).toBeTruthy();
+      scroll(true);
+      await waitFor(() => expect(within(inGroup()).queryByLabelText('Merged (merged)')).toBeNull());
+    } finally {
+      callbacks = [];
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('queue card', () => {
   it('shows the tokens of a run of the queue', async () => {
     window.location.hash = '#queue';

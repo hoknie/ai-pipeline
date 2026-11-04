@@ -616,7 +616,7 @@ describe('tags in text', () => {
       color: 'indigo' as const,
       task: { run: 'r1', number: 115 },
     };
-    expect(formatTagLabels([linked, tags[0]!])).toBe('#115:cards #auth');
+    expect(formatTagLabels([linked, tags[0]!])).toBe('#cards→#115 #auth');
     const text = formatTagList([linked, tags[0]!]);
     expect(text).toContain('TASK');
     expect(text).toContain('#115');
@@ -867,5 +867,111 @@ describe('name of the workflow in text', () => {
     expect(formatRunList([runView(run(1, { configText: named }), 1000)])).toContain(
       'Новая функция (feature)',
     );
+  });
+});
+
+describe('accepted answers of a group', () => {
+  it('shows human and autopilot answers in the group text and view', () => {
+    const state = run(1);
+    step(state, 1000);
+    const group = state.groups[0]!;
+    group.decisions.push(
+      { stepId: 'plan', question: 'Какой формат?', answer: 'JSON', by: 'human' },
+      { stepId: 'code', question: 'Продолжать?', answer: 'Да', by: 'autopilot' },
+    );
+    const view = groupView(state, group, '/w', null, 5000);
+    expect(view.decisions.map((d) => d.by)).toEqual(['human', 'autopilot']);
+    const text = formatGroup(view);
+    expect(text).toContain('Answer (human, plan): Какой формат? → JSON');
+    expect(text).toContain('Answer (autopilot, code): Продолжать? → Да');
+  });
+
+  it('attaches each answer to the attempt that asked the question', () => {
+    const state = run(1);
+    step(state, 1000);
+    finish(state, 'needs_human', { feedback: 'Какой формат?', now: 2000 });
+    const group = state.groups[0]!;
+    group.decisions.push({
+      stepId: 'plan',
+      question: 'Какой формат?',
+      answer: 'JSON',
+      by: 'human',
+    });
+    const first = groupView(state, group, '/w', null, 5000);
+    expect(first.attempts.map((a) => a.decision)).toEqual([
+      { question: 'Какой формат?', answer: 'JSON', by: 'human' },
+    ]);
+    expect(formatGroup(first)).toContain('answer (human): JSON');
+
+    group.attempts.push({
+      ...group.attempts[0]!,
+      seq: 2,
+      round: 2,
+    });
+    group.attempts.push({
+      ...group.attempts[0]!,
+      seq: 3,
+      round: 3,
+      report: null,
+      status: 'running',
+    });
+    group.decisions.push({ stepId: 'plan', question: 'Ещё?', answer: 'Да', by: 'autopilot' });
+    const second = groupView(state, group, '/w', null, 5000);
+    expect(second.attempts.map((a) => a.decision?.by ?? null)).toEqual([
+      'human',
+      'autopilot',
+      null,
+    ]);
+    expect(formatGroup(second)).toContain('answer (autopilot): Да');
+  });
+});
+
+describe('accepted answers of a run', () => {
+  function answered() {
+    const state = run(1);
+    step(state, 1000);
+    state.groups[0]!.decisions.push({
+      stepId: 'plan',
+      question: 'OAuth или пароль?\nПодробности',
+      answer: 'OAuth',
+      by: 'human',
+    });
+    return state;
+  }
+
+  it('counts answers by author in the list', () => {
+    const state = answered();
+    state.groups[0]!.decisions.push(
+      { stepId: 'code', question: 'a', answer: 'b', by: 'autopilot' },
+      { stepId: 'code', question: 'c', answer: 'd', by: 'autopilot' },
+    );
+    expect(formatRunList([runView(state, 2000)])).toContain('answers: human 1, autopilot 2');
+    state.groups[0]!.decisions.shift();
+    const text = formatRunList([runView(state, 2000)]);
+    expect(text).toContain('answers: autopilot 2');
+    expect(text).not.toContain('human');
+  });
+
+  it('shows no answers without decisions', () => {
+    const state = run(1);
+    step(state, 1000);
+    expect(formatRunList([runView(state, 2000)])).not.toContain('answers:');
+    expect(formatRun(runView(state, 2000), 2000)).not.toContain('Answers:');
+  });
+
+  it('prints the Answers block after the groups', () => {
+    const text = formatRun(runView(answered(), 2000), 2000);
+    expect(text).toContain('Answers:');
+    expect(text).toContain('→ OAuth');
+    const line = text.split('\n').find((l) => l.includes('(human)'))!;
+    expect(line).toMatch(/^ {2}\S+ · plan \(human\): OAuth или пароль\? → OAuth$/);
+    expect(text.indexOf('GROUP')).toBeLessThan(text.indexOf('Answers:'));
+  });
+
+  it('formats a view from a daemon without the field', () => {
+    const view: Partial<ReturnType<typeof runView>> = runView(answered(), 2000);
+    delete view.decisions;
+    expect(formatRun(view as ReturnType<typeof runView>, 2000)).not.toContain('Answers:');
+    expect(formatRunList([view as ReturnType<typeof runView>])).not.toContain('answers:');
   });
 });

@@ -140,7 +140,7 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 
 | Tool | Parameters | What it does |
 |---|---|---|
-| `swarm_run` | `workflow`, `task` or `groups[{title, task}]`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `repo?` | Puts a task at the end of the repository's queue and starts a stopped queue. The answer is `{item, run, queue}`. `run` is the created run, or `null` if the task waits |
+| `swarm_run` | `workflow`, `task` or `groups[{title, task}]`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `repo?` | Puts a task at the end of the repository's queue and starts a stopped queue. The answer is `{item, run, queue}`. `run` is the created run, or `null` if the task waits |
 | `swarm_status` | `run_id?` | Without `run_id`, the active runs and the 10 latest; with `run_id`, the table of groups |
 | `swarm_group` | `run_id`, `group`, `tail_lines?` | Step attempts, verdicts, remarks, tokens and the tail of the log |
 | `swarm_cancel` | `run_id`, `group?` | Stops a group or a whole run |
@@ -149,8 +149,8 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_answer` | `run_id`, `group`, `answer` | Answers a specialist who is waiting for a human decision |
 | `swarm_apply` | `run_id`, `groups?`, `force?` | Delivers ready groups (the command is `aip run apply`) |
 | `swarm_queue` | `repo?` | The queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order with their readiness and predecessors, and the runs that hold a place |
-| `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true` makes a running queue skip the task until the flag is cleared |
-| `swarm_queue_edit` | `item`, `workflow?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it (1 is first). `deliveryMode: null` follows `delivery.mode` again. `after` and `skip` replace the whole list, `[]` clears it. A returned run's task takes only `skip` (applied to the run), `after`, `position` |
+| `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
+| `swarm_queue_edit` | `item`, `workflow?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it (1 is first). `deliveryMode: null` follows the config again. `after` and `skip` replace the list, `[]` clears it. A returned run's task takes only `skip` (applied to it), `after`, `position` |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
 | `swarm_queue_parallel` | `parallel`, `repo?` | Changes the number of simultaneous runs in any queue state |
@@ -160,6 +160,8 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_run_pause` | `run_id`, `repo?` | Pauses an unfinished run: the step in progress finishes, nothing new starts, and the run moves to the end of the queue as `paused <run-id>`. Continue it with `swarm_queue_run_now`. `repo` defaults to the repository of the run |
 | `swarm_queue_pause` | `repo?` | Stops taking tasks; running runs keep working |
 | `swarm_queue_run_now` | `item`, `repo?` | Turns a task into a queue run at once; if no place is free, the last run that took a place is frozen. For a paused or frozen run it is Continue |
+
+- `parent` of `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` (a run id or a task number; `null` on edit removes it) is described in [Parent of a task](queue.md#tags).
 
 Without `repo`, the repository of the current directory is used. The queue, its settings, `after` and `skip` are described in [queue.md](queue.md). Every answer has a table for humans and the same data as JSON.
 
@@ -171,7 +173,7 @@ Specialists inside a run get their own MCP server (`aip mcp --worker`) with othe
 - `swarm_split` is available only on the split step.
 - `swarm_queue_add` (`workflow`, `task` or `groups`, `title?`, `deliveryMode?`, `skip?`, `after?`) is available only to a specialist with `queue: true`.
 - It puts the task in the queue of the run's repository, not of the directory where the specialist works.
-- The task gets tags automatically (see [Tags](queue.md#tags)).
+- The task gets tags automatically, always including the linked task tag of its run (see [Tags](queue.md#tags)).
 - A predecessor id from an earlier `swarm_queue_add` answer keeps working after that item has started, because it then points to its run.
 
 ### Run state

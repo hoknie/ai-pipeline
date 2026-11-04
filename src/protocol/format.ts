@@ -107,7 +107,7 @@ export function formatTagLabels(
   style: Style = plainStyle,
 ): string {
   return (tags ?? [])
-    .map((tag) => style.argument(tag.task ? `#${tag.task.number}:${tag.name}` : `#${tag.name}`))
+    .map((tag) => style.argument(tag.task ? `#${tag.name}→#${tag.task.number}` : `#${tag.name}`))
     .join(' ');
 }
 
@@ -160,6 +160,7 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
             ? `split ${run.split.status}`
             : run.counts || '—',
           deliveryText(run),
+          answersText(run),
         ]
           .filter(Boolean)
           .join(' · '),
@@ -214,7 +215,8 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
   if (system) header.push(system);
   const asked = run.system.find((step) => step.question);
   if (asked?.question) header.push(style.warning(`  question: ${asked.question}`));
-  if (run.groups.length === 0) return header.join('\n');
+  const answers = decisionLines(run, style);
+  if (run.groups.length === 0) return [...header, ...answers].join('\n');
   const rows = table(
     [
       ['GROUP', 'STATUS', 'STEP', 'ROUND', 'TIME', 'CHANGES', 'DELIVERY', 'NOTE'],
@@ -241,7 +243,30 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
     ],
     style,
   );
-  return `${header.join('\n')}\n\n${rows}`;
+  return `${header.join('\n')}\n\n${rows}${answers.length > 0 ? `\n\n${answers.join('\n')}` : ''}`;
+}
+
+/** `answers: human N, autopilot M` for the list of runs; empty without answers. */
+function answersText(run: RunView): string {
+  const decisions = run.decisions ?? [];
+  const parts = (['human', 'autopilot'] as const)
+    .map((by) => [by, decisions.filter((decision) => decision.by === by).length] as const)
+    .filter(([, count]) => count > 0)
+    .map(([by, count]) => `${by} ${count}`);
+  return parts.length > 0 ? `answers: ${parts.join(', ')}` : '';
+}
+
+/** The `Answers:` block of a run: one line per accepted answer; empty without answers. */
+function decisionLines(run: RunView, style: Style): string[] {
+  const decisions = run.decisions ?? [];
+  if (decisions.length === 0) return [];
+  const first = (text: string): string => text.split('\n')[0] ?? '';
+  return [
+    style.muted('Answers:'),
+    ...decisions.map(
+      (d) => `  ${d.group} · ${d.stepId} (${d.by}): ${first(d.question)} → ${first(d.answer)}`,
+    ),
+  ];
 }
 
 /** What a waiting group waits for, for the NOTE column. */
@@ -286,6 +311,12 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     `${style.muted('Task:')} ${group.task}`,
   ];
   if (group.question) lines.push(style.warning(`Question: ${group.question}`));
+  for (const decision of group.decisions ?? []) {
+    const who = decision.by === 'autopilot' ? 'autopilot' : 'human';
+    lines.push(
+      `${style.muted(`Answer (${who}, ${decision.stepId}):`)} ${decision.question.split('\n')[0]} → ${decision.answer}`,
+    );
+  }
   if (group.reason) lines.push(style.danger(`Reason: ${group.reason}`));
   for (const warning of group.warnings) lines.push(style.warning(`Warning: ${warning}`));
   for (const attempt of group.attempts) {
@@ -318,6 +349,9 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     );
     if (attempt.summary) lines.push(`     summary: ${attempt.summary}`);
     if (attempt.feedback) lines.push(`     feedback: ${attempt.feedback}`);
+    if (attempt.decision) {
+      lines.push(`     answer (${attempt.decision.by}): ${attempt.decision.answer}`);
+    }
     if (attempt.reason) lines.push(style.danger(`     reason: ${attempt.reason}`));
     for (const denial of attempt.denials) lines.push(`     denied: ${denialLine(denial)}`);
   }

@@ -1,0 +1,77 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { RunStatuses } from '../src/components/runs/RunStatuses.tsx';
+import { cleanup, fireEvent, render, screen } from './render.tsx';
+import { groupRow, runView } from './fixtures.ts';
+
+afterEach(cleanup);
+
+const labels = () =>
+  Array.from(document.querySelectorAll('[aria-label$=")"]')).map((node) =>
+    node.getAttribute('aria-label'),
+  );
+
+describe('run statuses', () => {
+  it('shows the run, the delivery and the merged group of a delivered run once', () => {
+    const group = groupRow({ status: 'merged', delivery: 'applied' });
+    const run = runView({
+      state: 'finished',
+      finished: true,
+      groups: [group],
+      delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: null },
+    });
+    render(<RunStatuses run={run} entry={group} />);
+    expect(labels()).toEqual([
+      expect.stringMatching(/\(finished\)$/),
+      'Delivered (applied)',
+      'Merged (merged)',
+    ]);
+  });
+
+  it('adds the delivery of the open group when several groups are merged', () => {
+    const groups = [
+      groupRow({ slug: 'a', status: 'merged', delivery: 'applied' }),
+      groupRow({ slug: 'b', status: 'merged', delivery: 'pending' }),
+    ];
+    const run = runView({
+      groups,
+      delivery: { applied: 1, merged: 2, failed: 0, inProgress: false, finishedAt: null },
+    });
+    render(<RunStatuses run={run} entry={groups[1]!} />);
+    expect(labels()).toEqual([
+      expect.stringMatching(/\(active\)$/),
+      'delivery 1/2 (pending)',
+      'Merged (merged)',
+      'Pending (pending)',
+    ]);
+  });
+
+  it('shows only the run badge without groups and delivery', () => {
+    const run = runView({
+      groups: [],
+      delivery: { applied: 0, merged: 0, failed: 0, inProgress: false, finishedAt: null },
+    });
+    render(<RunStatuses run={run} entry={null} />);
+    expect(labels()).toHaveLength(1);
+  });
+
+  it('opens the resolver from the delivery badge', () => {
+    const onSelect = vi.fn();
+    const run = runView({
+      groups: [groupRow({ status: 'merged' })],
+      delivery: { applied: 0, merged: 1, failed: 0, inProgress: false, finishedAt: null },
+      resolver: {
+        status: 'running',
+        wait: null,
+        round: 1,
+        rounds: 2,
+        conflicts: ['a.ts'],
+        reason: null,
+      },
+    });
+    render(<RunStatuses run={run} entry={null} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText('delivery 0/1'));
+    expect(onSelect).toHaveBeenCalledWith('_resolve');
+  });
+});

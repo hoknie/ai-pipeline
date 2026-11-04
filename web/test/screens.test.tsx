@@ -208,6 +208,7 @@ describe('run header', () => {
     expect(summary.className).toContain('border-l');
     expect(summary.className).toContain('@3xl:w-96');
     expect([...summary.querySelectorAll('dt')].map((node) => node.textContent)).toEqual([
+      'Status',
       'Path',
       'Time',
       'Tokens',
@@ -215,10 +216,10 @@ describe('run header', () => {
       'Type',
     ]);
     const values = [...summary.querySelectorAll('dd')].map((node) => node.textContent);
-    expect(values[0]).toBe('/repo');
-    expect(values[2]).toBe('1.0k/100');
-    expect(values[3]).toBe('$0.42');
-    expect(values[4]).toContain('feature');
+    expect(values[1]).toBe('/repo');
+    expect(values[3]).toBe('1.0k/100');
+    expect(values[4]).toBe('$0.42');
+    expect(values[5]).toContain('feature');
   });
 
   it('has no tokens and cost rows without usage or price', () => {
@@ -247,7 +248,7 @@ describe('run header', () => {
     expect(within(next).queryByText('Cost')).toBeNull();
   });
 
-  it('puts the state badge on the line of the title and drops the sum of changes', () => {
+  it('puts the state badge into the summary, not on the line of the title, and drops the sum of changes', () => {
     render(
       <RunHeader
         run={runView({ diff: { files: 3, added: 10, removed: 2 } })}
@@ -257,9 +258,11 @@ describe('run header', () => {
       />,
     );
     const title = screen.getByRole('heading', { level: 1 });
-    expect(
-      title.parentElement!.querySelector('[aria-label^="Active"], [aria-label*="("]'),
-    ).toBeTruthy();
+    expect(title.parentElement!.querySelector('[aria-label*="("]')).toBeNull();
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    expect(summary.querySelector('dd [aria-label^="Active"]')).toBeTruthy();
+    expect(title.className).not.toContain('truncate');
+    expect(title.className).toContain('break-words');
     expect(screen.queryByText(/3 files/)).toBeNull();
     expect(screen.getAllByLabelText('Pipeline: feature')).toHaveLength(1);
   });

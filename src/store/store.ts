@@ -254,6 +254,14 @@ export class Store {
     return Number(row.max);
   }
 
+  /** The id of the run of the repository with this task number; null when there is none. */
+  runIdByNumber(repository: string, number: number): string | null {
+    const row = this.database
+      .prepare('SELECT id FROM runs WHERE repository = ? AND number = ?')
+      .get(repository, number) as { id: string } | undefined;
+    return row?.id ?? null;
+  }
+
   loadQueue(repository: string): Queue | null {
     const row = this.database
       .prepare('SELECT * FROM queues WHERE repository = ?')

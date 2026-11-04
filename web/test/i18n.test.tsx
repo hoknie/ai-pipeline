@@ -245,6 +245,7 @@ const SAME_AS_ENGLISH = new Set([
   'Pipeline: {{id}}',
   'Pipeline: {{name}} ({{id}})',
   '{{action}} «{{id}}»?',
+  '{{who}} {{n}}',
   'English',
   'Español',
   'Русский',

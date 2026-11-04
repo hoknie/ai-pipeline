@@ -2293,3 +2293,56 @@ describe('skip in the draft', () => {
     expect(pruneSkip(['qa'], [])).toEqual([]);
   });
 });
+
+describe('parent task in the form', () => {
+  const linked = {
+    id: 'tl',
+    name: 'parent-run',
+    color: 'indigo' as const,
+    task: { run: 'run1', number: 12 },
+  };
+  const choose = async (name: string) => {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Parent task' }));
+    fireEvent.click(await screen.findByRole('option', { name: new RegExp(name) }));
+  };
+  const parentQueue = (items = [apiItem()]) =>
+    queueOf({ items, runs: [queueRun('run1', { title: 'Parent', number: 12 })] });
+
+  it('adds a task with the parent chosen from the runs', async () => {
+    const api = show(parentQueue([]));
+    await openNewTask();
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'Next' } });
+    await choose('Parent');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        workflow: 'feature',
+        task: 'Next',
+        parent: 'run1',
+      }),
+    );
+  });
+
+  it('does not send the parent of an edit when the field was not touched', async () => {
+    const item = queueItem('q1', 'API', 1, { tags: [linked] });
+    const api = show(parentQueue([item]));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    expect(screen.getByRole('combobox', { name: 'Parent task' }).textContent).toContain('Parent');
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
+    expect(vi.mocked(api.queueEdit).mock.calls[0]![1]).not.toHaveProperty('parent');
+  });
+
+  it('sends null when the parent is cleared in an edit', async () => {
+    const item = queueItem('q1', 'API', 1, { tags: [linked] });
+    const api = show(parentQueue([item]));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    await choose('No parent task');
+    fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ parent: null })),
+    );
+  });
+});

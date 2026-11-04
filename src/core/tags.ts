@@ -196,3 +196,34 @@ export function autoTagName(catalog: readonly Tag[], base: string): string {
     if (!taken.has(fold(name))) return name;
   }
 }
+
+/** The linked task tag of a run: the earliest one made for it, if any. */
+export function linkedTagOf(catalog: readonly Tag[], runId: string): Tag | undefined {
+  let found: Tag | undefined;
+  for (const tag of catalog) {
+    if (tag.task?.run !== runId) continue;
+    if (!found || tag.createdAt < found.createdAt) found = tag;
+  }
+  return found;
+}
+
+/** The ids without the tags of linked tasks. */
+export function withoutLinkedTags(catalog: readonly Tag[], ids: readonly string[]): string[] {
+  const linked = new Set(catalog.filter((tag) => tag.task !== null).map((tag) => tag.id));
+  return ids.filter((id) => !linked.has(id));
+}
+
+/** A parent reference: a run id candidate and/or a task number candidate. */
+export interface ParentRef {
+  id: string | null;
+  number: number | null;
+}
+
+/** `161`, `#161` and `161` as a number are task numbers; a string is also a run id. */
+export function parseParentRef(value: string | number): ParentRef {
+  if (typeof value === 'number') return { id: null, number: value };
+  const text = value.trim();
+  const match = /^#?(\d+)$/.exec(text);
+  const number = match ? Number(match[1]) : null;
+  return { id: text, number: number !== null && number > 0 ? number : null };
+}

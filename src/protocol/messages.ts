@@ -55,6 +55,8 @@ const settingPathSchema = z
   .min(1)
   .refine((path) => settingFieldOf(path) !== undefined, { message: 'unknown setting' });
 
+const parentRef = z.union([z.string().trim().min(1), z.number().int().positive()]);
+
 const runParams = z
   .object({
     repository: z.string().min(1),
@@ -65,6 +67,7 @@ const runParams = z
     autoDeliver: z.boolean().optional(),
     deliveryMode: deliveryModeSchema.optional(),
     tags: tagNames.optional(),
+    parent: parentRef.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
   })
@@ -87,6 +90,7 @@ const queueAddParams = z
     autoDeliver: z.boolean().optional(),
     deliveryMode: deliveryModeSchema.optional(),
     tags: tagNames.optional(),
+    parent: parentRef.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
     postponed: z.boolean().optional(),
@@ -123,6 +127,7 @@ const queueEditParams = z
     autoDeliver: z.boolean().nullable().optional(),
     deliveryMode: deliveryModeSchema.nullable().optional(),
     tags: tagNames.optional(),
+    parent: parentRef.nullable().optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
     postponed: z.boolean().optional(),

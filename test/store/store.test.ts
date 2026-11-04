@@ -390,6 +390,18 @@ describe('queues', () => {
     store.close();
   });
 
+  it('finds a run of the repository by its task number', () => {
+    const store = temporaryStore();
+    const state = run(1, { id: 'run000000001', now: 10 });
+    state.run.repository = '/repo';
+    state.run.number = 7;
+    store.saveRun(state);
+    expect(store.runIdByNumber('/repo', 7)).toBe('run000000001');
+    expect(store.runIdByNumber('/other', 7)).toBeNull();
+    expect(store.runIdByNumber('/repo', 8)).toBeNull();
+    store.close();
+  });
+
   it('keeps the queue origin of a run', () => {
     const store = temporaryStore();
     const state = run(1);

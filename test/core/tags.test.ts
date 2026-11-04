@@ -9,6 +9,9 @@ import {
   autoTagName,
   editTag,
   keepLinkedTags,
+  linkedTagOf,
+  parseParentRef,
+  withoutLinkedTags,
   knownTags,
   mergeTags,
   removeTag,
@@ -184,5 +187,41 @@ describe('linked task tags', () => {
     const catalog = [...plain, a];
     expect(keepLinkedTags(catalog, ['tg-0', 'la'], ['tg-1', 'tg-1', 'la'])).toEqual(['la', 'tg-1']);
     expect(keepLinkedTags(catalog, ['tg-0', 'la'], [])).toEqual(['la']);
+  });
+});
+
+describe('linked task tag of a run', () => {
+  const linked = (catalog: Tag[], name: string, run: string, createdAt: number): Tag => {
+    const tag = addLinkedTag(catalog, { name, task: { run, number: 5 } }, `lk-${name}`, createdAt);
+    return tag;
+  };
+
+  it('finds the earliest tag made for the run, also after a rename', () => {
+    const catalog = catalogOf('auth');
+    catalog.push(linked(catalog, 'late', 'r1', 50));
+    catalog.push(linked(catalog, 'early', 'r1', 10));
+    catalog.push(linked(catalog, 'other', 'r2', 1));
+    expect(linkedTagOf(catalog, 'r1')?.name).toBe('early');
+    expect(linkedTagOf(catalog, 'r2')?.name).toBe('other');
+    expect(linkedTagOf(catalog, 'r3')).toBeUndefined();
+    const renamed = catalog.map((tag) =>
+      tag.name === 'early' ? { ...tag, name: 'renamed' } : tag,
+    );
+    expect(linkedTagOf(renamed, 'r1')?.name).toBe('renamed');
+  });
+
+  it('drops linked task tags from a list of ids', () => {
+    const catalog = catalogOf('auth', 'v2');
+    catalog.push(linked(catalog, 'fix', 'r1', 10));
+    expect(withoutLinkedTags(catalog, ['lk-fix', 'tg-0', 'tg-1'])).toEqual(['tg-0', 'tg-1']);
+  });
+
+  it('reads a parent reference as a number and as a run id', () => {
+    expect(parseParentRef(161)).toEqual({ id: null, number: 161 });
+    expect(parseParentRef('161')).toEqual({ id: '161', number: 161 });
+    expect(parseParentRef('#161')).toEqual({ id: '#161', number: 161 });
+    expect(parseParentRef(' r1 ')).toEqual({ id: 'r1', number: null });
+    expect(parseParentRef('#x')).toEqual({ id: '#x', number: null });
+    expect(parseParentRef('0')).toEqual({ id: '0', number: null });
   });
 });

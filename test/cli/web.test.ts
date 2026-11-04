@@ -490,6 +490,30 @@ describe('aip web', () => {
     ).toBe(400);
   });
 
+  it('rejects an unknown parent of a queued task with 400', async () => {
+    const { web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    const added = await post('/api/queue/items', {
+      workflow: 'feature',
+      task: 'x',
+      parent: 'nope',
+    });
+    expect(added.status).toBe(400);
+    expect(await added.text()).toContain('unknown parent `nope`');
+    const item = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'x' })
+    ).json()) as QueueView & { item: string };
+    const edited = await post(`/api/queue/items/${item.item}`, { parent: 77 });
+    expect(edited.status).toBe(400);
+    expect(await edited.text()).toContain('unknown parent `77`');
+    expect((await post(`/api/queue/items/${item.item}`, { parent: null })).status).toBe(200);
+  });
+
   it('passes a predecessor of a queued task through the queue API', async () => {
     const { web, base } = await setup();
     const post = (path: string, body: unknown) =>

@@ -160,6 +160,8 @@ export const en = {
   },
   runs: {
     list: {
+      answers: 'Answers',
+      answersCount: '{{who}} {{n}}',
       tags: 'Tags',
       search: 'Search runs',
       filter: 'Run filter',
@@ -191,6 +193,7 @@ export const en = {
     header: {
       summary: {
         label: 'Run summary',
+        status: 'Status',
         path: 'Path',
         time: 'Time',
         tokens: 'Tokens',
@@ -315,8 +318,15 @@ export const en = {
       summary: 'Summary',
       feedbackLabel: 'feedback',
       feedback: 'Feedback',
+      answer: 'Answer ({{by}}):',
       list: 'attempts',
       none: 'No attempts yet.',
+    },
+    decisions: {
+      label: 'accepted answers',
+      heading: 'Accepted answers · {{n}}',
+      human: 'human',
+      autopilot: 'autopilot',
     },
     questions: {
       answerSent: 'Answer sent',
@@ -465,6 +475,8 @@ export const en = {
     dependency: { done: 'done', waiting: 'waiting', blocked: 'blocked' },
     form: {
       after: 'Waits for',
+      parent: 'Parent task',
+      noParent: 'No parent task',
       afterCurrent: 'Current predecessors',
       afterItems: 'Waiting tasks',
       afterRuns: 'Runs from the queue',

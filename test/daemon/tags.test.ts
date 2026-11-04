@@ -435,13 +435,14 @@ describe('tags of tasks from a specialist', () => {
     // the queue is stopped, so the tasks wait
     const waiting = await queueOf(h);
     expect(waiting.items).toHaveLength(2);
-    for (const item of waiting.items) expect(names(item.tags)).toEqual(['auth', 'v2']);
-    expect(names(await tagsOf(h))).toEqual(['auth', 'v2']);
+    // the linked task tag of the explore run comes first, then the tags of the run
+    for (const item of waiting.items) expect(names(item.tags)).toEqual([explore, 'auth', 'v2']);
+    expect(names(await tagsOf(h))).toEqual(['auth', explore, 'v2'].sort());
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
     const runs = await allRuns(h);
     expect(runs).toHaveLength(3);
-    for (const run of runs) expect(names(run.tags)).toEqual(['auth', 'v2']);
+    for (const run of runs) expect(names(run.tags)).toEqual([explore, 'auth', 'v2']);
     for (const run of runs) await h.waitFor(run.id, (view) => view.finished);
   });
 
@@ -823,5 +824,275 @@ describe('tags of linked tasks', () => {
     );
     const renamed = (await h.call('tag_edit', { tag: 'fix-login', name: 'login' })) as TagView[];
     expect(renamed.find((tag) => tag.name === 'login')).toMatchObject({ color: 'indigo' });
+  });
+});
+
+describe('parent of a task', () => {
+  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+
+  /** A run of the `feature` workflow made from the queue; the queue stays stopped. */
+  async function parentRun(h: Harness, title: string): Promise<RunView> {
+    const added = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'feature',
+      task: 'parent',
+      title,
+    })) as QueueView & { item: string };
+    const created = (await h.call('queue_run_now', { repository: h.repo, item: added.item })) as {
+      runId: string;
+    };
+    await h.waitFor(created.runId, (run) => run.finished);
+    return h.status(created.runId);
+  }
+
+  const add = async (h: Harness, extra: Record<string, unknown>): Promise<QueueView> =>
+    (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'feature',
+      task: 'child',
+      ...extra,
+    })) as QueueView;
+
+  it('makes the linked task tag of the parent by task number and gives it to the parent first', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    const parent = await parentRun(h, 'Cards half width');
+    const view = await add(h, { parent: parent.number });
+    const [tag] = await tagsOf(h).then((tags) => tags.filter((candidate) => candidate.task));
+    expect(tag).toMatchObject({
+      name: 'cards-half-width',
+      color: 'indigo',
+      task: { run: parent.id, number: parent.number },
+    });
+    expect(view.items[0]!.tags).toEqual([tag]);
+    expect(names((await h.status(parent.id)).tags)).toEqual(['cards-half-width']);
+  });
+
+  it('takes a number written as #N and a run id, and reuses the existing tag', async () => {
+    const h = await start();
+    const parent = await parentRun(h, 'Fix login');
+    await add(h, { parent: `#${parent.number}` });
+    await add(h, { parent: parent.id });
+    await add(h, { parent: String(parent.number) });
+    const linked = (await tagsOf(h)).filter((tag) => tag.task);
+    expect(linked).toHaveLength(1);
+    const items = (await queueOf(h)).items;
+    expect(items).toHaveLength(3);
+    for (const item of items) expect(item.tags).toEqual(linked);
+  });
+
+  it('returns a tag taken off the parent to it, first', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    const parent = await parentRun(h, 'Fix login');
+    await add(h, { parent: parent.id });
+    await h.call('run_tags', { runId: parent.id, remove: ['fix-login'] });
+    await h.call('run_tags', { runId: parent.id, add: ['auth'] });
+    await add(h, { parent: parent.id });
+    expect(names((await h.status(parent.id)).tags)).toEqual(['fix-login', 'auth']);
+    expect((await tagsOf(h)).filter((tag) => tag.task)).toHaveLength(1);
+  });
+
+  it('refuses an unknown run, an unknown number and the number of a waiting task, changing nothing', async () => {
+    const h = await start();
+    const parent = await parentRun(h, 'Fix login');
+    const waiting = await add(h, {});
+    const waitingNumber = waiting.items[0]!.number;
+    const before = await queueOf(h);
+    const catalog = await tagsOf(h);
+    for (const value of ['nope', 9999, '#9999', waitingNumber]) {
+      await expect(add(h, { parent: value })).rejects.toThrow(`unknown parent \`${value}\``);
+      await expect(
+        h.call('run', { repository: h.repo, workflow: 'feature', task: 'x', parent: value }),
+      ).rejects.toThrow('unknown parent');
+      await expect(
+        h.call('queue_edit', {
+          repository: h.repo,
+          item: before.items[0]!.id,
+          title: 'renamed',
+          parent: value,
+        }),
+      ).rejects.toThrow('unknown parent');
+    }
+    expect(await queueOf(h)).toEqual(before);
+    expect(await tagsOf(h)).toEqual(catalog);
+    expect((await h.status(parent.id)).tags).toEqual([]);
+  });
+
+  it('does not create a tag when the workflow is unknown', async () => {
+    const h = await start();
+    const parent = await parentRun(h, 'Fix login');
+    await expect(add(h, { workflow: 'missing', parent: parent.id })).rejects.toThrow();
+    expect(await tagsOf(h)).toEqual([]);
+    expect((await h.status(parent.id)).tags).toEqual([]);
+  });
+
+  it('puts the parent tag before the own tags and the tags of the predecessor', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    await addTag(h, 'v2');
+    const parent = await parentRun(h, 'Fix login');
+    const first = await add(h, { tags: ['v2'] });
+    const itemId = first.items[0]!.id;
+    const view = await add(h, { parent: parent.id, tags: ['auth'], after: [itemId] });
+    const second = view.items[1]!;
+    expect(names(second.tags)).toEqual(['fix-login', 'auth', 'v2']);
+    expect(second.after.map((ref) => ref.id)).toEqual([itemId]);
+  });
+
+  it('checks the whole request before it creates the tag', async () => {
+    const h = await start();
+    const parent = await parentRun(h, 'Fix login');
+    const first = await add(h, {});
+    const item = first.items[0]!.id;
+    const before = await queueOf(h);
+    const catalog = await tagsOf(h);
+    const edit = (extra: Record<string, unknown>) =>
+      h.call('queue_edit', { repository: h.repo, item, parent: parent.id, ...extra });
+    await expect(edit({ after: [item] })).rejects.toThrow('cannot depend on itself');
+    await expect(edit({ position: 99 })).rejects.toThrow('position must be');
+    await expect(edit({ task: 'a', groups: [{ title: 'g', task: 't' }] })).rejects.toThrow(
+      'pass either task or groups',
+    );
+    const second = await add(h, { after: [item] });
+    const other = second.items[1]!.id;
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item,
+        parent: parent.id,
+        after: [other],
+      }),
+    ).rejects.toThrow('dependency cycle');
+    const both = { task: 'a', groups: [{ title: 'g', task: 't' }] };
+    await expect(add(h, { parent: parent.id, ...both })).rejects.toThrow(
+      'pass either task or groups',
+    );
+    await expect(
+      h.call('run', { repository: h.repo, workflow: 'feature', parent: parent.id, ...both }),
+    ).rejects.toThrow('pass either task or groups');
+    expect((await queueOf(h)).items.map((entry) => entry.tags)).toEqual(
+      before.items.map((entry) => entry.tags).concat([[]]),
+    );
+    expect(await tagsOf(h)).toEqual(catalog);
+    expect((await h.status(parent.id)).tags).toEqual([]);
+  });
+
+  it('keeps the tags of a new predecessor behind the tag of the new parent on edit', async () => {
+    const h = await start();
+    const one = await parentRun(h, 'Fix login');
+    const two = await parentRun(h, 'Add cards');
+    const dep = await add(h, { parent: two.id });
+    const depId = dep.items[0]!.id;
+    const view = await add(h, {});
+    const item = view.items[1]!.id;
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      parent: one.id,
+      after: [depId],
+    })) as QueueView;
+    expect(names(edited.items[1]!.tags)).toEqual(['fix-login', 'add-cards']);
+  });
+
+  it('moves the tag to the run started now', async () => {
+    const h = await start();
+    const parent = await parentRun(h, 'Fix login');
+    const created = await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      task: 'child',
+      parent: parent.id,
+    });
+    expect(names((await h.status(created.runId)).tags)).toEqual(['fix-login']);
+  });
+
+  it('still refuses the name of a linked task tag among tags', async () => {
+    const h = await start();
+    const parent = await parentRun(h, 'Fix login');
+    await add(h, { parent: parent.id });
+    await expect(add(h, { tags: ['fix-login'] })).rejects.toThrow(
+      `tag \`fix-login\` belongs to task #${parent.number} and is set automatically`,
+    );
+  });
+
+  it('removes the linked task tag with parent null and changes the parent on edit', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    const one = await parentRun(h, 'Fix login');
+    const two = await parentRun(h, 'Add cards');
+    const view = await add(h, { parent: one.id, tags: ['auth'] });
+    const item = view.items[0]!.id;
+    const edit = async (params: Record<string, unknown>): Promise<QueueView> =>
+      (await h.call('queue_edit', { repository: h.repo, item, ...params })) as QueueView;
+    // an edit without parent keeps the linked task tag
+    expect(names((await edit({ title: 'x' })).items[0]!.tags)).toEqual(['fix-login', 'auth']);
+    expect(names((await edit({ parent: two.number })).items[0]!.tags)).toEqual([
+      'add-cards',
+      'auth',
+    ]);
+    expect(names((await edit({ parent: null })).items[0]!.tags)).toEqual(['auth']);
+    // the tags stay in the catalog and on the parents
+    expect(names((await tagsOf(h)).filter((tag) => tag.task))).toEqual(['add-cards', 'fix-login']);
+    expect(names((await h.status(one.id)).tags)).toEqual(['fix-login']);
+    // parent together with tags
+    const both = await edit({ parent: one.id, tags: [] });
+    expect(names(both.items[0]!.tags)).toEqual(['fix-login']);
+  });
+});
+
+describe('linked task tag of every task from a specialist', () => {
+  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+
+  async function exploreWith(h: Harness, tags: string[], title: string): Promise<string> {
+    const added = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'explore',
+      groups: [{ title: 'один', task: 'a' }],
+      title,
+      tags,
+    })) as QueueView & { item: string };
+    const created = (await h.call('queue_run_now', { repository: h.repo, item: added.item })) as {
+      runId: string;
+    };
+    return created.runId;
+  }
+
+  it('gives the tasks of a run with a tag the tag of the run first, then the tags of the run', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({ explore: [{ queueChain: [ONE.queue, ONE.queue] }] });
+    await addTag(h, 'bug');
+    const explore = await exploreWith(h, ['bug'], 'Fix login');
+    await h.waitFor(explore, (run) => run.finished);
+    const items = (await queueOf(h)).items;
+    expect(items).toHaveLength(2);
+    for (const item of items) expect(names(item.tags)).toEqual(['fix-login', 'bug']);
+    expect(names((await h.status(explore)).tags)).toEqual(['fix-login', 'bug']);
+    expect((await tagsOf(h)).filter((tag) => tag.task)).toHaveLength(1);
+  });
+
+  it('puts the tag of each run before the tags it inherited along the chain', async () => {
+    const h = await start(SCOUT_CONFIG);
+    h.script({
+      explore: [
+        { queue: { workflow: 'explore', groups: [{ title: 'g', task: 't' }] } },
+        { queue: ONE.queue },
+      ],
+    });
+    const first = await exploreWith(h, [], 'First');
+    await h.waitFor(first, (run) => run.finished);
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);
+    for (const run of await allRuns(h)) await h.waitFor(run.id, (view) => view.finished);
+    const runs = await allRuns(h);
+    const chains = runs.map((run) => run.tags.map((tag) => tag.task?.run));
+    expect(chains[0]).toEqual([first]);
+    const ids = new Set(runs.map((run) => run.id));
+    // a run made from a task of the second explore run: its tag, then the inherited one
+    const deeper = chains.find((chain) => chain.length === 2);
+    expect(deeper).toBeDefined();
+    expect(deeper![1]).toBe(first);
+    expect(deeper![0]).not.toBe(first);
+    expect(ids.has(deeper![0]!)).toBe(true);
   });
 });

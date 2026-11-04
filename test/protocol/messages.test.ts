@@ -202,6 +202,17 @@ describe('queue requests', () => {
     );
   });
 
+  it('takes parent as a task number or a non-empty string, null only on edit', () => {
+    ok('run', { repository: '/r', workflow: 'feature', task: 'x', parent: 115 });
+    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', parent: '#115' });
+    ok('queue_edit', { repository: '/r', item: 'q1', parent: 'r1' });
+    ok('queue_edit', { repository: '/r', item: 'q1', parent: null });
+    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', parent: null });
+    bad('run', { repository: '/r', workflow: 'feature', task: 'x', parent: 0 });
+    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', parent: '' });
+    bad('queue_edit', { repository: '/r', item: 'q1', parent: 1.5 });
+  });
+
   it('takes skip as a list of non-empty step ids', () => {
     ok('run', { repository: '/r', workflow: 'feature', task: 'x', skip: ['qa'] });
     ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', skip: ['review', 'qa'] });

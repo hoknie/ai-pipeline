@@ -382,6 +382,58 @@ describe('runView system steps', () => {
   });
 });
 
+describe('accepted answers in rows and the run view', () => {
+  const answer = (by: 'human' | 'autopilot', n: number) => ({
+    stepId: 'plan',
+    question: `q${n}`,
+    answer: `a${n}`,
+    by,
+  });
+
+  it('copies the answers of a group into its row, oldest first', () => {
+    const state = run(1);
+    const target = state.groups[0]!;
+    target.decisions.push(answer('human', 1), answer('autopilot', 2));
+    const row = runView(state, 5000).groups[0]!;
+    expect(row.decisions).toEqual(target.decisions);
+    expect(row.decisions[0]).not.toBe(target.decisions[0]);
+  });
+
+  it('puts the answers of a service step into its row', () => {
+    const state = run(1);
+    state.split = { ...group(state), slug: '_split', status: 'merged', attempts: [] };
+    state.split.decisions.push(answer('human', 1));
+    expect(runView(state, 5000).system[0]?.decisions).toEqual([answer('human', 1)]);
+  });
+
+  it('lists the answers of the run in the order split, groups, message, resolve', () => {
+    const state = run(2);
+    const base = group(state);
+    state.split = { ...base, slug: '_split', status: 'merged', attempts: [], decisions: [] };
+    state.message = { ...base, slug: '_message', status: 'running', attempts: [], decisions: [] };
+    state.resolve = { ...base, slug: '_resolve', status: 'running', attempts: [], decisions: [] };
+    state.resolve.decisions.push(answer('autopilot', 4));
+    state.message.decisions.push(answer('human', 3));
+    state.groups[1]!.decisions.push(answer('autopilot', 2));
+    state.groups[0]!.decisions.push(answer('human', 1));
+    state.split.decisions.push(answer('human', 0));
+    const view = runView(state, 5000);
+    expect(view.decisions.map((d) => [d.group, d.question, d.by])).toEqual([
+      ['_split', 'q0', 'human'],
+      [state.groups[0]!.slug, 'q1', 'human'],
+      [state.groups[1]!.slug, 'q2', 'autopilot'],
+      ['_message', 'q3', 'human'],
+      ['_resolve', 'q4', 'autopilot'],
+    ]);
+  });
+
+  it('is empty without answers', () => {
+    const view = runView(run(1), 5000);
+    expect(view.decisions).toEqual([]);
+    expect(view.groups[0]?.decisions).toEqual([]);
+  });
+});
+
 describe('queueView delivery mode and autopilot answer', () => {
   it('shows the mode of the repository and of the items, and the answer text', () => {
     const queue = emptyQueue('/repo', 1);
@@ -724,6 +776,22 @@ describe('runView progress', () => {
     expect(runView(state, 2000).progress).toEqual({ done: 1, total: 4 });
   });
 
+  it('does not lower after the reviewer sends the work back', () => {
+    const state = run(1);
+    for (let index = 0; index < 2; index += 1) {
+      step(state);
+      finish(state, 'done', { slug: 'gruppa-1' });
+    }
+    step(state);
+    const before = runView(state, 2000).progress.done;
+    finish(state, 'rejected', { slug: 'gruppa-1', feedback: 'переделать' });
+    expect(runView(state, 2000).progress).toEqual({ done: before, total: 4 });
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    const view = queueView(queue, (id) => (id === state.run.id ? state : undefined)).runs[0]!;
+    expect(view.steps.done).toBe(before);
+  });
+
   it('is empty while the task is split', () => {
     const state = run(1);
     state.groups = [];
@@ -736,6 +804,58 @@ describe('runView progress', () => {
     const { done, total } = runView(state, 2000).progress;
     expect(done).toBe(total);
     expect(total).toBeGreaterThan(0);
+  });
+});
+
+describe('runView liveDiff', () => {
+  const stat = (files: [string, number, number][]) => ({
+    files: files.map(([path, added, removed]) => ({ path, added, removed })),
+    added: files.reduce((sum, file) => sum + file[1], 0),
+    removed: files.reduce((sum, file) => sum + file[2], 0),
+  });
+
+  it('counts a running group before the merge', () => {
+    const state = run(1);
+    step(state);
+    const diffs = () =>
+      stat([
+        ['a.ts', 300, 0],
+        ['b.ts', 67, 0],
+      ]);
+    const view = runView(state, 2000, diffs);
+    expect(view.diff).toBeNull();
+    expect(view.liveDiff).toEqual({ files: 2, added: 367, removed: 0 });
+  });
+
+  it('counts a file shared by two groups once', () => {
+    const state = run(2);
+    group(state, 'gruppa-1').status = 'merged';
+    const diffs = (slug: string) =>
+      slug === 'gruppa-1'
+        ? stat([['a.ts', 5, 1]])
+        : stat([
+            ['a.ts', 2, 0],
+            ['b.ts', 3, 0],
+          ]);
+    expect(runView(state, 2000, diffs).liveDiff).toEqual({ files: 2, added: 10, removed: 1 });
+  });
+
+  it('skips cancelled groups', () => {
+    const state = run(2);
+    group(state, 'gruppa-2').status = 'cancelled';
+    const diffs = (slug: string) =>
+      slug === 'gruppa-1' ? stat([['a.ts', 1, 0]]) : stat([['b.ts', 9, 9]]);
+    expect(runView(state, 2000, diffs).liveDiff).toEqual({ files: 1, added: 1, removed: 0 });
+  });
+
+  it('is null without statistics', () => {
+    expect(runView(run(2), 2000).liveDiff).toBeNull();
+  });
+
+  it('skips a group without statistics instead of zeroing the sum', () => {
+    const state = run(2);
+    const diffs = (slug: string) => (slug === 'gruppa-1' ? stat([['a.ts', 4, 2]]) : null);
+    expect(runView(state, 2000, diffs).liveDiff).toEqual({ files: 1, added: 4, removed: 2 });
   });
 });
 

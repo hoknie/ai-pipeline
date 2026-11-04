@@ -270,7 +270,7 @@ describe('system stages in the run header', () => {
       Array.from(header.querySelectorAll('[aria-label$=")"]')).map((node) =>
         node.getAttribute('aria-label'),
       ),
-    ).toEqual([expect.stringMatching(/\(finished\)$/), 'Delivered (applied)']);
+    ).toEqual([expect.stringMatching(/\(finished\)$/), 'Delivered (applied)', 'Merged (merged)']);
   });
 
   const merged3 = () => [1, 2, 3].map((n) => groupRow({ slug: `g${n}`, status: 'merged' }));
@@ -290,6 +290,8 @@ describe('system stages in the run header', () => {
     expect(badgeLabels(header)).toEqual([
       expect.stringMatching(/\(active\)$/),
       'delivery 2/3 (pending)',
+      'Merged (merged)',
+      'Pending (pending)',
     ]);
     const texts = within(header)
       .queryAllByText(/deliver/i)
@@ -308,7 +310,7 @@ describe('system stages in the run header', () => {
     ]);
     const header = await screen.findByRole('banner', { name: 'run' });
     const labels = badgeLabels(header);
-    expect(labels).toHaveLength(2);
+    expect(labels).toHaveLength(3);
     expect(labels[1]).toMatch(/^Delivering/);
     expect(within(header).queryByText(/Delivery failed/)).toBeNull();
   });
@@ -321,7 +323,10 @@ describe('system stages in the run header', () => {
       }),
     ]);
     const header = await screen.findByRole('banner', { name: 'run' });
-    expect(badgeLabels(header)).toHaveLength(1);
+    expect(badgeLabels(header)).toEqual([
+      expect.stringMatching(/\(active\)$/),
+      expect.stringMatching(/\(running\)$/),
+    ]);
   });
 
   it('shows the reason of a failed delivery in the badge tooltip', async () => {

@@ -147,7 +147,10 @@ describe('worker MCP server', () => {
       },
       true,
     );
-    expect((await client.listTools()).tools.map((tool) => tool.name)).toContain('swarm_queue_add');
+    const tools = (await client.listTools()).tools;
+    expect(tools.map((tool) => tool.name)).toContain('swarm_queue_add');
+    const add = tools.find((tool) => tool.name === 'swarm_queue_add');
+    expect(Object.keys(add?.inputSchema.properties ?? {})).not.toContain('parent');
     const result = await client.callTool({
       name: 'swarm_queue_add',
       arguments: { workflow: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' },

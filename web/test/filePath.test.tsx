@@ -19,6 +19,15 @@ describe('FilePath', () => {
     expect(code.className).not.toContain('break-all');
   });
 
+  it('adds a class from the caller to the line variant', () => {
+    render(<FilePath variant="line" path="/repo/a.yaml" className="sm:self-end" />);
+    const code = screen.getByText('/repo/a.yaml');
+    expect(code.className).toContain('self-start');
+    expect(code.className).toContain('sm:self-end');
+    expect(code.className).toContain('truncate');
+    expect(code.getAttribute('title')).toBe('/repo/a.yaml');
+  });
+
   it('wraps in the inline variant, which is the default', () => {
     render(<FilePath path="docs/a.md" />);
     const code = screen.getByText('docs/a.md');

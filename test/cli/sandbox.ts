@@ -10,7 +10,7 @@ import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
 import { request } from '../../src/protocol/index.ts';
 import { runCli } from '../../src/cli/program.ts';
 import { TEST_TIMINGS, WORKFLOW_CONFIG } from '../daemon/harness.ts';
-import { writeConfigDirectory } from '../fixtures/config.ts';
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 
 // Shared by the cli test files; importing this module shuts down the daemons of the sandboxes after
 // every test.
@@ -68,16 +68,7 @@ afterEach(async () => {
 export function sandbox(config = WORKFLOW_CONFIG): Sandbox {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-cli-')));
   const repo = join(base, 'repo');
-  execFileSync('git', ['init', '-q', '-b', 'main', repo]);
-  for (const args of [
-    ['config', 'user.name', 'T'],
-    ['config', 'user.email', 't@e.com'],
-  ]) {
-    execFileSync('git', args, { cwd: repo });
-  }
-  writeConfigDirectory(repo, config);
-  execFileSync('git', ['add', '-A'], { cwd: repo });
-  execFileSync('git', ['commit', '-q', '-m', 'init'], { cwd: repo });
+  copyTemplateRepo(repo, config);
   writeFileSync(join(base, 'script.json'), '{}');
   const env = {
     ...process.env,

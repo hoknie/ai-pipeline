@@ -14,6 +14,7 @@ import { orderEntries } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { TagChips } from '../TagChip.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
+import { RunDecisions } from './RunDecisions.tsx';
 import { RunFilters } from './RunFilters.tsx';
 import { RunProgress } from './RunProgress.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
@@ -113,7 +114,7 @@ export function RunList({
                   title={`${runTitle(run)}\n${run.id}`}
                   onClick={() => onSelect(run.id, null)}
                 >
-                  <span className="truncate text-sm font-medium">
+                  <span className="block min-w-0 truncate text-sm font-medium">
                     <span className="font-mono text-xs text-muted-foreground">
                       {taskNumber(run.number)}
                     </span>{' '}
@@ -136,7 +137,9 @@ export function RunList({
                       <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
                       <RunWarningsBadge run={run} />
                     </span>
-                    <RunProgress done={run.progress.done} total={run.progress.total} />
+                    {run.state === 'finished' ? null : (
+                      <RunProgress done={run.progress.done} total={run.progress.total} />
+                    )}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <span>{times.created}</span>
@@ -147,6 +150,7 @@ export function RunList({
                   <span className="text-xs text-muted-foreground">
                     {run.diff ? diffText(run.diff, t) : '—'}
                   </span>
+                  <RunDecisions run={run} />
                 </button>
                 {open && groups.length > 1 ? (
                   <ul

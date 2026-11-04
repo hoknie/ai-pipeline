@@ -86,7 +86,7 @@ export function SettingField({
         const value = typeof shown === 'string' ? shown : setting.kind === 'specialist' ? NONE : '';
         return (
           <Select
-            value={value === '' ? undefined : value}
+            value={value}
             disabled={locked}
             onValueChange={(next) => onChange(next === NONE ? null : next)}
           >

@@ -22,6 +22,7 @@ import { Switch } from '../../ui/switch.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs.tsx';
 import { Markdown } from '../Markdown.tsx';
 import { OutsideChanges } from '../OutsideChanges.tsx';
+import { RunStatuses } from './RunStatuses.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
 
 import { AttemptTimeline } from './AttemptTimeline.tsx';
@@ -70,7 +71,10 @@ export function GroupScreen({
   run,
   onForceDeliver,
   showUsage = false,
+  onSelectEntry,
 }: {
+  /** Opens a group or a system step of the run (the resolver badge). */
+  onSelectEntry?: (slug: string) => void;
   /** Show duration, tokens and cost in the header (the run header is scrolled out of view). */
   showUsage?: boolean;
   api: Api;
@@ -170,7 +174,13 @@ export function GroupScreen({
           {'kind' in row ? (
             <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
           ) : null}
-          <StatusBadge status={row.status} wait={row.wait} />
+          {run ? (
+            showUsage ? (
+              <RunStatuses run={run} entry={row} onSelect={onSelectEntry} />
+            ) : null
+          ) : (
+            <StatusBadge status={row.status} wait={row.wait} />
+          )}
           {caps.retryDelivery ? (
             <Button
               variant="outline"
@@ -261,13 +271,6 @@ export function GroupScreen({
             </span>
           ) : null}
           {'diff' in row && row.diff ? <DiffStat diff={row.diff} /> : null}
-          {!('kind' in row) && row.status === 'merged' ? (
-            delivering ? (
-              <StatusBadge status="running" label={t('runs.system.delivering')} />
-            ) : (
-              <StatusBadge status={row.delivery} />
-            )
-          ) : null}
           {'kind' in row && row.kind !== 'split' && stage ? (
             <span
               role="status"
@@ -382,6 +385,32 @@ export function GroupScreen({
             onSubmit={(answer, done) => void act(() => api.answer(runId, row.slug, answer), done)}
           />
         )
+      ) : null}
+      {view && (view.decisions ?? []).length > 0 ? (
+        <section aria-label={t('runs.decisions.label')} className="flex flex-col gap-1 text-sm">
+          <div className="text-xs font-medium uppercase text-muted-foreground">
+            {t('runs.decisions.heading', { n: view.decisions.length })}
+          </div>
+          <ul className="flex flex-col gap-2">
+            {view.decisions.map((decision, index) => (
+              <li key={index} className="rounded-md border p-2">
+                <div className="text-muted-foreground">{decision.question}</div>
+                <div>
+                  → {decision.answer}{' '}
+                  <span className="text-xs text-muted-foreground">
+                    (
+                    {t(
+                      decision.by === 'autopilot'
+                        ? 'runs.decisions.autopilot'
+                        : 'runs.decisions.human',
+                    )}
+                    , {decision.stepId})
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
       {view?.warnings.map((warning) => (
         <Alert key={warning} variant="warn">

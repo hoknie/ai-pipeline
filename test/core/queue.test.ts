@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  checkReturnedPatch,
   DEFAULT_AUTOPILOT_ANSWER,
   QUEUE_PARALLEL_MAX,
   addItem,
@@ -160,6 +161,13 @@ describe('items', () => {
     }
     setParallel(queue, QUEUE_PARALLEL_MAX, 4);
     expect(queue.parallel).toBe(20);
+  });
+});
+
+describe('returned run patch', () => {
+  it('rejects a change of the task and allows the place', () => {
+    expect(() => checkReturnedPatch({ task: 'x' })).toThrow('a returned run keeps its own task');
+    expect(() => checkReturnedPatch({ position: 1, after: [] })).not.toThrow();
   });
 });
 

@@ -496,6 +496,7 @@ export function QueueList({
                               tags: fields.tags ?? [],
                               skip: fields.skip ?? [],
                               ...(fields.after !== undefined ? { after: fields.after } : {}),
+                              ...(fields.parent !== undefined ? { parent: fields.parent } : {}),
                             },
                       );
                       onQueue(view);

@@ -235,6 +235,7 @@ export function RunsPage({
         onDeliver={(force) => deliver(run, force)}
         onSelect={(slug) => select(run.id, slug)}
         headerRef={setHeaderElement}
+        entry={group}
       />
       {group ? (
         <GroupScreen
@@ -257,6 +258,7 @@ export function RunsPage({
           run={run}
           onForceDeliver={() => deliver(run, true)}
           showUsage={headerOut}
+          onSelectEntry={(slug) => select(run.id, slug)}
         />
       ) : (
         <p className="p-4 text-sm text-muted-foreground">{t('runs.page.noGroups')}</p>

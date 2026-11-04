@@ -311,6 +311,15 @@ describe('cli', () => {
       expect(restarted.stdout).toContain(`aip web: http://127.0.0.1:${port}/?token=`);
       const status = await aip(env, 'web', 'status');
       expect(status.stdout).toContain(`aip web: running (pid ${pid})`);
+      await aip(env, 'daemon', 'stop');
+    });
+
+    it('restarts the running daemon with --web again', async () => {
+      const box = sandbox();
+      const port = await freePort();
+      writeGlobalSettings(box, `web: { autostart: false, port: ${port} }\n`);
+      const env = noAutostart(box);
+      expect((await aip(env, 'daemon', 'restart', '--web')).code).toBe(0);
       const again = await aip(env, 'daemon', 'restart', '--web');
       expect(again.stdout).toMatch(/restarted \(pid (\d+)\)/);
       expect(again.stdout).toContain(`aip web: http://127.0.0.1:${port}/?token=`);

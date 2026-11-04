@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import i18next from 'i18next';
+import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { TagsProvider } from '../src/tags.tsx';
@@ -65,6 +67,24 @@ describe('run row layout', () => {
     expect(within(row).getByRole('progressbar').textContent).toBe('0%');
   });
 
+  it('shows a dash while no group is merged, even with a live diff', () => {
+    const row = show({
+      ...full(),
+      diff: null,
+      liveDiff: { files: 2, added: 367, removed: 0 },
+    });
+    expect(row.textContent).not.toContain('+367');
+    expect(row.textContent).toContain('—');
+  });
+
+  it('truncates the title to one line and keeps the full text in the tooltip', () => {
+    const title = 'очень длинное название запуска '.repeat(8).trim();
+    const row = show(runView({ title }));
+    const first = row.querySelector('span')!;
+    expect(first.className).toContain('truncate');
+    expect(row.getAttribute('title')).toContain(title);
+  });
+
   it('shows 0% while the task is split', () => {
     const row = show(runView({ progress: { done: 0, total: 0 } }));
     expect(within(row).getByRole('progressbar').textContent).toBe('0%');
@@ -91,5 +111,81 @@ describe('run row layout', () => {
     const grid = bar.parentElement!;
     expect(grid.className).toContain('grid-cols-2');
     expect(grid.lastElementChild).toBe(bar);
+  });
+
+  it('has no bar for a finished run, but keeps the badge and the grid cell', () => {
+    const row = show(
+      runView({ state: 'finished', finished: true, progress: { done: 4, total: 4 } }),
+    );
+    expect(within(row).queryByRole('progressbar')).toBeNull();
+    expect(row.textContent).not.toContain('100%');
+    expect(within(row).getByLabelText(/\(finished\)$/)).toBeTruthy();
+    expect(row.querySelector('.grid-cols-2')).toBeTruthy();
+  });
+
+  it('keeps the bar of a failed run', () => {
+    const row = show(runView({ state: 'failed', progress: { done: 2, total: 4 } }));
+    expect(within(row).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('50');
+  });
+
+  it('shows the bar again when the run returns to work', () => {
+    const done = runView({ state: 'finished', finished: true, progress: { done: 4, total: 4 } });
+    const props = {
+      selectedRun: null,
+      selectedGroup: null,
+      now: 2_000,
+      query: '',
+      onQuery: () => undefined,
+      filter: 'all' as const,
+      onFilter: () => undefined,
+      onSelect: () => undefined,
+      scope: 'repository' as const,
+      onScope: () => undefined,
+      repository: '/repo',
+      tagIds: [],
+      onTagIds: () => undefined,
+    };
+    const { rerender } = render(<RunList runs={[done]} {...props} />);
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    rerender(<RunList runs={[{ ...done, state: 'active', finished: false }]} {...props} />);
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+  });
+});
+
+describe('accepted answers on the card', () => {
+  const decisions = [
+    { group: 'login', stepId: 'plan', question: 'Формат?', answer: 'JSON', by: 'human' as const },
+    { group: 'login', stepId: 'code', question: 'Дальше?', answer: 'Да', by: 'autopilot' as const },
+    { group: 'api', stepId: 'code', question: 'Ещё?', answer: 'Нет', by: 'autopilot' as const },
+  ];
+
+  it('counts answers by author and lists them in the title', () => {
+    const row = show(runView({ decisions }));
+    const line = within(row).getByText(/Answers/);
+    expect(line.textContent).toBe('Answers: human 1 · autopilot 2');
+    expect(line.getAttribute('title')).toBe(
+      [
+        'login · plan (human): Формат? → JSON',
+        'login · code (autopilot): Дальше? → Да',
+        'api · code (autopilot): Ещё? → Нет',
+      ].join('\n'),
+    );
+  });
+
+  it('hides the author without answers', () => {
+    const row = show(runView({ decisions: decisions.slice(1) }));
+    expect(within(row).getByText(/Answers/).textContent).toBe('Answers: autopilot 2');
+    expect(row.textContent).not.toContain('human');
+  });
+
+  it('shows no line without answers', () => {
+    const row = show(runView({ decisions: [] }));
+    expect(row.textContent).not.toContain('Answers');
+  });
+
+  it('is translated', async () => {
+    await act(() => i18next.changeLanguage('ru'));
+    const row = show(runView({ decisions: decisions.slice(0, 1) }));
+    expect(within(row).getByText(/Ответы/).textContent).toBe('Ответы: человек 1');
   });
 });

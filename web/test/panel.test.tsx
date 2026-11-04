@@ -360,7 +360,11 @@ describe('run page', () => {
     fireEvent.click(within(tree).getByText('Вход'));
     const login = screen.getByRole('region', { name: 'group Вход' });
     expect(login.querySelector('header')!.textContent).toContain('2 files +3 −1');
-    expect(within(login).getByLabelText('Merged (merged)').className).toContain('bg-status-ok-bg');
+    expect(
+      within(screen.getByRole('complementary', { name: 'Run summary' })).getByLabelText(
+        'Merged (merged)',
+      ).className,
+    ).toContain('bg-status-ok-bg');
     expect(window.location.hash).toBe('#runs/run1/login');
     fireEvent.click(within(tree).getByText('Регистрация'));
     expect((screen.getByLabelText('answer for Регистрация') as HTMLTextAreaElement).value).toBe(

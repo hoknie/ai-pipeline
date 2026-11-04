@@ -17,7 +17,7 @@ import {
   type RunQueued,
   type RunView,
 } from '../../src/protocol/index.ts';
-import { writeConfigDirectory } from '../fixtures/config.ts';
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 
 const root = join(import.meta.dirname, '..', '..');
 const fakes = join(root, 'test', 'fakes');
@@ -109,13 +109,7 @@ export async function harness(
   const state = join(base, 'state');
   const fakeState = join(base, 'fake');
   mkdirSync(join(base, 'xdg'), { recursive: true });
-  execFileSync('git', ['init', '-q', '-b', 'main', repo]);
-  sh(repo, 'config', 'user.name', 'Test');
-  sh(repo, 'config', 'user.email', 'test@example.com');
-  writeFileSync(join(repo, 'lib.ts'), 'export const value = 1;\n');
-  writeConfigDirectory(repo, config);
-  sh(repo, 'add', '-A');
-  sh(repo, 'commit', '-q', '-m', 'initial');
+  copyTemplateRepo(repo, config, { 'lib.ts': 'export const value = 1;\n' });
   const gates = join(base, 'gates');
   mkdirSync(gates);
   const scriptPath = join(base, 'script.json');

@@ -130,6 +130,7 @@ function collect(value: string, previous: string[] = []): string[] {
 
 interface QueueTaskOptions {
   tag?: string[];
+  parent?: string | false;
   after?: string[];
   skip?: string[];
   task?: string;
@@ -181,6 +182,10 @@ function registerQueue(program: Command): void {
         `how the merged result is delivered: ${DELIVERY_MODES.join(', ')}; whatever delivery.mode says`,
       )
       .option('--tag <name>', 'tag of the task; repeat for several', collect)
+      .option(
+        '--parent <run>',
+        'run id or task number (161 or #161) whose linked task tag the task gets',
+      )
       .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
       .option(
         '--after <id>',
@@ -215,6 +220,7 @@ function registerQueue(program: Command): void {
         'aip queue add feature -g g.yaml',
         'aip queue add feature --task "Fix the typo" --skip review --skip qa',
         'aip queue add feature --task "Add the API" --after q1',
+        'aip queue add feature --task "Follow-up" --parent 115',
         'aip queue add feature --task "Later" --postpone',
       ]),
     )
@@ -232,6 +238,7 @@ function registerQueue(program: Command): void {
         ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
         ...(deliveryMode !== undefined ? { deliveryMode } : {}),
         ...(options.tag !== undefined ? { tags: options.tag } : {}),
+        ...(typeof options.parent === 'string' ? { parent: options.parent } : {}),
         ...(options.skip !== undefined ? { skip: options.skip } : {}),
         ...(options.after !== undefined ? { after: options.after } : {}),
         ...(options.postpone ? { postponed: true } : {}),
@@ -242,18 +249,23 @@ function registerQueue(program: Command): void {
 
   let editAfter = false;
   let editNoAfter = false;
+  let editParent = false;
+  let editNoParent = false;
   common(
     taskOptions(
       queue
         .command('edit')
         .on('option:after', () => (editAfter = true))
         .on('option:no-after', () => (editNoAfter = true))
+        .on('option:parent', () => (editParent = true))
+        .on('option:no-parent', () => (editNoParent = true))
         .description('Change a waiting task')
         .argument('<item>', 'item id from `aip queue list`')
         .option('-w, --workflow <id>', 'new workflow id')
         .option('--default-auto-deliver', 'follow delivery.auto of the configuration again')
         .option('--default-delivery-mode', 'follow delivery.mode of the configuration again')
         .option('--no-tags', 'remove all tags of the task')
+        .option('--no-parent', 'remove the linked task tags of the task')
         .option('--no-skips', 'run every step of the workflow again')
         .option('--no-after', 'remove all predecessors of the task')
         .option('--postpone', 'postpone the task: a running queue does not take it')
@@ -269,6 +281,8 @@ function registerQueue(program: Command): void {
         'aip queue edit 1 --no-skips',
         'aip queue edit 2 --after q1',
         'aip queue edit 2 --no-after',
+        'aip queue edit 2 --parent 115',
+        'aip queue edit 2 --no-parent',
         'aip queue edit 3 --postpone',
         'aip queue edit 3 --no-postpone',
       ]),
@@ -286,6 +300,9 @@ function registerQueue(program: Command): void {
       ) => {
         if (editAfter && editNoAfter) {
           throw new Error('--no-after cannot be combined with --after');
+        }
+        if (editParent && editNoParent) {
+          throw new Error('--no-parent cannot be combined with --parent');
         }
         if (options.tags === false && options.tag !== undefined) {
           throw new Error('--no-tags cannot be combined with --tag');
@@ -324,6 +341,8 @@ function registerQueue(program: Command): void {
                 : {}),
             ...(options.tags === false ? { tags: [] } : {}),
             ...(options.tag !== undefined ? { tags: options.tag } : {}),
+            ...(editNoParent ? { parent: null } : {}),
+            ...(editParent && typeof options.parent === 'string' ? { parent: options.parent } : {}),
             ...(options.skips === false ? { skip: [] } : {}),
             ...(options.skip !== undefined ? { skip: options.skip } : {}),
             ...(editNoAfter ? { after: [] } : {}),
@@ -686,6 +705,10 @@ function registerRun(program: Command): void {
       `how the merged result is delivered: ${DELIVERY_MODES.join(', ')}; whatever delivery.mode says`,
     )
     .option('--tag <name>', 'tag of the task; repeat for several', collect)
+    .option(
+      '--parent <run>',
+      'run id or task number (161 or #161) whose linked task tag the task gets',
+    )
     .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
     .option(
       '--after <id>',
@@ -701,6 +724,7 @@ function registerRun(program: Command): void {
         'aip run start feature --title "Login form" --task "Add a login form with OAuth"',
         'aip run start feature --groups groups.yaml --repo ~/projects/app',
         'aip run start feature --task "Add the API" --after q1',
+        'aip run start feature --task "Follow-up" --parent 115',
       ]),
     )
     .action(
@@ -714,6 +738,7 @@ function registerRun(program: Command): void {
           autoDeliver?: boolean;
           deliveryMode?: string;
           tag?: string[];
+          parent?: string;
           skip?: string[];
           after?: string[];
           json?: boolean;
@@ -733,6 +758,7 @@ function registerRun(program: Command): void {
           ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
           ...(deliveryMode !== undefined ? { deliveryMode } : {}),
           ...(options.tag !== undefined ? { tags: options.tag } : {}),
+          ...(options.parent !== undefined ? { parent: options.parent } : {}),
           ...(options.skip !== undefined ? { skip: options.skip } : {}),
           ...(options.after !== undefined ? { after: options.after } : {}),
         })) as RunQueued;

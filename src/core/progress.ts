@@ -2,7 +2,7 @@ import { stepLabel } from './topology.ts';
 import { stepsOf, type Group, type RunState } from './model.ts';
 
 export interface StepProgress {
-  /** Steps passed by all work groups; a group sent back to an earlier step passes fewer. */
+  /** Steps reached by all work groups; a return to an earlier step does not lower it. */
   done: number;
   /** Steps of all work groups; 0 while the task is split. */
   total: number;
@@ -18,7 +18,13 @@ function position(group: Group, count: number): number {
   return Math.min(group.attempts.at(-1)?.stepIndex ?? 0, count);
 }
 
-/** Step progress of a run by the current position of every work group. */
+function reached(group: Group, count: number): number {
+  if (ALL_STEPS.has(group.status)) return count;
+  const furthest = Math.max(0, ...group.attempts.map((attempt) => attempt.stepIndex));
+  return Math.min(count, Math.max(position(group, count), furthest));
+}
+
+/** Step progress of a run: reached steps by the furthest step, the current step by position. */
 export function stepProgress(state: RunState): StepProgress {
   let done = 0;
   let total = 0;
@@ -27,7 +33,7 @@ export function stepProgress(state: RunState): StepProgress {
     for (const group of state.groups) {
       const steps = stepsOf(state.run, group);
       const passed = position(group, steps.length);
-      done += passed;
+      done += reached(group, steps.length);
       total += steps.length;
       const step = steps[passed];
       if (state.groups.length === 1 && step) {

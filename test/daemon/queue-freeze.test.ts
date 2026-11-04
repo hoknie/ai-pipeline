@@ -141,6 +141,20 @@ describe('freezing for a priority run', () => {
     expect((await h.status(b)).hold).toBe('frozen');
   });
 
+  it('refuses a parent for the item of a returned run, also null', async () => {
+    const h = await start();
+    const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
+    await h.call('queue_return', { runId: a });
+    const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
+    const catalog = await h.call('tags', {});
+    for (const parent of [a, null]) {
+      await expect(
+        h.call('queue_edit', { repository: h.repo, item: item.id, parent }),
+      ).rejects.toThrow('a returned run keeps its own task');
+    }
+    expect(await h.call('tags', {})).toEqual(catalog);
+  });
+
   it('skips a step of a returned run through its queue item and keeps its task', async () => {
     const h = await start();
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });

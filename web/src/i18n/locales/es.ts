@@ -166,6 +166,8 @@ export const es: Dictionary = {
   },
   runs: {
     list: {
+      answers: 'Respuestas',
+      answersCount: '{{who}} {{n}}',
       tags: 'Etiquetas',
       search: 'Buscar ejecuciones',
       filter: 'Filtro de ejecuciones',
@@ -197,6 +199,7 @@ export const es: Dictionary = {
     header: {
       summary: {
         label: 'Resumen de la ejecución',
+        status: 'Estado',
         path: 'Ruta',
         time: 'Tiempo',
         tokens: 'Tokens',
@@ -322,8 +325,15 @@ export const es: Dictionary = {
       summary: 'Resumen',
       feedbackLabel: 'observaciones',
       feedback: 'Observaciones',
+      answer: 'Respuesta ({{by}}):',
       list: 'intentos',
       none: 'Aún no hay intentos.',
+    },
+    decisions: {
+      label: 'respuestas aceptadas',
+      heading: 'Respuestas aceptadas · {{n}}',
+      human: 'persona',
+      autopilot: 'piloto automático',
     },
     questions: {
       answerSent: 'Respuesta enviada',
@@ -478,6 +488,8 @@ export const es: Dictionary = {
     dependency: { done: 'hecha', waiting: 'en espera', blocked: 'bloqueada' },
     form: {
       after: 'Espera a',
+      parent: 'Tarea padre',
+      noParent: 'Sin tarea padre',
       afterCurrent: 'Predecesores actuales',
       afterItems: 'Tareas en espera',
       afterRuns: 'Ejecuciones de la cola',

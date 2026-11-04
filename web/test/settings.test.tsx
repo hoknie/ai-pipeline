@@ -1073,12 +1073,24 @@ describe('settings target block', () => {
     expect(tabs.queryByText(PROJECT_FILE)).toBeNull();
   });
 
+  it('aligns the path with the label and truncates it', async () => {
+    show(queueOf(), {}, '#settings/project/general');
+    await screen.findByTestId('setting-max');
+    const path = within(target()).getByText(PROJECT_FILE);
+    expect(path.className).toContain('truncate');
+    expect(path.getAttribute('title')).toBe(PROJECT_FILE);
+    expect(path.parentElement?.className).toContain('sm:justify-end');
+    expect(within(target()).getByText('Saved to').parentElement).toBe(path.parentElement);
+  });
+
   it('shows the shared file and the note on Shared', async () => {
     show(queueOf(), {}, '#settings/global/delivery');
     await screen.findByRole('region', { name: 'Where the settings are saved' });
     const block = within(target());
     expect(block.getByText(GLOBAL_FILE)).toBeTruthy();
-    expect(block.getByText('Applies to every repository')).toBeTruthy();
+    expect(block.getByText('Applies to every repository').parentElement).toBe(
+      block.getByText(GLOBAL_FILE).parentElement,
+    );
     expect(block.queryByRole('combobox')).toBeNull();
   });
 

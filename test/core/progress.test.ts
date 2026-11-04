@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { findGroup, stepProgress } from '../../src/core/index.ts';
 
-import { finish, run, step } from './helpers.ts';
+import { CONFIG_TEXT, finish, run, step } from './helpers.ts';
 
 describe('stepProgress', () => {
   it('counts every step of merged, merging and conflict groups', () => {
@@ -42,23 +42,59 @@ describe('stepProgress', () => {
     }
   });
 
-  it('lowers the progress when a group returns to an earlier step', () => {
-    const state = run(1);
-    for (let index = 0; index < 2; index += 1) {
+  function sentBack(state: ReturnType<typeof run>, steps: number) {
+    for (let index = 0; index < steps; index += 1) {
       step(state);
       finish(state, 'done');
     }
     step(state);
-    expect(stepProgress(state)).toMatchObject({
-      done: 2,
-      current: { step: 'review', name: 'Ревьюер', number: 3 },
-    });
     finish(state, 'rejected', { feedback: 'переделать' });
+  }
+
+  it('keeps the progress when a group returns to an earlier step', () => {
+    const state = run(1);
+    sentBack(state, 2);
     expect(stepProgress(state)).toEqual({
-      done: 1,
+      done: 2,
       total: 4,
       current: { step: 'code', name: 'Кодировщик', number: 2 },
     });
+  });
+
+  it('does not reset the progress on a return to the first step', () => {
+    const state = run(1, {
+      configText: CONFIG_TEXT.replace('        - { id: plan, specialist: plan }\n', ''),
+    });
+    step(state);
+    finish(state, 'done');
+    step(state);
+    finish(state, 'rejected', { feedback: 'переделать' });
+    const progress = stepProgress(state);
+    expect(progress.done).toBe(1);
+    expect(progress.current).toMatchObject({ step: 'code', number: 1 });
+  });
+
+  it('does not grow beyond the maximum on a repeated pass, then grows on a new step', () => {
+    const state = run(1);
+    sentBack(state, 2);
+    const before = stepProgress(state).done;
+    step(state);
+    finish(state, 'done');
+    expect(stepProgress(state).done).toBe(before);
+    step(state);
+    expect(stepProgress(state).done).toBe(before);
+    finish(state, 'done');
+    step(state);
+    expect(stepProgress(state).done).toBe(before + 1);
+  });
+
+  it('counts failed and cancelled groups after a return by the furthest step', () => {
+    for (const status of ['failed', 'cancelled'] as const) {
+      const state = run(1);
+      sentBack(state, 2);
+      findGroup(state, 'gruppa-1')!.status = status;
+      expect(stepProgress(state).done).toBe(2);
+    }
   });
 
   it('does not count a skipped step', () => {

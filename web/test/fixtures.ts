@@ -83,6 +83,7 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     diff: null,
     limitUntil: null,
     usage: null,
+    decisions: [],
     wait: null,
     ...overrides,
   };
@@ -149,6 +150,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     resolver: null,
     deliveryStage: null,
     diff: null,
+    liveDiff: null,
     topology: topologyOf(),
     steps: [
       { id: 'plan', specialist: 'plan', name: 'Planner', skipped: false, state: 'done' },
@@ -158,6 +160,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     specialists: [],
     groups: [groupRow()],
     system: [],
+    decisions: [],
     ...overrides,
   };
 }
@@ -201,6 +204,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
         verdict: null,
         summary: null,
         feedback: null,
+        decision: null,
         reason: null,
         startedAt: 1_000,
         durationMs: 5_000,
@@ -210,6 +214,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
       },
     ],
     permissionHints: [],
+    decisions: [],
     log: { seq: 1, lines: ['{"type":"system"}'] },
     ...overrides,
   };

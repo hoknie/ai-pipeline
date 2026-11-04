@@ -25,6 +25,7 @@ import {
 import {
   Rejection,
   addItem,
+  type ItemFields,
   checkSkip,
   stepStates,
   addLinkedTag,
@@ -65,6 +66,9 @@ import {
   removeItem,
   removeTag,
   keepLinkedTags,
+  linkedTagOf,
+  parseParentRef,
+  withoutLinkedTags,
   resolveManualTags,
   resolveTags,
   setParallel,
@@ -716,6 +720,14 @@ export class Daemon {
           } = request.params;
           let skip = request.params.skip;
           const returned = queue.items.find((candidate) => candidate.id === item);
+          const parentParam = request.params.parent;
+          if (returned?.run && parentParam !== undefined) {
+            throw new Rejection('a returned run keeps its own task');
+          }
+          const parentState =
+            parentParam === undefined || parentParam === null
+              ? null
+              : this.resolveParent(repository, parentParam);
           if (returned?.run && skip !== undefined) {
             // A returned run has no item-level skip: the steps are skipped in the run itself.
             checkReturnedPatch(
@@ -777,6 +789,26 @@ export class Daemon {
           if (existing && tags !== undefined) {
             tags = keepLinkedTags(this.catalog, knownTags(this.catalog, existing.tags), tags);
           }
+          const parentPending = existing !== undefined && parentParam !== undefined;
+          const patch = {
+            workflow,
+            task,
+            groups,
+            title,
+            position,
+            autoDeliver,
+            deliveryMode,
+            skip,
+            after,
+            postponed,
+          };
+          // Every check of the edit runs on a copy before the tag of the parent is created.
+          if (existing && parentState) editItem(structuredClone(queue), item, patch, now);
+          if (existing && parentPending) {
+            const parentTag = parentState ? await this.linkedTagFor(parentState) : null;
+            const rest = withoutLinkedTags(this.catalog, tags ?? existing.tags);
+            tags = mergeTags(parentTag ? [parentTag.id] : [], rest);
+          }
           if (existing && after !== undefined) {
             const fresh = after.filter((ref) => !existing.after.includes(ref));
             const inherited = knownTags(
@@ -785,24 +817,7 @@ export class Daemon {
             );
             if (inherited.length > 0) tags = mergeTags(tags ?? existing.tags, inherited);
           }
-          editItem(
-            queue,
-            item,
-            {
-              workflow,
-              task,
-              groups,
-              title,
-              position,
-              autoDeliver,
-              deliveryMode,
-              tags,
-              skip,
-              after,
-              postponed,
-            },
-            now,
-          );
+          editItem(queue, item, { ...patch, tags }, now);
           const edited = queue.items.find((candidate) => candidate.id === item);
           if (edited) {
             spreadTags(
@@ -1566,7 +1581,18 @@ export class Daemon {
     const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
-    const tags = this.inheritTags(queue, resolveManualTags(this.catalog, params.tags ?? []), after);
+    const manual = resolveManualTags(this.catalog, params.tags ?? []);
+    const parent =
+      params.parent === undefined ? null : this.resolveParent(repository, params.parent);
+    if (parent) {
+      this.checkNewItem(
+        queue,
+        { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after },
+        now,
+      );
+    }
+    const parentTag = parent ? await this.linkedTagFor(parent) : null;
+    const tags = this.inheritTags(queue, mergeTags(parentTag ? [parentTag.id] : [], manual), after);
     const item = addItem(
       queue,
       { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
@@ -1603,15 +1629,24 @@ export class Daemon {
       | 'after'
       | 'postponed'
     > &
-      Pick<ParamsOf<'queue_add'>, 'tags'>,
+      Pick<ParamsOf<'queue_add'>, 'tags' | 'parent'>,
     inherited?: string[],
   ): Promise<unknown> {
     const { workflow, task, groups, title, autoDeliver, deliveryMode, skip, postponed } = params;
-    const own = inherited ?? resolveManualTags(this.catalog, params.tags ?? []);
     const queue = this.queueFor(repository);
     const now = this.now();
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
+    let own = inherited ?? resolveManualTags(this.catalog, params.tags ?? []);
+    if (params.parent !== undefined) {
+      const parent = this.resolveParent(repository, params.parent);
+      this.checkNewItem(
+        queue,
+        { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after, postponed },
+        now,
+      );
+      own = mergeTags([(await this.linkedTagFor(parent)).id], own);
+    }
     const tags = this.inheritTags(queue, own, after);
     const item = addItem(
       queue,
@@ -1622,6 +1657,50 @@ export class Daemon {
     this.saveQueue(queue);
     await this.advanceQueue(repository);
     return { ...this.queueSnapshot(queue), item: item.id };
+  }
+
+  /** Runs the checks of `addItem` on a copy of the queue: nothing changes. */
+  private checkNewItem(queue: Queue, fields: ItemFields, now: number): void {
+    addItem(structuredClone(queue), fields, queueItemId(now, 0), now);
+  }
+
+  /** The run a `parent` refers to: a run id first, then a task number of the repository. */
+  private resolveParent(repository: string, ref: string | number): RunState {
+    const parsed = parseParentRef(ref);
+    if (parsed.id !== null) {
+      const state = this.lookupState(parsed.id);
+      if (state) return state;
+    }
+    if (parsed.number !== null) {
+      const id = this.store.runIdByNumber(repository, parsed.number);
+      const state = id === null ? undefined : this.lookupState(id);
+      if (state) return state;
+    }
+    throw new Rejection(`unknown parent \`${ref}\``);
+  }
+
+  /**
+   * The linked task tag of the run: the existing one or a new one named after the run.
+   * The tag goes to the run itself too (first), and to the items that wait for it.
+   */
+  private async linkedTagFor(state: RunState): Promise<Tag> {
+    const run = state.run;
+    let tag = linkedTagOf(this.catalog, run.id);
+    if (!tag) {
+      const base = run.name ?? (run.title ? runName(run.title) : run.id);
+      tag = this.createTag({
+        name: autoTagName(this.catalog, base),
+        task: { run: run.id, number: run.number },
+      });
+      this.publishTags();
+    }
+    const own = knownTags(this.catalog, run.tags);
+    if (!own.includes(tag.id)) {
+      await this.apply(state, { kind: 'tags_set', tags: [tag.id, ...own] });
+      const queue = this.queueFor(run.repository);
+      if (spreadTags(queue, run.id, [tag.id], this.now()).length > 0) this.saveQueue(queue);
+    }
+    return tag;
   }
 
   /** A task from a specialist with `queue: true` goes to the queue of the repository of its run. */
@@ -1639,23 +1718,23 @@ export class Daemon {
       if (findSpecialist(state.run.config, attempt.specialist)?.queue !== true) {
         throw new Rejection(`specialist \`${attempt.specialist}\` may not add tasks to the queue`);
       }
-      const own = knownTags(this.catalog, state.run.tags);
-      if (own.length > 0) return this.addQueueItem(state.run.repository, params, own);
-      // A run without tags starts a chain: its tag is created now and goes to the run and the task.
+      // Every task carries the linked task tag of its run, then the other tags of the run.
       const repository = state.run.repository;
       await this.ensureItem(repository, params.workflow, params.skip);
-      this.resolveDependencies(this.queueFor(repository), params.after ?? []);
-      const run = state.run;
-      const base = run.name ?? (run.title ? runName(run.title) : run.id);
-      const tag = this.createTag({
-        name: autoTagName(this.catalog, base),
-        task: { run: run.id, number: run.number },
-      });
-      await this.apply(state, { kind: 'tags_set', tags: [tag.id] });
       const queue = this.queueFor(repository);
-      if (spreadTags(queue, run.id, [tag.id], this.now()).length > 0) this.saveQueue(queue);
-      this.publishTags();
-      return this.addQueueItem(repository, params, [tag.id]);
+      const after = this.resolveDependencies(queue, params.after ?? []);
+      const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
+      this.checkNewItem(
+        queue,
+        { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after },
+        this.now(),
+      );
+      const tag = await this.linkedTagFor(state);
+      return this.addQueueItem(
+        repository,
+        params,
+        mergeTags([tag.id], knownTags(this.catalog, state.run.tags)),
+      );
     });
   }
 

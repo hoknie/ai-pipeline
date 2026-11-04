@@ -166,6 +166,8 @@ export const ru: Dictionary = {
   },
   runs: {
     list: {
+      answers: 'Ответы',
+      answersCount: '{{who}} {{n}}',
       tags: 'Теги',
       search: 'Поиск по запускам',
       filter: 'Фильтр запусков',
@@ -197,6 +199,7 @@ export const ru: Dictionary = {
     header: {
       summary: {
         label: 'Сводка запуска',
+        status: 'Статус',
         path: 'Путь',
         time: 'Время',
         tokens: 'Токены',
@@ -320,8 +323,15 @@ export const ru: Dictionary = {
       summary: 'Итог',
       feedbackLabel: 'замечания',
       feedback: 'Замечания',
+      answer: 'Ответ ({{by}}):',
       list: 'попытки',
       none: 'Попыток пока нет.',
+    },
+    decisions: {
+      label: 'принятые ответы',
+      heading: 'Принятые ответы · {{n}}',
+      human: 'человек',
+      autopilot: 'автопилот',
     },
     questions: {
       answerSent: 'Ответ отправлен',
@@ -476,6 +486,8 @@ export const ru: Dictionary = {
     dependency: { done: 'выполнена', waiting: 'ждёт', blocked: 'заблокирована' },
     form: {
       after: 'Ждёт задач',
+      parent: 'Родительская задача',
+      noParent: 'Без родительской задачи',
       afterCurrent: 'Текущие предшественники',
       afterItems: 'Ждущие задачи',
       afterRuns: 'Запуски из очереди',

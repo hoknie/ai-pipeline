@@ -69,6 +69,8 @@ export interface QueueFields {
   skip?: string[];
   /** Ids of queue items and runs the task waits for. */
   after?: string[];
+  /** Run id or task number; the task gets the linked task tag of that run. */
+  parent?: string | null;
 }
 
 /** Changes of a queued task; `title: null` removes the title. */
@@ -87,6 +89,8 @@ export interface QueuePatch {
   skip?: string[];
   /** Ids of queue items and runs the task waits for; replaces the list of the item. */
   after?: string[];
+  /** Run id or task number; `null` removes the linked task tags. */
+  parent?: string | null;
   /** A running queue does not take a postponed task. */
   postponed?: boolean;
   position?: number;

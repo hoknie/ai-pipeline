@@ -39,6 +39,12 @@ export function createHostServer(options: HostOptions): McpServer {
     .array(z.string())
     .optional()
     .describe('Names of existing tags; an unknown name is an error. Edit replaces the whole list');
+  const parent = z
+    .union([z.string(), z.number().int().positive()])
+    .optional()
+    .describe(
+      'Run id or task number of this repository (161 or #161): the task gets the linked task tag of that run, first',
+    );
   const skip = z
     .array(z.string())
     .optional()
@@ -88,6 +94,7 @@ export function createHostServer(options: HostOptions): McpServer {
             'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
           ),
         tags,
+        parent,
         skip,
         after,
       },
@@ -101,6 +108,7 @@ export function createHostServer(options: HostOptions): McpServer {
       autoDeliver,
       deliveryMode,
       tags: tagNames,
+      parent: parentRef,
       skip: skipSteps,
       after: afterIds,
     }) =>
@@ -114,6 +122,7 @@ export function createHostServer(options: HostOptions): McpServer {
           ...(autoDeliver !== undefined ? { autoDeliver } : {}),
           ...(deliveryMode !== undefined ? { deliveryMode } : {}),
           ...(tagNames !== undefined ? { tags: tagNames } : {}),
+          ...(parentRef !== undefined ? { parent: parentRef } : {}),
           ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
           ...(afterIds !== undefined ? { after: afterIds } : {}),
         })) as RunQueued;
@@ -297,6 +306,7 @@ export function createHostServer(options: HostOptions): McpServer {
             'How the merged result is delivered (worktree, commit or branch); omit to follow delivery.mode of the configuration',
           ),
         tags,
+        parent,
         skip,
         after,
         postponed: z
@@ -314,6 +324,7 @@ export function createHostServer(options: HostOptions): McpServer {
       autoDeliver,
       deliveryMode,
       tags: tagNames,
+      parent: parentRef,
       skip: skipSteps,
       after: afterIds,
       postponed,
@@ -330,6 +341,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
             ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
+            ...(parentRef !== undefined ? { parent: parentRef } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
             ...(postponed !== undefined ? { postponed } : {}),
@@ -363,6 +375,11 @@ export function createHostServer(options: HostOptions): McpServer {
           .optional()
           .describe('Delivery mode of this task; null follows delivery.mode again'),
         tags,
+        parent: parent
+          .nullable()
+          .describe(
+            'Run id or task number of this repository: replaces the linked task tags of the task with the tag of that run; null removes them',
+          ),
         skip,
         after,
         postponed: z
@@ -382,6 +399,7 @@ export function createHostServer(options: HostOptions): McpServer {
       autoDeliver,
       deliveryMode,
       tags: tagNames,
+      parent: parentRef,
       skip: skipSteps,
       after: afterIds,
       postponed,
@@ -400,6 +418,7 @@ export function createHostServer(options: HostOptions): McpServer {
             ...(autoDeliver !== undefined ? { autoDeliver } : {}),
             ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
+            ...(parentRef !== undefined ? { parent: parentRef } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
             ...(postponed !== undefined ? { postponed } : {}),

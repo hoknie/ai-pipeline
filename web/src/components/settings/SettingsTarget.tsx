@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
 import type { SettingsScope } from '../../settingsGroups.ts';
 import { Card } from '../../ui/card.tsx';
@@ -33,15 +34,15 @@ export function SettingsTarget({
     <Card
       role="region"
       aria-label={t('settingsPage.target')}
-      className="flex min-w-0 flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between"
+      className="flex min-w-0 flex-col gap-2 p-3 sm:flex-row sm:items-center"
     >
       {scope === 'project' ? (
         empty ? (
           <p className="text-sm text-muted-foreground">{t('settingsPage.noProjects')}</p>
         ) : (
-          <div className="flex min-w-0 flex-col gap-1.5 sm:w-72 sm:shrink-0">
+          <div className="flex min-w-0 flex-col gap-1 sm:w-72 sm:shrink-0">
             <Label htmlFor="settings-project">{t('settingsPage.project')}</Label>
-            <Select value={repository ?? undefined} onValueChange={onSelectRepository}>
+            <Select value={repository ?? ''} onValueChange={onSelectRepository}>
               <SelectTrigger id="settings-project" className="w-full" title={repository ?? ''}>
                 <SelectValue />
               </SelectTrigger>
@@ -62,11 +63,16 @@ export function SettingsTarget({
         )
       ) : null}
       {file && !empty ? (
-        <div className="flex min-w-0 flex-col gap-1.5 sm:items-end">
+        <div
+          className={cn(
+            'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1',
+            scope === 'project' && 'sm:ml-auto sm:justify-end',
+          )}
+        >
           <span className="text-sm font-medium">{t('settingsPage.writesTo')}</span>
           <FilePath path={file} variant="line" />
           {scope === 'global' ? (
-            <p className="text-xs text-muted-foreground">{t('settingsPage.globalNote')}</p>
+            <span className="text-xs text-muted-foreground">{t('settingsPage.globalNote')}</span>
           ) : null}
         </div>
       ) : null}

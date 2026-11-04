@@ -100,6 +100,10 @@ export {
   type Tag,
   type TagColor,
   type TagTask,
+  linkedTagOf,
+  withoutLinkedTags,
+  parseParentRef,
+  type ParentRef,
 } from './tags.ts';
 export {
   QUEUE_PARALLEL_MAX,

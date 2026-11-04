@@ -5,8 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../../api.ts';
 import { runTitle, taskNumber } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
-import { runStatusLabel } from '../../status.ts';
-import type { RunView, TagView } from '../../types.ts';
+import type { GroupRow, RunView, SystemStepRow, TagView } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
 import {
@@ -18,11 +17,10 @@ import {
 } from '../../ui/dropdown-menu.tsx';
 import { useTags } from '../../tags.tsx';
 import { TagPicker } from '../TagPicker.tsx';
-import { StatusBadge } from '../StatusBadge.tsx';
 import { RunSteps } from './RunSteps.tsx';
 import { RunSummary } from './RunSummary.tsx';
 
-import { canDeliver, deliveryBadge } from './delivery.ts';
+import { canDeliver } from './delivery.ts';
 import { ApplyDialog } from './ApplyDialog.tsx';
 
 export function RunHeader({
@@ -33,6 +31,7 @@ export function RunHeader({
   onSelect,
   onDeliver,
   headerRef,
+  entry = null,
 }: {
   run: RunView;
   api: Api;
@@ -44,6 +43,8 @@ export function RunHeader({
   onDeliver?: (force: boolean) => Promise<unknown>;
   /** Receives the header element, to know when it is scrolled out of view. */
   headerRef?: (element: HTMLElement | null) => void;
+  /** The open group or system step; its status joins the statuses of the summary. */
+  entry?: GroupRow | SystemStepRow | null;
 }) {
   const { t } = useTranslation();
   const [forcing, setForcing] = useState(false);
@@ -124,40 +125,7 @@ export function RunHeader({
     if (refused.length > 0) onError(t('runs.header.retryRefused', { list: refused.join('; ') }));
     else notifySuccess(t('runs.header.retryStarted'));
   };
-  const { delivery } = run;
   const deliverable = canDeliver(run);
-  const badge = deliveryBadge(run);
-  const resolver = run.resolver;
-  const resolverTip = resolver
-    ? [
-        t('runs.header.resolver'),
-        t(`status.${resolver.status}`, { defaultValue: resolver.status }),
-        t('runs.header.round', { round: resolver.round, rounds: resolver.rounds }),
-        resolver.conflicts.length > 0
-          ? t('runs.header.conflicts', { list: resolver.conflicts.join(', ') })
-          : null,
-        badge?.reason,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : undefined;
-  const badgeNode = badge ? (
-    <StatusBadge
-      status={badge.status}
-      title={badge.reason ?? undefined}
-      tip={resolverTip}
-      onClick={resolver ? () => onSelect?.('_resolve') : undefined}
-      label={
-        badge.label === 'delivering'
-          ? t('runs.header.delivering')
-          : badge.label === 'deliveryFailed'
-            ? t('runs.header.deliveryFailed', { n: delivery.failed })
-            : badge.label === 'delivery'
-              ? t('runs.header.delivery', { applied: delivery.applied, merged: delivery.merged })
-              : undefined
-      }
-    />
-  ) : null;
   const apply = async (force: boolean) => {
     setForcing(false);
     setApplying(true);
@@ -175,7 +143,7 @@ export function RunHeader({
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1
-              className="min-w-0 flex-1 truncate text-lg font-semibold"
+              className="min-w-0 flex-1 text-lg font-semibold break-words [overflow-wrap:anywhere]"
               title={`${runTitle(run)}\n${run.id}`}
             >
               <span className="font-mono text-base font-normal text-muted-foreground">
@@ -183,8 +151,6 @@ export function RunHeader({
               </span>{' '}
               {runTitle(run)}
             </h1>
-            <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
-            {badgeNode}
           </div>
           {run.name ? (
             <div className="font-mono text-xs text-muted-foreground">{run.name}</div>
@@ -266,7 +232,7 @@ export function RunHeader({
             </DropdownMenu>
           </div>
         </div>
-        <RunSummary run={run} now={now} />
+        <RunSummary run={run} now={now} entry={entry} onSelect={onSelect} />
       </div>
       {forcing ? (
         <ApplyDialog

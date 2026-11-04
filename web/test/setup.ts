@@ -42,7 +42,22 @@ if (typeof window !== 'undefined') {
   ]);
   const { configure } = await import('@testing-library/react');
   configure({ asyncUtilTimeout: 5_000 });
-  const { beforeEach } = await import('vitest');
+  const { beforeEach, afterEach } = await import('vitest');
+  // A field that switches between controlled and uncontrolled is a bug: React and Radix only
+  // warn about it, so the warning is turned into a failure of the test that caused it.
+  const switched: string[] = [];
+  for (const method of ['error', 'warn'] as const) {
+    const original = console[method].bind(console);
+    console[method] = (...args: unknown[]) => {
+      const text = args.map(String).join(' ');
+      if (/changing from (un)?controlled/i.test(text)) switched.push(text);
+      original(...args);
+    };
+  }
+  afterEach(() => {
+    const found = switched.splice(0);
+    if (found.length > 0) throw new Error(found.join('\n'));
+  });
   const { default: i18next } = await import('i18next');
   await import('../src/i18n/index.ts');
   // Only a file that draws the whole application needs it; the others test small pieces.

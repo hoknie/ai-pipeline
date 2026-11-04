@@ -219,6 +219,8 @@ aip tag edit auth --name login           # rename and/or change the color; tasks
 aip tag remove login                     # delete the tag and remove it from all tasks and runs
 aip queue add feature --task "Login form" --tag auth --tag v2   # --tag can repeat; run start accepts it too
 aip queue edit <item> --tag v2           # replaces all tags of the task; --no-tags removes them; with no flags the tags stay
+aip queue add feature --task "Follow-up" --parent 115   # link the task to a parent: run id or task number (115 or #115)
+aip queue edit <item> --parent 115       # replace the linked task tags of the task with the tag of that run; --no-parent removes them
 aip run tag <run-id> auth v2             # add tags to a run in any state, including a finished one
 aip run untag <run-id> v2                # remove tags
 aip run list --tag auth --tag v2         # runs with at least one of the tags
@@ -227,21 +229,29 @@ aip run list --tag auth --tag v2         # runs with at least one of the tags
 - The tags of a task move to the run when the run is created from the task.
 - An unknown tag name rejects the whole request. Create the tag with `aip tag add`.
 - Tags appear as `#name` in `aip run list`, `aip run show` and `aip queue list`. In JSON they are a `tags` field with a list of `{id, name, color}`.
-- A tag of a linked task (see below) shows as `#N:name` and in JSON has `task: {run, number}`; ordinary tags have `task: null`.
-- The `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` tools accept an optional `tags`. The catalog cannot be managed through MCP.
+- A tag of a linked task (see below) shows as `#name→#N` (the task the tag leads to) and in JSON has `task: {run, number}`; ordinary tags have `task: null`.
+- The `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` tools accept an optional `tags` and an optional `parent` (see below); `swarm_queue_edit` also takes `parent: null`. The catalog cannot be managed through MCP.
 
 Tags of tasks that a specialist queues:
 
-- A task that a specialist puts in the queue with `swarm_queue_add` gets all the tags its run has at that moment.
+- A task that a specialist puts in the queue with `swarm_queue_add` always gets the tag of a linked task of its run first, then all the other tags its run has at that moment.
 - A specialist cannot set tags itself.
-- When the run has no tags, the first `swarm_queue_add` creates a tag for the chain and puts it on the run and on the task. Later tasks of the chain get it by the rules above, so no second tag appears.
+- When the run has no tag of a linked task yet, the first `swarm_queue_add` creates it and puts it on the run (first) and on the task. Later tasks of the run reuse it, so no second tag appears. A run that has other tags gets its own tag too, so every task shows which task it came from.
 - The name of that tag is the name of the run (without a name: the transliterated title, without a title: the run id). It is cut to 30 characters at the last whole word; when the name is taken, `-2`, `-3`, … is added. An existing tag with the same name is not reused.
-- That tag is a tag of a linked task: it belongs to the task `N` that created it, has the reserved color `indigo` and shows as `#N:name` (in the web panel `#N: name`, a link to that task). `aip tag list` has a `TASK` column with `#N`; ordinary tags have `—`.
+- That tag is a tag of a linked task: it belongs to the task `N` that created it, has the reserved color `indigo` and shows as `#name→#N` (in the web panel `#N: name`, a link to that task). `aip tag list` has a `TASK` column with `#N`; ordinary tags have `—`.
 - `indigo` is not one of the ten colors: `aip tag add --color indigo` and `aip tag edit --color indigo` are refused, and the color of a tag of a linked task cannot be changed. Renaming and removing it work as for any tag.
-- Such a tag cannot be set by hand: `--tag`, `swarm_run`, `swarm_queue_add`, `swarm_queue_edit` and `aip run tag` refuse it with `tag … belongs to task #N and is set automatically`. `aip queue edit --tag` and `--no-tags` replace only ordinary tags and keep it. `aip run untag` can still remove it.
+- Such a tag cannot be set through `tags`: `--tag`, `swarm_run`, `swarm_queue_add`, `swarm_queue_edit` and `aip run tag` refuse it with `tag … belongs to task #N and is set automatically`. `aip queue edit --tag` and `--no-tags` replace only ordinary tags and keep it. `aip run untag` can still remove it.
 - Tags of runs that were created before this rule stay ordinary tags.
 - When the workflow or `after` of the task is wrong, the call fails and no tag is created.
 - Tags added to a run later do not move to tasks that were already queued, except tasks that wait for that run with `after`.
+
+Parent of a task:
+
+- `--parent <run>` of `aip queue add`, `aip queue edit` and `aip run start`, and the `parent` parameter of `swarm_run`, `swarm_queue_add` and `swarm_queue_edit`, link a task to a parent. The value is a run id (of any repository) or a task number of this repository (`115` or `#115`); the id is tried first.
+- The task gets the tag of a linked task of that run first, before its other tags. If the run already has such a tag it is reused; otherwise it is created by the rules above and also put on the parent run (first).
+- An unknown run or number, and the number of a task that has not started yet, are errors: nothing changes and no tag is created.
+- `aip queue edit --parent` (or `parent` of `swarm_queue_edit`) replaces all tags of linked tasks of the task, including those inherited through `after`; `--no-parent` (`parent: null`) removes them. An edit without `parent` leaves them alone. The tag stays in the catalog and on the parent run. A task that returns a run keeps its own task and takes no `parent`.
+- `parent` does not make the task wait for the parent: use `after` for that.
 
 Tags of tasks with `after`:
 

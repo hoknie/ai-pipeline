@@ -99,7 +99,7 @@ export function DeliveryFields({
           {t('queue.settings.deliveryMode')}
         </label>
         <Select
-          value={shownMode !== null && isDeliveryMode(shownMode) ? shownMode : undefined}
+          value={shownMode !== null && isDeliveryMode(shownMode) ? shownMode : ''}
           disabled={invalid || !mode.ready || mode.busy}
           onValueChange={(value) => void mode.set(value)}
         >

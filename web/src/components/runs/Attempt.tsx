@@ -232,7 +232,7 @@ export function Attempt({
                   <Markdown text={attempt.summary} />
                 </section>
               ) : null}
-              {attempt.feedback ? (
+              {attempt.feedback || attempt.decision ? (
                 <section
                   aria-label={t('runs.attempt.feedbackLabel')}
                   className="rounded-lg border border-status-warn/30 bg-status-warn-bg p-3"
@@ -240,7 +240,21 @@ export function Attempt({
                   <div className="mb-1 text-xs font-medium text-status-warn uppercase">
                     {t('runs.attempt.feedback')}
                   </div>
-                  <Markdown text={attempt.feedback} />
+                  {attempt.feedback ? <Markdown text={attempt.feedback} /> : null}
+                  {attempt.decision ? (
+                    <p className="mt-2 text-sm">
+                      <span className="font-medium">
+                        {t('runs.attempt.answer', {
+                          by: t(
+                            attempt.decision.by === 'autopilot'
+                              ? 'runs.decisions.autopilot'
+                              : 'runs.decisions.human',
+                          ),
+                        })}
+                      </span>{' '}
+                      {attempt.decision.answer}
+                    </p>
+                  ) : null}
                 </section>
               ) : null}
             </div>

@@ -39,6 +39,63 @@ describe('cli', () => {
     expect(list.stdout).toContain('2 groups');
   });
 
+  it('links a task to a parent run with --parent and unlinks it with --no-parent', async () => {
+    const box = sandbox();
+    const view = await fillQueue(box);
+    const started = await aip(box, 'queue', 'run', view.items[0]!.id);
+    expect(started.stdout).toContain('started');
+    const runs = JSON.parse((await aip(box, 'run', 'list', '--json')).stdout) as {
+      id: string;
+      number: number;
+    }[];
+    const parent = runs[0]!;
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'продолжение',
+      '--parent',
+      `#${parent.number}`,
+      '--json',
+    );
+    expect(added.code).toBe(0);
+    const item = (
+      JSON.parse(added.stdout) as {
+        items: { id: string; task: string | null; tags: { name: string; task: unknown }[] }[];
+      }
+    ).items.find((entry) => entry.task === 'продолжение')!;
+    expect(item.tags).toHaveLength(1);
+    expect(item.tags[0]!.task).toEqual({ run: parent.id, number: parent.number });
+    const label = `#${item.tags[0]!.name}→#${parent.number}`;
+    expect((await aip(box, 'queue', 'list')).stdout).toContain(label);
+    const edited = await aip(box, 'queue', 'edit', item.id, '--parent', parent.id);
+    expect(edited.stdout).toContain(label);
+    const removed = await aip(box, 'queue', 'edit', item.id, '--no-parent');
+    expect(removed.code).toBe(0);
+    const line = removed.stdout.split('\n').find((row) => row.includes('продолжение'));
+    expect(line).toBeDefined();
+    expect(line).not.toContain('→');
+  });
+
+  it('refuses an unknown parent and --parent together with --no-parent', async () => {
+    const box = sandbox();
+    const view = await fillQueue(box);
+    const unknown = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--parent', 'nope');
+    expect(unknown.code).not.toBe(0);
+    expect(`${unknown.stdout}${unknown.stderr}`).toContain('unknown parent `nope`');
+    const start = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--parent', '9999');
+    expect(start.code).not.toBe(0);
+    expect(`${start.stdout}${start.stderr}`).toContain('unknown parent `9999`');
+    const both = await aip(box, 'queue', 'edit', view.items[0]!.id, '--parent', '1', '--no-parent');
+    expect(both.code).not.toBe(0);
+    expect(`${both.stdout}${both.stderr}`).toContain(
+      '--no-parent cannot be combined with --parent',
+    );
+    expect((await aip(box, 'queue', 'list', '--json')).stdout).toContain(view.items[0]!.id);
+  });
+
   it('moves, edits and removes queue items', async () => {
     const box = sandbox();
     const view = await fillQueue(box);

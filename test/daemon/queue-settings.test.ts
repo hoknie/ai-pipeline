@@ -211,6 +211,10 @@ describe('autopilot answers', () => {
     expect(decisions).toHaveLength(1);
     expect(decisions[0]).toMatchObject({ question: 'OAuth или пароль?', by: 'autopilot' });
     expect(decisions[0]?.answer).toContain('I agree with your recommendations');
+    const view = await h.status(created!.id);
+    expect(view.decisions).toHaveLength(1);
+    expect(view.decisions[0]).toMatchObject({ by: 'autopilot', question: 'OAuth или пароль?' });
+    expect(view.groups.flatMap((row) => row.decisions.map((d) => d.by))).toEqual(['autopilot']);
   });
 
   it('answers with the text of the queue', async () => {

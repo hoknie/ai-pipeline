@@ -37,14 +37,15 @@ export function userMessage(input: StepInput): string {
   if (input.decisions.length > 0) {
     sections.push(
       [
-        '## Decisions made by a human in this group',
+        '## Accepted answers to questions in this group (do not ask them again)',
         ...input.decisions.map(
-          (decision) => `- ${decision.stepId}: Q: ${decision.question} A: ${decision.answer}`,
+          (decision) =>
+            `- ${decision.stepId}: Q: ${decision.question} A: ${decision.answer} (by ${decision.by})`,
         ),
       ].join('\n'),
     );
   }
   if (input.feedback) sections.push(`## Feedback to address\n${input.feedback}`);
-  if (input.humanAnswer) sections.push(`## Answer from a human\n${input.humanAnswer}`);
+  if (input.humanAnswer) sections.push(`## Latest accepted answer\n${input.humanAnswer}`);
   return sections.join('\n\n');
 }

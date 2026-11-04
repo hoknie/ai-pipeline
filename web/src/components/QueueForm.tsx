@@ -40,9 +40,16 @@ export interface QueueDraft {
   skip: string[];
   /** The user changed the field: an edit sends `after` only then. */
   afterTouched: boolean;
+  /** Id of the run whose linked task tag the task gets; `null`: none. */
+  parent: string | null;
+  /** The user changed the parent: an edit sends `parent` only then. */
+  parentTouched: boolean;
 }
 
 export const TITLE_LIMIT = 60;
+
+/** The value of the parent select that stands for no parent. */
+const NO_PARENT = '__none__';
 
 /** Picker group of each kind of predecessor. */
 const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global' } as const;
@@ -67,6 +74,8 @@ export function emptyDraft(workflow = ''): QueueDraft {
     after: [],
     skip: [],
     afterTouched: false,
+    parent: null,
+    parentTouched: false,
   };
 }
 
@@ -78,7 +87,7 @@ export function draftOf(item: {
   title: string | null;
   autoDeliver: boolean | null;
   deliveryMode?: DeliveryMode | null;
-  tags?: { id: string }[];
+  tags?: { id: string; task?: { run: string } | null }[];
   after?: { id: string }[];
   skip?: string[];
 }): QueueDraft {
@@ -94,6 +103,8 @@ export function draftOf(item: {
     after: (item.after ?? []).map((ref) => ref.id),
     skip: [...(item.skip ?? [])],
     afterTouched: false,
+    parent: (item.tags ?? []).find((tag) => tag.task)?.task?.run ?? null,
+    parentTouched: false,
   };
 }
 
@@ -139,6 +150,13 @@ export function fieldsOf(
         : {}
       : draft.after.length > 0
         ? { after: draft.after }
+        : {}),
+    ...(allTags
+      ? draft.parentTouched
+        ? { parent: draft.parent }
+        : {}
+      : draft.parent !== null
+        ? { parent: draft.parent }
         : {}),
   };
 }
@@ -220,6 +238,19 @@ export function QueueForm({
     description:
       choice.number === null ? choice.title : `${taskNumber(choice.number)} ${choice.title}`,
   }));
+  const parentOptions: AfterOption[] = afterChoices.filter((choice) => choice.kind === 'run');
+  if (
+    effective.parent !== null &&
+    !parentOptions.some((choice) => choice.id === effective.parent)
+  ) {
+    const linked = catalog.tags.find((tag) => tag.task?.run === effective.parent);
+    parentOptions.push({
+      id: effective.parent,
+      number: linked?.task?.number ?? null,
+      title: linked?.name ?? effective.parent,
+      kind: 'run',
+    });
+  }
   const options = [...ids];
   if (effective.workflow !== '' && !ids.includes(effective.workflow))
     options.push(effective.workflow);
@@ -246,7 +277,7 @@ export function QueueForm({
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor={`${idPrefix}-workflow`}>{t('queue.form.workflow')}</Label>
             <Select
-              value={effective.workflow === '' ? undefined : effective.workflow}
+              value={effective.workflow}
               onValueChange={(workflow) =>
                 change({
                   workflow,
@@ -354,6 +385,29 @@ export function QueueForm({
               contentClassName="min-w-80"
             />
           </div>
+          <fieldset disabled={locked} className="flex min-w-0 flex-col gap-1.5 border-0 p-0">
+            <Label htmlFor={`${idPrefix}-parent`}>{t('queue.form.parent')}</Label>
+            <Select
+              value={effective.parent ?? NO_PARENT}
+              onValueChange={(value) =>
+                change({ parent: value === NO_PARENT ? null : value, parentTouched: true })
+              }
+            >
+              <SelectTrigger id={`${idPrefix}-parent`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_PARENT}>{t('queue.form.noParent')}</SelectItem>
+                {parentOptions.map((choice) => (
+                  <SelectItem key={choice.id} value={choice.id}>
+                    {choice.number === null
+                      ? choice.title
+                      : `${taskNumber(choice.number)} ${choice.title}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </fieldset>
           <fieldset disabled={locked} className="flex min-w-0 flex-col gap-1.5 border-0 p-0">
             <Label htmlFor={`${idPrefix}-tags`}>{t('queue.form.tags')}</Label>
             <TagPicker

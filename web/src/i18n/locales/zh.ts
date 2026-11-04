@@ -161,6 +161,8 @@ export const zh: Dictionary = {
   },
   runs: {
     list: {
+      answers: '回答',
+      answersCount: '{{who}} {{n}}',
       tags: '标签',
       search: '搜索运行',
       filter: '运行筛选',
@@ -192,6 +194,7 @@ export const zh: Dictionary = {
     header: {
       summary: {
         label: '运行摘要',
+        status: '状态',
         path: '路径',
         time: '时间',
         tokens: '令牌',
@@ -314,8 +317,15 @@ export const zh: Dictionary = {
       summary: '总结',
       feedbackLabel: '意见',
       feedback: '意见',
+      answer: '回答（{{by}}）：',
       list: '尝试',
       none: '暂无尝试。',
+    },
+    decisions: {
+      label: '已接受的回答',
+      heading: '已接受的回答 · {{n}}',
+      human: '人工',
+      autopilot: '自动驾驶',
     },
     questions: {
       answerSent: '回答已发送',
@@ -463,6 +473,8 @@ export const zh: Dictionary = {
     dependency: { done: '已完成', waiting: '等待中', blocked: '已阻塞' },
     form: {
       after: '等待任务',
+      parent: '父任务',
+      noParent: '无父任务',
       afterCurrent: '当前前置任务',
       afterItems: '等待中的任务',
       afterRuns: '队列中的运行',
