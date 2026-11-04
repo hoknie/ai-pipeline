@@ -420,7 +420,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
 
 export function formatQueue(view: QueueView, style: Style = plainStyle): string {
   const lines = [
-    `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken), autopilot ${view.autopilot ? 'on' : 'off'}, skip failed ${view.skipFailed ? 'on' : 'off'}${view.onLimit === 'stop' ? ', on limit stop' : ''}`,
+    `${style.muted('Queue:')} ${statusBadge(view.status, style)}, parallel ${view.parallel} (${view.runs.length} of ${view.parallel} places taken), autopilot ${view.autopilot ? 'on' : 'off'}, auto answer ${view.autoAnswer ? 'on' : 'off'}, skip failed ${view.skipFailed ? 'on' : 'off'}${view.onLimit === 'stop' ? ', on limit stop' : ''}`,
   ];
   if (view.autopilotAnswer !== null) {
     lines.push(`${style.muted('Autopilot answer:')} ${firstLine(view.autopilotAnswer)}`);

@@ -103,7 +103,7 @@ describe('queue settings', () => {
   it('rejects an empty settings request and leaves the queue unchanged', async () => {
     const h = await start();
     await expect(h.call('queue_settings', { repository: h.repo })).rejects.toThrow(
-      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
     );
     expect(await queueOf(h)).toMatchObject({ autopilot: false, skipFailed: false, parallel: 1 });
   });
@@ -199,7 +199,7 @@ describe('autopilot answers', () => {
   it('answers a question of a specialist and goes on, marking the decision', async () => {
     const h = await start();
     h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}, {}] });
-    await h.call('queue_settings', { repository: h.repo, autopilot: true });
+    await h.call('queue_settings', { repository: h.repo, autoAnswer: true });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const done = await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
@@ -218,7 +218,7 @@ describe('autopilot answers', () => {
     h.script({ code: [{ verdict: 'needs_human', feedback: 'q' }, {}, {}] });
     await h.call('queue_settings', {
       repository: h.repo,
-      autopilot: true,
+      autoAnswer: true,
       autopilotAnswer: 'Делай как проще',
     });
     expect(await queueOf(h)).toMatchObject({ autopilotAnswer: 'Делай как проще' });
@@ -231,6 +231,41 @@ describe('autopilot answers', () => {
     expect(decisions[0]?.answer).toBe('Делай как проще');
     await h.call('queue_settings', { repository: h.repo, autopilotAnswer: null });
     expect((await queueOf(h)).autopilotAnswer).toBeNull();
+  });
+
+  it('waits for a human with autopilot on and auto answer off', async () => {
+    const h = await start();
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'q' }, {}, {}] });
+    await h.call('queue_settings', { repository: h.repo, autopilot: true });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
+  });
+
+  it('answers a waiting group when auto answer is turned on', async () => {
+    const h = await start();
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'q' }, {}, {}] });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
+    const view = await h.call('queue_settings', { repository: h.repo, autoAnswer: true });
+    expect(view).toMatchObject({ autoAnswer: true, autopilot: false });
+    await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
+    const [created] = await allRuns(h);
+    await h.waitFor(created!.id, (run) => run.finished);
+    const decisions = h.running.daemon.state(created!.id).groups.flatMap((g) => g.decisions);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]).toMatchObject({ by: 'autopilot' });
+    expect((await queueOf(h)).autopilot).toBe(false);
+  });
+
+  it('does not start a stopped queue with a task when auto answer is turned on', async () => {
+    const h = await start();
+    await add(h, 'A');
+    const view = await h.call('queue_settings', { repository: h.repo, autoAnswer: true });
+    expect(view).toMatchObject({ status: 'stopped', autoAnswer: true, autopilot: false });
   });
 
   it('waits for a human without the autopilot', async () => {

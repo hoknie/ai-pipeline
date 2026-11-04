@@ -732,7 +732,7 @@ describe('aip web', () => {
     const empty = await post('/api/queue/settings', {});
     expect(empty.status).toBe(400);
     expect(((await empty.json()) as { error: string }).error).toContain(
-      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
     );
     const onLimit = await post('/api/queue/settings', { onLimit: 'stop' });
     expect(onLimit.status).toBe(200);

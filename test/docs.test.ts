@@ -241,6 +241,7 @@ describe('documentation examples', () => {
     for (const text of [
       'aip queue settings',
       '--autopilot on\\|off',
+      '--auto-answer on\\|off',
       '--skip-failed on\\|off',
       'Skipped with a problem:',
     ]) {

@@ -188,7 +188,12 @@ describe('queueView', () => {
 describe('queueView settings and skipped runs', () => {
   it('shows the settings and an empty skipped list of a new queue', () => {
     const view = queueView(emptyQueue('/repo', 1), () => undefined);
-    expect(view).toMatchObject({ autopilot: false, skipFailed: false, skipped: [] });
+    expect(view).toMatchObject({
+      autopilot: false,
+      autoAnswer: false,
+      skipFailed: false,
+      skipped: [],
+    });
   });
 
   it('shows a skipped run with its stopping problem and leaves it out of the places', () => {

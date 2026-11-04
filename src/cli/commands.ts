@@ -410,15 +410,20 @@ function registerQueue(program: Command): void {
       .description('Change queue settings; only the passed ones change, takes effect at once')
       .option('-p, --parallel <n>', 'runs at the same time (1-20)')
       .option('--autopilot <on|off>', 'a running queue does not stop when it becomes empty')
+      .option('--auto-answer <on|off>', 'a running queue answers specialists questions')
       .option('--skip-failed <on|off>', 'a failed or conflicting run leaves its place')
       .option('--on-limit <wait|stop>', 'on a usage limit: wait for the reset, or stop')
-      .option('--autopilot-answer <text>', 'text the autopilot answers specialists questions with')
+      .option(
+        '--autopilot-answer <text>',
+        'text the queue answers specialists questions with when auto answer is on',
+      )
       .option('--default-autopilot-answer', 'answer with the default text again'),
   )
     .addHelpText(
       'after',
       examples([
         'aip queue settings --autopilot on',
+        'aip queue settings --auto-answer on',
         'aip queue settings --skip-failed on --parallel 2',
         'aip queue settings --on-limit stop',
         'aip queue settings --autopilot-answer "Agree; pick the simplest option"',
@@ -429,6 +434,7 @@ function registerQueue(program: Command): void {
         repo: string;
         parallel?: string;
         autopilot?: string;
+        autoAnswer?: string;
         skipFailed?: string;
         onLimit?: string;
         autopilotAnswer?: string;
@@ -442,6 +448,7 @@ function registerQueue(program: Command): void {
           throw new Error('--default-autopilot-answer cannot be combined with --autopilot-answer');
         }
         const autopilot = parseSwitch('--autopilot', options.autopilot);
+        const autoAnswer = parseSwitch('--auto-answer', options.autoAnswer);
         const skipFailed = parseSwitch('--skip-failed', options.skipFailed);
         showQueue(
           options.json,
@@ -449,6 +456,7 @@ function registerQueue(program: Command): void {
             repository: resolve(options.repo),
             ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
             ...(autopilot !== undefined ? { autopilot } : {}),
+            ...(autoAnswer !== undefined ? { autoAnswer } : {}),
             ...(skipFailed !== undefined ? { skipFailed } : {}),
             ...(options.onLimit !== undefined ? { onLimit: options.onLimit } : {}),
             ...(options.defaultAutopilotAnswer

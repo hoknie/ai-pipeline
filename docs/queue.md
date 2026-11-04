@@ -114,19 +114,21 @@ A task becomes a run at the moment it starts. The working tree is snapshotted th
 |---|---|
 | `--parallel <n>` | The number of simultaneous runs |
 | `--autopilot on\|off` | A running queue does not stop when it becomes empty |
+| `--auto-answer on\|off` | A running queue answers the questions of specialists with the answer text |
 | `--skip-failed on\|off` | A run with a problem leaves its place and the queue goes on |
-| `--autopilot-answer <text>` | The text the autopilot answers questions with |
+| `--autopilot-answer <text>` | The text the queue answers questions with when auto answer is on |
 | `--default-autopilot-answer` | Restores the default text |
 | `--on-limit wait\|stop` | What happens on a usage limit (see [Usage limit](#usage-limit)) |
 
 ```
 aip queue settings --autopilot on
+aip queue settings --auto-answer on
 aip queue settings --skip-failed on --parallel 2
 aip queue settings --autopilot-answer "Agree, pick the simplest option"
 aip queue settings --on-limit stop
 ```
 
-A call without settings is refused with `pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit`. The first line of `aip queue list` shows the modes (`autopilot on, skip failed off`, and `, on limit stop` when set).
+A call without settings is refused with `pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit`. The first line of `aip queue list` shows the modes (`autopilot on, auto answer off, skip failed off`, and `, on limit stop` when set).
 
 ## Autopilot
 
@@ -134,9 +136,15 @@ A call without settings is refused with `pass parallel, autopilot, autopilotAnsw
 - A paused queue stays paused, and a task added to it does not start.
 - Turning autopilot on starts a stopped queue that has no stop reason. A queue stopped on a problem stays stopped until `aip queue start`.
 - Turning it off stops an empty running queue on the next step.
-- A running queue with autopilot also answers the questions of specialists (a step that ended with `needs_human`). The answer is the queue's answer text, by default "I agree with your recommendations…". The step restarts, and the decision is marked `autopilot`.
+- Autopilot does not answer questions; that is the separate `auto answer` setting.
+
+## Answering questions
+
+- A running queue with `auto answer` on answers the questions of specialists (a step that ended with `needs_human`). It does not depend on autopilot. The answer is the queue's answer text, by default "I agree with your recommendations…". The step restarts, and the decision is marked `autopilot`.
+- Turning `auto answer` on never starts a stopped queue; a paused or stopped queue does not answer.
 - It gives at most 3 answers in a row to one group, then the question waits for you.
-- Stops for the `max_rounds` limit or for changes outside the worktree are never answered by the autopilot.
+- Stops for the `max_rounds` limit or for changes outside the worktree are never answered.
+- Queues saved before the split get `auto answer` equal to their autopilot, so their behaviour does not change.
 
 ## Skip failed
 

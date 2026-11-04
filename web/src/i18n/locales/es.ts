@@ -374,9 +374,13 @@ export const es: Dictionary = {
     settings: {
       title: 'Ajustes de la cola',
       label: 'ajustes de la cola',
-      autopilot: 'Piloto automático',
+      autopilot: 'No detener la cola vacía',
       autopilotHint:
-        'Una cola en marcha no se detiene al vaciarse y toma las tareas añadidas al instante. Una cola en pausa sigue en pausa.',
+        'Una cola en marcha no se detiene cuando queda vacía y toma de inmediato las tareas añadidas. Una cola en pausa sigue en pausa. Este interruptor no responde preguntas.',
+      autoAnswer: 'Responder preguntas',
+      autoAnswerHint:
+        'Una cola en marcha responde a las preguntas de los especialistas con el texto de abajo; como máximo 3 respuestas seguidas por grupo. Activarlo no inicia una cola detenida.',
+      autopilotAnswerInactive: 'No tiene efecto mientras «Responder preguntas» esté desactivado',
       skipFailed: 'Omitir fallidas',
       skipFailedHint:
         'Una ejecución con un grupo fallido, en conflicto o sin entregar libera su plaza y la cola sigue. Una cancelación y un límite de uso siguen deteniendo la cola.',
@@ -390,7 +394,7 @@ export const es: Dictionary = {
         'Dónde va el resultado de una tarea: el árbol de trabajo, un commit en la rama actual o una rama aip/ aparte. Se aplica a las tareas sin modo propio cuando empiezan.',
       autopilotAnswer: 'Respuesta a las preguntas',
       autopilotAnswerHint:
-        'El texto con el que el piloto automático responde a las preguntas de los especialistas; como máximo 3 respuestas seguidas por grupo.',
+        'El texto con el que la cola responde a las preguntas de los especialistas; como máximo 3 respuestas seguidas por grupo.',
       autopilotAnswerSave: 'Guardar respuesta',
       autopilotAnswerDefault: 'Respuesta por defecto',
       autopilotAnswerSaved: 'Respuesta guardada',
@@ -868,7 +872,7 @@ export const es: Dictionary = {
         'Comandos, argumentos y variables de entorno de los CLI de agentes. Los valores de las variables nunca se muestran.',
       system: 'Dirección y acceso del panel web, estado del daemon y del panel, y su reinicio.',
       queue:
-        'Modos de la cola: piloto automático, omisión, entrega y límite de uso. Inicio, pausa y paralelismo quedan en la página Cola.',
+        'Modos de la cola: no detener la cola vacía, responder preguntas, omisión, entrega y límite de uso. Inicio, pausa y paralelismo quedan en la página Cola.',
       tags: 'El catálogo de etiquetas, común a todos los repositorios.',
     },
     section: {

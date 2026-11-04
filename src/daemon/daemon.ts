@@ -786,12 +786,12 @@ export class Daemon {
           pauseQueue(queue, now);
           return this.saveQueue(queue);
         case 'queue_settings': {
-          const { parallel, autopilot, skipFailed, autopilotAnswer } = request.params;
+          const { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer } = request.params;
           const onLimit = request.params.onLimit as OnLimit | undefined;
           const enablesAutopilot = autopilot === true && !queue.autopilot;
           setQueueSettings(
             queue,
-            { parallel, autopilot, skipFailed, autopilotAnswer, onLimit },
+            { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer, onLimit },
             now,
           );
           if (enablesAutopilot && queue.status === 'stopped' && queue.stop === null) {

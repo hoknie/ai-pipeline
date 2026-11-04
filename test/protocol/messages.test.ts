@@ -198,7 +198,7 @@ describe('queue requests', () => {
     bad('queue_settings', { repository: '/r', skipFailed: 1 });
     const error = parse('queue_settings', { repository: '/r' });
     expect(JSON.stringify(error)).toContain(
-      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
     );
   });
 
@@ -244,6 +244,11 @@ describe('queue requests', () => {
     bad('run', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'patch' });
     bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: null });
     bad('queue_edit', { repository: '/r', item: 'q1', deliveryMode: true });
+  });
+
+  it('takes autoAnswer as a boolean', () => {
+    ok('queue_settings', { repository: '/r', autoAnswer: true });
+    bad('queue_settings', { repository: '/r', autoAnswer: 'on' });
   });
 
   it('takes the text of the autopilot answer, and null to reset it', () => {

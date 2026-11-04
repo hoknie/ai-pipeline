@@ -280,6 +280,7 @@ export const requestSchema = z.discriminatedUnion('method', [
         repository: queueRepository,
         parallel: queueParallel.optional(),
         autopilot: z.boolean().optional(),
+        autoAnswer: z.boolean().optional(),
         skipFailed: z.boolean().optional(),
         autopilotAnswer: z.string().trim().min(1).max(RECOMMENDATION_LIMIT).nullable().optional(),
         // Checked by the queue, so an unknown value gets its own error.
@@ -289,10 +290,11 @@ export const requestSchema = z.discriminatedUnion('method', [
         (params) =>
           params.parallel !== undefined ||
           params.autopilot !== undefined ||
+          params.autoAnswer !== undefined ||
           params.skipFailed !== undefined ||
           params.autopilotAnswer !== undefined ||
           params.onLimit !== undefined,
-        { message: 'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit' },
+        { message: 'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit' },
       ),
   }),
   z.object({

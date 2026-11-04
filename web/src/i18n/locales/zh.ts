@@ -362,8 +362,13 @@ export const zh: Dictionary = {
     settings: {
       title: '队列设置',
       label: '队列设置',
-      autopilot: '自动驾驶',
-      autopilotHint: '运行中的队列清空后不会停止，会立即接收新添加的任务。暂停的队列保持暂停。',
+      autopilot: '队列清空后不停止',
+      autopilotHint:
+        '运行中的队列清空后不会停止，并立即接收新增任务。暂停的队列保持暂停。此开关不会回答问题。',
+      autoAnswer: '回答问题',
+      autoAnswerHint:
+        '运行中的队列用下方文本回答专家的问题，每组最多连续 3 次。开启它不会启动已停止的队列。',
+      autopilotAnswerInactive: '“回答问题”关闭时不生效',
       skipFailed: '跳过失败项',
       skipFailedHint:
         '含失败、冲突或未交付分组的运行会释放名额，队列继续运行。取消和用量限额仍会停止队列。',
@@ -376,7 +381,7 @@ export const zh: Dictionary = {
       deliveryModeHint:
         '任务结果的去向：工作树、当前分支上的提交，或单独的 aip/ 分支。对没有自己方式的任务在其启动时生效。',
       autopilotAnswer: '问题的回答',
-      autopilotAnswerHint: '自动驾驶用来回答专家提问的文本；每个分组最多连续回答 3 次。',
+      autopilotAnswerHint: '队列回答专家问题所用的文本；每组最多连续 3 次。',
       autopilotAnswerSave: '保存回答',
       autopilotAnswerDefault: '默认回答',
       autopilotAnswerSaved: '回答已保存',
@@ -839,7 +844,8 @@ export const zh: Dictionary = {
       delivery: '运行结果去向、如何提交以及谁来解决冲突。',
       runtimes: '代理 CLI 的命令、参数和环境变量。变量的值从不显示。',
       system: '网页面板的地址和访问方式、守护进程和面板的状态及重启。',
-      queue: '队列模式：自动驾驶、跳过、交付和用量限制。启动、暂停和并行数留在“队列”页面。',
+      queue:
+        '队列模式：清空后不停止、回答问题、跳过、交付和用量限制。启动、暂停和并行数留在“队列”页面。',
       tags: '所有仓库共享的标签目录。',
     },
     section: {

@@ -107,6 +107,8 @@ export interface Queue {
   parallel: number;
   /** A running queue does not stop when it becomes empty. */
   autopilot: boolean;
+  /** A running queue answers the questions of specialists with the autopilot answer. */
+  autoAnswer: boolean;
   /** A run with a stopping problem leaves its place and the queue goes on. */
   skipFailed: boolean;
   /** Text the autopilot answers the questions of specialists with; `null`: the default text. */
@@ -147,6 +149,7 @@ export function emptyQueue(repository: string, now: number, nextNumber = 1): Que
     status: 'stopped',
     parallel: 1,
     autopilot: false,
+    autoAnswer: false,
     skipFailed: false,
     autopilotAnswer: null,
     onLimit: 'wait',
@@ -469,6 +472,7 @@ export function setParallel(queue: Queue, parallel: number, now: number): void {
 export interface QueueSettingsPatch {
   parallel?: number | undefined;
   autopilot?: boolean | undefined;
+  autoAnswer?: boolean | undefined;
   skipFailed?: boolean | undefined;
   /** `null`: the default text. */
   autopilotAnswer?: string | null | undefined;
@@ -490,11 +494,14 @@ export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: n
   if (
     patch.parallel === undefined &&
     patch.autopilot === undefined &&
+    patch.autoAnswer === undefined &&
     patch.skipFailed === undefined &&
     patch.autopilotAnswer === undefined &&
     patch.onLimit === undefined
   ) {
-    throw new Rejection('pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit');
+    throw new Rejection(
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
+    );
   }
   if (patch.onLimit !== undefined && !ON_LIMIT_MODES.includes(patch.onLimit)) {
     throw new Rejection(`onLimit must be one of: ${ON_LIMIT_MODES.join(', ')}`);
@@ -503,6 +510,7 @@ export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: n
     patch.autopilotAnswer === undefined ? undefined : cleanAnswer(patch.autopilotAnswer);
   if (patch.parallel !== undefined) setParallel(queue, patch.parallel, now);
   if (patch.autopilot !== undefined) queue.autopilot = patch.autopilot;
+  if (patch.autoAnswer !== undefined) queue.autoAnswer = patch.autoAnswer;
   if (patch.skipFailed !== undefined) queue.skipFailed = patch.skipFailed;
   if (answer !== undefined) queue.autopilotAnswer = answer;
   if (patch.onLimit !== undefined) queue.onLimit = patch.onLimit;
@@ -981,13 +989,13 @@ function autopilotStreak(decisions: readonly { by: string }[]): number {
 }
 
 /**
- * Questions the autopilot answers now: groups of the runs that hold a place in a
+ * Questions the queue answers now (when `autoAnswer` is on): groups of the runs that hold a place in a
  * running queue, waiting because the specialist reported `needs_human` (not
  * because of a limit or a change outside the worktree), that got fewer than
  * `AUTOPILOT_ANSWERS_MAX` autopilot answers in a row.
  */
 export function autopilotAnswers(queue: Queue, states: Iterable<RunState>): AutopilotAnswer[] {
-  if (queue.status !== 'running' || !queue.autopilot) return [];
+  if (queue.status !== 'running' || !queue.autoAnswer) return [];
   const answer = queue.autopilotAnswer ?? DEFAULT_AUTOPILOT_ANSWER;
   const result: AutopilotAnswer[] = [];
   for (const state of queueStates(queue, states)) {

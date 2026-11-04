@@ -90,7 +90,7 @@ A specialist can ask structured questions (`questions` in `swarm_report`). They 
 The queue settings are in [queue.md](queue.md).
 
 - The "Queue controls" block on the left holds the state, the buttons "New task", "Start" and "Pause", the parallelism and the link "Queue settings".
-- The modes of the queue are in the group "Queue" of [Settings](#settings) (`#settings/project/queue`): the switches "Autopilot", "Skip failed" and "Auto delivery", the "Delivery mode" selector, the autopilot's answer text and the "On a usage limit" selector.
+- The modes of the queue are in the group "Queue" of [Settings](#settings) (`#settings/project/queue`): the switches "Keep running when empty", "Answer questions", "Skip failed" and "Auto delivery", the "Delivery mode" selector, the answer text (dimmed with a note while "Answer questions" is off) and the "On a usage limit" selector.
   - "Auto delivery" and "Delivery mode" write `delivery.auto` and `delivery.mode` to the file the value comes from: the project `aip/settings.yaml` if the field is set there, otherwise the shared `settings.yaml`. The file is shown under the control.
 - The "On a usage limit" selector chooses `wait` or `stop`. A queue stopped by a usage limit shows which agent ran out, when the limit resets and, with `wait`, when the queue resumes by itself. "Pause" cancels the automatic start. A group waiting for the reset shows "Limit until HH:MM".
 - "Return to the queue" is on a skipped run only when it has failed or cancelled groups to retry. It is also in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed.
@@ -210,7 +210,7 @@ The background processes arrive in the `processes` event of `/api/events`: the d
 - The queue requests, `/api/config…` and `/api/workflows` accept `repository=<absolute path>`.
 - Without it the most recently added repository is used. While the list is empty, the answer is 409.
 - A relative path and a path outside a git repository are rejected with code 400. A `repository` field in the request body is ignored.
-- `POST /api/queue/settings` takes `parallel`, `autopilot`, `skipFailed`, `autopilotAnswer` and `onLimit`, all optional. An empty body is answered with 400.
+- `POST /api/queue/settings` takes `parallel`, `autopilot`, `autoAnswer`, `skipFailed`, `autopilotAnswer` and `onLimit`, all optional. An empty body is answered with 400.
 - `PUT /api/config/settings/<path>` writes one field of `settings.yaml`, `PUT /api/config/settings` writes several in one write.
   - The bodies are `{"value": …, "revision": …, "level": …}` and `{"values": {"<path>": …}, "revision": …, "level": …}`.
   - `level` is `global` (default) or `project`; `revision` is the one from `GET /api/config`; a value `null` removes the key.

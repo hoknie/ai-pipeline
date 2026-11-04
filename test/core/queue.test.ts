@@ -852,7 +852,7 @@ describe('queue settings', () => {
   it('refuses an empty patch and a wrong parallel without a change', () => {
     const queue = emptyQueue('/repo', 1);
     expect(() => setQueueSettings(queue, {}, 2)).toThrow(
-      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
     );
     expect(() => setQueueSettings(queue, { parallel: 0, autopilot: true }, 2)).toThrow(
       /parallel must be/,
@@ -860,9 +860,18 @@ describe('queue settings', () => {
     expect(queue).toMatchObject({ parallel: 1, autopilot: false, updatedAt: 1 });
   });
 
+  it('turns auto answer on without touching autopilot or the state', () => {
+    const queue = emptyQueue('/repo', 1);
+    setQueueSettings(queue, { autoAnswer: true }, 2);
+    expect(queue).toMatchObject({ autoAnswer: true, autopilot: false, status: 'stopped' });
+    setQueueSettings(queue, { autoAnswer: false }, 3);
+    expect(queue.autoAnswer).toBe(false);
+  });
+
   it('starts a new queue with both modes off and nothing skipped', () => {
     expect(emptyQueue('/repo', 1)).toMatchObject({
       autopilot: false,
+      autoAnswer: false,
       skipFailed: false,
       skipped: [],
     });
@@ -1167,8 +1176,9 @@ describe('answers of the autopilot', () => {
     return state;
   }
 
-  function running(autopilot = true): Queue {
+  function running(autoAnswer = true, autopilot = false): Queue {
     const queue = queueOf('A');
+    queue.autoAnswer = autoAnswer;
     queue.autopilot = autopilot;
     startQueue(queue, [], 3);
     itemStarted(queue, 'q1', 'a', 4);
@@ -1189,7 +1199,15 @@ describe('answers of the autopilot', () => {
     expect(autopilotAnswers(queue, [asking()])[0]?.answer).toBe('Согласен');
   });
 
-  it('does nothing with the autopilot off or the queue paused', () => {
+  it('answers with auto answer on and autopilot off', () => {
+    expect(autopilotAnswers(running(true, false), [asking()])).toHaveLength(1);
+  });
+
+  it('does not answer with auto answer off even when autopilot is on', () => {
+    expect(autopilotAnswers(running(false, true), [asking()])).toEqual([]);
+  });
+
+  it('does nothing with auto answer off or the queue paused', () => {
     expect(autopilotAnswers(running(false), [asking()])).toEqual([]);
     const queue = running();
     pauseQueue(queue, 5);
@@ -1352,6 +1370,16 @@ describe('postponed items', () => {
     advance(queue, [], none, 5);
     expect(queue.status).toBe('stopped');
     expect(queue.items).toHaveLength(1);
+  });
+
+  it('stops an empty queue with auto answer on and autopilot off', () => {
+    const queue = queueOf('A');
+    queue.autoAnswer = true;
+    queue.autopilot = false;
+    editItem(queue, 'q1', { postponed: true }, 3);
+    startQueue(queue, [], 4);
+    advance(queue, [], none, 5);
+    expect(queue.status).toBe('stopped');
   });
 
   it('keeps a queue with autopilot running over postponed items', () => {

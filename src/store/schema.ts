@@ -174,6 +174,10 @@ export const MIGRATIONS: string[] = [
   `,
   `ALTER TABLE runs ADD COLUMN hold TEXT`,
   `ALTER TABLE queues ADD COLUMN priority_json TEXT NOT NULL DEFAULT '[]'`,
+  `
+  ALTER TABLE queues ADD COLUMN auto_answer INTEGER NOT NULL DEFAULT 0;
+  UPDATE queues SET auto_answer = autopilot;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

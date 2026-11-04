@@ -1795,7 +1795,12 @@ describe('queue controls block', () => {
   it('has none of the modes of the queue', async () => {
     show(queueOf({ items: items('A') }));
     await controlsBlock();
-    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default'])
+    for (const name of [
+      'Keep running when empty',
+      'Answer questions',
+      'Skip failed',
+      'Auto delivery by default',
+    ])
       expect(screen.queryByRole('switch', { name })).toBeNull();
     expect(screen.queryByRole('combobox', { name: 'Delivery mode' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: 'On a usage limit' })).toBeNull();
@@ -1808,7 +1813,12 @@ describe('queue controls block', () => {
     fireEvent.click(block.getByRole('link', { name: 'Queue settings' }));
     await waitFor(() => expect(window.location.hash).toBe('#settings/project/queue'));
     const modes = within(await screen.findByRole('region', { name: 'queue settings' }));
-    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default'])
+    for (const name of [
+      'Keep running when empty',
+      'Answer questions',
+      'Skip failed',
+      'Auto delivery by default',
+    ])
       expect(modes.getByRole('switch', { name })).toBeTruthy();
     expect(modes.getByRole('combobox', { name: 'Delivery mode' })).toBeTruthy();
     expect(modes.getByRole('combobox', { name: 'On a usage limit' })).toBeTruthy();
@@ -1825,7 +1835,7 @@ describe('queue controls block', () => {
       ),
     });
     window.location.hash = '#settings/queue';
-    fireEvent.click(await screen.findByRole('switch', { name: 'Autopilot' }));
+    fireEvent.click(await screen.findByRole('switch', { name: 'Keep running when empty' }));
     await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ autopilot: true }));
     fireEvent.click(
       within(screen.getByRole('navigation', { name: 'sections' })).getByRole('link', {

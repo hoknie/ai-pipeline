@@ -823,6 +823,7 @@ export interface QueueView {
   status: 'stopped' | 'running';
   parallel: number;
   autopilot: boolean;
+  autoAnswer: boolean;
   skipFailed: boolean;
   /** `delivery.auto` of the repository now; null when its configuration is invalid. */
   autoDeliver: boolean | null;
@@ -952,6 +953,7 @@ export function queueView(
     status: queue.status,
     parallel: queue.parallel,
     autopilot: queue.autopilot,
+    autoAnswer: queue.autoAnswer,
     skipFailed: queue.skipFailed,
     autoDeliver,
     deliveryMode,

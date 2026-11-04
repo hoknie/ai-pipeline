@@ -345,9 +345,9 @@ export class Store {
     this.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number, priority_json)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number, priority_json = excluded.priority_json`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number, priority_json, auto_answer)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number, priority_json = excluded.priority_json, auto_answer = excluded.auto_answer`,
         )
         .run(
           queue.repository,
@@ -364,6 +364,7 @@ export class Store {
           queue.onLimit,
           queue.nextNumber,
           JSON.stringify(queue.priority),
+          queue.autoAnswer ? 1 : 0,
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
@@ -404,6 +405,7 @@ export class Store {
       status: String(row.status) as Queue['status'],
       parallel: Number(row.parallel),
       autopilot: Number(row.autopilot ?? 0) === 1,
+      autoAnswer: Number(row.auto_answer ?? 0) === 1,
       skipFailed: Number(row.skip_failed ?? 0) === 1,
       skipped: row.skipped_json ? parse(row.skipped_json) : [],
       autopilotAnswer: text(row.autopilot_answer ?? null),

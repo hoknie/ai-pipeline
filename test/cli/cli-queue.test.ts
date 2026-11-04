@@ -82,6 +82,15 @@ describe('cli', () => {
     expect(paused.stdout).toContain('Queue: stopped');
   });
 
+  it('sets auto answer without touching autopilot', async () => {
+    const box = sandbox();
+    const on = await aip(box, 'queue', 'settings', '--auto-answer', 'on', '--json');
+    expect(JSON.parse(on.stdout)).toMatchObject({ autoAnswer: true, autopilot: false });
+    const wrong = await aip(box, 'queue', 'settings', '--auto-answer', 'yes');
+    expect(wrong.code).toBe(1);
+    expect(`${wrong.stdout}${wrong.stderr}`).toContain('--auto-answer must be on or off');
+  });
+
   it('sets the autopilot from the terminal', async () => {
     const box = sandbox();
     const on = await aip(box, 'queue', 'settings', '--autopilot', 'on', '--json');
@@ -94,9 +103,9 @@ describe('cli', () => {
     });
     const text = await aip(box, 'queue', 'settings', '--skip-failed', 'on', '--parallel', '2');
     expect(text.stdout).toContain('parallel 2');
-    expect(text.stdout).toContain('autopilot on, skip failed on');
+    expect(text.stdout).toContain('autopilot on, auto answer off, skip failed on');
     const list = await aip(box, 'queue', 'list');
-    expect(list.stdout).toContain('autopilot on, skip failed on');
+    expect(list.stdout).toContain('autopilot on, auto answer off, skip failed on');
     const off = await aip(box, 'queue', 'settings', '--autopilot', 'off', '--json');
     expect(JSON.parse(off.stdout)).toMatchObject({ autopilot: false, skipFailed: true });
   });
@@ -109,7 +118,7 @@ describe('cli', () => {
     const empty = await aip(box, 'queue', 'settings');
     expect(empty.code).not.toBe(0);
     expect(`${empty.stdout}${empty.stderr}`).toContain(
-      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
     );
     const view = await aip(box, 'queue', 'list', '--json');
     expect(JSON.parse(view.stdout)).toMatchObject({ autopilot: false, skipFailed: false });

@@ -11,6 +11,7 @@ const VIEW: QueueView & { item: string } = {
   status: 'stopped',
   parallel: 1,
   autopilot: false,
+  autoAnswer: false,
   skipFailed: false,
   autoDeliver: true,
   deliveryMode: 'worktree',
@@ -199,6 +200,18 @@ describe('host MCP queue tools', () => {
         method: 'run',
         params: { repository: '/repo', workflow: 'feature', task: 'x', deliveryMode: 'branch' },
       },
+    ]);
+  });
+
+  it('passes auto_answer of the queue settings', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({ name: 'swarm_queue_settings', arguments: { auto_answer: true } });
+    expect(calls).toEqual([
+      { method: 'queue_settings', params: { repository: '/repo', autoAnswer: true } },
     ]);
   });
 
@@ -491,12 +504,14 @@ describe('host MCP queue tools', () => {
     const calls: unknown[] = [];
     const client = await connect(async (method, params) => {
       calls.push({ method, params });
-      throw new Error('pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit');
+      throw new Error(
+        'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
+      );
     });
     const result = await client.callTool({ name: 'swarm_queue_settings', arguments: {} });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain(
-      'pass parallel, autopilot, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
     );
     expect(calls).toEqual([{ method: 'queue_settings', params: { repository: '/repo' } }]);
   });

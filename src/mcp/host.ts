@@ -453,10 +453,14 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Change queue settings',
       description:
-        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once; turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting or undelivered group leaves its place and goes to the skipped list, the queue keeps going; a cancelled run and a usage limit still stop the queue. `on_limit`: what a usage limit of an agent does: `wait` (default) keeps the group waiting for the reset and starts the queue again after it, `stop` fails the group and keeps the queue stopped until started. `autopilot_answer`: with the autopilot on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. Takes effect at once.',
+        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once (it does not answer questions); turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting or undelivered group leaves its place and goes to the skipped list, the queue keeps going; a cancelled run and a usage limit still stop the queue. `on_limit`: what a usage limit of an agent does: `wait` (default) keeps the group waiting for the reset and starts the queue again after it, `stop` fails the group and keeps the queue stopped until started. `auto_answer`: a running queue answers the questions of specialists with the `autopilot_answer` text; turning it on does not start a stopped queue. `autopilot_answer`: with `auto_answer` on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. Takes effect at once.',
       inputSchema: {
         parallel: z.number().int().min(1).max(20).optional().describe('Runs at the same time'),
         autopilot: z.boolean().optional().describe('Keep the running queue going when it is empty'),
+        auto_answer: z
+          .boolean()
+          .optional()
+          .describe('Answer specialists questions with the autopilot_answer text'),
         skip_failed: z
           .boolean()
           .optional()
@@ -466,7 +470,7 @@ export function createHostServer(options: HostOptions): McpServer {
           .nullable()
           .optional()
           .describe(
-            'Text the autopilot answers specialists questions with; null restores the default text',
+            'Text the queue answers specialists questions with when auto_answer is on; null restores the default text',
           ),
         on_limit: z
           .enum(['wait', 'stop'])
@@ -475,13 +479,14 @@ export function createHostServer(options: HostOptions): McpServer {
         repo,
       },
     },
-    ({ parallel, autopilot, skip_failed, autopilot_answer, on_limit, repo: where }) =>
+    ({ parallel, autopilot, auto_answer, skip_failed, autopilot_answer, on_limit, repo: where }) =>
       attempt(() =>
         showQueue(
           'queue_settings',
           {
             ...(parallel !== undefined ? { parallel } : {}),
             ...(autopilot !== undefined ? { autopilot } : {}),
+            ...(auto_answer !== undefined ? { autoAnswer: auto_answer } : {}),
             ...(skip_failed !== undefined ? { skipFailed: skip_failed } : {}),
             ...(autopilot_answer !== undefined ? { autopilotAnswer: autopilot_answer } : {}),
             ...(on_limit !== undefined ? { onLimit: on_limit } : {}),

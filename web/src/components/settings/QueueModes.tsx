@@ -31,7 +31,9 @@ export function QueueModes({
   onError: (message: string) => void;
 }) {
   const { t } = useTranslation();
-  const [pending, setPending] = useState<Partial<Record<'autopilot' | 'skipFailed', boolean>>>({});
+  const [pending, setPending] = useState<
+    Partial<Record<'autopilot' | 'autoAnswer' | 'skipFailed', boolean>>
+  >({});
   const [answer, setAnswer] = useState<string | null>(null);
   const [savingAnswer, setSavingAnswer] = useState(false);
   const [pendingLimit, setPendingLimit] = useState<'wait' | 'stop' | null>(null);
@@ -48,7 +50,7 @@ export function QueueModes({
     }
   };
 
-  const toggle = async (key: 'autopilot' | 'skipFailed', value: boolean) => {
+  const toggle = async (key: 'autopilot' | 'autoAnswer' | 'skipFailed', value: boolean) => {
     const patch: QueueSettingsPatch = { [key]: value };
     setPending((current) => ({ ...current, [key]: value }));
     try {
@@ -102,7 +104,15 @@ export function QueueModes({
         disabled={pending.autopilot !== undefined}
         onChange={(value) => void toggle('autopilot', value)}
       />
-      <div className="flex flex-col gap-1">
+      <Toggle
+        id="queue-auto-answer"
+        label={t('queue.settings.autoAnswer')}
+        hint={t('queue.settings.autoAnswerHint')}
+        checked={pending.autoAnswer ?? queue.autoAnswer}
+        disabled={pending.autoAnswer !== undefined}
+        onChange={(value) => void toggle('autoAnswer', value)}
+      />
+      <div className={`flex flex-col gap-1 ${queue.autoAnswer ? '' : 'opacity-60'}`}>
         <label htmlFor="queue-autopilot-answer" className="text-sm font-medium">
           {t('queue.settings.autopilotAnswer')}
         </label>
@@ -115,6 +125,11 @@ export function QueueModes({
         <p id="queue-autopilot-answer-hint" className="text-xs text-muted-foreground">
           {t('queue.settings.autopilotAnswerHint')}
         </p>
+        {queue.autoAnswer ? null : (
+          <p id="queue-autopilot-answer-inactive" className="text-xs font-medium">
+            {t('queue.settings.autopilotAnswerInactive')}
+          </p>
+        )}
         <span className="flex gap-2">
           <Button
             size="sm"

@@ -34,6 +34,7 @@ export class ApiError extends Error {
 export interface QueueSettingsPatch {
   parallel?: number;
   autopilot?: boolean;
+  autoAnswer?: boolean;
   skipFailed?: boolean;
   /** `null`: the default text. */
   autopilotAnswer?: string | null;

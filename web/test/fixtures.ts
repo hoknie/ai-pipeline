@@ -271,6 +271,7 @@ export function queueOf(overrides: Partial<QueueView> = {}): QueueView {
     status: 'stopped',
     parallel: 1,
     autopilot: false,
+    autoAnswer: false,
     skipFailed: false,
     autoDeliver: true,
     deliveryMode: 'worktree',

@@ -363,9 +363,13 @@ export const en = {
     settings: {
       title: 'Queue settings',
       label: 'queue settings',
-      autopilot: 'Autopilot',
+      autopilot: 'Keep running when empty',
       autopilotHint:
-        'A running queue does not stop when it becomes empty and takes added tasks at once. A paused queue stays paused.',
+        'A running queue does not stop when it becomes empty and takes added tasks at once. A paused queue stays paused. This switch does not answer questions.',
+      autoAnswer: 'Answer questions',
+      autoAnswerHint:
+        'A running queue answers the questions of specialists with the text below; at most 3 answers in a row per group. Turning it on does not start a stopped queue.',
+      autopilotAnswerInactive: 'Has no effect while "Answer questions" is off',
       skipFailed: 'Skip failed',
       skipFailedHint:
         'A run with a failed, conflicting or undelivered group leaves its place, and the queue goes on. Only a usage limit still stops the queue; a cancel does not.',
@@ -379,7 +383,7 @@ export const en = {
         'Where the result of a task goes: the working tree, a commit on the current branch or a separate aip/ branch. Applies to tasks without their own mode, when they start.',
       autopilotAnswer: 'Answer to questions',
       autopilotAnswerHint:
-        'The text the autopilot answers the questions of specialists with; at most 3 answers in a row per group.',
+        'The text the queue answers the questions of specialists with; at most 3 answers in a row per group.',
       autopilotAnswerSave: 'Save answer',
       autopilotAnswerDefault: 'Default answer',
       autopilotAnswerSaved: 'Answer saved',
@@ -851,7 +855,7 @@ export const en = {
       system:
         'Address and access of the web panel, the state of the daemon and of the panel, and their restart.',
       queue:
-        'Modes of the queue: autopilot, skipping, delivery and the usage limit. Start, pause and parallelism stay on the Queue page.',
+        'Modes of the queue: keep running when empty, answering questions, skipping, delivery and the usage limit. Start, pause and parallelism stay on the Queue page.',
       tags: 'The tag catalog, shared by all repositories.',
     },
     section: {

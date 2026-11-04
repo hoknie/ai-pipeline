@@ -45,7 +45,12 @@ describe('queue settings block', () => {
   it('shows the three switches with hints, the repository and no start or pause', async () => {
     show(queueOf());
     const block = await settingsBlock();
-    for (const name of ['Autopilot', 'Skip failed', 'Auto delivery by default']) {
+    for (const name of [
+      'Keep running when empty',
+      'Answer questions',
+      'Skip failed',
+      'Auto delivery by default',
+    ]) {
       expect(block.getByRole('switch', { name })).toBeTruthy();
     }
     expect(block.getByText(/does not stop when it becomes empty/)).toBeTruthy();
@@ -71,9 +76,9 @@ describe('queue settings block', () => {
         'true',
       ),
     );
-    expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
-      'false',
-    );
+    expect(
+      block.getByRole('switch', { name: 'Keep running when empty' }).getAttribute('aria-checked'),
+    ).toBe('false');
     expect(api.queueSettings).toHaveBeenCalledTimes(1);
   });
 
@@ -84,11 +89,11 @@ describe('queue settings block', () => {
       }),
     });
     const block = await settingsBlock();
-    fireEvent.click(block.getByRole('switch', { name: 'Autopilot' }));
+    fireEvent.click(block.getByRole('switch', { name: 'Keep running when empty' }));
     await screen.findAllByText('boom');
-    expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
-      'false',
-    );
+    expect(
+      block.getByRole('switch', { name: 'Keep running when empty' }).getAttribute('aria-checked'),
+    ).toBe('false');
   });
 
   it('follows the queue event', async () => {
@@ -103,9 +108,9 @@ describe('queue settings block', () => {
       });
     });
     await waitFor(() =>
-      expect(block.getByRole('switch', { name: 'Autopilot' }).getAttribute('aria-checked')).toBe(
-        'true',
-      ),
+      expect(
+        block.getByRole('switch', { name: 'Keep running when empty' }).getAttribute('aria-checked'),
+      ).toBe('true'),
     );
     expect(block.getByRole('switch', { name: 'Skip failed' }).getAttribute('aria-checked')).toBe(
       'true',
@@ -335,6 +340,59 @@ describe('delivery mode in the queue settings', () => {
 describe('answer of the autopilot in the queue settings', () => {
   const settingsBlock = async () =>
     within(await screen.findByRole('region', { name: 'queue settings' }));
+
+  it('turns answers on with only autoAnswer and returns the switch on an error', async () => {
+    const api = show(queueOf(), {
+      queueSettings: vi.fn(async () => queueOf({ autoAnswer: true })),
+    });
+    const block = await settingsBlock();
+    fireEvent.click(block.getByRole('switch', { name: 'Answer questions' }));
+    await waitFor(() => expect(api.queueSettings).toHaveBeenCalledWith({ autoAnswer: true }));
+    await waitFor(() =>
+      expect(
+        block.getByRole('switch', { name: 'Answer questions' }).getAttribute('aria-checked'),
+      ).toBe('true'),
+    );
+  });
+
+  it('returns the answers switch when the server refuses', async () => {
+    show(queueOf(), {
+      queueSettings: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    });
+    const block = await settingsBlock();
+    fireEvent.click(block.getByRole('switch', { name: 'Answer questions' }));
+    await screen.findAllByText('boom');
+    expect(
+      block.getByRole('switch', { name: 'Answer questions' }).getAttribute('aria-checked'),
+    ).toBe('false');
+  });
+
+  it('notes that the answer has no effect while answers are off, until a queue event', async () => {
+    show(queueOf());
+    const block = await settingsBlock();
+    const note = 'Has no effect while "Answer questions" is off';
+    expect(block.getByText(note)).toBeTruthy();
+    act(() => {
+      stream().open();
+      stream().send({ event: 'queue', seq: 5, queue: queueOf({ autoAnswer: true }) });
+    });
+    await waitFor(() => expect(block.queryByText(note)).toBeNull());
+  });
+
+  it('saves the answer text while answers are off', async () => {
+    const api = show(queueOf(), {
+      queueSettings: vi.fn(async () => queueOf({ autopilotAnswer: 'Pick' })),
+    });
+    const block = await settingsBlock();
+    const field = block.getByRole<HTMLTextAreaElement>('textbox', { name: 'Answer to questions' });
+    fireEvent.change(field, { target: { value: 'Pick' } });
+    fireEvent.click(block.getByRole('button', { name: 'Save answer' }));
+    await waitFor(() =>
+      expect(api.queueSettings).toHaveBeenCalledWith({ autopilotAnswer: 'Pick' }),
+    );
+  });
 
   it('shows the default text, saves a text and resets it', async () => {
     const api = show(queueOf({ autopilotAnswerDefault: 'Agree with all' }), {
