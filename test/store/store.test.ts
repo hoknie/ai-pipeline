@@ -16,7 +16,9 @@ import { addItem, emptyQueue, transition } from '../../src/core/index.ts';
 
 function temporaryStore(): Store {
   const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
-  return new Store(databasePath(directory));
+  const store = new Store(databasePath(directory));
+  store.database.exec('PRAGMA synchronous = OFF');
+  return store;
 }
 
 describe('state directory', () => {
