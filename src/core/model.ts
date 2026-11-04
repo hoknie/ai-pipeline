@@ -191,6 +191,8 @@ export interface HumanDecision {
   answer: string;
   /** Who answered: a person or the autopilot of the queue. */
   by: 'human' | 'autopilot';
+  /** Number of the attempt that asked the question. */
+  attemptSeq?: number;
 }
 
 export interface StepInput {

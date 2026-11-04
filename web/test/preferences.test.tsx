@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App.tsx';
 import { usePreference } from '../src/preferences.ts';
@@ -66,14 +66,27 @@ describe('answers-only switch of the run screen', () => {
     return utils;
   }
 
-  it('filters the logs and stays on after the panel is opened again', async () => {
-    const first = open();
+  // The first render of the run screen in a file is several times slower than the next ones; it is
+  // paid here and not by the first test.
+  beforeAll(() => {
+    open().unmount();
+    window.location.hash = '';
+  });
+
+  it('filters the logs', async () => {
+    open();
     await screen.findByText('Read');
     const toggle = screen.getByRole('switch', { name: 'only specialist replies' });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle);
     expect(screen.queryByText('Read')).toBeNull();
     expect(screen.getByText('ответ специалиста')).toBeTruthy();
+  });
+
+  it('keeps the filter on after the panel is opened again', async () => {
+    const first = open();
+    await screen.findByText('Read');
+    fireEvent.click(screen.getByRole('switch', { name: 'only specialist replies' }));
     first.unmount();
     open();
     await screen.findByText('ответ специалиста');

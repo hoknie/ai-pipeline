@@ -482,20 +482,17 @@ describe('settings page', () => {
     expect(screen.queryByRole('combobox', { name: 'Project' })).toBeNull();
   });
 
-  it('shows forms and no table on every group', async () => {
-    for (const hash of [
-      '#settings/global/general',
-      '#settings/global/agents',
-      '#settings/global/delivery',
-      '#settings/global/runtimes',
-      '#settings/global/system',
-      '#settings/project/delivery',
-    ]) {
-      show(queueOf(), {}, hash);
-      await screen.findByRole('button', { name: 'Save' });
-      expect(document.querySelector('table')).toBeNull();
-      cleanup();
-    }
+  it.each([
+    '#settings/global/general',
+    '#settings/global/agents',
+    '#settings/global/delivery',
+    '#settings/global/runtimes',
+    '#settings/global/system',
+    '#settings/project/delivery',
+  ])('shows a form and no table on %s', async (hash) => {
+    show(queueOf(), {}, hash);
+    await screen.findByRole('button', { name: 'Save' });
+    expect(document.querySelector('table')).toBeNull();
   });
 
   it('opens a group by its address and shows only its fields', async () => {
@@ -516,20 +513,17 @@ describe('settings page', () => {
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
   });
 
-  it('leads the addresses of earlier versions to the new groups', async () => {
-    for (const [old, now] of [
-      ['#settings/delivery', '#settings/global/delivery'],
-      ['#settings/web', '#settings/global/system'],
-      ['#settings/naming', '#settings/global/general'],
-      ['#settings/claude', '#settings/global/agents'],
-      ['#settings/queue', '#settings/project/queue'],
-      ['#specialists/_settings', '#settings/global/general'],
-    ] as const) {
-      show(queueOf(), {}, old);
-      await screen.findByRole('navigation', { name: 'groups of settings' });
-      await waitFor(() => expect(window.location.hash).toBe(now));
-      cleanup();
-    }
+  it.each([
+    ['#settings/delivery', '#settings/global/delivery'],
+    ['#settings/web', '#settings/global/system'],
+    ['#settings/naming', '#settings/global/general'],
+    ['#settings/claude', '#settings/global/agents'],
+    ['#settings/queue', '#settings/project/queue'],
+    ['#specialists/_settings', '#settings/global/general'],
+  ] as const)('leads the address %s of an earlier version to %s', async (old, now) => {
+    show(queueOf(), {}, old);
+    await screen.findByRole('navigation', { name: 'groups of settings' });
+    await waitFor(() => expect(window.location.hash).toBe(now));
   });
 
   it('shows the default on the Shared tab and where it comes from', async () => {

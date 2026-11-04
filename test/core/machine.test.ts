@@ -155,7 +155,13 @@ describe('questions to a human', () => {
     expect(attempt.stepId).toBe('code');
     expect(attempt.input.humanAnswer).toBeNull();
     expect(attempt.input.decisions).toEqual([
-      { stepId: 'code', question: 'Как назвать функцию?', answer: 'Name it double', by: 'human' },
+      {
+        stepId: 'code',
+        question: 'Как назвать функцию?',
+        answer: 'Name it double',
+        by: 'human',
+        attemptSeq: 2,
+      },
     ]);
   });
 
@@ -563,6 +569,27 @@ describe('step_skip', () => {
     const before = JSON.stringify(state);
     expect(() => skip(state, 'plan')).toThrow('already passed');
     expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('binds the answer to the asking attempt after a skip and a repeated question', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'needs_human', { feedback: 'Первый?' });
+    const firstSeq = group(state).attempts.at(-1)!.seq;
+    skip(state, 'plan');
+    expect(group(state).decisions).toEqual([]);
+    state.run.skippedSteps = [];
+    // The group comes back to the step (e.g. after a restart of the group).
+    group(state).pending = { stepIndex: 0, feedback: null, humanAnswer: null, resume: false };
+    group(state).status = 'queued';
+    step(state);
+    expect(runningAttempt(state).stepId).toBe('plan');
+    finish(state, 'needs_human', { feedback: 'Второй?' });
+    const secondSeq = group(state).attempts.at(-1)!.seq;
+    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ответ' }, 4000);
+    expect(group(state).decisions).toHaveLength(1);
+    expect(group(state).decisions[0]).toMatchObject({ question: 'Второй?', attemptSeq: secondSeq });
+    expect(secondSeq).not.toBe(firstSeq);
   });
 
   it('refuses an unknown step, a goto target and skipping everything', () => {

@@ -632,20 +632,28 @@ export function runView(
 }
 
 /**
- * The answer given to the question of an attempt: the N-th decision of a step belongs to the
- * N-th attempt of that step that ended with needs_human.
+ * The answer given to the question of an attempt: a decision that records the number of the
+ * asking attempt belongs to that attempt; decisions without a number (older runs) are matched
+ * by order — the N-th one of a step to the N-th needs_human attempt of that step not claimed
+ * by a numbered decision.
  */
 function attemptDecision(group: Group, attempt: Attempt): AttemptDecision | null {
+  const numbered = group.decisions.find((d) => d.attemptSeq === attempt.seq);
+  if (numbered) {
+    return { question: numbered.question, answer: numbered.answer, by: numbered.by };
+  }
   if (attempt.status !== 'finished' || attempt.report?.verdict !== 'needs_human') return null;
+  const claimed = new Set(group.decisions.map((d) => d.attemptSeq));
   const asked = group.attempts.filter(
     (candidate) =>
       candidate.stepId === attempt.stepId &&
       candidate.status === 'finished' &&
-      candidate.report?.verdict === 'needs_human',
+      candidate.report?.verdict === 'needs_human' &&
+      !claimed.has(candidate.seq),
   );
-  const decision = group.decisions.filter((d) => d.stepId === attempt.stepId)[
-    asked.indexOf(attempt)
-  ];
+  const decision = group.decisions.filter(
+    (d) => d.stepId === attempt.stepId && d.attemptSeq === undefined,
+  )[asked.indexOf(attempt)];
   return decision
     ? { question: decision.question, answer: decision.answer, by: decision.by }
     : null;

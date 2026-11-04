@@ -508,8 +508,9 @@ function hydrateGroup(group: Row, attemptRows: Row[]): Group {
     warnings: parse(group.warnings_json ?? null),
     decisions: parse<(Omit<HumanDecision, 'by'> & { by?: unknown })[]>(
       group.decisions_json ?? null,
-    ).map((decision) => ({
+    ).map(({ attemptSeq, ...decision }) => ({
       ...decision,
+      ...(Number.isInteger(attemptSeq) ? { attemptSeq } : {}),
       by: decision.by === 'autopilot' ? ('autopilot' as const) : ('human' as const),
     })),
     conflictFiles: parse(group.conflict_files_json ?? null),

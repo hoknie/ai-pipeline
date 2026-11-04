@@ -665,12 +665,21 @@ class Machine {
     const group = this.group(slug);
     if (group.status !== 'needs_human') throw wrongStatus(group, 'answer', 'needs_human');
     this.refresh(group, permissions);
+    const last = group.attempts.at(-1);
+    const asking = last && last.stepIndex === group.pending?.stepIndex ? last : undefined;
     const stepId =
+      asking?.stepId ??
       group.attempts.find((candidate) => candidate.stepIndex === group.pending?.stepIndex)
         ?.stepId ??
-      group.attempts.at(-1)?.stepId ??
+      last?.stepId ??
       '';
-    group.decisions.push({ stepId, question: group.question ?? '', answer, by });
+    group.decisions.push({
+      stepId,
+      question: group.question ?? '',
+      answer,
+      by,
+      ...(asking ? { attemptSeq: asking.seq } : {}),
+    });
     group.status = 'queued';
     group.question = null;
     group.questions = null;

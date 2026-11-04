@@ -924,6 +924,44 @@ describe('accepted answers of a group', () => {
     ]);
     expect(formatGroup(second)).toContain('answer (autopilot): Да');
   });
+
+  it('keeps the answer on the second attempt after a skipped question', () => {
+    const state = run(1);
+    step(state, 1000);
+    finish(state, 'needs_human', { feedback: 'Первый?', now: 2000 });
+    const group = state.groups[0]!;
+    group.attempts.push({ ...group.attempts[0]!, seq: 2, round: 2 });
+    group.decisions.push({
+      stepId: 'plan',
+      question: 'Второй?',
+      answer: 'Да',
+      by: 'human',
+      attemptSeq: 2,
+    });
+    const view = groupView(state, group, '/w', null, 5000);
+    expect(view.attempts.map((a) => a.decision?.answer ?? null)).toEqual([null, 'Да']);
+  });
+
+  it('shows an answer on a rejected attempt and mixes numbered and plain decisions', () => {
+    const state = run(1);
+    step(state, 1000);
+    finish(state, 'needs_human', { feedback: 'Первый?', now: 2000 });
+    const group = state.groups[0]!;
+    group.attempts.push({ ...group.attempts[0]!, seq: 2, round: 2 });
+    group.attempts.push({
+      ...group.attempts[0]!,
+      seq: 3,
+      round: 3,
+      report: { ...group.attempts[0]!.report!, verdict: 'rejected' },
+    });
+    group.decisions.push(
+      { stepId: 'plan', question: 'Q3', answer: 'C', by: 'human', attemptSeq: 3 },
+      { stepId: 'plan', question: 'Q1', answer: 'A', by: 'human' },
+      { stepId: 'plan', question: 'Q2', answer: 'B', by: 'human' },
+    );
+    const view = groupView(state, group, '/w', null, 5000);
+    expect(view.attempts.map((a) => a.decision?.answer ?? null)).toEqual(['A', 'B', 'C']);
+  });
 });
 
 describe('accepted answers of a run', () => {

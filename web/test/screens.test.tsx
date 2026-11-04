@@ -349,6 +349,46 @@ describe('run header', () => {
   });
 });
 
+describe('delivery in progress on the group screen', () => {
+  it('disables the retry actions and shows «Delivering» in the summary, not in the group header', async () => {
+    window.location.hash = '#runs/run1/login';
+    mount(
+      [
+        runView({
+          finished: true,
+          delivery: { applied: 0, merged: 1, failed: 1, inProgress: true, finishedAt: null },
+          groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
+        }),
+      ],
+      {
+        group: vi.fn(async () =>
+          groupView({
+            status: 'merged',
+            delivery: {
+              state: 'apply_failed',
+              reason: 'conflict',
+              files: ['a.ts'],
+              conflicts: [],
+              userEdits: [],
+              finishedAt: null,
+            },
+          }),
+        ),
+      },
+    );
+    const retry = await screen.findByRole('button', { name: 'Retry delivery' });
+    expect(retry.hasAttribute('disabled')).toBe(true);
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    expect(within(summary).getByText('Delivering')).toBeTruthy();
+    expect(screen.getAllByText('Delivering')).toHaveLength(1);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'Enter' });
+    const force = await screen.findByRole('menuitem', { name: 'Deliver with --force…' });
+    expect(
+      force.getAttribute('aria-disabled') ?? force.getAttribute('data-disabled'),
+    ).not.toBeNull();
+  });
+});
+
 describe('workflow badge in runs', () => {
   it('shows the badge in the run list instead of plain text', async () => {
     mount([runView({ id: 'a', title: 'Первый', workflow: 'feature' })]);

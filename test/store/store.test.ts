@@ -747,6 +747,22 @@ describe('queue items and automatic delivery', () => {
     expect(store.loadRun(state.run.id)?.groups[0]?.decisions[0]?.by).toBe('human');
   });
 
+  it('keeps the attempt number of a decision and reads old decisions without it', () => {
+    const store = temporaryStore();
+    const state = run(1);
+    step(state);
+    finish(state, 'needs_human', { feedback: 'q' });
+    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ok' }, 5);
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)?.groups[0]?.decisions[0]?.attemptSeq).toBe(1);
+    store.database.exec(
+      `UPDATE groups SET decisions_json = '[{"stepId":"s","question":"q","answer":"a","attemptSeq":"x"}]'`,
+    );
+    const old = store.loadRun(state.run.id)?.groups[0]?.decisions[0];
+    expect(old).toBeDefined();
+    expect(old).not.toHaveProperty('attemptSeq');
+  });
+
   it('reads items of an older database as following the setting', () => {
     const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
     const old = new Store(databasePath(directory));
