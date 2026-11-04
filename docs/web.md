@@ -58,8 +58,8 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Workflow" and "Set
 
 - Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
 - A run card shows the first line of the task, the status, workflow, time, cost and a summary of changes (`2 files +367 −0`).
-- The run header has "Deliver", "Cancel run", "Retry failed (N)" and "Retry with current config (N)". The "More" menu has "Deliver with --force…" and "Copy run id".
-- "Retry with current config" is in the header for every failed or cancelled group, and next to "Retry" of a failed or cancelled group or split step. It retries as `aip group retry --refresh-config`: the run first takes the specialists (model, runtime, prompt, permissions) from the current configuration, and the workflow stays as it started.
+- The action row of the run header has "Deliver", "Return to the queue" and "Steps". The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Deliver with --force…" and "Copy run id".
+- "Retry with current config" is in the run's "More" menu for every failed or cancelled group, and next to "Retry" in the "⋯" menu of a failed or cancelled group or split step.
 - The retried group shows the warning `config refreshed: …` with the changes. A broken configuration refuses the retry with its error. Commit message and resolver steps do not have this button.
 - The run header has a "Steps" block: each step of the workflow with its state (done, running, upcoming) and a "Skip" switch with a visible label for steps that are not finished yet.
   - Skipping a running step asks for confirmation: the specialist is stopped without a commit.

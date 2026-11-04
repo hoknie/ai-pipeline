@@ -1,4 +1,4 @@
-import { RefreshCw, RotateCcw, SkipForward } from 'lucide-react';
+import { MoreHorizontal, RefreshCw, RotateCcw, SkipForward } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,12 @@ import { notifySuccess } from '../../notify.ts';
 import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../../ui/dropdown-menu.tsx';
 import { Empty } from '../../ui/empty.tsx';
 import { Label } from '../../ui/label.tsx';
 import { Skeleton } from '../../ui/skeleton.tsx';
@@ -177,38 +183,6 @@ export function GroupScreen({
               {t('runs.system.retryDelivery')}
             </Button>
           ) : null}
-          {caps.retry ? (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={busy}
-              onClick={() =>
-                void act(
-                  () => api.retry(runId, row.slug),
-                  () => notifySuccess(t('runs.header.retryStarted')),
-                )
-              }
-            >
-              <RotateCcw />
-              {t('runs.group.retry')}
-            </Button>
-          ) : null}
-          {caps.retry && row.status !== 'conflict' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={busy}
-              onClick={() =>
-                void act(
-                  () => api.retry(runId, row.slug, { refreshConfig: true }),
-                  () => notifySuccess(t('runs.header.retryStarted')),
-                )
-              }
-            >
-              <RefreshCw />
-              {t('runs.group.retryRefreshConfig')}
-            </Button>
-          ) : null}
           {canSkip && run && skippable ? (
             <Button
               variant="outline"
@@ -231,6 +205,49 @@ export function GroupScreen({
             >
               {t('runs.group.cancel')}
             </Button>
+          ) : null}
+          {caps.retry ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={busy}
+                  aria-label={t('runs.group.more', { title })}
+                  title={t('runs.group.more', { title })}
+                >
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={busy}
+                  onSelect={() =>
+                    void act(
+                      () => api.retry(runId, row.slug),
+                      () => notifySuccess(t('runs.header.retryStarted')),
+                    )
+                  }
+                >
+                  <RotateCcw />
+                  {t('runs.group.retry')}
+                </DropdownMenuItem>
+                {row.status !== 'conflict' ? (
+                  <DropdownMenuItem
+                    disabled={busy}
+                    onSelect={() =>
+                      void act(
+                        () => api.retry(runId, row.slug, { refreshConfig: true }),
+                        () => notifySuccess(t('runs.header.retryStarted')),
+                      )
+                    }
+                  >
+                    <RefreshCw />
+                    {t('runs.group.retryRefreshConfig')}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">

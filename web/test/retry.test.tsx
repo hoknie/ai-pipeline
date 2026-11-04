@@ -48,6 +48,16 @@ function panel(
   return api;
 }
 
+function openMore() {
+  fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'Enter' });
+}
+
+function openGroupMenu(title = 'Вход') {
+  fireEvent.keyDown(screen.getByRole('button', { name: `More actions: ${title}` }), {
+    key: 'Enter',
+  });
+}
+
 describe('retry a failed step', () => {
   it('offers the retry in the last attempt of a failed group and keeps it open', async () => {
     const api = panel('failed');
@@ -68,7 +78,9 @@ describe('retry a failed step', () => {
   it('offers the retry for a cancelled group, in the panel and in the last attempt', async () => {
     const api = panel('cancelled');
     await screen.findByText('#2 Кодер');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    openGroupMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry' }));
     await waitFor(() => expect(api.retry).toHaveBeenCalledWith('run1', 'login'));
     expect(screen.getAllByRole('button', { name: 'Retry step' }).length).toBeGreaterThan(0);
   });
@@ -77,7 +89,7 @@ describe('retry a failed step', () => {
     panel('merged');
     await screen.findByText('#2 Кодер');
     expect(screen.queryByText('Retry step')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'More actions: Вход' })).toBeNull();
   });
 
   it('offers no retry for a group that did not fail', async () => {
@@ -91,7 +103,9 @@ describe('retry with the current config', () => {
   it('offers it next to the retry of a failed group and sends refreshConfig', async () => {
     const api = panel('failed');
     await screen.findByText('#2 Кодер');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry with current config' }));
+    expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
+    openGroupMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry with current config' }));
     await waitFor(() =>
       expect(api.retry).toHaveBeenCalledWith('run1', 'login', { refreshConfig: true }),
     );
@@ -118,7 +132,9 @@ describe('retry with the current config', () => {
       />,
     );
     await screen.findByText('#2 Кодер');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry with current config' }));
+    expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
+    openGroupMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry with current config' }));
     await waitFor(() =>
       expect(onError).toHaveBeenCalledWith('configuration not loaded: swarm.max: must be 1-50'),
     );
@@ -127,7 +143,7 @@ describe('retry with the current config', () => {
   it('is not offered for a merged group', async () => {
     panel('merged');
     await screen.findByText('#2 Кодер');
-    expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
+    expect(screen.queryByText('Retry with current config')).toBeNull();
   });
 
   it('retries every failed group from the header with refreshConfig', async () => {
@@ -140,8 +156,8 @@ describe('retry with the current config', () => {
       ],
     });
     render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
-    expect(screen.getByRole('button', { name: 'Retry failed (2)' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry with current config (2)' }));
+    openMore();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry with current config (2)' }));
     await waitFor(() => expect(api.retry).toHaveBeenCalledTimes(2));
     expect(api.retry).toHaveBeenCalledWith('run1', 'a', { refreshConfig: true });
     expect(api.retry).toHaveBeenCalledWith('run1', 'b', { refreshConfig: true });
@@ -161,7 +177,8 @@ describe('retry every failed group', () => {
   it('retries both failed groups and leaves the merged one', async () => {
     const api = fakeApi();
     render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry failed (2)' }));
+    openMore();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry failed (2)' }));
     await waitFor(() => expect(api.retry).toHaveBeenCalledTimes(2));
     expect(api.retry).toHaveBeenCalledWith('run1', 'a');
     expect(api.retry).toHaveBeenCalledWith('run1', 'b');
@@ -176,7 +193,8 @@ describe('retry every failed group', () => {
       }),
     });
     render(<RunHeader run={run} api={api} now={0} onError={onError} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry failed (2)' }));
+    openMore();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry failed (2)' }));
     await waitFor(() =>
       expect(onError).toHaveBeenCalledWith('Could not retry: A: group `a` is running'),
     );
@@ -196,7 +214,8 @@ describe('retry every failed group', () => {
     const api = fakeApi();
     render(<RunHeader run={cancelled} api={api} now={0} onError={() => undefined} />);
     expect(screen.getByLabelText('Cancelled (cancelled)')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry failed and cancelled (2)' }));
+    openMore();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry failed and cancelled (2)' }));
     await waitFor(() => expect(api.retry).toHaveBeenCalledTimes(2));
     expect(api.retry).toHaveBeenCalledWith('run1', 'a');
     expect(api.retry).toHaveBeenCalledWith('run1', 'b');
@@ -211,12 +230,49 @@ describe('retry every failed group', () => {
     });
     const api = fakeApi();
     render(<RunHeader run={cancelled} api={api} now={0} onError={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry failed and cancelled (1)' }));
+    openMore();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry failed and cancelled (1)' }));
     await waitFor(() => expect(api.retry).toHaveBeenCalledWith('run1', '_split'));
   });
 
-  it('shows no button without failed groups', () => {
+  it('shows no item without failed groups', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
+    openMore();
     expect(screen.queryByText(/Retry failed/)).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Deliver with --force…' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Copy run id' })).toBeTruthy();
+  });
+
+  it('keeps the retries out of the action row and before the force delivery', () => {
+    render(<RunHeader run={run} api={fakeApi()} now={0} onError={() => undefined} />);
+    expect(screen.queryByRole('button', { name: 'Retry failed (2)' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry with current config (2)' })).toBeNull();
+    openMore();
+    const names = screen.getAllByRole('menuitem').map((item) => item.textContent);
+    expect(names).toEqual([
+      'Retry failed (2)',
+      'Retry with current config (2)',
+      'Deliver with --force…',
+      'Copy run id',
+    ]);
+  });
+
+  it('disables the items while a retry is running', async () => {
+    const api = fakeApi({ retry: vi.fn(() => new Promise<never>(() => undefined)) });
+    render(<RunHeader run={run} api={api} now={0} onError={() => undefined} />);
+    openMore();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry failed (2)' }));
+    await waitFor(() => expect(api.retry).toHaveBeenCalled());
+    openMore();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('menuitem', { name: 'Retry failed (2)' }).getAttribute('aria-disabled'),
+      ).toBe('true'),
+    );
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Retry with current config (2)' })
+        .getAttribute('aria-disabled'),
+    ).toBe('true');
   });
 });

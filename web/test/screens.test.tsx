@@ -122,8 +122,9 @@ describe('group screen', () => {
     mount([runView({ state: 'active', groups: [groupRow({ status: 'failed' })] })], {
       retry,
     } as never);
-    const button = await screen.findByRole('button', { name: 'Retry' });
-    fireEvent.click(button);
+    const button = await screen.findByRole('button', { name: 'More actions: Вход' });
+    fireEvent.keyDown(button, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry' }));
     await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true));
     expect(button.getAttribute('aria-busy')).toBe('true');
     await act(async () => done({}));

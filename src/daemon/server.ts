@@ -3,6 +3,7 @@ import {
   existsSync,
   linkSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -100,13 +101,20 @@ export async function startDaemon(options: DaemonOptions): Promise<RunningDaemon
   let closing: Promise<void> | null = null;
   const subscriptions = new Set<Socket>();
   let socketCheck: NodeJS.Timeout | null = null;
+  let own: Stats | null = null;
   const close = (): Promise<void> => {
     closing ??= (async () => {
       if (socketCheck) clearInterval(socketCheck);
       for (const connection of subscriptions) connection.destroy();
+      // Closing a listening Unix socket unlinks its path, whatever file is there now: a file put in
+      // place of the socket by someone else is moved aside for the close and then put back.
+      const foreign = own !== null && existsSync(daemon.socket) && !sameFile(daemon.socket, own);
+      const aside = `${daemon.socket}.${process.pid}.keep`;
+      if (foreign) renameSync(daemon.socket, aside);
       await new Promise<void>((resolve) => server.close(() => resolve()));
+      if (foreign) renameSync(aside, daemon.socket);
       await daemon.stop();
-      rmSync(daemon.socket, { force: true });
+      if (own && sameFile(daemon.socket, own)) rmSync(daemon.socket, { force: true });
       if (existsSync(lockPath) && readFileSync(lockPath, 'utf8').trim() === String(process.pid)) {
         rmSync(lockPath, { force: true });
       }
@@ -165,14 +173,15 @@ export async function startDaemon(options: DaemonOptions): Promise<RunningDaemon
       server.listen(daemon.socket, () => resolve());
     });
     chmodSync(daemon.socket, 0o600);
-    const own = statSync(daemon.socket);
+    const socketStat = statSync(daemon.socket);
+    own = socketStat;
     await daemon.start();
     // Without its socket nobody can reach the daemon; without its lock the next client starts
     // another one. Either is gone when the state directory is removed (the socket may live in the
     // temporary directory, see `socketPath`): the daemon then stops by itself.
     socketCheck = setInterval(() => {
       if (closing) return;
-      const lost = !sameFile(daemon.socket, own)
+      const lost = !sameFile(daemon.socket, socketStat)
         ? `socket ${daemon.socket}`
         : !ownLock(lockPath)
           ? `lock ${lockPath}`

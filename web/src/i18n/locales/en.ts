@@ -269,6 +269,7 @@ export const en = {
       cancelled: 'Group cancelled',
       retry: 'Retry',
       retryRefreshConfig: 'Retry with current config',
+      more: 'More actions: {{title}}',
       skipStep: 'Skip step',
       limitUntil: 'Limit until {{time}}',
       limitReason: 'The usage limit ran out',

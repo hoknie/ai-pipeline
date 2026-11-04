@@ -276,6 +276,7 @@ export const es: Dictionary = {
       cancelled: 'Grupo cancelado',
       retry: 'Reintentar',
       retryRefreshConfig: 'Reintentar con la configuración actual',
+      more: 'Más acciones: {{title}}',
       skipStep: 'Omitir paso',
       limitUntil: 'Límite hasta las {{time}}',
       limitReason: 'Se agotó el límite de uso',

@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../ui/dropdown-menu.tsx';
 import { useTags } from '../../tags.tsx';
@@ -189,33 +190,6 @@ export function RunHeader({
           </div>
           {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
           <div className="flex flex-wrap items-center gap-2">
-            {failed.length > 0 ? (
-              <Button
-                variant="outline"
-                disabled={retrying !== null}
-                onClick={() => void retryFailed(false)}
-              >
-                <RotateCcw
-                  className={retrying === 'plain' ? 'motion-safe:animate-spin' : undefined}
-                />
-                {hasCancelled
-                  ? t('runs.header.retryFailedCancelled')
-                  : t('runs.header.retryFailed')}{' '}
-                ({failed.length})
-              </Button>
-            ) : null}
-            {failed.length > 0 ? (
-              <Button
-                variant="outline"
-                disabled={retrying !== null}
-                onClick={() => void retryFailed(true)}
-              >
-                <RefreshCw
-                  className={retrying === 'refresh' ? 'motion-safe:animate-spin' : undefined}
-                />
-                {t('runs.header.retryRefreshConfig')} ({failed.length})
-              </Button>
-            ) : null}
             {run.returnable ? (
               <Button variant="outline" loading={returning} onClick={() => void putBack()}>
                 {t('runs.header.returnRun')}
@@ -233,6 +207,32 @@ export function RunHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                {failed.length > 0 ? (
+                  <>
+                    <DropdownMenuItem
+                      disabled={retrying !== null}
+                      onSelect={() => void retryFailed(false)}
+                    >
+                      <RotateCcw
+                        className={retrying === 'plain' ? 'motion-safe:animate-spin' : undefined}
+                      />
+                      {hasCancelled
+                        ? t('runs.header.retryFailedCancelled')
+                        : t('runs.header.retryFailed')}{' '}
+                      ({failed.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={retrying !== null}
+                      onSelect={() => void retryFailed(true)}
+                    >
+                      <RefreshCw
+                        className={retrying === 'refresh' ? 'motion-safe:animate-spin' : undefined}
+                      />
+                      {t('runs.header.retryRefreshConfig')} ({failed.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
                 <DropdownMenuItem disabled={!deliverable} onSelect={() => setForcing(true)}>
                   {t('runs.header.forceDeliver')}
                 </DropdownMenuItem>

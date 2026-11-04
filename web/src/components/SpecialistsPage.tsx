@@ -108,9 +108,9 @@ export default function SpecialistsPage({
             onSelect={(id) => void go(id)}
             entries={(view?.specialists ?? []).map((entry) => ({
               id: entry.slug,
-              title: entry.slug,
+              title: entry.effective?.name ?? entry.raw.name?.toString() ?? entry.slug,
               subtitle: [
-                entry.effective?.name ?? entry.raw.name?.toString(),
+                entry.slug,
                 entry.effective
                   ? `${entry.effective.runtime}${entry.effective.model ? ` · ${entry.effective.model}` : ''}`
                   : null,

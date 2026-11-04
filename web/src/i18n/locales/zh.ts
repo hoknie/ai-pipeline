@@ -269,6 +269,7 @@ export const zh: Dictionary = {
       cancelled: '分组已取消',
       retry: '重试',
       retryRefreshConfig: '按当前配置重试',
+      more: '更多操作：{{title}}',
       skipStep: '跳过步骤',
       limitUntil: '限额至 {{time}}',
       limitReason: '用量限额已用完',

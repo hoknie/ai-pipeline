@@ -275,6 +275,7 @@ export const ru: Dictionary = {
       cancelled: 'Группа отменена',
       retry: 'Повторить',
       retryRefreshConfig: 'Повторить с текущей конфигурацией',
+      more: 'Ещё действия: {{title}}',
       skipStep: 'Пропустить шаг',
       limitUntil: 'Лимит до {{time}}',
       limitReason: 'Кончился лимит',

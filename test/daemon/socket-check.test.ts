@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,7 +16,9 @@ afterEach(async () => {
 });
 
 async function daemon(): Promise<{ running: RunningDaemon; base: string; state: string }> {
-  const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-socket-')));
+  // Not resolved through realpath: on macOS `/var` becomes `/private/var`, and the longer path would
+  // move the socket out of the state directory (the Unix socket limit), which these tests rely on.
+  const base = mkdtempSync(join(tmpdir(), 'aips-'));
   const state = join(base, 'state');
   const running = await startDaemon({
     stateDirectory: state,

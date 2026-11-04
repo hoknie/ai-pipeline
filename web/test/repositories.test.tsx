@@ -269,11 +269,11 @@ describe('repository selector', () => {
     const { api, base } = twoRepositories();
     render(<App api={api} openStream={openFake} />);
     snapshot();
-    expect(await screen.findByText('coder')).toBeTruthy();
+    expect(await screen.findByText('CODER')).toBeTruthy();
     await openMenu();
     fireEvent.click(screen.getByRole('menuitemradio', { name: /lib/ }));
-    expect(await screen.findByText('writer')).toBeTruthy();
-    expect(screen.queryByText('coder')).toBeNull();
+    expect(await screen.findByText('WRITER')).toBeTruthy();
+    expect(screen.queryByText('CODER')).toBeNull();
     const calls = (base as Api & { calls: [string, string | null][] }).calls;
     expect(calls).toContainEqual(['config', LIB]);
 

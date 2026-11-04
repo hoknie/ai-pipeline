@@ -70,12 +70,13 @@ describe('routes', () => {
 describe('specialists list', () => {
   it('shows the level of each specialist', async () => {
     render(<Page api={fakeApi({ config: vi.fn(async () => twoLevels()) })} />);
-    await screen.findByText('coder');
+    await screen.findByText('CODER');
     const list = screen.getByRole('list', { name: 'specialists' });
-    const row = (slug: string) => within(list).getByText(slug).closest('li')!;
+    const row = (slug: string) => within(list).getByText(slug.toUpperCase()).closest('li')!;
     expect(within(row('coder')).getByText('project')).toBeTruthy();
     expect(within(row('qa')).getByText('global')).toBeTruthy();
     expect(within(row('plan')).getByText('project over global')).toBeTruthy();
+    expect(within(row('coder')).getByText(/^coder · /)).toBeTruthy();
   });
 
   it('shows the errors above the list with their files', async () => {
@@ -183,11 +184,11 @@ describe('specialist form', () => {
     render(<Page api={fakeApi({ config: vi.fn(async () => view) })} start="coder" />);
     fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
     const list = screen.getByRole('list', { name: 'specialists' });
-    fireEvent.click(within(list).getByText('plan'));
+    fireEvent.click(within(list).getByText('PLAN'));
     fireEvent.click(await screen.findByRole('button', { name: 'Stay' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(screen.getByRole('heading', { name: 'coder' })).toBeTruthy();
-    fireEvent.click(within(list).getByText('plan'));
+    fireEvent.click(within(list).getByText('PLAN'));
     fireEvent.click(await screen.findByRole('button', { name: 'Leave' }));
     expect(await screen.findByRole('heading', { name: 'plan' })).toBeTruthy();
   });
@@ -288,7 +289,7 @@ describe('creating, copying and deleting', () => {
     expect(within(box).getByText('delivery.resolver')).toBeTruthy();
     expect(deleteSpecialist).toHaveBeenCalledWith('reviewer', 'rev-reviewer', 'project');
     expect(
-      within(screen.getByRole('list', { name: 'specialists' })).getByText('reviewer'),
+      within(screen.getByRole('list', { name: 'specialists' })).getByText('REVIEWER'),
     ).toBeTruthy();
   });
 
