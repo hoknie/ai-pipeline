@@ -140,4 +140,43 @@ describe('freezing for a priority run', () => {
     expect(queue.items[0]).toMatchObject({ run: b, hold: 'frozen' });
     expect((await h.status(b)).hold).toBe('frozen');
   });
+
+  it('skips a step of a returned run through its queue item and keeps its task', async () => {
+    const h = await start();
+    const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
+    await h.call('queue_return', { runId: a });
+    const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
+    await h.call('queue_edit', { repository: h.repo, item: item.id, skip: ['review'] });
+    expect((await h.status(b)).steps.find((step) => step.id === 'review')?.skipped).toBe(true);
+    await h.call('queue_edit', { repository: h.repo, item: item.id, skip: [] });
+    expect((await h.status(b)).steps.find((step) => step.id === 'review')?.skipped).toBe(false);
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: item.id, task: 'другое' }),
+    ).rejects.toThrow('a returned run keeps its own task');
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item: item.id,
+        skip: ['review'],
+        task: 'другое',
+      }),
+    ).rejects.toThrow('a returned run keeps its own task');
+    expect((await h.status(b)).steps.find((step) => step.id === 'review')?.skipped).toBe(false);
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: item.id, skip: ['review'], position: 99 }),
+    ).rejects.toThrow();
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item: item.id,
+        skip: ['review'],
+        after: ['nonexistent'],
+      }),
+    ).rejects.toThrow();
+    expect((await h.status(b)).steps.find((step) => step.id === 'review')?.skipped).toBe(false);
+    await h.call('queue_edit', { repository: h.repo, item: item.id, skip: ['review'] });
+    expect((await queueOf(h)).items.find((entry) => entry.run === b)?.skip).toEqual(['review']);
+    h.open('a');
+    h.open('b');
+  });
 });

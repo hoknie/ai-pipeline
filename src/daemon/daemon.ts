@@ -26,6 +26,7 @@ import {
   Rejection,
   addItem,
   checkSkip,
+  stepStates,
   addLinkedTag,
   addTag,
   autoTagName,
@@ -35,6 +36,9 @@ import {
   allGroups,
   createRun,
   dependencyTags,
+  checkReturnedPatch,
+  checkPosition,
+  checkDependencies,
   editItem,
   spreadTags,
   editTag,
@@ -708,9 +712,52 @@ export class Daemon {
             position,
             autoDeliver,
             deliveryMode,
-            skip,
             postponed,
           } = request.params;
+          let skip = request.params.skip;
+          const returned = queue.items.find((candidate) => candidate.id === item);
+          if (returned?.run && skip !== undefined) {
+            // A returned run has no item-level skip: the steps are skipped in the run itself.
+            checkReturnedPatch(
+              {
+                workflow,
+                task,
+                groups,
+                title,
+                tags: request.params.tags,
+                autoDeliver,
+                deliveryMode,
+                postponed,
+                skip,
+              },
+              true,
+            );
+            const state = this.lookupState(returned.run);
+            if (!state) throw new Rejection(`unknown run \`${returned.run}\``);
+            const wanted = new Set(skip);
+            const current = new Set(state.run.skippedSteps);
+            const skipError = checkSkip(state.run.config, state.run.workflow, [...wanted]);
+            if (skipError !== null) throw new Rejection(skipError);
+            const changes = [
+              ...[...current].filter((step) => !wanted.has(step)).map((step) => [step, false]),
+              ...[...wanted].filter((step) => !current.has(step)).map((step) => [step, true]),
+            ] as [string, boolean][];
+            for (const [step] of changes) {
+              if (stepStates(state).find((entry) => entry.id === step)?.state === 'done') {
+                throw new Rejection(`step \`${step}\` is already passed by every group`);
+              }
+            }
+            if (position !== undefined) checkPosition(queue, position);
+            if (request.params.after !== undefined) {
+              checkDependencies(queue, item, [
+                ...new Set(this.resolveDependencies(queue, request.params.after)),
+              ]);
+            }
+            for (const [step, on] of changes) {
+              await this.apply(state, { kind: 'step_skip', step, skip: on });
+            }
+            skip = undefined;
+          }
           if (workflow !== undefined || skip !== undefined) {
             const current = queue.items.find((candidate) => candidate.id === item);
             if (current) {

@@ -120,6 +120,8 @@ export {
   checkDependencies,
   dependencyState,
   dependencyTags,
+  checkReturnedPatch,
+  checkPosition,
   editItem,
   spreadTags,
   itemReadiness,

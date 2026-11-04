@@ -344,7 +344,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Change a queued task',
       description:
-        'Change fields of a waiting task, or move it to a position (1 starts first). A task that already became a run cannot be changed.',
+        'Change fields of a waiting task, or move it to a position (1 starts first). A task that already became a run cannot be changed, except `skip`: for a returned run it skips or restores the steps of the run at once.',
       inputSchema: {
         item,
         workflow: z.string().optional(),

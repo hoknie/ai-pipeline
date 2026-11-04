@@ -270,14 +270,18 @@ export interface ItemPatch {
   position?: number | undefined;
 }
 
+/** Rejects a patch of a returned run's item that changes more than its place and `after`; `skip` is allowed when `skipInRun`. */
+export function checkReturnedPatch(patch: ItemPatch, skipInRun = false): void {
+  const { position: _position, after: _after, skip, ...rest } = patch;
+  const others = skipInRun ? rest : { ...rest, skip };
+  if (Object.values(others).some((value) => value !== undefined)) {
+    throw new Rejection('a returned run keeps its own task');
+  }
+}
+
 export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number): QueueItem {
   const item = find(queue, id);
-  if (item.run !== null) {
-    const { position: _position, after: _after, ...rest } = patch;
-    if (Object.values(rest).some((value) => value !== undefined)) {
-      throw new Rejection('a returned run keeps its own task');
-    }
-  }
+  if (item.run !== null) checkReturnedPatch(patch);
   if (patch.task !== undefined && patch.groups !== undefined) {
     throw new Rejection('pass either task or groups');
   }
@@ -443,7 +447,7 @@ export function itemReadiness(
   return states.every((state) => state === 'done') ? 'ready' : 'waiting';
 }
 
-function checkPosition(queue: Queue, position: number): void {
+export function checkPosition(queue: Queue, position: number): void {
   if (!Number.isInteger(position) || position < 1 || position > queue.items.length) {
     throw new Rejection(`position must be an integer from 1 to ${queue.items.length}`);
   }

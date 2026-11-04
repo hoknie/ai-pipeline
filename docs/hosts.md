@@ -150,7 +150,7 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_apply` | `run_id`, `groups?`, `force?` | Delivers ready groups (the command is `aip run apply`) |
 | `swarm_queue` | `repo?` | The queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order with their readiness and predecessors, and the runs that hold a place |
 | `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true` makes a running queue skip the task until the flag is cleared |
-| `swarm_queue_edit` | `item`, `workflow?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it (1 is first). `deliveryMode: null` follows `delivery.mode` again. `after` and `skip` replace the whole list, `[]` clears it |
+| `swarm_queue_edit` | `item`, `workflow?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it (1 is first). `deliveryMode: null` follows `delivery.mode` again. `after` and `skip` replace the whole list, `[]` clears it. A returned run's task takes only `skip` (applied to the run), `after`, `position` |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
 | `swarm_queue_parallel` | `parallel`, `repo?` | Changes the number of simultaneous runs in any queue state |

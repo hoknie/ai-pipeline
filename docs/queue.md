@@ -44,9 +44,9 @@ Every task gets an integer number within its repository when it is added to the 
 ### Returning a run
 
 - `aip queue return <run-id>` puts a run with failed or cancelled groups back in the queue as its first task. `--repo` defaults to the repository of the run. A skipped run leaves the skipped list.
-- The run does not change until the queue takes the task on a free place (or `aip queue run <item>`). Then its failed and cancelled groups are retried from where they stopped, the work already done is kept, and the run holds a place again.
+- Except for `--skip`/`--no-skips`, the run does not change until the queue takes the task on a free place (or `aip queue run <item>`). Then its failed and cancelled groups are retried from where they stopped, the work already done is kept, and the run holds a place again.
 - While the task waits, `aip run list`, `aip run show`, `swarm_status` and the web panel show the run as `queued` (the field `queueItem` holds the task id; the statuses of the groups do not change). Once the task is taken or removed, the run shows its own state again.
-- `aip queue list` marks the task `returns <run-id>`. It can be moved, removed or given `--after`, but not edited otherwise.
+- `aip queue list` marks the task `returns <run-id>`. It can be moved, removed or given `--after`, but not edited otherwise. The one exception is `--skip`/`--no-skips` (MCP `skip`): it skips or restores the steps of the run itself at once, and the list replaces all skipped steps of the run (the task shows the steps the run skips now). A step that every group has passed cannot be changed.
 - A run that is already in the queue, holds a place or has nothing to retry is refused. A skipped run whose groups are merged but whose delivery failed has nothing to retry.
 - `aip queue dismiss <run-id>` removes a skipped run from the skipped list; `--repo` defaults to the repository of the run. The run itself does not change: it keeps its status and stays in the run list, and it can still be delivered. A run that is not in the skipped list is refused. A task that waits for the removed run (`--after`) stays blocked.
 

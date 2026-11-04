@@ -988,7 +988,7 @@ export function queueView(
       autoDeliver: item.autoDeliver,
       deliveryMode: item.deliveryMode,
       tags: tagViews(catalog, item.tags),
-      skip: [...item.skip],
+      skip: [...(item.run === null ? item.skip : (lookup(item.run)?.run.skippedSteps ?? []))],
       readiness: itemReadiness(queue, item, lookup),
       after: item.after.map((ref): DependencyView => {
         const other = queue.items.find((candidate) => candidate.id === ref);
