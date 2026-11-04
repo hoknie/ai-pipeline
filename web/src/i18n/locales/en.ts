@@ -363,7 +363,7 @@ export const en = {
         'A running queue does not stop when it becomes empty and takes added tasks at once. A paused queue stays paused.',
       skipFailed: 'Skip failed',
       skipFailedHint:
-        'A run with a failed, conflicting or undelivered group leaves its place, and the queue goes on. A cancel and a usage limit still stop the queue.',
+        'A run with a failed, conflicting or undelivered group leaves its place, and the queue goes on. Only a usage limit still stops the queue; a cancel does not.',
       autoDeliver: 'Auto delivery by default',
       autoDeliverHint: 'Applies to tasks without their own auto delivery, when they start.',
       savedToProject: 'Saved to the project file: {{file}}',
@@ -782,6 +782,8 @@ export const en = {
     project: 'Project',
     noProjects: 'No repositories yet: add one in the repository menu.',
     writesTo: 'Saved to',
+    target: 'Where the settings are saved',
+    globalNote: 'Applies to every repository',
     save: 'Save',
     discard: 'Discard changes',
     saved: 'Settings saved',

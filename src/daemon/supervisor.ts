@@ -7,7 +7,7 @@ import type { Usage } from '../core/index.ts';
 import type { Launch, OutputParser, RunOutcome } from '../runtime/index.ts';
 
 export const STOP_GRACE_MS = 10_000;
-const DRAIN_MS = 2_000;
+export const DRAIN_MS = 2_000;
 
 export interface ProcessExit {
   code: number | null;
@@ -30,6 +30,8 @@ export function launchProcess(
     parser: OutputParser;
     environment: NodeJS.ProcessEnv;
     graceMs?: number;
+    /** How long the output is drained after the process exited; defaults to 2 s. */
+    drainMs?: number;
     /** Called when the usage of the parser changed after a line of output. */
     onUsage?: (usage: Usage) => void;
   },
@@ -114,7 +116,7 @@ export function launchProcess(
     });
     child.once('exit', (code, signal) => {
       signalGroup('SIGTERM');
-      setTimeout(() => finish(code, signal), DRAIN_MS).unref();
+      setTimeout(() => finish(code, signal), options.drainMs ?? DRAIN_MS).unref();
     });
     child.once('close', finish);
   });

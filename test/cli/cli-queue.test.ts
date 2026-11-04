@@ -9,7 +9,20 @@ import { MANUAL_CONFIG } from '../daemon/harness.ts';
 import { aip, main, sandbox, waitUntil } from './sandbox.ts';
 
 describe('cli', () => {
-  it('manages the queue from the terminal', async () => {
+  const fillQueue = async (box: ReturnType<typeof sandbox>) => {
+    writeFileSync(
+      join(box.repo, 'groups.yaml'),
+      '- { title: Вход, task: форма }\n- { title: Выход, task: кнопка }\n',
+    );
+    await aip(box, 'queue', 'add', 'feature', '--task', 'первая задача');
+    await aip(box, 'queue', 'add', 'feature', '--groups', 'groups.yaml', '--title', 'Две группы');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'третья');
+    return JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      items: { id: string; task: string | null }[];
+    };
+  };
+
+  it('adds tasks to the queue and lists them', async () => {
     const box = sandbox();
     writeFileSync(
       join(box.repo, 'groups.yaml'),
@@ -19,15 +32,16 @@ describe('cli', () => {
     expect(first.code).toBe(0);
     expect(JSON.parse(first.stdout)).toMatchObject({ status: 'stopped', parallel: 1 });
     await aip(box, 'queue', 'add', 'feature', '--groups', 'groups.yaml', '--title', 'Две группы');
-    await aip(box, 'queue', 'add', 'feature', '--task', 'третья');
     const list = await aip(box, 'queue', 'list');
     expect(list.stdout).toContain('Queue: stopped, parallel 1');
     expect(list.stdout).toContain('1.');
     expect(list.stdout).toContain('первая задача');
     expect(list.stdout).toContain('2 groups');
-    const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
-      items: { id: string; task: string | null }[];
-    };
+  });
+
+  it('moves, edits and removes queue items', async () => {
+    const box = sandbox();
+    const view = await fillQueue(box);
     const moved = await aip(box, 'queue', 'move', view.items[2]!.id, '1', '--json');
     expect((JSON.parse(moved.stdout) as typeof view).items.map((item) => item.task)).toEqual([
       'третья',
@@ -38,6 +52,11 @@ describe('cli', () => {
     expect(edited.stdout).toContain('изменённая');
     const removed = await aip(box, 'queue', 'remove', view.items[0]!.id, '--json');
     expect(JSON.parse(removed.stdout).items).toHaveLength(2);
+  });
+
+  it('refuses an unknown workflow and both a task and groups', async () => {
+    const box = sandbox();
+    writeFileSync(join(box.repo, 'groups.yaml'), '- { title: Вход, task: форма }\n');
     const bad = await aip(box, 'queue', 'add', 'nope', '--task', 'x');
     expect(bad.code).not.toBe(0);
     expect(`${bad.stdout}${bad.stderr}`).toContain('unknown workflow `nope`; known: feature');
@@ -52,6 +71,11 @@ describe('cli', () => {
       'groups.yaml',
     );
     expect(both.code).not.toBe(0);
+  });
+
+  it('runs an item now and pauses the queue', async () => {
+    const box = sandbox();
+    const view = await fillQueue(box);
     const now = await aip(box, 'queue', 'run', view.items[1]!.id);
     expect(now.stdout).toContain('started');
     const paused = await aip(box, 'queue', 'pause');
@@ -305,6 +329,11 @@ describe('cli', () => {
 
   it('changes parallel of a running queue at once and rejects 0', async () => {
     const box = sandbox();
+    // Both runs stay in their step, so the places they hold do not depend on agent speed.
+    writeFileSync(
+      join(box.repo, '..', 'script.json'),
+      JSON.stringify({ code: [{ waitFor: join(box.repo, '..', 'never') }] }),
+    );
     await aip(box, 'queue', 'add', 'feature', '--task', 'первая');
     await aip(box, 'queue', 'start');
     await aip(box, 'queue', 'add', 'feature', '--task', 'вторая');

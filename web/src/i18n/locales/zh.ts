@@ -775,6 +775,8 @@ export const zh: Dictionary = {
     project: '项目',
     noProjects: '还没有仓库：请在仓库菜单中添加。',
     writesTo: '保存到',
+    target: '设置保存到哪里',
+    globalNote: '适用于所有仓库',
     save: '保存',
     discard: '放弃更改',
     saved: '设置已保存',

@@ -141,6 +141,10 @@ describe('system steps in the runs section', () => {
     expect(tip.textContent).toContain('src/app.ts');
     fireEvent.click(badge);
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_resolve'));
+    window.location.hash = '#runs/run1';
+    await waitFor(() => expect(window.location.hash).toBe('#runs/run1'));
+    fireEvent.keyDown(badge, { key: 'Enter' });
+    await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_resolve'));
     expect(
       await screen.findByRole('region', { name: 'group Delivery conflict resolution' }),
     ).toBeTruthy();
@@ -267,6 +271,57 @@ describe('system stages in the run header', () => {
         node.getAttribute('aria-label'),
       ),
     ).toEqual([expect.stringMatching(/\(finished\)$/), 'Delivered (applied)']);
+  });
+
+  const merged3 = () => [1, 2, 3].map((n) => groupRow({ slug: `g${n}`, status: 'merged' }));
+  const badgeLabels = (header: HTMLElement) =>
+    Array.from(header.querySelectorAll('[aria-label$=")"]')).map((node) =>
+      node.getAttribute('aria-label'),
+    );
+
+  it('shows exactly one delivery element at 2/3 in the header', async () => {
+    mount([
+      runView({
+        groups: merged3(),
+        delivery: { applied: 2, merged: 3, failed: 0, inProgress: false, finishedAt: null },
+      }),
+    ]);
+    const header = await screen.findByRole('banner', { name: 'run' });
+    expect(badgeLabels(header)).toEqual([
+      expect.stringMatching(/\(active\)$/),
+      'delivery 2/3 (pending)',
+    ]);
+    const texts = within(header)
+      .queryAllByText(/deliver/i)
+      .filter((node) => node.closest('button')?.textContent?.trim() !== 'Deliver');
+    for (const text of ['Delivering', 'Delivery failed', 'Delivered']) {
+      expect(texts.some((node) => node.textContent?.includes(text))).toBe(false);
+    }
+  });
+
+  it('shows only the Delivering badge while delivering, even with failures', async () => {
+    mount([
+      runView({
+        groups: merged3(),
+        delivery: { applied: 0, merged: 3, failed: 1, inProgress: true, finishedAt: null },
+      }),
+    ]);
+    const header = await screen.findByRole('banner', { name: 'run' });
+    const labels = badgeLabels(header);
+    expect(labels).toHaveLength(2);
+    expect(labels[1]).toMatch(/^Delivering/);
+    expect(within(header).queryByText(/Delivery failed/)).toBeNull();
+  });
+
+  it('shows only the run state badge when there is nothing to deliver', async () => {
+    mount([
+      runView({
+        groups: [groupRow({ status: 'running' })],
+        delivery: { applied: 0, merged: 0, failed: 0, inProgress: false, finishedAt: null },
+      }),
+    ]);
+    const header = await screen.findByRole('banner', { name: 'run' });
+    expect(badgeLabels(header)).toHaveLength(1);
   });
 
   it('shows the reason of a failed delivery in the badge tooltip', async () => {

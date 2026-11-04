@@ -214,7 +214,7 @@ describe('background processes of a daemon', () => {
     await h.waitFor(runId, (view) => view.finished);
     expect(alive(child)).toBe(true);
     await until('the orphan still listed after the agent exited', async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      await new Promise((resolve) => setTimeout(resolve, 30));
       return listed();
     });
     process.kill(child, 'SIGKILL');
