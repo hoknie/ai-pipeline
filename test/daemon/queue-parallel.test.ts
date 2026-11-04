@@ -12,7 +12,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { MANUAL_CONFIG, WORKFLOW_CONFIG, startRun, type Harness } from './harness.ts';
+import { settle, MANUAL_CONFIG, WORKFLOW_CONFIG, startRun, type Harness } from './harness.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
 
 describe('live parallel', () => {
@@ -50,9 +50,8 @@ describe('live parallel', () => {
     })) as QueueView;
     expect(shrunk.runs).toHaveLength(2);
     expect(shrunk.items.map((item) => item.title)).toEqual(['C']);
-    // both runs are held: neither is interrupted, and C keeps waiting; the settings call has
-    // scheduled already, a short pause only gives a wrong start a chance to show
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // both runs are held: neither is interrupted, and C keeps waiting
+    await settle(h);
     const waiting = await queueOf(h);
     expect(waiting.runs).toHaveLength(2);
     expect(waiting.items).toHaveLength(1);
@@ -84,7 +83,7 @@ describe('live parallel', () => {
   });
 
   it('sends a queue event when the step of a queue run changes, and none without changes', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     h.script({ code: [{ waitFor: h.gate('code') }] });
     await add(h, 'A');
     const events: StreamEvent[] = [];
@@ -105,7 +104,7 @@ describe('live parallel', () => {
       return last?.status === 'stopped' && last.runs.length === 0;
     });
     // a moment for events without changes, which must not come
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     const queues = queueEvents();
     const steps = queues.flatMap((queue) =>
       queue.runs.flatMap((run) => run.active.map((a) => a.step)),
@@ -310,7 +309,7 @@ describe('run goes through the queue', () => {
 
 describe('skipped steps of a task', () => {
   it('runs the task without the skipped step up to merged', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     h.script({ code: [WRITE_LIB] });
     const view = await add(h, 'A', { skip: ['review'] });
     expect(view.items[0]?.skip).toEqual(['review']);
@@ -325,7 +324,7 @@ describe('skipped steps of a task', () => {
   });
 
   it('rejects an unknown step with the list of steps and keeps the queue', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     await expect(
       h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'x', skip: ['deploy'] }),
     ).rejects.toThrow('unknown step `deploy` in skip; steps: code, review');
@@ -344,7 +343,7 @@ describe('skipped steps of a task', () => {
   });
 
   it('replaces and clears skip when editing and checks the final combination', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     const { item } = await add(h, 'A');
     const edited = (await h.call('queue_edit', {
       repository: h.repo,
@@ -392,7 +391,7 @@ describe('skipped steps of a task', () => {
   });
 
   it('puts a task with a step removed from swarm.yaml first with an error and stops the queue', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     await add(h, 'A', { skip: ['review'] });
     writeConfigDirectory(
       h.repo,
@@ -409,7 +408,7 @@ describe('skipped steps of a task', () => {
   });
 
   it('passes skip to a run started now', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     h.script({ code: [WRITE_LIB] });
     const { item } = await add(h, 'A', { skip: ['review'] });
     const created = (await h.call('queue_run_now', { repository: h.repo, item })) as RunCreated;

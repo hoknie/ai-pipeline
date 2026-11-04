@@ -13,7 +13,7 @@ import {
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
 
-import { WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
+import { settle, WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -184,9 +184,10 @@ describe('groups waiting for a specialist', () => {
     await h.waitFor(secondId, (view) => row(view, 'signup')?.status === 'waiting');
     // The diff statistics of a run arrive later and send one more event; on a loaded machine that
     // takes longer than any fixed pause, so wait until the stream stays quiet.
-    for (let seen = -1; seen !== events.length;) {
-      seen = events.length;
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    for (let quiet = 0; quiet < 3;) {
+      const seen = events.length;
+      await settle(h);
+      quiet = seen === events.length ? quiet + 1 : 0;
     }
     const statusesOfSecond = () =>
       events.flatMap((event) =>
@@ -202,8 +203,7 @@ describe('groups waiting for a specialist', () => {
     await h.status(secondId);
     await h.group(secondId, 'signup');
     await h.call('status', { runId: first.runId });
-    // negative check: a short pause is enough for a stray event to arrive
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     expect(statusesOfSecond()).toHaveLength(before);
     h.open('first');
     await h.waitFor(secondId, (view) => row(view, 'signup')?.status === 'running');

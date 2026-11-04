@@ -9,6 +9,7 @@ import type { RepositoryView, RunCreated } from '../../src/protocol/index.ts';
 
 import { harness, startRun, type Harness } from './harness.ts';
 
+// Each test needs a fresh daemon: the registry of repositories belongs to the daemon.
 let current: Harness | null = null;
 
 afterEach(async () => {

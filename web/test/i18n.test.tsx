@@ -121,17 +121,19 @@ describe('language of the browser', () => {
 });
 
 describe('language menu', () => {
-  it('keeps the chosen language after a reload', async () => {
+  it('stores the chosen language', async () => {
     mount();
     openLanguageMenu();
     fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Русский' }));
     expect(window.localStorage.getItem('aip.web.language')).toBe('"ru"');
     expect(await screen.findByRole('link', { name: /Запуски/ })).toBeTruthy();
-    cleanup();
-    await act(() => i18next.changeLanguage('en'));
+  });
+
+  it('opens in the stored language after a reload', async () => {
+    window.localStorage.setItem('aip.web.language', '"ru"');
     applyStoredLanguage();
     mount();
-    expect(screen.getByRole('link', { name: /Запуски/ })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: /Запуски/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Язык: Русский' })).toBeTruthy();
   });
 

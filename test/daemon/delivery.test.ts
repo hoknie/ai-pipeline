@@ -7,7 +7,7 @@ import { databasePath } from '../../src/config/index.ts';
 import type { ApplyResult, RunCreated } from '../../src/protocol/index.ts';
 import { Store } from '../../src/store/index.ts';
 
-import { POLL_MS, WORKFLOW_CONFIG, git, harness, startRun, type Harness } from './harness.ts';
+import { POLL_MS, CODE_ONLY_CONFIG, git, harness, startRun, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 async function start(extra = '  delivery: { auto: false }\n'): Promise<Harness> {
-  current = await harness(`${WORKFLOW_CONFIG}${extra}`);
+  current = await harness(`${CODE_ONLY_CONFIG}${extra}`);
   return current;
 }
 
@@ -77,6 +77,7 @@ describe('delivery through the daemon', () => {
     const first = refused.groups[0]!.delivery.finishedAt!;
     expect(typeof first).toBe('number');
     expect((await h.status(runId)).delivery.finishedAt).toBe(first);
+    // the second delivery must carry a later time stamp (milliseconds)
     await new Promise((resolve) => setTimeout(resolve, 5));
     const again = (await h.call('apply', { runId })) as ApplyResult;
     expect(again.groups[0]?.delivery.reason).toBe(refused.groups[0]?.delivery.reason);
@@ -297,7 +298,7 @@ describe('delivery resolver', () => {
 
   it('starts a second round from a fresh snapshot when the tree changed again', async () => {
     const h = await harness(
-      `${WORKFLOW_CONFIG}  delivery: { resolver: coder, resolver_rounds: 2 }\n`,
+      `${CODE_ONLY_CONFIG}  delivery: { resolver: coder, resolver_rounds: 2 }\n`,
     );
     current = h;
     const runId = await conflictingRun(h, [

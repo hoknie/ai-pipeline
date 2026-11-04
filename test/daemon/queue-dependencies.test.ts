@@ -10,7 +10,7 @@ import {
   type RunCreated,
   type StreamEvent,
 } from '../../src/protocol/index.ts';
-import { MANUAL_CONFIG, POLL_MS, WORKFLOW_CONFIG, startRun, until } from './harness.ts';
+import { settle, MANUAL_CONFIG, POLL_MS, WORKFLOW_CONFIG, startRun, until } from './harness.ts';
 import {
   start,
   stop,
@@ -129,8 +129,7 @@ describe('dependencies of queue items', () => {
     );
     await h.waitFor(runId!, (view) => view.finished);
     // nothing starts B while A waits for apply
-    // negative check: a short pause is enough for a wrong start to show
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     const waiting = await queueOf(h);
     expect(waiting.status).toBe('running');
     expect(waiting.items).toHaveLength(1);
@@ -172,8 +171,7 @@ describe('dependencies of queue items', () => {
       ),
     );
     // a ready item does not start a stopped queue
-    // negative check: a short pause is enough for a wrong start to show
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     expect(await allRuns(h)).toHaveLength(1);
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.status === 'stopped' && queue.items.length === 0);

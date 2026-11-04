@@ -27,6 +27,9 @@ let foreign: Server | null = null;
 let command = '';
 let port = 0;
 
+// Every test sets up its own state: a free port, a directory and a copy of the fake `aip web`.
+// This is a mkdtemp and a file copy; what the tests assert on (the processes the script starts
+// and stops, the pid and token files) changes in every test and cannot be shared in `beforeAll`.
 async function setup(): Promise<void> {
   port = await freePort();
   base = mkdtempSync(join(tmpdir(), 'aip-web-script-'));

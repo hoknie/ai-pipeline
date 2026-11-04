@@ -80,7 +80,8 @@ describe('a usage limit in the queue', () => {
       if (Date.now() > deadline) throw new Error(`timed out; runs: ${JSON.stringify(runs)}`);
       await pause(POLL_MS);
     }
-    // negative check: a short pause is enough for a wrong start to show
+    // a moment for a place the queue could wrongly take (the requests above are ordered first)
+    await queueOf(h);
     await pause(50);
     const after = await queueOf(h);
     expect(after.status).toBe('stopped');

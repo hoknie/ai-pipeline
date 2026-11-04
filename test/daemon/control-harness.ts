@@ -46,6 +46,10 @@ export function alive(pid: number): boolean {
   }
 }
 
+/**
+ * `timeout: 1s` lasts `timeoutUnitMs` (50 ms) in the daemon of the harness, so a test of a timeout
+ * takes a fraction of a second.
+ */
 export const SHORT_TIMEOUT = WORKFLOW_CONFIG.replace(
   'coder: { name: Кодировщик }',
   'coder: { name: Кодировщик, timeout: 1s }',

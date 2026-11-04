@@ -51,6 +51,18 @@ export const WORKFLOW_CONFIG = `swarm:
         - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }
 `;
 
+/** One step: for tests of the queue and the places, where only the number of runs matters. */
+export const CODE_ONLY_CONFIG = `swarm:
+  max: 3
+  specialists:
+    coder: { name: Кодировщик }
+    reviewer: { name: Ревьюер, permissions: read }
+  workflows:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+
 export const MANUAL_CONFIG = `${WORKFLOW_CONFIG}  delivery: { auto: false }\n`;
 
 export interface Harness {
@@ -90,6 +102,16 @@ export async function until(
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }
+}
+
+/**
+ * For a negative check ("nothing else happens"): requests to the daemon are handled in order, so
+ * the round trips below return after everything it had under way; the last pause (at most
+ * 50 ms) only lets an event that must not come travel to the subscriber.
+ */
+export async function settle(h: Pick<Harness, 'call'>): Promise<void> {
+  for (let round = 0; round < 3; round += 1) await h.call('status', {});
+  await new Promise((resolve) => setTimeout(resolve, 25));
 }
 
 function sh(cwd: string, ...args: string[]): string {

@@ -1,14 +1,12 @@
-import { spawn, execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { describe, expect, it } from 'vitest';
 
 import { AlreadyRunning, acquireLock } from '../../src/daemon/index.ts';
 
-const run = promisify(execFile);
 const server = join(import.meta.dirname, '..', '..', 'src', 'daemon', 'server.ts');
 
 function directory(): string {

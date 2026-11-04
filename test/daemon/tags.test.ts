@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
@@ -14,7 +14,15 @@ import {
   type TagView,
 } from '../../src/protocol/index.ts';
 
-import { POLL_MS, WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
+import {
+  CODE_ONLY_CONFIG,
+  POLL_MS,
+  WORKFLOW_CONFIG,
+  harness,
+  startRun,
+  until,
+  type Harness,
+} from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -23,7 +31,8 @@ afterEach(async () => {
   current = null;
 });
 
-const SCOUT_CONFIG = `${WORKFLOW_CONFIG.replace(
+// one step in `feature`: the tests count tasks and runs, not the steps
+const SCOUT_CONFIG = `${CODE_ONLY_CONFIG.replace(
   '  workflows:\n',
   '    scout: { name: Разведчик, queue: true }\n  workflows:\n    explore:\n      steps:\n        - { id: explore, specialist: scout }\n',
 )}`;
@@ -66,8 +75,21 @@ const allRuns = async (h: Harness): Promise<RunView[]> =>
   ((await h.call('status', {})) as RunView[]).sort((a, b) => a.createdAt - b.createdAt);
 
 describe('tag catalog', () => {
+  // The tests that only add and read tags share one daemon (the catalog is emptied after each
+  // test); the one that restarts the daemon starts its own.
+  let shared: Harness;
+  beforeAll(async () => {
+    shared = await harness(WORKFLOW_CONFIG);
+  });
+  afterAll(async () => {
+    await shared.close();
+  });
+  afterEach(async () => {
+    for (const tag of await tagsOf(shared)) await shared.call('tag_remove', { tag: tag.name });
+  });
+
   it('is empty at first', async () => {
-    const h = await start();
+    const h = shared;
     expect(await tagsOf(h)).toEqual([]);
   });
 
@@ -83,7 +105,7 @@ describe('tag catalog', () => {
   });
 
   it('rejects a name that is too long, a repeat in another case and an unknown color', async () => {
-    const h = await start();
+    const h = shared;
     await addTag(h, 'auth');
     await expect(addTag(h, 'x'.repeat(31))).rejects.toThrow();
     await expect(addTag(h, ' AUTH ')).rejects.toThrow('tag `auth` already exists');
@@ -92,7 +114,7 @@ describe('tag catalog', () => {
   });
 
   it('gives the third tag the third color of the palette', async () => {
-    const h = await start();
+    const h = shared;
     await addTag(h, 'a');
     await addTag(h, 'b');
     const tags = await addTag(h, 'c');
@@ -100,7 +122,7 @@ describe('tag catalog', () => {
   });
 
   it('renames a tag under the same id and changes the case of a name', async () => {
-    const h = await start();
+    const h = shared;
     const [created] = await addTag(h, 'auth', 'blue');
     const renamed = (await h.call('tag_edit', { tag: 'auth', name: 'login' })) as TagView[];
     expect(renamed).toEqual([{ ...created, name: 'login' }]);

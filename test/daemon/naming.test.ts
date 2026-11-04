@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { RunCreated } from '../../src/protocol/index.ts';
 
-import { MANUAL_CONFIG, harness, startRun, type Harness } from './harness.ts';
+import { settle, MANUAL_CONFIG, harness, startRun, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -82,7 +82,7 @@ describe('run names', () => {
     const second = await create(off);
     await off.waitFor(second, (run) => run.finished);
     // naming starts with the run, before its steps: by the end of the run it would have shown
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(off);
     expect(existsSync(join(h.fakeState, 'oneshots.jsonl'))).toBe(false);
     expect(existsSync(join(off.fakeState, 'oneshots.jsonl'))).toBe(false);
   });

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import type { RunView } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, statuses, until } from './harness.ts';
+import { CODE_ONLY_CONFIG, settle, WORKFLOW_CONFIG, statuses, until } from './harness.ts';
 import { SHORT_TIMEOUT, alive, calls, run, start } from './control-harness.ts';
 
 describe('failures and control', () => {
@@ -106,7 +106,7 @@ describe('failures and control', () => {
   });
 
   it('never runs more than max specialists at once', async () => {
-    const h = await start(WORKFLOW_CONFIG.replace('max: 3', 'max: 2'));
+    const h = await start(CODE_ONLY_CONFIG.replace('max: 3', 'max: 2'));
     h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, 4);
     let peak = 0;
@@ -114,8 +114,7 @@ describe('failures and control', () => {
       view.groups.filter((group) => group.status === 'running').length;
     // two coders hold their places; the other two groups must wait however long they work
     await h.waitFor(runId, (view) => running(view) === 2);
-    // negative check: a short pause is enough for a third start to show
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     expect(running(await h.status(runId))).toBe(2);
     h.open('code');
     const final = await h.waitFor(runId, (view) => {

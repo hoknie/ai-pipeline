@@ -11,7 +11,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { POLL_MS, WORKFLOW_CONFIG } from './harness.ts';
+import { settle, POLL_MS, WORKFLOW_CONFIG } from './harness.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
 
 describe('queue settings', () => {
@@ -244,8 +244,7 @@ describe('autopilot answers', () => {
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
-    // negative check: a short pause is enough for a wrong resume to show
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
   });
 
@@ -279,8 +278,7 @@ describe('autopilot answers', () => {
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const waiting = await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
-    // negative check: a short pause is enough for a wrong resume to show
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await settle(h);
     expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
     expect(waiting.stop).toBeNull();
   });

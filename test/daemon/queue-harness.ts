@@ -1,8 +1,13 @@
 import { afterEach } from 'vitest';
 
 import type { QueueView, RunQueued, RunView } from '../../src/protocol/index.ts';
-import { POLL_MS, WORKFLOW_CONFIG, harness, type Harness } from './harness.ts';
+import { CODE_ONLY_CONFIG, POLL_MS, WORKFLOW_CONFIG, harness, type Harness } from './harness.ts';
 
+// Every queue test starts a daemon of its own on purpose: the fake agent counts the steps of its
+// script per group over the life of the state directory, and the task numbers, the queue stop
+// and the registry of repositories belong to the daemon. A daemon shared by a file would carry
+// them from one test into the next. (Files whose tests only read the daemon share one in
+// `beforeAll`, see the tag catalog.)
 // Shared by the queue test files; importing this module stops the daemon a test left running.
 let current: Harness | null = null;
 
@@ -11,7 +16,7 @@ afterEach(async () => {
   current = null;
 });
 
-export async function start(config = WORKFLOW_CONFIG): Promise<Harness> {
+export async function start(config = CODE_ONLY_CONFIG): Promise<Harness> {
   current = await harness(config);
   return current;
 }

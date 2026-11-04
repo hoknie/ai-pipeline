@@ -9,6 +9,8 @@ import {
 
 import { POLL_MS, harness, startRun, until, type Harness } from './harness.ts';
 
+// Each test needs a fresh daemon: the snapshot, the registry of repositories and the seq of the
+// events are those of one daemon from its start.
 let current: Harness | null = null;
 
 afterEach(async () => {

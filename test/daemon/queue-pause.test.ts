@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { formatQueue, type QueueView, type RunView } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, git, until, type Harness } from './harness.ts';
+import { settle, WORKFLOW_CONFIG, git, until, type Harness } from './harness.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
 const callsOf = (h: Harness): { step: string; group: string }[] =>
@@ -181,7 +181,7 @@ describe('pause a run: scenarios of the queue', () => {
   });
 
   it('lets the current step finish and commit, and starts no next step', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     h.script({
       code: [{ waitFor: h.gate('a'), write: { 'lib.ts': 'export const value = 2;\n' } }],
     });
@@ -198,18 +198,23 @@ describe('pause a run: scenarios of the queue', () => {
       ),
     );
     expect((await h.status(runId)).hold).toBe('paused');
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await settle(h);
     const after = await h.status(runId);
     expect(after.groups[0]!.status).toBe('queued');
     expect((await h.group(runId, slug)).attempts.map((attempt) => attempt.stepId)).toEqual([
       'code',
     ]);
     expect(callsOf(h).filter((call) => call.step === 'review')).toEqual([]);
-    const refs = git(h.repo, 'for-each-ref', '--format=%(refname)', `refs/aip/${runId}/`)
-      .split('\n')
-      .filter(Boolean);
-    expect(refs.length).toBeGreaterThan(0);
-    const committed = refs.map((ref) => git(h.repo, 'show', `${ref}:lib.ts`));
+    const committedValues = () =>
+      git(h.repo, 'for-each-ref', '--format=%(refname)', `refs/aip/${runId}/`)
+        .split('\n')
+        .filter(Boolean)
+        .map((ref) => git(h.repo, 'show', `${ref}:lib.ts`));
+    // the commit of the finished step follows the end of the attempt
+    await until('the commit of the step', () =>
+      committedValues().includes('export const value = 2;'),
+    );
+    const committed = committedValues();
     expect(committed).toContain('export const value = 2;');
   });
 
@@ -224,7 +229,7 @@ describe('pause a run: scenarios of the queue', () => {
     h.open('a');
     const failed = await h.waitFor(runId, (state) => state.groups[0]!.status === 'failed');
     expect(failed.hold).toBe('paused');
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await settle(h);
     const queue = await queueOf(h);
     expect(queue.status).toBe('running');
     expect(queue.stop).toBeNull();
@@ -236,7 +241,7 @@ describe('pause a run: scenarios of the queue', () => {
   });
 
   it('takes the return item of a paused run by advance and continues its steps', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     h.script({ code: [{ waitFor: h.gate('a') }, { waitFor: h.gate('b') }], review: [{}] });
     await add(h, 'A');
     await add(h, 'B');
@@ -396,6 +401,6 @@ async function waitUntilRuns(h: Awaited<ReturnType<typeof start>>, count: number
     const runs = await allRuns(h);
     if (runs.length >= count) return runs;
     if (Date.now() > deadline) throw new Error('timed out waiting for the next run');
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await settle(h);
   }
 }

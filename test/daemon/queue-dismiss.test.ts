@@ -10,6 +10,8 @@ import {
 } from '../../src/protocol/index.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
+// Each test needs a daemon of its own: the fake agent counts its script steps per group over the
+// life of the state directory, and a skipped run needs the first step to be the failing one.
 describe('dismiss a skipped run', () => {
   async function skippedRun() {
     const h = await start();

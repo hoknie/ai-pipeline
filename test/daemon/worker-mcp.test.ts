@@ -44,7 +44,7 @@ const textOf = (entry: ToolResult | undefined) => entry?.result.content[0]?.text
 
 describe('the worker MCP server through a real agent', () => {
   it('is only used when the agent asks for it', async () => {
-    const h = await start();
+    const h = await start(WORKFLOW_CONFIG);
     h.script({ code: [{ realWorker: true }], review: [{}] });
     const created = (await startRun(h, {
       repository: h.repo,
