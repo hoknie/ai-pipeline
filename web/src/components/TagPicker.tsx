@@ -105,7 +105,7 @@ export function TagPicker({
           if (!next) setQuery('');
         }}
       >
-        <div className="flex min-h-8 w-fit max-w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5">
+        <div className="flex min-h-9.5 w-fit max-w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5">
           {chips
             ? chosen.map((tag) => (
                 <span key={tag.id} className="inline-flex items-center gap-0.5">

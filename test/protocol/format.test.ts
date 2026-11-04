@@ -15,6 +15,7 @@ import {
   queueView,
   runView,
   waitNote,
+  workflowLabel,
 } from '../../src/protocol/index.ts';
 import {
   addItem,
@@ -847,5 +848,24 @@ describe('skipped steps in text', () => {
       },
     ];
     expect(formatRun(view, 1000)).toContain('Skipped steps: Ревьюер (review), Ревьюер (review-2)');
+  });
+});
+
+describe('name of the workflow in text', () => {
+  const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n');
+
+  it('prints «name (id)» in the run header, and the id alone without a name', () => {
+    expect(formatRun(runView(run(1, { configText: named }), 1000), 1000)).toContain(
+      'Новая функция (feature) ·',
+    );
+    expect(formatRun(runView(run(1), 1000), 1000)).toContain(' · feature · ');
+  });
+
+  it('prints «name (id)» in the run list and in the queue lines', () => {
+    expect(workflowLabel('feature', 'Новая функция')).toBe('Новая функция (feature)');
+    expect(workflowLabel('feature', 'feature')).toBe('feature');
+    expect(formatRunList([runView(run(1, { configText: named }), 1000)])).toContain(
+      'Новая функция (feature)',
+    );
   });
 });

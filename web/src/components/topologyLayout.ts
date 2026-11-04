@@ -258,7 +258,11 @@ export function layout(
       detail: [
         t('topology.splitDetail', { n: workflow.split.maxGroups }),
         ...(workflow.split.workflow
-          ? [t('topology.splitWorkflow', { id: workflow.split.workflow })]
+          ? [
+              t('topology.splitWorkflow', {
+                id: workflow.split.workflowName ?? workflow.split.workflow,
+              }),
+            ]
           : []),
       ].join(' · '),
       groups: live.splitting,

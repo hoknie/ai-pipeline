@@ -370,6 +370,7 @@ Loops and here-documents cannot be allowed by a pattern; for them the output say
 The file `aip/workflows/feature.yaml` (the id `feature` is the file name):
 
 ```yaml
+name: New feature                            # optional display name
 split:                                       # optional
   specialist: plan
   max_groups: 5
@@ -383,6 +384,7 @@ steps:
     additional_prompt: Check only the tests and the error handling.
 ```
 
+- `name` is the display name of the workflow: the panel shows it instead of the id (the id stays in the tooltip), and `aip run list`, `aip run show` and the queue print `<name> (<id>)`. It is optional; without it the id is shown. Surrounding spaces are dropped, an empty name is an error. The panel calls a workflow a "Pipeline"; in the files and in the CLI it stays a workflow.
 - `additional_prompt` on a step (and on `split` for the split specialist) is appended as a separate paragraph after the specialist's prompt with the task filled in, and before the `aip` service instructions.
   - One specialist behaves differently in different steps without copies: for example, a reviewer checks only the tests in one step.
   - The text is taken as is: `%s` and `%%` are not substituted in it.

@@ -362,7 +362,7 @@ export function QueueList({
                 <span className="font-mono text-xs text-muted-foreground">
                   {taskNumber(item.number)}
                 </span>
-                <WorkflowBadge id={item.workflow} />
+                <WorkflowBadge id={item.workflow} name={item.workflowName} />
                 <span className="min-w-0 flex-1 truncate" title={itemLabel(item, t)}>
                   {itemLabel(item, t)}
                 </span>

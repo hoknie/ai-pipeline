@@ -81,6 +81,8 @@ export {
   findSpecialist,
   findWorkflow,
   groupWorkflow,
+  workflowName,
+  workflowNameOf,
   isValidSlug,
   SLUG_PATTERN_TEXT,
   stepIndex,

@@ -26,7 +26,7 @@ export function RunSummary({ run, now }: { run: RunView; now: number }) {
     {
       key: 'type',
       label: t('runs.header.summary.type'),
-      value: <WorkflowBadge id={run.workflow} />,
+      value: <WorkflowBadge id={run.workflow} name={run.workflowName} />,
     },
   ];
   return (

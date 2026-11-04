@@ -88,6 +88,8 @@ export interface Split {
 
 export interface Workflow {
   id: string;
+  /** Display name; null: the id is shown. */
+  name: string | null;
   split: Split | null;
   steps: Step[];
 }
@@ -244,6 +246,17 @@ export function findSpecialist(config: ResolvedConfig, slug: string): Specialist
 
 export function findWorkflow(config: ResolvedConfig, id: string): Workflow | undefined {
   return config.workflows.find((workflow) => workflow.id === id);
+}
+
+/** Display name of a workflow: `name`, else the id. Tolerates snapshots saved before the field existed. */
+export function workflowName(workflow: Workflow): string {
+  return workflow.name ?? workflow.id;
+}
+
+/** Display name of the workflow `id`; the id itself when there is no such workflow. */
+export function workflowNameOf(config: ResolvedConfig, id: string): string {
+  const found = findWorkflow(config, id);
+  return found ? workflowName(found) : id;
 }
 
 /** The workflow whose steps the groups of `workflow` follow. */

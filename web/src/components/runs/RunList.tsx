@@ -128,7 +128,7 @@ export function RunList({
                         {repositoryLabel(run.repository)}
                       </span>
                     ) : null}
-                    <WorkflowBadge id={run.workflow} focusable={false} />
+                    <WorkflowBadge id={run.workflow} name={run.workflowName} focusable={false} />
                     <TagChips tags={run.tags ?? []} nested />
                   </span>
                   <span className="grid grid-cols-2 items-center gap-2 text-xs text-muted-foreground">

@@ -1,3 +1,4 @@
+name: Feature
 steps:
   - id: plan
     specialist: plan

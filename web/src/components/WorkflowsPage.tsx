@@ -15,6 +15,7 @@ import type { ConfigEditorResponse, RunView } from '../types.ts';
 import { ConfigErrors, EntryList, SplitPage } from './EntryList.tsx';
 import { LEVEL_KEYS, NEW_ID } from './SpecialistsPage.tsx';
 import { WorkflowForm } from './WorkflowForm.tsx';
+import { rawName } from './workflowName.ts';
 
 export default function WorkflowsPage({
   api,
@@ -87,12 +88,13 @@ export default function WorkflowsPage({
             {t('workflows.new')}
           </Button>
           <EntryList
-            label="workflow"
+            label="pipeline"
             selected={selected}
             onSelect={(id) => void go(id)}
             entries={(view?.workflows ?? []).map((entry) => ({
               id: entry.id,
-              title: entry.id,
+              title: rawName(entry.raw) ?? entry.id,
+              hint: entry.id,
               tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
             }))}
           />

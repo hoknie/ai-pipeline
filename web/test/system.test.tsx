@@ -216,7 +216,7 @@ describe('opening a split from the topology', () => {
   it('opens the runs section with the split screen', async () => {
     const workflow = workflowOf({
       id: 'feature',
-      split: { specialist: 'plan', maxGroups: 3, workflow: null },
+      split: { specialist: 'plan', maxGroups: 3, workflow: null, workflowName: null },
     });
     const run = runView({
       split: { status: 'running', wait: null, question: null, questions: null, reason: null },

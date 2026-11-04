@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { DeliveryMode } from '../config/index.ts';
+import { workflowNameOf, type DeliveryMode } from '../config/index.ts';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
   allGroups,
@@ -209,6 +209,8 @@ export interface RunView {
   name: string | null;
   repository: string;
   workflow: string;
+  /** Display name of the workflow in the configuration of the run. */
+  workflowName: string;
   branch: string;
   createdAt: number;
   /** When the first attempt of any group started; null while the run waits for a free slot. */
@@ -523,6 +525,7 @@ export function runView(
     name: state.run.name ?? null,
     repository: state.run.repository,
     workflow: state.run.workflow,
+    workflowName: workflowNameOf(state.run.config, state.run.workflow),
     branch: state.run.branch,
     createdAt: state.run.createdAt,
     startedAt: runStartedAt(state),
@@ -752,6 +755,8 @@ export interface QueueItemView {
   number: number;
   position: number;
   workflow: string;
+  /** Display name of the workflow in the current configuration. */
+  workflowName: string;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -794,6 +799,7 @@ export interface QueueRunView {
   title: string;
   state: RunPhase;
   workflow: string;
+  workflowName: string;
   tags: TagView[];
   createdAt: number;
   /** Work groups in a final status out of all work groups; `total` is 0 while the task is split. */
@@ -866,6 +872,7 @@ function queueRunView(
     title: runTitle(state),
     state: summarize(state).state,
     workflow: state.run.workflow,
+    workflowName: workflowNameOf(state.run.config, state.run.workflow),
     tags: tagViews(catalog, state.run.tags),
     createdAt: state.run.createdAt,
     groups: {
@@ -940,6 +947,7 @@ export function queueView(
   catalog: readonly Tag[] = [],
   deliveryMode: DeliveryMode | null = null,
   waits: WaitLookup = NO_WAITS,
+  names: (id: string) => string = (id) => id,
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -974,6 +982,7 @@ export function queueView(
       number: item.number,
       position: index + 1,
       workflow: item.workflow,
+      workflowName: names(item.workflow),
       ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,

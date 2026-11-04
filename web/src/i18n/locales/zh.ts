@@ -3,7 +3,7 @@ import type { Dictionary } from '../types.ts';
 /*
  * 术语表：run — 运行，group — 分组，step — 步骤，attempt — 尝试，
  * specialist — 专员，queue — 队列，delivery — 交付，merge — 合并。
- * Workflow 和 worktree 保留英文。
+ * Pipeline 和 worktree 保留英文。
  */
 export const zh: Dictionary = {
   common: {
@@ -23,7 +23,7 @@ export const zh: Dictionary = {
     queue: '队列',
     topology: '拓扑',
     specialists: '专员',
-    workflows: 'Workflow',
+    workflows: 'Pipeline',
     settings: '设置',
     sections: '栏目',
     sectionsTitle: '栏目',
@@ -130,7 +130,7 @@ export const zh: Dictionary = {
     run: '运行',
     groups: '分组',
     group: '分组',
-    workflows: 'Workflow',
+    workflows: 'Pipeline',
     specialists: '专员',
     specialist: '专员',
     actions: '操作',
@@ -472,12 +472,13 @@ export const zh: Dictionary = {
       autoDeliverForTask: '仅此任务',
       autoDeliverReset: '恢复为设置值',
       skip: '跳过步骤',
-      skipNoSteps: '该 workflow 没有步骤',
+      skipNoSteps: '该 pipeline 没有步骤',
       deliveryMode: '交付方式',
       deliveryModeBySetting: '方式按设置',
       deliveryModeForTask: '方式仅此任务',
       deliveryModeReset: '方式恢复为设置值',
-      noWorkflow: '没有 workflow',
+      workflow: 'Pipeline',
+      noWorkflow: '没有 pipeline',
       kind: '任务类型',
       task: '任务',
       groups: '分组',
@@ -537,7 +538,7 @@ export const zh: Dictionary = {
     },
   },
   topology: {
-    loading: '正在加载 workflow',
+    loading: '正在加载 pipeline',
     active: '活动：{{n}}',
     noActive: '没有活动的运行',
     edit: '编辑',
@@ -595,7 +596,8 @@ export const zh: Dictionary = {
     none: '没有被占用的专家。',
   },
   workflowBadge: {
-    label: 'Workflow: {{id}}',
+    label: 'Pipeline: {{name}} ({{id}})',
+    labelSame: 'Pipeline: {{id}}',
   },
   tags: {
     remove: '移除标签 {{name}}',
@@ -697,17 +699,18 @@ export const zh: Dictionary = {
     },
   },
   workflows: {
-    new: '新建 workflow',
+    name: '名称',
+    new: '新建 pipeline',
     saved: '已保存。更改对新的运行生效；进行中的运行继续使用各自的快照。',
-    savedToast: 'Workflow 已保存',
-    deletedToast: 'Workflow「{{id}}」已删除',
-    empty: '请在左侧选择 workflow',
-    section: 'workflow {{id}}',
+    savedToast: 'Pipeline 已保存',
+    deletedToast: 'Pipeline「{{id}}」已删除',
+    empty: '请在左侧选择 pipeline',
+    section: 'pipeline {{id}}',
     newName: '新建',
-    rereadTitle: '重新读取 workflow？',
-    reread: '重新读取 workflow',
+    rereadTitle: '重新读取 pipeline？',
+    reread: '重新读取 pipeline',
     runningRuns: ' 进行中的运行：{{count}}；它们会继续使用各自的快照。',
-    tabs: 'workflow 栏目',
+    tabs: 'pipeline 栏目',
     form: '表单',
     preview: '预览',
     previewLabel: '预览',
@@ -839,7 +842,7 @@ export const zh: Dictionary = {
       tags: '标签',
     },
     about: {
-      general: '限制、运行的工作副本和运行命名；专家和 workflow 的错误也显示在这里。',
+      general: '限制、运行的工作副本和运行命名；专家和 pipeline 的错误也显示在这里。',
       agents: '未指定自己值的专家得到什么，以及如何启动 Claude 代理。',
       delivery: '运行结果去向、如何提交以及谁来解决冲突。',
       runtimes: '代理 CLI 的命令、参数和环境变量。变量的值从不显示。',

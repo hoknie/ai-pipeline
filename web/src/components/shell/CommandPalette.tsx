@@ -19,6 +19,7 @@ import {
 } from '../../ui/command.tsx';
 import { orderGroups } from '../order.ts';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
+import { rawName } from '../workflowName.ts';
 
 interface Entries {
   workflows: EditorWorkflow[];
@@ -95,7 +96,7 @@ export function CommandPalette({
           {sorted.map((run) => (
             <CommandItem
               key={run.id}
-              value={`${t('palette.run')} ${taskNumber(run.number)} ${runTitle(run)} ${run.id}`}
+              value={`${t('palette.run')} ${taskNumber(run.number)} ${runTitle(run)} ${run.id} ${run.workflowName} ${run.workflow}`}
               onSelect={() => go({ view: 'runs', run: run.id, group: null, step: null })}
             >
               <span className="truncate">
@@ -105,7 +106,7 @@ export function CommandPalette({
                 {runTitle(run)}
               </span>
               <span className="ml-auto flex items-center gap-2">
-                <WorkflowBadge id={run.workflow} focusable={false} />
+                <WorkflowBadge id={run.workflow} name={run.workflowName} focusable={false} />
                 <span className="text-xs text-muted-foreground">{runStatusLabel(run, t)}</span>
               </span>
             </CommandItem>
@@ -128,15 +129,19 @@ export function CommandPalette({
         ) : null}
         {entries && entries.workflows.length > 0 ? (
           <CommandGroup heading={t('palette.workflows')}>
-            {entries.workflows.map((workflow) => (
-              <CommandItem
-                key={workflow.id}
-                value={`workflow ${workflow.id}`}
-                onSelect={() => go(to('workflows', workflow.id))}
-              >
-                {workflow.id}
-              </CommandItem>
-            ))}
+            {entries.workflows.map((workflow) => {
+              const name = rawName(workflow.raw) ?? workflow.id;
+              return (
+                <CommandItem
+                  key={workflow.id}
+                  value={`${t('palette.workflows')} ${name} ${workflow.id}`}
+                  title={workflow.id}
+                  onSelect={() => go(to('workflows', workflow.id))}
+                >
+                  {name}
+                </CommandItem>
+              );
+            })}
           </CommandGroup>
         ) : null}
         {entries && entries.specialists.length > 0 ? (

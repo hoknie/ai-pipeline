@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../src/ui/select.tsx';
+import { Input } from '../src/ui/input.tsx';
 import { Switch } from '../src/ui/switch.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../src/ui/tabs.tsx';
 import {
@@ -149,5 +150,28 @@ describe('switch', () => {
     expect(w - 2 * p - size).toBe(size);
     expect(thumb.className).toContain('data-[state=checked]:translate-x-full');
     expect(thumb.className).toContain('data-[state=unchecked]:translate-x-0');
+  });
+});
+
+describe('text fields', () => {
+  it('gives text fields and select triggers the height of a picker', () => {
+    render(
+      <>
+        <Input aria-label="plain" />
+        <Select>
+          <SelectTrigger aria-label="pick">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="a">a</SelectItem>
+          </SelectContent>
+        </Select>
+      </>,
+    );
+    for (const name of ['plain', 'pick']) {
+      const element = screen.getByLabelText(name);
+      expect(element.className).toContain('h-9.5');
+      expect(element.className).not.toMatch(/(^|\s)h-8(\s|$)/);
+    }
   });
 });

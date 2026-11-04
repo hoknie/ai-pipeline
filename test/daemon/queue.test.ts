@@ -79,6 +79,26 @@ describe('queue contents', () => {
   });
 });
 
+describe('name of the workflow in the queue', () => {
+  it('takes the name from the current configuration and follows its edits', async () => {
+    const h = await start(
+      WORKFLOW_CONFIG.replace('    feature:\n', '    feature:\n      name: Новая функция\n'),
+    );
+    await add(h, 'A');
+    expect((await queueOf(h)).items[0]).toMatchObject({
+      workflow: 'feature',
+      workflowName: 'Новая функция',
+    });
+    writeConfigDirectory(
+      h.repo,
+      WORKFLOW_CONFIG.replace('    feature:\n', '    feature:\n      name: Другое\n'),
+    );
+    expect((await queueOf(h)).items[0]?.workflowName).toBe('Другое');
+    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('feature:', 'other:'));
+    expect((await queueOf(h)).items[0]?.workflowName).toBe('feature');
+  });
+});
+
 describe('running the queue', () => {
   it('runs one task at a time and gives the next one the delivered result', async () => {
     const h = await start();

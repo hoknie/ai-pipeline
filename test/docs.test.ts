@@ -88,7 +88,7 @@ describe('documentation examples', () => {
   it('the specialist and workflow examples of docs/configuration.md are valid files', () => {
     const blocks = yamlBlocks('docs/configuration.md');
     const plan = blocks.find((block) => block.startsWith('name: Planner')) ?? '';
-    const workflow = blocks.find((block) => block.startsWith('split:')) ?? '';
+    const workflow = blocks.find((block) => block.startsWith('name: New feature')) ?? '';
     const config = configFromFiles({
       specialists: {
         plan,
@@ -98,6 +98,7 @@ describe('documentation examples', () => {
       workflows: { feature: workflow },
     });
     expect(findSpecialist(config, 'plan')).toMatchObject({ max: 1, permissions: 'read' });
+    expect(findWorkflow(config, 'feature')?.name).toBe('New feature');
     expect(findWorkflow(config, 'feature')?.split).toEqual({
       specialist: 'plan',
       maxGroups: 5,

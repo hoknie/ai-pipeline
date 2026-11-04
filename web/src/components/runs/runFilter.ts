@@ -40,6 +40,7 @@ function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
     runTitle(run),
     run.name,
     run.workflow,
+    run.workflowName,
     run.id,
     taskNumber(run.number),
     ...run.groups.map((group) => group.title),

@@ -26,7 +26,9 @@ import type {
 
 import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
 import { stepIds } from './stepIds.ts';
+import { formatRoute } from '../route.ts';
 import { WorkflowGraph } from './WorkflowGraph.tsx';
+import { rawName } from './workflowName.ts';
 
 export const PREVIEW_DELAY_MS = 300;
 
@@ -58,6 +60,8 @@ export interface SplitDraft {
 }
 
 export interface Draft {
+  /** Display name; empty: the file has none. */
+  name: string;
   steps: StepDraft[];
   split: SplitDraft | null;
 }
@@ -119,6 +123,7 @@ export function draftOf(raw: Record<string, unknown>): Draft {
   }
   const split = raw.split === undefined ? null : record(raw.split);
   return {
+    name: text(raw.name),
     steps,
     split: split
       ? {
@@ -137,6 +142,7 @@ const asNumber = (value: string): number | string =>
 /** The file content of a draft; the key order of the existing file is kept by the writer. */
 export function valueOf(draft: Draft): Record<string, unknown> {
   const value: Record<string, unknown> = {};
+  if (draft.name.trim() !== '') value.name = draft.name.trim();
   if (draft.split) {
     const split: Record<string, unknown> = { specialist: draft.split.specialist };
     if (draft.split.maxGroups.trim() !== '') split.max_groups = asNumber(draft.split.maxGroups);
@@ -176,6 +182,10 @@ function stepOfError(
   // Errors of the whole list of steps belong to the choice of group steps.
   if (rest === 'steps') return { step: null, split: hasSplit };
   return { step: null, split: rest === 'split' || rest.startsWith('split.') };
+}
+
+function isNameError(path: string, id: string): boolean {
+  return path === `swarm.workflows.${id}.name`;
 }
 
 function fieldLabel(path: string): string {
@@ -405,12 +415,15 @@ export function WorkflowForm({
   );
   const otherErrors = errors.filter((error) => {
     const place = stepOfError(error.path, id, draft.split !== null);
-    return place.step === null && !place.split;
+    return place.step === null && !place.split && !isNameError(error.path, id);
   });
+  const nameErrors = errors.filter((error) => isNameError(error.path, id));
 
   const targets = view.workflows
     .filter((candidate) => candidate.id !== id && !record(record(candidate.raw).split).workflow)
     .map((candidate) => candidate.id);
+  const nameOf = (target: string): string =>
+    rawName(record(view.workflows.find((candidate) => candidate.id === target)?.raw)) ?? target;
   const ownTarget = draft.split?.workflow ?? '';
   if (ownTarget !== '' && !targets.includes(ownTarget)) targets.push(ownTarget);
 
@@ -442,7 +455,9 @@ export function WorkflowForm({
       aria-label={t('workflows.section', { id: id || t('workflows.newName') })}
     >
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{workflow ? workflow.id : t('workflows.new')}</h2>
+        <h2 className="text-lg font-semibold">
+          {workflow ? (rawName(workflow.raw) ?? workflow.id) : t('workflows.new')}
+        </h2>
         {workflow ? <FilePath variant="line" path={source?.file ?? workflow.file} /> : null}
       </div>
       {notice ? <Alert role="status">{notice}</Alert> : null}
@@ -504,6 +519,25 @@ export function WorkflowForm({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="form" className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="field-workflow-name">{t('workflows.name')}</Label>
+            <Input
+              id="field-workflow-name"
+              type="text"
+              value={draft.name}
+              disabled={busy}
+              onChange={(event) => update((current) => ({ ...current, name: event.target.value }))}
+            />
+            {nameErrors.map((error) => (
+              <p
+                className="text-sm text-destructive"
+                role="alert"
+                key={`${error.path}:${error.message}`}
+              >
+                {error.message}
+              </p>
+            ))}
+          </div>
           {!workflow ? (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="field-workflow-id">Id</Label>
@@ -568,7 +602,7 @@ export function WorkflowForm({
                       <SelectItem value={NONE}>{t('workflows.ownSteps')}</SelectItem>
                       {targets.map((target) => (
                         <SelectItem key={target} value={target}>
-                          {target}
+                          {nameOf(target)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -601,9 +635,14 @@ export function WorkflowForm({
               {t('workflows.groupsFollow')}{' '}
               <a
                 className="underline"
-                href={`#workflows/${encodeURIComponent(draft.split.workflow)}`}
+                href={formatRoute({
+                  view: 'workflows',
+                  run: draft.split.workflow,
+                  group: null,
+                  step: null,
+                })}
               >
-                {draft.split.workflow}
+                {nameOf(draft.split.workflow)}
               </a>
             </p>
           ) : (

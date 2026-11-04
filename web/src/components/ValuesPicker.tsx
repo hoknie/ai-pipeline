@@ -116,7 +116,7 @@ export function ValuesPicker({
       }}
     >
       <div
-        className="flex min-h-8 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5 aria-invalid:border-destructive"
+        className="flex min-h-9.5 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5 aria-invalid:border-destructive"
         aria-invalid={invalid}
       >
         {inherited.map((value) => (

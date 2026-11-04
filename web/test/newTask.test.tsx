@@ -36,7 +36,7 @@ describe('new task from the top strip', () => {
     await waitFor(() => expect(document.activeElement?.id).toBe('new-task'));
     expect(window.location.hash).toBe(hash);
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(within(dialog).getByLabelText('Task text'), {
       target: { value: 'Сделать вход' },
@@ -81,6 +81,24 @@ describe('new task from the top strip', () => {
     const again = await screen.findByRole('dialog', { name: 'New task' });
     expect((within(again).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(
       'черновик',
+    );
+  });
+  it('gives every field of the new task dialog the same height', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    const field = within(dialog);
+    expect(field.getByPlaceholderText('Name (optional)').className).toContain('h-9.5');
+    expect(field.getByRole('combobox', { name: 'Pipeline' }).className).toContain('h-9.5');
+    expect(field.getByRole('combobox', { name: 'Delivery mode' }).className).toContain('h-9.5');
+    expect(field.getByRole('combobox', { name: 'Waits for' }).parentElement?.className).toContain(
+      'min-h-9.5',
+    );
+    expect(field.getByRole('combobox', { name: 'Tags' }).parentElement?.className).toContain(
+      'min-h-9.5',
     );
   });
 });

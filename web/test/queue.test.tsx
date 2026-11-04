@@ -471,7 +471,7 @@ describe('workflow badge in the queue', () => {
   it('stands right after the state badge on the card, not in the time row', async () => {
     show(queueOf({ status: 'running', runs: [queueRun('run1', { title: 'Вход' })] }));
     const card = await screen.findByRole('group', { name: 'Вход' });
-    const badge = within(card).getByLabelText('Workflow: feature');
+    const badge = within(card).getByLabelText('Pipeline: feature');
     const state = within(card).getByText('Active').closest('span')!.parentElement!;
     expect(state.nextElementSibling).toBe(badge);
     expect(badge.parentElement).toBe(state.parentElement);
@@ -482,7 +482,7 @@ describe('workflow badge in the queue', () => {
   it('shows the badge in the row of a waiting task', async () => {
     show(queueOf({ items: [queueItem('q1', 'A', 1, { workflow: 'epic', readiness: 'waiting' })] }));
     const row = await screen.findByRole('listitem', { name: /A/ });
-    expect(within(row).getByLabelText('Workflow: epic')).toBeTruthy();
+    expect(within(row).getByLabelText('Pipeline: epic')).toBeTruthy();
   });
 });
 
@@ -517,7 +517,7 @@ describe('new task form', () => {
     const text = await screen.findByLabelText('Task text');
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     expect(add.disabled).toBe(true);
     fireEvent.change(text, { target: { value: 'Сделать вход' } });
@@ -541,7 +541,7 @@ describe('new task form', () => {
     });
     await openNewTask();
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(await screen.findByLabelText('Task text'), {
       target: { value: 'Сделать вход' },
@@ -556,7 +556,7 @@ describe('new task form', () => {
     });
     await openNewTask();
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -571,7 +571,7 @@ describe('new task form', () => {
     });
     await openNewTask();
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -629,7 +629,7 @@ describe('new task form', () => {
     await openNewTask();
     const text = await screen.findByLabelText('Task text');
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(text, { target: { value: 'Сделать вход' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -643,7 +643,7 @@ describe('new task form', () => {
     await openNewTask();
     const text = await screen.findByLabelText('Task text');
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(text, { target: { value: 'черновик' } });
     act(() => {
@@ -692,7 +692,7 @@ describe('automatic delivery switch', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText('as in the settings')).toBeTruthy();
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(text, { target: { value: 'Сделать вход' } });
     fireEvent.click(toggle);
@@ -1155,18 +1155,18 @@ describe('workflows', () => {
         workflowsView({
           workflows: [
             { ...workflowsView().workflows[0]!, id: 'feature' },
-            { ...workflowsView().workflows[0]!, id: 'fix' },
+            { ...workflowsView().workflows[0]!, id: 'fix', name: 'Исправление' },
           ],
         }),
       ),
     });
     await openNewTask();
-    const trigger = await screen.findByRole('combobox', { name: 'Workflow' });
+    const trigger = await screen.findByRole('combobox', { name: 'Pipeline' });
     fireEvent.keyDown(trigger, { key: 'Enter' });
-    await screen.findByRole('option', { name: 'fix' });
+    await screen.findByRole('option', { name: 'Исправление' });
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
       'feature',
-      'fix',
+      'Исправление',
     ]);
   });
 });
@@ -1211,7 +1211,7 @@ describe('tags in the queue', () => {
     await openNewTask();
     const text = await screen.findByLabelText('Task text');
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(text, { target: { value: 'Сделать вход' } });
     await pick('auth', 'v2');
@@ -1397,7 +1397,7 @@ describe('task form layout', () => {
     show(queueOf());
     await openNewTask();
     const name = await screen.findByLabelText('Name');
-    const workflow = screen.getByRole('combobox', { name: 'Workflow' });
+    const workflow = screen.getByRole('combobox', { name: 'Pipeline' });
     expect(name.compareDocumentPosition(workflow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(name.id).toBe('new-title');
   });
@@ -1605,7 +1605,7 @@ describe('dependencies in the list', () => {
     expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
     expect(
       [...li.querySelectorAll('[data-state]')].filter(
-        (node) => !node.matches('[aria-label^="Workflow"]') && !node.closest('[role="switch"]'),
+        (node) => !node.matches('[aria-label^="Pipeline"]') && !node.closest('[role="switch"]'),
       ),
     ).toEqual([]);
     expect(li.className).not.toContain('border-destructive');
@@ -1931,7 +1931,7 @@ describe('delivery mode of a task', () => {
     expect(select.textContent).toBe('In the working tree');
     expect(screen.getByText('mode as in the settings')).toBeTruthy();
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(text, { target: { value: 'Сделать вход' } });
     fireEvent.keyDown(select, { key: 'Enter' });
@@ -2132,7 +2132,7 @@ describe('new task dialog', () => {
     await openNewTask();
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'X' } });
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Workflow' }).textContent).toBe('feature'),
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/unknown workflow/);
@@ -2165,7 +2165,7 @@ describe('two halves of the task form', () => {
     await skipStepAsync('plan');
     const order = [
       screen.getByLabelText('Name'),
-      screen.getByRole('combobox', { name: 'Workflow' }),
+      screen.getByRole('combobox', { name: 'Pipeline' }),
       screen.getByLabelText('Task text'),
       screen.getByRole('combobox', { name: 'Waits for' }),
       screen.getByRole('combobox', { name: 'Tags' }),
@@ -2225,7 +2225,7 @@ describe('two halves of the task form', () => {
     const api = show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
     await openNewTask();
     fireEvent.click(await skipStepAsync('qa'));
-    fireEvent.click(screen.getByRole('combobox', { name: 'Workflow' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
     fireEvent.click(await screen.findByRole('option', { name: 'small' }));
     await waitFor(() => expect(within(skipGroup()).getAllByRole('button')).toHaveLength(2));
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });

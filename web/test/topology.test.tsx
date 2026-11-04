@@ -142,7 +142,7 @@ describe('topology page', () => {
       workflows: [
         workflowOf({
           id: 'epic',
-          split: { specialist: 'plan', maxGroups: 3, workflow: 'explore' },
+          split: { specialist: 'plan', maxGroups: 3, workflow: 'explore', workflowName: 'explore' },
           steps: workflowOf().steps.map((step) => ({ ...step, id: `explore-${step.id}` })),
         }),
       ],
@@ -166,7 +166,10 @@ describe('topology page', () => {
     const workflows = workflowsView({
       workflows: [
         workflowOf(),
-        workflowOf({ id: 'epic', split: { specialist: 'plan', maxGroups: 3, workflow: null } }),
+        workflowOf({
+          id: 'epic',
+          split: { specialist: 'plan', maxGroups: 3, workflow: null, workflowName: null },
+        }),
       ],
     });
     const { view, select } = page(
@@ -176,7 +179,7 @@ describe('topology page', () => {
       ],
       workflows,
     );
-    const list = await screen.findByRole('list', { name: 'workflow' });
+    const list = await screen.findByRole('list', { name: 'pipeline' });
     expect(
       within(list)
         .getAllByRole('button')
@@ -261,8 +264,8 @@ describe('edit link', () => {
     window.location.hash = '#topology/feature';
     render(<App api={fakeApi()} openStream={openFake} />);
     fireEvent.click(await screen.findByRole('link', { name: 'Edit' }));
-    expect(window.location.hash).toBe('#workflows/feature');
-    expect(screen.getByRole('link', { name: 'Workflow' }).getAttribute('aria-current')).toBe(
+    expect(window.location.hash).toBe('#pipelines/feature');
+    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
       'page',
     );
   });
@@ -630,7 +633,7 @@ describe('wide window', () => {
         onOpenGroup={() => undefined}
       />,
     );
-    await screen.findByLabelText(/^workflow /);
+    await screen.findByLabelText(/^pipeline /);
     for (const element of container.querySelectorAll('div, section'))
       expect(element.className).not.toMatch(/(^|\s)(max-w-(?!full)\S+|mx-auto)/);
     const grid = container.querySelector('[class*="lg:grid-cols-[minmax(0,1fr)_18rem]"]');

@@ -99,7 +99,7 @@ const SPECIALIST_KEYS = [
   'max',
   'queue',
 ];
-const WORKFLOW_KEYS = ['split', 'steps'];
+const WORKFLOW_KEYS = ['name', 'split', 'steps'];
 const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt'];
 const ON_REJECT_KEYS = ['goto', 'max_rounds'];
 
@@ -537,6 +537,7 @@ class Validator {
     const mapping = this.mapping(value, path);
     if (!mapping) return null;
     this.entries(mapping, path, WORKFLOW_KEYS);
+    const name = 'name' in mapping ? this.string(mapping.name, join(path, 'name')) : null;
     const split = 'split' in mapping ? this.split(mapping.split, join(path, 'split'), known) : null;
     const stepsPath = join(path, 'steps');
     if (split?.workflow) {
@@ -544,7 +545,7 @@ class Validator {
         this.error(stepsPath, 'must not be set together with `split.workflow`');
         return null;
       }
-      return { id, split, steps: [] };
+      return { id, name: name?.trim() ?? null, split, steps: [] };
     }
     if (!('steps' in mapping)) {
       this.error(stepsPath, 'is required');
@@ -572,7 +573,7 @@ class Validator {
       if (target === -1) this.error(gotoPath, `unknown step \`${step.onReject.goto}\``);
       else if (target >= index) this.error(gotoPath, 'must point to an earlier step');
     });
-    return { id, split, steps };
+    return { id, name: name?.trim() ?? null, split, steps };
   }
 
   split(value: unknown, path: string, known: string[]): Split | null {

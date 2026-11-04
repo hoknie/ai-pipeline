@@ -19,6 +19,7 @@ import {
   loadConfig,
   planSettings,
   socketPath,
+  workflowNameOf,
   type DeliveryMode,
 } from '../config/index.ts';
 import {
@@ -370,19 +371,25 @@ export class Daemon {
       this.catalog,
       delivery.mode,
       this.waitLookup,
+      delivery.names,
     );
   }
 
-  /** `delivery.auto` and `delivery.mode` of the repository now; null when its configuration cannot be loaded. */
+  /** `delivery.auto`, `delivery.mode` and workflow names of the repository now; null when its configuration cannot be loaded. */
   private deliverySettings(repository: string): {
     auto: boolean | null;
     mode: DeliveryMode | null;
+    names: (id: string) => string;
   } {
     try {
-      const { delivery } = loadConfig(this.configPathsOf(repository));
-      return { auto: delivery.auto, mode: delivery.mode };
+      const config = loadConfig(this.configPathsOf(repository));
+      return {
+        auto: config.delivery.auto,
+        mode: config.delivery.mode,
+        names: (id) => workflowNameOf(config, id),
+      };
     } catch (error) {
-      if (error instanceof ConfigLoadError) return { auto: null, mode: null };
+      if (error instanceof ConfigLoadError) return { auto: null, mode: null, names: (id) => id };
       throw error;
     }
   }

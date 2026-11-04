@@ -70,7 +70,7 @@ describe('top navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Runs', 'Queue', 'Topology', 'Specialists', 'Workflow', 'Settings']);
+    ).toEqual(['Runs', 'Queue', 'Topology', 'Specialists', 'Pipeline', 'Settings']);
     expect(within(bar!).getByText('web')).toBeTruthy();
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])
@@ -105,7 +105,7 @@ describe('top navigation', () => {
   it('navigates by the section links', () => {
     const onNavigate = vi.fn();
     mount({ onNavigate });
-    fireEvent.click(screen.getByRole('link', { name: 'Workflow' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
     expect(onNavigate).toHaveBeenCalledWith('workflows');
   });
 

@@ -277,7 +277,7 @@ describe('repository selector', () => {
     const calls = (base as Api & { calls: [string, string | null][] }).calls;
     expect(calls).toContainEqual(['config', LIB]);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Workflow' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
     await waitFor(() => expect(calls).toContainEqual(['config', LIB]));
     fireEvent.click(screen.getByRole('link', { name: 'Topology' }));
     await waitFor(() => expect(calls).toContainEqual(['workflows', LIB]));

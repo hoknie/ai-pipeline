@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api.ts';
+import { formatRoute } from '../route.ts';
 import type { RunView, WorkflowsView } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
@@ -77,7 +78,7 @@ export default function TopologyPage({
             </div>
           ) : null}
           <EntryList
-            label="workflow"
+            label="pipeline"
             selected={workflow?.id ?? null}
             onSelect={(id) => {
               setSelected(null);
@@ -85,7 +86,8 @@ export default function TopologyPage({
             }}
             entries={(view?.workflows ?? []).map((candidate) => ({
               id: candidate.id,
-              title: candidate.id,
+              title: candidate.name,
+              hint: candidate.id,
               subtitle: candidate.steps.map((step) => step.name).join(' → '),
               extra: counts.get(candidate.id) ? (
                 <StatusBadge
@@ -104,14 +106,21 @@ export default function TopologyPage({
         {failure ? <Alert variant="destructive">{failure}</Alert> : null}
         {view ? <ConfigErrors errors={view.errors} /> : null}
         {workflow && live ? (
-          <section aria-label={`workflow ${workflow.id}`} className="flex flex-col gap-3">
+          <section aria-label={`pipeline ${workflow.id}`} className="flex flex-col gap-3">
             <header className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold">{workflow.id}</h2>
+                <h2 className="text-lg font-semibold" title={workflow.id}>
+                  {workflow.name}
+                </h2>
                 {onEditWorkflow ? (
                   <Button variant="link" size="sm" asChild>
                     <a
-                      href={`#workflows/${encodeURIComponent(workflow.id)}`}
+                      href={formatRoute({
+                        view: 'workflows',
+                        run: workflow.id,
+                        group: null,
+                        step: null,
+                      })}
                       onClick={(event) => {
                         event.preventDefault();
                         onEditWorkflow(workflow.id);

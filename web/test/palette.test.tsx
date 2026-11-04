@@ -38,7 +38,7 @@ describe('workflow badge in the palette', () => {
   it('shows the badge on a run item', async () => {
     mount([runView({ id: 'a', title: 'First run', workflow: 'feature' })]);
     openPalette();
-    const badge = (await screen.findAllByLabelText('Workflow: feature')).find((node) =>
+    const badge = (await screen.findAllByLabelText('Pipeline: feature')).find((node) =>
       node.closest('[cmdk-item]'),
     )!;
     expect(badge.closest('[cmdk-item]')).toBeTruthy();
@@ -141,6 +141,31 @@ describe('command palette', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     openPalette();
     expect(api.config).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a pipeline by its name and finds it by the name', async () => {
+    mount([runView()], {
+      config: vi.fn(async () =>
+        configView({
+          workflows: [
+            {
+              id: 'feature',
+              level: 'project',
+              file: '/f',
+              revision: 'r',
+              raw: { name: 'Feature delivery' },
+              sources: { project: { file: '/f', revision: 'r', raw: {} } },
+            },
+          ],
+        }),
+      ),
+    });
+    openPalette();
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByRole('option', { name: 'Feature delivery' })).toBeTruthy();
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'delivery' } });
+    expect(within(dialog).getByRole('option', { name: 'Feature delivery' })).toBeTruthy();
+    expect(within(dialog).queryByRole('option', { name: 'feature' })).toBeNull();
   });
 
   it('opens the shortcuts with «?»', async () => {

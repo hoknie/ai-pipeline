@@ -3,7 +3,7 @@ import type { Dictionary } from '../types.ts';
 /*
  * Глоссарий: run — запуск, group — группа, step — этап, attempt — попытка,
  * specialist — специалист, queue — очередь, delivery — доставка, merge — слияние.
- * Workflow и worktree остаются латиницей.
+ * Pipeline и worktree остаются латиницей.
  */
 export const ru: Dictionary = {
   common: {
@@ -23,7 +23,7 @@ export const ru: Dictionary = {
     queue: 'Очередь',
     topology: 'Топология',
     specialists: 'Специалисты',
-    workflows: 'Workflow',
+    workflows: 'Pipeline',
     settings: 'Настройки',
     sections: 'разделы',
     sectionsTitle: 'Разделы',
@@ -133,7 +133,7 @@ export const ru: Dictionary = {
     run: 'запуск',
     groups: 'Группы',
     group: 'группа',
-    workflows: 'Workflow',
+    workflows: 'Pipeline',
     specialists: 'Специалисты',
     specialist: 'специалист',
     actions: 'Действия',
@@ -485,12 +485,13 @@ export const ru: Dictionary = {
       autoDeliverForTask: 'для этой задачи',
       autoDeliverReset: 'как в настройке',
       skip: 'Пропустить этапы',
-      skipNoSteps: 'У workflow нет этапов',
+      skipNoSteps: 'У pipeline нет этапов',
       deliveryMode: 'Способ доставки',
       deliveryModeBySetting: 'способ по настройке',
       deliveryModeForTask: 'способ для этой задачи',
       deliveryModeReset: 'способ как в настройке',
-      noWorkflow: 'нет workflow',
+      workflow: 'Pipeline',
+      noWorkflow: 'нет pipeline',
       kind: 'вид задачи',
       task: 'Задача',
       groups: 'Группы',
@@ -552,7 +553,7 @@ export const ru: Dictionary = {
     },
   },
   topology: {
-    loading: 'Загружаю workflow',
+    loading: 'Загружаю pipeline',
     active: 'активных: {{n}}',
     noActive: 'нет активных запусков',
     edit: 'Редактировать',
@@ -612,7 +613,8 @@ export const ru: Dictionary = {
     none: 'Нет занятых специалистов.',
   },
   workflowBadge: {
-    label: 'Workflow: {{id}}',
+    label: 'Pipeline: {{name}} ({{id}})',
+    labelSame: 'Pipeline: {{id}}',
   },
   tags: {
     remove: 'Снять тег {{name}}',
@@ -717,18 +719,19 @@ export const ru: Dictionary = {
     },
   },
   workflows: {
-    new: 'Новый workflow',
+    name: 'Название',
+    new: 'Новый pipeline',
     saved:
       'Сохранено. Изменения действуют для новых запусков; идущие запуски работают по своему снимку.',
-    savedToast: 'Workflow сохранён',
-    deletedToast: 'Workflow «{{id}}» удалён',
-    empty: 'Выберите workflow слева',
-    section: 'workflow {{id}}',
+    savedToast: 'Pipeline сохранён',
+    deletedToast: 'Pipeline «{{id}}» удалён',
+    empty: 'Выберите pipeline слева',
+    section: 'pipeline {{id}}',
     newName: 'новый',
-    rereadTitle: 'Перечитать workflow?',
-    reread: 'Перечитать workflow',
+    rereadTitle: 'Перечитать pipeline?',
+    reread: 'Перечитать pipeline',
     runningRuns: ' Идущих запусков: {{count}}; они продолжат работу по своему снимку.',
-    tabs: 'разделы workflow',
+    tabs: 'разделы pipeline',
     form: 'Форма',
     preview: 'Превью',
     previewLabel: 'превью',
@@ -861,7 +864,7 @@ export const ru: Dictionary = {
     },
     about: {
       general:
-        'Лимиты, рабочая копия запуска и именование запусков; здесь же ошибки специалистов и workflow.',
+        'Лимиты, рабочая копия запуска и именование запусков; здесь же ошибки специалистов и pipeline.',
       agents:
         'Что получает специалист, не назвавший своего значения, и как запускается агент Claude.',
       delivery: 'Куда попадает результат запуска, как он коммитится и кто разбирает конфликты.',

@@ -26,6 +26,7 @@ const VIEW: QueueView & { item: string } = {
       number: 1,
       position: 1,
       workflow: 'feature',
+      workflowName: 'feature',
       task: 'Сделать вход',
       groups: null,
       title: null,

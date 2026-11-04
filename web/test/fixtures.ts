@@ -123,6 +123,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     name: null,
     repository: '/repo',
     workflow: 'feature',
+    workflowName: overrides.workflow ?? 'feature',
     branch: 'refs/aip/run1/run',
     createdAt: 1_000,
     startedAt: 1_000,
@@ -217,6 +218,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
 export function workflowOf(overrides: Partial<WorkflowTopology> = {}): WorkflowTopology {
   return {
     id: 'feature',
+    name: overrides.id ?? 'feature',
     split: null,
     steps: topologyOf().steps.map(
       ({ groups: _g, attempts: _a, rejections: _r, usage: _u, skipped: _s, ...step }) => step,
@@ -249,6 +251,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     title: id,
     state: 'active',
     workflow: 'feature',
+    workflowName: overrides.workflow ?? 'feature',
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
@@ -350,6 +353,7 @@ export function queueItem(
     number: position,
     position,
     workflow: 'feature',
+    workflowName: extra.workflow ?? 'feature',
     task,
     groups: null,
     title: null,

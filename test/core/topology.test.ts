@@ -145,7 +145,12 @@ describe('topology of a workflow that splits into another', () => {
 
   it('shows the steps of the target and the link', () => {
     const view = workflowTopology(config(text), 'feature');
-    expect(view?.split).toEqual({ specialist: 'plan', maxGroups: 5, workflow: 'explore' });
+    expect(view?.split).toEqual({
+      specialist: 'plan',
+      maxGroups: 5,
+      workflow: 'explore',
+      workflowName: 'explore',
+    });
     expect(view?.steps.map((entry) => entry.id)).toEqual(['research', 'write']);
   });
 
@@ -226,5 +231,25 @@ describe('human names of steps', () => {
     expect(
       attemptStepLabel(state, group, { ...attempt, stepId: 'gone', specialist: 'nobody' }),
     ).toBe('gone');
+  });
+});
+
+describe('name of a workflow in the topology', () => {
+  const named = `${CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n')}    epic:\n      split: { specialist: plan, workflow: feature }\n`;
+
+  it('carries the name, or the id without one, and the name of the split target', () => {
+    const topologies = workflowTopologies(config(named));
+    const feature = topologies.find((entry) => entry.id === 'feature')!;
+    expect(feature.name).toBe('Новая функция');
+    const epic = topologies.find((entry) => entry.id === 'epic')!;
+    expect(epic.name).toBe('epic');
+    expect(epic.split?.workflowName).toBe('Новая функция');
+    expect(workflowTopology(config(), 'feature')?.name).toBe('feature');
+  });
+
+  it('takes the name of the split target from the snapshot of the run', () => {
+    const state = run(1, { configText: named, split: true });
+    state.run.workflow = 'epic';
+    expect(topology(state).split?.workflowName).toBe('Новая функция');
   });
 });

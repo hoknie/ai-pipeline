@@ -234,6 +234,26 @@ describe('cli', () => {
     expect(epic).not.toContain('steps:');
   });
 
+  it('shows the name of a workflow in config check only when it is set', async () => {
+    const box = sandbox(`swarm:
+  specialists:
+    coder: { name: Кодировщик }
+  workflows:
+    feature:
+      name: Новая функция
+      steps:
+        - { id: code, specialist: coder }
+    plain:
+      steps:
+        - { id: code, specialist: coder }
+`);
+    const result = await aip(box, 'config', 'check');
+    expect(result.code).toBe(0);
+    const feature = (result.stdout.split('    feature:')[1] ?? '').split('    plain:')[0] ?? '';
+    expect(feature).toContain('name: Новая функция');
+    expect(result.stdout.split('    plain:')[1] ?? '').not.toContain('name:');
+  });
+
   it('shows max of a specialist in config check only when it is set', async () => {
     const box = sandbox(
       WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),

@@ -5,24 +5,33 @@ import { Badge } from '../ui/badge.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
 
 /**
- * The workflow of a run or a queue task: a neutral outlined rectangular badge with a monospace id,
+ * The pipeline of a run or a queue task: a neutral outlined rectangular badge with its name,
  * unlike the colored rounded status badges and tags. Not interactive; `focusable={false}` inside
  * buttons and command items, where the tooltip is only shown on hover.
  */
-export function WorkflowBadge({ id, focusable = true }: { id: string; focusable?: boolean }) {
+export function WorkflowBadge({
+  id,
+  name,
+  focusable = true,
+}: {
+  id: string;
+  name: string;
+  focusable?: boolean;
+}) {
   const { t } = useTranslation();
-  const label = t('workflowBadge.label', { id });
+  const label =
+    name === id ? t('workflowBadge.labelSame', { id }) : t('workflowBadge.label', { name, id });
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Badge
           variant="outline"
-          className="max-w-40 rounded-md font-mono"
+          className="max-w-40 rounded-md"
           aria-label={label}
           tabIndex={focusable ? 0 : undefined}
         >
           <GitBranch aria-hidden />
-          <span className="min-w-0 truncate">{id}</span>
+          <span className="min-w-0 truncate">{name}</span>
         </Badge>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>

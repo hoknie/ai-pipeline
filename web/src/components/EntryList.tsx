@@ -11,6 +11,8 @@ import type { FieldError } from '../types.ts';
 export interface Entry {
   id: string;
   title: ReactNode;
+  /** Tooltip of the entry, for example the id behind a name. */
+  hint?: string;
   subtitle?: ReactNode;
   /** Small label on the right, for example the level of a file. */
   tag?: string;
@@ -40,6 +42,7 @@ export function EntryList({
               'flex w-full flex-col gap-1 rounded-md border border-transparent px-2.5 py-1.5 text-left text-sm hover:bg-accent',
               entry.id === selected && 'border-border bg-accent',
             )}
+            title={entry.hint}
             onClick={() => onSelect(entry.id)}
           >
             <span className="flex items-center justify-between gap-2">

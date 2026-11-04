@@ -261,7 +261,7 @@ describe('run header', () => {
       title.parentElement!.querySelector('[aria-label^="Active"], [aria-label*="("]'),
     ).toBeTruthy();
     expect(screen.queryByText(/3 files/)).toBeNull();
-    expect(screen.getAllByLabelText('Workflow: feature')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Pipeline: feature')).toHaveLength(1);
   });
 
   it('reports a refused first delivery from the header as "Delivery failed", not "again"', async () => {
@@ -349,7 +349,7 @@ describe('run header', () => {
 describe('workflow badge in runs', () => {
   it('shows the badge in the run list instead of plain text', async () => {
     mount([runView({ id: 'a', title: 'Первый', workflow: 'feature' })]);
-    const badge = await screen.findByLabelText('Workflow: feature');
+    const badge = await screen.findByLabelText('Pipeline: feature');
     expect(badge.closest('button')).toBeTruthy();
     expect(badge.hasAttribute('tabindex')).toBe(false);
     const row = badge.parentElement!;
@@ -361,7 +361,7 @@ describe('workflow badge in runs', () => {
 
   it('shows the badge once in the run header, inside the summary block', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
-    const badge = screen.getByLabelText('Workflow: feature');
+    const badge = screen.getByLabelText('Pipeline: feature');
     expect(badge.hasAttribute('tabindex')).toBe(true);
     expect(badge.closest('aside')).toBe(screen.getByRole('complementary', { name: 'Run summary' }));
   });

@@ -72,6 +72,7 @@ export function presentConfig(config: ResolvedConfig): unknown {
       config.workflows.map((workflow) => [
         workflow.id,
         {
+          ...(workflow.name ? { name: workflow.name } : {}),
           ...(workflow.split
             ? {
                 split: {

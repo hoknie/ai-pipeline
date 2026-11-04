@@ -92,7 +92,7 @@ describe('top bar and connection', () => {
     expect(screen.getByRole('link', { name: /^Runs/ }).getAttribute('aria-current')).toBe('page');
     expect(screen.queryByRole('link', { name: 'Раны' })).toBeNull();
     expect(screen.getByRole('link', { name: /^Queue/ }).getAttribute('href')).toBe('#queue');
-    for (const name of ['Topology', 'Specialists', 'Workflow'])
+    for (const name of ['Topology', 'Specialists', 'Pipeline'])
       expect(screen.getByRole('link', { name })).toBeTruthy();
     act(() => {
       stream().open();

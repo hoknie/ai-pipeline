@@ -784,3 +784,33 @@ describe('frozen runs in views', () => {
     expect(withQueue(frozen, 'q9')).toMatchObject({ state: 'frozen', queueItem: 'q9' });
   });
 });
+
+describe('name of the workflow in views', () => {
+  const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n');
+
+  it('takes the name of a run from its snapshot and the id without a name', () => {
+    expect(runView(run(1, { configText: named }), 1).workflowName).toBe('Новая функция');
+    expect(runView(run(1), 1).workflowName).toBe('feature');
+  });
+
+  it('gives the name to the cards and items of the queue through the lookup', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
+    addItem(queue, { workflow: 'gone', task: 'B' }, 'q2', 2);
+    const working = run(1, { id: 'r', configText: named });
+    queue.runs.push('r');
+    const names = (id: string) => (id === 'feature' ? 'Новая функция' : id);
+    const view = queueView(
+      queue,
+      (id) => (id === 'r' ? working : undefined),
+      null,
+      [],
+      null,
+      undefined,
+      names,
+    );
+    expect(view.items.map((item) => item.workflowName)).toEqual(['Новая функция', 'gone']);
+    expect(view.runs[0]?.workflowName).toBe('Новая функция');
+    expect(queueView(queue, () => undefined).items[0]?.workflowName).toBe('feature');
+  });
+});

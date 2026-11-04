@@ -30,7 +30,7 @@ export function parseRoute(hash: string): Route {
   if (head === 'queue') return { view: 'queue', run: null, group: null, step: null };
   if (head === 'topology')
     return { view: 'topology', run: decode(rest[0]), group: null, step: null };
-  if (head === 'workflows')
+  if (head === 'pipelines' || head === 'workflows')
     return { view: 'workflows', run: decode(rest[0]), group: null, step: null };
   if (head === 'specialists') {
     // the former «General settings» entry of the specialists list
@@ -56,7 +56,7 @@ export function formatRoute(route: Route): string {
     const { scope, group } = route.group === null ? settingsLocationOf(route.run, null) : place;
     return `#settings/${scope}/${group}`;
   }
-  if (route.view === 'workflows') return route.run ? `#workflows/${enc(route.run)}` : '#workflows';
+  if (route.view === 'workflows') return route.run ? `#pipelines/${enc(route.run)}` : '#pipelines';
   if (!route.run) return '#runs';
   const parts = [route.run, route.group, route.group ? route.step : null].filter(
     (part): part is string => part !== null,

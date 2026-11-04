@@ -1,6 +1,6 @@
 # Web panel
 
-The web panel is a page in your browser. In it you follow runs, answer specialists, manage the queue and edit specialists and workflows. For the commands see [cli.md](cli.md), for the settings see [configuration.md](configuration.md).
+The web panel is a page in your browser. In it you follow runs, answer specialists, manage the queue and edit specialists and pipelines (workflows). For the commands see [cli.md](cli.md), for the settings see [configuration.md](configuration.md).
 
 ## Open the panel
 
@@ -47,17 +47,17 @@ The repository picker lists the repositories of the daemon (see [Multiple reposi
 
 - "Add repository…" takes a path inside a git repository, adds its root and selects it.
 - "Remove from list" is in every item except the default repository, the most recently added one. The daemon refuses to remove a repository with unfinished runs or queued tasks.
-- The choice is remembered in the browser. "Queue", "Topology", "Specialists", "Workflow" and the command palette work with the selected repository.
+- The choice is remembered in the browser. "Queue", "Topology", "Specialists", "Pipeline" and the command palette work with the selected repository.
 - Other repositories with runs waiting for an answer get a counter in the list.
 
 ## Sections
 
-The sections are "Runs", "Queue", "Topology", "Specialists", "Workflow" and "Settings". The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. Runs waiting for an answer come first in the list, then the other unfinished runs, then finished ones.
+The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Settings". The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. Runs waiting for an answer come first in the list, then the other unfinished runs, then finished ones.
 
 ### Runs
 
 - Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
-- A run card shows the first line of the task, the status, workflow, time, cost and a summary of changes (`2 files +367 −0`).
+- A run card shows the first line of the task, the status, the name of its pipeline (the id is in the tooltip), time, cost and a summary of changes (`2 files +367 −0`).
 - The action row of the run header has "Deliver", "Return to the queue" and "Steps". The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Deliver with --force…" and "Copy run id".
 - "Retry with current config" is in the run's "More" menu for every failed or cancelled group, and next to "Retry" in the "⋯" menu of a failed or cancelled group or split step.
 - The retried group shows the warning `config refreshed: …` with the changes. A broken configuration refuses the retry with its error. Commit message and resolver steps do not have this button.
@@ -110,7 +110,7 @@ The queue settings are in [queue.md](queue.md).
 - The groups of active runs sit at their current step. A click on a group opens it in "Runs".
 - A node whose specialist has a limit shows "busy N of M · in other runs: K". It is highlighted when the limit is reached.
 - A step node shows "attempts N" and, on a line of its own, the tokens and cost of the active runs: `in/out · $cost`. Until a cost is known only tokens are shown, and "—" when there is no usage.
-- The address `#topology/<workflow>` opens a workflow.
+- The address `#topology/<workflow>` opens a pipeline.
 
 ### Specialists
 
@@ -125,15 +125,16 @@ The tab edits the `aip/specialists/<slug>.yaml` files of the project and of the 
 - Changes apply to new runs. Running runs keep their snapshot.
 - The addresses are `#specialists`, `#specialists/<slug>` and `#specialists/new`.
 
-### Workflow
+### Pipeline
 
 The tab edits the `aip/workflows/<id>.yaml` files of the project and of the shared directory, with the save, delete and level rules of specialists.
 
+- The "Name" field sets the optional `name` of the workflow; lists, badges, the graph and the palette show it instead of the id, and the id stays in the tooltip. Without a name the id is shown.
 - The form lists the steps: id, specialist, the return on rejection with the number of rounds, and the additional prompt. Steps are added, deleted and reordered with buttons.
 - The "Task split" switch turns on the split block.
 - "Preview" shows the graph of the draft without writing. While the draft is invalid, the last valid graph stays with a "stale" mark.
 - Running runs continue from their snapshot after the workflow is deleted. A new run of a deleted workflow is rejected.
-- The addresses are `#workflows`, `#workflows/<id>` and `#workflows/new`.
+- The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`. The older `#workflows…` addresses still open and are replaced with the new ones.
 
 ### Settings
 
@@ -187,7 +188,7 @@ The background processes arrive in the `processes` event of `/api/events`: the d
 
 ## Keyboard and look
 
-- `Cmd+K` on macOS, `Ctrl+K` elsewhere, opens the command palette. It searches sections, runs (those waiting for an answer first), groups of the open run, workflows and specialists, and runs actions such as "New task in the queue".
+- `Cmd+K` on macOS, `Ctrl+K` elsewhere, opens the command palette. It searches sections, runs (those waiting for an answer first), groups of the open run, pipelines and specialists, and runs actions such as "New task in the queue".
 - Outside input fields and dialogs: `j` and `k` move to the next and previous run, `?` shows the shortcuts.
 - Cancelling a run or a group, removing from the queue, leaving an unsaved form and rereading the configuration ask for confirmation. Focus is on the refusal, and `Esc` refuses.
 - Results of actions are notifications. Errors stay until you dismiss them.

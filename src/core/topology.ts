@@ -2,6 +2,8 @@ import {
   findSpecialist,
   findWorkflow,
   groupWorkflow,
+  workflowName,
+  workflowNameOf,
   type OnReject,
   type Permissions,
   type ResolvedConfig,
@@ -52,6 +54,8 @@ export interface Topology {
     specialist: string;
     maxGroups: number;
     workflow: string | null;
+    /** Display name of `workflow`; null without it. */
+    workflowName: string | null;
     status: GroupStatus | 'waiting' | null;
   } | null;
   steps: StepTopology[];
@@ -83,7 +87,14 @@ function brief(group: Group): StepGroup {
 
 export interface WorkflowTopology {
   id: string;
-  split: { specialist: string; maxGroups: number; workflow: string | null } | null;
+  /** Display name: `name` of the workflow, else the id. */
+  name: string;
+  split: {
+    specialist: string;
+    maxGroups: number;
+    workflow: string | null;
+    workflowName: string | null;
+  } | null;
   steps: StepInfo[];
   delivery: { mode: string; resolver: string | null };
   /** `max` of the specialists of the split, the steps and the resolver, by slug. */
@@ -150,15 +161,22 @@ function limitsOf(
   return limits;
 }
 
+function splitTargetName(config: ResolvedConfig, workflow: Workflow): string | null {
+  const target = workflow.split?.workflow ?? null;
+  return target === null ? null : workflowNameOf(config, target);
+}
+
 function shape(config: ResolvedConfig, workflow: Workflow): WorkflowTopology {
   const steps = groupWorkflow(config, workflow).steps;
   return {
     id: workflow.id,
+    name: workflowName(workflow),
     split: workflow.split
       ? {
           specialist: workflow.split.specialist,
           maxGroups: workflow.split.maxGroups,
           workflow: workflow.split.workflow ?? null,
+          workflowName: splitTargetName(config, workflow),
         }
       : null,
     steps: steps.map((step) => stepInfo(config, steps, step)),
@@ -210,6 +228,7 @@ export function topology(state: RunState): Topology {
           specialist: workflow.split.specialist,
           maxGroups: workflow.split.maxGroups,
           workflow: workflow.split.workflow ?? null,
+          workflowName: splitTargetName(config, workflow),
           status: state.split?.status ?? null,
         }
       : null,

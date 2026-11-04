@@ -86,7 +86,7 @@ function RunCard({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={run.state} />
-        <WorkflowBadge id={run.workflow} />
+        <WorkflowBadge id={run.workflow} name={run.workflowName} />
         <TagChips tags={run.tags ?? []} />
         {run.priority ? (
           <Badge variant="run" title={t('queue.priorityHint')}>

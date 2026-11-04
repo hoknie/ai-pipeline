@@ -27,6 +27,7 @@ aip run apply <run-id>            # all ready groups; or: aip run apply <run-id>
 git diff                          # review and commit it yourself
 ```
 
+- A workflow with a `name` is printed as `<name> (<id>)` in `aip run list`, `aip run show` and the queue; without a `name`, as the id. Arguments such as `aip run start <workflow>` still take the id.
 - `aip run show` prints a `System:` line with the system stages in the order split, commit message, resolver and delivery, for example `System: split done · message running · delivery pending`. A failed delivery shows its first reason there, even when no resolver ran.
 - A group that waits for a free specialist or place has the status `waiting`, and the `NOTE` column says what it waits for, for example `waiting for coder`. The `Groups:` line counts them as `waiting N`.
 - The changes are merged with your uncommitted edits. Conflicts, the resolver and `--force` are described in [`delivery`](configuration.md#delivery).

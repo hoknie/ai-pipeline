@@ -16,6 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
 import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
 import { ValuesPicker } from './ValuesPicker.tsx';
+import { rawName } from './workflowName.ts';
 import type {
   CatalogEntry,
   ConfigCatalogResponse,
@@ -135,10 +136,12 @@ function fieldOf(path: string, slug: string): FieldName | null {
   return FIELDS.includes(name) ? name : null;
 }
 
-function describeReference(reference: EntryReference): string {
+function describeReference(reference: EntryReference, view: ConfigEditorResponse): string {
   if (reference.field) return reference.field;
-  if (reference.split) return `${reference.workflow} → split`;
-  return `${reference.workflow} → ${reference.step}`;
+  const entry = view.workflows.find((candidate) => candidate.id === reference.workflow);
+  const workflow = (entry ? rawName(entry.raw) : null) ?? reference.workflow;
+  if (reference.split) return `${workflow} → split`;
+  return `${workflow} → ${reference.step}`;
 }
 
 export function SpecialistForm({
@@ -550,7 +553,7 @@ export function SpecialistForm({
           <p>{t('specialists.usedBy')}</p>
           <ul className="list-disc pl-4">
             {references.map((reference) => (
-              <li key={describeReference(reference)}>{describeReference(reference)}</li>
+              <li key={describeReference(reference, view)}>{describeReference(reference, view)}</li>
             ))}
           </ul>
         </Alert>

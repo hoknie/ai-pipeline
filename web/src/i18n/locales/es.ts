@@ -3,7 +3,7 @@ import type { Dictionary } from '../types.ts';
 /*
  * Glosario: run — ejecución, group — grupo, step — paso, attempt — intento,
  * specialist — especialista, queue — cola, delivery — entrega, merge — fusión.
- * Workflow y worktree se dejan en inglés.
+ * Pipeline y worktree se dejan en inglés.
  */
 export const es: Dictionary = {
   common: {
@@ -23,7 +23,7 @@ export const es: Dictionary = {
     queue: 'Cola',
     topology: 'Topología',
     specialists: 'Especialistas',
-    workflows: 'Workflow',
+    workflows: 'Pipeline',
     settings: 'Ajustes',
     sections: 'secciones',
     sectionsTitle: 'Secciones',
@@ -134,7 +134,7 @@ export const es: Dictionary = {
     run: 'ejecución',
     groups: 'Grupos',
     group: 'grupo',
-    workflows: 'Workflow',
+    workflows: 'Pipeline',
     specialists: 'Especialistas',
     specialist: 'especialista',
     actions: 'Acciones',
@@ -487,12 +487,13 @@ export const es: Dictionary = {
       autoDeliverForTask: 'para esta tarea',
       autoDeliverReset: 'como en la configuración',
       skip: 'Omitir etapas',
-      skipNoSteps: 'El workflow no tiene etapas',
+      skipNoSteps: 'El pipeline no tiene etapas',
       deliveryMode: 'Modo de entrega',
       deliveryModeBySetting: 'modo según la configuración',
       deliveryModeForTask: 'modo para esta tarea',
       deliveryModeReset: 'modo como en la configuración',
-      noWorkflow: 'sin workflow',
+      workflow: 'Pipeline',
+      noWorkflow: 'sin pipeline',
       kind: 'tipo de tarea',
       task: 'Tarea',
       groups: 'Grupos',
@@ -553,7 +554,7 @@ export const es: Dictionary = {
     },
   },
   topology: {
-    loading: 'Cargando los workflows',
+    loading: 'Cargando los pipelines',
     active: 'activas: {{n}}',
     noActive: 'sin ejecuciones activas',
     edit: 'Editar',
@@ -613,7 +614,8 @@ export const es: Dictionary = {
     none: 'No hay especialistas ocupados.',
   },
   workflowBadge: {
-    label: 'Workflow: {{id}}',
+    label: 'Pipeline: {{name}} ({{id}})',
+    labelSame: 'Pipeline: {{id}}',
   },
   tags: {
     remove: 'Quitar la etiqueta {{name}}',
@@ -719,18 +721,19 @@ export const es: Dictionary = {
     },
   },
   workflows: {
-    new: 'Nuevo workflow',
+    name: 'Nombre',
+    new: 'Nuevo pipeline',
     saved:
       'Guardado. Los cambios se aplican a las nuevas ejecuciones; las ejecuciones en curso siguen con su instantánea.',
-    savedToast: 'Workflow guardado',
-    deletedToast: 'Workflow «{{id}}» eliminado',
-    empty: 'Elija un workflow a la izquierda',
-    section: 'workflow {{id}}',
+    savedToast: 'Pipeline guardado',
+    deletedToast: 'Pipeline «{{id}}» eliminado',
+    empty: 'Elija un pipeline a la izquierda',
+    section: 'pipeline {{id}}',
     newName: 'nuevo',
-    rereadTitle: '¿Volver a leer el workflow?',
-    reread: 'Volver a leer el workflow',
+    rereadTitle: '¿Volver a leer el pipeline?',
+    reread: 'Volver a leer el pipeline',
     runningRuns: ' Ejecuciones en curso: {{count}}; seguirán con su instantánea.',
-    tabs: 'secciones del workflow',
+    tabs: 'secciones del pipeline',
     form: 'Formulario',
     preview: 'Vista previa',
     previewLabel: 'vista previa',
@@ -864,7 +867,7 @@ export const es: Dictionary = {
     },
     about: {
       general:
-        'Límites, copia de trabajo de una ejecución y nombres de ejecuciones; aquí también se muestran los errores de especialistas y workflows.',
+        'Límites, copia de trabajo de una ejecución y nombres de ejecuciones; aquí también se muestran los errores de especialistas y pipelines.',
       agents: 'Lo que recibe un especialista sin valor propio y cómo se inicia el agente Claude.',
       delivery:
         'Adónde va el resultado de una ejecución, cómo se confirma y quién resuelve los conflictos.',

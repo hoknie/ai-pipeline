@@ -53,6 +53,11 @@ export function table(rows: string[][], style: Style = plainStyle): string {
 }
 
 /** `#7`: how a task number is shown. */
+/** A workflow in text: `<name> (<id>)`, or the id alone when it has no other name. */
+export function workflowLabel(id: string, name: string): string {
+  return name === id ? id : `${name} (${id})`;
+}
+
 export function taskNumber(number: number): string {
   return `#${number}`;
 }
@@ -148,7 +153,7 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
         taskNumber(run.number),
         style.accent(run.id),
         statusBadge(run.state, style),
-        run.workflow,
+        workflowLabel(run.workflow, run.workflowName),
         withTags(shortTitle(run.title), run.tags, style),
         [
           run.split && run.split.status !== 'done'
@@ -169,7 +174,7 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
 
 export function formatRun(run: RunView, now: number, style: Style = plainStyle): string {
   const header = [
-    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${run.workflow} · ${statusBadge(run.state, style)} · ${run.branch}`,
+    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${workflowLabel(run.workflow, run.workflowName)} · ${statusBadge(run.state, style)} · ${run.branch}`,
     ...(run.title
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
       : []),
@@ -395,7 +400,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
         : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
     const delivering = `${run.delivering ? ' · delivering' : ''}${run.priority ? ' · priority' : ''}`;
     lines.push(
-      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
+      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${workflowLabel(run.workflow, run.workflowName)}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
     );
     for (const active of run.active) {
       lines.push(
@@ -474,7 +479,7 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
     lines.push(
-      `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
+      `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${workflowLabel(item.workflow, item.workflowName)}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );
   }
   return lines.join('\n');

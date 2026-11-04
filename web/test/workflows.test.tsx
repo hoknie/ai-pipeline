@@ -89,22 +89,86 @@ const openForm = () =>
 
 const stepNow = (index: number) => screen.getAllByRole('listitem', { name: /^step \d+$/ })[index]!;
 
+describe('the name of a pipeline', () => {
+  it('shows the name in the list and in the heading, with the id in the tooltip', async () => {
+    const named = entry('feature', { raw: { ...RAW, name: 'Новая функция' } });
+    render(<Page api={api({}, [named])} start="feature" />);
+    const list = await screen.findByRole('list', { name: 'pipeline' });
+    const item = within(list).getByRole('button', { name: /Новая функция/ });
+    expect(item.getAttribute('title')).toBe('feature');
+    expect(await screen.findByRole('heading', { name: 'Новая функция' })).toBeTruthy();
+  });
+
+  it('writes the typed name first and drops a cleared one', () => {
+    const draft = draftOf({ ...RAW, name: 'Старое' });
+    expect(draft.name).toBe('Старое');
+    expect(Object.keys(valueOf({ ...draft, name: '  Новое ' }))).toEqual(['name', 'steps']);
+    expect(valueOf({ ...draft, name: '  Новое ' }).name).toBe('Новое');
+    expect('name' in valueOf({ ...draft, name: '  ' })).toBe(false);
+  });
+
+  it('saves a new pipeline with the name from the field', async () => {
+    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writeWorkflow })} start="new" />);
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Мой пайплайн' } });
+    fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'mine' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
+    const added = await stepBox(0);
+    choose(within(added).getByRole('combobox', { name: 'step specialist' }), 'writer');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
+    const [id, value] = writeWorkflow.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(id).toBe('mine');
+    expect(Object.keys(value)[0]).toBe('name');
+    expect(value.name).toBe('Мой пайплайн');
+  });
+
+  it('shows the error of an empty name at the field', async () => {
+    const named = entry('feature', { raw: { ...RAW, name: 'x' } });
+    const previewWorkflow = vi.fn(async () => ({
+      topology: null,
+      errors: [{ path: 'swarm.workflows.feature.name', message: 'must not be empty' }],
+    }));
+    render(<Page api={api({ previewWorkflow }, [named])} start="feature" />);
+    const field = await screen.findByLabelText('Name');
+    fireEvent.change(field, { target: { value: ' ' } });
+    expect(await screen.findByText('must not be empty')).toBeTruthy();
+  });
+});
+
 describe('routes and the tab', () => {
-  it('reads and writes the workflows addresses', () => {
+  it('still reads the old workflows addresses', () => {
     expect(parseRoute('#workflows/feature')).toEqual({
       view: 'workflows',
       run: 'feature',
       group: null,
       step: null,
     });
-    expect(parseRoute('#workflows').run).toBeNull();
+    expect(parseRoute('#workflows').view).toBe('workflows');
+  });
+
+  it('replaces an old address with the new one', async () => {
+    window.location.hash = '#workflows/feature';
+    render(<App api={api()} openStream={openFake} />);
+    expect(await screen.findByRole('heading', { name: 'feature' })).toBeTruthy();
+    expect(window.location.hash).toBe('#pipelines/feature');
+  });
+
+  it('reads and writes the workflows addresses', () => {
+    expect(parseRoute('#pipelines/feature')).toEqual({
+      view: 'workflows',
+      run: 'feature',
+      group: null,
+      step: null,
+    });
+    expect(parseRoute('#pipelines').run).toBeNull();
     expect(formatRoute({ view: 'workflows', run: 'new', group: null, step: null })).toBe(
-      '#workflows/new',
+      '#pipelines/new',
     );
   });
 
   it('shows the file of a workflow as a chip under the heading, none for a new one', async () => {
-    window.location.hash = '#workflows/feature';
+    window.location.hash = '#pipelines/feature';
     render(<App api={api()} openStream={openFake} />);
     const heading = await screen.findByRole('heading', { name: 'feature' });
     const section = heading.closest('section')!;
@@ -115,20 +179,20 @@ describe('routes and the tab', () => {
     expect(heading.contains(chip)).toBe(false);
     expect(heading.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     cleanup();
-    window.location.hash = '#workflows/new';
+    window.location.hash = '#pipelines/new';
     render(<App api={api()} openStream={openFake} />);
-    const created = await screen.findByRole('heading', { name: 'New workflow' });
+    const created = await screen.findByRole('heading', { name: 'New pipeline' });
     expect(created.closest('section')!.querySelector('code')).toBeNull();
   });
 
   it('opens the form of the workflow from the address', async () => {
-    window.location.hash = '#workflows/feature';
+    window.location.hash = '#pipelines/feature';
     render(<App api={api()} openStream={openFake} />);
-    expect(screen.getByRole('link', { name: 'Workflow' }).getAttribute('aria-current')).toBe(
+    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
       'page',
     );
     expect(await screen.findByRole('heading', { name: 'feature' })).toBeTruthy();
-    expect(window.location.hash).toBe('#workflows/feature');
+    expect(window.location.hash).toBe('#pipelines/feature');
   });
 });
 
@@ -153,7 +217,7 @@ describe('the list', () => {
       return { ok: true as const, revision: 'rev-quick', file: '/f' };
     });
     render(<Page api={fakeApi({ config, writeWorkflow })} start="quick" />);
-    const list = await screen.findByRole('list', { name: 'workflow' });
+    const list = await screen.findByRole('list', { name: 'pipeline' });
     await waitFor(() => expect(within(list).getByText('global')).toBeTruthy());
     expect(within(list).getByText('project')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'configuration errors' })).toBeTruthy();
@@ -283,7 +347,7 @@ describe('group steps of the split', () => {
     expect(screen.queryByRole('list', { name: 'steps' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add step' })).toBeNull();
     expect(screen.getByRole('link', { name: 'explore' }).getAttribute('href')).toBe(
-      '#workflows/explore',
+      '#pipelines/explore',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
@@ -543,7 +607,7 @@ describe('saving and deleting', () => {
       ).value,
     ).toBe('analysis');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Reread the workflow' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reread the pipeline' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Reread' }));
     await waitFor(() => expect(config).toHaveBeenCalledTimes(2));
   });
@@ -567,7 +631,7 @@ describe('saving and deleting', () => {
     await waitFor(() =>
       expect(deleteWorkflow).toHaveBeenCalledWith('feature', 'rev-feature', 'project'),
     );
-    expect((await screen.findAllByText('Workflow «feature» deleted')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Pipeline «feature» deleted')).length).toBeGreaterThan(0);
   });
 
   it('saves a copy under a new id and creates a workflow from an empty form', async () => {
@@ -582,7 +646,7 @@ describe('saving and deleting', () => {
     cleanup();
     writeWorkflow.mockClear();
     render(<Page api={api({ writeWorkflow })} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'New workflow' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'New pipeline' }));
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'quick' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     choose(within(await stepBox(0)).getByRole('combobox', { name: 'step specialist' }), 'coder');
@@ -667,7 +731,7 @@ describe('leaving with unsaved edits', () => {
         target: { value: 'analysis' },
       },
     );
-    const list = screen.getByRole('list', { name: 'workflow' });
+    const list = screen.getByRole('list', { name: 'pipeline' });
     fireEvent.click(within(list).getByText('quick'));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog.textContent).toContain('unsaved changes');
@@ -735,7 +799,7 @@ describe('step ids follow the specialist', () => {
 
   it('writes ids from the specialists of a new workflow, with a suffix for a repeat', async () => {
     const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    window.location.hash = '#workflows/new';
+    window.location.hash = '#pipelines/new';
     render(<App api={api({ writeWorkflow })} openStream={openFake} />);
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'quick' } });
     for (const slug of ['plan', 'coder', 'coder']) {

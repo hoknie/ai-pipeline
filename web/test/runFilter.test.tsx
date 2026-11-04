@@ -294,3 +294,14 @@ describe('filter by the tag of a linked task', () => {
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
   });
 });
+
+describe('search by the name of the pipeline', () => {
+  it('finds a run by the name and by the id of its pipeline', () => {
+    const runs = [
+      runView({ id: 'a', title: 'Первый', workflow: 'feature', workflowName: 'Новая функция' }),
+      runView({ id: 'b', title: 'Второй', workflow: 'fix', workflowName: 'Исправление' }),
+    ];
+    expect(filterRuns(runs, 'функци', 'all').map((run) => run.id)).toEqual(['a']);
+    expect(filterRuns(runs, 'fix', 'all').map((run) => run.id)).toEqual(['b']);
+  });
+});

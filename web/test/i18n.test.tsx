@@ -238,11 +238,12 @@ const DICTIONARIES = { es, ru, zh } as Record<string, Tree>;
 
 // Words that read the same in the language: names of languages, product and protocol terms.
 const SAME_AS_ENGLISH = new Set([
-  'Workflow',
+  'Pipeline',
   'OpenCode',
   'Tokens',
-  'workflow {{id}}',
-  'Workflow: {{id}}',
+  'pipeline {{id}}',
+  'Pipeline: {{id}}',
+  'Pipeline: {{name}} ({{id}})',
   '{{action}} «{{id}}»?',
   'English',
   'Español',
@@ -305,6 +306,26 @@ describe.each(Object.keys(DICTIONARIES))('dictionary %s', (language) => {
       ([key, text]) => reference.get(key) === text && !SAME_AS_ENGLISH.has(text),
     );
     expect(untranslated).toEqual([]);
+  });
+});
+
+describe('the term «Pipeline»', () => {
+  const values = (value: unknown): string[] =>
+    typeof value === 'string'
+      ? [value]
+      : value && typeof value === 'object'
+        ? Object.values(value).flatMap(values)
+        : [];
+
+  it.each([
+    ['en', en],
+    ['ru', ru],
+    ['es', es],
+    ['zh', zh],
+  ])('does not call the pipeline a workflow in the %s dictionary', (_language, dictionary) => {
+    // interpolation variables such as {{workflow}} are not texts
+    const texts = values(dictionary).map((text) => text.replace(/\{\{[^}]*\}\}/g, ''));
+    expect(texts.filter((text) => /workflow/i.test(text))).toEqual([]);
   });
 });
 

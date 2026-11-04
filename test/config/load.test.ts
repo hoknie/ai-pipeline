@@ -17,6 +17,8 @@ import {
   loadWebSettings,
   parseConfig,
   withConfigDefaults,
+  workflowName,
+  workflowNameOf,
   type ConfigPaths,
   type FieldError,
   type LevelPaths,
@@ -1078,3 +1080,39 @@ describe('split.workflow', () => {
 function workflowWithSteps(): string {
   return `${BASE}  workflows:\n    feature:\n      split: { specialist: coder }\n      steps:\n        - { id: code, specialist: coder }\n`;
 }
+
+describe('name of a workflow', () => {
+  const STEPS = '      steps:\n        - { id: code, specialist: coder }\n';
+  const text = (extra: string) => `${BASE}  workflows:\n    feature:\n${extra}${STEPS}`;
+
+  it('reads the name, trimmed, and falls back to the id without it', () => {
+    const named = parseConfig(text('      name: "  Новая функция "\n'));
+    expect(findWorkflow(named, 'feature')?.name).toBe('Новая функция');
+    expect(workflowName(findWorkflow(named, 'feature')!)).toBe('Новая функция');
+    expect(workflowNameOf(named, 'feature')).toBe('Новая функция');
+    const plain = parseConfig(text(''));
+    expect(findWorkflow(plain, 'feature')?.name).toBeNull();
+    expect(workflowNameOf(plain, 'feature')).toBe('feature');
+  });
+
+  it('gives the id for an unknown workflow and for a snapshot without the field', () => {
+    const config = parseConfig(text(''));
+    expect(workflowNameOf(config, 'ghost')).toBe('ghost');
+    const old = { id: 'old', split: null, steps: [] } as unknown as Parameters<
+      typeof workflowName
+    >[0];
+    expect(workflowName(old)).toBe('old');
+  });
+
+  it('accepts a name together with split.workflow', () => {
+    const config = parseConfig(
+      `${BASE}  workflows:\n    explore:\n${STEPS}    epic:\n      name: Эпик\n      split: { specialist: coder, workflow: explore }\n`,
+    );
+    expect(workflowNameOf(config, 'epic')).toBe('Эпик');
+  });
+
+  it('rejects an empty name and a name that is not a string', () => {
+    expectError(errorsOf(text('      name: "  "\n')), 'swarm.workflows.feature.name', 'empty');
+    expectError(errorsOf(text('      name: 5\n')), 'swarm.workflows.feature.name', 'string');
+  });
+});

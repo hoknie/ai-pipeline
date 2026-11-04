@@ -244,7 +244,7 @@ export function QueueForm({
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Label htmlFor={`${idPrefix}-workflow`}>Workflow</Label>
+            <Label htmlFor={`${idPrefix}-workflow`}>{t('queue.form.workflow')}</Label>
             <Select
               value={effective.workflow === '' ? undefined : effective.workflow}
               onValueChange={(workflow) =>
@@ -266,7 +266,7 @@ export function QueueForm({
               <SelectContent>
                 {options.map((id) => (
                   <SelectItem key={id} value={id}>
-                    {id}
+                    {workflows?.workflows.find((candidate) => candidate.id === id)?.name ?? id}
                   </SelectItem>
                 ))}
               </SelectContent>
