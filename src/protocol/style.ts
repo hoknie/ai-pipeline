@@ -82,9 +82,10 @@ export const STATUS_BADGES: Readonly<Record<string, { badge: string; role: Style
   merging: { badge: '▸', role: 'command' },
   queued: { badge: '◦', role: 'muted' },
   waiting: { badge: '◷', role: 'muted' },
+  paused: { badge: '◦', role: 'warning' },
+  frozen: { badge: '◦', role: 'warning' },
   pending: { badge: '◦', role: 'muted' },
   stopped: { badge: '◦', role: 'muted' },
-  paused: { badge: '◦', role: 'warning' },
   cancelled: { badge: '⊘', role: 'muted' },
 };
 

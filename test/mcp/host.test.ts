@@ -18,6 +18,7 @@ const VIEW: QueueView & { item: string } = {
   autopilotAnswerDefault: 'default',
   onLimit: 'wait',
   stop: null,
+  freezeCandidate: null,
   items: [
     {
       id: 'q1',
@@ -464,10 +465,12 @@ describe('host MCP queue tools', () => {
     expect(calls).toEqual([{ method: 'queue_return', params: { runId: 'r1' } }]);
   });
 
-  it('pauses a run from Claude Code', async () => {
+  it('pauses a run from Claude Code and returns a rule error as a tool error', async () => {
     const calls: unknown[] = [];
+    let fail = false;
     const client = await connect(async (method, params) => {
       calls.push({ method, params });
+      if (fail) throw new Error('run is already paused');
       return {
         ...VIEW,
         items: [{ ...VIEW.items[0]!, id: 'q9', run: 'A', hold: 'paused' }],
@@ -478,6 +481,10 @@ describe('host MCP queue tools', () => {
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('paused A');
     expect(calls).toEqual([{ method: 'run_pause', params: { runId: 'A' } }]);
+    fail = true;
+    const refused = await client.callTool({ name: 'swarm_run_pause', arguments: { run_id: 'A' } });
+    expect(refused.isError).toBe(true);
+    expect(textOf(refused)).toContain('run is already paused');
   });
 
   it('returns the daemon error of an empty settings call', async () => {
@@ -609,6 +616,14 @@ describe('host MCP swarm_skip_step', () => {
       { method: 'run_skip', params: { runId: 'run000000001', step: 'qa', skip: true } },
       { method: 'run_skip', params: { runId: 'run000000001', step: 'qa', skip: false } },
     ]);
+  });
+
+  it('describes the freezing of the last run in the tools that take a place', async () => {
+    const client = await connect(async () => VIEW);
+    const tools = (await client.listTools()).tools;
+    for (const name of ['swarm_queue_run_now', 'swarm_queue_return', 'swarm_retry']) {
+      expect(tools.find((tool) => tool.name === name)?.description).toContain('frozen');
+    }
   });
 
   it('sends refreshConfig of swarm_retry only when it is given', async () => {

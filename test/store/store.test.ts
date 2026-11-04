@@ -66,6 +66,38 @@ describe('migrations', () => {
   });
 });
 
+describe('hold of a run and priority runs', () => {
+  it('keeps the hold of a run and the priority list of a queue', () => {
+    const store = temporaryStore();
+    const state = run(1);
+    state.run.hold = 'frozen';
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)?.run.hold).toBe('frozen');
+    state.run.hold = null;
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)?.run.hold).toBeNull();
+    const queue = emptyQueue('/repo', 1);
+    queue.priority = ['r1', 'r2'];
+    store.saveQueue(queue);
+    expect(store.loadQueue('/repo')?.priority).toEqual(['r1', 'r2']);
+  });
+
+  it('reads an older database with no hold and an empty priority list', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = new Store(databasePath(directory));
+    const state = run(1);
+    old.saveRun(state);
+    old.saveQueue(emptyQueue('/repo', 1));
+    old.database.exec('ALTER TABLE runs DROP COLUMN hold');
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.close();
+    const store = new Store(databasePath(directory));
+    expect(store.loadRun(state.run.id)?.run.hold).toBeNull();
+    expect(store.loadQueue('/repo')?.priority).toEqual([]);
+  });
+});
+
 describe('queues', () => {
   it('has no queue for an unknown repository', () => {
     const store = temporaryStore();
@@ -161,7 +193,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE tags DROP COLUMN task_run');
     old.database.exec('ALTER TABLE tags DROP COLUMN task_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (7 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (7 + 3)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
@@ -204,7 +237,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE tags DROP COLUMN task_run');
     old.database.exec('ALTER TABLE tags DROP COLUMN task_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (6 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (6 + 3)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')).toMatchObject({
@@ -250,7 +284,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE tags DROP COLUMN task_run');
     old.database.exec('ALTER TABLE tags DROP COLUMN task_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (3 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (3 + 3)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([false, false]);
@@ -266,7 +301,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE tags DROP COLUMN task_run');
     old.database.exec('ALTER TABLE tags DROP COLUMN task_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (1 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (1 + 3)}`);
     old.close();
   }
 
@@ -537,7 +573,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-17)).toContain('denials_json');
+    expect(MIGRATIONS.at(-18)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -560,7 +596,7 @@ describe('refused tool calls', () => {
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-16)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-17)).toContain('outside_changes_json');
   });
 });
 
@@ -603,7 +639,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(20);
+    expect(SCHEMA_VERSION).toBe(21);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -700,7 +736,8 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN number');
     old.database.exec('ALTER TABLE queues DROP COLUMN next_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (10 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (10 + 3)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -738,7 +775,8 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN number');
     old.database.exec('ALTER TABLE queues DROP COLUMN next_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (11 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (11 + 3)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -845,7 +883,8 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE queue_items DROP COLUMN number');
     old.database.exec('ALTER TABLE queues DROP COLUMN next_number');
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (9 + 2)}`);
+    old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (9 + 3)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);

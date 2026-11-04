@@ -173,6 +173,7 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE tags ADD COLUMN task_number INTEGER;
   `,
   `ALTER TABLE runs ADD COLUMN hold TEXT`,
+  `ALTER TABLE queues ADD COLUMN priority_json TEXT NOT NULL DEFAULT '[]'`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -474,6 +474,7 @@ describe('colored text', () => {
       autopilotAnswer: null,
       autopilotAnswerDefault: 'default',
       onLimit: 'wait' as const,
+      freezeCandidate: null,
       updatedAt: 1,
     };
     expect(ansi(formatQueue(queue, style)).split('\n')[0]).toContain('◦ stopped');
@@ -660,6 +661,23 @@ describe('usage limit in the text output', () => {
     paused.run.hold = 'paused';
     expect(formatQueue(queueView(queue, () => paused))).toContain('paused run000000001');
     expect(formatRunList([runView(paused, 1000)])).toContain('paused');
+  });
+
+  it('shows frozen for the item of a frozen run, priority on a card and frozen in the state column', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'работа' }, 'q1', 2);
+    queue.items[0]!.run = 'run000000001';
+    const frozen = run(1);
+    frozen.run.hold = 'frozen';
+    const text = formatQueue(queueView(queue, () => frozen));
+    expect(text).toContain('frozen run000000001');
+    const other = run(1, { id: 'run000000002' });
+    step(other);
+    const taken = emptyQueue('/repo', 1);
+    taken.runs = ['run000000002'];
+    taken.priority = ['run000000002'];
+    expect(formatQueue(queueView(taken, () => other))).toContain('priority');
+    expect(formatRun(runView(frozen, 1000), 1000)).toContain('· frozen ·');
   });
 
   it('shows a group waiting for the limit', () => {

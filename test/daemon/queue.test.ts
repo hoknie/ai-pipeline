@@ -212,7 +212,7 @@ describe('running the queue', () => {
     expect(await allRuns(h)).toEqual([]);
   });
 
-  it('runs an item now over the limit and the run holds a place of the queue', async () => {
+  it('runs an item now and freezes the last run that took a place', async () => {
     const h = await start();
     const hold = { waitFor: h.gate('ab') };
     h.script({ code: [hold, hold, {}] });
@@ -222,39 +222,34 @@ describe('running the queue', () => {
     const c = await add(h, 'C');
     const d = await add(h, 'D');
     await h.call('queue_start', { repository: h.repo });
-    await waitQueue(h, (view) => view.runs.length === 2);
+    const before = await waitQueue(h, (view) => view.runs.length === 2);
+    const [first, second] = before.runs;
     const created = (await h.call('queue_run_now', {
       repository: h.repo,
       item: d.item,
     })) as RunCreated;
     const queue = await queueOf(h);
-    expect(queue.runs).toHaveLength(3);
+    expect(queue.runs.map((run) => run.id)).toEqual([first!.id, created.runId]);
+    expect(queue.runs[1]!.priority).toBe(true);
     expect(queue.parallel).toBe(2);
     expect(queue.status).toBe('running');
-    expect(queue.items.map((item) => item.id)).toEqual([c.item]);
-    expect(queue.runs.map((run) => run.id)).toContain(created.runId);
+    expect(queue.items.map((item) => item.run ?? item.id)).toEqual([second!.id, c.item]);
+    expect(queue.items[0]).toMatchObject({ hold: 'frozen' });
+    expect((await h.status(second!.id)).state).toBe('frozen');
     expect((await h.status(created.runId)).fromQueue).toBe(true);
     await expect(h.call('queue_run_now', { repository: h.repo, item: d.item })).rejects.toThrow(
       'unknown queue item',
     );
-    // C starts only when two of the three runs have left their places
+    // the frozen run continues first, C starts after it; the places never exceed parallel
     const sizes = new Set<number>([queue.runs.length]);
-    const two = await waitQueue(h, (view) => {
-      sizes.add(view.runs.length);
-      return view.runs.length === 2;
-    });
-    expect(two.items.map((item) => item.id)).toEqual([c.item]);
     h.open('ab');
     await waitQueue(h, (view) => {
       sizes.add(view.runs.length);
-      if (view.runs.length >= 3) {
-        expect(view.items.map((item) => item.id)).toEqual([c.item]);
-      }
       return view.status === 'stopped' && view.items.length === 0;
     });
-    expect(Math.max(...sizes)).toBe(3);
-    expect(sizes.has(4)).toBe(false);
+    expect(Math.max(...sizes)).toBe(2);
     expect(await allRuns(h)).toHaveLength(4);
+    expect((await h.status(second!.id)).hold).toBeNull();
   });
 
   it('runs an item now in a stopped queue and leaves the queue stopped', async () => {

@@ -111,6 +111,8 @@ export {
   retryableGroups,
   returnRun,
   pauseRun,
+  freezeCandidate,
+  claimPlace,
   canReturn,
   dismissRun,
   returnItemOf,

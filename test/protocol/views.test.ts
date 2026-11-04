@@ -733,3 +733,49 @@ describe('runView progress', () => {
     expect(total).toBeGreaterThan(0);
   });
 });
+
+describe('frozen runs in views', () => {
+  const active = (id: string) => {
+    const state = run(1, { id });
+    step(state);
+    return state;
+  };
+
+  it('names the run a priority action would freeze, only when every place is taken', () => {
+    const [a, b] = [active('a'), active('b')];
+    const queue = emptyQueue('/repo', 1);
+    queue.parallel = 2;
+    queue.runs = ['a', 'b'];
+    queue.priority = ['a'];
+    const lookup = (id: string) => [a, b].find((state) => state.run.id === id);
+    const full = queueView(queue, lookup);
+    expect(full.freezeCandidate).toBe('b');
+    expect(full.runs.map((card) => card.priority)).toEqual([true, false]);
+    queue.parallel = 3;
+    expect(queueView(queue, lookup).freezeCandidate).toBeNull();
+    queue.parallel = 1;
+    queue.priority = ['a', 'b'];
+    expect(queueView(queue, lookup).freezeCandidate).toBeNull();
+  });
+
+  it('shows a frozen run as frozen with its hold on the item', () => {
+    const state = active('b');
+    state.run.hold = 'frozen';
+    expect(runView(state, 1000)).toMatchObject({ state: 'frozen', hold: 'frozen' });
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'B' }, 'q1', 2);
+    queue.items[0]!.run = 'b';
+    const view = queueView(queue, (id) => (id === 'b' ? state : undefined));
+    expect(view.items[0]).toMatchObject({ run: 'b', hold: 'frozen' });
+  });
+
+  it('shows a frozen run that failed as frozen, not queued', () => {
+    const state = active('b');
+    group(state).status = 'failed';
+    state.run.finishedAt = 5;
+    state.run.hold = 'frozen';
+    const frozen = runView(state, 1000);
+    expect(frozen).toMatchObject({ state: 'frozen', finished: true });
+    expect(withQueue(frozen, 'q9')).toMatchObject({ state: 'frozen', queueItem: 'q9' });
+  });
+});

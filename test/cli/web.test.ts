@@ -590,6 +590,38 @@ describe('aip web', () => {
     expect((await post('/api/queue/return', { run })).status).toBe(400);
   });
 
+  it('pauses a run through the API', async () => {
+    const { h, web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    h.script({ code: [{ waitFor: h.gate('a') }] });
+    const added = (await (
+      await post('/api/queue/items', { workflow: 'feature', task: 'работа' })
+    ).json()) as QueueView & { item: string };
+    await post(`/api/queue/items/${added.item}/run`, {});
+    let run = '';
+    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+      const queue = (await (
+        await fetch(`${base}/api/queue`, { headers: authed(web) })
+      ).json()) as QueueView;
+      if (queue.runs.length > 0) run = queue.runs[0]!.id;
+      else await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(run).not.toBe('');
+    const paused = await post(`/api/runs/${run}/pause`, {});
+    expect(paused.status).toBe(200);
+    expect(((await paused.json()) as QueueView).items[0]).toMatchObject({ run, hold: 'paused' });
+    const again = await post(`/api/runs/${run}/pause`, {});
+    expect(again.status).toBe(400);
+    expect(((await again.json()) as { error: string }).error).toContain('run is already paused');
+    expect((await post('/api/runs/nope/pause', {})).status).toBe(404);
+    h.open('a');
+  });
+
   it('removes a skipped run through the API', async () => {
     const { h, web, base } = await setup();
     const post = (path: string, body: unknown) =>

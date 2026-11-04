@@ -327,8 +327,9 @@ export function attemptVerdict(attempt: Attempt): Verdict | null {
   return attempt.status === 'finished' ? (attempt.report?.verdict ?? null) : null;
 }
 
-/** Why a run is held: the scheduler starts no step of a held run. */
-export type RunHold = 'paused';
+/** Why the scheduler does not start new steps of a run. */
+export const RUN_HOLDS = ['paused', 'frozen'] as const;
+export type RunHold = (typeof RUN_HOLDS)[number];
 
 export interface Run {
   id: string;

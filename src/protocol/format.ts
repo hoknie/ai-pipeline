@@ -393,7 +393,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
       run.groups.total === 0
         ? 'splitting'
         : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
-    const delivering = run.delivering ? ' · delivering' : '';
+    const delivering = `${run.delivering ? ' · delivering' : ''}${run.priority ? ' · priority' : ''}`;
     lines.push(
       `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${run.workflow}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
     );
@@ -472,9 +472,7 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const postponed = item.postponed ? ' · postponed' : '';
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     const returned =
-      item.run === null
-        ? ''
-        : ` · ${item.hold === 'paused' ? 'paused' : 'returns'} ${style.accent(item.run)}`;
+      item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
     lines.push(
       `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );

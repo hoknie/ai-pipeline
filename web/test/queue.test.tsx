@@ -885,6 +885,56 @@ describe('added time and run now over the limit', () => {
   });
 });
 
+describe('pause and freeze of runs', () => {
+  it('names the run that run now would freeze instead of warning about the limit', async () => {
+    show(
+      queueOf({
+        status: 'running',
+        parallel: 2,
+        runs: [queueRun('run1', { number: 4 }), queueRun('run2', { number: 7 })],
+        freezeCandidate: 'run2',
+        items: items('A'),
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    expect(screen.getByRole('button', { name: 'Run now' }).getAttribute('title')).toBe(
+      'Will freeze task #7',
+    );
+  });
+
+  it('marks a frozen item and continues it without a confirmation', async () => {
+    const api = show(
+      queueOf({
+        status: 'running',
+        parallel: 1,
+        runs: [queueRun('run9', { priority: true })],
+        items: [
+          queueItem('q1', 'B', 1, { run: 'run1', hold: 'frozen', readiness: 'waiting' }),
+          queueItem('q2', 'C', 2, { run: 'run2', hold: 'paused', readiness: 'waiting' }),
+        ],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    expect(screen.getByText('Frozen')).toBeTruthy();
+    expect(screen.getByText('Paused')).toBeTruthy();
+    expect(screen.getByText('Priority')).toBeTruthy();
+    const buttons = screen.getAllByRole('button', { name: 'Continue' });
+    expect(screen.queryByRole('button', { name: 'Run now' })).toBeNull();
+    fireEvent.click(buttons[0]!);
+    await waitFor(() => expect(api.queueRunNow).toHaveBeenCalledWith('q1'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('pauses a run of the queue from its card', async () => {
+    const api = show(
+      queueOf({ status: 'running', parallel: 1, runs: [queueRun('run1')], items: items('A') }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(screen.getByRole('button', { name: 'Pause run' }));
+    await waitFor(() => expect(api.pauseRun).toHaveBeenCalledWith('run1', expect.anything()));
+  });
+});
+
 describe('order', () => {
   const dataTransfer = () => {
     const data: Record<string, string> = {};

@@ -176,6 +176,9 @@ describe('queue requests', () => {
     ok('queue_edit', { repository: '/r', item: 'q1', position: 2, title: null });
     ok('queue_remove', { repository: '/r', item: 'q1' });
     ok('queue_start', { repository: '/r' });
+    ok('run_pause', { runId: 'r1' });
+    ok('run_pause', { runId: 'r1', repository: '/r' });
+    bad('run_pause', { runId: '' });
     ok('queue_dismiss', { runId: 'r1' });
     ok('queue_dismiss', { runId: 'r1', repository: '/r' });
     bad('queue_dismiss', { runId: '' });

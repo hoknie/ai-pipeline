@@ -50,6 +50,7 @@ import {
   retryableGroups,
   returnRun,
   pauseRun,
+  claimPlace,
   canReturn,
   dismissRun,
   returnItemOf,
@@ -490,8 +491,9 @@ export class Daemon {
       const state = this.lookupState(id);
       return state ? [state] : [];
     });
-    const { take } = advance(queue, states, (id) => this.lookupState(id), this.now());
+    const { take, freeze } = advance(queue, states, (id) => this.lookupState(id), this.now());
     let changed = fingerprint() !== before;
+    for (const id of freeze) await this.freezeRun(id);
     const current = queue.runs.flatMap((id) => this.lookupState(id) ?? []);
     for (const answer of autopilotAnswers(queue, current)) {
       const state = this.lookupState(answer.run);
@@ -543,6 +545,25 @@ export class Daemon {
     }
     this.armWake();
     return started;
+  }
+
+  /** Sets `hold: frozen` on a run the queue has taken off its places for a priority run. */
+  private async freezeRun(id: string): Promise<void> {
+    const state = this.lookupState(id);
+    if (!state) return;
+    try {
+      await this.apply(state, { kind: 'hold', hold: 'frozen' });
+    } catch (error) {
+      if (!(error instanceof Rejection)) throw error;
+    }
+  }
+
+  /** A priority action: the run takes a place, and the last run that took one may be frozen. */
+  private async claimPlaceFor(queue: Queue, run: string): Promise<void> {
+    const now = this.now();
+    const states = queue.runs.flatMap((id) => this.lookupState(id) ?? []);
+    const frozen = claimPlace(queue, states, run, queueItemId(now, randomInt(36 ** 3)), now);
+    if (frozen !== null) await this.freezeRun(frozen);
   }
 
   /**
@@ -788,6 +809,12 @@ export class Daemon {
           const item = queue.items.find((candidate) => candidate.id === request.params.item);
           if (!item) throw new Rejection('unknown queue item');
           if (item.run !== null) {
+            const target = this.lookupState(item.run);
+            if (!target) throw new Rejection(`unknown run \`${item.run}\``);
+            if (target.run.hold === null && retryableGroups(target).length === 0) {
+              throw new Rejection('run has no failed or cancelled groups');
+            }
+            await this.claimPlaceFor(queue, item.run);
             const resumed = await this.takeReturned(queue, item);
             this.saveQueue(queue);
             return resumed;
@@ -797,6 +824,7 @@ export class Daemon {
             knownTags(this.catalog, item.tags),
             item,
           );
+          await this.claimPlaceFor(queue, created.runId);
           itemStarted(queue, item.id, created.runId, this.now());
           this.saveQueue(queue);
           return created;
@@ -1351,7 +1379,13 @@ export class Daemon {
       await this.apply(state, { kind: 'retry', group: params.group, ...refresh });
       if (state.run.hold !== null) await this.apply(state, { kind: 'hold', hold: null });
       const queue = this.queueFor(state.run.repository);
-      if (adoptRun(queue, state, keys, this.now())) {
+      const now = this.now();
+      const adopted = adoptRun(queue, state, keys, now, {
+        states: queue.runs.flatMap((id) => this.lookupState(id) ?? []),
+        itemId: queueItemId(now, randomInt(36 ** 3)),
+      });
+      if (adopted) {
+        if (adopted.frozen !== null) await this.freezeRun(adopted.frozen);
         this.saveQueue(queue);
         this.requestAdvance(state.run.repository);
       }

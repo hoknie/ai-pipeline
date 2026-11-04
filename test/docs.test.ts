@@ -255,6 +255,18 @@ describe('documentation examples', () => {
     expect(web).toContain('"Skipped with a problem"');
   });
 
+  it('documents the pause and the freezing of runs', () => {
+    const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
+    for (const text of ['### Pausing a run', 'aip run pause', '### Freezing', 'frozen <run-id>']) {
+      expect(queue).toContain(text);
+    }
+    const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+    expect(hosts).toContain('| `swarm_run_pause`');
+    expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_run_now`'))).toContain(
+      'frozen',
+    );
+  });
+
   it('document the dependencies of queue tasks', () => {
     const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
     expect(queue).toContain('--after <id>');

@@ -9,6 +9,7 @@ import {
 import {
   MESSAGE_GROUP,
   ON_LIMIT_MODES,
+  RUN_HOLDS,
   RESOLVE_GROUP,
   SPLIT_GROUP,
   allGroups,
@@ -344,9 +345,9 @@ export class Store {
     this.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number, priority_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number, priority_json = excluded.priority_json`,
         )
         .run(
           queue.repository,
@@ -362,6 +363,7 @@ export class Store {
           queue.autopilotAnswer,
           queue.onLimit,
           queue.nextNumber,
+          JSON.stringify(queue.priority),
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
@@ -407,6 +409,7 @@ export class Store {
       autopilotAnswer: text(row.autopilot_answer ?? null),
       onLimit: ON_LIMIT_MODES.find((mode) => mode === row.on_limit) ?? 'wait',
       nextNumber: Number(row.next_number ?? 1),
+      priority: row.priority_json ? parse(row.priority_json) : [],
       items: items.map((item): QueueItem => ({
         id: String(item.id),
         number: Number(item.number),
@@ -463,9 +466,9 @@ export class Store {
         fromQueue: Number(row.from_queue ?? 0) === 1,
         queueItem: text(row.queue_item ?? null),
         number: Number(row.number ?? 0),
+        hold: RUN_HOLDS.find((hold) => hold === row.hold) ?? null,
         tags: row.tags_json ? parse(row.tags_json) : [],
         skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],
-        hold: row.hold === 'paused' ? 'paused' : null,
       },
       split: groups.find((group) => group.slug === SPLIT_GROUP) ?? null,
       groups: groups.filter(

@@ -72,6 +72,7 @@ export const ru: Dictionary = {
     limit: 'Ждёт сброса лимита подписки {{runtime}}, до {{time}}',
   },
   status: {
+    frozen: 'Заморожена',
     queued: 'В очереди',
     waiting: 'Ждёт специалиста',
     running: 'В работе',
@@ -456,6 +457,8 @@ export const ru: Dictionary = {
     dismissDescription: 'Сам запуск не изменится.',
     dismissed: 'Запуск убран из пропущенных',
     returning: 'Возврат',
+    priority: 'Приоритет',
+    priorityHint: 'Занял место приоритетным действием: его не замораживают',
     returnOf: 'возврат запуска {{run}}',
     reasons: {
       needs_human: 'группа ждёт ответа человека',
@@ -532,7 +535,10 @@ export const ru: Dictionary = {
       edit: 'Изменить',
       cancel: 'Отмена',
       runNow: 'Запустить сейчас',
+      paused: 'На паузе',
+      frozen: 'Заморожена',
       continue: 'Продолжить',
+      runNowFreeze: 'Заморозит задачу {{number}}',
       addedAt: 'Добавлена {{when}}',
       runNowOverflow: 'Превысит лимит: {{taken}} из {{count}} мест',
       startFailed: 'Не удалось запустить: {{error}}',

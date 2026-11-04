@@ -70,6 +70,7 @@ export const zh: Dictionary = {
     limit: '等待 {{runtime}} 用量限制重置，直到 {{time}}',
   },
   status: {
+    frozen: '已冻结',
     queued: '排队中',
     waiting: '等待专家',
     running: '进行中',
@@ -442,6 +443,8 @@ export const zh: Dictionary = {
     dismissDescription: '运行本身不会改变。',
     dismissed: '已从跳过列表移除',
     returning: '放回',
+    priority: '优先',
+    priorityHint: '通过优先操作占用名额：不会被冻结',
     returnOf: '放回运行 {{run}}',
     reasons: {
       needs_human: '分组在等待人工回答',
@@ -516,7 +519,10 @@ export const zh: Dictionary = {
       edit: '修改',
       cancel: '取消',
       runNow: '立即运行',
+      paused: '已暂停',
+      frozen: '已冻结',
       continue: '继续',
+      runNowFreeze: '将冻结任务 {{number}}',
       addedAt: '添加于 {{when}}',
       runNowOverflow: '将超出上限：{{taken}} / {{count}} 个名额',
       startFailed: '无法启动：{{error}}',

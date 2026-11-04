@@ -106,6 +106,7 @@ export type Event =
   | { kind: 'tags_set'; tags: string[] }
   | { kind: 'hold'; hold: RunHold | null }
   | { kind: 'step_skip'; step: string; skip: boolean }
+  | { kind: 'hold'; hold: RunHold | null }
   | { kind: 'interrupted' };
 
 export { Rejection };
@@ -126,6 +127,7 @@ export function transition(state: RunState, event: Event, now: number): Effect[]
   machine.skipAhead();
   machine.startNextMerge();
   updateFinished(state, now);
+  if (state.run.finishedAt !== null && retryableGroups(state).length === 0) state.run.hold = null;
   if (!wasFinished && state.run.finishedAt !== null && state.run.config.delivery.auto) {
     machine.autoDeliver();
     updateFinished(state, now);
@@ -219,9 +221,18 @@ class Machine {
         return;
       case 'commit_failed':
         return this.failGroup(this.group(event.group), { kind: 'git', message: event.message });
+      case 'hold':
+        return this.hold(event.hold);
       case 'interrupted':
         return this.interrupted();
     }
+  }
+
+  private hold(hold: RunHold | null): void {
+    if (hold !== null && this.state.run.finishedAt !== null && this.state.run.hold === null) {
+      throw new Rejection('a finished run cannot be held');
+    }
+    this.state.run.hold = hold;
   }
 
   private report(slug: string, seq: number, report: Report): void {

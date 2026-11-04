@@ -244,6 +244,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
   return {
     id,
     returnable: true,
+    priority: false,
     number: 1,
     title: id,
     state: 'active',
@@ -277,6 +278,7 @@ export function queueOf(overrides: Partial<QueueView> = {}): QueueView {
     autopilotAnswerDefault: 'I agree with your recommendations',
     onLimit: 'wait',
     stop: null,
+    freezeCandidate: null,
     items: [],
     runs: [],
     skipped: [],

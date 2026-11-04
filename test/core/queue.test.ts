@@ -1245,7 +1245,7 @@ describe('answers of the autopilot', () => {
 });
 
 describe('fixed runs go first', () => {
-  it('returns a skipped run that works again to the start of the places, over the parallel limit', () => {
+  it('returns a skipped run that works again to the end of the places, over the parallel limit', () => {
     const queue = queueOf('A', 'B', 'C');
     queue.skipFailed = true;
     startQueue(queue, [], 3);
@@ -1261,7 +1261,7 @@ describe('fixed runs go first', () => {
     step(other);
     const take = advance(queue, [other], lookupOf(failed, other), 7).take;
     expect(take).toEqual([]);
-    expect(queue).toMatchObject({ runs: ['a', 'b'], skipped: [] });
+    expect(queue).toMatchObject({ runs: ['b', 'a'], skipped: [] });
   });
 
   it('only forgets a skipped run that no longer holds a place', () => {
@@ -1388,7 +1388,7 @@ describe('adopting a retried run', () => {
     const queue = stoppedQueue();
     const { state, keys } = retried('a');
     expect(keys.length).toBe(1);
-    expect(adoptRun(queue, state, keys, 9)).toBe(true);
+    expect(adoptRun(queue, state, keys, 9)).toEqual({ frozen: null });
     expect(queue.runs).toEqual(['a']);
     expect(queue.acknowledged).toEqual(expect.arrayContaining(keys));
     expect(queue).toMatchObject({
@@ -1402,7 +1402,7 @@ describe('adopting a retried run', () => {
     const queue = stoppedQueue();
     addItem(queue, { workflow: 'feature', task: 't' }, 'ret', 4).run = 'a';
     const { state, keys } = retried('a');
-    expect(adoptRun(queue, state, keys, 9)).toBe(true);
+    expect(adoptRun(queue, state, keys, 9)).toEqual({ frozen: null });
     expect(ids(queue)).toEqual(['q1']);
   });
 
@@ -1410,22 +1410,27 @@ describe('adopting a retried run', () => {
     const { state, keys } = retried('a');
     const held = stoppedQueue();
     held.runs.push('a');
-    const skipped = stoppedQueue();
-    skipped.skipped.push('a');
     const finished = stoppedQueue();
     const done = failedRun('b');
     done.run.finishedAt = 10;
     const foreign = emptyQueue('/other', 1);
     for (const [queue, target] of [
       [held, state],
-      [skipped, state],
       [finished, done],
       [foreign, state],
     ] as const) {
       const before = JSON.stringify(queue);
-      expect(adoptRun(queue, target, keys, 9)).toBe(false);
+      expect(adoptRun(queue, target, keys, 9)).toBeNull();
       expect(JSON.stringify(queue)).toBe(before);
     }
+  });
+
+  it('adopts a skipped run: it leaves the skipped list and holds a place once', () => {
+    const queue = stoppedQueue();
+    queue.skipped.push('a');
+    const { state, keys } = retried('a');
+    expect(adoptRun(queue, state, keys, 9)).toEqual({ frozen: null });
+    expect(queue).toMatchObject({ skipped: [], runs: ['a'] });
   });
 
   it('keeps waiting items until both adopted runs release their places', () => {
@@ -1458,7 +1463,7 @@ describe('adopting a retried run', () => {
     group(state, 'gruppa-2').status = 'failed';
     const keys = problemKeys(state);
     group(state, 'gruppa-1').status = 'running';
-    expect(adoptRun(queue, state, keys, 4)).toBe(true);
+    expect(adoptRun(queue, state, keys, 4)).toEqual({ frozen: null });
     advance(queue, [state], lookupOf(state), 5);
     expect(queue).toMatchObject({ status: 'running', stop: null });
   });

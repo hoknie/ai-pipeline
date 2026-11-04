@@ -180,3 +180,27 @@ describe('planDispatch', () => {
     expect(planDispatch([state], 5, 1500).start.map((entry) => entry.group.slug)).toContain(slug);
   });
 });
+
+describe('a run with a hold', () => {
+  it('starts nothing, fills no waits and starts again after the hold is lifted', () => {
+    const state = planned(1, { id: 'a' });
+    transition(state, { kind: 'hold', hold: 'paused' }, 3000);
+    const held = planDispatch([state], 5, 3001);
+    expect(held.start).toEqual([]);
+    expect(held.waits.size).toBe(0);
+    transition(state, { kind: 'hold', hold: null }, 3002);
+    const lifted = planDispatch([state], 5, 3003);
+    expect(lifted.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
+    expect(lifted.start[0]!.group.pending?.stepIndex).toBe(1);
+  });
+
+  it('lets a running attempt of the held run finish', () => {
+    const state = run(1);
+    step(state);
+    transition(state, { kind: 'hold', hold: 'paused' }, 3000);
+    expect(runningAttempt(state).status).toBe('running');
+    finish(state, 'done');
+    expect(dispatch([state], 5, 3500)).toEqual([]);
+    expect(state.groups[0]!.pending?.stepIndex).toBe(1);
+  });
+});

@@ -14,6 +14,7 @@ import type { QueueRunView, QueueView } from '../types.ts';
 
 import { useConfirm } from '../confirm.tsx';
 import { Button } from '../ui/button.tsx';
+import { Badge } from '../ui/badge.tsx';
 import { Card } from '../ui/card.tsx';
 
 import { StatusBadge } from './StatusBadge.tsx';
@@ -87,6 +88,11 @@ function RunCard({
         <StatusBadge status={run.state} />
         <WorkflowBadge id={run.workflow} />
         <TagChips tags={run.tags ?? []} />
+        {run.priority ? (
+          <Badge variant="run" title={t('queue.priorityHint')}>
+            {t('queue.priority')}
+          </Badge>
+        ) : null}
         {run.delivering ? (
           <span className="inline-flex items-center gap-1 text-muted-foreground">
             <Truck aria-hidden className="size-4" />
@@ -331,7 +337,7 @@ export function QueueRuns({
                 now={now}
                 linked={highlight?.has(run.id) === true}
                 action={
-                  run.state === 'finished' || run.state === 'cancelled' ? null : (
+                  run.delivering || run.state === 'finished' || run.state === 'cancelled' ? null : (
                     <Button
                       size="sm"
                       variant="outline"

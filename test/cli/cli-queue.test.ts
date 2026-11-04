@@ -390,7 +390,7 @@ describe('cli', () => {
     expect(view.parallel).toBe(2);
   });
 
-  it('queues `run start` behind busy places and runs a waiting task over the limit', async () => {
+  it('queues `run start` behind busy places and freezes the last run for a task started now', async () => {
     const box = sandbox();
     writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
     const first = await aip(box, 'run', 'start', 'feature', '--task', 'первая', '--json');
@@ -409,7 +409,8 @@ describe('cli', () => {
     expect(listed.stdout).toMatch(/added \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
     const now = await aip(box, 'queue', 'run', json.item);
     expect(now.code).toBe(0);
-    expect(now.stdout).toContain('2 of 1 places taken');
+    expect(now.stdout).toContain('1 of 1 places taken');
+    expect((await aip(box, 'queue', 'list')).stdout).toMatch(/frozen \w+/);
   });
 
   it('serves the host MCP tools over stdio', async () => {

@@ -58,6 +58,23 @@ Every task gets an integer number within its repository when it is added to the 
 - A paused run stays in the queue: removing its task is refused while the run is unfinished. Cancel the run instead; it stays `paused` until you continue or remove the task.
 - The pause is lifted by itself once the run is finished and has nothing to retry. A run with nothing to pause (finished), one that is already paused, or one that is already in the queue as a returned task is refused.
 
+### Freezing
+
+When a run needs a place and every place is taken, the queue freezes the run that took a place last instead of going over `parallel`. Such a priority action is:
+
+- the queue taking the task of a returned run without a hold (`aip queue return`) in a running queue, at once, before ordinary tasks;
+- `aip queue run <item>` / "Run now" / "Continue";
+- a direct retry of a group, "Retry failed", after which the run holds a place.
+
+How it works:
+
+- The frozen run is the last one that took a place. A run is not frozen when a group waits for a human answer, when it is finished and waits for delivery, when it is on pause or already frozen, when it is itself a priority run (it took its place by a priority action and holds it), or when it is the run that needs the place. When nobody can be frozen, the priority run takes a place over `parallel`.
+- A frozen run finishes its current steps and starts no new one, like a paused run. It leaves its place, and its task goes first in the queue, marked `frozen <run-id>` in `aip queue list` (state `frozen` in `aip run list` and the panel). The state of the queue does not change.
+- A frozen run continues by itself, in any state of the queue, as soon as a place is free and before any other task, regardless of `--after` and the postponed flag. Its failed groups are retried from where they stopped. "Continue" brings it back earlier; the run then holds a place over `parallel` if the priority run still holds one.
+- Freezing is never done by hand: pause a run to stop it yourself. A frozen run can be paused (it then waits at the end of the queue), and its task cannot be removed while the run is unfinished.
+- A task of a run on pause is taken only when its turn comes; a returned run on pause is not a priority task and freezes nobody.
+- `aip queue list --json` shows `freezeCandidate` (the run a priority action would freeze now, or `null`) and `priority` on every run card.
+
 A task that has become a run can no longer be edited or removed from the queue. Manage the run with `aip run list` and `aip run cancel`.
 
 The queue is stored in the daemon's database and survives a daemon restart. A started queue keeps taking tasks.
@@ -70,7 +87,7 @@ These actions are also in the `swarm_queue*` tools (see [hosts.md](hosts.md)) an
 aip queue start --parallel 2    # take tasks from the front, 2 runs at a time
 aip queue parallel 3            # change the number of simultaneous runs, in any queue state
 aip queue pause                 # take no new tasks, running runs keep working
-aip queue run <item>            # start a task right now, beyond the limit; the run takes a place
+aip queue run <item>            # start a task right now; the last run that took a place is frozen if none is free
 ```
 
 - At most `parallel` runs go at the same time (1–20, 1 by default). A freed place goes to the next task.
@@ -79,8 +96,8 @@ aip queue run <item>            # start a task right now, beyond the limit; the 
 - `aip queue list` shows how busy the queue is ("1 of 2 places taken").
 - For every run it shows the workflow, the progress by group and by step (`1/3 groups · steps 5/12`, or `splitting` while the task is being split), active steps, delivery mode and problem.
 - When the tasks run out and all runs of the queue are finished, the queue stops by itself.
-- `aip queue run <item>` and "Run now" in the panel create a queue run immediately, even when all places are taken.
-- Such a run takes a place beyond the limit (for example, "3 of 2 places taken"). The next task starts only when the number of runs drops below `parallel`.
+- `aip queue run <item>` and "Run now" in the panel create a queue run immediately, even when all places are taken. When no place is free, the run that took a place last is frozen (see [Freezing](#freezing)).
+- Only when nothing can be frozen does such a run take a place beyond the limit (for example, "3 of 2 places taken"). The next task starts only when the number of runs drops below `parallel`.
 - A problem in such a run stops the queue.
 
 A task becomes a run at the moment it starts. The working tree is snapshotted then, not when the task is added.

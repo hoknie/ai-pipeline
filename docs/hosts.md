@@ -159,7 +159,7 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_queue_return` | `run_id`, `repo?` | Puts a run with failed or cancelled groups back first in its queue; those groups are retried from where they stopped. `repo` defaults to the repository of the run |
 | `swarm_run_pause` | `run_id`, `repo?` | Pauses an unfinished run: the step in progress finishes, nothing new starts, and the run moves to the end of the queue as `paused <run-id>`. Continue it with `swarm_queue_run_now`. `repo` defaults to the repository of the run |
 | `swarm_queue_pause` | `repo?` | Stops taking tasks; running runs keep working |
-| `swarm_queue_run_now` | `item`, `repo?` | Turns a task into a queue run at once, beyond the limit |
+| `swarm_queue_run_now` | `item`, `repo?` | Turns a task into a queue run at once; if no place is free, the last run that took a place is frozen. For a paused or frozen run it is Continue |
 
 Without `repo`, the repository of the current directory is used. The queue, its settings, `after` and `skip` are described in [queue.md](queue.md). Every answer has a table for humans and the same data as JSON.
 

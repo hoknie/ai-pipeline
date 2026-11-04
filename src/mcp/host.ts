@@ -176,7 +176,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Retry a group',
       description:
-        'Retry a failed or cancelled group from where it stopped, or its merge after a conflict. With refresh_config=true the run first takes the whole specialists (model, runtime, prompt, permissions) from the current configuration; the workflow stays as it started.',
+        'Retry a failed or cancelled group from where it stopped, or its merge after a conflict. With refresh_config=true the run first takes the whole specialists (model, runtime, prompt, permissions) from the current configuration; the workflow stays as it started. If the run joins the queue and every place is taken, the last run that took a place is frozen: it finishes its current step and continues when a place is free.',
       inputSchema: {
         run_id: runId,
         group,
@@ -506,7 +506,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Return a run to the queue',
       description:
-        'Put a run with failed or cancelled groups back into its queue as the first task. When the queue takes it (a free place in a running queue, or swarm_queue_run_now), the failed and cancelled groups are retried from where they stopped; the work already done is kept and no new run is created.',
+        'Put a run with failed or cancelled groups back into its queue as the first task. When the queue takes it (a free place in a running queue, or swarm_queue_run_now), the failed and cancelled groups are retried from where they stopped; the work already done is kept and no new run is created. A running queue takes the returned run at once; if every place is taken, the last run that took a place is frozen until it is free.',
       inputSchema: {
         run_id: runId,
         repo: z
@@ -578,7 +578,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Run a queued task now',
       description:
-        'Turn a waiting task into a run immediately, whatever the state and parallel limit of the queue. The run holds a place of the queue even over the parallel limit (for example 3 of 2).',
+        'Turn a waiting task into a run immediately, whatever the state and parallel limit of the queue. If every place is taken, the last run that took a place is frozen (it finishes its current step, starts no new one and continues when a place is free); only when nothing can be frozen does the run go over the parallel limit. For a paused or frozen run this is Continue.',
       inputSchema: { item, repo },
     },
     ({ item: id, repo: where }) =>

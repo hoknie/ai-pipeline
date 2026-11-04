@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import type { DeliveryMode } from '../config/index.ts';
 import {
-  type RunHold,
   DEFAULT_AUTOPILOT_ANSWER,
   allGroups,
   attemptVerdict,
@@ -19,6 +18,7 @@ import {
   itemReadiness,
   limitResetsAt,
   dependencyState,
+  freezeCandidate,
   knownTags,
   occupiesSlot,
   runPhase,
@@ -26,6 +26,7 @@ import {
   suggestPatterns,
   summarize,
   type Attempt,
+  type RunHold,
   type Suggestion,
   type DependencyState,
   type Group,
@@ -193,8 +194,11 @@ export type DeliveryStage =
   | { status: 'applied' }
   | { status: 'apply_failed'; reason: string | null; groups: string[] };
 
-/** The state of a run in a view: its phase, or `queued` for a finished run waiting as a return item. */
-export type RunViewState = RunPhase | 'queued' | 'paused';
+/**
+ * The state of a run in a view: its phase, `queued` for a finished run waiting as a return
+ * item, or the hold (`paused`, `frozen`) of a run the scheduler keeps still.
+ */
+export type RunViewState = RunPhase | 'queued' | RunHold;
 
 export interface RunView {
   id: string;
@@ -212,7 +216,7 @@ export interface RunView {
   finishedAt: number | null;
   finished: boolean;
   state: RunViewState;
-  /** Why the run is held; null when it runs normally. */
+  /** Why the scheduler starts no new steps of the run; null: no hold. */
   hold: RunHold | null;
   /** Groups waiting for a human answer. */
   waiting: number;
@@ -524,7 +528,8 @@ export function runView(
     startedAt: runStartedAt(state),
     finishedAt: state.run.finishedAt,
     finished: summary.finished,
-    state: state.run.hold !== null && summary.state !== 'needs_human' ? 'paused' : summary.state,
+    state:
+      state.run.hold !== null && summary.state !== 'needs_human' ? state.run.hold : summary.state,
     hold: state.run.hold,
     waiting: summary.waiting,
     dirtyWarning: state.run.dirtyWarning,
@@ -765,7 +770,7 @@ export interface QueueItemView {
   error: string | null;
   /** A returned run: taking the item retries it; null for a new task. */
   run: string | null;
-  /** The returned run is on pause; null otherwise. */
+  /** Hold of the run of a returned item; null for a new task and for a run without a hold. */
   hold: RunHold | null;
 }
 
@@ -782,6 +787,8 @@ export interface QueueRunView {
   id: string;
   /** The run can go back to the queue: it has failed or cancelled groups and is not in it. */
   returnable: boolean;
+  /** The run took its place by a priority action and is not frozen for another one. */
+  priority: boolean;
   /** Number of the task of the run. */
   number: number;
   title: string;
@@ -827,6 +834,8 @@ export interface QueueView {
   /** What a usage limit does: the group waits for the reset, or fails. */
   onLimit: OnLimit;
   stop: QueueStop | null;
+  /** The run a priority action would freeze now; null when a place is free or there is none. */
+  freezeCandidate: string | null;
   items: QueueItemView[];
   /** Runs of the queue that still occupy a place. */
   runs: QueueRunView[];
@@ -851,6 +860,7 @@ function queueRunView(
   return {
     id: state.run.id,
     returnable: canReturn(queue, state),
+    priority: queue.priority.includes(state.run.id),
     number: state.run.number,
     title: runTitle(state),
     state: summarize(state).state,
@@ -949,6 +959,14 @@ export function queueView(
     autopilotAnswerDefault: DEFAULT_AUTOPILOT_ANSWER,
     onLimit: queue.onLimit,
     stop: queue.stop,
+    freezeCandidate:
+      queue.runs.length >= queue.parallel
+        ? freezeCandidate(
+            queue,
+            queue.runs.flatMap((id) => lookup(id) ?? []),
+            null,
+          )
+        : null,
     items: queue.items.map((item, index) => ({
       id: item.id,
       number: item.number,

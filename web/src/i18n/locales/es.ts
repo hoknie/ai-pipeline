@@ -73,6 +73,7 @@ export const es: Dictionary = {
     limit: 'Espera el reinicio del límite de {{runtime}}, hasta {{time}}',
   },
   status: {
+    frozen: 'Congelada',
     queued: 'En cola',
     waiting: 'Espera al especialista',
     running: 'En curso',
@@ -458,6 +459,8 @@ export const es: Dictionary = {
     dismissDescription: 'La ejecución en sí no cambia.',
     dismissed: 'Ejecución quitada de las omitidas',
     returning: 'Devolución',
+    priority: 'Prioridad',
+    priorityHint: 'Ocupó su plaza con una acción prioritaria: no se congela',
     returnOf: 'devuelve la ejecución {{run}}',
     reasons: {
       needs_human: 'un grupo espera la respuesta de una persona',
@@ -533,7 +536,10 @@ export const es: Dictionary = {
       edit: 'Editar',
       cancel: 'Cancelar',
       runNow: 'Ejecutar ahora',
+      paused: 'En pausa',
+      frozen: 'Congelada',
       continue: 'Continuar',
+      runNowFreeze: 'Congelará la tarea {{number}}',
       addedAt: 'Añadida {{when}}',
       runNowOverflow: 'Superará el límite: {{taken}} de {{count}} plazas',
       startFailed: 'No se pudo iniciar: {{error}}',

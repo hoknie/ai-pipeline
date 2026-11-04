@@ -700,3 +700,36 @@ describe('retry with the current config', () => {
     expect(state.run.config).toEqual(before);
   });
 });
+
+describe('hold of a run', () => {
+  it('sets and clears the hold', () => {
+    const state = run(1);
+    step(state);
+    transition(state, { kind: 'hold', hold: 'paused' }, 3000);
+    expect(state.run.hold).toBe('paused');
+    transition(state, { kind: 'hold', hold: null }, 3001);
+    expect(state.run.hold).toBeNull();
+  });
+
+  it('keeps the hold of a run that failed, and drops it once everything is merged', () => {
+    const state = run(1);
+    step(state);
+    transition(state, { kind: 'hold', hold: 'paused' }, 3000);
+    transition(state, { kind: 'cancel', group: null }, 3001);
+    expect(state.run.finishedAt).not.toBeNull();
+    expect(state.run.hold).toBe('paused');
+    transition(state, { kind: 'hold', hold: 'frozen' }, 3002);
+    expect(state.run.hold).toBe('frozen');
+    transition(state, { kind: 'hold', hold: null }, 3003);
+    expect(state.run.hold).toBeNull();
+  });
+
+  it('refuses a hold for a finished run without one', () => {
+    const state = run(1);
+    step(state);
+    transition(state, { kind: 'cancel', group: null }, 3001);
+    expect(() => transition(state, { kind: 'hold', hold: 'paused' }, 3002)).toThrow();
+    transition(state, { kind: 'hold', hold: null }, 3003);
+    expect(state.run.hold).toBeNull();
+  });
+});

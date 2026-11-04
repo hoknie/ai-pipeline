@@ -68,6 +68,7 @@ export const en = {
     limit: 'Waiting for the {{runtime}} usage limit to reset, until {{time}}',
   },
   status: {
+    frozen: 'Frozen',
     queued: 'Queued',
     waiting: 'Waiting for specialist',
     running: 'Running',
@@ -445,6 +446,8 @@ export const en = {
     dismissDescription: 'The run itself does not change.',
     dismissed: 'Run removed from skipped',
     returning: 'Return',
+    priority: 'Priority',
+    priorityHint: 'Took its place by a priority action: it is not frozen',
     returnOf: 'returns run {{run}}',
     reasons: {
       needs_human: 'a group waits for an answer from a human',
@@ -519,7 +522,10 @@ export const en = {
       edit: 'Edit',
       cancel: 'Cancel',
       runNow: 'Run now',
+      paused: 'Paused',
+      frozen: 'Frozen',
       continue: 'Continue',
+      runNowFreeze: 'Will freeze task {{number}}',
       addedAt: 'Added {{when}}',
       runNowOverflow: 'Over the limit: {{taken}} of {{count}} places',
       startFailed: 'Could not start: {{error}}',

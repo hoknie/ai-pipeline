@@ -2,7 +2,7 @@ import { DELIVERY_MODES, type DeliveryMode } from '../config/index.ts';
 
 import type { NewGroup } from './create.ts';
 import { Rejection } from './errors.ts';
-import { RUN_TITLE_LIMIT } from './ids.ts';
+import { RUN_TITLE_LIMIT, queueItemId } from './ids.ts';
 import { retryableGroups } from './retryable.ts';
 import { cleanSkip } from './skip.ts';
 import { mergeTags } from './tags.ts';
@@ -118,6 +118,8 @@ export interface Queue {
   nextNumber: number;
   /** Runs created by the queue that still occupy a place. */
   runs: string[];
+  /** Runs that took a place by a priority action; they are not frozen for another one. */
+  priority: string[];
   /** Keys of the problems the user already knows about. */
   acknowledged: string[];
   /** Runs taken off the places because of a stopping problem, the latest first. */
@@ -151,6 +153,7 @@ export function emptyQueue(repository: string, now: number, nextNumber = 1): Que
     items: [],
     nextNumber,
     runs: [],
+    priority: [],
     acknowledged: [],
     skipped: [],
     stop: null,
@@ -206,6 +209,17 @@ function cleanDeliveryMode(mode: DeliveryMode | null | undefined): DeliveryMode 
     throw new Rejection(`delivery mode must be one of: ${DELIVERY_MODES.join(', ')}`);
   }
   return mode;
+}
+
+/** An id for a return item made by the queue itself; free among the items. */
+function newItemId(queue: Queue, now: number): string {
+  let random = queue.items.length;
+  let id = queueItemId(now, random);
+  while (queue.items.some((item) => item.id === id)) {
+    random += 1;
+    id = queueItemId(now, random);
+  }
+  return id;
 }
 
 function find(queue: Queue, id: string): QueueItem {
@@ -352,7 +366,7 @@ export function removeItem(
   if (item.run !== null) {
     const state = lookup?.(item.run);
     if (state && state.run.hold !== null && state.run.finishedAt === null) {
-      throw new Rejection('a paused run stays in the queue; continue or cancel it');
+      throw new Rejection(`a ${state.run.hold} run stays in the queue; continue or cancel it`);
     }
   }
   queue.items = queue.items.filter((candidate) => candidate !== item);
@@ -410,6 +424,7 @@ export function dependencyState(
   }
   const state = lookup(ref);
   if (!state) return 'blocked';
+  if (state.run.hold !== null) return 'waiting';
   if (runProblems(state).some((problem) => BLOCKING_REASONS.has(problem.reason))) return 'blocked';
   return runDone(state) ? 'done' : 'waiting';
 }
@@ -602,6 +617,62 @@ export function occupiesSlot(state: RunState): boolean {
   );
 }
 
+/**
+ * The run a priority action would freeze: the last of the places that took one, skipping a run
+ * that waits for a human, a finished run awaiting delivery, a held run, a priority run and
+ * `claimant` itself. `null` when there is none.
+ */
+export function freezeCandidate(
+  queue: Queue,
+  states: Iterable<RunState>,
+  claimant: string | null,
+): string | null {
+  const byId = new Map([...states].map((state) => [state.run.id, state]));
+  for (const id of [...queue.runs].reverse()) {
+    const state = byId.get(id);
+    if (!state || id === claimant) continue;
+    if (queue.priority.includes(id) || state.run.hold !== null) continue;
+    if (state.run.finishedAt !== null) continue;
+    if (allGroups(state).some((group) => group.status === 'needs_human')) continue;
+    return id;
+  }
+  return null;
+}
+
+/**
+ * Gives `run` a place as a priority run. When every place is taken and a run can be frozen, that
+ * run leaves the places and its return item `itemId` goes first in the queue; its id is returned
+ * and the caller sets `hold: frozen` on it. Without a candidate the run takes a place over
+ * `parallel`.
+ */
+export function claimPlace(
+  queue: Queue,
+  states: Iterable<RunState>,
+  run: string,
+  itemId: string,
+  now: number,
+): string | null {
+  let frozen: string | null = null;
+  const list = [...states];
+  const others = queue.runs.filter((id) => id !== run).length;
+  if (others >= queue.parallel) {
+    const candidate = freezeCandidate(queue, list, run);
+    const state = candidate === null ? undefined : list.find((s) => s.run.id === candidate);
+    if (candidate !== null && state) {
+      queue.runs = queue.runs.filter((id) => id !== candidate);
+      queue.priority = queue.priority.filter((id) => id !== candidate);
+      queue.acknowledged = queue.acknowledged.filter((key) => !key.startsWith(`${candidate}/`));
+      queue.items = queue.items.filter((item) => item.run !== candidate);
+      queue.items.unshift(returnItem(state, itemId, now));
+      frozen = candidate;
+    }
+  }
+  if (!queue.runs.includes(run)) queue.runs.push(run);
+  if (!queue.priority.includes(run)) queue.priority.push(run);
+  queue.updatedAt = now;
+  return frozen;
+}
+
 function queueStates(queue: Queue, states: Iterable<RunState>): RunState[] {
   const wanted = new Set(queue.runs);
   return [...states].filter((state) => wanted.has(state.run.id));
@@ -636,16 +707,19 @@ export function adoptRun(
   state: RunState,
   known: readonly string[],
   now: number,
-): boolean {
+  claim?: { states: Iterable<RunState>; itemId: string },
+): { frozen: string | null } | null {
   const id = state.run.id;
-  if (state.run.repository !== queue.repository) return false;
-  if (queue.runs.includes(id) || queue.skipped.includes(id)) return false;
-  if (!occupiesSlot(state)) return false;
+  if (state.run.repository !== queue.repository) return null;
+  if (queue.runs.includes(id)) return null;
+  if (!occupiesSlot(state)) return null;
   queue.items = queue.items.filter((item) => item.run !== id);
-  queue.runs.push(id);
+  queue.skipped = queue.skipped.filter((skipped) => skipped !== id);
+  const frozen = claim ? claimPlace(queue, claim.states, id, claim.itemId, now) : null;
+  if (!claim) queue.runs.push(id);
   queue.acknowledged = [...new Set([...queue.acknowledged, ...known, ...problemKeys(state)])];
   queue.updatedAt = now;
-  return true;
+  return { frozen };
 }
 
 /**
@@ -657,7 +731,7 @@ export function advance(
   states: Iterable<RunState>,
   lookup: (id: string) => RunState | undefined,
   now: number,
-): { take: QueueItem[] } {
+): { take: QueueItem[]; freeze: string[] } {
   let own = queueStates(queue, states);
   const wake = queueWakeAt(queue);
   if (wake !== null && now >= wake) startQueue(queue, own, now);
@@ -691,11 +765,11 @@ export function advance(
     })
     .slice(0, QUEUE_SKIPPED_MAX);
   if (returned.length > 0) {
-    queue.runs = [...returned.map((state) => state.run.id), ...queue.runs];
+    queue.runs = [...queue.runs, ...returned.map((state) => state.run.id)];
     for (const state of returned) {
       for (const hit of limitHits(state)) queue.acknowledged.push(hit.key);
     }
-    own = [...returned, ...own];
+    own = [...own, ...returned];
   }
   const watched = own.filter((state) => state.run.hold === null);
   stopOnLimit(queue, watched);
@@ -717,6 +791,18 @@ export function advance(
     }
   }
   const keep = new Set(own.filter(occupiesSlot).map((state) => state.run.id));
+  for (const item of [...queue.items]) {
+    if (item.run === null) continue;
+    const state = lookup(item.run);
+    if (state && state.run.finishedAt !== null && retryableGroups(state).length === 0) {
+      queue.items = queue.items.filter((candidate) => candidate !== item);
+      for (const other of queue.items) {
+        other.after = [
+          ...new Set(other.after.map((ref) => (ref === item.id ? item.run : ref))),
+        ].filter((ref): ref is string => ref !== null);
+      }
+    }
+  }
   const released = queue.runs.filter((id) => !keep.has(id));
   if (released.length > 0) {
     queue.runs = queue.runs.filter((id) => keep.has(id));
@@ -724,22 +810,40 @@ export function advance(
       (key) => !released.some((id) => key.startsWith(`${id}/`)),
     );
   }
-  // A return item of a finished run with nothing to retry has no purpose left.
-  queue.items = queue.items.filter((item) => {
-    if (item.run === null) return true;
-    const state = lookup(item.run);
-    return !(state && state.run.finishedAt !== null && retryableGroups(state).length === 0);
-  });
-  let take: QueueItem[] = [];
+  const take: QueueItem[] = [];
+  const freeze: string[] = [];
+  // Frozen runs go first, in any state of the queue, as soon as a place is free.
+  for (const item of queue.items) {
+    if (item.run === null || lookup(item.run)?.run.hold !== 'frozen') continue;
+    if (queue.runs.length + take.length >= queue.parallel) break;
+    take.push(item);
+  }
+  const frozenTaken = take.length;
   if (queue.status === 'running') {
-    take = queue.items
-      .filter(
-        (item) =>
-          !item.postponed &&
-          !(queue.skipFailed && item.error !== null) &&
-          itemReadiness(queue, item, lookup) === 'ready',
-      )
-      .slice(0, Math.max(0, queue.parallel - queue.runs.length));
+    // Returned runs without a hold take a place at once, freezing the last run that took one.
+    const live = (): RunState[] => own.filter((state) => queue.runs.includes(state.run.id));
+    for (const item of [...queue.items]) {
+      if (item.run === null || item.postponed) continue;
+      if (queue.skipFailed && item.error !== null) continue;
+      const state = lookup(item.run);
+      if (!state || state.run.hold !== null || retryableGroups(state).length === 0) continue;
+      if (itemReadiness(queue, item, lookup) !== 'ready') continue;
+      const frozen = claimPlace(queue, live(), item.run, newItemId(queue, now), now);
+      if (frozen !== null) freeze.push(frozen);
+      take.push(item);
+    }
+    const free = Math.max(0, queue.parallel - queue.runs.length - frozenTaken);
+    take.push(
+      ...queue.items
+        .filter(
+          (item) =>
+            !take.includes(item) &&
+            !item.postponed &&
+            !(queue.skipFailed && item.error !== null) &&
+            itemReadiness(queue, item, lookup) === 'ready',
+        )
+        .slice(0, free),
+    );
     if (
       !queue.autopilot &&
       !queue.items.some((item) => !item.postponed) &&
@@ -748,8 +852,9 @@ export function advance(
       queue.status = 'stopped';
     }
   }
+  queue.priority = queue.priority.filter((id) => queue.runs.includes(id));
   queue.updatedAt = now;
-  return { take };
+  return { take, freeze };
 }
 
 /** A new usage limit of a run of the queue stops it; every such attempt counts once. */
@@ -795,19 +900,25 @@ function returnItem(state: RunState, id: string, now: number): QueueItem {
 
 /**
  * Puts a run on pause (checked before the hold is set): the run leaves its place and becomes the
- * last item of the queue; taking the item continues it.
+ * last item of the queue; taking the item continues it. A frozen run already has its item: the
+ * item moves to the end.
  */
 export function pauseRun(queue: Queue, state: RunState, id: string, now: number): QueueItem {
   const run = state.run.id;
-  if (state.run.hold === null && state.run.finishedAt !== null) {
-    throw new Rejection('run has nothing to pause');
+  if (state.run.hold === 'paused') throw new Rejection('run is already paused');
+  if (state.run.hold === 'frozen') {
+    const item = returnItemOf(queue, run) ?? returnItem(state, id, now);
+    queue.items = [...queue.items.filter((other) => other !== item), item];
+    queue.updatedAt = now;
+    return item;
   }
-  if (state.run.hold !== null) throw new Rejection('run is already paused');
+  if (state.run.finishedAt !== null) throw new Rejection('run has nothing to pause');
   if (queue.items.some((item) => item.run === run)) {
     throw new Rejection('run is already in the queue');
   }
   const item = returnItem(state, id, now);
   queue.runs = queue.runs.filter((candidate) => candidate !== run);
+  queue.priority = queue.priority.filter((candidate) => candidate !== run);
   queue.skipped = queue.skipped.filter((candidate) => candidate !== run);
   queue.acknowledged = queue.acknowledged.filter((key) => !key.startsWith(`${run}/`));
   queue.items.push(item);
@@ -898,7 +1009,7 @@ export function itemStarted(queue: Queue, id: string, run: string, now: number):
   for (const other of queue.items) {
     other.after = [...new Set(other.after.map((ref) => (ref === id ? run : ref)))];
   }
-  queue.runs.push(run);
+  if (!queue.runs.includes(run)) queue.runs.push(run);
   queue.updatedAt = now;
 }
 

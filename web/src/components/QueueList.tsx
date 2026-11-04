@@ -96,6 +96,18 @@ export function itemLabel(item: QueueItemView, t: TFunction): string {
   );
 }
 
+/** What "run now" does when no place is free: freezes the last run that took a place, or goes over the limit. */
+function runNowTip(queue: QueueView, item: QueueItemView, t: TFunction): string | undefined {
+  if (queue.runs.length < queue.parallel) return undefined;
+  const frozen = queue.freezeCandidate
+    ? queue.runs.find((run) => run.id === queue.freezeCandidate)
+    : undefined;
+  if (frozen && item.hold !== 'frozen') {
+    return t('queue.list.runNowFreeze', { number: taskNumber(frozen.number) });
+  }
+  return t('queue.list.runNowOverflow', { taken: queue.runs.length + 1, count: queue.parallel });
+}
+
 type Drop = { index: number; after: boolean } | null;
 
 export function QueueList({
@@ -355,6 +367,11 @@ export function QueueList({
                   {itemLabel(item, t)}
                 </span>
                 <TagChips tags={item.tags ?? []} />
+                {item.hold !== null ? (
+                  <Badge variant="warn">
+                    {item.hold === 'paused' ? t('queue.list.paused') : t('queue.list.frozen')}
+                  </Badge>
+                ) : null}
                 {item.run !== null ? (
                   <a
                     className="rounded bg-muted px-1.5 py-0.5 text-xs text-primary underline"
@@ -422,17 +439,10 @@ export function QueueList({
                   <Button
                     variant="ghost"
                     size="sm"
-                    title={
-                      item.hold === null && queue.runs.length >= queue.parallel
-                        ? t('queue.list.runNowOverflow', {
-                            taken: queue.runs.length + 1,
-                            count: queue.parallel,
-                          })
-                        : undefined
-                    }
+                    title={runNowTip(queue, item, t)}
                     onClick={() => void runNow(item)}
                   >
-                    {item.hold === 'paused' ? t('queue.list.continue') : t('queue.list.runNow')}
+                    {item.hold === null ? t('queue.list.runNow') : t('queue.list.continue')}
                   </Button>
                 </span>
               </div>

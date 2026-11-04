@@ -11,6 +11,7 @@ import {
   PackageCheck,
   PackageX,
   PauseCircle,
+  Snowflake,
   XCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -61,6 +62,7 @@ export const STATUS: Record<string, StatusEntry> = {
   cancelled: { labelKey: 'cancelled', tone: 'mute', icon: Ban, spin: false },
   pending: { labelKey: 'pending', tone: 'mute', icon: Circle, spin: false },
   paused: { labelKey: 'paused', tone: 'warn', icon: PauseCircle, spin: false },
+  frozen: { labelKey: 'frozen', tone: 'warn', icon: Snowflake, spin: false },
   stopped: { labelKey: 'stopped', tone: 'mute', icon: PauseCircle, spin: false },
   warnings: { labelKey: 'warnings', tone: 'warn', icon: AlertTriangle, spin: false },
 };
