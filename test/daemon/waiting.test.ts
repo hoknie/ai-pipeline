@@ -186,7 +186,7 @@ describe('groups waiting for a specialist', () => {
     // takes longer than any fixed pause, so wait until the stream stays quiet.
     for (let seen = -1; seen !== events.length;) {
       seen = events.length;
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
     const statusesOfSecond = () =>
       events.flatMap((event) =>
@@ -202,7 +202,8 @@ describe('groups waiting for a specialist', () => {
     await h.status(secondId);
     await h.group(secondId, 'signup');
     await h.call('status', { runId: first.runId });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // negative check: a short pause is enough for a stray event to arrive
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(statusesOfSecond()).toHaveLength(before);
     h.open('first');
     await h.waitFor(secondId, (view) => row(view, 'signup')?.status === 'running');

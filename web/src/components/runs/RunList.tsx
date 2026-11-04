@@ -114,7 +114,7 @@ export function RunList({
                   title={`${runTitle(run)}\n${run.id}`}
                   onClick={() => onSelect(run.id, null)}
                 >
-                  <span className="block min-w-0 truncate text-sm font-medium">
+                  <span className="block min-w-0 text-sm font-medium break-words [overflow-wrap:anywhere]">
                     <span className="font-mono text-xs text-muted-foreground">
                       {taskNumber(run.number)}
                     </span>{' '}
@@ -148,7 +148,7 @@ export function RunList({
                     {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {run.diff ? diffText(run.diff, t) : '—'}
+                    {run.liveDiff ? diffText(run.liveDiff, t) : '—'}
                   </span>
                   <RunDecisions run={run} />
                 </button>

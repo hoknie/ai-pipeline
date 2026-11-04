@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import type { PanelControl } from '../../daemon/index.ts';
 import type { WebStartResult, WebStatusResult, WebStopResult } from '../../protocol/index.ts';
 import { configPaths, loadWebSettings } from '../../config/index.ts';
@@ -10,7 +12,11 @@ export interface DaemonPanelOptions {
   stateDirectory: string;
   socket: string;
   environment?: NodeJS.ProcessEnv;
-  /** Where reasons for not starting go; defaults to stderr (the daemon log). */
+  /** Directory the `aip/` configuration is found from; the current directory by default. */
+  cwd?: string;
+  /** Process id written to the panel state; the one of this process by default. */
+  pid?: number;
+  /** Where reasons for not starting go (the daemon log); dropped by default. */
   log?: (line: string) => void;
   /** Command that runs `aip` (node and the script); restarting the daemon from the panel needs it. */
   entry?: string[];
@@ -43,8 +49,10 @@ function failureReason(error: unknown, address: string): string {
  * every start.
  */
 export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelController {
-  const env = options.environment ?? process.env;
-  const log = options.log ?? ((line: string) => void process.stderr.write(`${line}\n`));
+  const env = options.environment ?? {};
+  const cwd = options.cwd ?? resolve('.');
+  const pid = options.pid ?? process.pid;
+  const log = options.log ?? (() => undefined);
   let web: WebServer | null = null;
   let auth: 'token' | 'none' = 'token';
   let lastToken: string | null = null;
@@ -76,14 +84,14 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
     if (current === null) return;
     web = null;
     await current.close();
-    removePanelState(options.stateDirectory, process.pid);
+    removePanelState(options.stateDirectory, pid);
   }
 
   /** Raises the server; on failure keeps the reason and throws it as an Error. */
   async function launch(requested: string | undefined): Promise<void> {
     let address = '';
     try {
-      const settings = loadWebSettings(configPaths(process.cwd(), env.XDG_CONFIG_HOME, env.HOME));
+      const settings = loadWebSettings(configPaths(cwd, env.XDG_CONFIG_HOME, env.HOME));
       address = `${settings.host}:${settings.port}`;
       let token: string | undefined;
       if (settings.auth === 'token') {
@@ -99,6 +107,7 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
         port: settings.port,
         auth: settings.auth,
         ...(token === undefined ? {} : { token }),
+        log,
         defaultRepository: () => latestRepository(options.socket),
         system: {
           restartWeb: async () => {
@@ -121,7 +130,7 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
       });
       try {
         writePanelState(options.stateDirectory, {
-          pid: process.pid,
+          pid,
           host: server.host,
           port: server.port,
           auth: settings.auth,
@@ -168,9 +177,7 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
     autostart: () =>
       serial(async () => {
         try {
-          const settings = loadWebSettings(
-            configPaths(process.cwd(), env.XDG_CONFIG_HOME, env.HOME),
-          );
+          const settings = loadWebSettings(configPaths(cwd, env.XDG_CONFIG_HOME, env.HOME));
           if (
             !settings.autostart ||
             env.AIP_WEB_AUTOSTART === '0' ||

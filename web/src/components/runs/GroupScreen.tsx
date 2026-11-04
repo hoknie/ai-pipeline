@@ -386,32 +386,6 @@ export function GroupScreen({
           />
         )
       ) : null}
-      {view && (view.decisions ?? []).length > 0 ? (
-        <section aria-label={t('runs.decisions.label')} className="flex flex-col gap-1 text-sm">
-          <div className="text-xs font-medium uppercase text-muted-foreground">
-            {t('runs.decisions.heading', { n: view.decisions.length })}
-          </div>
-          <ul className="flex flex-col gap-2">
-            {view.decisions.map((decision, index) => (
-              <li key={index} className="rounded-md border p-2">
-                <div className="text-muted-foreground">{decision.question}</div>
-                <div>
-                  → {decision.answer}{' '}
-                  <span className="text-xs text-muted-foreground">
-                    (
-                    {t(
-                      decision.by === 'autopilot'
-                        ? 'runs.decisions.autopilot'
-                        : 'runs.decisions.human',
-                    )}
-                    , {decision.stepId})
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
       {view?.warnings.map((warning) => (
         <Alert key={warning} variant="warn">
           {warning}

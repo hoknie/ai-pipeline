@@ -22,6 +22,7 @@ import { startWebServer, webTokenFromEnv, type WebServer } from '../../src/cli/w
 import type { GroupView, QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
 import { MANUAL_CONFIG, harness, startRun, type Harness } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
+import { waitValue } from '../fixtures/wait-until.ts';
 
 let h: Harness | null = null;
 let web: WebServer | null = null;
@@ -592,14 +593,12 @@ describe('aip web', () => {
     h.script({ code: [{ noReport: true }, {}] });
     await post('/api/queue/items', { workflow: 'feature', task: 'работа' });
     await post('/api/queue/start', {});
-    let run = '';
-    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+    const run = await waitValue('the queue to stop on a problem', async () => {
       const queue = (await (
         await fetch(`${base}/api/queue`, { headers: authed(web) })
       ).json()) as QueueView;
-      if (queue.stop?.kind === 'problem') run = queue.stop.run;
-      else await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      return queue.stop?.kind === 'problem' ? queue.stop.run : null;
+    });
     const before = (await (
       await fetch(`${base}/api/runs/${run}`, { headers: authed(web) })
     ).json()) as { returnable: boolean };
@@ -627,14 +626,12 @@ describe('aip web', () => {
       await post('/api/queue/items', { workflow: 'feature', task: 'работа' })
     ).json()) as QueueView & { item: string };
     await post(`/api/queue/items/${added.item}/run`, {});
-    let run = '';
-    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+    const run = await waitValue('a run in the queue', async () => {
       const queue = (await (
         await fetch(`${base}/api/queue`, { headers: authed(web) })
       ).json()) as QueueView;
-      if (queue.runs.length > 0) run = queue.runs[0]!.id;
-      else await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      return queue.runs[0]?.id;
+    });
     expect(run).not.toBe('');
     const paused = await post(`/api/runs/${run}/pause`, {});
     expect(paused.status).toBe(200);
@@ -658,14 +655,12 @@ describe('aip web', () => {
     await post('/api/queue/settings', { skipFailed: true });
     await post('/api/queue/items', { workflow: 'feature', task: 'работа' });
     await post('/api/queue/start', {});
-    let run = '';
-    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+    const run = await waitValue('a skipped run', async () => {
       const queue = (await (
         await fetch(`${base}/api/queue`, { headers: authed(web) })
       ).json()) as QueueView;
-      if (queue.skipped.length > 0) run = queue.skipped[0]!.id;
-      else await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      return queue.skipped[0]?.id;
+    });
     expect(run).not.toBe('');
     const dismissed = await post('/api/queue/dismiss', { run });
     expect(dismissed.status).toBe(200);
@@ -821,7 +816,8 @@ describe('aip web', () => {
 
   it('skips a step through POST with validation', async () => {
     const { h, web, base } = await setup();
-    h.script({ code: [{ delayMs: 20_000 }] });
+    // the agent stays running until the daemon of the test is stopped
+    h.script({ code: [{ waitFor: h.gate('hold') }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       workflow: 'feature',
@@ -846,7 +842,9 @@ describe('aip web', () => {
 
   it('answers a question and cancels through POST', async () => {
     const { h, web, base } = await setup();
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'Which auth?' }, { delayMs: 20_000 }] });
+    h.script({
+      code: [{ verdict: 'needs_human', feedback: 'Which auth?' }, { waitFor: h.gate('hold') }],
+    });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       workflow: 'feature',

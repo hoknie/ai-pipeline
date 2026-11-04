@@ -4,20 +4,20 @@ import { colorEnabled, createStyle } from '../protocol/index.ts';
 
 import { registerCommands } from './commands.ts';
 import { addFooter, bareHelpTarget, configureHelpStyle } from './help.ts';
+import { failLine, type CliIo } from './io.ts';
 import { VERSION } from './version.ts';
 
 /**
- * Runs the CLI for `argv` (the whole `process.argv`). Reads the environment, the working
- * directory and the standard streams when it is called, so a caller may point them elsewhere
- * for the duration of the call. Failures set `process.exitCode`.
+ * Runs the CLI for `argv` (the whole `process.argv`). The working directory, the environment,
+ * the output streams and the exit code are the ones of `io`. Failures set the exit code 1.
  */
-export async function runCli(argv: string[]): Promise<void> {
+export async function runCli(argv: string[], io: CliIo): Promise<void> {
   const args = argv.slice(2);
   const noColorFlag = args.includes('--no-color');
   const colors = colorEnabled({
     noColorFlag,
-    env: process.env,
-    isTTY: process.stdout.isTTY === true,
+    env: io.env,
+    isTTY: io.isTTY,
   });
   const style = createStyle(colors);
 
@@ -28,7 +28,7 @@ export async function runCli(argv: string[]): Promise<void> {
     .option('--no-color', 'turn off colors (NO_COLOR and FORCE_COLOR are honored too)');
 
   configureHelpStyle(program, style, colors);
-  registerCommands(program, style);
+  registerCommands(program, style, io);
   addFooter(program, style);
 
   try {
@@ -39,7 +39,6 @@ export async function runCli(argv: string[]): Promise<void> {
     if (target) target.help();
     await program.parseAsync(argv);
   } catch (error) {
-    process.stderr.write(`aip: ${(error as Error).message}\n`);
-    process.exitCode = 1;
+    failLine(io, 'aip', (error as Error).message);
   }
 }

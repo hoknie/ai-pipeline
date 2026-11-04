@@ -12,6 +12,7 @@ import {
 } from '../protocol/index.ts';
 
 import { context, daemon } from './commands.ts';
+import { failLine, writeLine, type CliIo } from './io.ts';
 import { examples } from './help.ts';
 import { startPanel } from './web-control.ts';
 
@@ -58,22 +59,27 @@ export function formatDaemonStatus(status: DaemonStatus, warning: string | null 
   return lines.join('\n');
 }
 
-function print(value: string): void {
-  process.stdout.write(`${value}\n`);
-}
-
-function fail(message: string): void {
-  process.stderr.write(`aip daemon: ${message}\n`);
-  process.exitCode = 1;
-}
-
-export function registerDaemon(program: Command, style: Style): void {
+export function registerDaemon(program: Command, style: Style, io: CliIo): void {
+  const print = (value: string): void => writeLine(io, value);
+  const fail = (message: string): void => failLine(io, 'aip daemon', message);
+  const reportStop = (result: Awaited<ReturnType<typeof stopDaemon>>): void => {
+    if (result.state === 'not_running') {
+      print('aip daemon: not running');
+    } else if (result.state === 'busy') {
+      fail(
+        `busy${result.pid === null ? '' : ` (pid ${result.pid})`}: agents are running; ` +
+          `use --force to stop the daemon with them`,
+      );
+    } else {
+      print(`aip daemon: stopped (pid ${result.pid ?? 'unknown'})`);
+    }
+  };
   const command = program
     .command('daemon')
     .description('Run the aip daemon in the foreground, or control the background one')
     .addHelpText('after', examples(['aip daemon', 'aip daemon status'], style))
     .action(async () => {
-      const ctx = context();
+      const ctx = context(io, style);
       // Imported on demand: the other daemon subcommands and every other command stay light.
       const [{ AlreadyRunning, startDaemon }, { createDaemonPanel }] = await Promise.all([
         import('../daemon/index.ts'),
@@ -84,6 +90,10 @@ export function registerDaemon(program: Command, style: Style): void {
           stateDirectory: ctx.stateDirectory,
           socket: ctx.socket,
           entry: ctx.entry,
+          environment: io.env,
+          cwd: io.cwd,
+          pid: io.pid,
+          log: (line) => io.stderr(`${line}\n`),
         });
         const running = await startDaemon({
           stateDirectory: ctx.stateDirectory,
@@ -91,9 +101,9 @@ export function registerDaemon(program: Command, style: Style): void {
           panel,
         });
         const stop = () => void running.close();
-        process.once('SIGTERM', stop);
-        process.once('SIGINT', stop);
-        print(`aip daemon listening on ${ctx.socket} (pid ${process.pid})`);
+        io.onSignal('SIGTERM', stop);
+        io.onSignal('SIGINT', stop);
+        print(`aip daemon listening on ${ctx.socket} (pid ${io.pid})`);
         const started = await panel.autostart();
         if (started !== null) print(`aip web: ${started.url}`);
         await running.closed;
@@ -112,7 +122,7 @@ export function registerDaemon(program: Command, style: Style): void {
     .description('Start the daemon in the background (nothing happens if it runs)')
     .addHelpText('after', examples(['aip daemon start'], style))
     .action(async () => {
-      const ctx = context();
+      const ctx = context(io, style);
       const check = await daemon(ctx, 'aip daemon start');
       const ping = await pingDaemon(ctx.socket);
       const pid = ping?.pid ?? 'unknown';
@@ -125,7 +135,7 @@ export function registerDaemon(program: Command, style: Style): void {
     .option('--force', 'stop the daemon together with its running agents')
     .addHelpText('after', examples(['aip daemon stop', 'aip daemon stop --force'], style))
     .action(async (options: { force?: boolean }) => {
-      const ctx = context();
+      const ctx = context(io, style);
       const result = await stopDaemon(ctx.socket, {
         force: options.force,
         lockPath: lockPath(ctx.stateDirectory),
@@ -146,7 +156,7 @@ export function registerDaemon(program: Command, style: Style): void {
       ),
     )
     .action(async (options: { force?: boolean; web?: boolean }) => {
-      const ctx = context();
+      const ctx = context(io, style);
       const result = await stopDaemon(ctx.socket, {
         force: options.force,
         lockPath: lockPath(ctx.stateDirectory),
@@ -160,7 +170,7 @@ export function registerDaemon(program: Command, style: Style): void {
       const word = result.state === 'stopped' ? 'restarted' : 'started';
       print(`aip daemon: ${word} (pid ${ping?.pid ?? 'unknown'})`);
       if (options.web)
-        await startPanel({ restart: false, open: false, client: 'aip daemon restart' });
+        await startPanel(io, style, { restart: false, open: false, client: 'aip daemon restart' });
     });
 
   command
@@ -169,25 +179,12 @@ export function registerDaemon(program: Command, style: Style): void {
     .option('--json', 'print JSON on one line')
     .addHelpText('after', examples(['aip daemon status', 'aip daemon status --json'], style))
     .action(async (options: { json?: boolean }) => {
-      const ctx = context();
+      const ctx = context(io, style);
       const ping = await pingDaemon(ctx.socket);
       const check = ping === null ? null : await checkDaemon(ctx.socket);
       const status = daemonStatus(ping, check, ctx.socket);
       const warning = check ? daemonMismatchMessage(check, 'aip') : null;
       print(options.json ? JSON.stringify(status) : formatDaemonStatus(status, warning));
-      if (!status.running) process.exitCode = EXIT_NOT_RUNNING;
+      if (!status.running) io.setExitCode(EXIT_NOT_RUNNING);
     });
-}
-
-function reportStop(result: Awaited<ReturnType<typeof stopDaemon>>): void {
-  if (result.state === 'not_running') {
-    print('aip daemon: not running');
-  } else if (result.state === 'busy') {
-    fail(
-      `busy${result.pid === null ? '' : ` (pid ${result.pid})`}: agents are running; ` +
-        `use --force to stop the daemon with them`,
-    );
-  } else {
-    print(`aip daemon: stopped (pid ${result.pid ?? 'unknown'})`);
-  }
 }

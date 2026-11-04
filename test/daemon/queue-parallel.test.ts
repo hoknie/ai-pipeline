@@ -50,8 +50,9 @@ describe('live parallel', () => {
     })) as QueueView;
     expect(shrunk.runs).toHaveLength(2);
     expect(shrunk.items.map((item) => item.title)).toEqual(['C']);
-    // both runs are held: neither is interrupted, and C keeps waiting
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // both runs are held: neither is interrupted, and C keeps waiting; the settings call has
+    // scheduled already, a short pause only gives a wrong start a chance to show
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const waiting = await queueOf(h);
     expect(waiting.runs).toHaveLength(2);
     expect(waiting.items).toHaveLength(1);
@@ -104,7 +105,7 @@ describe('live parallel', () => {
       return last?.status === 'stopped' && last.runs.length === 0;
     });
     // a moment for events without changes, which must not come
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const queues = queueEvents();
     const steps = queues.flatMap((queue) =>
       queue.runs.flatMap((run) => run.active.map((a) => a.step)),

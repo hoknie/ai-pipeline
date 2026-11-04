@@ -3,14 +3,18 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } fr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach } from 'vitest';
+import { afterAll, afterEach } from 'vitest';
 
 import { socketPath } from '../../src/config/index.ts';
 import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
 import { request } from '../../src/protocol/index.ts';
+import type { CliIo } from '../../src/cli/io.ts';
 import { runCli } from '../../src/cli/program.ts';
 import { TEST_TIMINGS, WORKFLOW_CONFIG } from '../daemon/harness.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
+import { waitUntil } from '../fixtures/wait-until.ts';
+
+export { waitUntil };
 
 // Shared by the cli test files; importing this module shuts down the daemons of the sandboxes after
 // every test.
@@ -51,8 +55,8 @@ function stopDaemon(sandbox: Sandbox): void {
 /** Daemons started in this process, by socket. */
 const daemons = new Map<string, Promise<RunningDaemon>>();
 
-afterEach(async () => {
-  for (const sandbox of sandboxes.splice(0)) {
+async function teardown(list: Sandbox[]): Promise<void> {
+  for (const sandbox of list.splice(0)) {
     closed.add(sandbox.socket);
     const own = daemons.get(sandbox.socket);
     daemons.delete(sandbox.socket);
@@ -63,9 +67,15 @@ afterEach(async () => {
     // A daemon a killed `aip` call was starting may not listen yet: stop it by its pid.
     stopDaemon(sandbox);
   }
-});
+}
 
-export function sandbox(config = WORKFLOW_CONFIG): Sandbox {
+afterEach(() => teardown(sandboxes));
+afterAll(() => teardown(shared));
+
+/** Sandboxes of a `beforeAll`: they live until the end of the file, not of one test. */
+const shared: Sandbox[] = [];
+
+export function sandbox(config = WORKFLOW_CONFIG, options: { shared?: boolean } = {}): Sandbox {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-cli-')));
   const repo = join(base, 'repo');
   copyTemplateRepo(repo, config);
@@ -83,7 +93,7 @@ export function sandbox(config = WORKFLOW_CONFIG): Sandbox {
   };
   const state = join(base, 'state', 'aip');
   const created = { repo, env, socket: socketPath(state), state };
-  sandboxes.push(created);
+  (options.shared ? shared : sandboxes).push(created);
   return created;
 }
 
@@ -108,23 +118,6 @@ export function aipProcess(
     );
     running.add(child);
   });
-}
-
-/**
- * Polls `check` every 25 ms until it holds; fails after `timeoutMs`, well inside the test
- * timeout, so a stuck wait reports what it waited for instead of timing the test out.
- */
-export async function waitUntil(
-  what: string,
-  check: () => boolean | Promise<boolean>,
-  timeoutMs = 10_000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!(await check())) {
-    if (Date.now() >= deadline)
-      throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
 }
 
 /** The run of the answer of `aip run start --json`; fails when the task waits. */
@@ -201,8 +194,24 @@ async function inProcess(
   }) as typeof process.stderr.write;
   console.log = console.info = (...parts: unknown[]) => void (stdout += text(parts));
   console.error = console.warn = (...parts: unknown[]) => void (stderr += text(parts));
+  const io: CliIo = {
+    cwd: box.repo,
+    env: box.env,
+    isTTY: false,
+    entry: [process.execPath, main],
+    pid: process.pid,
+    stdout: (text) => void (stdout += text),
+    stderr: (text) => void (stderr += text),
+    setExitCode: (code) => {
+      process.exitCode = code;
+    },
+    exit: (code) => process.exit(code),
+    onSignal: (signal, handler) => void process.once(signal, handler),
+    watchIntervalMs: 25,
+    panelPollMs: 25,
+  };
   try {
-    await runCli([process.execPath, main, ...args]);
+    await runCli([process.execPath, main, ...args], io);
     return { code: Number(process.exitCode ?? 0), stdout, stderr };
   } finally {
     process.stdout.write = stdoutWrite;

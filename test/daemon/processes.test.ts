@@ -268,14 +268,15 @@ describe('background processes in the event stream', () => {
       undefined,
       {},
       {
-        processesIntervalMs: 30,
+        processesIntervalMs: 10,
         snapshotProcesses: () => {
           calls += 1;
           return Promise.resolve([]);
         },
       },
     ));
-    await pause(150);
+    // five intervals pass without a subscriber and without a look
+    await pause(50);
     expect(calls).toBe(0);
     const first = watch(h);
     await until('the first list', () => processEvents(first.events).length === 1);
@@ -285,7 +286,8 @@ describe('background processes in the event stream', () => {
       () => processEvents(second.events).length === 1,
     );
     expect(second.events[0]?.event).toBe('snapshot');
-    await pause(200);
+    // five intervals pass with an unchanged list and without another look
+    await pause(50);
     expect(calls).toBe(1);
     expect(processEvents(first.events)).toHaveLength(1);
     first.stop();
@@ -298,7 +300,7 @@ describe('background processes in the event stream', () => {
       undefined,
       {},
       {
-        processesIntervalMs: 30,
+        processesIntervalMs: 10,
         snapshotProcesses: () => {
           calls += 1;
           return Promise.reject(new Error('no ps'));

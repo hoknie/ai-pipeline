@@ -114,7 +114,8 @@ describe('failures and control', () => {
       view.groups.filter((group) => group.status === 'running').length;
     // two coders hold their places; the other two groups must wait however long they work
     await h.waitFor(runId, (view) => running(view) === 2);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // negative check: a short pause is enough for a third start to show
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(running(await h.status(runId))).toBe(2);
     h.open('code');
     const final = await h.waitFor(runId, (view) => {

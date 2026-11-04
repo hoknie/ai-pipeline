@@ -330,8 +330,6 @@ export const es: Dictionary = {
       none: 'Aún no hay intentos.',
     },
     decisions: {
-      label: 'respuestas aceptadas',
-      heading: 'Respuestas aceptadas · {{n}}',
       human: 'persona',
       autopilot: 'piloto automático',
     },

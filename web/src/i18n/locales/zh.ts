@@ -322,8 +322,6 @@ export const zh: Dictionary = {
       none: '暂无尝试。',
     },
     decisions: {
-      label: '已接受的回答',
-      heading: '已接受的回答 · {{n}}',
       human: '人工',
       autopilot: '自动驾驶',
     },

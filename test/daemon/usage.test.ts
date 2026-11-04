@@ -36,21 +36,24 @@ async function run(h: Harness): Promise<string> {
 }
 
 /** Run views of the `run` events of the stream, collected as they come. */
-function listen(h: Harness): RunView[] {
+async function listen(h: Harness): Promise<RunView[]> {
   const views: RunView[] = [];
   abort = new AbortController();
+  // the stream opens with a snapshot: once it arrives the subscription is in place
+  let subscribed!: () => void;
+  const ready = new Promise<void>((resolve) => (subscribed = resolve));
   void subscribe(
     h.socket,
     (line) => {
+      subscribed();
       const event: StreamEvent = streamEventSchema.parse(JSON.parse(line));
       if (event.event === 'run') views.push(event.run as unknown as RunView);
     },
     abort.signal,
   ).catch(() => undefined);
+  await ready;
   return views;
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('live usage', () => {
   it('shows a growing usage of a running attempt in the run events and views', async () => {
@@ -67,8 +70,7 @@ describe('live usage', () => {
         },
       ],
     });
-    const views = listen(h);
-    await sleep(100);
+    const views = await listen(h);
     const runId = await run(h);
     const live = await h.waitFor(
       runId,
@@ -125,8 +127,7 @@ describe('live usage', () => {
         },
       ],
     });
-    const views = listen(h);
-    await sleep(100);
+    const views = await listen(h);
     const runId = await run(h);
     // the agent goes on once the live usage of all twenty updates reached the stream
     await h.waitFor(runId, () =>

@@ -268,7 +268,7 @@ describe('run tree', () => {
           runView({
             id: 'b',
             title: 'сделай веб интерфейс',
-            diff: { files: 2, added: 367, removed: 0 },
+            liveDiff: { files: 2, added: 367, removed: 0 },
           }),
         ],
         { selectedRun: 'a', selectedGroup: 'login', now: 61_000 },

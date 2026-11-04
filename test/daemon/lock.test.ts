@@ -39,15 +39,28 @@ describe('daemon lock', () => {
 
   it('lets only one of several processes started at once take the lock', async () => {
     const lock = join(directory(), 'aip.pid');
+    // The winner keeps the lock until its stdin is closed, so the others always meet it held.
     const script = `
       import { acquireLock } from ${JSON.stringify(server)};
-      try { acquireLock(${JSON.stringify(lock)}); console.log('won'); await new Promise((r) => setTimeout(r, 1500)); }
+      try { acquireLock(${JSON.stringify(lock)}); console.log('won'); process.stdin.resume(); await new Promise((r) => process.stdin.on('end', r)); }
       catch (error) { console.log(error.name); }
     `;
-    const results = await Promise.all(
-      Array.from({ length: 6 }, () => run(process.execPath, ['--input-type=module', '-e', script])),
+    const children = Array.from({ length: 6 }, () =>
+      spawn(process.execPath, ['--input-type=module', '-e', script], {
+        stdio: ['pipe', 'pipe', 'inherit'],
+      }),
     );
-    const outcomes = results.map((result) => result.stdout.trim());
+    const exited = children.map((child) => new Promise((resolve) => child.once('close', resolve)));
+    const outcomes = await Promise.all(
+      children.map(
+        (child) =>
+          new Promise<string>((resolve) => {
+            child.stdout.once('data', (chunk: Buffer) => resolve(String(chunk).trim()));
+          }),
+      ),
+    );
+    for (const child of children) child.stdin.end();
+    await Promise.all(exited);
     expect(outcomes.filter((outcome) => outcome === 'won')).toHaveLength(1);
     expect(outcomes.filter((outcome) => outcome === 'AlreadyRunning')).toHaveLength(5);
   });

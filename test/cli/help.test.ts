@@ -40,7 +40,18 @@ function aip(
 
 function tree(): Command {
   const program = new Command().name('aip');
-  registerCommands(program);
+  registerCommands(program, undefined, {
+    cwd: base,
+    env: env(),
+    isTTY: false,
+    entry: [process.execPath, main],
+    pid: process.pid,
+    stdout: () => undefined,
+    stderr: () => undefined,
+    setExitCode: () => undefined,
+    exit: () => undefined,
+    onSignal: () => undefined,
+  });
   return program;
 }
 

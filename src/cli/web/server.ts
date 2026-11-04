@@ -51,6 +51,8 @@ export interface WebOptions {
    * (`aip web` on its own) both restarts answer 409 `web_standalone`.
    */
   system?: SystemHooks;
+  /** Where failures after a response go (the daemon log); dropped by default. */
+  log?: (line: string) => void;
 }
 
 export interface SystemHooks {
@@ -780,7 +782,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     response.once('finish', () => {
       setImmediate(() => {
         action().catch((error: unknown) => {
-          process.stderr.write(`aip web: restart failed: ${(error as Error).message}\n`);
+          options.log?.(`aip web: restart failed: ${(error as Error).message}`);
         });
       });
     });

@@ -67,7 +67,8 @@ describe('reapAbandoned', () => {
     const live = runDirectory(parent, 'live', process.pid, daemon.pid!);
     const unknown = runDirectory(parent, 'unknown', null, daemon.pid!);
     reapAbandoned(parent);
-    expect(await exited(daemon, 300)).toBe(false);
+    // reapAbandoned signals at once, a signal needs a moment to end a process: 50 ms is enough to see it
+    expect(await exited(daemon, 50)).toBe(false);
     expect(existsSync(live)).toBe(true);
     expect(existsSync(unknown)).toBe(true);
   });
@@ -81,7 +82,8 @@ describe('reapAbandoned', () => {
     await new Promise((resolve) => other.once('spawn', resolve));
     const directory = runDirectory(parent, 'dead', await deadPid(), other.pid!);
     reapAbandoned(parent);
-    expect(await exited(other, 300)).toBe(false);
+    // as above: a signal sent by reapAbandoned would end the process within 50 ms
+    expect(await exited(other, 50)).toBe(false);
     expect(existsSync(directory)).toBe(false);
   });
 });

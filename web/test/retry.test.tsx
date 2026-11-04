@@ -279,26 +279,6 @@ describe('retry every failed group', () => {
 });
 
 describe('accepted answers', () => {
-  it('lists answers of a person and of the autopilot', async () => {
-    const api = fakeApi({
-      group: vi.fn(async () =>
-        groupView({
-          decisions: [
-            { stepId: 'plan', question: 'Какой формат?', answer: 'JSON', by: 'human' },
-            { stepId: 'code', question: 'Продолжать?', answer: 'Да', by: 'autopilot' },
-          ],
-        }),
-      ),
-    });
-    panel('done', api);
-    const section = await screen.findByRole('region', { name: 'accepted answers' });
-    expect(within(section).getByText('Какой формат?')).toBeTruthy();
-    expect(section.textContent).toContain('→ JSON');
-    expect(section.textContent).toContain('(human, plan)');
-    expect(section.textContent).toContain('→ Да');
-    expect(section.textContent).toContain('(autopilot, code)');
-  });
-
   it('shows the answer in the feedback of the attempt that asked', async () => {
     const api = fakeApi({
       group: vi.fn(async () =>

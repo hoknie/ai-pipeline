@@ -328,8 +328,6 @@ export const ru: Dictionary = {
       none: 'Попыток пока нет.',
     },
     decisions: {
-      label: 'принятые ответы',
-      heading: 'Принятые ответы · {{n}}',
       human: 'человек',
       autopilot: 'автопилот',
     },

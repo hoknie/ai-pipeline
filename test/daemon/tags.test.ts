@@ -238,8 +238,11 @@ describe('tag events', () => {
     subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
     await until('the snapshot', () => events.length > 0);
     await h.call('run_tags', { runId: created.runId, add: ['auth'] });
-    await until('a run event', () => events.some((event) => event.event === 'run'));
-    const run = events.find((event) => event.event === 'run');
+    // the snapshot may carry the run as well, still without the tag: wait for the event of the change
+    const tagged = (event: StreamEvent) =>
+      event.event === 'run' && (event.run as unknown as RunView).tags.length > 0;
+    await until('a run event with the tag', () => events.some(tagged));
+    const run = events.find(tagged);
     expect(run?.event === 'run' ? (run.run as unknown as RunView).tags : null).toMatchObject([
       { name: 'auth' },
     ]);

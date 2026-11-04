@@ -29,7 +29,7 @@ async function daemon(): Promise<{ running: RunningDaemon; base: string; state: 
       AIP_CLAUDE_BIN: join(fakes, 'claude'),
       AIP_OPENCODE_BIN: join(fakes, 'opencode'),
     },
-    socketCheckMs: 20,
+    socketCheckMs: 10,
   });
   started.push(running);
   return { running, base, state };
@@ -50,7 +50,8 @@ describe('daemon socket check', () => {
     const { running } = await daemon();
     const outcome = await Promise.race([
       running.closed.then(() => 'stopped'),
-      new Promise((resolve) => setTimeout(() => resolve('running'), 200)),
+      // five checks of the socket (10 ms each) pass without a stop
+      new Promise((resolve) => setTimeout(() => resolve('running'), 50)),
     ]);
     expect(outcome).toBe('running');
   });

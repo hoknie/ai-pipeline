@@ -12,7 +12,7 @@ import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
 import {
@@ -26,27 +26,47 @@ import {
 } from './sandbox.ts';
 
 describe('cli', () => {
-  it('starts, reports and stops the daemon with aip daemon', async () => {
-    const box = sandbox();
-    const first = await aip(box, 'daemon', 'start');
-    expect(first.code).toBe(0);
-    const pid = /started \(pid (\d+)\)/.exec(first.stdout)?.[1];
-    expect(pid).toBeDefined();
-    const status = await aip(box, 'daemon', 'status');
-    expect(status.code).toBe(0);
-    expect(status.stdout).toContain(`aip daemon: running (pid ${pid})`);
-    expect(status.stdout).toContain('busy: no');
-    const again = await aip(box, 'daemon', 'start');
-    expect(again).toMatchObject({ code: 0, stdout: `aip daemon: already running (pid ${pid})\n` });
-    const json = JSON.parse((await aip(box, 'daemon', 'status', '--json')).stdout) as {
-      running: boolean;
-      pid: number;
-    };
-    expect(json).toMatchObject({ running: true, pid: Number(pid) });
-    const stopped = await aip(box, 'daemon', 'stop');
-    expect(stopped).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
-    expect(existsSync(box.socket)).toBe(false);
-    expect(existsSync(join(box.state, 'aip.pid'))).toBe(false);
+  describe('aip daemon start, status and stop', () => {
+    let box: Sandbox;
+    let first: Awaited<ReturnType<typeof aip>>;
+    let pid: string | undefined;
+    beforeAll(async () => {
+      box = sandbox(undefined, { shared: true });
+      first = await aip(box, 'daemon', 'start');
+      pid = /started \(pid (\d+)\)/.exec(first.stdout)?.[1];
+    });
+
+    it('starts the daemon', () => {
+      expect(first.code).toBe(0);
+      expect(pid).toBeDefined();
+    });
+
+    it('reports it running and not busy', async () => {
+      const status = await aip(box, 'daemon', 'status');
+      expect(status.code).toBe(0);
+      expect(status.stdout).toContain(`aip daemon: running (pid ${pid})`);
+      expect(status.stdout).toContain('busy: no');
+    });
+
+    it('does not start a second one and reports json status', async () => {
+      const again = await aip(box, 'daemon', 'start');
+      expect(again).toMatchObject({
+        code: 0,
+        stdout: `aip daemon: already running (pid ${pid})\n`,
+      });
+      const json = JSON.parse((await aip(box, 'daemon', 'status', '--json')).stdout) as {
+        running: boolean;
+        pid: number;
+      };
+      expect(json).toMatchObject({ running: true, pid: Number(pid) });
+    });
+
+    it('stops the daemon and removes the socket and pid file', async () => {
+      const stopped = await aip(box, 'daemon', 'stop');
+      expect(stopped).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
+      expect(existsSync(box.socket)).toBe(false);
+      expect(existsSync(join(box.state, 'aip.pid'))).toBe(false);
+    });
   });
 
   it('reports a missing daemon without starting it', async () => {
@@ -79,8 +99,8 @@ describe('cli', () => {
     expect((await aip(box, 'daemon', 'status')).stdout).toContain(`(pid ${next})`);
   });
 
-  async function busy() {
-    const box = sandbox();
+  async function busy(options: { shared?: boolean } = {}) {
+    const box = sandbox(undefined, options);
     writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
     const { runId } = runOf(
       (await aip(box, 'run', 'start', 'feature', '--task', 'x', '--json')).stdout,
@@ -103,14 +123,26 @@ describe('cli', () => {
     expect((await aip(box, 'daemon', 'status')).stdout).toContain(`(pid ${pid})`);
   });
 
-  it('stops a busy daemon with --force and interrupts the step', async () => {
-    const { box, runId, pid } = await busy();
-    const forced = await aip(box, 'daemon', 'stop', '--force');
-    expect(forced).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
-    // The next call starts the daemon again; it marks the step it found running as interrupted.
-    const shown = await aip(box, 'run', 'show', runId, '--json');
-    expect(shown.code).toBe(0);
-    expect(shown.stdout).toMatch(/"reason":\s*"interrupted"/);
+  describe('a busy daemon stopped with --force', () => {
+    let box: Sandbox;
+    let runId: string;
+    let pid: string | undefined;
+    let forced: Awaited<ReturnType<typeof aip>>;
+    beforeAll(async () => {
+      ({ box, runId, pid } = await busy({ shared: true }));
+      forced = await aip(box, 'daemon', 'stop', '--force');
+    });
+
+    it('stops', () => {
+      expect(forced).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
+    });
+
+    it('interrupts the step', async () => {
+      // The next call starts the daemon again; it marks the step it found running as interrupted.
+      const shown = await aip(box, 'run', 'show', runId, '--json');
+      expect(shown.code).toBe(0);
+      expect(shown.stdout).toMatch(/"reason":\s*"interrupted"/);
+    });
   });
 
   it('stops the daemon cleanly on SIGTERM', async () => {

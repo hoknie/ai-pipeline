@@ -2,7 +2,6 @@ import { execFile, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { createInterface } from 'node:readline/promises';
 
 import { configPaths, defaultRuntimes, loadRuntimeSettings } from '../config/index.ts';
 import { findExecutable } from '../runtime/index.ts';
@@ -36,7 +35,7 @@ export interface SetupDeps {
   exists(path: string): boolean;
 }
 
-export function systemDeps(env: NodeJS.ProcessEnv = process.env): SetupDeps {
+export function systemDeps(env: NodeJS.ProcessEnv): SetupDeps {
   return {
     env,
     root: join(import.meta.dirname, '..', '..'),
@@ -398,16 +397,11 @@ function packageName(root: string): { name: string; version: string } {
   };
 }
 
-async function confirm(question: string): Promise<boolean> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = await rl.question(question);
-    return /^y(es)?$/i.test(answer.trim());
-  } catch {
-    return false;
-  } finally {
-    rl.close();
-  }
+type Ask = (question: string) => Promise<string | null>;
+
+async function confirm(ask: Ask, question: string): Promise<boolean> {
+  const answer = await ask(question);
+  return answer !== null && /^y(es)?$/i.test(answer.trim());
 }
 
 /** Flags to hand to `aip setup` when it restarts itself from the global installation. */
@@ -430,6 +424,7 @@ async function installGloballyAndRestart(
   deps: SetupDeps,
   style: Style,
   write: (line: string) => void,
+  ask: Ask,
 ): Promise<number> {
   const { name, version } = packageName(deps.root);
   const spec = `${name}@${version}`;
@@ -442,7 +437,10 @@ async function installGloballyAndRestart(
   }
   if (
     !options.yes &&
-    !(await confirm(`aip is running from a temporary npx copy. Install ${spec} globally? [y/N] `))
+    !(await confirm(
+      ask,
+      `aip is running from a temporary npx copy. Install ${spec} globally? [y/N] `,
+    ))
   ) {
     write(`${style.danger('✗')} Not installed. Run \`${command}\` yourself, then \`aip setup\`.`);
     return 1;
@@ -477,11 +475,12 @@ async function installGloballyAndRestart(
 export async function setupCommand(
   options: SetupOptions,
   style: Style,
-  deps: SetupDeps = systemDeps(),
-  write: (line: string) => void = (line) => process.stdout.write(`${line}\n`),
+  deps: SetupDeps,
+  write: (line: string) => void,
+  ask: Ask = async () => null,
 ): Promise<number> {
   if (isNpxCache(deps.root, deps.env))
-    return installGloballyAndRestart(options, deps, style, write);
+    return installGloballyAndRestart(options, deps, style, write, ask);
   const outcomes = await runSetup(planSetup(options, deps), options, (outcome) =>
     write(formatOutcome(outcome, style)),
   );

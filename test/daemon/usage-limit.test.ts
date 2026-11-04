@@ -80,7 +80,8 @@ describe('a usage limit in the queue', () => {
       if (Date.now() > deadline) throw new Error(`timed out; runs: ${JSON.stringify(runs)}`);
       await pause(POLL_MS);
     }
-    await pause(200);
+    // negative check: a short pause is enough for a wrong start to show
+    await pause(50);
     const after = await queueOf(h);
     expect(after.status).toBe('stopped');
     expect(after.stop).toMatchObject({ kind: 'limit', runtime: 'claude', autoResume: true });
@@ -92,8 +93,8 @@ describe('a usage limit in the queue', () => {
 
   it('lets the group wait for the reset, resumes its session and the queue by itself', async () => {
     const h = await start();
-    // the reset is 2-3 s away by the wall clock, 0.4-1.4 s by the clock of the daemon
-    skewMs = 1600;
+    // the reset is 2-3 s away by the wall clock, 0.7-1.7 s by the clock of the daemon
+    skewMs = 1300;
     h.script({ code: [{ usageLimit: { resetsAt: resetIn(2) } }, {}] });
     await add(h, 'A');
     await add(h, 'B');

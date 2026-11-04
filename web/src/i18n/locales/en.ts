@@ -323,8 +323,6 @@ export const en = {
       none: 'No attempts yet.',
     },
     decisions: {
-      label: 'accepted answers',
-      heading: 'Accepted answers · {{n}}',
       human: 'human',
       autopilot: 'autopilot',
     },

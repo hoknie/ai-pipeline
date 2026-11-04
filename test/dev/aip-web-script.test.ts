@@ -82,9 +82,8 @@ function alive(pid: number): boolean {
 
 const pidOf = (): number => Number(readFileSync(join(state, 'pid'), 'utf8'));
 
-async function waitDead(pid: number): Promise<void> {
-  for (let i = 0; i < 100 && alive(pid); i += 1) await new Promise((r) => setTimeout(r, 50));
-}
+/** Resolves when `manual` has exited: its `exit` event, not a poll of the pid. */
+let manualExit: Promise<unknown> = Promise.resolve();
 
 afterEach(async () => {
   manual?.kill('SIGKILL');
@@ -126,7 +125,7 @@ describe('scripts/aip-web.sh', () => {
     const pid = pidOf();
     const stopped = await run(['stop']);
     expect(stopped.code).toBe(0);
-    await waitDead(pid);
+    // the script returns once the process has exited
     expect(alive(pid)).toBe(false);
     const again = await run(['stop']);
     expect(again.code).toBe(0);
@@ -178,18 +177,20 @@ describe('scripts/aip-web.sh', () => {
       [join(base, 'bin', 'main.ts'), 'web', '--port', String(port)],
       {
         env: { ...process.env, AIP_WEB_TOKEN: 'abcdefghijklmnop1234' },
-        stdio: 'ignore',
+        stdio: ['ignore', 'pipe', 'ignore'],
       },
     );
-    for (let i = 0; i < 100; i += 1) {
-      try {
-        await fetch(`http://127.0.0.1:${port}/`);
-        break;
-      } catch {
-        await new Promise((r) => setTimeout(r, 50));
-      }
-    }
-    return manual.pid as number;
+    const child = manual;
+    manualExit = new Promise((done) => child.once('exit', done));
+    // the fake prints its link once it listens
+    await new Promise<void>((done) => {
+      let seen = '';
+      child.stdout?.on('data', (chunk: Buffer) => {
+        seen += chunk.toString();
+        if (seen.includes('aip web: http')) done();
+      });
+    });
+    return child.pid as number;
   }
 
   portIt('restart stops an aip web started by hand on the port', async () => {
@@ -197,7 +198,7 @@ describe('scripts/aip-web.sh', () => {
     const manualPid = await startManual();
     const result = await run(['restart', String(port)]);
     expect(result.code).toBe(0);
-    await waitDead(manualPid);
+    await manualExit;
     expect(alive(manualPid)).toBe(false);
     expect((await fetch(`http://127.0.0.1:${port}/`)).status).toBe(200);
   });
@@ -218,7 +219,7 @@ describe('scripts/aip-web.sh', () => {
     const result = await run(['stop', String(port)]);
     expect(result.code).toBe(0);
     expect(result.out).toContain('aip web stopped');
-    await waitDead(manualPid);
+    await manualExit;
     expect(alive(manualPid)).toBe(false);
   });
 

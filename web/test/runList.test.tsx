@@ -45,7 +45,8 @@ const full = () =>
     tags: [tagView('auth')],
     progress: { done: 2, total: 4 },
     usage: { inputTokens: 12_300, outputTokens: 1_100, costUsd: 0.42 },
-    diff: { files: 2, added: 367, removed: 0 },
+    diff: null,
+    liveDiff: { files: 2, added: 367, removed: 0 },
   });
 
 describe('run row layout', () => {
@@ -62,26 +63,29 @@ describe('run row layout', () => {
   });
 
   it('shows dashes without a name and without a diff', () => {
-    const row = show(runView({ name: null, diff: null, progress: { done: 0, total: 4 } }));
+    const row = show(
+      runView({ name: null, diff: null, liveDiff: null, progress: { done: 0, total: 4 } }),
+    );
     expect(within(row).getAllByText('—')).toHaveLength(2);
     expect(within(row).getByRole('progressbar').textContent).toBe('0%');
   });
 
-  it('shows a dash while no group is merged, even with a live diff', () => {
+  it('shows the live diff before any group is merged', () => {
     const row = show({
       ...full(),
       diff: null,
       liveDiff: { files: 2, added: 367, removed: 0 },
     });
-    expect(row.textContent).not.toContain('+367');
-    expect(row.textContent).toContain('—');
+    expect(row.textContent).toContain('2 files +367 −0');
   });
 
-  it('truncates the title to one line and keeps the full text in the tooltip', () => {
+  it('wraps the full title and keeps it in the tooltip', () => {
     const title = 'очень длинное название запуска '.repeat(8).trim();
     const row = show(runView({ title }));
     const first = row.querySelector('span')!;
-    expect(first.className).toContain('truncate');
+    expect(first.className).not.toContain('truncate');
+    expect(first.textContent).toContain(title);
+    expect(first.textContent).not.toContain('…');
     expect(row.getAttribute('title')).toContain(title);
   });
 

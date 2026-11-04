@@ -86,7 +86,7 @@ export interface SpawnRestartOptions {
   entry: string[];
   stateDirectory: string;
   force: boolean;
-  environment?: NodeJS.ProcessEnv;
+  environment: NodeJS.ProcessEnv;
 }
 
 /**
@@ -105,7 +105,7 @@ export function spawnDaemonRestart(options: SpawnRestartOptions): void {
       {
         detached: true,
         stdio: ['ignore', output, output],
-        env: options.environment ?? process.env,
+        env: options.environment,
       },
     );
     child.on('error', () => undefined);

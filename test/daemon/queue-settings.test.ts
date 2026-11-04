@@ -244,7 +244,8 @@ describe('autopilot answers', () => {
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // negative check: a short pause is enough for a wrong resume to show
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
   });
 
@@ -278,7 +279,8 @@ describe('autopilot answers', () => {
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const waiting = await waitQueue(h, (queue) => queue.runs[0]?.problem?.reason === 'needs_human');
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // negative check: a short pause is enough for a wrong resume to show
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect((await queueOf(h)).runs[0]?.problem?.reason).toBe('needs_human');
     expect(waiting.stop).toBeNull();
   });

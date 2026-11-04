@@ -47,6 +47,7 @@ import {
 } from '../protocol/index.ts';
 
 import { examples as renderExamples, HELP_GROUPS } from './help.ts';
+import { writeLine, failLine, type CliIo } from './io.ts';
 import { VERSION } from './version.ts';
 import { latestRepository } from './web/default-repository.ts';
 import { registerDaemon } from './daemon.ts';
@@ -61,16 +62,17 @@ export interface Context {
   socket: string;
   entry: string[];
   style: Style;
+  io: CliIo;
 }
 
-export function context(): Context {
-  const directory = stateDirectoryFromEnvironment();
-  const script = process.argv[1] ?? '';
+export function context(io: CliIo, style: Style): Context {
+  const directory = stateDirectoryFromEnvironment(io.env);
   return {
     stateDirectory: directory,
     socket: socketPath(directory),
-    entry: [process.execPath, script],
-    style: activeStyle,
+    entry: io.entry,
+    style,
+    io,
   };
 }
 
@@ -97,24 +99,24 @@ export async function daemon(ctx: Context, client = 'aip'): Promise<DaemonCheck>
   const message = daemonMismatchMessage(check, client);
   if (message && !warned.has(message)) {
     warned.add(message);
-    process.stderr.write(`aip: warning: ${message}\n`);
+    ctx.io.stderr(`aip: warning: ${message}\n`);
   }
   return check;
 }
 
-function print(value: string): void {
-  process.stdout.write(`${value}\n`);
+/** The helpers of the commands, bound to the streams and the style of one call. */
+function bind(io: CliIo, style: Style) {
+  const print = (value: string): void => writeLine(io, value);
+  return {
+    print,
+    output: (json: boolean | undefined, text: string, data: unknown): void =>
+      print(json ? JSON.stringify(data, null, 2) : text),
+    examples: (lines: string[]): string => renderExamples(lines, style),
+    context: (): Context => context(io, style),
+    activeStyle: style,
+  };
 }
-
-function output(json: boolean | undefined, text: string, data: unknown): void {
-  print(json ? JSON.stringify(data, null, 2) : text);
-}
-
-let activeStyle: Style = plainStyle;
-
-function examples(lines: string[]): string {
-  return renderExamples(lines, activeStyle);
-}
+type Bound = ReturnType<typeof bind>;
 
 function readGroups(file: string) {
   return proposedGroupSchema
@@ -159,11 +161,10 @@ function parseSwitch(flag: string, value: string | undefined): boolean | undefin
   throw new Error(`${flag} must be on or off`);
 }
 
-function showQueue(json: boolean | undefined, view: QueueView): void {
-  output(json, formatQueue(view, activeStyle), view);
-}
-
-function registerQueue(program: Command): void {
+function registerQueue(program: Command, io: CliIo, style: Style): void {
+  const { print, output, examples, context, activeStyle } = bind(io, style);
+  const showQueue = (json: boolean | undefined, view: QueueView): void =>
+    output(json, formatQueue(view, activeStyle), view);
   const queue = program
     .command('queue')
     .description('Tasks waiting for a start: add, reorder and run them one by one or in parallel');
@@ -559,7 +560,8 @@ function registerQueue(program: Command): void {
     });
 }
 
-function registerRepositories(program: Command): void {
+function registerRepositories(program: Command, io: CliIo, style: Style): void {
+  const { print, output, examples, context, activeStyle } = bind(io, style);
   const repo = program
     .command('repo')
     .description('Repositories the daemon knows: list, add and remove them');
@@ -608,7 +610,8 @@ function registerRepositories(program: Command): void {
     });
 }
 
-function registerTag(program: Command): void {
+function registerTag(program: Command, io: CliIo, style: Style): void {
+  const { print, output, examples, context, activeStyle } = bind(io, style);
   const tag = program
     .command('tag')
     .description(
@@ -677,7 +680,8 @@ function registerTag(program: Command): void {
     });
 }
 
-function registerRun(program: Command): void {
+function registerRun(program: Command, io: CliIo, style: Style): void {
+  const { print, output, examples, context, activeStyle } = bind(io, style);
   const run = program
     .command('run')
     .description('Start, follow, deliver and clean up runs of a workflow');
@@ -833,7 +837,7 @@ function registerRun(program: Command): void {
     .argument('[run-id]', 'run id; defaults to the latest active run')
     .addHelpText('after', examples(['aip run watch', 'aip run watch 0mh3k2ab1x9z']))
     .action(async (runId: string | undefined) => {
-      await watch(context(), runId);
+      await watch(context(), runId, io.watchIntervalMs);
     });
 
   run
@@ -860,7 +864,7 @@ function registerRun(program: Command): void {
         runId,
         ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
       })) as QueueView & { item: string };
-      showQueue(options.json, view);
+      output(options.json, formatQueue(view, activeStyle), view);
     });
 
   run
@@ -887,7 +891,7 @@ function registerRun(program: Command): void {
         })) as ApplyResult;
         output(options.json, formatApply(result, activeStyle), result);
         if (result.groups.some((group) => group.delivery.state === 'apply_failed'))
-          process.exitCode = 1;
+          io.setExitCode(1);
       },
     );
 
@@ -945,7 +949,8 @@ function registerRun(program: Command): void {
     });
 }
 
-function registerGroup(program: Command): void {
+function registerGroup(program: Command, io: CliIo, style: Style): void {
+  const { print, output, examples, context, activeStyle } = bind(io, style);
   const group = program
     .command('group')
     .description('Inspect and steer one group of a run: attempts, retry, cancel, answer');
@@ -1033,16 +1038,16 @@ function registerGroup(program: Command): void {
     });
 }
 
-export function registerCommands(program: Command, style: Style = plainStyle): void {
-  activeStyle = style;
+export function registerCommands(program: Command, style: Style = plainStyle, io: CliIo): void {
+  const { print, output, examples, context, activeStyle } = bind(io, style);
   const [runs, queueGroup, dashboards, setup, plumbing] = HELP_GROUPS;
   program.commandsGroup(runs!.heading);
-  registerRun(program);
-  registerGroup(program);
+  registerRun(program, io, style);
+  registerGroup(program, io, style);
   program.commandsGroup(queueGroup!.heading);
-  registerQueue(program);
-  registerRepositories(program);
-  registerTag(program);
+  registerQueue(program, io, style);
+  registerRepositories(program, io, style);
+  registerTag(program, io, style);
   program.commandsGroup(dashboards!.heading);
   const web = program
     .command('web')
@@ -1062,9 +1067,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       examples(['aip web', 'aip web --port 8080 --open', 'aip web start', 'aip web status']),
     )
     .action(async (options: { port?: string; host?: string; open?: boolean }) => {
-      const settings = loadWebSettings(
-        configPaths(process.cwd(), process.env.XDG_CONFIG_HOME, process.env.HOME),
-      );
+      const settings = loadWebSettings(configPaths(io.cwd, io.env.XDG_CONFIG_HOME, io.env.HOME));
       const host = options.host ?? settings.host;
       const port = options.port === undefined ? settings.port : Number(options.port);
       if (!Number.isInteger(port) || port < 0 || port > 65535)
@@ -1074,17 +1077,17 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       assertLoopbackHost(host);
       let token: string | undefined;
       if (settings.auth === 'none') {
-        if (process.env.AIP_WEB_TOKEN)
-          process.stderr.write('aip web: AIP_WEB_TOKEN is ignored: web.auth is none\n');
+        if (io.env.AIP_WEB_TOKEN)
+          io.stderr('aip web: AIP_WEB_TOKEN is ignored: web.auth is none\n');
       } else {
-        token = webTokenFromEnv(process.env);
+        token = webTokenFromEnv(io.env);
       }
       const ctx = context();
       await daemon(ctx, 'aip web');
       const autostart =
         settings.autostart &&
-        process.env.AIP_WEB_AUTOSTART !== '0' &&
-        process.env.AIP_WEB_AUTOSTART !== 'false';
+        io.env.AIP_WEB_AUTOSTART !== '0' &&
+        io.env.AIP_WEB_AUTOSTART !== 'false';
       let url: string | undefined;
       if (autostart && host === settings.host && port === settings.port) {
         // A panel stopped by `aip web stop` is not coming back: do not wait for it.
@@ -1092,7 +1095,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
           (result) => (result as { stopped?: boolean }).stopped === true,
           () => false,
         );
-        const deadline = Date.now() + (stopped ? 0 : 5000);
+        const deadline = Date.now() + (stopped ? 0 : (io.panelWaitMs ?? 5000));
         for (;;) {
           const state = readPanelState(ctx.stateDirectory);
           if (state !== null && state.host === host && state.port === port) {
@@ -1102,11 +1105,11 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
             break;
           }
           if (Date.now() >= deadline) break;
-          await new Promise((done) => setTimeout(done, 100));
+          await new Promise((done) => setTimeout(done, io.panelPollMs ?? 100));
         }
       }
       if (url !== undefined) {
-        if (options.open) openBrowser(url);
+        if (options.open) openBrowser(url, io.stderr);
         return;
       }
       let web: WebServer;
@@ -1130,15 +1133,15 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       }
       print(`aip web: ${web.url}`);
       print('Press Ctrl+C to stop.');
-      if (options.open) openBrowser(web.url);
+      if (options.open) openBrowser(web.url, io.stderr);
       await new Promise<void>((resolve) => {
-        process.once('SIGINT', resolve);
-        process.once('SIGTERM', resolve);
+        io.onSignal('SIGINT', resolve);
+        io.onSignal('SIGTERM', resolve);
       });
       await web.close();
     });
 
-  registerWebControl(web, activeStyle);
+  registerWebControl(web, activeStyle, io);
 
   program
     .command('events')
@@ -1149,15 +1152,12 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       const ctx = context();
       await daemon(ctx);
       let interrupted = false;
-      process.once('SIGINT', () => {
+      io.onSignal('SIGINT', () => {
         interrupted = true;
-        process.exit(0);
+        io.exit(0);
       });
-      await subscribe(ctx.socket, (line) => process.stdout.write(`${line}\n`));
-      if (!interrupted) {
-        process.stderr.write('aip events: the daemon closed the stream\n');
-        process.exitCode = 1;
-      }
+      await subscribe(ctx.socket, (line) => print(line));
+      if (!interrupted) failLine(io, 'aip events', 'the daemon closed the stream');
     });
 
   program.commandsGroup(setup!.heading);
@@ -1183,17 +1183,22 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
         opencode: boolean;
         plugin: boolean;
       }) => {
-        const { setupCommand } = await import('./setup.ts');
-        process.exitCode = await setupCommand(
-          {
-            yes: options.yes ?? false,
-            dryRun: options.dryRun ?? false,
-            force: options.force ?? false,
-            claude: options.claude,
-            opencode: options.opencode,
-            plugin: options.plugin,
-          },
-          activeStyle,
+        const { setupCommand, systemDeps } = await import('./setup.ts');
+        io.setExitCode(
+          await setupCommand(
+            {
+              yes: options.yes ?? false,
+              dryRun: options.dryRun ?? false,
+              force: options.force ?? false,
+              claude: options.claude,
+              opencode: options.opencode,
+              plugin: options.plugin,
+            },
+            activeStyle,
+            systemDeps(io.env),
+            print,
+            io.ask,
+          ),
         );
       },
     );
@@ -1207,11 +1212,11 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
       try {
         const { initConfig } = await import('./init.ts');
         const result = await initConfig({
-          cwd: process.cwd(),
+          cwd: io.cwd,
           shared: options.shared ?? false,
-          env: process.env,
+          env: io.env,
         });
-        const show = (file: string): string => relative(process.cwd(), file) || file;
+        const show = (file: string): string => relative(io.cwd, file) || file;
         for (const file of result.created) print(`${activeStyle.success('created')} ${show(file)}`);
         for (const file of result.kept)
           print(`${activeStyle.muted('kept   ')} ${show(file)} (already exists)`);
@@ -1219,8 +1224,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
           `\nNext: ${activeStyle.command('aip config check')}, then ${activeStyle.command('aip run start feature --task "Describe the task"')}`,
         );
       } catch (error) {
-        process.stderr.write(`aip init: ${(error as Error).message}\n`);
-        process.exitCode = 1;
+        failLine(io, 'aip init', (error as Error).message);
       }
     });
 
@@ -1234,7 +1238,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
     .addHelpText('after', examples(['aip config check', 'aip config check --repo ~/projects/app']))
     .action(async (options: { repo: string }) => {
       const { checkConfig } = await import('./config-check.ts');
-      process.exitCode = await checkConfig(resolve(options.repo));
+      io.setExitCode(await checkConfig(resolve(io.cwd, options.repo), io));
     });
 
   program
@@ -1249,7 +1253,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
   program.helpCommand('help [command]', 'Show help for a command');
 
   program.commandsGroup(plumbing!.heading);
-  registerDaemon(program, activeStyle);
+  registerDaemon(program, activeStyle, io);
 
   program
     .command('mcp')
@@ -1281,7 +1285,7 @@ export function registerCommands(program: Command, style: Style = plainStyle): v
         }
         const ctx = context();
         const server = createHostServer({
-          cwd: process.cwd(),
+          cwd: io.cwd,
           send: (method, params) => call(ctx, method as Method, params as never),
         });
         await server.connect(new StdioServerTransport());

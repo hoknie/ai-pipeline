@@ -1,3 +1,4 @@
+import type { CliIo } from './io.ts';
 import { stringify } from 'yaml';
 
 import {
@@ -131,30 +132,32 @@ export function configWarnings(config: ResolvedConfig): string[] {
   return warnings;
 }
 
-export async function checkConfig(directory: string, environment = process.env): Promise<number> {
+export async function checkConfig(
+  directory: string,
+  io: Pick<CliIo, 'env' | 'stdout' | 'stderr'>,
+): Promise<number> {
+  const environment = io.env;
   let config: ResolvedConfig;
   let files: string[];
   try {
     const repository = await repositoryRoot(directory);
     ({ config, files } = loadConfigSources(configPathsFromEnvironment(repository)));
   } catch (error) {
-    process.stderr.write(
-      `${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`,
-    );
+    io.stderr(`${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`);
     return 1;
   }
-  process.stdout.write(stringify({ swarm: presentConfig(config) }));
+  io.stdout(stringify({ swarm: presentConfig(config) }));
   const runtimes = [...new Set(config.specialists.map((specialist) => specialist.runtime))];
-  process.stdout.write('\nConfig files:\n');
-  for (const file of files) process.stdout.write(`  ${file}\n`);
-  process.stdout.write('\nAgent CLIs:\n');
+  io.stdout('\nConfig files:\n');
+  for (const file of files) io.stdout(`  ${file}\n`);
+  io.stdout('\nAgent CLIs:\n');
   for (const name of runtimes) {
     const runtime = runtimeFor(name, environment, config.runtimes);
     const path = findExecutable(runtime.executable, environment.PATH);
-    process.stdout.write(
+    io.stdout(
       `  ${name}: ${path ? `${await probeVersion(path)} (${path})` : 'not found in PATH'}\n`,
     );
   }
-  for (const warning of configWarnings(config)) process.stdout.write(`Warning: ${warning}\n`);
+  for (const warning of configWarnings(config)) io.stdout(`Warning: ${warning}\n`);
   return 0;
 }

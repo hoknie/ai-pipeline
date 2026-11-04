@@ -6,6 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { describe, expect, it } from 'vitest';
 
 import { MANUAL_CONFIG } from '../daemon/harness.ts';
+import { waitValue } from '../fixtures/wait-until.ts';
 import { aip, main, sandbox, waitUntil } from './sandbox.ts';
 
 describe('cli', () => {
@@ -201,14 +202,12 @@ describe('cli', () => {
     );
     expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
     await aip(box, 'queue', 'start');
-    let run = '';
-    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+    const run = await waitValue('the queue to stop on a problem', async () => {
       const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
         stop: { kind: string; run?: string } | null;
       };
-      if (view.stop?.kind === 'problem') run = view.stop.run ?? '';
-      else await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      return view.stop?.kind === 'problem' ? view.stop.run || null : null;
+    });
     const returned = await aip(box, 'queue', 'return', run);
     expect(returned.code).toBe(0);
     expect(returned.stdout).toContain(`returns ${run}`);
@@ -239,14 +238,12 @@ describe('cli', () => {
     expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
     expect((await aip(box, 'queue', 'add', 'feature', '--task', 'вторая')).code).toBe(0);
     await aip(box, 'queue', 'start');
-    let run = '';
-    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+    const run = await waitValue('a run in the queue', async () => {
       const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
         runs: { id: string }[];
       };
-      run = view.runs[0]?.id ?? '';
-      if (run === '') await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      return view.runs[0]?.id;
+    });
     const paused = await aip(box, 'run', 'pause', run);
     expect(paused.code).toBe(0);
     expect(paused.stdout).toContain(`paused ${run}`);
@@ -280,14 +277,12 @@ describe('cli', () => {
     await aip(box, 'queue', 'settings', '--skip-failed', 'on');
     expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
     await aip(box, 'queue', 'start');
-    let run = '';
-    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+    const run = await waitValue('a skipped run', async () => {
       const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
         skipped: { id: string }[];
       };
-      if (view.skipped.length > 0) run = view.skipped[0]!.id;
-      else await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+      return view.skipped[0]?.id;
+    });
     expect(run).not.toBe('');
     const dismissed = await aip(box, 'queue', 'dismiss', run, '--json');
     expect(dismissed.code).toBe(0);

@@ -489,7 +489,7 @@ describe('settings page', () => {
     '#settings/global/runtimes',
     '#settings/global/system',
     '#settings/project/delivery',
-  ])('shows a form and no table on %s', async (hash) => {
+  ])('shows a form and no table on the group %s', async (hash) => {
     show(queueOf(), {}, hash);
     await screen.findByRole('button', { name: 'Save' });
     expect(document.querySelector('table')).toBeNull();
@@ -711,7 +711,7 @@ describe('settings form', () => {
     expect(saveButton().disabled).toBe(true);
   });
 
-  it('writes a list of strings and removes the key of an empty one', async () => {
+  it('writes a list of strings without the removed item', async () => {
     const config = vi.fn(async () =>
       configView({
         settings: settingsOf({
@@ -734,6 +734,22 @@ describe('settings form', () => {
         'global',
       ),
     );
+  });
+
+  it('removes the key of a list of strings that became empty', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settings: settingsOf({
+          'defaults.tools': {
+            path: 'defaults.tools',
+            value: ['Read', 'Edit'],
+            written: { global: ['Read', 'Edit'] },
+          },
+        }),
+      }),
+    );
+    const api = show(queueOf(), { config }, '#settings/global/agents');
+    await screen.findByTestId('setting-defaults.tools');
     fireEvent.click(screen.getByRole('button', { name: 'Remove Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Read' }));
     fireEvent.click(saveButton());

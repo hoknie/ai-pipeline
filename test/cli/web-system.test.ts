@@ -71,7 +71,12 @@ describe('spawnDaemonRestart', () => {
     writeFileSync(script, 'console.log(JSON.stringify(process.argv.slice(2)));\n');
     const state = join(dir, 'state');
     for (const force of [false, true]) {
-      spawnDaemonRestart({ entry: [process.execPath, script], stateDirectory: state, force });
+      spawnDaemonRestart({
+        entry: [process.execPath, script],
+        stateDirectory: state,
+        force,
+        environment: process.env,
+      });
       const expected = ['daemon', 'restart', '--web', ...(force ? ['--force'] : [])];
       await until(
         'the helper to write its arguments',
