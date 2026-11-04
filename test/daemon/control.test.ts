@@ -13,7 +13,7 @@ describe('failures and control', () => {
     const h = await start(SHORT_TIMEOUT);
     h.script({ code: [{ hang: true }] });
     const runId = await run(h);
-    const final = await h.waitFor(runId, (view) => view.finished, 15_000);
+    const final = await h.waitFor(runId, (view) => view.finished);
     expect(final.groups[0]).toMatchObject({ status: 'failed', reason: 'timeout' });
   });
 

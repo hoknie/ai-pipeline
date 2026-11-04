@@ -15,7 +15,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
-import { aip, main, runOf, sandbox, waitUntil, type Sandbox } from './sandbox.ts';
+import {
+  aip as aipFast,
+  aipProcess as aip,
+  main,
+  runOf,
+  sandbox,
+  waitUntil,
+  type Sandbox,
+} from './sandbox.ts';
 
 describe('cli', () => {
   it('starts, reports and stops the daemon with aip daemon', async () => {
@@ -71,7 +79,7 @@ describe('cli', () => {
     expect((await aip(box, 'daemon', 'status')).stdout).toContain(`(pid ${next})`);
   });
 
-  it('refuses to stop a busy daemon unless --force, and interrupts the step then', async () => {
+  async function busy() {
     const box = sandbox();
     writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
     const { runId } = runOf(
@@ -81,6 +89,11 @@ describe('cli', () => {
       (await aip(box, 'daemon', 'status')).stdout.includes('busy: yes'),
     );
     const pid = /\(pid (\d+)\)/.exec((await aip(box, 'daemon', 'status')).stdout)?.[1];
+    return { box, runId, pid };
+  }
+
+  it('refuses to stop or restart a busy daemon unless --force', async () => {
+    const { box, pid } = await busy();
     const refused = await aip(box, 'daemon', 'stop');
     expect(refused.code).toBe(1);
     expect(refused.stderr).toContain('--force');
@@ -88,6 +101,10 @@ describe('cli', () => {
     expect(kept.code).toBe(1);
     expect(kept.stderr).toContain('--force');
     expect((await aip(box, 'daemon', 'status')).stdout).toContain(`(pid ${pid})`);
+  });
+
+  it('stops a busy daemon with --force and interrupts the step', async () => {
+    const { box, runId, pid } = await busy();
     const forced = await aip(box, 'daemon', 'stop', '--force');
     expect(forced).toMatchObject({ code: 0, stdout: `aip daemon: stopped (pid ${pid})\n` });
     // The next call starts the daemon again; it marks the step it found running as interrupted.
@@ -591,19 +608,19 @@ describe('cli', () => {
   it('adds a repository by a subdirectory, lists it and refuses a path outside git', async () => {
     const box = sandbox();
     mkdirSync(join(box.repo, 'sub'));
-    const added = await aip(box, 'repo', 'add', join(box.repo, 'sub'));
+    const added = await aipFast(box, 'repo', 'add', join(box.repo, 'sub'));
     expect(added.code).toBe(0);
-    const list = await aip(box, 'repo', 'list', '--json');
+    const list = await aipFast(box, 'repo', 'list', '--json');
     expect(JSON.parse(list.stdout)).toEqual([
       { path: box.repo, addedAt: expect.any(Number), unfinished: 0, waiting: 0, queued: 0 },
     ]);
-    const text = await aip(box, 'repo', 'list');
+    const text = await aipFast(box, 'repo', 'list');
     expect(text.stdout).toContain('REPOSITORY');
     const outside = realpathSync(mkdtempSync(join(tmpdir(), 'aip-outside-')));
-    const refused = await aip(box, 'repo', 'add', outside);
+    const refused = await aipFast(box, 'repo', 'add', outside);
     expect(refused.code).toBe(1);
     expect(refused.stderr).not.toBe('');
-    const removed = await aip(box, 'repo', 'remove', box.repo, '--json');
+    const removed = await aipFast(box, 'repo', 'remove', box.repo, '--json');
     expect(removed.code).toBe(0);
     expect(JSON.parse(removed.stdout)).toEqual([]);
   });
@@ -619,49 +636,51 @@ describe('cli', () => {
 
   it('creates, lists, edits and removes tags', async () => {
     const box = sandbox();
-    expect((await aip(box, 'tag', 'list')).stdout).toContain('No tags yet.');
-    const added = await aip(box, 'tag', 'add', 'auth', '--color', 'blue');
+    expect((await aipFast(box, 'tag', 'list')).stdout).toContain('No tags yet.');
+    const added = await aipFast(box, 'tag', 'add', 'auth', '--color', 'blue');
     expect(added.code).toBe(0);
-    const list = await aip(box, 'tag', 'list');
+    const list = await aipFast(box, 'tag', 'list');
     expect(list.stdout).toMatch(/auth\s+blue/);
-    const bad = await aip(box, 'tag', 'add', 'other', '--color', 'cyan');
+    const bad = await aipFast(box, 'tag', 'add', 'other', '--color', 'cyan');
     expect(bad.code).not.toBe(0);
     expect(bad.stderr).toContain('gray, red, orange');
-    expect((await aip(box, 'tag', 'add', 'AUTH')).stderr).toContain('tag `auth` already exists');
-    const none = await aip(box, 'tag', 'edit', 'auth');
+    expect((await aipFast(box, 'tag', 'add', 'AUTH')).stderr).toContain(
+      'tag `auth` already exists',
+    );
+    const none = await aipFast(box, 'tag', 'edit', 'auth');
     expect(none.code).not.toBe(0);
-    const edited = await aip(box, 'tag', 'edit', 'auth', '--name', 'login', '--color', 'teal');
+    const edited = await aipFast(box, 'tag', 'edit', 'auth', '--name', 'login', '--color', 'teal');
     expect(edited.stdout).toMatch(/login\s+teal/);
-    const json = JSON.parse((await aip(box, 'tag', 'list', '--json')).stdout) as {
+    const json = JSON.parse((await aipFast(box, 'tag', 'list', '--json')).stdout) as {
       name: string;
     }[];
     expect(json.map((tag) => tag.name)).toEqual(['login']);
-    const removed = await aip(box, 'tag', 'remove', 'login');
+    const removed = await aipFast(box, 'tag', 'remove', 'login');
     expect(removed.stdout).toContain('No tags yet.');
-    expect((await aip(box, 'tag', '--help')).stdout.replace(/\s+/g, ' ')).toContain(
+    expect((await aipFast(box, 'tag', '--help')).stdout.replace(/\s+/g, ' ')).toContain(
       'gray, red, orange, yellow, green, teal, blue, violet, pink, brown',
     );
   });
 
   it('keeps the color indigo for linked task tags and shows the TASK column', async () => {
     const box = sandbox();
-    const refused = await aip(box, 'tag', 'add', 'auth', '--color', 'indigo');
+    const refused = await aipFast(box, 'tag', 'add', 'auth', '--color', 'indigo');
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('reserved for linked task tags');
-    await aip(box, 'tag', 'add', 'auth');
-    const list = await aip(box, 'tag', 'list');
+    await aipFast(box, 'tag', 'add', 'auth');
+    const list = await aipFast(box, 'tag', 'list');
     expect(list.stdout).toMatch(/NAME\s+COLOR\s+TASK/);
     expect(list.stdout).toMatch(/auth\s+gray\s+—/);
-    const edit = await aip(box, 'tag', 'edit', 'auth', '--color', 'indigo');
+    const edit = await aipFast(box, 'tag', 'edit', 'auth', '--color', 'indigo');
     expect(edit.code).not.toBe(0);
-    expect((await aip(box, 'tag', '--help')).stdout).not.toContain('indigo');
+    expect((await aipFast(box, 'tag', '--help')).stdout).not.toContain('indigo');
   });
 
   it('puts tags on queued tasks and edits them', async () => {
     const box = sandbox();
-    await aip(box, 'tag', 'add', 'auth');
-    await aip(box, 'tag', 'add', 'v2');
-    const added = await aip(
+    await aipFast(box, 'tag', 'add', 'auth');
+    await aipFast(box, 'tag', 'add', 'v2');
+    const added = await aipFast(
       box,
       'queue',
       'add',
@@ -674,31 +693,33 @@ describe('cli', () => {
       'v2',
     );
     expect(added.code).toBe(0);
-    expect((await aip(box, 'queue', 'list')).stdout).toContain('#auth #v2');
-    const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+    expect((await aipFast(box, 'queue', 'list')).stdout).toContain('#auth #v2');
+    const view = JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as {
       items: { id: string; tags: { name: string }[] }[];
     };
     expect(view.items[0]!.tags.map((tag) => tag.name)).toEqual(['auth', 'v2']);
     const id = view.items[0]!.id;
-    const both = await aip(box, 'queue', 'edit', id, '--tag', 'auth', '--no-tags');
+    const both = await aipFast(box, 'queue', 'edit', id, '--tag', 'auth', '--no-tags');
     expect(both.code).not.toBe(0);
-    expect((await aip(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain('#auth #v2');
-    const replaced = await aip(box, 'queue', 'edit', id, '--tag', 'v2');
+    expect((await aipFast(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain(
+      '#auth #v2',
+    );
+    const replaced = await aipFast(box, 'queue', 'edit', id, '--tag', 'v2');
     expect(replaced.stdout).toContain('#v2');
     expect(replaced.stdout).not.toContain('#auth');
-    const cleared = await aip(box, 'queue', 'edit', id, '--no-tags', '--json');
+    const cleared = await aipFast(box, 'queue', 'edit', id, '--no-tags', '--json');
     expect((JSON.parse(cleared.stdout) as typeof view).items[0]!.tags).toEqual([]);
-    const unknown = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--tag', 'nope');
+    const unknown = await aipFast(box, 'queue', 'add', 'feature', '--task', 'x', '--tag', 'nope');
     expect(unknown.code).not.toBe(0);
     expect(unknown.stderr).toContain('aip tag add nope');
     expect(
-      (JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as typeof view).items,
+      (JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as typeof view).items,
     ).toHaveLength(1);
   });
 
   it('skips steps of queued tasks and edits the list', async () => {
     const box = sandbox();
-    const added = await aip(
+    const added = await aipFast(
       box,
       'queue',
       'add',
@@ -713,19 +734,28 @@ describe('cli', () => {
     const view = JSON.parse(added.stdout) as { items: { id: string; skip: string[] }[] };
     expect(view.items[0]!.skip).toEqual(['review']);
     const id = view.items[0]!.id;
-    expect((await aip(box, 'queue', 'list')).stdout).toContain('skip: review');
-    const both = await aip(box, 'queue', 'edit', id, '--skip', 'review', '--no-skips');
+    expect((await aipFast(box, 'queue', 'list')).stdout).toContain('skip: review');
+    const both = await aipFast(box, 'queue', 'edit', id, '--skip', 'review', '--no-skips');
     expect(both.code).not.toBe(0);
     expect(both.stderr).toContain('--no-skips cannot be combined with --skip');
-    expect((await aip(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain(
+    expect((await aipFast(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain(
       'skip: review',
     );
-    const cleared = await aip(box, 'queue', 'edit', id, '--no-skips', '--json');
+    const cleared = await aipFast(box, 'queue', 'edit', id, '--no-skips', '--json');
     expect((JSON.parse(cleared.stdout) as typeof view).items[0]!.skip).toEqual([]);
-    const unknown = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--skip', 'deploy');
+    const unknown = await aipFast(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'x',
+      '--skip',
+      'deploy',
+    );
     expect(unknown.code).not.toBe(0);
     expect(unknown.stderr).toContain('unknown step `deploy` in skip');
-    const accepted = await aip(
+    const accepted = await aipFast(
       box,
       'run',
       'start',
@@ -737,7 +767,7 @@ describe('cli', () => {
       '--json',
     );
     expect(accepted.code).toBe(0);
-    const started = await aip(box, 'run', 'start', 'feature', '--task', 'y', '--skip', 'nope');
+    const started = await aipFast(box, 'run', 'start', 'feature', '--task', 'y', '--skip', 'nope');
     expect(started.code).not.toBe(0);
     expect(started.stderr).toContain('unknown step `nope` in skip');
   });
@@ -745,20 +775,21 @@ describe('cli', () => {
   it('postpones queued tasks and takes them back, and refuses the flag on `run start`', async () => {
     const box = sandbox();
     const added = JSON.parse(
-      (await aip(box, 'queue', 'add', 'feature', '--task', 'later', '--postpone', '--json')).stdout,
+      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'later', '--postpone', '--json'))
+        .stdout,
     ) as { item: string; items: { id: string; postponed: boolean }[] };
     expect(added.items.find((item) => item.id === added.item)!.postponed).toBe(true);
-    expect((await aip(box, 'queue', 'list')).stdout).toContain('· postponed');
+    expect((await aipFast(box, 'queue', 'list')).stdout).toContain('· postponed');
     const cleared = JSON.parse(
-      (await aip(box, 'queue', 'edit', added.item, '--no-postpone', '--json')).stdout,
+      (await aipFast(box, 'queue', 'edit', added.item, '--no-postpone', '--json')).stdout,
     ) as typeof added;
     expect(cleared.items[0]!.postponed).toBe(false);
-    expect((await aip(box, 'queue', 'list')).stdout).not.toContain('postponed');
+    expect((await aipFast(box, 'queue', 'list')).stdout).not.toContain('postponed');
     const again = JSON.parse(
-      (await aip(box, 'queue', 'edit', added.item, '--postpone', '--json')).stdout,
+      (await aipFast(box, 'queue', 'edit', added.item, '--postpone', '--json')).stdout,
     ) as typeof added;
     expect(again.items[0]!.postponed).toBe(true);
-    const start = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--postpone');
+    const start = await aipFast(box, 'run', 'start', 'feature', '--task', 'x', '--postpone');
     expect(start.code).not.toBe(0);
     expect(start.stderr).toContain('unknown option');
   });
@@ -766,9 +797,9 @@ describe('cli', () => {
   it('queues a task after another one, clears the dependencies and refuses both flags', async () => {
     const box = sandbox();
     const first = JSON.parse(
-      (await aip(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
+      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
     ) as { item: string };
-    const added = await aip(
+    const added = await aipFast(
       box,
       'queue',
       'add',
@@ -787,23 +818,33 @@ describe('cli', () => {
     const second = view.items.find((item) => item.id === view.item)!;
     expect(second).toMatchObject({ readiness: 'waiting' });
     expect(second.after).toMatchObject([{ id: first.item, state: 'waiting' }]);
-    expect((await aip(box, 'queue', 'list')).stdout).toContain(`after #1 ${first.item} (waiting)`);
-    const both = await aip(box, 'queue', 'edit', view.item, '--after', first.item, '--no-after');
+    expect((await aipFast(box, 'queue', 'list')).stdout).toContain(
+      `after #1 ${first.item} (waiting)`,
+    );
+    const both = await aipFast(
+      box,
+      'queue',
+      'edit',
+      view.item,
+      '--after',
+      first.item,
+      '--no-after',
+    );
     expect(both.code).not.toBe(0);
     expect(both.stderr).toContain('--no-after cannot be combined with --after');
-    expect((await aip(box, 'queue', 'list')).stdout).toContain(`after #1 ${first.item}`);
-    const cleared = await aip(box, 'queue', 'edit', view.item, '--no-after', '--json');
+    expect((await aipFast(box, 'queue', 'list')).stdout).toContain(`after #1 ${first.item}`);
+    const cleared = await aipFast(box, 'queue', 'edit', view.item, '--no-after', '--json');
     expect(cleared.code).toBe(0);
     expect(
       (JSON.parse(cleared.stdout) as typeof view).items.find((item) => item.id === view.item)!
         .after,
     ).toEqual([]);
-    const cycle = await aip(box, 'queue', 'edit', first.item, '--after', view.item);
+    const cycle = await aipFast(box, 'queue', 'edit', first.item, '--after', view.item);
     expect(cycle.code).toBe(0);
-    const closing = await aip(box, 'queue', 'edit', view.item, '--after', first.item);
+    const closing = await aipFast(box, 'queue', 'edit', view.item, '--after', first.item);
     expect(closing.code).not.toBe(0);
     expect(closing.stderr).toContain('dependency cycle');
-    const unknown = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--after', 'nope');
+    const unknown = await aipFast(box, 'queue', 'add', 'feature', '--task', 'x', '--after', 'nope');
     expect(unknown.code).not.toBe(0);
     expect(unknown.stderr).toContain('unknown dependency `nope`');
   });
@@ -811,9 +852,9 @@ describe('cli', () => {
   it('queues run start with an unfinished dependency instead of creating a run', async () => {
     const box = sandbox();
     const first = JSON.parse(
-      (await aip(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
+      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
     ) as { item: string };
-    const started = await aip(
+    const started = await aipFast(
       box,
       'run',
       'start',
@@ -826,28 +867,37 @@ describe('cli', () => {
     );
     expect(started.code).toBe(0);
     expect(JSON.parse(started.stdout)).toMatchObject({ run: null });
-    const text = await aip(box, 'run', 'start', 'feature', '--task', 'UI', '--after', first.item);
+    const text = await aipFast(
+      box,
+      'run',
+      'start',
+      'feature',
+      '--task',
+      'UI',
+      '--after',
+      first.item,
+    );
     expect(text.stdout).toMatch(/Task #\d+ \S+ queued at position/);
   });
 
   it('removes a tag from a queued task', async () => {
     const box = sandbox();
-    await aip(box, 'tag', 'add', 'auth');
-    await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--tag', 'auth');
-    await aip(box, 'tag', 'remove', 'auth');
-    const list = await aip(box, 'queue', 'list');
+    await aipFast(box, 'tag', 'add', 'auth');
+    await aipFast(box, 'queue', 'add', 'feature', '--task', 'x', '--tag', 'auth');
+    await aipFast(box, 'tag', 'remove', 'auth');
+    const list = await aipFast(box, 'queue', 'list');
     expect(list.stdout).not.toContain('#auth');
     expect(list.stdout).toContain('x');
   });
 
   it('tags and untags runs and filters the list by any of the tags', async () => {
     const box = sandbox();
-    await aip(box, 'tag', 'add', 'auth');
-    await aip(box, 'tag', 'add', 'v2');
+    await aipFast(box, 'tag', 'add', 'auth');
+    await aipFast(box, 'tag', 'add', 'v2');
     const started = async (title: string, ...tags: string[]) => {
       const queued = JSON.parse(
         (
-          await aip(
+          await aipFast(
             box,
             'run',
             'start',
@@ -864,7 +914,7 @@ describe('cli', () => {
       return queued.run!.runId;
     };
     // Three places: the runs go at once instead of one after another.
-    await aip(box, 'queue', 'settings', '--parallel', '3');
+    await aipFast(box, 'queue', 'settings', '--parallel', '3');
     const a = await started('first', 'auth');
     const b = await started('second');
     const c = await started('third');
@@ -872,26 +922,26 @@ describe('cli', () => {
       const runs = (await request(box.socket, 'status', {})) as { finished: boolean }[];
       return runs.length === 3 && runs.every((run) => run.finished);
     });
-    const tagged = await aip(box, 'run', 'tag', b, 'v2');
+    const tagged = await aipFast(box, 'run', 'tag', b, 'v2');
     expect(tagged.code).toBe(0);
     expect(tagged.stdout).toContain('#v2');
-    expect((await aip(box, 'run', 'show', b)).stdout).toContain('#v2');
-    const filtered = await aip(box, 'run', 'list', '--tag', 'AUTH', '--tag', 'v2');
+    expect((await aipFast(box, 'run', 'show', b)).stdout).toContain('#v2');
+    const filtered = await aipFast(box, 'run', 'list', '--tag', 'AUTH', '--tag', 'v2');
     expect(filtered.stdout).toContain(a);
     expect(filtered.stdout).toContain(b);
     expect(filtered.stdout).not.toContain(c);
     expect(filtered.stdout).toContain('#auth');
-    const one = JSON.parse((await aip(box, 'run', 'list', '--tag', 'v2', '--json')).stdout) as {
+    const one = JSON.parse((await aipFast(box, 'run', 'list', '--tag', 'v2', '--json')).stdout) as {
       id: string;
     }[];
     expect(one.map((run) => run.id)).toEqual([b]);
-    const untagged = await aip(box, 'run', 'untag', b, 'v2');
+    const untagged = await aipFast(box, 'run', 'untag', b, 'v2');
     expect(untagged.stdout).toContain('none');
-    await aip(box, 'tag', 'add', 'idle');
-    const empty = await aip(box, 'run', 'list', '--tag', 'idle');
+    await aipFast(box, 'tag', 'add', 'idle');
+    const empty = await aipFast(box, 'run', 'list', '--tag', 'idle');
     expect(empty.code).toBe(0);
     expect(empty.stdout).toContain('No runs with these tags.');
-    const unknown = await aip(box, 'run', 'tag', b, 'nope');
+    const unknown = await aipFast(box, 'run', 'tag', b, 'nope');
     expect(unknown.code).not.toBe(0);
     expect(unknown.stderr).toContain('unknown tag `nope`');
   }, 120_000);

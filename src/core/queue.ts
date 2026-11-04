@@ -53,11 +53,13 @@ export interface QueueItem {
 export type ProblemReason =
   'needs_human' | 'failed' | 'conflict' | 'cancelled' | 'apply_failed' | 'usage_limit';
 
-/** Problems that stop the queue; a question to a human does not, a usage limit stops it its own way. */
+/**
+ * Problems that stop the queue; a question to a human does not, a usage limit stops it its own
+ * way, and a manual cancel does not either: the user did it on purpose.
+ */
 const STOPPING_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason>([
   'failed',
   'conflict',
-  'cancelled',
   'apply_failed',
 ]);
 
@@ -71,6 +73,7 @@ const SKIPPED_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason>([
 /** Problems that block the tasks depending on the run. */
 const BLOCKING_REASONS: ReadonlySet<ProblemReason> = new Set<ProblemReason>([
   ...STOPPING_REASONS,
+  'cancelled',
   'usage_limit',
 ]);
 

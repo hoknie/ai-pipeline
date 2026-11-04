@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createConnection } from 'node:net';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -22,6 +23,17 @@ interface Action {
    * previous call returned. The results go to queued.jsonl.
    */
   queueChain?: Record<string, unknown>[];
+  /**
+   * Reports through the real worker MCP server (`aip mcp --worker`) instead of sending the same
+   * requests straight to the daemon socket, which is the default: starting a node process for
+   * every attempt costs far more than the rest of an attempt.
+   */
+  realWorker?: boolean;
+  /**
+   * Tool calls made before `split`, `queue` and the report; each answer goes to tools.jsonl as
+   * `{ step, group, name, result }`. Lets a test check the text and the errors of a tool.
+   */
+  toolCalls?: { name: string; arguments: Record<string, unknown> }[];
   delayMs?: number;
   /** Waits until this file exists, after `delayMs`: the test decides when the agent goes on. */
   waitFor?: string;
@@ -102,6 +114,82 @@ async function connectWorker(command: string, commandArgs: string[]) {
       child.stdin.end();
       await closed;
     },
+  };
+}
+
+/** One request to the daemon socket: the same line protocol as `src/protocol/client.ts`. */
+function ipc(socket: string, method: string, params: Record<string, unknown>): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const connection = createConnection(socket);
+    let buffer = '';
+    connection.setEncoding('utf8');
+    connection.once('error', reject);
+    connection.once('connect', () =>
+      connection.write(`${JSON.stringify({ id: 1, method, params })}\n`),
+    );
+    connection.on('data', (chunk: string) => {
+      buffer += chunk;
+      const end = buffer.indexOf('\n');
+      if (end === -1) return;
+      connection.end();
+      const response = JSON.parse(buffer.slice(0, end)) as {
+        ok: boolean;
+        result?: unknown;
+        error?: string;
+      };
+      if (response.ok) resolve(response.result);
+      else reject(new Error(response.error));
+    });
+  });
+}
+
+const toolText = (value: string, isError = false) => ({
+  content: [{ type: 'text', text: value }],
+  ...(isError ? { isError: true } : {}),
+});
+
+/** The tools of the worker server, answered without a worker process; same texts and arguments. */
+function connectDirect(workerArgs: string[]) {
+  const option = (name: string) => workerArgs[workerArgs.indexOf(name) + 1]!;
+  const token = option('--worker');
+  const socket = option('--socket');
+  return {
+    async callTool(request: { name: string; arguments: Record<string, unknown> }) {
+      const input = request.arguments;
+      try {
+        if (request.name === 'swarm_report') {
+          await ipc(socket, 'report', {
+            token,
+            verdict: input.verdict,
+            summary: input.summary,
+            feedback: input.feedback ?? null,
+            questions: input.questions ?? null,
+          });
+          return toolText(`Recorded verdict ${String(input.verdict)}. You can stop now.`);
+        }
+        if (request.name === 'swarm_split') {
+          const groups = input.groups as unknown[];
+          await ipc(socket, 'split', { token, groups });
+          return toolText(
+            `Recorded ${groups.length} group(s). Call swarm_report when you are done.`,
+          );
+        }
+        if ((input.task === undefined) === (input.groups === undefined))
+          throw new Error('pass either task or groups');
+        const { workflow, ...rest } = input;
+        const result = (await ipc(socket, 'worker_queue_add', {
+          token,
+          workflow,
+          ...rest,
+        })) as { item?: string };
+        return toolText(
+          `Queued ${result.item ?? 'the task'} for workflow ${String(workflow)}. It starts when the queue runs.`,
+        );
+      } catch (error) {
+        return toolText((error as Error).message, true);
+      }
+    },
+    async close() {},
   };
 }
 
@@ -186,13 +274,16 @@ if (args.includes('--no-session-persistence') || args.includes('aip-oneshot')) {
   const script = process.env.AIP_FAKE_SCRIPT
     ? JSON.parse(readFileSync(process.env.AIP_FAKE_SCRIPT, 'utf8'))
     : {};
-  const naming = script.naming as { answer?: string; delayMs?: number } | undefined;
+  const naming = script.naming as
+    { answer?: string; delayMs?: number; waitFor?: string } | undefined;
   if (state) {
     mkdirSync(state, { recursive: true });
     appendFileSync(join(state, 'oneshots.jsonl'), `${JSON.stringify({ mode, args })}\n`);
   }
   if (!naming) process.exit(1);
   if (naming.delayMs) await new Promise((resolve) => setTimeout(resolve, naming.delayMs));
+  while (naming.waitFor && !existsSync(naming.waitFor))
+    await new Promise((resolve) => setTimeout(resolve, 10));
   const answer = naming.answer ?? '';
   if (mode === 'claude') {
     console.log(
@@ -371,7 +462,20 @@ if (action.usageLimit && mode === 'claude') {
 }
 
 if (!action.noReport) {
-  const client = await connectWorker(worker.command, worker.args);
+  const client = action.realWorker
+    ? await connectWorker(worker.command, worker.args)
+    : connectDirect(worker.args);
+  appendFileSync(
+    join(state, 'worker.jsonl'),
+    `${JSON.stringify({ step, group, via: action.realWorker ? 'mcp' : 'direct' })}\n`,
+  );
+  for (const call of action.toolCalls ?? []) {
+    const result = await client.callTool(call);
+    appendFileSync(
+      join(state, 'tools.jsonl'),
+      `${JSON.stringify({ step, group, name: call.name, result })}\n`,
+    );
+  }
   if (action.split)
     await client.callTool({ name: 'swarm_split', arguments: { groups: action.split } });
   if (action.queue) {

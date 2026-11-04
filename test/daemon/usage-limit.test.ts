@@ -20,8 +20,12 @@ afterEach(async () => {
   current = null;
 });
 
+/** The clock of the daemon runs this many ms ahead: a reset of the usage limit comes sooner. */
+let skewMs = 0;
+
 async function start(): Promise<Harness> {
-  current = await harness();
+  skewMs = 0;
+  current = await harness(undefined, {}, { now: () => Date.now() + skewMs });
   return current;
 }
 
@@ -88,6 +92,8 @@ describe('a usage limit in the queue', () => {
 
   it('lets the group wait for the reset, resumes its session and the queue by itself', async () => {
     const h = await start();
+    // the reset is 2-3 s away by the wall clock, 0.4-1.4 s by the clock of the daemon
+    skewMs = 1600;
     h.script({ code: [{ usageLimit: { resetsAt: resetIn(2) } }, {}] });
     await add(h, 'A');
     await add(h, 'B');
@@ -129,13 +135,14 @@ describe('a usage limit in the queue', () => {
 
   it('resumes a queue whose reset passed while the daemon was down', async () => {
     const h = await start();
-    const resetsAt = resetIn(2);
-    h.script({ code: [{ usageLimit: { resetsAt } }, {}] });
+    h.script({ code: [{ usageLimit: { resetsAt: resetIn(3600) } }, {}] });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const stopped = await waitQueue(h, (view) => view.stop?.kind === 'limit');
-    // down until the reset has passed; the daemon itself would wake a second after it
-    await h.restart(() => execSleep(Math.max(0, resetsAt * 1000 - Date.now() + 100)));
+    // down until the reset has passed (the clock of the daemon jumps over it)
+    await h.restart(() => {
+      skewMs = 3601_000;
+    });
     const runId = (stopped.stop as { run: string }).run;
     await h.waitFor(runId, (view) => view.state === 'finished');
     expect((await queueOf(h)).stop?.kind).not.toBe('limit');
@@ -290,7 +297,3 @@ describe('return a run to the queue', () => {
     await waitQueue(h, (queue) => queue.runs.length === 0);
   });
 });
-
-function execSleep(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}

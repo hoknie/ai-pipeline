@@ -6,8 +6,10 @@ import { join } from 'node:path';
 import { afterEach } from 'vitest';
 
 import { socketPath } from '../../src/config/index.ts';
+import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
 import { request } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG } from '../daemon/harness.ts';
+import { runCli } from '../../src/cli/program.ts';
+import { TEST_TIMINGS, WORKFLOW_CONFIG } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 
 // Shared by the cli test files; importing this module shuts down the daemons of the sandboxes after
@@ -46,9 +48,15 @@ function stopDaemon(sandbox: Sandbox): void {
   }
 }
 
+/** Daemons started in this process, by socket. */
+const daemons = new Map<string, Promise<RunningDaemon>>();
+
 afterEach(async () => {
   for (const sandbox of sandboxes.splice(0)) {
     closed.add(sandbox.socket);
+    const own = daemons.get(sandbox.socket);
+    daemons.delete(sandbox.socket);
+    await (await own)?.close().catch(() => undefined);
     for (const child of inFlight.get(sandbox.socket) ?? []) child.kill('SIGKILL');
     inFlight.delete(sandbox.socket);
     await request(sandbox.socket, 'shutdown', {}).catch(() => undefined);
@@ -88,7 +96,7 @@ export function sandbox(config = WORKFLOW_CONFIG): Sandbox {
   return created;
 }
 
-export function aip(
+export function aipProcess(
   box: Sandbox,
   ...args: string[]
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -133,4 +141,85 @@ export function runOf(stdout: string): { runId: string } {
   const { run } = JSON.parse(stdout) as { run: { runId: string } | null };
   if (!run) throw new Error('the task waits in the queue');
   return run;
+}
+
+/** Starts the daemon of the sandbox inside the test process, once. */
+export function ownDaemon(box: Sandbox): Promise<RunningDaemon> {
+  let daemon = daemons.get(box.socket);
+  if (!daemon) {
+    daemon = startDaemon({
+      stateDirectory: box.state,
+      entry: [process.execPath, main],
+      environment: box.env,
+      timings: TEST_TIMINGS,
+    });
+    daemons.set(box.socket, daemon);
+  }
+  return daemon;
+}
+
+let running: Promise<unknown> = Promise.resolve();
+
+/**
+ * Runs `aip` inside the test process against a daemon of the test process: no node process is
+ * started per call. The environment, the working directory and the output streams are the
+ * sandbox's for the duration of the call; calls run one after another.
+ */
+export function aip(
+  box: Sandbox,
+  ...args: string[]
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const call = running.then(() => inProcess(box, args));
+  running = call.catch(() => undefined);
+  return call;
+}
+
+async function inProcess(
+  box: Sandbox,
+  args: string[],
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  if (closed.has(box.socket)) {
+    throw new Error('the sandbox is torn down: the test outlived its timeout');
+  }
+  await ownDaemon(box);
+  const savedEnv = { ...process.env };
+  const savedCwd = process.cwd();
+  const savedExitCode = process.exitCode;
+  const stdoutWrite = process.stdout.write;
+  const stderrWrite = process.stderr.write;
+  const consoleMethods = {
+    log: console.log,
+    info: console.info,
+    error: console.error,
+    warn: console.warn,
+  };
+  let stdout = '';
+  let stderr = '';
+  for (const key of Object.keys(process.env)) delete process.env[key];
+  Object.assign(process.env, box.env);
+  process.chdir(box.repo);
+  process.exitCode = undefined;
+  const text = (parts: unknown[]) => `${parts.map(String).join(' ')}\n`;
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += String(chunk);
+    return true;
+  }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+  console.log = console.info = (...parts: unknown[]) => void (stdout += text(parts));
+  console.error = console.warn = (...parts: unknown[]) => void (stderr += text(parts));
+  try {
+    await runCli([process.execPath, main, ...args]);
+    return { code: Number(process.exitCode ?? 0), stdout, stderr };
+  } finally {
+    process.stdout.write = stdoutWrite;
+    process.stderr.write = stderrWrite;
+    Object.assign(console, consoleMethods);
+    process.chdir(savedCwd);
+    for (const key of Object.keys(process.env)) delete process.env[key];
+    Object.assign(process.env, savedEnv);
+    process.exitCode = savedExitCode;
+  }
 }

@@ -999,6 +999,55 @@ describe('project of the settings', () => {
   });
 });
 
+describe('settings target block', () => {
+  const target = () => screen.getByRole('region', { name: 'Where the settings are saved' });
+
+  it('holds the project, its path and the file under the tabs of Project', async () => {
+    show(queueOf(), {}, '#settings/project/general');
+    await screen.findByTestId('setting-max');
+    const block = within(target());
+    expect(block.getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    expect(block.getByText('/repo')).toBeTruthy();
+    expect(block.getByText('Saved to')).toBeTruthy();
+    expect(block.getByText(PROJECT_FILE)).toBeTruthy();
+    const tabs = within(screen.getByRole('tablist', { name: 'level of settings' }));
+    expect(tabs.queryByRole('combobox')).toBeNull();
+    expect(tabs.queryByText(PROJECT_FILE)).toBeNull();
+  });
+
+  it('shows the shared file and the note on Shared', async () => {
+    show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByRole('region', { name: 'Where the settings are saved' });
+    const block = within(target());
+    expect(block.getByText(GLOBAL_FILE)).toBeTruthy();
+    expect(block.getByText('Applies to every repository')).toBeTruthy();
+    expect(block.queryByRole('combobox')).toBeNull();
+  });
+
+  it('shows no file in the Queue group', async () => {
+    show(queueOf(), {}, '#settings/project/queue');
+    await screen.findByRole('region', { name: 'queue settings' });
+    expect(within(target()).queryByText('Saved to')).toBeNull();
+  });
+
+  it('has no block in the Tags group of Shared', async () => {
+    show(queueOf(), {}, '#settings/global/tags');
+    await screen.findByRole('navigation', { name: 'groups of settings' });
+    expect(screen.queryByRole('region', { name: 'Where the settings are saved' })).toBeNull();
+  });
+
+  it('shows only the note and no groups without repositories', async () => {
+    show(
+      queueOf(),
+      { queue: vi.fn(async () => Promise.reject(new Error('none'))) },
+      '#settings/project/general',
+    );
+    await screen.findByText('No repositories yet: add one in the repository menu.');
+    expect(within(target()).getByText(/No repositories yet/)).toBeTruthy();
+    expect(screen.queryByRole('navigation', { name: 'groups of settings' })).toBeNull();
+  });
+});
+
 describe('system group', () => {
   const flush = (ms = 0) =>
     act(async () => {

@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { startDaemon, type DaemonOptions, type RunningDaemon } from '../../src/daemon/index.ts';
+import {
+  startDaemon,
+  type DaemonOptions,
+  type DaemonTimings,
+  type RunningDaemon,
+} from '../../src/daemon/index.ts';
 import {
   request,
   type GroupView,
@@ -16,6 +21,23 @@ import { writeConfigDirectory } from '../fixtures/config.ts';
 
 const root = join(import.meta.dirname, '..', '..');
 const fakes = join(root, 'test', 'fakes');
+
+/**
+ * Short durations of the test daemons: a `timeout: 1s` lasts 50 ms and a stopped agent is killed
+ * after 100 ms.
+ */
+export const TEST_TIMINGS: DaemonTimings = {
+  timeoutUnitMs: 50,
+  drainMs: 50,
+  stopGraceMs: 100,
+  killGraceMs: 100,
+  wakeMarginMs: 20,
+  usageIntervalMs: 20,
+  namingTimeoutMs: 10_000,
+  processStreamMs: 2000,
+  processKillLookMs: 20,
+  processCacheMs: 20,
+};
 
 export const WORKFLOW_CONFIG = `swarm:
   max: 3
@@ -79,7 +101,7 @@ export async function harness(
   environment: NodeJS.ProcessEnv = {},
   options: Pick<
     DaemonOptions,
-    'build' | 'panel' | 'processesIntervalMs' | 'snapshotProcesses'
+    'build' | 'panel' | 'processesIntervalMs' | 'snapshotProcesses' | 'timings' | 'now'
   > = {},
 ): Promise<Harness> {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-daemon-')));
@@ -112,8 +134,8 @@ export async function harness(
       stateDirectory: state,
       entry: [process.execPath, join(root, 'src', 'cli', 'main.ts')],
       environment: env,
-      graceMs: 500,
       ...options,
+      timings: { ...TEST_TIMINGS, ...options.timings },
     });
   let running = await start();
   const socket = running.daemon.socket;

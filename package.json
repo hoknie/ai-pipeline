@@ -29,9 +29,9 @@
     "prepack": "npm run build",
     "build": "tsc -p tsconfig.build.json && vite build --config web/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project web --maxWorkers=3 && vitest run --project e2e --maxWorkers=3",
     "format": "prettier --write .",
-    "check": "prettier --check . && tsc -p tsconfig.json && tsc -p web/tsconfig.json && vitest run"
+    "check": "prettier --check . && tsc -p tsconfig.json && tsc -p web/tsconfig.json && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

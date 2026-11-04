@@ -31,11 +31,27 @@ if (typeof window !== 'undefined') {
 if (typeof window !== 'undefined') {
   // `findBy…` and `waitFor` give up after one second by default; the suite often runs next to other
   // test runs, and a loaded machine renders slower than that. Passing tests do not wait longer.
+  // The pages the application loads on demand: the first import of each is transformed by Vite
+  // and costs hundreds of milliseconds, so it is paid here and not by the first test that opens one.
+  // The pages that draw the workflow graph are not loaded here: a test file may replace the graph.
+  await Promise.all([
+    import('../src/components/NewTaskDialog.tsx'),
+    import('../src/components/QueuePage.tsx'),
+    import('../src/components/SpecialistsPage.tsx'),
+    import('../src/components/settings/SettingsPage.tsx'),
+  ]);
   const { configure } = await import('@testing-library/react');
   configure({ asyncUtilTimeout: 5_000 });
   const { beforeEach } = await import('vitest');
   const { default: i18next } = await import('i18next');
   await import('../src/i18n/index.ts');
+  // Only a file that draws the whole application needs it; the others test small pieces.
+  const { readFileSync } = await import('node:fs');
+  const { expect } = await import('vitest');
+  const file = expect.getState().testPath;
+  if (file && /<App[ >]/.test(readFileSync(file, 'utf8'))) {
+    await (await import('./warm.tsx')).warmUp();
+  }
   beforeEach(async () => {
     window.localStorage.removeItem('aip.web.language');
     Object.defineProperty(window.navigator, 'languages', {

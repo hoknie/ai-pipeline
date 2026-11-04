@@ -21,7 +21,8 @@ afterEach(async () => {
 });
 
 async function start(): Promise<Harness> {
-  current = await harness();
+  // the test measures the throttling of the live usage: the real interval
+  current = await harness(undefined, {}, { timings: { usageIntervalMs: 1000 } });
   return current;
 }
 
