@@ -171,6 +171,16 @@ describe('queue tab', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Pause' }).disabled).toBe(true);
   });
 
+  it('shows a paused run as a task with a continue button', async () => {
+    const api = show(
+      queueOf({ items: [queueItem('q1', 'A', 1, { run: 'run7', hold: 'paused' })] }),
+    );
+    await screen.findByText('On pause');
+    expect(screen.queryByRole('button', { name: 'Run now' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(api.queueRunNow).toHaveBeenCalledWith('q1'));
+  });
+
   it('pauses a running queue', async () => {
     const api = show(queueOf({ status: 'running', items: items('A') }));
     fireEvent.click(await screen.findByRole('button', { name: 'Pause' }));
@@ -1956,12 +1966,12 @@ describe('system stages and waiting in the cards of the queue', () => {
         {
           group: 'signup',
           step: 'code',
-          wait: { reason: 'specialist', specialist: 'coder', max: 1 },
+          wait: { reason: 'specialist', specialist: 'coder', name: 'Coder', max: 1 },
         },
       ],
     });
     expect(await screen.findByText('signup')).toBeTruthy();
-    expect(screen.getByText('Waiting for coder: 1 of 1 busy')).toBeTruthy();
+    expect(screen.getByText('Waiting for Coder: 1 of 1 busy')).toBeTruthy();
   });
 
   it('shows the commit message step as active and the system stages row', async () => {

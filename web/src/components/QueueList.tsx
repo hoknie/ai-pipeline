@@ -157,7 +157,7 @@ export function QueueList({
   };
 
   const runNow = async (item: QueueItemView) => {
-    if (item.readiness !== 'ready') {
+    if (item.readiness !== 'ready' && item.hold === null) {
       const yes = await confirm({
         title: t('queue.list.unmetTitle'),
         description: t('queue.list.unmetText', {
@@ -320,7 +320,7 @@ export function QueueList({
                     title={t('queue.returnOf', { run: item.run })}
                     href={formatRoute({ view: 'runs', run: item.run, group: null, step: null })}
                   >
-                    {t('queue.returning')}
+                    {item.hold === 'paused' ? t('queue.onPause') : t('queue.returning')}
                   </a>
                 ) : null}
                 <Switch
@@ -395,7 +395,7 @@ export function QueueList({
                     variant="ghost"
                     size="sm"
                     title={
-                      queue.runs.length >= queue.parallel
+                      item.hold === null && queue.runs.length >= queue.parallel
                         ? t('queue.list.runNowOverflow', {
                             taken: queue.runs.length + 1,
                             count: queue.parallel,
@@ -404,7 +404,7 @@ export function QueueList({
                     }
                     onClick={() => void runNow(item)}
                   >
-                    {t('queue.list.runNow')}
+                    {item.hold === 'paused' ? t('queue.list.continue') : t('queue.list.runNow')}
                   </Button>
                 </span>
               </div>

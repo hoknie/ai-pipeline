@@ -713,6 +713,11 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/pause$`),
+      handle: ([runId]) => call('run_pause', { runId: runId ?? '' }),
+    },
+    {
+      method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/skip$`),
       handle: async ([runId], body) => {
         const { step, skip } = parseBody(skipBody, body);

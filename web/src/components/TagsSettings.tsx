@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api.ts';
@@ -8,6 +9,8 @@ import { TAG_COLOR_NAMES } from '../tagColors.ts';
 import { useTags } from '../tags.tsx';
 import type { TagColor, TagView } from '../types.ts';
 import { Button } from '../ui/button.tsx';
+import { Card } from '../ui/card.tsx';
+import { Empty } from '../ui/empty.tsx';
 import { Input } from '../ui/input.tsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.tsx';
 import { TagLabel } from './TagChip.tsx';
@@ -73,12 +76,17 @@ export function TagsSettings({ api }: { api: Api }) {
   };
 
   const row = (tag: TagView, withColor: boolean) => (
-    <li key={tag.id} data-tag-row={tag.id} className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <TagLabel tag={tag} />
+    <li key={tag.id} data-tag-row={tag.id} className="flex flex-col gap-1 py-2">
+      <div
+        data-tag-cells
+        className="flex flex-wrap items-center gap-2 sm:grid sm:grid-cols-[10rem_minmax(0,16rem)_9rem_auto]"
+      >
+        <span className="min-w-0">
+          <TagLabel tag={tag} />
+        </span>
         <Input
           aria-label={t('tags.settings.name', { name: tag.name })}
-          className="max-w-48"
+          className="w-full"
           value={names[tag.id] ?? tag.name}
           disabled={busy === tag.id}
           onChange={(event) => setNames({ ...names, [tag.id]: event.target.value })}
@@ -95,7 +103,7 @@ export function TagsSettings({ api }: { api: Api }) {
           >
             <SelectTrigger
               aria-label={t('tags.settings.color', { name: tag.name })}
-              className="w-36"
+              className="w-full"
             >
               <SelectValue />
             </SelectTrigger>
@@ -107,15 +115,18 @@ export function TagsSettings({ api }: { api: Api }) {
               ))}
             </SelectContent>
           </Select>
-        ) : null}
+        ) : (
+          <span aria-hidden="true" data-tag-color-placeholder />
+        )}
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           disabled={busy === tag.id}
           aria-label={t('tags.settings.removeLabel', { name: tag.name })}
+          title={t('tags.settings.removeLabel', { name: tag.name })}
           onClick={() => void remove(tag)}
         >
-          {t('tags.settings.remove')}
+          <Trash2 />
         </Button>
       </div>
       {errors[tag.id] ? (
@@ -131,19 +142,28 @@ export function TagsSettings({ api }: { api: Api }) {
 
   return (
     <section aria-label={t('tags.settings.label')} className="flex flex-col gap-3">
-      <h3 className="text-base font-semibold">{t('tags.settings.title')}</h3>
-      <p className="text-sm text-muted-foreground">{t('tags.settings.hint')}</p>
-      {ordinary.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('tags.none')}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">{ordinary.map((tag) => row(tag, true))}</ul>
-      )}
-      {linked.length > 0 ? (
-        <section aria-label={t('tags.settings.linkedTitle')} className="flex flex-col gap-2">
-          <h4 className="text-sm font-semibold">{t('tags.settings.linkedTitle')}</h4>
-          <p className="text-sm text-muted-foreground">{t('tags.settings.linkedHint')}</p>
-          <ul className="flex flex-col gap-2">{linked.map((tag) => row(tag, false))}</ul>
+      <Card>
+        <section aria-labelledby="tags-ordinary" className="flex flex-col gap-2 p-4">
+          <h3 id="tags-ordinary" className="text-sm font-semibold">
+            {t('tags.settings.ordinaryTitle')}
+          </h3>
+          {ordinary.length === 0 ? (
+            <Empty title={t('tags.none')} />
+          ) : (
+            <ul className="flex flex-col divide-y">{ordinary.map((tag) => row(tag, true))}</ul>
+          )}
         </section>
+      </Card>
+      {linked.length > 0 ? (
+        <Card>
+          <section aria-labelledby="tags-linked" className="flex flex-col gap-2 p-4">
+            <h3 id="tags-linked" className="text-sm font-semibold">
+              {t('tags.settings.linkedTitle')}
+            </h3>
+            <p className="text-xs text-muted-foreground">{t('tags.settings.linkedHint')}</p>
+            <ul className="flex flex-col divide-y">{linked.map((tag) => row(tag, false))}</ul>
+          </section>
+        </Card>
       ) : null}
     </section>
   );

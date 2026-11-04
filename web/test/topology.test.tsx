@@ -505,7 +505,7 @@ describe('specialist occupancy', () => {
       title: 'Чужой',
       repository: '/other',
       workflow: 'epic',
-      specialists: [specialistUse('coder', { level: 'global', running: ['api'] })],
+      specialists: [specialistUse('coder', { level: 'global', name: 'Кодер', running: ['api'] })],
       ...overrides,
     });
   const busyOf = (runs: ReturnType<typeof runView>[], id = 'step:code') => {
@@ -590,6 +590,9 @@ describe('specialist occupancy', () => {
     const side = screen.getByRole('complementary', { name: 'node coder' });
     expect(within(side).getByText('Specialist busy in other runs')).toBeTruthy();
     expect(within(side).getByText(/Чужой · other/)).toBeTruthy();
+    expect(
+      within(side).getByText(/other runs and repositories that run on, or wait for, Кодер\./),
+    ).toBeTruthy();
     fireEvent.click(within(side).getByRole('button', { name: 'api' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ runId: 'x', slug: 'api' }), 'code');
   });

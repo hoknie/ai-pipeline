@@ -26,6 +26,14 @@ describe('requests', () => {
     expect(parse({ ...target, refreshConfig: 'yes' })).toBe(false);
   });
 
+  it('parses a pause request with an optional repository', () => {
+    const parse = (params: object) =>
+      requestSchema.safeParse({ method: 'run_pause', params }).success;
+    expect(parse({ runId: 'r' })).toBe(true);
+    expect(parse({ runId: 'r', repository: '/repo' })).toBe(true);
+    expect(parse({})).toBe(false);
+  });
+
   it('parses a valid request and survives a round trip', () => {
     const line = JSON.stringify({
       id: 7,

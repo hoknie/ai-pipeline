@@ -20,6 +20,7 @@ import {
   type SpecialistsRefresh,
 } from './permissions.ts';
 import { groupSlugs } from './ids.ts';
+import { retryableGroups } from './retryable.ts';
 import { attemptStepLabel } from './topology.ts';
 import { questionsText } from './questions.ts';
 import {
@@ -46,6 +47,7 @@ import {
   type OnLimit,
   type ProposedGroup,
   type Report,
+  type RunHold,
   type RunState,
   type Usage,
 } from './model.ts';
@@ -102,6 +104,7 @@ export type Event =
   | { kind: 'resolve_prepared'; conflicts: string[] }
   | { kind: 'run_named'; title: string | null; name: string | null; usage: Usage | null }
   | { kind: 'tags_set'; tags: string[] }
+  | { kind: 'hold'; hold: RunHold | null }
   | { kind: 'step_skip'; step: string; skip: boolean }
   | { kind: 'interrupted' };
 
@@ -127,6 +130,7 @@ export function transition(state: RunState, event: Event, now: number): Effect[]
     machine.autoDeliver();
     updateFinished(state, now);
   }
+  if (state.run.finishedAt !== null && retryableGroups(state).length === 0) state.run.hold = null;
   return machine.effects;
 }
 
@@ -197,6 +201,16 @@ class Machine {
         return;
       case 'tags_set':
         this.state.run.tags = [...event.tags];
+        return;
+      case 'hold':
+        if (
+          event.hold !== null &&
+          this.state.run.finishedAt !== null &&
+          this.state.run.hold === null
+        ) {
+          throw new Rejection('run is finished; nothing to hold');
+        }
+        this.state.run.hold = event.hold;
         return;
       case 'step_skip':
         return this.stepSkip(event.step, event.skip);

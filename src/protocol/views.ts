@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type { DeliveryMode } from '../config/index.ts';
 import {
+  type RunHold,
   DEFAULT_AUTOPILOT_ANSWER,
   allGroups,
   attemptVerdict,
@@ -193,7 +194,7 @@ export type DeliveryStage =
   | { status: 'apply_failed'; reason: string | null; groups: string[] };
 
 /** The state of a run in a view: its phase, or `queued` for a finished run waiting as a return item. */
-export type RunViewState = RunPhase | 'queued';
+export type RunViewState = RunPhase | 'queued' | 'paused';
 
 export interface RunView {
   id: string;
@@ -211,6 +212,8 @@ export interface RunView {
   finishedAt: number | null;
   finished: boolean;
   state: RunViewState;
+  /** Why the run is held; null when it runs normally. */
+  hold: RunHold | null;
   /** Groups waiting for a human answer. */
   waiting: number;
   dirtyWarning: boolean;
@@ -472,7 +475,8 @@ function runDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
 /** Marks the view with its return item; a finished run with one shows as `queued`. */
 export function withQueue(view: RunView, item: string | null): RunView {
   if (item === null) return view;
-  return { ...view, queueItem: item, state: view.finished ? 'queued' : view.state };
+  const state = view.hold !== null ? view.state : view.finished ? 'queued' : view.state;
+  return { ...view, queueItem: item, state };
 }
 
 export function runView(
@@ -513,7 +517,8 @@ export function runView(
     startedAt: runStartedAt(state),
     finishedAt: state.run.finishedAt,
     finished: summary.finished,
-    state: summary.state,
+    state: state.run.hold !== null && summary.state !== 'needs_human' ? 'paused' : summary.state,
+    hold: state.run.hold,
     waiting: summary.waiting,
     dirtyWarning: state.run.dirtyWarning,
     autoDeliver: state.run.config.delivery.auto,
@@ -752,6 +757,8 @@ export interface QueueItemView {
   error: string | null;
   /** A returned run: taking the item retries it; null for a new task. */
   run: string | null;
+  /** The returned run is on pause; null otherwise. */
+  hold: RunHold | null;
 }
 
 export interface DependencyView {
@@ -972,6 +979,7 @@ export function queueView(
       createdAt: item.createdAt,
       error: item.error,
       run: item.run,
+      hold: (item.run === null ? undefined : lookup(item.run)?.run.hold) ?? null,
     })),
     runs,
     skipped,

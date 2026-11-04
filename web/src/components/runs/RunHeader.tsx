@@ -61,6 +61,19 @@ export function RunHeader({
       setReturning(false);
     }
   };
+  const [pausing, setPausing] = useState(false);
+  const pause = async () => {
+    setPausing(true);
+    try {
+      await api.pauseRun(run.id, run.repository);
+      notifySuccess(t('runs.header.paused'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setPausing(false);
+    }
+  };
+  const pausable = !run.finished && run.hold === null && run.queueItem === null;
   const [tagging, setTagging] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
   const { byId } = useTags();
@@ -190,6 +203,11 @@ export function RunHeader({
           </div>
           {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
           <div className="flex flex-wrap items-center gap-2">
+            {pausable ? (
+              <Button variant="outline" loading={pausing} onClick={() => void pause()}>
+                {t('runs.header.pause')}
+              </Button>
+            ) : null}
             {run.returnable ? (
               <Button variant="outline" loading={returning} onClick={() => void putBack()}>
                 {t('runs.header.returnRun')}

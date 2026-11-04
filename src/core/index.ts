@@ -56,6 +56,7 @@ export {
 } from './occupancy.ts';
 export {
   attemptStepLabel,
+  specialistName,
   stepLabel,
   stepName,
   topology,
@@ -109,6 +110,7 @@ export {
   problemKeys,
   retryableGroups,
   returnRun,
+  pauseRun,
   canReturn,
   dismissRun,
   returnItemOf,

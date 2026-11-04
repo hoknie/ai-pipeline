@@ -172,6 +172,7 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE tags ADD COLUMN task_run TEXT;
   ALTER TABLE tags ADD COLUMN task_number INTEGER;
   `,
+  `ALTER TABLE runs ADD COLUMN hold TEXT`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

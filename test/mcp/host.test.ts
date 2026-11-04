@@ -37,6 +37,7 @@ const VIEW: QueueView & { item: string } = {
       createdAt: 1,
       error: null,
       run: null,
+      hold: null,
     },
   ],
   runs: [],
@@ -461,6 +462,22 @@ describe('host MCP queue tools', () => {
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('returns r1');
     expect(calls).toEqual([{ method: 'queue_return', params: { runId: 'r1' } }]);
+  });
+
+  it('pauses a run from Claude Code', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return {
+        ...VIEW,
+        items: [{ ...VIEW.items[0]!, id: 'q9', run: 'A', hold: 'paused' }],
+        item: 'q9',
+      };
+    });
+    const result = await client.callTool({ name: 'swarm_run_pause', arguments: { run_id: 'A' } });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('paused A');
+    expect(calls).toEqual([{ method: 'run_pause', params: { runId: 'A' } }]);
   });
 
   it('returns the daemon error of an empty settings call', async () => {

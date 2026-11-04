@@ -84,6 +84,7 @@ export const STATUS_BADGES: Readonly<Record<string, { badge: string; role: Style
   waiting: { badge: '◷', role: 'muted' },
   pending: { badge: '◦', role: 'muted' },
   stopped: { badge: '◦', role: 'muted' },
+  paused: { badge: '◦', role: 'warning' },
   cancelled: { badge: '⊘', role: 'muted' },
 };
 

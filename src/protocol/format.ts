@@ -471,7 +471,10 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
             .join(', ')}${mark}`;
     const postponed = item.postponed ? ' · postponed' : '';
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
-    const returned = item.run === null ? '' : ` · returns ${style.accent(item.run)}`;
+    const returned =
+      item.run === null
+        ? ''
+        : ` · ${item.hold === 'paused' ? 'paused' : 'returns'} ${style.accent(item.run)}`;
     lines.push(
       `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${item.workflow}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );

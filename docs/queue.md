@@ -50,6 +50,14 @@ Every task gets an integer number within its repository when it is added to the 
 - A run that is already in the queue, holds a place or has nothing to retry is refused. A skipped run whose groups are merged but whose delivery failed has nothing to retry.
 - `aip queue dismiss <run-id>` removes a skipped run from the skipped list; `--repo` defaults to the repository of the run. The run itself does not change: it keeps its status and stays in the run list, and it can still be delivered. A run that is not in the skipped list is refused. A task that waits for the removed run (`--after`) stays blocked.
 
+### Pausing a run
+
+- `aip run pause <run-id>` pauses any unfinished run of the repository (`--repo` defaults to the repository of the run), whether the queue is running or stopped. The step in progress finishes and is committed, no new step starts, and the run frees its place. It becomes the last task of the queue and shows as `paused` in `aip run list`, `aip run show` and `aip queue list` (`paused <run-id>`).
+- A paused run does not stop the queue: its problems are not watched and a failure of the step that was finishing leaves the run paused. Tasks that wait for it keep waiting.
+- The task is taken in its turn like any other, and `aip queue run <item>` ("Continue" in the web panel) continues it at once, whatever the limit. The run then goes on from the next step; a failed or cancelled group is retried. `aip group retry` on a paused run also lifts the pause.
+- A paused run stays in the queue: removing its task is refused while the run is unfinished. Cancel the run instead; it stays `paused` until you continue or remove the task.
+- The pause is lifted by itself once the run is finished and has nothing to retry. A run with nothing to pause (finished), one that is already paused, or one that is already in the queue as a returned task is refused.
+
 A task that has become a run can no longer be edited or removed from the queue. Manage the run with `aip run list` and `aip run cancel`.
 
 The queue is stored in the daemon's database and survives a daemon restart. A started queue keeps taking tasks.

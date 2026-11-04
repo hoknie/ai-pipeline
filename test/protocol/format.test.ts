@@ -652,6 +652,16 @@ describe('usage limit in the text output', () => {
     );
   });
 
+  it('marks the item of a paused run', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { workflow: 'feature', task: 'работа' }, 'q1', 2);
+    queue.items[0]!.run = 'run000000001';
+    const paused = run(1);
+    paused.run.hold = 'paused';
+    expect(formatQueue(queueView(queue, () => paused))).toContain('paused run000000001');
+    expect(formatRunList([runView(paused, 1000)])).toContain('paused');
+  });
+
   it('shows a group waiting for the limit', () => {
     const state = run(1);
     step(state);
@@ -701,7 +711,12 @@ describe('live usage in text', () => {
 });
 
 describe('system stages and waiting in text', () => {
-  const specialistWait: GroupWait = { reason: 'specialist', specialist: 'coder', max: 1 };
+  const specialistWait: GroupWait = {
+    reason: 'specialist',
+    specialist: 'coder',
+    name: 'Coder',
+    max: 1,
+  };
 
   it('prints a System line instead of Split with the delivery stage last', () => {
     const state = run(1, { split: true, configText: CONFIG_TEXT });

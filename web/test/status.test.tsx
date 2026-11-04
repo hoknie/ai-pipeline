@@ -107,7 +107,10 @@ describe('waiting', () => {
       label: 'Waiting for specialist',
       tone: 'mute',
     });
-    expect(waitText({ reason: 'specialist', specialist: 'coder', max: 1 }, t)).toBe(
+    expect(waitText({ reason: 'specialist', specialist: 'coder', name: 'Coder', max: 1 }, t)).toBe(
+      'Waiting for Coder: 1 of 1 busy',
+    );
+    expect(waitText({ reason: 'specialist', specialist: 'coder', max: 1 } as never, t)).toBe(
       'Waiting for coder: 1 of 1 busy',
     );
     expect(waitText({ reason: 'capacity', max: 3 }, t)).toBe(

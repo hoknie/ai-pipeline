@@ -4,6 +4,7 @@ import { findGroup } from '../../src/core/index.ts';
 import {
   attemptStepLabel,
   stepLabel,
+  specialistName,
   stepName,
   topology,
   transition,
@@ -177,6 +178,16 @@ function twins() {
     '  ';
   return state;
 }
+
+describe('human names of specialists', () => {
+  it('returns the name, and the slug without a name or for an unknown specialist', () => {
+    const state = twins();
+    const { config } = state.run;
+    expect(specialistName(config, 'coder')).toBe('Кодер');
+    expect(specialistName(config, 'mute')).toBe('mute');
+    expect(specialistName(config, 'nobody')).toBe('nobody');
+  });
+});
 
 describe('human names of steps', () => {
   it('names a step after its specialist, or by the specialist slug when the name is empty', () => {

@@ -579,7 +579,7 @@ describe('settings page', () => {
 
   it('shows the catalog of tags in the Tags group', async () => {
     show(queueOf(), {}, '#settings/global/tags');
-    expect(await screen.findByText('The tag catalog is shared by all repositories.')).toBeTruthy();
+    expect(await screen.findByText('The tag catalog, shared by all repositories.')).toBeTruthy();
   });
 
   it('has no General settings entry in the list of specialists', async () => {

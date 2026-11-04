@@ -300,6 +300,10 @@ export const requestSchema = z.discriminatedUnion('method', [
     params: z.object({ runId: z.string().min(1), repository: queueRepository.optional() }),
   }),
   z.object({
+    method: z.literal('run_pause'),
+    params: z.object({ runId: z.string().min(1), repository: queueRepository.optional() }),
+  }),
+  z.object({
     method: z.literal('queue_dismiss'),
     params: z.object({ runId: z.string().min(1), repository: queueRepository.optional() }),
   }),

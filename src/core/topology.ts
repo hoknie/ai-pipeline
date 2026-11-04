@@ -95,7 +95,8 @@ export function stepName(config: ResolvedConfig, step: Step): string {
   return specialistName(config, step.specialist);
 }
 
-function specialistName(config: ResolvedConfig, slug: string): string {
+/** The human name of a specialist: its name, or the slug without one. */
+export function specialistName(config: ResolvedConfig, slug: string): string {
   const name = findSpecialist(config, slug)?.name.trim();
   return name ? name : slug;
 }

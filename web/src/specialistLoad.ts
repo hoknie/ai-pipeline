@@ -20,6 +20,8 @@ export interface LoadEntry {
 
 export interface SlugLoad {
   specialist: string;
+  /** The human name of the specialist; the slug without one. */
+  name: string;
   /** The smallest limit among the runs; null when no run limits the specialist. */
   max: number | null;
   running: LoadEntry[];
@@ -36,7 +38,13 @@ export function machineLoad(runs: readonly RunView[]): MachineLoad {
     for (const use of run.specialists ?? []) {
       let slug = load.get(use.specialist);
       if (!slug) {
-        slug = { specialist: use.specialist, max: null, running: [], waiting: [] };
+        slug = {
+          specialist: use.specialist,
+          name: use.name ?? use.specialist,
+          max: null,
+          running: [],
+          waiting: [],
+        };
         load.set(use.specialist, slug);
       }
       if (use.max !== null && use.max > 0 && (slug.max === null || use.max < slug.max)) {
@@ -82,6 +90,7 @@ export interface RepositoryUse {
 
 export interface GlobalSection {
   specialist: string;
+  name: string;
   max: number | null;
   /** Running and waiting of the slug over the whole machine, every repository and level. */
   running: number;
@@ -91,6 +100,7 @@ export interface GlobalSection {
 
 export interface ProjectSpecialist {
   specialist: string;
+  name: string;
   max: number | null;
   /** Running of the slug over the whole machine. */
   totalRunning: number;
@@ -149,6 +159,7 @@ export function loadSections(load: MachineLoad, selected: string | null): LoadSe
       const repositories = [...globals.values()].sort((a, b) => order(a.repository, b.repository));
       global.push({
         specialist: slug.specialist,
+        name: slug.name,
         max: slug.max,
         running: slug.running.length,
         waiting: slug.waiting.length,
@@ -165,6 +176,7 @@ export function loadSections(load: MachineLoad, selected: string | null): LoadSe
       section.waiting += use.waiting.length;
       section.specialists.push({
         specialist: slug.specialist,
+        name: slug.name,
         max: slug.max,
         totalRunning: slug.running.length,
         running: use.running,

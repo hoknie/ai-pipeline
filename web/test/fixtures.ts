@@ -136,6 +136,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     fromQueue: false,
     returnable: false,
     queueItem: null,
+    hold: null,
     number: 1,
     tags: [],
     counts: 'running 1',
@@ -358,6 +359,7 @@ export function queueItem(
     createdAt: 1,
     error: null,
     run: null,
+    hold: null,
     ...extra,
   };
 }
@@ -575,6 +577,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     queuePause: vi.fn(async () => queueOf()),
     queueSettings: vi.fn(async () => queueOf()),
     queueReturn: vi.fn(async () => ({ ...queueOf(), item: 'q9' })),
+    pauseRun: vi.fn(async () => ({ ...queueOf(), item: 'q9' })),
     queueDismiss: vi.fn(async () => queueOf()),
     system: vi.fn(async () => systemView()),
     restartWeb: vi.fn(async () => undefined),
@@ -657,6 +660,7 @@ export function specialistUse(
   specialist: string,
   overrides: {
     level?: Use['level'];
+    name?: string;
     max?: number | null;
     running?: string[];
     waiting?: string[];
@@ -665,6 +669,7 @@ export function specialistUse(
   const item = (slug: string) => ({ slug, title: slug, step: 'code', stepName: 'Кодер' });
   return {
     specialist,
+    name: overrides.name ?? specialist,
     level: overrides.level ?? 'project',
     max: overrides.max ?? null,
     running: (overrides.running ?? []).map((slug) => ({ ...item(slug), startedAt: 1_000 })),

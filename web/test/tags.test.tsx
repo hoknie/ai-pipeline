@@ -212,6 +212,21 @@ describe('tags on the settings page', () => {
   const settings = (tags: TagView[], overrides: Partial<Api> = {}) =>
     boot('#settings/tags', tags, [runView()], overrides);
 
+  it('shows the heading and the explanation once', async () => {
+    settings([tagView('auth', 'blue', 'a')]);
+    await screen.findByRole('region', { name: 'Regular tags' });
+    expect(screen.getAllByRole('heading', { name: 'Tags' })).toHaveLength(1);
+    expect(screen.getAllByText('The tag catalog, shared by all repositories.')).toHaveLength(1);
+    expect(screen.queryByText('The tag catalog is shared by all repositories.')).toBeNull();
+  });
+
+  it('shows an empty catalog without the linked card', async () => {
+    settings([]);
+    const regular = await screen.findByRole('region', { name: 'Regular tags' });
+    expect(within(regular).getByText('No tags yet')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Linked task tags' })).toBeNull();
+  });
+
   it('recolors a tag', async () => {
     const api = settings([tagView('auth', 'blue', 'a')], {
       editTag: vi.fn(async () => [tagView('auth', 'green', 'a')]),
@@ -321,5 +336,13 @@ describe('tags of linked tasks', () => {
       within(section).getByRole('textbox', { name: 'Name of tag cards-half-width' }),
     ).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Color of tag auth' })).toBeTruthy();
+    const ordinary = screen.getByRole('region', { name: 'Regular tags' });
+    expect(within(ordinary).getByLabelText('Name of tag auth')).toBeTruthy();
+    expect(section.querySelector('[data-tag-color-placeholder]')).not.toBeNull();
+    const cells = document.querySelectorAll('[data-tag-cells]');
+    expect(cells).toHaveLength(2);
+    for (const row of cells) {
+      expect(row.className).toContain('sm:grid-cols-[10rem_minmax(0,16rem)_9rem_auto]');
+    }
   });
 });

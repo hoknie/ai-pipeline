@@ -813,6 +813,23 @@ function registerRun(program: Command): void {
     });
 
   run
+    .command('pause')
+    .description(
+      'Pause a run: the step in progress finishes, nothing new starts, and the run goes to the end of the queue; "aip queue run-now" continues it',
+    )
+    .argument('<run-id>', 'run id')
+    .option('-r, --repo <path>', 'repository path; defaults to the repository of the run')
+    .option('--json', 'print JSON')
+    .addHelpText('after', examples(['aip run pause 0mh3k2ab1x9z']))
+    .action(async (runId: string, options: { repo?: string; json?: boolean }) => {
+      const view = (await call(context(), 'run_pause', {
+        runId,
+        ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
+      })) as QueueView & { item: string };
+      showQueue(options.json, view);
+    });
+
+  run
     .command('apply')
     .description('Deliver merged groups of a run into your working tree (or as delivery.mode says)')
     .argument('<run-id>', 'run id')

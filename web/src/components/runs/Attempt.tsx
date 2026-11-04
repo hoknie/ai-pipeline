@@ -131,10 +131,9 @@ export function Attempt({
             </span>
             <span
               className="truncate text-muted-foreground"
-              title={`${attempt.runtime} ${attempt.model ?? ''}`}
+              title={`${attempt.specialist} · ${attempt.runtime} ${attempt.model ?? ''}`.trim()}
             >
-              {attempt.specialist}
-              {attempt.model ? ` · ${attempt.model}` : ''}
+              {attempt.model ?? attempt.runtime}
             </span>
             <StatusBadge status={verdict} />
             <span className="text-xs text-muted-foreground tabular-nums">

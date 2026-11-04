@@ -295,6 +295,18 @@ export function QueueRuns({
 }) {
   const { t } = useTranslation();
   const running = queue.status === 'running';
+  const [pausing, setPausing] = useState<string | null>(null);
+  const pause = async (run: string) => {
+    setPausing(run);
+    try {
+      onQueue(await api.pauseRun(run, queue.repository));
+      notifySuccess(t('queue.runPaused'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setPausing(null);
+    }
+  };
   const skipped =
     queue.skipped.length > 0 ? (
       <SkippedRuns queue={queue} now={now} api={api} onQueue={onQueue} onError={onError} />
@@ -314,7 +326,24 @@ export function QueueRuns({
         <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
           {queue.runs.map((run) => (
             <li key={run.id} className="min-w-0">
-              <RunCard run={run} now={now} linked={highlight?.has(run.id) === true} />
+              <RunCard
+                run={run}
+                now={now}
+                linked={highlight?.has(run.id) === true}
+                action={
+                  run.state === 'finished' || run.state === 'cancelled' ? null : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={pausing === run.id}
+                      disabled={pausing !== null}
+                      onClick={() => void pause(run.id)}
+                    >
+                      {t('queue.pauseRun')}
+                    </Button>
+                  )
+                }
+              />
             </li>
           ))}
           {Array.from({ length: free }, (_, index) => (

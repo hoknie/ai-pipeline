@@ -84,6 +84,7 @@ export function createRun(input: NewRun): RunState {
       number: input.number,
       tags: [...(input.tags ?? [])],
       skippedSteps: [],
+      hold: null,
     },
     split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,
     groups: splitting

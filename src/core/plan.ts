@@ -1,12 +1,13 @@
 import { findSpecialist } from '../config/index.ts';
 
 import { allGroups, stepsOf, type Group, type RunState } from './model.ts';
+import { specialistName } from './topology.ts';
 import { limitHolds, runningBySpecialist, runningCount } from './scheduler.ts';
 
 /** Why a queued group is not started yet. */
 export type GroupWait =
   | { reason: 'limit'; runtime: string; until: number }
-  | { reason: 'specialist'; specialist: string; max: number }
+  | { reason: 'specialist'; specialist: string; name: string; max: number }
   | { reason: 'capacity'; max: number };
 
 export interface DispatchPlan {
@@ -18,6 +19,10 @@ export interface DispatchPlan {
 
 export function waitKey(run: string, slug: string): string {
   return `${run}/${slug}`;
+}
+
+function isDeliveryGroup(state: RunState, group: Group): boolean {
+  return group === state.message || group === state.resolve;
 }
 
 /** Decides which queued groups start and which wait, without changing any state. */
@@ -36,6 +41,8 @@ export function planDispatch(states: RunState[], max: number, now: number): Disp
     .flatMap((state) =>
       [...allGroups(state)]
         .sort((left, right) => left.position - right.position)
+        // A held run starts no worker groups and no split step; delivery groups still run.
+        .filter((group) => state.run.hold === null || isDeliveryGroup(state, group))
         .filter((group) => group.status === 'queued' && group.pending !== null)
         .map((group) => ({ state, group })),
     );
@@ -52,7 +59,12 @@ export function planDispatch(states: RunState[], max: number, now: number): Disp
     }
     const limit = specialist?.max ?? null;
     if (slug && limit !== null && (bySpecialist.get(slug) ?? 0) >= limit) {
-      waits.set(key, { reason: 'specialist', specialist: slug, max: limit });
+      waits.set(key, {
+        reason: 'specialist',
+        specialist: slug,
+        name: specialistName(state.run.config, slug),
+        max: limit,
+      });
       continue;
     }
     if (running >= max) {

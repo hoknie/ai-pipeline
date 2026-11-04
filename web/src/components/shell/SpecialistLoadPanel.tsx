@@ -95,7 +95,9 @@ export function SpecialistLoadPanel({
           {sections.global.map((section) => (
             <div key={section.specialist} className="flex flex-col gap-0.5">
               <div className="flex flex-wrap gap-2">
-                <span className="font-medium">{section.specialist}</span>
+                <span className="font-medium" title={section.specialist}>
+                  {section.name}
+                </span>
                 <span className="text-muted-foreground">
                   {section.max === null
                     ? t('topology.busyUnlimited', { n: section.running })
@@ -124,8 +126,8 @@ export function SpecialistLoadPanel({
               {section.specialists.map((item) => (
                 <div key={item.specialist} className="flex flex-col gap-0.5 pl-3">
                   <div className="flex flex-wrap gap-2">
-                    <span className="font-medium">
-                      {item.specialist}
+                    <span className="font-medium" title={item.specialist}>
+                      {item.name}
                       {limit(item.max)}
                     </span>
                     <Counts running={item.running.length} waiting={item.waiting.length} />

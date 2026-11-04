@@ -526,6 +526,30 @@ export function createHostServer(options: HostOptions): McpServer {
   );
 
   server.registerTool(
+    'swarm_run_pause',
+    {
+      title: 'Pause a run',
+      description:
+        'Pause an unfinished run. The step in progress finishes and is committed, no new step starts, and the run moves to the end of its queue and frees its place. Continue it with swarm_queue_run_now on its queue item: it goes on from the next step.',
+      inputSchema: {
+        run_id: runId,
+        repo: z
+          .string()
+          .optional()
+          .describe('Repository path; defaults to the repository of the run'),
+      },
+    },
+    ({ run_id, repo: where }) =>
+      attempt(async () => {
+        const view = (await options.send('run_pause', {
+          runId: run_id,
+          ...(where !== undefined ? { repository: where } : {}),
+        })) as QueueView & { item: string };
+        return withData(`Paused ${run_id} as item ${view.item}.\n${formatQueue(view)}`, view);
+      }),
+  );
+
+  server.registerTool(
     'swarm_queue_dismiss',
     {
       title: 'Remove a skipped run from the queue',

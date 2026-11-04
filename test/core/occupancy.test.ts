@@ -36,6 +36,7 @@ describe('specialistUse', () => {
     expect(specialistUse(state)).toMatchObject([
       {
         specialist: 'coder',
+        name: 'Кодировщик',
         level: 'project',
         max: 1,
         running: [

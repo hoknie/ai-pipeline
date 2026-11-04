@@ -101,6 +101,25 @@ describe('status bar', () => {
     expect(screen.getByText('No specialists are busy.')).toBeTruthy();
   });
 
+  it('labels specialists by name and keeps the slug in the hint', () => {
+    bar(fakeApi(), {
+      runs: [
+        runView({
+          id: 'r1',
+          repository: APP,
+          specialists: [
+            specialistUse('coder', { level: 'global', name: 'Кодер', max: 1, running: ['a'] }),
+            specialistUse('plan', { name: 'Планировщик', waiting: ['b'] }),
+          ],
+        }),
+      ],
+    });
+    fireEvent.click(toggle());
+    expect(screen.getByText('Кодер').getAttribute('title')).toBe('coder');
+    expect(screen.getByText(/Планировщик/).getAttribute('title')).toBe('plan');
+    expect(screen.queryByText('coder')).toBeNull();
+  });
+
   it('counts background processes', async () => {
     const api = fakeApi({
       processes: vi.fn(async () => ({

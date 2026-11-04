@@ -174,6 +174,25 @@ describe('language menu', () => {
   });
 });
 
+describe('term for a step in Russian', () => {
+  const strings = (value: unknown, path = ''): [string, string][] =>
+    typeof value === 'string'
+      ? [[path, value]]
+      : Object.entries(value as object).flatMap(([key, item]) =>
+          strings(item, path ? `${path}.${key}` : key),
+        );
+
+  it('never says «шаг»: a step is an «этап»', () => {
+    expect(strings(ru).filter(([, text]) => /шаг/i.test(text))).toEqual([]);
+  });
+
+  it('writes the run header button and the group menu with «этап»', () => {
+    const t = i18next.getFixedT('ru');
+    expect(t('runs.steps.button', { active: 3, total: 4 })).toBe('Этапы: 3 из 4');
+    expect(t('runs.group.skipStep')).toBe('Пропустить этап');
+  });
+});
+
 describe('formatting', () => {
   it('declines the number of files', () => {
     const t = i18next.getFixedT('ru');

@@ -1,7 +1,7 @@
 import { findSpecialist, type SpecialistLevel, type Step } from '../config/index.ts';
 
 import { allGroups, stepsOf, type RunState } from './model.ts';
-import { attemptStepLabel, stepLabel } from './topology.ts';
+import { attemptStepLabel, specialistName, stepLabel } from './topology.ts';
 
 export interface SpecialistRunning {
   slug: string;
@@ -21,6 +21,8 @@ export interface SpecialistWaiting {
 /** What one run does with one specialist now: attempts it runs and groups waiting for it. */
 export interface SpecialistUse {
   specialist: string;
+  /** Human name of the specialist; the slug without a name. */
+  name: string;
   level: SpecialistLevel;
   /** Limit of simultaneously running attempts of the specialist; null means no limit. */
   max: number | null;
@@ -38,6 +40,7 @@ export function specialistUse(state: RunState): SpecialistUse[] {
       const found = findSpecialist(state.run.config, slug);
       use = {
         specialist: slug,
+        name: specialistName(state.run.config, slug),
         level: found?.level ?? 'project',
         max: found?.max ?? null,
         running: [],

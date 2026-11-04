@@ -60,6 +60,7 @@ export const STATUS: Record<string, StatusEntry> = {
   finished: { labelKey: 'finished', tone: 'ok', icon: CheckCircle2, spin: false },
   cancelled: { labelKey: 'cancelled', tone: 'mute', icon: Ban, spin: false },
   pending: { labelKey: 'pending', tone: 'mute', icon: Circle, spin: false },
+  paused: { labelKey: 'paused', tone: 'warn', icon: PauseCircle, spin: false },
   stopped: { labelKey: 'stopped', tone: 'mute', icon: PauseCircle, spin: false },
   warnings: { labelKey: 'warnings', tone: 'warn', icon: AlertTriangle, spin: false },
 };
@@ -80,7 +81,7 @@ export function statusInfo(code: string, t: TFunction): StatusInfo {
 export function waitText(wait: GroupWait, t: TFunction): string {
   switch (wait.reason) {
     case 'specialist':
-      return t('wait.specialist', { specialist: wait.specialist, max: wait.max });
+      return t('wait.specialist', { specialist: wait.name ?? wait.specialist, max: wait.max });
     case 'capacity':
       return t('wait.capacity', { max: wait.max });
     case 'limit':

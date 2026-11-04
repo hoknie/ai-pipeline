@@ -821,6 +821,18 @@ describe('aip web', () => {
     expect(((await cancelled.json()) as RunView).id).toBe(runId);
   });
 
+  it('refuses to pause an unknown run', async () => {
+    const { web, base } = await setup();
+    const response = await fetch(`${base}/api/runs/missing/pause`, {
+      method: 'POST',
+      headers: authed(web, JSON_TYPE),
+      body: '{}',
+    });
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBeLessThan(500);
+    expect(((await response.json()) as { error: string }).error).toContain('unknown run');
+  });
+
   it('reports daemon errors as JSON with a 4xx status', async () => {
     const { web, base } = await setup();
     const response = await fetch(`${base}/api/runs/missing/cancel`, {

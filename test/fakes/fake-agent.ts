@@ -266,7 +266,8 @@ writeFileSync(counterPath, String(count + 1));
 const script = process.env.AIP_FAKE_SCRIPT
   ? JSON.parse(readFileSync(process.env.AIP_FAKE_SCRIPT, 'utf8'))
   : {};
-const actions: Action[] = script[step] ?? [];
+// `step@group` scripts one group of the step; `step` serves every group
+const actions: Action[] = script[`${step}@${group}`] ?? script[step] ?? [];
 const action: Action = actions[Math.min(count, actions.length - 1)] ?? {};
 
 if (action.read) {

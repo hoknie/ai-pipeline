@@ -155,7 +155,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 Tags of linked tasks (made automatically for a chain of tasks) are shown as `#115: name` in the color `indigo`, which no other tag can have.
 The label is a link to the task that created the tag; in the run list a click on it opens that task, not the run of the row.
 These tags are not offered in the tag pickers, cannot be created or removed there, and are never sent when other tags of a task or run change; a task edit keeps them.
-"Tags" in the settings shows them in a separate section "Linked task tags" with a name field and "Delete", without a color choice.
+"Tags" in the settings shows two cards: "Regular tags" (label, name, color, delete) and, when there are any, "Linked task tags" (name and delete, without a color choice). The rows are aligned in columns.
 - "System" shows the state of the daemon (pid, version, build, whether agents work) and of the web panel (pid, address without the token, access, build), refreshed every 3 seconds, and the path of the daemon log.
   - "Restart panel" restarts the panel on the same address with the same token; the page comes back by itself. The daemon and its agents keep running.
   - "Restart daemon" runs `aip daemon restart --web` as a separate process. While agents work the panel asks again, and "Restart, stopping the agents" runs it with `--force`.

@@ -49,6 +49,7 @@ describe('groups waiting for a specialist', () => {
     expect(row(waiting, 'signup')?.wait).toEqual({
       reason: 'specialist',
       specialist: 'coder',
+      name: 'Кодировщик',
       max: 1,
     });
     expect(row(waiting, 'login')?.status).toBe('running');

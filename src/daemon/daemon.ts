@@ -49,6 +49,7 @@ import {
   problemKeys,
   retryableGroups,
   returnRun,
+  pauseRun,
   canReturn,
   dismissRun,
   returnItemOf,
@@ -506,8 +507,12 @@ export class Daemon {
     const id = item.run as string;
     const state = this.lookupState(id);
     if (!state) throw new Rejection(`unknown run \`${id}\``);
+    const held = state.run.hold !== null;
+    if (held) await this.apply(state, { kind: 'hold', hold: null });
     const groups = retryableGroups(state);
-    if (groups.length === 0) throw new Rejection('run has no failed or cancelled groups');
+    if (groups.length === 0 && !held) {
+      throw new Rejection('run has no failed or cancelled groups');
+    }
     for (const group of groups) {
       await this.apply(state, {
         kind: 'retry',
@@ -540,6 +545,29 @@ export class Daemon {
       const queue = this.queueFor(state.run.repository);
       const now = this.now();
       const item = returnRun(queue, state, queueItemId(now, randomInt(36 ** 3)), now);
+      this.saveQueue(queue);
+      await this.advanceQueue(state.run.repository);
+      return { ...this.queueSnapshot(queue), item: item.id };
+    });
+  }
+
+  /**
+   * `run_pause`: the run keeps `hold: paused`, starts no new step, and becomes the last item of
+   * the queue; the step in progress finishes.
+   */
+  private pauseRunRequest(params: ParamsOf<'run_pause'>): Promise<unknown> {
+    return this.serial(async () => {
+      const state = this.state(params.runId);
+      if (params.repository !== undefined) {
+        const root = await this.rootOf(params.repository);
+        if (root !== state.run.repository) {
+          throw new Rejection('run belongs to another repository');
+        }
+      }
+      const queue = this.queueFor(state.run.repository);
+      const now = this.now();
+      const item = pauseRun(queue, state, queueItemId(now, randomInt(36 ** 3)), now);
+      await this.apply(state, { kind: 'hold', hold: 'paused' });
       this.saveQueue(queue);
       await this.advanceQueue(state.run.repository);
       return { ...this.queueSnapshot(queue), item: item.id };
@@ -667,9 +695,13 @@ export class Daemon {
           await this.advanceQueue(repository);
           return this.queueSnapshot(queue);
         }
-        case 'queue_remove':
-          removeItem(queue, request.params.item, now);
+        case 'queue_remove': {
+          const removed = queue.items.find((candidate) => candidate.id === request.params.item);
+          removeItem(queue, request.params.item, now, (id) => this.lookupState(id));
+          const held = removed?.run ? this.lookupState(removed.run) : undefined;
+          if (held && held.run.hold !== null) await this.apply(held, { kind: 'hold', hold: null });
           return this.saveQueue(queue);
+        }
         case 'queue_start': {
           if (request.params.parallel !== undefined) {
             setParallel(queue, request.params.parallel, now);
@@ -1238,6 +1270,8 @@ export class Daemon {
         return this.returnToQueue(request.params);
       case 'queue_dismiss':
         return this.dismissFromQueue(request.params);
+      case 'run_pause':
+        return this.pauseRunRequest(request.params);
     }
   }
 
@@ -1262,7 +1296,9 @@ export class Daemon {
         params.refreshConfig === true
           ? { specialists: this.currentSpecialists(state) }
           : { permissions: this.currentPermissions(state) };
+      // A rejected retry leaves the hold in place; the hold is released only after it succeeds.
       await this.apply(state, { kind: 'retry', group: params.group, ...refresh });
+      if (state.run.hold !== null) await this.apply(state, { kind: 'hold', hold: null });
       const queue = this.queueFor(state.run.repository);
       if (adoptRun(queue, state, keys, this.now())) {
         this.saveQueue(queue);

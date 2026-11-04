@@ -87,9 +87,9 @@ export class Store {
     const { run } = state;
     this.database
       .prepare(
-        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json`,
+        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number, hold)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json, hold = excluded.hold`,
       )
       .run(
         run.id,
@@ -112,6 +112,7 @@ export class Store {
         run.queueItem,
         JSON.stringify(run.skippedSteps),
         run.number,
+        run.hold,
       );
     const groupStatement = this.database.prepare(
       `INSERT OR REPLACE INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict, merge_commit, delivery_json, questions_json)
@@ -464,6 +465,7 @@ export class Store {
         number: Number(row.number ?? 0),
         tags: row.tags_json ? parse(row.tags_json) : [],
         skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],
+        hold: row.hold === 'paused' ? 'paused' : null,
       },
       split: groups.find((group) => group.slug === SPLIT_GROUP) ?? null,
       groups: groups.filter(

@@ -6,6 +6,7 @@ import {
   advance,
   dispatch,
   emptyQueue,
+  pauseRun,
   startQueue,
   transition,
   type GroupWait,
@@ -316,6 +317,7 @@ describe('runView specialists', () => {
     expect(runView(state, 5000).specialists).toEqual([
       {
         specialist: 'coder',
+        name: 'Кодировщик',
         level: 'project',
         max: 1,
         running: [
@@ -454,7 +456,12 @@ describe('live usage in views', () => {
 });
 
 describe('waiting groups in views', () => {
-  const specialistWait: GroupWait = { reason: 'specialist', specialist: 'coder', max: 1 };
+  const specialistWait: GroupWait = {
+    reason: 'specialist',
+    specialist: 'coder',
+    name: 'Coder',
+    max: 1,
+  };
   const only =
     (slug: string, wait: GroupWait) =>
     (_run: string, candidate: string): GroupWait | null =>
@@ -526,7 +533,7 @@ describe('waiting groups in views', () => {
       null,
       [],
       null,
-      () => ({ reason: 'specialist', specialist: 'plan', max: 1 }),
+      () => ({ reason: 'specialist', specialist: 'plan', name: 'Plan', max: 1 }),
     ).runs[0]!;
     expect(card.system).toEqual([{ kind: 'split', status: 'waiting' }]);
     expect(card.waiting).toEqual([
@@ -534,7 +541,7 @@ describe('waiting groups in views', () => {
         group: '_split',
         step: 'split',
         stepName: 'Планировщик',
-        wait: { reason: 'specialist', specialist: 'plan', max: 1 },
+        wait: { reason: 'specialist', specialist: 'plan', name: 'Plan', max: 1 },
       },
     ]);
   });
@@ -636,6 +643,32 @@ describe('a run waiting in the queue', () => {
       state: 'active',
       queueItem: 'q9',
     });
+  });
+
+  it('shows a held run as paused, finished or not', () => {
+    const held = { ...view(true, 'failed'), hold: 'paused' as const };
+    expect(withQueue(held, 'q9')).toMatchObject({ state: 'failed', queueItem: 'q9' });
+    const state = run(1);
+    expect(runView(state, 1000).hold).toBeNull();
+    state.run.hold = 'paused';
+    expect(runView(state, 1000)).toMatchObject({ state: 'paused', hold: 'paused' });
+  });
+
+  it('keeps needs_human for a held run with a question', () => {
+    const state = run(1);
+    step(state);
+    group(state).status = 'needs_human';
+    state.run.hold = 'paused';
+    expect(runView(state, 1000)).toMatchObject({ state: 'needs_human', hold: 'paused' });
+  });
+
+  it('takes the hold of a queue item from its run', () => {
+    const state = run(1);
+    const queue = emptyQueue('/repo', 1);
+    pauseRun(queue, state, 'q1', 2);
+    state.run.hold = 'paused';
+    const found = queueView(queue, (id) => (id === state.run.id ? state : undefined));
+    expect(found.items[0]).toMatchObject({ id: 'q1', hold: 'paused' });
   });
 
   it('changes nothing without an item', () => {

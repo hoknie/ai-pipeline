@@ -48,6 +48,7 @@ describe('planDispatch', () => {
     expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toEqual({
       reason: 'specialist',
       specialist: 'coder',
+      name: 'Кодировщик',
       max: 1,
     });
     expect(plan.waits.has(waitKey(state.run.id, 'gruppa-1'))).toBe(false);

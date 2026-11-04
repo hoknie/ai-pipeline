@@ -135,6 +135,34 @@ describe('machineLoad', () => {
     expect(sections.global[0]?.repositories.map((use) => use.repository)).toEqual([LIB]);
   });
 
+  it('carries the human name of the specialist into the sections', () => {
+    const load = machineLoad([
+      runView({
+        id: 'r1',
+        repository: APP,
+        specialists: [
+          specialistUse('coder', { level: 'global', name: 'Кодер', running: ['a'] }),
+          specialistUse('plan', { name: 'Планировщик', waiting: ['b'] }),
+        ],
+      }),
+    ]);
+    const sections = loadSections(load, null);
+    expect(sections.global[0]).toMatchObject({ specialist: 'coder', name: 'Кодер' });
+    expect(sections.project[0]?.specialists[0]).toMatchObject({
+      specialist: 'plan',
+      name: 'Планировщик',
+    });
+  });
+
+  it('falls back to the slug when a daemon sends no name', () => {
+    const use = { ...specialistUse('coder', { level: 'global', running: ['a'] }) } as Partial<
+      ReturnType<typeof specialistUse>
+    >;
+    delete use.name;
+    const load = machineLoad([runView({ specialists: [use as ReturnType<typeof specialistUse>] })]);
+    expect(loadSections(load, null).global[0]?.name).toBe('coder');
+  });
+
   it('gives nothing for specialists nobody uses', () => {
     const load = machineLoad([runView({ specialists: [specialistUse('coder')] })]);
     expect(loadSections(load, null)).toEqual({ global: [], project: [], running: 0, waiting: 0 });

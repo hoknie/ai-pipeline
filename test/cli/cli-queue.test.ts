@@ -139,6 +139,48 @@ describe('cli', () => {
     expect(`${again.stdout}${again.stderr}`).toContain('run is already in the queue');
   });
 
+  it('pauses a running run and refuses a finished one', async () => {
+    const box = sandbox();
+    const gate = join(box.repo, '..', 'gate');
+    writeFileSync(
+      join(box.repo, '..', 'script.json'),
+      JSON.stringify({ code: [{ waitFor: gate }, { waitFor: gate }] }),
+    );
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'вторая')).code).toBe(0);
+    await aip(box, 'queue', 'start');
+    let run = '';
+    for (let tries = 0; tries < 300 && run === ''; tries += 1) {
+      const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+        runs: { id: string }[];
+      };
+      run = view.runs[0]?.id ?? '';
+      if (run === '') await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const paused = await aip(box, 'run', 'pause', run);
+    expect(paused.code).toBe(0);
+    expect(paused.stdout).toContain(`paused ${run}`);
+    expect((await aip(box, 'run', 'list')).stdout).toMatch(/paused\s+feature/);
+    const again = await aip(box, 'run', 'pause', run);
+    expect(again.code).toBe(1);
+    expect(`${again.stdout}${again.stderr}`).toContain('run is already paused');
+    writeFileSync(gate, '');
+  });
+
+  it('refuses to pause a finished run', async () => {
+    const box = sandbox();
+    const started = JSON.parse(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'работа', '--json')).stdout,
+    ) as { run: { runId: string } };
+    const id = started.run.runId;
+    await waitUntil('the run to finish', async () =>
+      (await aip(box, 'run', 'show', id)).stdout.includes('· finished ·'),
+    );
+    const refused = await aip(box, 'run', 'pause', id);
+    expect(refused.code).toBe(1);
+    expect(`${refused.stdout}${refused.stderr}`).toContain('run has nothing to pause');
+  });
+
   it('removes a skipped run from the skipped list', async () => {
     const box = sandbox();
     writeFileSync(
@@ -371,6 +413,7 @@ describe('cli', () => {
       'swarm_queue_start',
       'swarm_retry',
       'swarm_run',
+      'swarm_run_pause',
       'swarm_skip_step',
       'swarm_status',
     ]);

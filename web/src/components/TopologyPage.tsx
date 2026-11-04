@@ -181,7 +181,12 @@ export default function TopologyPage({
                   <>
                     <h3 className="font-semibold">{t('topology.occupied')}</h3>
                     <p className="text-muted-foreground">
-                      {t('topology.occupiedHint', { specialist: node?.data.specialist ?? '' })}
+                      {t('topology.occupiedHint', {
+                        specialist:
+                          load.get(node?.data.specialist ?? '')?.name ??
+                          node?.data.specialist ??
+                          '',
+                      })}
                     </p>
                     <ul className="flex flex-col gap-1.5" aria-label={t('topology.occupied')}>
                       {[...others.running, ...others.waiting].map((entry) => (

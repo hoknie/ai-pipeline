@@ -507,6 +507,13 @@ describe('attempts and transcript', () => {
     expect(screen.queryByText(/denials:/)).toBeNull();
   });
 
+  it('shows the model, not the specialist slug, in the title of an attempt', async () => {
+    panel(fakeApi());
+    await screen.findByText('#1 Кодер');
+    expect(screen.getByText('sonnet').getAttribute('title')).toBe('coder · claude sonnet');
+    expect(screen.queryByText('coder')).toBeNull();
+  });
+
   it('shows no refused commands for a group without them', async () => {
     panel(fakeApi());
     await screen.findByText('#1 Кодер');

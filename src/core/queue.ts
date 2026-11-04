@@ -3,6 +3,7 @@ import { DELIVERY_MODES, type DeliveryMode } from '../config/index.ts';
 import type { NewGroup } from './create.ts';
 import { Rejection } from './errors.ts';
 import { RUN_TITLE_LIMIT } from './ids.ts';
+import { retryableGroups } from './retryable.ts';
 import { cleanSkip } from './skip.ts';
 import { mergeTags } from './tags.ts';
 import {
@@ -14,6 +15,8 @@ import {
   type RunState,
 } from './model.ts';
 import { limitResetsAt } from './scheduler.ts';
+
+export { retryableGroups };
 
 export const QUEUE_PARALLEL_MAX = 20;
 /** The most runs the queue remembers as skipped. */
@@ -336,8 +339,19 @@ export function returnItemOf(queue: Queue, run: string): QueueItem | null {
   return queue.items.find((item) => item.run === run) ?? null;
 }
 
-export function removeItem(queue: Queue, id: string, now: number): void {
+export function removeItem(
+  queue: Queue,
+  id: string,
+  now: number,
+  lookup?: (id: string) => RunState | undefined,
+): void {
   const item = find(queue, id);
+  if (item.run !== null) {
+    const state = lookup?.(item.run);
+    if (state && state.run.hold !== null && state.run.finishedAt === null) {
+      throw new Rejection('a paused run stays in the queue; continue or cancel it');
+    }
+  }
   queue.items = queue.items.filter((candidate) => candidate !== item);
   for (const other of queue.items) other.after = other.after.filter((ref) => ref !== id);
   queue.updatedAt = now;
@@ -576,6 +590,7 @@ export function runProblems(state: RunState): Problem[] {
 
 /** A run keeps its place until it is finished and, with auto delivery, delivered. */
 export function occupiesSlot(state: RunState): boolean {
+  if (state.run.hold !== null) return false;
   if (state.run.finishedAt === null) return true;
   if (!state.run.config.delivery.auto) return false;
   return (
@@ -644,8 +659,10 @@ export function advance(
   const wake = queueWakeAt(queue);
   if (wake !== null && now >= wake) startQueue(queue, own, now);
   if (queue.skipFailed) {
-    const failed = own.filter((state) =>
-      runProblems(state).some((problem) => SKIPPED_REASONS.has(problem.reason)),
+    const failed = own.filter(
+      (state) =>
+        state.run.hold === null &&
+        runProblems(state).some((problem) => SKIPPED_REASONS.has(problem.reason)),
     );
     if (failed.length > 0) {
       const ids = new Set(failed.map((state) => state.run.id));
@@ -677,10 +694,11 @@ export function advance(
     }
     own = [...returned, ...own];
   }
-  stopOnLimit(queue, own);
+  const watched = own.filter((state) => state.run.hold === null);
+  stopOnLimit(queue, watched);
   const known = new Set(queue.acknowledged);
   if (queue.stop === null) {
-    for (const state of own) {
+    for (const state of watched) {
       const fresh = runProblems(state).find(
         (problem) => STOPPING_REASONS.has(problem.reason) && !known.has(problem.key),
       );
@@ -703,6 +721,12 @@ export function advance(
       (key) => !released.some((id) => key.startsWith(`${id}/`)),
     );
   }
+  // A return item of a finished run with nothing to retry has no purpose left.
+  queue.items = queue.items.filter((item) => {
+    if (item.run === null) return true;
+    const state = lookup(item.run);
+    return !(state && state.run.finishedAt !== null && retryableGroups(state).length === 0);
+  });
   let take: QueueItem[] = [];
   if (queue.status === 'running') {
     take = queue.items
@@ -745,12 +769,47 @@ function stopOnLimit(queue: Queue, own: readonly RunState[]): void {
   };
 }
 
-/** Work groups and the split step of a run that a retry can continue. */
-export function retryableGroups(state: RunState): string[] {
-  const work = state.split ? [state.split, ...state.groups] : state.groups;
-  return work
-    .filter((group) => group.status === 'failed' || group.status === 'cancelled')
-    .map((group) => group.slug);
+/** The queue item that takes `state` back: retries it, or only lifts its hold. */
+function returnItem(state: RunState, id: string, now: number): QueueItem {
+  return {
+    id,
+    number: state.run.number,
+    workflow: state.run.workflow,
+    task: null,
+    groups: null,
+    title: state.run.title,
+    autoDeliver: null,
+    deliveryMode: null,
+    tags: [...state.run.tags],
+    skip: [],
+    after: [],
+    createdAt: now,
+    error: null,
+    run: state.run.id,
+    postponed: false,
+  };
+}
+
+/**
+ * Puts a run on pause (checked before the hold is set): the run leaves its place and becomes the
+ * last item of the queue; taking the item continues it.
+ */
+export function pauseRun(queue: Queue, state: RunState, id: string, now: number): QueueItem {
+  const run = state.run.id;
+  if (state.run.hold === null && state.run.finishedAt !== null) {
+    throw new Rejection('run has nothing to pause');
+  }
+  if (state.run.hold !== null) throw new Rejection('run is already paused');
+  if (queue.items.some((item) => item.run === run)) {
+    throw new Rejection('run is already in the queue');
+  }
+  const item = returnItem(state, id, now);
+  queue.runs = queue.runs.filter((candidate) => candidate !== run);
+  queue.skipped = queue.skipped.filter((candidate) => candidate !== run);
+  queue.acknowledged = queue.acknowledged.filter((key) => !key.startsWith(`${run}/`));
+  queue.items.push(item);
+  queue.updatedAt = now;
+  return item;
 }
 
 /**
@@ -766,23 +825,7 @@ export function returnRun(queue: Queue, state: RunState, id: string, now: number
   if (queue.items.some((item) => item.run === run)) {
     throw new Rejection('run is already in the queue');
   }
-  const item: QueueItem = {
-    id,
-    number: state.run.number,
-    workflow: state.run.workflow,
-    task: null,
-    groups: null,
-    title: state.run.title,
-    autoDeliver: null,
-    deliveryMode: null,
-    tags: [...state.run.tags],
-    skip: [],
-    after: [],
-    createdAt: now,
-    error: null,
-    run,
-    postponed: false,
-  };
+  const item = returnItem(state, id, now);
   queue.items.unshift(item);
   queue.skipped = queue.skipped.filter((skipped) => skipped !== run);
   queue.updatedAt = now;

@@ -327,6 +327,9 @@ export function attemptVerdict(attempt: Attempt): Verdict | null {
   return attempt.status === 'finished' ? (attempt.report?.verdict ?? null) : null;
 }
 
+/** Why a run is held: the scheduler starts no step of a held run. */
+export type RunHold = 'paused';
+
 export interface Run {
   id: string;
   repository: string;
@@ -356,6 +359,8 @@ export interface Run {
   tags: string[];
   /** Steps skipped after the start; the step list of the snapshot is unchanged. */
   skippedSteps: string[];
+  /** The run is held and starts no step; null when it runs normally. */
+  hold: RunHold | null;
 }
 
 export interface PendingDelivery {

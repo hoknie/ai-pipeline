@@ -91,6 +91,8 @@ export interface Api {
   queueSettings(patch: QueueSettingsPatch): Promise<QueueView>;
   /** Puts a run back first in the queue of its repository; it continues where it stopped. */
   queueReturn(run: string, repository: string): Promise<QueueView & { item: string }>;
+  /** Pauses an unfinished run: it finishes its step and goes to the end of the queue. */
+  pauseRun(run: string, repository: string): Promise<QueueView & { item: string }>;
   /** Removes a skipped run from the skipped list of the queue. */
   queueDismiss(run: string, repository: string): Promise<QueueView>;
   /** State of the daemon and of the panel itself. */
@@ -228,6 +230,8 @@ function bound(repository: string | null): Api {
     queueSettings: (patch) => post(at('/api/queue/settings'), patch),
     queueReturn: (run, runRepository) =>
       post(withRepository('/api/queue/return', runRepository), { run }),
+    pauseRun: (run, runRepository) =>
+      post(withRepository(`/api/runs/${enc(run)}/pause`, runRepository)),
     queueDismiss: (run, runRepository) =>
       post(withRepository('/api/queue/dismiss', runRepository), { run }),
     system: () => call('/api/system'),
