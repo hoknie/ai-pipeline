@@ -1,7 +1,7 @@
 import { SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { cost, diffText, runTime, runTitle, taskNumber, usageText } from '../../format.ts';
+import { cost, diffText, runTimes, runTitle, taskNumber, usageText } from '../../format.ts';
 import { useLocale } from '../../i18n/index.ts';
 import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
@@ -15,6 +15,7 @@ import { StatusBadge } from '../StatusBadge.tsx';
 import { TagChips } from '../TagChip.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunFilters } from './RunFilters.tsx';
+import { RunProgress } from './RunProgress.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
 import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
@@ -99,6 +100,7 @@ export function RunList({
           {shown.map((run) => {
             const open = run.id === selectedRun;
             const groups = orderEntries(run);
+            const times = runTimes(run, now, locale);
             return (
               <li key={run.id} data-run={run.id}>
                 <button
@@ -111,31 +113,39 @@ export function RunList({
                   title={`${runTitle(run)}\n${run.id}`}
                   onClick={() => onSelect(run.id, null)}
                 >
-                  <span className="line-clamp-2 text-sm font-medium">
+                  <span className="truncate text-sm font-medium">
                     <span className="font-mono text-xs text-muted-foreground">
                       {taskNumber(run.number)}
                     </span>{' '}
                     {runTitle(run)}
                   </span>
-                  {run.name ? (
-                    <span className="truncate font-mono text-xs text-muted-foreground">
-                      {run.name}
-                    </span>
-                  ) : null}
-                  <TagChips tags={run.tags ?? []} nested />
+                  <span className="truncate font-mono text-xs text-muted-foreground">
+                    {run.name ?? '—'}
+                  </span>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
-                    <RunWarningsBadge run={run} />
                     {scope === 'all' ? (
                       <span className="font-medium" title={run.repository}>
                         {repositoryLabel(run.repository)}
                       </span>
                     ) : null}
                     <WorkflowBadge id={run.workflow} focusable={false} />
-                    <span>{runTime(run, now, t, locale)}</span>
+                    <TagChips tags={run.tags ?? []} nested />
+                  </span>
+                  <span className="grid grid-cols-2 items-center gap-2 text-xs text-muted-foreground">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
+                      <RunWarningsBadge run={run} />
+                    </span>
+                    <RunProgress done={run.progress.done} total={run.progress.total} />
+                  </span>
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span>{times.created}</span>
+                    <span>{times.duration}</span>
                     {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
                     {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
-                    {run.diff ? <span>{diffText(run.diff, t)}</span> : null}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {run.diff ? diffText(run.diff, t) : '—'}
                   </span>
                 </button>
                 {open && groups.length > 1 ? (

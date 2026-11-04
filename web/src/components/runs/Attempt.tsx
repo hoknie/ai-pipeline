@@ -161,16 +161,7 @@ export function Attempt({
         <CollapsibleContent>
           {open ? (
             <div className="flex flex-col gap-3 border-t p-3">
-              {attempt.reason || onRetry ? (
-                <Alert variant="destructive" className="flex items-center justify-between gap-3">
-                  <span>{attempt.reason}</span>
-                  {onRetry ? (
-                    <Button variant="outline" size="sm" onClick={onRetry}>
-                      {t('runs.attempt.retryStep')}
-                    </Button>
-                  ) : null}
-                </Alert>
-              ) : null}
+              {attempt.reason ? <Alert variant="destructive">{attempt.reason}</Alert> : null}
               {denials.length > 0 ? (
                 <section aria-label={t('runs.attempt.denialsLabel')}>
                   <Alert variant="warn">

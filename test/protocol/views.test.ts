@@ -709,3 +709,27 @@ describe('human names of steps in views', () => {
     expect(runView(state, 2000).groups[0]?.stepName).toBe('Аналитик');
   });
 });
+
+describe('runView progress', () => {
+  it('counts the steps passed by the groups', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'done', { slug: 'gruppa-1' });
+    step(state);
+    expect(runView(state, 2000).progress).toEqual({ done: 1, total: 4 });
+  });
+
+  it('is empty while the task is split', () => {
+    const state = run(1);
+    state.groups = [];
+    expect(runView(state, 2000).progress).toEqual({ done: 0, total: 0 });
+  });
+
+  it('is complete for a merged run', () => {
+    const state = run(1);
+    group(state).status = 'merged';
+    const { done, total } = runView(state, 2000).progress;
+    expect(done).toBe(total);
+    expect(total).toBeGreaterThan(0);
+  });
+});

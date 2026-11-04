@@ -65,7 +65,8 @@ describe('retry a failed step', () => {
     const blocks = screen.getAllByRole('listitem').filter((item) => item.closest('ol'));
     expect(within(blocks[0]!).queryByText('Retry step')).toBeNull();
     const buttons = within(blocks[1]!).getAllByRole('button', { name: 'Retry step' });
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(1);
+    expect(within(blocks[1]!).queryByRole('alert')?.querySelector('button') ?? null).toBeNull();
     fireEvent.click(buttons[0]!);
     await waitFor(() => expect(api.retry).toHaveBeenCalledWith('run1', 'login'));
     expect(

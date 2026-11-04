@@ -124,7 +124,7 @@ export function TopNav({
           <Button
             variant="outline"
             size="icon"
-            className="shrink-0 text-muted-foreground"
+            className="size-7 shrink-0 text-muted-foreground"
             onClick={onNewTask}
             disabled={!onNewTask}
             aria-label={t('nav.newTask')}

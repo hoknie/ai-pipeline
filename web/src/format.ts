@@ -57,17 +57,20 @@ export function when(timestamp: number, now: number, locale: string): string {
   return `${day} ${time}`;
 }
 
-/** When a run started and how long it took; only an active run shows a running clock. */
-export function runTime(
+/** Percent (0–100) of the steps a run has passed; 0 while the task is split. */
+export function progressPercent(progress: { done: number; total: number }): number {
+  if (progress.total <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((progress.done / progress.total) * 100)));
+}
+
+/** When a run was created and how long it has taken: up to `finishedAt` when finished, else to `now`. */
+export function runTimes(
   run: { createdAt: number; finishedAt: number | null; finished: boolean },
   now: number,
-  t: TFunction,
   locale: string,
-): string {
-  if (run.finished && run.finishedAt !== null) {
-    return `${when(run.createdAt, now, locale)} · ${duration(run.finishedAt - run.createdAt)}`;
-  }
-  return t('format.running', { duration: duration(now - run.createdAt) });
+): { created: string; duration: string } {
+  const end = run.finished && run.finishedAt !== null ? run.finishedAt : now;
+  return { created: when(run.createdAt, now, locale), duration: duration(end - run.createdAt) };
 }
 
 /** One question of a specialist, as the panel receives it. */

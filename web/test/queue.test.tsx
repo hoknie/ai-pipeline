@@ -2182,8 +2182,9 @@ describe('two halves of the task form', () => {
       }),
       { workflows: vi.fn(async () => fiveSteps) },
     );
-    await screen.findByText('skips: Ревьюер, Тестировщик');
-    expect(screen.getAllByText(/^skips:/)).toHaveLength(1);
+    await screen.findByLabelText('skips: Ревьюер, Тестировщик');
+    expect(screen.getAllByLabelText(/^skips:/)).toHaveLength(1);
+    expect(screen.queryByText(/^skips:/)).toBeNull();
     fireEvent.click(
       within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
     );

@@ -81,6 +81,15 @@ describe('group screen', () => {
     );
   });
 
+  it('shows the task body as Markdown in a block on the Task tab', async () => {
+    window.location.hash = '#runs/run1/login';
+    mount();
+    await screen.findByRole('tab', { name: 'Task' });
+    openTab('Task');
+    const block = await screen.findByRole('region', { name: 'Task' });
+    expect(within(block).getByText('вход').tagName).toBe('STRONG');
+  });
+
   it('opens the log on a link to a step', async () => {
     window.location.hash = '#runs/run1/login/code';
     mount();

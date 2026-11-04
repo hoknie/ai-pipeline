@@ -476,7 +476,12 @@ export function GroupScreen({
             </TabsContent>
           ) : null}
           <TabsContent value="task">
-            <Markdown text={view.task} />
+            <section
+              aria-label={t('runs.group.task')}
+              className="rounded-md border bg-card p-4 text-card-foreground"
+            >
+              <Markdown text={view.task} />
+            </section>
           </TabsContent>
         </Tabs>
       )}

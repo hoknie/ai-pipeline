@@ -1,4 +1,4 @@
-import { Ban, CircleCheck, Clock, GripVertical, ListOrdered } from 'lucide-react';
+import { Ban, CircleCheck, Clock, GripVertical, ListOrdered, TriangleAlert } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,7 @@ import { Badge, badgeVariants } from '../ui/badge.tsx';
 import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
 import { Switch } from '../ui/switch.tsx';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
 
 import { TagChips } from './TagChip.tsx';
 import { WorkflowBadge } from './WorkflowBadge.tsx';
@@ -32,6 +33,46 @@ import { afterOptions, dependents, depth, unmet } from './queueLinks.ts';
 
 const STATE_ICON = { done: CircleCheck, waiting: Clock, blocked: Ban } as const;
 const STATE_TONE = { done: 'ok', waiting: 'warn', blocked: 'err' } as const;
+
+/** A warning icon for a task that skips workflow steps; the tooltip lists the skipped steps. */
+function SkippedSteps({
+  item,
+  workflows,
+}: {
+  item: QueueItemView;
+  workflows: WorkflowsView | null | undefined;
+}) {
+  const { t } = useTranslation();
+  if (!item.skip || item.skip.length === 0) return null;
+  const steps = workflows?.workflows.find((candidate) => candidate.id === item.workflow)?.steps;
+  const skipped = item.skip.map((id) => ({
+    id,
+    name: steps?.find((step) => step.id === id)?.name ?? id,
+  }));
+  const names = skipped.map((entry) => entry.name);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex cursor-help rounded-sm text-status-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          tabIndex={0}
+          role="img"
+          aria-label={t('queue.list.skips', { steps: names.join(', ') })}
+        >
+          <TriangleAlert className="size-4" aria-hidden />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="px-3 py-2">
+        <p className="font-medium">{t('queue.list.skipsTitle')}</p>
+        <ul className="mt-1 list-disc pl-4">
+          {skipped.map(({ id, name }) => (
+            <li key={id}>{name}</li>
+          ))}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 /** The icon and the tone of a predecessor state or a readiness; `ready` looks like `done`. */
 function stateLook(state: DependencyState | ItemReadiness) {
@@ -351,20 +392,7 @@ export function QueueList({
                     {t('queue.list.deliveryMode', { mode: t(`deliveryMode.${item.deliveryMode}`) })}
                   </span>
                 )}
-                {item.skip && item.skip.length > 0 ? (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                    {t('queue.list.skips', {
-                      steps: item.skip
-                        .map(
-                          (id) =>
-                            workflows?.workflows
-                              .find((candidate) => candidate.id === item.workflow)
-                              ?.steps.find((step) => step.id === id)?.name ?? id,
-                        )
-                        .join(', '),
-                    })}
-                  </span>
-                ) : null}
+                <SkippedSteps item={item} workflows={workflows} />
                 {item.title && item.groups ? (
                   <span className="text-muted-foreground">{groupsText(item.groups.length, t)}</span>
                 ) : null}

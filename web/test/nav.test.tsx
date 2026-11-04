@@ -167,6 +167,18 @@ describe('top navigation', () => {
     expect(container.querySelectorAll('[data-nav-icon] .absolute')).toHaveLength(0);
   });
 
+  it('gives the new task button the height of the search button', () => {
+    mount({ onNewTask: vi.fn() });
+    const bar = screen.getByRole('banner');
+    const button = within(bar).getByRole('button', { name: 'New task' });
+    const palette = within(bar).getByRole('button', { name: 'Command palette' });
+    expect(button.classList.contains('size-7')).toBe(true);
+    expect(button.classList.contains('size-8')).toBe(false);
+    expect(palette.classList.contains('h-7')).toBe(true);
+    expect(button.querySelector('svg')).toBeTruthy();
+    expect(palette.querySelector('svg')).toBeTruthy();
+  });
+
   it('puts the new task button right before the search and disables it without a handler', () => {
     const onNewTask = vi.fn();
     const { rerender } = mount({ onNewTask });

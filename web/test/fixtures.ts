@@ -141,6 +141,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     tags: [],
     counts: 'running 1',
     total: 1,
+    progress: { done: 0, total: 1 },
     usage: { inputTokens: 1000, outputTokens: 100, costUsd: 0.42 },
     split: null,
     delivery: { applied: 0, merged: 0, failed: 0, inProgress: false, finishedAt: null },

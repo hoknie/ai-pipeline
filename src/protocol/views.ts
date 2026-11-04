@@ -230,6 +230,8 @@ export interface RunView {
   tags: TagView[];
   counts: string;
   total: number;
+  /** Steps passed by the work groups out of all their steps; `total` is 0 while the task is split. */
+  progress: { done: number; total: number };
   usage: Usage | null;
   split: SplitRow | null;
   delivery: {
@@ -479,6 +481,11 @@ export function withQueue(view: RunView, item: string | null): RunView {
   return { ...view, queueItem: item, state };
 }
 
+function runProgress(state: RunState): { done: number; total: number } {
+  const { done, total } = stepProgress(state);
+  return { done, total };
+}
+
 export function runView(
   state: RunState,
   now: number,
@@ -557,6 +564,7 @@ export function runView(
       : null,
     deliveryStage: deliveryStage(state),
     diff: runDiff(state, diffs),
+    progress: runProgress(state),
     topology: waitingTopology,
     steps: stepStates(state),
     specialists: specialistUse(state),

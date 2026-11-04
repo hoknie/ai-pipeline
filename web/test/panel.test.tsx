@@ -134,7 +134,7 @@ describe('run state', () => {
 });
 
 describe('run times', () => {
-  it('shows a running clock only for active runs', () => {
+  it('counts an active run up to now and a finished one up to its end', () => {
     const now = new Date(2026, 9, 31, 15, 0).getTime();
     const started = new Date(2026, 9, 31, 14, 30).getTime();
     render(
@@ -153,9 +153,8 @@ describe('run times', () => {
         { now },
       ),
     );
-    expect(screen.getByText('running 30m00s')).toBeTruthy();
-    const time = new Date(started).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
-    expect(screen.getByText(`${time} · 3m45s`)).toBeTruthy();
+    expect(screen.getByText('30m00s')).toBeTruthy();
+    expect(screen.getByText('3m45s')).toBeTruthy();
   });
 });
 
