@@ -579,6 +579,44 @@ describe('specialist tools', () => {
   });
 });
 
+describe('human review', () => {
+  const WORKFLOW = (step: string) =>
+    `${BASE}    reviewer: { name: R }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
+
+  it('reads human_review, false by default', () => {
+    const config = parseConfig(WORKFLOW(', human_review: true'));
+    expect(config.workflows[0]!.steps.map((step) => step.humanReview)).toEqual([false, true]);
+  });
+
+  it('rejects a value that is not a boolean', () => {
+    expectError(
+      errorsOf(WORKFLOW(', human_review: "yes"')),
+      'swarm.workflows.feature.steps[1].human_review',
+      'true or false',
+    );
+  });
+
+  it('does not accept the key in split', () => {
+    expectError(
+      errorsOf(
+        `${BASE}  workflows:\n    feature:\n      split: { specialist: coder, human_review: true }\n      steps:\n        - { id: code, specialist: coder }\n`,
+      ),
+      'swarm.workflows.feature.split.human_review',
+      'unknown key',
+    );
+  });
+
+  it('fills false in a snapshot stored before the field existed', () => {
+    const stored = structuredClone(parseConfig(WORKFLOW(', human_review: true')));
+    for (const step of stored.workflows[0]!.steps)
+      delete (step as { humanReview?: boolean }).humanReview;
+    expect(withConfigDefaults(stored).workflows[0]!.steps.map((step) => step.humanReview)).toEqual([
+      false,
+      false,
+    ]);
+  });
+});
+
 describe('additional prompts', () => {
   const WORKFLOW = (step: string, split = '') =>
     `${BASE}    reviewer: { name: R }\n  workflows:\n    feature:\n${split}      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
@@ -1114,5 +1152,38 @@ describe('name of a workflow', () => {
   it('rejects an empty name and a name that is not a string', () => {
     expectError(errorsOf(text('      name: "  "\n')), 'swarm.workflows.feature.name', 'empty');
     expectError(errorsOf(text('      name: 5\n')), 'swarm.workflows.feature.name', 'string');
+  });
+});
+
+describe('specialist tags', () => {
+  it('accepts tags without changing the specialist', () => {
+    const plain = parseConfig(BASE);
+    const tagged = parseConfig(
+      'swarm:\n  specialists:\n    coder: { name: Кодировщик, tags: [backend, review] }\n',
+    );
+    expect(tagged.specialists).toEqual(plain.specialists);
+  });
+
+  it('rejects tags that are not a list of names', () => {
+    expectError(
+      errorsOf('swarm:\n  specialists:\n    coder: { name: C, tags: backend }\n'),
+      'swarm.specialists.coder.tags',
+      'must be a list of strings',
+    );
+    expectError(
+      errorsOf(`swarm:\n  specialists:\n    coder: { name: C, tags: [${'a'.repeat(31)}] }\n`),
+      'swarm.specialists.coder.tags',
+      'at most 30 characters',
+    );
+    expectError(
+      errorsOf('swarm:\n  specialists:\n    coder: { name: C, tags: ["  "] }\n'),
+      'swarm.specialists.coder.tags',
+      'must not be empty',
+    );
+    expectError(
+      errorsOf('swarm:\n  specialists:\n    coder: { name: C, tags: ["a\\nb"] }\n'),
+      'swarm.specialists.coder.tags',
+      'line break',
+    );
   });
 });

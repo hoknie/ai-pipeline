@@ -76,7 +76,7 @@ describe('event stream', () => {
     })) as { item: string };
     await h.call('queue_edit', { repository: h.repo, item: second.item, position: 1 });
     // a tags event comes after every event of the calls before it
-    await h.call('tag_add', { name: 'marker' });
+    await h.call('tag_add', { repository: h.repo, name: 'marker' });
     await until('the marker', () => events.some((event) => event.event === 'tags'));
     const queueEvents = events.filter((event) => event.event === 'queue');
     expect(queueEvents).toHaveLength(2);
@@ -114,7 +114,7 @@ describe('repositories event', () => {
     expect(repositories()[0]?.repositories).toMatchObject([{ path: h.repo, waiting: 0 }]);
     await h.call('repository_add', { path: h.repo });
     // a tags event comes after every event of the calls before it
-    await h.call('tag_add', { name: 'marker' });
+    await h.call('tag_add', { repository: h.repo, name: 'marker' });
     await until('the marker', () => events.some((event) => event.event === 'tags'));
     expect(repositories()).toHaveLength(1);
     const { runId } = (await startRun(h, {

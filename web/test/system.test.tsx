@@ -219,7 +219,14 @@ describe('opening a split from the topology', () => {
       split: { specialist: 'plan', maxGroups: 3, workflow: null, workflowName: null },
     });
     const run = runView({
-      split: { status: 'running', wait: null, question: null, questions: null, reason: null },
+      split: {
+        status: 'running',
+        wait: null,
+        question: null,
+        questions: null,
+        humanOnly: null,
+        reason: null,
+      },
       groups: [],
       system: [systemRow('split')],
       topology: topologyOf(),
@@ -248,7 +255,14 @@ describe('system stages in the run header', () => {
       runView({
         state: 'finished',
         groups: [groupRow({ status: 'merged' })],
-        split: { status: 'done', wait: null, question: null, questions: null, reason: null },
+        split: {
+          status: 'done',
+          wait: null,
+          question: null,
+          questions: null,
+          humanOnly: null,
+          reason: null,
+        },
         system: [systemRow('split', { status: 'done' }), systemRow('message')],
         deliveryStage: { status: 'pending' },
         delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: null },

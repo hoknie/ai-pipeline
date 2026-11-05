@@ -26,6 +26,8 @@ export interface NotificationItem {
   groupTitle: string;
   /** The first line of the question or of the reason; empty when there is none. */
   detail: string;
+  /** The question is for a person only; null otherwise. */
+  humanOnly: 'review' | 'request' | null;
   createdAt: number;
 }
 
@@ -63,6 +65,7 @@ export function notificationItems(runs: readonly RunView[]): NotificationItem[] 
             slug: group.slug,
             groupTitle: group.title,
             detail: firstLine(text),
+            humanOnly: kind === 'needs_human' ? (group.humanOnly ?? null) : null,
             createdAt: run.createdAt,
           },
           order: KIND_ORDER.indexOf(kind),
@@ -151,7 +154,10 @@ export function useNotificationCenter(
     if (before === null || readPermission() !== 'granted') return;
     for (const item of all) {
       if (before.has(item.key)) continue;
-      const label = statusInfo(item.kind, i18next.t).label;
+      const base = statusInfo(item.kind, i18next.t).label;
+      const label = item.humanOnly
+        ? `${base} · ${i18next.t(`runs.humanOnly.${item.humanOnly}`)}`
+        : base;
       const notification = new Notification(`aip: ${item.groupTitle}`, {
         body: item.detail ? `${label} · ${item.detail}` : label,
         tag: item.key,

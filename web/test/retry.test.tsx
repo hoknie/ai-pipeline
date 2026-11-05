@@ -226,7 +226,14 @@ describe('retry every failed group', () => {
     const cancelled = runView({
       finished: true,
       state: 'cancelled',
-      split: { status: 'cancelled', wait: null, question: null, questions: null, reason: null },
+      split: {
+        status: 'cancelled',
+        wait: null,
+        question: null,
+        questions: null,
+        humanOnly: null,
+        reason: null,
+      },
       groups: [],
     });
     const api = fakeApi();

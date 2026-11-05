@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Alert } from '../ui/alert.tsx';
@@ -6,8 +6,15 @@ import { Button } from '../ui/button.tsx';
 import { Input } from '../ui/input.tsx';
 import { Label } from '../ui/label.tsx';
 import { Switch } from '../ui/switch.tsx';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.tsx';
-import { Textarea } from '../ui/textarea.tsx';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
 import type { Api } from '../api.ts';
@@ -16,9 +23,10 @@ import { DELIVERY_MODES } from '../deliveryModes.ts';
 import { taskNumber } from '../format.ts';
 import { useTags } from '../tags.tsx';
 import type { QueueFields, WorkflowsView } from '../types.ts';
+import { MarkdownField } from './MarkdownField.tsx';
 import { SkipSteps, pruneSkip } from './SkipSteps.tsx';
 import { TagPicker } from './TagPicker.tsx';
-import type { AfterOption } from './queueLinks.ts';
+import type { AfterOption, ParentChoice } from './queueLinks.ts';
 import { ValuesPicker, type PickerOption } from './ValuesPicker.tsx';
 
 /** What the user has typed into a task form; kept outside the form so updates do not erase it. */
@@ -44,6 +52,8 @@ export interface QueueDraft {
   parent: string | null;
   /** The user changed the parent: an edit sends `parent` only then. */
   parentTouched: boolean;
+  /** The repository the draft was typed for; not sent, the repository goes in the address. */
+  repository?: string | null;
 }
 
 export const TITLE_LIMIT = 60;
@@ -108,6 +118,32 @@ export function draftOf(item: {
   };
 }
 
+/**
+ * The draft moved to another repository: the links to its items and runs are cleared, the
+ * workflow stays when the new repository has it and is replaced by the first one otherwise.
+ * The tags are cleared (every repository has its own catalog); the text, the name and the
+ * delivery settings are kept.
+ */
+export function retarget(
+  draft: QueueDraft,
+  workflowIds: readonly string[],
+  stepIdsOf: (workflow: string) => string[],
+): QueueDraft {
+  const workflow = workflowIds.includes(draft.workflow)
+    ? draft.workflow
+    : (workflowIds[0] ?? draft.workflow);
+  return {
+    ...draft,
+    workflow,
+    after: [],
+    afterTouched: false,
+    parent: null,
+    parentTouched: false,
+    skip: pruneSkip(draft.skip, stepIdsOf(workflow)),
+    tags: [],
+  };
+}
+
 export function draftValid(draft: QueueDraft): boolean {
   if (draft.workflow === '') return false;
   if ([...draft.title.trim()].length > TITLE_LIMIT) return false;
@@ -165,11 +201,15 @@ export function QueueForm({
   idPrefix,
   draft,
   workflows,
+  repository,
   api,
   autoDeliverDefault = null,
   deliveryModeDefault = null,
   afterChoices = [],
+  parentChoices = [],
   locked = false,
+  repositoryField,
+  pending = false,
   submitLabel,
   onDraft,
   onSubmit,
@@ -178,6 +218,8 @@ export function QueueForm({
   idPrefix: string;
   draft: QueueDraft;
   workflows: WorkflowsView | null;
+  /** The repository of the task; its tag catalog is the one the tag field offers. */
+  repository: string | null;
   /** Lets the tag field create tags; without it the field only picks. */
   api?: Api;
   /** `delivery.auto` of the repository now; null when it is not known. */
@@ -186,8 +228,14 @@ export function QueueForm({
   deliveryModeDefault?: DeliveryMode | null;
   /** What the task can wait for. */
   afterChoices?: AfterOption[];
+  /** The runs the task can be a child of, in the order to show them. */
+  parentChoices?: ParentChoice[];
   /** A returned run keeps its own task: only the predecessors can change. */
   locked?: boolean;
+  /** The field of the repository, the first in the left half; only a new task has it. */
+  repositoryField?: ReactNode;
+  /** The data of the form is still loading: the form cannot be sent. */
+  pending?: boolean;
   submitLabel: string;
   onDraft: (draft: QueueDraft) => void;
   /** Rejects with the message to show next to the form; the draft is kept then. */
@@ -210,7 +258,7 @@ export function QueueForm({
   const valid = draftValid(effective);
 
   const submit = async () => {
-    if (!valid || busy) return;
+    if (!valid || busy || pending) return;
     setBusy(true);
     setError(null);
     try {
@@ -219,7 +267,7 @@ export function QueueForm({
           effective,
           (id) => {
             const tag = catalog.byId.get(id);
-            return tag && !tag.task ? tag.name : undefined;
+            return tag && tag.repository === repository && !tag.task ? tag.name : undefined;
           },
           idPrefix !== 'new',
         ),
@@ -238,19 +286,31 @@ export function QueueForm({
     description:
       choice.number === null ? choice.title : `${taskNumber(choice.number)} ${choice.title}`,
   }));
-  const parentOptions: AfterOption[] = afterChoices.filter((choice) => choice.kind === 'run');
+  let outside: { id: string; number: number | null; title: string } | null = null;
   if (
     effective.parent !== null &&
-    !parentOptions.some((choice) => choice.id === effective.parent)
+    !parentChoices.some((choice) => choice.id === effective.parent)
   ) {
-    const linked = catalog.tags.find((tag) => tag.task?.run === effective.parent);
-    parentOptions.push({
+    const linked = catalog.of(repository).find((tag) => tag.task?.run === effective.parent);
+    outside = {
       id: effective.parent,
       number: linked?.task?.number ?? null,
       title: linked?.name ?? effective.parent,
-      kind: 'run',
-    });
+    };
   }
+  const parentLabel = (choice: { number: number | null; title: string }) =>
+    choice.number === null ? choice.title : `${taskNumber(choice.number)} ${choice.title}`;
+  const parentSections = (['active', 'planned', 'finished'] as const).map((section) => ({
+    section,
+    label: t(
+      section === 'active'
+        ? 'queue.form.parentActive'
+        : section === 'planned'
+          ? 'queue.form.parentPlanned'
+          : 'queue.form.parentFinished',
+    ),
+    choices: parentChoices.filter((choice) => choice.section === section),
+  }));
   const options = [...ids];
   if (effective.workflow !== '' && !ids.includes(effective.workflow))
     options.push(effective.workflow);
@@ -264,6 +324,12 @@ export function QueueForm({
     >
       <div className="grid gap-4 @3xl:grid-cols-2">
         <fieldset disabled={locked} className="flex min-w-0 flex-col gap-3 border-0 p-0">
+          {repositoryField !== undefined ? (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor={`${idPrefix}-repository`}>{t('queue.form.repository')}</Label>
+              {repositoryField}
+            </div>
+          ) : null}
           <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor={`${idPrefix}-title`}>{t('queue.form.name')}</Label>
             <Input
@@ -313,13 +379,13 @@ export function QueueForm({
             </ToggleGroup>
           </div>
           {effective.mode === 'task' ? (
-            <Textarea
+            <MarkdownField
               id={`${idPrefix}-task`}
               aria-label={t('queue.form.taskText')}
               rows={9}
               value={effective.task}
               placeholder={t('queue.form.taskPlaceholder')}
-              onChange={(event) => change({ task: event.target.value })}
+              onChange={(task) => change({ task })}
             />
           ) : (
             <div className="flex flex-col gap-2">
@@ -335,12 +401,12 @@ export function QueueForm({
                     placeholder={t('queue.form.titlePlaceholder')}
                     onChange={(event) => setGroup(index, { title: event.target.value })}
                   />
-                  <Textarea
+                  <MarkdownField
                     aria-label={t('queue.form.groupText', { n: index + 1 })}
                     rows={2}
                     value={group.task}
                     placeholder={t('queue.form.groupTaskPlaceholder')}
-                    onChange={(event) => setGroup(index, { task: event.target.value })}
+                    onChange={(task) => setGroup(index, { task })}
                   />
                   <Button
                     variant="ghost"
@@ -398,13 +464,21 @@ export function QueueForm({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NO_PARENT}>{t('queue.form.noParent')}</SelectItem>
-                {parentOptions.map((choice) => (
-                  <SelectItem key={choice.id} value={choice.id}>
-                    {choice.number === null
-                      ? choice.title
-                      : `${taskNumber(choice.number)} ${choice.title}`}
-                  </SelectItem>
-                ))}
+                {outside ? (
+                  <SelectItem value={outside.id}>{parentLabel(outside)}</SelectItem>
+                ) : null}
+                {parentSections.map(({ section, label, choices }) =>
+                  choices.length > 0 ? (
+                    <SelectGroup key={section}>
+                      <SelectLabel>{label}</SelectLabel>
+                      {choices.map((choice) => (
+                        <SelectItem key={choice.id} value={choice.id}>
+                          {parentLabel(choice)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ) : null,
+                )}
               </SelectContent>
             </Select>
           </fieldset>
@@ -415,6 +489,7 @@ export function QueueForm({
               label={t('queue.form.tags')}
               selected={effective.tags}
               onChange={(tags) => change({ tags })}
+              repository={repository}
               api={api}
               allowCreate={api !== undefined}
               hideLinked
@@ -481,7 +556,7 @@ export function QueueForm({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={!valid || busy}>
+        <Button type="submit" disabled={!valid || busy || pending}>
           {submitLabel}
         </Button>
         {onCancel ? (

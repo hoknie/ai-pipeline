@@ -49,6 +49,7 @@ import {
   type Specialist,
   type WebSettings,
 } from './model.ts';
+import { tagsOf } from './tag-names.ts';
 import { validateConfig, validateRuntimesSection, validateWebSection } from './validate.ts';
 
 export type EntryKind = 'specialist' | 'workflow';
@@ -234,7 +235,7 @@ function resolution(global: Level, project: Level): Resolution {
   }
 }
 
-function readText(file: string): string | undefined {
+export function readText(file: string): string | undefined {
   try {
     return readFileSync(file, 'utf8');
   } catch (error) {
@@ -247,7 +248,7 @@ function sourcesOf(files: LevelFiles, kind: EntryKind): ConfigSource[] {
   return files[KIND_SECTION[kind]];
 }
 
-function stemOf(path: string): string {
+export function stemOf(path: string): string {
   return basename(path).replace(/\.ya?ml$/, '');
 }
 
@@ -367,13 +368,70 @@ export function draftConfig(
 }
 
 /**
+ * New errors of the configuration when several files of the project level are added or replaced
+ * at once, without writing: the errors the current configuration does not have.
+ */
+export function draftProjectFiles(
+  paths: ConfigPaths,
+  entries: { kind: EntryKind; id: string; file: string; text: string }[],
+): FieldError[] {
+  const files = readLevels(paths);
+  let drafted = files.project;
+  try {
+    for (const entry of entries) {
+      drafted = withEntry(drafted, entry.kind, entry.id, entry.file, entry.text);
+    }
+  } catch (error) {
+    if (!(error instanceof ConfigLoadError)) throw error;
+    const first = entries.find((entry) => error.message.includes(entry.file)) ?? entries[0];
+    return [
+      {
+        file: first?.file ?? '',
+        path: `swarm.${KIND_SECTION[first?.kind ?? 'specialist']}.${first?.id ?? ''}`,
+        message: error.message,
+      },
+    ];
+  }
+  const before = resolution(assembleLevel(files.global), assembleLevel(files.project));
+  const after = resolution(assembleLevel(files.global), assembleLevel(drafted));
+  const known = new Set(before.errors.map(key));
+  return after.errors.filter((error) => !known.has(key(error)));
+}
+
+/**
  * Checks an edit without writing: the revision, then the whole configuration with the file
  * replaced in memory. Only errors the current configuration does not have reject the edit.
  */
-export function planEdit(paths: ConfigPaths, edit: EditRequest): EditPlan {
-  const level = edit.level ?? 'project';
-  const file = entryFile(paths, edit.kind, edit.id, level);
+export function planEdit(paths: ConfigPaths, request: EditRequest): EditPlan {
+  const level = request.level ?? 'project';
+  const file = entryFile(paths, request.kind, request.id, level);
   const current = readText(file);
+  let edit = request;
+  if (edit.kind === 'specialist' && level === 'global' && edit.value !== null) {
+    // Shared tags are changed only in the file: a write of the entry keeps them as the file has them.
+    let stored: unknown;
+    try {
+      const parsed = current === undefined ? undefined : parseYaml(current, file);
+      stored = isMapping(parsed) ? parsed.tags : undefined;
+    } catch {
+      stored = undefined;
+    }
+    const { tags, ...rest } = edit.value;
+    if ('tags' in edit.value && !sameValue(tags, stored)) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        errors: [
+          {
+            file,
+            path: `swarm.specialists.${edit.id}.tags`,
+            message: 'shared tags are changed only in the file',
+          },
+        ],
+      };
+    }
+    edit = { ...edit, value: stored === undefined ? rest : { ...rest, tags: stored } };
+  }
   if (revisionOf(current) !== edit.revision) {
     return {
       ok: false,
@@ -800,6 +858,10 @@ export interface EditorSpecialist {
   sources: EntrySources;
   /** Values after defaults; null when the specialist does not pass validation. */
   effective: EditorSpecialistValues | null;
+  /** Tags of the shared file (read only here); empty when it has none or they are not valid. */
+  shared_tags: string[];
+  /** Tags of the project file. */
+  own_tags: string[];
 }
 
 export interface EditorSpecialistValues {
@@ -1006,6 +1068,8 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
       raw: rawOf(source),
       sources: sourcesFor(inProject, inGlobal),
       effective,
+      shared_tags: tagsOf(rawOf(inGlobal)),
+      own_tags: tagsOf(rawOf(inProject)),
     };
   });
   const globalWorkflows = byStem(files.global.workflows);

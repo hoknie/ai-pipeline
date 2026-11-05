@@ -158,7 +158,7 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_queue_settings` | `parallel?`, `autopilot?`, `auto_answer?`, `skip_failed?`, `autopilot_answer?`, `on_limit?`, `repo?` | Changes only the passed queue settings (at least one is required). `auto_answer`: a running queue answers questions with the `autopilot_answer` text (null: default). `on_limit`: `wait` for the usage limit to reset, or `stop` (the group fails) |
 | `swarm_queue_dismiss` | `run_id`, `repo?` | Removes a skipped run from the skipped list of its queue; the run itself does not change. `repo` defaults to the repository of the run |
 | `swarm_queue_return` | `run_id`, `repo?` | Puts a run with failed or cancelled groups back first in its queue; those groups are retried from where they stopped. `repo` defaults to the repository of the run |
-| `swarm_run_pause` | `run_id`, `repo?` | Pauses an unfinished run: the step in progress finishes, nothing new starts, and the run moves to the end of the queue as `paused <run-id>`. Continue it with `swarm_queue_run_now`. `repo` defaults to the repository of the run |
+| `swarm_run_pause` | `run_id`, `repo?` | Pauses an unfinished run: the running agents are stopped (a step that has already reported finishes and is committed), nothing new starts, and the run moves to the end of the queue as `paused <run-id>`. `swarm_queue_run_now` continues the interrupted step in the same session. `repo` defaults to the repository of the run |
 | `swarm_queue_pause` | `repo?` | Stops taking tasks; running runs keep working |
 | `swarm_queue_run_now` | `item`, `repo?` | Turns a task into a queue run at once; if no place is free, the last run that took a place is frozen. For a paused or frozen run it is Continue |
 
@@ -171,6 +171,7 @@ Without `repo`, the repository of the current directory is used. The queue, its 
 Specialists inside a run get their own MCP server (`aip mcp --worker`) with other tools:
 
 - `swarm_report` reports the result of a step.
+- `swarm_artifact` (`file_name`, `title?`, `content` or `path`) publishes a file of the step as an artifact of the group. The text in `content` is limited to 1 MiB, a file in `path` must lie in the worktree of the group and be at most 16 MiB. Artifacts are kept outside git, in `artifacts/` of the state directory, and are shown on the "Artifacts" tab of the panel.
 - `swarm_split` is available only on the split step.
 - `swarm_queue_add` (`workflow`, `task` or `groups`, `title?`, `deliveryMode?`, `skip?`, `after?`) is available only to a specialist with `queue: true`.
 - It puts the task in the queue of the run's repository, not of the directory where the specialist works.
@@ -211,7 +212,7 @@ One daemon and one state database (`$XDG_STATE_HOME/aip/`, `~/.local/state/aip/`
 - **`aip config check`** works without the daemon and does not change the list.
 - **CLI.** `--repo <path>` exists on `aip run start`, `aip queue …` and `aip config check`. By default it is the current directory. Commands that take a run id work from any directory, and `aip run list` shows the runs of all repositories.
 - **MCP and the plugin.** `swarm_run` and `swarm_queue*` have `repo?`. `/aip:run` starts a workflow in the repository of the Claude Code session. The session's directory does not affect which repository the panel selects.
-- **Limits.** The daemon has one global limit: `max` of the most recently started run. A specialist's `max` is counted by its slug across all runs, so a specialist in a second repository may wait for one in the first.
+- **Limits.** `max` is counted per repository: each repository gets the `max` of its most recently created run, and its runs do not wait for slots taken in another repository. A specialist's `max` is counted by its slug across all runs, so a specialist in a second repository may wait for one in the first.
 - **Web panel.** One panel serves all repositories: pick the repository in it (see [web.md](web.md)). `aip web --port 7342` is only for a separate panel with its own token.
 
 ```sh

@@ -1,5 +1,6 @@
 import type {
   ApplyResult,
+  ArtifactView,
   BackgroundProcessesView,
   ConfigCatalogResponse,
   ConfigEditResult,
@@ -15,6 +16,8 @@ import type {
   RunCreated,
   SettingValue,
   RunView,
+  SpecialistTagsView,
+  SpecialistsImportResult,
   SystemView,
   TagView,
   Transcript,
@@ -66,6 +69,12 @@ export interface Api {
   transcript(runId: string, group: string, seq: number, after: number): Promise<Transcript>;
   /** Diff of one changed file of a group with a few lines of context. */
   fileDiff(runId: string, group: string, path: string): Promise<FileDiffView>;
+  /** Artifacts the specialists published for a group, newest first. */
+  groupArtifacts(runId: string, group: string): Promise<ArtifactView[]>;
+  /** Address of an artifact: the download, or with `inline` the text for a preview. */
+  artifactUrl(runId: string, group: string, id: string, inline?: boolean): string;
+  /** The text of a `.md` or `.log` artifact. */
+  artifactText(runId: string, group: string, id: string): Promise<string>;
   /** The patch of the merged groups of a run, for `git apply`. */
   runPatch(runId: string): Promise<{ blob: Blob; fileName: string }>;
   answer(runId: string, group: string, answer: string): Promise<unknown>;
@@ -83,13 +92,15 @@ export interface Api {
   processes(): Promise<BackgroundProcessesView>;
   /** Terminates a background process and its children; the daemon refuses any other PID. */
   killProcess(pid: number): Promise<unknown>;
-  /** The tag catalog (shared by all repositories). */
+  /** The tag catalog of the repository of the client. */
   tags(): Promise<TagView[]>;
   /** Creates a tag (the daemon picks the color when none is given); returns the catalog. */
   addTag(name: string, color?: string): Promise<TagView[]>;
   /** Renames and/or recolors a tag, addressed by its current name; returns the catalog. */
   editTag(tag: string, patch: { name?: string; color?: string }): Promise<TagView[]>;
   removeTag(tag: string): Promise<TagView[]>;
+  /** Replaces the title of a run in any state; the name stays. */
+  setRunTitle(runId: string, title: string): Promise<RunView>;
   /** Adds and removes tags (by name) of a run in any state. */
   setRunTags(runId: string, change: { add?: string[]; remove?: string[] }): Promise<RunView>;
   /** The queue of the bound repository. */
@@ -103,7 +114,7 @@ export interface Api {
   queueSettings(patch: QueueSettingsPatch): Promise<QueueView>;
   /** Puts a run back first in the queue of its repository; it continues where it stopped. */
   queueReturn(run: string, repository: string): Promise<QueueView & { item: string }>;
-  /** Pauses an unfinished run: it finishes its step and goes to the end of the queue. */
+  /** Pauses an unfinished run: its running step stops (it continues in the same session) and the run goes to the end of the queue. */
   pauseRun(run: string, repository: string): Promise<QueueView & { item: string }>;
   /** Removes a skipped run from the skipped list of the queue. */
   queueDismiss(run: string, repository: string): Promise<QueueView>;
@@ -113,6 +124,13 @@ export interface Api {
   restartWeb(): Promise<void>;
   /** Restarts the daemon; refused with code `daemon_busy` while agents run, unless `force`. */
   restartDaemon(force: boolean): Promise<void>;
+  /**
+   * Stops the daemon; the panel stays up in a stand-in process. Refused with code `daemon_busy`
+   * while agents run, unless `force`.
+   */
+  stopDaemon(force: boolean): Promise<void>;
+  /** Starts the daemon from the stand-in panel; the daemon takes the panel back. */
+  startDaemon(): Promise<void>;
   /** The configuration of the bound repository, for the editors. */
   config(): Promise<ConfigEditorResponse>;
   /** Tools and skills a specialist can name, per runtime. */
@@ -125,6 +143,10 @@ export interface Api {
     level?: WriteLevel,
   ): Promise<ConfigEditResult>;
   deleteSpecialist(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
+  /** The specialists of the shared level and of every repository, with their tags. */
+  specialistTags(): Promise<SpecialistTagsView>;
+  /** Copies project specialists of another repository into the bound one. */
+  importSpecialists(source: string, slugs: string[]): Promise<SpecialistsImportResult>;
   /** Writes one general setting (`null` removes it); problems come back as a result. */
   writeSetting(
     path: string,
@@ -214,6 +236,24 @@ function bound(repository: string | null): Api {
       call(`/api/runs/${enc(runId)}/groups/${enc(group)}/transcript?seq=${seq}&after=${after}`),
     fileDiff: (runId, group, path) =>
       call(`/api/runs/${enc(runId)}/groups/${enc(group)}/diff?path=${enc(path)}`),
+    groupArtifacts: async (runId, group) =>
+      (
+        await call<{ artifacts: ArtifactView[] }>(
+          `/api/runs/${enc(runId)}/groups/${enc(group)}/artifacts`,
+        )
+      ).artifacts,
+    artifactUrl: (runId, group, id, inline = false) =>
+      `/api/runs/${enc(runId)}/groups/${enc(group)}/artifacts/${enc(id)}${inline ? '?inline=1' : ''}`,
+    artifactText: async (runId, group, id) => {
+      const response = await fetch(api.artifactUrl(runId, group, id, true), {
+        credentials: 'same-origin',
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new ApiError(response.status, body.error ?? response.statusText);
+      }
+      return response.text();
+    },
     runPatch: async (runId) => {
       const response = await fetch(`/api/runs/${enc(runId)}/patch`, { credentials: 'same-origin' });
       if (!response.ok) {
@@ -242,10 +282,11 @@ function bound(repository: string | null): Api {
       post(`/api/runs/${enc(runId)}/delivered`, groups ? { groups } : {}),
     processes: () => call('/api/processes'),
     killProcess: (pid) => post(`/api/processes/${pid}/kill`),
-    tags: () => call('/api/tags'),
-    addTag: (name, color) => post('/api/tags', color ? { name, color } : { name }),
-    editTag: (tag, patch) => post('/api/tags/edit', { tag, ...patch }),
-    removeTag: (tag) => post('/api/tags/remove', { tag }),
+    tags: () => call(at('/api/tags')),
+    addTag: (name, color) => post(at('/api/tags'), color ? { name, color } : { name }),
+    editTag: (tag, patch) => post(at('/api/tags/edit'), { tag, ...patch }),
+    removeTag: (tag) => post(at('/api/tags/remove'), { tag }),
+    setRunTitle: (runId, title) => post(`/api/runs/${enc(runId)}/title`, { title }),
     setRunTags: (runId, change) => post(`/api/runs/${enc(runId)}/tags`, change),
     queue: () => call(at('/api/queue')),
     queueAdd: (fields) => post(at('/api/queue/items'), fields),
@@ -266,6 +307,9 @@ function bound(repository: string | null): Api {
     restartWeb: async () => void (await post('/api/system/web/restart')),
     restartDaemon: async (force) =>
       void (await post('/api/system/daemon/restart', force ? { force: true } : {})),
+    stopDaemon: async (force) =>
+      void (await post('/api/system/daemon/stop', force ? { force: true } : {})),
+    startDaemon: async () => void (await post('/api/system/daemon/start')),
     config: () => call(at('/api/config')),
     catalog: () => call(at('/api/config/catalog')),
     writeSpecialist: (id, value, revision, level) =>
@@ -290,6 +334,13 @@ function bound(repository: string | null): Api {
       edit(at(`/api/config/specialists/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
         method: 'DELETE',
       }),
+    specialistTags: () => call('/api/specialist-tags'),
+    importSpecialists: async (source, slugs) =>
+      (await edit(at('/api/config/specialists/import'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ source, slugs }),
+      })) as unknown as SpecialistsImportResult,
     writeWorkflow: (id, value, revision, level) =>
       edit(at(`/api/config/workflows/${enc(id)}`), {
         method: 'PUT',

@@ -615,7 +615,7 @@ function registerTag(program: Command, io: CliIo, style: Style): void {
   const tag = program
     .command('tag')
     .description(
-      `Tags of tasks and runs, one catalog for all repositories. Colors: ${TAG_COLORS.join(', ')}`,
+      `Tags of tasks and runs; every repository has its own catalog. Colors: ${TAG_COLORS.join(', ')}`,
     );
   const show = (json: boolean | undefined, tags: TagView[]): void => {
     output(json, formatTagList(tags, activeStyle), tags);
@@ -623,11 +623,15 @@ function registerTag(program: Command, io: CliIo, style: Style): void {
 
   tag
     .command('list')
-    .description('Show the tags')
+    .description('Show the tags of the repository')
+    .option('-r, --repo <path>', 'repository path', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag list']))
-    .action(async (options: { json?: boolean }) => {
-      show(options.json, (await call(context(), 'tags', {})) as TagView[]);
+    .action(async (options: { repo: string; json?: boolean }) => {
+      show(
+        options.json,
+        (await call(context(), 'tags', { repository: resolve(options.repo) })) as TagView[],
+      );
     });
 
   tag
@@ -635,12 +639,14 @@ function registerTag(program: Command, io: CliIo, style: Style): void {
     .description('Create a tag (name up to 30 characters, unique ignoring case)')
     .argument('<name>', 'tag name')
     .option('--color <color>', `one of: ${TAG_COLORS.join(', ')}`)
+    .option('-r, --repo <path>', 'repository path', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag add auth --color blue']))
-    .action(async (name: string, options: { color?: string; json?: boolean }) => {
+    .action(async (name: string, options: { color?: string; repo: string; json?: boolean }) => {
       show(
         options.json,
         (await call(context(), 'tag_add', {
+          repository: resolve(options.repo),
           name,
           ...(options.color !== undefined ? { color: options.color } : {}),
         })) as TagView[],
@@ -653,30 +659,44 @@ function registerTag(program: Command, io: CliIo, style: Style): void {
     .argument('<name>', 'tag name')
     .option('--name <new>', 'new name')
     .option('--color <color>', `one of: ${TAG_COLORS.join(', ')}`)
+    .option('-r, --repo <path>', 'repository path', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag edit auth --name login --color teal']))
-    .action(async (name: string, options: { name?: string; color?: string; json?: boolean }) => {
-      if (options.name === undefined && options.color === undefined) {
-        throw new Error('pass --name or --color');
-      }
-      show(
-        options.json,
-        (await call(context(), 'tag_edit', {
-          tag: name,
-          ...(options.name !== undefined ? { name: options.name } : {}),
-          ...(options.color !== undefined ? { color: options.color } : {}),
-        })) as TagView[],
-      );
-    });
+    .action(
+      async (
+        name: string,
+        options: { name?: string; color?: string; repo: string; json?: boolean },
+      ) => {
+        if (options.name === undefined && options.color === undefined) {
+          throw new Error('pass --name or --color');
+        }
+        show(
+          options.json,
+          (await call(context(), 'tag_edit', {
+            repository: resolve(options.repo),
+            tag: name,
+            ...(options.name !== undefined ? { name: options.name } : {}),
+            ...(options.color !== undefined ? { color: options.color } : {}),
+          })) as TagView[],
+        );
+      },
+    );
 
   tag
     .command('remove')
-    .description('Delete a tag and take it off every task and run')
+    .description('Delete a tag and take it off every task and run of the repository')
     .argument('<name>', 'tag name')
+    .option('-r, --repo <path>', 'repository path', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag remove auth']))
-    .action(async (name: string, options: { json?: boolean }) => {
-      show(options.json, (await call(context(), 'tag_remove', { tag: name })) as TagView[]);
+    .action(async (name: string, options: { repo: string; json?: boolean }) => {
+      show(
+        options.json,
+        (await call(context(), 'tag_remove', {
+          repository: resolve(options.repo),
+          tag: name,
+        })) as TagView[],
+      );
     });
 }
 
@@ -853,7 +873,7 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
   run
     .command('pause')
     .description(
-      'Pause a run: the step in progress finishes, nothing new starts, and the run goes to the end of the queue; "aip queue run-now" continues it',
+      'Pause a run: the running agents stop, nothing new starts, and the run goes to the end of the queue; "aip queue run-now" continues the interrupted step in the same session',
     )
     .argument('<run-id>', 'run id')
     .option('-r, --repo <path>', 'repository path; defaults to the repository of the run')
@@ -1122,7 +1142,8 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
         const deadline = Date.now() + (stopped ? 0 : (io.panelWaitMs ?? 5000));
         for (;;) {
           const state = readPanelState(ctx.stateDirectory);
-          if (state !== null && state.host === host && state.port === port) {
+          // A stand-in panel hands the port to the daemon started above: wait for the daemon's.
+          if (state !== null && !state.standby && state.host === host && state.port === port) {
             print(`aip web: ${state.url}`);
             print(`aip web: served by the aip daemon (pid ${state.pid})`);
             url = state.url;
@@ -1241,6 +1262,16 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
           env: io.env,
         });
         const show = (file: string): string => relative(io.cwd, file) || file;
+        if (result.repository !== null) {
+          // The web panel lists the daemon's registry only, so the initialized repository joins it.
+          try {
+            await call(context(), 'repository_add', { path: result.repository });
+          } catch (error) {
+            io.stderr(
+              `aip: warning: could not add the repository to the list: ${(error as Error).message}\n`,
+            );
+          }
+        }
         for (const file of result.created) print(`${activeStyle.success('created')} ${show(file)}`);
         for (const file of result.kept)
           print(`${activeStyle.muted('kept   ')} ${show(file)} (already exists)`);

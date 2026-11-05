@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { act, cleanup, fireEvent, openTab, render, screen, waitFor, within } from './render.tsx';
 import i18next from 'i18next';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
 import { ApiError } from '../src/api.ts';
 import { dropPosition, dropSlot, moveId } from '../src/components/queueOrder.ts';
-import { afterOptions, dependents, depth, related, unmet } from '../src/components/queueLinks.ts';
+import {
+  afterOptions,
+  dependents,
+  depth,
+  parentChoices,
+  related,
+  unmet,
+} from '../src/components/queueLinks.ts';
 import { parseParallel } from '../src/components/QueuePage.tsx';
 import { draftOf, emptyDraft, fieldsOf } from '../src/components/QueueForm.tsx';
 import { pruneSkip } from '../src/components/SkipSteps.tsx';
@@ -721,6 +728,13 @@ describe('automatic delivery switch', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('false');
   });
 
+  it('previews the text of an item as Markdown in the edit form', async () => {
+    show(queueOf({ items: [queueItem('q1', '**важно**', 1)] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    openTab('Preview');
+    expect((await screen.findByText('важно')).tagName).toBe('STRONG');
+  });
+
   it('returns an item to the setting with null when it is edited', async () => {
     const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { autoDeliver: true })] }));
     await screen.findByText('auto delivery');
@@ -744,6 +758,16 @@ describe('automatic delivery switch', () => {
 });
 
 describe('items', () => {
+  it('has no repository field in the form of an item', async () => {
+    show();
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    await screen.findAllByLabelText('Task text');
+    expect(screen.queryByRole('combobox', { name: 'Repository' })).toBeNull();
+  });
+
   it('edits in place and keeps the draft over events', async () => {
     const api = show();
     await screen.findByRole('list', { name: 'tasks in the queue' });
@@ -1178,8 +1202,8 @@ describe('workflows', () => {
 });
 
 describe('tags in the queue', () => {
-  const auth = { id: 'ta', name: 'auth', color: 'red' as const, task: null };
-  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const, task: null };
+  const auth = { id: 'ta', repository: '/repo', name: 'auth', color: 'red' as const, task: null };
+  const v2 = { id: 'tv', repository: '/repo', name: 'v2', color: 'blue' as const, task: null };
 
   /** Shows the queue page; the first snapshot brings the catalog. */
   function withTags(queue = queueOf({ items: items('A', 'B') }), overrides = {}) {
@@ -1245,6 +1269,7 @@ describe('tags in the queue', () => {
   it('sends only ordinary tags when an item with a linked task tag is edited', async () => {
     const linked = {
       id: 'tl',
+      repository: '/repo',
       name: 'cards',
       color: 'indigo' as const,
       task: { run: 'run9', number: 115 },
@@ -2303,6 +2328,7 @@ describe('skip in the draft', () => {
 describe('parent task in the form', () => {
   const linked = {
     id: 'tl',
+    repository: '/repo',
     name: 'parent-run',
     color: 'indigo' as const,
     task: { run: 'run1', number: 12 },
@@ -2313,9 +2339,18 @@ describe('parent task in the form', () => {
   };
   const parentQueue = (items = [apiItem()]) =>
     queueOf({ items, runs: [queueRun('run1', { title: 'Parent', number: 12 })] });
+  /** The runs the panel knows, as the first snapshot of the stream brings them. */
+  const sendRuns = async (...runs: Parameters<typeof runView>[0][]) => {
+    await waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    act(() => {
+      stream().send({ event: 'snapshot', seq: 1, runs: runs.map((run) => runView(run)) });
+    });
+  };
+  const parent = () => sendRuns({ id: 'run1', title: 'Parent', number: 12 });
 
   it('adds a task with the parent chosen from the runs', async () => {
     const api = show(parentQueue([]));
+    await parent();
     await openNewTask();
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'Next' } });
     await choose('Parent');
@@ -2332,9 +2367,12 @@ describe('parent task in the form', () => {
   it('does not send the parent of an edit when the field was not touched', async () => {
     const item = queueItem('q1', 'API', 1, { tags: [linked] });
     const api = show(parentQueue([item]));
+    await parent();
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
-    expect(screen.getByRole('combobox', { name: 'Parent task' }).textContent).toContain('Parent');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Parent task' }).textContent).toContain('Parent'),
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
     expect(vi.mocked(api.queueEdit).mock.calls[0]![1]).not.toHaveProperty('parent');
@@ -2343,6 +2381,7 @@ describe('parent task in the form', () => {
   it('sends null when the parent is cleared in an edit', async () => {
     const item = queueItem('q1', 'API', 1, { tags: [linked] });
     const api = show(parentQueue([item]));
+    await parent();
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
     await choose('No parent task');
@@ -2350,5 +2389,100 @@ describe('parent task in the form', () => {
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ parent: null })),
     );
+  });
+
+  it('offers a finished run as the parent of a new task, after the active and planned ones', async () => {
+    const api = show(queueOf());
+    await sendRuns(
+      {
+        id: 'old',
+        title: 'Old',
+        number: 3,
+        finished: true,
+        state: 'finished',
+        finishedAt: 5_000,
+      },
+      {
+        id: 'new',
+        title: 'Recent',
+        number: 4,
+        finished: true,
+        state: 'finished',
+        finishedAt: 9_000,
+      },
+      {
+        id: 'plan',
+        title: 'Planned',
+        number: 6,
+        startedAt: null,
+        state: 'queued',
+        createdAt: 100,
+      },
+      { id: 'work', title: 'Working', number: 5 },
+      { id: 'other', title: 'Elsewhere', number: 9, repository: '/b' },
+    );
+    await openNewTask();
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'Next' } });
+    await screen.findByRole('combobox', { name: 'Parent task' });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Parent task' }));
+    const options = (await screen.findAllByRole('option')).map((option) => option.textContent);
+    expect(options).toEqual(['No parent task', '#5 Working', '#6 Planned', '#4 Recent', '#3 Old']);
+    for (const label of ['In progress', 'Planned', 'Finished'])
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('option', { name: '#4 Recent' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        workflow: 'feature',
+        task: 'Next',
+        parent: 'new',
+      }),
+    );
+  });
+
+  it('shows a finished parent of an item as #N title in the edit form', async () => {
+    const item = queueItem('q1', 'API', 1, { tags: [linked] });
+    show(queueOf({ items: [item] }));
+    await sendRuns({
+      id: 'run1',
+      title: 'Вход по ссылке',
+      number: 12,
+      finished: true,
+      state: 'finished',
+    });
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    await editRow('API');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Parent task' }).textContent).toBe(
+        '#12 Вход по ссылке',
+      ),
+    );
+  });
+});
+
+describe('parentChoices', () => {
+  const run = (id: string, overrides: Parameters<typeof runView>[0] = {}) =>
+    runView({ id, number: Number(id.replace(/\D/g, '')) || 1, title: id, ...overrides });
+
+  it('orders in progress, planned and finished runs of the repository', () => {
+    const runs = [
+      run('f1', { finished: true, state: 'finished', finishedAt: 10 }),
+      run('f2', { finished: true, state: 'cancelled', finishedAt: 20 }),
+      run('p1', { startedAt: null, state: 'queued', createdAt: 5 }),
+      run('p2', { state: 'queued', createdAt: 8 }),
+      run('a1', { startedAt: 100 }),
+      run('a2', { startedAt: 200, state: 'paused', hold: 'paused' }),
+      run('x1', { repository: '/b' }),
+    ];
+    const choices = parentChoices(runs, '/repo');
+    expect(choices.map((choice) => [choice.id, choice.section])).toEqual([
+      ['a2', 'active'],
+      ['a1', 'active'],
+      ['p2', 'planned'],
+      ['p1', 'planned'],
+      ['f2', 'finished'],
+      ['f1', 'finished'],
+    ]);
+    expect(parentChoices(runs, '/b').map((choice) => choice.id)).toEqual(['x1']);
   });
 });

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Input } from '../../ui/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../ui/toggle-group.tsx';
 import type { RunView } from '../../types.ts';
+import { useTags } from '../../tags.tsx';
 import { TagPicker } from '../TagPicker.tsx';
 
 import { filterCounts, RUN_FILTERS, runsOf, type RunFilter, type RunScope } from './runFilter.ts';
@@ -34,7 +35,12 @@ export function RunFilters({
   onTagIds: (ids: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const counts = filterCounts(runsOf(runs, scope === 'repository' ? repository : null), tagIds);
+  const { byId } = useTags();
+  const counts = filterCounts(
+    runsOf(runs, scope === 'repository' ? repository : null),
+    tagIds,
+    byId,
+  );
   return (
     <div className="flex flex-col gap-2">
       <Input
@@ -67,7 +73,12 @@ export function RunFilters({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <TagPicker label={t('runs.list.tags')} selected={tagIds} onChange={onTagIds} />
+      <TagPicker
+        label={t('runs.list.tags')}
+        selected={tagIds}
+        onChange={onTagIds}
+        repository={repository}
+      />
     </div>
   );
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { progressPercent, runClockEnd, runTimes } from '../src/format.ts';
+import { createInstance } from 'i18next';
+
+import { en } from '../src/i18n/locales/en.ts';
+import { ru } from '../src/i18n/locales/ru.ts';
+import { formatBytes, progressPercent, runClockEnd, runTimes } from '../src/format.ts';
 
 describe('progressPercent', () => {
   it('rounds the share of passed steps', () => {
@@ -47,5 +51,26 @@ describe('runClockEnd', () => {
     expect(runClockEnd({ finishedAt: 4_000, finished: true, clockStoppedAt: null }, 9_000)).toBe(
       4_000,
     );
+  });
+});
+
+describe('formatBytes', () => {
+  const i18n = createInstance({
+    lng: 'en',
+    resources: { en: { translation: en }, ru: { translation: ru } },
+  });
+  void i18n.init();
+  const t = i18n.getFixedT('en');
+  it('shows bytes, KB and MB with one decimal', () => {
+    expect(formatBytes(0, t, 'en')).toBe('0 B');
+    expect(formatBytes(1023, t, 'en')).toBe('1023 B');
+    expect(formatBytes(1536, t, 'en')).toBe('1.5 KB');
+    expect(formatBytes(1024 * 1024, t, 'en')).toBe('1 MB');
+    expect(formatBytes(2.5 * 1024 * 1024, t, 'en')).toBe('2.5 MB');
+  });
+  it('speaks the language of the panel', () => {
+    const ru = i18n.getFixedT('ru');
+    expect(formatBytes(1536, ru, 'ru')).toBe('1,5 КБ');
+    expect(formatBytes(5, ru, 'ru')).toBe('5 Б');
   });
 });

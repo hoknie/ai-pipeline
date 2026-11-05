@@ -19,6 +19,8 @@ export interface InitResult {
   /** Absolute paths. */
   created: string[];
   kept: string[];
+  /** Root of the repository the configuration was written to; null for the shared configuration. */
+  repository: string | null;
 }
 
 function templateFiles(directory = TEMPLATE): string[] {
@@ -34,6 +36,7 @@ function templateFiles(directory = TEMPLATE): string[] {
 /** Copies the starter configuration into `aip/` of the repository; existing files stay as they are. */
 export async function initConfig(options: InitOptions): Promise<InitResult> {
   let directory: string;
+  let root: string | null = null;
   if (options.shared) {
     directory = configPaths('', options.env.XDG_CONFIG_HOME, options.env.HOME).global.directory;
   } else {
@@ -42,6 +45,7 @@ export async function initConfig(options: InitOptions): Promise<InitResult> {
         `${options.cwd} is not inside a git repository. Run \`git init\` first, or use \`aip init --shared\` for the shared configuration.`,
       );
     });
+    root = repository;
     directory = configPaths(repository, undefined, undefined).project.directory;
   }
   const created: string[] = [];
@@ -56,5 +60,5 @@ export async function initConfig(options: InitOptions): Promise<InitResult> {
     writeFileSync(target, readFileSync(source));
     created.push(target);
   }
-  return { directory, created, kept };
+  return { directory, created, kept, repository: root };
 }

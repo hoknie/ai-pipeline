@@ -1,6 +1,6 @@
 import { Ban, CircleCheck, Clock, GripVertical, ListOrdered, TriangleAlert } from 'lucide-react';
 import type { TFunction } from 'i18next';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api.ts';
@@ -15,6 +15,7 @@ import type {
   ItemReadiness,
   QueueItemView,
   QueueView,
+  RunView,
   WorkflowsView,
 } from '../types.ts';
 
@@ -29,7 +30,7 @@ import { TagChips } from './TagChip.tsx';
 import { WorkflowBadge } from './WorkflowBadge.tsx';
 import { QueueForm, draftOf, type QueueDraft } from './QueueForm.tsx';
 import { dropPosition, dropSlot, moveId } from './queueOrder.ts';
-import { afterOptions, dependents, depth, unmet } from './queueLinks.ts';
+import { afterOptions, dependents, depth, parentChoices, unmet } from './queueLinks.ts';
 
 const STATE_ICON = { done: CircleCheck, waiting: Clock, blocked: Ban } as const;
 const STATE_TONE = { done: 'ok', waiting: 'warn', blocked: 'err' } as const;
@@ -113,6 +114,7 @@ type Drop = { index: number; after: boolean } | null;
 export function QueueList({
   api,
   queue,
+  runs = [],
   workflows,
   now,
   drafts,
@@ -123,6 +125,8 @@ export function QueueList({
 }: {
   api: Api;
   queue: QueueView;
+  /** All runs of the panel: the parent choices come from them. */
+  runs?: RunView[];
   workflows: WorkflowsView | null;
   now: number;
   drafts: Record<string, QueueDraft>;
@@ -136,6 +140,7 @@ export function QueueList({
   const { t } = useTranslation();
   const locale = useLocale();
   const confirm = useConfirm();
+  const parents = useMemo(() => parentChoices(runs, queue.repository), [runs, queue.repository]);
   const [order, setOrder] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [drop, setDrop] = useState<Drop>(null);
@@ -479,10 +484,12 @@ export function QueueList({
                   idPrefix={`edit-${item.id}`}
                   draft={editing}
                   workflows={workflows}
+                  repository={queue.repository}
                   api={api}
                   autoDeliverDefault={queue.autoDeliver}
                   deliveryModeDefault={queue.deliveryMode}
                   afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item)}
+                  parentChoices={parents}
                   locked={item.run !== null}
                   submitLabel={t('queue.list.save')}
                   onDraft={(draft) => onDraft(`edit:${item.id}`, draft)}

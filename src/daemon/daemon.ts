@@ -1,7 +1,8 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { open, realpath, stat } from 'node:fs/promises';
+import { isAbsolute, join, resolve, sep } from 'node:path';
 
 import {
   ConfigEditError,
@@ -9,6 +10,13 @@ import {
   type ConfigPaths,
   type EditRequest,
   commitEdit,
+  commitEdits,
+  tagFolder,
+  planImport,
+  planTagRemove,
+  planTagRename,
+  planTagsSet,
+  type TagPlan,
   draftConfig,
   editorView,
   planEdit,
@@ -30,6 +38,7 @@ import {
   checkSkip,
   stepStates,
   addLinkedTag,
+  tagsOfRepository,
   addTag,
   autoTagName,
   runName,
@@ -77,6 +86,11 @@ import {
   startQueue,
   dispatch,
   findGroup,
+  ARTIFACTS_PER_GROUP,
+  ARTIFACT_FILE_LIMIT,
+  artifactPreview,
+  artifactTitle,
+  attemptStepLabel,
   groupRef,
   isRunFinished,
   groupsFromTask,
@@ -140,6 +154,10 @@ import {
   type TagView,
   type Transcript,
   type ConfigEditResult,
+  type SpecialistTagFolderView,
+  type SpecialistTagsResult,
+  type SpecialistTagsView,
+  type SpecialistsImportResult,
   type ConfigPreview,
   type ConfigCatalogResponse,
   type ConfigEditorResponse,
@@ -150,6 +168,8 @@ import {
   runTitle,
   type WebStopResult,
   type FileDiffView,
+  type ArtifactContentView,
+  type ArtifactView,
   type RunPatchView,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
@@ -157,6 +177,7 @@ import { Store, type KnownRepository } from '../store/index.ts';
 
 import { Executor, NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS, type AttemptKey } from './executor.ts';
 import { readLines, readTail, readTimes, timesPath } from './logs.ts';
+import { FileArtifactStorage, artifactStorageFor, type ArtifactStorage } from './artifacts.ts';
 import { FilePatchStorage, storageFor, type PatchStorage } from './patches.ts';
 import { DRAIN_MS, STOP_GRACE_MS } from './supervisor.ts';
 import {
@@ -259,9 +280,9 @@ export class Daemon {
   private readonly diffing = new Set<string>();
   private readonly diffAgain = new Set<string>();
   private readonly patchStorages: PatchStorage[];
+  private readonly artifactStorages: ArtifactStorage[];
   private readonly patching = new Map<string, Promise<void>>();
   private seq = 0;
-  private max = 3;
   private queue: Promise<unknown> = Promise.resolve();
   private readonly queues = new Map<string, Queue>();
   private readonly advanceRequested = new Set<string>();
@@ -292,6 +313,7 @@ export class Daemon {
     this.store = new Store(databasePath(options.stateDirectory));
     this.socket = socketPath(options.stateDirectory);
     this.patchStorages = [new FilePatchStorage(join(options.stateDirectory, 'patches'))];
+    this.artifactStorages = [new FileArtifactStorage(join(options.stateDirectory, 'artifacts'))];
     this.environment = options.environment ?? process.env;
     this.now = options.now ?? Date.now;
     this.build = options.build ?? currentBuild();
@@ -309,6 +331,7 @@ export class Daemon {
 
   async start(): Promise<void> {
     await this.sweepPatches();
+    await this.sweepArtifacts();
     await this.serial(async () => {
       const recovered = this.store.recover(this.now());
       for (const { state } of recovered) this.states.set(state.run.id, state);
@@ -318,8 +341,6 @@ export class Daemon {
         const state = this.store.loadRun(id);
         if (state && limitHolds([state], this.now()).size > 0) this.states.set(id, state);
       }
-      const latest = [...this.states.values()].sort((a, b) => b.run.createdAt - a.run.createdAt)[0];
-      if (latest) this.max = latest.run.config.max;
       for (const queue of this.store.queues()) this.queues.set(queue.repository, queue);
       this.catalog = this.store.tags();
       for (const entry of this.store.repositories()) this.registry.set(entry.path, entry);
@@ -393,7 +414,7 @@ export class Daemon {
       queue,
       (id) => this.lookupState(id),
       delivery.auto,
-      this.catalog,
+      this.catalogOf(queue.repository),
       delivery.mode,
       this.waitLookup,
       delivery.names,
@@ -553,7 +574,7 @@ export class Daemon {
         }
         const created = await this.createRun(
           itemParams(queue, item),
-          knownTags(this.catalog, item.tags),
+          knownTags(this.catalogOf(queue.repository), item.tags),
           item,
         );
         itemStarted(queue, item.id, created.runId, this.now());
@@ -651,8 +672,8 @@ export class Daemon {
   }
 
   /**
-   * `run_pause`: the run keeps `hold: paused`, starts no new step, and becomes the last item of
-   * the queue; the step in progress finishes.
+   * `run_pause`: the run keeps `hold: paused` and becomes the last item of the queue; the running
+   * agents are stopped by the `hold` event, and after run-now the step continues in the same session.
    */
   private pauseRunRequest(params: ParamsOf<'run_pause'>): Promise<unknown> {
     return this.serial(async () => {
@@ -800,11 +821,12 @@ export class Daemon {
           let tags =
             request.params.tags === undefined
               ? undefined
-              : resolveManualTags(this.catalog, request.params.tags);
+              : resolveManualTags(this.catalogOf(repository), request.params.tags);
           const existing = queue.items.find((candidate) => candidate.id === item);
           const before = existing?.tags ?? [];
           if (existing && tags !== undefined) {
-            tags = keepLinkedTags(this.catalog, knownTags(this.catalog, existing.tags), tags);
+            const catalog = this.catalogOf(repository);
+            tags = keepLinkedTags(catalog, knownTags(catalog, existing.tags), tags);
           }
           const parentPending = existing !== undefined && parentParam !== undefined;
           const patch = {
@@ -822,14 +844,14 @@ export class Daemon {
           // Every check of the edit runs on a copy before the tag of the parent is created.
           if (existing && parentState) editItem(structuredClone(queue), item, patch, now);
           if (existing && parentPending) {
-            const parentTag = parentState ? await this.linkedTagFor(parentState) : null;
-            const rest = withoutLinkedTags(this.catalog, tags ?? existing.tags);
+            const parentTag = parentState ? await this.parentTagFor(repository, parentState) : null;
+            const rest = withoutLinkedTags(this.catalogOf(repository), tags ?? existing.tags);
             tags = mergeTags(parentTag ? [parentTag.id] : [], rest);
           }
           if (existing && after !== undefined) {
             const fresh = after.filter((ref) => !existing.after.includes(ref));
             const inherited = knownTags(
-              this.catalog,
+              this.catalogOf(repository),
               dependencyTags(queue, fresh, (id) => this.lookupState(id)?.run.tags),
             );
             if (inherited.length > 0) tags = mergeTags(tags ?? existing.tags, inherited);
@@ -907,7 +929,7 @@ export class Daemon {
           }
           const created = await this.createRun(
             itemParams(queue, item),
-            knownTags(this.catalog, item.tags),
+            knownTags(this.catalogOf(queue.repository), item.tags),
             item,
           );
           await this.claimPlaceFor(queue, created.runId);
@@ -932,8 +954,9 @@ export class Daemon {
       state,
       now,
       (slug) => this.diffs.get(`${state.run.id}/${slug}`) ?? null,
-      this.catalog,
+      this.catalogOf(state.run.repository),
       this.waitLookup,
+      this.store.artifactCounts(state.run.id),
     );
     const queue = this.queues.get(state.run.repository);
     const item = queue ? returnItemOf(queue, state.run.id) : null;
@@ -1077,6 +1100,126 @@ export class Daemon {
       if (record) keep.set(id, record.uri);
     }
     for (const storage of this.patchStorages) await storage.sweep(keep).catch(() => undefined);
+  }
+
+  /** Removes artifact files of runs the database does not know and files it has no record of. */
+  private async sweepArtifacts(): Promise<void> {
+    const keep = this.store.artifactUris();
+    for (const storage of this.artifactStorages) await storage.sweep(keep).catch(() => undefined);
+  }
+
+  private groupArtifacts(params: ParamsOf<'group_artifacts'>): ArtifactView[] {
+    const state = this.state(params.runId);
+    const group = findGroup(state, params.group);
+    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    return this.store.artifacts(state.run.id, group.slug).map((record) => {
+      const attempt = group.attempts.find((candidate) => candidate.seq === record.seq);
+      return {
+        id: record.id,
+        step: record.step,
+        stepName: attempt ? attemptStepLabel(state, group, attempt) : record.step,
+        seq: record.seq,
+        specialist: record.specialist,
+        title: record.title,
+        fileName: record.fileName,
+        size: record.size,
+        createdAt: record.createdAt,
+        preview: artifactPreview(record.fileName),
+      };
+    });
+  }
+
+  private async artifactContent(params: ParamsOf<'artifact'>): Promise<ArtifactContentView> {
+    const state = this.state(params.runId);
+    const group = findGroup(state, params.group);
+    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    const record = this.store.artifact(state.run.id, params.id);
+    if (!record || record.group !== group.slug) {
+      throw new Rejection(`unknown artifact \`${params.id}\``);
+    }
+    const bytes =
+      (await artifactStorageFor(this.artifactStorages, record.uri)?.get(record.uri)) ?? null;
+    if (bytes === null) throw new Rejection(`artifact \`${params.id}\` is not available`);
+    return { fileName: record.fileName, size: bytes.length, base64: bytes.toString('base64') };
+  }
+
+  private async artifactPublish(params: ParamsOf<'artifact_publish'>): Promise<{ id: string }> {
+    const key = this.executor.attemptFor(params.token);
+    if (!key) throw new Rejection('unknown or expired report token');
+    const state = this.state(key.run);
+    const group = findGroup(state, key.group);
+    const attempt = group?.attempts.find((candidate) => candidate.seq === key.seq);
+    if (!group || !attempt || attempt.status !== 'running') {
+      throw new Rejection('unknown or expired report token');
+    }
+    const bytes =
+      params.content !== undefined
+        ? Buffer.from(params.content, 'utf8')
+        : await this.readArtifactFile(this.executor.worktreePath(state, group), params.path ?? '');
+    const runId = state.run.id;
+    const fileName = params.fileName;
+    return this.serial(async () => {
+      const existing = this.store.findArtifact(runId, group.slug, attempt.seq, fileName);
+      if (!existing && this.store.artifactCount(runId, group.slug) >= ARTIFACTS_PER_GROUP) {
+        throw new Rejection(`a group may have at most ${ARTIFACTS_PER_GROUP} artifacts`);
+      }
+      const id = existing?.id ?? randomUUID();
+      const uri = await this.artifactStorages[0]!.put(runId, id, bytes);
+      const { artifact, previousUri } = this.store.addArtifact({
+        id,
+        runId,
+        group: group.slug,
+        step: attempt.stepId,
+        seq: attempt.seq,
+        specialist: attempt.specialist,
+        title: params.title ?? artifactTitle(fileName),
+        fileName,
+        size: bytes.length,
+        uri,
+        createdAt: this.now(),
+      });
+      if (previousUri !== null && previousUri !== uri) {
+        await artifactStorageFor(this.artifactStorages, previousUri)
+          ?.remove(previousUri)
+          .catch(() => undefined);
+      }
+      this.broadcast(state);
+      return { id: artifact.id };
+    });
+  }
+
+  /** Reads a regular file inside the worktree (symlinks resolved, `.git` excluded), size-limited. */
+  private async readArtifactFile(worktree: string, path: string): Promise<Buffer> {
+    let root: string;
+    let target: string;
+    try {
+      root = await realpath(worktree);
+      target = await realpath(isAbsolute(path) ? path : resolve(root, path));
+    } catch {
+      throw new Rejection(`cannot read \`${path}\`: no such file in the worktree`);
+    }
+    const inside = target.startsWith(root + sep) ? target.slice(root.length + 1) : null;
+    if (inside === null || inside.split(sep)[0] === '.git') {
+      throw new Rejection(`\`${path}\` is outside of the worktree of the group`);
+    }
+    const before = await stat(target);
+    if (!before.isFile()) throw new Rejection(`\`${path}\` is not a regular file`);
+    if (before.size > ARTIFACT_FILE_LIMIT) {
+      throw new Rejection(`\`${path}\` is larger than ${ARTIFACT_FILE_LIMIT} bytes`);
+    }
+    const handle = await open(target, 'r');
+    try {
+      const info = await handle.stat();
+      if (!info.isFile()) throw new Rejection(`\`${path}\` is not a regular file`);
+      if (info.size > ARTIFACT_FILE_LIMIT) {
+        throw new Rejection(`\`${path}\` is larger than ${ARTIFACT_FILE_LIMIT} bytes`);
+      }
+      const buffer = Buffer.alloc(Math.min(info.size, ARTIFACT_FILE_LIMIT));
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
   }
 
   private async runPatch(params: ParamsOf<'run_patch'>): Promise<RunPatchView> {
@@ -1389,7 +1532,7 @@ export class Daemon {
     try {
       const active = [...this.states.values()].filter((state) => state.run.finishedAt === null);
       // Finished runs too: a usage limit of a failed run still holds its runtime.
-      const effects = dispatch([...this.states.values()], this.max, this.now());
+      const effects = dispatch([...this.states.values()], this.now());
       this.armWake();
       if (effects.length === 0) return;
       for (const state of active) this.save(state);
@@ -1405,7 +1548,7 @@ export class Daemon {
   /** Recomputes which queued groups wait, and tells subscribers about runs whose waits changed. */
   private refreshWaits(): void {
     const states = [...this.states.values()];
-    this.waits = planDispatch(states, this.max, this.now()).waits;
+    this.waits = planDispatch(states, this.now()).waits;
     const repositories = new Set<string>();
     for (const state of states) {
       const id = state.run.id;
@@ -1500,6 +1643,12 @@ export class Daemon {
         return this.groupFileDiff(request.params);
       case 'run_patch':
         return this.runPatch(request.params);
+      case 'group_artifacts':
+        return Promise.resolve(this.groupArtifacts(request.params));
+      case 'artifact':
+        return this.artifactContent(request.params);
+      case 'artifact_publish':
+        return this.artifactPublish(request.params);
       case 'transcript':
         return Promise.resolve(this.transcript(request.params));
       case 'workflows':
@@ -1522,6 +1671,28 @@ export class Daemon {
         return this.configSettings(request.params);
       case 'config_preview':
         return this.configPreview(request.params);
+      case 'specialist_tags':
+        return Promise.resolve(this.specialistTags());
+      case 'specialist_tags_set':
+        return this.specialistTagEdit(request.params.repository, (paths, level) =>
+          planTagsSet(
+            paths,
+            level,
+            request.params.slug,
+            request.params.tags,
+            request.params.revision,
+          ),
+        );
+      case 'specialist_tag_rename':
+        return this.specialistTagEdit(request.params.repository, (paths, level) =>
+          planTagRename(paths, level, request.params.from, request.params.to),
+        );
+      case 'specialist_tag_remove':
+        return this.specialistTagEdit(request.params.repository, (paths, level) =>
+          planTagRemove(paths, level, request.params.tag),
+        );
+      case 'specialists_import':
+        return this.specialistsImport(request.params);
       case 'config_delete':
         return this.configEdit(request.params.repository, {
           kind: request.params.kind,
@@ -1566,6 +1737,7 @@ export class Daemon {
             summary: request.params.summary,
             feedback: request.params.feedback ?? null,
             questions: request.params.questions ?? null,
+            ...(request.params.human_only === true ? { humanOnly: true } : {}),
           },
         }));
       case 'split':
@@ -1579,13 +1751,17 @@ export class Daemon {
       case 'run_mark_delivered':
         return this.markDelivered(request.params);
       case 'tags':
-        return Promise.resolve(catalogView(this.catalog));
+        return this.rootOf(request.params.repository).then((repository) =>
+          catalogView(this.catalogOf(repository)),
+        );
       case 'tag_add':
-        return this.serial(() => Promise.resolve(this.tagAdd(request.params)));
+        return this.serial(() => this.tagAdd(request.params));
       case 'tag_edit':
-        return this.serial(() => Promise.resolve(this.tagEdit(request.params)));
+        return this.serial(() => this.tagEdit(request.params));
       case 'tag_remove':
-        return this.serial(() => this.tagRemove(request.params.tag));
+        return this.serial(() => this.tagRemove(request.params));
+      case 'run_title':
+        return this.serial(() => this.runTitle(request.params));
       case 'run_tags':
         return this.serial(() => this.runTags(request.params));
       case 'worker_queue_add':
@@ -1701,17 +1877,28 @@ export class Daemon {
     });
   }
 
-  private publishTags(): TagView[] {
-    const tags = catalogView(this.catalog);
+  /** The tags of one repository; names are unique and resolved inside it only. */
+  private catalogOf(repository: string): Tag[] {
+    return tagsOfRepository(this.catalog, repository);
+  }
+
+  /** Publishes all tags and returns the catalog of the changed repository. */
+  private publishTags(repository: string): TagView[] {
     if (this.subscribers.size > 0) {
       this.seq += 1;
-      const line = JSON.stringify({ event: 'tags', seq: this.seq, tags });
+      const line = JSON.stringify({
+        event: 'tags',
+        seq: this.seq,
+        repository,
+        tags: catalogView(this.catalog),
+      });
       for (const send of this.subscribers) send(line);
     }
-    return tags;
+    return catalogView(this.catalogOf(repository));
   }
 
   private createTag(input: {
+    repository: string;
     name: string;
     color?: string | undefined;
     task?: { run: string; number: number } | undefined;
@@ -1720,32 +1907,40 @@ export class Daemon {
     let id = tagId(now, randomInt(36 ** 3));
     while (this.catalog.some((tag) => tag.id === id)) id = tagId(now, randomInt(36 ** 3));
     const tag = input.task
-      ? addLinkedTag(this.catalog, { name: input.name, task: input.task }, id, now)
-      : addTag(this.catalog, input, id, now);
+      ? addLinkedTag(
+          this.catalogOf(input.repository),
+          { name: input.name, task: input.task, repository: input.repository },
+          id,
+          now,
+        )
+      : addTag(this.catalogOf(input.repository), input, id, now);
     this.store.saveTag(tag);
     this.catalog = [...this.catalog, tag];
     return tag;
   }
 
-  private tagAdd(params: ParamsOf<'tag_add'>): TagView[] {
-    this.createTag(params);
-    return this.publishTags();
+  private async tagAdd(params: ParamsOf<'tag_add'>): Promise<TagView[]> {
+    const repository = await this.rootOf(params.repository);
+    this.createTag({ ...params, repository });
+    return this.publishTags(repository);
   }
 
-  private tagEdit(params: ParamsOf<'tag_edit'>): TagView[] {
-    const tag = editTag(this.catalog, params.tag, params);
+  private async tagEdit(params: ParamsOf<'tag_edit'>): Promise<TagView[]> {
+    const repository = await this.rootOf(params.repository);
+    const tag = editTag(this.catalogOf(repository), params.tag, params);
     this.store.saveTag(tag);
     this.catalog = this.catalog.map((candidate) => (candidate.id === tag.id ? tag : candidate));
-    return this.publishTags();
+    return this.publishTags(repository);
   }
 
   /** Takes the tag off every run and queue item, in memory and in the store, then publishes. */
-  private async tagRemove(name: string): Promise<TagView[]> {
-    const { id } = removeTag(this.catalog, name);
-    this.store.removeTag(id);
+  private async tagRemove(params: ParamsOf<'tag_remove'>): Promise<TagView[]> {
+    const repository = await this.rootOf(params.repository);
+    const { id } = removeTag(this.catalogOf(repository), params.tag);
+    this.store.removeTag(repository, id);
     this.catalog = this.catalog.filter((tag) => tag.id !== id);
     for (const state of [...this.states.values()]) {
-      if (state.run.tags.includes(id)) {
+      if (state.run.repository === repository && state.run.tags.includes(id)) {
         await this.apply(state, {
           kind: 'tags_set',
           tags: state.run.tags.filter((tag) => tag !== id),
@@ -1753,25 +1948,33 @@ export class Daemon {
       }
     }
     for (const queue of this.queues.values()) {
+      if (queue.repository !== repository) continue;
       if (!queue.items.some((item) => item.tags.includes(id))) continue;
       for (const item of queue.items) item.tags = item.tags.filter((tag) => tag !== id);
       queue.updatedAt = this.now();
       this.saveQueue(queue);
     }
-    return this.publishTags();
+    return this.publishTags(repository);
   }
 
   /** Own tags plus the tags of the predecessors in `after`, only those still in the catalog. */
   private inheritTags(queue: Queue, own: string[], after: string[]): string[] {
     const inherited = dependencyTags(queue, after, (id) => this.lookupState(id)?.run.tags);
-    return knownTags(this.catalog, mergeTags(own, inherited));
+    return knownTags(this.catalogOf(queue.repository), mergeTags(own, inherited));
+  }
+
+  private async runTitle(params: ParamsOf<'run_title'>): Promise<RunView> {
+    const state = this.state(params.runId);
+    await this.apply(state, { kind: 'title_set', title: params.title });
+    return this.view(state);
   }
 
   private async runTags(params: ParamsOf<'run_tags'>): Promise<RunView> {
     const state = this.state(params.runId);
-    const add = resolveManualTags(this.catalog, params.add ?? []);
-    const remove = new Set(resolveTags(this.catalog, params.remove ?? []));
-    const current = knownTags(this.catalog, state.run.tags).filter((id) => !remove.has(id));
+    const catalog = this.catalogOf(state.run.repository);
+    const add = resolveManualTags(catalog, params.add ?? []);
+    const remove = new Set(resolveTags(catalog, params.remove ?? []));
+    const current = knownTags(catalog, state.run.tags).filter((id) => !remove.has(id));
     const tags = [...current, ...add.filter((id) => !current.includes(id) && !remove.has(id))];
     await this.apply(state, { kind: 'tags_set', tags });
     const added = tags.filter((id) => !current.includes(id));
@@ -1790,7 +1993,7 @@ export class Daemon {
     const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
-    const manual = resolveManualTags(this.catalog, params.tags ?? []);
+    const manual = resolveManualTags(this.catalogOf(repository), params.tags ?? []);
     const parent =
       params.parent === undefined ? null : this.resolveParent(repository, params.parent);
     if (parent) {
@@ -1800,7 +2003,7 @@ export class Daemon {
         now,
       );
     }
-    const parentTag = parent ? await this.linkedTagFor(parent) : null;
+    const parentTag = parent ? await this.parentTagFor(repository, parent) : null;
     const tags = this.inheritTags(queue, mergeTags(parentTag ? [parentTag.id] : [], manual), after);
     const item = addItem(
       queue,
@@ -1846,7 +2049,7 @@ export class Daemon {
     const now = this.now();
     await this.ensureItem(repository, workflow, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
-    let own = inherited ?? resolveManualTags(this.catalog, params.tags ?? []);
+    let own = inherited ?? resolveManualTags(this.catalogOf(repository), params.tags ?? []);
     if (params.parent !== undefined) {
       const parent = this.resolveParent(repository, params.parent);
       this.checkNewItem(
@@ -1854,7 +2057,8 @@ export class Daemon {
         { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after, postponed },
         now,
       );
-      own = mergeTags([(await this.linkedTagFor(parent)).id], own);
+      const parentTag = await this.parentTagFor(repository, parent);
+      own = mergeTags(parentTag ? [parentTag.id] : [], own);
     }
     const tags = this.inheritTags(queue, own, after);
     const item = addItem(
@@ -1889,21 +2093,31 @@ export class Daemon {
   }
 
   /**
+   * The linked task tag of a parent for a task of `repository`. A parent from another
+   * repository gives no tag: the catalogs are per repository, and nothing is created there.
+   */
+  private async parentTagFor(repository: string, parent: RunState): Promise<Tag | null> {
+    return parent.run.repository === repository ? this.linkedTagFor(parent) : null;
+  }
+
+  /**
    * The linked task tag of the run: the existing one or a new one named after the run.
    * The tag goes to the run itself too (first), and to the items that wait for it.
    */
   private async linkedTagFor(state: RunState): Promise<Tag> {
     const run = state.run;
-    let tag = linkedTagOf(this.catalog, run.id);
+    const catalog = this.catalogOf(run.repository);
+    let tag = linkedTagOf(catalog, run.id);
     if (!tag) {
       const base = run.name ?? (run.title ? runName(run.title) : run.id);
       tag = this.createTag({
-        name: autoTagName(this.catalog, base),
+        repository: run.repository,
+        name: autoTagName(catalog, base),
         task: { run: run.id, number: run.number },
       });
-      this.publishTags();
+      this.publishTags(run.repository);
     }
-    const own = knownTags(this.catalog, run.tags);
+    const own = knownTags(this.catalogOf(run.repository), run.tags);
     if (!own.includes(tag.id)) {
       await this.apply(state, { kind: 'tags_set', tags: [tag.id, ...own] });
       const queue = this.queueFor(run.repository);
@@ -1942,7 +2156,7 @@ export class Daemon {
       return this.addQueueItem(
         repository,
         params,
-        mergeTags([tag.id], knownTags(this.catalog, state.run.tags)),
+        mergeTags([tag.id], knownTags(this.catalogOf(repository), state.run.tags)),
       );
     });
   }
@@ -2014,7 +2228,6 @@ export class Daemon {
       ...(params.title ? { title: params.title } : {}),
     });
     this.states.set(id, state);
-    this.max = config.max;
     this.save(state);
     await this.schedule();
     if (state.run.title === null && config.naming.enabled) void this.executor.nameRun(state);
@@ -2109,6 +2322,70 @@ export class Daemon {
     const result = { ok: true as const, ...commitEdit(plan) };
     this.republishQueue(repository);
     return result;
+  }
+
+  private tagFolderOf(repository: string | null): SpecialistTagFolderView {
+    const paths = this.configPathsOf(repository ?? '/');
+    return { repository, ...tagFolder(paths, repository === null ? 'global' : 'project') };
+  }
+
+  /** The shared level, then one folder per repository of the registry. */
+  private specialistTags(): SpecialistTagsView {
+    return {
+      folders: [null, ...this.repositoryList().map((entry) => entry.path)].map((repository) =>
+        this.tagFolderOf(repository),
+      ),
+    };
+  }
+
+  /** Plans and writes without an await between them, so two edits never interleave. */
+  private async specialistTagEdit(
+    repository: string | null,
+    plan: (paths: ConfigPaths, level: 'global' | 'project') => TagPlan,
+  ): Promise<SpecialistTagsResult> {
+    if (repository !== null && !this.registry.has(repository)) {
+      throw new Rejection(`unknown repository ${repository}`);
+    }
+    let planned: TagPlan;
+    try {
+      planned = plan(
+        this.configPathsOf(repository ?? '/'),
+        repository === null ? 'global' : 'project',
+      );
+    } catch (error) {
+      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      throw error;
+    }
+    if (!planned.ok) return planned;
+    commitEdits(planned.edits);
+    if (repository !== null) this.republishQueue(repository);
+    return { ok: true, folder: this.tagFolderOf(repository) };
+  }
+
+  private async specialistsImport(
+    params: ParamsOf<'specialists_import'>,
+  ): Promise<SpecialistsImportResult> {
+    for (const path of [params.repository, params.source]) {
+      if (!this.registry.has(path)) throw new Rejection(`unknown repository ${path}`);
+    }
+    if (params.repository === params.source) {
+      throw new Rejection('the source must be another repository');
+    }
+    let planned: TagPlan;
+    try {
+      planned = planImport(
+        this.configPathsOf(params.repository),
+        this.configPathsOf(params.source),
+        params.slugs,
+      );
+    } catch (error) {
+      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      throw error;
+    }
+    if (!planned.ok) return planned;
+    commitEdits(planned.edits);
+    this.republishQueue(params.repository);
+    return { ok: true, imported: [...new Set(params.slugs)] };
   }
 
   private async configSetting(params: ParamsOf<'config_setting'>): Promise<ConfigEditResult> {

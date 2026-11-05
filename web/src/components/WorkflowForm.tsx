@@ -49,6 +49,7 @@ export interface StepDraft {
   gotoRaw: string;
   maxRounds: string;
   additionalPrompt: string;
+  humanReview: boolean;
 }
 
 export interface SplitDraft {
@@ -91,6 +92,7 @@ export function draftOf(raw: Record<string, unknown>): Draft {
       gotoRaw: text(onReject.goto),
       maxRounds: text(onReject.max_rounds),
       additionalPrompt: text(step.additional_prompt),
+      humanReview: step.human_review === true,
     };
   });
   const derived = stepIds(steps.map((step) => ({ ...step, autoId: true })));
@@ -164,6 +166,7 @@ export function valueOf(draft: Draft): Record<string, unknown> {
       out.on_reject = onReject;
     }
     if (step.additionalPrompt !== '') out.additional_prompt = step.additionalPrompt;
+    if (step.humanReview) out.human_review = true;
     return out;
   });
   return value;
@@ -768,6 +771,15 @@ export function WorkflowForm({
                             setStep(step.key, { additionalPrompt: event.target.value })
                           }
                         />
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id={`review-${step.key}`}
+                            checked={step.humanReview}
+                            disabled={readOnly || busy}
+                            onCheckedChange={(humanReview) => setStep(step.key, { humanReview })}
+                          />
+                          <Label htmlFor={`review-${step.key}`}>{t('workflows.humanReview')}</Label>
+                        </div>
                         {stepErrors(index).map((error) => (
                           <p
                             className="text-sm text-destructive"
@@ -800,6 +812,7 @@ export function WorkflowForm({
                           gotoRaw: '',
                           maxRounds: '',
                           additionalPrompt: '',
+                          humanReview: false,
                         },
                       ],
                     }))

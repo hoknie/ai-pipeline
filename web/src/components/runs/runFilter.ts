@@ -27,10 +27,21 @@ function inFilter(run: RunView, filter: RunFilter): boolean {
   }
 }
 
-/** Whether the run has at least one of the tags; no chosen tags means every run. */
-export function inTags(run: RunView, tagIds: readonly string[]): boolean {
+/**
+ * Whether the run has at least one of the tags; no chosen tags means every run. The tags come
+ * from the catalog of one repository: a run of another repository (the list of every repository)
+ * matches the tag of the same name, ignoring case.
+ */
+export function inTags(
+  run: RunView,
+  tagIds: readonly string[],
+  catalog: ReadonlyMap<string, TagView> = new Map(),
+): boolean {
   if (tagIds.length === 0) return true;
-  return (run.tags ?? []).some((tag) => tagIds.includes(tag.id));
+  const names = tagIds.flatMap((id) => catalog.get(id)?.name.toLowerCase() ?? []);
+  return (run.tags ?? []).some(
+    (tag) => tagIds.includes(tag.id) || names.includes(tag.name.toLowerCase()),
+  );
 }
 
 /** Searched text of a run: title, name, workflow, id, group titles, tag names. */
@@ -74,7 +85,8 @@ export function filterRuns(
   const matches = (run: RunView): boolean =>
     numeric ? run.number === Number(numeric[1]) : haystack(run, catalog).includes(needle);
   return runsOf(runs, repository).filter(
-    (run) => inFilter(run, filter) && inTags(run, tagIds) && (needle === '' || matches(run)),
+    (run) =>
+      inFilter(run, filter) && inTags(run, tagIds, catalog) && (needle === '' || matches(run)),
   );
 }
 
@@ -89,8 +101,9 @@ export function navRunCounts(runs: RunView[]): { working: number; waiting: numbe
 export function filterCounts(
   all: RunView[],
   tagIds: readonly string[] = [],
+  catalog: ReadonlyMap<string, TagView> = new Map(),
 ): Record<RunFilter, number> {
-  const runs = all.filter((run) => inTags(run, tagIds));
+  const runs = all.filter((run) => inTags(run, tagIds, catalog));
   return {
     all: runs.length,
     waiting: runs.filter((run) => inFilter(run, 'waiting')).length,

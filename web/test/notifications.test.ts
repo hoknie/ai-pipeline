@@ -44,6 +44,23 @@ const asking = (slug = 'q') =>
   groupRow({ slug, title: slug, status: 'needs_human', question: '\nWhich one?\nmore' });
 
 describe('notificationItems', () => {
+  it('carries the human-only mark of a question', () => {
+    const items = notificationItems([
+      runView({
+        groups: [
+          groupRow({ slug: 'a', status: 'needs_human', question: 'Look?', humanOnly: 'review' }),
+          groupRow({ slug: 'b', status: 'needs_human', question: 'Plain?' }),
+          groupRow({ slug: 'c', status: 'failed', reason: 'boom', humanOnly: 'request' }),
+        ],
+      }),
+    ]);
+    expect(items.map((item) => [item.slug, item.humanOnly])).toEqual([
+      ['a', 'review'],
+      ['b', null],
+      ['c', null],
+    ]);
+  });
+
   it('takes needs_human, failed, conflict and apply_failed groups of every repository', () => {
     const items = notificationItems([
       runView({

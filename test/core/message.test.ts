@@ -62,7 +62,7 @@ describe('a message to a running attempt', () => {
       sessionId: 's1',
     });
     expect(group(state).status).toBe('queued');
-    const [start] = dispatch([state], 5, 4000);
+    const [start] = dispatch([state], 4000);
     expect(start).toMatchObject({ kind: 'start_attempt', group: 'gruppa-1' });
     const next = runningAttempt(state);
     expect(next).toMatchObject({
@@ -79,7 +79,7 @@ describe('a message to a running attempt', () => {
     expect(runningAttempt(state).sessionId).toBeNull();
     send(state);
     exit(state, 'late-session');
-    dispatch([state], 5, 4000);
+    dispatch([state], 4000);
     expect(runningAttempt(state).resumeSession).toBe('late-session');
   });
 
@@ -87,7 +87,7 @@ describe('a message to a running attempt', () => {
     const state = started();
     send(state);
     exit(state);
-    dispatch([state], 5, 4000);
+    dispatch([state], 4000);
     finish(state, 'done');
     expect(group(state).attempts.map((attempt) => attempt.status)).toEqual([
       'cancelled',

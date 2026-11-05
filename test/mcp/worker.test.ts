@@ -43,9 +43,25 @@ describe('worker MCP server', () => {
           summary: 'готово',
           feedback: null,
           questions: null,
+          human_only: null,
         },
       },
     ]);
+  });
+
+  it('forwards human_only and lists it in the tool schema', async () => {
+    const calls: { params: Record<string, unknown> }[] = [];
+    const client = await connect(false, async (_method, params) => {
+      calls.push({ params });
+      return null;
+    });
+    const tool = (await client.listTools()).tools.find((item) => item.name === 'swarm_report');
+    expect(Object.keys(tool?.inputSchema.properties ?? {})).toContain('human_only');
+    await client.callTool({
+      name: 'swarm_report',
+      arguments: { verdict: 'needs_human', summary: 's', feedback: 'Глянь', human_only: true },
+    });
+    expect(calls[0]?.params.human_only).toBe(true);
   });
 
   it('forwards structured questions and rejects invalid ones', async () => {
@@ -71,6 +87,7 @@ describe('worker MCP server', () => {
           summary: 's',
           feedback: null,
           questions,
+          human_only: null,
         },
       },
     ]);
@@ -114,7 +131,10 @@ describe('worker MCP server', () => {
 
   it('offers swarm_split only in the split step', async () => {
     const plain = await connect(false, async () => null);
-    expect((await plain.listTools()).tools.map((tool) => tool.name)).toEqual(['swarm_report']);
+    expect((await plain.listTools()).tools.map((tool) => tool.name)).toEqual([
+      'swarm_report',
+      'swarm_artifact',
+    ]);
     const calls: unknown[] = [];
     const splitting = await connect(true, async (method, params) => {
       calls.push({ method, params });
@@ -122,6 +142,7 @@ describe('worker MCP server', () => {
     });
     expect((await splitting.listTools()).tools.map((tool) => tool.name)).toEqual([
       'swarm_report',
+      'swarm_artifact',
       'swarm_split',
     ]);
     const result = await splitting.callTool({
@@ -132,6 +153,61 @@ describe('worker MCP server', () => {
     expect(calls).toEqual([
       { method: 'split', params: { token: 'token-1', groups: [{ title: 'A', task: 'a' }] } },
     ]);
+  });
+
+  it('swarm_artifact sends content or a path and answers with the id', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(false, async (method, params) => {
+      calls.push({ method, params });
+      return { id: 'a-1' };
+    });
+    const content = await client.callTool({
+      name: 'swarm_artifact',
+      arguments: { file_name: 'report.md', title: 'Итог', content: '# hi' },
+    });
+    expect(content.isError).toBeFalsy();
+    expect(textOf(content)).toContain('Recorded artifact a-1 (report.md)');
+    const path = await client.callTool({
+      name: 'swarm_artifact',
+      arguments: { file_name: 'build.log', path: 'tmp/build.log' },
+    });
+    expect(path.isError).toBeFalsy();
+    expect(calls).toEqual([
+      {
+        method: 'artifact_publish',
+        params: { token: 'token-1', fileName: 'report.md', title: 'Итог', content: '# hi' },
+      },
+      {
+        method: 'artifact_publish',
+        params: { token: 'token-1', fileName: 'build.log', path: 'tmp/build.log' },
+      },
+    ]);
+  });
+
+  it('swarm_artifact refuses a wrong call before it reaches the daemon', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(false, async (method) => {
+      calls.push(method);
+      return { id: 'x' };
+    });
+    const bad: Record<string, unknown>[] = [
+      { file_name: 'a.md' },
+      { file_name: 'a.md', content: 'x', path: 'a.md' },
+      { file_name: '../a.md', content: 'x' },
+      { file_name: 'a/b.md', content: 'x' },
+      { file_name: 'a.md', content: 'x'.repeat(1024 * 1024 + 1) },
+    ];
+    for (const args of bad) {
+      let refused = false;
+      try {
+        refused =
+          (await client.callTool({ name: 'swarm_artifact', arguments: args })).isError === true;
+      } catch {
+        refused = true;
+      }
+      expect(refused).toBe(true);
+    }
+    expect(calls).toEqual([]);
   });
 
   it('offers swarm_queue_add only to a specialist allowed to queue', async () => {

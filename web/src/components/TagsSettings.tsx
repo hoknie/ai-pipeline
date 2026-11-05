@@ -15,11 +15,12 @@ import { Input } from '../ui/input.tsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select.tsx';
 import { TagLabel } from './TagChip.tsx';
 
-/** The tag catalog: rename, recolor, delete. The catalog is shared by all repositories. */
-export function TagsSettings({ api }: { api: Api }) {
+/** The tag catalog of one project: rename, recolor, delete. */
+export function TagsSettings({ api, repository }: { api: Api; repository: string }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const catalog = useTags();
+  const scoped = api.forRepository(repository);
   const [names, setNames] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function TagsSettings({ api }: { api: Api }) {
     setBusy(tag.id);
     fail(tag.id, null);
     try {
-      catalog.update(await api.editTag(tag.name, patch));
+      catalog.update(repository, await scoped.editTag(tag.name, patch));
     } catch (error) {
       fail(tag.id, (error as Error).message);
     } finally {
@@ -66,7 +67,7 @@ export function TagsSettings({ api }: { api: Api }) {
     setBusy(tag.id);
     fail(tag.id, null);
     try {
-      catalog.update(await api.removeTag(tag.name));
+      catalog.update(repository, await scoped.removeTag(tag.name));
       notifySuccess(t('tags.settings.removed'));
     } catch (error) {
       fail(tag.id, (error as Error).message);
@@ -137,8 +138,9 @@ export function TagsSettings({ api }: { api: Api }) {
     </li>
   );
 
-  const ordinary = catalog.tags.filter((tag) => !tag.task);
-  const linked = catalog.tags.filter((tag) => tag.task);
+  const own = catalog.of(repository);
+  const ordinary = own.filter((tag) => !tag.task);
+  const linked = own.filter((tag) => tag.task);
 
   return (
     <section aria-label={t('tags.settings.label')} className="flex flex-col gap-3">

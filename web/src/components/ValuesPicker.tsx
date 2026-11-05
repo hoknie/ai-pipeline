@@ -65,7 +65,7 @@ export function ValuesPicker({
   mark?: (value: string) => string | null;
   /** The text of a chosen value in its chip and in the remove button; default: the value itself. */
   display?: (value: string) => string;
-  /** Group headings instead of the names of the sources. */
+  /** Group headings instead of the names of the sources; an empty string shows no heading. */
   headings?: Partial<Record<OptionSource, string>>;
   creatable?: boolean;
   disabled?: boolean;
@@ -184,7 +184,7 @@ export function ValuesPicker({
               return (
                 <CommandGroup
                   key={source}
-                  heading={headings?.[source] ?? t(`picker.groups.${source}`)}
+                  heading={(headings?.[source] ?? t(`picker.groups.${source}`)) || undefined}
                 >
                   {group.map((option) => {
                     const chosen = values.includes(option.name);

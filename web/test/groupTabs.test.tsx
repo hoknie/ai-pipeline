@@ -110,6 +110,32 @@ describe('tabs of the group screen in the address', () => {
   });
 });
 
+describe('summary of the changes', () => {
+  it('shows files and lines in the Changes tab and not in the header', async () => {
+    window.location.hash = '#runs/run1/login?tab=changes';
+    const api = fakeApi({
+      group: vi.fn(async () =>
+        groupView({
+          diff: {
+            added: 9,
+            removed: 2,
+            files: [
+              { path: 'a.ts', added: 5, removed: 1 },
+              { path: 'b.ts', added: 4, removed: 1 },
+            ],
+          },
+        }),
+      ),
+    });
+    render(<App api={api} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    const panel = await screen.findByRole('tabpanel');
+    await waitFor(() => expect(panel.textContent).toContain('2 files +9 −2'));
+    const region = screen.getByRole('region', { name: 'group Вход' });
+    expect(region.querySelector('header')!.textContent).not.toContain('2 files');
+  });
+});
+
 describe('moving to another group', () => {
   it('drops the tab from the address and selects the log', async () => {
     window.location.hash = '#runs/run1/login?tab=changes';
@@ -122,6 +148,67 @@ describe('moving to another group', () => {
     expect((await screen.findByRole('tab', { name: 'Log' })).getAttribute('aria-selected')).toBe(
       'true',
     );
+  });
+});
+
+describe('Artifacts tab', () => {
+  const withArtifacts = (count: number) => runView({ groups: [groupRow({ artifacts: count })] });
+
+  it('is visible but disabled without artifacts and cannot be selected', async () => {
+    mount([withArtifacts(0)]);
+    const tab = await screen.findByRole('tab', { name: 'Artifacts' });
+    expect((tab as HTMLButtonElement).disabled).toBe(true);
+    openTab('Artifacts');
+    expect(tab.getAttribute('aria-selected')).toBe('false');
+    expect(window.location.hash).not.toContain('artifacts');
+  });
+
+  it('with ?tab=artifacts but no artifacts opens the log and drops the parameter', async () => {
+    window.location.hash = '#runs/run1/login?tab=artifacts';
+    mount([withArtifacts(0)]);
+    await waitFor(() => expect(window.location.hash).toBe('#runs/run1/login'));
+    expect((await screen.findByRole('tab', { name: 'Log' })).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+  });
+
+  it('lists the artifacts and keeps the tab in the address', async () => {
+    const api = fakeApi({
+      group: vi.fn(async () => groupView()),
+      groupArtifacts: vi.fn(async () => [
+        {
+          id: 'a1',
+          step: 'code',
+          stepName: 'Кодировщик',
+          seq: 1,
+          specialist: 'coder',
+          title: 'Отчёт',
+          fileName: 'report.md',
+          size: 10,
+          createdAt: 1000,
+          preview: 'markdown' as const,
+        },
+      ]),
+    });
+    window.location.hash = '#runs/run1/login?tab=artifacts';
+    render(<App api={api} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [withArtifacts(1)] }));
+    const tab = await screen.findByRole('tab', { name: 'Artifacts · 1' });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByText('report.md')).toBeTruthy();
+    expect(window.location.hash).toBe('#runs/run1/login?tab=artifacts');
+  });
+
+  it('turns on when the counter grows', async () => {
+    const api = fakeApi({ group: vi.fn(async () => groupView()) });
+    render(<App api={api} openStream={openFake} />);
+    window.location.hash = '#runs/run1/login';
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [withArtifacts(0)] }));
+    const tab = await screen.findByRole('tab', { name: 'Artifacts' });
+    expect((tab as HTMLButtonElement).disabled).toBe(true);
+    act(() => FakeEventSource.last!.send({ event: 'run', seq: 2, run: withArtifacts(2) }));
+    const next = await screen.findByRole('tab', { name: 'Artifacts · 2' });
+    expect((next as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

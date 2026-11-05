@@ -51,6 +51,7 @@ import {
   type Step,
   type Workflow,
 } from './model.ts';
+import { tagNameProblem } from './tag-names.ts';
 
 const ROOT_KEYS = ['swarm'];
 const SWARM_KEYS = [
@@ -98,9 +99,10 @@ const SPECIALIST_KEYS = [
   'prompt',
   'max',
   'queue',
+  'tags',
 ];
 const WORKFLOW_KEYS = ['name', 'split', 'steps'];
-const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt'];
+const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt', 'human_review'];
 const ON_REJECT_KEYS = ['goto', 'max_rounds'];
 
 type Mapping = Record<string, unknown>;
@@ -179,6 +181,17 @@ class Validator {
       return [];
     }
     return value.flatMap((item, index) => this.string(item, `${path}[${index}]`) ?? []);
+  }
+
+  tagNames(value: unknown, path: string): void {
+    if (!Array.isArray(value)) {
+      this.error(path, 'must be a list of strings');
+      return;
+    }
+    for (const [index, item] of value.entries()) {
+      const problem = tagNameProblem(item);
+      if (problem !== null) this.error(path, `item ${index + 1} ${problem}`);
+    }
   }
 
   integer(value: unknown, path: string, [low, high]: Range): number | null {
@@ -516,6 +529,10 @@ class Validator {
         case 'queue':
           specialist.queue = this.boolean(field, fieldPath) ?? false;
           break;
+        case 'tags':
+          // Tags are metadata for the panel: checked here, never part of the specialist.
+          this.tagNames(field, fieldPath);
+          break;
       }
     }
     if (!('name' in mapping)) this.error(join(path, 'name'), 'is required');
@@ -608,7 +625,13 @@ class Validator {
   }
 
   step(value: unknown, path: string, known: string[]): Step {
-    const step: Step = { id: '', specialist: '', onReject: null, additionalPrompt: null };
+    const step: Step = {
+      id: '',
+      specialist: '',
+      onReject: null,
+      additionalPrompt: null,
+      humanReview: false,
+    };
     const mapping = this.mapping(value, path);
     if (!mapping) return step;
     for (const [key, field] of this.entries(mapping, path, STEP_KEYS)) {
@@ -623,6 +646,7 @@ class Validator {
       }
       if (key === 'on_reject') step.onReject = this.onReject(field, fieldPath);
       if (key === 'additional_prompt') step.additionalPrompt = this.string(field, fieldPath);
+      if (key === 'human_review') step.humanReview = this.boolean(field, fieldPath) ?? false;
     }
     if (!('id' in mapping)) this.error(join(path, 'id'), 'is required');
     if (!('specialist' in mapping)) this.error(join(path, 'specialist'), 'is required');

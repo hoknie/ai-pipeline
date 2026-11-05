@@ -10,7 +10,7 @@ import {
   socketPath,
   stateDirectory,
 } from '../../src/config/index.ts';
-import { SCHEMA_VERSION, Store, migrate } from '../../src/store/index.ts';
+import { SCHEMA_VERSION, Store, migrate, type ArtifactRecord } from '../../src/store/index.ts';
 import { finish, run, step } from '../core/helpers.ts';
 import { addItem, emptyQueue, transition } from '../../src/core/index.ts';
 
@@ -94,7 +94,8 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('DROP TABLE run_patches');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -199,7 +200,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (7 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (7 + 8)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
@@ -234,7 +236,8 @@ describe('queues', () => {
     old.saveQueue(on);
     old.saveQueue(off);
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/on')).toMatchObject({ autopilot: true, autoAnswer: true });
@@ -263,7 +266,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (6 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (6 + 8)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')).toMatchObject({
@@ -311,7 +315,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (3 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (3 + 8)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([false, false]);
@@ -329,7 +334,8 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (1 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (1 + 8)}`);
     old.close();
   }
 
@@ -440,6 +446,22 @@ describe('runs', () => {
     const loaded = store.loadRun(state.run.id)!;
     expect(loaded.groups[0]!.questions).toEqual(questions);
     expect(loaded).toEqual(state);
+  });
+
+  it('keeps the human-only mark of a group and reads an unknown value as none', () => {
+    const store = temporaryStore();
+    const state = run(1);
+    step(state);
+    finish(state, 'needs_human', { feedback: 'Глянь', humanOnly: true });
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)!.groups[0]!.humanOnly).toBe('request');
+    state.groups[0]!.humanOnly = 'review';
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)!.groups[0]!.humanOnly).toBe('review');
+    store.database.exec("UPDATE groups SET human_only = 'bogus'");
+    expect(store.loadRun(state.run.id)!.groups[0]!.humanOnly).toBeNull();
+    store.database.exec('UPDATE groups SET human_only = NULL');
+    expect(store.loadRun(state.run.id)!.groups[0]!.humanOnly).toBeNull();
   });
 
   it('keeps the title, the name and the usage of naming', () => {
@@ -602,7 +624,7 @@ describe('refused tool calls', () => {
     store.saveRun(state);
     // As a database written before the column existed.
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; PRAGMA user_version = 3',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; PRAGMA user_version = 3',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
@@ -612,7 +634,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-20)).toContain('denials_json');
+    expect(MIGRATIONS.at(-23)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -629,13 +651,13 @@ describe('refused tool calls', () => {
     ]);
     // As a database written before the column existed.
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; PRAGMA user_version = 4',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; PRAGMA user_version = 4',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-19)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-22)).toContain('outside_changes_json');
   });
 });
 
@@ -678,7 +700,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(23);
+    expect(SCHEMA_VERSION).toBe(26);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -813,7 +835,8 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (10 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (10 + 8)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -853,7 +876,8 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (11 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (11 + 8)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -887,6 +911,7 @@ describe('repository registry', () => {
 describe('tags', () => {
   const tag = (id: string, name: string) => ({
     id,
+    repository: '/repo',
     name,
     color: 'blue' as const,
     createdAt: 5,
@@ -899,8 +924,27 @@ describe('tags', () => {
     store.saveTag(tag('tg-a', 'auth'));
     store.saveTag({ ...tag('tg-a', 'login'), color: 'teal' });
     expect(store.tags()).toEqual([
-      { id: 'tg-a', name: 'login', color: 'teal', createdAt: 5, task: null },
+      { id: 'tg-a', repository: '/repo', name: 'login', color: 'teal', createdAt: 5, task: null },
     ]);
+  });
+
+  it('removes a tag only in its own repository', () => {
+    const store = temporaryStore();
+    store.saveTag(tag('tg-a', 'auth'));
+    store.saveTag({ ...tag('tg-a-2', 'auth'), repository: '/other' });
+    const mine = run(1, { id: 'mine00000001' });
+    mine.run.tags = ['tg-a'];
+    store.saveRun(mine);
+    const queue = emptyQueue('/other', 1);
+    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-a-2'] }, 'q1', 1);
+    store.saveQueue(queue);
+    store.removeTag('/repo', 'tg-a');
+    expect(store.tags().map((entry) => entry.id)).toEqual(['tg-a-2']);
+    expect(store.loadRun('mine00000001')!.run.tags).toEqual([]);
+    // the same id on an item of another repository is not touched
+    expect(store.loadQueue('/other')!.items[0]!.tags).toEqual(['tg-a', 'tg-a-2']);
+    store.removeTag('/repo', 'tg-a-2');
+    expect(store.tags().map((entry) => entry.id)).toEqual(['tg-a-2']);
   });
 
   it('keeps the source task of a linked tag across a rename and a reopen', () => {
@@ -962,7 +1006,8 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN hold');
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (9 + 5)}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (9 + 8)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);
@@ -985,7 +1030,7 @@ describe('tags', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 1);
     store.saveQueue(queue);
-    store.removeTag('tg-a');
+    store.removeTag('/repo', 'tg-a');
     expect(store.tags().map((entry) => entry.id)).toEqual(['tg-b']);
     expect(store.loadRun('done00000001')!.run.tags).toEqual(['tg-b']);
     expect(store.loadRun('other0000001')!.run.tags).toEqual(['tg-b']);
@@ -1020,10 +1065,198 @@ describe('patch of a run', () => {
     const old = new Store(databasePath(directory));
     old.saveRun(run(1));
     old.database.exec('DROP TABLE run_patches');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.runPatchIds()).toEqual([]);
     store.close();
+  });
+});
+
+describe('artifacts', () => {
+  const record = (over: Partial<ArtifactRecord> = {}): ArtifactRecord => ({
+    id: 'a1',
+    runId: 'r1',
+    group: 'g1',
+    step: 'code',
+    seq: 1,
+    specialist: 'coder',
+    title: 'Report',
+    fileName: 'report.md',
+    size: 10,
+    uri: 'file:///x/r1/a1',
+    createdAt: 100,
+    ...over,
+  });
+
+  function storeWithRun(): Store {
+    const store = temporaryStore();
+    const state = run(1);
+    store.saveRun(state);
+    return store;
+  }
+
+  it('keeps the id when the same attempt publishes the same file again', () => {
+    const store = storeWithRun();
+    const id = store.database.prepare('SELECT id FROM runs').get() as { id: string };
+    const first = store.addArtifact(record({ runId: id.id }));
+    expect(first.previousUri).toBeNull();
+    const second = store.addArtifact(
+      record({ runId: id.id, id: 'other', size: 20, uri: 'file:///x/r1/other', createdAt: 200 }),
+    );
+    expect(second.previousUri).toBe('file:///x/r1/a1');
+    expect(second.artifact).toMatchObject({ id: 'a1', size: 20, createdAt: 200 });
+    expect(store.artifacts(id.id, 'g1')).toHaveLength(1);
+    expect(store.findArtifact(id.id, 'g1', 1, 'report.md')?.id).toBe('a1');
+    store.close();
+  });
+
+  it('gives a new record to another attempt and lists newest first', () => {
+    const store = storeWithRun();
+    const { id: runId } = store.database.prepare('SELECT id FROM runs').get() as { id: string };
+    store.addArtifact(record({ runId, id: 'a1', createdAt: 100 }));
+    store.addArtifact(record({ runId, id: 'a2', seq: 2, createdAt: 100 }));
+    store.addArtifact(record({ runId, id: 'a3', fileName: 'x.log', createdAt: 300 }));
+    store.addArtifact(record({ runId, id: 'a4', group: 'g2', createdAt: 50 }));
+    expect(store.artifacts(runId, 'g1').map((a) => a.id)).toEqual(['a3', 'a2', 'a1']);
+    expect(store.artifact(runId, 'a4')?.group).toBe('g2');
+    expect(store.artifact(runId, 'nope')).toBeNull();
+    expect(store.artifactCount(runId, 'g1')).toBe(3);
+    expect(store.artifactCount(runId, 'none')).toBe(0);
+    expect(store.artifactCounts(runId)).toEqual(
+      new Map([
+        ['g1', { count: 3, revision: 300 + 3 * 10 }],
+        ['g2', { count: 1, revision: 50 + 10 }],
+      ]),
+    );
+    expect(store.artifactUris().get(runId)).toHaveLength(4);
+    store.close();
+  });
+
+  it('migrates an older database and does not mix runs', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = new Store(databasePath(directory));
+    old.database.exec('DROP TABLE artifacts');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.close();
+    const store = new Store(databasePath(directory));
+    expect(store.artifactUris().size).toBe(0);
+    expect(store.artifactCounts('r1').size).toBe(0);
+    store.close();
+  });
+
+  it('removes the artifacts together with their run', () => {
+    const store = storeWithRun();
+    const { id: runId } = store.database.prepare('SELECT id FROM runs').get() as { id: string };
+    store.addArtifact(record({ runId }));
+    store.database.exec('PRAGMA foreign_keys = ON');
+    store.database.prepare('DELETE FROM runs WHERE id = ?').run(runId);
+    expect(store.artifactCount(runId, 'g1')).toBe(0);
+    store.close();
+  });
+});
+
+describe('migration to project tags', () => {
+  const runSql =
+    "INSERT INTO runs (id, repository, workflow, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq, tags_json) VALUES (?, ?, 'f', 'abc', 'b', ?, '{}', 0, 0, ?)";
+
+  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { MIGRATIONS } = await import('../../src/store/index.ts');
+    const database = new DatabaseSync(':memory:');
+    MIGRATIONS.slice(0, -1).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    prepare(database);
+    migrate(database);
+    return database;
+  }
+
+  const tagRow = (database: import('node:sqlite').DatabaseSync, id: string, name: string) =>
+    database
+      .prepare(
+        'INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(id, name, id === 'lk' ? 'indigo' : 'blue', 1, null, null);
+
+  it('copies a tag into every repository it is used in, keeping the order of tags', async () => {
+    const database = await before((db) => {
+      tagRow(db, 'ta', 'auth');
+      tagRow(db, 'tb', 'v2');
+      db.prepare(runSql).run('run1', '/b', 1, JSON.stringify(['tb', 'ta']));
+      db.prepare(
+        "INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, updated_at) VALUES ('/a', 'stopped', 1, '[]', '[]', 1)",
+      ).run();
+      db.prepare(
+        "INSERT INTO queue_items (id, repository, position, workflow, created_at, tags_json) VALUES ('q1', '/a', 0, 'f', 1, ?)",
+      ).run(JSON.stringify(['ta']));
+    });
+    const tags = database
+      .prepare('SELECT id, repository, name FROM tags ORDER BY id, repository')
+      .all() as { id: string; repository: string; name: string }[];
+    expect(tags.map((tag) => [tag.id, tag.repository])).toEqual([
+      ['ta', '/a'],
+      ['ta-2', '/b'],
+      ['tb', '/b'],
+    ]);
+    const runTags = database.prepare("SELECT tags_json FROM runs WHERE id = 'run1'").get() as {
+      tags_json: string;
+    };
+    expect(JSON.parse(runTags.tags_json)).toEqual(['tb', 'ta-2']);
+    const itemTags = database
+      .prepare("SELECT tags_json FROM queue_items WHERE id = 'q1'")
+      .get() as {
+      tags_json: string;
+    };
+    expect(JSON.parse(itemTags.tags_json)).toEqual(['ta']);
+    database.close();
+  });
+
+  it('copies an unused tag into every known repository, or drops it without repositories', async () => {
+    const two = await before((db) => {
+      tagRow(db, 'tu', 'unused');
+      db.prepare("INSERT INTO repositories (path, added_at) VALUES ('/b', 1), ('/a', 2)").run();
+    });
+    const rows = two.prepare('SELECT id, repository FROM tags ORDER BY repository').all() as {
+      id: string;
+      repository: string;
+    }[];
+    expect(rows.map((row) => [row.id, row.repository])).toEqual([
+      ['tu', '/a'],
+      ['tu-2', '/b'],
+    ]);
+    two.close();
+    const none = await before((db) => tagRow(db, 'tu', 'unused'));
+    expect(none.prepare('SELECT COUNT(*) AS n FROM tags').get()).toEqual({ n: 0 });
+    none.close();
+  });
+
+  it('puts a linked tag into the repository of its source run first, and drops it without one', async () => {
+    const database = await before((db) => {
+      db.prepare(
+        "INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES ('lk', 'cards', 'indigo', 1, 'src', 3)",
+      ).run();
+      db.prepare(
+        "INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES ('lost', 'lost', 'indigo', 1, 'gone', 4)",
+      ).run();
+      db.prepare(runSql).run('src', '/z', 1, '[]');
+      db.prepare(runSql).run('child', '/a', 2, JSON.stringify(['lk']));
+    });
+    const rows = database
+      .prepare('SELECT id, repository, task_run FROM tags ORDER BY repository')
+      .all() as {
+      id: string;
+      repository: string;
+      task_run: string;
+    }[];
+    expect(rows.map((row) => [row.id, row.repository, row.task_run])).toEqual([
+      ['lk-2', '/a', 'src'],
+      ['lk', '/z', 'src'],
+    ]);
+    const child = database.prepare("SELECT tags_json FROM runs WHERE id = 'child'").get() as {
+      tags_json: string;
+    };
+    expect(JSON.parse(child.tags_json)).toEqual(['lk-2']);
+    database.close();
   });
 });

@@ -87,6 +87,7 @@ export function finish(
     summary?: string;
     now?: number;
     questions?: HumanQuestion[];
+    humanOnly?: boolean;
   } = {},
 ): Effect[] {
   const slug = options.slug ?? 'gruppa-1';
@@ -104,6 +105,7 @@ export function finish(
         feedback:
           options.feedback ?? (verdict === 'done' || options.questions ? null : 'замечания'),
         ...(options.questions ? { questions: options.questions } : {}),
+        ...(options.humanOnly ? { humanOnly: true } : {}),
       },
     },
     now,
@@ -121,5 +123,5 @@ export function finish(
 }
 
 export function step(state: RunState, now = 1500): Effect[] {
-  return dispatch([state], state.run.config.max, now);
+  return dispatch([state], now);
 }

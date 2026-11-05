@@ -2,7 +2,12 @@ import { findSpecialist } from '../config/index.ts';
 
 import { allGroups, stepsOf, type Group, type RunState } from './model.ts';
 import { specialistName } from './topology.ts';
-import { limitHolds, runningBySpecialist, runningCount } from './scheduler.ts';
+import {
+  limitHolds,
+  repositoryLimits,
+  runningByRepository,
+  runningBySpecialist,
+} from './scheduler.ts';
 
 /** Why a queued group is not started yet. */
 export type GroupWait =
@@ -25,11 +30,16 @@ function isDeliveryGroup(state: RunState, group: Group): boolean {
   return group === state.message || group === state.resolve;
 }
 
-/** Decides which queued groups start and which wait, without changing any state. */
-export function planDispatch(states: RunState[], max: number, now: number): DispatchPlan {
+/**
+ * Decides which queued groups start and which wait, without changing any state.
+ * `swarm.max` limits the running specialists of each repository separately; a specialist's
+ * `max` counts its slug across all runs.
+ */
+export function planDispatch(states: RunState[], now: number): DispatchPlan {
   const start: DispatchPlan['start'] = [];
   const waits = new Map<string, GroupWait>();
-  let running = runningCount(states);
+  const running = runningByRepository(states);
+  const limits = repositoryLimits(states);
   const bySpecialist = runningBySpecialist(states);
   const holds = limitHolds(states, now);
   const queue = states
@@ -67,14 +77,16 @@ export function planDispatch(states: RunState[], max: number, now: number): Disp
       });
       continue;
     }
-    if (running >= max) {
+    const repository = state.run.repository;
+    const max = limits.get(repository) ?? state.run.config.max;
+    if ((running.get(repository) ?? 0) >= max) {
       // A step without a specialist is a configuration error, not a wait.
       if (specialist) waits.set(key, { reason: 'capacity', max });
       continue;
     }
     start.push({ state, group });
     if (slug) bySpecialist.set(slug, (bySpecialist.get(slug) ?? 0) + 1);
-    running += 1;
+    running.set(repository, (running.get(repository) ?? 0) + 1);
   }
   return { start, waits };
 }

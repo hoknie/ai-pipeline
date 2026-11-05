@@ -230,7 +230,9 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
         group.status === 'merged' ? statusBadge(group.delivery, style) : '—',
         [
           group.question
-            ? style.warning(`question: ${group.question.split('\n')[0]}`)
+            ? style.warning(
+                `question${humanMark(group.humanOnly)}: ${group.question.split('\n')[0]}`,
+              )
             : group.reason
               ? style.danger(group.reason)
               : '',
@@ -310,7 +312,9 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     `${style.muted('Usage:')} ${formatUsage(group.usage)}`,
     `${style.muted('Task:')} ${group.task}`,
   ];
-  if (group.question) lines.push(style.warning(`Question: ${group.question}`));
+  if (group.question) {
+    lines.push(style.warning(`Question${humanMark(group.humanOnly)}: ${group.question}`));
+  }
   for (const decision of group.decisions ?? []) {
     const who = decision.by === 'autopilot' ? 'autopilot' : 'human';
     lines.push(
@@ -537,4 +541,11 @@ export function formatRepositories(
     ],
     style,
   );
+}
+
+/** The note after `question` for a question only a person answers. */
+function humanMark(humanOnly: 'review' | 'request' | null | undefined): string {
+  if (humanOnly === 'review') return ' (human review)';
+  if (humanOnly === 'request') return ' (human only)';
+  return '';
 }

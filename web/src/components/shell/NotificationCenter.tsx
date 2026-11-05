@@ -118,6 +118,9 @@ export function NotificationCenter({
                   >
                     <span className="flex max-w-full items-center gap-2">
                       <Badge variant={info.tone}>{info.label}</Badge>
+                      {item.humanOnly ? (
+                        <Badge variant="warn">{t(`runs.humanOnly.${item.humanOnly}`)}</Badge>
+                      ) : null}
                       <span
                         className={cn(
                           'truncate',

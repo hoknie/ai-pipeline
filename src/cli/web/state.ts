@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { z } from 'zod';
 
-/** The panel started by the daemon, as written to `<state>/web.json`. */
+/** The panel of the daemon (or its stand-in), as written to `<state>/web.json`. */
 export interface PanelState {
   pid: number;
   host: string;
@@ -11,6 +11,8 @@ export interface PanelState {
   auth: 'token' | 'none';
   token: string | null;
   url: string;
+  /** Set by the stand-in that serves the panel while the daemon is stopped. */
+  standby?: boolean;
 }
 
 const panelStateSchema = z.object({
@@ -20,6 +22,7 @@ const panelStateSchema = z.object({
   auth: z.enum(['token', 'none']),
   token: z.string().nullable(),
   url: z.string(),
+  standby: z.boolean().optional(),
 });
 
 export function panelStatePath(stateDirectory: string): string {

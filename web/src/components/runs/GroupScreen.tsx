@@ -1,4 +1,4 @@
-import { MoreHorizontal, RefreshCw, RotateCcw, SkipForward } from 'lucide-react';
+import { MoreHorizontal, RefreshCw, RotateCcw, SkipForward, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +17,7 @@ import { notifySuccess } from '../../notify.ts';
 import { useElementHeight } from '../../useElementHeight.ts';
 import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
+import { Badge } from '../../ui/badge.tsx';
 import { Button } from '../../ui/button.tsx';
 import {
   DropdownMenu,
@@ -34,6 +35,7 @@ import { OutsideChanges } from '../OutsideChanges.tsx';
 import { RunStatuses, entryBadge } from './RunStatuses.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
 
+import { ArtifactsTab } from './ArtifactsTab.tsx';
 import { AttemptTimeline } from './AttemptTimeline.tsx';
 import { FileTree } from './FileTree.tsx';
 import { QuestionCard } from './QuestionCard.tsx';
@@ -43,10 +45,11 @@ import { ApplyDialog } from './ApplyDialog.tsx';
 import { MessageDialog } from './MessageDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
 import { stepOfGroup, useSkipStep } from './skipStep.tsx';
+import { groupNotices, latestNotice, useDismissedNotice } from './groupNotices.ts';
 import { taskProgress } from './taskProgress.ts';
 import { useGroupSpec } from './useGroupSpec.ts';
 
-type Tab = 'log' | 'changes' | 'task' | 'design' | 'tasks';
+type Tab = 'log' | 'changes' | 'task' | 'design' | 'tasks' | 'artifacts';
 
 /** Lines of a delivery failure shown before «Show all». */
 const REASON_LINES = 6;
@@ -126,7 +129,7 @@ export function GroupScreen({
   const [messaging, setMessaging] = useState<number | null>(null);
   const [header, setHeader] = useState<HTMLElement | null>(null);
   const headerHeight = useElementHeight(header);
-  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}`;
+  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}/${row.artifacts}/${row.artifactsRevision}`;
   const delivering = run?.delivery.inProgress ?? false;
   const caps = capabilities(row, deliverable, delivering);
   const skipper = useSkipStep(run, api, onError);
@@ -152,6 +155,7 @@ export function GroupScreen({
   if (caps.changes) available.add('changes');
   if (spec?.design != null) available.add('design');
   if (spec?.tasks != null) available.add('tasks');
+  if (row.artifacts > 0) available.add('artifacts');
   const loaded = view !== null && (system || spec !== undefined);
   const tab: Tab = (available.has(requestedTab ?? 'log') ? (requestedTab ?? 'log') : 'log') as Tab;
   const setTab = (next: string) => onTab(next);
@@ -216,12 +220,179 @@ export function GroupScreen({
         () => notifySuccess(t('runs.header.markedDelivered')),
       );
   };
-  const hints = view?.permissionHints ?? [];
+  const [dismissed, dismiss] = useDismissedNotice(runId, row.slug);
+  const notice = latestNotice(groupNotices(view, row as GroupRow), dismissed);
+  const closeButton = notice ? (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="absolute top-1 right-1 size-7"
+      aria-label={t('runs.group.dismissNotice')}
+      title={t('runs.group.dismissNotice')}
+      onClick={() => dismiss(notice.key)}
+    >
+      <X />
+    </Button>
+  ) : null;
   const deliveryFailed =
     !('kind' in row) && row.status === 'merged' && row.delivery === 'apply_failed';
   const reason = view?.delivery.reason ?? null;
   const stage = run?.deliveryStage ?? null;
   const attemptAt = run?.delivery.finishedAt ?? null;
+
+  const compact = !!run && !showUsage;
+  const heading = (
+    <h2
+      className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate text-base font-semibold'}
+      title={run ? undefined : title}
+      aria-hidden={run && !showUsage ? true : undefined}
+    >
+      {run ? (
+        <span
+          aria-hidden={showUsage ? undefined : true}
+          title={`${runTitle(run)}\n${run.id}`}
+          className={`block truncate transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
+            showUsage ? 'translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'
+          }`}
+        >
+          <span className="font-mono font-normal text-muted-foreground">
+            {taskNumber(run.number)}
+          </span>{' '}
+          {runTitle(run)}
+        </span>
+      ) : (
+        title
+      )}
+    </h2>
+  );
+  const actions = (
+    <>
+      {'kind' in row ? (
+        <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
+      ) : null}
+      {run ? (
+        showUsage ? (
+          <RunStatuses run={run} entry={row} onSelect={onSelectEntry} layout="inline" />
+        ) : null
+      ) : (
+        entryBadge(row, t)
+      )}
+      {caps.retryDelivery ? (
+        <Button
+          variant="outline"
+          size="sm"
+          loading={busy || delivering}
+          disabled={delivering}
+          onClick={() => void act(() => (onDeliver ? onDeliver() : Promise.resolve()))}
+        >
+          <RotateCcw />
+          {t('runs.system.retryDelivery')}
+        </Button>
+      ) : null}
+      {canSkip && run && skippable ? (
+        <Button
+          variant="outline"
+          size="sm"
+          loading={skipper.pending !== null}
+          onClick={() => void skipper.toggle(skippable, true, { allGroups: run.groups.length > 1 })}
+        >
+          <SkipForward />
+          {t('runs.group.skipStep')}
+        </Button>
+      ) : null}
+      {caps.cancel ? (
+        <Button variant="destructive" size="sm" loading={busy} onClick={() => void cancelGroup()}>
+          {t('runs.group.cancel')}
+        </Button>
+      ) : null}
+      {caps.retry ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              loading={busy}
+              aria-label={t('runs.group.more', { title })}
+              title={t('runs.group.more', { title })}
+            >
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={busy}
+              onSelect={() =>
+                void act(
+                  () => api.retry(runId, row.slug),
+                  () => notifySuccess(t('runs.header.retryStarted')),
+                )
+              }
+            >
+              <RotateCcw />
+              {t('runs.group.retry')}
+            </DropdownMenuItem>
+            {row.status !== 'conflict' ? (
+              <DropdownMenuItem
+                disabled={busy}
+                onSelect={() =>
+                  void act(
+                    () => api.retry(runId, row.slug, { refreshConfig: true }),
+                    () => notifySuccess(t('runs.header.retryStarted')),
+                  )
+                }
+              >
+                <RefreshCw />
+                {t('runs.group.retryRefreshConfig')}
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </>
+  );
+  const details = (
+    <>
+      <span className="font-medium text-foreground" title={row.step ?? undefined}>
+        {row.stepName ?? row.step ?? '—'}
+      </span>
+      {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
+      {row.limitUntil !== null ? (
+        <span className="text-status-warn">
+          {t('runs.group.limitUntil', { time: clock(row.limitUntil) })}
+        </span>
+      ) : null}
+      {'kind' in row && row.kind !== 'split' && stage ? (
+        <span
+          role="status"
+          aria-label={t('runs.system.delivery')}
+          className="flex flex-wrap items-center gap-x-2"
+        >
+          {stage.status === 'delivering' ? (
+            <StatusBadge status="running" label={t('runs.system.delivering')} />
+          ) : stage.status === 'applied' || stage.status === 'apply_failed' ? (
+            <>
+              <StatusBadge status={stage.status} />
+              {attemptAt !== null ? (
+                <span>{t('runs.system.lastAttempt', { time: clock(attemptAt) })}</span>
+              ) : null}
+              {stage.status === 'apply_failed' && stage.reason ? (
+                <span className="min-w-0 truncate" title={stage.reason}>
+                  {stage.reason.split('\n')[0]}
+                </span>
+              ) : null}
+            </>
+          ) : null}
+        </span>
+      ) : null}
+      {showUsage ? (
+        <>
+          <span>{duration(row.durationMs)}</span>
+          {usageText(row.usage) ? <span>{usageText(row.usage)}</span> : null}
+          {cost(row.usage) ? <span>{cost(row.usage)}</span> : null}
+        </>
+      ) : null}
+    </>
+  );
 
   return (
     <section
@@ -233,160 +404,33 @@ export function GroupScreen({
         ref={setHeader}
         className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur"
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <h2
-            className="min-w-0 flex-1 truncate text-base font-semibold"
-            title={run ? undefined : title}
-            aria-hidden={run && !showUsage ? true : undefined}
-          >
-            {run ? (
-              <span
-                aria-hidden={showUsage ? undefined : true}
-                title={`${runTitle(run)}\n${run.id}`}
-                className={`block truncate transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
-                  showUsage ? 'translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'
-                }`}
-              >
-                <span className="font-mono font-normal text-muted-foreground">
-                  {taskNumber(run.number)}
-                </span>{' '}
-                {runTitle(run)}
-              </span>
-            ) : (
-              title
-            )}
-          </h2>
-          {'kind' in row ? (
-            <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
-          ) : null}
-          {run ? (
-            showUsage ? (
-              <RunStatuses run={run} entry={row} onSelect={onSelectEntry} layout="inline" />
-            ) : null
-          ) : (
-            entryBadge(row, t)
-          )}
-          {caps.retryDelivery ? (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={busy || delivering}
-              disabled={delivering}
-              onClick={() => void act(() => (onDeliver ? onDeliver() : Promise.resolve()))}
+        {compact ? (
+          <>
+            {heading}
+            <div
+              data-slot="group-header-row"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2"
             >
-              <RotateCcw />
-              {t('runs.system.retryDelivery')}
-            </Button>
-          ) : null}
-          {canSkip && run && skippable ? (
-            <Button
-              variant="outline"
-              size="sm"
-              loading={skipper.pending !== null}
-              onClick={() =>
-                void skipper.toggle(skippable, true, { allGroups: run.groups.length > 1 })
-              }
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                {details}
+              </div>
+              <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div data-slot="group-header-row" className="flex flex-wrap items-center gap-2">
+              {heading}
+              {actions}
+            </div>
+            <div
+              data-slot="group-header-row"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"
             >
-              <SkipForward />
-              {t('runs.group.skipStep')}
-            </Button>
-          ) : null}
-          {caps.cancel ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              loading={busy}
-              onClick={() => void cancelGroup()}
-            >
-              {t('runs.group.cancel')}
-            </Button>
-          ) : null}
-          {caps.retry ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  loading={busy}
-                  aria-label={t('runs.group.more', { title })}
-                  title={t('runs.group.more', { title })}
-                >
-                  <MoreHorizontal />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  disabled={busy}
-                  onSelect={() =>
-                    void act(
-                      () => api.retry(runId, row.slug),
-                      () => notifySuccess(t('runs.header.retryStarted')),
-                    )
-                  }
-                >
-                  <RotateCcw />
-                  {t('runs.group.retry')}
-                </DropdownMenuItem>
-                {row.status !== 'conflict' ? (
-                  <DropdownMenuItem
-                    disabled={busy}
-                    onSelect={() =>
-                      void act(
-                        () => api.retry(runId, row.slug, { refreshConfig: true }),
-                        () => notifySuccess(t('runs.header.retryStarted')),
-                      )
-                    }
-                  >
-                    <RefreshCw />
-                    {t('runs.group.retryRefreshConfig')}
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground" title={row.step ?? undefined}>
-            {row.stepName ?? row.step ?? '—'}
-          </span>
-          {row.round !== null ? <span>{t('runs.group.round', { round: row.round })}</span> : null}
-          {row.limitUntil !== null ? (
-            <span className="text-status-warn">
-              {t('runs.group.limitUntil', { time: clock(row.limitUntil) })}
-            </span>
-          ) : null}
-          {'diff' in row && row.diff ? <DiffStat diff={row.diff} /> : null}
-          {'kind' in row && row.kind !== 'split' && stage ? (
-            <span
-              role="status"
-              aria-label={t('runs.system.delivery')}
-              className="flex flex-wrap items-center gap-x-2"
-            >
-              {stage.status === 'delivering' ? (
-                <StatusBadge status="running" label={t('runs.system.delivering')} />
-              ) : stage.status === 'applied' || stage.status === 'apply_failed' ? (
-                <>
-                  <StatusBadge status={stage.status} />
-                  {attemptAt !== null ? (
-                    <span>{t('runs.system.lastAttempt', { time: clock(attemptAt) })}</span>
-                  ) : null}
-                  {stage.status === 'apply_failed' && stage.reason ? (
-                    <span className="min-w-0 truncate" title={stage.reason}>
-                      {stage.reason.split('\n')[0]}
-                    </span>
-                  ) : null}
-                </>
-              ) : null}
-            </span>
-          ) : null}
-          {showUsage ? (
-            <>
-              <span>{duration(row.durationMs)}</span>
-              {usageText(row.usage) ? <span>{usageText(row.usage)}</span> : null}
-              {cost(row.usage) ? <span>{cost(row.usage)}</span> : null}
-            </>
-          ) : null}
-        </div>
+              {details}
+            </div>
+          </>
+        )}
       </header>
       {deliveryFailed ? (
         <Alert variant="destructive" className="flex flex-col gap-2">
@@ -468,8 +512,28 @@ export function GroupScreen({
         />
       ) : null}
 
-      {row.reason && row.status !== 'needs_human' ? (
-        <Alert variant="destructive">{reasonLabel(row.reason, t)}</Alert>
+      {row.status === 'needs_human' && row.humanOnly ? (
+        <section
+          aria-label={t(`runs.humanOnly.${row.humanOnly}`)}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <Badge variant="warn">{t(`runs.humanOnly.${row.humanOnly}`)}</Badge>
+          <span className="text-xs text-muted-foreground">{t('runs.humanOnly.hint')}</span>
+          {row.humanOnly === 'review' ? (
+            <Button
+              size="sm"
+              loading={busy}
+              onClick={() =>
+                void act(
+                  () => api.answer(runId, row.slug, 'Принято'),
+                  () => notifySuccess(t('runs.questions.answerSent')),
+                )
+              }
+            >
+              {t('runs.humanOnly.accept')}
+            </Button>
+          ) : null}
+        </section>
       ) : null}
       {row.status === 'needs_human' ? (
         row.questions && row.questions.length > 0 ? (
@@ -493,30 +557,35 @@ export function GroupScreen({
           />
         )
       ) : null}
-      {view?.warnings.map((warning) => (
-        <Alert key={warning} variant="warn">
-          {warning}
-        </Alert>
-      ))}
-      {view?.attempts.map((attempt) => (
-        <OutsideChanges key={attempt.seq} attempt={attempt} />
-      ))}
-      {hints.length > 0 ? (
-        <section aria-label={t('runs.group.hintsLabel')}>
-          <Alert variant="warn">
-            <div className="mb-1 text-xs font-medium uppercase">{t('runs.group.hintsTitle')}</div>
-            <p>
-              {t('runs.group.hintsAdd')} <code>allow_commands</code>:{' '}
-              {hints.map((pattern, index) => (
-                <span key={pattern}>
-                  {index > 0 ? ', ' : ''}
-                  <code>{pattern}</code>
-                </span>
-              ))}
-              {t('runs.group.hintsAfter')} <FilePath path="aip/specialists/" />.
-            </p>
+      {notice ? (
+        notice.kind === 'outside' ? (
+          <OutsideChanges attempt={notice.attempt} onDismiss={() => dismiss(notice.key)} />
+        ) : notice.kind === 'hints' ? (
+          <section aria-label={t('runs.group.hintsLabel')}>
+            <Alert variant="warn" className="relative pr-10">
+              {closeButton}
+              <div className="mb-1 text-xs font-medium uppercase">{t('runs.group.hintsTitle')}</div>
+              <p>
+                {t('runs.group.hintsAdd')} <code>allow_commands</code>:{' '}
+                {notice.patterns.map((pattern, index) => (
+                  <span key={pattern}>
+                    {index > 0 ? ', ' : ''}
+                    <code>{pattern}</code>
+                  </span>
+                ))}
+                {t('runs.group.hintsAfter')} <FilePath path="aip/specialists/" />.
+              </p>
+            </Alert>
+          </section>
+        ) : (
+          <Alert
+            variant={notice.kind === 'reason' ? 'destructive' : 'warn'}
+            className="relative pr-10"
+          >
+            {closeButton}
+            {notice.kind === 'reason' ? reasonLabel(notice.text, t) : notice.text}
           </Alert>
-        </section>
+        )
       ) : null}
 
       {view === null ? (
@@ -544,6 +613,14 @@ export function GroupScreen({
                 {progress ? ` · ${progress.done}/${progress.total}` : ''}
               </TabsTrigger>
             ) : null}
+            <TabsTrigger
+              value="artifacts"
+              disabled={row.artifacts === 0}
+              title={row.artifacts === 0 ? t('runs.group.artifactsEmpty') : undefined}
+            >
+              {t('runs.group.artifacts')}
+              {row.artifacts > 0 ? ` · ${row.artifacts}` : ''}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="log" className="flex flex-col gap-3">
             {onOnlyReplies || onShowJson ? (
@@ -589,7 +666,21 @@ export function GroupScreen({
           {caps.changes ? (
             <TabsContent value="changes">
               {view.diff && view.diff.files.length > 0 ? (
-                <FileTree files={view.diff.files} diff={{ api, runId, group: row.slug, version }} />
+                <div className="flex flex-col gap-3">
+                  <div className="text-sm text-muted-foreground">
+                    <DiffStat
+                      diff={{
+                        files: view.diff.files.length,
+                        added: view.diff.added,
+                        removed: view.diff.removed,
+                      }}
+                    />
+                  </div>
+                  <FileTree
+                    files={view.diff.files}
+                    diff={{ api, runId, group: row.slug, version }}
+                  />
+                </div>
               ) : (
                 <Empty title={t('runs.group.noChanges')}>{t('runs.group.noChangesText')}</Empty>
               )}
@@ -627,6 +718,18 @@ export function GroupScreen({
                 </p>
                 <Markdown text={spec.tasks} />
               </section>
+            </TabsContent>
+          ) : null}
+          {row.artifacts > 0 ? (
+            <TabsContent value="artifacts">
+              <ArtifactsTab
+                api={api}
+                runId={runId}
+                group={row.slug}
+                count={row.artifacts}
+                revision={row.artifactsRevision}
+                onError={onError}
+              />
             </TabsContent>
           ) : null}
         </Tabs>

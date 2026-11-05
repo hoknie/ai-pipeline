@@ -2,19 +2,34 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import type { TagView } from './types.ts';
 
-/** The tag catalog as the panel knows it now; chips and pickers resolve tags by id from it. */
+/**
+ * The tag catalogs as the panel knows them now. Every repository has its own catalog; chips
+ * resolve tags by id from all of them, pickers and filters take the catalog of one repository.
+ */
 export interface TagCatalog {
+  /** The tags of every repository. */
   tags: TagView[];
   byId: Map<string, TagView>;
-  /** Takes the fresher catalog that an answer of the API carries, before the event arrives. */
-  update: (tags: TagView[]) => void;
+  /** The tags of one repository; none for `null`. */
+  of: (repository: string | null) => TagView[];
+  /**
+   * Takes the fresher catalog of one repository that an answer of the API carries, before the
+   * event arrives.
+   */
+  update: (repository: string, tags: TagView[]) => void;
 }
 
 export function catalogOf(
   tags: TagView[],
-  update: (tags: TagView[]) => void = () => {},
+  update: (repository: string, tags: TagView[]) => void = () => {},
 ): TagCatalog {
-  return { tags, byId: new Map(tags.map((tag) => [tag.id, tag])), update };
+  return {
+    tags,
+    byId: new Map(tags.map((tag) => [tag.id, tag])),
+    of: (repository) =>
+      repository === null ? [] : tags.filter((tag) => tag.repository === repository),
+    update,
+  };
 }
 
 const EMPTY = catalogOf([]);
@@ -26,7 +41,7 @@ export function TagsProvider({
   children,
 }: {
   tags: TagView[];
-  onTags?: (tags: TagView[]) => void;
+  onTags?: (repository: string, tags: TagView[]) => void;
   children: ReactNode;
 }) {
   const value = useMemo(() => catalogOf(tags, onTags), [tags, onTags]);

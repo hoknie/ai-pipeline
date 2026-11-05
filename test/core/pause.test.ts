@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   Rejection,
   addItem,
+  describeFailReason,
+  dispatch,
   newGroup,
   advance,
   emptyQueue,
@@ -13,11 +15,12 @@ import {
   retryableGroups,
   startQueue,
   transition,
+  type Effect,
   type Queue,
   type RunState,
 } from '../../src/core/index.ts';
 
-import { finish, group, run, step } from './helpers.ts';
+import { finish, group, run, runningAttempt, step } from './helpers.ts';
 
 function queueWith(state: RunState): Queue {
   const queue = emptyQueue('/repo', 1);
@@ -72,11 +75,11 @@ describe('planDispatch with a hold', () => {
     step(state);
     finish(state, 'done');
     state.run.hold = 'paused';
-    const held = planDispatch([state], 5, 1500);
+    const held = planDispatch([state], 1500);
     expect(held.start).toEqual([]);
     expect(held.waits.size).toBe(0);
     state.run.hold = null;
-    expect(planDispatch([state], 5, 1500).start.length).toBeGreaterThan(0);
+    expect(planDispatch([state], 1500).start.length).toBeGreaterThan(0);
   });
 });
 
@@ -87,7 +90,7 @@ describe('planDispatch with a hold and delivery groups', () => {
     finish(state, 'done');
     state.message = newGroup('message', 'Сообщение', 'сообщение', 100);
     state.run.hold = 'paused';
-    const slugs = planDispatch([state], 5, 1500).start.map((entry) => entry.group.slug);
+    const slugs = planDispatch([state], 1500).start.map((entry) => entry.group.slug);
     expect(slugs).toEqual(['message']);
   });
 });
@@ -212,5 +215,150 @@ describe('pauseRun: where the run was', () => {
     pauseRun(queue, state, 'q1', 3);
     expect(queue.runs).toEqual([]);
     expect(queue.items.at(-1)).toMatchObject({ run: state.run.id });
+  });
+});
+
+describe('a pause stops the running step', () => {
+  const pause = (state: RunState, now = 3000) =>
+    transition(state, { kind: 'hold', hold: 'paused' }, now);
+  const exitOf = (
+    state: RunState,
+    failure: { kind: 'no_report' } | null = null,
+    now = 3500,
+  ): Effect[] => {
+    const attempt = runningAttempt(state);
+    return transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq: attempt.seq,
+        exit: { sessionId: 's1', usage: null, failure, outsideChanges: [] },
+      },
+      now,
+    );
+  };
+
+  it('stops an attempt without a report', () => {
+    const state = run(1);
+    step(state);
+    const attempt = runningAttempt(state);
+    expect(pause(state)).toEqual([
+      { kind: 'stop_attempt', run: state.run.id, group: 'gruppa-1', seq: attempt.seq },
+    ]);
+    expect(attempt.reason).toEqual({ kind: 'paused', at: 3000 });
+    expect(describeFailReason({ kind: 'paused', at: 1 })).toBe('interrupted by a pause');
+  });
+
+  it('does not stop an attempt that reported, a second pause or a freeze', () => {
+    const state = run(1);
+    step(state);
+    transition(state, { kind: 'hold', hold: 'frozen' }, 2500);
+    expect(runningAttempt(state).reason).toBeNull();
+    const effects = pause(state);
+    expect(effects).toHaveLength(1);
+    expect(pause(state, 3100)).toEqual([]);
+
+    const reported = run(1);
+    step(reported);
+    const attempt = runningAttempt(reported);
+    transition(
+      reported,
+      {
+        kind: 'report',
+        group: 'gruppa-1',
+        seq: attempt.seq,
+        report: { verdict: 'done', summary: 'ok', feedback: null },
+      },
+      2000,
+    );
+    expect(pause(reported)).toEqual([]);
+    expect(attempt.reason).toBeNull();
+  });
+
+  it('does not stop anything when the hold is a freeze', () => {
+    const state = run(1);
+    step(state);
+    expect(transition(state, { kind: 'hold', hold: 'frozen' }, 3000)).toEqual([]);
+    expect(runningAttempt(state).reason).toBeNull();
+  });
+
+  it('returns the group to the queue on the same step and resumes the session', () => {
+    const state = run(1);
+    step(state);
+    const stopped = runningAttempt(state);
+    pause(state);
+    expect(exitOf(state, { kind: 'no_report' })).toEqual([]);
+    expect(stopped).toMatchObject({ status: 'cancelled', sessionId: 's1' });
+    expect(group(state).status).toBe('queued');
+    expect(group(state).rejections).toEqual({});
+    expect(dispatch([state], 4000)).toEqual([]);
+    transition(state, { kind: 'hold', hold: null }, 5000);
+    dispatch([state], 5000);
+    expect(runningAttempt(state)).toMatchObject({
+      stepId: stopped.stepId,
+      resumeSession: 's1',
+    });
+    expect(state.run.finishedAt).toBeNull();
+  });
+
+  it('accepts a report that arrives while stopping and commits it', () => {
+    const state = run(1);
+    step(state);
+    pause(state);
+    const attempt = runningAttempt(state);
+    transition(
+      state,
+      {
+        kind: 'report',
+        group: 'gruppa-1',
+        seq: attempt.seq,
+        report: { verdict: 'done', summary: 'ok', feedback: null },
+      },
+      3200,
+    );
+    const effects = exitOf(state, { kind: 'no_report' });
+    expect(effects.map((effect) => effect.kind)).toContain('commit');
+    expect(attempt.status).toBe('finished');
+    expect(attempt.reason).toBeNull();
+  });
+
+  it('does not fail the group on a timeout while stopping', () => {
+    const state = run(1);
+    step(state);
+    pause(state);
+    const attempt = runningAttempt(state);
+    expect(
+      transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: attempt.seq }, 9000),
+    ).toEqual([]);
+    expect(attempt.status).toBe('running');
+    expect(group(state).status).toBe('running');
+  });
+
+  it('survives a restart of the daemon, while a frozen run still fails', () => {
+    const state = run(1);
+    step(state);
+    pause(state);
+    transition(state, { kind: 'interrupted' }, 4000);
+    expect(group(state).status).toBe('queued');
+    expect(state.run.hold).toBe('paused');
+    expect(state.run.finishedAt).toBeNull();
+
+    const frozen = run(1);
+    step(frozen);
+    transition(frozen, { kind: 'hold', hold: 'frozen' }, 3000);
+    transition(frozen, { kind: 'interrupted' }, 4000);
+    expect(group(frozen).status).toBe('failed');
+    expect(group(frozen).attempts[0]?.reason).toEqual({ kind: 'interrupted' });
+  });
+
+  it('rejects a message to an attempt being stopped', () => {
+    const state = run(1);
+    step(state);
+    pause(state);
+    const attempt = runningAttempt(state);
+    expect(() =>
+      transition(state, { kind: 'message', group: 'gruppa-1', seq: attempt.seq, text: 'x' }, 3100),
+    ).toThrow(Rejection);
   });
 });

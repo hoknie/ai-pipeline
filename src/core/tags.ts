@@ -28,6 +28,8 @@ export const TAG_NAME_LIMIT = 30;
 
 export interface Tag {
   id: string;
+  /** The repository (absolute root) whose catalog holds the tag. */
+  repository: string;
   name: string;
   color: TagColor;
   createdAt: number;
@@ -63,6 +65,11 @@ function checkUnique(catalog: readonly Tag[], name: string, except: string | nul
   if (same) throw new Rejection(`tag \`${same.name}\` already exists`);
 }
 
+/** The tags of one repository. */
+export function tagsOfRepository(catalog: readonly Tag[], repository: string): Tag[] {
+  return catalog.filter((tag) => tag.repository === repository);
+}
+
 /** Finds a tag by name, ignoring case and surrounding spaces. */
 export function findTag(catalog: readonly Tag[], name: string): Tag {
   const tag = catalog.find((candidate) => fold(candidate.name) === fold(name));
@@ -75,7 +82,7 @@ export function findTag(catalog: readonly Tag[], name: string): Tag {
 
 export function addTag(
   catalog: readonly Tag[],
-  input: { name: string; color?: string | undefined },
+  input: { name: string; color?: string | undefined; repository: string },
   id: string,
   now: number,
 ): Tag {
@@ -85,19 +92,26 @@ export function addTag(
       ? (TAG_COLORS[catalog.length % TAG_COLORS.length] ?? 'gray')
       : cleanColor(input.color);
   checkUnique(catalog, name, null);
-  return { id, name, color, createdAt: now, task: null };
+  return { id, repository: input.repository, name, color, createdAt: now, task: null };
 }
 
 /** A tag of a linked task: the reserved color, the source task is fixed. */
 export function addLinkedTag(
   catalog: readonly Tag[],
-  input: { name: string; task: TagTask },
+  input: { name: string; task: TagTask; repository: string },
   id: string,
   now: number,
 ): Tag {
   const name = cleanName(input.name);
   checkUnique(catalog, name, null);
-  return { id, name, color: CHAIN_TAG_COLOR, createdAt: now, task: { ...input.task } };
+  return {
+    id,
+    repository: input.repository,
+    name,
+    color: CHAIN_TAG_COLOR,
+    createdAt: now,
+    task: { ...input.task },
+  };
 }
 
 /** Returns the changed copy of the tag; the catalog itself is not modified. */

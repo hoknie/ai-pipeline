@@ -4,8 +4,11 @@ import { join } from 'node:path';
 
 import type { BuildInfo, DaemonCheck, PingResult } from '../../protocol/index.ts';
 
-/** Who serves the panel: the daemon (it can restart the panel) or a standalone `aip web`. */
-export type ServedBy = 'daemon' | 'standalone';
+/**
+ * Who serves the panel: the daemon (it can restart the panel), a standalone `aip web`, or the
+ * stand-in that keeps the panel up while the daemon is stopped (it can start the daemon again).
+ */
+export type ServedBy = 'daemon' | 'standalone' | 'standby';
 
 export interface SystemView {
   daemon: {
@@ -84,13 +87,16 @@ export function systemView(input: SystemInput): SystemView {
 export interface SpawnRestartOptions {
   /** Command that runs `aip`: the node executable and the script. */
   entry: string[];
+  /** `restart` by default; `stop` keeps a stand-in panel up after the daemon stops. */
+  command?: 'restart' | 'stop';
   stateDirectory: string;
   force: boolean;
   environment: NodeJS.ProcessEnv;
 }
 
 /**
- * Runs `aip daemon restart --web [--force]` as a process of its own. It outlives the daemon that
+ * Runs `aip daemon restart --web [--force]` (or `aip daemon stop --web [--force]`) as a process
+ * of its own. It outlives the daemon that
  * starts it and writes to the daemon log, because the daemon is the one that goes away.
  */
 export function spawnDaemonRestart(options: SpawnRestartOptions): void {
@@ -101,7 +107,13 @@ export function spawnDaemonRestart(options: SpawnRestartOptions): void {
   try {
     const child = spawn(
       executable,
-      [...args, 'daemon', 'restart', '--web', ...(options.force ? ['--force'] : [])],
+      [
+        ...args,
+        'daemon',
+        options.command ?? 'restart',
+        '--web',
+        ...(options.force ? ['--force'] : []),
+      ],
       {
         detached: true,
         stdio: ['ignore', output, output],

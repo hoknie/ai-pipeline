@@ -41,6 +41,8 @@ export function buildInput(run: Run, group: Group, pending: Pending): StepInput 
     humanAnswer: pending.humanAnswer,
     ...(pending.message ? { message: { ...pending.message } } : {}),
     decisions: group.decisions.map((decision) => ({ ...decision })),
+    ...(step.humanReview ? { humanReview: true } : {}),
+    ...(pending.reviewed ? { reviewed: true } : {}),
   };
 }
 

@@ -3,6 +3,10 @@ export type {
   CatalogEntry,
   ConfigCatalogResponse,
   ConfigEditResult,
+  SpecialistTagFolderView,
+  SpecialistTagsResult,
+  SpecialistTagsView,
+  SpecialistsImportResult,
   ConfigPreview,
   ConfigEditorResponse,
   DependencyView,
@@ -15,6 +19,7 @@ export type {
   DiffTotals,
   FileDiffView,
   FileStat,
+  ArtifactView,
   RunPatchView,
   GroupRow,
   GroupWait,
@@ -102,6 +107,7 @@ export type {
   EditorSetting,
   EditorSpecialist,
   EditorSpecialistValues,
+  SpecialistTagEntry,
   EditorWorkflow,
   EntryLevel,
   EntryReference,
@@ -134,8 +140,11 @@ export interface SystemView {
     auth: 'token' | 'none';
     version: string;
     build: string;
-    /** `standalone`: started by `aip web`, it cannot restart itself. */
-    servedBy: 'daemon' | 'standalone';
+    /**
+     * `standalone`: started by `aip web`, it cannot restart itself; `standby`: serves the panel
+     * while the daemon is stopped and can start it again.
+     */
+    servedBy: 'daemon' | 'standalone' | 'standby';
   };
   logPath: string | null;
 }

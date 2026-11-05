@@ -99,9 +99,9 @@ describe('scheduler', () => {
   });
 
   it('serves the earlier run first and groups in their order', () => {
-    const later = run(2, { id: 'run000000002', now: 2000 });
-    const earlier = run(2, { id: 'run000000001', now: 1000 });
-    const effects = dispatch([later, earlier], 3, 3000);
+    const later = run(2, { id: 'run000000002', now: 2000, max: 3 });
+    const earlier = run(2, { id: 'run000000001', now: 1000, max: 3 });
+    const effects = dispatch([later, earlier], 3000);
     expect(
       effects.map((effect) =>
         effect.kind === 'start_attempt' ? `${effect.run}/${effect.group}` : '',
@@ -109,11 +109,11 @@ describe('scheduler', () => {
     ).toEqual(['run000000001/gruppa-1', 'run000000001/gruppa-2', 'run000000002/gruppa-1']);
   });
 
-  it('counts running specialists across runs', () => {
-    const first = run(2, { id: 'run000000001' });
-    const second = run(2, { id: 'run000000002', now: 2000 });
-    dispatch([first], 2, 1);
-    expect(dispatch([first, second], 3, 2)).toHaveLength(1);
+  it('counts running specialists across runs of a repository', () => {
+    const first = run(2, { id: 'run000000001', max: 2 });
+    const second = run(2, { id: 'run000000002', now: 2000, max: 3 });
+    dispatch([first], 1);
+    expect(dispatch([first, second], 2)).toHaveLength(1);
   });
 });
 
@@ -146,7 +146,7 @@ describe('specialist limit', () => {
   it('counts running attempts by specialist across runs', () => {
     const first = run(2, { id: 'run000000001' });
     const second = run(1, { id: 'run000000002', now: 2000 });
-    dispatch([first, second], 5, 1);
+    dispatch([first, second], 1);
     expect(runningBySpecialist([first, second])).toEqual(new Map([['plan', 3]]));
   });
 
@@ -175,15 +175,15 @@ describe('specialist limit', () => {
     const first = run(1, { id: 'run000000001', configText: LIMITED });
     step(first);
     finish(first, 'done');
-    dispatch([first], 5, 1600);
+    dispatch([first], 1600);
     const second = run(1, { id: 'run000000002', now: 2000, configText: LIMITED });
-    dispatch([first, second], 5, 1700);
+    dispatch([first, second], 1700);
     finish(second, 'done');
     expect(runningAttempt(first).specialist).toBe('coder');
-    expect(dispatch([first, second], 5, 1800)).toEqual([]);
+    expect(dispatch([first, second], 1800)).toEqual([]);
     expect(group(second).status).toBe('queued');
     finish(first, 'done');
-    dispatch([first, second], 5, 1900);
+    dispatch([first, second], 1900);
     expect(runningAttempt(second).specialist).toBe('coder');
   });
 
@@ -358,8 +358,8 @@ describe('dispatch and the plan', () => {
     });
     step(first);
     for (let index = 1; index <= 3; index++) finish(first, 'done', { slug: `gruppa-${index}` });
-    const plan = planDispatch([first], 5, 1500);
-    const effects = dispatch([first], 5, 1500);
+    const plan = planDispatch([first], 1500);
+    const effects = dispatch([first], 1500);
     expect(effects.map((effect) => (effect.kind === 'start_attempt' ? effect.group : ''))).toEqual(
       plan.start.map((entry) => entry.group.slug),
     );

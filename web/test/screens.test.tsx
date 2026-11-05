@@ -49,6 +49,38 @@ describe('group screen', () => {
     expect((screen.getByLabelText('answer for Вход') as HTMLTextAreaElement).value).toBe('');
   });
 
+  it('marks a human review and accepts it with one button', async () => {
+    const api = mount(
+      [
+        runView({
+          state: 'needs_human',
+          waiting: 1,
+          groups: [{ ...asking(), humanOnly: 'review' }],
+        }),
+      ],
+      { group: vi.fn(async () => groupView({ status: 'needs_human' })) },
+    );
+    expect(await screen.findByText('Human review')).toBeTruthy();
+    expect(screen.getByText('The queue autopilot does not answer this question.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', 'login', 'Принято'));
+  });
+
+  it('marks a request of a specialist without the accept button', async () => {
+    mount(
+      [
+        runView({
+          state: 'needs_human',
+          waiting: 1,
+          groups: [{ ...asking(), humanOnly: 'request' }],
+        }),
+      ],
+      { group: vi.fn(async () => groupView({ status: 'needs_human' })) },
+    );
+    expect(await screen.findByText('Human needed')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+  });
+
   it('keeps the chosen tab when the group moves to the next step', async () => {
     const first = { files: [{ path: 'old.ts', added: 1, removed: 0 }], added: 1, removed: 0 };
     const second = { files: [{ path: 'fresh.ts', added: 2, removed: 0 }], added: 2, removed: 0 };
@@ -912,6 +944,64 @@ describe('usage in the group header', () => {
     expect(screen.getByText('$0.42')).toBeTruthy();
     expect(screen.getByText('1m05s')).toBeTruthy();
   });
+  describe('header layout', () => {
+    const rows = () => document.querySelectorAll('[data-slot="group-header-row"]');
+
+    const cancel = { name: /Cancel|Отменить/ };
+    const skip = { name: /Skip step|Пропустить/ };
+    const withDiff = groupRow({
+      ...row,
+      diff: { files: 2, added: 367, removed: 4 },
+    });
+    const mount = (props: { showUsage?: boolean; run?: boolean }) =>
+      render(
+        <GroupScreen
+          api={fakeApi({ group: vi.fn(async () => groupView()) })}
+          runId="run1"
+          row={withDiff}
+          draftKey="run1/login"
+          drafts={{}}
+          onDraft={() => undefined}
+          onClearDrafts={() => undefined}
+          onError={() => undefined}
+          {...(props.run === false ? {} : { run: runView() })}
+          {...(props.showUsage ? { showUsage: true } : {})}
+        />,
+      );
+
+    it('is a single row before scrolling with the step and the buttons in it', () => {
+      mount({});
+      expect(rows()).toHaveLength(1);
+      const first = within(rows()[0] as HTMLElement);
+      expect(first.getByText(row.stepName ?? '')).toBeTruthy();
+      expect(first.queryByText(/\+367/)).toBeNull();
+      expect(first.getByRole('button', skip)).toBeTruthy();
+      expect(first.getByRole('button', cancel)).toBeTruthy();
+    });
+
+    it('has two rows after scrolling: the title and buttons first, the step and usage second', () => {
+      mount({ showUsage: true });
+      expect(rows()).toHaveLength(2);
+      const first = within(rows()[0] as HTMLElement);
+      const second = within(rows()[1] as HTMLElement);
+      expect(first.getByText(/добавить вход/)).toBeTruthy();
+      expect(first.getByRole('button', cancel)).toBeTruthy();
+      expect(second.getByText(row.stepName ?? '')).toBeTruthy();
+      expect(second.getByText('$0.42')).toBeTruthy();
+      expect(second.queryAllByRole('button')).toHaveLength(0);
+    });
+
+    it('has two rows with the group title without a run', () => {
+      mount({ run: false });
+      expect(rows()).toHaveLength(2);
+      const first = within(rows()[0] as HTMLElement);
+      const second = within(rows()[1] as HTMLElement);
+      expect(first.getByText(row.title)).toBeTruthy();
+      expect(first.getByRole('button', cancel)).toBeTruthy();
+      expect(second.getByText(row.stepName ?? '')).toBeTruthy();
+    });
+  });
+
   describe('run title', () => {
     const title = () => screen.getByText('добавить вход', { exact: false });
 

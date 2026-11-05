@@ -65,6 +65,38 @@ export interface RunPatchRecord {
   createdAt: number;
 }
 
+/** A file a specialist published for a group; the bytes live outside the database. */
+export interface ArtifactRecord {
+  id: string;
+  runId: string;
+  group: string;
+  step: string;
+  /** Number of the attempt that published it. */
+  seq: number;
+  specialist: string;
+  title: string;
+  fileName: string;
+  size: number;
+  uri: string;
+  createdAt: number;
+}
+
+function artifactRecord(row: Row): ArtifactRecord {
+  return {
+    id: String(row.id),
+    runId: String(row.run_id),
+    group: String(row.group_slug),
+    step: String(row.step_id),
+    seq: Number(row.seq),
+    specialist: String(row.specialist),
+    title: String(row.title),
+    fileName: String(row.file_name),
+    size: Number(row.size),
+    uri: String(row.uri),
+    createdAt: Number(row.created_at),
+  };
+}
+
 export class Store {
   readonly database: DatabaseSync;
 
@@ -125,8 +157,8 @@ export class Store {
         run.hold,
       );
     const groupStatement = this.database.prepare(
-      `INSERT OR REPLACE INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict, merge_commit, delivery_json, questions_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict, merge_commit, delivery_json, questions_json, human_only)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const attemptStatement = this.database.prepare(
       `INSERT OR REPLACE INTO attempts (run_id, group_slug, seq, step_id, step_index, round, specialist, runtime, model, status, input_json, resume_session, session_id, report_json, reason_json, started_at, finished_at, usage_json, proposal_json, denials_json, outside_changes_json)
@@ -153,6 +185,7 @@ export class Store {
         group.mergeCommit,
         JSON.stringify(group.delivery),
         json(group.questions),
+        group.humanOnly,
       );
       for (const attempt of group.attempts) {
         attemptStatement.run(
@@ -209,6 +242,100 @@ export class Store {
     return (this.database.prepare('SELECT run_id FROM run_patches').all() as Row[]).map((row) =>
       String(row.run_id),
     );
+  }
+
+  /** The artifact the same attempt already published under that file name, if any. */
+  findArtifact(runId: string, group: string, seq: number, fileName: string): ArtifactRecord | null {
+    const row = this.database
+      .prepare(
+        'SELECT * FROM artifacts WHERE run_id = ? AND group_slug = ? AND seq = ? AND file_name = ?',
+      )
+      .get(runId, group, seq, fileName) as Row | undefined;
+    return row ? artifactRecord(row) : null;
+  }
+
+  /**
+   * Records an artifact; the same attempt publishing the same file name again replaces the
+   * earlier record (its `id` stays). Returns the stored record and the URI it replaced.
+   */
+  addArtifact(record: ArtifactRecord): { artifact: ArtifactRecord; previousUri: string | null } {
+    return this.transaction(() => {
+      const before = this.findArtifact(record.runId, record.group, record.seq, record.fileName);
+      this.database
+        .prepare(
+          `INSERT INTO artifacts (id, run_id, group_slug, step_id, seq, specialist, title, file_name, size, uri, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (run_id, group_slug, seq, file_name) DO UPDATE SET
+             title = excluded.title, size = excluded.size, uri = excluded.uri,
+             created_at = excluded.created_at, specialist = excluded.specialist,
+             step_id = excluded.step_id`,
+        )
+        .run(
+          record.id,
+          record.runId,
+          record.group,
+          record.step,
+          record.seq,
+          record.specialist,
+          record.title,
+          record.fileName,
+          record.size,
+          record.uri,
+          record.createdAt,
+        );
+      const artifact = this.findArtifact(record.runId, record.group, record.seq, record.fileName);
+      return { artifact: artifact!, previousUri: before?.uri ?? null };
+    });
+  }
+
+  /** Artifacts of a group, newest first. */
+  artifacts(runId: string, group: string): ArtifactRecord[] {
+    return (
+      this.database
+        .prepare(
+          'SELECT * FROM artifacts WHERE run_id = ? AND group_slug = ? ORDER BY created_at DESC, rowid DESC',
+        )
+        .all(runId, group) as Row[]
+    ).map(artifactRecord);
+  }
+
+  artifact(runId: string, id: string): ArtifactRecord | null {
+    const row = this.database
+      .prepare('SELECT * FROM artifacts WHERE run_id = ? AND id = ?')
+      .get(runId, id) as Row | undefined;
+    return row ? artifactRecord(row) : null;
+  }
+
+  artifactCount(runId: string, group: string): number {
+    const row = this.database
+      .prepare('SELECT COUNT(*) AS n FROM artifacts WHERE run_id = ? AND group_slug = ?')
+      .get(runId, group) as Row;
+    return Number(row.n);
+  }
+
+  /** Number of artifacts per group of a run. */
+  artifactCounts(runId: string): Map<string, { count: number; revision: number }> {
+    const rows = this.database
+      .prepare(
+        'SELECT group_slug, COUNT(*) AS n, MAX(created_at) AS at, SUM(size) AS bytes FROM artifacts WHERE run_id = ? GROUP BY group_slug',
+      )
+      .all(runId) as Row[];
+    return new Map(
+      rows.map((row) => [
+        String(row.group_slug),
+        { count: Number(row.n), revision: Number(row.at) + Number(row.bytes) },
+      ]),
+    );
+  }
+
+  /** URIs of all artifacts by run, for sweeping the storage. */
+  artifactUris(): Map<string, string[]> {
+    const uris = new Map<string, string[]>();
+    for (const row of this.database.prepare('SELECT run_id, uri FROM artifacts').all() as Row[]) {
+      const run = String(row.run_id);
+      uris.set(run, [...(uris.get(run) ?? []), String(row.uri)]);
+    }
+    return uris;
   }
 
   loadRun(id: string): RunState | null {
@@ -329,10 +456,11 @@ export class Store {
   tags(): Tag[] {
     const rows = this.database
       .prepare(
-        'SELECT id, name, color, created_at, task_run, task_number FROM tags ORDER BY created_at, id',
+        'SELECT id, repository, name, color, created_at, task_run, task_number FROM tags ORDER BY created_at, id',
       )
       .all() as {
       id: string;
+      repository: string;
       name: string;
       color: string;
       created_at: number;
@@ -341,6 +469,7 @@ export class Store {
     }[];
     return rows.map((row) => ({
       id: row.id,
+      repository: row.repository,
       name: row.name,
       color: row.color as TagColor,
       createdAt: row.created_at,
@@ -354,11 +483,12 @@ export class Store {
   saveTag(tag: Tag): void {
     this.database
       .prepare(
-        `INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO tags (id, repository, name, color, created_at, task_run, task_number) VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, color = excluded.color`,
       )
       .run(
         tag.id,
+        tag.repository,
         tag.name,
         tag.color,
         tag.createdAt,
@@ -367,17 +497,17 @@ export class Store {
       );
   }
 
-  /** Deletes the tag and takes its id off every run and queue item, in one transaction. */
-  removeTag(id: string): void {
+  /** Deletes the tag and takes its id off every run and queue item of its repository, in one transaction. */
+  removeTag(repository: string, id: string): void {
     this.transaction(() => {
-      this.database.prepare('DELETE FROM tags WHERE id = ?').run(id);
+      this.database.prepare('DELETE FROM tags WHERE id = ? AND repository = ?').run(id, repository);
       for (const table of ['runs', 'queue_items']) {
         this.database
           .prepare(
             `UPDATE ${table} SET tags_json = (SELECT json_group_array(value) FROM json_each(tags_json) WHERE value <> ?)
-             WHERE EXISTS (SELECT 1 FROM json_each(tags_json) WHERE value = ?)`,
+             WHERE repository = ? AND EXISTS (SELECT 1 FROM json_each(tags_json) WHERE value = ?)`,
           )
-          .run(id, id);
+          .run(id, repository, id);
       }
     });
   }
@@ -542,6 +672,8 @@ function hydrateGroup(group: Row, attemptRows: Row[]): Group {
       .map((attempt) => hydrateAttempt(attempt)),
     question: text(group.question ?? null),
     questions: nullable(group.questions_json ?? null),
+    humanOnly:
+      group.human_only === 'review' || group.human_only === 'request' ? group.human_only : null,
     reason: text(group.reason ?? null),
     warnings: parse(group.warnings_json ?? null),
     decisions: parse<(Omit<HumanDecision, 'by'> & { by?: unknown })[]>(

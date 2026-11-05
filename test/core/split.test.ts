@@ -11,7 +11,7 @@ const SPLIT_CONFIG = CONFIG_TEXT.replace(
 
 function splitting(): RunState {
   const state = run(1, { split: true, configText: SPLIT_CONFIG });
-  dispatch([state], 5, 1100);
+  dispatch([state], 1100);
   return state;
 }
 
@@ -38,7 +38,7 @@ describe('split step', () => {
       ['vhod', 'queued'],
       ['registratsiya', 'queued'],
     ]);
-    dispatch([state], 5, 1300);
+    dispatch([state], 1300);
     expect(runningAttempt(state, 'vhod').stepId).toBe('plan');
     expect(state.run.finishedAt).toBeNull();
   });
@@ -49,7 +49,7 @@ describe('split step', () => {
       '    feature:\n      split: { specialist: plan, additional_prompt: Не больше одной группы на модуль }\n      steps:',
     );
     const state = run(1, { split: true, configText: text });
-    dispatch([state], 5, 1100);
+    dispatch([state], 1100);
     const prompt = runningAttempt(state, SPLIT_GROUP).input.prompt;
     const extra = prompt.indexOf('Не больше одной группы на модуль');
     expect(extra).toBeGreaterThan(prompt.indexOf('задача 1'));
@@ -69,7 +69,7 @@ describe('split step', () => {
     expect(state.run.finishedAt).not.toBeNull();
     transition(state, { kind: 'retry', group: SPLIT_GROUP }, 1500);
     expect(state.run.finishedAt).toBeNull();
-    dispatch([state], 5, 1600);
+    dispatch([state], 1600);
     expect(runningAttempt(state, SPLIT_GROUP).seq).toBe(2);
   });
 
@@ -89,7 +89,7 @@ describe('split step', () => {
     finish(state, 'needs_human', { slug: SPLIT_GROUP, feedback: 'на сколько частей?' });
     expect(state.split?.status).toBe('needs_human');
     transition(state, { kind: 'answer', group: SPLIT_GROUP, answer: 'на две' }, 1400);
-    dispatch([state], 5, 1500);
+    dispatch([state], 1500);
     expect(runningAttempt(state, SPLIT_GROUP).input.humanAnswer).toBe('на две');
     transition(state, { kind: 'cancel', group: null }, 1600);
     expect(state.split?.status).toBe('cancelled');
@@ -98,7 +98,7 @@ describe('split step', () => {
 
   it('rejects swarm_split outside the split step', () => {
     const state = run(1);
-    dispatch([state], 5, 1);
+    dispatch([state], 1);
     expect(() =>
       transition(state, { kind: 'split_proposed', seq: 1, groups: [{ title: 'a', task: 'b' }] }, 2),
     ).toThrow('not a running split step');
@@ -113,7 +113,7 @@ describe('specialist limit on the split step', () => {
     );
     const first = run(1, { id: 'run000000001', split: true, configText: text });
     const second = run(1, { id: 'run000000002', now: 2000, split: true, configText: text });
-    expect(dispatch([first, second], 5, 3000)).toHaveLength(1);
+    expect(dispatch([first, second], 3000)).toHaveLength(1);
     expect(runningAttempt(first, SPLIT_GROUP).stepId).toBe('split');
     expect(second.split?.status).toBe('queued');
   });
@@ -132,13 +132,13 @@ describe('split into another workflow', () => {
 
   it('starts the proposed groups at the first step of the target', () => {
     const state = run(1, { split: true, configText: CONFIG });
-    dispatch([state], 5, 1100);
+    dispatch([state], 1100);
     propose(state, [
       { title: 'a', task: 'a' },
       { title: 'b', task: 'b' },
     ]);
     finish(state, 'done', { slug: SPLIT_GROUP });
-    dispatch([state], 5, 1300);
+    dispatch([state], 1300);
     const workers = state.groups.filter((item) => item.slug !== SPLIT_GROUP);
     expect(workers).toHaveLength(2);
     for (const worker of workers) {
@@ -149,18 +149,18 @@ describe('split into another workflow', () => {
   it('starts explicit groups at the first step of the target without a split step', () => {
     const state = run(2, { split: true, configText: CONFIG });
     expect(state.split).toBeNull();
-    dispatch([state], 5, 1100);
+    dispatch([state], 1100);
     expect(state.groups.map((item) => item.attempts[0]?.stepId)).toEqual(['research', 'research']);
   });
 
   it('returns to a step of the target on rejection', () => {
     const state = run(2, { split: true, configText: CONFIG });
     expect(state.split).toBeNull();
-    dispatch([state], 5, 1100);
+    dispatch([state], 1100);
     finish(state, 'done');
-    dispatch([state], 5, 1500);
+    dispatch([state], 1500);
     finish(state, 'rejected', { feedback: 'мало' });
-    dispatch([state], 5, 1600);
+    dispatch([state], 1600);
     expect(runningAttempt(state).stepId).toBe('research');
     expect(runningAttempt(state).input.feedback).toBe('мало');
   });

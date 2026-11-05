@@ -133,14 +133,39 @@ export function registerDaemon(program: Command, style: Style, io: CliIo): void 
     .command('stop')
     .description('Stop the daemon; refuses while agents run unless --force')
     .option('--force', 'stop the daemon together with its running agents')
-    .addHelpText('after', examples(['aip daemon stop', 'aip daemon stop --force'], style))
-    .action(async (options: { force?: boolean }) => {
+    .option(
+      '--web',
+      'keep serving the web panel in this process while the daemon is stopped; it hands the panel back once the daemon starts',
+    )
+    .addHelpText(
+      'after',
+      examples(['aip daemon stop', 'aip daemon stop --force', 'aip daemon stop --web'], style),
+    )
+    .action(async (options: { force?: boolean; web?: boolean }) => {
       const ctx = context(io, style);
       const result = await stopDaemon(ctx.socket, {
         force: options.force,
         lockPath: lockPath(ctx.stateDirectory),
       });
       reportStop(result);
+      if (!options.web || result.state === 'busy') return;
+      const { runStandbyPanel } = await import('./web/standby.ts');
+      const end = await runStandbyPanel({
+        socket: ctx.socket,
+        stateDirectory: ctx.stateDirectory,
+        entry: ctx.entry,
+        environment: io.env,
+        cwd: io.cwd,
+        pid: io.pid,
+        log: (line) => io.stderr(`${line}\n`),
+        stop: new Promise((resolve) => {
+          io.onSignal('SIGTERM', resolve);
+          io.onSignal('SIGINT', resolve);
+        }),
+        onListening: (url) =>
+          print(`aip web: ${url} (the daemon is stopped; Start brings it back)`),
+      });
+      print(end === 'handed_over' ? 'aip web: handed over to the daemon' : 'aip web: stopped');
     });
 
   command

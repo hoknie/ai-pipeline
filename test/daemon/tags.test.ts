@@ -42,13 +42,18 @@ async function start(config = WORKFLOW_CONFIG): Promise<Harness> {
   return current;
 }
 
-const tagsOf = async (h: Harness): Promise<TagView[]> => (await h.call('tags', {})) as TagView[];
+const tagsOf = async (h: Harness): Promise<TagView[]> =>
+  (await h.call('tags', { repository: h.repo })) as TagView[];
 const queueOf = async (h: Harness): Promise<QueueView> =>
   (await h.call('queue', { repository: h.repo })) as QueueView;
 const names = (tags: { name: string }[]) => tags.map((tag) => tag.name);
 
 async function addTag(h: Harness, name: string, color?: string): Promise<TagView[]> {
-  return (await h.call('tag_add', { name, ...(color ? { color } : {}) })) as TagView[];
+  return (await h.call('tag_add', {
+    repository: h.repo,
+    name,
+    ...(color ? { color } : {}),
+  })) as TagView[];
 }
 
 async function tagsWhen(h: Harness, done: (tags: TagView[]) => boolean): Promise<TagView[]> {
@@ -74,6 +79,45 @@ async function waitQueue(h: Harness, done: (queue: QueueView) => boolean): Promi
 const allRuns = async (h: Harness): Promise<RunView[]> =>
   ((await h.call('status', {})) as RunView[]).sort((a, b) => a.createdAt - b.createdAt);
 
+/** A second git repository next to the harness one, with the same config. */
+async function secondRepo(h: Harness): Promise<string> {
+  const other = join(h.repo, '..', 'lib');
+  mkdirSync(other, { recursive: true });
+  execFileSync('git', ['init', '-q', '-b', 'main', other]);
+  writeFileSync(join(other, 'x'), '1');
+  execFileSync('git', ['-C', other, 'add', '-A']);
+  execFileSync('git', [
+    '-C',
+    other,
+    '-c',
+    'user.name=T',
+    '-c',
+    'user.email=t@e.x',
+    'commit',
+    '-q',
+    '-m',
+    'i',
+  ]);
+  const { writeConfigDirectory } = await import('../fixtures/config.ts');
+  writeConfigDirectory(other, WORKFLOW_CONFIG);
+  return other;
+}
+
+/** A finished run of `feature` in `repository`. */
+async function finishedRun(h: Harness, repository: string, title: string): Promise<RunView> {
+  const added = (await h.call('queue_add', {
+    repository,
+    workflow: 'feature',
+    task: 'p',
+    title,
+  })) as QueueView & { item: string };
+  const created = (await h.call('queue_run_now', { repository, item: added.item })) as {
+    runId: string;
+  };
+  await h.waitFor(created.runId, (run) => run.finished);
+  return h.status(created.runId);
+}
+
 describe('tag catalog', () => {
   // The tests that only add and read tags share one daemon (the catalog is emptied after each
   // test); the one that restarts the daemon starts its own.
@@ -85,7 +129,8 @@ describe('tag catalog', () => {
     await shared.close();
   });
   afterEach(async () => {
-    for (const tag of await tagsOf(shared)) await shared.call('tag_remove', { tag: tag.name });
+    for (const tag of await tagsOf(shared))
+      await shared.call('tag_remove', { repository: shared.repo, tag: tag.name });
   });
 
   it('is empty at first', async () => {
@@ -124,9 +169,17 @@ describe('tag catalog', () => {
   it('renames a tag under the same id and changes the case of a name', async () => {
     const h = shared;
     const [created] = await addTag(h, 'auth', 'blue');
-    const renamed = (await h.call('tag_edit', { tag: 'auth', name: 'login' })) as TagView[];
+    const renamed = (await h.call('tag_edit', {
+      repository: h.repo,
+      tag: 'auth',
+      name: 'login',
+    })) as TagView[];
     expect(renamed).toEqual([{ ...created, name: 'login' }]);
-    const recased = (await h.call('tag_edit', { tag: 'LOGIN', name: 'Login' })) as TagView[];
+    const recased = (await h.call('tag_edit', {
+      repository: h.repo,
+      tag: 'LOGIN',
+      name: 'Login',
+    })) as TagView[];
     expect(recased[0]?.name).toBe('Login');
   });
 
@@ -139,48 +192,64 @@ describe('tag catalog', () => {
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth'],
     })) as RunQueued;
-    await h.call('tag_edit', { tag: 'auth', name: 'login', color: 'teal' });
+    await h.call('tag_edit', { repository: h.repo, tag: 'auth', name: 'login', color: 'teal' });
     const view = await h.status(queued.run!.runId);
     expect(view.tags).toMatchObject([{ name: 'login', color: 'teal' }]);
     await h.waitFor(view.id, (run) => run.finished);
   });
 
-  it('keeps one tag for tasks in two repositories', async () => {
+  it('keeps a separate catalog for every repository', async () => {
     const h = await start();
     await addTag(h, 'auth');
-    const other = join(h.repo, '..', 'lib');
-    mkdirSync(other, { recursive: true });
-    execFileSync('git', ['init', '-q', '-b', 'main', other]);
+    const other = await secondRepo(h);
+    // a tag of another repository is unknown here
+    expect(await h.call('tags', { repository: other })).toEqual([]);
+    await expect(
+      h.call('queue_add', { repository: other, workflow: 'feature', task: 'b', tags: ['auth'] }),
+    ).rejects.toThrow('unknown tag `auth`');
+    // the same name in both repositories gives two tags
+    const added = (await h.call('tag_add', {
+      repository: other,
+      name: 'AUTH',
+      color: 'pink',
+    })) as TagView[];
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({ name: 'AUTH', color: 'pink', repository: other });
+    const mine = (await tagsOf(h))[0]!;
+    expect(mine.repository).toBe(h.repo);
+    expect(mine.id).not.toBe(added[0]!.id);
     const first = (await h.call('queue_add', {
       repository: h.repo,
       workflow: 'feature',
       task: 'a',
       tags: ['auth'],
     })) as QueueView;
-    // a second repository with its own configuration
-    writeFileSync(join(other, 'x'), '1');
-    execFileSync('git', ['-C', other, 'add', '-A']);
-    execFileSync('git', [
-      '-C',
-      other,
-      '-c',
-      'user.name=T',
-      '-c',
-      'user.email=t@e.x',
-      'commit',
-      '-q',
-      '-m',
-      'i',
-    ]);
-    const { writeConfigDirectory } = await import('../fixtures/config.ts');
-    writeConfigDirectory(other, WORKFLOW_CONFIG);
     const second = (await h.call('queue_add', {
       repository: other,
       workflow: 'feature',
       task: 'b',
       tags: ['auth'],
     })) as QueueView;
-    expect(first.items[0]?.tags[0]?.id).toBe(second.items[0]?.tags[0]?.id);
+    expect(first.items[0]?.tags[0]?.id).toBe(mine.id);
+    expect(second.items[0]?.tags[0]?.id).toBe(added[0]!.id);
+    // removing the tag in one repository leaves the other one alone
+    await h.call('tag_remove', { repository: h.repo, tag: 'auth' });
+    expect(await tagsOf(h)).toEqual([]);
+    const kept = (await h.call('tags', { repository: other })) as TagView[];
+    expect(kept.map((tag) => tag.id)).toEqual([added[0]!.id]);
+    const queue = (await h.call('queue', { repository: other })) as QueueView;
+    expect(queue.items[0]?.tags.map((tag) => tag.id)).toEqual([added[0]!.id]);
+  });
+
+  it('puts all tags and the repository into the tags event', async () => {
+    const h = await start();
+    const events: StreamEvent[] = [];
+    void subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
+    await until('the snapshot', () => events.length > 0);
+    await addTag(h, 'auth');
+    await until('a tags event', () => events.some((event) => event.event === 'tags'));
+    const event = events.find((candidate) => candidate.event === 'tags');
+    expect(event).toMatchObject({ event: 'tags', repository: h.repo });
   });
 });
 
@@ -203,7 +272,7 @@ describe('tag removal', () => {
       task: 'x',
       tags: ['auth', 'v2'],
     });
-    const left = (await h.call('tag_remove', { tag: 'AUTH' })) as TagView[];
+    const left = (await h.call('tag_remove', { repository: h.repo, tag: 'AUTH' })) as TagView[];
     expect(names(left)).toEqual(['v2']);
     expect(names((await h.status(finished.runId)).tags)).toEqual(['v2']);
     expect(names((await queueOf(h)).items[0]!.tags)).toEqual(['v2']);
@@ -215,7 +284,9 @@ describe('tag removal', () => {
 
   it('rejects an unknown tag', async () => {
     const h = await start();
-    await expect(h.call('tag_remove', { tag: 'nope' })).rejects.toThrow('unknown tag `nope`');
+    await expect(h.call('tag_remove', { repository: h.repo, tag: 'nope' })).rejects.toThrow(
+      'unknown tag `nope`',
+    );
   });
 });
 
@@ -233,8 +304,8 @@ describe('tag events', () => {
       snapshot?.event === 'snapshot' ? names(snapshot.tags as unknown as TagView[]) : null,
     ).toEqual(['old']);
     await addTag(h, 'auth');
-    await h.call('tag_edit', { tag: 'auth', color: 'teal' });
-    await h.call('tag_remove', { tag: 'old' });
+    await h.call('tag_edit', { repository: h.repo, tag: 'auth', color: 'teal' });
+    await h.call('tag_remove', { repository: h.repo, tag: 'old' });
     await until('three tags events', () => events.filter((e) => e.event === 'tags').length >= 3);
     const tagEvents = events.filter((event) => event.event === 'tags');
     expect(
@@ -363,7 +434,7 @@ describe('tags of tasks', () => {
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth', 'v2'],
     })) as QueueView & { item: string };
-    await h.call('tag_remove', { tag: 'auth' });
+    await h.call('tag_remove', { repository: h.repo, tag: 'auth' });
     const created = (await h.call('queue_run_now', {
       repository: h.repo,
       item: added.item,
@@ -564,7 +635,7 @@ describe('tags of tasks from a specialist', () => {
     const explore = await exploreNow(h, undefined);
     await h.waitFor(explore, (run) => run.finished);
     const [auto] = await tagsOf(h);
-    await h.call('tag_remove', { tag: auto?.name ?? '' });
+    await h.call('tag_remove', { repository: h.repo, tag: auto?.name ?? '' });
     expect(await tagsOf(h)).toEqual([]);
     for (const item of (await queueOf(h)).items) expect(item.tags).toEqual([]);
     expect((await h.status(explore)).tags).toEqual([]);
@@ -590,7 +661,7 @@ describe('tags of tasks from a specialist', () => {
     })) as { runId: string };
     const first = await tagsWhen(h, (tags) => tags.length === 1);
     expect(names(first)).toEqual(['fix-login']);
-    await h.call('tag_remove', { tag: 'fix-login' });
+    await h.call('tag_remove', { repository: h.repo, tag: 'fix-login' });
     h.open('second');
     await h.waitFor(created.runId, (run) => run.finished);
     const catalog = await tagsOf(h);
@@ -841,13 +912,17 @@ describe('tags of linked tasks', () => {
     const { h } = await chain();
     await expect(addTag(h, 'x', 'indigo')).rejects.toThrow('reserved for linked task tags');
     await addTag(h, 'plain');
-    await expect(h.call('tag_edit', { tag: 'plain', color: 'indigo' })).rejects.toThrow(
-      'reserved for linked task tags',
-    );
-    await expect(h.call('tag_edit', { tag: 'fix-login', color: 'red' })).rejects.toThrow(
-      'linked task tag color cannot be changed',
-    );
-    const renamed = (await h.call('tag_edit', { tag: 'fix-login', name: 'login' })) as TagView[];
+    await expect(
+      h.call('tag_edit', { repository: h.repo, tag: 'plain', color: 'indigo' }),
+    ).rejects.toThrow('reserved for linked task tags');
+    await expect(
+      h.call('tag_edit', { repository: h.repo, tag: 'fix-login', color: 'red' }),
+    ).rejects.toThrow('linked task tag color cannot be changed');
+    const renamed = (await h.call('tag_edit', {
+      repository: h.repo,
+      tag: 'fix-login',
+      name: 'login',
+    })) as TagView[];
     expect(renamed.find((tag) => tag.name === 'login')).toMatchObject({ color: 'indigo' });
   });
 });
@@ -1119,5 +1194,98 @@ describe('linked task tag of every task from a specialist', () => {
     expect(deeper![1]).toBe(first);
     expect(deeper![0]).not.toBe(first);
     expect(ids.has(deeper![0]!)).toBe(true);
+  });
+});
+
+describe('tags of several repositories', () => {
+  it('puts the tag of the own repository on a run and refuses a tag of another one', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    await addTag(h, 'only-here');
+    const other = await secondRepo(h);
+    const added = (await h.call('tag_add', { repository: other, name: 'auth' })) as TagView[];
+    const run = await finishedRun(h, other, 'Task');
+    const tagged = (await h.call('run_tags', { runId: run.id, add: ['auth'] })) as RunView;
+    expect(tagged.tags.map((tag) => tag.id)).toEqual([added[0]!.id]);
+    await expect(h.call('run_tags', { runId: run.id, add: ['only-here'] })).rejects.toThrow(
+      'unknown tag `only-here`',
+    );
+    await expect(h.call('run_tags', { runId: run.id, remove: ['only-here'] })).rejects.toThrow(
+      'unknown tag `only-here`',
+    );
+  });
+
+  it('names a linked task tag without a suffix when the name is taken in another repository', async () => {
+    const h = await start();
+    await addTag(h, 'fix-login');
+    const other = await secondRepo(h);
+    const parent = await finishedRun(h, other, 'Fix login');
+    await h.call('queue_add', {
+      repository: other,
+      workflow: 'feature',
+      task: 'child',
+      parent: parent.id,
+    });
+    const linked = ((await h.call('tags', { repository: other })) as TagView[]).filter(
+      (tag) => tag.task,
+    );
+    expect(names(linked)).toEqual(['fix-login']);
+    expect(names(await tagsOf(h))).toEqual(['fix-login']);
+  });
+
+  it('renames a tag to a name used only in another repository', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    await addTag(h, 'login');
+    const other = await secondRepo(h);
+    await h.call('tag_add', { repository: other, name: 'taken' });
+    const renamed = (await h.call('tag_edit', {
+      repository: h.repo,
+      tag: 'login',
+      name: 'taken',
+    })) as TagView[];
+    expect(names(renamed)).toEqual(['auth', 'taken']);
+    await expect(
+      h.call('tag_edit', { repository: h.repo, tag: 'auth', name: 'TAKEN' }),
+    ).rejects.toThrow('already exists');
+  });
+
+  it('takes the default color from the catalog of the own repository', async () => {
+    const h = await start();
+    await addTag(h, 'a');
+    await addTag(h, 'b');
+    const other = await secondRepo(h);
+    const first = (await h.call('tag_add', { repository: other, name: 'x' })) as TagView[];
+    const mine = (await tagsOf(h))[0]!;
+    expect(first[0]!.color).toBe(mine.color);
+  });
+
+  it('gives no tag and creates none for a parent from another repository', async () => {
+    const h = await start();
+    const other = await secondRepo(h);
+    const parent = await finishedRun(h, other, 'Fix login');
+    const view = (await h.call('queue_add', {
+      repository: h.repo,
+      workflow: 'feature',
+      task: 'child',
+      parent: parent.id,
+    })) as QueueView;
+    expect(view.items[0]!.tags).toEqual([]);
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: view.items[0]!.id,
+      parent: parent.id,
+    })) as QueueView;
+    expect(edited.items[0]!.tags).toEqual([]);
+    const run = (await h.call('run', {
+      repository: h.repo,
+      workflow: 'feature',
+      task: 'x',
+      parent: parent.id,
+    })) as RunQueued;
+    expect(run.item).toBeTruthy();
+    expect(await h.call('tags', { repository: other })).toEqual([]);
+    expect(await tagsOf(h)).toEqual([]);
+    expect((await h.status(parent.id)).tags).toEqual([]);
   });
 });

@@ -187,6 +187,74 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   );
   `,
+  `
+  ALTER TABLE groups ADD COLUMN human_only TEXT;
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS artifacts (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES runs (id) ON DELETE CASCADE,
+    group_slug TEXT NOT NULL,
+    step_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    specialist TEXT NOT NULL,
+    title TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    uri TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE (run_id, group_slug, seq, file_name)
+  );
+  CREATE INDEX IF NOT EXISTS artifacts_group ON artifacts (run_id, group_slug);
+  `,
+  `
+  CREATE TEMP TABLE tag_use (tag TEXT NOT NULL, repository TEXT NOT NULL, source INTEGER NOT NULL);
+  INSERT INTO tag_use SELECT j.value, r.repository, 0 FROM runs r, json_each(r.tags_json) j;
+  INSERT INTO tag_use SELECT j.value, q.repository, 0 FROM queue_items q, json_each(q.tags_json) j;
+  INSERT INTO tag_use SELECT t.id, r.repository, 1 FROM tags t JOIN runs r ON r.id = t.task_run;
+  INSERT INTO tag_use
+    SELECT t.id, p.path, 0 FROM tags t, repositories p
+    WHERE t.task_run IS NULL AND NOT EXISTS (SELECT 1 FROM tag_use u WHERE u.tag = t.id);
+  CREATE TEMP TABLE tag_map AS
+    SELECT tag, repository, CASE WHEN rn = 1 THEN tag ELSE tag || '-' || rn END AS new_id
+    FROM (
+      SELECT u.tag AS tag, u.repository AS repository,
+             ROW_NUMBER() OVER (PARTITION BY u.tag ORDER BY u.source DESC, u.repository) AS rn
+      FROM (
+        SELECT tag, repository, MAX(source) AS source FROM tag_use
+        WHERE tag IN (SELECT id FROM tags) GROUP BY tag, repository
+      ) u
+    );
+  CREATE TABLE tags_split (
+    id TEXT PRIMARY KEY,
+    repository TEXT NOT NULL,
+    name TEXT NOT NULL,
+    color TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    task_run TEXT,
+    task_number INTEGER
+  );
+  INSERT INTO tags_split (id, repository, name, color, created_at, task_run, task_number)
+    SELECT m.new_id, m.repository, t.name, t.color, t.created_at, t.task_run, t.task_number
+    FROM tag_map m JOIN tags t ON t.id = m.tag;
+  UPDATE runs SET tags_json = (
+    SELECT COALESCE(json_group_array(new_id ORDER BY k), '[]') FROM (
+      SELECT m.new_id AS new_id, j.key AS k FROM json_each(runs.tags_json) j
+      JOIN tag_map m ON m.tag = j.value AND m.repository = runs.repository
+    )
+  );
+  UPDATE queue_items SET tags_json = (
+    SELECT COALESCE(json_group_array(new_id ORDER BY k), '[]') FROM (
+      SELECT m.new_id AS new_id, j.key AS k FROM json_each(queue_items.tags_json) j
+      JOIN tag_map m ON m.tag = j.value AND m.repository = queue_items.repository
+    )
+  );
+  DROP TABLE tags;
+  ALTER TABLE tags_split RENAME TO tags;
+  CREATE INDEX tags_by_repository ON tags (repository);
+  DROP TABLE tag_map;
+  DROP TABLE tag_use;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

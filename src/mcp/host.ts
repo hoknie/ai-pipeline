@@ -221,7 +221,8 @@ export function createHostServer(options: HostOptions): McpServer {
     'swarm_answer',
     {
       title: 'Answer a question from a specialist',
-      description: 'Answer a group in needs_human; the same step runs again with the answer.',
+      description:
+        'Answer a group in needs_human; the same step runs again with the answer. A group with humanOnly (a human review or a specialist asking for a person) is answered only with the words of the user: never invent the answer or accept on their behalf.',
       inputSchema: { run_id: runId, group, answer: z.string().min(1) },
     },
     ({ run_id, group: slug, answer }) =>
@@ -577,7 +578,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Pause a run',
       description:
-        'Pause an unfinished run. The step in progress finishes and is committed, no new step starts, and the run moves to the end of its queue and frees its place. Continue it with swarm_queue_run_now on its queue item: it goes on from the next step.',
+        'Pause an unfinished run. The running agents are stopped, no new step starts, and the run moves to the end of its queue and frees its place. Continue it with swarm_queue_run_now on its queue item: the interrupted step goes on in the same session.',
       inputSchema: {
         run_id: runId,
         repo: z

@@ -144,6 +144,38 @@ describe('requests', () => {
   });
 });
 
+describe('artifact requests', () => {
+  const parse = (method: string, params: object) =>
+    requestSchema.safeParse({ method, params }).success;
+
+  it('takes content or a path, never both and never neither', () => {
+    const base = { token: 't', fileName: 'report.md' };
+    expect(parse('artifact_publish', { ...base, content: '# x' })).toBe(true);
+    expect(parse('artifact_publish', { ...base, path: 'out/report.md', title: 'Итог' })).toBe(true);
+    expect(parse('artifact_publish', base)).toBe(false);
+    expect(parse('artifact_publish', { ...base, content: 'x', path: 'a' })).toBe(false);
+  });
+
+  it('refuses a too long content, a path in the name and a missing token', () => {
+    const base = { token: 't', fileName: 'report.md' };
+    expect(parse('artifact_publish', { ...base, content: 'x'.repeat(1024 * 1024) })).toBe(true);
+    expect(parse('artifact_publish', { ...base, content: 'x'.repeat(1024 * 1024 + 1) })).toBe(
+      false,
+    );
+    expect(parse('artifact_publish', { ...base, fileName: '../x.md', content: 'x' })).toBe(false);
+    expect(parse('artifact_publish', { ...base, fileName: 'a/x.md', content: 'x' })).toBe(false);
+    expect(parse('artifact_publish', { fileName: 'a.md', content: 'x' })).toBe(false);
+    expect(parse('artifact_publish', { ...base, title: ' ', content: 'x' })).toBe(false);
+  });
+
+  it('parses the list and the content requests', () => {
+    expect(parse('group_artifacts', { runId: 'r', group: 'g' })).toBe(true);
+    expect(parse('group_artifacts', { runId: 'r' })).toBe(false);
+    expect(parse('artifact', { runId: 'r', group: 'g', id: 'a' })).toBe(true);
+    expect(parse('artifact', { runId: 'r', group: 'g' })).toBe(false);
+  });
+});
+
 describe('client', () => {
   function server(answer: (line: string) => string): string {
     const path = join(mkdtempSync(join(tmpdir(), 'aip-ipc-')), 's.sock');
@@ -502,20 +534,42 @@ describe('tag requests', () => {
   const bad = (method: string, params: Record<string, unknown>) =>
     expect('error' in parse(method, params)).toBe(true);
 
-  it('accepts the catalog methods', () => {
-    ok('tags', {});
-    ok('tag_add', { name: 'auth' });
-    ok('tag_add', { name: 'auth', color: 'blue' });
-    ok('tag_edit', { tag: 'auth', name: 'login' });
-    ok('tag_edit', { tag: 'auth', color: 'teal' });
-    bad('tag_edit', { tag: 'auth' });
-    ok('tag_remove', { tag: 'auth' });
-    bad('tag_remove', {});
+  it('accepts the catalog methods with a repository', () => {
+    const repository = '/r';
+    ok('tags', { repository });
+    ok('tag_add', { repository, name: 'auth' });
+    ok('tag_add', { repository, name: 'auth', color: 'blue' });
+    ok('tag_edit', { repository, tag: 'auth', name: 'login' });
+    ok('tag_edit', { repository, tag: 'auth', color: 'teal' });
+    bad('tag_edit', { repository, tag: 'auth' });
+    ok('tag_remove', { repository, tag: 'auth' });
+    bad('tag_remove', { repository });
+  });
+
+  it('rejects the catalog methods without a repository, naming the field', () => {
+    for (const [method, params] of [
+      ['tags', {}],
+      ['tag_add', { name: 'auth' }],
+      ['tag_edit', { tag: 'auth', name: 'login' }],
+      ['tag_remove', { tag: 'auth' }],
+    ] as const) {
+      bad(method, params);
+      expect(JSON.stringify(parse(method, params))).toContain('repository');
+    }
   });
 
   it('accepts run_skip only with a boolean skip', () => {
     ok('run_skip', { runId: 'r', step: 'qa', skip: true });
     bad('run_skip', { runId: 'r', step: 'qa' });
+  });
+
+  it('takes a trimmed title of 1 to 60 characters in run_title', () => {
+    ok('run_title', { runId: 'r', title: ' Вход ' });
+    ok('run_title', { runId: 'r', title: 'x'.repeat(60) });
+    bad('run_title', { runId: 'r', title: '' });
+    bad('run_title', { runId: 'r', title: '   ' });
+    bad('run_title', { runId: 'r', title: 'x'.repeat(61) });
+    bad('run_title', { title: 'x' });
   });
 
   it('needs something to add or remove in run_tags', () => {
@@ -550,6 +604,10 @@ describe('stream events of tags', () => {
   it('parses the tags event and a snapshot with and without the catalog', () => {
     expect(
       streamEventSchema.safeParse({ event: 'tags', seq: 1, tags: [{ id: 'a' }] }).success,
+    ).toBe(true);
+    expect(
+      streamEventSchema.safeParse({ event: 'tags', seq: 1, repository: '/r', tags: [{ id: 'a' }] })
+        .success,
     ).toBe(true);
     const snapshot = { event: 'snapshot', seq: 1, runs: [] };
     expect(streamEventSchema.safeParse(snapshot).success).toBe(true);
@@ -629,5 +687,34 @@ describe('background processes', () => {
     expect(
       'error' in parseRequest(JSON.stringify({ id: 3, method: 'process_kill', params: { pid } })),
     ).toBe(true);
+  });
+});
+
+describe('specialist tag requests', () => {
+  const parse = (method: string, params: object) =>
+    requestSchema.safeParse({ method, params }).success;
+
+  it('accepts the shared level as a null repository', () => {
+    expect(parse('specialist_tags', {})).toBe(true);
+    expect(
+      parse('specialist_tags_set', { repository: null, slug: 'qa', tags: [], revision: null }),
+    ).toBe(true);
+    expect(parse('specialist_tag_rename', { repository: '/repo', from: 'a', to: 'b' })).toBe(true);
+    expect(parse('specialist_tag_remove', { repository: null, tag: 'a' })).toBe(true);
+  });
+
+  it('rejects a slug that is not a slug and a missing level', () => {
+    expect(
+      parse('specialist_tags_set', { repository: null, slug: '../x', tags: [], revision: null }),
+    ).toBe(false);
+    expect(parse('specialist_tag_remove', { tag: 'a' })).toBe(false);
+    expect(parse('specialist_tag_rename', { repository: '/repo', from: '', to: 'b' })).toBe(false);
+  });
+
+  it('takes an import with at least one slug', () => {
+    const base = { repository: '/app', source: '/lib', slugs: ['coder'] };
+    expect(parse('specialists_import', base)).toBe(true);
+    expect(parse('specialists_import', { ...base, slugs: [] })).toBe(false);
+    expect(parse('specialists_import', { ...base, slugs: ['Bad Slug'] })).toBe(false);
   });
 });

@@ -16,7 +16,7 @@ export function duration(milliseconds: number): string {
 }
 
 export function cost(usage: { costUsd: number | null } | null | undefined): string {
-  if (!usage || usage.costUsd === null) return '';
+  if (!usage || usage.costUsd === null || usage.costUsd === 0) return '';
   return `$${usage.costUsd.toFixed(2)}`;
 }
 
@@ -160,6 +160,15 @@ export function formatMemory(bytes: number, t: TFunction, locale: string): strin
   if (bytes >= 1024 ** 3) return `${number(bytes / 1024 ** 3, 1)} ${t('format.unitGb')}`;
   if (bytes >= 1024 ** 2) return `${number(bytes / 1024 ** 2, 0)} ${t('format.unitMb')}`;
   return `${number(bytes / 1024, 0)} ${t('format.unitKb')}`;
+}
+
+/** Size of a file: bytes, KB or MB with one decimal (1024-based), in the language of the panel. */
+export function formatBytes(bytes: number, t: TFunction, locale: string): string {
+  const number = (value: number) =>
+    new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(value);
+  if (bytes >= 1024 ** 2) return `${number(bytes / 1024 ** 2)} ${t('format.unitMb')}`;
+  if (bytes >= 1024) return `${number(bytes / 1024)} ${t('format.unitKb')}`;
+  return `${bytes} ${t('format.unitB')}`;
 }
 
 /** `14:32:05`: clock time with seconds, for a line of a log. */

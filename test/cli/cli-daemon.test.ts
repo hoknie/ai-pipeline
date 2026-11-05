@@ -675,6 +675,38 @@ describe('cli', () => {
     expect(JSON.parse(list.stdout)).toEqual([]);
   });
 
+  it('keeps a separate catalog for every repository, chosen with --repo', async () => {
+    const box = sandbox();
+    await aipFast(box, 'tag', 'add', 'auth', '--color', 'blue');
+    const second = realpathSync(mkdtempSync(join(tmpdir(), 'aip-second-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', second]);
+    expect((await aipFast(box, 'tag', 'list', '--repo', second)).stdout).toContain('No tags yet.');
+    const added = await aipFast(box, 'tag', 'add', 'auth', '-r', second, '--color', 'pink');
+    expect(added.code).toBe(0);
+    expect(added.stdout).toMatch(/auth\s+pink/);
+    expect((await aipFast(box, 'tag', 'list')).stdout).toMatch(/auth\s+blue/);
+    // a tag of one repository is unknown in the other
+    await aipFast(box, 'tag', 'add', 'only-here', '--repo', second);
+    const unknown = await aipFast(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'x',
+      '--tag',
+      'only-here',
+    );
+    expect(unknown.code).not.toBe(0);
+    expect(unknown.stderr).toContain('unknown tag `only-here`');
+    const removed = await aipFast(box, 'tag', 'remove', 'auth', '--repo', second);
+    expect(removed.stdout).toContain('only-here');
+    expect((await aipFast(box, 'tag', 'list')).stdout).toMatch(/auth\s+blue/);
+    const help = (await aipFast(box, 'tag', '--help')).stdout.replace(/\s+/g, ' ');
+    expect(help).toContain('every repository has its own catalog');
+    expect(help).not.toContain('one catalog for all repositories');
+  });
+
   it('creates, lists, edits and removes tags', async () => {
     const box = sandbox();
     expect((await aipFast(box, 'tag', 'list')).stdout).toContain('No tags yet.');

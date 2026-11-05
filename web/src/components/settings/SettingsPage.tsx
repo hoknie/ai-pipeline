@@ -182,7 +182,9 @@ export default function SettingsPage({
             {failure ? <Alert variant="destructive">{failure}</Alert> : null}
             {group !== 'tags' && config ? <ConfigErrors errors={errors.get(group) ?? []} /> : null}
             {group === 'tags' ? (
-              <TagsSettings api={api} />
+              repository === null ? null : (
+                <TagsSettings api={api} repository={repository} />
+              )
             ) : group === 'queue' ? (
               queue ? (
                 <QueueModes

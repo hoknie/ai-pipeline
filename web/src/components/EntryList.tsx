@@ -45,12 +45,12 @@ export function EntryList({
             title={entry.hint}
             onClick={() => onSelect(entry.id)}
           >
-            <span className="flex items-center justify-between gap-2">
-              <span className="min-w-0 truncate font-medium">{entry.title}</span>
-              {entry.tag ? <Badge variant="outline">{entry.tag}</Badge> : null}
-            </span>
-            {entry.subtitle ? (
-              <span className="truncate text-xs text-muted-foreground">{entry.subtitle}</span>
+            <span className="min-w-0 truncate font-medium">{entry.title}</span>
+            {entry.tag || entry.subtitle ? (
+              <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                {entry.tag ? <Badge variant="outline">{entry.tag}</Badge> : null}
+                {entry.subtitle ? <span className="min-w-0 truncate">{entry.subtitle}</span> : null}
+              </span>
             ) : null}
             {entry.extra}
           </button>

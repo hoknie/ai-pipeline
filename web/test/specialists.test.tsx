@@ -207,6 +207,7 @@ describe('specialist form', () => {
       skills: ['a', '', ' b '],
       max: '2',
       prompt: '',
+      tags: [],
     };
     expect(valueOf(draft, raw)).toEqual({
       name: 'Кодировщик',
@@ -294,8 +295,8 @@ describe('creating, copying and deleting', () => {
     ).toBeTruthy();
   });
 
-  it('opens a global specialist for editing and writes it with level global', async () => {
-    const writeSpecialist = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
+  it('opens a global specialist read only, without save and remove', async () => {
+    const writeSpecialist = vi.fn();
     const config = vi.fn(async () =>
       configView({
         specialists: [
@@ -305,13 +306,20 @@ describe('creating, copying and deleting', () => {
     );
     render(<Page api={fakeApi({ config, writeSpecialist })} start="qa" />);
     const name = (await screen.findByLabelText('Name')) as HTMLInputElement;
+    expect(name.disabled).toBe(true);
+    expect(screen.getByText(/shared specialist: it is view only/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Override in the project' })).toBeTruthy();
+    expect(writeSpecialist).not.toHaveBeenCalled();
+  });
+
+  it('keeps a project specialist editable', async () => {
+    render(<Page api={fakeApi({ config: async () => twoLevels() })} start="coder" />);
+    const name = (await screen.findByLabelText('Name')) as HTMLInputElement;
     expect(name.disabled).toBe(false);
-    expect(screen.getByText(/applies in every repository/)).toBeTruthy();
-    fireEvent.change(name, { target: { value: 'QA2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() =>
-      expect(writeSpecialist).toHaveBeenCalledWith('qa', { name: 'QA2' }, 'rev-qa', 'global'),
-    );
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+    expect(screen.queryByText(/shared specialist: it is view only/)).toBeNull();
   });
 
   it('overrides a global specialist in the project', async () => {
@@ -400,9 +408,17 @@ describe('creating, copying and deleting', () => {
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Общий'),
     );
     expect(screen.getByText(/the project file overrides it/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete', hidden: false }));
-    await waitFor(() => expect(deleteSpecialist).toHaveBeenCalledWith('qa', 'g', 'global'));
+    // the shared file is view only: it cannot be deleted from here
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'Project' }));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Проект'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Remove the override|Delete/ }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Remove the override|Delete/, hidden: false }),
+    );
+    await waitFor(() => expect(deleteSpecialist).toHaveBeenCalledWith('qa', 'p', 'project'));
   });
 
   it('asks before switching the level with unsaved edits', async () => {
@@ -746,5 +762,332 @@ describe('form width', () => {
     render(<Page api={fakeApi()} start="coder" />);
     const root = await screen.findByRole('region', { name: 'specialist coder' });
     expect(root.className).not.toMatch(/max-w-|mx-auto/);
+  });
+});
+
+describe('specialist filters', () => {
+  const fleet = () =>
+    configView({
+      specialists: [
+        specialistEntry(
+          'coder',
+          {},
+          { runtime: 'claude', model: 'opus', allow_commands: ['npm test*'] },
+        ),
+        specialistEntry(
+          'plan',
+          { level: 'global', file: '/xdg/aip/specialists/plan.yaml', revision: null },
+          { runtime: 'opencode', model: 'x/y', allow_commands: ['npm test*'] },
+        ),
+        specialistEntry(
+          'qa',
+          { level: 'project_over_global' },
+          { runtime: 'claude', tools: ['Bash'] },
+        ),
+      ],
+    });
+  const rows = () =>
+    within(screen.getByRole('list', { name: 'specialists' }))
+      .getAllByRole('listitem')
+      .map((row) => row.textContent ?? '');
+  const openPanel = async () => {
+    const button = await screen.findByRole('button', { name: /^Filters/ });
+    if (button.getAttribute('aria-expanded') !== 'true') fireEvent.click(button);
+  };
+  const pick = async (label: string, name: string) => {
+    await openPanel();
+    fireEvent.click(await screen.findByRole('combobox', { name: label }));
+    fireEvent.click(await screen.findByRole('option', { name }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  };
+  const api = () => fakeApi({ config: vi.fn(async () => fleet()) });
+
+  beforeEach(() => window.localStorage.clear());
+
+  it('searches by name and by slug without case', async () => {
+    render(<Page api={api()} />);
+    const search = await screen.findByRole('searchbox', { name: 'Search specialists' });
+    fireEvent.change(search, { target: { value: ' CODER ' } });
+    expect(rows()).toHaveLength(1);
+    fireEvent.change(search, { target: { value: 'pla' } });
+    expect(rows()[0]).toContain('plan');
+  });
+
+  it('filters by level; an override fits both', async () => {
+    render(<Page api={api()} />);
+    await screen.findByRole('searchbox', { name: 'Search specialists' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Project only' }));
+    expect(rows()).toHaveLength(2);
+    fireEvent.click(screen.getByRole('radio', { name: 'Shared only' }));
+    expect(rows()).toHaveLength(2);
+    expect(rows().some((row) => row.includes('coder'))).toBe(false);
+  });
+
+  it('combines filters with AND and shows the count on the button', async () => {
+    render(<Page api={api()} />);
+    await pick('Runtimes', 'claude');
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await pick('Commands', 'npm test*');
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0]).toContain('coder');
+    expect(screen.getByRole('button', { name: 'Filters (2)' })).toBeTruthy();
+    expect(window.localStorage.getItem('aip.web.specialistFilters')).toContain('npm test*');
+  });
+
+  it('shows field values without a group heading', async () => {
+    render(<Page api={api()} />);
+    await openPanel();
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Runtimes' }));
+    expect(await screen.findByRole('option', { name: 'claude' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'opencode' })).toBeTruthy();
+    expect(screen.queryByText('Project')).toBeNull();
+  });
+
+  it('ignores a malformed saved choice', async () => {
+    window.localStorage.setItem(
+      'aip.web.specialistFilters',
+      JSON.stringify({ '/repo': { runtimes: 'x', level: 'bogus' } }),
+    );
+    render(<Page api={api()} />);
+    await screen.findByRole('searchbox', { name: 'Search specialists' });
+    expect(rows().length).toBeGreaterThan(0);
+  });
+
+  it('hides a list nobody has values for', async () => {
+    render(<Page api={api()} />);
+    await openPanel();
+    expect(screen.getByRole('combobox', { name: 'Tools' })).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Skills' })).toBeNull();
+  });
+
+  it('remembers the filters but not the search, and resets everything', async () => {
+    const shared = api();
+    const view = render(<Page api={shared} />);
+    await pick('Models', 'opus');
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search specialists' }), {
+      target: { value: 'zzz' },
+    });
+    expect(rows).toThrow();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(rows()).toHaveLength(3);
+    expect(
+      (screen.getByRole('searchbox', { name: 'Search specialists' }) as HTMLInputElement).value,
+    ).toBe('');
+    await pick('Models', 'opus');
+    view.unmount();
+    render(<Page api={shared} />);
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(
+      (screen.getByRole('searchbox', { name: 'Search specialists' }) as HTMLInputElement).value,
+    ).toBe('');
+  });
+
+  it('keeps the open form when the filter hides it', async () => {
+    window.localStorage.setItem(
+      'aip.web.specialistFilters',
+      JSON.stringify({ '/repo': { runtimes: ['opencode'] } }),
+    );
+    render(<Page api={api()} start="coder" />);
+    await screen.findByRole('region', { name: 'specialist coder' });
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toContain('plan');
+  });
+});
+
+describe('specialist tags', () => {
+  const tagged = () =>
+    configView({
+      specialists: [
+        specialistEntry('coder', { shared_tags: ['backend'], own_tags: ['legacy'] }),
+        specialistEntry('plan', { own_tags: ['fast'] }),
+        specialistEntry('qa'),
+      ],
+    });
+  const listRows = () =>
+    within(screen.getByRole('list', { name: 'specialists' }))
+      .getAllByRole('listitem')
+      .map((row) => row.textContent ?? '');
+  const openPanel = async () => {
+    const button = await screen.findByRole('button', { name: /^Filters/ });
+    if (button.getAttribute('aria-expanded') !== 'true') fireEvent.click(button);
+  };
+  const pick = async (name: string, label = 'Tags') => {
+    await openPanel();
+    fireEvent.click(await screen.findByRole('combobox', { name: label }));
+    fireEvent.click(await screen.findByRole('option', { name }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  };
+
+  beforeEach(() => window.localStorage.clear());
+
+  it('shows the shared tag with a mark and the own tag without one', async () => {
+    render(<Page api={fakeApi({ config: vi.fn(async () => tagged()) })} />);
+    const chips = await screen.findByTestId('tags-coder');
+    const shared = within(chips).getByText('backend').closest('[data-shared]');
+    expect(shared?.getAttribute('title')).toContain('Shared tag');
+    expect(within(chips).getByText('Shared:')).toBeTruthy();
+    expect(within(chips).getByText('legacy').closest('[data-shared]')).toBeNull();
+    expect(screen.queryByTestId('tags-qa')).toBeNull();
+  });
+
+  it('keeps specialists that have any of the chosen tags and remembers the choice', async () => {
+    const api = fakeApi({ config: vi.fn(async () => tagged()) });
+    const view = render(<Page api={api} />);
+    await screen.findByTestId('tags-coder');
+    expect(listRows()).toHaveLength(3);
+    await pick('backend');
+    await pick('fast');
+    await waitFor(() => expect(listRows()).toHaveLength(2));
+    expect(listRows().some((row) => row.includes('QA'))).toBe(false);
+    expect(window.localStorage.getItem('aip.web.specialistTags')).toBe(
+      JSON.stringify({ '/repo': ['backend', 'fast'] }),
+    );
+    view.unmount();
+    render(<Page api={api} />);
+    await screen.findByTestId('tags-plan');
+    expect(listRows()).toHaveLength(2);
+  });
+
+  it('drops a chosen tag that nobody has any more', async () => {
+    window.localStorage.setItem(
+      'aip.web.specialistTags',
+      JSON.stringify({ '/repo': ['gone', 'fast'] }),
+    );
+    render(<Page api={fakeApi({ config: vi.fn(async () => tagged()) })} />);
+    await screen.findByTestId('tags-plan');
+    expect(listRows()).toHaveLength(1);
+    await waitFor(() =>
+      expect(window.localStorage.getItem('aip.web.specialistTags')).toBe(
+        JSON.stringify({ '/repo': ['fast'] }),
+      ),
+    );
+  });
+
+  it('keeps the open form when the filter hides it and offers to reset the filter', async () => {
+    window.localStorage.setItem('aip.web.specialistTags', JSON.stringify({ '/repo': ['fast'] }));
+    render(<Page api={fakeApi({ config: vi.fn(async () => tagged()) })} start="qa" />);
+    await screen.findByTestId('tags-plan');
+    expect(screen.getByRole('region', { name: 'specialist qa' })).toBeTruthy();
+    expect(listRows().some((row) => row.includes('QA'))).toBe(false);
+  });
+
+  it('shows an empty result with a reset button', async () => {
+    window.localStorage.setItem('aip.web.specialistTags', JSON.stringify({ '/repo': ['legacy'] }));
+    const view = configView({
+      specialists: [specialistEntry('coder', { own_tags: ['legacy'] })],
+    });
+    render(<Page api={fakeApi({ config: vi.fn(async () => view) })} />);
+    await screen.findByTestId('tags-coder');
+    await openPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove legacy' }));
+    // nothing chosen: every specialist is back
+    expect(listRows()).toHaveLength(1);
+  });
+
+  it('shows shared tags in the form read only with a link to the settings', async () => {
+    const view = configView({
+      specialists: [
+        specialistEntry('coder', {
+          raw: { name: 'Кодировщик', tags: ['legacy'] },
+          shared_tags: ['backend'],
+          own_tags: ['legacy'],
+        }),
+      ],
+    });
+    render(<Page api={fakeApi({ config: vi.fn(async () => view) })} start="coder" />);
+    const field = await screen.findByTestId('specialist-tags');
+    const shared = within(field).getByRole('list', { name: 'shared tags' });
+    expect(within(shared).getByText('backend')).toBeTruthy();
+    expect(within(shared).queryByRole('button')).toBeNull();
+    expect(within(field).queryByRole('link', { name: 'Manage shared tags' })).toBeNull();
+    expect(within(field).getByRole('button', { name: 'Remove legacy' })).toBeTruthy();
+  });
+
+  it('writes own tags to the project file', async () => {
+    const writeSpecialist = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 'n',
+      file: '/f',
+    }));
+    const view = configView({
+      specialists: [
+        specialistEntry('coder', {
+          raw: { name: 'Кодировщик', tags: ['legacy'] },
+          shared_tags: ['backend'],
+          own_tags: ['legacy'],
+        }),
+      ],
+    });
+    render(
+      <Page api={fakeApi({ writeSpecialist, config: vi.fn(async () => view) })} start="coder" />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove legacy' }));
+    fireEvent.click(within(screen.getByTestId('specialist-tags')).getByRole('combobox'));
+    fireEvent.change(await screen.findByRole('combobox', { name: /Search in Tags/ }), {
+      target: { value: 'slow' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /slow/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
+    expect(writeSpecialist.mock.calls[0]).toEqual([
+      'coder',
+      { name: 'Кодировщик', tags: ['slow'] },
+      'rev-coder',
+      'project',
+    ]);
+  });
+
+  it('shows the tags of a shared file and cannot edit them', async () => {
+    const writeSpecialist = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 'n',
+      file: '/f',
+    }));
+    const view = configView({
+      specialists: [
+        specialistEntry('qa', {
+          level: 'global',
+          file: '/xdg/aip/specialists/qa.yaml',
+          revision: null,
+          raw: { name: 'QA', tags: ['review'] },
+          shared_tags: ['review'],
+        }),
+      ],
+    });
+    render(<Page api={fakeApi({ writeSpecialist, config: vi.fn(async () => view) })} start="qa" />);
+    const field = await screen.findByTestId('specialist-tags');
+    expect(within(field).getByText('review')).toBeTruthy();
+    expect(within(field).queryByRole('combobox')).toBeNull();
+    expect((screen.getByLabelText('Model') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(writeSpecialist).not.toHaveBeenCalled();
+  });
+
+  it('copies a shared specialist to the project without its tags', async () => {
+    const writeSpecialist = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 'n',
+      file: '/f',
+    }));
+    const view = configView({
+      specialists: [
+        specialistEntry('qa', {
+          level: 'global',
+          file: '/xdg/aip/specialists/qa.yaml',
+          revision: null,
+          raw: { name: 'QA', model: 'sonnet', tags: ['review'] },
+          shared_tags: ['review'],
+        }),
+      ],
+    });
+    render(<Page api={fakeApi({ writeSpecialist, config: vi.fn(async () => view) })} start="qa" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Override in the project' }));
+    await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
+    expect(writeSpecialist.mock.calls[0]).toEqual([
+      'qa',
+      { name: 'QA', model: 'sonnet' },
+      null,
+      'project',
+    ]);
   });
 });

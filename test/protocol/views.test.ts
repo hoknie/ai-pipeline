@@ -259,16 +259,30 @@ describe('automatic delivery in views', () => {
 
 describe('tags in views', () => {
   const catalog = [
-    { id: 'tg-a', name: 'auth', color: 'blue' as const, createdAt: 1, task: null },
-    { id: 'tg-b', name: 'v2', color: 'red' as const, createdAt: 2, task: null },
+    {
+      id: 'tg-a',
+      repository: '/repo',
+      name: 'auth',
+      color: 'blue' as const,
+      createdAt: 1,
+      task: null,
+    },
+    {
+      id: 'tg-b',
+      repository: '/repo',
+      name: 'v2',
+      color: 'red' as const,
+      createdAt: 2,
+      task: null,
+    },
   ];
 
   it('shows the tags of a run in order and drops dangling ids', () => {
     const state = run(1);
     state.run.tags = ['tg-b', 'gone', 'tg-a'];
     expect(runView(state, 1000, undefined, catalog).tags).toEqual([
-      { id: 'tg-b', name: 'v2', color: 'red', task: null },
-      { id: 'tg-a', name: 'auth', color: 'blue', task: null },
+      { id: 'tg-b', repository: '/repo', name: 'v2', color: 'red', task: null },
+      { id: 'tg-a', repository: '/repo', name: 'auth', color: 'blue', task: null },
     ]);
     expect(runView(state, 1000).tags).toEqual([]);
   });
@@ -276,6 +290,7 @@ describe('tags in views', () => {
   it('shows the source task of a linked tag in every view', () => {
     const linked = {
       id: 'tg-l',
+      repository: '/repo',
       name: 'cards',
       color: 'indigo' as const,
       createdAt: 3,
@@ -285,6 +300,7 @@ describe('tags in views', () => {
     state.run.tags = ['tg-l'];
     const expected = {
       id: 'tg-l',
+      repository: '/repo',
       name: 'cards',
       color: 'indigo',
       task: { run: 'r1', number: 115 },
@@ -303,8 +319,12 @@ describe('tags in views', () => {
     started.run.tags = ['tg-b'];
     queue.runs.push(started.run.id);
     const view = queueView(queue, () => started, null, catalog);
-    expect(view.items[0]!.tags).toEqual([{ id: 'tg-a', name: 'auth', color: 'blue', task: null }]);
-    expect(view.runs[0]!.tags).toEqual([{ id: 'tg-b', name: 'v2', color: 'red', task: null }]);
+    expect(view.items[0]!.tags).toEqual([
+      { id: 'tg-a', repository: '/repo', name: 'auth', color: 'blue', task: null },
+    ]);
+    expect(view.runs[0]!.tags).toEqual([
+      { id: 'tg-b', repository: '/repo', name: 'v2', color: 'red', task: null },
+    ]);
   });
 });
 
@@ -380,6 +400,31 @@ describe('runView system steps', () => {
 
   it('is empty without service groups', () => {
     expect(runView(run(1), 5000).system).toEqual([]);
+  });
+});
+
+describe('artifact counters in rows', () => {
+  it('is 0 without counters and takes the count of the group slug', () => {
+    const state = run(2);
+    expect(runView(state, 5000).groups.map((row) => row.artifacts)).toEqual([0, 0]);
+    const counts = new Map([[state.groups[1]!.slug, { count: 3, revision: 9 }]]);
+    const view = runView(state, 5000, undefined, [], undefined, counts);
+    expect(view.groups.map((row) => row.artifacts)).toEqual([0, 3]);
+    expect(view.groups.map((row) => row.artifactsRevision)).toEqual([0, 9]);
+  });
+
+  it('puts the count into the row of a service step', () => {
+    const state = run(1);
+    state.split = { ...group(state), slug: '_split', status: 'merged', attempts: [] };
+    const view = runView(
+      state,
+      5000,
+      undefined,
+      [],
+      undefined,
+      new Map([['_split', { count: 2, revision: 7 }]]),
+    );
+    expect(view.system[0]?.artifacts).toBe(2);
   });
 });
 
@@ -475,7 +520,7 @@ describe('a message to the specialist in the views', () => {
       },
       2800,
     );
-    dispatch([state], 5, 2900);
+    dispatch([state], 2900);
     const [first, second] = groupView(state, group(state), '/w', null, 3000).attempts;
     expect(first).toMatchObject({ status: 'cancelled', interrupting: false, message: null });
     expect(second).toMatchObject({
@@ -556,8 +601,8 @@ describe('waiting groups in views', () => {
       candidate === slug ? wait : null;
 
   it('shows a group waiting for a busy specialist as waiting, the run stays active', () => {
-    const state = run(2);
-    dispatch([state], 1, 1500);
+    const state = run(2, { max: 1 });
+    dispatch([state], 1500);
     const view = runView(state, 5000, () => null, [], only('gruppa-2', specialistWait));
     expect(view.groups[1]).toMatchObject({ status: 'waiting', wait: specialistWait });
     expect(view.groups[0]).toMatchObject({ status: 'running', wait: null });
@@ -1092,5 +1137,56 @@ describe('pickSpecChange', () => {
       { change: 'zeta', path: 'openspec/changes/zeta' },
       { change: '2026-11-04-old', path: 'openspec/changes/archive/2026-11-04-old' },
     ]);
+  });
+});
+
+describe('catalog view', () => {
+  it('sorts by repository, then by name ignoring case', () => {
+    const tag = (id: string, repository: string, name: string) => ({
+      id,
+      repository,
+      name,
+      color: 'blue' as const,
+      createdAt: 1,
+      task: null,
+    });
+    const view = catalogView([
+      tag('1', '/b', 'alpha'),
+      tag('2', '/a', 'Zeta'),
+      tag('3', '/a', 'beta'),
+    ]);
+    expect(view.map((entry) => [entry.repository, entry.name])).toEqual([
+      ['/a', 'beta'],
+      ['/a', 'Zeta'],
+      ['/b', 'alpha'],
+    ]);
+  });
+});
+
+describe('a pause stopping the running attempt in the views', () => {
+  it('marks the attempt as interrupting and shows the reason once it is cancelled', () => {
+    const state = run(1);
+    step(state);
+    const seq = group(state).attempts.at(-1)!.seq;
+    transition(state, { kind: 'hold', hold: 'paused' }, 2600);
+    const during = groupView(state, group(state), '/w', null, 2700).attempts[0];
+    expect(during).toMatchObject({ interrupting: true, status: 'running' });
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq,
+        exit: { sessionId: 's', usage: null, failure: null, outsideChanges: [] },
+      },
+      2800,
+    );
+    const [first] = groupView(state, group(state), '/w', null, 3000).attempts;
+    expect(first).toMatchObject({
+      status: 'cancelled',
+      interrupting: false,
+      reason: 'interrupted by a pause',
+    });
+    expect(runView(state, 3000)).toMatchObject({ state: 'paused', hold: 'paused' });
   });
 });

@@ -62,7 +62,7 @@ A running run keeps a snapshot of the configuration, so editing the files does n
 ## The `settings.yaml` root
 
 ```yaml
-max: 3                    # specialists running at once on the machine, 1..32
+max: 3                    # specialists running at once in the repository, 1..32
 workspace_dir: .aip       # worktrees and logs: relative to the repository root, or an absolute path
 outside_changes: warn     # warn | stop | off
 workspace: { ... }
@@ -79,7 +79,7 @@ defaults: { ... }
 
 Specialists and workflows live in their own directories, not in `settings.yaml`.
 
-`max` is the global limit across all runs. The value from the configuration of the most recently created run applies.
+`max` limits the specialists running at once across all runs of one repository; runs of other repositories do not take its slots. The value from the configuration of the repository's most recently created run applies.
 
 ### `workspace`
 
@@ -292,13 +292,14 @@ tools: [WebFetch]         # tools on top of the set for the permission level
 skills: [grill-me, "review:pr"]
 max: 1                    # at most one such specialist at a time
 queue: false              # true: may add tasks to the queue (swarm_queue_add)
+tags: [planning, review]  # labels for the panel; do not affect runs
 prompt: |
   Write a plan: %s
 ```
 
 - `max` is an integer from 1 to 32: how many specialists with this slug may work at once on the machine, across all runs. Several groups can plan at the same time while a single coder writes the code.
-  - Without the field a specialist has no limit of its own, and only the global `max` applies.
-- A group that the scheduler does not start yet has the status `waiting` instead of `queued`, with a reason in `wait`: `specialist` (the `max` of its specialist is reached), `capacity` (the global `max` is reached) or `limit` (the runtime waits for its usage limit to reset). The run itself stays `active`.
+  - Without the field a specialist has no limit of its own, and only the `max` of the repository applies.
+- A group that the scheduler does not start yet has the status `waiting` instead of `queued`, with a reason in `wait`: `specialist` (the `max` of its specialist is reached), `capacity` (the `max` of the repository is reached) or `limit` (the runtime waits for its usage limit to reset). The run itself stays `active`.
   - A group that needs a busy specialist stays `queued` and does not hold back groups whose specialists are free.
   - The limit also applies to the task split (`split`), the commit message and the resolver.
   - It is not inherited from `defaults` and does not interrupt specialists that are already working.
@@ -310,6 +311,10 @@ prompt: |
   - The last step of a workflow can pass results on, for example by queueing a `feature` task for each prepared change.
   - An unknown workflow, invalid parameters, or a call after the attempt has ended return an error to the specialist.
   - For Claude the tool is allowed in advance at every permission level.
+- `tags` are labels of the specialist for the panel's "Specialists" page (filter and import). The page also filters specialists by search text, level (project or shared), `runtime`, `model`, `skills`, `tools` and `allow_commands`; values are taken after `defaults`. They do not change the specialist's configuration, prompt, permissions or the snapshot of a run.
+  - A name is trimmed, 1 to 30 characters, without a line break; repeats that differ only in case are merged. A value that is not a list of such names is an error at `swarm.specialists.<slug>.tags`.
+  - Tags of the shared `~/.config/aip/specialists/<slug>.yaml` are shared: the panel shows them in every project, read only on the "Specialists" page; they are changed only in the file itself. Tags of the project file `aip/specialists/<slug>.yaml` are the project's own. A specialist defined in both shows both sets, although the project file replaces the other fields as a whole.
+  - Removing the field from files before returning to a version without tag support is required: that version treats `tags` as an unknown key.
 - `model` is a model name in the runtime's format: `opus`, `sonnet` or a full id for Claude; `provider/model` for OpenCode. Without `model` the runtime's default model is used.
 - `skills` tells the specialist to use these skills. If a skill is not found in the runtime's directories (`.claude/skills`, `~/.claude/skills`, `~/.config/opencode/skills` and so on), a warning goes to the step log and the step still starts.
   - The panel suggests skills from the same directories (`SKILL.md` in subdirectories, and command files `.md`, nested ones as `directory:command`) and marks whether each comes from the repository or the home directory.
@@ -382,6 +387,7 @@ steps:
     specialist: reviewer
     on_reject: { goto: code, max_rounds: 3 }
     additional_prompt: Check only the tests and the error handling.
+    human_review: true
 ```
 
 - `name` is the display name of the workflow: the panel shows it instead of the id (the id stays in the tooltip), and `aip run list`, `aip run show` and the queue print `<name> (<id>)`. It is optional; without it the id is shown. Surrounding spaces are dropped, an empty name is an error. The panel calls a workflow a "Pipeline"; in the files and in the CLI it stays a workflow.
@@ -389,6 +395,11 @@ steps:
   - One specialist behaves differently in different steps without copies: for example, a reviewer checks only the tests in one step.
   - The text is taken as is: `%s` and `%%` are not substituted in it.
   - State any narrowing explicitly: the step's text comes after the specialist's prompt.
+- `human_review: true` on a step stops the group for a review by a person after the step reports `done`.
+  - The changes of the step are committed first, so the person sees them in the diff. The group goes to `needs_human` with a question that carries the summary of the step, marked `human review`.
+  - The answer of the person resumes the same step. If the specialist reports `done` again, the group goes on without a second review; `rejected` and `needs_human` work as usual.
+  - The queue autopilot (`auto_answer`) never answers such a question.
+- `human_only: true` in `swarm_report` (only with `needs_human`) asks for a person's own look, for example at the architecture of what was written. The question is marked `human only` and the queue autopilot does not answer it.
 - The steps of a group go strictly in order. Groups of one run work in parallel, within `max`.
 - Every specialist ends a step by calling `swarm_report` with a verdict:
   - `done` moves on to the next step;
@@ -398,6 +409,10 @@ steps:
   - A question has a `text` (up to 2000 characters), optional `options` (1 to 6 choices of up to 200 characters each) and a `recommendation` (up to 2000 characters), the recommended answer.
   - If `feedback` is empty, it is filled with the numbered text of the questions, so `aip run list`, `aip group` and `aip group answer` show it as text.
   - The human's answer reaches the specialist as one text: `Q1: …` / `A1: …` for each question.
+- A specialist can publish files of its step as artifacts with `swarm_artifact` (`file_name`, `title?`, and one of `content` or `path`) before it reports; see also [Tools of a specialist](hosts.md#tools-of-a-specialist).
+  - `content` is the text of the file (up to 1 MiB) and is the way to publish reports and logs. `path` is a file inside the worktree of the group (up to 16 MiB); a path outside the worktree, through a symlink out of it, or into `.git` is refused. A file that git tracks would also be committed, so use `path` for files git ignores, such as build output.
+  - `file_name` is a plain name without a directory (up to 200 characters); `title` defaults to the name without the extension. Publishing the same `file_name` again in the same attempt replaces the artifact; another attempt makes a new one. A group holds up to 200 artifacts.
+  - Artifacts never enter a step commit, the merge of the group or the delivered diff. The bytes lie in `artifacts/` of the state directory and live as long as the run; `aip clean` leaves them. The panel shows them on the "Artifacts" tab of the group: `.md` and `.log` files can be previewed and every file can be downloaded.
 - A step that ends without `swarm_report`, or on `timeout`, gets the `failed` status; you can retry it with `aip group retry`.
 - The statuses of a run (`failed`, `cancelled` and others) are listed in [hosts.md](hosts.md#run-state). `aip group retry` continues a cancelled group from the interrupted step; failed or cancelled deliveries (`_message`, `_resolve`) are repeated through `aip run apply`.
 - `on_reject.goto` must point to an earlier step. After `max_rounds` returns the group goes to `needs_human`. A `rejected` verdict on a step without `on_reject` also leads to `needs_human`.

@@ -1,4 +1,4 @@
-import type { DependencyView, QueueItemView, QueueView } from '../types.ts';
+import type { DependencyView, QueueItemView, QueueView, RunView } from '../types.ts';
 
 /** Deepest branch indent: longer chains do not indent further. */
 export const MAX_DEPTH = 3;
@@ -87,4 +87,54 @@ export function afterOptions(
         kind: 'current',
       });
   return [...result.values()];
+}
+
+export interface ParentChoice {
+  id: string;
+  number: number;
+  title: string;
+  /** In progress, planned (not started or put back in the queue) or finished. */
+  section: 'active' | 'planned' | 'finished';
+}
+
+const SECTION_ORDER: Record<ParentChoice['section'], number> = {
+  active: 0,
+  planned: 1,
+  finished: 2,
+};
+
+/**
+ * The runs of `repository` a task can be a child of, finished ones included: in progress first
+ * (newest start first), then planned (newest created first), then finished (latest finish first).
+ */
+export function parentChoices(runs: readonly RunView[], repository: string): ParentChoice[] {
+  const keyed = runs
+    .filter((run) => run.repository === repository)
+    .map((run) => {
+      const section: ParentChoice['section'] = run.finished
+        ? 'finished'
+        : run.state === 'queued' || run.startedAt === null
+          ? 'planned'
+          : 'active';
+      const key =
+        section === 'finished'
+          ? (run.finishedAt ?? run.createdAt)
+          : section === 'active'
+            ? (run.startedAt ?? run.createdAt)
+            : run.createdAt;
+      return { run, section, key };
+    });
+  keyed.sort(
+    (a, b) =>
+      SECTION_ORDER[a.section] - SECTION_ORDER[b.section] ||
+      b.key - a.key ||
+      b.run.createdAt - a.run.createdAt ||
+      a.run.id.localeCompare(b.run.id),
+  );
+  return keyed.map(({ run, section }) => ({
+    id: run.id,
+    number: run.number,
+    title: run.title,
+    section,
+  }));
 }

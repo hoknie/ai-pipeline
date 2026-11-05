@@ -1,9 +1,8 @@
-import { MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { ListPlus, MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
-import { runTitle, taskNumber } from '../../format.ts';
 import { useConfirm } from '../../confirm.tsx';
 import { notifySuccess } from '../../notify.ts';
 import type { GroupRow, RunView, SystemStepRow, TagView } from '../../types.ts';
@@ -19,6 +18,7 @@ import {
 import { useTags } from '../../tags.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { TagPicker } from '../TagPicker.tsx';
+import { RunTitle } from './RunTitle.tsx';
 import { RunSteps } from './RunSteps.tsx';
 import { RunSummary } from './RunSummary.tsx';
 
@@ -32,6 +32,7 @@ export function RunHeader({
   onError,
   onSelect,
   onDeliver,
+  onSubtask,
   headerRef,
   entry = null,
 }: {
@@ -43,6 +44,8 @@ export function RunHeader({
   onSelect?: (slug: string) => void;
   /** Delivers the run and reports the outcome; without it the header only calls `apply`. */
   onDeliver?: (force: boolean) => Promise<unknown>;
+  /** Opens a new task as a child of the run; without it the menu has no such item. */
+  onSubtask?: (run: RunView) => void;
   /** Receives the header element, to know when it is scrolled out of view. */
   headerRef?: (element: HTMLElement | null) => void;
   /** The open group or system step; its status joins the statuses of the summary. */
@@ -66,10 +69,14 @@ export function RunHeader({
     }
   };
   const [pausing, setPausing] = useState(false);
+  // The queue item the server answered a pause with: "Continue" shows at once, without the stream.
+  const [pausedItem, setPausedItem] = useState<string | null>(null);
+  useEffect(() => setPausedItem(null), [run.hold, run.queueItem]);
   const pause = async () => {
     setPausing(true);
     try {
-      await api.pauseRun(run.id, run.repository);
+      const answer = await api.pauseRun(run.id, run.repository);
+      setPausedItem(answer.item);
       notifySuccess(t('runs.header.paused'));
     } catch (error) {
       onError((error as Error).message);
@@ -77,7 +84,22 @@ export function RunHeader({
       setPausing(false);
     }
   };
-  const pausable = !run.finished && run.hold === null && run.queueItem === null;
+  const [continuing, setContinuing] = useState(false);
+  const continueItem = (run.hold !== null ? run.queueItem : null) ?? pausedItem;
+  const resume = async (item: string) => {
+    setContinuing(true);
+    try {
+      await api.forRepository(run.repository).queueRunNow(item);
+      setPausedItem(null);
+      notifySuccess(t('runs.header.continued'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setContinuing(false);
+    }
+  };
+  const pausable =
+    !run.finished && run.hold === null && run.queueItem === null && pausedItem === null;
   const [tagging, setTagging] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
   const { byId } = useTags();
@@ -160,15 +182,7 @@ export function RunHeader({
       <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1
-              className="min-w-0 flex-1 text-lg font-semibold break-words [overflow-wrap:anywhere]"
-              title={`${runTitle(run)}\n${run.id}`}
-            >
-              <span className="font-mono text-base font-normal text-muted-foreground">
-                {taskNumber(run.number)}
-              </span>{' '}
-              {runTitle(run)}
-            </h1>
+            <RunTitle run={run} api={api} />
           </div>
           <div>
             <WorkflowBadge id={run.workflow} name={run.workflowName} />
@@ -180,6 +194,7 @@ export function RunHeader({
             <TagPicker
               label={t('runs.header.tags')}
               selected={runTagIds}
+              repository={run.repository}
               onChange={(ids, fresh) => void changeTags(ids, fresh)}
               api={api}
               allowCreate
@@ -190,6 +205,15 @@ export function RunHeader({
           </div>
           {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
           <div className="flex flex-wrap items-center gap-2">
+            {continueItem !== null ? (
+              <Button
+                variant="outline"
+                loading={continuing}
+                onClick={() => void resume(continueItem)}
+              >
+                {t('runs.header.continue')}
+              </Button>
+            ) : null}
             {pausable ? (
               <Button variant="outline" loading={pausing} onClick={() => void pause()}>
                 {t('runs.header.pause')}
@@ -234,6 +258,15 @@ export function RunHeader({
                         className={retrying === 'refresh' ? 'motion-safe:animate-spin' : undefined}
                       />
                       {t('runs.header.retryRefreshConfig')} ({failed.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
+                {onSubtask ? (
+                  <>
+                    <DropdownMenuItem onSelect={() => onSubtask(run)}>
+                      <ListPlus />
+                      {t('runs.header.subtask')}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>

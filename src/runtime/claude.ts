@@ -17,11 +17,17 @@ import {
 import { claudeTranscript } from './transcript.ts';
 
 const REPORT_TOOL = 'mcp__aip__swarm_report';
+const ARTIFACT_TOOL = 'mcp__aip__swarm_artifact';
+const SPLIT_TOOL = 'mcp__aip__swarm_split';
 const QUEUE_TOOL = 'mcp__aip__swarm_queue_add';
 
-/** The aip tools the specialist may call without asking: the report, and the queue when allowed. */
+/**
+ * The aip tools the specialist may call without asking: the report, the artifact and the split
+ * (the worker server offers the split only on the split step), and the queue when allowed.
+ */
 function aipTools(context: LaunchContext): string[] {
-  return context.specialist.queue === true ? [REPORT_TOOL, QUEUE_TOOL] : [REPORT_TOOL];
+  const tools = [REPORT_TOOL, ARTIFACT_TOOL, SPLIT_TOOL];
+  return context.specialist.queue === true ? [...tools, QUEUE_TOOL] : tools;
 }
 /** Setting sources without the user's level: no personal hooks, plugins or permission rules. */
 const PROJECT_SETTINGS = ['--setting-sources', 'project,local'];

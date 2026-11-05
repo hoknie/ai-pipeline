@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 import { DELIVERY_MODES, SLUG_PATTERN_TEXT, isValidSlug, settingFieldOf } from '../config/index.ts';
 import {
+  ARTIFACT_CONTENT_LIMIT,
+  ARTIFACT_FILE_NAME_LIMIT,
+  ARTIFACT_TITLE_LIMIT,
   FEEDBACK_LIMIT,
   OPTIONS_LIMIT,
   OPTION_LIMIT,
@@ -12,6 +15,7 @@ import {
   SUMMARY_LIMIT,
   TAG_NAME_LIMIT,
   VERDICTS,
+  validArtifactFileName,
 } from '../core/index.ts';
 
 export const proposedGroupSchema = z.object({
@@ -31,6 +35,7 @@ export const reportParamsSchema = z.object({
   summary: z.string().min(1).max(SUMMARY_LIMIT),
   feedback: z.string().max(FEEDBACK_LIMIT).nullish(),
   questions: z.array(humanQuestionSchema).min(1).max(QUESTIONS_LIMIT).nullish(),
+  human_only: z.boolean().nullish(),
 });
 
 /** Tag names, as the user sees them; the daemon resolves them to ids. */
@@ -116,6 +121,22 @@ export const workerQueueAddParams = z
     message: 'pass either task or groups',
   });
 
+/** A file a specialist publishes outside of git: exactly one of `content` and `path`. */
+export const artifactPublishParams = z
+  .object({
+    token: z.string().min(1),
+    fileName: z
+      .string()
+      .max(ARTIFACT_FILE_NAME_LIMIT)
+      .refine(validArtifactFileName, { message: 'not a plain file name' }),
+    title: z.string().trim().min(1).max(ARTIFACT_TITLE_LIMIT).optional(),
+    content: z.string().max(ARTIFACT_CONTENT_LIMIT).optional(),
+    path: z.string().min(1).optional(),
+  })
+  .refine((params) => (params.content === undefined) !== (params.path === undefined), {
+    message: 'pass either content or path',
+  });
+
 const queueEditParams = z
   .object({
     repository: queueRepository,
@@ -143,6 +164,8 @@ export const entryIdSchema = z
   .refine(isValidSlug, { message: `id must match ${SLUG_PATTERN_TEXT}` });
 
 const entryKindSchema = z.enum(['specialist', 'workflow']);
+/** Repository of the project level; null is the shared level. */
+const levelRepository = z.string().min(1).nullable();
 const writeLevelSchema = z.enum(['project', 'global']);
 
 /** Longest message a human can send to a running specialist. */
@@ -168,6 +191,11 @@ export const requestSchema = z.discriminatedUnion('method', [
   z.object({
     method: z.literal('group_file_diff'),
     params: z.object({ ...target, path: z.string().min(1) }),
+  }),
+  z.object({ method: z.literal('group_artifacts'), params: z.object(target) }),
+  z.object({
+    method: z.literal('artifact'),
+    params: z.object({ ...target, id: z.string().min(1) }),
   }),
   z.object({
     method: z.literal('run_patch'),
@@ -227,6 +255,39 @@ export const requestSchema = z.discriminatedUnion('method', [
       id: entryIdSchema,
       value: z.record(z.string(), z.unknown()),
       level: writeLevelSchema.optional(),
+    }),
+  }),
+  z.object({
+    method: z.literal('specialist_tags'),
+    params: z.object({}),
+  }),
+  z.object({
+    method: z.literal('specialist_tags_set'),
+    params: z.object({
+      repository: levelRepository,
+      slug: entryIdSchema,
+      tags: z.array(z.string()),
+      revision: z.string().min(1).nullable(),
+    }),
+  }),
+  z.object({
+    method: z.literal('specialist_tag_rename'),
+    params: z.object({
+      repository: levelRepository,
+      from: z.string().min(1),
+      to: z.string().min(1),
+    }),
+  }),
+  z.object({
+    method: z.literal('specialist_tag_remove'),
+    params: z.object({ repository: levelRepository, tag: z.string().min(1) }),
+  }),
+  z.object({
+    method: z.literal('specialists_import'),
+    params: z.object({
+      repository: z.string().min(1),
+      source: z.string().min(1),
+      slugs: z.array(entryIdSchema).min(1),
     }),
   }),
   z.object({
@@ -345,15 +406,20 @@ export const requestSchema = z.discriminatedUnion('method', [
     method: z.literal('queue_run_now'),
     params: z.object({ repository: queueRepository, item: queueItem }),
   }),
-  z.object({ method: z.literal('tags'), params: z.object({}).default({}) }),
+  z.object({ method: z.literal('tags'), params: z.object({ repository: queueRepository }) }),
   z.object({
     method: z.literal('tag_add'),
-    params: z.object({ name: z.string(), color: z.string().optional() }),
+    params: z.object({
+      repository: queueRepository,
+      name: z.string(),
+      color: z.string().optional(),
+    }),
   }),
   z.object({
     method: z.literal('tag_edit'),
     params: z
       .object({
+        repository: queueRepository,
         tag: z.string().min(1),
         name: z.string().optional(),
         color: z.string().optional(),
@@ -362,7 +428,10 @@ export const requestSchema = z.discriminatedUnion('method', [
         message: 'pass a new name or a new color',
       }),
   }),
-  z.object({ method: z.literal('tag_remove'), params: z.object({ tag: z.string().min(1) }) }),
+  z.object({
+    method: z.literal('tag_remove'),
+    params: z.object({ repository: queueRepository, tag: z.string().min(1) }),
+  }),
   z.object({
     method: z.literal('run_tags'),
     params: z
@@ -374,6 +443,10 @@ export const requestSchema = z.discriminatedUnion('method', [
       .refine((params) => (params.add?.length ?? 0) + (params.remove?.length ?? 0) > 0, {
         message: 'pass tags to add or remove',
       }),
+  }),
+  z.object({
+    method: z.literal('run_title'),
+    params: z.object({ runId: z.string().min(1), title: queueTitle }),
   }),
   z.object({ method: z.literal('processes'), params: z.object({}).default({}) }),
   z.object({
@@ -396,6 +469,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('web_stop'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('report'), params: reportParamsSchema }),
   z.object({ method: z.literal('worker_queue_add'), params: workerQueueAddParams }),
+  z.object({ method: z.literal('artifact_publish'), params: artifactPublishParams }),
   z.object({
     method: z.literal('split'),
     params: z.object({ token: z.string().min(1), groups: z.array(proposedGroupSchema) }),
@@ -489,6 +563,7 @@ export const streamEventSchema = z.discriminatedUnion('event', [
   z.object({
     event: z.literal('tags'),
     seq: z.number().int(),
+    repository: z.string().optional(),
     tags: z.array(z.looseObject({ id: z.string() })),
   }),
   z.object({

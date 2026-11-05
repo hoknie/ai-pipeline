@@ -1,6 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 
 interface Action {
@@ -9,6 +16,8 @@ interface Action {
   feedback?: string;
   questions?: { text: string; options?: string[]; recommendation?: string }[];
   write?: Record<string, string>;
+  /** Symlinks created in the worktree: link path → target. */
+  link?: Record<string, string>;
   /** Paths whose contents (or null) are appended to reads.jsonl in the state directory. */
   read?: string[];
   outside?: Record<string, string>;
@@ -166,6 +175,20 @@ function connectDirect(workerArgs: string[]) {
             questions: input.questions ?? null,
           });
           return toolText(`Recorded verdict ${String(input.verdict)}. You can stop now.`);
+        }
+        if (request.name === 'swarm_artifact') {
+          if ((input.content === undefined) === (input.path === undefined))
+            throw new Error('pass either content or path');
+          const result = (await ipc(socket, 'artifact_publish', {
+            token,
+            fileName: input.file_name,
+            ...(input.title !== undefined ? { title: input.title } : {}),
+            ...(input.content !== undefined ? { content: input.content } : {}),
+            ...(input.path !== undefined ? { path: input.path } : {}),
+          })) as { id?: string };
+          return toolText(
+            `Recorded artifact ${result.id ?? ''} (${String(input.file_name)}). Call swarm_report when you are done.`,
+          );
         }
         if (request.name === 'swarm_split') {
           const groups = input.groups as unknown[];
@@ -373,6 +396,9 @@ if (action.read) {
 for (const [path, content] of Object.entries(action.write ?? {})) {
   mkdirSync(dirname(join(worker.cwd, path)), { recursive: true });
   writeFileSync(join(worker.cwd, path), content);
+}
+for (const [path, target] of Object.entries(action.link ?? {})) {
+  symlinkSync(target, join(worker.cwd, path));
 }
 for (const [path, content] of Object.entries(action.outside ?? {})) writeFileSync(path, content);
 if (action.child) {

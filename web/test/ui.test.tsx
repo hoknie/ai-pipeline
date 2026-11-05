@@ -52,6 +52,30 @@ describe('tabs', () => {
   });
 });
 
+describe('disabled tab', () => {
+  it('is dimmed, not allowed and cannot be selected', () => {
+    render(
+      <Tabs defaultValue="a">
+        <TabsList>
+          <TabsTrigger value="a">First</TabsTrigger>
+          <TabsTrigger value="b" disabled>
+            Second
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="a">text a</TabsContent>
+        <TabsContent value="b">text b</TabsContent>
+      </Tabs>,
+    );
+    const second = screen.getByRole('tab', { name: 'Second' });
+    expect(second.className).toContain('disabled:cursor-not-allowed');
+    expect(second.className).toContain('disabled:opacity-50');
+    fireEvent.mouseDown(second, { button: 0, ctrlKey: false });
+    fireEvent.click(second);
+    expect(second.getAttribute('aria-selected')).toBe('false');
+    expect(screen.queryByText('text b')).toBeNull();
+  });
+});
+
 describe('alert dialog', () => {
   const dialog = () => (
     <AlertDialog>

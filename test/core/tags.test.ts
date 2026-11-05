@@ -7,6 +7,8 @@ import {
   addLinkedTag,
   addTag,
   autoTagName,
+  tagsOfRepository,
+  findTag,
   editTag,
   keepLinkedTags,
   linkedTagOf,
@@ -20,9 +22,13 @@ import {
   type Tag,
 } from '../../src/core/index.ts';
 
+const REPO = '/repo';
+
 function catalogOf(...names: string[]): Tag[] {
   const catalog: Tag[] = [];
-  names.forEach((name, index) => catalog.push(addTag(catalog, { name }, `tg-${index}`, index)));
+  names.forEach((name, index) =>
+    catalog.push(addTag(catalog, { name, repository: REPO }, `tg-${index}`, index)),
+  );
   return catalog;
 }
 
@@ -32,37 +38,43 @@ describe('tag catalog', () => {
   });
 
   it('rejects a name longer than 30 characters, empty or with a line break', () => {
-    expect(() => addTag([], { name: 'x'.repeat(31) }, 'a', 1)).toThrow(Rejection);
-    expect(addTag([], { name: 'x'.repeat(30) }, 'a', 1).name).toHaveLength(30);
-    expect(() => addTag([], { name: '  ' }, 'a', 1)).toThrow(Rejection);
-    expect(() => addTag([], { name: 'a\nb' }, 'a', 1)).toThrow(Rejection);
+    expect(() => addTag([], { repository: REPO, name: 'x'.repeat(31) }, 'a', 1)).toThrow(Rejection);
+    expect(addTag([], { repository: REPO, name: 'x'.repeat(30) }, 'a', 1).name).toHaveLength(30);
+    expect(() => addTag([], { repository: REPO, name: '  ' }, 'a', 1)).toThrow(Rejection);
+    expect(() => addTag([], { repository: REPO, name: 'a\nb' }, 'a', 1)).toThrow(Rejection);
   });
 
   it('trims the name', () => {
-    expect(addTag([], { name: '  auth ' }, 'a', 1).name).toBe('auth');
+    expect(addTag([], { repository: REPO, name: '  auth ' }, 'a', 1).name).toBe('auth');
   });
 
   it('rejects a repeated name in another case, Cyrillic included', () => {
     const catalog = catalogOf('auth', 'Вход');
-    expect(() => addTag(catalog, { name: ' AUTH ' }, 'x', 1)).toThrow('tag `auth` already exists');
-    expect(() => addTag(catalog, { name: 'вход' }, 'x', 1)).toThrow('tag `Вход` already exists');
+    expect(() => addTag(catalog, { repository: REPO, name: ' AUTH ' }, 'x', 1)).toThrow(
+      'tag `auth` already exists',
+    );
+    expect(() => addTag(catalog, { repository: REPO, name: 'вход' }, 'x', 1)).toThrow(
+      'tag `Вход` already exists',
+    );
   });
 
   it('rejects an unknown color and lists the palette', () => {
-    expect(() => addTag([], { name: 'a', color: '#ff0000' }, 'x', 1)).toThrow(
+    expect(() => addTag([], { repository: REPO, name: 'a', color: '#ff0000' }, 'x', 1)).toThrow(
       `known: ${TAG_COLORS.join(', ')}`,
     );
   });
 
   it('takes the default color from the palette by the size of the catalog', () => {
     const catalog = catalogOf('a', 'b');
-    expect(addTag(catalog, { name: 'c' }, 'x', 1).color).toBe('orange');
-    expect(addTag(catalog, { name: 'c', color: 'pink' }, 'x', 1).color).toBe('pink');
+    expect(addTag(catalog, { repository: REPO, name: 'c' }, 'x', 1).color).toBe('orange');
+    expect(addTag(catalog, { repository: REPO, name: 'c', color: 'pink' }, 'x', 1).color).toBe(
+      'pink',
+    );
   });
 
   it('wraps the default color around the palette', () => {
     const catalog = catalogOf(...Array.from({ length: 10 }, (_, index) => `t${index}`));
-    expect(addTag(catalog, { name: 'next' }, 'x', 1).color).toBe('gray');
+    expect(addTag(catalog, { repository: REPO, name: 'next' }, 'x', 1).color).toBe('gray');
   });
 
   it('allows a rename that only changes the case, and keeps the id', () => {
@@ -145,22 +157,31 @@ describe('autoTagName', () => {
 
 describe('linked task tags', () => {
   it('rejects the reserved color for ordinary tags', () => {
-    expect(() => addTag([], { name: 'a', color: 'indigo' }, 'a', 1)).toThrow(
+    expect(() => addTag([], { repository: REPO, name: 'a', color: 'indigo' }, 'a', 1)).toThrow(
       'color `indigo` is reserved for linked task tags',
     );
-    expect(() => addTag([], { name: 'a', color: 'nope' }, 'a', 1)).toThrow('unknown color');
+    expect(() => addTag([], { repository: REPO, name: 'a', color: 'nope' }, 'a', 1)).toThrow(
+      'unknown color',
+    );
     const catalog = catalogOf('a');
     expect(() => editTag(catalog, 'a', { color: 'indigo' })).toThrow('reserved');
     expect(catalog[0]!.task).toBeNull();
-    expect(addTag(catalogOf('a', 'b'), { name: 'c' }, 'c', 1).color).toBe(TAG_COLORS[2]);
+    expect(addTag(catalogOf('a', 'b'), { repository: REPO, name: 'c' }, 'c', 1).color).toBe(
+      TAG_COLORS[2],
+    );
   });
 
   it('adds a linked tag, allows a rename but not a color change', () => {
-    const linked = addLinkedTag([], { name: 'cards', task: { run: 'r1', number: 115 } }, 'l', 1);
-    expect(linked).toMatchObject({ color: CHAIN_TAG_COLOR, task: { run: 'r1', number: 115 } });
-    expect(() => addLinkedTag([linked], { name: 'CARDS', task: linked.task! }, 'm', 2)).toThrow(
-      'already exists',
+    const linked = addLinkedTag(
+      [],
+      { repository: REPO, name: 'cards', task: { run: 'r1', number: 115 } },
+      'l',
+      1,
     );
+    expect(linked).toMatchObject({ color: CHAIN_TAG_COLOR, task: { run: 'r1', number: 115 } });
+    expect(() =>
+      addLinkedTag([linked], { repository: REPO, name: 'CARDS', task: linked.task! }, 'm', 2),
+    ).toThrow('already exists');
     expect(() => editTag([linked], 'cards', { color: 'red' })).toThrow(
       'linked task tag color cannot be changed',
     );
@@ -172,7 +193,12 @@ describe('linked task tags', () => {
 
   it('refuses a linked tag by hand, naming its task', () => {
     const plain = catalogOf('auth');
-    const linked = addLinkedTag(plain, { name: 'cards', task: { run: 'r1', number: 7 } }, 'l', 1);
+    const linked = addLinkedTag(
+      plain,
+      { repository: REPO, name: 'cards', task: { run: 'r1', number: 7 } },
+      'l',
+      1,
+    );
     const catalog = [...plain, linked];
     expect(resolveManualTags(catalog, ['auth'])).toEqual(['tg-0']);
     expect(() => resolveManualTags(catalog, ['auth', 'cards'])).toThrow(
@@ -183,7 +209,12 @@ describe('linked task tags', () => {
 
   it('keeps linked tags first in their order', () => {
     const plain = catalogOf('auth', 'v2');
-    const a = addLinkedTag(plain, { name: 'a', task: { run: 'r1', number: 1 } }, 'la', 1);
+    const a = addLinkedTag(
+      plain,
+      { repository: REPO, name: 'a', task: { run: 'r1', number: 1 } },
+      'la',
+      1,
+    );
     const catalog = [...plain, a];
     expect(keepLinkedTags(catalog, ['tg-0', 'la'], ['tg-1', 'tg-1', 'la'])).toEqual(['la', 'tg-1']);
     expect(keepLinkedTags(catalog, ['tg-0', 'la'], [])).toEqual(['la']);
@@ -192,7 +223,12 @@ describe('linked task tags', () => {
 
 describe('linked task tag of a run', () => {
   const linked = (catalog: Tag[], name: string, run: string, createdAt: number): Tag => {
-    const tag = addLinkedTag(catalog, { name, task: { run, number: 5 } }, `lk-${name}`, createdAt);
+    const tag = addLinkedTag(
+      catalog,
+      { repository: REPO, name, task: { run, number: 5 } },
+      `lk-${name}`,
+      createdAt,
+    );
     return tag;
   };
 
@@ -223,5 +259,56 @@ describe('linked task tag of a run', () => {
     expect(parseParentRef(' r1 ')).toEqual({ id: 'r1', number: null });
     expect(parseParentRef('#x')).toEqual({ id: '#x', number: null });
     expect(parseParentRef('0')).toEqual({ id: '0', number: null });
+  });
+});
+
+describe('project catalogs', () => {
+  const A = '/a';
+  const B = '/b';
+  const both = (): Tag[] => {
+    const a = addTag([], { repository: A, name: 'auth' }, 'ta', 1);
+    const b = addTag([], { repository: B, name: 'auth', color: 'pink' }, 'tb', 2);
+    return [a, b];
+  };
+
+  it('puts the repository into the tag', () => {
+    expect(addTag([], { repository: A, name: 'x' }, 'x', 1).repository).toBe(A);
+    const linked = addLinkedTag(
+      [],
+      { repository: B, name: 'x', task: { run: 'r', number: 1 } },
+      'x',
+      1,
+    );
+    expect(linked.repository).toBe(B);
+  });
+
+  it('returns only the tags of the repository', () => {
+    const catalog = both();
+    expect(tagsOfRepository(catalog, A).map((tag) => tag.id)).toEqual(['ta']);
+    expect(tagsOfRepository(catalog, B).map((tag) => tag.id)).toEqual(['tb']);
+    expect(tagsOfRepository(catalog, '/c')).toEqual([]);
+  });
+
+  it('allows one name in two repositories', () => {
+    const catalog = both();
+    expect(() =>
+      addTag(tagsOfRepository(catalog, A), { repository: A, name: 'AUTH' }, 'x', 3),
+    ).toThrow('already exists');
+    expect(tagsOfRepository(catalog, B)[0]!.color).toBe('pink');
+  });
+
+  it('counts the default color and free names inside the repository', () => {
+    const catalog = [...both(), addTag([], { repository: A, name: 'second' }, 'ta2', 3)];
+    const ofB = tagsOfRepository(catalog, B);
+    expect(addTag(ofB, { repository: B, name: 'next' }, 'x', 4).color).toBe(TAG_COLORS[1]);
+    expect(autoTagName(tagsOfRepository(catalog, A), 'second')).toBe('second-2');
+    expect(autoTagName(ofB, 'second')).toBe('second');
+  });
+
+  it('does not find the tag of another repository', () => {
+    const catalog = [addTag([], { repository: A, name: 'only-a' }, 'ta', 1)];
+    const ofB = tagsOfRepository(catalog, B);
+    expect(() => findTag(ofB, 'only-a')).toThrow('unknown tag `only-a`');
+    expect(() => resolveManualTags(ofB, ['only-a'])).toThrow('unknown tag');
   });
 });

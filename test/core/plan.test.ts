@@ -29,14 +29,20 @@ const SPLIT = CONFIG_TEXT.replace(
   '    feature:\n      split: { specialist: plan, max_groups: 3 }\n      steps:',
 );
 
+/** The run with its `swarm.max` replaced; 0 fills every slot. */
+function withMax(state: RunState, max: number): RunState {
+  state.run.config.max = max;
+  return state;
+}
+
 describe('planDispatch', () => {
   it('starts what dispatch starts and leaves the state untouched', () => {
     const state = planned(3);
     const before = structuredClone(state);
-    const plan = planDispatch([state], 5, 1500);
+    const plan = planDispatch([state], 1500);
     expect(state).toEqual(before);
     expect(plan.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
-    const effects = dispatch([state], 5, 1500);
+    const effects = dispatch([state], 1500);
     expect(effects.map((effect) => (effect.kind === 'start_attempt' ? effect.group : ''))).toEqual([
       'gruppa-1',
     ]);
@@ -44,7 +50,7 @@ describe('planDispatch', () => {
 
   it('makes groups wait for a busy specialist in the same run', () => {
     const state = planned(3);
-    const plan = planDispatch([state], 5, 1500);
+    const plan = planDispatch([state], 1500);
     expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toEqual({
       reason: 'specialist',
       specialist: 'coder',
@@ -57,7 +63,7 @@ describe('planDispatch', () => {
   it('makes a group wait for a specialist busy in another run', () => {
     const first = planned(1, { id: 'run000000001' });
     const second = planned(1, { id: 'run000000002', now: 2000 });
-    const plan = planDispatch([first, second], 5, 1500);
+    const plan = planDispatch([first, second], 1500);
     expect(plan.start.map((entry) => entry.state.run.id)).toEqual(['run000000001']);
     expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toMatchObject({
       reason: 'specialist',
@@ -65,12 +71,45 @@ describe('planDispatch', () => {
   });
 
   it('reports capacity when swarm.max is taken', () => {
-    const state = run(3);
-    const plan = planDispatch([state], 2, 1500);
+    const state = run(3, { max: 2 });
+    const plan = planDispatch([state], 1500);
     expect(plan.start).toHaveLength(2);
     expect(plan.waits.get(waitKey(state.run.id, 'gruppa-3'))).toEqual({
       reason: 'capacity',
       max: 2,
+    });
+  });
+
+  it('counts swarm.max separately for each repository', () => {
+    const first = run(2, { id: 'run000000001', max: 1 });
+    const second = run(2, { id: 'run000000002', now: 2000, max: 1 });
+    second.run.repository = '/other';
+    const plan = planDispatch([first, second], 1500);
+    expect(plan.start.map((entry) => `${entry.state.run.id}/${entry.group.slug}`)).toEqual([
+      'run000000001/gruppa-1',
+      'run000000002/gruppa-1',
+    ]);
+    expect(plan.waits.get(waitKey('run000000001', 'gruppa-2'))).toEqual({
+      reason: 'capacity',
+      max: 1,
+    });
+  });
+
+  it('takes swarm.max of a repository from its most recently created run', () => {
+    const older = run(3, { id: 'run000000001', max: 1 });
+    const newer = run(1, { id: 'run000000002', now: 2000, max: 3 });
+    const elsewhere = run(1, { id: 'run000000003', now: 3000, max: 1 });
+    elsewhere.run.repository = '/other';
+    const plan = planDispatch([older, newer, elsewhere], 3500);
+    expect(plan.start.map((entry) => `${entry.state.run.id}/${entry.group.slug}`)).toEqual([
+      'run000000001/gruppa-1',
+      'run000000001/gruppa-2',
+      'run000000001/gruppa-3',
+      'run000000003/gruppa-1',
+    ]);
+    expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toEqual({
+      reason: 'capacity',
+      max: 3,
     });
   });
 
@@ -93,7 +132,7 @@ describe('planDispatch', () => {
       },
       2000,
     );
-    const plan = planDispatch([state], 5, 3000);
+    const plan = planDispatch([state], 3000);
     expect(plan.start).toEqual([]);
     expect(plan.waits.get(waitKey(state.run.id, 'gruppa-1'))).toEqual({
       reason: 'limit',
@@ -103,8 +142,8 @@ describe('planDispatch', () => {
   });
 
   it('names the specialist, not the capacity, when both hold a group back', () => {
-    const state = planned(2);
-    const plan = planDispatch([state], 1, 1500);
+    const state = withMax(planned(2), 1);
+    const plan = planDispatch([state], 1500);
     expect(plan.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
     expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toMatchObject({
       reason: 'specialist',
@@ -113,16 +152,16 @@ describe('planDispatch', () => {
 
   it('does not put a group with a free specialist into waits', () => {
     const state = run(2);
-    const plan = planDispatch([state], 5, 1500);
+    const plan = planDispatch([state], 1500);
     expect(plan.start).toHaveLength(2);
     expect(plan.waits.size).toBe(0);
   });
 
   it('plans the system steps like groups', () => {
     const state: RunState = run(1, { split: true, configText: SPLIT });
-    const full = planDispatch([state], 0, 1500);
+    const full = planDispatch([withMax(state, 0)], 1500);
     expect(full.waits.get(waitKey(state.run.id, '_split'))).toEqual({ reason: 'capacity', max: 0 });
-    expect(planDispatch([state], 5, 1500).start.map((entry) => entry.group.slug)).toEqual([
+    expect(planDispatch([withMax(state, 5)], 1500).start.map((entry) => entry.group.slug)).toEqual([
       '_split',
     ]);
   });
@@ -130,7 +169,7 @@ describe('planDispatch', () => {
   it('ignores a finished run', () => {
     const state = run(1);
     state.run.finishedAt = 1200;
-    const plan = planDispatch([state], 5, 1500);
+    const plan = planDispatch([state], 1500);
     expect(plan.start).toEqual([]);
     expect(plan.waits.size).toBe(0);
   });
@@ -140,7 +179,7 @@ describe('planDispatch', () => {
     state.run.config.specialists = state.run.config.specialists.filter(
       (specialist) => specialist.slug !== 'plan',
     );
-    const plan = planDispatch([state], 0, 1500);
+    const plan = planDispatch([state], 1500);
     expect(plan.waits.size).toBe(0);
   });
   it('lets the usage limit win over a busy specialist and a full swarm.max', () => {
@@ -162,7 +201,7 @@ describe('planDispatch', () => {
       },
       2000,
     );
-    const plan = planDispatch([state], 0, 3000);
+    const plan = planDispatch([withMax(state, 0)], 3000);
     expect(plan.start).toEqual([]);
     expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toMatchObject({ reason: 'limit' });
   });
@@ -175,9 +214,11 @@ describe('planDispatch', () => {
     if (field === 'message') state.run.config.delivery.messageSpecialist = 'coder';
     else state.run.config.delivery.resolver = 'coder';
     state[field] = newGroup(slug, slug, 'task', 1_000_000);
-    const full = planDispatch([state], 0, 1500);
+    const full = planDispatch([withMax(state, 0)], 1500);
     expect(full.waits.get(waitKey(state.run.id, slug))).toEqual({ reason: 'capacity', max: 0 });
-    expect(planDispatch([state], 5, 1500).start.map((entry) => entry.group.slug)).toContain(slug);
+    expect(
+      planDispatch([withMax(state, 5)], 1500).start.map((entry) => entry.group.slug),
+    ).toContain(slug);
   });
 });
 
@@ -185,11 +226,11 @@ describe('a run with a hold', () => {
   it('starts nothing, fills no waits and starts again after the hold is lifted', () => {
     const state = planned(1, { id: 'a' });
     transition(state, { kind: 'hold', hold: 'paused' }, 3000);
-    const held = planDispatch([state], 5, 3001);
+    const held = planDispatch([state], 3001);
     expect(held.start).toEqual([]);
     expect(held.waits.size).toBe(0);
     transition(state, { kind: 'hold', hold: null }, 3002);
-    const lifted = planDispatch([state], 5, 3003);
+    const lifted = planDispatch([state], 3003);
     expect(lifted.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
     expect(lifted.start[0]!.group.pending?.stepIndex).toBe(1);
   });
@@ -200,7 +241,7 @@ describe('a run with a hold', () => {
     transition(state, { kind: 'hold', hold: 'paused' }, 3000);
     expect(runningAttempt(state).status).toBe('running');
     finish(state, 'done');
-    expect(dispatch([state], 5, 3500)).toEqual([]);
+    expect(dispatch([state], 3500)).toEqual([]);
     expect(state.groups[0]!.pending?.stepIndex).toBe(1);
   });
 });

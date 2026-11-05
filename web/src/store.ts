@@ -37,7 +37,7 @@ type StreamEvent =
     }
   | { event: 'daemon'; daemon: DaemonMismatch }
   | { event: 'repositories'; repositories: RepositoryView[] }
-  | { event: 'tags'; tags: TagView[] }
+  | { event: 'tags'; repository?: string; tags: TagView[] }
   | { event: 'run'; run: RunView }
   | { event: 'queue'; queue: QueueView }
   | { event: 'processes'; processes?: BackgroundProcessView[]; error?: string };
@@ -101,6 +101,20 @@ function sameTags(current: TagView[], next: TagView[]): TagView[] {
   return JSON.stringify(current) === JSON.stringify(next) ? current : next;
 }
 
+/** The tags with those of one repository replaced; an unchanged list keeps its object. */
+export function replaceTags(
+  current: TagView[],
+  next: TagView[],
+  repository: string | null,
+): TagView[] {
+  if (repository === null) return current;
+  const rest = current.filter((tag) => tag.repository !== repository);
+  const merged = [...rest, ...next.filter((tag) => tag.repository === repository)];
+  // the order of the daemon: by repository, then the order inside the repository
+  merged.sort((a, b) => a.repository.localeCompare(b.repository));
+  return sameTags(current, merged);
+}
+
 /** The registry as it was when nothing in it changed, so unchanged lists do not re-render. */
 function sameRepositories(current: RepositoryView[], next: RepositoryView[]): RepositoryView[] {
   return JSON.stringify(current) === JSON.stringify(next) ? current : next;
@@ -138,12 +152,14 @@ export function useRuns(
   selected: string | null;
   /** Queue of the selected repository; null until known. */
   queue: QueueView | null;
+  /** The queues of all repositories the panel knows, by repository. */
+  queues: ReadonlyMap<string, QueueView>;
   /** Takes a fresher queue, for example the answer to a change made on the page. */
   setQueue: (queue: QueueView) => void;
   /** The tag catalog. */
   tags: TagView[];
-  /** Takes a fresher catalog, for example the answer to creating a tag. */
-  setTags: (tags: TagView[]) => void;
+  /** Takes a fresher catalog of one repository, for example the answer to creating a tag. */
+  setTags: (repository: string, tags: TagView[]) => void;
   /** The daemon runs another build than `aip web`; null when the builds match or unknown. */
   daemon: DaemonMismatch;
   /** The last `processes` event of the stream; null until one arrives. */
@@ -166,6 +182,10 @@ export function useRuns(
   openedRef.current = opened;
   const extraRef = useRef(extra);
   extraRef.current = extra;
+  const homeRef = useRef(home);
+  homeRef.current = home;
+  const wantedRef = useRef(wanted);
+  wantedRef.current = wanted;
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
@@ -209,7 +229,13 @@ export function useRuns(
         setRegistryState((current) => sameRepositories(current, known));
         const catalog = await api.tags();
         if (closed) return;
-        setTags((current) => sameTags(current, catalog));
+        setTags((current) => replaceTags(current, catalog, homeRef.current));
+        const chosen = wantedRef.current;
+        if (chosen !== null && chosen !== homeRef.current) {
+          const more = await api.forRepository(chosen).tags();
+          if (closed) return;
+          setTags((current) => replaceTags(current, more, chosen));
+        }
       } catch {
         // the server is unreachable; keep the last known state
       }
@@ -323,8 +349,8 @@ export function useRuns(
   const setQueue = useCallback((view: QueueView) => {
     setQueues((current) => putQueue(current, view));
   }, []);
-  const updateTags = useCallback((next: TagView[]) => {
-    setTags((current) => sameTags(current, next));
+  const updateTags = useCallback((repository: string, next: TagView[]) => {
+    setTags((current) => replaceTags(current, next, repository));
   }, []);
   const setRegistry = useCallback((next: RepositoryView[]) => {
     setRegistryState((current) => sameRepositories(current, next));
@@ -363,6 +389,7 @@ export function useRuns(
     setRegistry,
     selected,
     queue,
+    queues,
     setQueue,
     tags,
     setTags: updateTags,

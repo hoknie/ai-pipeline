@@ -52,9 +52,11 @@ Every task gets an integer number within its repository when it is added to the 
 
 ### Pausing a run
 
-- `aip run pause <run-id>` pauses any unfinished run of the repository (`--repo` defaults to the repository of the run), whether the queue is running or stopped. The step in progress finishes and is committed, no new step starts, and the run frees its place. It becomes the last task of the queue and shows as `paused` in `aip run list`, `aip run show` and `aip queue list` (`paused <run-id>`).
-- A paused run does not stop the queue: its problems are not watched and a failure of the step that was finishing leaves the run paused. Tasks that wait for it keep waiting.
-- The task is taken in its turn like any other, and `aip queue run <item>` ("Continue" in the web panel) continues it at once, whatever the limit. The run then goes on from the next step; a failed or cancelled group is retried. `aip group retry` on a paused run also lifts the pause.
+- `aip run pause <run-id>` pauses any unfinished run of the repository (`--repo` defaults to the repository of the run), whether the queue is running or stopped. The agents of the run stop at once (a step that has already reported finishes and is committed), no new step starts, and the run frees its place.
+- The run becomes the last task of the queue and shows as `paused` in `aip run list`, `aip run show` and `aip queue list` (`paused <run-id>`).
+- The interrupted step continues in the same session when the run is continued.
+- A paused run does not stop the queue: its problems are not watched. Tasks that wait for it keep waiting.
+- The task is taken in its turn like any other, and `aip queue run <item>` ("Continue" in the web panel) continues it at once, whatever the limit. The run then goes on: the stopped step continues in the same session; a failed or cancelled group is retried. `aip group retry` on a paused run also lifts the pause.
 - A paused run stays in the queue: removing its task is refused while the run is unfinished. Cancel the run instead; it stays `paused` until you continue or remove the task.
 - The pause is lifted by itself once the run is finished and has nothing to retry. A run with nothing to pause (finished), one that is already paused, or one that is already in the queue as a returned task is refused.
 
@@ -69,7 +71,7 @@ When a run needs a place and every place is taken, the queue freezes the run tha
 How it works:
 
 - The frozen run is the last one that took a place. A run is not frozen when a group waits for a human answer, when it is finished and waits for delivery, when it is on pause or already frozen, when it is itself a priority run (it took its place by a priority action and holds it), or when it is the run that needs the place. When nobody can be frozen, the priority run takes a place over `parallel`.
-- A frozen run finishes its current steps and starts no new one, like a paused run. It leaves its place, and its task goes first in the queue, marked `frozen <run-id>` in `aip queue list` (state `frozen` in `aip run list` and the panel). The state of the queue does not change.
+- A frozen run finishes its current steps and starts no new one (its agents are not stopped). It leaves its place, and its task goes first in the queue, marked `frozen <run-id>` in `aip queue list` (state `frozen` in `aip run list` and the panel). The state of the queue does not change.
 - The groups of a frozen run that do not run a step have the status `frozen` (`paused` for a paused run), and the time of the run stops once its last step ends.
 - A frozen run continues by itself, in any state of the queue, as soon as a place is free and before any other task, regardless of `--after` and the postponed flag. Its failed groups are retried from where they stopped. "Continue" brings it back earlier; the run then holds a place over `parallel` if the priority run still holds one.
 - Freezing is never done by hand: pause a run to stop it yourself. A frozen run can be paused (it then waits at the end of the queue), and its task cannot be removed while the run is unfinished.
@@ -208,14 +210,14 @@ aip queue edit <item> --no-after                       # clears the list
 
 ## Tags
 
-Tags are named colored labels for tasks and runs. There is one catalog for all repositories.
+Tags are named colored labels for tasks and runs. Every repository has its own catalog: the same name can exist in two repositories, and a task or run sees only the tags of its repository. `aip tag` works with the repository of the current directory; `-r, --repo <path>` picks another one.
 
 - A name has at most 30 characters and is unique regardless of letter case (Cyrillic included).
 - The color is one of ten: `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `violet`, `pink`, `brown`. Without `--color`, the next color in turn is used.
 
 ```
 aip tag add auth --color blue            # create a tag
-aip tag list                             # the catalog (--json)
+aip tag list                             # the catalog of the repository (--json)
 aip tag edit auth --name login           # rename and/or change the color; tasks and runs keep the tag
 aip tag remove login                     # delete the tag and remove it from all tasks and runs
 aip queue add feature --task "Login form" --tag auth --tag v2   # --tag can repeat; run start accepts it too

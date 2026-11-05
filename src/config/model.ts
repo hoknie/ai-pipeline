@@ -75,6 +75,8 @@ export interface Step {
   onReject: OnReject | null;
   /** Text appended to the prompt of the specialist in this step only. */
   additionalPrompt: string | null;
+  /** After `done` the group stops for a review by a person before the next step. */
+  humanReview: boolean;
 }
 
 export interface Split {
@@ -210,7 +212,15 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     ...stored.claude,
     settings: (stored.claude as Partial<ClaudeSettings>).settings ?? 'isolated',
   };
-  return { ...stored, workspace, delivery, naming, web, runtimes, specialists, claude };
+  // Runs stored before `human_review` existed have no such steps.
+  const workflows = stored.workflows.map((workflow) => ({
+    ...workflow,
+    steps: workflow.steps.map((step) => ({
+      ...step,
+      humanReview: (step as Partial<Step>).humanReview ?? false,
+    })),
+  }));
+  return { ...stored, workspace, delivery, naming, web, runtimes, specialists, claude, workflows };
 }
 
 export interface ResolvedConfig {

@@ -13,6 +13,7 @@ import {
   queueOf,
   settingsOf,
   systemView,
+  tagFolder,
 } from './fixtures.ts';
 
 beforeEach(() => {
@@ -443,8 +444,8 @@ const FILES = {
   project: { file: PROJECT_FILE, revision: 'p1' },
 };
 
-const GLOBAL_GROUPS = ['General', 'Agents', 'Delivery', 'Runtimes', 'System', 'Tags'];
-const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue'];
+const GLOBAL_GROUPS = ['General', 'Agents', 'Delivery', 'Runtimes', 'System'];
+const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Tags'];
 
 const groupNav = () => screen.getByRole('navigation', { name: 'groups of settings' });
 const groupNames = () =>
@@ -468,6 +469,23 @@ describe('settings page', () => {
       'page',
     );
     expect(screen.getByText(GLOBAL_FILE)).toBeTruthy();
+  });
+
+  it('leads the address of the removed specialist tags group to General', async () => {
+    show(queueOf(), {}, '#settings/global/specialist-tags');
+    await screen.findByTestId('setting-max');
+    expect(
+      within(groupNav()).getByRole('link', { name: 'General' }).getAttribute('aria-current'),
+    ).toBe('page');
+    expect(within(groupNav()).queryByRole('link', { name: 'Specialist tags' })).toBeNull();
+  });
+
+  it('leads the project address of the specialist tags to General of the project tab', async () => {
+    show(queueOf(), {}, '#settings/project/specialist-tags');
+    await screen.findByTestId('setting-max');
+    expect(
+      within(groupNav()).getByRole('link', { name: 'General' }).getAttribute('aria-current'),
+    ).toBe('page');
   });
 
   it('has other groups on the Project tab and a selector of the project only there', async () => {
@@ -630,8 +648,12 @@ describe('settings page', () => {
   });
 
   it('shows the catalog of tags in the Tags group', async () => {
-    show(queueOf(), {}, '#settings/global/tags');
-    expect(await screen.findByText('The tag catalog, shared by all repositories.')).toBeTruthy();
+    show(queueOf(), {}, '#settings/project/tags');
+    expect(
+      await screen.findByText(
+        'The tags of the selected project. Every project has its own catalog.',
+      ),
+    ).toBeTruthy();
   });
 
   it('has no General settings entry in the list of specialists', async () => {
@@ -1110,10 +1132,17 @@ describe('settings target block', () => {
     expect(within(target()).queryByText('Saved to')).toBeNull();
   });
 
-  it('has no block in the Tags group of Shared', async () => {
+  it('shows the project and no file in the Tags group of Project', async () => {
+    show(queueOf(), {}, '#settings/project/tags');
+    await screen.findByRole('region', { name: 'Regular tags' });
+    expect(within(target()).getByRole('combobox', { name: 'Project' })).toBeTruthy();
+    expect(within(target()).queryByText('Saved to')).toBeNull();
+  });
+
+  it('leads the former shared address of the tags to the Project tab', async () => {
     show(queueOf(), {}, '#settings/global/tags');
-    await screen.findByRole('navigation', { name: 'groups of settings' });
-    expect(screen.queryByRole('region', { name: 'Where the settings are saved' })).toBeNull();
+    await screen.findByRole('region', { name: 'Regular tags' });
+    await waitFor(() => expect(window.location.hash).toBe('#settings/project/tags'));
   });
 
   it('shows only the note and no groups without repositories', async () => {
@@ -1304,5 +1333,68 @@ describe('system group', () => {
     });
     expect(api.restartDaemon).toHaveBeenCalledTimes(1);
     expect(card('Daemon').getByRole('button', { name: 'Restart daemon' })).toBeTruthy();
+  });
+
+  it('stops the daemon after a confirmation and waits until a stand-in reports it stopped', async () => {
+    const api = await mountSystem();
+    expect(card('Daemon').queryByRole('button', { name: 'Start daemon' })).toBeNull();
+    await click('Daemon', 'Stop daemon');
+    expect(api.stopDaemon).not.toHaveBeenCalled();
+    await confirmIn('Stop daemon');
+    expect(api.stopDaemon).toHaveBeenCalledWith(false);
+    down = true;
+    await flush(1000);
+    expect(card('Daemon').getByRole('button', { name: 'Stopping…' })).toBeTruthy();
+    current = systemView({
+      daemon: daemonOf({ running: false, pid: null, busy: null }),
+      web: { ...systemView().web, servedBy: 'standby' },
+    });
+    down = false;
+    await flush(1000);
+    expect(card('Daemon').getByText('Not running')).toBeTruthy();
+    expect(card('Daemon').queryByRole('button', { name: 'Restart daemon' })).toBeNull();
+    expect(card('Daemon').queryByRole('button', { name: 'Stop daemon' })).toBeNull();
+    expect(
+      card('Daemon').getByRole<HTMLButtonElement>('button', { name: 'Start daemon' }).disabled,
+    ).toBe(false);
+    expect(
+      card('Web panel').getByRole<HTMLButtonElement>('button', { name: 'Restart panel' }).disabled,
+    ).toBe(true);
+    expect(screen.getByText(/served by a stand-in process/)).toBeTruthy();
+  });
+
+  it('asks again for a busy daemon and stops it with force', async () => {
+    const stopDaemon = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(409, 'agents are running', 'daemon_busy'))
+      .mockResolvedValue(undefined);
+    const api = await mountSystem({ stopDaemon });
+    await click('Daemon', 'Stop daemon');
+    await confirmIn('Stop daemon');
+    const busy = await screen.findByRole('alertdialog');
+    await act(async () => {
+      fireEvent.click(within(busy).getByRole('button', { name: 'Stop, stopping the agents' }));
+    });
+    expect(api.stopDaemon).toHaveBeenLastCalledWith(true);
+  });
+
+  it('starts the daemon from a stand-in panel without asking and waits for the daemon to serve it', async () => {
+    const api = await mountSystem();
+    current = systemView({
+      daemon: daemonOf({ running: false, pid: null, busy: null }),
+      web: { ...systemView().web, servedBy: 'standby' },
+    });
+    await flush(3100);
+    await click('Daemon', 'Start daemon');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(api.startDaemon).toHaveBeenCalledTimes(1);
+    await flush(1000);
+    expect(card('Daemon').getByRole('button', { name: 'Starting…' })).toBeTruthy();
+    current = systemView({ daemon: daemonOf({ pid: 400 }) });
+    await flush(1000);
+    expect(card('Daemon').getByText('400')).toBeTruthy();
+    expect(card('Daemon').getByRole('button', { name: 'Restart daemon' })).toBeTruthy();
+    expect(card('Daemon').getByRole('button', { name: 'Stop daemon' })).toBeTruthy();
+    expect(screen.getAllByText('The daemon started').length).toBeGreaterThan(0);
   });
 });

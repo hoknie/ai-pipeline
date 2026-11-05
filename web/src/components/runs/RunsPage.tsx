@@ -53,6 +53,7 @@ export function RunsPage({
   repository,
   scope,
   onScope,
+  onSubtask,
 }: {
   api: Api;
   runs: RunView[];
@@ -73,6 +74,8 @@ export function RunsPage({
   /** The selected repository; null until known. */
   repository: string | null;
   scope: RunScope;
+  /** Opens a new task as a child of the run; absent while the queue is unknown. */
+  onSubtask?: (run: RunView) => void;
   onScope: (scope: RunScope) => void;
 }) {
   const { t } = useTranslation();
@@ -84,8 +87,9 @@ export function RunsPage({
   const [filter, setFilter] = usePreference<RunFilter>('runFilter', 'all');
   const { byId } = useTags();
   const [storedTags, setStoredTags] = usePreference<string[]>('runTags', []);
-  // an id that is not in the catalog (the tag was removed) drops out of the selection
-  const tagIds = storedTags.filter((id) => byId.has(id));
+  // an id that is not in the catalog of the selected repository (the tag was removed, or the
+  // repository changed) drops out of the selection
+  const tagIds = storedTags.filter((id) => byId.get(id)?.repository === repository);
   const [screen, setScreen] = useState<'list' | 'detail'>(route.group ? 'detail' : 'list');
 
   const deliver = useDeliveryOutcome(api, runs);
@@ -233,6 +237,7 @@ export function RunsPage({
         now={now}
         onError={onError}
         onDeliver={(force) => deliver(run, force)}
+        onSubtask={onSubtask}
         onSelect={(slug) => select(run.id, slug)}
         headerRef={setHeaderElement}
         entry={group}

@@ -6,7 +6,7 @@ import type { Api } from '../api.ts';
 import { clock } from '../format.ts';
 import { takeFocusRequest } from '../hotkeys.ts';
 import { formatRoute } from '../route.ts';
-import type { QueueView, WorkflowsView } from '../types.ts';
+import type { QueueView, RunView, WorkflowsView } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
@@ -84,6 +84,7 @@ export default function QueuePage({
   onQueue,
   onError,
   onNewTask,
+  runs = [],
 }: {
   api: Api;
   queue: QueueView | null;
@@ -93,6 +94,7 @@ export default function QueuePage({
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
   onNewTask: () => void;
+  runs?: RunView[];
 }) {
   const { t } = useTranslation();
   const [workflows, setWorkflows] = useState<WorkflowsView | null>(null);
@@ -153,6 +155,7 @@ export default function QueuePage({
             <QueueList
               api={api}
               queue={queue}
+              runs={runs}
               workflows={workflows}
               now={now}
               drafts={drafts}

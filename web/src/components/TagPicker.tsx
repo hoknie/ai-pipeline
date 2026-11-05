@@ -28,6 +28,7 @@ export function TagPicker({
   label,
   selected,
   onChange,
+  repository,
   api,
   allowCreate = false,
   disabled = false,
@@ -39,6 +40,8 @@ export function TagPicker({
   selected: string[];
   /** `fresh` is the updated catalog when the change created a tag. */
   onChange: (ids: string[], fresh?: TagView[]) => void;
+  /** The repository whose catalog is offered; tags of other repositories are not. */
+  repository: string | null;
   api?: Api;
   allowCreate?: boolean;
   disabled?: boolean;
@@ -49,6 +52,7 @@ export function TagPicker({
 }) {
   const { t } = useTranslation();
   const catalog = useTags();
+  const own = catalog.of(repository);
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,16 +61,17 @@ export function TagPicker({
 
   const typed = query.trim();
   const needle = typed.toLowerCase();
-  const visible = catalog.tags.filter(
+  const visible = own.filter(
     (tag) =>
       !(hideLinked && tag.task) && (needle === '' || tag.name.toLowerCase().includes(needle)),
   );
-  const pickable = catalog.tags.filter((tag) => !(hideLinked && tag.task));
+  const pickable = own.filter((tag) => !(hideLinked && tag.task));
   const canCreate =
     allowCreate &&
     api !== undefined &&
+    repository !== null &&
     typed !== '' &&
-    !catalog.tags.some((tag) => tag.name.toLowerCase() === needle);
+    !own.some((tag) => tag.name.toLowerCase() === needle);
 
   const toggle = (tagId: string) => {
     setError(null);
@@ -75,12 +80,12 @@ export function TagPicker({
   };
 
   const create = async () => {
-    if (!api || creating) return;
+    if (!api || repository === null || creating) return;
     setCreating(true);
     setError(null);
     try {
-      const list = await api.addTag(typed);
-      catalog.update(list);
+      const list = await api.forRepository(repository).addTag(typed);
+      catalog.update(repository, list);
       const made = list.find((tag) => tag.name.toLowerCase() === needle);
       if (made && !selected.includes(made.id)) onChange([...selected, made.id], list);
       setQuery('');

@@ -413,6 +413,26 @@ describe('group steps of the split', () => {
   });
 });
 
+describe('human review', () => {
+  const raw = {
+    steps: [
+      { id: 'code', specialist: 'coder', human_review: true },
+      { id: 'review', specialist: 'reviewer' },
+    ],
+  };
+
+  it('reads human_review into the draft and writes it only when on', () => {
+    const draft = draftOf(raw);
+    expect(draft.steps.map((step) => step.humanReview)).toEqual([true, false]);
+    const value = valueOf(draft) as { steps: Record<string, unknown>[] };
+    expect(value.steps[0]?.human_review).toBe(true);
+    expect('human_review' in (value.steps[1] ?? {})).toBe(false);
+    draft.steps[0]!.humanReview = false;
+    const off = valueOf(draft) as { steps: Record<string, unknown>[] };
+    expect('human_review' in (off.steps[0] ?? {})).toBe(false);
+  });
+});
+
 describe('preview', () => {
   it('asks once for a series of edits, after the delay', async () => {
     vi.useFakeTimers();

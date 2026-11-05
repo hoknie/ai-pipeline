@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { QueueView, RunCreated } from '../../src/protocol/index.ts';
@@ -105,18 +108,21 @@ describe('freezing for a priority run', () => {
     await h.waitFor(b, (view) => view.finished);
   });
 
-  it('freezes nobody for a run on pause that failed in a full queue', async () => {
+  it('freezes nobody for a run on pause that was stopped in a full queue', async () => {
     const h = await start();
-    h.script({ code: [{ waitFor: h.gate('p'), noReport: true }, { waitFor: h.gate('b') }, {}] });
+    h.script({ code: [{ waitFor: h.gate('p') }, { waitFor: h.gate('b') }, {}] });
     await add(h, 'P');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
     const p = (await waitQueue(h, (view) => view.runs.length === 1)).runs[0]!.id;
+    await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
     await h.call('run_pause', { runId: p });
     const full = await waitQueue(h, (view) => view.runs.length === 1 && view.runs[0]!.id !== p);
     const b = full.runs[0]!.id;
-    h.open('p');
-    await h.waitFor(p, (view) => view.finished);
+    await until('the paused step is stopped', async () => {
+      const slug = (await h.status(p)).groups[0]!.slug;
+      return (await h.group(p, slug)).attempts.some((attempt) => attempt.status === 'cancelled');
+    });
     const queue = await queueOf(h);
     expect(queue.runs.map((run) => run.id)).toEqual([b]);
     expect(queue.items.at(-1)).toMatchObject({ run: p, hold: 'paused' });
@@ -147,13 +153,13 @@ describe('freezing for a priority run', () => {
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
     await h.call('queue_return', { runId: a });
     const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
-    const catalog = await h.call('tags', {});
+    const catalog = await h.call('tags', { repository: h.repo });
     for (const parent of [a, null]) {
       await expect(
         h.call('queue_edit', { repository: h.repo, item: item.id, parent }),
       ).rejects.toThrow('a returned run keeps its own task');
     }
-    expect(await h.call('tags', {})).toEqual(catalog);
+    expect(await h.call('tags', { repository: h.repo })).toEqual(catalog);
   });
 
   it('skips a step of a returned run through its queue item and keeps its task', async () => {

@@ -35,6 +35,7 @@ import {
 } from './fixtures.ts';
 
 beforeEach(() => {
+  window.localStorage.removeItem('aip.web.dismissedNotices');
   window.location.hash = '';
 });
 
@@ -359,7 +360,7 @@ describe('run page', () => {
     );
     fireEvent.click(within(tree).getByText('Вход'));
     const login = screen.getByRole('region', { name: 'group Вход' });
-    expect(login.querySelector('header')!.textContent).toContain('2 files +3 −1');
+    expect(login.querySelector('header')!.textContent).not.toContain('2 files');
     expect(
       within(screen.getByRole('complementary', { name: 'Run summary' })).getByLabelText(
         'Merged (merged)',
@@ -715,7 +716,7 @@ describe('attempts and transcript', () => {
     expect(head.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(head);
     expect(head.getAttribute('aria-expanded')).toBe('true');
-    const block = head.parentElement!;
+    const block = head.parentElement!.parentElement!;
     const chips = [...block.querySelectorAll('li code')];
     expect(chips.map((item) => item.textContent)).toEqual(list);
     chips.forEach((chip, index) => {
@@ -740,6 +741,93 @@ describe('attempts and transcript', () => {
       screen.queryByRole('button', { name: /in the working copy changed during step/ }),
     ).toBeNull();
     expect(screen.queryByText(/in working copy:/)).toBeNull();
+  });
+
+  describe('one notice of a group', () => {
+    const crowded = (extra: Record<string, unknown> = {}, row = groupRow()) =>
+      render(
+        <GroupScreen
+          api={fakeApi({
+            group: vi.fn(async () =>
+              groupView({
+                warnings: ['config refreshed: no changes', 'permissions not refreshed: boom'],
+                attempts: [attempt(1, { outsideChanges: ['a.md'] })],
+                ...extra,
+              }),
+            ),
+          })}
+          runId="run1"
+          row={row}
+          draftKey="run1/login"
+          drafts={{}}
+          onDraft={() => undefined}
+          onClearDrafts={() => undefined}
+          onError={() => undefined}
+        />,
+      );
+
+    it('shows only the reason of a failure', async () => {
+      crowded({}, groupRow({ status: 'failed', reason: 'boom' }));
+      await screen.findByText('#1 Планировщик');
+      expect(screen.getByText('boom')).toBeTruthy();
+      expect(screen.queryByText(/config refreshed/)).toBeNull();
+      expect(screen.queryByText(/permissions not refreshed/)).toBeNull();
+      expect(screen.queryByRole('button', { name: /in the working copy changed/ })).toBeNull();
+    });
+
+    it('shows the second of two warnings and keeps it closed after a new mount', async () => {
+      const first = crowded({ attempts: [attempt(1)] });
+      expect(await screen.findByText('permissions not refreshed: boom')).toBeTruthy();
+      expect(screen.queryByText('config refreshed: no changes')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss notice' }));
+      expect(screen.queryByText('permissions not refreshed: boom')).toBeNull();
+      first.unmount();
+      crowded({ attempts: [attempt(1)] });
+      await screen.findByText('#1 Планировщик');
+      expect(screen.queryByText('permissions not refreshed: boom')).toBeNull();
+      expect(screen.queryByText('config refreshed: no changes')).toBeNull();
+    });
+
+    it('closes the outside changes block without folding it and keeps the count', async () => {
+      crowded({ warnings: [] });
+      const head = await screen.findByRole('button', { name: /in the working copy changed/ });
+      expect(head.getAttribute('aria-expanded')).toBe('true');
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss notice' }));
+      expect(screen.queryByRole('button', { name: /in the working copy changed/ })).toBeNull();
+      expect(screen.getByText('in working copy: 1')).toBeTruthy();
+    });
+
+    it('shows a new hint after the warning was closed', async () => {
+      const first = crowded({ attempts: [attempt(1)] });
+      await screen.findByText('permissions not refreshed: boom');
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss notice' }));
+      first.unmount();
+      crowded({ attempts: [attempt(1)], permissionHints: ['claude plugin *'] });
+      const hint = await screen.findByRole('region', { name: 'permissions hint' });
+      expect(hint.textContent).toContain('claude plugin *');
+      expect(within(hint).getByRole('button', { name: 'Dismiss notice' })).toBeTruthy();
+    });
+
+    it('keeps the delivery failure next to the notice', async () => {
+      crowded(
+        {
+          attempts: [attempt(1)],
+          delivery: {
+            state: 'apply_failed',
+            reason: 'conflict',
+            files: [],
+            conflicts: [],
+            userEdits: [],
+            manual: false,
+            finishedAt: null,
+          },
+        },
+        groupRow({ status: 'merged', delivery: 'apply_failed' }),
+      );
+      expect(await screen.findByText('permissions not refreshed: boom')).toBeTruthy();
+      expect(screen.getByText('Delivery failed')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Retry delivery' })).toBeTruthy();
+    });
   });
 
   it('keeps the attempt open when a nested block is folded', async () => {
@@ -962,7 +1050,7 @@ describe('useRuns stability', () => {
 });
 
 describe('tag catalog and filter', () => {
-  const auth = { id: 'ta', name: 'auth', color: 'red' as const, task: null };
+  const auth = { id: 'ta', repository: '/repo', name: 'auth', color: 'red' as const, task: null };
 
   it('keeps the catalog from the snapshot and updates it on the tags event', () => {
     const api = fakeApi();

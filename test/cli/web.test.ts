@@ -426,7 +426,7 @@ describe('aip web', () => {
     const text = second.client.text;
     expect(text.indexOf('"event":"snapshot"')).toBeGreaterThanOrEqual(0);
     expect(text.indexOf('"event":"processes"')).toBeGreaterThan(text.indexOf('"event":"snapshot"'));
-    await h.call('tag_add', { name: 'later' });
+    await h.call('tag_add', { repository: h.repo, name: 'later' });
     await second.read('"name":"later"');
     first.client.controller.abort();
     second.client.controller.abort();
@@ -452,7 +452,7 @@ describe('aip web', () => {
       }
     };
     await read('"snapshot"');
-    await h.call('tag_add', { name: 'auth' });
+    await h.call('tag_add', { repository: h.repo, name: 'auth' });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       workflow: 'feature',
@@ -511,6 +511,58 @@ describe('aip web', () => {
     expect((await post('/api/tags/remove', { tag: 'nope' })).status).toBe(400);
     expect((await post('/api/tags/remove', { tag: 'login' })).status).toBe(200);
     expect(await names()).toEqual([]);
+  });
+
+  it('changes the title of a run through the API', async () => {
+    const { h, web, base } = await setup();
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    const set = await post(`/api/runs/${runId}/title`, { title: '  Новое название ' });
+    expect(set.status).toBe(200);
+    expect(((await set.json()) as { title: string }).title).toBe('Новое название');
+    expect((await post(`/api/runs/${runId}/title`, {})).status).toBe(400);
+    expect((await post(`/api/runs/${runId}/title`, { title: '  ' })).status).toBe(400);
+    expect((await post(`/api/runs/${runId}/title`, { title: 'x'.repeat(61) })).status).toBe(400);
+    expect((await post('/api/runs/unknown/title', { title: 'x' })).status).toBe(404);
+  });
+
+  it('serves the catalog of the chosen repository', async () => {
+    const { h, web, base } = await setup();
+    const second = realpathSync(mkdtempSync(join(tmpdir(), 'aip-second-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', second]);
+    const post = (path: string, body: unknown, repository?: string) =>
+      fetch(`${base}${path}${repository ? `?repository=${encodeURIComponent(repository)}` : ''}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    const names = async (repository?: string) =>
+      (
+        (await (
+          await fetch(
+            `${base}/api/tags${repository ? `?repository=${encodeURIComponent(repository)}` : ''}`,
+            { headers: authed(web) },
+          )
+        ).json()) as { name: string; repository: string }[]
+      ).map((tag) => `${tag.name}@${tag.repository}`);
+    expect((await post('/api/tags', { name: 'auth' })).status).toBe(200);
+    expect((await post('/api/tags', { name: 'auth' }, second)).status).toBe(200);
+    expect(await names()).toEqual([`auth@${h.repo}`]);
+    expect(await names(second)).toEqual([`auth@${second}`]);
+    expect((await post('/api/tags/edit', { tag: 'auth', name: 'ui' }, second)).status).toBe(200);
+    expect(await names()).toEqual([`auth@${h.repo}`]);
+    expect((await post('/api/tags/remove', { tag: 'ui' }, second)).status).toBe(200);
+    expect(await names(second)).toEqual([]);
+    expect(await names()).toEqual([`auth@${h.repo}`]);
   });
 
   it('passes tags of a queued task through the queue API', async () => {
@@ -1058,6 +1110,84 @@ describe('aip web', () => {
     expect((await fetch(`${base}/api/runs/nope/patch`, { headers: authed(web) })).status).toBe(404);
   });
 
+  it('lists artifacts and serves them as attachments, inline only as text', async () => {
+    const { h, web, base } = await setup();
+    const tool = (args: Record<string, unknown>) => ({ name: 'swarm_artifact', arguments: args });
+    h.script({
+      code: [
+        {
+          toolCalls: [
+            tool({ file_name: 'Отчёт.md', content: '# Привет\n' }),
+            tool({ file_name: 'page.html', content: '<script>alert(1)</script>' }),
+            tool({ file_name: 'out.log', content: 'line' }),
+          ],
+        },
+      ],
+    });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.finished);
+    const group = (await h.status(runId)).groups[0]!.slug;
+    const listUrl = `${base}/api/runs/${runId}/groups/${group}/artifacts`;
+    const listed = await fetch(listUrl, { headers: authed(web) });
+    expect(listed.status).toBe(200);
+    const { artifacts } = (await listed.json()) as {
+      artifacts: { id: string; fileName: string; preview: string | null }[];
+    };
+    expect(artifacts.map((artifact) => artifact.fileName).sort()).toEqual([
+      'out.log',
+      'page.html',
+      'Отчёт.md',
+    ]);
+    expect((await fetch(listUrl)).status).toBe(401);
+    expect((await fetch(listUrl, { method: 'POST', headers: authed(web) })).status).toBe(405);
+    expect(
+      (await fetch(`${base}/api/runs/nope/groups/${group}/artifacts`, { headers: authed(web) }))
+        .status,
+    ).toBe(404);
+    expect(
+      (await fetch(`${base}/api/runs/${runId}/groups/nope/artifacts`, { headers: authed(web) }))
+        .status,
+    ).toBe(404);
+
+    const byName = (name: string) => artifacts.find((artifact) => artifact.fileName === name)!;
+    const url = (name: string) => `${listUrl}/${byName(name).id}`;
+    const md = await fetch(url('Отчёт.md'), { headers: authed(web) });
+    expect(md.status).toBe(200);
+    expect(md.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
+    expect(md.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(md.headers.get('cache-control')).toBe('no-store');
+    expect(md.headers.get('content-disposition')).toBe(
+      `attachment; filename="_____.md"; filename*=UTF-8''%D0%9E%D1%82%D1%87%D1%91%D1%82.md`,
+    );
+    expect(await md.text()).toBe('# Привет\n');
+
+    const html = await fetch(url('page.html'), { headers: authed(web) });
+    expect(html.headers.get('content-type')).toBe('application/octet-stream');
+    expect(html.headers.get('content-disposition')).toContain('attachment;');
+    expect(html.headers.get('x-content-type-options')).toBe('nosniff');
+    expect((await fetch(`${url('page.html')}?inline=1`, { headers: authed(web) })).status).toBe(
+      400,
+    );
+
+    const inline = await fetch(`${url('out.log')}?inline=1`, { headers: authed(web) });
+    expect(inline.status).toBe(200);
+    expect(inline.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(inline.headers.get('content-disposition')).toBeNull();
+    expect(await inline.text()).toBe('line');
+
+    expect((await fetch(url('out.log'))).status).toBe(401);
+    expect((await fetch(url('out.log'), { method: 'DELETE', headers: authed(web) })).status).toBe(
+      405,
+    );
+    expect((await fetch(`${listUrl}/nope`, { headers: authed(web) })).status).toBe(404);
+    h.running.daemon.store.database.prepare("UPDATE artifacts SET uri = 's3://b/x'").run();
+    expect((await fetch(url('out.log'), { headers: authed(web) })).status).toBe(409);
+  });
+
   it('serves the workflows of the repository, and the errors of a broken configuration', async () => {
     const { h, web, base } = await setup();
     const ok = await fetch(`${base}/api/workflows?repository=${encodeURIComponent(h.repo)}`, {
@@ -1099,6 +1229,95 @@ describe('aip web catalog', () => {
     mkdirSync(join(h.repo, '.claude', 'skills', 'fresh'), { recursive: true });
     writeFileSync(join(h.repo, '.claude', 'skills', 'fresh', 'SKILL.md'), 'x');
     expect((await read()).runtimes.claude.skills.map((skill) => skill.name)).toContain('fresh');
+  });
+});
+
+describe('aip web specialist tags', () => {
+  async function editor(): Promise<{ h: Harness; web: WebServer; base: string; lib: string }> {
+    h = await harness(MANUAL_CONFIG, { HOME: mkdtempSync(join(tmpdir(), 'aip-web-home-')) });
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-web-lib-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', lib]);
+    mkdirSync(join(lib, 'aip', 'specialists'), { recursive: true });
+    writeFileSync(join(lib, 'aip', 'specialists', 'plan.yaml'), 'name: Plan\ntags: [fast]\n');
+    const base = `http://127.0.0.1:${web.port}`;
+    await fetch(`${base}/api/config?repository=${encodeURIComponent(lib)}`, {
+      headers: authed(web),
+    });
+    await fetch(`${base}/api/config`, { headers: authed(web) });
+    return { h, web, base, lib };
+  }
+
+  const post = (web: WebServer, url: string, body: unknown) =>
+    fetch(url, { method: 'POST', headers: authed(web, JSON_TYPE), body: JSON.stringify(body) });
+
+  it('needs the token', async () => {
+    const { base } = await editor();
+    expect((await fetch(`${base}/api/specialist-tags`)).status).toBe(401);
+    expect(
+      (
+        await fetch(`${base}/api/specialist-tags/rename`, {
+          method: 'POST',
+          headers: JSON_TYPE,
+          body: JSON.stringify({ repository: null, from: 'a', to: 'b' }),
+        })
+      ).status,
+    ).toBe(401);
+  });
+
+  it('lists folders and edits tags of the shared level and of a project', async () => {
+    const { web, base, lib } = await editor();
+    const read = async () =>
+      (await (await fetch(`${base}/api/specialist-tags`, { headers: authed(web) })).json()) as {
+        folders: { repository: string | null; specialists: { slug: string; tags: string[] }[] }[];
+      };
+    const first = await read();
+    expect(first.folders[0]?.repository).toBeNull();
+    const planFolder = first.folders.find((folder) => folder.repository === lib);
+    expect(planFolder?.specialists).toEqual([
+      expect.objectContaining({ slug: 'plan', tags: ['fast'] }),
+    ]);
+    const renamed = await post(web, `${base}/api/specialist-tags/rename`, {
+      repository: lib,
+      from: 'fast',
+      to: 'quick',
+    });
+    expect(renamed.status).toBe(200);
+    expect(readFileSync(join(lib, 'aip', 'specialists', 'plan.yaml'), 'utf8')).toContain('quick');
+    const unknown = await post(web, `${base}/api/specialist-tags/remove`, {
+      repository: lib,
+      tag: 'nope',
+    });
+    expect(unknown.status).toBe(422);
+    const stale = await fetch(`${base}/api/specialist-tags/specialists/plan`, {
+      method: 'PUT',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ repository: lib, tags: ['x'], revision: 'stale' }),
+    });
+    expect(stale.status).toBe(409);
+  });
+
+  it('refuses a relative repository before it asks the daemon', async () => {
+    const { web, base } = await editor();
+    const response = await post(web, `${base}/api/specialist-tags/remove`, {
+      repository: 'relative/path',
+      tag: 'a',
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('imports with a conflict as 409 and a relative source as 400', async () => {
+    const { h, web, base, lib } = await editor();
+    const url = `${base}/api/config/specialists/import`;
+    const bad = await post(web, url, { source: 'lib', slugs: ['plan'] });
+    expect(bad.status).toBe(400);
+    expect((await post(web, url, { source: lib, slugs: [] })).status).toBe(400);
+    const done = await post(web, url, { source: lib, slugs: ['plan'] });
+    expect(done.status).toBe(200);
+    expect(existsSync(join(h.repo, 'aip', 'specialists', 'plan.yaml'))).toBe(true);
+    const again = await post(web, url, { source: lib, slugs: ['plan'] });
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { slugs: string[] }).slugs).toEqual(['plan']);
   });
 });
 

@@ -25,6 +25,7 @@ import type {
   WorkflowTopology,
   WorkflowsView,
   SystemView,
+  SpecialistTagFolderView,
 } from '../src/types.ts';
 
 export function topologyOf(overrides: Partial<Topology> = {}): Topology {
@@ -78,6 +79,7 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     durationMs: 65_000,
     question: null,
     questions: null,
+    humanOnly: null,
     reason: null,
     warnings: 0,
     delivery: 'pending',
@@ -85,6 +87,8 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     limitUntil: null,
     usage: null,
     decisions: [],
+    artifacts: 0,
+    artifactsRevision: 0,
     wait: null,
     ...overrides,
   };
@@ -179,6 +183,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
     worktree: '/w',
     question: null,
     questions: null,
+    humanOnly: null,
     reason: null,
     limitUntil: null,
     warnings: [],
@@ -249,7 +254,7 @@ export function tagView(
   color: TagColor = 'blue',
   id = `t-${name.toLowerCase()}`,
 ): TagView {
-  return { id, name, color, task: null };
+  return { id, repository: '/repo', name, color, task: null };
 }
 
 export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): QueueRunView {
@@ -325,6 +330,8 @@ export function specialistEntry(
       max: null,
       ...values,
     },
+    shared_tags: [],
+    own_tags: [],
     ...overrides,
   };
   return { ...base, sources: overrides.sources ?? sourcesFor('specialists', base) };
@@ -525,6 +532,25 @@ export function catalogView(overrides: Partial<ConfigCatalogResponse> = {}): Con
   };
 }
 
+/** A folder of the specialist tags: `repository` null is the shared level. */
+export function tagFolder(
+  repository: string | null,
+  specialists: { slug: string; tags?: string[]; name?: string | null; error?: string }[],
+): SpecialistTagFolderView {
+  const base = repository ?? '/xdg/aip';
+  return {
+    repository,
+    directory: `${base}${repository === null ? '' : '/aip'}/specialists`,
+    specialists: specialists.map((entry) => ({
+      slug: entry.slug,
+      name: entry.name === undefined ? entry.slug.toUpperCase() : entry.name,
+      tags: entry.tags ?? [],
+      revision: entry.error ? null : `rev-${entry.slug}`,
+      ...(entry.error ? { error: entry.error } : {}),
+    })),
+  };
+}
+
 export function configView(overrides: Partial<ConfigEditorResponse> = {}): ConfigEditorResponse {
   return {
     repository: '/repo',
@@ -567,6 +593,12 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     workflows: vi.fn(async () => workflowsView()),
     group: vi.fn(async () => groupView()),
     groupSpec: vi.fn(async () => null),
+    groupArtifacts: vi.fn(async () => []),
+    artifactUrl: vi.fn(
+      (run: string, group: string, id: string, inline?: boolean) =>
+        `/api/runs/${run}/groups/${group}/artifacts/${id}${inline ? '?inline=1' : ''}`,
+    ),
+    artifactText: vi.fn(async () => ''),
     transcript: vi.fn(async () => transcript),
     fileDiff: vi.fn(async (_run: string, _group: string, path: string) => ({
       path,
@@ -590,6 +622,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     addTag: vi.fn(async (name: string) => [tagView(name)]),
     editTag: vi.fn(async () => []),
     removeTag: vi.fn(async () => []),
+    setRunTitle: vi.fn(async () => runView()),
     setRunTags: vi.fn(async () => runView()),
     queue: vi.fn(async () => queueOf()),
     queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
@@ -612,10 +645,17 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     system: vi.fn(async () => systemView()),
     restartWeb: vi.fn(async () => undefined),
     restartDaemon: vi.fn(async () => undefined),
+    stopDaemon: vi.fn(async () => undefined),
+    startDaemon: vi.fn(async () => undefined),
     config: vi.fn(async () => configView()),
     catalog: vi.fn(async () => catalogView()),
     writeSpecialist: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteSpecialist: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
+    specialistTags: vi.fn(async () => ({ folders: [] })),
+    importSpecialists: vi.fn(async (_source: string, slugs: string[]) => ({
+      ok: true as const,
+      imported: slugs,
+    })),
     writeWorkflow: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     writeSettings: vi.fn(async () => ({
       ok: true as const,

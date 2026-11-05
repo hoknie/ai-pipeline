@@ -14,11 +14,51 @@ import { FilePath } from '../FilePath.tsx';
 
 /** How often the state is read while the group is open. */
 export const SYSTEM_POLL_MS = 3000;
-/** How often and for how long the page waits for a restarted part to answer. */
+/** How often and for how long the page waits for a restarted, stopped or started part. */
 export const RESTART_POLL_MS = 1000;
 export const RESTART_WAIT_MS = 30_000;
 
-type Part = 'web' | 'daemon';
+type Action = 'webRestart' | 'daemonRestart' | 'daemonStop' | 'daemonStart';
+
+/** Translation keys of an action: its question, its result and its timeout. */
+const TEXT = {
+  webRestart: {
+    title: 'system.web.restartTitle',
+    description: 'system.web.restartDescription',
+    confirm: 'system.restart',
+    done: 'system.web.restarted',
+    notBack: 'system.web.notBack',
+  },
+  daemonRestart: {
+    title: 'system.daemon.restartTitle',
+    description: 'system.daemon.restartDescription',
+    confirm: 'system.restart',
+    done: 'system.daemon.restarted',
+    notBack: 'system.daemon.notBack',
+  },
+  daemonStop: {
+    title: 'system.daemon.stopTitle',
+    description: 'system.daemon.stopDescription',
+    confirm: 'system.daemon.stop',
+    done: 'system.daemon.stopped',
+    notBack: 'system.daemon.notStopped',
+  },
+  daemonStart: { done: 'system.daemon.started', notBack: 'system.daemon.notStarted' },
+} as const;
+
+/** Whether the system reached the state the action leads to. */
+function reached(action: Action, next: SystemView, pidBefore: number | null): boolean {
+  switch (action) {
+    case 'webRestart':
+      return true;
+    case 'daemonRestart':
+      return next.daemon.pid !== null && next.daemon.pid !== pidBefore;
+    case 'daemonStop':
+      return !next.daemon.running;
+    case 'daemonStart':
+      return next.daemon.running && next.web.servedBy === 'daemon';
+  }
+}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -33,13 +73,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** State of the daemon and of the panel, and their restarts. */
+/** State of the daemon and of the panel, their restarts, and stopping and starting the daemon. */
 export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () => void }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [view, setView] = useState<SystemView | null>(null);
   const [offline, setOffline] = useState(false);
-  const [restarting, setRestarting] = useState<Part | null>(null);
+  const [pending, setPending] = useState<Action | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const alive = useRef(true);
   const latest = useRef<SystemView | null>(null);
@@ -65,22 +105,22 @@ export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () =>
     };
   }, [api]);
 
-  /** Waits until the restarted part answers: the panel by any answer, the daemon by a new pid. */
-  const waitBack = useCallback(
-    async (part: Part, pidBefore: number | null): Promise<boolean> => {
+  /** Waits until the panel answers with the state the action leads to. */
+  const waitFor = useCallback(
+    async (action: Action, pidBefore: number | null): Promise<boolean> => {
       for (let waited = 0; waited < RESTART_WAIT_MS && alive.current; waited += RESTART_POLL_MS) {
         await sleep(RESTART_POLL_MS);
         if (!alive.current) return false;
         try {
           const next = await api.system();
           if (!alive.current) return false;
-          if (part === 'web' || (next.daemon.pid !== null && next.daemon.pid !== pidBefore)) {
+          if (reached(action, next, pidBefore)) {
             setView(next);
             setOffline(false);
             return true;
           }
         } catch {
-          // the part is still coming up
+          // the panel is still coming up
         }
       }
       return false;
@@ -88,35 +128,52 @@ export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () =>
     [api],
   );
 
-  const restart = async (part: Part) => {
+  const send = (action: Action, force: boolean): Promise<void> => {
+    switch (action) {
+      case 'webRestart':
+        return api.restartWeb();
+      case 'daemonRestart':
+        return api.restartDaemon(force);
+      case 'daemonStop':
+        return api.stopDaemon(force);
+      case 'daemonStart':
+        return api.startDaemon();
+    }
+  };
+
+  const run = async (action: Action) => {
     const pidBefore = latest.current?.daemon.pid ?? null;
-    const ask = await confirm({
-      title: t(part === 'web' ? 'system.web.restartTitle' : 'system.daemon.restartTitle'),
-      description: t(
-        part === 'web' ? 'system.web.restartDescription' : 'system.daemon.restartDescription',
-      ),
-      confirmLabel: t('system.restart'),
-      cancelLabel: t('system.cancel'),
-    });
-    if (!ask) return;
+    const text = TEXT[action];
+    if ('title' in text) {
+      const ask = await confirm({
+        title: t(text.title),
+        description: t(text.description),
+        confirmLabel: t(text.confirm),
+        cancelLabel: t('system.cancel'),
+        destructive: action === 'daemonStop',
+      });
+      if (!ask) return;
+    }
     setFailure(null);
     let force = false;
     for (;;) {
       try {
-        if (part === 'web') await api.restartWeb();
-        else await api.restartDaemon(force);
+        await send(action, force);
         break;
       } catch (error) {
         if (
-          part === 'daemon' &&
+          (action === 'daemonRestart' || action === 'daemonStop') &&
           !force &&
           error instanceof ApiError &&
           error.code === 'daemon_busy'
         ) {
+          const stop = action === 'daemonStop';
           const agree = await confirm({
             title: t('system.daemon.busyTitle'),
-            description: t('system.daemon.busyDescription'),
-            confirmLabel: t('system.daemon.restartForce'),
+            description: t(
+              stop ? 'system.daemon.busyStopDescription' : 'system.daemon.busyDescription',
+            ),
+            confirmLabel: t(stop ? 'system.daemon.stopForce' : 'system.daemon.restartForce'),
             cancelLabel: t('system.cancel'),
             destructive: true,
           });
@@ -132,19 +189,15 @@ export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () =>
         return;
       }
     }
-    setRestarting(part);
-    const back = await waitBack(part, pidBefore);
+    setPending(action);
+    const done = await waitFor(action, pidBefore);
     if (!alive.current) return;
-    setRestarting(null);
-    if (back) {
-      notifySuccess(t(part === 'web' ? 'system.web.restarted' : 'system.daemon.restarted'));
-      onRestarted();
+    setPending(null);
+    if (done) {
+      notifySuccess(t(text.done));
+      if (action !== 'daemonStop') onRestarted();
     } else {
-      setFailure(
-        t(part === 'web' ? 'system.web.notBack' : 'system.daemon.notBack', {
-          log: latest.current?.logPath ?? 'daemon.log',
-        }),
-      );
+      setFailure(t(text.notBack, { log: latest.current?.logPath ?? 'daemon.log' }));
     }
   };
 
@@ -159,6 +212,14 @@ export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () =>
   }
   const { daemon, web } = view;
   const standalone = web.servedBy === 'standalone';
+  const standby = web.servedBy === 'standby';
+  // The pending button stays in place while the regular poll sees the daemon go down or come up.
+  const showRunning =
+    pending === 'daemonRestart' || pending === 'daemonStop'
+      ? true
+      : pending === 'daemonStart'
+        ? false
+        : daemon.running;
   return (
     <div className="flex flex-col gap-3" aria-label={t('system.label')} role="region">
       {offline ? <Alert variant="warn">{t('system.offline')}</Alert> : null}
@@ -200,14 +261,36 @@ export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () =>
               </Row>
             ) : null}
           </dl>
-          <div>
-            <Button
-              variant="outline"
-              disabled={restarting !== null || standalone}
-              onClick={() => void restart('daemon')}
-            >
-              {restarting === 'daemon' ? t('system.restarting') : t('system.daemon.restart')}
-            </Button>
+          {standby ? <p className="text-xs text-muted-foreground">{t('system.standby')}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            {showRunning ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={pending !== null || standalone}
+                  onClick={() => void run('daemonRestart')}
+                >
+                  {pending === 'daemonRestart'
+                    ? t('system.restarting')
+                    : t('system.daemon.restart')}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={pending !== null || standalone}
+                  onClick={() => void run('daemonStop')}
+                >
+                  {pending === 'daemonStop' ? t('system.stopping') : t('system.daemon.stop')}
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                disabled={pending !== null || !standby}
+                onClick={() => void run('daemonStart')}
+              >
+                {pending === 'daemonStart' ? t('system.starting') : t('system.daemon.start')}
+              </Button>
+            )}
           </div>
         </section>
         <section
@@ -233,10 +316,10 @@ export function SystemGroup({ api, onRestarted }: { api: Api; onRestarted: () =>
           <div>
             <Button
               variant="outline"
-              disabled={restarting !== null || standalone}
-              onClick={() => void restart('web')}
+              disabled={pending !== null || standalone || standby}
+              onClick={() => void run('webRestart')}
             >
-              {restarting === 'web' ? t('system.restarting') : t('system.web.restart')}
+              {pending === 'webRestart' ? t('system.restarting') : t('system.web.restart')}
             </Button>
           </div>
         </section>

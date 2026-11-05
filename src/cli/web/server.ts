@@ -19,11 +19,15 @@ import {
   streamEventSchema,
   subscribe,
   type ConfigEditResult,
+  type SpecialistTagsResult,
+  type SpecialistsImportResult,
   type DaemonCheck,
+  type ArtifactContentView,
   type RunPatchView,
   type Method,
   type ParamsOf,
 } from '../../protocol/index.ts';
+import { artifactPreview, RUN_TITLE_LIMIT } from '../../core/index.ts';
 
 import { systemView } from './system.ts';
 
@@ -58,8 +62,14 @@ export interface WebOptions {
 }
 
 export interface SystemHooks {
-  restartWeb(): Promise<void>;
-  restartDaemon(force: boolean): Promise<void>;
+  /** `daemon` by default; `standby` while the daemon is stopped and a stand-in serves the panel. */
+  servedBy?: 'daemon' | 'standby';
+  restartWeb?(): Promise<void>;
+  restartDaemon?(force: boolean): Promise<void>;
+  /** Stops the daemon and keeps the panel up in a stand-in process. */
+  stopDaemon?(force: boolean): Promise<void>;
+  /** Starts the daemon and hands the panel back to it (the stand-in only). */
+  startDaemon?(): Promise<void>;
   /** The daemon log, shown in the system view. */
   logPath?: string;
 }
@@ -123,6 +133,7 @@ const runTagsBody = z
   .refine((body) => (body.add?.length ?? 0) + (body.remove?.length ?? 0) > 0, {
     message: 'pass tags to add or remove',
   });
+const runTitleBody = z.object({ title: z.string().trim().min(1).max(RUN_TITLE_LIMIT) });
 
 const levelParam = z.enum(['project', 'global']);
 const previewBody = z.object({
@@ -135,7 +146,40 @@ const writeBody = z.object({
   level: levelParam.optional(),
 });
 
-const restartDaemonBody = z.object({ force: z.boolean().optional() });
+/** Repository of the project level; null is the shared level. */
+const levelRepository = z
+  .string()
+  .nullable()
+  .refine((value) => value === null || isAbsolute(value), {
+    message: 'repository must be an absolute path',
+  });
+const tagsSetBody = z.object({
+  repository: levelRepository,
+  tags: z.array(z.string()),
+  revision: z.string().min(1).nullable(),
+});
+const tagRenameBody = z.object({
+  repository: levelRepository,
+  from: z.string().min(1),
+  to: z.string().min(1),
+});
+const specialistTagRemoveBody = z.object({ repository: levelRepository, tag: z.string().min(1) });
+const importBody = z.object({
+  source: z.string().refine((value) => isAbsolute(value), {
+    message: 'source must be an absolute path',
+  }),
+  slugs: z.array(z.string().min(1)).min(1),
+});
+
+const forceBody = z.object({ force: z.boolean().optional() });
+
+type SystemAction = 'web_restart' | 'daemon_restart' | 'daemon_stop' | 'daemon_start';
+const SYSTEM_ACTIONS: Record<string, SystemAction | undefined> = {
+  '/api/system/web/restart': 'web_restart',
+  '/api/system/daemon/restart': 'daemon_restart',
+  '/api/system/daemon/stop': 'daemon_stop',
+  '/api/system/daemon/start': 'daemon_start',
+};
 
 const settingBody = z.object({
   value: settingValueSchema,
@@ -164,6 +208,15 @@ function editReply(result: ConfigEditResult): Reply {
   if (result.ok) return new Reply(200, result);
   if (result.reason === 'conflict') return new Reply(409, { error: result.message });
   return new Reply(422, { errors: result.errors, references: result.references ?? [] });
+}
+
+/** Reply of a tag edit or an import: 200 with the outcome, 422 for errors, 409 for a conflict. */
+function tagReply(result: SpecialistTagsResult | SpecialistsImportResult): Reply {
+  if (result.ok) return new Reply(200, result);
+  if (result.reason === 'conflict') {
+    return new Reply(409, { error: result.message, slugs: result.slugs ?? [] });
+  }
+  return new Reply(422, { errors: result.errors, references: [] });
 }
 
 function entryId(value: string | undefined): string {
@@ -485,6 +538,13 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'GET',
+      pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/artifacts$`),
+      handle: async ([runId, group]) => ({
+        artifacts: await call('group_artifacts', { runId: runId ?? '', group: group ?? '' }),
+      }),
+    },
+    {
+      method: 'GET',
       pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/transcript$`),
       handle: ([runId, group], body) =>
         call('transcript', {
@@ -610,6 +670,55 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       },
     },
     {
+      method: 'GET',
+      pattern: /^\/api\/specialist-tags$/,
+      handle: () => call('specialist_tags', {}),
+    },
+    {
+      method: 'PUT',
+      pattern: new RegExp(`^/api/specialist-tags/specialists/${segment}$`),
+      handle: async ([slug], body) =>
+        tagReply(
+          (await call('specialist_tags_set', {
+            ...parseBody(tagsSetBody, body),
+            slug: entryId(slug),
+          })) as SpecialistTagsResult,
+        ),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/specialist-tags\/rename$/,
+      handle: async (_match, body) =>
+        tagReply(
+          (await call(
+            'specialist_tag_rename',
+            parseBody(tagRenameBody, body),
+          )) as SpecialistTagsResult,
+        ),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/specialist-tags\/remove$/,
+      handle: async (_match, body) =>
+        tagReply(
+          (await call(
+            'specialist_tag_remove',
+            parseBody(specialistTagRemoveBody, body),
+          )) as SpecialistTagsResult,
+        ),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/config\/specialists\/import$/,
+      handle: async (_match, body, repository) =>
+        tagReply(
+          (await call('specialists_import', {
+            repository,
+            ...parseBody(importBody, body),
+          })) as SpecialistsImportResult,
+        ),
+    },
+    {
       method: 'PUT',
       pattern: /^\/api\/config\/settings$/,
       handle: async (_match, body, repository) => {
@@ -695,27 +804,40 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           level: parseBody(previewBody, body).level,
         }),
     },
-    { method: 'GET', pattern: /^\/api\/tags$/, handle: () => call('tags', {}) },
+    {
+      method: 'GET',
+      pattern: /^\/api\/tags$/,
+      handle: (_match, _body, repository) => call('tags', { repository }),
+    },
     {
       method: 'POST',
       pattern: /^\/api\/tags$/,
-      handle: async (_, body) => call('tag_add', parseBody(tagAddBody, body)),
+      handle: async (_, body, repository) =>
+        call('tag_add', { repository, ...parseBody(tagAddBody, body) }),
     },
     {
       method: 'POST',
       pattern: /^\/api\/tags\/edit$/,
-      handle: async (_, body) => call('tag_edit', parseBody(tagEditBody, body)),
+      handle: async (_, body, repository) =>
+        call('tag_edit', { repository, ...parseBody(tagEditBody, body) }),
     },
     {
       method: 'POST',
       pattern: /^\/api\/tags\/remove$/,
-      handle: async (_, body) => call('tag_remove', parseBody(tagRemoveBody, body)),
+      handle: async (_, body, repository) =>
+        call('tag_remove', { repository, ...parseBody(tagRemoveBody, body) }),
     },
     {
       method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/tags$`),
       handle: async ([runId], body) =>
         call('run_tags', { runId: runId ?? '', ...parseBody(runTagsBody, body) }),
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/title$`),
+      handle: async ([runId], body) =>
+        call('run_title', { runId: runId ?? '', ...parseBody(runTitleBody, body) }),
     },
     {
       method: 'GET',
@@ -819,11 +941,15 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
   }
 
   /** Runs `action` once the response is on its way: the restart closes this very server. */
-  function afterResponse(response: ServerResponse, action: () => Promise<void>): void {
+  function afterResponse(
+    response: ServerResponse,
+    label: string,
+    action: () => Promise<void>,
+  ): void {
     response.once('finish', () => {
       setImmediate(() => {
         action().catch((error: unknown) => {
-          options.log?.(`aip web: restart failed: ${(error as Error).message}`);
+          options.log?.(`aip web: ${label} failed: ${(error as Error).message}`);
         });
       });
     });
@@ -850,47 +976,58 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           ping,
           check,
           panelBuild: currentBuild(),
-          servedBy: hooks === undefined ? 'standalone' : 'daemon',
+          servedBy: hooks === undefined ? 'standalone' : (hooks.servedBy ?? 'daemon'),
           panel: { pid: process.pid, host, port, auth: open ? 'none' : 'token' },
           logPath: hooks?.logPath ?? null,
         }),
       );
     }
-    const action =
-      path === '/api/system/web/restart'
-        ? 'web'
-        : path === '/api/system/daemon/restart'
-          ? 'daemon'
-          : null;
-    if (action === null) throw new HttpError(404, 'not found');
+    const action = SYSTEM_ACTIONS[path];
+    if (action === undefined) throw new HttpError(404, 'not found');
     if (verb !== 'POST') throw new HttpError(405, 'method not allowed');
-    const body =
-      action === 'daemon'
-        ? parseBody(restartDaemonBody, await readJson(incoming))
-        : parseBody(z.object({}), await readJson(incoming));
+    const body = parseBody(
+      action === 'web_restart' ? z.object({}) : forceBody,
+      await readJson(incoming),
+    );
+    const force = (body as { force?: boolean }).force === true;
     if (hooks === undefined) {
       throw new HttpError(
         409,
-        'this panel was started by `aip web`: restart it in the terminal',
+        'this panel was started by `aip web`: control the daemon in the terminal',
         'web_standalone',
       );
     }
-    if (action === 'web') {
-      afterResponse(response, () => hooks.restartWeb());
-    } else {
-      const force = (body as { force?: boolean }).force === true;
-      if (!force) {
-        const ping = await pingDaemon(options.socket).catch(() => null);
-        if (ping?.busy === true)
-          throw new HttpError(
-            409,
-            'agents are running: restart anyway to stop them',
-            'daemon_busy',
-          );
-      }
-      afterResponse(response, () => hooks.restartDaemon(force));
+    const hook =
+      action === 'web_restart'
+        ? hooks.restartWeb
+        : action === 'daemon_restart'
+          ? hooks.restartDaemon
+          : action === 'daemon_stop'
+            ? hooks.stopDaemon
+            : hooks.startDaemon;
+    if (hook === undefined) {
+      if (action === 'daemon_start')
+        throw new HttpError(409, 'the daemon is already running', 'daemon_running');
+      throw new HttpError(409, 'the daemon is stopped: start it first', 'daemon_stopped');
     }
-    json(response, 202, { state: 'restarting' });
+    if ((action === 'daemon_restart' || action === 'daemon_stop') && !force) {
+      const ping = await pingDaemon(options.socket).catch(() => null);
+      if (ping?.busy === true)
+        throw new HttpError(
+          409,
+          `agents are running: ${action === 'daemon_stop' ? 'stop' : 'restart'} anyway to stop them`,
+          'daemon_busy',
+        );
+    }
+    afterResponse(response, action.replace('_', ' '), () => hook(force));
+    json(response, 202, {
+      state:
+        action === 'daemon_stop'
+          ? 'stopping'
+          : action === 'daemon_start'
+            ? 'starting'
+            : 'restarting',
+    });
   }
 
   async function handle(incoming: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -992,6 +1129,48 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       return;
     }
 
+    const artifactMatch = new RegExp(
+      `^/api/runs/${segment}/groups/${segment}/artifacts/${segment}$`,
+    ).exec(url.pathname);
+    if (artifactMatch) {
+      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      let parts: string[];
+      try {
+        parts = artifactMatch.slice(1).map((part) => decodeURIComponent(part));
+      } catch {
+        throw new HttpError(400, 'malformed percent-encoding in path');
+      }
+      const [runId = '', group = '', id = ''] = parts;
+      const inline = url.searchParams.get('inline') === '1';
+      const artifact = (await call('artifact', { runId, group, id })) as ArtifactContentView;
+      const preview = artifactPreview(artifact.fileName);
+      if (inline && preview === null) {
+        throw new HttpError(400, 'only .md and .log artifacts can be shown inline');
+      }
+      const bytes = Buffer.from(artifact.base64, 'base64');
+      const headers: Record<string, string | number> = {
+        'Content-Length': bytes.length,
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'no-store',
+      };
+      if (inline) {
+        headers['Content-Type'] = 'text/plain; charset=utf-8';
+      } else {
+        headers['Content-Type'] =
+          preview === 'markdown'
+            ? 'text/markdown; charset=utf-8'
+            : preview === 'log'
+              ? 'text/plain; charset=utf-8'
+              : 'application/octet-stream';
+        const ascii = artifact.fileName.replace(/[^A-Za-z0-9._-]/g, '_');
+        headers['Content-Disposition'] =
+          `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(artifact.fileName).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
+      }
+      response.writeHead(200, headers);
+      response.end(bytes);
+      return;
+    }
+
     let wrongMethod = false;
     for (const route of routes) {
       const match = route.pattern.exec(url.pathname);
@@ -1035,6 +1214,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       const repository =
         url.pathname.startsWith('/api/runs') ||
         url.pathname.startsWith('/api/processes') ||
+        url.pathname.startsWith('/api/specialist-tags') ||
         ownRepository
           ? ''
           : await requestRepository(url.searchParams);
@@ -1059,19 +1239,20 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           ...(error.code === undefined ? {} : { code: error.code }),
         });
       else if (error instanceof IpcError) {
-        const status = /^(unknown (run|group|attempt|queue item)\b|not a background process)/.test(
-          error.message,
-        )
-          ? 404
-          : /is not changed in group/.test(error.message)
+        const status =
+          /^(unknown (run|group|attempt|queue item|artifact)\b|not a background process)/.test(
+            error.message,
+          )
             ? 404
-            : /has no merged changes|is not available/.test(error.message)
-              ? 409
-              : /^aip daemon did not answer/.test(error.message)
-                ? 504
-                : error.message.startsWith('malformed response')
-                  ? 502
-                  : 400;
+            : /is not changed in group/.test(error.message)
+              ? 404
+              : /has no merged changes|is not available/.test(error.message)
+                ? 409
+                : /^aip daemon did not answer/.test(error.message)
+                  ? 504
+                  : error.message.startsWith('malformed response')
+                    ? 502
+                    : 400;
         json(response, status, { error: error.message });
       } else json(response, 502, { error: (error as Error).message });
     });

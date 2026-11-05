@@ -111,6 +111,18 @@ describe('run statuses', () => {
     expect(screen.queryByLabelText('Running (running)')).toBeNull();
   });
 
+  it('labels a running group of a paused run as being paused', () => {
+    const group = groupRow({ status: 'running', hold: 'paused' });
+    render(
+      <RunStatuses
+        run={runView({ state: 'paused', hold: 'paused', groups: [group] })}
+        entry={group}
+      />,
+    );
+    expect(labels()).toContain('Pausing (running)');
+    expect(screen.queryByLabelText('Finishing step (running)')).toBeNull();
+  });
+
   it('keeps a running group without the hold field as running', () => {
     const { hold: _hold, ...legacy } = groupRow({ status: 'running' });
     const entry = legacy as ReturnType<typeof groupRow>;

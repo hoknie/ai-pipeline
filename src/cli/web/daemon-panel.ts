@@ -20,7 +20,7 @@ export interface DaemonPanelOptions {
   log?: (line: string) => void;
   /** Command that runs `aip` (node and the script); restarting the daemon from the panel needs it. */
   entry?: string[];
-  /** Starts the process that restarts the daemon; replaced in tests. */
+  /** Starts the process that restarts or stops the daemon; replaced in tests. */
   spawnRestart?: (options: SpawnRestartOptions) => void;
 }
 
@@ -87,6 +87,23 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
     removePanelState(options.stateDirectory, pid);
   }
 
+  /**
+   * Runs `aip daemon restart|stop --web` as a process of its own: it outlives this daemon. The old
+   * daemon removes web.json on stop, so the helper gets the token through the environment and the
+   * browser keeps its access.
+   */
+  function helper(command: 'restart' | 'stop', force: boolean): void {
+    if (options.entry === undefined) throw new Error('the command to run aip is unknown');
+    const token = auth === 'token' ? (web?.token ?? lastToken) : null;
+    (options.spawnRestart ?? spawnDaemonRestart)({
+      entry: options.entry,
+      stateDirectory: options.stateDirectory,
+      command,
+      force,
+      environment: token === null ? env : { ...env, AIP_WEB_TOKEN: token },
+    });
+  }
+
   /** Raises the server; on failure keeps the reason and throws it as an Error. */
   async function launch(requested: string | undefined): Promise<void> {
     let address = '';
@@ -113,18 +130,8 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
           restartWeb: async () => {
             await controller.start({ restart: true });
           },
-          restartDaemon: async (force) => {
-            if (options.entry === undefined) throw new Error('the command to run aip is unknown');
-            // The old daemon removes web.json on stop, so the new one gets the token through the
-            // environment and the browser keeps its access.
-            const token = auth === 'token' ? (web?.token ?? lastToken) : null;
-            (options.spawnRestart ?? spawnDaemonRestart)({
-              entry: options.entry,
-              stateDirectory: options.stateDirectory,
-              force,
-              environment: token === null ? env : { ...env, AIP_WEB_TOKEN: token },
-            });
-          },
+          restartDaemon: async (force) => helper('restart', force),
+          stopDaemon: async (force) => helper('stop', force),
           logPath: `${options.stateDirectory}/daemon.log`,
         },
       });

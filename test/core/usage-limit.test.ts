@@ -111,12 +111,12 @@ describe('holding a runtime until the limit resets', () => {
   it('starts no step of the runtime in any run until the reset', () => {
     const first = run(1, { id: 'run000000001' });
     const second = run(1, { id: 'run000000002', now: 1100 });
-    dispatch([first], 5, 1500);
+    dispatch([first], 1500);
     hitLimit(first);
-    expect(dispatch([first, second], 5, 3000)).toEqual([]);
+    expect(dispatch([first, second], 3000)).toEqual([]);
     expect(group(second).status).toBe('queued');
     expect(group(first).status).toBe('queued');
-    const effects = dispatch([first, second], 5, RESET);
+    const effects = dispatch([first, second], RESET);
     expect(effects.map((effect) => effect.run)).toEqual(['run000000001', 'run000000002']);
     expect(runningAttempt(first).resumeSession).toBe('session-1');
   });
@@ -126,17 +126,17 @@ describe('holding a runtime until the limit resets', () => {
     step(state);
     hitLimit(state, { resetsAt: null, now: 2000 });
     expect(limitHolds([state], 2001).get('claude')).toBe(2000 + USAGE_LIMIT_FALLBACK_MS);
-    expect(dispatch([state], 5, 2000 + USAGE_LIMIT_FALLBACK_MS - 1)).toEqual([]);
-    expect(dispatch([state], 5, 2000 + USAGE_LIMIT_FALLBACK_MS)).toHaveLength(1);
+    expect(dispatch([state], 2000 + USAGE_LIMIT_FALLBACK_MS - 1)).toEqual([]);
+    expect(dispatch([state], 2000 + USAGE_LIMIT_FALLBACK_MS)).toHaveLength(1);
   });
 
   it('starts steps of another runtime', () => {
     const limited = run(1, { id: 'run000000001' });
     const other = run(1, { id: 'run000000002', now: 1100 });
-    dispatch([limited, other], 5, 1500);
+    dispatch([limited, other], 1500);
     hitLimit(limited);
     finish(other, 'done');
-    const effects = dispatch([limited, other], 5, 3000);
+    const effects = dispatch([limited, other], 3000);
     expect(effects).toEqual([
       { kind: 'start_attempt', run: 'run000000002', group: 'gruppa-1', seq: 2 },
     ]);

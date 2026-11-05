@@ -18,9 +18,14 @@ describe('groups of settings', () => {
       'delivery',
       'runtimes',
       'system',
+    ]);
+    expect(SETTINGS_GROUPS_BY_SCOPE.project).toEqual([
+      'general',
+      'agents',
+      'delivery',
+      'queue',
       'tags',
     ]);
-    expect(SETTINGS_GROUPS_BY_SCOPE.project).toEqual(['general', 'agents', 'delivery', 'queue']);
   });
 
   it('puts every field to the enlarged group of its section', () => {
@@ -55,6 +60,14 @@ describe('groups of settings', () => {
     expect(settingsLocationOf('project', 'queue')).toEqual({ scope: 'project', group: 'queue' });
     expect(settingsLocationOf('global', 'queue')).toEqual({ scope: 'global', group: 'general' });
     expect(settingsLocationOf('project', 'nope')).toEqual({ scope: 'project', group: 'general' });
+    expect(settingsLocationOf('global', 'specialist-tags')).toEqual({
+      scope: 'global',
+      group: 'general',
+    });
+    expect(settingsLocationOf('project', 'specialist-tags')).toEqual({
+      scope: 'project',
+      group: 'general',
+    });
     expect(settingsLocationOf(null, null)).toEqual({ scope: 'global', group: 'general' });
     expect(settingsLocationOf('nowhere', null)).toEqual({ scope: 'global', group: 'general' });
     for (const [key, place] of Object.entries(LEGACY_SETTINGS_GROUPS)) {
@@ -64,6 +77,9 @@ describe('groups of settings', () => {
     expect(settingsLocationOf('claude', null)).toEqual({ scope: 'global', group: 'agents' });
     expect(settingsLocationOf('web', null)).toEqual({ scope: 'global', group: 'system' });
     expect(settingsLocationOf('queue', null)).toEqual({ scope: 'project', group: 'queue' });
+    expect(settingsLocationOf('tags', null)).toEqual({ scope: 'project', group: 'tags' });
+    expect(settingsLocationOf('global', 'tags')).toEqual({ scope: 'project', group: 'tags' });
+    expect(settingsLocationOf('project', 'tags')).toEqual({ scope: 'project', group: 'tags' });
   });
 });
 
@@ -91,6 +107,9 @@ describe('settings addresses', () => {
     expect(parseRoute('#settings/web')).toEqual(route('system', 'global'));
     expect(parseRoute('#settings/nowhere')).toEqual(route('general', 'global'));
     expect(formatRoute(route('queue', null))).toBe('#settings/project/queue');
+    expect(parseRoute('#settings/tags')).toEqual(route('tags', 'project'));
+    expect(parseRoute('#settings/global/tags')).toEqual(route('tags', 'project'));
+    expect(formatRoute(route('tags', 'project'))).toBe('#settings/project/tags');
   });
 
   it('sends the former general settings address to the settings page', () => {

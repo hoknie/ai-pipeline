@@ -181,8 +181,8 @@ describe('run list', () => {
 });
 
 describe('filter by tags', () => {
-  const auth = { id: 'ta', name: 'auth', color: 'red' as const, task: null };
-  const v2 = { id: 'tv', name: 'v2', color: 'blue' as const, task: null };
+  const auth = { id: 'ta', repository: '/repo', name: 'auth', color: 'red' as const, task: null };
+  const v2 = { id: 'tv', repository: '/repo', name: 'v2', color: 'blue' as const, task: null };
   const catalog = new Map([auth, v2].map((tag) => [tag.id, tag]));
   const tagged = [
     runView({ id: 'A', title: 'Веб-панель', tags: [auth], state: 'needs_human' }),
@@ -199,6 +199,24 @@ describe('filter by tags', () => {
       'D',
     ]);
     expect(ids(filterRuns(tagged, '', 'all', null, [], catalog))).toHaveLength(4);
+  });
+
+  it('matches the runs of other repositories by the name of the tag, ignoring case', () => {
+    const other = { id: 'tx', repository: '/lib', name: 'Auth', color: 'red' as const, task: null };
+    const rows = [
+      runView({ id: 'A', repository: '/repo', tags: [auth] }),
+      runView({ id: 'X', repository: '/lib', tags: [other] }),
+      runView({ id: 'Y', repository: '/lib', tags: [{ ...other, id: 'ty', name: 'v2' }] }),
+    ];
+    expect(ids(filterRuns(rows, '', 'all', null, ['ta'], catalog) as typeof tagged)).toEqual([
+      'A',
+      'X',
+    ]);
+    expect(filterCounts(rows, ['ta'], catalog).all).toBe(2);
+    // only the repository of the selection: the other repository has no runs in the list
+    expect(ids(filterRuns(rows, '', 'all', '/repo', ['ta'], catalog) as typeof tagged)).toEqual([
+      'A',
+    ]);
   });
 
   it('combines with the status filter', () => {
@@ -276,7 +294,7 @@ describe('filter by the tag of a linked task', () => {
           onSelect={() => undefined}
           scope="repository"
           onScope={() => undefined}
-          repository={null}
+          repository="/repo"
           tagIds={tagIds}
           onTagIds={setTagIds}
         />

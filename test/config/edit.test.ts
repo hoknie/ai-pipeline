@@ -1168,3 +1168,94 @@ describe('batch write of settings', () => {
     expect(port).toMatchObject({ globalOnly: true, defaultValue: 7341, value: 7341 });
   });
 });
+
+describe('specialist tags in the editor', () => {
+  const tagged = (tags: string) => `name: Кодировщик\n${tags}\n`;
+
+  it('splits the tags of the shared and the project file', () => {
+    const paths = setup();
+    write(specialistFile(paths, 'qa', paths.global), tagged('tags: [review]'));
+    write(specialistFile(paths, 'coder', paths.global), tagged('tags: [backend]'));
+    write(specialistFile(paths, 'coder'), tagged('tags: [legacy]\nmodel: b'));
+    const specialists = new Map(editorView(paths).specialists.map((item) => [item.slug, item]));
+    expect(specialists.get('qa')).toMatchObject({ shared_tags: ['review'], own_tags: [] });
+    expect(specialists.get('coder')).toMatchObject({
+      shared_tags: ['backend'],
+      own_tags: ['legacy'],
+    });
+    expect(specialists.get('coder')?.effective?.model).toBe('b');
+  });
+
+  it('keeps a specialist with invalid tags and reports the error', () => {
+    const paths = setup();
+    write(specialistFile(paths, 'coder'), tagged('tags: backend'));
+    const view = editorView(paths);
+    expect(view.specialists.map((item) => [item.slug, item.own_tags])).toEqual([['coder', []]]);
+    expect(view.errors.map((error) => error.path)).toContain('swarm.specialists.coder.tags');
+  });
+
+  it('keeps the tags of a shared file when the entry is written without them', () => {
+    const paths = setup();
+    const file = specialistFile(paths, 'qa', paths.global);
+    write(file, '# shared\nname: QA\ntags: [review] # keep\nmodel: a\n');
+    const current = readFileSync(file, 'utf8');
+    const plan = accepted(
+      planEdit(paths, {
+        kind: 'specialist',
+        id: 'qa',
+        value: { name: 'QA', model: 'b' },
+        revision: revisionOf(current),
+        level: 'global',
+      }),
+    );
+    expect(plan.text).toMatch(/tags: \[ ?review ?\] # keep/);
+    expect(plan.text).toContain('# shared');
+    expect(plan.text).toContain('model: b');
+  });
+
+  it('refuses to change the tags of a shared file', () => {
+    const paths = setup();
+    const file = specialistFile(paths, 'qa', paths.global);
+    write(file, 'name: QA\ntags: [review]\n');
+    const before = readFileSync(file, 'utf8');
+    const plan = planEdit(paths, {
+      kind: 'specialist',
+      id: 'qa',
+      value: { name: 'QA', tags: ['review', 'fast'] },
+      revision: revisionOf(before),
+      level: 'global',
+    });
+    expect(plan).toMatchObject({ ok: false, reason: 'invalid' });
+    expect(plan.ok ? [] : (plan as { errors: { path: string; message: string }[] }).errors).toEqual(
+      [
+        expect.objectContaining({
+          path: 'swarm.specialists.qa.tags',
+          message: 'shared tags are changed only in the file',
+        }),
+      ],
+    );
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('refuses tags for a new shared specialist and writes them at the project level', () => {
+    const paths = setup();
+    expect(
+      planEdit(paths, {
+        kind: 'specialist',
+        id: 'qa',
+        value: { name: 'QA', tags: ['review'] },
+        revision: null,
+        level: 'global',
+      }),
+    ).toMatchObject({ ok: false, reason: 'invalid' });
+    const plan = accepted(
+      planEdit(paths, {
+        kind: 'specialist',
+        id: 'qa',
+        value: { name: 'QA', tags: ['review'] },
+        revision: null,
+      }),
+    );
+    expect(plan.text).toContain('tags:');
+  });
+});

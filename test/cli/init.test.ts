@@ -10,7 +10,10 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+
+import { request } from '../../src/protocol/index.ts';
+import { socketPath } from '../../src/config/index.ts';
 
 const main = join(import.meta.dirname, '..', '..', 'src', 'cli', 'main.ts');
 const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-init-')));
@@ -21,6 +24,8 @@ function aip(args: string[], cwd: string, name: string) {
     XDG_CONFIG_HOME: join(base, name, 'config'),
     XDG_STATE_HOME: join(base, name, 'state'),
     AIP_CLAUDE_BIN: join(import.meta.dirname, '..', 'fakes', 'claude'),
+    AIP_OPENCODE_BIN: join(import.meta.dirname, '..', 'fakes', 'opencode'),
+    AIP_WEB_AUTOSTART: '0',
   };
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     execFile(
@@ -40,7 +45,22 @@ function repository(name: string): string {
   return directory;
 }
 
+afterAll(async () => {
+  for (const name of ['sub', 'keep', 'outside', 'shared', 'registry']) {
+    const socket = socketPath(join(base, name, 'state', 'aip'));
+    await request(socket, 'shutdown', {}).catch(() => undefined);
+  }
+});
+
 describe('aip init', () => {
+  it('adds the repository to the daemon list so the panel can pick it', async () => {
+    const repo = repository('registry');
+    const result = await aip(['init'], join(repo, 'src', 'deep'), 'registry');
+    expect(result.code, result.stderr).toBe(0);
+    const list = await aip(['repo', 'list', '--json'], base, 'registry');
+    expect(JSON.parse(list.stdout).map((entry: { path: string }) => entry.path)).toContain(repo);
+  });
+
   it('writes the starter configuration to the repository root from a subdirectory', async () => {
     const repo = repository('sub');
     const result = await aip(['init'], join(repo, 'src', 'deep'), 'sub');

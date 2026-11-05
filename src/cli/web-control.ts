@@ -166,6 +166,17 @@ export function registerWebControl(web: Command, style: Style, io: CliIo): void 
       const ctx = context(io, style);
       const ping = await pingDaemon(ctx.socket);
       if (ping === null) {
+        // The daemon is stopped, but its stand-in may still serve the panel.
+        const standby = readPanelState(ctx.stateDirectory);
+        if (standby?.standby === true) {
+          try {
+            process.kill(standby.pid, 'SIGTERM');
+          } catch {
+            // gone already
+          }
+          print(`aip web: stopped (pid ${standby.pid})`);
+          return;
+        }
         print('aip web: not running');
         return;
       }

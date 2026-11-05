@@ -50,6 +50,8 @@ export interface Report {
   summary: string;
   feedback: string | null;
   questions?: HumanQuestion[] | null;
+  /** With `needs_human`: only a person can answer; the queue autopilot leaves it alone. */
+  humanOnly?: boolean;
 }
 
 export type FailReason =
@@ -65,7 +67,9 @@ export type FailReason =
   /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
   | { kind: 'usage_limit'; resetsAt: number | null }
   /** A human message interrupted the attempt; the step continues in the same session. */
-  | { kind: 'message'; text: string; at: number };
+  | { kind: 'message'; text: string; at: number }
+  /** A pause of the run stopped the attempt; the step continues in the same session. */
+  | { kind: 'paused'; at: number };
 
 /** What a usage limit does to a group: wait for the reset or fail. */
 export const ON_LIMIT_MODES = ['wait', 'stop'] as const;
@@ -100,6 +104,8 @@ export function describeFailReason(reason: FailReason): string {
       return 'step skipped';
     case 'message':
       return 'interrupted by a message';
+    case 'paused':
+      return 'interrupted by a pause';
     case 'usage_limit':
       return reason.resetsAt === null
         ? 'usage limit'
@@ -114,6 +120,9 @@ export function validateReport(report: Report): string | null {
   }
   const feedback = report.feedback?.trim() ? report.feedback : null;
   const questions = report.questions ?? null;
+  if (report.humanOnly && report.verdict !== 'needs_human') {
+    return 'human_only is allowed only when verdict is needs_human';
+  }
   if (questions !== null) {
     if (report.verdict !== 'needs_human') {
       return 'questions are allowed only when verdict is needs_human';
@@ -217,6 +226,10 @@ export interface StepInput {
   decisions: HumanDecision[];
   /** A message the human sent to the specialist while the previous attempt ran. */
   message?: HumanMessage | null;
+  /** The step was resumed by the answer to a human review: its `done` goes on without a new review. */
+  reviewed?: boolean;
+  /** The step stops for a human review after `done`. */
+  humanReview?: boolean;
 }
 
 export interface ProposedGroup {
@@ -254,6 +267,7 @@ export interface Pending {
   humanAnswer: string | null;
   resume: boolean;
   message?: HumanMessage | null;
+  reviewed?: boolean;
 }
 
 export function freshPending(stepIndex: number): Pending {
@@ -288,6 +302,8 @@ export function pendingDelivery(): GroupDelivery {
   };
 }
 
+export type HumanOnly = 'review' | 'request';
+
 export interface Group {
   slug: string;
   title: string;
@@ -299,6 +315,8 @@ export interface Group {
   attempts: Attempt[];
   question: string | null;
   questions: HumanQuestion[] | null;
+  /** Why the open question is for a person only; null: anyone may answer. */
+  humanOnly: HumanOnly | null;
   reason: string | null;
   warnings: string[];
   decisions: HumanDecision[];
@@ -322,6 +340,7 @@ export function newGroup(slug: string, title: string, task: string, position: nu
     attempts: [],
     question: null,
     questions: null,
+    humanOnly: null,
     reason: null,
     warnings: [],
     decisions: [],
@@ -459,12 +478,16 @@ export function stepsOf(run: Run, group: Group): Step[] {
   if (isMessageGroup(group)) {
     const specialist = run.config.delivery.messageSpecialist;
     if (!specialist) throw new Error('no delivery.message_specialist is configured');
-    return [{ id: MESSAGE_STEP, specialist, onReject: null, additionalPrompt: null }];
+    return [
+      { id: MESSAGE_STEP, specialist, onReject: null, additionalPrompt: null, humanReview: false },
+    ];
   }
   if (isResolveGroup(group)) {
     const specialist = run.config.delivery.resolver;
     if (!specialist) throw new Error('no delivery.resolver is configured');
-    return [{ id: RESOLVE_STEP, specialist, onReject: null, additionalPrompt: null }];
+    return [
+      { id: RESOLVE_STEP, specialist, onReject: null, additionalPrompt: null, humanReview: false },
+    ];
   }
   if (!isSplitGroup(group)) return groupWorkflow(run.config, workflow).steps;
   if (!workflow.split) throw new Error(`workflow ${workflow.id} has no split`);
@@ -475,6 +498,7 @@ export function stepsOf(run: Run, group: Group): Step[] {
       onReject: null,
       // Runs saved before the field existed have no value.
       additionalPrompt: workflow.split.additionalPrompt ?? null,
+      humanReview: false,
     },
   ];
 }

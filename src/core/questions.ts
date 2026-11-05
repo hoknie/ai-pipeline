@@ -12,3 +12,8 @@ export function questionsText(questions: readonly HumanQuestion[]): string {
     })
     .join('\n');
 }
+
+/** The question of a human review: the finished step and what its specialist reported. */
+export function reviewQuestion(stepLabel: string, summary: string): string {
+  return `Step \`${stepLabel}\` is done and waits for your review. Summary:\n${summary.trim()}\n\nAnswer to accept, or describe what to change.`;
+}

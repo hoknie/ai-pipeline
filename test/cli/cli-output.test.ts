@@ -258,6 +258,21 @@ describe('cli', () => {
     expect(epic).not.toContain('steps:');
   });
 
+  it('shows human_review in config check only for steps that have it', async () => {
+    const box = sandbox(`swarm:
+  specialists:
+    coder: { name: Кодировщик }
+  workflows:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+        - { id: check, specialist: coder, human_review: true }
+`);
+    const result = await aip(box, 'config', 'check');
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout.match(/human_review: true/g)).toHaveLength(1);
+  });
+
   it('shows the name of a workflow in config check only when it is set', async () => {
     const box = sandbox(`swarm:
   specialists:

@@ -137,10 +137,14 @@ describe('live update', () => {
       expect(await screen.findAllByText('12.3k/1.1k')).toHaveLength(2);
       const scroll = (isIntersecting: boolean) =>
         act(() => callbacks.forEach((cb) => cb([{ isIntersecting }])));
+      const rows = () => document.querySelectorAll('[data-slot="group-header-row"]').length;
+      expect(rows()).toBe(1);
       scroll(false);
       await waitFor(() => expect(screen.getAllByText('12.3k/1.1k')).toHaveLength(3));
+      expect(rows()).toBe(2);
       scroll(true);
       await waitFor(() => expect(screen.getAllByText('12.3k/1.1k')).toHaveLength(2));
+      expect(rows()).toBe(1);
     } finally {
       callbacks = [];
       vi.unstubAllGlobals();

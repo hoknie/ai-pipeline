@@ -58,9 +58,11 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Set
 
 - Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
 - A run card shows the first line of the task, the status, the name of its pipeline (the id is in the tooltip), time, cost and a summary of changes (`2 files +367 −0`).
-- The action row of the run header has "Deliver", "Return to the queue" and "Steps". The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Deliver with --force…" and "Copy run id".
+- The action row of the run header has "Deliver", "Return to the queue" and "Steps". The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Create subtask…" (in every state of the run), "Deliver with --force…" and "Copy run id".
+- "Create subtask…" opens the "New task" dialog on the repository of the run with that run as the "Parent task"; the text already typed in the dialog is kept, and a parent can be removed or changed there.
 - "Retry with current config" is in the run's "More" menu for every failed or cancelled group, and next to "Retry" in the "⋯" menu of a failed or cancelled group or split step.
 - The retried group shows the warning `config refreshed: …` with the changes. A broken configuration refuses the retry with its error. Commit message and resolver steps do not have this button.
+- The title in the run header is edited in place: a pencil appears only while the pointer is over the title or the pencil has keyboard focus. Enter or leaving the field saves, Escape cancels, an empty or unchanged title sends nothing, and a refusal shows under the field.
 - The run header has a "Steps" block: each step of the workflow with its state (done, running, upcoming) and a "Skip" switch with a visible label for steps that are not finished yet.
   - Skipping a running step asks for confirmation: the specialist is stopped without a commit.
   - Its partial changes stay uncommitted in the group worktree.
@@ -81,7 +83,11 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Set
   - "Message to the specialist" sits on the right of the header of the last attempt, while it runs and has not reported. It interrupts the specialist: the attempt is stopped ("interrupted by a message") and the step continues in the same session as a new attempt that receives your text.
   - While the attempt is stopping, the header shows "interrupting…". Files changed before the interruption stay in the working copy. Cancelling the group at that moment drops the message.
 - "Changes" is a file tree with `+N −M`. "Task" shows the task text.
-- The addresses `#runs/<run-id>` and `#runs/<run-id>/<group>` open a run and a group. `#runs/<run-id>/<group>?tab=<tab>` opens a tab (`changes`, `task`, `design`, `tasks`); the log is the default and is not written to the address, so a link can be shared.
+- "Artifacts · N" lists the files the specialists of the group published with `swarm_artifact`. The tab is always shown; while the group has no artifacts it is dimmed and cannot be opened, and `?tab=artifacts` falls back to the log.
+  - A row has the step that published the file (name and attempt number; the tooltip has the step id and the specialist), the title, the file name with its extension, the creation time (the full date is in the tooltip) and the size. The newest artifact is on top.
+  - "Open" is offered for `.md` and `.log` files: Markdown is rendered, a log is shown as plain text, under the table (in a dialog on a narrow screen). A file over 1 MB is not loaded for the preview; download it instead.
+  - "Download" saves any file. Artifacts are not part of the git history or of the delivered changes.
+- The addresses `#runs/<run-id>` and `#runs/<run-id>/<group>` open a run and a group. `#runs/<run-id>/<group>?tab=<tab>` opens a tab (`changes`, `task`, `design`, `tasks`, `artifacts`); the log is the default and is not written to the address, so a link can be shared.
 
 ### Questions
 
@@ -103,10 +109,12 @@ The queue settings are in [queue.md](queue.md).
 - "Remove from list" is on every skipped run in the block "Skipped with a problem". After a confirmation the card disappears; the run itself does not change.
 - The "In work" switch of a row postpones the task or puts it back.
 - A running run's card shows its duration, tokens and cost.
-- "New task" opens a dialog with two halves: the task (title, workflow, text or groups) on the left and the settings (predecessors, tags, delivery, "Skip steps") on the right. "Skip steps" is a row of segments: a pressed segment is a skipped step, and the last unpressed one stays disabled. Below the controls are the running runs and the waiting tasks.
+- "New task" opens a dialog with two halves: the task on the left (the "Repository" field with a search first, then title, workflow, text or groups) and the settings (predecessors, tags, delivery, "Skip steps") on the right. "Skip steps" is a row of segments: a pressed segment is a skipped step, and the last unpressed one stays disabled.
+- In the dialog, "Repository" defaults to the repository selected in the top bar at each opening; choosing another one adds the task to its queue and does not switch the panel, and the workflows, "Waits for", the parent task and the delivery defaults come from that repository (the links are cleared on a switch, the text and tags stay). Below the controls are the running runs and the waiting tasks.
 - Runs the queue skipped because of a problem are in the "Skipped with a problem" block. They do not count as taken places.
 - Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. Every waiting task has "Edit", "Delete" and "Run now".
-- The "Parent task" field of the task form chooses one run of the queue as the parent: the task gets the tag of a linked task of that run. An edit sends the field only after it was changed; "No parent task" removes the linked task tags of the task.
+- The "Parent task" field of the task form chooses one run of the repository as the parent, finished runs included. The runs come in three labeled parts: "In progress" (latest start first), "Planned" (not started or put back in the queue, latest created first) and "Finished" (latest finish first).
+  The chosen parent is shown as `#N title`. The task gets the tag of a linked task of that run. An edit sends the field only after it was changed; "No parent task" removes the linked task tags of the task.
 - The "Waits for" field of the task form chooses the predecessors. A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).
 - "Run now" on a task that is not ready asks to confirm "Dependencies are not met" and lists them.
 
@@ -171,8 +179,10 @@ These tags are not offered in the tag pickers, cannot be created or removed ther
 - "System" shows the state of the daemon (pid, version, build, whether agents work) and of the web panel (pid, address without the token, access, build), refreshed every 3 seconds, and the path of the daemon log.
   - "Restart panel" restarts the panel on the same address with the same token; the page comes back by itself. The daemon and its agents keep running.
   - "Restart daemon" runs `aip daemon restart --web` as a separate process. While agents work the panel asks again, and "Restart, stopping the agents" runs it with `--force`.
-  - A panel started by `aip web` itself cannot restart itself or the daemon: restart it in the terminal.
-  - The page waits up to 30 seconds for the restarted part to answer (for the daemon, with a new pid) and otherwise points to the daemon log.
+  - "Stop daemon" asks for confirmation and runs `aip daemon stop --web` as a separate process. While agents work the panel asks again, and "Stop, stopping the agents" runs it with `--force`. The page stays open: a stand-in process serves it on the same address with the same token while the daemon is stopped.
+  - "Restart daemon" and "Stop daemon" are shown only while the daemon runs. A stopped daemon shows "Start daemon": it starts the daemon, which takes the panel back on the same address. The panel cannot be restarted while the stand-in serves it.
+  - A panel started by `aip web` itself cannot restart, stop or start anything: do it in the terminal.
+  - The page waits up to 30 seconds for the part to answer (a restarted daemon with a new pid, a stopped daemon as not running, a started daemon serving the panel again) and otherwise points to the daemon log.
 
 ## Status
 
@@ -215,6 +225,13 @@ The background processes arrive in the `processes` event of `/api/events`: the d
   - The daemon saves the patch as a file when a group merges and before the run is cleaned up, so it can be downloaded after delivery.
   - The file lies in `patches/<run id>/<commit>.patch` of the state directory. The database keeps only its URI (`file:`), so another storage can be added later.
   - The patch lives as long as the run record. Patches of unknown runs are removed when the daemon starts.
+- `GET /api/runs/<id>/groups/<group>/artifacts` returns the artifacts of a group, newest first: `{"artifacts": [{id, step, stepName, seq, specialist, title, fileName, size, createdAt, preview}]}`. `preview` is `markdown`, `log` or `null`. An unknown run or group comes back with code 404.
+- `GET /api/runs/<id>/groups/<group>/artifacts/<artifact>` downloads an artifact as an attachment (`Content-Disposition` with an ASCII `filename` and a UTF-8 `filename*`).
+  - `Content-Type` is `text/markdown` for `.md`, `text/plain` for `.log` and `application/octet-stream` for everything else; every answer has `X-Content-Type-Options: nosniff` and `Cache-Control: no-store`, so an HTML or SVG artifact is never run in the page of the panel.
+  - With `?inline=1` the answer is `text/plain; charset=utf-8` without `attachment`, for `.md` and `.log` only; any other file comes back with code 400.
+  - An unknown run, group or artifact comes back with code 404, an artifact whose bytes are no longer available with code 409, any method but `GET` with code 405.
+  - The bytes lie in `artifacts/<run id>/<artifact id>` of the state directory; the database keeps only their URI (`file:`), so another storage can be added later. They live as long as the run record, and `aip clean` does not remove them. Files the database does not know are removed when the daemon starts.
+- `POST /api/runs/<id>/title` with the body `{"title": "<new title>"}` changes the title of the run (trimmed, 1 to 60 characters) and returns the run. The short `name` stays as it was, and a later answer of the naming model does not replace the title. An empty or too long title comes back with code 400, an unknown run with code 404.
 - `POST /api/runs/<id>/skip` with the body `{"step": "<step id>", "skip": true}` skips a step of the run (`false` brings it back) and returns the run. A refusal of the daemon (unknown step, a step every group has passed) comes back with code 400.
 - `POST /api/queue/dismiss` with the body `{"run": "<run id>"}` removes a skipped run from the skipped list and returns the queue. A run that is not skipped comes back with code 400, an unknown run with code 404.
 - `GET /api/runs/<id>/groups/<group>/spec` returns the spec change of the group (`change`, `path`, `design`, `tasks`) or `null`; an unknown group comes back with code 404.

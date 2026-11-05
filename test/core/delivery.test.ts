@@ -252,7 +252,7 @@ describe('commit messages', () => {
     const state = mergedRun(1, { configText: WRITER });
     expect(request(state)).toEqual([]);
     expect(state.message?.task).toContain('src/app.ts');
-    dispatch([state], 5, 6100);
+    dispatch([state], 6100);
     expect(runningAttempt(state, MESSAGE_GROUP)).toMatchObject({
       stepId: 'message',
       specialist: 'writer',
@@ -269,7 +269,7 @@ describe('commit messages', () => {
   it('falls back to the template when the message specialist fails', () => {
     const state = mergedRun(1, { configText: WRITER });
     request(state);
-    dispatch([state], 5, 6100);
+    dispatch([state], 6100);
     const effects = transition(state, { kind: 'timed_out', group: MESSAGE_GROUP, seq: 1 }, 6200);
     expect(effects).toContainEqual(
       expect.objectContaining({
@@ -414,7 +414,7 @@ describe('delivery resolver', () => {
     expect(
       transition(state, { kind: 'resolve_prepared', conflicts: ['src/app.ts'] }, 6200),
     ).toEqual([]);
-    dispatch([state], 5, 6300);
+    dispatch([state], 6300);
     return state;
   }
 
@@ -453,7 +453,7 @@ describe('delivery resolver', () => {
     ]);
     transition(state, { kind: 'resolve_prepared', conflicts: ['src/app.ts'] }, 6500);
     expect(state.resolve?.status).toBe('queued');
-    dispatch([state], 5, 6600);
+    dispatch([state], 6600);
     finish(state, 'done', { slug: RESOLVE_GROUP, now: 6700 });
     const final = transition(
       state,
@@ -525,11 +525,11 @@ describe('delivery after a daemon restart', () => {
       ) + '  delivery: { mode: commit, message_specialist: writer }\n';
     const state = mergedRun(1, { configText: WRITER });
     request(state);
-    dispatch([state], 5, 6100);
+    dispatch([state], 6100);
     expect(interrupt(state)).toEqual([]);
     expect(state.message?.status).toBe('queued');
     expect(state.run.finishedAt).toBeNull();
-    dispatch([state], 5, 9100);
+    dispatch([state], 9100);
     expect(runningAttempt(state, MESSAGE_GROUP)).toMatchObject({ specialist: 'writer' });
   });
 
@@ -547,7 +547,7 @@ describe('delivery after a daemon restart', () => {
       6100,
     );
     transition(state, { kind: 'resolve_prepared', conflicts: ['src/app.ts'] }, 6200);
-    dispatch([state], 5, 6300);
+    dispatch([state], 6300);
     expect(interrupt(state)).toEqual([
       expect.objectContaining({ kind: 'deliver', groups: ['gruppa-1'] }),
     ]);

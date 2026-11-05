@@ -35,17 +35,34 @@ export function limitHolds(states: Iterable<RunState>, now: number): Map<string,
   return holds;
 }
 
-export function runningCount(states: RunState[]): number {
-  return states.reduce(
-    (count, state) =>
-      count +
-      allGroups(state).reduce(
-        (groupCount, group) =>
-          groupCount + group.attempts.filter((attempt) => attempt.status === 'running').length,
-        0,
-      ),
-    0,
-  );
+/** Running attempts of each repository. */
+export function runningByRepository(states: RunState[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const state of states) {
+    const running = allGroups(state).reduce(
+      (count, group) =>
+        count + group.attempts.filter((attempt) => attempt.status === 'running').length,
+      0,
+    );
+    const repository = state.run.repository;
+    counts.set(repository, (counts.get(repository) ?? 0) + running);
+  }
+  return counts;
+}
+
+/** `swarm.max` of each repository: the value of its most recently created run. */
+export function repositoryLimits(states: RunState[]): Map<string, number> {
+  const latest = new Map<string, RunState>();
+  for (const state of states) {
+    const current = latest.get(state.run.repository);
+    if (
+      !current ||
+      state.run.createdAt > current.run.createdAt ||
+      (state.run.createdAt === current.run.createdAt && state.run.id > current.run.id)
+    )
+      latest.set(state.run.repository, state);
+  }
+  return new Map([...latest].map(([repository, state]) => [repository, state.run.config.max]));
 }
 
 export function runningBySpecialist(states: RunState[]): Map<string, number> {
@@ -61,8 +78,8 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
   return counts;
 }
 
-export function dispatch(states: RunState[], max: number, now: number): Effect[] {
-  return planDispatch(states, max, now).start.map(({ state, group }) => {
+export function dispatch(states: RunState[], now: number): Effect[] {
+  return planDispatch(states, now).start.map(({ state, group }) => {
     const attempt = startAttempt(state, group, now);
     return { kind: 'start_attempt', run: state.run.id, group: group.slug, seq: attempt.seq };
   });

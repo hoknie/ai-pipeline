@@ -480,6 +480,35 @@ describe('structured questions', () => {
   });
 });
 
+describe('title_set', () => {
+  it('replaces the title of a finished run only, with no effects', () => {
+    const state = run(1);
+    transition(state, { kind: 'cancel', group: null }, 10);
+    const name = state.run.name;
+    expect(transition(state, { kind: 'title_set', title: 'Новое' }, 20)).toEqual([]);
+    expect(state.run.title).toBe('Новое');
+    expect(state.run.name).toBe(name);
+  });
+
+  it('works on an active run and leaves the groups and the naming usage', () => {
+    const state = run(1);
+    step(state);
+    const groups = JSON.stringify(state.groups);
+    transition(state, { kind: 'title_set', title: 'Ручное' }, 20);
+    expect(state.run.title).toBe('Ручное');
+    expect(state.run.namingUsage).toBeNull();
+    expect(JSON.stringify(state.groups)).toBe(groups);
+  });
+
+  it('is not overwritten by a late run_named, which still counts its usage', () => {
+    const state = run(1);
+    const usage = { inputTokens: 30, outputTokens: 10, costUsd: 0.002 };
+    transition(state, { kind: 'title_set', title: 'Ручное' }, 10);
+    transition(state, { kind: 'run_named', title: 'Модель', name: 'model', usage }, 20);
+    expect(state.run).toMatchObject({ title: 'Ручное', namingUsage: usage });
+  });
+});
+
 describe('tags_set', () => {
   it('changes only the tags of a finished run, with no effects', () => {
     const state = run(1);

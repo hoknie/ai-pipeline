@@ -101,6 +101,7 @@ export function presentConfig(config: ResolvedConfig): unknown {
                       }
                     : {}),
                   ...(step.additionalPrompt ? { additional_prompt: step.additionalPrompt } : {}),
+                  ...(step.humanReview ? { human_review: true } : {}),
                 })),
               }),
         },

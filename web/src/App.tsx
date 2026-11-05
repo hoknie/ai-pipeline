@@ -21,6 +21,7 @@ import { sectionLabel } from './sections.ts';
 import { settingsLocationOf } from './settingsGroups.ts';
 import { browserEventSource, useRuns, type EventSourceFactory } from './store.ts';
 import { TagsProvider } from './tags.tsx';
+import type { RunView } from './types.ts';
 import { Skeleton } from './ui/skeleton.tsx';
 
 const TopologyPage = lazy(() => import('./components/TopologyPage.tsx'));
@@ -90,6 +91,7 @@ function Panel({
     setRegistry,
     selected,
     queue,
+    queues,
     setQueue,
     tags,
     setTags,
@@ -113,7 +115,17 @@ function Panel({
   const [shortcuts, setShortcuts] = useState(false);
   const [newTask, setNewTask] = useState(false);
   const [newTaskOpened, setNewTaskOpened] = useState(false);
+  const [newTaskPreset, setNewTaskPreset] = useState<{
+    repository: string;
+    parent: string;
+  } | null>(null);
   const openNewTask = useCallback(() => {
+    setNewTaskPreset(null);
+    setNewTaskOpened(true);
+    setNewTask(true);
+  }, []);
+  const openSubtask = useCallback((run: RunView) => {
+    setNewTaskPreset({ repository: run.repository, parent: run.id });
     setNewTaskOpened(true);
     setNewTask(true);
   }, []);
@@ -306,12 +318,18 @@ function Panel({
           onRoute={setRoute}
           onShortcuts={() => setShortcuts(true)}
         />
-        {queue !== null && newTaskOpened ? (
+        {queue !== null && selected !== null && newTaskOpened ? (
           <Suspense fallback={null}>
             <NewTaskDialog
               key={pageKey}
-              api={scopedApi}
-              queue={queue}
+              api={api}
+              selected={selected}
+              repositories={repositories}
+              waiting={waitingRepositories}
+              queues={queues}
+              runs={runs}
+              preset={newTaskPreset}
+              onPresetApplied={() => setNewTaskPreset(null)}
               open={newTask}
               onOpenChange={setNewTask}
               draft={queueDrafts.new}
@@ -335,6 +353,7 @@ function Panel({
               onQueue={setQueue}
               onError={onError}
               onNewTask={openNewTask}
+              runs={runs}
             />
           </Suspense>
         ) : route.view === 'settings' ? (
@@ -416,6 +435,7 @@ function Panel({
             repository={selected}
             scope={scope}
             onScope={setScope}
+            onSubtask={queue ? openSubtask : undefined}
           />
         )}
       </AppShell>

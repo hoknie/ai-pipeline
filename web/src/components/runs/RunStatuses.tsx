@@ -15,8 +15,13 @@ export interface StatusPart {
   badges: ReactNode[];
 }
 
-/** Badge of the open group or step; a running one of a held run is finishing its last step. */
+/** Badge of the open group or step; a running one of a paused run is being stopped, of a frozen run it finishes its step. */
 export function entryBadge(entry: GroupRow | SystemStepRow, t: TFunction): ReactNode {
+  if (entry.status === 'running' && entry.hold === 'paused') {
+    return (
+      <StatusBadge status="running" label={t('status.pausing')} tip={t('runs.header.pausingTip')} />
+    );
+  }
   if (entry.status === 'running' && entry.hold != null) {
     return (
       <StatusBadge

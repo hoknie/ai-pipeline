@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../ui/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
+import { sameTag } from '../specialistTags.ts';
 import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
+import { SpecialistTagChip } from './SpecialistTagChip.tsx';
 import { ValuesPicker } from './ValuesPicker.tsx';
 import { rawName } from './workflowName.ts';
 import type {
@@ -42,7 +44,8 @@ type FieldName =
   | 'tools'
   | 'skills'
   | 'max'
-  | 'prompt';
+  | 'prompt'
+  | 'tags';
 
 const FIELDS: FieldName[] = [
   'name',
@@ -55,15 +58,16 @@ const FIELDS: FieldName[] = [
   'skills',
   'max',
   'prompt',
+  'tags',
 ];
-type ListField = 'allow_commands' | 'tools' | 'skills';
-const LIST_FIELDS = new Set<FieldName>(['allow_commands', 'tools', 'skills']);
+type ListField = 'allow_commands' | 'tools' | 'skills' | 'tags';
+const LIST_FIELDS = new Set<FieldName>(['allow_commands', 'tools', 'skills', 'tags']);
 
 const isList = (field: FieldName): field is ListField => LIST_FIELDS.has(field);
 
 /** The fields of the form by section; the titles are `specialists.sections.<key>`. */
 const SECTIONS: { key: 'main' | 'limits' | 'tools' | 'prompt'; fields: FieldName[] }[] = [
-  { key: 'main', fields: ['name', 'runtime', 'model'] },
+  { key: 'main', fields: ['name', 'runtime', 'model', 'tags'] },
   { key: 'limits', fields: ['permissions', 'timeout', 'max', 'allow_commands'] },
   { key: 'tools', fields: ['tools', 'skills'] },
   { key: 'prompt', fields: ['prompt'] },
@@ -144,6 +148,20 @@ function describeReference(reference: EntryReference, view: ConfigEditorResponse
   return `${workflow} → ${reference.step}`;
 }
 
+/**
+ * The value written to a file of the level. The tags of a shared file are changed only in the file:
+ * a shared file keeps its tags as they are and a new shared file has none.
+ */
+function forLevel(
+  value: Record<string, unknown>,
+  level: WriteLevel,
+  stored: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (level !== 'global') return value;
+  const { tags: _tags, ...rest } = value;
+  return stored !== null && stored.tags !== undefined ? { ...rest, tags: stored.tags } : rest;
+}
+
 export function SpecialistForm({
   api,
   view,
@@ -190,7 +208,8 @@ export function SpecialistForm({
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const readOnly = false;
+  // a shared (global) specialist is view only; the project override is how to change it
+  const readOnly = Boolean(specialist) && level === 'global';
   const dirty = !sameDraft(draft, initial) || (!specialist && slug !== '');
   useEffect(() => {
     onDirty(dirty);
@@ -272,7 +291,7 @@ export function SpecialistForm({
       const target = specialist ? specialist.slug : slug;
       const result = await api.writeSpecialist(
         target,
-        valueOf(draft, raw),
+        forLevel(valueOf(draft, raw), level, specialist && source ? raw : null),
         specialist ? revision : null,
         level,
       );
@@ -284,19 +303,21 @@ export function SpecialistForm({
       setErrors([]);
       setConflict(null);
       const target = saveAs ?? '';
-      const result = await api.writeSpecialist(target, valueOf(draft, raw), null, level);
+      const result = await api.writeSpecialist(
+        target,
+        forLevel(valueOf(draft, raw), level, null),
+        null,
+        level,
+      );
       if (report(result)) await onSaved(target);
     });
 
   /** Copies the file that applies to the other level, which has none. */
   const copyTo = (target: WriteLevel) =>
     attempt(async () => {
-      const result = await api.writeSpecialist(
-        specialist?.slug ?? '',
-        specialist?.raw ?? {},
-        null,
-        target,
-      );
+      // the copy has no tags: the tags of the source level stay there
+      const { tags: _tags, ...copy } = specialist?.raw ?? {};
+      const result = await api.writeSpecialist(specialist?.slug ?? '', copy, null, target);
       if (report(result)) await onSaved(specialist?.slug ?? '');
     });
 
@@ -362,7 +383,46 @@ export function SpecialistForm({
   const setList = (field: ListField, items: string[]) =>
     setDraft((current) => ({ ...current, [field]: items }));
 
+  const tagsInput = () => {
+    // on the shared level the tags are the shared ones: view only
+    const shared = level === 'global' ? draft.tags : (specialist?.shared_tags ?? []);
+    const suggestions = new Map<string, string>();
+    for (const entry of view.specialists) {
+      for (const name of entry.own_tags) suggestions.set(name.toLocaleLowerCase(), name);
+    }
+    return (
+      <div className="flex flex-col gap-1.5" data-testid="specialist-tags">
+        {shared.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <ul aria-label={t('specialists.tags.sharedList')} className="flex flex-wrap gap-1.5">
+              {shared.map((name) => (
+                <li key={name}>
+                  <SpecialistTagChip name={name} shared />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {level === 'global' ? null : (
+          <ValuesPicker
+            id="field-tags"
+            label={fieldLabel('tags', t)}
+            values={draft.tags}
+            onChange={(items) => setList('tags', items)}
+            options={[...suggestions.values()]
+              .filter((name) => !shared.some((known) => sameTag(known, name)))
+              .map((name) => ({ name, source: 'project' as const }))}
+            headings={{ project: t('specialists.tags.own') }}
+            disabled={readOnly || busy}
+            invalid={fieldErrors('tags').length > 0}
+          />
+        )}
+      </div>
+    );
+  };
+
   const input = (field: FieldName) => {
+    if (field === 'tags') return tagsInput();
     if (isList(field)) {
       return (
         <ValuesPicker
@@ -440,7 +500,11 @@ export function SpecialistForm({
     <div className="flex flex-col gap-1.5" key={field}>
       <Label htmlFor={`field-${field}`}>{fieldLabel(field, t)}</Label>
       {input(field)}
-      <p className="text-xs text-muted-foreground">{t(`specialists.help.${field}`)}</p>
+      <p className="text-xs text-muted-foreground">
+        {field === 'tags' && level === 'global'
+          ? t('specialists.tags.sharedOnly')
+          : t(`specialists.help.${field}`)}
+      </p>
       {field === 'allow_commands' && draft.allow_commands.length === 0 && hint(field) ? (
         <p className="text-xs text-muted-foreground">{hint(field)}</p>
       ) : null}
@@ -478,20 +542,22 @@ export function SpecialistForm({
         {specialist ? <FilePath variant="line" path={source?.file ?? specialist.file} /> : null}
         {levelToggle ? <div className="flex">{levelToggle}</div> : null}
         <div className="flex flex-wrap gap-2">
-          <Button disabled={busy || (!specialist && !slug)} onClick={() => void save()}>
-            {t('settings.editor.save')}
-          </Button>
+          {readOnly ? null : (
+            <Button disabled={busy || (!specialist && !slug)} onClick={() => void save()}>
+              {t('settings.editor.save')}
+            </Button>
+          )}
           {specialist && sources.global && !sources.project ? (
             <Button variant="outline" disabled={busy} onClick={() => void copyTo('project')}>
               {t('settings.editor.overrideInProject')}
             </Button>
           ) : null}
-          {specialist && sources.project && !sources.global ? (
+          {specialist && sources.project && !sources.global && !readOnly ? (
             <Button variant="outline" disabled={busy} onClick={() => void copyTo('global')}>
               {t('settings.editor.makeGlobal')}
             </Button>
           ) : null}
-          {specialist ? (
+          {specialist && !readOnly ? (
             <Button
               variant="outline"
               disabled={busy}
@@ -500,7 +566,7 @@ export function SpecialistForm({
               {t('settings.editor.saveAs')}
             </Button>
           ) : null}
-          {specialist && source ? (
+          {specialist && source && !readOnly ? (
             <Button variant="destructive" disabled={busy} onClick={() => void remove()}>
               {removeLabel}
             </Button>
@@ -527,6 +593,7 @@ export function SpecialistForm({
           </div>
         </div>
       ) : null}
+      {readOnly ? <Alert role="status">{t('specialists.sharedReadOnly')}</Alert> : null}
       {notice ? <Alert role="status">{notice}</Alert> : null}
       {problem ? <Alert variant="destructive">{problem}</Alert> : null}
       {conflict ? (

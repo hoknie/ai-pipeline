@@ -32,14 +32,15 @@ export {
   stepStates,
 } from './skip.ts';
 export type { StepPhase as StepStatePhase, StepState } from './skip.ts';
-export { questionsText } from './questions.ts';
+export { questionsText, reviewQuestion } from './questions.ts';
 export { planDispatch, waitKey, type DispatchPlan, type GroupWait } from './plan.ts';
 export {
   dispatch,
   limitHolds,
   limitResetsAt,
+  repositoryLimits,
+  runningByRepository,
   runningBySpecialist,
-  runningCount,
 } from './scheduler.ts';
 export {
   deliveryCounts,
@@ -95,6 +96,7 @@ export {
   knownTags,
   mergeTags,
   removeTag,
+  tagsOfRepository,
   resolveManualTags,
   resolveTags,
   type Tag,
@@ -156,3 +158,4 @@ export {
   type QueueSettingsPatch,
   type QueueStop,
 } from './queue.ts';
+export * from './artifacts.ts';

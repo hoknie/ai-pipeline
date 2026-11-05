@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { workflowNameOf, type DeliveryMode } from '../config/index.ts';
+import { workflowNameOf, type DeliveryMode, type SpecialistTagFolder } from '../config/index.ts';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
   allGroups,
@@ -41,6 +41,7 @@ import {
   stepsOf,
   type GroupDelivery,
   type HumanDecision,
+  type HumanOnly,
   type HumanQuestion,
   type RunPhase,
   type GroupStatus,
@@ -66,6 +67,7 @@ import type { ConfigEditorView, EntryReference, FieldError } from '../config/ind
 /** A catalog tag as clients see it. */
 export interface TagView {
   id: string;
+  repository: string;
   name: string;
   color: TagColor;
   task: { run: string; number: number } | null;
@@ -75,19 +77,30 @@ export function tagViews(catalog: readonly Tag[], ids: readonly string[]): TagVi
   const byId = new Map(catalog.map((tag) => [tag.id, tag]));
   return knownTags(catalog, ids).flatMap((id) => {
     const tag = byId.get(id);
-    return tag ? [{ id: tag.id, name: tag.name, color: tag.color, task: tag.task }] : [];
+    return tag
+      ? [
+          {
+            id: tag.id,
+            repository: tag.repository,
+            name: tag.name,
+            color: tag.color,
+            task: tag.task,
+          },
+        ]
+      : [];
   });
 }
 
-/** The whole catalog sorted by name, ignoring case. */
+/** The catalog sorted by repository, then by name ignoring case. */
 export function catalogView(catalog: readonly Tag[]): TagView[] {
   return [...catalog]
     .sort(
       (a, b) =>
+        a.repository.localeCompare(b.repository) ||
         a.name.toLocaleLowerCase('und').localeCompare(b.name.toLocaleLowerCase('und')) ||
         a.id.localeCompare(b.id),
     )
-    .map(({ id, name, color, task }) => ({ id, name, color, task }));
+    .map(({ id, repository, name, color, task }) => ({ id, repository, name, color, task }));
 }
 
 export interface FileStat {
@@ -142,6 +155,11 @@ export type RowStatus = GroupStatus | 'done' | 'waiting' | RunHold;
 export type WaitLookup = (run: string, slug: string) => GroupWait | null;
 
 const NO_WAITS: WaitLookup = () => null;
+
+/** Number of artifacts per group slug of one run. */
+export type ArtifactCounts = ReadonlyMap<string, { count: number; revision: number }>;
+
+const NO_ARTIFACTS: ArtifactCounts = new Map();
 
 /**
  * `frozen`/`paused` for a queued group of a held run, `waiting` for a queued group that the
@@ -204,6 +222,8 @@ export interface GroupRow {
   durationMs: number;
   question: string | null;
   questions: HumanQuestion[] | null;
+  /** The question is for a person only (the queue autopilot skips it); null: anyone may answer. */
+  humanOnly: HumanOnly | null;
   reason: string | null;
   warnings: number;
   delivery: GroupDelivery['state'];
@@ -214,6 +234,10 @@ export interface GroupRow {
   usage: Usage | null;
   /** Answers accepted for the group, oldest first. */
   decisions: HumanDecision[];
+  /** Artifacts the specialists published for the group. */
+  artifacts: number;
+  /** Changes whenever an artifact of the group is published or replaced. */
+  artifactsRevision: number;
 }
 
 /** An accepted answer in the overview of a run, with the slug of its group. */
@@ -224,6 +248,7 @@ export interface SplitRow {
   wait: GroupWait | null;
   question: string | null;
   questions: HumanQuestion[] | null;
+  humanOnly: HumanOnly | null;
   reason: string | null;
 }
 
@@ -364,7 +389,7 @@ export interface AttemptView {
   outsideChanges: string[];
   /** The message the human sent to the specialist before this attempt continued its session. */
   message: { text: string; at: number } | null;
-  /** A human message is stopping this running attempt. */
+  /** A human message or a pause is stopping this running attempt. */
   interrupting: boolean;
 }
 
@@ -387,6 +412,7 @@ export interface GroupView {
   worktree: string;
   question: string | null;
   questions: HumanQuestion[] | null;
+  humanOnly: HumanOnly | null;
   /** Accepted answers to the questions of the group, a person's and the autopilot's, oldest first. */
   decisions: HumanDecision[];
   reason: string | null;
@@ -459,6 +485,7 @@ export function groupRow(
   now: number,
   diffs: DiffLookup = NO_DIFFS,
   wait: GroupWait | null = null,
+  artifacts: ArtifactCounts = NO_ARTIFACTS,
 ): GroupRow {
   const legacy = legacyOutsideChanges(group);
   const last = group.attempts.at(-1);
@@ -475,6 +502,7 @@ export function groupRow(
     durationMs: groupDuration(group, now),
     question: group.question,
     questions: group.questions,
+    humanOnly: group.humanOnly,
     reason: group.reason,
     warnings:
       legacy.warnings.length +
@@ -486,6 +514,8 @@ export function groupRow(
     limitUntil: groupLimitUntil(group),
     usage: groupUsage(group),
     decisions: group.decisions.map((decision) => ({ ...decision })),
+    artifacts: artifacts.get(group.slug)?.count ?? 0,
+    artifactsRevision: artifacts.get(group.slug)?.revision ?? 0,
   };
 }
 
@@ -499,9 +529,10 @@ export function systemRow(
   kind: SystemStepKind,
   now: number,
   wait: GroupWait | null = null,
+  artifacts: ArtifactCounts = NO_ARTIFACTS,
 ): SystemStepRow {
   return {
-    ...groupRow(state, group, now, NO_DIFFS, wait),
+    ...groupRow(state, group, now, NO_DIFFS, wait, artifacts),
     kind,
     status: displayStatus(serviceStatus(group), wait, groupHold(state, group)),
   };
@@ -605,6 +636,7 @@ export function runView(
   diffs: DiffLookup = NO_DIFFS,
   catalog: readonly Tag[] = [],
   waits: WaitLookup = NO_WAITS,
+  artifacts: ArtifactCounts = NO_ARTIFACTS,
 ): RunView {
   const summary = summarize(state);
   const waitOf = (group: Group): GroupWait | null =>
@@ -672,6 +704,7 @@ export function runView(
           wait: groupHold(state, state.split) === null ? waitOf(state.split) : null,
           question: state.split.question,
           questions: state.split.questions,
+          humanOnly: state.split.humanOnly,
           reason: state.split.reason,
         }
       : null,
@@ -697,14 +730,18 @@ export function runView(
     topology: waitingTopology,
     steps: stepStates(state),
     specialists: specialistUse(state),
-    groups: state.groups.map((group) => groupRow(state, group, now, diffs, waitOf(group))),
+    groups: state.groups.map((group) =>
+      groupRow(state, group, now, diffs, waitOf(group), artifacts),
+    ),
     system: [
-      ...(state.split ? [systemRow(state, state.split, 'split', now, waitOf(state.split))] : []),
+      ...(state.split
+        ? [systemRow(state, state.split, 'split', now, waitOf(state.split), artifacts)]
+        : []),
       ...(state.message
-        ? [systemRow(state, state.message, 'message', now, waitOf(state.message))]
+        ? [systemRow(state, state.message, 'message', now, waitOf(state.message), artifacts)]
         : []),
       ...(state.resolve
-        ? [systemRow(state, state.resolve, 'resolve', now, waitOf(state.resolve))]
+        ? [systemRow(state, state.resolve, 'resolve', now, waitOf(state.resolve), artifacts)]
         : []),
     ],
     decisions: allGroups(state).flatMap((group) =>
@@ -772,7 +809,9 @@ export function attemptView(
     })),
     outsideChanges: [...attempt.outsideChanges],
     message: attempt.input.message ? { ...attempt.input.message } : null,
-    interrupting: attempt.status === 'running' && attempt.reason?.kind === 'message',
+    interrupting:
+      attempt.status === 'running' &&
+      (attempt.reason?.kind === 'message' || attempt.reason?.kind === 'paused'),
   };
 }
 
@@ -832,6 +871,7 @@ export function groupView(
     worktree,
     question: group.question,
     questions: group.questions,
+    humanOnly: group.humanOnly,
     decisions: group.decisions.map((decision) => ({ ...decision })),
     reason: group.reason,
     limitUntil: groupLimitUntil(group),
@@ -902,6 +942,27 @@ export type ConfigEditResult =
   | { ok: true; revision: string | null; file: string }
   | { ok: false; reason: 'invalid'; errors: FieldError[]; references?: EntryReference[] }
   | { ok: false; reason: 'conflict'; message: string };
+
+/** The specialists of one level with their tags; `repository` is null for the shared level. */
+export interface SpecialistTagFolderView extends SpecialistTagFolder {
+  repository: string | null;
+}
+
+export interface SpecialistTagsView {
+  folders: SpecialistTagFolderView[];
+}
+
+/** The outcome of a tag edit: the folder of the level as it is now, or why nothing was written. */
+export type SpecialistTagsResult =
+  | { ok: true; folder: SpecialistTagFolderView }
+  | { ok: false; reason: 'invalid'; errors: FieldError[] }
+  | { ok: false; reason: 'conflict'; message: string; slugs?: string[] };
+
+/** The outcome of an import: the slugs that were copied, or why nothing was. */
+export type SpecialistsImportResult =
+  | { ok: true; imported: string[] }
+  | { ok: false; reason: 'invalid'; errors: FieldError[] }
+  | { ok: false; reason: 'conflict'; message: string; slugs?: string[] };
 
 /** The graph of a draft workflow, or the errors that keep it from being built. */
 export interface ConfigPreview {
@@ -1294,6 +1355,30 @@ export interface FileDiffView {
   lines: string[];
   totalLines: number;
   truncated: boolean;
+}
+
+/** One artifact in the list of a group (`group_artifacts`). */
+export interface ArtifactView {
+  id: string;
+  /** Workflow step of the attempt that published it. */
+  step: string;
+  stepName: string;
+  /** Number of that attempt. */
+  seq: number;
+  specialist: string;
+  title: string;
+  fileName: string;
+  size: number;
+  createdAt: number;
+  /** How the panel previews the file; null: download only. */
+  preview: 'markdown' | 'log' | null;
+}
+
+/** Answer to `artifact`: the bytes of one artifact in base64. */
+export interface ArtifactContentView {
+  fileName: string;
+  size: number;
+  base64: string;
 }
 
 /** Answer to `run_patch`: the patch of the merged groups of a run, bytes in base64. */

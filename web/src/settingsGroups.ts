@@ -6,8 +6,8 @@ export type SettingsScope = (typeof SETTINGS_SCOPES)[number];
 
 /** Groups of the settings page, per tab, in the order of the column on the left. */
 export const SETTINGS_GROUPS_BY_SCOPE = {
-  global: ['general', 'agents', 'delivery', 'runtimes', 'system', 'tags'],
-  project: ['general', 'agents', 'delivery', 'queue'],
+  global: ['general', 'agents', 'delivery', 'runtimes', 'system'],
+  project: ['general', 'agents', 'delivery', 'queue', 'tags'],
 } as const;
 
 export type SettingsGroup =
@@ -31,7 +31,7 @@ export const LEGACY_SETTINGS_GROUPS: Record<
   runtimes: { scope: 'global', group: 'runtimes' },
   web: { scope: 'global', group: 'system' },
   queue: { scope: 'project', group: 'queue' },
-  tags: { scope: 'global', group: 'tags' },
+  tags: { scope: 'project', group: 'tags' },
   system: { scope: 'global', group: 'system' },
 };
 
@@ -46,6 +46,8 @@ export function settingsLocationOf(
   scope: string | null,
   group: string | null,
 ): { scope: SettingsScope; group: SettingsGroup } {
+  // the catalog of tags left the shared tab: its address leads to the project tab
+  if (scope === 'global' && group === 'tags') return { scope: 'project', group: 'tags' };
   if (isScope(scope)) {
     const groups: readonly string[] = SETTINGS_GROUPS_BY_SCOPE[scope];
     const found = groups.find((candidate) => candidate === group);

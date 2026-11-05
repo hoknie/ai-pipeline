@@ -18,6 +18,7 @@ export function SettingsTarget({
   repositories,
   onSelectRepository,
   file,
+  note = null,
 }: {
   scope: SettingsScope;
   repository: string | null;
@@ -25,9 +26,11 @@ export function SettingsTarget({
   onSelectRepository: (path: string) => void;
   /** The file the open group saves to; null when the group does not show it. */
   file: string | null;
+  /** Text instead of a file for a group that saves to many files; null for none. */
+  note?: string | null;
 }) {
   const { t } = useTranslation();
-  if (scope === 'global' && !file) return null;
+  if (scope === 'global' && !file && !note) return null;
   const empty = scope === 'project' && repositories.length === 0;
 
   return (
@@ -62,6 +65,7 @@ export function SettingsTarget({
           </div>
         )
       ) : null}
+      {note && !file ? <p className="text-sm text-muted-foreground">{note}</p> : null}
       {file && !empty ? (
         <div
           className={cn(

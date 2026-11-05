@@ -1005,7 +1005,7 @@ export function autopilotAnswers(queue: Queue, states: Iterable<RunState>): Auto
   for (const state of queueStates(queue, states)) {
     const work = state.split ? [state.split, ...state.groups] : state.groups;
     for (const group of work) {
-      if (group.status !== 'needs_human') continue;
+      if (group.status !== 'needs_human' || group.humanOnly) continue;
       const last = group.attempts.at(-1);
       if (last?.report?.verdict !== 'needs_human' || last.outsideChanges.length > 0) continue;
       if (autopilotStreak(group.decisions) >= AUTOPILOT_ANSWERS_MAX) continue;

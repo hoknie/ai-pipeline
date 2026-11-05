@@ -84,6 +84,21 @@ describe('spawnDaemonRestart', () => {
         5000,
       );
     }
+    spawnDaemonRestart({
+      entry: [process.execPath, script],
+      stateDirectory: state,
+      command: 'stop',
+      force: false,
+      environment: process.env,
+    });
+    await until(
+      'the stop helper to write its arguments',
+      () =>
+        readFileSync(join(state, 'daemon.log'), 'utf8').includes(
+          JSON.stringify(['daemon', 'stop', '--web']),
+        ),
+      5000,
+    );
   });
 });
 
@@ -124,11 +139,16 @@ describe('/api/system', () => {
     expect(JSON.stringify(view)).not.toContain(web.token!);
   });
 
-  it('refuses both restarts of a standalone panel with web_standalone', async () => {
+  it('refuses restarts, stop and start of a standalone panel with web_standalone', async () => {
     h = await harness(MANUAL_CONFIG);
     web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
     const base = `http://127.0.0.1:${web.port}`;
-    for (const path of ['/api/system/web/restart', '/api/system/daemon/restart']) {
+    for (const path of [
+      '/api/system/web/restart',
+      '/api/system/daemon/restart',
+      '/api/system/daemon/stop',
+      '/api/system/daemon/start',
+    ]) {
       const response = await post(base, path, web.token);
       expect(response.status).toBe(409);
       expect(await response.json()).toMatchObject({ code: 'web_standalone' });
@@ -169,6 +189,51 @@ describe('/api/system', () => {
     );
   });
 
+  it('stops the daemon through its hook and refuses to start a running one', async () => {
+    h = await harness(MANUAL_CONFIG);
+    const calls: string[] = [];
+    web = await startWebServer({
+      socket: h.socket,
+      port: 0,
+      repository: h.repo,
+      system: {
+        restartWeb: async () => undefined,
+        stopDaemon: async (force) => void calls.push(`stop:${force}`),
+      },
+    });
+    const base = `http://127.0.0.1:${web.port}`;
+    const stopping = await post(base, '/api/system/daemon/stop', web.token);
+    expect(stopping.status).toBe(202);
+    expect(await stopping.json()).toEqual({ state: 'stopping' });
+    await until('the stop hook', () => calls.includes('stop:false'), 2000);
+    const start = await post(base, '/api/system/daemon/start', web.token);
+    expect(start.status).toBe(409);
+    expect(await start.json()).toMatchObject({ code: 'daemon_running' });
+    const restart = await post(base, '/api/system/daemon/restart', web.token);
+    expect(restart.status).toBe(409);
+    expect(await restart.json()).toMatchObject({ code: 'daemon_stopped' });
+  });
+
+  it('starts the daemon from a stand-in panel', async () => {
+    h = await harness(MANUAL_CONFIG);
+    let started = 0;
+    web = await startWebServer({
+      socket: h.socket,
+      port: 0,
+      repository: h.repo,
+      system: { servedBy: 'standby', startDaemon: async () => void started++ },
+    });
+    const base = `http://127.0.0.1:${web.port}`;
+    const view = (await (
+      await fetch(`${base}/api/system`, { headers: { 'x-aip-token': web.token! } })
+    ).json()) as ReturnType<typeof systemView>;
+    expect(view.web.servedBy).toBe('standby');
+    const starting = await post(base, '/api/system/daemon/start', web.token);
+    expect(starting.status).toBe(202);
+    expect(await starting.json()).toEqual({ state: 'starting' });
+    await until('the start hook', () => started === 1, 2000);
+  });
+
   it('answers 409 daemon_busy for a busy daemon unless force is set', async () => {
     h = await harness(MANUAL_CONFIG);
     h.script({ code: [{ waitFor: h.gate('code') }] });
@@ -181,6 +246,7 @@ describe('/api/system', () => {
       system: {
         restartWeb: async () => undefined,
         restartDaemon: async (force) => void calls.push(force),
+        stopDaemon: async (force) => void calls.push(force),
       },
     });
     const base = `http://127.0.0.1:${web.port}`;
@@ -194,9 +260,11 @@ describe('/api/system', () => {
         ).daemon.busy === true,
       5000,
     );
-    const refused = await post(base, '/api/system/daemon/restart', web.token);
-    expect(refused.status).toBe(409);
-    expect(await refused.json()).toMatchObject({ code: 'daemon_busy' });
+    for (const path of ['/api/system/daemon/restart', '/api/system/daemon/stop']) {
+      const refused = await post(base, path, web.token);
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toMatchObject({ code: 'daemon_busy' });
+    }
     expect(calls).toEqual([]);
     const forced = await post(base, '/api/system/daemon/restart', web.token, { force: true });
     expect(forced.status).toBe(202);
@@ -221,7 +289,12 @@ describe('restart from the panel of the daemon', () => {
     mkdirSync(join(config, 'aip'));
     const port = await freePort();
     writeFileSync(join(config, 'aip', 'settings.yaml'), `web: { port: ${port} }\n`);
-    const spawned: { entry: string[]; force: boolean; token: string | undefined }[] = [];
+    const spawned: {
+      entry: string[];
+      command: string | undefined;
+      force: boolean;
+      token: string | undefined;
+    }[] = [];
     const controller = createDaemonPanel({
       stateDirectory: h.state,
       socket: h.socket,
@@ -230,6 +303,7 @@ describe('restart from the panel of the daemon', () => {
       spawnRestart: (options) =>
         void spawned.push({
           entry: options.entry,
+          command: options.command,
           force: options.force,
           token: options.environment?.AIP_WEB_TOKEN,
         }),
@@ -263,7 +337,22 @@ describe('restart from the panel of the daemon', () => {
       const daemon = await post(base, '/api/system/daemon/restart', token, { force: true });
       expect(daemon.status).toBe(202);
       await until('the helper to start', () => spawned.length === 1, 2000);
-      expect(spawned[0]).toEqual({ entry: ['node', 'aip.js'], force: true, token });
+      expect(spawned[0]).toEqual({
+        entry: ['node', 'aip.js'],
+        command: 'restart',
+        force: true,
+        token,
+      });
+
+      const stop = await post(base, '/api/system/daemon/stop', token, { force: true });
+      expect(stop.status).toBe(202);
+      await until('the stop helper to start', () => spawned.length === 2, 2000);
+      expect(spawned[1]).toEqual({
+        entry: ['node', 'aip.js'],
+        command: 'stop',
+        force: true,
+        token,
+      });
     } finally {
       await controller.close();
     }

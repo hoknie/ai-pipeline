@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { formatQueue, type QueueView, type RunView } from '../../src/protocol/index.ts';
 import { settle, WORKFLOW_CONFIG, git, until, type Harness } from './harness.ts';
+import { calls } from './control-harness.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
 const callsOf = (h: Harness): { step: string; group: string }[] =>
@@ -15,6 +16,39 @@ const callsOf = (h: Harness): { step: string; group: string }[] =>
     .map((line) => JSON.parse(line));
 
 const resetIn = (seconds: number) => Math.ceil(Date.now() / 1000) + seconds;
+
+const SPLIT_CONFIG = WORKFLOW_CONFIG.replace(
+  '    feature:\n      steps:',
+  '    feature:\n      split: { specialist: coder, max_groups: 3 }\n      steps:',
+);
+
+/**
+ * A paused run with a failed group: of two groups one fails, the other is stopped by the pause.
+ */
+async function failedPaused() {
+  const h = await start(SPLIT_CONFIG);
+  h.script({
+    split: [
+      {
+        split: [
+          { title: 'Вход', task: 'вход' },
+          { title: 'Выход', task: 'выход' },
+        ],
+      },
+    ],
+    'code@Вход': [{ noReport: true }, {}],
+    'code@Выход': [{ waitFor: h.gate('a') }, {}],
+    review: [{}],
+  });
+  await add(h, 'A');
+  await add(h, 'B');
+  await h.call('queue_start', { repository: h.repo });
+  const runId = (await allRuns(h))[0]!.id;
+  await h.waitFor(runId, (state) => state.groups.some((group) => group.status === 'failed'));
+  const view = (await h.call('run_pause', { runId })) as QueueView & { item: string };
+  const failed = (await h.status(runId)).groups.find((group) => group.status === 'failed')!;
+  return { h, runId, view, failed: failed.slug };
+}
 
 async function paused() {
   const h = await start();
@@ -83,27 +117,17 @@ describe('pause a run', () => {
     h.open('a');
   });
 
-  it('lifts the pause of a failed paused run on a direct retry', async () => {
-    const h = await start();
-    h.script({ code: [{ waitFor: h.gate('a'), noReport: true }, { waitFor: h.gate('b') }, {}] });
-    await add(h, 'A');
-    await add(h, 'B');
-    await h.call('queue_start', { repository: h.repo });
-    const [a] = await allRuns(h);
-    const runId = a!.id;
-    const view = (await h.call('run_pause', { runId })) as QueueView & { item: string };
-    h.open('a');
+  it('lifts the pause of a paused run with a failed group on a direct retry', async () => {
+    const { h, runId, view, failed } = await failedPaused();
     await waitQueue(h, (q) => q.items.some((item) => item.run === runId));
-    const failed = await h.waitFor(runId, (state) => state.finished);
-    expect(failed).toMatchObject({ hold: 'paused', state: 'paused' });
     const queue = await queueOf(h);
     expect(queue.items.at(-1)).toMatchObject({ id: view.item, hold: 'paused' });
-    await h.call('retry', { runId, group: failed.groups[0]!.slug });
+    await h.call('retry', { runId, group: failed });
     const after = await queueOf(h);
     expect(after.items.map((item) => item.run)).not.toContain(runId);
     expect(after.runs.map((card) => card.id)).toContain(runId);
     expect(((await h.status(runId)) as RunView).hold).toBeNull();
-    h.open('b');
+    h.open('a');
   });
 });
 
@@ -180,65 +204,61 @@ describe('pause a run: scenarios of the queue', () => {
     expect(queue.items.at(-1)).toMatchObject({ id: view.item, run: runId, hold: 'paused' });
   });
 
-  it('lets the current step finish and commit, and starts no next step', async () => {
+  it('stops the running step, starts no next one and continues the step in the same session', async () => {
     const h = await start(WORKFLOW_CONFIG);
     h.script({
-      code: [{ waitFor: h.gate('a'), write: { 'lib.ts': 'export const value = 2;\n' } }],
+      code: [{ waitFor: h.gate('a') }, { write: { 'lib.ts': 'export const value = 2;\n' } }],
     });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const runId = (await waitUntilRuns(h, 1))[0]!.id;
+    await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
     await h.call('queue_pause', { repository: h.repo });
-    await h.call('run_pause', { runId });
-    h.open('a');
+    const view = (await h.call('run_pause', { runId })) as QueueView & { item: string };
     const slug = (await h.status(runId)).groups[0]!.slug;
-    await until('the code step is done', async () =>
-      (await h.group(runId, slug)).attempts.some(
-        (attempt) => attempt.stepId === 'code' && attempt.status === 'finished',
-      ),
+    await until('the step is stopped', async () =>
+      (await h.group(runId, slug)).attempts.some((attempt) => attempt.status === 'cancelled'),
     );
-    expect((await h.status(runId)).hold).toBe('paused');
     await settle(h);
     const after = await h.status(runId);
-    expect(after.groups[0]!.status).toBe('paused');
-    expect(after.groups[0]).toMatchObject({ hold: 'paused', wait: null });
-    expect((await h.group(runId, slug)).attempts.map((attempt) => attempt.stepId)).toEqual([
-      'code',
-    ]);
-    expect(callsOf(h).filter((call) => call.step === 'review')).toEqual([]);
+    expect(after.groups[0]).toMatchObject({ status: 'paused', hold: 'paused', wait: null });
+    expect(after.finished).toBe(false);
+    const detail = await h.group(runId, slug);
+    expect(detail.attempts).toHaveLength(1);
+    expect(detail.attempts[0]).toMatchObject({
+      status: 'cancelled',
+      reason: 'interrupted by a pause',
+      interrupting: false,
+    });
+    expect(callsOf(h).filter((call) => call.step === 'code')).toHaveLength(1);
+
+    await h.call('queue_run_now', { repository: h.repo, item: view.item });
+    const done = await h.waitFor(runId, (state) => state.finished);
+    expect(done.hold).toBeNull();
+    const codeCalls = calls(h).filter((call) => call.step === 'code');
+    expect(codeCalls).toHaveLength(2);
+    expect(codeCalls[1]?.args).toContain('--resume');
+    expect(callsOf(h).filter((call) => call.step === 'review')).toHaveLength(1);
     const committedValues = () =>
       git(h.repo, 'for-each-ref', '--format=%(refname)', `refs/aip/${runId}/`)
         .split('\n')
         .filter(Boolean)
         .map((ref) => git(h.repo, 'show', `${ref}:lib.ts`));
-    // the commit of the finished step follows the end of the attempt
     await until('the commit of the step', () =>
       committedValues().includes('export const value = 2;'),
     );
-    const committed = committedValues();
-    expect(committed).toContain('export const value = 2;');
   });
 
-  it('shows a failed paused run as `paused <run>` and keeps the queue running', async () => {
-    const h = await start();
-    h.script({ code: [{ waitFor: h.gate('a'), noReport: true }, { waitFor: h.gate('b') }, {}] });
-    await add(h, 'A');
-    await add(h, 'B');
-    await h.call('queue_start', { repository: h.repo });
-    const runId = (await allRuns(h))[0]!.id;
-    await h.call('run_pause', { runId });
-    h.open('a');
-    const failed = await h.waitFor(runId, (state) => state.groups[0]!.status === 'failed');
-    expect(failed.hold).toBe('paused');
+  it('shows a paused run with a failed group as `paused <run>`', async () => {
+    const { h, runId } = await failedPaused();
     await settle(h);
     const queue = await queueOf(h);
-    expect(queue.status).toBe('running');
-    expect(queue.stop).toBeNull();
     expect(queue.runs.map((card) => card.id)).not.toContain(runId);
-    expect(queue.items.map((item) => item.run)).toEqual([runId]);
+    expect(queue.items.map((item) => item.run)).toContain(runId);
     expect(formatQueue(queue)).toContain(`paused ${runId}`);
-    expect(((await h.status(runId)) as RunView).groups[0]!.status).toBe('failed');
-    h.open('b');
+    const state = (await h.status(runId)) as RunView;
+    expect(state.groups.map((group) => group.status).sort()).toEqual(['failed', 'paused']);
+    h.open('a');
   });
 
   it('takes the return item of a paused run by advance and continues its steps', async () => {
@@ -248,11 +268,11 @@ describe('pause a run: scenarios of the queue', () => {
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
     const runId = (await allRuns(h))[0]!.id;
+    await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
     await h.call('run_pause', { runId });
-    h.open('a');
     const slug = (await h.status(runId)).groups[0]!.slug;
-    await until('the code step is done', async () =>
-      (await h.group(runId, slug)).attempts.some((a) => a.status === 'finished'),
+    await until('the code step is stopped', async () =>
+      (await h.group(runId, slug)).attempts.some((a) => a.status === 'cancelled'),
     );
     expect(((await queueOf(h)).items.at(-1) ?? null)?.run).toBe(runId);
     h.open('b');
@@ -268,40 +288,20 @@ describe('pause a run: scenarios of the queue', () => {
     expect(queue.items).toEqual([]);
   });
 
-  it('continues a failed paused run with run-now: the group is retried and the run holds a place', async () => {
-    const h = await start();
-    h.script({
-      code: [
-        { waitFor: h.gate('a'), noReport: true },
-        { waitFor: h.gate('b') },
-        { waitFor: h.gate('c') },
-      ],
-    });
-    await add(h, 'A');
-    await add(h, 'B');
-    await h.call('queue_start', { repository: h.repo });
-    const runId = (await allRuns(h))[0]!.id;
-    const view = (await h.call('run_pause', { runId })) as QueueView & { item: string };
-    h.open('a');
-    await h.waitFor(runId, (state) => state.groups[0]!.status === 'failed');
+  it('continues a paused run with a failed group with run-now: the group is retried and the run holds a place', async () => {
+    const { h, runId, view } = await failedPaused();
     await h.call('queue_run_now', { repository: h.repo, item: view.item });
     const state = await h.status(runId);
     expect(state.hold).toBeNull();
-    expect(['queued', 'running']).toContain(state.groups[0]!.status);
+    expect(state.groups.map((group) => group.status)).not.toContain('paused');
     const queue = await queueOf(h);
     expect(queue.runs.map((card) => card.id)).toContain(runId);
     expect(queue.items.map((item) => item.id)).not.toContain(view.item);
-    h.open('b');
-    h.open('c');
+    h.open('a');
   });
 });
 
 describe('pause a run: outside the queue and skipped', () => {
-  const SPLIT_CONFIG = WORKFLOW_CONFIG.replace(
-    '    feature:\n      steps:',
-    '    feature:\n      split: { specialist: coder, max_groups: 3 }\n      steps:',
-  );
-
   /** A run of two groups: one failed, so the run is skipped; the other still works. */
   async function skippedRun() {
     const h = await start(SPLIT_CONFIG);
@@ -362,7 +362,7 @@ describe('pause a run: daemon restart', () => {
         - { id: code, specialist: coder }
 `;
 
-  it('keeps the hold and the return item when the interrupted step leaves something to retry', async () => {
+  it('keeps the hold and the return item and continues the stopped step after a restart', async () => {
     const h = await start();
     h.script({ code: [{ waitFor: h.gate('a') }, {}] });
     await add(h, 'A');
@@ -372,7 +372,8 @@ describe('pause a run: daemon restart', () => {
     await h.call('run_pause', { runId });
     await h.restart();
     const state = await h.status(runId);
-    expect(state.groups[0]!.status).toBe('failed');
+    expect(state.groups[0]!.status).toBe('paused');
+    expect(state.finished).toBe(false);
     expect(state.hold).toBe('paused');
     const queue = await queueOf(h);
     expect(queue.status).toBe('stopped');

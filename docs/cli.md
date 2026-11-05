@@ -71,13 +71,15 @@ The daemon starts automatically on the first request. To control the background 
 
 ```sh
 aip daemon start          # does nothing if it runs
-aip daemon stop
+aip daemon stop [--force] [--web]
 aip daemon restart [--force] [--web]
 aip daemon status [--json]
 ```
 
 - `stop` and `restart` refuse with code 1 while agents work or a merge runs. `--force` stops the daemon together with its agents, and their steps become `failed` with the reason `interrupted` at the next start.
 - `restart --web` also raises the web panel of the new daemon, even with `web.autostart: false`, and prints `aip web: <url>`. If the panel cannot start (a busy port, an error in the `web` section), the reason goes to stderr, the exit code is 1 and the daemon keeps running.
+- `stop --web` stops the daemon and keeps serving the web panel in this process, at the same address and with the same token. This stand-in never starts the daemon by itself.
+- Once a daemon runs again ("Start daemon" in the panel, `aip daemon start` or any other `aip` command), the stand-in hands the panel back to it with the same token and exits. `aip web stop` stops the stand-in.
 - `status` starts and stops nothing. It exits with code 3 when no daemon runs.
 - Bare `aip daemon` runs the daemon in the foreground.
 

@@ -23,7 +23,7 @@ import {
 import { groupSlugs } from './ids.ts';
 import { retryableGroups } from './retryable.ts';
 import { attemptStepLabel } from './topology.ts';
-import { questionsText } from './questions.ts';
+import { questionsText, reviewQuestion } from './questions.ts';
 import {
   addUsage,
   allGroups,
@@ -44,6 +44,7 @@ import {
   type Attempt,
   type FailReason,
   type Group,
+  type HumanOnly,
   type HumanQuestion,
   type OnLimit,
   type ProposedGroup,
@@ -107,7 +108,7 @@ export type Event =
   | { kind: 'resolve_prepared'; conflicts: string[] }
   | { kind: 'run_named'; title: string | null; name: string | null; usage: Usage | null }
   | { kind: 'tags_set'; tags: string[] }
-  | { kind: 'hold'; hold: RunHold | null }
+  | { kind: 'title_set'; title: string }
   | { kind: 'step_skip'; step: string; skip: boolean }
   | { kind: 'hold'; hold: RunHold | null }
   | { kind: 'interrupted' };
@@ -209,18 +210,11 @@ class Machine {
         }
         this.state.run.namingUsage = addUsage(this.state.run.namingUsage, event.usage);
         return;
+      case 'title_set':
+        this.state.run.title = event.title;
+        return;
       case 'tags_set':
         this.state.run.tags = [...event.tags];
-        return;
-      case 'hold':
-        if (
-          event.hold !== null &&
-          this.state.run.finishedAt !== null &&
-          this.state.run.hold === null
-        ) {
-          throw new Rejection('run is finished; nothing to hold');
-        }
-        this.state.run.hold = event.hold;
         return;
       case 'step_skip':
         return this.stepSkip(event.step, event.skip);
@@ -240,7 +234,25 @@ class Machine {
     if (hold !== null && this.state.run.finishedAt !== null && this.state.run.hold === null) {
       throw new Rejection('a finished run cannot be held');
     }
+    const pausing = hold === 'paused' && this.state.run.hold !== 'paused';
     this.state.run.hold = hold;
+    if (!pausing) return;
+    // A pause stops the running agents; their steps go on in the same session after it.
+    const groups = [...(this.state.split ? [this.state.split] : []), ...this.state.groups];
+    for (const group of groups) {
+      for (const attempt of group.attempts) {
+        if (attempt.status !== 'running' || attempt.report !== null || attempt.reason !== null) {
+          continue;
+        }
+        attempt.reason = { kind: 'paused', at: this.now };
+        this.effects.push({
+          kind: 'stop_attempt',
+          run: this.state.run.id,
+          group: group.slug,
+          seq: attempt.seq,
+        });
+      }
+    }
   }
 
   private report(slug: string, seq: number, report: Report): void {
@@ -260,6 +272,7 @@ class Machine {
           ? questionsText(report.questions)
           : null,
       ...(report.questions ? { questions: report.questions } : {}),
+      ...(report.humanOnly ? { humanOnly: true } : {}),
     };
   }
 
@@ -295,6 +308,15 @@ class Machine {
     if (attempt.reason?.kind === 'message') {
       this.continueAfterMessage(group, attempt, attempt.reason);
       return;
+    }
+    if (attempt.reason?.kind === 'paused') {
+      if (attempt.report === null) {
+        this.continueAfterPause(group, attempt);
+        return;
+      }
+      // The report came before the stop: the exit failure is the stop itself.
+      attempt.reason = null;
+      exit = { ...exit, failure: null };
     }
     // A report sent before the limit ran out counts as usual.
     const limited = exit.failure?.kind === 'usage_limit' && attempt.report !== null;
@@ -336,9 +358,33 @@ class Machine {
     else if (report.verdict === 'done' && isMessageGroup(group))
       this.finishMessage(group, report.summary);
     else if (report.verdict === 'done' && isSplitGroup(group)) this.finishSplit(group, attempt);
-    else if (report.verdict === 'done') this.advance(group, attempt.stepIndex);
+    else if (report.verdict === 'done') this.finishStep(group, attempt, report);
     else if (report.verdict === 'rejected') this.rejected(group, attempt, report.feedback ?? '');
-    else this.askHuman(group, attempt.stepIndex, report.feedback ?? '', report.questions ?? null);
+    else {
+      this.askHuman(
+        group,
+        attempt.stepIndex,
+        report.feedback ?? '',
+        report.questions ?? null,
+        report.humanOnly ? 'request' : null,
+      );
+    }
+  }
+
+  /** `done` of an ordinary step: on to the next one, or first to a review by a person. */
+  private finishStep(group: Group, attempt: Attempt, report: Report): void {
+    const step = stepsOf(this.state.run, group)[attempt.stepIndex];
+    if (step?.humanReview && !attempt.input.reviewed) {
+      this.askHuman(
+        group,
+        attempt.stepIndex,
+        reviewQuestion(attemptStepLabel(this.state, group, attempt), report.summary),
+        null,
+        'review',
+      );
+      return;
+    }
+    this.advance(group, attempt.stepIndex);
   }
 
   private finishSplit(split: Group, attempt: Attempt): void {
@@ -446,10 +492,12 @@ class Machine {
     step: number,
     question: string,
     questions: HumanQuestion[] | null,
+    humanOnly: HumanOnly | null = null,
   ): void {
     group.status = 'needs_human';
     group.question = question;
     group.questions = questions;
+    group.humanOnly = humanOnly;
     group.pending = { stepIndex: step, feedback: null, humanAnswer: null, resume: true };
   }
 
@@ -461,6 +509,7 @@ class Machine {
         feedback: last.input.feedback,
         humanAnswer: last.input.humanAnswer,
         resume: false,
+        ...(last.input.reviewed ? { reviewed: true } : {}),
       };
     }
   }
@@ -473,6 +522,7 @@ class Machine {
       feedback: attempt.input.feedback,
       humanAnswer: attempt.input.humanAnswer,
       resume: attempt.sessionId !== null,
+      ...(attempt.input.reviewed ? { reviewed: true } : {}),
     };
     group.status = 'queued';
     group.reason = null;
@@ -502,7 +552,9 @@ class Machine {
   private timedOut(slug: string, seq: number): void {
     const group = this.group(slug);
     const attempt = this.running(group, seq);
-    if (!attempt || attempt.reason?.kind === 'message') return;
+    if (!attempt || attempt.reason?.kind === 'message' || attempt.reason?.kind === 'paused') {
+      return;
+    }
     attempt.status = 'failed';
     attempt.reason = { kind: 'timeout' };
     attempt.finishedAt = this.now;
@@ -534,8 +586,16 @@ class Machine {
       ...freshPending(attempt.stepIndex),
       resume: true,
       message: { text: reason.text, at: reason.at },
+      ...(attempt.input.reviewed ? { reviewed: true } : {}),
     };
     group.status = 'queued';
+  }
+
+  /** The attempt stopped because of a pause: the step goes on in the same session. */
+  private continueAfterPause(group: Group, attempt: Attempt): void {
+    attempt.status = 'cancelled';
+    attempt.finishedAt ??= this.now;
+    this.waitForLimit(group, attempt);
   }
 
   private cancel(only: string | null): void {
@@ -607,6 +667,7 @@ class Machine {
         group.status = 'queued';
         group.question = null;
         group.questions = null;
+        group.humanOnly = null;
         group.pending = { ...group.pending, humanAnswer: null, resume: false };
       }
     }
@@ -726,7 +787,11 @@ class Machine {
     group.status = 'queued';
     group.question = null;
     group.questions = null;
-    if (group.pending) group.pending.humanAnswer = answer;
+    if (group.pending) {
+      group.pending.humanAnswer = answer;
+      if (group.humanOnly === 'review') group.pending.reviewed = true;
+    }
+    group.humanOnly = null;
   }
 
   private enqueueMerge(group: Group, updateOnConflict: boolean): void {
@@ -798,6 +863,10 @@ class Machine {
         if (attempt.status !== 'running') continue;
         if (attempt.reason?.kind === 'message') {
           this.continueAfterMessage(group, attempt, attempt.reason);
+          continue;
+        }
+        if (attempt.reason?.kind === 'paused') {
+          this.continueAfterPause(group, attempt);
           continue;
         }
         attempt.status = 'failed';

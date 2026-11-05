@@ -66,6 +66,7 @@ const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string =>
 describe('host MCP parent of a task', () => {
   const LINKED = {
     id: 'tg1',
+    repository: '/repo',
     name: 'cards-half-width',
     color: 'indigo' as const,
     task: { run: 'r115', number: 115 },
@@ -753,6 +754,12 @@ describe('host MCP swarm_skip_step', () => {
       { method: 'run_skip', params: { runId: 'run000000001', step: 'qa', skip: true } },
       { method: 'run_skip', params: { runId: 'run000000001', step: 'qa', skip: false } },
     ]);
+  });
+
+  it('tells that a humanOnly question is answered only with the words of the user', async () => {
+    const client = await connect(async () => VIEW);
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((tool) => tool.name === 'swarm_answer')?.description).toContain('humanOnly');
   });
 
   it('describes the freezing of the last run in the tools that take a place', async () => {

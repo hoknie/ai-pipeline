@@ -18,6 +18,7 @@ import {
   workflowsView,
 } from './fixtures.ts';
 import type { TagView } from '../src/types.ts';
+import { replaceTags } from '../src/store.ts';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -113,6 +114,22 @@ describe('tag picker in the task form', () => {
     queue: vi.fn(async () => queueOf()),
     workflows: vi.fn(async () => workflowsView()),
     ...overrides,
+  });
+
+  it('offers only the tags of the repository of the task', async () => {
+    const lib = { ...tagView('lib-only', 'red', 'b'), repository: '/work/lib' };
+    boot('#queue', [tagView('auth', 'blue', 'a'), lib], [runView()], queueApi());
+    await openPicker();
+    expect(await screen.findByRole('option', { name: /auth/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /lib-only/ })).toBeNull();
+  });
+
+  it('offers to create a name that exists only in another repository', async () => {
+    const lib = { ...tagView('lib-only', 'red', 'b'), repository: '/work/lib' };
+    boot('#queue', [lib], [runView()], queueApi());
+    const input = await openPicker();
+    fireEvent.change(input, { target: { value: 'lib-only' } });
+    expect(await screen.findByRole('option', { name: 'Create tag «lib-only»' })).toBeTruthy();
   });
 
   it('creates a tag right in the form and selects it', async () => {
@@ -216,8 +233,26 @@ describe('tags on the settings page', () => {
     settings([tagView('auth', 'blue', 'a')]);
     await screen.findByRole('region', { name: 'Regular tags' });
     expect(screen.getAllByRole('heading', { name: 'Tags' })).toHaveLength(1);
-    expect(screen.getAllByText('The tag catalog, shared by all repositories.')).toHaveLength(1);
-    expect(screen.queryByText('The tag catalog is shared by all repositories.')).toBeNull();
+    expect(
+      screen.getAllByText('The tags of the selected project. Every project has its own catalog.'),
+    ).toHaveLength(1);
+  });
+
+  it('shows only the tags of the selected project', async () => {
+    const lib = { ...tagView('lib-only', 'red', 'b'), repository: '/work/lib' };
+    settings([tagView('auth', 'blue', 'a'), lib]);
+    await screen.findByRole('region', { name: 'Regular tags' });
+    expect(within(tags()).getByLabelText('Name of tag auth')).toBeTruthy();
+    expect(within(tags()).queryByLabelText('Name of tag lib-only')).toBeNull();
+  });
+
+  it('shows the section in the groups of the Project tab only', async () => {
+    settings([]);
+    await screen.findByRole('region', { name: 'Regular tags' });
+    expect(window.location.hash).toBe('#settings/project/tags');
+    expect(screen.getByRole('link', { name: 'Tags' }).getAttribute('href')).toBe(
+      '#settings/project/tags',
+    );
   });
 
   it('shows an empty catalog without the linked card', async () => {
@@ -344,5 +379,27 @@ describe('tags of linked tasks', () => {
     for (const row of cells) {
       expect(row.className).toContain('sm:grid-cols-[10rem_minmax(0,16rem)_9rem_auto]');
     }
+  });
+});
+
+describe('catalogs per repository', () => {
+  const lib = (name: string, id: string): TagView => ({
+    ...tagView(name, 'red', id),
+    repository: '/work/lib',
+  });
+
+  it('replaces the tags of one repository and keeps the tags of the others', () => {
+    const current = [tagView('auth', 'blue', 'a'), lib('ui', 'u')];
+    const next = replaceTags(current, [tagView('login', 'blue', 'a')], '/repo');
+    expect(next.map((tag) => tag.name)).toEqual(['login', 'ui']);
+    expect(next.find((tag) => tag.id === 'u')).toBe(current[1]);
+    expect(replaceTags(next, [], '/repo').map((tag) => tag.name)).toEqual(['ui']);
+  });
+
+  it('ignores tags of another repository in the answer and keeps the same list when unchanged', () => {
+    const current = [tagView('auth', 'blue', 'a'), lib('ui', 'u')];
+    expect(replaceTags(current, [tagView('auth', 'blue', 'a')], '/repo')).toBe(current);
+    expect(replaceTags(current, [lib('x', 'x')], '/repo').map((tag) => tag.name)).toEqual(['ui']);
+    expect(replaceTags(current, [], null)).toBe(current);
   });
 });

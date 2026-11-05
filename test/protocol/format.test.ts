@@ -45,6 +45,21 @@ describe('text for people', () => {
     );
   });
 
+  it('marks a question only a person answers in the table and the details', () => {
+    const state = run(1);
+    step(state, 1000);
+    finish(state, 'needs_human', { feedback: 'Глянь сам', humanOnly: true, now: 61_000 });
+    expect(formatRun(runView(state, 121_000), 121_000)).toContain(
+      'question (human only): Глянь сам',
+    );
+    expect(runView(state, 121_000).groups[0]?.humanOnly).toBe('request');
+    state.groups[0]!.humanOnly = 'review';
+    expect(formatRun(runView(state, 121_000), 121_000)).toContain('question (human review)');
+    expect(formatGroup(groupView(state, group(state), '/w', null, 121_000))).toContain(
+      'Question (human review): Глянь сам',
+    );
+  });
+
   it('shows the groups of a frozen run as frozen in the table and the counts', () => {
     const state = run(1);
     state.run.hold = 'frozen';
@@ -587,8 +602,8 @@ describe('formatRunQueued', () => {
 
 describe('tags in text', () => {
   const tags = [
-    { id: 'tg-a', name: 'auth', color: 'blue' as const, task: null },
-    { id: 'tg-b', name: 'v2', color: 'red' as const, task: null },
+    { id: 'tg-a', repository: '/repo', name: 'auth', color: 'blue' as const, task: null },
+    { id: 'tg-b', repository: '/repo', name: 'v2', color: 'red' as const, task: null },
   ];
   const runWith = (id: string, own: typeof tags) => ({
     ...runView(run(1, { id }), 1000),
@@ -620,6 +635,7 @@ describe('tags in text', () => {
   it('labels a linked task tag with the task number and lists it in TASK', () => {
     const linked = {
       id: 'tg-l',
+      repository: '/repo',
       name: 'cards',
       color: 'indigo' as const,
       task: { run: 'r1', number: 115 },

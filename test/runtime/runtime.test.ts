@@ -88,6 +88,22 @@ describe('message to the specialist', () => {
     expect(userMessage({ ...input, message: null })).not.toContain('Message from the person');
   });
 
+  it('tells about human_only and, for a reviewed step, what to list in the summary', () => {
+    const plain = systemPrompt(specialist(), input);
+    expect(plain).toContain('human_only: true');
+    expect(plain).not.toContain('a person reviews this step');
+    const reviewed = systemPrompt(specialist(), { ...input, humanReview: true });
+    expect(reviewed).toContain('a person reviews this step');
+    expect(reviewed).toContain('summary');
+  });
+
+  it('shows the answer to a review under its own heading', () => {
+    const text = userMessage({ ...input, reviewed: true, humanAnswer: 'Принято' });
+    expect(text).toContain('## Answer of the person who reviewed this step\nПринято');
+    expect(text).toContain('report "done"');
+    expect(text).not.toContain('## Latest accepted answer');
+  });
+
   it('requires swarm_report, names the worktree rule and the skills', () => {
     const text = systemPrompt(specialist({ skills: ['grill-me', 'opsx:propose'] }), input);
     expect(text).toContain('MUST call the tool `swarm_report`');
@@ -124,13 +140,20 @@ describe('claude adapter', () => {
       launch.args.indexOf('--allowedTools') + 1,
       launch.args.indexOf('--disallowedTools'),
     );
-    expect(allowed).toEqual(['Read', 'Grep', 'Glob', 'mcp__aip__swarm_report']);
+    expect(allowed).toEqual([
+      'Read',
+      'Grep',
+      'Glob',
+      'mcp__aip__swarm_report',
+      'mcp__aip__swarm_artifact',
+      'mcp__aip__swarm_split',
+    ]);
   });
 
   it('allows the queue tool only to a specialist with queue', () => {
     const between = (args: string[]) =>
       args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools'));
-    for (const claudeEditMode of ['allowlist', 'auto'] as const) {
+    for (const claudeEditMode of ['allowlist', 'accept_edits', 'auto'] as const) {
       for (const permissions of ['read', 'edit'] as const) {
         const allowed = between(
           runtime.buildLaunch(
@@ -142,6 +165,21 @@ describe('claude adapter', () => {
       }
     }
     expect(between(runtime.buildLaunch(context()).args)).not.toContain('mcp__aip__swarm_queue_add');
+  });
+
+  it('allows the artifact tool to every specialist in every edit mode', () => {
+    const between = (args: string[]) =>
+      args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools'));
+    for (const claudeEditMode of ['allowlist', 'accept_edits', 'auto'] as const) {
+      for (const permissions of ['read', 'edit'] as const) {
+        const allowed = between(
+          runtime.buildLaunch(context({ claudeEditMode, specialist: specialist({ permissions }) }))
+            .args,
+        );
+        expect(allowed).toContain('mcp__aip__swarm_artifact');
+        expect(allowed).not.toContain('mcp__aip__swarm_queue_add');
+      }
+    }
   });
 
   it('allows edits and only the listed commands for edit, never acceptEdits', () => {
@@ -163,7 +201,12 @@ describe('claude adapter', () => {
       launch.args.indexOf('--allowedTools') + 1,
       launch.args.indexOf('--disallowedTools'),
     );
-    expect(allowed).toEqual(['Bash(npm test*)', 'mcp__aip__swarm_report']);
+    expect(allowed).toEqual([
+      'Bash(npm test*)',
+      'mcp__aip__swarm_report',
+      'mcp__aip__swarm_artifact',
+      'mcp__aip__swarm_split',
+    ]);
     expect(launch.args).toContain('Bash(git push:*)');
     const read = runtime.buildLaunch(
       context({ claudeEditMode: 'accept_edits', specialist: specialist({ permissions: 'read' }) }),
@@ -178,7 +221,12 @@ describe('claude adapter', () => {
       launch.args.indexOf('--allowedTools') + 1,
       launch.args.indexOf('--disallowedTools'),
     );
-    expect(allowed).toEqual(['Bash(npm test*)', 'mcp__aip__swarm_report']);
+    expect(allowed).toEqual([
+      'Bash(npm test*)',
+      'mcp__aip__swarm_report',
+      'mcp__aip__swarm_artifact',
+      'mcp__aip__swarm_split',
+    ]);
     expect(launch.args).toEqual(
       expect.arrayContaining(['Bash(git push:*)', 'Bash(git checkout:*)', 'Bash(git switch:*)']),
     );

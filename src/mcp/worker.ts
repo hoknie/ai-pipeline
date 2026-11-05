@@ -3,6 +3,9 @@ import { z } from 'zod';
 
 import { DELIVERY_MODES } from '../config/index.ts';
 import {
+  ARTIFACT_CONTENT_LIMIT,
+  ARTIFACT_FILE_NAME_LIMIT,
+  ARTIFACT_TITLE_LIMIT,
   FEEDBACK_LIMIT,
   OPTIONS_LIMIT,
   OPTION_LIMIT,
@@ -12,6 +15,7 @@ import {
   RUN_TITLE_LIMIT,
   SUMMARY_LIMIT,
   VERDICTS,
+  validArtifactFileName,
 } from '../core/index.ts';
 import { VERSION } from './version.ts';
 
@@ -32,7 +36,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
     {
       title: 'Report the result of this step',
       description:
-        'Call this exactly once as your last action. verdict: "done" when the step is complete; "rejected" when the received work must be redone (put concrete remarks into feedback); "needs_human" when a person must decide (put the question into feedback, or pass several independent questions as questions, each with a recommendation and, for a clear choice, options).',
+        'Call this exactly once as your last action. verdict: "done" when the step is complete; "rejected" when the received work must be redone (put concrete remarks into feedback); "needs_human" when a person must decide (put the question into feedback, or pass several independent questions as questions, each with a recommendation and, for a clear choice, options; set human_only when only a person may answer, for example when you ask for a personal look at the result).',
       inputSchema: {
         verdict: z.enum(VERDICTS),
         summary: z.string().min(1).max(SUMMARY_LIMIT).describe('What you did, in a few sentences'),
@@ -64,9 +68,15 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
           .max(QUESTIONS_LIMIT)
           .optional()
           .describe('Only with needs_human: independent questions for the person'),
+        human_only: z
+          .boolean()
+          .optional()
+          .describe(
+            'Only with needs_human: a person must look personally; the queue autopilot does not answer',
+          ),
       },
     },
-    ({ verdict, summary, feedback, questions }) =>
+    ({ verdict, summary, feedback, questions, human_only }) =>
       attempt(async () => {
         await options.send('report', {
           token: options.token,
@@ -74,8 +84,55 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
           summary,
           feedback: feedback ?? null,
           questions: questions ?? null,
+          human_only: human_only ?? null,
         });
         return `Recorded verdict ${verdict}. You can stop now.`;
+      }),
+  );
+  server.registerTool(
+    'swarm_artifact',
+    {
+      title: 'Publish an artifact',
+      description:
+        'Publish a file of this step (a report, a log, a template) as an artifact of the group. Artifacts are stored by the daemon outside of git, are shown in the panel on the Artifacts tab and never reach the delivered diff. Pass the text as content (best for reports and logs), or path to an existing file of your worktree that git ignores (build output, tmp/): a file that git tracks would be committed. Files named *.md and *.log can be previewed in the panel, others are downloaded. Publishing the same file_name again in this step replaces the artifact. Then call swarm_report as usual.',
+      inputSchema: {
+        file_name: z
+          .string()
+          .max(ARTIFACT_FILE_NAME_LIMIT)
+          .refine(validArtifactFileName, { message: 'not a plain file name' })
+          .describe('File name with extension, without a directory, e.g. review.md'),
+        title: z
+          .string()
+          .trim()
+          .min(1)
+          .max(ARTIFACT_TITLE_LIMIT)
+          .optional()
+          .describe('Title shown in the list; defaults to the file name without extension'),
+        content: z
+          .string()
+          .max(ARTIFACT_CONTENT_LIMIT)
+          .optional()
+          .describe('The text of the file, at most 1 MiB; pass either content or path'),
+        path: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('A file inside your worktree, at most 16 MiB; pass either content or path'),
+      },
+    },
+    ({ file_name, title, content, path }) =>
+      attempt(async () => {
+        if ((content === undefined) === (path === undefined)) {
+          throw new Error('pass either content or path');
+        }
+        const result = (await options.send('artifact_publish', {
+          token: options.token,
+          fileName: file_name,
+          ...(title !== undefined ? { title } : {}),
+          ...(content !== undefined ? { content } : {}),
+          ...(path !== undefined ? { path } : {}),
+        })) as { id?: string };
+        return `Recorded artifact ${result.id ?? ''} (${file_name}). Call swarm_report when you are done.`;
       }),
   );
   if (options.split) {
