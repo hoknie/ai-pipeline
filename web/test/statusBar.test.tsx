@@ -228,6 +228,74 @@ describe('background processes tab', () => {
     expect(screen.getByRole('columnheader', { name: 'PID' })).toBeTruthy();
     expect(screen.getByRole('columnheader', { name: 'Command' })).toBeTruthy();
     expect(screen.queryByRole('columnheader', { name: 'Name' })).toBeNull();
+    expect(within(row).queryByText('Логин · Первый')).toBeNull();
+    const header = screen.getByRole('button', { name: 'Логин · Первый' }).closest('tr')!;
+    expect(header.nextElementSibling).toBe(row);
+  });
+
+  const owned = (group: string | null, title: string, pid: number, runId = 'run1') =>
+    processView({
+      pid,
+      owner: { ...processView().owner, runId, group, groupTitle: title, step: `s${pid}` },
+    });
+
+  it('shows a header of each task above its processes', async () => {
+    await open(
+      fakeApi({
+        processes: vi.fn(async () => ({
+          processes: [
+            owned('cache', 'Кэш', 100),
+            owned('login', 'Вход', 200),
+            owned('cache', 'Кэш', 300),
+          ],
+        })),
+      }),
+    );
+    await screen.findByText('100');
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows.map((row) => row.textContent!.match(/^(Кэш|Вход)|^\d+/)![0])).toEqual([
+      'Кэш · Первый'.slice(0, 3),
+      '100',
+      '300',
+      'Вход',
+      '200',
+    ]);
+  });
+
+  it('shows a task without a group as plain text', async () => {
+    await open(
+      fakeApi({
+        processes: vi.fn(async () => ({ processes: [owned(null, 'x', 7)] })),
+      }),
+    );
+    expect(await screen.findByText('Первый')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Первый/ })).toBeNull();
+  });
+
+  it('drops a task header with its last process', async () => {
+    const processes = vi
+      .fn()
+      .mockResolvedValueOnce({ processes: [owned('a', 'А', 1), owned('b', 'Б', 2)] })
+      .mockResolvedValue({ processes: [owned('b', 'Б', 2)] });
+    const { api } = await open(fakeApi({ processes }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminate node (1)' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Terminate' }));
+    await waitFor(() => expect(api.killProcess).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'А · Первый' })).toBeNull());
+    expect(screen.getByRole('button', { name: 'Б · Первый' })).toBeTruthy();
+  });
+
+  it('opens the group with the step of the last process of the task', async () => {
+    const { onOpenGroup } = await open(
+      fakeApi({
+        processes: vi.fn(async () => ({
+          processes: [owned('a', 'А', 1), owned('a', 'А', 2)],
+        })),
+      }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'А · Первый' }));
+    expect(onOpenGroup).toHaveBeenCalledWith({ runId: 'run1', group: 'a', step: 's2' });
   });
 
   it('shows the whole command in a tooltip on focus', async () => {

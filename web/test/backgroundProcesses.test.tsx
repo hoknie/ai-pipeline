@@ -2,7 +2,11 @@
 import { createInstance } from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PROCESS_POLL_MS, useBackgroundProcesses } from '../src/backgroundProcesses.ts';
+import {
+  PROCESS_POLL_MS,
+  groupProcessesByTask,
+  useBackgroundProcesses,
+} from '../src/backgroundProcesses.ts';
 import { formatCpu, formatMemory, formatUptime } from '../src/format.ts';
 import type { StreamedProcesses } from '../src/store.ts';
 import { en } from '../src/i18n/locales/en.ts';
@@ -152,5 +156,29 @@ describe('formats', () => {
     expect(formatMemory(1.5 * 1024 ** 3, t.t, 'en')).toBe('1.5 GB');
     expect(formatMemory(1.5 * 1024 ** 3, t.getFixedT('ru'), 'ru')).toBe('1,5 ГБ');
     expect(formatMemory(512 * 1024, t.t, 'en')).toBe('512 KB');
+  });
+});
+
+describe('groupProcessesByTask', () => {
+  const p = (pid: number, group: string | null, runId = 'run1') =>
+    processView({ pid, owner: { ...processView().owner, runId, group } });
+
+  it('returns nothing for an empty list', () => {
+    expect(groupProcessesByTask([])).toEqual([]);
+  });
+
+  it('keeps the order of tasks and of processes inside them', () => {
+    const tasks = groupProcessesByTask([p(1, 'a'), p(2, 'b'), p(3, 'a')]);
+    expect(tasks.map((t) => t.processes.map((x) => x.pid))).toEqual([[1, 3], [2]]);
+    expect(tasks.map((t) => t.owner.group)).toEqual(['a', 'b']);
+  });
+
+  it('separates the same group of two runs', () => {
+    expect(groupProcessesByTask([p(1, 'a'), p(2, 'a', 'run2')])).toHaveLength(2);
+  });
+
+  it('makes a task of a run for a process without a group', () => {
+    const tasks = groupProcessesByTask([p(1, null), p(2, 'a'), p(3, null)]);
+    expect(tasks.map((t) => t.processes.length)).toEqual([2, 1]);
   });
 });

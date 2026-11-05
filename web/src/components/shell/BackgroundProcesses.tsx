@@ -3,7 +3,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
-import type { BackgroundProcesses as Polled } from '../../backgroundProcesses.ts';
+import {
+  groupProcessesByTask,
+  type BackgroundProcesses as Polled,
+} from '../../backgroundProcesses.ts';
 import { useConfirm } from '../../confirm.tsx';
 import { formatCpu, formatMemory, formatUptime } from '../../format.ts';
 import { notifyError, notifySuccess } from '../../notify.ts';
@@ -66,6 +69,7 @@ export function BackgroundProcesses({
   if (rows.length === 0) {
     return <p className="text-muted-foreground">{t('statusBar.noProcesses')}</p>;
   }
+  const tasks = groupProcessesByTask(rows);
   const numeric = 'px-2 py-1.5 text-right align-middle whitespace-nowrap tabular-nums';
   const head = 'bg-card px-2 py-1.5 font-medium';
   return (
@@ -90,92 +94,103 @@ export function BackgroundProcesses({
           </th>
         </tr>
       </thead>
-      <tbody>
-        {rows.map((process) => {
-          const command = process.command === '' ? process.name : process.command;
-          return (
-            <tr key={process.pid} className="border-b last:border-0 hover:bg-muted/50">
-              <td className={numeric}>{process.pid}</td>
-              <td className="min-w-0 px-2 py-1.5 align-middle">
-                <div className="flex min-w-0 items-center gap-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <code tabIndex={0} className={`${FILE_PATH_CLASS} block min-w-0 truncate`}>
-                        {command}
-                      </code>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[min(40rem,90vw)] font-mono break-all">
-                      {command}
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-6 shrink-0"
-                        aria-label={t('statusBar.copyCommand')}
-                        onClick={() => void copy(command)}
-                      >
-                        <Copy className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t('statusBar.copyCommand')}</TooltipContent>
-                  </Tooltip>
-                </div>
-                {process.owner.group !== null ? (
+      {tasks.map((task) => {
+        const { owner } = task;
+        const last = task.processes[task.processes.length - 1]!;
+        return (
+          <tbody key={task.key}>
+            <tr className="border-b bg-muted/40">
+              <th scope="rowgroup" colSpan={6} className="px-2 py-1.5 text-left font-medium">
+                {owner.group !== null ? (
                   <Button
                     variant="link"
                     size="sm"
-                    className="h-auto max-w-full justify-start p-0 text-xs"
+                    className="h-auto max-w-full justify-start p-0 text-xs font-medium"
                     onClick={() =>
                       onOpenGroup({
-                        runId: process.owner.runId,
-                        group: process.owner.group!,
-                        step: process.owner.step,
+                        runId: owner.runId,
+                        group: owner.group!,
+                        step: last.owner.step,
                       })
                     }
                   >
                     <span className="truncate">
                       {t('statusBar.owner', {
-                        group: process.owner.groupTitle ?? process.owner.group,
-                        run: process.owner.runTitle,
+                        group: owner.groupTitle ?? owner.group,
+                        run: owner.runTitle,
                       })}
                     </span>
                   </Button>
                 ) : (
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {process.owner.runTitle}
-                  </span>
+                  <span className="block truncate text-xs">{owner.runTitle}</span>
                 )}
-              </td>
-              <td className={numeric}>{formatUptime(process.uptimeSeconds, t)}</td>
-              <td className={numeric}>{formatCpu(process.cpuPercent, i18n.language)}</td>
-              <td className={numeric}>{formatMemory(process.memoryBytes, t, i18n.language)}</td>
-              <td className="px-2 py-1.5 text-right align-middle">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 text-destructive hover:text-destructive"
-                      disabled={killing.has(process.pid)}
-                      aria-label={t('statusBar.killLabel', {
-                        name: process.name,
-                        pid: process.pid,
-                      })}
-                      onClick={() => void kill(process)}
-                    >
-                      <CircleStop className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t('statusBar.kill')}</TooltipContent>
-                </Tooltip>
-              </td>
+              </th>
             </tr>
-          );
-        })}
-      </tbody>
+            {task.processes.map((process) => {
+              const command = process.command === '' ? process.name : process.command;
+              return (
+                <tr key={process.pid} className="border-b last:border-0 hover:bg-muted/50">
+                  <td className={numeric}>{process.pid}</td>
+                  <td className="min-w-0 px-2 py-1.5 align-middle">
+                    <div className="flex min-w-0 items-center gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <code
+                            tabIndex={0}
+                            className={`${FILE_PATH_CLASS} block min-w-0 truncate`}
+                          >
+                            {command}
+                          </code>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[min(40rem,90vw)] font-mono break-all">
+                          {command}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-6 shrink-0"
+                            aria-label={t('statusBar.copyCommand')}
+                            onClick={() => void copy(command)}
+                          >
+                            <Copy className="size-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('statusBar.copyCommand')}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </td>
+                  <td className={numeric}>{formatUptime(process.uptimeSeconds, t)}</td>
+                  <td className={numeric}>{formatCpu(process.cpuPercent, i18n.language)}</td>
+                  <td className={numeric}>{formatMemory(process.memoryBytes, t, i18n.language)}</td>
+                  <td className="px-2 py-1.5 text-right align-middle">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-destructive hover:text-destructive"
+                          disabled={killing.has(process.pid)}
+                          aria-label={t('statusBar.killLabel', {
+                            name: process.name,
+                            pid: process.pid,
+                          })}
+                          onClick={() => void kill(process)}
+                        >
+                          <CircleStop className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('statusBar.kill')}</TooltipContent>
+                    </Tooltip>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        );
+      })}
     </table>
   );
 }

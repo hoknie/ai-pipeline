@@ -78,3 +78,22 @@ export function useBackgroundProcesses(
   }, [refresh, polling]);
   return { processes, error, refresh };
 }
+
+/** The processes of one task: a group of a run, or the run itself when the process has no group. */
+export interface ProcessTask {
+  key: string;
+  owner: BackgroundProcessView['owner'];
+  processes: BackgroundProcessView[];
+}
+
+/** Splits processes into tasks, in order of first appearance; the order inside a task is kept. */
+export function groupProcessesByTask(processes: readonly BackgroundProcessView[]): ProcessTask[] {
+  const tasks = new Map<string, ProcessTask>();
+  for (const process of processes) {
+    const key = JSON.stringify([process.owner.runId, process.owner.group]);
+    const task = tasks.get(key);
+    if (task) task.processes.push(process);
+    else tasks.set(key, { key, owner: process.owner, processes: [process] });
+  }
+  return [...tasks.values()];
+}

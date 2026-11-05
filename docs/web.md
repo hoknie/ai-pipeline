@@ -184,7 +184,7 @@ The background processes arrive in the `processes` event of `/api/events`: the d
 - "Background processes" lists what the agents of the daemon started: their child processes and the members of their process groups, including those left after the agent exited, while they live.
 - The open strip has a constant height, the same on both tabs: 256 px by default. Drag its top edge, or press the up and down arrows on it (16 px a step), to change it, from 160 px to 80 % of the window height. The height is remembered in the browser; when the window gets smaller the strip shrinks and returns to the chosen height when the window grows.
 - The agent itself and its `aip mcp --worker` server are not listed.
-- A row has the PID, the command with its arguments (a long one is cut with an ellipsis, the full line is in the tooltip, and a button copies it), the owner group (a link to it), the uptime, the average CPU (CPU time over uptime, percent of one core) and the memory (resident set).
+- A row has the PID, the command with its arguments (a long one is cut with an ellipsis, the full line is in the tooltip, and a button copies it), the uptime, the average CPU (CPU time over uptime, percent of one core) and the memory (resident set).
 - "Terminate" is an icon button with a tooltip. It asks for confirmation, then sends `SIGTERM` to the process and its children and, after 5 seconds, `SIGKILL` to those still alive. The group keeps running. The daemon ends only processes from its own list; any other PID is refused.
 - Processes that left the process tree and group of the agent (`setsid`, a double fork) are not listed.
 
