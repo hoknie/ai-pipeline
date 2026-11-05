@@ -17,6 +17,7 @@ export function AttemptTimeline({
   showJson,
   retryable,
   onRetry,
+  onMessage,
 }: {
   api: Api;
   runId: string;
@@ -30,6 +31,8 @@ export function AttemptTimeline({
   /** The last attempt of a failed group can be retried. */
   retryable: boolean;
   onRetry: () => void;
+  /** Opens the message to the specialist; offered for the running last attempt. */
+  onMessage?: () => void;
 }) {
   const { t } = useTranslation();
   if (attempts.length === 0)
@@ -48,6 +51,13 @@ export function AttemptTimeline({
           onlyReplies={onlyReplies}
           showJson={showJson}
           {...(attempt.seq === lastSeq && retryable ? { onRetry } : {})}
+          {...(attempt.seq === lastSeq &&
+          onMessage &&
+          attempt.status === 'running' &&
+          attempt.verdict === null &&
+          !attempt.interrupting
+            ? { onMessage }
+            : {})}
         />
       ))}
     </ol>

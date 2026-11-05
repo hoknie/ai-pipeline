@@ -82,6 +82,7 @@ export type Event =
   | { kind: 'attempt_exited'; group: string; seq: number; exit: AttemptExit }
   | { kind: 'attempt_usage'; updates: { group: string; seq: number; usage: Usage }[] }
   | { kind: 'timed_out'; group: string; seq: number }
+  | { kind: 'message'; group: string; seq: number; text: string }
   | { kind: 'cancel'; group: string | null }
   | {
       kind: 'retry';
@@ -173,6 +174,8 @@ class Machine {
         return;
       case 'timed_out':
         return this.timedOut(event.group, event.seq);
+      case 'message':
+        return this.message(event.group, event.seq, event.text);
       case 'cancel':
         return this.cancel(event.group);
       case 'retry':
@@ -238,6 +241,9 @@ class Machine {
   private report(slug: string, seq: number, report: Report): void {
     const attempt = this.running(this.group(slug), seq);
     if (!attempt) throw new Rejection(`attempt ${seq} is not running`);
+    if (attempt.reason?.kind === 'message') {
+      throw new Rejection(`attempt ${seq} was interrupted by a message`);
+    }
     const problem = validateReport(report);
     if (problem !== null) throw new Rejection(`invalid report: ${problem}`);
     attempt.report = {
@@ -281,6 +287,10 @@ class Machine {
     attempt.usage = exit.usage ?? attempt.usage;
     attempt.denials = exit.denials ?? [];
     attempt.outsideChanges = [...exit.outsideChanges];
+    if (attempt.reason?.kind === 'message') {
+      this.continueAfterMessage(group, attempt, attempt.reason);
+      return;
+    }
     // A report sent before the limit ran out counts as usual.
     const limited = exit.failure?.kind === 'usage_limit' && attempt.report !== null;
     const failure = limited
@@ -487,12 +497,40 @@ class Machine {
   private timedOut(slug: string, seq: number): void {
     const group = this.group(slug);
     const attempt = this.running(group, seq);
-    if (!attempt) return;
+    if (!attempt || attempt.reason?.kind === 'message') return;
     attempt.status = 'failed';
     attempt.reason = { kind: 'timeout' };
     attempt.finishedAt = this.now;
     this.effects.push({ kind: 'stop_attempt', run: this.state.run.id, group: slug, seq });
     this.failGroup(group, { kind: 'timeout' });
+  }
+
+  private message(slug: string, seq: number, text: string): void {
+    const group = this.group(slug);
+    const attempt = this.running(group, seq);
+    if (!attempt) throw new Rejection(`attempt ${seq} is not running`);
+    if (attempt.report !== null) throw new Rejection(`attempt ${seq} already reported`);
+    if (attempt.reason !== null) {
+      throw new Rejection(`attempt ${seq} is already being interrupted`);
+    }
+    attempt.reason = { kind: 'message', text, at: this.now };
+    this.effects.push({ kind: 'stop_attempt', run: this.state.run.id, group: slug, seq });
+  }
+
+  /** The attempt stopped because of a human message: the step goes on in the same session. */
+  private continueAfterMessage(
+    group: Group,
+    attempt: Attempt,
+    reason: { text: string; at: number },
+  ): void {
+    attempt.status = 'cancelled';
+    attempt.finishedAt ??= this.now;
+    group.pending = {
+      ...freshPending(attempt.stepIndex),
+      resume: true,
+      message: { text: reason.text, at: reason.at },
+    };
+    group.status = 'queued';
   }
 
   private cancel(only: string | null): void {
@@ -753,6 +791,10 @@ class Machine {
       let wasRunning = false;
       for (const attempt of group.attempts) {
         if (attempt.status !== 'running') continue;
+        if (attempt.reason?.kind === 'message') {
+          this.continueAfterMessage(group, attempt, attempt.reason);
+          continue;
+        }
         attempt.status = 'failed';
         attempt.reason = { kind: 'interrupted' };
         attempt.finishedAt = this.now;

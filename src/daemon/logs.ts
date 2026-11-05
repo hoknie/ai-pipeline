@@ -1,4 +1,5 @@
-import { closeSync, openSync, readSync, statSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const TAIL_BYTES = 256 * 1024;
 
@@ -43,4 +44,25 @@ export function readTail(path: string, lines: number): string[] {
   } finally {
     closeSync(descriptor);
   }
+}
+
+/** File next to an attempt's log with the time each log line was received. */
+export function timesPath(logPath: string): string {
+  return join(dirname(logPath), 'output.times');
+}
+
+/** Line number → moment (ms) from a times file; broken lines are skipped, no file is empty. */
+export function readTimes(path: string): Map<number, number> {
+  const times = new Map<number, number>();
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    return times;
+  }
+  for (const line of text.split('\n')) {
+    const match = /^(\d+)\t(\d+)$/.exec(line);
+    if (match && !times.has(Number(match[1]))) times.set(Number(match[1]), Number(match[2]));
+  }
+  return times;
 }

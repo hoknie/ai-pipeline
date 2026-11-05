@@ -145,6 +145,9 @@ export const entryIdSchema = z
 const entryKindSchema = z.enum(['specialist', 'workflow']);
 const writeLevelSchema = z.enum(['project', 'global']);
 
+/** Longest message a human can send to a running specialist. */
+export const MESSAGE_TEXT_LIMIT = 20_000;
+
 const target = { runId: z.string().min(1), group: z.string().min(1) };
 
 export const requestSchema = z.discriminatedUnion('method', [
@@ -271,6 +274,14 @@ export const requestSchema = z.discriminatedUnion('method', [
   z.object({
     method: z.literal('answer'),
     params: z.object({ ...target, answer: z.string().trim().min(1) }),
+  }),
+  z.object({
+    method: z.literal('message'),
+    params: z.object({
+      ...target,
+      seq: z.number().int().positive(),
+      text: z.string().trim().min(1).max(MESSAGE_TEXT_LIMIT),
+    }),
   }),
   z.object({ method: z.literal('queue'), params: z.object({ repository: queueRepository }) }),
   z.object({ method: z.literal('repositories'), params: z.object({}).default({}) }),

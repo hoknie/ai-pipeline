@@ -161,3 +161,16 @@ export function formatMemory(bytes: number, t: TFunction, locale: string): strin
   if (bytes >= 1024 ** 2) return `${number(bytes / 1024 ** 2, 0)} ${t('format.unitMb')}`;
   return `${number(bytes / 1024, 0)} ${t('format.unitKb')}`;
 }
+
+/** `14:32:05`: clock time with seconds, for a line of a log. */
+export function clockSeconds(timestamp: number): string {
+  const date = new Date(timestamp);
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
+}
+
+/** Full date and time of a moment in the given language, for a tooltip. */
+export function dateTime(timestamp: number, language: string): string {
+  return new Date(timestamp).toLocaleString(language);
+}

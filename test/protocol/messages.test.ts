@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DaemonUnavailable,
+  MESSAGE_TEXT_LIMIT,
+  transcriptEntrySchema,
   IpcError,
   parseRequest,
   request,
@@ -23,6 +25,27 @@ describe('requests', () => {
       requestSchema.safeParse({ method: 'group_spec', params }).success;
     expect(parse({ runId: 'r', group: 'g' })).toBe(true);
     expect(parse({ runId: 'r' })).toBe(false);
+  });
+
+  it('takes a message to a running attempt with a non-empty, bounded text', () => {
+    const parse = (params: object) =>
+      requestSchema.safeParse({ method: 'message', params }).success;
+    const target = { runId: 'r', group: 'g', seq: 1, text: 'привет' };
+    expect(parse(target)).toBe(true);
+    expect(parse({ ...target, text: '   ' })).toBe(false);
+    expect(parse({ ...target, text: 'x'.repeat(MESSAGE_TEXT_LIMIT) })).toBe(true);
+    expect(parse({ ...target, text: 'x'.repeat(MESSAGE_TEXT_LIMIT + 1) })).toBe(false);
+    expect(parse({ ...target, seq: 0 })).toBe(false);
+    expect(parse({ runId: 'r', group: 'g', text: 'x' })).toBe(false);
+  });
+
+  it('accepts transcript entries without a time, with null and with a number', () => {
+    const parse = (entry: object) => transcriptEntrySchema.safeParse(entry).success;
+    expect(parse({ kind: 'text', text: 'a' })).toBe(true);
+    expect(parse({ kind: 'text', text: 'a', at: null })).toBe(true);
+    expect(parse({ kind: 'text', text: 'a', at: 1_700_000_000_000 })).toBe(true);
+    expect(parse({ kind: 'tool_result', id: null, text: 'a', error: false, at: 5 })).toBe(true);
+    expect(parse({ kind: 'text', text: 'a', at: 'now' })).toBe(false);
   });
 
   it('takes an optional refreshConfig flag on a retry', () => {

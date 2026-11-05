@@ -1,9 +1,9 @@
-import { ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronRight, MessageSquare, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
-import { cost, duration, tokens } from '../../format.ts';
+import { clockSeconds, cost, dateTime, duration, tokens } from '../../format.ts';
 import { cn } from '../../lib/cn.ts';
 import { statusTone, type Tone } from '../../status.ts';
 import type { AttemptView, TranscriptEntry } from '../../types.ts';
@@ -15,7 +15,7 @@ import { Skeleton } from '../../ui/skeleton.tsx';
 import { Switch } from '../../ui/switch.tsx';
 import { Markdown } from '../Markdown.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
-import { Transcript } from '../Transcript.tsx';
+import { EntryTime, Transcript } from '../Transcript.tsx';
 
 const TRANSCRIPT_POLL_MS = 1500;
 
@@ -83,6 +83,7 @@ export function Attempt({
   onlyReplies = false,
   showJson = true,
   onRetry,
+  onMessage,
 }: {
   api: Api;
   runId: string;
@@ -97,8 +98,10 @@ export function Attempt({
   showJson?: boolean;
   /** Retries the step; given for the last attempt of a failed group only. */
   onRetry?: () => void;
+  /** Opens the message to the specialist; given for the running last attempt only. */
+  onMessage?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(initiallyOpen);
   const [raw, setRaw] = useState(false);
   const transcript = useTranscript(api, runId, group, attempt.seq, open);
@@ -116,7 +119,7 @@ export function Attempt({
         )}
       />
       <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border bg-card">
-        <div className="flex items-center gap-2 pr-2">
+        <div className="sticky top-[var(--group-header-height,0px)] z-[5] flex items-center gap-2 rounded-t-lg bg-card pr-2">
           <CollapsibleTrigger
             aria-label={t('runs.attempt.label', {
               seq: attempt.seq,
@@ -151,6 +154,15 @@ export function Attempt({
               </span>
             ) : null}
           </CollapsibleTrigger>
+          {attempt.interrupting ? (
+            <span className="text-xs text-status-warn">{t('runs.attempt.interrupting')}</span>
+          ) : null}
+          {onMessage ? (
+            <Button variant="outline" size="sm" onClick={onMessage}>
+              <MessageSquare />
+              {t('runs.message.button')}
+            </Button>
+          ) : null}
           {onRetry ? (
             <Button variant="outline" size="sm" onClick={onRetry}>
               <RotateCcw />
@@ -191,6 +203,27 @@ export function Attempt({
                       ))}
                     </ul>
                   </Alert>
+                </section>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                <time
+                  dateTime={new Date(attempt.startedAt).toISOString()}
+                  title={dateTime(attempt.startedAt, i18n.language)}
+                  className="tabular-nums"
+                >
+                  {t('runs.attempt.started', { time: clockSeconds(attempt.startedAt) })}
+                </time>
+              </p>
+              {attempt.message ? (
+                <section
+                  aria-label={t('runs.attempt.humanMessage')}
+                  className="rounded-lg border border-status-warn/30 bg-status-warn-bg p-3"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-status-warn uppercase">
+                    <span>{t('runs.attempt.humanMessage')}</span>
+                    <EntryTime at={attempt.message.at} />
+                  </div>
+                  <Markdown text={attempt.message.text} />
                 </section>
               ) : null}
               <div className="flex items-center justify-between">

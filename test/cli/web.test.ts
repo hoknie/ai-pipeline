@@ -20,7 +20,7 @@ import { databasePath } from '../../src/config/index.ts';
 import { Store } from '../../src/store/index.ts';
 import { startWebServer, webTokenFromEnv, type WebServer } from '../../src/cli/web/server.ts';
 import type { GroupView, QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
-import { MANUAL_CONFIG, harness, startRun, type Harness } from '../daemon/harness.ts';
+import { MANUAL_CONFIG, harness, startRun, until, type Harness } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { waitValue } from '../fixtures/wait-until.ts';
 
@@ -847,6 +847,30 @@ describe('aip web', () => {
     const refused = await post({ step: 'nope', skip: true });
     expect(refused.status).toBe(400);
     expect(((await refused.json()) as { error: string }).error).toContain('unknown step');
+  });
+
+  it('sends a message to the running specialist through POST', async () => {
+    const { h, web, base } = await setup();
+    h.script({ code: [{ waitFor: h.gate('code') }, { waitFor: h.gate('hold') }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.groups.some((group) => group.status === 'running'));
+    const url = `${base}/api/runs/${runId}/groups/login/message`;
+    const post = (body: unknown) =>
+      fetch(url, { method: 'POST', headers: authed(web, JSON_TYPE), body: JSON.stringify(body) });
+    expect((await post({ seq: 1, text: '  ' })).status).toBe(400);
+    expect((await post({ seq: 0, text: 'x' })).status).toBe(400);
+    expect((await post({ text: 'x' })).status).toBe(400);
+    expect((await post({ seq: 7, text: 'x' })).status).toBe(400);
+    expect((await post({ seq: 1, text: 'use OAuth' })).status).toBe(200);
+    await until('the next attempt carries the message', async () => {
+      const view = await h.group(runId, 'login');
+      return view.attempts.at(-1)?.message?.text === 'use OAuth';
+    });
+    h.open('hold');
   });
 
   it('answers a question and cancels through POST', async () => {

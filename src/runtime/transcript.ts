@@ -49,29 +49,37 @@ export function toolSummary(name: string, input: unknown, cwd: string | null = n
   return json.length > 120 ? `${json.slice(0, 119)}…` : json;
 }
 
-function toolCall(id: unknown, name: string, input: unknown, cwd: string | null): TranscriptEntry {
+function toolCall(
+  id: unknown,
+  name: string,
+  input: unknown,
+  cwd: string | null,
+  at: number | null,
+): TranscriptEntry {
   return {
     kind: 'tool_call',
     id: typeof id === 'string' ? id : null,
     name,
     summary: toolSummary(name, input, cwd),
     input: clip(JSON.stringify(input ?? {}, null, 2)),
+    at,
   };
 }
 
 const CLAUDE_QUIET = new Set(['system', 'rate_limit_event', 'stream_event']);
 
 /** Transcript of the `--output-format stream-json` log of Claude Code. */
-export function claudeTranscript(lines: string[]): TranscriptEntry[] {
+export function claudeTranscript(lines: string[], times?: (number | null)[]): TranscriptEntry[] {
   const entries: TranscriptEntry[] = [];
   let cwd: string | null = null;
   // A refused call is reported twice: as a permission_denied event and as an error result.
   const denied = new Map<string, number>();
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
+    const at = times?.[index] ?? null;
     if (line.trim() === '') continue;
     const event = parse(line);
     if (!isObject(event) || typeof event.type !== 'string') {
-      entries.push({ kind: 'raw', text: clip(line) });
+      entries.push({ kind: 'raw', text: clip(line), at });
       continue;
     }
     if (event.type === 'system') {
@@ -83,6 +91,7 @@ export function claudeTranscript(lines: string[]): TranscriptEntry[] {
           id: typeof event.tool_use_id === 'string' ? event.tool_use_id : null,
           text: `permission denied: ${text(event.message ?? event.decision_reason)}`,
           error: true,
+          at,
         });
       }
       continue;
@@ -94,9 +103,9 @@ export function claudeTranscript(lines: string[]): TranscriptEntry[] {
       for (const block of blocks) {
         if (!isObject(block)) continue;
         if (block.type === 'text' && event.type === 'assistant' && text(block.text).trim()) {
-          entries.push({ kind: 'text', text: clip(text(block.text)) });
+          entries.push({ kind: 'text', text: clip(text(block.text)), at });
         } else if (block.type === 'tool_use') {
-          entries.push(toolCall(block.id, String(block.name ?? 'tool'), block.input, cwd));
+          entries.push(toolCall(block.id, String(block.name ?? 'tool'), block.input, cwd, at));
         } else if (block.type === 'tool_result') {
           const id = typeof block.tool_use_id === 'string' ? block.tool_use_id : null;
           const earlier = id !== null ? denied.get(id) : undefined;
@@ -106,6 +115,7 @@ export function claudeTranscript(lines: string[]): TranscriptEntry[] {
               id,
               text: clip(`permission denied: ${text(block.content)}`),
               error: true,
+              at,
             };
             continue;
           }
@@ -114,6 +124,7 @@ export function claudeTranscript(lines: string[]): TranscriptEntry[] {
             id: typeof block.tool_use_id === 'string' ? block.tool_use_id : null,
             text: clip(text(block.content)),
             error: block.is_error === true,
+            at,
           });
         }
       }
@@ -132,10 +143,11 @@ export function claudeTranscript(lines: string[]): TranscriptEntry[] {
         inputTokens: isObject(event.usage) ? input : null,
         outputTokens: typeof usage.output_tokens === 'number' ? usage.output_tokens : null,
         costUsd: typeof event.total_cost_usd === 'number' ? event.total_cost_usd : null,
+        at,
       });
       continue;
     }
-    entries.push({ kind: 'raw', text: clip(line) });
+    entries.push({ kind: 'raw', text: clip(line), at });
   }
   return entries;
 }
@@ -154,33 +166,35 @@ export function opencodeErrorText(error: unknown): string {
 const OPENCODE_QUIET = new Set(['step_start', 'step-start']);
 
 /** Transcript of the `run --format json` log of OpenCode. */
-export function opencodeTranscript(lines: string[]): TranscriptEntry[] {
+export function opencodeTranscript(lines: string[], times?: (number | null)[]): TranscriptEntry[] {
   const entries: TranscriptEntry[] = [];
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
+    const at = times?.[index] ?? null;
     if (line.trim() === '') continue;
     const event = parse(line);
     if (!isObject(event)) {
-      entries.push({ kind: 'raw', text: clip(line) });
+      entries.push({ kind: 'raw', text: clip(line), at });
       continue;
     }
     const part = isObject(event.part) ? event.part : event;
     const type = String(part.type ?? event.type ?? '');
     if (OPENCODE_QUIET.has(type)) continue;
     if (type === 'text' && typeof part.text === 'string') {
-      if (part.text.trim()) entries.push({ kind: 'text', text: clip(part.text) });
+      if (part.text.trim()) entries.push({ kind: 'text', text: clip(part.text), at });
       continue;
     }
     if (type === 'tool' || type === 'tool_use') {
       const name = String(part.tool ?? part.name ?? 'tool');
       const state = isObject(part.state) ? part.state : {};
       const id = part.callID ?? part.id ?? null;
-      entries.push(toolCall(id, name, state.input ?? part.input, null));
+      entries.push(toolCall(id, name, state.input ?? part.input, null, at));
       if (state.output !== undefined || state.error !== undefined) {
         entries.push({
           kind: 'tool_result',
           id: typeof id === 'string' ? id : null,
           text: clip(text(state.error ?? state.output)),
           error: state.status === 'error' || state.error !== undefined,
+          at,
         });
       }
       continue;
@@ -195,6 +209,7 @@ export function opencodeTranscript(lines: string[]): TranscriptEntry[] {
         inputTokens: typeof tokens.input === 'number' ? tokens.input : null,
         outputTokens: typeof tokens.output === 'number' ? tokens.output : null,
         costUsd: typeof part.cost === 'number' ? part.cost : null,
+        at,
       });
       continue;
     }
@@ -204,10 +219,11 @@ export function opencodeTranscript(lines: string[]): TranscriptEntry[] {
         id: null,
         text: clip(opencodeErrorText(event.error ?? part)),
         error: true,
+        at,
       });
       continue;
     }
-    entries.push({ kind: 'raw', text: clip(line) });
+    entries.push({ kind: 'raw', text: clip(line), at });
   }
   return entries;
 }

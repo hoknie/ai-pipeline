@@ -14,6 +14,7 @@ import {
   usageText,
 } from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
+import { useElementHeight } from '../../useElementHeight.ts';
 import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
@@ -39,6 +40,7 @@ import { QuestionCard } from './QuestionCard.tsx';
 import { DiffStat } from './DiffStat.tsx';
 import { FilePath } from '../FilePath.tsx';
 import { ApplyDialog } from './ApplyDialog.tsx';
+import { MessageDialog } from './MessageDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
 import { stepOfGroup, useSkipStep } from './skipStep.tsx';
 import { taskProgress } from './taskProgress.ts';
@@ -121,6 +123,9 @@ export function GroupScreen({
   const [busy, setBusy] = useState(false);
   const [forcing, setForcing] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
+  const [messaging, setMessaging] = useState<number | null>(null);
+  const [header, setHeader] = useState<HTMLElement | null>(null);
+  const headerHeight = useElementHeight(header);
   const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}`;
   const delivering = run?.delivery.inProgress ?? false;
   const caps = capabilities(row, deliverable, delivering);
@@ -205,8 +210,15 @@ export function GroupScreen({
   const attemptAt = run?.delivery.finishedAt ?? null;
 
   return (
-    <section aria-label={t('runs.group.label', { title })} className="flex flex-col gap-3 p-4">
-      <header className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
+    <section
+      aria-label={t('runs.group.label', { title })}
+      className="flex flex-col gap-3 p-4"
+      style={{ '--group-header-height': `${headerHeight}px` } as React.CSSProperties}
+    >
+      <header
+        ref={setHeader}
+        className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur"
+      >
         <div className="flex flex-wrap items-center gap-2">
           <h2
             className="min-w-0 flex-1 truncate text-base font-semibold"
@@ -408,6 +420,20 @@ export function GroupScreen({
           </div>
         </Alert>
       ) : null}
+      {messaging !== null ? (
+        <MessageDialog
+          onSend={async (text) => {
+            try {
+              await api.message(runId, row.slug, messaging, text);
+            } catch (error) {
+              onError((error as Error).message);
+              throw error;
+            }
+            notifySuccess(t('runs.message.sent'));
+          }}
+          onClose={() => setMessaging(null)}
+        />
+      ) : null}
       {forcing && run ? (
         <ApplyDialog
           run={run}
@@ -528,6 +554,7 @@ export function GroupScreen({
               rawLog={view.log ? view.log.lines : null}
               onlyReplies={onlyReplies}
               showJson={showJson}
+              onMessage={() => setMessaging(lastSeq)}
               retryable={caps.retry && (row.status === 'failed' || row.status === 'cancelled')}
               onRetry={() =>
                 void act(

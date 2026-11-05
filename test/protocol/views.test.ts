@@ -455,6 +455,36 @@ describe('queueView delivery mode and autopilot answer', () => {
   });
 });
 
+describe('a message to the specialist in the views', () => {
+  it('shows the message an attempt continued with and the attempt being interrupted', () => {
+    const state = run(1);
+    step(state);
+    const seq = group(state).attempts.at(-1)!.seq;
+    const before = groupView(state, group(state), '/w', null, 2500).attempts[0];
+    expect(before).toMatchObject({ message: null, interrupting: false });
+    transition(state, { kind: 'message', group: 'gruppa-1', seq, text: 'проверь OAuth' }, 2600);
+    const during = groupView(state, group(state), '/w', null, 2700).attempts[0];
+    expect(during).toMatchObject({ interrupting: true, reason: 'interrupted by a message' });
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq,
+        exit: { sessionId: 's', usage: null, failure: null, outsideChanges: [] },
+      },
+      2800,
+    );
+    dispatch([state], 5, 2900);
+    const [first, second] = groupView(state, group(state), '/w', null, 3000).attempts;
+    expect(first).toMatchObject({ status: 'cancelled', interrupting: false, message: null });
+    expect(second).toMatchObject({
+      interrupting: false,
+      message: { text: 'проверь OAuth', at: 2600 },
+    });
+  });
+});
+
 describe('a group waiting for a usage limit', () => {
   function limited(onLimit: 'wait' | 'stop') {
     const state = run(1);

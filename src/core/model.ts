@@ -63,7 +63,9 @@ export type FailReason =
   /** The step was skipped while its attempt ran. */
   | { kind: 'skipped' }
   /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
-  | { kind: 'usage_limit'; resetsAt: number | null };
+  | { kind: 'usage_limit'; resetsAt: number | null }
+  /** A human message interrupted the attempt; the step continues in the same session. */
+  | { kind: 'message'; text: string; at: number };
 
 /** What a usage limit does to a group: wait for the reset or fail. */
 export const ON_LIMIT_MODES = ['wait', 'stop'] as const;
@@ -96,6 +98,8 @@ export function describeFailReason(reason: FailReason): string {
       return `git: ${reason.message}`;
     case 'skipped':
       return 'step skipped';
+    case 'message':
+      return 'interrupted by a message';
     case 'usage_limit':
       return reason.resetsAt === null
         ? 'usage limit'
@@ -195,6 +199,12 @@ export interface HumanDecision {
   attemptSeq?: number;
 }
 
+export interface HumanMessage {
+  text: string;
+  /** When the daemon accepted the message (ms). */
+  at: number;
+}
+
 export interface StepInput {
   prompt: string;
   groupTitle: string;
@@ -205,6 +215,8 @@ export interface StepInput {
   feedback: string | null;
   humanAnswer: string | null;
   decisions: HumanDecision[];
+  /** A message the human sent to the specialist while the previous attempt ran. */
+  message?: HumanMessage | null;
 }
 
 export interface ProposedGroup {
@@ -241,6 +253,7 @@ export interface Pending {
   feedback: string | null;
   humanAnswer: string | null;
   resume: boolean;
+  message?: HumanMessage | null;
 }
 
 export function freshPending(stepIndex: number): Pending {

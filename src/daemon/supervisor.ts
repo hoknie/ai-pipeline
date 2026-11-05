@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, createWriteStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -34,6 +34,8 @@ export function launchProcess(
     drainMs?: number;
     /** Called when the usage of the parser changed after a line of output. */
     onUsage?: (usage: Usage) => void;
+    /** When set, the moment each log line was written is appended there as `<line>\t<ms>`. */
+    timesPath?: string;
   },
 ): SupervisedProcess {
   for (const file of launch.files) {
@@ -41,6 +43,27 @@ export function launchProcess(
     writeFileSync(file.path, file.content, { mode: 0o600 });
   }
   mkdirSync(dirname(options.logPath), { recursive: true });
+  // Lines already in the log (an executor may have added some) keep their numbers.
+  let lineCount = 0;
+  if (options.timesPath) {
+    try {
+      for (const char of readFileSync(options.logPath, 'utf8')) if (char === '\n') lineCount += 1;
+    } catch {
+      lineCount = 0;
+    }
+  }
+  const stamp = (lines: number) => {
+    if (!options.timesPath || lines <= 0) return;
+    const now = Date.now();
+    let text = '';
+    for (let index = 0; index < lines; index += 1) text += `${lineCount + index}\t${now}\n`;
+    lineCount += lines;
+    try {
+      appendFileSync(options.timesPath, text);
+    } catch {
+      // the journal works without times
+    }
+  };
   const log = createWriteStream(options.logPath, { flags: 'a' });
   let child: ChildProcess;
   let spawnError: string | null = null;
@@ -53,6 +76,7 @@ export function launchProcess(
     });
   } catch (error) {
     spawnError = (error as Error).message;
+    stamp(1);
     log.end(`[aip] spawn failed: ${spawnError}\n`);
     return {
       pid: undefined,
@@ -69,6 +93,7 @@ export function launchProcess(
   let reported: Usage | null = null;
   stdout.on('line', (line) => {
     log.write(`${line}\n`);
+    stamp(1);
     options.parser.push(line);
     if (options.onUsage) {
       const usage = options.parser.usage();
@@ -84,7 +109,10 @@ export function launchProcess(
       }
     }
   });
-  child.stderr!.on('data', (chunk: Buffer) => log.write(chunk));
+  child.stderr!.on('data', (chunk: Buffer) => {
+    log.write(chunk);
+    stamp(chunk.filter((byte) => byte === 10).length);
+  });
   let killTimer: NodeJS.Timeout | null = null;
   const signalGroup = (signal: NodeJS.Signals) => {
     if (child.pid === undefined) return;
@@ -105,6 +133,7 @@ export function launchProcess(
       settled = true;
       if (killTimer) clearTimeout(killTimer);
       stdout.close();
+      stamp(1);
       log.end(
         `[aip] exited code=${code} signal=${signal}${spawnError ? ` error=${spawnError}` : ''}\n`,
       );

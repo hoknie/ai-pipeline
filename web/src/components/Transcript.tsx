@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { cost, tokens } from '../format.ts';
+import { clockSeconds, cost, dateTime, tokens } from '../format.ts';
 import { cn } from '../lib/cn.ts';
 import type { TranscriptEntry } from '../types.ts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.tsx';
@@ -35,6 +35,21 @@ export function blocks(entries: TranscriptEntry[]): Block[] {
   return result;
 }
 
+/** The moment of a log entry; nothing when the daemon did not send it. */
+export function EntryTime({ at }: { at: number | null | undefined }) {
+  const { i18n } = useTranslation();
+  if (at === null || at === undefined) return null;
+  return (
+    <time
+      dateTime={new Date(at).toISOString()}
+      title={dateTime(at, i18n.language)}
+      className="shrink-0 text-xs text-muted-foreground tabular-nums"
+    >
+      {clockSeconds(at)}
+    </time>
+  );
+}
+
 function firstLine(text: string): string {
   const line = text.split('\n').find((part) => part.trim() !== '') ?? '';
   return line.length > 140 ? `${line.slice(0, 139)}…` : line;
@@ -43,10 +58,12 @@ function firstLine(text: string): string {
 function Fold({
   failed = false,
   head,
+  at,
   children,
 }: {
   failed?: boolean;
   head: React.ReactNode;
+  at?: number | null | undefined;
   children: React.ReactNode;
 }) {
   return (
@@ -56,6 +73,8 @@ function Fold({
       <CollapsibleTrigger className="group flex w-full items-center gap-2 px-2 py-1 text-left">
         <ChevronRight className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
         {head}
+        <span className="ml-auto" />
+        <EntryTime at={at} />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <pre className="max-h-96 overflow-auto px-3 pb-2 font-mono text-xs whitespace-pre-wrap">
@@ -80,6 +99,7 @@ function Result({ result, showJson }: { result: ToolResult; showJson: boolean })
             {firstLine(text)}
           </span>
         }
+        at={result.at}
       >
         {text}
       </Fold>
@@ -92,6 +112,7 @@ function Result({ result, showJson }: { result: ToolResult; showJson: boolean })
           {t('runs.transcript.result')} · {firstLine(text) || t('runs.transcript.emptyResult')}
         </span>
       }
+      at={result.at}
     >
       {text}
     </Fold>
@@ -123,6 +144,7 @@ function Call({
             </code>
           </>
         }
+        at={call.at}
       >
         {input === undefined ? call.input : readableJson(input)}
       </Fold>
@@ -144,8 +166,9 @@ function Entry({ entry, showJson }: { entry: TranscriptEntry; showJson: boolean 
           aria-label={t('runs.transcript.textLabel')}
           className="rounded-lg border bg-card p-3"
         >
-          <div className="mb-1 text-xs font-medium text-muted-foreground uppercase">
-            {t('runs.transcript.specialist')}
+          <div className="mb-1 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground uppercase">
+            <span>{t('runs.transcript.specialist')}</span>
+            <EntryTime at={entry.at} />
           </div>
           <Markdown text={entry.text} />
         </section>
@@ -172,6 +195,7 @@ function Entry({ entry, showJson }: { entry: TranscriptEntry; showJson: boolean 
             })}{' '}
             {cost(entry)}
           </span>
+          <EntryTime at={entry.at} />
         </div>
       );
     case 'raw':

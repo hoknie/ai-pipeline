@@ -47,5 +47,10 @@ export function userMessage(input: StepInput): string {
   }
   if (input.feedback) sections.push(`## Feedback to address\n${input.feedback}`);
   if (input.humanAnswer) sections.push(`## Latest accepted answer\n${input.humanAnswer}`);
+  if (input.message) {
+    sections.push(
+      `## Message from the person (sent ${new Date(input.message.at).toISOString()})\n${input.message.text}`,
+    );
+  }
   return sections.join('\n\n');
 }

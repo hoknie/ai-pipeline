@@ -156,7 +156,7 @@ import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import { Store, type KnownRepository } from '../store/index.ts';
 
 import { Executor, NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS, type AttemptKey } from './executor.ts';
-import { readLines, readTail } from './logs.ts';
+import { readLines, readTail, readTimes, timesPath } from './logs.ts';
 import { FilePatchStorage, storageFor, type PatchStorage } from './patches.ts';
 import { DRAIN_MS, STOP_GRACE_MS } from './supervisor.ts';
 import {
@@ -1552,6 +1552,10 @@ export class Daemon {
           permissions: this.currentPermissions(state),
         }));
       }
+      case 'message': {
+        const { runId: id, group, seq, text } = request.params;
+        return this.event(id, { kind: 'message', group, seq, text });
+      }
       case 'report':
         return this.workerEvent(request.params.token, (key) => ({
           kind: 'report',
@@ -2155,11 +2159,12 @@ export class Daemon {
     }
     const base = { runId: state.run.id, group: group.slug };
     if (!attempt) return { ...base, seq: null, cursor: 0, running: false, entries: [] };
-    const { lines, cursor } = readLines(
-      this.executor.logPath(state, group.slug, attempt.seq),
-      params.after ?? 0,
-    );
-    const entries = runtimeFor(attempt.runtime, this.environment).transcript(lines);
+    const logPath = this.executor.logPath(state, group.slug, attempt.seq);
+    const after = params.after ?? 0;
+    const { lines, cursor } = readLines(logPath, after);
+    const moments = readTimes(timesPath(logPath));
+    const times = lines.map((_, index) => moments.get(after + index) ?? null);
+    const entries = runtimeFor(attempt.runtime, this.environment).transcript(lines, times);
     const verdict = attempt.report?.verdict ?? null;
     for (const entry of entries) if (entry.kind === 'result') entry.verdict = verdict;
     return { ...base, seq: attempt.seq, cursor, running: attempt.status === 'running', entries };

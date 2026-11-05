@@ -362,6 +362,10 @@ export interface AttemptView {
   denials: DenialView[];
   /** Files the attempt changed outside its worktree. */
   outsideChanges: string[];
+  /** The message the human sent to the specialist before this attempt continued its session. */
+  message: { text: string; at: number } | null;
+  /** A human message is stopping this running attempt. */
+  interrupting: boolean;
 }
 
 export interface DenialView {
@@ -763,6 +767,8 @@ export function attemptView(
       suggestions: denial.command === null ? [] : suggestPatterns(denial.command, allowCommands),
     })),
     outsideChanges: [...attempt.outsideChanges],
+    message: attempt.input.message ? { ...attempt.input.message } : null,
+    interrupting: attempt.status === 'running' && attempt.reason?.kind === 'message',
   };
 }
 

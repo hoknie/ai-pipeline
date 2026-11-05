@@ -67,7 +67,8 @@ export interface Runtime {
   buildOneShot(request: OneShotRequest): Launch;
   createParser(): OutputParser;
   /** Readable entries of an attempt log written by this runtime. */
-  transcript(lines: string[]): TranscriptEntry[];
+  /** `times[i]` is the moment (ms) the daemon received `lines[i]`, when known. */
+  transcript(lines: string[], times?: (number | null)[]): TranscriptEntry[];
   skillDirectories(worktree: string, home: string): string[];
   /** Tools the agent CLI has without any configuration. */
   readonly builtinTools: string[];

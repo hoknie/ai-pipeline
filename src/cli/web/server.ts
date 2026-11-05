@@ -12,6 +12,7 @@ import {
   IpcError,
   checkDaemon,
   currentBuild,
+  MESSAGE_TEXT_LIMIT,
   pingDaemon,
   request,
   settingValueSchema,
@@ -98,6 +99,10 @@ const COOKIE = 'aip_token';
 const BODY_LIMIT = 64 * 1024;
 const skipBody = z.object({ step: z.string().trim().min(1), skip: z.boolean() });
 const answerBody = z.object({ answer: z.string().trim().min(1) });
+const messageBody = z.object({
+  seq: z.number().int().positive(),
+  text: z.string().trim().min(1).max(MESSAGE_TEXT_LIMIT),
+});
 const retryBody = z.object({ refreshConfig: z.boolean().optional() });
 const applyBody = z.object({
   groups: z.array(z.string().min(1)).optional(),
@@ -776,6 +781,14 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           group: group ?? '',
           answer: parseBody(answerBody, body).answer,
         }),
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/message$`),
+      handle: async ([runId, group], body) => {
+        const { seq, text } = parseBody(messageBody, body);
+        return call('message', { runId: runId ?? '', group: group ?? '', seq, text });
+      },
     },
   ];
 

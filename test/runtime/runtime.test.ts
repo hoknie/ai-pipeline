@@ -74,6 +74,20 @@ describe('message to the specialist', () => {
     );
   });
 
+  it('adds the message of the person with its time after the answer', () => {
+    const text = userMessage({ ...input, message: { text: 'смотри в src/auth', at: 0 } });
+    expect(
+      text.endsWith(
+        '## Message from the person (sent 1970-01-01T00:00:00.000Z)\nсмотри в src/auth',
+      ),
+    ).toBe(true);
+    expect(text.indexOf('## Latest accepted answer')).toBeLessThan(
+      text.indexOf('## Message from the person'),
+    );
+    expect(userMessage(input)).not.toContain('Message from the person');
+    expect(userMessage({ ...input, message: null })).not.toContain('Message from the person');
+  });
+
   it('requires swarm_report, names the worktree rule and the skills', () => {
     const text = systemPrompt(specialist({ skills: ['grill-me', 'opsx:propose'] }), input);
     expect(text).toContain('MUST call the tool `swarm_report`');

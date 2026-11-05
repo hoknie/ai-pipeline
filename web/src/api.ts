@@ -69,6 +69,8 @@ export interface Api {
   /** The patch of the merged groups of a run, for `git apply`. */
   runPatch(runId: string): Promise<{ blob: Blob; fileName: string }>;
   answer(runId: string, group: string, answer: string): Promise<unknown>;
+  /** Interrupts the running attempt `seq`; the step continues in its session with the text. */
+  message(runId: string, group: string, seq: number, text: string): Promise<unknown>;
   /** `refreshConfig` first takes the specialists of the current configuration into the run. */
   retry(runId: string, group: string, options?: { refreshConfig?: boolean }): Promise<unknown>;
   /** Skips a step of the run (or brings it back with `skip=false`); returns the run. */
@@ -219,6 +221,8 @@ function bound(repository: string | null): Api {
       const name = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '');
       return { blob: await response.blob(), fileName: name?.[1] ?? `${runId}.patch` };
     },
+    message: (runId, group, seq, text) =>
+      post(`/api/runs/${enc(runId)}/groups/${enc(group)}/message`, { seq, text }),
     answer: (runId, group, answer) =>
       post(`/api/runs/${enc(runId)}/groups/${enc(group)}/answer`, { answer }),
     skipStep: (runId, step, skip) => post(`/api/runs/${enc(runId)}/skip`, { step, skip }),

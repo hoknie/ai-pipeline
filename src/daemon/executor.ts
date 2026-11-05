@@ -62,6 +62,7 @@ import {
 
 import type { Daemon, DaemonTimings } from './daemon.ts';
 import type { AgentRoot } from './processes.ts';
+import { timesPath } from './logs.ts';
 import { launchProcess, type SupervisedProcess } from './supervisor.ts';
 
 export interface AttemptKey {
@@ -418,6 +419,7 @@ export class Executor {
       environment: this.daemon.environment,
       graceMs: this.graceMs,
       drainMs: this.timings.drainMs,
+      timesPath: timesPath(logPath),
       onUsage: (usage) => this.reportUsage(state, key, usage),
     });
     const timer = setTimeout(() => {

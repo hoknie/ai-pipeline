@@ -75,6 +75,11 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Set
   - "Skip step" is shown for the step the group stands on, unless that step is skipped or finished. It skips the step for the whole run. The panel asks for confirmation when an attempt is running on the step or the run has more than one group.
 - Above the tabs are the question to a human, warnings and files outside the worktree.
 - "Log" shows the attempts of the group: specialist, runtime, verdict, tokens and cost. The log of a running attempt keeps loading by itself.
+  - Every entry of the log (the text of the specialist, a command, its result and the totals) carries the time it was received, as `HH:MM:SS`; the date is in the tooltip. An attempt that started before the times were recorded shows the log without them.
+  - An opened attempt starts with the line "Attempt started" and its time. When the attempt continues after a message from the person, a "Message from the person" block with its time follows.
+  - The header of an opened attempt stays pinned under the header of the group while the log scrolls. Only one attempt header is pinned: reaching the next attempt replaces it.
+  - "Message to the specialist" sits on the right of the header of the last attempt, while it runs and has not reported. It interrupts the specialist: the attempt is stopped ("interrupted by a message") and the step continues in the same session as a new attempt that receives your text.
+  - While the attempt is stopping, the header shows "interrupting…". Files changed before the interruption stay in the working copy. Cancelling the group at that moment drops the message.
 - "Changes" is a file tree with `+N −M`. "Task" shows the task text.
 - The addresses `#runs/<run-id>` and `#runs/<run-id>/<group>` open a run and a group. `#runs/<run-id>/<group>?tab=<tab>` opens a tab (`changes`, `task`, `design`, `tasks`); the log is the default and is not written to the address, so a link can be shared.
 
