@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { progressPercent, runTimes } from '../src/format.ts';
+import { progressPercent, runClockEnd, runTimes } from '../src/format.ts';
 
 describe('progressPercent', () => {
   it('rounds the share of passed steps', () => {
@@ -26,5 +26,26 @@ describe('runTimes', () => {
     const run = { createdAt: at(10), finishedAt: null, finished: false };
     const next = new Date(2026, 0, 11, 9).getTime();
     expect(runTimes(run, next, 'en').created).toMatch(/\d\d\/\d\d|\d\d\.\d\d/);
+  });
+});
+
+describe('runClockEnd', () => {
+  it('stops a held run at the end of its last attempt', () => {
+    const run = { finishedAt: null, finished: false, clockStoppedAt: 3_000 };
+    expect(runClockEnd(run, 9_000)).toBe(3_000);
+    expect(runTimes({ ...run, createdAt: 1_000 }, 99_000, 'en').duration).toBe(
+      runTimes({ ...run, createdAt: 1_000 }, 9_000, 'en').duration,
+    );
+  });
+  it('follows now without a stop, also when the field is absent', () => {
+    expect(runClockEnd({ finishedAt: null, finished: false, clockStoppedAt: null }, 9_000)).toBe(
+      9_000,
+    );
+    expect(runClockEnd({ finishedAt: null, finished: false }, 9_000)).toBe(9_000);
+  });
+  it('ends a finished run at its finish', () => {
+    expect(runClockEnd({ finishedAt: 4_000, finished: true, clockStoppedAt: null }, 9_000)).toBe(
+      4_000,
+    );
   });
 });

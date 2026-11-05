@@ -46,7 +46,13 @@ function StopReason({ queue }: { queue: QueueView }) {
       </Alert>
     );
   }
-  const route = formatRoute({ view: 'runs', run: stop.run, group: stop.group, step: null });
+  const route = formatRoute({
+    view: 'runs',
+    run: stop.run,
+    group: stop.group,
+    step: null,
+    tab: null,
+  });
   if (stop.kind === 'limit') {
     return (
       <Alert variant="warn" role="status">

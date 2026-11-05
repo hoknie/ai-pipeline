@@ -67,6 +67,7 @@ export function CommandPalette({
     run,
     group: null,
     step: null,
+    tab: null,
   });
   const openRun = runs.find((candidate) => candidate.id === route.run) ?? null;
   const sorted = [...runs].sort(
@@ -97,7 +98,7 @@ export function CommandPalette({
             <CommandItem
               key={run.id}
               value={`${t('palette.run')} ${taskNumber(run.number)} ${runTitle(run)} ${run.id} ${run.workflowName} ${run.workflow}`}
-              onSelect={() => go({ view: 'runs', run: run.id, group: null, step: null })}
+              onSelect={() => go({ view: 'runs', run: run.id, group: null, step: null, tab: null })}
             >
               <span className="truncate">
                 <span className="font-mono text-xs text-muted-foreground">
@@ -119,7 +120,7 @@ export function CommandPalette({
                 key={group.slug}
                 value={`${t('palette.group')} ${group.title} ${group.slug}`}
                 onSelect={() =>
-                  go({ view: 'runs', run: openRun.id, group: group.slug, step: null })
+                  go({ view: 'runs', run: openRun.id, group: group.slug, step: null, tab: null })
                 }
               >
                 {group.title}

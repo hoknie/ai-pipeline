@@ -161,6 +161,15 @@ export const requestSchema = z.discriminatedUnion('method', [
     method: z.literal('group'),
     params: z.object({ ...target, tailLines: z.number().int().min(1).max(500).optional() }),
   }),
+  z.object({ method: z.literal('group_spec'), params: z.object(target) }),
+  z.object({
+    method: z.literal('group_file_diff'),
+    params: z.object({ ...target, path: z.string().min(1) }),
+  }),
+  z.object({
+    method: z.literal('run_patch'),
+    params: z.object({ runId: z.string().min(1) }),
+  }),
   z.object({
     method: z.literal('workflows'),
     params: z.object({ repository: z.string().min(1) }),

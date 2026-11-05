@@ -76,7 +76,7 @@ The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Set
 - Above the tabs are the question to a human, warnings and files outside the worktree.
 - "Log" shows the attempts of the group: specialist, runtime, verdict, tokens and cost. The log of a running attempt keeps loading by itself.
 - "Changes" is a file tree with `+N −M`. "Task" shows the task text.
-- The addresses `#runs/<run-id>` and `#runs/<run-id>/<group>` open a run and a group.
+- The addresses `#runs/<run-id>` and `#runs/<run-id>/<group>` open a run and a group. `#runs/<run-id>/<group>?tab=<tab>` opens a tab (`changes`, `task`, `design`, `tasks`); the log is the default and is not written to the address, so a link can be shared.
 
 ### Questions
 
@@ -201,8 +201,18 @@ The background processes arrive in the `processes` event of `/api/events`: the d
 
 ## HTTP API
 
+- `GET /api/runs/<id>/groups/<group>/diff?path=<file>` returns the diff of one changed file of a group: `{path, previousPath, binary, lines, totalLines, truncated}`.
+  - `lines` start at the first hunk and carry five lines of context around each change. A diff over 2000 lines is cut (`truncated`). A binary file has no lines.
+  - A missing `path` is answered with 400, a file the group did not change with 404, a diff that cannot be read any more with 409.
+- `GET /api/runs/<id>/patch` downloads the patch of the merged groups of the run as the attachment `<id>.patch` (`text/x-diff`).
+  - It is made by `git diff --binary` from the commit the run started on. Apply it with `git apply`, or with `--3way` when the files have moved on.
+  - A run with no merged group is answered with 409.
+  - The daemon saves the patch as a file when a group merges and before the run is cleaned up, so it can be downloaded after delivery.
+  - The file lies in `patches/<run id>/<commit>.patch` of the state directory. The database keeps only its URI (`file:`), so another storage can be added later.
+  - The patch lives as long as the run record. Patches of unknown runs are removed when the daemon starts.
 - `POST /api/runs/<id>/skip` with the body `{"step": "<step id>", "skip": true}` skips a step of the run (`false` brings it back) and returns the run. A refusal of the daemon (unknown step, a step every group has passed) comes back with code 400.
 - `POST /api/queue/dismiss` with the body `{"run": "<run id>"}` removes a skipped run from the skipped list and returns the queue. A run that is not skipped comes back with code 400, an unknown run with code 404.
+- `GET /api/runs/<id>/groups/<group>/spec` returns the spec change of the group (`change`, `path`, `design`, `tasks`) or `null`; an unknown group comes back with code 404.
 - `GET /api/processes` returns the background processes of the agents (`{"processes": [...]}`). `POST /api/processes/<pid>/kill` terminates one; a PID that is not a number comes back with code 400, a PID that is not in the list with code 404.
 - `GET /api/repositories` returns the repositories with counters.
 - `POST /api/repositories` with the body `{"path": "<absolute path>"}` adds one.

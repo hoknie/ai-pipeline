@@ -232,7 +232,14 @@ export function RunHeader({
             </DropdownMenu>
           </div>
         </div>
-        <RunSummary run={run} now={now} entry={entry} onSelect={onSelect} />
+        <RunSummary
+          run={run}
+          now={now}
+          entry={entry}
+          onSelect={onSelect}
+          api={api}
+          onError={onError}
+        />
       </div>
       {forcing ? (
         <ApplyDialog

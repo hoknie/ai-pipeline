@@ -68,6 +68,9 @@ export const en = {
     limit: 'Waiting for the {{runtime}} usage limit to reset, until {{time}}',
   },
   status: {
+    not_merged: 'Not merged',
+    mergedOf: 'Merged {{merged}}/{{total}}',
+    finishing: 'Finishing step',
     frozen: 'Frozen',
     queued: 'Queued',
     waiting: 'Waiting for specialist',
@@ -191,9 +194,19 @@ export const en = {
       back: 'Back to the list',
     },
     header: {
+      parts: {
+        run: 'Run',
+        group: 'Group',
+        step: 'Step',
+        merge: 'Merge',
+        delivery: 'Delivery',
+      },
+      finishingTip: 'The run is {{hold}}: the current step finishes, no new steps start',
       summary: {
         label: 'Run summary',
         status: 'Status',
+        changes: 'Changes',
+        download: 'Download',
         path: 'Path',
         time: 'Time',
         tokens: 'Tokens',
@@ -294,6 +307,9 @@ export const en = {
       log: 'Log',
       changes: 'Changes',
       task: 'Task',
+      design: 'Design',
+      tasks: 'Tasks',
+      specChange: 'Change: {{name}}',
       onlyReplies: 'only specialist replies',
       showJson: 'show JSON',
       noChanges: 'No changes yet',
@@ -350,6 +366,12 @@ export const en = {
     },
     files: {
       binary: 'binary',
+      diffLoading: 'Loading the diff…',
+      diffUnavailable: 'The diff is not available',
+      diffBinary: 'Binary file: no diff to show.',
+      diffEmpty: 'No lines to show.',
+      diffTruncated: 'Showing {{shown}} of {{total}} lines.',
+      renamedFrom: 'was {{path}}',
       label: 'changed files',
     },
     outside: {

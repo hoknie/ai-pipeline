@@ -467,3 +467,46 @@ export async function cleanRun(plan: CleanPlan): Promise<string[]> {
   }
   return removed;
 }
+
+function lines(output: string): string[] {
+  return output === '' ? [] : output.split('\n');
+}
+
+/** Paths under `pathspec` that differ from `base` in the working tree, including untracked files. */
+export async function changedPathsSince(
+  worktree: string,
+  base: string,
+  pathspec: string,
+): Promise<string[]> {
+  const tracked = lines(await git(worktree, 'diff', '--name-only', base, '--', pathspec));
+  const untracked = lines(
+    await git(worktree, 'ls-files', '--others', '--exclude-standard', '--', pathspec),
+  );
+  return [...new Set([...tracked, ...untracked])];
+}
+
+/** Paths under `pathspec` that exist in `to` and differ from `from`. */
+export async function changedPathsBetween(
+  repository: string,
+  from: string,
+  to: string,
+  pathspec: string,
+): Promise<string[]> {
+  return lines(
+    await git(repository, 'diff', '--name-only', '--diff-filter=d', from, to, '--', pathspec),
+  );
+}
+
+/** The content of a file in a commit, or `null` when the commit has no such file. */
+export async function readFileAt(
+  repository: string,
+  commit: string,
+  path: string,
+): Promise<string | null> {
+  try {
+    return (await runGit(repository, ['show', `${commit}:${path}`])).stdout;
+  } catch (error) {
+    if (error instanceof GitError) return null;
+    throw error;
+  }
+}

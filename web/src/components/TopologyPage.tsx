@@ -120,6 +120,7 @@ export default function TopologyPage({
                         run: workflow.id,
                         group: null,
                         step: null,
+                        tab: null,
                       })}
                       onClick={(event) => {
                         event.preventDefault();

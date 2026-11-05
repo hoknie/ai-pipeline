@@ -178,6 +178,15 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE queues ADD COLUMN auto_answer INTEGER NOT NULL DEFAULT 0;
   UPDATE queues SET auto_answer = autopilot;
   `,
+  `
+  CREATE TABLE IF NOT EXISTS run_patches (
+    run_id TEXT PRIMARY KEY REFERENCES runs (id) ON DELETE CASCADE,
+    uri TEXT NOT NULL,
+    commit_id TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

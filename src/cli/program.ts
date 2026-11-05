@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, CommanderError } from 'commander';
 
 import { colorEnabled, createStyle } from '../protocol/index.ts';
 
@@ -28,6 +28,11 @@ export async function runCli(argv: string[], io: CliIo): Promise<void> {
     .option('--no-color', 'turn off colors (NO_COLOR and FORCE_COLOR are honored too)');
 
   configureHelpStyle(program, style, colors);
+  // Help, version and parse errors go to the streams of the call, and commander leaves the
+  // process alone; subcommands inherit both, so they are set before the commands are added.
+  program
+    .configureOutput({ writeOut: (text) => io.stdout(text), writeErr: (text) => io.stderr(text) })
+    .exitOverride();
   registerCommands(program, style, io);
   addFooter(program, style);
 
@@ -39,6 +44,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<void> {
     if (target) target.help();
     await program.parseAsync(argv);
   } catch (error) {
-    failLine(io, 'aip', (error as Error).message);
+    // commander has already printed its message (help, version or a parse error)
+    if (error instanceof CommanderError) io.setExitCode(error.exitCode);
+    else failLine(io, 'aip', (error as Error).message);
   }
 }

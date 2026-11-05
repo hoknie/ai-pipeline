@@ -40,8 +40,9 @@ describe('freezing for a priority run', () => {
     await h.call('queue_pause', { repository: h.repo });
 
     h.open('b');
-    const idle = await h.waitFor(b, (view) => view.groups.every((g) => g.status === 'queued'));
+    const idle = await h.waitFor(b, (view) => view.groups.every((g) => g.status === 'frozen'));
     expect(idle.finished).toBe(false);
+    expect(idle.groups[0]).toMatchObject({ status: 'frozen', hold: 'frozen', wait: null });
     expect((await h.group(b, idle.groups[0]!.slug)).attempts).toHaveLength(1);
     expect((await queueOf(h)).items[0]).toMatchObject({ run: b, hold: 'frozen' });
 

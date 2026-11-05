@@ -55,15 +55,16 @@ describe('routes', () => {
       run: null,
       group: null,
       step: null,
+      tab: null,
     });
     expect(parseRoute('#specialists/coder').run).toBe('coder');
     expect(parseRoute('#specialists/new').run).toBe('new');
-    expect(formatRoute({ view: 'specialists', run: 'coder', group: null, step: null })).toBe(
-      '#specialists/coder',
-    );
-    expect(formatRoute({ view: 'specialists', run: null, group: null, step: null })).toBe(
-      '#specialists',
-    );
+    expect(
+      formatRoute({ view: 'specialists', run: 'coder', group: null, step: null, tab: null }),
+    ).toBe('#specialists/coder');
+    expect(
+      formatRoute({ view: 'specialists', run: null, group: null, step: null, tab: null }),
+    ).toBe('#specialists');
   });
 });
 

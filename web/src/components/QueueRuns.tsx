@@ -79,7 +79,7 @@ function RunCard({
         <a
           className="min-w-0 truncate font-medium text-primary underline"
           title={run.title}
-          href={formatRoute({ view: 'runs', run: run.id, group: null, step: null })}
+          href={formatRoute({ view: 'runs', run: run.id, group: null, step: null, tab: null })}
         >
           {run.title}
         </a>
@@ -173,7 +173,13 @@ function RunCard({
           <code>{problem.reason}</code> — {reasonText(problem.reason, t)}.{' '}
           <a
             className="underline"
-            href={formatRoute({ view: 'runs', run: run.id, group: problem.group, step: null })}
+            href={formatRoute({
+              view: 'runs',
+              run: run.id,
+              group: problem.group,
+              step: null,
+              tab: null,
+            })}
           >
             {problem.group ? t('queue.openGroup', { group: problem.group }) : t('queue.openRun')}
           </a>

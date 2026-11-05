@@ -70,6 +70,7 @@ How it works:
 
 - The frozen run is the last one that took a place. A run is not frozen when a group waits for a human answer, when it is finished and waits for delivery, when it is on pause or already frozen, when it is itself a priority run (it took its place by a priority action and holds it), or when it is the run that needs the place. When nobody can be frozen, the priority run takes a place over `parallel`.
 - A frozen run finishes its current steps and starts no new one, like a paused run. It leaves its place, and its task goes first in the queue, marked `frozen <run-id>` in `aip queue list` (state `frozen` in `aip run list` and the panel). The state of the queue does not change.
+- The groups of a frozen run that do not run a step have the status `frozen` (`paused` for a paused run), and the time of the run stops once its last step ends.
 - A frozen run continues by itself, in any state of the queue, as soon as a place is free and before any other task, regardless of `--after` and the postponed flag. Its failed groups are retried from where they stopped. "Continue" brings it back earlier; the run then holds a place over `parallel` if the priority run still holds one.
 - Freezing is never done by hand: pause a run to stop it yourself. A frozen run can be paused (it then waits at the end of the queue), and its task cannot be removed while the run is unfinished.
 - A task of a run on pause is taken only when its turn comes; a returned run on pause is not a priority task and freezes nobody.

@@ -133,6 +133,7 @@ describe('aip web', () => {
 
   it('lists runs and shows a group', async () => {
     const { h, web, base } = await setup();
+    h.script({ code: [{ write: { 'openspec/changes/add-login/tasks.md': '- [ ] one\n' } }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       workflow: 'feature',
@@ -158,6 +159,14 @@ describe('aip web', () => {
     expect((await fetch(`${base}/api/runs/nope`, { headers: authed(web) })).status).toBe(404);
     expect(
       (await fetch(`${base}/api/runs/${runId}/groups/nope`, { headers: authed(web) })).status,
+    ).toBe(404);
+    const spec = await fetch(`${base}/api/runs/${runId}/groups/login/spec`, {
+      headers: authed(web),
+    });
+    expect(spec.status).toBe(200);
+    expect(await spec.json()).toMatchObject({ change: 'add-login', tasks: '- [ ] one\n' });
+    expect(
+      (await fetch(`${base}/api/runs/${runId}/groups/nope/spec`, { headers: authed(web) })).status,
     ).toBe(404);
     expect((await fetch(`${base}/api/runs?tail=x`, { headers: authed(web) })).status).toBe(200);
   });
@@ -954,6 +963,39 @@ describe('aip web', () => {
     expect(((await rest.json()) as { entries: unknown[] }).entries).toEqual([]);
     expect((await fetch(`${path}?after=-1`, { headers: authed(web) })).status).toBe(400);
     expect((await fetch(`${path}?seq=99`, { headers: authed(web) })).status).toBe(404);
+  });
+
+  it('serves the diff of a file and the patch of the run as an attachment', async () => {
+    const { h, web, base } = await setup();
+    h.script({ code: [{ write: { 'lib.ts': 'export const value = 2;\n' } }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.finished);
+    const diffUrl = `${base}/api/runs/${runId}/groups/login/diff`;
+    const diff = await fetch(`${diffUrl}?path=lib.ts`, { headers: authed(web) });
+    expect(diff.status).toBe(200);
+    expect(((await diff.json()) as { lines: string[] }).lines).toContain(
+      '+export const value = 2;',
+    );
+    expect((await fetch(diffUrl, { headers: authed(web) })).status).toBe(400);
+    expect((await fetch(`${diffUrl}?path=none.ts`, { headers: authed(web) })).status).toBe(404);
+    expect((await fetch(`${diffUrl}?path=lib.ts`)).status).toBe(401);
+
+    const patchUrl = `${base}/api/runs/${runId}/patch`;
+    const patch = await fetch(patchUrl, { headers: authed(web) });
+    expect(patch.status).toBe(200);
+    expect(patch.headers.get('content-type')).toBe('text/x-diff; charset=binary');
+    expect(patch.headers.get('content-disposition')).toBe(`attachment; filename="${runId}.patch"`);
+    const bytes = Buffer.from(await patch.arrayBuffer());
+    expect(bytes.toString('utf8')).toContain('+export const value = 2;');
+    const file = join(h.state, 'download.patch');
+    writeFileSync(file, bytes);
+    execFileSync('git', ['apply', '--check', file], { cwd: h.repo });
+    expect((await fetch(patchUrl)).status).toBe(401);
+    expect((await fetch(`${base}/api/runs/nope/patch`, { headers: authed(web) })).status).toBe(404);
   });
 
   it('serves the workflows of the repository, and the errors of a broken configuration', async () => {

@@ -18,12 +18,29 @@ import {
 } from '../../src/protocol/index.ts';
 
 describe('requests', () => {
+  it('parses a group_spec request and rejects one without a group', () => {
+    const parse = (params: object) =>
+      requestSchema.safeParse({ method: 'group_spec', params }).success;
+    expect(parse({ runId: 'r', group: 'g' })).toBe(true);
+    expect(parse({ runId: 'r' })).toBe(false);
+  });
+
   it('takes an optional refreshConfig flag on a retry', () => {
     const target = { runId: 'r', group: 'g' };
     const parse = (params: object) => requestSchema.safeParse({ method: 'retry', params }).success;
     expect(parse(target)).toBe(true);
     expect(parse({ ...target, refreshConfig: true })).toBe(true);
     expect(parse({ ...target, refreshConfig: 'yes' })).toBe(false);
+  });
+
+  it('parses the file diff and run patch requests', () => {
+    const parse = (method: string, params: object) =>
+      requestSchema.safeParse({ method, params }).success;
+    expect(parse('group_file_diff', { runId: 'r', group: 'g', path: 'a.ts' })).toBe(true);
+    expect(parse('group_file_diff', { runId: 'r', group: 'g' })).toBe(false);
+    expect(parse('group_file_diff', { runId: 'r', group: 'g', path: '' })).toBe(false);
+    expect(parse('run_patch', { runId: 'r' })).toBe(true);
+    expect(parse('run_patch', {})).toBe(false);
   });
 
   it('parses a pause request with an optional repository', () => {

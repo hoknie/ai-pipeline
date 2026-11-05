@@ -1,8 +1,14 @@
+import { Download } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { cost, duration, usageText } from '../../format.ts';
+import type { Api } from '../../api.ts';
+
+import { cost, duration, runClockEnd, usageText } from '../../format.ts';
 import type { GroupRow, RunView, SystemStepRow } from '../../types.ts';
 import { FilePath } from '../FilePath.tsx';
+import { Button } from '../../ui/button.tsx';
+import { DiffStat } from './DiffStat.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunStatuses } from './RunStatuses.tsx';
 
@@ -12,20 +18,63 @@ export function RunSummary({
   now,
   entry = null,
   onSelect,
+  api,
+  onError,
 }: {
   run: RunView;
   now: number;
+  api?: Api;
+  onError?: (message: string) => void;
   entry?: GroupRow | SystemStepRow | null;
   onSelect?: (slug: string) => void;
 }) {
   const { t } = useTranslation();
+  const [downloading, setDownloading] = useState(false);
+  const download = async () => {
+    if (!api) return;
+    setDownloading(true);
+    try {
+      const { blob, fileName } = await api.runPatch(run.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      onError?.((error as Error).message);
+    } finally {
+      setDownloading(false);
+    }
+  };
   const tokens = usageText(run.usage);
   const price = cost(run.usage);
   const rows: { key: string; label: string; value: React.ReactNode }[] = [
     {
       key: 'status',
       label: t('runs.header.summary.status'),
-      value: <RunStatuses run={run} entry={entry} onSelect={onSelect} />,
+      value: <RunStatuses run={run} entry={entry} onSelect={onSelect} layout="rows" />,
+    },
+    {
+      key: 'changes',
+      label: t('runs.header.summary.changes'),
+      value: (
+        <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+          {run.diff ? <DiffStat diff={run.diff} /> : <span>—</span>}
+          <Button
+            variant="outline"
+            size="sm"
+            loading={downloading}
+            disabled={run.delivery.merged === 0 || !api}
+            onClick={() => void download()}
+          >
+            <Download aria-hidden />
+            {t('runs.header.summary.download')}
+          </Button>
+        </span>
+      ),
     },
     {
       key: 'path',
@@ -35,7 +84,7 @@ export function RunSummary({
     {
       key: 'time',
       label: t('runs.header.summary.time'),
-      value: duration((run.finishedAt ?? now) - run.createdAt),
+      value: duration(runClockEnd(run, now) - run.createdAt),
     },
     ...(tokens ? [{ key: 'tokens', label: t('runs.header.summary.tokens'), value: tokens }] : []),
     ...(price ? [{ key: 'cost', label: t('runs.header.summary.cost'), value: price }] : []),

@@ -73,6 +73,9 @@ export const es: Dictionary = {
     limit: 'Espera el reinicio del límite de {{runtime}}, hasta {{time}}',
   },
   status: {
+    not_merged: 'Sin fusionar',
+    mergedOf: 'Fusionado {{merged}}/{{total}}',
+    finishing: 'Terminando el paso',
     frozen: 'Congelada',
     queued: 'En cola',
     waiting: 'Espera al especialista',
@@ -197,9 +200,20 @@ export const es: Dictionary = {
       back: 'Volver a la lista',
     },
     header: {
+      parts: {
+        run: 'Ejecución',
+        group: 'Grupo',
+        step: 'Etapa',
+        merge: 'Fusión',
+        delivery: 'Entrega',
+      },
+      finishingTip:
+        'La ejecución está retenida ({{hold}}): el paso actual termina, no empiezan pasos nuevos',
       summary: {
         label: 'Resumen de la ejecución',
         status: 'Estado',
+        changes: 'Cambios',
+        download: 'Descargar',
         path: 'Ruta',
         time: 'Tiempo',
         tokens: 'Tokens',
@@ -301,6 +315,9 @@ export const es: Dictionary = {
       log: 'Registro',
       changes: 'Cambios',
       task: 'Tarea',
+      design: 'Diseño',
+      tasks: 'Tareas',
+      specChange: 'Cambio: {{name}}',
       onlyReplies: 'solo respuestas del especialista',
       showJson: 'mostrar JSON',
       noChanges: 'Aún no hay cambios',
@@ -357,6 +374,12 @@ export const es: Dictionary = {
     },
     files: {
       binary: 'binario',
+      diffLoading: 'Cargando el diff…',
+      diffUnavailable: 'El diff no está disponible',
+      diffBinary: 'Archivo binario: no hay diff que mostrar.',
+      diffEmpty: 'No hay líneas que mostrar.',
+      diffTruncated: 'Se muestran {{shown}} de {{total}} líneas.',
+      renamedFrom: 'antes {{path}}',
       label: 'archivos cambiados',
     },
     outside: {

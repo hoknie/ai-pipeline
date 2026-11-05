@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TagsProvider } from '../src/tags.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
 import { cleanup, render, screen, within } from './render.tsx';
-import { runView, tagView } from './fixtures.ts';
+import { groupRow, runView, tagView } from './fixtures.ts';
 
 afterEach(cleanup);
 
@@ -34,7 +34,7 @@ function show(run: ReturnType<typeof runView>, props: Props = {}) {
       />
     </TagsProvider>,
   );
-  return screen.getByRole('button', { name: /./ });
+  return screen.getAllByRole('button', { name: /./ })[0]!;
 }
 
 const full = () =>
@@ -191,5 +191,31 @@ describe('accepted answers on the card', () => {
     await act(() => i18next.changeLanguage('ru'));
     const row = show(runView({ decisions: decisions.slice(0, 1) }));
     expect(within(row).getByText(/Ответы/).textContent).toBe('Ответы: человек 1');
+  });
+});
+
+describe('groups of a held run in the list', () => {
+  const held = (groups: ReturnType<typeof groupRow>[]) =>
+    runView({ state: 'frozen', hold: 'frozen', clockStoppedAt: 1_500, groups });
+
+  it('labels a queued group as frozen and a running one as finishing its step', () => {
+    show(
+      held([
+        groupRow({ slug: 'a', title: 'A', status: 'frozen', hold: 'frozen' }),
+        groupRow({ slug: 'b', title: 'B', status: 'running', hold: 'frozen' }),
+      ]),
+      { selectedRun: 'run1' },
+    );
+    const list = screen.getByRole('list', { name: 'run groups' });
+    expect(within(list).getByLabelText('Frozen (frozen)')).toBeTruthy();
+    expect(within(list).getByLabelText('Finishing step (running)')).toBeTruthy();
+  });
+
+  it('shows the same duration whatever the time is now', () => {
+    const run = held([groupRow()]);
+    const first = show(run, { now: 5_000 }).textContent;
+    cleanup();
+    const second = show(run, { now: 600_000 }).textContent;
+    expect(second).toBe(first);
   });
 });

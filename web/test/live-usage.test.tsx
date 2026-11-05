@@ -181,7 +181,12 @@ describe('statuses in the group header', () => {
       const scroll = (isIntersecting: boolean) =>
         act(() => callbacks.forEach((cb) => cb([{ isIntersecting }])));
       scroll(false);
-      await waitFor(() => expect(within(inGroup()).getByLabelText('Merged (merged)')).toBeTruthy());
+      await waitFor(() =>
+        expect(within(inGroup()).getAllByLabelText('Merged (merged)')).toHaveLength(2),
+      );
+      for (const label of ['Run:', 'Group:', 'Merge:', 'Delivery:']) {
+        expect(within(inGroup()).getByText(label)).toBeTruthy();
+      }
       expect(within(inGroup()).getByLabelText(/\(finished\)$/)).toBeTruthy();
       expect(within(inGroup()).getByLabelText('Delivered (applied)')).toBeTruthy();
       scroll(true);

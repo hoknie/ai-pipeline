@@ -66,26 +66,29 @@ describe('routes', () => {
       run: 'r1',
       group: 'login',
       step: 'review',
+      tab: null,
     });
     expect(parseRoute('#topology/feature')).toEqual({
       view: 'topology',
       run: 'feature',
       group: null,
       step: null,
+      tab: null,
     });
     expect(parseRoute('#r1/login')).toEqual({
       view: 'runs',
       run: 'r1',
       group: 'login',
       step: null,
+      tab: null,
     });
-    expect(parseRoute('')).toEqual({ view: 'runs', run: null, group: null, step: null });
-    expect(formatRoute({ view: 'runs', run: 'r1', group: 'login', step: 'code' })).toBe(
+    expect(parseRoute('')).toEqual({ view: 'runs', run: null, group: null, step: null, tab: null });
+    expect(formatRoute({ view: 'runs', run: 'r1', group: 'login', step: 'code', tab: null })).toBe(
       '#runs/r1/login/code',
     );
-    expect(formatRoute({ view: 'topology', run: 'feature', group: null, step: null })).toBe(
-      '#topology/feature',
-    );
+    expect(
+      formatRoute({ view: 'topology', run: 'feature', group: null, step: null, tab: null }),
+    ).toBe('#topology/feature');
   });
 });
 

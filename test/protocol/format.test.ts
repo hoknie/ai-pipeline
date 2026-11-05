@@ -45,6 +45,14 @@ describe('text for people', () => {
     );
   });
 
+  it('shows the groups of a frozen run as frozen in the table and the counts', () => {
+    const state = run(1);
+    state.run.hold = 'frozen';
+    const text = formatRun(runView(state, 2000), 2000);
+    expect(text).toContain('Groups: frozen 1');
+    expect(text).toMatch(/gruppa-1\s+frozen/);
+  });
+
   it('shows the resolver round and conflicting files of a delivery', () => {
     const state = run(1, {
       configText: `${CONFIG_TEXT}  delivery: { auto: false, resolver: coder, resolver_rounds: 2 }\n`,

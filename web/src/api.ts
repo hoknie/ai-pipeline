@@ -5,6 +5,8 @@ import type {
   ConfigEditResult,
   ConfigEditorResponse,
   ConfigPreview,
+  FileDiffView,
+  GroupSpecView,
   GroupView,
   QueueFields,
   QueuePatch,
@@ -60,7 +62,12 @@ export interface Api {
   /** Workflows of the bound repository, or of the one given. */
   workflows(repository?: string): Promise<WorkflowsView>;
   group(runId: string, group: string): Promise<GroupView>;
+  groupSpec(runId: string, group: string): Promise<GroupSpecView | null>;
   transcript(runId: string, group: string, seq: number, after: number): Promise<Transcript>;
+  /** Diff of one changed file of a group with a few lines of context. */
+  fileDiff(runId: string, group: string, path: string): Promise<FileDiffView>;
+  /** The patch of the merged groups of a run, for `git apply`. */
+  runPatch(runId: string): Promise<{ blob: Blob; fileName: string }>;
   answer(runId: string, group: string, answer: string): Promise<unknown>;
   /** `refreshConfig` first takes the specialists of the current configuration into the run. */
   retry(runId: string, group: string, options?: { refreshConfig?: boolean }): Promise<unknown>;
@@ -198,8 +205,20 @@ function bound(repository: string | null): Api {
       call(`/api/repositories?repository=${enc(path)}`, { method: 'DELETE' }),
     workflows: (other) => call(withRepository('/api/workflows', other ?? repository)),
     group: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}?tail=200`),
+    groupSpec: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}/spec`),
     transcript: (runId, group, seq, after) =>
       call(`/api/runs/${enc(runId)}/groups/${enc(group)}/transcript?seq=${seq}&after=${after}`),
+    fileDiff: (runId, group, path) =>
+      call(`/api/runs/${enc(runId)}/groups/${enc(group)}/diff?path=${enc(path)}`),
+    runPatch: async (runId) => {
+      const response = await fetch(`/api/runs/${enc(runId)}/patch`, { credentials: 'same-origin' });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new ApiError(response.status, body.error ?? response.statusText);
+      }
+      const name = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '');
+      return { blob: await response.blob(), fileName: name?.[1] ?? `${runId}.patch` };
+    },
     answer: (runId, group, answer) =>
       post(`/api/runs/${enc(runId)}/groups/${enc(group)}/answer`, { answer }),
     skipStep: (runId, step, skip) => post(`/api/runs/${enc(runId)}/skip`, { step, skip }),

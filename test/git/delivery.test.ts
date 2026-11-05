@@ -18,6 +18,8 @@ import {
   commitAll,
   commitResolve,
   diffStat,
+  fileDiff,
+  rangePatch,
   filesWithMarkers,
   prepareResolve,
   deliver,
@@ -404,10 +406,92 @@ describe('diff statistics', () => {
       files: [
         { path: 'app.ts', added: 2, removed: 1 },
         { path: 'logo.bin', added: null, removed: null },
-        { path: 'renamed.ts', added: 0, removed: 0 },
+        { path: 'renamed.ts', added: 0, removed: 0, previousPath: 'old.ts' },
       ],
       added: 2,
       removed: 1,
     });
+  });
+});
+
+describe('file diff and range patch', () => {
+  const numbered = (change?: number) =>
+    Array.from({ length: 40 }, (_, i) => (i + 1 === change ? `changed ${i + 1}` : `line ${i + 1}`))
+      .join('\n')
+      .concat('\n');
+
+  async function twoCommits(
+    before: Record<string, string | Buffer>,
+    after: Record<string, string | Buffer>,
+    rename?: [string, string],
+  ): Promise<{ repo: string; from: string; to: string }> {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), 'aip-diff-test-')));
+    sh(repo, 'init', '-q', '-b', 'main');
+    sh(repo, 'config', 'user.name', 'Test');
+    sh(repo, 'config', 'user.email', 'test@example.com');
+    for (const [name, data] of Object.entries(before)) writeFileSync(join(repo, name), data);
+    sh(repo, 'add', '-A');
+    sh(repo, 'commit', '-q', '-m', 'one');
+    const from = sh(repo, 'rev-parse', 'HEAD');
+    if (rename) sh(repo, 'mv', rename[0], rename[1]);
+    for (const [name, data] of Object.entries(after)) writeFileSync(join(repo, name), data);
+    sh(repo, 'add', '-A');
+    sh(repo, 'commit', '-q', '-m', 'two');
+    return { repo, from, to: sh(repo, 'rev-parse', 'HEAD') };
+  }
+
+  it('shows five lines of context around a change, without file headers', async () => {
+    const { repo, from, to } = await twoCommits({ 'a.ts': numbered() }, { 'a.ts': numbered(20) });
+    const diff = await fileDiff(repo, from, to, ['a.ts'], { context: 5, maxLines: 2000 });
+    expect(diff.lines[0]).toMatch(/^@@ -15,11 \+15,11 @@/);
+    expect(diff.lines).toContain('-line 20');
+    expect(diff.lines).toContain('+changed 20');
+    expect(diff.lines.some((line) => line.startsWith('diff --git'))).toBe(false);
+    expect(diff.truncated).toBe(false);
+    expect(diff.totalLines).toBe(diff.lines.length);
+  });
+
+  it('gives one hunk for a rename with an edit', async () => {
+    const { repo, from, to } = await twoCommits(
+      { 'old.ts': numbered() },
+      { 'new.ts': numbered(20) },
+      ['old.ts', 'new.ts'],
+    );
+    const diff = await fileDiff(repo, from, to, ['old.ts', 'new.ts'], {
+      context: 5,
+      maxLines: 2000,
+    });
+    expect(diff.lines.filter((line) => line.startsWith('@@'))).toHaveLength(1);
+  });
+
+  it('truncates past the line limit', async () => {
+    const { repo, from, to } = await twoCommits({ 'a.ts': numbered() }, { 'a.ts': numbered(20) });
+    const diff = await fileDiff(repo, from, to, ['a.ts'], { context: 5, maxLines: 4 });
+    expect(diff.lines).toHaveLength(4);
+    expect(diff.truncated).toBe(true);
+    expect(diff.totalLines).toBeGreaterThan(4);
+  });
+
+  it('builds a patch that applies on the base and keeps binary and Latin-1 bytes', async () => {
+    const latin = Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]);
+    const binary = Buffer.from([0, 1, 2, 255, 254]);
+    const { repo, from, to } = await twoCommits(
+      { 'a.txt': 'x\n' },
+      { 'latin.txt': latin, 'logo.bin': binary },
+    );
+    const patch = await rangePatch(repo, from, to);
+    const clone = realpathSync(mkdtempSync(join(tmpdir(), 'aip-diff-clone-')));
+    sh(clone, 'init', '-q', '-b', 'main');
+    sh(clone, 'config', 'user.name', 'Test');
+    sh(clone, 'config', 'user.email', 'test@example.com');
+    writeFileSync(join(clone, 'a.txt'), 'x\n');
+    sh(clone, 'add', '-A');
+    sh(clone, 'commit', '-q', '-m', 'base');
+    const file = join(clone, '..', `${Date.now()}.patch`);
+    writeFileSync(file, patch);
+    sh(clone, 'apply', '--check', file);
+    sh(clone, 'apply', file);
+    expect(readFileSync(join(clone, 'latin.txt')).equals(latin)).toBe(true);
+    expect(readFileSync(join(clone, 'logo.bin')).equals(binary)).toBe(true);
   });
 });

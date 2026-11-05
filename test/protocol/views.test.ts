@@ -14,6 +14,7 @@ import {
 import {
   formatRepositories,
   groupView,
+  pickSpecChange,
   catalogView,
   queueView,
   repositoryViews,
@@ -932,5 +933,131 @@ describe('name of the workflow in views', () => {
     expect(view.items.map((item) => item.workflowName)).toEqual(['Новая функция', 'gone']);
     expect(view.runs[0]?.workflowName).toBe('Новая функция');
     expect(queueView(queue, () => undefined).items[0]?.workflowName).toBe('feature');
+  });
+});
+
+describe('statuses of the groups of a held run', () => {
+  it('shows a queued group of a held run as its hold, without a wait', () => {
+    const state = run(1);
+    state.run.hold = 'frozen';
+    const wait: GroupWait = { reason: 'capacity', max: 1 };
+    const view = runView(state, 1000, undefined, [], () => wait);
+    expect(view.groups[0]).toMatchObject({ status: 'frozen', hold: 'frozen', wait: null });
+    expect(view.counts).toBe('frozen 1');
+    state.run.hold = 'paused';
+    const paused = runView(state, 1000);
+    expect(paused.groups[0]).toMatchObject({ status: 'paused', hold: 'paused' });
+    expect(paused.counts).toBe('paused 1');
+  });
+
+  it('keeps a running group running and takes the hold in the topology and the system rows', () => {
+    const state = run(1, { configText: SPLIT_CONFIG, split: true });
+    step(state, 1000);
+    state.run.hold = 'frozen';
+    const view = runView(state, 2000);
+    expect(view.split).toMatchObject({ status: 'running' });
+    const queued = run(2);
+    step(queued, 1000);
+    finish(queued, 'done', { now: 2000 });
+    queued.run.hold = 'frozen';
+    const held = runView(queued, 3000);
+    const first = held.groups.find((row) => row.slug === 'gruppa-1')!;
+    expect(first).toMatchObject({ status: 'frozen', hold: 'frozen' });
+    const running = held.groups.find((row) => row.slug === 'gruppa-2')!;
+    expect(running).toMatchObject({ status: 'running', hold: 'frozen' });
+    const onTopology = held.topology.steps.flatMap((item) => item.groups);
+    expect(onTopology.find((item) => item.slug === 'gruppa-1')?.status).toBe('frozen');
+    expect(onTopology.find((item) => item.slug === 'gruppa-2')?.status).toBe('running');
+  });
+
+  it('shows a queued split step of a held run as its hold', () => {
+    const state = run(1, { configText: SPLIT_CONFIG, split: true });
+    state.run.hold = 'paused';
+    const view = runView(state, 1000);
+    expect(view.split).toMatchObject({ status: 'paused', wait: null });
+    expect(view.system[0]).toMatchObject({ kind: 'split', status: 'paused', hold: 'paused' });
+    expect(view.topology.split?.status).toBe('paused');
+  });
+
+  it('has no hold on a row of a run without one', () => {
+    const state = run(1);
+    const wait: GroupWait = { reason: 'capacity', max: 1 };
+    const view = runView(state, 1000, undefined, [], () => wait);
+    expect(view.groups[0]).toMatchObject({ status: 'waiting', hold: null });
+    expect(view.clockStoppedAt).toBeNull();
+  });
+});
+
+describe('the clock of a held run', () => {
+  const heldAfterStep = () => {
+    const state = run(1);
+    step(state, 1000);
+    finish(state, 'done', { now: 3000 });
+    return state;
+  };
+
+  it('stops at the end of the last attempt once nothing runs', () => {
+    const state = heldAfterStep();
+    state.run.hold = 'frozen';
+    expect(runView(state, 9000).clockStoppedAt).toBe(3000);
+  });
+
+  it('runs while an attempt is under way', () => {
+    const state = run(1);
+    step(state, 1000);
+    state.run.hold = 'frozen';
+    expect(runView(state, 9000).clockStoppedAt).toBeNull();
+  });
+
+  it('runs without a hold', () => {
+    expect(runView(heldAfterStep(), 9000).clockStoppedAt).toBeNull();
+  });
+
+  it('runs when the held run has no attempt yet', () => {
+    const state = run(1);
+    state.run.hold = 'paused';
+    expect(runView(state, 9000).clockStoppedAt).toBeNull();
+  });
+
+  it('runs while a delivery is in progress or a group merges', () => {
+    const merging = heldAfterStep();
+    merging.run.hold = 'frozen';
+    group(merging).status = 'merging';
+    expect(runView(merging, 9000).clockStoppedAt).toBeNull();
+    const delivering = heldAfterStep();
+    delivering.run.hold = 'frozen';
+    delivering.run.pendingDelivery = {
+      round: 1,
+      conflicts: [],
+    } as unknown as typeof delivering.run.pendingDelivery;
+    expect(runView(delivering, 9000).clockStoppedAt).toBeNull();
+  });
+});
+
+describe('pickSpecChange', () => {
+  it('ignores paths outside the changes and nested spec files', () => {
+    expect(
+      pickSpecChange([
+        'src/a.ts',
+        'openspec/specs/x/spec.md',
+        'openspec/changes/add/specs/x/spec.md',
+        'openspec/changes/add/adr/y.md',
+        'openspec/changes/add/notes.md',
+      ]),
+    ).toEqual([]);
+  });
+
+  it('puts active changes before archived ones, then orders by name', () => {
+    const picked = pickSpecChange([
+      'openspec/changes/archive/2026-11-04-old/tasks.md',
+      'openspec/changes/zeta/tasks.md',
+      'openspec/changes/alpha/design.md',
+      'openspec/changes/alpha/tasks.md',
+    ]);
+    expect(picked).toEqual([
+      { change: 'alpha', path: 'openspec/changes/alpha' },
+      { change: 'zeta', path: 'openspec/changes/zeta' },
+      { change: '2026-11-04-old', path: 'openspec/changes/archive/2026-11-04-old' },
+    ]);
   });
 });

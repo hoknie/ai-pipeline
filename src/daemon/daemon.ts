@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import {
   ConfigEditError,
@@ -93,6 +94,8 @@ import {
   type OnLimit,
   type Queue,
   type QueueItem,
+  type Group,
+  isServiceGroup,
   type RunState,
   type Tag,
   type GroupWait,
@@ -100,10 +103,15 @@ import {
   waitKey,
 } from '../core/index.ts';
 import {
+  changedPathsBetween,
+  changedPathsSince,
+  readFileAt,
   diffStat,
   excludeWorkspace,
+  fileDiff,
   git,
   prepareRunBranch,
+  rangePatch,
   refExists,
   repositoryRoot,
   workspaceRoot,
@@ -113,11 +121,13 @@ import {
   catalogView,
   currentBuild,
   groupView,
+  pickSpecChange,
   queueView,
   repositoryViews,
   runView,
   withQueue,
   type BuildInfo,
+  type GroupSpecView,
   type PingResult,
   type RepositoryView,
   type ParamsOf,
@@ -139,12 +149,15 @@ import {
   type BackgroundProcessesView,
   runTitle,
   type WebStopResult,
+  type FileDiffView,
+  type RunPatchView,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import { Store, type KnownRepository } from '../store/index.ts';
 
 import { Executor, NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS, type AttemptKey } from './executor.ts';
 import { readLines, readTail } from './logs.ts';
+import { FilePatchStorage, storageFor, type PatchStorage } from './patches.ts';
 import { DRAIN_MS, STOP_GRACE_MS } from './supervisor.ts';
 import {
   selectBackground,
@@ -245,6 +258,8 @@ export class Daemon {
   private readonly diffs = new Map<string, DiffStat>();
   private readonly diffing = new Set<string>();
   private readonly diffAgain = new Set<string>();
+  private readonly patchStorages: PatchStorage[];
+  private readonly patching = new Map<string, Promise<void>>();
   private seq = 0;
   private max = 3;
   private queue: Promise<unknown> = Promise.resolve();
@@ -276,6 +291,7 @@ export class Daemon {
   constructor(options: DaemonOptions) {
     this.store = new Store(databasePath(options.stateDirectory));
     this.socket = socketPath(options.stateDirectory);
+    this.patchStorages = [new FilePatchStorage(join(options.stateDirectory, 'patches'))];
     this.environment = options.environment ?? process.env;
     this.now = options.now ?? Date.now;
     this.build = options.build ?? currentBuild();
@@ -292,6 +308,7 @@ export class Daemon {
   }
 
   async start(): Promise<void> {
+    await this.sweepPatches();
     await this.serial(async () => {
       const recovered = this.store.recover(this.now());
       for (const { state } of recovered) this.states.set(state.run.id, state);
@@ -939,6 +956,62 @@ export class Daemon {
     }
   }
 
+  /** The commits a group's changes lie between, or null when they are not recorded yet. */
+  private async groupRange(state: RunState, group: Group): Promise<[string, string] | null> {
+    const { repository } = state.run;
+    if (group.status === 'merged' && group.mergeCommit) {
+      return [`${group.mergeCommit}^1`, group.mergeCommit];
+    }
+    const ref = groupRef(state.run, group.slug);
+    const run = runRef(state.run);
+    if ((await refExists(repository, ref)) && (await refExists(repository, run))) {
+      return [await git(repository, 'merge-base', run, ref), ref];
+    }
+    return null;
+  }
+
+  /** The documents of the OpenSpec change the group made or is making. */
+  private async groupSpec(params: ParamsOf<'group_spec'>): Promise<GroupSpecView | null> {
+    const state = this.state(params.runId);
+    const group = findGroup(state, params.group);
+    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (isServiceGroup(group)) return null;
+    const { repository } = state.run;
+    const pathspec = 'openspec/changes';
+    try {
+      const worktree = this.executor.worktreePath(state, group);
+      let paths: string[];
+      let read: (path: string) => Promise<string | null>;
+      if (group.status !== 'merged' && existsSync(worktree)) {
+        const base = await git(worktree, 'merge-base', runRef(state.run), 'HEAD');
+        paths = await changedPathsSince(worktree, base, pathspec);
+        read = (path) =>
+          Promise.resolve(
+            (() => {
+              try {
+                return readFileSync(join(worktree, path), 'utf8');
+              } catch {
+                return null;
+              }
+            })(),
+          );
+      } else {
+        const range = await this.groupRange(state, group);
+        if (range === null) return null;
+        paths = await changedPathsBetween(repository, range[0], range[1], pathspec);
+        read = (path) => readFileAt(repository, range[1], path);
+      }
+      for (const candidate of pickSpecChange(paths)) {
+        const design = await read(`${candidate.path}/design.md`);
+        const tasks = await read(`${candidate.path}/tasks.md`);
+        if (design !== null || tasks !== null) return { ...candidate, design, tasks };
+      }
+    } catch {
+      // the worktree or the commits are gone; show no change
+    }
+    return null;
+  }
+
   async refreshDiff(state: RunState, slug: string): Promise<void> {
     const key = `${state.run.id}/${slug}`;
     const group = findGroup(state, slug);
@@ -950,16 +1023,7 @@ export class Daemon {
     this.diffing.add(key);
     try {
       const { repository } = state.run;
-      let range: [string, string] | null = null;
-      if (group.status === 'merged' && group.mergeCommit) {
-        range = [`${group.mergeCommit}^1`, group.mergeCommit];
-      } else {
-        const ref = groupRef(state.run, slug);
-        const run = runRef(state.run);
-        if ((await refExists(repository, ref)) && (await refExists(repository, run))) {
-          range = [await git(repository, 'merge-base', run, ref), ref];
-        }
-      }
+      const range = await this.groupRange(state, group);
       if (range === null) return;
       this.diffs.set(key, await diffStat(repository, range[0], range[1]));
       this.broadcast(state);
@@ -968,6 +1032,115 @@ export class Daemon {
     } finally {
       this.diffing.delete(key);
       if (this.diffAgain.delete(key)) void this.refreshDiff(state, slug);
+    }
+  }
+
+  /**
+   * Keeps the patch of the merged groups of a run in the patch storage and its URI in the
+   * database. Serialized per run; failures are written to stderr and never reach the caller.
+   */
+  savePatch(state: RunState): Promise<void> {
+    const id = state.run.id;
+    const next = (this.patching.get(id) ?? Promise.resolve())
+      .then(() => this.writePatch(state))
+      .catch((error: unknown) => {
+        if (this.stopping) return;
+        process.stderr.write(`aip daemon: cannot save the patch of run ${id}: ${String(error)}\n`);
+      });
+    this.patching.set(id, next);
+    return next;
+  }
+
+  private async writePatch(state: RunState): Promise<void> {
+    if (!hasMergedChanges(state)) return;
+    const { repository, id } = state.run;
+    const ref = runRef(state.run);
+    if (!(await refExists(repository, ref))) return;
+    const commit = await git(repository, 'rev-parse', ref);
+    const stored = this.store.runPatch(id);
+    if (stored?.commit === commit) return;
+    const bytes = await rangePatch(repository, state.run.baseCommit, commit);
+    const uri = await this.patchStorages[0]!.put(id, commit, bytes);
+    this.store.setRunPatch(id, { uri, commit, size: bytes.length, createdAt: this.now() });
+    if (stored && stored.uri !== uri) {
+      await storageFor(this.patchStorages, stored.uri)
+        ?.remove(stored.uri)
+        .catch(() => undefined);
+    }
+  }
+
+  /** Removes patch files of runs the database does not know and superseded ones. */
+  private async sweepPatches(): Promise<void> {
+    const keep = new Map<string, string>();
+    for (const id of this.store.runPatchIds()) {
+      const record = this.store.runPatch(id);
+      if (record) keep.set(id, record.uri);
+    }
+    for (const storage of this.patchStorages) await storage.sweep(keep).catch(() => undefined);
+  }
+
+  private async runPatch(params: ParamsOf<'run_patch'>): Promise<RunPatchView> {
+    const state = this.state(params.runId);
+    const id = state.run.id;
+    if (!hasMergedChanges(state)) throw new Rejection(`run ${id} has no merged changes`);
+    const { repository } = state.run;
+    const ref = runRef(state.run);
+    const present = await refExists(repository, ref);
+    if (present) await this.savePatch(state);
+    const record = this.store.runPatch(id);
+    let bytes: Buffer | null = null;
+    if (record) bytes = (await storageFor(this.patchStorages, record.uri)?.get(record.uri)) ?? null;
+    if (bytes === null && present) {
+      bytes = await rangePatch(
+        repository,
+        state.run.baseCommit,
+        await git(repository, 'rev-parse', ref),
+      );
+    }
+    if (bytes === null) {
+      throw new Rejection(
+        present || record
+          ? `the patch of run ${id} is not available`
+          : `the patch of run ${id} is not available: run refs are removed`,
+      );
+    }
+    return { fileName: `${id}.patch`, size: bytes.length, base64: bytes.toString('base64') };
+  }
+
+  private async groupFileDiff(params: ParamsOf<'group_file_diff'>): Promise<FileDiffView> {
+    const state = this.state(params.runId);
+    const group = findGroup(state, params.group);
+    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    const key = `${state.run.id}/${group.slug}`;
+    if (!this.diffs.has(key)) await this.refreshDiff(state, group.slug);
+    const stat = this.diffs.get(key);
+    if (!stat) throw new Rejection(`the diff of group ${group.slug} is not available`);
+    const file = stat.files.find((entry) => entry.path === params.path);
+    if (!file) throw new Rejection(`${params.path} is not changed in group ${group.slug}`);
+    const previousPath = file.previousPath ?? null;
+    if (file.added === null) {
+      return {
+        path: file.path,
+        previousPath,
+        binary: true,
+        lines: [],
+        totalLines: 0,
+        truncated: false,
+      };
+    }
+    try {
+      const range = await this.groupRange(state, group);
+      if (range === null) throw new Error('refs are removed');
+      const diff = await fileDiff(
+        state.run.repository,
+        range[0],
+        range[1],
+        previousPath ? [previousPath, file.path] : [file.path],
+        { context: FILE_DIFF_CONTEXT, maxLines: FILE_DIFF_MAX_LINES },
+      );
+      return { path: file.path, previousPath, binary: false, ...diff };
+    } catch {
+      throw new Rejection(`the diff of ${params.path} is not available`);
     }
   }
 
@@ -1321,6 +1494,12 @@ export class Daemon {
         return Promise.resolve(this.status(request.params.runId));
       case 'group':
         return Promise.resolve(this.group(request.params));
+      case 'group_spec':
+        return this.groupSpec(request.params);
+      case 'group_file_diff':
+        return this.groupFileDiff(request.params);
+      case 'run_patch':
+        return this.runPatch(request.params);
       case 'transcript':
         return Promise.resolve(this.transcript(request.params));
       case 'workflows':
@@ -2011,6 +2190,13 @@ export class Daemon {
       this.waitLookup,
     );
   }
+}
+
+const FILE_DIFF_CONTEXT = 5;
+const FILE_DIFF_MAX_LINES = 2000;
+
+function hasMergedChanges(state: RunState): boolean {
+  return state.groups.some((group) => group.status === 'merged' && group.mergeCommit !== null);
 }
 
 /** The arguments of `run` that an item of the queue stands for. */

@@ -143,6 +143,7 @@ describe('routes and the tab', () => {
       run: 'feature',
       group: null,
       step: null,
+      tab: null,
     });
     expect(parseRoute('#workflows').view).toBe('workflows');
   });
@@ -160,9 +161,10 @@ describe('routes and the tab', () => {
       run: 'feature',
       group: null,
       step: null,
+      tab: null,
     });
     expect(parseRoute('#pipelines').run).toBeNull();
-    expect(formatRoute({ view: 'workflows', run: 'new', group: null, step: null })).toBe(
+    expect(formatRoute({ view: 'workflows', run: 'new', group: null, step: null, tab: null })).toBe(
       '#pipelines/new',
     );
   });

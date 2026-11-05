@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
-import { clock, cost, duration, reasonLabel, usageText } from '../../format.ts';
+import {
+  clock,
+  cost,
+  duration,
+  reasonLabel,
+  runTitle,
+  taskNumber,
+  usageText,
+} from '../../format.ts';
 import { notifySuccess } from '../../notify.ts';
 import type { GroupRow, GroupView, RunView, SystemStepRow } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
@@ -22,7 +30,7 @@ import { Switch } from '../../ui/switch.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs.tsx';
 import { Markdown } from '../Markdown.tsx';
 import { OutsideChanges } from '../OutsideChanges.tsx';
-import { RunStatuses } from './RunStatuses.tsx';
+import { RunStatuses, entryBadge } from './RunStatuses.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
 
 import { AttemptTimeline } from './AttemptTimeline.tsx';
@@ -33,8 +41,10 @@ import { FilePath } from '../FilePath.tsx';
 import { ApplyDialog } from './ApplyDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
 import { stepOfGroup, useSkipStep } from './skipStep.tsx';
+import { taskProgress } from './taskProgress.ts';
+import { useGroupSpec } from './useGroupSpec.ts';
 
-type Tab = 'log' | 'changes' | 'task';
+type Tab = 'log' | 'changes' | 'task' | 'design' | 'tasks';
 
 /** Lines of a delivery failure shown before «Show all». */
 const REASON_LINES = 6;
@@ -72,10 +82,15 @@ export function GroupScreen({
   onForceDeliver,
   showUsage = false,
   onSelectEntry,
+  tab: addressTab = null,
+  onTab: onAddressTab,
 }: {
+  /** Tab asked for by the address; null for the log. */
+  tab?: string | null;
+  onTab?: (tab: string) => void;
   /** Opens a group or a system step of the run (the resolver badge). */
   onSelectEntry?: (slug: string) => void;
-  /** Show duration, tokens and cost in the header (the run header is scrolled out of view). */
+  /** The run header is scrolled out of view: show the run title, statuses, duration, tokens and cost in the header. */
   showUsage?: boolean;
   api: Api;
   runId: string;
@@ -104,7 +119,6 @@ export function GroupScreen({
   const confirm = useConfirm();
   const [view, setView] = useState<GroupView | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<Tab>('log');
   const [forcing, setForcing] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
   const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}`;
@@ -114,6 +128,32 @@ export function GroupScreen({
   const skippable = run && !('kind' in row) ? stepOfGroup(run, row.slug) : null;
   const skipState = skippable ? run?.steps?.find((step) => step.id === skippable) : undefined;
   const canSkip = !!run && !!skipState && skipState.state !== 'done' && !skipState.skipped;
+  // without a controlling parent the screen keeps its tab itself
+  const [localTab, setLocalTab] = useState<string | null>(null);
+  const requestedTab = onAddressTab ? addressTab : localTab;
+  const onTab = onAddressTab ?? setLocalTab;
+  const active = !['merged', 'done', 'failed', 'cancelled'].includes(row.status);
+  const system = 'kind' in row;
+  const spec = useGroupSpec(
+    api,
+    runId,
+    row.slug,
+    version,
+    active && (requestedTab === 'design' || requestedTab === 'tasks'),
+    onError,
+    !system,
+  );
+  const available = new Set<string>(['log', 'task']);
+  if (caps.changes) available.add('changes');
+  if (spec?.design != null) available.add('design');
+  if (spec?.tasks != null) available.add('tasks');
+  const loaded = view !== null && (system || spec !== undefined);
+  const tab: Tab = (available.has(requestedTab ?? 'log') ? (requestedTab ?? 'log') : 'log') as Tab;
+  const setTab = (next: string) => onTab(next);
+  useEffect(() => {
+    if (loaded && requestedTab !== null && !available.has(requestedTab)) onTab('log');
+  });
+  const progress = spec?.tasks != null ? taskProgress(spec.tasks) : null;
   const title = 'kind' in row ? t(`runs.system.${row.kind}`) : row.title;
 
   useEffect(() => {
@@ -168,18 +208,37 @@ export function GroupScreen({
     <section aria-label={t('runs.group.label', { title })} className="flex flex-col gap-3 p-4">
       <header className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="min-w-0 flex-1 truncate text-base font-semibold" title={title}>
-            {title}
+          <h2
+            className="min-w-0 flex-1 truncate text-base font-semibold"
+            title={run ? undefined : title}
+            aria-hidden={run && !showUsage ? true : undefined}
+          >
+            {run ? (
+              <span
+                aria-hidden={showUsage ? undefined : true}
+                title={`${runTitle(run)}\n${run.id}`}
+                className={`block truncate transition-[opacity,transform,visibility] duration-200 ease-out motion-reduce:transition-none ${
+                  showUsage ? 'translate-y-0 opacity-100' : 'invisible translate-y-1 opacity-0'
+                }`}
+              >
+                <span className="font-mono font-normal text-muted-foreground">
+                  {taskNumber(run.number)}
+                </span>{' '}
+                {runTitle(run)}
+              </span>
+            ) : (
+              title
+            )}
           </h2>
           {'kind' in row ? (
             <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
           ) : null}
           {run ? (
             showUsage ? (
-              <RunStatuses run={run} entry={row} onSelect={onSelectEntry} />
+              <RunStatuses run={run} entry={row} onSelect={onSelectEntry} layout="inline" />
             ) : null
           ) : (
-            <StatusBadge status={row.status} wait={row.wait} />
+            entryBadge(row, t)
           )}
           {caps.retryDelivery ? (
             <Button
@@ -418,7 +477,7 @@ export function GroupScreen({
           <Skeleton className="h-24" />
         </div>
       ) : (
-        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList aria-label={t('runs.group.tabs')}>
             <TabsTrigger value="log">{t('runs.group.log')}</TabsTrigger>
             {caps.changes ? (
@@ -428,6 +487,15 @@ export function GroupScreen({
               </TabsTrigger>
             ) : null}
             <TabsTrigger value="task">{t('runs.group.task')}</TabsTrigger>
+            {spec?.design != null ? (
+              <TabsTrigger value="design">{t('runs.group.design')}</TabsTrigger>
+            ) : null}
+            {spec?.tasks != null ? (
+              <TabsTrigger value="tasks">
+                {t('runs.group.tasks')}
+                {progress ? ` · ${progress.done}/${progress.total}` : ''}
+              </TabsTrigger>
+            ) : null}
           </TabsList>
           <TabsContent value="log" className="flex flex-col gap-3">
             {onOnlyReplies || onShowJson ? (
@@ -472,7 +540,7 @@ export function GroupScreen({
           {caps.changes ? (
             <TabsContent value="changes">
               {view.diff && view.diff.files.length > 0 ? (
-                <FileTree files={view.diff.files} />
+                <FileTree files={view.diff.files} diff={{ api, runId, group: row.slug, version }} />
               ) : (
                 <Empty title={t('runs.group.noChanges')}>{t('runs.group.noChangesText')}</Empty>
               )}
@@ -486,6 +554,32 @@ export function GroupScreen({
               <Markdown text={view.task} />
             </section>
           </TabsContent>
+          {spec?.design != null ? (
+            <TabsContent value="design">
+              <section
+                aria-label={t('runs.group.design')}
+                className="rounded-md border bg-card p-4 text-card-foreground"
+              >
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {t('runs.group.specChange', { name: spec.change })}
+                </p>
+                <Markdown text={spec.design} />
+              </section>
+            </TabsContent>
+          ) : null}
+          {spec?.tasks != null ? (
+            <TabsContent value="tasks">
+              <section
+                aria-label={t('runs.group.tasks')}
+                className="rounded-md border bg-card p-4 text-card-foreground"
+              >
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {t('runs.group.specChange', { name: spec.change })}
+                </p>
+                <Markdown text={spec.tasks} />
+              </section>
+            </TabsContent>
+          ) : null}
         </Tabs>
       )}
     </section>

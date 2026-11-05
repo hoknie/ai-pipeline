@@ -19,6 +19,7 @@ import {
   subscribe,
   type ConfigEditResult,
   type DaemonCheck,
+  type RunPatchView,
   type Method,
   type ParamsOf,
 } from '../../protocol/index.ts';
@@ -473,12 +474,27 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'GET',
+      pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/spec$`),
+      handle: ([runId, group]) => call('group_spec', { runId: runId ?? '', group: group ?? '' }),
+    },
+    {
+      method: 'GET',
       pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/transcript$`),
       handle: ([runId, group], body) =>
         call('transcript', {
           runId: runId ?? '',
           group: group ?? '',
           ...(body as { seq?: number; after?: number }),
+        }),
+    },
+    {
+      method: 'GET',
+      pattern: new RegExp(`^/api/runs/${segment}/groups/${segment}/diff$`),
+      handle: ([runId, group], body) =>
+        call('group_file_diff', {
+          runId: runId ?? '',
+          group: group ?? '',
+          path: (body as { path: string }).path,
         }),
     },
     {
@@ -930,6 +946,27 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       return;
     }
 
+    const patchMatch = new RegExp(`^/api/runs/${segment}/patch$`).exec(url.pathname);
+    if (patchMatch) {
+      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      let runId: string;
+      try {
+        runId = decodeURIComponent(patchMatch[1] ?? '');
+      } catch {
+        throw new HttpError(400, 'malformed percent-encoding in path');
+      }
+      const patch = (await call('run_patch', { runId })) as RunPatchView;
+      const bytes = Buffer.from(patch.base64, 'base64');
+      response.writeHead(200, {
+        'Content-Type': 'text/x-diff; charset=binary',
+        'Content-Disposition': `attachment; filename="${patch.fileName.replace(/[^A-Za-z0-9._-]/g, '_')}"`,
+        'Content-Length': bytes.length,
+        'Cache-Control': 'no-store',
+      });
+      response.end(bytes);
+      return;
+    }
+
     let wrongMethod = false;
     for (const route of routes) {
       const match = route.pattern.exec(url.pathname);
@@ -960,6 +997,10 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         body = { tail };
       } else if (url.pathname.endsWith('/transcript')) {
         body = transcriptQuery(url.searchParams);
+      } else if (url.pathname.endsWith('/diff')) {
+        const path = url.searchParams.get('path');
+        if (path === null || path === '') throw new HttpError(400, 'path is required');
+        body = { path };
       }
       // Runs belong to the daemon, not to a repository: they work without one.
       // A returned run belongs to its own repository unless the request names one.
@@ -997,11 +1038,15 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           error.message,
         )
           ? 404
-          : /^aip daemon did not answer/.test(error.message)
-            ? 504
-            : error.message.startsWith('malformed response')
-              ? 502
-              : 400;
+          : /is not changed in group/.test(error.message)
+            ? 404
+            : /has no merged changes|is not available/.test(error.message)
+              ? 409
+              : /^aip daemon did not answer/.test(error.message)
+                ? 504
+                : error.message.startsWith('malformed response')
+                  ? 502
+                  : 400;
         json(response, status, { error: error.message });
       } else json(response, 502, { error: (error as Error).message });
     });

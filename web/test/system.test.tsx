@@ -270,7 +270,12 @@ describe('system stages in the run header', () => {
       Array.from(header.querySelectorAll('[aria-label$=")"]')).map((node) =>
         node.getAttribute('aria-label'),
       ),
-    ).toEqual([expect.stringMatching(/\(finished\)$/), 'Delivered (applied)', 'Merged (merged)']);
+    ).toEqual([
+      expect.stringMatching(/\(finished\)$/),
+      'Merged (merged)',
+      'Merged (merged)',
+      'Delivered (applied)',
+    ]);
   });
 
   const merged3 = () => [1, 2, 3].map((n) => groupRow({ slug: `g${n}`, status: 'merged' }));
@@ -289,8 +294,9 @@ describe('system stages in the run header', () => {
     const header = await screen.findByRole('banner', { name: 'run' });
     expect(badgeLabels(header)).toEqual([
       expect.stringMatching(/\(active\)$/),
-      'delivery 2/3 (pending)',
       'Merged (merged)',
+      'Merged (merged)',
+      'delivery 2/3 (pending)',
       'Pending (pending)',
     ]);
     const texts = within(header)
@@ -310,8 +316,8 @@ describe('system stages in the run header', () => {
     ]);
     const header = await screen.findByRole('banner', { name: 'run' });
     const labels = badgeLabels(header);
-    expect(labels).toHaveLength(3);
-    expect(labels[1]).toMatch(/^Delivering/);
+    expect(labels).toHaveLength(4);
+    expect(labels[3]).toMatch(/^Delivering/);
     expect(within(header).queryByText(/Delivery failed/)).toBeNull();
   });
 
@@ -326,6 +332,7 @@ describe('system stages in the run header', () => {
     expect(badgeLabels(header)).toEqual([
       expect.stringMatching(/\(active\)$/),
       expect.stringMatching(/\(running\)$/),
+      'Not merged (not_merged)',
     ]);
   });
 

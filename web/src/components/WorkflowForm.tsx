@@ -640,6 +640,7 @@ export function WorkflowForm({
                   run: draft.split.workflow,
                   group: null,
                   step: null,
+                  tab: null,
                 })}
               >
                 {nameOf(draft.split.workflow)}

@@ -832,7 +832,11 @@ describe('run names', () => {
         }),
       }),
     );
-    expect(screen.getAllByText('Флаг --json для version')).toHaveLength(2);
+    // the third occurrence is the hidden run title in the group header
+    const visible = screen
+      .getAllByText('Флаг --json для version')
+      .filter((element) => !element.closest('[aria-hidden="true"]'));
+    expect(visible).toHaveLength(2);
     expect(screen.getAllByText('add-version-json-flag')).toHaveLength(2);
     expect(screen.queryByText('mvwed8krym92')).toBeNull();
     expect(document.body.innerHTML).toContain('mvwed8krym92');

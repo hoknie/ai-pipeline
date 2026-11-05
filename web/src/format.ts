@@ -63,13 +63,34 @@ export function progressPercent(progress: { done: number; total: number }): numb
   return Math.min(100, Math.max(0, Math.round((progress.done / progress.total) * 100)));
 }
 
-/** When a run was created and how long it has taken: up to `finishedAt` when finished, else to `now`. */
+/**
+ * Where the clock of a run ends: `finishedAt` when finished, the stop of a held run's clock
+ * when it has one, else `now`.
+ */
+export function runClockEnd(
+  run: {
+    finishedAt: number | null;
+    finished: boolean;
+    clockStoppedAt?: number | null;
+  },
+  now: number,
+): number {
+  if (run.finished && run.finishedAt !== null) return run.finishedAt;
+  return run.clockStoppedAt ?? now;
+}
+
+/** When a run was created and how long it has taken, by `runClockEnd`. */
 export function runTimes(
-  run: { createdAt: number; finishedAt: number | null; finished: boolean },
+  run: {
+    createdAt: number;
+    finishedAt: number | null;
+    finished: boolean;
+    clockStoppedAt?: number | null;
+  },
   now: number,
   locale: string,
 ): { created: string; duration: string } {
-  const end = run.finished && run.finishedAt !== null ? run.finishedAt : now;
+  const end = runClockEnd(run, now);
   return { created: when(run.createdAt, now, locale), duration: duration(end - run.createdAt) };
 }
 

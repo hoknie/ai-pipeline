@@ -72,6 +72,9 @@ export const ru: Dictionary = {
     limit: 'Ждёт сброса лимита подписки {{runtime}}, до {{time}}',
   },
   status: {
+    not_merged: 'Не слито',
+    mergedOf: 'Слито {{merged}}/{{total}}',
+    finishing: 'Дорабатывает этап',
     frozen: 'Заморожена',
     queued: 'В очереди',
     waiting: 'Ждёт специалиста',
@@ -197,9 +200,20 @@ export const ru: Dictionary = {
       back: 'Назад к списку',
     },
     header: {
+      parts: {
+        run: 'Запуск',
+        group: 'Группа',
+        step: 'Этап',
+        merge: 'Слияние',
+        delivery: 'Доставка',
+      },
+      finishingTip:
+        'Запуск удерживается ({{hold}}): текущий этап дорабатывает, новые этапы не начнутся',
       summary: {
         label: 'Сводка запуска',
         status: 'Статус',
+        changes: 'Изменения',
+        download: 'Скачать',
         path: 'Путь',
         time: 'Время',
         tokens: 'Токены',
@@ -299,6 +313,9 @@ export const ru: Dictionary = {
       log: 'Журнал',
       changes: 'Изменения',
       task: 'Задача',
+      design: 'Дизайн',
+      tasks: 'Задачи',
+      specChange: 'Изменение: {{name}}',
       onlyReplies: 'только ответы специалиста',
       showJson: 'показывать JSON',
       noChanges: 'Изменений пока нет',
@@ -355,6 +372,12 @@ export const ru: Dictionary = {
     },
     files: {
       binary: 'двоичный',
+      diffLoading: 'Загрузка диффа…',
+      diffUnavailable: 'Дифф недоступен',
+      diffBinary: 'Двоичный файл: показывать нечего.',
+      diffEmpty: 'Нет строк для показа.',
+      diffTruncated: 'Показано {{shown}} из {{total}} строк.',
+      renamedFrom: 'было {{path}}',
       label: 'изменённые файлы',
     },
     outside: {

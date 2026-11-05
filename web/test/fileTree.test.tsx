@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { FileTree } from '../src/components/runs/FileTree.tsx';
 import { buildFileTree } from '../src/components/runs/fileTree.ts';
 
-import { cleanup, fireEvent, render, screen } from './render.tsx';
+import { fakeApi } from './fixtures.ts';
+import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
 
 afterEach(() => cleanup());
 
@@ -53,5 +54,92 @@ describe('FileTree', () => {
     fireEvent.click(dir);
     expect(screen.queryByText('server.ts')).toBeNull();
     expect(screen.getByText('binary')).toBeTruthy();
+  });
+});
+
+describe('FileTree with diffs', () => {
+  const small = [
+    { path: 'a.ts', added: 1, removed: 1 },
+    { path: 'b.ts', added: 2, removed: 0 },
+    { path: 'logo.png', added: null, removed: null },
+    { path: 'new.ts', added: 0, removed: 0, previousPath: 'old.ts' },
+  ];
+  const source = (api = fakeApi(), version = 'v1') => ({
+    api,
+    runId: 'run1',
+    group: 'login',
+    version,
+  });
+
+  it('opens the diff of a file on a click, with line numbers, and closes it without a request', async () => {
+    const api = fakeApi();
+    render(<FileTree files={small} diff={source(api)} />);
+    const button = screen.getByRole('button', { name: 'a.ts' });
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(button);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    await screen.findByText('new');
+    expect(api.fileDiff).toHaveBeenCalledWith('run1', 'login', 'a.ts');
+    expect(screen.getByText('@@ -1,2 +1,2 @@')).toBeTruthy();
+    fireEvent.click(button);
+    expect(screen.queryByText('new')).toBeNull();
+    fireEvent.click(button);
+    await screen.findByText('new');
+    expect(api.fileDiff).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps several files open at once', async () => {
+    const api = fakeApi();
+    render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'b.ts' }));
+    await waitFor(() => expect(screen.getAllByText('new')).toHaveLength(2));
+  });
+
+  it('asks again after the changes of the group changed', async () => {
+    const api = fakeApi();
+    const { rerender } = render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    await screen.findByText('new');
+    rerender(<FileTree files={small} diff={source(api, 'v2')} />);
+    await waitFor(() => expect(api.fileDiff).toHaveBeenCalledTimes(2));
+  });
+
+  it('says so for a binary file and when the diff is not available', async () => {
+    const api = fakeApi({
+      fileDiff: vi.fn(async (_run: string, _group: string, path: string) => {
+        if (path === 'a.ts') throw new Error('the diff of a.ts is not available');
+        return {
+          path,
+          previousPath: null,
+          binary: true,
+          lines: [],
+          totalLines: 0,
+          truncated: false,
+        };
+      }),
+    });
+    render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'logo.png' }));
+    await screen.findByText('Binary file: no diff to show.');
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    await screen.findByText(/The diff is not available: the diff of a.ts is not available/);
+  });
+
+  it('marks a truncated diff and shows the old path of a rename', async () => {
+    const api = fakeApi({
+      fileDiff: vi.fn(async (_run: string, _group: string, path: string) => ({
+        path,
+        previousPath: null,
+        binary: false,
+        lines: ['@@ -1 +1 @@', '-a', '+b'],
+        totalLines: 5000,
+        truncated: true,
+      })),
+    });
+    render(<FileTree files={small} diff={source(api)} />);
+    expect(screen.getByText('was old.ts')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'new.ts' }));
+    await screen.findByText('Showing 3 of 5000 lines.');
   });
 });

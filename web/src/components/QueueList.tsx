@@ -376,7 +376,13 @@ export function QueueList({
                   <a
                     className="rounded bg-muted px-1.5 py-0.5 text-xs text-primary underline"
                     title={t('queue.returnOf', { run: item.run })}
-                    href={formatRoute({ view: 'runs', run: item.run, group: null, step: null })}
+                    href={formatRoute({
+                      view: 'runs',
+                      run: item.run,
+                      group: null,
+                      step: null,
+                      tab: null,
+                    })}
                   >
                     {item.hold === 'paused' ? t('queue.onPause') : t('queue.returning')}
                   </a>
@@ -461,6 +467,7 @@ export function QueueList({
                       run: started.runId,
                       group: null,
                       step: null,
+                      tab: null,
                     })}
                   >
                     {t('queue.list.run', { id: started.runId })}
@@ -563,7 +570,7 @@ function DependencyChip({ dependency }: { dependency: QueueItemView['after'][num
       className={cn(badgeVariants({ variant: tone }), 'underline')}
       title={`${state}: ${name}`}
       data-state={dependency.state}
-      href={formatRoute({ view: 'runs', run: dependency.id, group: null, step: null })}
+      href={formatRoute({ view: 'runs', run: dependency.id, group: null, step: null, tab: null })}
     >
       {body}
     </a>

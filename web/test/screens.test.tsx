@@ -209,6 +209,7 @@ describe('run header', () => {
     expect(summary.className).toContain('@3xl:w-96');
     expect([...summary.querySelectorAll('dt')].map((node) => node.textContent)).toEqual([
       'Status',
+      'Changes',
       'Path',
       'Time',
       'Tokens',
@@ -216,10 +217,68 @@ describe('run header', () => {
       'Type',
     ]);
     const values = [...summary.querySelectorAll('dd')].map((node) => node.textContent);
-    expect(values[1]).toBe('/repo');
-    expect(values[3]).toBe('1.0k/100');
-    expect(values[4]).toBe('$0.42');
-    expect(values[5]).toContain('feature');
+    expect(values[2]).toBe('/repo');
+    expect(values[4]).toBe('1.0k/100');
+    expect(values[5]).toBe('$0.42');
+    expect(values[6]).toContain('feature');
+  });
+
+  it('downloads the patch of the run from the summary', async () => {
+    const api = fakeApi();
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    URL.createObjectURL = vi.fn(() => 'blob:patch');
+    URL.revokeObjectURL = vi.fn();
+    render(
+      <RunHeader
+        run={runView({ delivery: { ...runView().delivery, merged: 1 } })}
+        api={api}
+        now={0}
+        onError={() => undefined}
+      />,
+    );
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    fireEvent.click(within(summary).getByRole('button', { name: 'Download' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(api.runPatch).toHaveBeenCalledWith('run1');
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    click.mockRestore();
+  });
+
+  it('cannot download without merged changes and shows a dash for no changes', () => {
+    render(
+      <RunHeader
+        run={runView({ diff: null, delivery: { ...runView().delivery, merged: 0 } })}
+        api={fakeApi()}
+        now={0}
+        onError={() => undefined}
+      />,
+    );
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    expect(within(summary).getByRole('button', { name: 'Download' }).hasAttribute('disabled')).toBe(
+      true,
+    );
+    expect(within(summary).getByText('—')).toBeTruthy();
+  });
+
+  it('reports a refused download through onError', async () => {
+    const onError = vi.fn();
+    const api = fakeApi({
+      runPatch: vi.fn(async () => {
+        throw new Error('run refs are removed');
+      }),
+    });
+    render(
+      <RunHeader
+        run={runView({ delivery: { ...runView().delivery, merged: 1 } })}
+        api={api}
+        now={0}
+        onError={onError}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('run refs are removed'));
   });
 
   it('has no tokens and cost rows without usage or price', () => {
@@ -248,7 +307,7 @@ describe('run header', () => {
     expect(within(next).queryByText('Cost')).toBeNull();
   });
 
-  it('puts the state badge into the summary, not on the line of the title, and drops the sum of changes', () => {
+  it('puts the state badge into the summary, not on the line of the title, and keeps the sum of changes in the summary only', () => {
     render(
       <RunHeader
         run={runView({ diff: { files: 3, added: 10, removed: 2 } })}
@@ -263,7 +322,9 @@ describe('run header', () => {
     expect(summary.querySelector('dd [aria-label^="Active"]')).toBeTruthy();
     expect(title.className).not.toContain('truncate');
     expect(title.className).toContain('break-words');
-    expect(screen.queryByText(/3 files/)).toBeNull();
+    // the sum of changes stands in the summary only, never under the tags
+    expect(within(summary).getByText(/3 files/)).toBeTruthy();
+    expect(screen.getAllByText(/3 files/)).toHaveLength(1);
     expect(screen.getAllByLabelText('Pipeline: feature')).toHaveLength(1);
   });
 
@@ -840,5 +901,47 @@ describe('usage in the group header', () => {
     expect(screen.getByText('1.0k/100')).toBeTruthy();
     expect(screen.getByText('$0.42')).toBeTruthy();
     expect(screen.getByText('1m05s')).toBeTruthy();
+  });
+  describe('run title', () => {
+    const title = () => screen.getByText('добавить вход', { exact: false });
+
+    it('is not shown as a heading before scrolling, the section keeps its group label', () => {
+      show();
+      expect(screen.queryByRole('heading', { name: /добавить вход/ })).toBeNull();
+      expect(screen.queryByRole('heading', { name: row.title })).toBeNull();
+      expect(title().closest('[aria-hidden="true"]')).toBeTruthy();
+      expect(screen.getByRole('region', { name: /Вход|login/i })).toBeTruthy();
+    });
+
+    it('is shown as a heading with the run id in the tooltip after scrolling', () => {
+      show(true);
+      const heading = screen.getByRole('heading', { name: '#1 добавить вход' });
+      expect(heading).toBeTruthy();
+      expect(title().getAttribute('title')).toContain('run1');
+    });
+
+    it('is animated with a transition that respects reduced motion', () => {
+      show();
+      const classes = title().className;
+      expect(classes).toContain('transition-[opacity,transform,visibility]');
+      expect(classes).toContain('duration-200');
+      expect(classes).toContain('motion-reduce:transition-none');
+    });
+
+    it('falls back to the group title without a run', () => {
+      render(
+        <GroupScreen
+          api={fakeApi({ group: vi.fn(async () => groupView()) })}
+          runId="run1"
+          row={row}
+          draftKey="run1/login"
+          drafts={{}}
+          onDraft={() => undefined}
+          onClearDrafts={() => undefined}
+          onError={() => undefined}
+        />,
+      );
+      expect(screen.getByRole('heading', { name: row.title })).toBeTruthy();
+    });
   });
 });

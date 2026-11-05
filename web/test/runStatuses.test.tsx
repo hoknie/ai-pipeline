@@ -12,6 +12,11 @@ const labels = () =>
     node.getAttribute('aria-label'),
   );
 
+const parts = () =>
+  Array.from(document.querySelectorAll('[data-part]')).map((node) =>
+    node.textContent?.replace(/:$/, ''),
+  );
+
 describe('run statuses', () => {
   it('shows the run, the delivery and the merged group of a delivered run once', () => {
     const group = groupRow({ status: 'merged', delivery: 'applied' });
@@ -24,9 +29,11 @@ describe('run statuses', () => {
     render(<RunStatuses run={run} entry={group} />);
     expect(labels()).toEqual([
       expect.stringMatching(/\(finished\)$/),
-      'Delivered (applied)',
       'Merged (merged)',
+      'Merged (merged)',
+      'Delivered (applied)',
     ]);
+    expect(parts()).toEqual(['Run', 'Group', 'Merge', 'Delivery']);
   });
 
   it('adds the delivery of the open group when several groups are merged', () => {
@@ -41,10 +48,68 @@ describe('run statuses', () => {
     render(<RunStatuses run={run} entry={groups[1]!} />);
     expect(labels()).toEqual([
       expect.stringMatching(/\(active\)$/),
-      'delivery 1/2 (pending)',
       'Merged (merged)',
+      'Merged (merged)',
+      'delivery 1/2 (pending)',
       'Pending (pending)',
     ]);
+  });
+
+  it('shows how many groups are merged', () => {
+    const groups = [
+      groupRow({ slug: 'a', status: 'merged' }),
+      groupRow({ slug: 'b', status: 'running' }),
+      groupRow({ slug: 'c', status: 'queued' }),
+    ];
+    const run = runView({ groups });
+    render(<RunStatuses run={run} entry={groups[1]!} />);
+    expect(labels()).toContain('Merged 1/3 (merged)');
+  });
+
+  it('says not merged and has no delivery part while nothing is merged', () => {
+    const groups = [groupRow({ status: 'running' })];
+    render(<RunStatuses run={runView({ groups })} entry={groups[0]!} />);
+    expect(labels()).toContain('Not merged (not_merged)');
+    expect(parts()).toEqual(['Run', 'Group', 'Merge']);
+  });
+
+  it('has no merge and delivery parts while the task is split', () => {
+    const split = {
+      ...groupRow({ status: 'running' }),
+      kind: 'split' as const,
+    };
+    render(<RunStatuses run={runView({ groups: [] })} entry={split} />);
+    expect(parts()).toEqual(['Run', 'Step']);
+  });
+
+  it('labels a running group of a held run as finishing its step', () => {
+    const group = groupRow({ status: 'running', hold: 'frozen' });
+    render(
+      <RunStatuses
+        run={runView({ state: 'frozen', hold: 'frozen', groups: [group] })}
+        entry={group}
+      />,
+    );
+    expect(labels()).toContain('Finishing step (running)');
+    expect(screen.queryByLabelText('Running (running)')).toBeNull();
+  });
+
+  it('shows a queued group of a held run as frozen', () => {
+    const group = groupRow({ status: 'frozen', hold: 'frozen' });
+    render(
+      <RunStatuses
+        run={runView({ state: 'frozen', hold: 'frozen', groups: [group] })}
+        entry={group}
+      />,
+    );
+    expect(labels()).toContain('Frozen (frozen)');
+  });
+
+  it('puts the parts in one line in the inline layout', () => {
+    const group = groupRow({ status: 'running' });
+    render(<RunStatuses run={runView({ groups: [group] })} entry={group} layout="inline" />);
+    expect(screen.getByText('Run:')).toBeTruthy();
+    expect(screen.getByText('Group:')).toBeTruthy();
   });
 
   it('shows only the run badge without groups and delivery', () => {
@@ -54,6 +119,7 @@ describe('run statuses', () => {
     });
     render(<RunStatuses run={run} entry={null} />);
     expect(labels()).toHaveLength(1);
+    expect(parts()).toEqual(['Run']);
   });
 
   it('opens the resolver from the delivery badge', () => {

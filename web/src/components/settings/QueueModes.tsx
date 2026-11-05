@@ -91,7 +91,7 @@ export function QueueModes({
           : t('queue.settings.forRepository', { name: repositoryName })}{' '}
         <a
           className="underline"
-          href={formatRoute({ view: 'queue', run: null, group: null, step: null })}
+          href={formatRoute({ view: 'queue', run: null, group: null, step: null, tab: null })}
         >
           {t('queue.settings.openQueue')}
         </a>

@@ -72,7 +72,13 @@ function stream(): FakeEventSource {
 
 describe('routes and order helpers', () => {
   it('parses and formats #queue', () => {
-    expect(parseRoute('#queue')).toEqual({ view: 'queue', run: null, group: null, step: null });
+    expect(parseRoute('#queue')).toEqual({
+      view: 'queue',
+      run: null,
+      group: null,
+      step: null,
+      tab: null,
+    });
     expect(formatRoute(parseRoute('#queue'))).toBe('#queue');
   });
 
@@ -1869,7 +1875,7 @@ describe('skipped runs', () => {
     const card = within(skipped.getByRole('group', { name: 'Логин' }));
     expect(card.getByText('a group failed', { exact: false })).toBeTruthy();
     expect(card.getByRole('link', { name: /login/ }).getAttribute('href')).toBe(
-      formatRoute({ view: 'runs', run: 'run1', group: 'login', step: null }),
+      formatRoute({ view: 'runs', run: 'run1', group: 'login', step: null, tab: null }),
     );
     const running = screen.getByRole('region', { name: 'running from the queue' });
     expect(within(running).getByRole('heading').textContent).toContain('1 of 1 place');

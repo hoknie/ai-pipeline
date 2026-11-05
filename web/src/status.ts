@@ -46,6 +46,7 @@ export interface StatusInfo {
 /** Every status the panel shows: the key of its label in the dictionaries, tone and icon. */
 export const STATUS: Record<string, StatusEntry> = {
   queued: { labelKey: 'queued', tone: 'mute', icon: CircleDashed, spin: false },
+  not_merged: { labelKey: 'not_merged', tone: 'mute', icon: CircleDashed, spin: false },
   waiting: { labelKey: 'waiting', tone: 'mute', icon: Hourglass, spin: false },
   running: { labelKey: 'running', tone: 'run', icon: Loader2, spin: true },
   merging: { labelKey: 'merging', tone: 'run', icon: GitMerge, spin: false },

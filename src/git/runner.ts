@@ -62,3 +62,31 @@ export function runGit(
 export async function git(cwd: string, ...args: string[]): Promise<string> {
   return (await runGit(cwd, args)).stdout.trim();
 }
+
+/** Like `runGit`, but the standard output is returned as bytes (patches may hold any encoding). */
+export function runGitBuffer(
+  cwd: string,
+  args: string[],
+  options: { timeoutMs?: number; env?: NodeJS.ProcessEnv } = {},
+): Promise<Buffer> {
+  observer?.({ cwd, args });
+  return new Promise((resolve, reject) => {
+    execFile(
+      'git',
+      args,
+      {
+        cwd,
+        encoding: 'buffer',
+        timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        maxBuffer: 64 * 1024 * 1024,
+        env: { ...process.env, ...options.env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const code = typeof error.code === 'number' ? error.code : -1;
+          reject(new GitError(args, code, String(stderr) || error.message));
+        } else resolve(stdout);
+      },
+    );
+  });
+}

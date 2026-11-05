@@ -153,7 +153,7 @@ function Panel({
 
   const notifications = useNotificationCenter(
     runs,
-    (item) => setRoute({ view: 'runs', run: item.runId, group: item.slug, step: null }),
+    (item) => setRoute({ view: 'runs', run: item.runId, group: item.slug, step: null, tab: null }),
     loaded,
   );
 
@@ -181,10 +181,12 @@ function Panel({
   const tabRoute = (view: View): Route => {
     if (view === route.view) return route;
     if (view === 'queue' || view === 'specialists' || view === 'workflows')
-      return { view, run: null, group: null, step: null };
-    if (view === 'settings') return { view, run: 'general', group: 'global', step: null };
-    if (view === 'topology') return { view, run: run?.workflow ?? null, group: null, step: null };
-    return { view, run: lastRun.current, group: null, step: null };
+      return { view, run: null, group: null, step: null, tab: null };
+    if (view === 'settings')
+      return { view, run: 'general', group: 'global', step: null, tab: null };
+    if (view === 'topology')
+      return { view, run: run?.workflow ?? null, group: null, step: null, tab: null };
+    return { view, run: lastRun.current, group: null, step: null, tab: null };
   };
   const { working, waiting } = navRunCounts(runsOf(runs, scope === 'repository' ? selected : null));
   const waitingRepositories = useMemo(() => waitingByRepository(registry), [registry]);
@@ -205,7 +207,8 @@ function Panel({
     lastRun.current = null;
     setChosen(path);
     // A run of the previous repository cannot stay open: the list is about to show another.
-    if (route.view === 'runs') setRoute({ view: 'runs', run: null, group: null, step: null });
+    if (route.view === 'runs')
+      setRoute({ view: 'runs', run: null, group: null, step: null, tab: null });
   };
 
   const addRepository = async (path: string) => {
@@ -243,7 +246,8 @@ function Panel({
       dirty.current = false;
       lastRun.current = null;
       setChosen(null);
-      if (route.view === 'runs') setRoute({ view: 'runs', run: null, group: null, step: null });
+      if (route.view === 'runs')
+        setRoute({ view: 'runs', run: null, group: null, step: null, tab: null });
     }
   };
 
@@ -258,7 +262,13 @@ function Panel({
             streamedProcesses={streamedProcesses}
             api={api}
             onOpenGroup={(entry) =>
-              setRoute({ view: 'runs', run: entry.runId, group: entry.group, step: entry.step })
+              setRoute({
+                view: 'runs',
+                run: entry.runId,
+                group: entry.group,
+                step: entry.step,
+                tab: null,
+              })
             }
           />
         }
@@ -351,7 +361,9 @@ function Panel({
               api={scopedApi}
               runs={runs}
               selected={route.run}
-              onSelect={(id) => setRoute({ view: 'workflows', run: id, group: null, step: null })}
+              onSelect={(id) =>
+                setRoute({ view: 'workflows', run: id, group: null, step: null, tab: null })
+              }
             />
           </Suspense>
         ) : route.view === 'specialists' ? (
@@ -361,7 +373,9 @@ function Panel({
               dirty={dirty}
               api={scopedApi}
               selected={route.run}
-              onSelect={(id) => setRoute({ view: 'specialists', run: id, group: null, step: null })}
+              onSelect={(id) =>
+                setRoute({ view: 'specialists', run: id, group: null, step: null, tab: null })
+              }
             />
           </Suspense>
         ) : route.view === 'topology' ? (
@@ -372,13 +386,13 @@ function Panel({
               runs={runs}
               workflow={route.run}
               onSelectWorkflow={(id) =>
-                setRoute({ view: 'topology', run: id, group: null, step: null })
+                setRoute({ view: 'topology', run: id, group: null, step: null, tab: null })
               }
               onEditWorkflow={(id) =>
-                setRoute({ view: 'workflows', run: id, group: null, step: null })
+                setRoute({ view: 'workflows', run: id, group: null, step: null, tab: null })
               }
               onOpenGroup={(target, step) =>
-                setRoute({ view: 'runs', run: target.runId, group: target.slug, step })
+                setRoute({ view: 'runs', run: target.runId, group: target.slug, step, tab: null })
               }
             />
           </Suspense>

@@ -576,6 +576,7 @@ export class Executor {
     }
     await this.daemon.apply(state, { kind: 'merge_finished', group: slug, outcome });
     void this.daemon.refreshDiff(state, slug);
+    if (outcome.kind === 'merged') void this.daemon.savePatch(state);
   }
 
   async changedFiles(state: RunState, slugs: string[] | null): Promise<string[]> {
@@ -694,6 +695,8 @@ export class Executor {
   }
 
   private async cleanup(state: RunState): Promise<void> {
+    // The refs the patch is built from go away with the cleanup.
+    await this.daemon.savePatch(state);
     try {
       await cleanRun({
         repository: state.run.repository,

@@ -200,7 +200,8 @@ describe('pause a run: scenarios of the queue', () => {
     expect((await h.status(runId)).hold).toBe('paused');
     await settle(h);
     const after = await h.status(runId);
-    expect(after.groups[0]!.status).toBe('queued');
+    expect(after.groups[0]!.status).toBe('paused');
+    expect(after.groups[0]).toMatchObject({ hold: 'paused', wait: null });
     expect((await h.group(runId, slug)).attempts.map((attempt) => attempt.stepId)).toEqual([
       'code',
     ]);

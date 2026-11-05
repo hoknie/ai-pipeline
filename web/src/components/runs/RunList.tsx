@@ -12,6 +12,7 @@ import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
 import { orderEntries } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
+import { entryBadge } from './RunStatuses.tsx';
 import { TagChips } from '../TagChip.tsx';
 import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunDecisions } from './RunDecisions.tsx';
@@ -176,7 +177,7 @@ export function RunList({
                               </span>
                             ) : null}
                           </span>
-                          <StatusBadge status={group.status} wait={group.wait} />
+                          {entryBadge(group, t)}
                         </button>
                       </li>
                     ))}

@@ -70,6 +70,9 @@ export const zh: Dictionary = {
     limit: '等待 {{runtime}} 用量限制重置，直到 {{time}}',
   },
   status: {
+    not_merged: '未合并',
+    mergedOf: '已合并 {{merged}}/{{total}}',
+    finishing: '正在完成步骤',
     frozen: '已冻结',
     queued: '排队中',
     waiting: '等待专家',
@@ -192,9 +195,19 @@ export const zh: Dictionary = {
       back: '返回列表',
     },
     header: {
+      parts: {
+        run: '运行',
+        group: '分组',
+        step: '阶段',
+        merge: '合并',
+        delivery: '交付',
+      },
+      finishingTip: '运行已被保留（{{hold}}）：当前步骤将完成，不会开始新步骤',
       summary: {
         label: '运行摘要',
         status: '状态',
+        changes: '变更',
+        download: '下载',
         path: '路径',
         time: '时间',
         tokens: '令牌',
@@ -293,6 +306,9 @@ export const zh: Dictionary = {
       log: '日志',
       changes: '变更',
       task: '任务',
+      design: '设计',
+      tasks: '任务清单',
+      specChange: '变更：{{name}}',
       onlyReplies: '仅显示专员回复',
       showJson: '显示 JSON',
       noChanges: '暂无变更',
@@ -349,6 +365,12 @@ export const zh: Dictionary = {
     },
     files: {
       binary: '二进制',
+      diffLoading: '正在加载差异…',
+      diffUnavailable: '无法获取差异',
+      diffBinary: '二进制文件：没有可显示的差异。',
+      diffEmpty: '没有可显示的行。',
+      diffTruncated: '显示 {{total}} 行中的 {{shown}} 行。',
+      renamedFrom: '原路径 {{path}}',
       label: '已修改的文件',
     },
     outside: {

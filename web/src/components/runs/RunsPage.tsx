@@ -96,7 +96,7 @@ export function RunsPage({
 
   const select = (runId: string, slug: string | null) => {
     setScreen('detail');
-    onRoute({ view: 'runs', run: runId, group: slug, step: null });
+    onRoute({ view: 'runs', run: runId, group: slug, step: null, tab: null });
   };
 
   const shown = filterRuns(
@@ -215,7 +215,7 @@ export function RunsPage({
             href="#queue"
             onClick={(event) => {
               event.preventDefault();
-              onRoute({ view: 'queue', run: null, group: null, step: null });
+              onRoute({ view: 'queue', run: null, group: null, step: null, tab: null });
             }}
           >
             {t('runs.page.openQueue')}
@@ -244,6 +244,8 @@ export function RunsPage({
           runId={run.id}
           row={group}
           openStep={route.group === group.slug ? route.step : null}
+          tab={route.group === null || route.group === group.slug ? route.tab : null}
+          onTab={(tab) => onRoute({ ...route, group: group.slug, tab: tab === 'log' ? null : tab })}
           draftKey={`${run.id}/${group.slug}`}
           drafts={drafts}
           onDraft={onDraft}

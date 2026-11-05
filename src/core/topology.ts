@@ -19,6 +19,7 @@ import {
   type Attempt,
   type Group,
   type GroupStatus,
+  type RunHold,
   type RunState,
   type Usage,
 } from './model.ts';
@@ -26,7 +27,7 @@ import {
 export interface StepGroup {
   slug: string;
   title: string;
-  status: GroupStatus | 'waiting';
+  status: GroupStatus | 'waiting' | RunHold;
 }
 
 export interface StepInfo {
@@ -56,7 +57,7 @@ export interface Topology {
     workflow: string | null;
     /** Display name of `workflow`; null without it. */
     workflowName: string | null;
-    status: GroupStatus | 'waiting' | null;
+    status: GroupStatus | 'waiting' | RunHold | null;
   } | null;
   steps: StepTopology[];
   /** Groups waiting for or in the merge queue, or in conflict. */

@@ -17,6 +17,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   RUN_WORKTREE,
   changedPaths,
+  changedPathsBetween,
+  changedPathsSince,
+  readFileAt,
   hashFiles,
   cleanRun,
   hasRunLeftovers,
@@ -573,5 +576,29 @@ describe('working tree snapshot', () => {
         .split('\n')
         .sort(),
     ).toEqual(['openspec/changes/plan.md', 'openspec/changes/tasks.md']);
+  });
+});
+
+describe('paths of a pathspec', () => {
+  it('lists uncommitted, untracked and committed files but not those of the base', async () => {
+    const { repo } = repository();
+    mkdirSync(join(repo, 'docs'));
+    writeFileSync(join(repo, 'docs', 'base.md'), 'base\n');
+    sh(repo, 'add', '-A');
+    sh(repo, 'commit', '-q', '-m', 'base docs');
+    const base = sh(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'docs', 'committed.md'), 'c\n');
+    sh(repo, 'add', '-A');
+    sh(repo, 'commit', '-q', '-m', 'docs');
+    const head = sh(repo, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'docs', 'base.md'), 'changed\n');
+    writeFileSync(join(repo, 'docs', 'fresh.md'), 'f\n');
+    writeFileSync(join(repo, 'lib.ts'), 'other\n');
+
+    const since = await changedPathsSince(repo, base, 'docs');
+    expect(since.sort()).toEqual(['docs/base.md', 'docs/committed.md', 'docs/fresh.md']);
+    expect(await changedPathsBetween(repo, base, head, 'docs')).toEqual(['docs/committed.md']);
+    expect(await readFileAt(repo, head, 'docs/committed.md')).toBe('c\n');
+    expect(await readFileAt(repo, head, 'docs/missing.md')).toBeNull();
   });
 });

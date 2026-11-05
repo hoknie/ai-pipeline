@@ -73,6 +73,7 @@ describe('settings addresses', () => {
     run,
     group,
     step: null,
+    tab: null,
   });
 
   it('reads and writes #settings/<tab>/<group>', () => {

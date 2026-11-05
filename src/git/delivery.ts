@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { git, runGit } from './runner.ts';
+import { git, runGit, runGitBuffer } from './runner.ts';
 import { commitAll, existingPaths, snapshotCommit } from './workspace.ts';
 
 export interface GroupChange {
@@ -342,6 +342,8 @@ export interface FileStat {
   /** Added lines; null for a binary file. */
   added: number | null;
   removed: number | null;
+  /** Old path of a renamed file. */
+  previousPath?: string;
 }
 
 export interface DiffStat {
@@ -361,7 +363,9 @@ export async function diffStat(repository: string, from: string, to: string): Pr
     const [added = '-', removed = '-', path = ''] = head.split('\t');
     // A rename prints an empty path followed by the old and the new path.
     let name = path;
+    let previousPath: string | undefined;
     if (path === '') {
+      previousPath = parts[index + 1] ?? '';
       name = parts[index + 2] ?? '';
       index += 2;
     }
@@ -369,6 +373,7 @@ export async function diffStat(repository: string, from: string, to: string): Pr
       path: name,
       added: added === '-' ? null : Number(added),
       removed: removed === '-' ? null : Number(removed),
+      ...(previousPath ? { previousPath } : {}),
     });
   }
   files.sort((left, right) => left.path.localeCompare(right.path));
@@ -377,4 +382,46 @@ export async function diffStat(repository: string, from: string, to: string): Pr
     added: files.reduce((sum, file) => sum + (file.added ?? 0), 0),
     removed: files.reduce((sum, file) => sum + (file.removed ?? 0), 0),
   };
+}
+
+export interface FileDiffResult {
+  /** Lines of the diff after the `diff --git`, `index`, `---` and `+++` headers. */
+  lines: string[];
+  totalLines: number;
+  truncated: boolean;
+}
+
+/** Diff of the given paths (a renamed file needs both) with `context` lines around each change. */
+export async function fileDiff(
+  repository: string,
+  from: string,
+  to: string,
+  paths: string[],
+  options: { context: number; maxLines: number },
+): Promise<FileDiffResult> {
+  const output = (
+    await runGit(repository, [
+      'diff',
+      `-U${options.context}`,
+      '-M',
+      '--no-color',
+      from,
+      to,
+      '--',
+      ...paths,
+    ])
+  ).stdout;
+  const all = lines(output.replace(/\n$/, ''));
+  const start = all.findIndex((line) => line.startsWith('@@'));
+  const body = start < 0 ? [] : all.slice(start);
+  return {
+    lines: body.slice(0, options.maxLines),
+    totalLines: body.length,
+    truncated: body.length > options.maxLines,
+  };
+}
+
+/** Patch of `from..to` for `git apply`, binary files included, as raw bytes. */
+export async function rangePatch(repository: string, from: string, to: string): Promise<Buffer> {
+  return runGitBuffer(repository, ['diff', '--binary', '-M', from, to]);
 }

@@ -13,35 +13,45 @@ export interface Route {
   group: string | null;
   /** Step whose last attempt is opened in the group. */
   step: string | null;
+  /** Tab of the group screen; null for the default log tab. */
+  tab: string | null;
 }
 
 /** The settings route of `#settings/<tab>/<group>`, or of an old `#settings/<group>`. */
 function settingsRoute(first: string | null, second: string | null): Route {
   const { scope, group } = settingsLocationOf(first, second);
-  return { view: 'settings', run: group, group: scope, step: null };
+  return { view: 'settings', run: group, group: scope, step: null, tab: null };
 }
 
 const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : null);
 
 /** `#runs/<run>/<group>/<step>`, `#topology/<run>`; the older `#<run>/<group>` still works. */
 export function parseRoute(hash: string): Route {
-  const parts = hash.replace(/^#\/?/, '').split('/');
+  const [path = '', query = ''] = hash.split('?', 2) as [string, string?];
+  const tab = new URLSearchParams(query).get('tab') || null;
+  const parts = path.replace(/^#\/?/, '').split('/');
   const [head, ...rest] = parts;
-  if (head === 'queue') return { view: 'queue', run: null, group: null, step: null };
+  if (head === 'queue') return { view: 'queue', run: null, group: null, step: null, tab: null };
   if (head === 'topology')
-    return { view: 'topology', run: decode(rest[0]), group: null, step: null };
+    return { view: 'topology', run: decode(rest[0]), group: null, step: null, tab: null };
   if (head === 'pipelines' || head === 'workflows')
-    return { view: 'workflows', run: decode(rest[0]), group: null, step: null };
+    return { view: 'workflows', run: decode(rest[0]), group: null, step: null, tab: null };
   if (head === 'specialists') {
     // the former «General settings» entry of the specialists list
     if (decode(rest[0]) === '_settings') return settingsRoute(null, null);
-    return { view: 'specialists', run: decode(rest[0]), group: null, step: null };
+    return { view: 'specialists', run: decode(rest[0]), group: null, step: null, tab: null };
   }
   if (head === 'settings') return settingsRoute(decode(rest[0]), decode(rest[1]));
   if (head === 'runs') {
-    return { view: 'runs', run: decode(rest[0]), group: decode(rest[1]), step: decode(rest[2]) };
+    return {
+      view: 'runs',
+      run: decode(rest[0]),
+      group: decode(rest[1]),
+      step: decode(rest[2]),
+      tab,
+    };
   }
-  return { view: 'runs', run: decode(head), group: decode(rest[0]), step: null };
+  return { view: 'runs', run: decode(head), group: decode(rest[0]), step: null, tab };
 }
 
 export function formatRoute(route: Route): string {
@@ -61,5 +71,6 @@ export function formatRoute(route: Route): string {
   const parts = [route.run, route.group, route.group ? route.step : null].filter(
     (part): part is string => part !== null,
   );
-  return `#runs/${parts.map(enc).join('/')}`;
+  const tab = route.group && route.tab && route.tab !== 'log' ? `?tab=${enc(route.tab)}` : '';
+  return `#runs/${parts.map(enc).join('/')}${tab}`;
 }

@@ -99,7 +99,13 @@ export function QueueControls({
       </span>
       <a
         className="text-sm underline"
-        href={formatRoute({ view: 'settings', run: 'queue', group: 'project', step: null })}
+        href={formatRoute({
+          view: 'settings',
+          run: 'queue',
+          group: 'project',
+          step: null,
+          tab: null,
+        })}
       >
         {t('queue.controls.settings')}
       </a>

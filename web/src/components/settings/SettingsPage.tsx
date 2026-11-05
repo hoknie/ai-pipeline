@@ -26,10 +26,16 @@ import { SettingsTarget } from './SettingsTarget.tsx';
 import { SystemGroup } from './SystemGroup.tsx';
 
 /** Where the state and the restarts of the panel and the daemon are. */
-const SYSTEM_LINK = formatRoute({ view: 'settings', run: 'system', group: 'global', step: null });
+const SYSTEM_LINK = formatRoute({
+  view: 'settings',
+  run: 'system',
+  group: 'global',
+  step: null,
+  tab: null,
+});
 
 const hrefOf = (scope: SettingsScope, group: SettingsGroup) =>
-  formatRoute({ view: 'settings', run: group, group: scope, step: null });
+  formatRoute({ view: 'settings', run: group, group: scope, step: null, tab: null });
 
 /**
  * The settings page: tabs «Shared» and «Project», the groups of the tab in the column on the

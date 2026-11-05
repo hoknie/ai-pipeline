@@ -95,6 +95,8 @@ export interface FileStat {
   /** Added lines; null for a binary file. */
   added: number | null;
   removed: number | null;
+  /** Old path of a renamed file. */
+  previousPath?: string;
 }
 
 export interface DiffStat {
@@ -134,19 +136,57 @@ export function runTitle(state: RunState): string {
 export type { GroupWait } from '../core/index.ts';
 
 /** Status of a row: the stored one, `done` for a merged service step, or the derived `waiting`. */
-export type RowStatus = GroupStatus | 'done' | 'waiting';
+export type RowStatus = GroupStatus | 'done' | 'waiting' | RunHold;
 
 /** Why a queued group is not started yet, by run and group slug; null when it is not held back. */
 export type WaitLookup = (run: string, slug: string) => GroupWait | null;
 
 const NO_WAITS: WaitLookup = () => null;
 
-/** `waiting` for a queued group that the scheduler does not take; the stored status otherwise. */
+/**
+ * `frozen`/`paused` for a queued group of a held run, `waiting` for a queued group that the
+ * scheduler does not take; the stored status otherwise.
+ */
 export function displayStatus<S extends GroupStatus | 'done'>(
   status: S,
   wait: GroupWait | null,
-): S | 'waiting' {
-  return status === 'queued' && wait !== null ? 'waiting' : status;
+): S | 'waiting';
+export function displayStatus<S extends GroupStatus | 'done'>(
+  status: S,
+  wait: GroupWait | null,
+  hold: RunHold | null,
+): S | 'waiting' | RunHold;
+export function displayStatus<S extends GroupStatus | 'done'>(
+  status: S,
+  wait: GroupWait | null,
+  hold: RunHold | null = null,
+): S | 'waiting' | RunHold {
+  if (status !== 'queued') return status;
+  return hold ?? (wait !== null ? 'waiting' : status);
+}
+
+/** Hold that applies to a group: delivery steps (commit message, resolver) run despite it. */
+function groupHold(state: RunState, group: Group): RunHold | null {
+  return group === state.message || group === state.resolve ? null : state.run.hold;
+}
+
+/**
+ * When the clock of a held run stops: the end of its last attempt, once nothing runs, merges
+ * or delivers. Null while the run is not held, is finished, still works or has no attempt.
+ */
+export function clockStoppedAt(state: RunState): number | null {
+  if (state.run.hold === null || state.run.finishedAt !== null) return null;
+  if (state.run.pendingDelivery !== null) return null;
+  const groups = allGroups(state);
+  if (groups.some((group) => group.status === 'merging')) return null;
+  const attempts = groups.flatMap((group) => group.attempts);
+  if (attempts.length === 0 || attempts.some((attempt) => attempt.status === 'running')) {
+    return null;
+  }
+  const ends = attempts
+    .map((attempt) => attempt.finishedAt)
+    .filter((time): time is number => time !== null);
+  return ends.length > 0 ? Math.max(...ends) : null;
 }
 
 export interface GroupRow {
@@ -155,6 +195,8 @@ export interface GroupRow {
   status: Exclude<RowStatus, 'done'>;
   /** Why the group is `waiting`; null for other statuses. */
   wait: GroupWait | null;
+  /** Hold of the run that applies to the group; null: none, or a delivery step. */
+  hold: RunHold | null;
   step: string | null;
   /** The human name of `step`; null with `step`. */
   stepName: string | null;
@@ -226,6 +268,11 @@ export interface RunView {
   state: RunViewState;
   /** Why the scheduler starts no new steps of the run; null: no hold. */
   hold: RunHold | null;
+  /**
+   * When the clock of the held run stopped (ms): nothing runs, merges or delivers. Null when
+   * the clock runs.
+   */
+  clockStoppedAt: number | null;
   /** Groups waiting for a human answer. */
   waiting: number;
   dirtyWarning: boolean;
@@ -398,6 +445,10 @@ export function groupLimitUntil(group: Group): number | null {
   return group.status === 'queued' && last ? limitResetsAt(last) : null;
 }
 
+function isHold(status: unknown): status is RunHold {
+  return status === 'frozen' || status === 'paused';
+}
+
 export function groupRow(
   state: RunState,
   group: Group,
@@ -407,11 +458,13 @@ export function groupRow(
 ): GroupRow {
   const legacy = legacyOutsideChanges(group);
   const last = group.attempts.at(-1);
+  const hold = groupHold(state, group);
   return {
     slug: group.slug,
     title: group.title,
-    status: displayStatus(group.status, wait),
-    wait: group.status === 'queued' ? wait : null,
+    status: displayStatus(group.status, wait, hold),
+    wait: group.status === 'queued' && hold === null ? wait : null,
+    hold,
     step: last?.stepId ?? null,
     stepName: last ? attemptStepLabel(state, group, last) : null,
     round: last?.round ?? null,
@@ -446,7 +499,7 @@ export function systemRow(
   return {
     ...groupRow(state, group, now, NO_DIFFS, wait),
     kind,
-    status: displayStatus(serviceStatus(group), wait),
+    status: displayStatus(serviceStatus(group), wait, groupHold(state, group)),
   };
 }
 
@@ -480,10 +533,18 @@ export function deliveryStage(state: RunState): DeliveryStage | null {
 function countsLine(state: RunState, waiting: number): string {
   const summary = summarize(state);
   const counts: Record<string, number> = { ...summary.counts };
-  counts['queued'] = (counts['queued'] ?? 0) - waiting;
+  const hold = state.run.hold;
+  const held =
+    hold === null
+      ? 0
+      : allGroups(state).filter(
+          (group) => group.status === 'queued' && groupHold(state, group) !== null,
+        ).length;
+  counts['queued'] = (counts['queued'] ?? 0) - waiting - held;
   counts['waiting'] = waiting;
+  if (hold !== null) counts[hold] = held;
   const order = GROUP_STATUSES.flatMap((status) =>
-    status === 'queued' ? ['queued', 'waiting'] : [status],
+    status === 'queued' ? ['queued', 'waiting', 'frozen', 'paused'] : [status],
   );
   return order
     .filter((status) => (counts[status] ?? 0) > 0)
@@ -539,20 +600,32 @@ export function runView(
 ): RunView {
   const summary = summarize(state);
   const waitOf = (group: Group): GroupWait | null =>
-    group.status === 'queued' ? waits(state.run.id, group.slug) : null;
+    group.status === 'queued' && groupHold(state, group) === null
+      ? waits(state.run.id, group.slug)
+      : null;
   const waitingGroups = state.groups.filter((group) => waitOf(group) !== null).length;
   const stages = {
-    split: state.split ? displayStatus(serviceStatus(state.split), waitOf(state.split)) : null,
+    split: state.split
+      ? displayStatus(
+          serviceStatus(state.split),
+          waitOf(state.split),
+          groupHold(state, state.split),
+        )
+      : null,
     resolve: state.resolve ? displayStatus(state.resolve.status, waitOf(state.resolve)) : null,
   };
   const waitingTopology = topology(state);
   for (const step of waitingTopology.steps) {
     for (const group of step.groups) {
       const found = state.groups.find((candidate) => candidate.slug === group.slug);
-      if (found && waitOf(found) !== null && group.status === 'queued') group.status = 'waiting';
+      if (!found || group.status !== 'queued') continue;
+      const shown = displayStatus('queued', waitOf(found), groupHold(state, found));
+      if (shown !== 'queued') group.status = shown;
     }
   }
-  if (waitingTopology.split && stages.split === 'waiting') waitingTopology.split.status = 'waiting';
+  if (waitingTopology.split && (stages.split === 'waiting' || isHold(stages.split))) {
+    waitingTopology.split.status = stages.split;
+  }
   if (waitingTopology.delivery.resolverStatus && stages.resolve === 'waiting') {
     waitingTopology.delivery.resolverStatus = 'waiting';
   }
@@ -572,6 +645,7 @@ export function runView(
     state:
       state.run.hold !== null && summary.state !== 'needs_human' ? state.run.hold : summary.state,
     hold: state.run.hold,
+    clockStoppedAt: clockStoppedAt(state),
     waiting: summary.waiting,
     dirtyWarning: state.run.dirtyWarning,
     autoDeliver: state.run.config.delivery.auto,
@@ -587,7 +661,7 @@ export function runView(
     split: state.split
       ? {
           status: stages.split ?? 'queued',
-          wait: waitOf(state.split),
+          wait: groupHold(state, state.split) === null ? waitOf(state.split) : null,
           question: state.split.question,
           questions: state.split.questions,
           reason: state.split.reason,
@@ -738,8 +812,12 @@ export function groupView(
     slug: group.slug,
     title: group.title,
     task: group.task,
-    status: displayStatus(isServiceGroup(group) ? serviceStatus(group) : group.status, wait),
-    wait,
+    status: displayStatus(
+      isServiceGroup(group) ? serviceStatus(group) : group.status,
+      wait,
+      groupHold(state, group),
+    ),
+    wait: groupHold(state, group) === null ? wait : null,
     branch: isSplitGroup(group) ? state.run.branch : groupRef(state.run, group.slug),
     worktree,
     question: group.question,
@@ -958,7 +1036,7 @@ function queueRunView(
       ...(state.resolve ? [{ kind: 'resolve' as const, group: state.resolve }] : []),
     ].map(({ kind, group }) => ({
       kind,
-      status: displayStatus(serviceStatus(group), waitOf(group)),
+      status: displayStatus(serviceStatus(group), waitOf(group), groupHold(state, group)),
     })),
     delivery: deliveryStage(state)?.status ?? null,
     waiting: allGroups(state).flatMap((group) => {
@@ -1160,4 +1238,57 @@ export interface BackgroundProcessView {
 
 export interface BackgroundProcessesView {
   processes: BackgroundProcessView[];
+}
+
+/** The documents of the OpenSpec change a group works on. */
+export interface GroupSpecView {
+  /** The directory name of the change, for example `add-export`. */
+  change: string;
+  /** The directory of the change from the repository root. */
+  path: string;
+  design: string | null;
+  tasks: string | null;
+}
+
+export interface SpecCandidate {
+  change: string;
+  path: string;
+}
+
+const SPEC_PATH = /^openspec\/changes\/(archive\/[^/]+|[^/]+)\/(?:proposal|design|tasks)\.md$/;
+
+/** The changes among `paths`, active before archived and then by name. */
+export function pickSpecChange(paths: string[]): SpecCandidate[] {
+  const found = new Map<string, SpecCandidate>();
+  for (const path of paths) {
+    const directory = SPEC_PATH.exec(path)?.[1];
+    if (directory === undefined || found.has(directory)) continue;
+    found.set(directory, {
+      change: directory.slice(directory.lastIndexOf('/') + 1),
+      path: `openspec/changes/${directory}`,
+    });
+  }
+  const archived = (candidate: SpecCandidate) => candidate.path.includes('/changes/archive/');
+  return [...found.values()].sort(
+    (a, b) =>
+      Number(archived(a)) - Number(archived(b)) ||
+      (a.change < b.change ? -1 : a.change > b.change ? 1 : 0),
+  );
+}
+
+/** Answer to `group_file_diff`: the diff of one file of a group, without the file headers. */
+export interface FileDiffView {
+  path: string;
+  previousPath: string | null;
+  binary: boolean;
+  lines: string[];
+  totalLines: number;
+  truncated: boolean;
+}
+
+/** Answer to `run_patch`: the patch of the merged groups of a run, bytes in base64. */
+export interface RunPatchView {
+  fileName: string;
+  size: number;
+  base64: string;
 }
