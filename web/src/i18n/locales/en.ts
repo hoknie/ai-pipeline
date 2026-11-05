@@ -178,6 +178,9 @@ export const en = {
       active: 'Active',
       done: 'Finished',
       empty: 'Nothing found',
+      loadingMore: 'Loading older runs…',
+      moreFailed: 'Could not load older runs.',
+      retry: 'Retry',
       reset: 'Reset',
       progress: 'Run progress',
       filters: 'Filters',
@@ -930,6 +933,25 @@ export const en = {
       createCopy: 'Create a copy',
     },
   },
+  sharedSpecialists: {
+    list: 'Shared specialists',
+    search: 'Search by slug or name',
+    empty: 'No shared specialists yet',
+    nothing: 'Nothing found',
+    tags: 'The tags of a shared specialist are shown here but not changed.',
+    usage: {
+      title: 'Used in projects',
+      count: 'Projects: {{count}}',
+      none: 'Not used in any project',
+      shared: 'Shared level',
+      loading: 'Loading usage…',
+      error: 'Could not load usage: {{message}}',
+      blocked:
+        'Delete is unavailable while the specialist is used: remove its references or override it with a project file in every project first.',
+      waiting: 'Delete is unavailable until the usage is loaded.',
+      repository: 'Repository {{path}}',
+    },
+  },
   settingsPage: {
     groups: 'groups of settings',
     hasErrors: 'the group has configuration errors',
@@ -978,6 +1000,7 @@ export const en = {
       agents: 'Agents',
       delivery: 'Delivery',
       runtimes: 'Runtimes',
+      specialists: 'Specialists',
       system: 'System',
       queue: 'Queue',
       tags: 'Tags',
@@ -990,6 +1013,8 @@ export const en = {
       delivery: 'Where the result of a run goes, how it is committed and who resolves conflicts.',
       runtimes:
         'Commands, arguments and environment variables of the agent CLIs. The values of the variables are never shown.',
+      specialists:
+        'Shared specialists: files of the shared specialists directory, available in every repository. Every field can be changed here.',
       system:
         'Address and access of the web panel, the state of the daemon and of the panel, their restart, and stopping and starting the daemon.',
       queue:

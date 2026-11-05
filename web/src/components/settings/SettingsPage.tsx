@@ -20,6 +20,7 @@ import { Skeleton } from '../../ui/skeleton.tsx';
 
 import { ConfigErrors } from '../EntryList.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
+import { SharedSpecialistsGroup } from './SharedSpecialistsGroup.tsx';
 import { QueueModes } from './QueueModes.tsx';
 import { SettingsForm } from './SettingsForm.tsx';
 import { SettingsTarget } from './SettingsTarget.tsx';
@@ -45,6 +46,8 @@ export default function SettingsPage({
   api,
   scope,
   group,
+  specialist,
+  onSelectSpecialist,
   repository,
   repositories,
   onSelectRepository,
@@ -56,6 +59,9 @@ export default function SettingsPage({
   api: Api;
   scope: SettingsScope;
   group: SettingsGroup;
+  /** The open shared specialist of the group «Specialists» (a slug or `new`); null for none. */
+  specialist: string | null;
+  onSelectSpecialist: (slug: string | null) => void;
   /** The selected repository; null while none is known. */
   repository: string | null;
   /** The repositories of the panel, the choices of «Project». */
@@ -109,7 +115,8 @@ export default function SettingsPage({
     (SETTINGS_GROUPS_BY_SCOPE[target] as readonly string[]).includes(group) ? group : 'general';
   const file = config?.settingsFiles[scope].file ?? null;
   const noProjects = scope === 'project' && repositories.length === 0;
-  const isForm = group !== 'tags' && group !== 'queue';
+  const isForm = group !== 'tags' && group !== 'queue' && group !== 'specialists';
+  const sharedDirectory = config ? `${config.directories.global}/specialists` : null;
 
   return (
     <div className="flex w-full flex-col gap-4 p-4">
@@ -137,7 +144,7 @@ export default function SettingsPage({
         repository={repository}
         repositories={repositories}
         onSelectRepository={onSelectRepository}
-        file={isForm ? file : null}
+        file={group === 'specialists' ? sharedDirectory : isForm ? file : null}
       />
       {noProjects ? null : (
         <div className="grid w-full gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
@@ -199,6 +206,21 @@ export default function SettingsPage({
               ) : (
                 <div role="status" aria-label={t('queue.loading')}>
                   <Skeleton className="h-24" />
+                </div>
+              )
+            ) : group === 'specialists' ? (
+              config ? (
+                <SharedSpecialistsGroup
+                  api={api}
+                  config={config}
+                  selected={specialist}
+                  onSelect={onSelectSpecialist}
+                  onReload={reload}
+                  dirty={dirty}
+                />
+              ) : failure ? null : (
+                <div role="status" aria-label={t('settings.editor.loading')}>
+                  <Skeleton className="h-40" />
                 </div>
               )
             ) : (

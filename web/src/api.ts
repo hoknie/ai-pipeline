@@ -16,6 +16,7 @@ import type {
   RunCreated,
   SettingValue,
   RunView,
+  SharedSpecialistsView,
   SpecialistTagsView,
   SpecialistsImportResult,
   SystemView,
@@ -54,6 +55,8 @@ export interface Api {
    */
   forRepository(repository: string | null): Api;
   runs(): Promise<RunView[]>;
+  /** A page of finished runs after the cursor `before` (none: the newest); `next` is null at the end. */
+  finishedRuns(before?: string): Promise<{ runs: RunView[]; next: string | null }>;
   /** One run by id, also one the list no longer carries; 404 when the daemon does not know it. */
   run(runId: string): Promise<RunView>;
   /** The daemon's list of repositories with counters. */
@@ -143,6 +146,8 @@ export interface Api {
     level?: WriteLevel,
   ): Promise<ConfigEditResult>;
   deleteSpecialist(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
+  /** The shared specialists with the repositories of the registry that use them. */
+  sharedSpecialists(): Promise<SharedSpecialistsView>;
   /** The specialists of the shared level and of every repository, with their tags. */
   specialistTags(): Promise<SpecialistTagsView>;
   /** Copies project specialists of another repository into the bound one. */
@@ -214,6 +219,9 @@ async function edit(path: string, init: RequestInit): Promise<ConfigEditResult> 
 }
 
 /** The address with `repository=<path>` added (`null` leaves it as it is). */
+/** How many finished runs one page of the run list loads. */
+const FINISHED_PAGE = 15;
+
 export function withRepository(path: string, repository: string | null): string {
   if (repository === null) return path;
   return `${path}${path.includes('?') ? '&' : '?'}repository=${enc(repository)}`;
@@ -224,6 +232,8 @@ function bound(repository: string | null): Api {
   const api: Api = {
     forRepository: (next) => (next === repository ? api : bound(next)),
     runs: () => call('/api/runs'),
+    finishedRuns: (before) =>
+      call(`/api/finished-runs?limit=${FINISHED_PAGE}${before ? `&before=${enc(before)}` : ''}`),
     run: (runId) => call(`/api/runs/${enc(runId)}`),
     repositories: () => call('/api/repositories'),
     addRepository: (path) => post('/api/repositories', { path }),
@@ -334,6 +344,7 @@ function bound(repository: string | null): Api {
       edit(at(`/api/config/specialists/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
         method: 'DELETE',
       }),
+    sharedSpecialists: () => call('/api/shared-specialists'),
     specialistTags: () => call('/api/specialist-tags'),
     importSpecialists: async (source, slugs) =>
       (await edit(at('/api/config/specialists/import'), {

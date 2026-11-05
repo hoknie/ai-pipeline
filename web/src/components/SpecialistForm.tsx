@@ -15,6 +15,7 @@ import { Textarea } from '../ui/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
 import { sameTag } from '../specialistTags.ts';
+import { repositoryLabel } from '../repositories.ts';
 import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
 import { SpecialistTagChip } from './SpecialistTagChip.tsx';
 import { ValuesPicker } from './ValuesPicker.tsx';
@@ -26,6 +27,7 @@ import type {
   EditorSpecialist,
   EntryReference,
   FieldError,
+  SharedSpecialistView,
   WriteLevel,
 } from '../types.ts';
 
@@ -140,12 +142,80 @@ function fieldOf(path: string, slug: string): FieldName | null {
   return FIELDS.includes(name) ? name : null;
 }
 
-function describeReference(reference: EntryReference, view: ConfigEditorResponse): string {
-  if (reference.field) return reference.field;
-  const entry = view.workflows.find((candidate) => candidate.id === reference.workflow);
-  const workflow = (entry ? rawName(entry.raw) : null) ?? reference.workflow;
-  if (reference.split) return `${workflow} → split`;
-  return `${workflow} → ${reference.step}`;
+export function describeReference(
+  reference: EntryReference,
+  view: ConfigEditorResponse | null,
+): string {
+  const where = (() => {
+    if (reference.field) return reference.field;
+    const entry = reference.repository
+      ? undefined
+      : view?.workflows.find((candidate) => candidate.id === reference.workflow);
+    const workflow = (entry ? rawName(entry.raw) : null) ?? reference.workflow;
+    if (reference.split) return `${workflow} → split`;
+    return `${workflow} → ${reference.step}`;
+  })();
+  return reference.repository ? `${repositoryLabel(reference.repository)}: ${where}` : where;
+}
+
+/** The shared-level view of the form: the usage of the specialist by the projects. */
+export interface SharedOnly {
+  /** Usage of the open specialist; null while it is not loaded. */
+  usage: SharedSpecialistView | null;
+  usageError: string | null;
+  /** Reads the usage again, for example after the daemon refused a delete. */
+  onUsageStale: () => void;
+}
+
+function UsageBlock({ shared, view }: { shared: SharedOnly; view: ConfigEditorResponse }) {
+  const { t } = useTranslation();
+  const { usage, usageError } = shared;
+  return (
+    <Card>
+      <section aria-labelledby="usage-title" className="flex flex-col gap-2 p-4">
+        <h3 id="usage-title" className="text-sm font-semibold">
+          {t('sharedSpecialists.usage.title')}
+        </h3>
+        {usageError ? (
+          <Alert variant="destructive">
+            {t('sharedSpecialists.usage.error', { message: usageError })}
+          </Alert>
+        ) : usage === null ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            {t('sharedSpecialists.usage.loading')}
+          </p>
+        ) : (
+          <>
+            <p className="text-sm" data-testid="usage-count">
+              {t('sharedSpecialists.usage.count', { count: usage.projects.length })}
+            </p>
+            {usage.projects.length === 0 && usage.global.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('sharedSpecialists.usage.none')}</p>
+            ) : null}
+            <ul aria-label={t('sharedSpecialists.usage.title')} className="flex flex-col gap-1">
+              {usage.global.length > 0 ? (
+                <li className="text-sm">
+                  <span className="font-medium">{t('sharedSpecialists.usage.shared')}</span>:{' '}
+                  {usage.global.map((reference) => describeReference(reference, view)).join(', ')}
+                </li>
+              ) : null}
+              {usage.projects.map((project) => (
+                <li key={project.repository} className="text-sm">
+                  <span className="font-medium" title={project.repository}>
+                    {repositoryLabel(project.repository)}
+                  </span>
+                  :{' '}
+                  {project.references
+                    .map((reference) => describeReference(reference, null))
+                    .join(', ')}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    </Card>
+  );
 }
 
 /**
@@ -173,6 +243,7 @@ export function SpecialistForm({
   onReload,
   onSaved,
   onDeleted,
+  sharedOnly,
 }: {
   api: Api;
   view: ConfigEditorResponse;
@@ -186,11 +257,13 @@ export function SpecialistForm({
   onReload: () => Promise<void>;
   onSaved: (slug: string) => Promise<void>;
   onDeleted: () => Promise<void>;
+  /** Edits a shared specialist at the shared level only, with the usage by the projects. */
+  sharedOnly?: SharedOnly;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [level, setLevel] = useState<WriteLevel>(
-    specialist?.level === 'global' ? 'global' : 'project',
+    sharedOnly || specialist?.level === 'global' ? 'global' : 'project',
   );
   const sources = specialist?.sources ?? {};
   const source = sources[level];
@@ -209,17 +282,18 @@ export function SpecialistForm({
   const [busy, setBusy] = useState(false);
 
   // a shared (global) specialist is view only; the project override is how to change it
-  const readOnly = Boolean(specialist) && level === 'global';
+  const readOnly = Boolean(specialist) && level === 'global' && !sharedOnly;
   const dirty = !sameDraft(draft, initial) || (!specialist && slug !== '');
   useEffect(() => {
     onDirty(dirty);
     return () => onDirty(false);
   }, [dirty, onDirty]);
 
+  // the shared level is checked against the shared defaults, not against what a project makes of them
   const defaults = Object.fromEntries(
     view.settings
       .filter((setting) => setting.path.startsWith('defaults.'))
-      .map((s) => [s.path, s.value]),
+      .map((s) => [s.path, sharedOnly ? s.globalValue : s.value]),
   );
   const hint = (field: FieldName): string => {
     if (field === 'runtime' || field === 'permissions' || field === 'timeout') {
@@ -268,6 +342,7 @@ export function SpecialistForm({
     else {
       setErrors(result.errors);
       setReferences(result.references ?? []);
+      if (sharedOnly && (result.references ?? []).length > 0) sharedOnly.onUsageStale();
     }
     return false;
   };
@@ -357,6 +432,16 @@ export function SpecialistForm({
       const result = await api.deleteSpecialist(specialist.slug, source.revision, level);
       if (report(result)) await onDeleted();
     });
+
+  const removeBlocked =
+    sharedOnly !== undefined &&
+    (sharedOnly.usage === null ||
+      sharedOnly.usage.projects.length > 0 ||
+      sharedOnly.usage.global.length > 0);
+  const removeBlockedReason =
+    sharedOnly?.usage === null
+      ? t('sharedSpecialists.usage.waiting')
+      : t('sharedSpecialists.usage.blocked');
 
   const removeLabel =
     level === 'project' && sources.global
@@ -481,7 +566,7 @@ export function SpecialistForm({
   };
 
   const levelToggle =
-    (specialist && bothLevels) || !specialist ? (
+    !sharedOnly && ((specialist && bothLevels) || !specialist) ? (
       <ToggleGroup
         type="single"
         value={level}
@@ -547,7 +632,7 @@ export function SpecialistForm({
               {t('settings.editor.save')}
             </Button>
           )}
-          {specialist && sources.global && !sources.project ? (
+          {specialist && !sharedOnly && sources.global && !sources.project ? (
             <Button variant="outline" disabled={busy} onClick={() => void copyTo('project')}>
               {t('settings.editor.overrideInProject')}
             </Button>
@@ -567,7 +652,12 @@ export function SpecialistForm({
             </Button>
           ) : null}
           {specialist && source && !readOnly ? (
-            <Button variant="destructive" disabled={busy} onClick={() => void remove()}>
+            <Button
+              variant="destructive"
+              disabled={busy || removeBlocked}
+              title={removeBlocked ? removeBlockedReason : undefined}
+              onClick={() => void remove()}
+            >
               {removeLabel}
             </Button>
           ) : null}
@@ -592,6 +682,11 @@ export function SpecialistForm({
             </Button>
           </div>
         </div>
+      ) : null}
+      {removeBlocked && specialist ? (
+        <p className="text-sm text-muted-foreground" data-testid="delete-blocked">
+          {removeBlockedReason}
+        </p>
       ) : null}
       {readOnly ? <Alert role="status">{t('specialists.sharedReadOnly')}</Alert> : null}
       {notice ? <Alert role="status">{notice}</Alert> : null}
@@ -639,6 +734,7 @@ export function SpecialistForm({
           />
         </p>
       ) : null}
+      {sharedOnly && specialist ? <UsageBlock shared={sharedOnly} view={view} /> : null}
       <div className="@container">
         <div className="grid gap-3 @3xl:grid-cols-2">
           {SECTIONS.map((section) => (

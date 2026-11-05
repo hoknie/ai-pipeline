@@ -156,6 +156,17 @@ describe('aip web', () => {
       (await fetch(`${base}/api/runs/${runId}/groups/login?tail=0`, { headers: authed(web) }))
         .status,
     ).toBe(400);
+    const page = (await (
+      await fetch(`${base}/api/finished-runs?limit=5`, { headers: authed(web) })
+    ).json()) as { runs: RunView[]; next: string | null };
+    expect(page.runs.map((run) => run.id)).toContain(runId);
+    expect(page.next).toBeNull();
+    for (const query of ['limit=0', 'limit=101', 'before=garbage']) {
+      expect(
+        (await fetch(`${base}/api/finished-runs?${query}`, { headers: authed(web) })).status,
+      ).toBe(400);
+    }
+    expect((await fetch(`${base}/api/finished-runs`)).status).toBe(401);
     expect((await fetch(`${base}/api/runs/nope`, { headers: authed(web) })).status).toBe(404);
     expect(
       (await fetch(`${base}/api/runs/${runId}/groups/nope`, { headers: authed(web) })).status,
@@ -2215,5 +2226,53 @@ describe('createDaemonPanel', () => {
     } finally {
       await controller.close();
     }
+  });
+});
+
+describe('aip web shared specialists', () => {
+  it('needs the token, lists the usage and refuses to delete a used shared specialist', async () => {
+    h = await harness(MANUAL_CONFIG, { HOME: mkdtempSync(join(tmpdir(), 'aip-web-home-')) });
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const shared = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip', 'specialists');
+    mkdirSync(shared, { recursive: true });
+    writeFileSync(join(shared, 'qa.yaml'), 'name: QA\n');
+    writeFileSync(join(shared, 'writer.yaml'), 'name: Writer\n');
+    const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-web-lib-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', lib]);
+    mkdirSync(join(lib, 'aip', 'workflows'), { recursive: true });
+    writeFileSync(
+      join(lib, 'aip', 'workflows', 'feature.yaml'),
+      'steps:\n  - id: test\n    specialist: qa\n',
+    );
+    await fetch(`${base}/api/config?repository=${encodeURIComponent(lib)}`, {
+      headers: authed(web),
+    });
+    await fetch(`${base}/api/config`, { headers: authed(web) });
+
+    expect((await fetch(`${base}/api/shared-specialists`)).status).toBe(401);
+    const response = await fetch(`${base}/api/shared-specialists`, { headers: authed(web) });
+    expect(response.status).toBe(200);
+    const usage = (await response.json()) as {
+      specialists: { slug: string; projects: { repository: string }[] }[];
+    };
+    expect(usage.specialists.find((entry) => entry.slug === 'qa')?.projects).toEqual([
+      expect.objectContaining({ repository: lib }),
+    ]);
+    expect(usage.specialists.find((entry) => entry.slug === 'writer')?.projects).toEqual([]);
+
+    const revision = (await (
+      await fetch(`${base}/api/config`, { headers: authed(web) })
+    ).json()) as {
+      specialists: { slug: string; sources: { global?: { revision: string } } }[];
+    };
+    const qa = revision.specialists.find((entry) => entry.slug === 'qa')?.sources.global?.revision;
+    const refused = await fetch(
+      `${base}/api/config/specialists/qa?revision=${encodeURIComponent(qa ?? '')}&level=global`,
+      { method: 'DELETE', headers: authed(web) },
+    );
+    expect(refused.status).toBe(422);
+    const body = (await refused.json()) as { references: { repository?: string }[] };
+    expect(body.references).toEqual([expect.objectContaining({ repository: lib })]);
   });
 });

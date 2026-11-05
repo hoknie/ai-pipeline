@@ -59,6 +59,12 @@ export {
   type TagFileEdit,
   type TagPlan,
 } from './specialist-tags.ts';
+export {
+  sharedSpecialistUsage,
+  type SharedSpecialistProject,
+  type SharedSpecialistUsage,
+  type SharedSpecialistsUsage,
+} from './shared-specialists.ts';
 export { TAG_NAME_MAX } from './tag-names.ts';
 export { formatDuration, parseDuration } from './duration.ts';
 export {

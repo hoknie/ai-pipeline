@@ -377,6 +377,35 @@ export class Store {
   }
 
   /**
+   * A page of finished runs, newest created first, strictly after the cursor `before`;
+   * `more` tells whether older finished runs remain.
+   */
+  finishedRunsPage(
+    limit: number,
+    before?: { createdAt: number; id: string },
+  ): { runs: RunState[]; more: boolean } {
+    const rows = (
+      before
+        ? this.database
+            .prepare(
+              `SELECT * FROM runs WHERE finished_at IS NOT NULL
+                 AND (created_at < ? OR (created_at = ? AND id < ?))
+               ORDER BY created_at DESC, id DESC LIMIT ?`,
+            )
+            .all(before.createdAt, before.createdAt, before.id, limit + 1)
+        : this.database
+            .prepare(
+              'SELECT * FROM runs WHERE finished_at IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT ?',
+            )
+            .all(limit + 1)
+    ) as Row[];
+    return {
+      runs: rows.slice(0, limit).map((row) => this.hydrate(row)),
+      more: rows.length > limit,
+    };
+  }
+
+  /**
    * Marks what the old daemon left running as interrupted: active runs and finished runs whose
    * delivery had not finished. The returned effects (a restarted delivery) are for the daemon.
    */

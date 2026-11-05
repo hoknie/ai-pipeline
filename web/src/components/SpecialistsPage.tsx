@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
-import { Download, Plus, Users } from 'lucide-react';
+import { Download, ListFilter, Plus, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useConfirm } from '../confirm.tsx';
 import { notifySuccess } from '../notify.ts';
+import { useMediaQuery } from '../media.ts';
 import { usePreference } from '../preferences.ts';
 import {
   EMPTY_FILTER,
@@ -19,6 +20,8 @@ import { tagsOfSpecialist } from '../specialistTags.ts';
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.tsx';
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '../ui/sheet.tsx';
 import { Skeleton } from '../ui/skeleton.tsx';
 import type { Api } from '../api.ts';
 import type {
@@ -89,7 +92,8 @@ export default function SpecialistsPage({
   const [othersByRepository, setOthersByRepository] = usePreference<
     Record<string, Partial<Omit<SpecialistFilter, 'tags'>>>
   >('specialistFilters', {});
-  const [filtersOpen, setFiltersOpen] = usePreference('specialistFiltersOpen', false);
+  const wide = useMediaQuery('(min-width: 768px)');
+  const columns = useMediaQuery('(min-width: 1280px)');
   const [search, setSearch] = useState('');
   const repository = view?.repository ?? null;
   const options = useMemo(() => filterOptions(view?.specialists ?? []), [view]);
@@ -170,10 +174,46 @@ export default function SpecialistsPage({
 
   const specialist = view?.specialists.find((candidate) => candidate.slug === selected) ?? null;
   const shown = applyFilter(view?.specialists ?? [], filter, search);
-  const narrowed = activeFilterCount(filter) > 0 || search.trim() !== '';
+  const count = activeFilterCount(filter, search);
+  const narrowed = count > 0;
+  const filtersPanel = view ? (
+    <SpecialistFilters
+      filter={filter}
+      options={options}
+      search={search}
+      onFilter={setFilter}
+      onSearch={setSearch}
+    />
+  ) : null;
+  const filterButton = (
+    <Button variant="outline" size="sm" className="w-full justify-start">
+      <ListFilter />
+      {count > 0
+        ? t('specialists.filters.buttonCount', { count })
+        : t('specialists.filters.button')}
+    </Button>
+  );
+  const filtersControl =
+    !view || columns ? null : wide ? (
+      <Popover>
+        <PopoverTrigger asChild>{filterButton}</PopoverTrigger>
+        <PopoverContent className="w-80 p-3">{filtersPanel}</PopoverContent>
+      </Popover>
+    ) : (
+      <Sheet>
+        <SheetTrigger asChild>{filterButton}</SheetTrigger>
+        <SheetContent>
+          <SheetTitle>{t('specialists.filters.button')}</SheetTitle>
+          <SheetDescription className="sr-only">{t('specialists.filters.button')}</SheetDescription>
+          <div className="p-3">{filtersPanel}</div>
+        </SheetContent>
+      </Sheet>
+    );
 
   return (
     <SplitPage
+      filters={columns ? filtersPanel : null}
+      filtersLabel={t('specialists.filters.button')}
       side={
         <>
           {failure ? <Alert variant="destructive">{failure}</Alert> : null}
@@ -188,17 +228,7 @@ export default function SpecialistsPage({
               {t('specialists.import.open')}
             </Button>
           </div>
-          {view ? (
-            <SpecialistFilters
-              filter={filter}
-              options={options}
-              search={search}
-              open={filtersOpen}
-              onFilter={setFilter}
-              onSearch={setSearch}
-              onOpen={setFiltersOpen}
-            />
-          ) : null}
+          {filtersControl}
           {view && shown.length === 0 && narrowed ? (
             <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
               <p>{t('specialists.filters.nothing')}</p>

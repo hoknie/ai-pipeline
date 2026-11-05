@@ -584,6 +584,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
   };
   const base: Omit<Api, 'forRepository'> = {
     runs: vi.fn(async () => [runView()]),
+    finishedRuns: vi.fn(async () => ({ runs: [], next: null })),
     run: vi.fn(async () => {
       throw new ApiError(404, 'unknown run');
     }),
@@ -651,6 +652,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     catalog: vi.fn(async () => catalogView()),
     writeSpecialist: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteSpecialist: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
+    sharedSpecialists: vi.fn(async () => ({ directory: '/xdg/aip/specialists', specialists: [] })),
     specialistTags: vi.fn(async () => ({ folders: [] })),
     importSpecialists: vi.fn(async (_source: string, slugs: string[]) => ({
       ok: true as const,

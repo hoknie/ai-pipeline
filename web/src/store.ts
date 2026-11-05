@@ -48,6 +48,16 @@ export interface StreamedProcesses {
   error: string | null;
 }
 
+/** Loading of the finished runs the stream does not carry. */
+export interface HistoryState {
+  loading: boolean;
+  error: string | null;
+  /** No older runs are left. */
+  done: boolean;
+  /** Loads the next page; does nothing while a page is loading or when none is left. */
+  loadMore: () => void;
+}
+
 export function sortRuns(runs: Iterable<RunView>): RunView[] {
   return [...runs].sort((left, right) => {
     // A finished run waiting in the queue as a return item counts as unfinished.
@@ -164,6 +174,8 @@ export function useRuns(
   daemon: DaemonMismatch;
   /** The last `processes` event of the stream; null until one arrives. */
   streamedProcesses: StreamedProcesses | null;
+  /** Older finished runs, loaded page by page on demand. */
+  history: HistoryState;
 } {
   const [streamedProcesses, setStreamedProcesses] = useState<StreamedProcesses | null>(null);
   const [runs, setRuns] = useState<Map<string, RunView>>(new Map());
@@ -176,6 +188,14 @@ export function useRuns(
   const [tags, setTags] = useState<TagView[]>([]);
   // Runs fetched by id because the list (active and recent finished) lacks them.
   const [extra, setExtra] = useState<Map<string, RunView>>(new Map());
+  // Finished runs loaded page by page, and the cursor of the next page (undefined: none loaded yet).
+  const [history, setHistory] = useState<Map<string, RunView>>(new Map());
+  const [cursor, setCursor] = useState<string | null | undefined>(undefined);
+  const [paging, setPaging] = useState(false);
+  const [pagingError, setPagingError] = useState<string | null>(null);
+  const pagingRef = useRef(false);
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
   const [unknown, setUnknown] = useState<Set<string>>(new Set());
   const inFlight = useRef<Set<string>>(new Set());
   const openedRef = useRef(opened);
@@ -308,6 +328,7 @@ export function useRuns(
           return new Map(current).set(run.id, run);
         });
         setExtra((current) => (current.has(run.id) ? putRun(current, run) : current));
+        setHistory((current) => (current.has(run.id) ? putRun(current, run) : current));
       }
     };
     source.onerror = () => {
@@ -323,11 +344,36 @@ export function useRuns(
 
   const sorted = useMemo(() => {
     const all = new Map(extra);
+    for (const [id, run] of history) all.set(id, run);
     for (const [id, run] of runs) all.set(id, run);
     return sortRuns(all.values());
-  }, [runs, extra]);
+  }, [runs, extra, history]);
+  const loadMore = useCallback(() => {
+    if (pagingRef.current || cursorRef.current === null) return;
+    pagingRef.current = true;
+    setPaging(true);
+    setPagingError(null);
+    api
+      .finishedRuns(cursorRef.current)
+      .then((page) => {
+        setHistory((current) => page.runs.reduce((map, run) => putRun(map, run), current));
+        cursorRef.current = page.next;
+        setCursor(page.next);
+      })
+      .catch((error: unknown) => {
+        setPagingError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        pagingRef.current = false;
+        setPaging(false);
+      });
+  }, [api]);
+  const historyState = useMemo(
+    () => ({ loading: paging, error: pagingError, done: cursor === null, loadMore }),
+    [paging, pagingError, cursor, loadMore],
+  );
   const listed = opened !== null && runs.has(opened);
-  const known = opened !== null && (listed || extra.has(opened));
+  const known = opened !== null && (listed || extra.has(opened) || history.has(opened));
   const gone = opened !== null && unknown.has(opened);
   const openedState: OpenedState =
     opened === null ? null : known ? 'listed' : gone ? 'missing' : loaded ? 'loading' : null;
@@ -381,6 +427,7 @@ export function useRuns(
     runs: sorted,
     openedState,
     streamedProcesses,
+    history: historyState,
     connection,
     loaded,
     home,

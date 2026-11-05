@@ -184,6 +184,15 @@ export const requestSchema = z.discriminatedUnion('method', [
     params: z.object({ runId: z.string().min(1).optional() }).default({}),
   }),
   z.object({
+    method: z.literal('finished_runs'),
+    params: z
+      .object({
+        limit: z.number().int().min(1).max(100).default(15),
+        before: z.string().min(1).optional(),
+      })
+      .default({ limit: 15 }),
+  }),
+  z.object({
     method: z.literal('group'),
     params: z.object({ ...target, tailLines: z.number().int().min(1).max(500).optional() }),
   }),
@@ -259,6 +268,10 @@ export const requestSchema = z.discriminatedUnion('method', [
   }),
   z.object({
     method: z.literal('specialist_tags'),
+    params: z.object({}),
+  }),
+  z.object({
+    method: z.literal('shared_specialists'),
     params: z.object({}),
   }),
   z.object({

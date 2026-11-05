@@ -518,6 +518,11 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     { method: 'GET', pattern: /^\/api\/runs$/, handle: () => call('status', {}) },
     {
       method: 'GET',
+      pattern: /^\/api\/finished-runs$/,
+      handle: (_match, body) => call('finished_runs', body as { limit: number; before?: string }),
+    },
+    {
+      method: 'GET',
       pattern: new RegExp(`^/api/runs/${segment}$`),
       handle: ([runId]) => call('status', { runId: runId ?? '' }),
     },
@@ -668,6 +673,11 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           })) as ConfigEditResult,
         );
       },
+    },
+    {
+      method: 'GET',
+      pattern: /^\/api\/shared-specialists$/,
+      handle: () => call('shared_specialists', {}),
     },
     {
       method: 'GET',
@@ -1199,6 +1209,12 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         if (!Number.isInteger(tail) || tail < 1 || tail > 500)
           throw new HttpError(400, 'tail must be an integer from 1 to 500');
         body = { tail };
+      } else if (url.pathname === '/api/finished-runs') {
+        const limit = Number(url.searchParams.get('limit') ?? 15);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+          throw new HttpError(400, 'limit must be an integer from 1 to 100');
+        const before = url.searchParams.get('before');
+        body = { limit, ...(before ? { before } : {}) };
       } else if (url.pathname.endsWith('/transcript')) {
         body = transcriptQuery(url.searchParams);
       } else if (url.pathname.endsWith('/diff')) {
@@ -1213,6 +1229,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         !url.searchParams.get('repository');
       const repository =
         url.pathname.startsWith('/api/runs') ||
+        url.pathname === '/api/finished-runs' ||
         url.pathname.startsWith('/api/processes') ||
         url.pathname.startsWith('/api/specialist-tags') ||
         ownRepository

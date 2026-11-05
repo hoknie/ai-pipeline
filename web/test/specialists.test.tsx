@@ -787,12 +787,11 @@ describe('specialist filters', () => {
       ],
     });
   const rows = () =>
-    within(screen.getByRole('list', { name: 'specialists' }))
-      .getAllByRole('listitem')
+    within(screen.getByRole('list', { name: 'specialists', hidden: true }))
+      .getAllByRole('listitem', { hidden: true })
       .map((row) => row.textContent ?? '');
   const openPanel = async () => {
-    const button = await screen.findByRole('button', { name: /^Filters/ });
-    if (button.getAttribute('aria-expanded') !== 'true') fireEvent.click(button);
+    await screen.findByRole('complementary', { name: 'Filters' });
   };
   const pick = async (label: string, name: string) => {
     await openPanel();
@@ -830,8 +829,65 @@ describe('specialist filters', () => {
     await pick('Commands', 'npm test*');
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(rows()[0]).toContain('coder');
-    expect(screen.getByRole('button', { name: 'Filters (2)' })).toBeTruthy();
     expect(window.localStorage.getItem('aip.web.specialistFilters')).toContain('npm test*');
+  });
+
+  it('shows the filters in a column without a button in a wide window', async () => {
+    render(<Page api={api()} />);
+    const column = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(within(column).getByRole('searchbox', { name: 'Search specialists' })).toBeTruthy();
+    expect(within(column).getByRole('radio', { name: 'Project only' })).toBeTruthy();
+    expect(within(column).getByRole('combobox', { name: 'Runtimes' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
+  });
+
+  describe.each([
+    ['popover', 1100],
+    ['sheet', 600],
+  ])('behind a button (%s)', (_name, width) => {
+    const original = window.matchMedia;
+    beforeEach(() => {
+      window.matchMedia = ((query: string) => ({
+        matches:
+          (/min-width: (\d+)px/.test(query) ? Number(/(\d+)px/.exec(query)![1]) : 0) <= width,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })) as unknown as typeof window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = original;
+    });
+
+    it('opens the filters from the button and narrows the list', async () => {
+      render(<Page api={api()} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+      expect(screen.queryByRole('complementary', { name: 'Filters' })).toBeNull();
+      fireEvent.change(await screen.findByRole('searchbox', { name: 'Search specialists' }), {
+        target: { value: 'cod' },
+      });
+      expect(rows()).toHaveLength(1);
+      expect(screen.getByRole('button', { name: 'Filters (1)', hidden: true })).toBeTruthy();
+    });
+
+    it('counts the saved filters on the button', async () => {
+      window.localStorage.setItem(
+        'aip.web.specialistFilters',
+        JSON.stringify({ '/repo': { level: 'project', runtimes: ['claude'], models: ['opus'] } }),
+      );
+      render(<Page api={api()} />);
+      expect(await screen.findByRole('button', { name: 'Filters (3)' })).toBeTruthy();
+    });
+
+    it('chooses a value inside the panel and narrows the list', async () => {
+      render(<Page api={api()} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+      fireEvent.click(await screen.findByRole('combobox', { name: 'Runtimes' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'opencode' }));
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+      await waitFor(() => expect(rows()).toHaveLength(1));
+      expect(rows()[0]).toContain('plan');
+    });
   });
 
   it('shows field values without a group heading', async () => {
@@ -904,12 +960,11 @@ describe('specialist tags', () => {
       ],
     });
   const listRows = () =>
-    within(screen.getByRole('list', { name: 'specialists' }))
-      .getAllByRole('listitem')
+    within(screen.getByRole('list', { name: 'specialists', hidden: true }))
+      .getAllByRole('listitem', { hidden: true })
       .map((row) => row.textContent ?? '');
   const openPanel = async () => {
-    const button = await screen.findByRole('button', { name: /^Filters/ });
-    if (button.getAttribute('aria-expanded') !== 'true') fireEvent.click(button);
+    await screen.findByRole('complementary', { name: 'Filters' });
   };
   const pick = async (name: string, label = 'Tags') => {
     await openPanel();

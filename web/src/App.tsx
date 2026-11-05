@@ -98,6 +98,7 @@ function Panel({
     daemon,
     openedState,
     streamedProcesses,
+    history,
   } = useRuns(api, openStream, chosen, route.view === 'runs' ? route.run : null, notifyError);
   // Every request names its repository, so it never depends on the server's default.
   const scopedApi = useMemo(() => api.forRepository(selected), [api, selected]);
@@ -363,6 +364,16 @@ function Panel({
               api={scopedApi}
               scope={settingsLocationOf(route.group, route.run).scope}
               group={settingsLocationOf(route.group, route.run).group}
+              specialist={route.step}
+              onSelectSpecialist={(slug) =>
+                setRoute({
+                  view: 'settings',
+                  run: 'specialists',
+                  group: 'global',
+                  step: slug,
+                  tab: null,
+                })
+              }
               repository={selected}
               repositories={repositories}
               onSelectRepository={(path) => void selectRepository(path)}
@@ -436,6 +447,7 @@ function Panel({
             scope={scope}
             onScope={setScope}
             onSubtask={queue ? openSubtask : undefined}
+            history={history}
           />
         )}
       </AppShell>

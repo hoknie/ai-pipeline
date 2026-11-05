@@ -17,6 +17,7 @@ describe('groups of settings', () => {
       'agents',
       'delivery',
       'runtimes',
+      'specialists',
       'system',
     ]);
     expect(SETTINGS_GROUPS_BY_SCOPE.project).toEqual([
@@ -110,6 +111,25 @@ describe('settings addresses', () => {
     expect(parseRoute('#settings/tags')).toEqual(route('tags', 'project'));
     expect(parseRoute('#settings/global/tags')).toEqual(route('tags', 'project'));
     expect(formatRoute(route('tags', 'project'))).toBe('#settings/project/tags');
+  });
+
+  it('keeps the shared specialist in the address of its group only', () => {
+    expect(parseRoute('#settings/global/specialists/qa')).toEqual({
+      ...route('specialists', 'global'),
+      step: 'qa',
+    });
+    expect(parseRoute('#settings/global/specialists/new').step).toBe('new');
+    expect(parseRoute('#settings/global/specialists').step).toBeNull();
+    expect(parseRoute('#settings/global/delivery/qa').step).toBeNull();
+    // the project tab has no such group
+    expect(parseRoute('#settings/project/specialists')).toEqual(route('general', 'project'));
+    expect(formatRoute({ ...route('specialists', 'global'), step: 'qa' })).toBe(
+      '#settings/global/specialists/qa',
+    );
+    expect(formatRoute(route('specialists', 'global'))).toBe('#settings/global/specialists');
+    expect(formatRoute({ ...route('delivery', 'global'), step: 'qa' })).toBe(
+      '#settings/global/delivery',
+    );
   });
 
   it('sends the former general settings address to the settings page', () => {

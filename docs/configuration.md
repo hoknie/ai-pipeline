@@ -276,6 +276,7 @@ Sets how the `claude` runtime gets the `edit` level:
 | `timeout` | a duration: `90s`, `30m`, `2h` | `30m` |
 | `allow_commands` | a list of command patterns | `[]` |
 | `tools` | a list of runtime tools on top of the set for the permission level | `[]` |
+| `mcp` | MCP servers of this specialist, `claude` runtime only | none |
 
 ## Specialists
 
@@ -318,6 +319,18 @@ prompt: |
 - `model` is a model name in the runtime's format: `opus`, `sonnet` or a full id for Claude; `provider/model` for OpenCode. Without `model` the runtime's default model is used.
 - `skills` tells the specialist to use these skills. If a skill is not found in the runtime's directories (`.claude/skills`, `~/.claude/skills`, `~/.config/opencode/skills` and so on), a warning goes to the step log and the step still starts.
   - The panel suggests skills from the same directories (`SKILL.md` in subdirectories, and command files `.md`, nested ones as `directory:command`) and marks whether each comes from the repository or the home directory.
+- `mcp` starts MCP servers for this specialist only, next to the `aip` server. Other specialists do not get them, which is the difference from `claude.mcp: inherit`.
+  - Each key is a server name: letters, digits, `-` and `_`; `aip` is reserved. `command` is required (a command name or an absolute path), `args` and `env` are optional.
+  - All tools of these servers run without a permission request.
+  - The values, `env` included, are stored in the run snapshot and in the `mcp.json` of the attempt, so pass secrets some other way.
+
+  ```yaml
+  mcp:
+    code-graph:
+      command: /usr/local/bin/code-graph
+      args: [--read-only]
+  ```
+
 - `tools` are Claude tools added to the set for the permission level (see below), for example `WebFetch`, `WebSearch` or `Task`. A value on a specialist replaces the value from `defaults`. The panel suggests names from the catalog: Claude's built-in tools and the `mcp__<server>` servers from the repository's `.mcp.json` and `~/.claude.json`. A value that is not in the catalog is typed by hand.
 - `prompt`: every `%s` is replaced by the group's task, and `%%` gives a literal `%`. If there is no `%s`, the task is added as a separate paragraph. Without `prompt` the specialist gets only the task.
 

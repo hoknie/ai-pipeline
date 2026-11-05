@@ -31,9 +31,15 @@ import { RunHeader } from './RunHeader.tsx';
 import { RunFilters } from './RunFilters.tsx';
 import type { OpenedState } from '../../store.ts';
 import { RunList } from './RunList.tsx';
+import type { HistoryState } from '../../store.ts';
 import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
 
 /** The runs section: filters, the list of runs and the open run with its group; filters sit in a column from 1280 px and behind a button below. */
+function moreOf(history: HistoryState | undefined): 'idle' | 'loading' | 'error' | 'done' {
+  if (!history || history.done) return 'done';
+  return history.error !== null ? 'error' : history.loading ? 'loading' : 'idle';
+}
+
 export function RunsPage({
   api,
   runs,
@@ -54,6 +60,7 @@ export function RunsPage({
   scope,
   onScope,
   onSubtask,
+  history,
 }: {
   api: Api;
   runs: RunView[];
@@ -76,6 +83,8 @@ export function RunsPage({
   scope: RunScope;
   /** Opens a new task as a child of the run; absent while the queue is unknown. */
   onSubtask?: (run: RunView) => void;
+  /** Loading of older finished runs; without it the list is all there is. */
+  history?: HistoryState;
   onScope: (scope: RunScope) => void;
 }) {
   const { t } = useTranslation();
@@ -197,6 +206,8 @@ export function RunsPage({
         repository={repository}
         tagIds={tagIds}
         onTagIds={setStoredTags}
+        more={moreOf(history)}
+        onMore={history?.loadMore}
       />
     )
   ) : (

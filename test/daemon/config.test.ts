@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -462,5 +470,101 @@ describe('config catalog', () => {
     ]);
     expect(catalog.runtimes.claude.tools.map((t) => t.name)).toContain('mcp__jira');
     expect(readFileSync(coderFile(h), 'utf8')).toBe(before);
+  });
+});
+
+describe('shared specialists', () => {
+  const sharedDir = (h: Harness) => join(h.repo, '..', 'xdg', 'aip');
+
+  function put(path: string, text: string): void {
+    mkdirSync(join(path, '..'), { recursive: true });
+    writeFileSync(path, text);
+  }
+
+  /** A second repository of the registry, with a project workflow that needs the shared `qa`. */
+  async function registryWithLib(h: Harness): Promise<string> {
+    const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-lib-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', lib]);
+    put(
+      join(lib, 'aip', 'workflows', 'feature.yaml'),
+      'steps:\n  - id: test\n    specialist: qa\n',
+    );
+    put(join(sharedDir(h), 'specialists', 'qa.yaml'), 'name: QA\n');
+    put(join(sharedDir(h), 'specialists', 'writer.yaml'), 'name: Writer\n');
+    // naming a repository registers it
+    await h.call('config', { repository: lib });
+    await view(h);
+    return lib;
+  }
+
+  type Usage = {
+    directory: string;
+    specialists: {
+      slug: string;
+      projects: { repository: string; references: unknown[] }[];
+      global: unknown[];
+    }[];
+  };
+
+  it('reports the repositories of the registry that need each shared specialist', async () => {
+    const h = await start();
+    const lib = await registryWithLib(h);
+    const usage = (await h.call('shared_specialists', {})) as Usage;
+    expect(usage.directory).toBe(join(sharedDir(h), 'specialists'));
+    expect(usage.specialists.map((entry) => entry.slug)).toEqual(['qa', 'writer']);
+    const [qa, writer] = usage.specialists;
+    expect(qa?.global).toEqual([]);
+    expect(qa?.projects).toEqual([
+      { repository: lib, references: [{ workflow: 'feature', step: 'test' }] },
+    ]);
+    expect(writer?.projects).toEqual([]);
+  });
+
+  it('refuses to delete a shared specialist another repository needs', async () => {
+    const h = await start();
+    const lib = await registryWithLib(h);
+    const qa = join(sharedDir(h), 'specialists', 'qa.yaml');
+    const result = (await h.call('config_delete', {
+      repository: h.repo,
+      kind: 'specialist',
+      id: 'qa',
+      revision: revisionOf(readFileSync(qa, 'utf8'))!,
+      level: 'global',
+    })) as ConfigEditResult;
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+      references: [{ workflow: 'feature', step: 'test', repository: lib }],
+    });
+    expect(existsSync(qa)).toBe(true);
+  });
+
+  it('deletes an unused shared specialist and lets a project override go', async () => {
+    const h = await start();
+    const lib = await registryWithLib(h);
+    const writer = join(sharedDir(h), 'specialists', 'writer.yaml');
+    const removed = (await h.call('config_delete', {
+      repository: h.repo,
+      kind: 'specialist',
+      id: 'writer',
+      revision: revisionOf(readFileSync(writer, 'utf8'))!,
+      level: 'global',
+    })) as ConfigEditResult;
+    expect(removed.ok).toBe(true);
+    expect(existsSync(writer)).toBe(false);
+
+    // an override in the project makes the project independent of the shared file
+    put(join(lib, 'aip', 'specialists', 'qa.yaml'), 'name: Own QA\n');
+    const usage = (await h.call('shared_specialists', {})) as Usage;
+    expect(usage.specialists.find((entry) => entry.slug === 'qa')?.projects).toEqual([]);
+    const qa = join(sharedDir(h), 'specialists', 'qa.yaml');
+    const gone = (await h.call('config_delete', {
+      repository: h.repo,
+      kind: 'specialist',
+      id: 'qa',
+      revision: revisionOf(readFileSync(qa, 'utf8'))!,
+      level: 'global',
+    })) as ConfigEditResult;
+    expect(gone.ok).toBe(true);
   });
 });

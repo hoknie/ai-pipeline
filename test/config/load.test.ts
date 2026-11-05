@@ -219,6 +219,34 @@ describe('validation', () => {
     expectError(errors, 'swarm.workflows.f.steps', 'required');
   });
 
+  it('reads the MCP servers of a specialist', () => {
+    const config = parseConfig(
+      'swarm:\n  specialists:\n    plan:\n      name: P\n      mcp:\n        code-graph:\n          command: /bin/graph\n          args: [--scout]\n          env: { A: b }\n    coder: { name: C }\n',
+    );
+    expect(findSpecialist(config, 'plan')?.mcp).toEqual({
+      'code-graph': { command: '/bin/graph', args: ['--scout'], env: { A: 'b' } },
+    });
+    expect(findSpecialist(config, 'coder')?.mcp).toBeUndefined();
+  });
+
+  it('rejects wrong MCP servers of a specialist', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    a:\n      name: A\n      mcp:\n        aip: { command: x }\n        "b c": { command: x }\n        d: { args: [] }\n        e: { command: bin/x }\n        f: { command: x, url: y }\n',
+    );
+    expectError(errors, 'swarm.specialists.a.mcp.aip', 'reserved');
+    expectError(errors, 'swarm.specialists.a.mcp.b c', 'letters');
+    expectError(errors, 'swarm.specialists.a.mcp.d.command', 'required');
+    expectError(errors, 'swarm.specialists.a.mcp.e.command', 'absolute path');
+    expectError(errors, 'swarm.specialists.a.mcp.f.url', 'unknown key');
+  });
+
+  it('allows MCP servers of a specialist only on the claude runtime', () => {
+    const errors = errorsOf(
+      'swarm:\n  specialists:\n    a: { name: A, runtime: opencode, mcp: { g: { command: x } } }\n',
+    );
+    expectError(errors, 'swarm.specialists.a.mcp', 'claude runtime');
+  });
+
   it('requires the swarm root', () => {
     expectError(errorsOf('other: 1\n'), 'swarm', 'required');
   });

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { workflowNameOf, type DeliveryMode, type SpecialistTagFolder } from '../config/index.ts';
+import {
+  workflowNameOf,
+  type DeliveryMode,
+  type SharedSpecialistUsage,
+  type SharedSpecialistsUsage,
+  type SpecialistTagFolder,
+} from '../config/index.ts';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
   allGroups,
@@ -951,6 +957,10 @@ export interface SpecialistTagFolderView extends SpecialistTagFolder {
 export interface SpecialistTagsView {
   folders: SpecialistTagFolderView[];
 }
+
+/** The shared specialists with the repositories of the registry that use them. */
+export type SharedSpecialistsView = SharedSpecialistsUsage;
+export type SharedSpecialistView = SharedSpecialistUsage;
 
 /** The outcome of a tag edit: the folder of the level as it is now, or why nothing was written. */
 export type SpecialistTagsResult =

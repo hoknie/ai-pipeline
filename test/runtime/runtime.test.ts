@@ -150,6 +150,40 @@ describe('claude adapter', () => {
     ]);
   });
 
+  it('starts the MCP servers of the specialist next to aip and allows their tools', () => {
+    const mcp = { graph: { command: '/bin/graph', args: ['--scout'], env: { A: 'b' } } };
+    const between = (args: string[]) =>
+      args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools'));
+    for (const claudeEditMode of ['allowlist', 'accept_edits', 'auto'] as const) {
+      for (const permissions of ['read', 'edit'] as const) {
+        const launch = runtime.buildLaunch(
+          context({ claudeEditMode, specialist: specialist({ permissions, mcp }) }),
+        );
+        expect(between(launch.args)).toContain('mcp__graph');
+        const config = JSON.parse(launch.files[0]?.content ?? '') as {
+          mcpServers: Record<string, unknown>;
+        };
+        expect(config.mcpServers.graph).toEqual({ type: 'stdio', ...mcp.graph });
+        expect(Object.keys(config.mcpServers).sort()).toEqual(['aip', 'graph']);
+      }
+    }
+  });
+
+  it('keeps --strict-mcp-config for a specialist with its own servers', () => {
+    const mcp = { graph: { command: 'graph', args: [], env: {} } };
+    const launch = runtime.buildLaunch(context({ specialist: specialist({ mcp }) }));
+    expect(launch.args).toContain('--strict-mcp-config');
+  });
+
+  it('adds nothing for a specialist without its own servers', () => {
+    const launch = runtime.buildLaunch(context());
+    const config = JSON.parse(launch.files[0]?.content ?? '') as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(Object.keys(config.mcpServers)).toEqual(['aip']);
+    expect(launch.args.filter((arg) => arg === 'mcp__graph')).toEqual([]);
+  });
+
   it('allows the queue tool only to a specialist with queue', () => {
     const between = (args: string[]) =>
       args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools'));

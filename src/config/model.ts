@@ -42,6 +42,13 @@ export interface Defaults {
 /** Where a specialist is defined: the global aip/ directory only, or the project one. */
 export type SpecialistLevel = 'global' | 'project';
 
+/** An MCP server started for one specialist, next to the `aip` server. */
+export interface McpServer {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
 export interface Specialist {
   slug: string;
   name: string;
@@ -51,6 +58,8 @@ export interface Specialist {
   timeoutSeconds: number;
   allowCommands: string[];
   tools: string[];
+  /** MCP servers of this specialist by name; absent when there are none. */
+  mcp?: Record<string, McpServer>;
   skills: string[];
   prompt: string | null;
   /** Limit of simultaneously running specialists with this slug; null means no limit. */

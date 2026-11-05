@@ -9,6 +9,7 @@ import {
   ConfigLoadError,
   type ConfigPaths,
   type EditRequest,
+  type EntryReference,
   commitEdit,
   commitEdits,
   tagFolder,
@@ -27,6 +28,7 @@ import {
   findWorkflow,
   loadConfig,
   planSettings,
+  sharedSpecialistUsage,
   socketPath,
   workflowNameOf,
   type DeliveryMode,
@@ -157,6 +159,7 @@ import {
   type SpecialistTagFolderView,
   type SpecialistTagsResult,
   type SpecialistTagsView,
+  type SharedSpecialistsView,
   type SpecialistsImportResult,
   type ConfigPreview,
   type ConfigCatalogResponse,
@@ -1635,6 +1638,8 @@ export class Daemon {
         return this.serial(() => this.enqueueRun(request.params));
       case 'status':
         return Promise.resolve(this.status(request.params.runId));
+      case 'finished_runs':
+        return Promise.resolve(this.finishedRuns(request.params));
       case 'group':
         return Promise.resolve(this.group(request.params));
       case 'group_spec':
@@ -1673,6 +1678,8 @@ export class Daemon {
         return this.configPreview(request.params);
       case 'specialist_tags':
         return Promise.resolve(this.specialistTags());
+      case 'shared_specialists':
+        return Promise.resolve(this.sharedSpecialists());
       case 'specialist_tags_set':
         return this.specialistTagEdit(request.params.repository, (paths, level) =>
           planTagsSet(
@@ -2252,6 +2259,26 @@ export class Daemon {
       .map((stored) => this.view(this.states.get(stored.run.id) ?? stored, now));
   }
 
+  /** A page of finished runs after the cursor `<created_at>.<id>`; `next` is null at the end. */
+  private finishedRuns(params: { limit: number; before?: string | undefined }): unknown {
+    let before: { createdAt: number; id: string } | undefined;
+    if (params.before !== undefined) {
+      const match = /^(\d+)\.(.+)$/.exec(params.before);
+      if (!match) throw new Rejection('before is not a valid cursor');
+      before = { createdAt: Number(match[1]), id: match[2] ?? '' };
+    }
+    const now = this.now();
+    const page = this.store.finishedRunsPage(params.limit, before);
+    const runs = page.runs.map((stored) =>
+      this.view(this.states.get(stored.run.id) ?? stored, now),
+    );
+    const last = page.runs.at(-1);
+    return {
+      runs,
+      next: page.more && last ? `${last.run.createdAt}.${last.run.id}` : null,
+    };
+  }
+
   /**
    * Whole specialists of the current configuration of the run's repository; a configuration that
    * does not load or pass validation refuses the request.
@@ -2319,9 +2346,36 @@ export class Daemon {
       throw error;
     }
     if (!plan.ok) return plan;
+    if (edit.kind === 'specialist' && edit.value === null && edit.level === 'global') {
+      const references = this.sharedUsageOf(repository, edit.id);
+      if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };
+    }
     const result = { ok: true as const, ...commitEdit(plan) };
     this.republishQueue(repository);
     return result;
+  }
+
+  /** The shared specialists with the repositories of the registry that need them. */
+  private sharedSpecialists(): SharedSpecialistsView {
+    const roots = this.repositoryList().map((entry) => entry.path);
+    return sharedSpecialistUsage(
+      this.configPathsOf('/'),
+      roots.map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
+    );
+  }
+
+  /** References to a shared specialist from the registry and the requesting repository. */
+  private sharedUsageOf(repository: string, slug: string): EntryReference[] {
+    const roots = new Set(this.repositoryList().map((entry) => entry.path));
+    roots.add(repository);
+    const usage = sharedSpecialistUsage(
+      this.configPathsOf('/'),
+      [...roots].map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
+      slug,
+    ).specialists[0];
+    return (usage?.projects ?? []).flatMap((project) =>
+      project.references.map((reference) => ({ ...reference, repository: project.repository })),
+    );
   }
 
   private tagFolderOf(repository: string | null): SpecialistTagFolderView {

@@ -62,6 +62,7 @@ export function presentConfig(config: ResolvedConfig): unknown {
           timeout: formatDuration(specialist.timeoutSeconds),
           allow_commands: specialist.allowCommands,
           ...(specialist.tools.length > 0 ? { tools: specialist.tools } : {}),
+          ...(specialist.mcp ? { mcp: Object.keys(specialist.mcp) } : {}),
           skills: specialist.skills,
           ...(specialist.prompt ? { prompt: specialist.prompt } : {}),
           ...(specialist.max !== null ? { max: specialist.max } : {}),

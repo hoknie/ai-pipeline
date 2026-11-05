@@ -6,7 +6,7 @@ export type SettingsScope = (typeof SETTINGS_SCOPES)[number];
 
 /** Groups of the settings page, per tab, in the order of the column on the left. */
 export const SETTINGS_GROUPS_BY_SCOPE = {
-  global: ['general', 'agents', 'delivery', 'runtimes', 'system'],
+  global: ['general', 'agents', 'delivery', 'runtimes', 'specialists', 'system'],
   project: ['general', 'agents', 'delivery', 'queue', 'tags'],
 } as const;
 

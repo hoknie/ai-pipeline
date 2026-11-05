@@ -18,9 +18,11 @@ export interface Route {
 }
 
 /** The settings route of `#settings/<tab>/<group>`, or of an old `#settings/<group>`. */
-function settingsRoute(first: string | null, second: string | null): Route {
+function settingsRoute(first: string | null, second: string | null, third: string | null): Route {
   const { scope, group } = settingsLocationOf(first, second);
-  return { view: 'settings', run: group, group: scope, step: null, tab: null };
+  // a shared specialist (or `new`) of the group «Specialists» is the third part
+  const step = scope === 'global' && group === 'specialists' ? third : null;
+  return { view: 'settings', run: group, group: scope, step, tab: null };
 }
 
 const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : null);
@@ -38,10 +40,10 @@ export function parseRoute(hash: string): Route {
     return { view: 'workflows', run: decode(rest[0]), group: null, step: null, tab: null };
   if (head === 'specialists') {
     // the former «General settings» entry of the specialists list
-    if (decode(rest[0]) === '_settings') return settingsRoute(null, null);
+    if (decode(rest[0]) === '_settings') return settingsRoute(null, null, null);
     return { view: 'specialists', run: decode(rest[0]), group: null, step: null, tab: null };
   }
-  if (head === 'settings') return settingsRoute(decode(rest[0]), decode(rest[1]));
+  if (head === 'settings') return settingsRoute(decode(rest[0]), decode(rest[1]), decode(rest[2]));
   if (head === 'runs') {
     return {
       view: 'runs',
@@ -64,7 +66,8 @@ export function formatRoute(route: Route): string {
     const place = settingsLocationOf(route.group, route.run);
     // an old route with the group only (`run`) leads to its new place
     const { scope, group } = route.group === null ? settingsLocationOf(route.run, null) : place;
-    return `#settings/${scope}/${group}`;
+    const slug = scope === 'global' && group === 'specialists' ? route.step : null;
+    return `#settings/${scope}/${group}${slug === null ? '' : `/${enc(slug)}`}`;
   }
   if (route.view === 'workflows') return route.run ? `#pipelines/${enc(route.run)}` : '#pipelines';
   if (!route.run) return '#runs';

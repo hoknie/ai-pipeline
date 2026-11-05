@@ -159,7 +159,14 @@ On "Shared" the block shows the shared file and a note that it applies to every 
 The groups "Queue" and "Tags" show no file.
 Without repositories "Project" shows only a note and no groups.
 
-The groups of "Shared" are "General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", "System" and "Tags". The groups of "Project" are "General", "Agents", "Delivery" and "Queue". Fields of `web.*` and `runtimes.*` exist only on "Shared".
+The groups of "Shared" are "General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", "Specialists" and "System". The groups of "Project" are "General", "Agents", "Delivery" and "Queue". Fields of `web.*` and `runtimes.*` exist only on "Shared".
+
+The group "Specialists" of "Shared" edits the shared specialists: the files of the shared `specialists/` directory.
+
+- A list on the left and a form on the right, as in the section "Specialists". Every field can be changed, and the form saves to the shared file; there is no level switch.
+- The block "Used in projects" shows the number of repositories where the specialist is used and the list of them, with the workflow and step, `split` or delivery field that refer to it. References from the shared workflows and shared `delivery.*` get a separate line "Shared level".
+- A specialist is used in a repository when the configuration of the repository refers to it and the repository has no project file with the same name.
+- "Delete" stays disabled while the specialist is used anywhere. The daemon checks this too, and refuses with the references and the repositories they come from.
 
 The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery` or `#settings/project/queue`. An unknown group opens "General" of the tab. The addresses of earlier versions (`#settings/<group>`, `#specialists/_settings`) open the matching group of the new layout.
 
@@ -216,6 +223,9 @@ The background processes arrive in the `processes` event of `/api/events`: the d
 
 ## HTTP API
 
+- `GET /api/finished-runs?limit=<n>&before=<cursor>` returns a page of finished runs, newest created first: `{runs, next}`. The panel loads older runs with it while the run list is scrolled.
+  - `limit` is an integer from 1 to 100 (15 by default). `before` is the `next` of the previous page; leave it out for the first page. `next` is `null` on the last page.
+  - A `limit` out of range or a `before` that is not a cursor is answered with 400.
 - `GET /api/runs/<id>/groups/<group>/diff?path=<file>` returns the diff of one changed file of a group: `{path, previousPath, binary, lines, totalLines, truncated}`.
   - `lines` start at the first hunk and carry five lines of context around each change. A diff over 2000 lines is cut (`truncated`). A binary file has no lines.
   - A missing `path` is answered with 400, a file the group did not change with 404, a diff that cannot be read any more with 409.

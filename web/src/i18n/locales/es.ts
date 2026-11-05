@@ -184,6 +184,9 @@ export const es: Dictionary = {
       active: 'Activas',
       done: 'Terminadas',
       empty: 'No se encontró nada',
+      loadingMore: 'Cargando ejecuciones anteriores…',
+      moreFailed: 'No se pudieron cargar las ejecuciones anteriores.',
+      retry: 'Reintentar',
       reset: 'Restablecer',
       progress: 'Progreso de la ejecución',
       filters: 'Filtros',
@@ -949,6 +952,25 @@ export const es: Dictionary = {
       createCopy: 'Crear una copia',
     },
   },
+  sharedSpecialists: {
+    list: 'Especialistas compartidos',
+    search: 'Buscar por slug o nombre',
+    empty: 'Aún no hay especialistas compartidos',
+    nothing: 'No se encontró nada',
+    tags: 'Las etiquetas de un especialista compartido aquí solo se muestran, no se cambian.',
+    usage: {
+      title: 'Usado en proyectos',
+      count: 'Proyectos: {{count}}',
+      none: 'No se usa en ningún proyecto',
+      shared: 'Nivel compartido',
+      loading: 'Cargando el uso…',
+      error: 'No se pudo cargar el uso: {{message}}',
+      blocked:
+        'No se puede eliminar mientras el especialista se use: quite antes sus referencias o sustitúyalo con un archivo de proyecto en cada proyecto.',
+      waiting: 'No se puede eliminar hasta que se cargue el uso.',
+      repository: 'Repositorio {{path}}',
+    },
+  },
   settingsPage: {
     groups: 'grupos de ajustes',
     hasErrors: 'el grupo tiene errores de configuración',
@@ -997,6 +1019,7 @@ export const es: Dictionary = {
       agents: 'Agentes',
       delivery: 'Entrega',
       runtimes: 'Ejecutores',
+      specialists: 'Especialistas',
       system: 'Sistema',
       queue: 'Cola',
       tags: 'Etiquetas',
@@ -1009,6 +1032,8 @@ export const es: Dictionary = {
         'Adónde va el resultado de una ejecución, cómo se confirma y quién resuelve los conflictos.',
       runtimes:
         'Comandos, argumentos y variables de entorno de los CLI de agentes. Los valores de las variables nunca se muestran.',
+      specialists:
+        'Especialistas compartidos: archivos del directorio compartido, disponibles en todos los repositorios. Aquí se puede cambiar cualquier campo.',
       system:
         'Dirección y acceso del panel web, estado del daemon y del panel, su reinicio, y la detención y el inicio del daemon.',
       queue:

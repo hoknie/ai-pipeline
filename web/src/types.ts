@@ -3,6 +3,8 @@ export type {
   CatalogEntry,
   ConfigCatalogResponse,
   ConfigEditResult,
+  SharedSpecialistView,
+  SharedSpecialistsView,
   SpecialistTagFolderView,
   SpecialistTagsResult,
   SpecialistTagsView,

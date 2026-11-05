@@ -88,3 +88,13 @@ describe('specialist filters', () => {
     ).toBe(3);
   });
 });
+
+describe('activeFilterCount with a search', () => {
+  it('counts a non-empty search once and ignores spaces', () => {
+    expect(activeFilterCount(EMPTY_FILTER, 'cod')).toBe(1);
+    expect(activeFilterCount(EMPTY_FILTER, '   ')).toBe(0);
+    expect(
+      activeFilterCount({ ...EMPTY_FILTER, level: 'global', tags: ['a', 'b'], models: ['m'] }),
+    ).toBe(3);
+  });
+});

@@ -1,4 +1,5 @@
 import { SearchX } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cost, diffText, runTimes, runTitle, taskNumber, usageText } from '../../format.ts';
@@ -6,10 +7,12 @@ import { useLocale } from '../../i18n/index.ts';
 import { cn } from '../../lib/cn.ts';
 import { repositoryLabel } from '../../repositories.ts';
 import { runStatusLabel } from '../../status.ts';
+import { useNearEnd } from '../../useNearEnd.ts';
 import type { RunView } from '../../types.ts';
 import { useTags } from '../../tags.tsx';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
+import { Skeleton } from '../../ui/skeleton.tsx';
 import { orderEntries } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { entryBadge } from './RunStatuses.tsx';
@@ -38,6 +41,8 @@ export function RunList({
   tagIds,
   onTagIds,
   filters = true,
+  more = 'done',
+  onMore = () => undefined,
 }: {
   runs: RunView[];
   selectedRun: string | null;
@@ -58,6 +63,10 @@ export function RunList({
   onTagIds: (ids: string[]) => void;
   /** Whether the filters stand above the list; false when the page shows them elsewhere. */
   filters?: boolean;
+  /** Older finished runs: more to load (`idle`), loading, failed, or none left (`done`). */
+  more?: 'idle' | 'loading' | 'error' | 'done';
+  /** Loads the next page of older runs; also the retry after an error. */
+  onMore?: () => void;
 }) {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -65,6 +74,27 @@ export function RunList({
   const only = scope === 'repository' ? repository : null;
   const shown = filterRuns(runs, query, filter, only, tagIds, byId);
   const filtered = activeFilters(query, filter, tagIds) > 0;
+  const [marker, setMarker] = useState<HTMLElement | null>(null);
+  useNearEnd(more === 'idle' ? marker : null, onMore, runs.length);
+  const tail =
+    more === 'done' ? null : more === 'error' ? (
+      <div role="alert" className="flex flex-col items-start gap-2 text-sm text-destructive">
+        {t('runs.list.moreFailed')}
+        <Button variant="outline" size="sm" onClick={onMore}>
+          {t('runs.list.retry')}
+        </Button>
+      </div>
+    ) : (
+      <div
+        ref={setMarker}
+        role={more === 'loading' ? 'status' : undefined}
+        aria-label={more === 'loading' ? t('runs.list.loadingMore') : undefined}
+        data-run-list-end=""
+        className="flex flex-col gap-2"
+      >
+        {more === 'loading' ? <Skeleton className="h-16" /> : <div className="h-4" />}
+      </div>
+    );
   return (
     <div className="flex flex-col gap-2">
       {filters ? (
@@ -82,7 +112,8 @@ export function RunList({
         />
       ) : null}
       {shown.length === 0 ? (
-        <Empty icon={<SearchX />} title={t('runs.list.empty')}>
+        <>
+          {more === 'done' ? <Empty icon={<SearchX />} title={t('runs.list.empty')} /> : null}
           {filtered ? (
             <Button
               variant="outline"
@@ -96,7 +127,7 @@ export function RunList({
               {t('runs.list.reset')}
             </Button>
           ) : null}
-        </Empty>
+        </>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {shown.map((run) => {
@@ -188,6 +219,7 @@ export function RunList({
           })}
         </ul>
       )}
+      {tail}
     </div>
   );
 }

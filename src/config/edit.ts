@@ -174,6 +174,8 @@ export interface EntryReference {
   split?: boolean;
   /** `delivery.resolver` or `delivery.message_specialist`. */
   field?: string;
+  /** Root of the registry repository the reference comes from; set for shared specialists. */
+  repository?: string;
 }
 
 /** Everything in a merged `{ swarm }` tree that names the specialist. */

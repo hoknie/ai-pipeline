@@ -29,6 +29,21 @@ function aipTools(context: LaunchContext): string[] {
   const tools = [REPORT_TOOL, ARTIFACT_TOOL, SPLIT_TOOL];
   return context.specialist.queue === true ? [...tools, QUEUE_TOOL] : tools;
 }
+
+/** Tools allowed without a prompt: those of aip and all of the specialist's own MCP servers. */
+function mcpTools(context: LaunchContext): string[] {
+  const own = Object.keys(context.specialist.mcp ?? {}).map((name) => `mcp__${name}`);
+  return [...aipTools(context), ...own];
+}
+
+function ownMcpServers(context: LaunchContext): Record<string, object> {
+  return Object.fromEntries(
+    Object.entries(context.specialist.mcp ?? {}).map(([name, server]) => [
+      name,
+      { type: 'stdio', ...server },
+    ]),
+  );
+}
 /** Setting sources without the user's level: no personal hooks, plugins or permission rules. */
 const PROJECT_SETTINGS = ['--setting-sources', 'project,local'];
 const READ_TOOLS = ['Read', 'Grep', 'Glob'];
@@ -171,16 +186,16 @@ export function claudeTools(context: LaunchContext): string[] {
 
 export function claudeAllowedTools(context: LaunchContext): string[] {
   const { permissions, allowCommands } = context.specialist;
-  if (permissions === 'read') return [...READ_TOOLS, ...aipTools(context)];
+  if (permissions === 'read') return [...READ_TOOLS, ...mcpTools(context)];
   if (permissions === 'edit') {
     return [
       ...READ_TOOLS,
       ...EDIT_TOOLS,
       ...allowCommands.map((pattern) => `Bash(${pattern})`),
-      ...aipTools(context),
+      ...mcpTools(context),
     ];
   }
-  return aipTools(context);
+  return mcpTools(context);
 }
 
 export function claudePermissionArgs(context: LaunchContext): string[] {
@@ -194,7 +209,7 @@ export function claudePermissionArgs(context: LaunchContext): string[] {
       context.claudeEditMode === 'auto' ? 'auto' : 'acceptEdits',
       '--allowedTools',
       ...allowCommands.map((pattern) => `Bash(${pattern})`),
-      ...aipTools(context),
+      ...mcpTools(context),
     ];
   }
   return ['--permission-mode', 'default', '--allowedTools', ...claudeAllowedTools(context)];
@@ -254,7 +269,10 @@ export function createClaudeRuntime(
       const mcpConfigPath = join(context.attemptDirectory, 'mcp.json');
       const [workerCommand, ...workerArgs] = context.workerCommand;
       const mcpConfig = {
-        mcpServers: { aip: { type: 'stdio', command: workerCommand, args: workerArgs } },
+        mcpServers: {
+          ...ownMcpServers(context),
+          aip: { type: 'stdio', command: workerCommand, args: workerArgs },
+        },
       };
       const session = context.resumeSession
         ? ['--resume', context.resumeSession]

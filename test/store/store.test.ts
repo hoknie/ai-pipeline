@@ -1260,3 +1260,28 @@ describe('migration to project tags', () => {
     database.close();
   });
 });
+
+describe('finishedRunsPage', () => {
+  function finished(id: string, now: number, done: boolean) {
+    const state = run(1, { id, now });
+    if (done) state.run.finishedAt = now + 1;
+    return state;
+  }
+
+  it('pages finished runs by the (created_at, id) cursor without repeats', () => {
+    const store = temporaryStore();
+    store.saveRun(finished('run000000001', 10, true));
+    store.saveRun(finished('run000000002', 20, true));
+    store.saveRun(finished('run000000003', 20, true));
+    store.saveRun(finished('run000000004', 30, true));
+    store.saveRun(finished('run000000005', 40, false));
+    const first = store.finishedRunsPage(2);
+    expect(first.runs.map((state) => state.run.id)).toEqual(['run000000004', 'run000000003']);
+    expect(first.more).toBe(true);
+    const last = first.runs.at(-1)!.run;
+    const second = store.finishedRunsPage(2, { createdAt: last.createdAt, id: last.id });
+    expect(second.runs.map((state) => state.run.id)).toEqual(['run000000002', 'run000000001']);
+    expect(second.more).toBe(false);
+    store.close();
+  });
+});

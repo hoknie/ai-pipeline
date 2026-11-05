@@ -150,9 +150,10 @@ export function existingFilter(filter: SpecialistFilter, options: FilterOptions)
   return next;
 }
 
-/** How many filters narrow the list: the level and every non-empty list. */
-export function activeFilterCount(filter: SpecialistFilter): number {
+/** How many filters narrow the list: the search, the level and every non-empty list. */
+export function activeFilterCount(filter: SpecialistFilter, search = ''): number {
   return (
+    (search.trim() === '' ? 0 : 1) +
     (filter.level === 'all' ? 0 : 1) +
     (filter.tags.length > 0 ? 1 : 0) +
     LIST_FIELDS.filter((field) => filter[field].length > 0).length
