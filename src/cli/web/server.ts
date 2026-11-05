@@ -108,6 +108,7 @@ const applyBody = z.object({
   groups: z.array(z.string().min(1)).optional(),
   force: z.boolean().optional(),
 });
+const markDeliveredBody = z.object({ groups: z.array(z.string().min(1)).optional() });
 
 const tagName = z.string().trim().min(1);
 const tagAddBody = z.object({ name: tagName, color: z.string().optional() });
@@ -756,6 +757,17 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
           runId: runId ?? '',
           ...(groups ? { groups } : {}),
           ...(force ? { force: true } : {}),
+        });
+      },
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/delivered$`),
+      handle: async ([runId], body) => {
+        const { groups } = parseBody(markDeliveredBody, body);
+        return call('run_mark_delivered', {
+          runId: runId ?? '',
+          ...(groups ? { groups } : {}),
         });
       },
     },

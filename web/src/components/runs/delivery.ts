@@ -8,7 +8,7 @@ export function canDeliver(run: RunView): boolean {
 export type DeliveryBadge = {
   status: 'running' | 'apply_failed' | 'pending' | 'applied';
   /** Which dictionary label to use; `null` takes the label of the status. */
-  label: 'delivering' | 'deliveryFailed' | 'delivery' | null;
+  label: 'delivering' | 'deliveryFailed' | 'delivery' | 'deliveredManually' | null;
   /** Why the delivery failed. */
   reason: string | null;
 };
@@ -28,7 +28,10 @@ export function deliveryBadge(run: RunView): DeliveryBadge | null {
   if (delivery.merged > delivery.applied) {
     return { status: 'pending', label: 'delivery', reason: null };
   }
-  if (delivery.merged > 0) return { status: 'applied', label: null, reason: null };
+  if (delivery.merged > 0) {
+    const manual = run.deliveryStage?.status === 'applied' && run.deliveryStage.manual;
+    return { status: 'applied', label: manual ? 'deliveredManually' : null, reason: null };
+  }
   return null;
 }
 

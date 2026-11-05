@@ -702,6 +702,26 @@ describe('delivery time of a group', () => {
   });
 });
 
+describe('manual delivery mark of a group', () => {
+  it('reads a delivery_json without manual as false and keeps a stored true', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aip-store-'));
+    const store = new Store(databasePath(directory));
+    const state = run(1);
+    state.groups[0]!.delivery = { ...state.groups[0]!.delivery, state: 'applied', manual: true };
+    store.saveRun(state);
+    expect(store.loadRun(state.run.id)!.groups[0]!.delivery.manual).toBe(true);
+    const { manual: _omit, ...old } = state.groups[0]!.delivery;
+    store.database
+      .prepare('UPDATE groups SET delivery_json = ? WHERE run_id = ?')
+      .run(JSON.stringify(old), state.run.id);
+    expect(store.loadRun(state.run.id)!.groups[0]!.delivery).toMatchObject({
+      state: 'applied',
+      manual: false,
+    });
+    store.close();
+  });
+});
+
 describe('queue items and automatic delivery', () => {
   it('keeps true, false and null of an item', () => {
     const store = temporaryStore();

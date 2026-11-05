@@ -4,6 +4,7 @@ import {
   cancelDelivery,
   finishDelivery,
   finishMessage,
+  markDelivered,
   requestDelivery,
   resolvePrepared,
   resolverDone,
@@ -101,6 +102,7 @@ export type Event =
   | { kind: 'merge_finished'; group: string; outcome: MergeOutcome }
   | { kind: 'commit_failed'; group: string; message: string }
   | { kind: 'deliver_requested'; groups: string[] | null; force: boolean; files: string[] }
+  | { kind: 'delivered_marked'; groups: string[] | null }
   | { kind: 'delivery_finished'; result: DeliveryResult }
   | { kind: 'resolve_prepared'; conflicts: string[] }
   | { kind: 'run_named'; title: string | null; name: string | null; usage: Usage | null }
@@ -184,6 +186,9 @@ class Machine {
         return this.answer(event.group, event.answer, event.by ?? 'human', event.permissions);
       case 'merge_finished':
         return this.mergeFinished(event.group, event.outcome);
+      case 'delivered_marked':
+        this.effects.push(...markDelivered(this.state, event.groups, this.now));
+        return;
       case 'deliver_requested':
         this.effects.push(
           ...requestDelivery(this.state, {

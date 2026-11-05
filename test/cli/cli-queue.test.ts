@@ -491,6 +491,7 @@ describe('cli', () => {
       'swarm_apply',
       'swarm_cancel',
       'swarm_group',
+      'swarm_mark_delivered',
       'swarm_queue',
       'swarm_queue_add',
       'swarm_queue_dismiss',

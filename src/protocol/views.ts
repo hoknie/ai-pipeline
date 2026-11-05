@@ -239,7 +239,7 @@ export interface SystemStepRow extends Omit<GroupRow, 'status'> {
 export type DeliveryStage =
   | { status: 'pending' }
   | { status: 'delivering' }
-  | { status: 'applied' }
+  | { status: 'applied'; manual: boolean }
   | { status: 'apply_failed'; reason: string | null; groups: string[] };
 
 /**
@@ -530,7 +530,11 @@ export function deliveryStage(state: RunState): DeliveryStage | null {
       groups: failed.map((group) => group.slug),
     };
   }
-  return counts.applied === counts.merged ? { status: 'applied' } : { status: 'pending' };
+  if (counts.applied !== counts.merged) return { status: 'pending' };
+  return {
+    status: 'applied',
+    manual: state.groups.some((group) => group.status === 'merged' && group.delivery.manual),
+  };
 }
 
 /** Status counts with the groups held back by the scheduler moved from `queued` to `waiting`. */

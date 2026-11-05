@@ -9,10 +9,9 @@ import type { GroupRow, RunView, SystemStepRow } from '../../types.ts';
 import { FilePath } from '../FilePath.tsx';
 import { Button } from '../../ui/button.tsx';
 import { DiffStat } from './DiffStat.tsx';
-import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { RunStatuses } from './RunStatuses.tsx';
 
-/** The summary block of a run: statuses, path, time, tokens, cost and the type of the task. */
+/** The summary block of a run: statuses, path, time, tokens and cost. */
 export function RunSummary({
   run,
   now,
@@ -88,14 +87,12 @@ export function RunSummary({
     },
     ...(tokens ? [{ key: 'tokens', label: t('runs.header.summary.tokens'), value: tokens }] : []),
     ...(price ? [{ key: 'cost', label: t('runs.header.summary.cost'), value: price }] : []),
-    {
-      key: 'type',
-      label: t('runs.header.summary.type'),
-      value: <WorkflowBadge id={run.workflow} name={run.workflowName} />,
-    },
   ];
   return (
-    <aside aria-label={t('runs.header.summary.label')} className="shrink-0 border-l pl-4 @3xl:w-96">
+    <aside
+      aria-label={t('runs.header.summary.label')}
+      className="shrink-0 border-l pl-4 @3xl:w-[28rem]"
+    >
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 text-sm">
         {rows.map((row) => (
           <div key={row.key} className="contents">

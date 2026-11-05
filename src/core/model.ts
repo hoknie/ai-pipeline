@@ -270,6 +270,8 @@ export interface GroupDelivery {
   conflicts: string[];
   /** Files committed whole together with uncommitted edits the user had in them. */
   userEdits: string[];
+  /** The user merged the result by hand and marked the group delivered; no git operation ran. */
+  manual: boolean;
   /** When the last delivery attempt of the group ended (ms); null before the first attempt. */
   finishedAt: number | null;
 }
@@ -281,6 +283,7 @@ export function pendingDelivery(): GroupDelivery {
     files: [],
     conflicts: [],
     userEdits: [],
+    manual: false,
     finishedAt: null,
   };
 }

@@ -896,6 +896,30 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
     );
 
   run
+    .command('mark-delivered')
+    .description('Mark merged groups delivered after you merged them by hand')
+    .argument('<run-id>', 'run id')
+    .option(
+      '--group <slug...>',
+      'groups to mark; all merged ones that are not delivered by default',
+    )
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples([
+        'aip run mark-delivered 0mh3k2ab1x9z',
+        'aip run mark-delivered 0mh3k2ab1x9z --group login signup',
+      ]),
+    )
+    .action(async (runId: string, options: { group?: string[]; json?: boolean }) => {
+      const result = (await call(context(), 'run_mark_delivered', {
+        runId,
+        ...(options.group && options.group.length > 0 ? { groups: options.group } : {}),
+      })) as ApplyResult;
+      output(options.json, formatApply(result, activeStyle), result);
+    });
+
+  run
     .command('skip')
     .description(
       'Skip a step of a run that is not finished yet, or bring it back with --off; a running step is stopped without a commit',

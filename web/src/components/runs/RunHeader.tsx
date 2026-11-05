@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../api.ts';
 import { runTitle, taskNumber } from '../../format.ts';
+import { useConfirm } from '../../confirm.tsx';
 import { notifySuccess } from '../../notify.ts';
 import type { GroupRow, RunView, SystemStepRow, TagView } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '../../ui/dropdown-menu.tsx';
 import { useTags } from '../../tags.tsx';
+import { WorkflowBadge } from '../WorkflowBadge.tsx';
 import { TagPicker } from '../TagPicker.tsx';
 import { RunSteps } from './RunSteps.tsx';
 import { RunSummary } from './RunSummary.tsx';
@@ -50,6 +52,7 @@ export function RunHeader({
   const [forcing, setForcing] = useState(false);
   const [retrying, setRetrying] = useState<'plain' | 'refresh' | null>(null);
   const [applying, setApplying] = useState(false);
+  const confirm = useConfirm();
   const [returning, setReturning] = useState(false);
   const putBack = async () => {
     setReturning(true);
@@ -126,6 +129,21 @@ export function RunHeader({
     else notifySuccess(t('runs.header.retryStarted'));
   };
   const deliverable = canDeliver(run);
+  const markDelivered = async () => {
+    const yes = await confirm({
+      title: t('runs.header.markDeliveredTitle'),
+      description: t('runs.header.markDeliveredConfirm'),
+      confirmLabel: t('runs.header.markDeliveredAction'),
+      cancelLabel: t('runs.header.markDeliveredKeep'),
+    });
+    if (!yes) return;
+    try {
+      await api.markDelivered(run.id);
+      notifySuccess(t('runs.header.markedDelivered'));
+    } catch (error) {
+      onError((error as Error).message);
+    }
+  };
   const apply = async (force: boolean) => {
     setForcing(false);
     setApplying(true);
@@ -151,6 +169,9 @@ export function RunHeader({
               </span>{' '}
               {runTitle(run)}
             </h1>
+          </div>
+          <div>
+            <WorkflowBadge id={run.workflow} name={run.workflowName} />
           </div>
           {run.name ? (
             <div className="font-mono text-xs text-muted-foreground">{run.name}</div>
@@ -219,6 +240,9 @@ export function RunHeader({
                 ) : null}
                 <DropdownMenuItem disabled={!deliverable} onSelect={() => setForcing(true)}>
                   {t('runs.header.forceDeliver')}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!deliverable} onSelect={() => void markDelivered()}>
+                  {t('runs.header.markDelivered')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {

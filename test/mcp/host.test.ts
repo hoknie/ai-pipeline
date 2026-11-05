@@ -134,6 +134,56 @@ describe('host MCP parent of a task', () => {
   });
 });
 
+describe('host MCP swarm_mark_delivered', () => {
+  const APPLIED = {
+    runId: 'r1',
+    pending: false,
+    groups: [
+      {
+        slug: 'login',
+        delivery: {
+          state: 'applied',
+          reason: null,
+          files: [],
+          conflicts: [],
+          userEdits: [],
+          manual: true,
+          finishedAt: 1,
+        },
+      },
+    ],
+  };
+
+  it('sends run_mark_delivered and prints the delivery as manual', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return APPLIED;
+    });
+    const result = await client.callTool({
+      name: 'swarm_mark_delivered',
+      arguments: { run_id: 'r1', groups: ['login'] },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain('login: applied (manually)');
+    expect(calls).toEqual([
+      { method: 'run_mark_delivered', params: { runId: 'r1', groups: ['login'] } },
+    ]);
+  });
+
+  it('reports a refusal as a tool error', async () => {
+    const client = await connect(async () => {
+      throw new Error('nothing to mark: no merged groups are waiting for delivery');
+    });
+    const result = await client.callTool({
+      name: 'swarm_mark_delivered',
+      arguments: { run_id: 'r1' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('nothing to mark');
+  });
+});
+
 describe('host MCP queue tools', () => {
   it('lists the queue tools', async () => {
     const client = await connect(async () => VIEW);

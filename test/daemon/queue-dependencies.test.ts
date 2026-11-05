@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -328,6 +328,32 @@ describe('dependencies of queue items', () => {
     );
     await stop(h);
     expect(await ended).toBe('closed');
+  });
+
+  it('lets a task continue after the run it waits for is marked delivered by hand', async () => {
+    const h = await start();
+    h.script({
+      code: [{ write: { 'lib.ts': 'export const value = 2;\n' }, waitFor: h.gate('a') }, {}],
+    });
+    const a = await add(h, 'A');
+    await add(h, 'B', { after: [a.item] });
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    const runId = (await waitQueue(h, (queue) => queue.runs.length === 1)).runs[0]!.id;
+    // the user edits the file the run writes: the automatic delivery is refused
+    writeFileSync(join(h.repo, 'lib.ts'), 'export const value = 9;\n');
+    h.open('a');
+    const skipped = await waitQueue(h, (queue) => queue.skipped.length === 1);
+    expect(skipped.skipped[0]?.id).toBe(runId);
+    expect(skipped.items.map((item) => item.readiness)).not.toContain('ready');
+    await h.call('run_mark_delivered', { runId });
+    const view = await h.status(runId);
+    expect(view.deliveryStage).toEqual({ status: 'applied', manual: true });
+    await waitQueue(h, (queue) => queue.skipped.length === 0);
+    await waitQueue(h, (queue) => queue.items.length === 0);
+    await waitQueue(h, (queue) => queue.runs.length === 0);
+    expect(await allRuns(h)).toHaveLength(2);
+    await stop(h);
   });
 
   it('sends a queue event with the new autoDeliver after delivery.auto is written', async () => {

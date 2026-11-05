@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -43,6 +43,30 @@ describe('cli', () => {
     );
     const forced = await aip(box, 'run', 'apply', second.runId, '--force');
     expect(forced.code).toBe(0);
+  });
+
+  it('marks a run delivered by hand with aip run mark-delivered', async () => {
+    const box = sandbox(MANUAL_CONFIG);
+    writeFileSync(
+      box.env.AIP_FAKE_SCRIPT!,
+      JSON.stringify({ code: [{ write: { 'feature.ts': 'export const on = true;\n' } }] }),
+    );
+    const started = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'ручное', '--json')).stdout,
+    );
+    await aip(box, 'run', 'watch', started.runId);
+    const marked = await aip(box, 'run', 'mark-delivered', started.runId, '--json');
+    expect(marked.code).toBe(0);
+    const result = JSON.parse(marked.stdout) as {
+      groups: { delivery: { state: string; manual: boolean } }[];
+    };
+    expect(result.groups[0]?.delivery).toMatchObject({ state: 'applied', manual: true });
+    const plain = await aip(box, 'run', 'mark-delivered', started.runId);
+    expect(plain.code).toBe(1);
+    expect(plain.stderr).toContain('nothing to mark');
+    expect(existsSync(join(box.repo, 'feature.ts'))).toBe(false);
+    const status = await aip(box, 'run', 'show', started.runId);
+    expect(status.stdout).toContain('Delivery: applied 1/1');
   });
 
   it('streams events with aip events and exits with 1 when the daemon stops', async () => {

@@ -95,6 +95,7 @@ describe('delivery requests', () => {
       files: ['a.ts'],
       conflicts: [],
       userEdits: [],
+      manual: false,
       finishedAt: 7000,
     });
     expect(deliveryCounts(state).failed).toBe(1);
@@ -158,6 +159,71 @@ describe('delivery requests', () => {
     const state = mergedRun(2, { leaveLast: true });
     request(state);
     expect(transition(state, { kind: 'delivery_finished', result: applied }, 7000)).toEqual([]);
+  });
+});
+
+describe('manual delivery mark', () => {
+  const mark = (state: RunState, groups: string[] | null = null): Effect[] =>
+    transition(state, { kind: 'delivered_marked', groups }, 8000);
+
+  it('marks groups with a failed delivery and cleans up', () => {
+    const state = mergedRun(1);
+    request(state);
+    transition(
+      state,
+      { kind: 'delivery_finished', result: { kind: 'refused', reason: 'x', files: ['a.ts'] } },
+      7000,
+    );
+    expect(mark(state)).toEqual([{ kind: 'cleanup', run: state.run.id }]);
+    expect(state.groups[0]?.delivery).toEqual({
+      state: 'applied',
+      reason: null,
+      files: [],
+      conflicts: [],
+      userEdits: [],
+      manual: true,
+      finishedAt: 8000,
+    });
+  });
+
+  it('marks groups waiting in pending and a chosen part of them', () => {
+    const state = mergedRun(2);
+    expect(mark(state, ['gruppa-1'])).toEqual([]);
+    expect(state.groups.map((group) => group.delivery.state)).toEqual(['applied', 'pending']);
+    expect(mark(state)).toEqual([{ kind: 'cleanup', run: state.run.id }]);
+    expect(state.groups.every((group) => group.delivery.manual)).toBe(true);
+  });
+
+  it('does not clean up with keep, or while other groups still work', () => {
+    const kept = mergedRun(1);
+    kept.run.config.delivery.keep = true;
+    expect(mark(kept)).toEqual([]);
+    expect(kept.groups[0]?.delivery.state).toBe('applied');
+    const working = mergedRun(3, { leaveLast: true });
+    expect(mark(working)).toEqual([]);
+    expect(working.groups[0]?.delivery.manual).toBe(true);
+    expect(working.groups[2]?.delivery.state).toBe('pending');
+  });
+
+  it('marks a run that keeps its result in a branch', () => {
+    const state = mergedRun(1);
+    state.run.refStyle = 'branches';
+    mark(state);
+    expect(state.groups[0]?.delivery.state).toBe('applied');
+  });
+
+  it('refuses without changing anything', () => {
+    const state = mergedRun(3, { leaveLast: true });
+    request(state, ['gruppa-1']);
+    expect(() => mark(state)).toThrow('already in progress');
+    transition(state, { kind: 'delivery_finished', result: applied }, 7000);
+    expect(() => mark(state, ['gruppa-1'])).toThrow('already delivered');
+    expect(() => mark(state, ['gruppa-3'])).toThrow('only merged groups can be marked delivered');
+    expect(() => mark(state, ['nope'])).toThrow('unknown group');
+    expect(() => mark(state, ['gruppa-2', 'gruppa-1'])).toThrow('already delivered');
+    expect(state.groups[1]?.delivery.state).toBe('pending');
+    expect(state.groups[0]?.delivery.manual).toBe(false);
+    expect(() => mark(run(1))).toThrow('nothing to mark: no merged groups are waiting');
   });
 });
 

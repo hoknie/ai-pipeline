@@ -57,18 +57,64 @@ export function selectGroups(state: RunState, requested: string[] | null): Group
       throw new Rejection('nothing to deliver: no merged groups are waiting');
     return groups;
   }
-  return requested.map((slug) => {
-    const group = state.groups.find((candidate) => candidate.slug === slug);
-    if (!group) throw new Rejection(`unknown group \`${slug}\``);
-    if (group.delivery.state === 'applied')
-      throw new Rejection(`group \`${slug}\` is already delivered`);
-    if (group.status !== 'merged') {
-      throw new Rejection(
-        `group \`${slug}\` is ${group.status}; only merged groups can be delivered`,
-      );
-    }
-    return group;
-  });
+  return requested.map((slug) => requestedGroup(state, slug, 'delivered'));
+}
+
+function requestedGroup(state: RunState, slug: string, verb: string): Group {
+  const group = state.groups.find((candidate) => candidate.slug === slug);
+  if (!group) throw new Rejection(`unknown group \`${slug}\``);
+  if (group.delivery.state === 'applied')
+    throw new Rejection(`group \`${slug}\` is already delivered`);
+  if (group.status !== 'merged') {
+    throw new Rejection(`group \`${slug}\` is ${group.status}; only merged groups can be ${verb}`);
+  }
+  return group;
+}
+
+/**
+ * The user merged the result by hand: mark merged groups delivered without any git operation.
+ * `null` or an empty list selects every merged group that is not delivered yet.
+ */
+export function markDelivered(
+  state: RunState,
+  requested: string[] | null,
+  now: number,
+): DeliveryEffect[] {
+  if (state.run.pendingDelivery !== null) {
+    throw new Rejection(`a delivery of run ${state.run.id} is already in progress`);
+  }
+  let groups: Group[];
+  if (requested === null || requested.length === 0) {
+    groups = state.groups.filter(deliverable);
+    if (groups.length === 0)
+      throw new Rejection('nothing to mark: no merged groups are waiting for delivery');
+  } else {
+    groups = requested.map((slug) => requestedGroup(state, slug, 'marked delivered'));
+  }
+  for (const group of groups) {
+    group.delivery = {
+      state: 'applied',
+      reason: null,
+      files: [],
+      conflicts: [],
+      userEdits: [],
+      manual: true,
+      finishedAt: now,
+    };
+  }
+  return cleanupIfDelivered(state);
+}
+
+function cleanupIfDelivered(state: RunState): DeliveryEffect[] {
+  const merged = state.groups.filter((group) => group.status === 'merged');
+  const everything =
+    merged.length > 0 && merged.every((group) => group.delivery.state === 'applied');
+  const settled = state.groups.every((group) =>
+    ['merged', 'failed', 'cancelled'].includes(group.status),
+  );
+  if (everything && settled && !state.run.config.delivery.keep)
+    return [{ kind: 'cleanup', run: state.run.id }];
+  return [];
 }
 
 function lastSummary(group: Group): string {
@@ -240,15 +286,7 @@ export function finishDelivery(
   for (const group of state.groups.filter((candidate) => pending.groups.includes(candidate.slug))) {
     group.delivery = deliveryOf(outcome, now);
   }
-  const merged = state.groups.filter((group) => group.status === 'merged');
-  const everything =
-    merged.length > 0 && merged.every((group) => group.delivery.state === 'applied');
-  const settled = state.groups.every((group) =>
-    ['merged', 'failed', 'cancelled'].includes(group.status),
-  );
-  if (everything && settled && !state.run.config.delivery.keep)
-    return [{ kind: 'cleanup', run: state.run.id }];
-  return [];
+  return cleanupIfDelivered(state);
 }
 
 function deliveryOf(result: DeliveryResult, now: number): GroupDelivery {
@@ -260,6 +298,7 @@ function deliveryOf(result: DeliveryResult, now: number): GroupDelivery {
         files: result.files,
         conflicts: result.conflicts,
         userEdits: result.userEdits ?? [],
+        manual: false,
         finishedAt: now,
       };
     case 'refused':
@@ -269,6 +308,7 @@ function deliveryOf(result: DeliveryResult, now: number): GroupDelivery {
         files: result.files,
         conflicts: [],
         userEdits: [],
+        manual: false,
         finishedAt: now,
       };
     case 'failed':
@@ -278,6 +318,7 @@ function deliveryOf(result: DeliveryResult, now: number): GroupDelivery {
         files: [],
         conflicts: [],
         userEdits: [],
+        manual: false,
         finishedAt: now,
       };
   }

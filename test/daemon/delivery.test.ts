@@ -52,6 +52,7 @@ describe('delivery through the daemon', () => {
           files: ['lib.ts'],
           conflicts: [],
           userEdits: [],
+          manual: false,
           finishedAt: expect.any(Number),
         },
       },
@@ -87,6 +88,55 @@ describe('delivery through the daemon', () => {
     const forced = (await h.call('apply', { runId, force: true })) as ApplyResult;
     expect(forced.groups[0]?.delivery).toMatchObject({ state: 'applied', conflicts: ['lib.ts'] });
     expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toContain('<<<<<<<');
+  });
+
+  it('marks a run with a refused delivery as delivered by hand and cleans up', async () => {
+    const h = await start();
+    h.script(WRITE_LIB);
+    const runId = await finishedRun(h);
+    writeFileSync(join(h.repo, 'lib.ts'), 'export const value = 9;\n');
+    await h.call('apply', { runId });
+    expect((await h.status(runId)).deliveryStage).toMatchObject({ status: 'apply_failed' });
+    const result = (await h.call('run_mark_delivered', { runId })) as ApplyResult;
+    expect(result.pending).toBe(false);
+    expect(result.groups).toEqual([
+      {
+        slug: 'vhod',
+        delivery: {
+          state: 'applied',
+          reason: null,
+          files: [],
+          conflicts: [],
+          userEdits: [],
+          manual: true,
+          finishedAt: expect.any(Number),
+        },
+      },
+    ]);
+    const view = await h.status(runId);
+    expect(view.deliveryStage).toEqual({ status: 'applied', manual: true });
+    expect(view.delivery).toMatchObject({ applied: 1, merged: 1, failed: 0 });
+    expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 9;\n');
+    expect(git(h.repo, 'branch', '--list', 'aip/*')).toBe('');
+    expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toBe('');
+    await expect(h.call('run_mark_delivered', { runId })).rejects.toThrow('nothing to mark');
+    await expect(h.call('run_mark_delivered', { runId, groups: ['vhod'] })).rejects.toThrow(
+      'already delivered',
+    );
+  });
+
+  it('keeps the result of a manually delivered run with delivery.keep', async () => {
+    const h = await start('  delivery: { auto: false, keep: true }\n');
+    h.script(WRITE_LIB);
+    const runId = await finishedRun(h);
+    await h.call('run_mark_delivered', { runId, groups: ['vhod'] });
+    expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toContain(`refs/aip/${runId}/`);
+    expect((await h.status(runId)).deliveryStage).toEqual({ status: 'applied', manual: true });
+  });
+
+  it('refuses to mark an unknown run', async () => {
+    const h = await start();
+    await expect(h.call('run_mark_delivered', { runId: 'nope' })).rejects.toThrow();
   });
 
   it('commits with a message written by the message specialist', async () => {

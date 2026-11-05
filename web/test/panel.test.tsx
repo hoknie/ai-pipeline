@@ -390,6 +390,7 @@ describe('run page', () => {
           files: ['src/app.ts'],
           conflicts: [],
           userEdits: [],
+          manual: false,
           finishedAt: null,
         },
       }),
@@ -407,6 +408,53 @@ describe('run page', () => {
     await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', true));
     fireEvent.click(screen.getByRole('button', { name: 'Deliver' }));
     await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', false));
+  });
+});
+
+describe('marking a run delivered by hand', () => {
+  const failedRun = () =>
+    runView({
+      finished: true,
+      delivery: { applied: 0, merged: 1, failed: 1, inProgress: false, finishedAt: null },
+      groups: [groupRow({ status: 'merged', delivery: 'apply_failed' })],
+    });
+  const open = async (api: ReturnType<typeof fakeApi>, run = failedRun()) => {
+    render(<App api={api} openStream={openFake} />);
+    act(() =>
+      stream().send({ event: 'snapshot', seq: 1, runs: [run], repositories: [repositoryView()] }),
+    );
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'Enter' });
+    return screen.findByRole('menuitem', { name: 'Mark as delivered…' });
+  };
+
+  it('asks first and then marks the run', async () => {
+    const api = fakeApi();
+    fireEvent.click(await open(api));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Mark as delivered' }));
+    await waitFor(() => expect(api.markDelivered).toHaveBeenCalledWith('run1'));
+  });
+
+  it('does nothing when the question is declined', async () => {
+    const api = fakeApi();
+    fireEvent.click(await open(api));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Do not mark' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.markDelivered).not.toHaveBeenCalled();
+  });
+
+  it('is not available when nothing waits for delivery', async () => {
+    const api = fakeApi();
+    const item = await open(
+      api,
+      runView({
+        finished: true,
+        delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: 1 },
+        groups: [groupRow({ status: 'merged', delivery: 'applied' })],
+      }),
+    );
+    expect(item.getAttribute('aria-disabled')).toBe('true');
   });
 });
 

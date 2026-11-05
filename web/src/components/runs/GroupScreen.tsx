@@ -202,6 +202,20 @@ export function GroupScreen({
         () => notifySuccess(t('runs.group.cancelled')),
       );
   };
+  const markDelivered = async () => {
+    if (!run) return;
+    const yes = await confirm({
+      title: t('runs.system.markDeliveredTitle', { title }),
+      description: t('runs.header.markDeliveredConfirm'),
+      confirmLabel: t('runs.header.markDeliveredAction'),
+      cancelLabel: t('runs.header.markDeliveredKeep'),
+    });
+    if (yes)
+      await act(
+        () => api.markDelivered(run.id, [row.slug]),
+        () => notifySuccess(t('runs.header.markedDelivered')),
+      );
+  };
   const hints = view?.permissionHints ?? [];
   const deliveryFailed =
     !('kind' in row) && row.status === 'merged' && row.delivery === 'apply_failed';
@@ -416,6 +430,14 @@ export function GroupScreen({
               onClick={() => setForcing(true)}
             >
               {t('runs.system.forceDeliver')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!deliverable || delivering || !run}
+              onClick={() => void markDelivered()}
+            >
+              {t('runs.system.markDelivered')}
             </Button>
           </div>
         </Alert>

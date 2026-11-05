@@ -257,6 +257,29 @@ export function createHostServer(options: HostOptions): McpServer {
       }),
   );
 
+  server.registerTool(
+    'swarm_mark_delivered',
+    {
+      description:
+        'Mark merged groups of a run as delivered when you merged their result by hand. Nothing is applied to the working tree; the run becomes finished and queue tasks depending on it continue. Refuses groups that are not merged or already delivered.',
+      inputSchema: {
+        run_id: runId,
+        groups: z
+          .array(z.string())
+          .optional()
+          .describe('Groups to mark; all merged ones that are not delivered by default'),
+      },
+    },
+    ({ run_id, groups }) =>
+      attempt(async () => {
+        const result = (await options.send('run_mark_delivered', {
+          runId: run_id,
+          ...(groups ? { groups } : {}),
+        })) as ApplyResult;
+        return withData(formatApply(result), result);
+      }),
+  );
+
   const repo = z.string().optional().describe('Repository path; defaults to the current directory');
   const item = z.string().describe('Queue item id from swarm_queue');
   const queueGroups = z

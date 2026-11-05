@@ -148,6 +148,7 @@ If `opencode run` prints nothing for minutes, the cause is usually not the model
 | `swarm_skip_step` | `run_id`, `step`, `skip?` | Skips a step that is running or still ahead (`skip=false` brings it back); a running step is stopped without a commit |
 | `swarm_answer` | `run_id`, `group`, `answer` | Answers a specialist who is waiting for a human decision |
 | `swarm_apply` | `run_id`, `groups?`, `force?` | Delivers ready groups (the command is `aip run apply`) |
+| `swarm_mark_delivered` | `run_id`, `groups?` | Marks merged groups as delivered when you merged them by hand (the command is `aip run mark-delivered`) |
 | `swarm_queue` | `repo?` | The queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order with their readiness and predecessors, and the runs that hold a place |
 | `swarm_queue_add` | `workflow`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
 | `swarm_queue_edit` | `item`, `workflow?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it (1 is first). `deliveryMode: null` follows the config again. `after` and `skip` replace the list, `[]` clears it. A returned run's task takes only `skip` (applied to it), `after`, `position` |

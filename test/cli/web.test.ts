@@ -207,6 +207,42 @@ describe('aip web', () => {
     expect(((await response.json()) as RunView).id).toBe(oldest);
   });
 
+  it('routes marking a run delivered by hand with validation', async () => {
+    const { h, web, base } = await setup();
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.finished);
+    const post = (path: string, body: unknown) =>
+      fetch(`${base}/api/runs/${runId}${path}`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+
+    expect((await post('/delivered', { groups: [''] })).status).toBe(400);
+    const marked = await post('/delivered', {});
+    expect(marked.status).toBe(200);
+    const markedResult = (await marked.json()) as {
+      groups: { delivery: { state: string; manual: boolean } }[];
+    };
+    expect(markedResult.groups.every((group) => group.delivery.manual)).toBe(true);
+    const again = await post('/delivered', {});
+    expect(again.status).toBe(400);
+    expect(((await again.json()) as { error: string }).error).toContain('nothing to mark');
+    expect(
+      (
+        await fetch(`${base}/api/runs/nope/delivered`, {
+          method: 'POST',
+          headers: authed(web, JSON_TYPE),
+          body: '{}',
+        })
+      ).status,
+    ).toBe(404);
+  });
+
   it('routes retry and apply with validation', async () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {

@@ -254,6 +254,7 @@ describe('retry every failed group', () => {
       'Retry failed (2)',
       'Retry with current config (2)',
       'Deliver with --force…',
+      'Mark as delivered…',
       'Copy run id',
     ]);
   });

@@ -397,7 +397,8 @@ function describeDelivery(delivery: GroupView['delivery'], style: Style = plainS
       : '';
   if (delivery.state === 'apply_failed')
     return `${statusBadge('apply_failed', style)}: ${delivery.reason ?? ''}${files}`;
-  return `${statusBadge(delivery.state, style)}${files}${conflicts}${userEdits}`;
+  const manual = delivery.manual ? ' (manually)' : '';
+  return `${statusBadge(delivery.state, style)}${manual}${files}${conflicts}${userEdits}`;
 }
 
 export function formatApply(result: ApplyResult, style: Style = plainStyle): string {

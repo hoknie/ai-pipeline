@@ -202,11 +202,11 @@ describe('run header', () => {
     expect(screen.queryByRole('button', { name: 'Cancel run' })).toBeNull();
   });
 
-  it('shows the summary block: path, time, tokens, cost and type, in this order', () => {
+  it('shows the summary block: path, time, tokens and cost, in this order', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
     const summary = screen.getByRole('complementary', { name: 'Run summary' });
     expect(summary.className).toContain('border-l');
-    expect(summary.className).toContain('@3xl:w-96');
+    expect(summary.className).toContain('@3xl:w-[28rem]');
     expect([...summary.querySelectorAll('dt')].map((node) => node.textContent)).toEqual([
       'Status',
       'Changes',
@@ -214,13 +214,20 @@ describe('run header', () => {
       'Time',
       'Tokens',
       'Cost',
-      'Type',
     ]);
     const values = [...summary.querySelectorAll('dd')].map((node) => node.textContent);
     expect(values[2]).toBe('/repo');
     expect(values[4]).toBe('1.0k/100');
     expect(values[5]).toBe('$0.42');
-    expect(values[6]).toContain('feature');
+  });
+
+  it('shows the type badge under the title, outside the summary block', () => {
+    render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
+    const summary = screen.getByRole('complementary', { name: 'Run summary' });
+    const badge = screen.getByText('feature');
+    expect(summary.contains(badge)).toBe(false);
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(title.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('downloads the patch of the run from the summary', async () => {
@@ -387,6 +394,7 @@ describe('run header', () => {
             files: ['a.ts'],
             conflicts: [],
             userEdits: [],
+            manual: false,
             finishedAt: null,
           },
         }),
@@ -431,6 +439,7 @@ describe('delivery in progress on the group screen', () => {
               files: ['a.ts'],
               conflicts: [],
               userEdits: [],
+              manual: false,
               finishedAt: null,
             },
           }),
@@ -463,11 +472,12 @@ describe('workflow badge in runs', () => {
     expect(plain).toHaveLength(0);
   });
 
-  it('shows the badge once in the run header, inside the summary block', () => {
+  it('shows the badge once in the run header, under the title', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
     const badge = screen.getByLabelText('Pipeline: feature');
     expect(badge.hasAttribute('tabindex')).toBe(true);
-    expect(badge.closest('aside')).toBe(screen.getByRole('complementary', { name: 'Run summary' }));
+    expect(badge.closest('aside')).toBeNull();
+    expect(screen.getAllByLabelText('Pipeline: feature')).toHaveLength(1);
   });
 });
 

@@ -272,6 +272,13 @@ export const requestSchema = z.discriminatedUnion('method', [
     }),
   }),
   z.object({
+    method: z.literal('run_mark_delivered'),
+    params: z.object({
+      runId: z.string().min(1),
+      groups: z.array(z.string().min(1)).optional(),
+    }),
+  }),
+  z.object({
     method: z.literal('answer'),
     params: z.object({ ...target, answer: z.string().trim().min(1) }),
   }),

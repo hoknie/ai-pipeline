@@ -23,6 +23,7 @@ import {
   pauseQueue,
   problemKeys,
   removeItem,
+  runDone,
   runPhase,
   runProblems,
   setParallel,
@@ -267,6 +268,27 @@ describe('problems', () => {
     expect(runProblems(state)).toEqual([]);
     group(state).delivery = { ...group(state).delivery, state: 'apply_failed' };
     expect(runProblems(state).map((problem) => problem.reason)).toEqual(['apply_failed']);
+  });
+
+  it('drops the failed delivery of a group marked delivered by hand', () => {
+    const state = run(1);
+    state.run.config.delivery.auto = true;
+    toMerging(state);
+    merge(state);
+    state.run.pendingDelivery = null;
+    group(state).delivery = { ...group(state).delivery, state: 'apply_failed' };
+    expect(runProblems(state).map((problem) => problem.reason)).toEqual(['apply_failed']);
+    expect(runDone(state)).toBe(false);
+    transition(state, { kind: 'delivered_marked', groups: null }, 6000);
+    expect(runPhase(state)).toBe('finished');
+    expect(runProblems(state)).toEqual([]);
+    expect(runDone(state)).toBe(true);
+    expect(occupiesSlot(state)).toBe(false);
+    expect(
+      dependencyState(queueOf('A'), state.run.id, (id) =>
+        id === state.run.id ? state : undefined,
+      ),
+    ).toBe('done');
   });
 
   it('gives a repeated failure after a retry a new key', () => {

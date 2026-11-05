@@ -675,7 +675,10 @@ describe('the delivery stage', () => {
     const state = merged(null);
     expect(runView(state, 5000).deliveryStage).toEqual({ status: 'pending' });
     group(state).delivery = { ...group(state).delivery, state: 'applied' };
-    expect(runView(state, 5000).deliveryStage).toEqual({ status: 'applied' });
+    expect(runView(state, 5000).deliveryStage).toEqual({ status: 'applied', manual: false });
+    group(state).delivery = { ...group(state).delivery, manual: true };
+    expect(runView(state, 5000).deliveryStage).toEqual({ status: 'applied', manual: true });
+    group(state).delivery = { ...group(state).delivery, manual: false };
     state.run.pendingDelivery = { round: 1, conflicts: [] } as never;
     expect(runView(state, 5000).deliveryStage).toEqual({ status: 'delivering' });
   });

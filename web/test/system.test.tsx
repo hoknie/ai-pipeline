@@ -270,12 +270,7 @@ describe('system stages in the run header', () => {
       Array.from(header.querySelectorAll('[aria-label$=")"]')).map((node) =>
         node.getAttribute('aria-label'),
       ),
-    ).toEqual([
-      expect.stringMatching(/\(finished\)$/),
-      'Merged (merged)',
-      'Merged (merged)',
-      'Delivered (applied)',
-    ]);
+    ).toEqual([expect.stringMatching(/\(finished\)$/), 'Merged (merged)', 'Delivered (applied)']);
   });
 
   const merged3 = () => [1, 2, 3].map((n) => groupRow({ slug: `g${n}`, status: 'merged' }));
@@ -294,7 +289,6 @@ describe('system stages in the run header', () => {
     const header = await screen.findByRole('banner', { name: 'run' });
     expect(badgeLabels(header)).toEqual([
       expect.stringMatching(/\(active\)$/),
-      'Merged (merged)',
       'Merged (merged)',
       'delivery 2/3 (pending)',
       'Pending (pending)',
@@ -316,8 +310,8 @@ describe('system stages in the run header', () => {
     ]);
     const header = await screen.findByRole('banner', { name: 'run' });
     const labels = badgeLabels(header);
-    expect(labels).toHaveLength(4);
-    expect(labels[3]).toMatch(/^Delivering/);
+    expect(labels).toHaveLength(3);
+    expect(labels[2]).toMatch(/^Delivering/);
     expect(within(header).queryByText(/Delivery failed/)).toBeNull();
   });
 
@@ -380,6 +374,7 @@ describe('a failed delivery on the group screen', () => {
             files: [],
             conflicts: [],
             userEdits: [],
+            manual: false,
             finishedAt: null,
           },
         }),
@@ -421,6 +416,25 @@ describe('a failed delivery on the group screen', () => {
     await waitFor(() => expect(api.apply).toHaveBeenCalledWith('run1', true));
   });
 
+  it('marks the group delivered after the confirmation', async () => {
+    const api = failed();
+    await screen.findByText('does not exist in index');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as delivered' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Mark as delivered' }));
+    await waitFor(() => expect(api.markDelivered).toHaveBeenCalledWith('run1', ['login']));
+  });
+
+  it('does not mark the group when the confirmation is declined', async () => {
+    const api = failed();
+    await screen.findByText('does not exist in index');
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as delivered' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Do not mark' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.markDelivered).not.toHaveBeenCalled();
+  });
+
   it('disables both buttons while a delivery is in progress', async () => {
     failed(false);
     await screen.findByText('does not exist in index');
@@ -441,6 +455,7 @@ describe('the outcome of a delivery started in the panel', () => {
     files: [],
     conflicts: [],
     userEdits: [],
+    manual: false,
     finishedAt: 1000,
     ...overrides,
   });
@@ -505,7 +520,7 @@ describe('the outcome of a delivery started in the panel', () => {
       stuck({
         groups: [groupRow({ status: 'merged', delivery: 'applied' })],
         delivery: { applied: 1, merged: 1, failed: 0, inProgress: false, finishedAt: 3000 },
-        deliveryStage: { status: 'applied' },
+        deliveryStage: { status: 'applied', manual: false },
       }),
       3,
     );

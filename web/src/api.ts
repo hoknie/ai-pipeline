@@ -77,6 +77,8 @@ export interface Api {
   skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
   cancel(runId: string, group?: string): Promise<unknown>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
+  /** Marks merged groups delivered after the user merged them by hand; nothing is applied. */
+  markDelivered(runId: string, groups?: string[]): Promise<ApplyResult>;
   /** Processes started by agents of the daemon (all repositories). */
   processes(): Promise<BackgroundProcessesView>;
   /** Terminates a background process and its children; the daemon refuses any other PID. */
@@ -236,6 +238,8 @@ function bound(repository: string | null): Api {
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)
         : post(`/api/runs/${enc(runId)}/cancel`),
     apply: (runId, force) => post(`/api/runs/${enc(runId)}/apply`, force ? { force: true } : {}),
+    markDelivered: (runId, groups) =>
+      post(`/api/runs/${enc(runId)}/delivered`, groups ? { groups } : {}),
     processes: () => call('/api/processes'),
     killProcess: (pid) => post(`/api/processes/${pid}/kill`),
     tags: () => call('/api/tags'),

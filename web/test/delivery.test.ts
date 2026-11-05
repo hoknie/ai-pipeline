@@ -47,6 +47,22 @@ describe('deliveryBadge', () => {
     });
   });
 
+  it('labels a delivery marked by hand', () => {
+    const manual = withDelivery(
+      { merged: 1, applied: 1 },
+      { deliveryStage: { status: 'applied', manual: true } },
+    );
+    expect(deliveryBadge(manual)).toMatchObject({
+      status: 'applied',
+      label: 'deliveredManually',
+    });
+    const real = withDelivery(
+      { merged: 1, applied: 1 },
+      { deliveryStage: { status: 'applied', manual: false } },
+    );
+    expect(deliveryBadge(real)).toMatchObject({ status: 'applied', label: null });
+  });
+
   it('reports undelivered merged groups as pending', () => {
     expect(deliveryBadge(withDelivery({ merged: 3, applied: 2 }))).toMatchObject({
       status: 'pending',
@@ -107,7 +123,10 @@ describe('settledOutcome', () => {
   const stage = (status: 'applied' | 'apply_failed', finishedAt: number, inProgress = false) =>
     runView({
       delivery: { applied: 0, merged: 1, failed: 0, inProgress, finishedAt },
-      deliveryStage: status === 'applied' ? { status } : { status, reason: 'boom', groups: ['a'] },
+      deliveryStage:
+        status === 'applied'
+          ? { status, manual: false }
+          : { status, reason: 'boom', groups: ['a'] },
     });
 
   it('waits while the delivery goes on', () => {

@@ -1576,6 +1576,8 @@ export class Daemon {
         }));
       case 'apply':
         return this.deliver(request.params);
+      case 'run_mark_delivered':
+        return this.markDelivered(request.params);
       case 'tags':
         return Promise.resolve(catalogView(this.catalog));
       case 'tag_add':
@@ -1664,6 +1666,30 @@ export class Daemon {
       return {
         runId: state.run.id,
         pending: state.run.pendingDelivery !== null,
+        groups: state.groups
+          .filter((group) =>
+            requested && requested.length > 0
+              ? requested.includes(group.slug)
+              : group.status === 'merged' && !before.has(group.slug),
+          )
+          .map((group) => ({ slug: group.slug, delivery: group.delivery })),
+      };
+    });
+  }
+
+  private markDelivered(params: ParamsOf<'run_mark_delivered'>): Promise<ApplyResult> {
+    return this.serial(async () => {
+      const state = this.state(params.runId);
+      const requested = params.groups ?? null;
+      const before = new Set(
+        state.groups
+          .filter((group) => group.delivery.state === 'applied')
+          .map((group) => group.slug),
+      );
+      await this.apply(state, { kind: 'delivered_marked', groups: requested });
+      return {
+        runId: state.run.id,
+        pending: false,
         groups: state.groups
           .filter((group) =>
             requested && requested.length > 0

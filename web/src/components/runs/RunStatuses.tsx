@@ -17,7 +17,7 @@ export interface StatusPart {
 
 /** Badge of the open group or step; a running one of a held run is finishing its last step. */
 export function entryBadge(entry: GroupRow | SystemStepRow, t: TFunction): ReactNode {
-  if (entry.status === 'running' && entry.hold !== null) {
+  if (entry.status === 'running' && entry.hold != null) {
     return (
       <StatusBadge
         status="running"
@@ -41,7 +41,10 @@ function mergeBadge(run: RunView, t: TFunction): ReactNode | null {
   return <StatusBadge status="merged" />;
 }
 
-/** Labelled parts of the statuses of a run: run, open group or step, merge and delivery. */
+/**
+ * Labelled parts of the statuses of a run: run, open group or step, merge and delivery.
+ * The merge badge sits inside the group part; it is a part of its own for a step or no entry.
+ */
 export function statusParts(
   run: RunView,
   entry: GroupRow | SystemStepRow | null,
@@ -78,13 +81,22 @@ export function statusParts(
     },
   ];
   if (entry) {
+    const isStep = 'kind' in entry;
+    const badges: ReactNode[] = [<span key="entry">{entryBadge(entry, t)}</span>];
+    // The merge of a working group joins its part; a merged group of a fully merged run says it once.
+    const joined = isStep ? null : mergeBadge(run, t);
+    const allMerged =
+      run.groups.length > 0 && run.groups.every((group) => group.status === 'merged');
+    if (joined && !(entry.status === 'merged' && allMerged)) {
+      badges.push(<span key="merge">{joined}</span>);
+    }
     parts.push({
       key: 'entry',
-      label: t('kind' in entry ? 'runs.header.parts.step' : 'runs.header.parts.group'),
-      badges: [<span key="entry">{entryBadge(entry, t)}</span>],
+      label: t(isStep ? 'runs.header.parts.step' : 'runs.header.parts.group'),
+      badges,
     });
   }
-  const merge = mergeBadge(run, t);
+  const merge = entry && !('kind' in entry) ? null : mergeBadge(run, t);
   if (merge) {
     parts.push({
       key: 'merge',
@@ -106,12 +118,14 @@ export function statusParts(
             ? t('runs.header.delivering')
             : badge.label === 'deliveryFailed'
               ? t('runs.header.deliveryFailed', { n: delivery.failed })
-              : badge.label === 'delivery'
-                ? t('runs.header.delivery', {
-                    applied: delivery.applied,
-                    merged: delivery.merged,
-                  })
-                : undefined
+              : badge.label === 'deliveredManually'
+                ? t('runs.header.deliveredManually')
+                : badge.label === 'delivery'
+                  ? t('runs.header.delivery', {
+                      applied: delivery.applied,
+                      merged: delivery.merged,
+                    })
+                  : undefined
         }
       />,
     );
