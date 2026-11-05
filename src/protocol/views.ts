@@ -1262,6 +1262,8 @@ export interface RepositoryEntry {
 
 export interface RepositoryView {
   path: string;
+  /** The path for display: the home directory is written as `~`. */
+  displayPath: string;
   addedAt: number;
   /** Runs that are not finished yet. */
   unfinished: number;
@@ -1271,11 +1273,20 @@ export interface RepositoryView {
   queued: number;
 }
 
+/** The path with the home directory (itself or as a prefix before a separator) written as `~`. */
+export function displayPath(path: string, home: string | null): string {
+  if (home === null || home === '') return path;
+  const base = home.length > 1 ? home.replace(/\/+$/, '') : home;
+  if (path === base) return '~';
+  return path.startsWith(`${base}/`) ? `~${path.slice(base.length)}` : path;
+}
+
 /** Registry entries with their counters, sorted by path. */
 export function repositoryViews(
   entries: readonly RepositoryEntry[],
   runs: readonly RunState[],
   queues: readonly Queue[],
+  home: string | null = null,
 ): RepositoryView[] {
   return entries
     .map((entry) => {
@@ -1283,6 +1294,7 @@ export function repositoryViews(
       const queue = queues.find((candidate) => candidate.repository === entry.path);
       return {
         path: entry.path,
+        displayPath: displayPath(entry.path, home),
         addedAt: entry.addedAt,
         unfinished: own.filter((state) => !isRunFinished(state)).length,
         waiting: own.filter((state) => runPhase(state) === 'needs_human').length,

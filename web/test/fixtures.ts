@@ -722,7 +722,15 @@ export function repositoryView(
   path = '/repo',
   overrides: Partial<RepositoryView> = {},
 ): RepositoryView {
-  return { path, addedAt: 1, unfinished: 0, waiting: 0, queued: 0, ...overrides };
+  return {
+    path,
+    displayPath: path,
+    addedAt: 1,
+    unfinished: 0,
+    waiting: 0,
+    queued: 0,
+    ...overrides,
+  };
 }
 
 type Use = RunView['specialists'][number];

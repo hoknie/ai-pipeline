@@ -58,10 +58,37 @@ describe('repositoryViews', () => {
     expect(views[2]).toMatchObject({ unfinished: 0, waiting: 0, queued: 0 });
   });
 
+  it('writes the home directory as ~ in displayPath', () => {
+    const list = [
+      { path: '/Users/me', addedAt: 1 },
+      { path: '/Users/me/projects/shop', addedAt: 2 },
+      { path: '/Users/me2/shop', addedAt: 3 },
+      { path: '/srv/app', addedAt: 4 },
+    ];
+    const shown = (home: string | null) =>
+      repositoryViews(list, [], [], home).map((view) => view.displayPath);
+    expect(shown('/Users/me')).toEqual(['~', '~/projects/shop', '/Users/me2/shop', '/srv/app']);
+    expect(shown(null)).toEqual([
+      '/Users/me',
+      '/Users/me/projects/shop',
+      '/Users/me2/shop',
+      '/srv/app',
+    ]);
+  });
+
   it('renders a table', () => {
     expect(formatRepositories([])).toBe('No repositories yet.');
     expect(
-      formatRepositories([{ path: '/repo/app', addedAt: 1, unfinished: 2, waiting: 1, queued: 0 }]),
+      formatRepositories([
+        {
+          path: '/repo/app',
+          displayPath: '/repo/app',
+          addedAt: 1,
+          unfinished: 2,
+          waiting: 1,
+          queued: 0,
+        },
+      ]),
     ).toBe(
       ['REPOSITORY  UNFINISHED  WAITING  QUEUED', '/repo/app   2           1        0'].join('\n'),
     );

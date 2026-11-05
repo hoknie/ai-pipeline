@@ -1041,7 +1041,16 @@ describe('order', () => {
         seq: 1,
         runs: [],
         queues: [queueOf({ repository: '/work/lib', items: items('A', 'B', 'C') })],
-        repositories: [{ path: '/work/lib', addedAt: 1, unfinished: 0, waiting: 0, queued: 3 }],
+        repositories: [
+          {
+            path: '/work/lib',
+            displayPath: '/work/lib',
+            addedAt: 1,
+            unfinished: 0,
+            waiting: 0,
+            queued: 3,
+          },
+        ],
       });
     });
     await screen.findByRole('list', { name: 'tasks in the queue' });
@@ -1143,7 +1152,16 @@ describe('store', () => {
       stream().send({
         event: 'repositories',
         seq: 1,
-        repositories: [{ path: '/other', addedAt: 1, unfinished: 1, waiting: 0, queued: 0 }],
+        repositories: [
+          {
+            path: '/other',
+            displayPath: '/other',
+            addedAt: 1,
+            unfinished: 1,
+            waiting: 0,
+            queued: 0,
+          },
+        ],
       }),
     );
     await waitFor(() => expect(result.current.selected).toBe('/other'));

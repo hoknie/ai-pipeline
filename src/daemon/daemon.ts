@@ -486,6 +486,7 @@ export class Daemon {
       [...this.registry.values()],
       [...this.states.values()],
       [...this.queues.values()],
+      this.environment.HOME || homedir(),
     );
   }
 

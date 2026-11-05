@@ -24,3 +24,15 @@ export function waitingByRepository(registry: readonly RepositoryView[]): Map<st
   for (const entry of registry) if (entry.waiting > 0) counts.set(entry.path, entry.waiting);
   return counts;
 }
+
+/** The path of each registered repository as it is shown (the home directory written as `~`). */
+export function displayPaths(registry: readonly RepositoryView[]): Map<string, string> {
+  return new Map(registry.map((entry) => [entry.path, entry.displayPath ?? entry.path]));
+}
+
+/** Whether the name or the path of a repository contains the query, ignoring case. */
+export function repositoryMatches(path: string, shown: string, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return true;
+  return [repositoryLabel(path), path, shown].some((text) => text.toLowerCase().includes(needle));
+}

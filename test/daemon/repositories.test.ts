@@ -55,6 +55,17 @@ describe('repository registry', () => {
     expect(await paths(h)).toEqual([viewed, previewed, queued].sort());
   });
 
+  it('shows the home directory of the daemon as ~ in displayPath', async () => {
+    const home = realpathSync(tmpdir());
+    const h = (current = await harness(undefined, { HOME: home }));
+    const [entry] = await list(h);
+    expect(entry).toBeUndefined();
+    await h.call('config', { repository: h.repo });
+    const [added] = await list(h);
+    expect(added!.path).toBe(h.repo);
+    expect(added!.displayPath).toBe(`~${h.repo.slice(home.length)}`);
+  });
+
   it('keeps the registry after a restart', async () => {
     const h = (current = await harness());
     await h.call('workflows', { repository: h.repo });
@@ -67,7 +78,14 @@ describe('repository registry', () => {
     const repo = newRepository();
     const added = (await h.call('repository_add', { path: join(repo, 'sub') })) as RepositoryView[];
     expect(added).toEqual([
-      { path: repo, addedAt: expect.any(Number), unfinished: 0, waiting: 0, queued: 0 },
+      {
+        path: repo,
+        displayPath: repo,
+        addedAt: expect.any(Number),
+        unfinished: 0,
+        waiting: 0,
+        queued: 0,
+      },
     ]);
     const again = (await h.call('repository_add', { path: repo })) as RepositoryView[];
     expect(again).toEqual(added);

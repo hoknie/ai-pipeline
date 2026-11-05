@@ -58,22 +58,41 @@ export interface HistoryState {
   loadMore: () => void;
 }
 
+/**
+ * The order of the run list: running runs first (those waiting for an answer on top, then the
+ * ones not started yet, then by start time), then held runs (frozen, paused), then finished runs
+ * by finish time, then runs without a finish time by creation time. A run returned to its queue
+ * counts as finished.
+ */
 export function sortRuns(runs: Iterable<RunView>): RunView[] {
+  const part = (run: RunView): number => {
+    if (run.state === 'queued') return run.finishedAt !== null ? 2 : 3;
+    if (!run.finished && run.hold !== null) return 1;
+    if (!run.finished) return 0;
+    return run.finishedAt !== null ? 2 : 3;
+  };
+  const compareId = (left: RunView, right: RunView) =>
+    left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
   return [...runs].sort((left, right) => {
-    // A finished run waiting in the queue as a return item counts as unfinished.
-    const rank = (run: RunView) =>
-      run.state === 'queued' ? 1 : run.finished ? 2 : run.state === 'needs_human' ? 0 : 1;
-    if (rank(left) !== rank(right)) return rank(left) - rank(right);
-    // A run that waits for a slot is not started yet: it goes first among the unfinished.
-    const waiting = (run: RunView) =>
-      run.state === 'queued' || (!run.finished && run.startedAt === null);
-    if (waiting(left) !== waiting(right)) return waiting(left) ? -1 : 1;
-    const key = (run: RunView) => (waiting(run) ? run.createdAt : (run.startedAt ?? run.createdAt));
-    return (
-      key(right) - key(left) ||
-      right.createdAt - left.createdAt ||
-      (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
-    );
+    const at = part(left);
+    if (at !== part(right)) return at - part(right);
+    if (at === 0) {
+      const waiting = (run: RunView) => (run.state === 'needs_human' ? 0 : 1);
+      if (waiting(left) !== waiting(right)) return waiting(left) - waiting(right);
+      // A run that waits for a slot is not started yet: it goes first among the running.
+      const idle = (run: RunView) => run.startedAt === null;
+      if (idle(left) !== idle(right)) return idle(left) ? -1 : 1;
+      const key = (run: RunView) => (idle(run) ? run.createdAt : (run.startedAt ?? run.createdAt));
+      return key(right) - key(left) || right.createdAt - left.createdAt || compareId(left, right);
+    }
+    if (at === 2) {
+      return (
+        (right.finishedAt ?? 0) - (left.finishedAt ?? 0) ||
+        right.createdAt - left.createdAt ||
+        compareId(left, right)
+      );
+    }
+    return right.createdAt - left.createdAt || compareId(left, right);
   });
 }
 

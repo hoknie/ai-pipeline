@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
 import { act, cleanup, render, screen, waitFor, within } from './render.tsx';
 import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,14 +64,12 @@ describe('tokens of a run', () => {
     now: 0,
     query: '',
     onQuery: () => undefined,
-    filter: 'all' as const,
-    onFilter: () => undefined,
+    filters: EMPTY_FILTERS,
+    onFilters: () => undefined,
     onSelect: () => undefined,
     scope: 'repository' as const,
     onScope: () => undefined,
     repository: null,
-    tagIds: [],
-    onTagIds: () => undefined,
   };
 
   it('shows them in the list and the header, and no dollars while the cost is unknown', () => {

@@ -1,4 +1,11 @@
-import { ArrowLeft, Inbox, ListFilter, MousePointerClick } from 'lucide-react';
+import {
+  ArrowLeft,
+  Inbox,
+  ListFilter,
+  MousePointerClick,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -32,7 +39,31 @@ import { RunFilters } from './RunFilters.tsx';
 import type { OpenedState } from '../../store.ts';
 import { RunList } from './RunList.tsx';
 import type { HistoryState } from '../../store.ts';
-import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
+import {
+  activeFilters,
+  EMPTY_FILTERS,
+  filterRuns,
+  type RunFilterState,
+  type RunScope,
+} from './runFilter.ts';
+
+/** Widths (px) of the columns: the filters, their collapsed strip and the list of runs. */
+const FILTERS_WIDTH = 256;
+const STRIP_WIDTH = 40;
+const LIST_WIDTH = 320;
+/** Collapsing frees FILTERS_WIDTH − STRIP_WIDTH px: 2/3 of it goes to the list, 1/3 to the run. */
+const LIST_WIDTH_COLLAPSED = LIST_WIDTH + Math.round(((FILTERS_WIDTH - STRIP_WIDTH) * 2) / 3);
+
+/** The tags chosen before the filters were stored together, so that the choice survives. */
+function legacyTags(): string[] {
+  try {
+    const raw = window.localStorage.getItem('aip.web.runTags');
+    const parsed: unknown = raw === null ? [] : JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 /** The runs section: filters, the list of runs and the open run with its group; filters sit in a column from 1280 px and behind a button below. */
 function moreOf(history: HistoryState | undefined): 'idle' | 'loading' | 'error' | 'done' {
@@ -57,6 +88,7 @@ export function RunsPage({
   onShowJson,
   onRoute,
   repository,
+  repositoryPaths,
   scope,
   onScope,
   onSubtask,
@@ -80,6 +112,8 @@ export function RunsPage({
   onRoute: (route: Route) => void;
   /** The selected repository; null until known. */
   repository: string | null;
+  /** The path of each repository as shown; absent: the path itself. */
+  repositoryPaths?: ReadonlyMap<string, string>;
   scope: RunScope;
   /** Opens a new task as a child of the run; absent while the queue is unknown. */
   onSubtask?: (run: RunView) => void;
@@ -93,12 +127,20 @@ export function RunsPage({
   const [query, setQuery] = useState('');
   const [headerElement, setHeaderElement] = useState<HTMLElement | null>(null);
   const headerOut = useOutOfView(headerElement);
-  const [filter, setFilter] = usePreference<RunFilter>('runFilter', 'all');
   const { byId } = useTags();
-  const [storedTags, setStoredTags] = usePreference<string[]>('runTags', []);
+  const [legacy] = useState(legacyTags);
+  const [stored, setStored] = usePreference<RunFilterState>('runFilters', {
+    ...EMPTY_FILTERS,
+    tagIds: legacy,
+  });
+  const [collapsed, setCollapsed] = usePreference<boolean>('runFiltersCollapsed', false);
   // an id that is not in the catalog of the selected repository (the tag was removed, or the
   // repository changed) drops out of the selection
-  const tagIds = storedTags.filter((id) => byId.get(id)?.repository === repository);
+  const filters: RunFilterState = {
+    ...EMPTY_FILTERS,
+    ...stored,
+    tagIds: (stored.tagIds ?? []).filter((id) => byId.get(id)?.repository === repository),
+  };
   const [screen, setScreen] = useState<'list' | 'detail'>(route.group ? 'detail' : 'list');
 
   const deliver = useDeliveryOutcome(api, runs);
@@ -112,14 +154,7 @@ export function RunsPage({
     onRoute({ view: 'runs', run: runId, group: slug, step: null, tab: null });
   };
 
-  const shown = filterRuns(
-    runs,
-    query,
-    filter,
-    scope === 'repository' ? repository : null,
-    tagIds,
-    byId,
-  );
+  const shown = filterRuns(runs, query, filters, scope, repository, byId);
   const step = (delta: number) => {
     if (shown.length === 0) return;
     const at = shown.findIndex((candidate) => candidate.id === run?.id);
@@ -153,15 +188,14 @@ export function RunsPage({
     runs,
     query,
     onQuery: setQuery,
-    filter,
-    onFilter: setFilter,
+    filters,
+    onFilters: setStored,
     scope,
     onScope,
     repository,
-    tagIds,
-    onTagIds: setStoredTags,
+    repositoryPaths,
   };
-  const count = activeFilters(query, filter, tagIds);
+  const count = activeFilters(query, filters, scope);
   const filterButton = (
     <Button variant="outline" size="sm" className="w-full justify-start">
       <ListFilter />
@@ -191,21 +225,20 @@ export function RunsPage({
   const list = loaded ? (
     runs.length === 0 ? null : (
       <RunList
-        filters={false}
+        showFilters={false}
         runs={runs}
         selectedRun={run?.id ?? null}
         selectedGroup={group?.slug ?? null}
         now={now}
         query={query}
         onQuery={setQuery}
-        filter={filter}
-        onFilter={setFilter}
+        filters={filters}
+        onFilters={setStored}
         onSelect={select}
         scope={scope}
         onScope={onScope}
         repository={repository}
-        tagIds={tagIds}
-        onTagIds={setStoredTags}
+        repositoryPaths={repositoryPaths}
         more={moreOf(history)}
         onMore={history?.loadMore}
       />
@@ -319,14 +352,57 @@ export function RunsPage({
   return (
     <div className="flex min-h-0 flex-1">
       {columns && loaded ? (
-        <aside
-          aria-label={t('runs.list.filters')}
-          className="w-64 shrink-0 overflow-y-auto border-r p-3"
-        >
-          <RunFilters {...filterProps} />
-        </aside>
+        collapsed ? (
+          <aside
+            aria-label={t('runs.list.filters')}
+            data-filters="collapsed"
+            style={{ width: STRIP_WIDTH }}
+            className="flex shrink-0 flex-col items-center gap-2 border-r py-3"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('runs.list.expand')}
+              title={t('runs.list.expand')}
+              onClick={() => setCollapsed(false)}
+            >
+              <PanelLeftOpen />
+            </Button>
+            {count > 0 ? (
+              <span
+                aria-label={t('runs.list.filtersCount', { count })}
+                className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
+              >
+                {count}
+              </span>
+            ) : null}
+          </aside>
+        ) : (
+          <aside
+            aria-label={t('runs.list.filters')}
+            data-filters="expanded"
+            style={{ width: FILTERS_WIDTH }}
+            className="flex shrink-0 flex-col gap-2 overflow-y-auto border-r p-3"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-fit"
+              aria-label={t('runs.list.collapse')}
+              onClick={() => setCollapsed(true)}
+            >
+              <PanelLeftClose />
+              {t('runs.list.collapse')}
+            </Button>
+            <RunFilters {...filterProps} />
+          </aside>
+        )
       ) : null}
-      <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-r p-3">
+      <aside
+        data-runs-list
+        style={{ width: columns && collapsed ? LIST_WIDTH_COLLAPSED : LIST_WIDTH }}
+        className="flex shrink-0 flex-col gap-2 overflow-y-auto border-r p-3"
+      >
         {loaded ? filtersControl : null}
         {list}
       </aside>

@@ -36,6 +36,7 @@ export type {
   QueueView,
   RepositoryView,
   RunCreated,
+  RunViewState,
   ResolverRow,
   RunView,
   RuntimeCatalog,

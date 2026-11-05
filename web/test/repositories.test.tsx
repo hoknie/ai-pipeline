@@ -35,7 +35,7 @@ const APP = '/work/app';
 const LIB = '/work/lib';
 
 function entry(path: string, waiting = 0): RepositoryView {
-  return { path, addedAt: 1, unfinished: waiting, waiting, queued: 0 };
+  return { path, displayPath: path, addedAt: 1, unfinished: waiting, waiting, queued: 0 };
 }
 
 describe('repositoryList, waitingByRepository, repositoryLabel', () => {

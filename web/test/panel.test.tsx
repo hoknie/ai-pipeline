@@ -18,7 +18,7 @@ import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
 import { Transcript } from '../src/components/Transcript.tsx';
 import { RunHeader } from '../src/components/runs/RunHeader.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
-import type { RunFilter } from '../src/components/runs/runFilter.ts';
+import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
 import { files } from '../src/format.ts';
 import { sortRuns, useRuns } from '../src/store.ts';
 
@@ -54,14 +54,12 @@ function list(runs: Parameters<typeof RunList>[0]['runs'], props: ListProps = {}
     now: 0,
     query: '',
     onQuery: () => undefined,
-    filter: 'all' as RunFilter,
-    onFilter: () => undefined,
+    filters: EMPTY_FILTERS,
+    onFilters: () => undefined,
     onSelect: () => undefined,
     scope: 'repository' as const,
     onScope: () => undefined,
     repository: null,
-    tagIds: [],
-    onTagIds: () => undefined,
   };
   return <RunList runs={runs} {...base} {...props} />;
 }
@@ -173,13 +171,40 @@ describe('needs_human runs', () => {
     expect(sortRuns(runs).map((run) => run.id)).toEqual(['old-wait', 'new', 'old', 'fin']);
   });
 
-  it('puts a run waiting in the queue among the unfinished, above started ones', () => {
+  it('sorts a run returned to its queue among the finished ones by finish time', () => {
     const runs = [
-      runView({ id: 'fin', finished: true, state: 'finished', createdAt: 9 }),
+      runView({ id: 'fin', finished: true, state: 'finished', createdAt: 9, finishedAt: 50 }),
       runView({ id: 'active', createdAt: 8, startedAt: 80 }),
-      runView({ id: 'queued', finished: true, state: 'queued', queueItem: 'q1', createdAt: 1 }),
+      runView({
+        id: 'queued',
+        finished: true,
+        state: 'queued',
+        queueItem: 'q1',
+        createdAt: 1,
+        finishedAt: 70,
+      }),
     ];
-    expect(sortRuns(runs).map((run) => run.id)).toEqual(['queued', 'active', 'fin']);
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['active', 'queued', 'fin']);
+  });
+
+  it('puts frozen and paused runs below running ones and above finished ones', () => {
+    const runs = [
+      runView({ id: 'fin', finished: true, state: 'finished', createdAt: 9, finishedAt: 99 }),
+      runView({ id: 'frozen', state: 'frozen', hold: 'frozen', createdAt: 5, startedAt: 500 }),
+      runView({ id: 'paused', state: 'paused', hold: 'paused', createdAt: 6, startedAt: 1 }),
+      runView({ id: 'active', createdAt: 1, startedAt: 10 }),
+    ];
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['active', 'paused', 'frozen', 'fin']);
+  });
+
+  it('sorts finished runs by finish time and the ones without it last, by creation time', () => {
+    const runs = [
+      runView({ id: 'cancelled', finished: true, state: 'cancelled', createdAt: 400 }),
+      runView({ id: 'early', finished: true, state: 'finished', createdAt: 300, finishedAt: 10 }),
+      runView({ id: 'late', finished: true, state: 'finished', createdAt: 1, finishedAt: 20 }),
+      runView({ id: 'older', finished: true, state: 'cancelled', createdAt: 100 }),
+    ];
+    expect(sortRuns(runs).map((run) => run.id)).toEqual(['late', 'early', 'cancelled', 'older']);
   });
 
   it('sorts by start time, not by creation time', () => {
@@ -197,15 +222,6 @@ describe('needs_human runs', () => {
       runView({ id: 'queued-new', createdAt: 8, startedAt: null }),
     ];
     expect(sortRuns(runs).map((run) => run.id)).toEqual(['queued-new', 'queued', 'started']);
-  });
-
-  it('sorts finished runs by start time, falling back to creation time', () => {
-    const runs = [
-      runView({ id: 'a', finished: true, state: 'finished', createdAt: 5, startedAt: 100 }),
-      runView({ id: 'b', finished: true, state: 'finished', createdAt: 300, startedAt: null }),
-      runView({ id: 'c', finished: true, state: 'finished', createdAt: 1, startedAt: 200 }),
-    ];
-    expect(sortRuns(runs).map((run) => run.id)).toEqual(['b', 'c', 'a']);
   });
 
   it('shows needs_human ×N in the list and header, and active after the answer', () => {
@@ -1081,8 +1097,31 @@ describe('tag catalog and filter', () => {
     expect(within(list).getByText('С тегом')).toBeTruthy();
     expect(within(list).queryByText('Без тега')).toBeNull();
     expect(within(list).getByText('login')).toBeTruthy();
-    const field = screen.getByRole('combobox', { name: 'Tags' }).parentElement!;
-    expect(within(field).getByText('login')).toBeTruthy();
+    // the removed tag drops out; the chosen one is a number on the button, not a chip
+    expect(within(screen.getByRole('combobox', { name: 'Tags' })).getByText('1')).toBeTruthy();
+  });
+
+  it('ignores the status filter of the old versions and keeps the filters after a reload', async () => {
+    window.localStorage.setItem('aip.web.runFilter', JSON.stringify('waiting'));
+    window.localStorage.setItem(
+      'aip.web.runFilters',
+      JSON.stringify({
+        states: ['finished'],
+        workflows: [],
+        specialists: [],
+        tagIds: [],
+        repositories: [],
+      }),
+    );
+    const done = runView({ id: 'a', title: 'Готов', state: 'finished', finished: true });
+    const live = runView({ id: 'b', title: 'Идёт' });
+    render(<App api={fakeApi({ runs: vi.fn(async () => [done, live]) })} openStream={openFake} />);
+    act(() => {
+      stream().open();
+      stream().send({ event: 'snapshot', seq: 1, runs: [done, live], tags: [] });
+    });
+    await waitFor(() => expect(document.querySelector('li[data-run="a"]')).toBeTruthy());
+    expect(document.querySelector('li[data-run="b"]')).toBeNull();
   });
 
   it('shows nothing found with a reset that clears the tags', async () => {
@@ -1095,7 +1134,8 @@ describe('tag catalog and filter', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
     await waitFor(() => expect(document.querySelector('li[data-run="b"]')).toBeTruthy());
-    expect(window.localStorage.getItem('aip.web.runTags')).toBe('[]');
+    const stored = JSON.parse(window.localStorage.getItem('aip.web.runFilters') ?? '{}');
+    expect(stored.tagIds).toEqual([]);
   });
 });
 

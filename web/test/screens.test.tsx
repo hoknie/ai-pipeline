@@ -811,13 +811,14 @@ describe('runs section columns', () => {
     window.location.hash = '#runs/a';
     mount(two());
     const filters = await screen.findByRole('complementary', { name: 'Filters' });
-    expect(filters.className).toContain('w-64');
+    expect(filters.style.width).toBe('256px');
     expect(within(filters).getByRole('searchbox', { name: 'Search runs' })).toBeTruthy();
-    expect(within(filters).getByRole('radio', { name: 'Waiting 1' })).toBeTruthy();
+    expect(within(filters).getByRole('combobox', { name: 'State' })).toBeTruthy();
+    expect(within(filters).getByRole('combobox', { name: 'Specialists' })).toBeTruthy();
     expect(within(filters).getByRole('radio', { name: 'This repository' })).toBeTruthy();
     expect(within(filters).queryByText('Первый')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
-    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.className).toContain('w-80');
+    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('320px');
     expect(screen.getByRole('main')).toBeTruthy();
   });
 
@@ -828,18 +829,71 @@ describe('runs section columns', () => {
     expect(screen.queryByRole('searchbox', { name: 'Search runs' })).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
     expect(await screen.findByRole('searchbox', { name: 'Search runs' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Waiting 1' })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'State' })).toBeTruthy();
   });
 
   it('shows the number of filters in effect on the button', async () => {
     restore = setWindowWidth(1100);
     mount(two());
     fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
-    fireEvent.click(await screen.findByRole('radio', { name: 'Waiting 1' }));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'State' }));
+    fireEvent.click(await screen.findByRole('option', { name: /Needs answer/ }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {
       target: { value: 'Первый' },
     });
     expect(await screen.findByRole('button', { name: 'Filters (2)' })).toBeTruthy();
+  });
+
+  it('collapses the filters into a strip and gives the freed width to the list', async () => {
+    restore = setWindowWidth(1600);
+    window.location.hash = '#runs/a';
+    mount(two());
+    const filters = await screen.findByRole('complementary', { name: 'Filters' });
+    const list = screen.getAllByText('Первый')[0]!.closest('aside')!;
+    expect(list.style.width).toBe('320px');
+    fireEvent.click(within(filters).getByRole('button', { name: 'Collapse filters' }));
+    const strip = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(strip.style.width).toBe('40px');
+    expect(within(strip).queryByRole('searchbox')).toBeNull();
+    // 320 + 2/3 of the freed 216 px; the run keeps the rest
+    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('464px');
+    expect(screen.getByRole('main')).toBeTruthy();
+    // the choice outlives the page
+    cleanup();
+    mount(two());
+    const again = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(again.style.width).toBe('40px');
+    fireEvent.click(within(again).getByRole('button', { name: 'Expand filters' }));
+    expect((await screen.findByRole('complementary', { name: 'Filters' })).style.width).toBe(
+      '256px',
+    );
+  });
+
+  it('shows the number of conditions on the collapsed strip', async () => {
+    restore = setWindowWidth(1600);
+    window.localStorage.setItem('aip.web.runFiltersCollapsed', 'true');
+    window.localStorage.setItem(
+      'aip.web.runFilters',
+      JSON.stringify({
+        states: ['active', 'failed'],
+        workflows: [],
+        specialists: [],
+        tagIds: [],
+        repositories: [],
+      }),
+    );
+    mount(two());
+    const strip = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(within(strip).getByText('2')).toBeTruthy();
+  });
+
+  it('does not collapse anything below 1280 px', async () => {
+    restore = setWindowWidth(1100);
+    window.localStorage.setItem('aip.web.runFiltersCollapsed', 'true');
+    mount(two());
+    expect(await screen.findByRole('button', { name: 'Filters' })).toBeTruthy();
+    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('320px');
   });
 
   it('opens the filters in a sheet in a phone-wide window', async () => {

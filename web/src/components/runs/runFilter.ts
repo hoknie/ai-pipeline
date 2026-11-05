@@ -1,30 +1,57 @@
 import { runTitle, taskNumber } from '../../format.ts';
-import type { RunView, TagView } from '../../types.ts';
+import type { RunView, RunViewState, TagView } from '../../types.ts';
 
 /** Whose runs the list shows: those of the selected repository or of every repository. */
 export type RunScope = 'repository' | 'all';
 
-export type RunFilter = 'all' | 'waiting' | 'active' | 'done';
-
-/** Filters of the run list; labels are keys under `runs.list` in the dictionaries. */
-export const RUN_FILTERS: { value: RunFilter; labelKey: RunFilter }[] = [
-  { value: 'all', labelKey: 'all' },
-  { value: 'waiting', labelKey: 'waiting' },
-  { value: 'active', labelKey: 'active' },
-  { value: 'done', labelKey: 'done' },
+/** The eight states a run can be in, in the order of the state filter. */
+export const RUN_STATES: RunViewState[] = [
+  'needs_human',
+  'active',
+  'queued',
+  'paused',
+  'frozen',
+  'finished',
+  'failed',
+  'cancelled',
 ];
 
-function inFilter(run: RunView, filter: RunFilter): boolean {
-  switch (filter) {
-    case 'all':
-      return true;
-    case 'waiting':
-      return run.state === 'needs_human';
-    case 'active':
-      return run.state === 'queued' || (!run.finished && run.state !== 'needs_human');
-    case 'done':
-      return run.state !== 'queued' && (run.finished || run.state === 'cancelled');
-  }
+/** Choices of the run filters; every list is empty when the filter is off. */
+export interface RunFilterState {
+  states: RunViewState[];
+  /** Workflow slugs. */
+  workflows: string[];
+  /** Specialist slugs. */
+  specialists: string[];
+  tagIds: string[];
+  /** Repository paths; applies only to the runs of every repository. */
+  repositories: string[];
+}
+
+export const EMPTY_FILTERS: RunFilterState = {
+  states: [],
+  workflows: [],
+  specialists: [],
+  tagIds: [],
+  repositories: [],
+};
+
+/** A filter of the state; `key` names its list. */
+export type RunFilterKey = keyof RunFilterState;
+
+const FILTER_KEYS: RunFilterKey[] = [
+  'states',
+  'workflows',
+  'specialists',
+  'tagIds',
+  'repositories',
+];
+
+/** Specialists of the steps the run does not skip, plus the one of the split. */
+export function runSpecialists(run: RunView): string[] {
+  const slugs = (run.steps ?? []).filter((step) => !step.skipped).map((step) => step.specialist);
+  const split = run.topology?.split?.specialist;
+  return [...new Set(split ? [...slugs, split] : slugs)];
 }
 
 /**
@@ -44,7 +71,7 @@ export function inTags(
   );
 }
 
-/** Searched text of a run: title, name, workflow, id, group titles, tag names. */
+/** Searched text of a run: title, name, workflow, id, group titles, tag names, specialists. */
 function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
   const tagNames = (run.tags ?? []).flatMap((tag) => catalog.get(tag.id)?.name ?? []);
   return [
@@ -56,6 +83,7 @@ function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
     taskNumber(run.number),
     ...run.groups.map((group) => group.title),
     ...tagNames,
+    ...runSpecialists(run),
   ]
     .filter((part): part is string => Boolean(part))
     .join('\n')
@@ -67,27 +95,118 @@ export function runsOf(runs: RunView[], repository: string | null): RunView[] {
   return repository === null ? runs : runs.filter((run) => run.repository === repository);
 }
 
+function matchesQuery(run: RunView, query: string, catalog: ReadonlyMap<string, TagView>) {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return true;
+  // `#7` is the number of a task and matches it exactly (not 17 or 70).
+  const numeric = /^#(\d+)$/.exec(needle);
+  return numeric ? run.number === Number(numeric[1]) : haystack(run, catalog).includes(needle);
+}
+
+/** Whether the run passes the filter `key` of the state; the repository one needs the scope «all». */
+function passes(
+  run: RunView,
+  key: RunFilterKey,
+  state: RunFilterState,
+  scope: RunScope,
+  catalog: ReadonlyMap<string, TagView>,
+): boolean {
+  switch (key) {
+    case 'states':
+      return state.states.length === 0 || state.states.includes(run.state);
+    case 'workflows':
+      return state.workflows.length === 0 || state.workflows.includes(run.workflow);
+    case 'specialists':
+      return (
+        state.specialists.length === 0 ||
+        runSpecialists(run).some((slug) => state.specialists.includes(slug))
+      );
+    case 'tagIds':
+      return inTags(run, state.tagIds, catalog);
+    case 'repositories':
+      return (
+        scope !== 'all' ||
+        state.repositories.length === 0 ||
+        state.repositories.includes(run.repository)
+      );
+  }
+}
+
 /**
- * Runs matching the query (case-insensitive), the status filter and the tags (any of them), in
- * their own order; with a repository, only its runs (`null` means all repositories).
+ * Runs matching the query (case-insensitive) and every filter (any of the choices inside one
+ * filter, all the filters together), in their own order; with a repository, only its runs
+ * (`null` means all repositories).
  */
 export function filterRuns(
   runs: RunView[],
   query: string,
-  filter: RunFilter,
+  state: RunFilterState,
+  scope: RunScope,
   repository: string | null = null,
-  tagIds: readonly string[] = [],
   catalog: ReadonlyMap<string, TagView> = new Map(),
 ): RunView[] {
-  const needle = query.trim().toLowerCase();
-  // `#7` is the number of a task and matches it exactly (not 17 or 70).
-  const numeric = /^#(\d+)$/.exec(needle);
-  const matches = (run: RunView): boolean =>
-    numeric ? run.number === Number(numeric[1]) : haystack(run, catalog).includes(needle);
-  return runsOf(runs, repository).filter(
+  return runsOf(runs, scope === 'repository' ? repository : null).filter(
     (run) =>
-      inFilter(run, filter) && inTags(run, tagIds, catalog) && (needle === '' || matches(run)),
+      matchesQuery(run, query, catalog) &&
+      FILTER_KEYS.every((key) => passes(run, key, state, scope, catalog)),
   );
+}
+
+/**
+ * Runs for the counters of the filter `key`: those passing the query and every other filter, so
+ * a counter says how many runs the choice would show.
+ */
+export function facetRuns(
+  runs: RunView[],
+  query: string,
+  state: RunFilterState,
+  scope: RunScope,
+  repository: string | null,
+  catalog: ReadonlyMap<string, TagView>,
+  key: RunFilterKey,
+): RunView[] {
+  return runsOf(runs, scope === 'repository' ? repository : null).filter(
+    (run) =>
+      matchesQuery(run, query, catalog) &&
+      FILTER_KEYS.every((other) => other === key || passes(run, other, state, scope, catalog)),
+  );
+}
+
+/** How many runs each value of the filter `key` would show, by value. */
+export function optionCounts(
+  runs: RunView[],
+  query: string,
+  state: RunFilterState,
+  scope: RunScope,
+  repository: string | null,
+  catalog: ReadonlyMap<string, TagView>,
+  key: RunFilterKey,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const add = (value: string) => counts.set(value, (counts.get(value) ?? 0) + 1);
+  for (const run of facetRuns(runs, query, state, scope, repository, catalog, key)) {
+    switch (key) {
+      case 'states':
+        add(run.state);
+        break;
+      case 'workflows':
+        add(run.workflow);
+        break;
+      case 'specialists':
+        runSpecialists(run).forEach(add);
+        break;
+      case 'repositories':
+        add(run.repository);
+        break;
+      case 'tagIds': {
+        // a run counts for each tag of the catalog it carries, also by the name (other repository)
+        for (const id of catalog.keys())
+          if ((run.tags ?? []).length > 0 && inTags(run, [id], catalog)) add(id);
+        break;
+      }
+    }
+  }
+  return counts;
 }
 
 /** Navigation counters: unfinished runs and those among them waiting for an answer. */
@@ -97,22 +216,14 @@ export function navRunCounts(runs: RunView[]): { working: number; waiting: numbe
   return { working: active + waiting, waiting };
 }
 
-/** Counters of the status filter over the runs that have one of the tags. */
-export function filterCounts(
-  all: RunView[],
-  tagIds: readonly string[] = [],
-  catalog: ReadonlyMap<string, TagView> = new Map(),
-): Record<RunFilter, number> {
-  const runs = all.filter((run) => inTags(run, tagIds, catalog));
-  return {
-    all: runs.length,
-    waiting: runs.filter((run) => inFilter(run, 'waiting')).length,
-    active: runs.filter((run) => inFilter(run, 'active')).length,
-    done: runs.filter((run) => inFilter(run, 'done')).length,
-  };
-}
-
-/** How many filters are in effect: a non-empty search, a status other than «all», chosen tags. */
-export function activeFilters(query: string, filter: RunFilter, tagIds: readonly string[]): number {
-  return (query.trim() !== '' ? 1 : 0) + (filter !== 'all' ? 1 : 0) + tagIds.length;
+/** How many filters are in effect: a non-empty search and every chosen value. */
+export function activeFilters(query: string, state: RunFilterState, scope: RunScope): number {
+  // the repository choice only applies in the «all repositories» scope
+  return (
+    (query.trim() !== '' ? 1 : 0) +
+    FILTER_KEYS.reduce(
+      (sum, key) => sum + (key === 'repositories' && scope !== 'all' ? 0 : state[key].length),
+      0,
+    )
+  );
 }

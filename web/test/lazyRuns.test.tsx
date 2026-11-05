@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
+import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
 import { useRuns } from '../src/store.ts';
 import { useNearEnd } from '../src/useNearEnd.ts';
 import { TagsProvider } from '../src/tags.tsx';
@@ -127,14 +128,12 @@ describe('useNearEnd and the list end', () => {
           now={2_000}
           query="zzz"
           onQuery={() => undefined}
-          filter="all"
-          onFilter={() => undefined}
+          filters={EMPTY_FILTERS}
+          onFilters={() => undefined}
           onSelect={() => undefined}
           scope="all"
           onScope={() => undefined}
           repository="/repo"
-          tagIds={[]}
-          onTagIds={() => undefined}
           more={more}
           onMore={onMore}
         />

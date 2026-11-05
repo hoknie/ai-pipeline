@@ -6,11 +6,12 @@ import { TagsProvider } from '../src/tags.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
 import {
   activeFilters,
-  filterCounts,
+  EMPTY_FILTERS,
   filterRuns,
   navRunCounts,
-  runsOf,
-  type RunFilter,
+  optionCounts,
+  runSpecialists,
+  type RunFilterState,
 } from '../src/components/runs/runFilter.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
@@ -31,19 +32,30 @@ const runs = [
   }),
 ];
 
+const only = (patch: Partial<RunFilterState>): RunFilterState => ({ ...EMPTY_FILTERS, ...patch });
+const ids = (list: { id: string }[]) => list.map((run) => run.id);
+const find = (
+  list: ReturnType<typeof runView>[],
+  query: string,
+  state: RunFilterState = EMPTY_FILTERS,
+  scope: 'repository' | 'all' = 'all',
+  repository: string | null = null,
+  catalog: Map<string, never> | Map<string, ReturnType<typeof tagView>> = new Map(),
+) => filterRuns(list, query, state, scope, repository, catalog as never);
+
 describe('search by task number', () => {
   const numbered = [7, 17, 70].map((number) =>
     runView({ id: `n${number}`, title: 'Задача', number }),
   );
 
   it('finds the run by #N exactly, not the numbers that contain it', () => {
-    expect(filterRuns(numbered, '#7', 'all').map((run) => run.id)).toEqual(['n7']);
-    expect(filterRuns(numbered, '#17', 'all').map((run) => run.id)).toEqual(['n17']);
-    expect(filterRuns(numbered, '#8', 'all')).toEqual([]);
+    expect(ids(find(numbered, '#7'))).toEqual(['n7']);
+    expect(ids(find(numbered, '#17'))).toEqual(['n17']);
+    expect(find(numbered, '#8')).toEqual([]);
   });
 
   it('keeps the text search for other queries', () => {
-    expect(filterRuns(numbered, 'задача', 'all')).toHaveLength(3);
+    expect(find(numbered, 'задача')).toHaveLength(3);
   });
 });
 
@@ -59,57 +71,130 @@ describe('navRunCounts', () => {
 
 describe('filterRuns', () => {
   it('searches without regard to case in the title, the name, the workflow, the id and the groups', () => {
-    expect(filterRuns(runs, 'жДущИй', 'all').map((run) => run.id)).toEqual(['w']);
-    expect(filterRuns(runs, 'FEATURE-login', 'all').map((run) => run.id)).toEqual(['a']);
-    expect(filterRuns(runs, 'регистр', 'all').map((run) => run.id)).toEqual(['g']);
-    expect(filterRuns(runs, 'feature', 'all')).toHaveLength(runs.length);
-    expect(filterRuns(runs, '  ', 'all')).toHaveLength(runs.length);
-    expect(filterRuns(runs, 'run1', 'all')).toHaveLength(0);
+    expect(ids(find(runs, 'жДущИй'))).toEqual(['w']);
+    expect(ids(find(runs, 'FEATURE-login'))).toEqual(['a']);
+    expect(ids(find(runs, 'регистр'))).toEqual(['g']);
+    expect(find(runs, 'feature')).toHaveLength(runs.length);
+    expect(find(runs, '  ')).toHaveLength(runs.length);
+    expect(find(runs, 'run1')).toHaveLength(0);
   });
 
-  it('filters by phase and counts each filter; a cancelled run counts as finished', () => {
-    expect(filterRuns(runs, '', 'waiting').map((run) => run.id)).toEqual(['w']);
-    expect(filterRuns(runs, '', 'active').map((run) => run.id)).toEqual(['a', 'g']);
-    expect(filterRuns(runs, '', 'done').map((run) => run.id)).toEqual(['f', 'c']);
-    expect(filterCounts(runs)).toEqual({ all: 5, waiting: 1, active: 2, done: 2 });
+  it('filters by one or several of the eight states', () => {
+    expect(ids(find(runs, '', only({ states: ['needs_human'] })))).toEqual(['w']);
+    expect(ids(find(runs, '', only({ states: ['active'] })))).toEqual(['a', 'g']);
+    expect(ids(find(runs, '', only({ states: ['finished', 'cancelled'] })))).toEqual(['f', 'c']);
+    expect(ids(find(runs, '', only({ states: ['failed'] })))).toEqual([]);
   });
 
-  it('counts a failed run as done', () => {
-    const failed = runView({ id: 'x', state: 'failed', finished: true });
-    expect(filterRuns([failed], '', 'done').map((run) => run.id)).toEqual(['x']);
-    expect(filterRuns([failed], '', 'active')).toEqual([]);
-  });
-
-  it('counts a run waiting in the queue as active, not as done', () => {
+  it('shows a run waiting in the queue only under «Queued»', () => {
     const queued = runView({ id: 'q', state: 'queued', finished: true, queueItem: 'q1' });
     const all = [...runs, queued];
-    expect(filterRuns(all, '', 'active').map((run) => run.id)).toEqual(['a', 'g', 'q']);
-    expect(filterRuns(all, '', 'done').map((run) => run.id)).toEqual(['f', 'c']);
-    expect(filterCounts(all)).toEqual({ all: 6, waiting: 1, active: 3, done: 2 });
+    expect(ids(find(all, '', only({ states: ['queued'] })))).toEqual(['q']);
+    expect(ids(find(all, '', only({ states: ['active', 'finished'] })))).toEqual(['a', 'f', 'g']);
     expect(navRunCounts(all)).toEqual(navRunCounts(runs));
   });
 
-  it('keeps the order of the runs and combines the query with the filter', () => {
-    expect(filterRuns(runs, 'готовый', 'active')).toEqual([]);
-    expect(filterRuns(runs, 'о', 'all').map((run) => run.id)).toEqual(['w', 'a', 'f', 'c', 'g']);
+  it('keeps frozen and paused runs apart', () => {
+    const held = [
+      runView({ id: 'fr', state: 'frozen', hold: 'frozen' }),
+      runView({ id: 'pa', state: 'paused', hold: 'paused' }),
+    ];
+    expect(ids(find(held, '', only({ states: ['frozen'] })))).toEqual(['fr']);
+    expect(ids(find(held, '', only({ states: ['paused'] })))).toEqual(['pa']);
   });
 
-  it('keeps only the runs of one repository, or every run for null', () => {
+  it('keeps the order of the runs and combines the query with the filter', () => {
+    expect(find(runs, 'готовый', only({ states: ['active'] }))).toEqual([]);
+    expect(ids(find(runs, 'о'))).toEqual(['w', 'a', 'f', 'c', 'g']);
+  });
+
+  it('keeps only the runs of one repository in the scope «repository»', () => {
     const mixed = [
       runView({ id: 'a1', repository: '/work/app' }),
       runView({ id: 'l1', repository: '/work/lib', state: 'needs_human' }),
       runView({ id: 'a2', repository: '/work/app', finished: true, state: 'finished' }),
     ];
-    expect(filterRuns(mixed, '', 'all', '/work/app').map((r) => r.id)).toEqual(['a1', 'a2']);
-    expect(filterRuns(mixed, '', 'all', null)).toHaveLength(3);
-    expect(filterRuns(mixed, '', 'waiting', '/work/app')).toEqual([]);
-    expect(filterCounts(runsOf(mixed, '/work/app'))).toMatchObject({ all: 2, done: 1 });
+    expect(ids(find(mixed, '', EMPTY_FILTERS, 'repository', '/work/app'))).toEqual(['a1', 'a2']);
+    expect(find(mixed, '', EMPTY_FILTERS, 'all', '/work/app')).toHaveLength(3);
+    expect(find(mixed, '', only({ states: ['needs_human'] }), 'repository', '/work/app')).toEqual(
+      [],
+    );
+  });
+
+  it('filters by repository only when the runs of every repository are shown', () => {
+    const mixed = [
+      runView({ id: 'a1', repository: '/work/app' }),
+      runView({ id: 'l1', repository: '/work/lib' }),
+    ];
+    const state = only({ repositories: ['/work/lib'] });
+    expect(ids(find(mixed, '', state, 'all'))).toEqual(['l1']);
+    expect(ids(find(mixed, '', state, 'repository', '/work/app'))).toEqual(['a1']);
+  });
+
+  it('filters by workflow and by specialist, any of the choices and all the filters together', () => {
+    const steps = (...slugs: string[]) =>
+      slugs.map((specialist, index) => ({
+        id: `s${index}`,
+        specialist,
+        name: specialist,
+        skipped: false,
+        state: 'upcoming' as const,
+      }));
+    const rows = [
+      runView({ id: 'f1', workflow: 'feature', steps: steps('planner', 'coder') }),
+      runView({ id: 'f2', workflow: 'feature', steps: steps('coder') }),
+      runView({ id: 'x1', workflow: 'fix', steps: steps('debugger') }),
+    ];
+    expect(ids(find(rows, '', only({ workflows: ['fix'] })))).toEqual(['x1']);
+    expect(ids(find(rows, '', only({ workflows: ['fix', 'feature'] })))).toEqual([
+      'f1',
+      'f2',
+      'x1',
+    ]);
+    expect(ids(find(rows, '', only({ specialists: ['coder'] })))).toEqual(['f1', 'f2']);
+    expect(ids(find(rows, '', only({ specialists: ['planner', 'debugger'] })))).toEqual([
+      'f1',
+      'x1',
+    ]);
+    expect(ids(find(rows, '', only({ workflows: ['feature'], specialists: ['planner'] })))).toEqual(
+      ['f1'],
+    );
+    // the search covers the slug of the workflow and the specialists
+    expect(ids(find(rows, 'debugger'))).toEqual(['x1']);
+  });
+
+  it('does not count the specialists of skipped steps', () => {
+    const run = runView({
+      steps: [
+        { id: 'a', specialist: 'planner', name: 'a', skipped: true, state: 'upcoming' },
+        { id: 'b', specialist: 'coder', name: 'b', skipped: false, state: 'upcoming' },
+      ],
+    });
+    expect(runSpecialists(run)).toContain('coder');
+    expect(runSpecialists(run)).not.toContain('planner');
+  });
+
+  it('counts the options by the other filters (faceted)', () => {
+    const rows = [
+      runView({ id: 'a', workflow: 'feature', state: 'active' }),
+      runView({ id: 'b', workflow: 'feature', state: 'finished', finished: true }),
+      runView({ id: 'c', workflow: 'fix', state: 'finished', finished: true }),
+    ];
+    const state = only({ workflows: ['fix'] });
+    const states = optionCounts(rows, '', state, 'all', null, new Map(), 'states');
+    expect(states.get('finished')).toBe(1);
+    expect(states.get('active')).toBeUndefined();
+    const workflows = optionCounts(rows, '', state, 'all', null, new Map(), 'workflows');
+    expect(workflows.get('feature')).toBe(2);
+    expect(workflows.get('fix')).toBe(1);
+    const searched = optionCounts(rows, 'нет', EMPTY_FILTERS, 'all', null, new Map(), 'states');
+    expect(searched.size).toBe(0);
   });
 });
 
-function Harness({ initial = 'all' as RunFilter }) {
+function Harness({ initial = EMPTY_FILTERS }: { initial?: RunFilterState }) {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<RunFilter>(initial);
+  const [filters, setFilters] = useState<RunFilterState>(initial);
   return (
     <RunList
       runs={runs}
@@ -118,16 +203,19 @@ function Harness({ initial = 'all' as RunFilter }) {
       now={0}
       query={query}
       onQuery={setQuery}
-      filter={filter}
-      onFilter={setFilter}
+      filters={filters}
+      onFilters={setFilters}
       onSelect={() => undefined}
       scope="repository"
       onScope={() => undefined}
       repository={null}
-      tagIds={[]}
-      onTagIds={() => undefined}
     />
   );
+}
+
+async function choose(filter: string, option: RegExp | string) {
+  fireEvent.click(screen.getByRole('combobox', { name: filter }));
+  fireEvent.click(await screen.findByRole('option', { name: option }));
 }
 
 describe('run list', () => {
@@ -153,17 +241,20 @@ describe('run list', () => {
     expect(screen.getByText('Готовый')).toBeTruthy();
   });
 
-  it('shows only the runs waiting for an answer', () => {
+  it('shows only the runs waiting for an answer, with the choice kept on the button', async () => {
     render(<Harness />);
-    expect(screen.getByRole('radio', { name: 'Waiting 1' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'Waiting 1' }));
-    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
+    await choose('State', /Needs answer/);
+    expect(screen.getAllByRole('button', { expanded: false, name: /./ })).toBeTruthy();
     expect(screen.getByText('Ждущий Запуск')).toBeTruthy();
+    expect(screen.queryByText('Активный')).toBeNull();
+    // the list stays open: another state can be added
+    fireEvent.click(screen.getByRole('option', { name: /Cancelled/ }));
+    expect(screen.getByText('Отменённый')).toBeTruthy();
   });
 
-  it('says that nothing is found and resets the search and the filter', () => {
+  it('says that nothing is found and resets the search and every filter', async () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Finished 2' }));
+    await choose('State', /Finished/);
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'нет такого' } });
     expect(screen.getByText('Nothing found')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
@@ -172,8 +263,8 @@ describe('run list', () => {
     expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('');
   });
 
-  it('puts the cancelled run into «Finished»', () => {
-    render(<Harness initial="done" />);
+  it('puts the cancelled run into «Cancelled» and keeps the order', () => {
+    render(<Harness initial={only({ states: ['finished', 'cancelled'] })} />);
     const items = screen.getAllByRole('listitem');
     expect(within(items[0]!).getByText('Готовый')).toBeTruthy();
     expect(within(items[1]!).getByText('Отменённый')).toBeTruthy();
@@ -190,15 +281,14 @@ describe('filter by tags', () => {
     runView({ id: 'C', title: 'Без тегов' }),
     runView({ id: 'D', title: 'Ещё', tags: [auth], state: 'finished', finished: true }),
   ];
-  const ids = (list: typeof tagged) => list.map((run) => run.id);
 
   it('keeps the runs with any of the chosen tags', () => {
-    expect(ids(filterRuns(tagged, '', 'all', null, ['ta', 'tv'], catalog))).toEqual([
+    expect(ids(find(tagged, '', only({ tagIds: ['ta', 'tv'] }), 'all', null, catalog))).toEqual([
       'A',
       'B',
       'D',
     ]);
-    expect(ids(filterRuns(tagged, '', 'all', null, [], catalog))).toHaveLength(4);
+    expect(find(tagged, '', EMPTY_FILTERS, 'all', null, catalog)).toHaveLength(4);
   });
 
   it('matches the runs of other repositories by the name of the tag, ignoring case', () => {
@@ -208,31 +298,38 @@ describe('filter by tags', () => {
       runView({ id: 'X', repository: '/lib', tags: [other] }),
       runView({ id: 'Y', repository: '/lib', tags: [{ ...other, id: 'ty', name: 'v2' }] }),
     ];
-    expect(ids(filterRuns(rows, '', 'all', null, ['ta'], catalog) as typeof tagged)).toEqual([
-      'A',
-      'X',
-    ]);
-    expect(filterCounts(rows, ['ta'], catalog).all).toBe(2);
-    // only the repository of the selection: the other repository has no runs in the list
-    expect(ids(filterRuns(rows, '', 'all', '/repo', ['ta'], catalog) as typeof tagged)).toEqual([
-      'A',
-    ]);
+    const state = only({ tagIds: ['ta'] });
+    expect(ids(find(rows, '', state, 'all', null, catalog))).toEqual(['A', 'X']);
+    expect(ids(find(rows, '', state, 'repository', '/repo', catalog))).toEqual(['A']);
+    expect(optionCounts(rows, '', EMPTY_FILTERS, 'all', null, catalog, 'tagIds').get('ta')).toBe(2);
   });
 
-  it('combines with the status filter', () => {
-    expect(ids(filterRuns(tagged, '', 'waiting', null, ['ta'], catalog))).toEqual(['A']);
+  it('combines with the state filter', () => {
+    const state = only({ tagIds: ['ta'], states: ['needs_human'] });
+    expect(ids(find(tagged, '', state, 'all', null, catalog))).toEqual(['A']);
   });
 
   it('searches the names of the tags of a run', () => {
-    expect(ids(filterRuns(tagged, 'Auth', 'all', null, [], catalog))).toEqual(['A', 'D']);
+    expect(ids(find(tagged, 'Auth', EMPTY_FILTERS, 'all', null, catalog))).toEqual(['A', 'D']);
   });
 
-  it('counts the status filter over the runs with the tags', () => {
-    expect(filterCounts(tagged, ['ta'])).toEqual({ all: 2, waiting: 1, active: 0, done: 1 });
+  it('counts the states over the runs with the tags', () => {
+    const counts = optionCounts(
+      tagged,
+      '',
+      only({ tagIds: ['ta'] }),
+      'all',
+      null,
+      catalog,
+      'states',
+    );
+    expect(counts.get('needs_human')).toBe(1);
+    expect(counts.get('finished')).toBe(1);
+    expect(counts.get('active')).toBeUndefined();
   });
 
-  it('resets the tags together with the search', () => {
-    const onTagIds = vi.fn();
+  it('resets the filters together with the search', () => {
+    const onFilters = vi.fn();
     render(
       <RunList
         runs={[]}
@@ -241,29 +338,34 @@ describe('filter by tags', () => {
         now={0}
         query=""
         onQuery={() => undefined}
-        filter="all"
-        onFilter={() => undefined}
+        filters={only({ tagIds: ['gone'] })}
+        onFilters={onFilters}
         onSelect={() => undefined}
         scope="repository"
         onScope={() => undefined}
         repository={null}
-        tagIds={['gone']}
-        onTagIds={onTagIds}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
-    expect(onTagIds).toHaveBeenCalledWith([]);
+    expect(onFilters).toHaveBeenCalledWith(EMPTY_FILTERS);
   });
 });
 
 describe('activeFilters', () => {
-  it('counts a search, a status other than «all» and every chosen tag', () => {
-    expect(activeFilters('', 'all', [])).toBe(0);
-    expect(activeFilters('  ', 'all', [])).toBe(0);
-    expect(activeFilters('json', 'all', [])).toBe(1);
-    expect(activeFilters('', 'waiting', [])).toBe(1);
-    expect(activeFilters('', 'all', ['ta', 'tv'])).toBe(2);
-    expect(activeFilters('x', 'done', ['ta'])).toBe(3);
+  it('counts a search and every chosen value', () => {
+    expect(activeFilters('', EMPTY_FILTERS, 'all')).toBe(0);
+    expect(activeFilters('  ', EMPTY_FILTERS, 'all')).toBe(0);
+    expect(activeFilters('json', EMPTY_FILTERS, 'all')).toBe(1);
+    expect(activeFilters('', only({ states: ['active'] }), 'all')).toBe(1);
+    expect(activeFilters('', only({ tagIds: ['ta', 'tv'] }), 'all')).toBe(2);
+    expect(
+      activeFilters('x', only({ states: ['failed'], workflows: ['fix'], tagIds: ['ta'] }), 'all'),
+    ).toBe(4);
+  });
+
+  it('ignores the repository choice outside the «all repositories» scope', () => {
+    expect(activeFilters('', only({ repositories: ['/a'] }), 'repository')).toBe(0);
+    expect(activeFilters('', only({ repositories: ['/a'] }), 'all')).toBe(1);
   });
 });
 
@@ -278,48 +380,78 @@ describe('filter by the tag of a linked task', () => {
   ];
 
   function Filtered() {
-    const [tagIds, setTagIds] = useState<string[]>([]);
-    const shown = filterRuns(rows, '', 'all', null, tagIds, new Map([[linked.id, linked]]));
+    const [filters, setFilters] = useState<RunFilterState>(EMPTY_FILTERS);
     return (
       <TagsProvider tags={[linked]}>
         <RunList
-          runs={shown}
+          runs={rows}
           selectedRun={null}
           selectedGroup={null}
           now={0}
           query=""
           onQuery={() => undefined}
-          filter="all"
-          onFilter={() => undefined}
+          filters={filters}
+          onFilters={setFilters}
           onSelect={() => undefined}
           scope="repository"
           onScope={() => undefined}
           repository="/repo"
-          tagIds={tagIds}
-          onTagIds={setTagIds}
         />
       </TagsProvider>
     );
   }
 
-  it('offers, applies and removes it like an ordinary tag', () => {
+  it('offers, applies and removes it like an ordinary tag, without chips in the column', async () => {
     render(<Filtered />);
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
     fireEvent.click(screen.getByRole('combobox', { name: 'Tags' }));
-    fireEvent.click(screen.getByRole('option', { name: /cards-half-width/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /cards-half-width/ }));
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove tag cards-half-width' }));
+    // the choice is a number on the button, not a chip with a remove button
+    expect(screen.queryByRole('button', { name: 'Remove tag cards-half-width' })).toBeNull();
+    expect(within(screen.getByRole('combobox', { name: 'Tags' })).getByText('1')).toBeTruthy();
+    fireEvent.click(screen.getByRole('option', { name: /cards-half-width/ }));
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
   });
 });
 
 describe('search by the name of the pipeline', () => {
   it('finds a run by the name and by the id of its pipeline', () => {
-    const runs = [
+    const named = [
       runView({ id: 'a', title: 'Первый', workflow: 'feature', workflowName: 'Новая функция' }),
       runView({ id: 'b', title: 'Второй', workflow: 'fix', workflowName: 'Исправление' }),
     ];
-    expect(filterRuns(runs, 'функци', 'all').map((run) => run.id)).toEqual(['a']);
-    expect(filterRuns(runs, 'fix', 'all').map((run) => run.id)).toEqual(['b']);
+    expect(ids(find(named, 'функци'))).toEqual(['a']);
+    expect(ids(find(named, 'fix'))).toEqual(['b']);
+  });
+});
+
+describe('repository filter', () => {
+  it('is offered only for the runs of every repository, with the path under the name', async () => {
+    const rows = [
+      runView({ id: 'a', repository: '/work/app' }),
+      runView({ id: 'l', repository: '/work/lib' }),
+    ];
+    const paths = new Map([['/work/lib', '~/lib']]);
+    const props = {
+      runs: rows,
+      selectedRun: null,
+      selectedGroup: null,
+      now: 0,
+      query: '',
+      onQuery: () => undefined,
+      filters: EMPTY_FILTERS,
+      onFilters: () => undefined,
+      onSelect: () => undefined,
+      onScope: () => undefined,
+      repository: '/work/app',
+      repositoryPaths: paths,
+    };
+    const { rerender } = render(<RunList {...props} scope="repository" />);
+    expect(screen.queryByRole('combobox', { name: 'Repository' })).toBeNull();
+    rerender(<RunList {...props} scope="all" />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Repository' }));
+    expect(await screen.findByText('~/lib')).toBeTruthy();
+    expect(screen.getByText('/work/app')).toBeTruthy();
   });
 });

@@ -653,7 +653,14 @@ describe('cli', () => {
     expect(added.code).toBe(0);
     const list = await aipFast(box, 'repo', 'list', '--json');
     expect(JSON.parse(list.stdout)).toEqual([
-      { path: box.repo, addedAt: expect.any(Number), unfinished: 0, waiting: 0, queued: 0 },
+      {
+        path: box.repo,
+        displayPath: box.repo,
+        addedAt: expect.any(Number),
+        unfinished: 0,
+        waiting: 0,
+        queued: 0,
+      },
     ]);
     const text = await aipFast(box, 'repo', 'list');
     expect(text.stdout).toContain('REPOSITORY');

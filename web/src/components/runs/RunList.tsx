@@ -23,7 +23,13 @@ import { RunFilters } from './RunFilters.tsx';
 import { RunProgress } from './RunProgress.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 
-import { activeFilters, filterRuns, type RunFilter, type RunScope } from './runFilter.ts';
+import {
+  activeFilters,
+  EMPTY_FILTERS,
+  filterRuns,
+  type RunFilterState,
+  type RunScope,
+} from './runFilter.ts';
 
 export function RunList({
   runs,
@@ -32,15 +38,14 @@ export function RunList({
   now,
   query,
   onQuery,
-  filter,
-  onFilter,
+  filters: filterState,
+  onFilters,
   onSelect,
   scope,
   onScope,
   repository,
-  tagIds,
-  onTagIds,
-  filters = true,
+  repositoryPaths,
+  showFilters = true,
   more = 'done',
   onMore = () => undefined,
 }: {
@@ -50,19 +55,18 @@ export function RunList({
   now: number;
   query: string;
   onQuery: (query: string) => void;
-  filter: RunFilter;
-  onFilter: (filter: RunFilter) => void;
+  filters: RunFilterState;
+  onFilters: (filters: RunFilterState) => void;
   onSelect: (runId: string, group: string | null) => void;
   /** Whose runs the list shows: those of the selected repository or of every one. */
   scope: RunScope;
   onScope: (scope: RunScope) => void;
   /** The selected repository; null until known. */
   repository: string | null;
-  /** Ids of the tags to filter by (a run needs any one of them). */
-  tagIds: string[];
-  onTagIds: (ids: string[]) => void;
+  /** The path of each repository as shown; absent: the path itself. */
+  repositoryPaths?: ReadonlyMap<string, string>;
   /** Whether the filters stand above the list; false when the page shows them elsewhere. */
-  filters?: boolean;
+  showFilters?: boolean;
   /** Older finished runs: more to load (`idle`), loading, failed, or none left (`done`). */
   more?: 'idle' | 'loading' | 'error' | 'done';
   /** Loads the next page of older runs; also the retry after an error. */
@@ -71,9 +75,8 @@ export function RunList({
   const { t } = useTranslation();
   const locale = useLocale();
   const { byId } = useTags();
-  const only = scope === 'repository' ? repository : null;
-  const shown = filterRuns(runs, query, filter, only, tagIds, byId);
-  const filtered = activeFilters(query, filter, tagIds) > 0;
+  const shown = filterRuns(runs, query, filterState, scope, repository, byId);
+  const filtered = activeFilters(query, filterState, scope) > 0;
   const [marker, setMarker] = useState<HTMLElement | null>(null);
   useNearEnd(more === 'idle' ? marker : null, onMore, runs.length);
   const tail =
@@ -97,18 +100,17 @@ export function RunList({
     );
   return (
     <div className="flex flex-col gap-2">
-      {filters ? (
+      {showFilters ? (
         <RunFilters
           runs={runs}
           query={query}
           onQuery={onQuery}
-          filter={filter}
-          onFilter={onFilter}
+          filters={filterState}
+          onFilters={onFilters}
           scope={scope}
           onScope={onScope}
           repository={repository}
-          tagIds={tagIds}
-          onTagIds={onTagIds}
+          repositoryPaths={repositoryPaths}
         />
       ) : null}
       {shown.length === 0 ? (
@@ -120,8 +122,7 @@ export function RunList({
               size="sm"
               onClick={() => {
                 onQuery('');
-                onFilter('all');
-                onTagIds([]);
+                onFilters(EMPTY_FILTERS);
               }}
             >
               {t('runs.list.reset')}

@@ -52,11 +52,11 @@ The repository picker lists the repositories of the daemon (see [Multiple reposi
 
 ## Sections
 
-The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Settings". The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. Runs waiting for an answer come first in the list, then the other unfinished runs, then finished ones.
+The sections are "Runs", "Queue", "Topology", "Specialists", "Pipeline" and "Settings". The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. 
 
 ### Runs
 
-- Filters: repository, a search and the status ("All", "Waiting", "Active", "Finished").
+- Filters: a search (title, name, task number `#N`, pipeline, specialists, groups, tags), the switch "This repository" / "All repositories" and multiselects with a search, counters and "Clear": "State" (needs answer, active, queued, paused, frozen, finished, failed, cancelled), "Pipeline", "Specialists", "Tags" and, for all repositories, "Repository".
 - A run card shows the first line of the task, the status, the name of its pipeline (the id is in the tooltip), time, cost and a summary of changes (`2 files +367 −0`).
 - The action row of the run header has "Deliver", "Return to the queue" and "Steps". The "More" menu has "Retry failed (N)" ("Retry failed and cancelled (N)") and "Retry with current config (N)" when the run has failed or cancelled groups, then "Create subtask…" (in every state of the run), "Deliver with --force…" and "Copy run id".
 - "Create subtask…" opens the "New task" dialog on the repository of the run with that run as the "Parent task"; the text already typed in the dialog is kept, and a parent can be removed or changed there.
@@ -246,7 +246,7 @@ The background processes arrive in the `processes` event of `/api/events`: the d
 - `POST /api/queue/dismiss` with the body `{"run": "<run id>"}` removes a skipped run from the skipped list and returns the queue. A run that is not skipped comes back with code 400, an unknown run with code 404.
 - `GET /api/runs/<id>/groups/<group>/spec` returns the spec change of the group (`change`, `path`, `design`, `tasks`) or `null`; an unknown group comes back with code 404.
 - `GET /api/processes` returns the background processes of the agents (`{"processes": [...]}`). `POST /api/processes/<pid>/kill` terminates one; a PID that is not a number comes back with code 400, a PID that is not in the list with code 404.
-- `GET /api/repositories` returns the repositories with counters.
+- `GET /api/repositories` returns the repositories with counters and `displayPath`, the path with the home directory written as `~`.
 - `POST /api/repositories` with the body `{"path": "<absolute path>"}` adds one.
 - `DELETE /api/repositories?repository=<absolute path>` removes one.
 - A relative path is rejected with code 400 without contacting the daemon. Daemon errors also come back with code 400 and the error text.

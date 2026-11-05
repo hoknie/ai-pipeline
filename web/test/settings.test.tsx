@@ -1031,7 +1031,14 @@ describe('settings form', () => {
 describe('project of the settings', () => {
   const APP = '/work/app';
   const LIB = '/work/lib';
-  const entry = (path: string) => ({ path, addedAt: 1, unfinished: 0, waiting: 0, queued: 0 });
+  const entry = (path: string) => ({
+    path,
+    displayPath: path,
+    addedAt: 1,
+    unfinished: 0,
+    waiting: 0,
+    queued: 0,
+  });
 
   function open(hash: string, repositories = [entry(APP), entry(LIB)]) {
     const api = show(queueOf({ repository: APP }), {}, hash);

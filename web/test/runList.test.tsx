@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
 import i18next from 'i18next';
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -22,14 +23,12 @@ function show(run: ReturnType<typeof runView>, props: Props = {}) {
         now={2_000}
         query=""
         onQuery={() => undefined}
-        filter="all"
-        onFilter={() => undefined}
+        filters={EMPTY_FILTERS}
+        onFilters={() => undefined}
         onSelect={() => undefined}
         scope="repository"
         onScope={() => undefined}
         repository="/repo"
-        tagIds={[]}
-        onTagIds={() => undefined}
         {...props}
       />
     </TagsProvider>,
@@ -140,14 +139,12 @@ describe('run row layout', () => {
       now: 2_000,
       query: '',
       onQuery: () => undefined,
-      filter: 'all' as const,
-      onFilter: () => undefined,
+      filters: EMPTY_FILTERS,
+      onFilters: () => undefined,
       onSelect: () => undefined,
       scope: 'repository' as const,
       onScope: () => undefined,
       repository: '/repo',
-      tagIds: [],
-      onTagIds: () => undefined,
     };
     const { rerender } = render(<RunList runs={[done]} {...props} />);
     expect(screen.queryByRole('progressbar')).toBeNull();

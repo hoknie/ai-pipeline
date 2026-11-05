@@ -16,7 +16,7 @@ import { notifyError } from './notify.ts';
 import { useNotificationCenter } from './notifications.ts';
 import { usePreference } from './preferences.ts';
 import { formatRoute, parseRoute, type Route, type View } from './route.ts';
-import { repositoryLabel, waitingByRepository } from './repositories.ts';
+import { displayPaths, repositoryLabel, waitingByRepository } from './repositories.ts';
 import { sectionLabel } from './sections.ts';
 import { settingsLocationOf } from './settingsGroups.ts';
 import { browserEventSource, useRuns, type EventSourceFactory } from './store.ts';
@@ -203,6 +203,7 @@ function Panel({
   };
   const { working, waiting } = navRunCounts(runsOf(runs, scope === 'repository' ? selected : null));
   const waitingRepositories = useMemo(() => waitingByRepository(registry), [registry]);
+  const repositoryPaths = useMemo(() => displayPaths(registry), [registry]);
   const selectRepository = async (path: string) => {
     if (path === selected) return;
     if (
@@ -295,6 +296,7 @@ function Panel({
           },
           repository: {
             repositories,
+            paths: repositoryPaths,
             selected,
             waiting: waitingRepositories,
             home,
@@ -444,6 +446,7 @@ function Panel({
             onShowJson={setShowJson}
             onRoute={setRoute}
             repository={selected}
+            repositoryPaths={repositoryPaths}
             scope={scope}
             onScope={setScope}
             onSubtask={queue ? openSubtask : undefined}
