@@ -11,7 +11,7 @@ import {
   choose,
   cleanup,
   fireEvent,
-  openTab,
+  previewMarkdown,
   render,
   screen,
   waitFor,
@@ -531,19 +531,104 @@ describe('markdown field of the new task', () => {
     return event;
   }
 
-  it('shows the text as Markdown on the Preview tab and keeps the draft', async () => {
+  it('shows the text as Markdown in the preview and keeps the draft', async () => {
     const { api, dialog } = await openDialog();
     const text = '# Заголовок\n\n- [x] готово\n\n**жирный**';
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: text } });
-    openTab('Preview');
+    previewMarkdown(dialog);
     expect(within(dialog).getByRole('heading', { name: 'Заголовок' })).toBeTruthy();
     expect(within(dialog).getByText('жирный').tagName).toBe('STRONG');
     expect(within(dialog).getByRole<HTMLInputElement>('checkbox').checked).toBe(true);
-    openTab('Write');
+    previewMarkdown(dialog, false);
     expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(text);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
     expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: text });
+  });
+
+  const MARKS = [
+    'Heading',
+    'Bold',
+    'Italic',
+    'Strikethrough',
+    'Bulleted list',
+    'Numbered list',
+    'Task list',
+    'Quote',
+    'Code',
+    'Code block',
+    'Link',
+  ];
+
+  it('starts on Plain with the markup buttons and the preview unavailable', async () => {
+    const { dialog } = await openDialog();
+    const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
+    const first = bar.querySelector('button, [role="radio"]');
+    expect(first?.textContent).toBe('Plain');
+    expect(within(bar).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    for (const name of [...MARKS, 'Preview']) {
+      const button = within(bar).getByRole<HTMLButtonElement>('button', { name });
+      expect(button.disabled).toBe(true);
+    }
+    expect(within(bar).getByRole('button', { name: 'Bold' }).getAttribute('title')).toBe(
+      'Bold (switch to MD)',
+    );
+    expect(bar.lastElementChild?.textContent).toBe('Preview');
+  });
+
+  it('enables the buttons on MD and takes them away again on Plain from the preview', async () => {
+    const { dialog } = await openDialog();
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'MD' }));
+    for (const name of [...MARKS, 'Preview']) {
+      expect(within(dialog).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
+    }
+    const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
+    fireEvent.change(area, { target: { value: '# Итог' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Preview' }));
+    expect(area.hidden).toBe(true);
+    expect(
+      within(dialog).getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Bold' }).disabled).toBe(
+      true,
+    );
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Plain' }));
+    expect(area.hidden).toBe(false);
+    expect(within(dialog).queryByRole('heading', { name: 'Итог' })).toBeNull();
+    expect(
+      within(dialog).getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed'),
+    ).toBe('false');
+    expect(area.value).toBe('# Итог');
+  });
+
+  it('puts the markup of a button into the draft and keeps the selection in the field', async () => {
+    const { api, dialog } = await openDialog();
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'MD' }));
+    const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
+    fireEvent.change(area, { target: { value: 'раз два' } });
+    area.setSelectionRange(0, 3);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Bold' }));
+    expect(area.value).toBe('**раз** два');
+    expect([area.selectionStart, area.selectionEnd]).toEqual([2, 5]);
+    expect(document.activeElement).toBe(area);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Bulleted list' }));
+    expect(area.value).toBe('- **раз** два');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Bulleted list' }));
+    expect(area.value).toBe('**раз** два');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Quote' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
+    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: '> **раз** два' });
+  });
+
+  it('pastes formatted text on Plain as Markdown', async () => {
+    const { dialog } = await openDialog();
+    const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
+    const event = paste(area, { 'text/html': '<strong>важно</strong>', 'text/plain': 'важно' });
+    expect(event.defaultPrevented).toBe(true);
+    expect(area.value).toBe('**важно**');
   });
 
   it('shows HTML in the text as text', async () => {
@@ -551,7 +636,7 @@ describe('markdown field of the new task', () => {
     fireEvent.change(within(dialog).getByLabelText('Task text'), {
       target: { value: '<img src=x alt="pic"> тут' },
     });
-    openTab('Preview');
+    previewMarkdown(dialog);
     expect(dialog.querySelector('img')).toBeNull();
     expect(
       within(dialog)
@@ -563,31 +648,54 @@ describe('markdown field of the new task', () => {
   it('says there is nothing to preview for an empty text', async () => {
     const { dialog } = await openDialog();
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: '  ' } });
-    openTab('Preview');
+    previewMarkdown(dialog);
     expect(within(dialog).getByText('Nothing to preview')).toBeTruthy();
   });
 
-  it('opens on the Write tab with the focus in the field after a preview', async () => {
+  it('opens on Plain with the focus in the field after a preview', async () => {
     const { dialog } = await openDialog();
-    openTab('Preview');
+    previewMarkdown(dialog);
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
     const again = await screen.findByRole('dialog', { name: 'New task' });
-    expect(within(again).getByRole('tab', { name: 'Write' }).getAttribute('aria-selected')).toBe(
+    expect(within(again).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
       'true',
     );
     await waitFor(() => expect(document.activeElement?.id).toBe('new-task'));
   });
 
-  it('has the tabs for the text of a group', async () => {
+  it('keeps one stop of the Tab key on the toolbar', async () => {
+    const { dialog } = await openDialog();
+    const bar = within(dialog).getByRole('toolbar', { name: 'Text formatting' });
+    // the roving focus makes the bar itself the only stop until focus enters it
+    const items = [...bar.querySelectorAll('button, [role="radio"]')];
+    expect(items.length).toBeGreaterThan(1);
+    expect(items.every((item) => item.getAttribute('tabindex') !== '0')).toBe(true);
+    expect(bar.getAttribute('tabindex')).toBe('0');
+  });
+
+  it('has an independent toolbar for the text of every group', async () => {
     const { dialog } = await openDialog();
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
-    fireEvent.change(within(dialog).getByLabelText('Text of group 1'), {
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
+    const second = within(dialog).getByLabelText('Text of group 2').closest('fieldset')!;
+    const first = within(dialog).getByLabelText('Text of group 1').closest('fieldset')!;
+    fireEvent.change(within(first).getByLabelText('Text of group 1'), {
       target: { value: '## Раздел' },
     });
-    openTab('Preview');
-    expect(within(dialog).getByRole('heading', { name: 'Раздел' })).toBeTruthy();
+    fireEvent.change(within(second).getByLabelText('Text of group 2'), {
+      target: { value: '## Второй' },
+    });
+    previewMarkdown(second);
+    expect(within(second).getByRole('heading', { name: 'Второй' })).toBeTruthy();
+    expect(within(first).queryByRole('heading')).toBeNull();
+    expect(within(first).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    expect(within(first).getByLabelText<HTMLTextAreaElement>('Text of group 1').hidden).toBe(false);
+    previewMarkdown(first);
+    expect(within(first).getByRole('heading', { name: 'Раздел' })).toBeTruthy();
   });
 
   it('pastes formatted text into the middle of the text as Markdown', async () => {

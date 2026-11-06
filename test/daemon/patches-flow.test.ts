@@ -5,7 +5,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { FileDiffView, RunCreated, RunPatchView } from '../../src/protocol/index.ts';
 
-import { CODE_ONLY_CONFIG, git, harness, startRun, type Harness } from './harness.ts';
+import {
+  CODE_ONLY_CONFIG,
+  MANUAL_CONFIG,
+  git,
+  harness,
+  startRun,
+  type Harness,
+} from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -139,5 +146,71 @@ describe('diff of a file of a group', () => {
       path: 'logo.bin',
     })) as FileDiffView;
     expect(diff).toMatchObject({ binary: true, lines: [], totalLines: 0 });
+  });
+});
+
+describe('revision of the changes of a group', () => {
+  it('is the commit range of the group, the same in the row and in the group view', async () => {
+    current = await harness(`${CODE_ONLY_CONFIG}  delivery: { auto: false }\n`);
+    const h = current;
+    const runId = await finishedRun(h);
+    const view = await h.waitFor(runId, (run) => run.groups[0]?.diffRevision != null);
+    const revision = view.groups[0]?.diffRevision;
+    expect(revision).toMatch(/^[0-9a-f]{40}\.\.[0-9a-f]{40}$/);
+    const [from, to] = revision!.split('..');
+    expect(from).not.toBe(to);
+    expect((await h.group(runId, 'vhod')).diff?.revision).toBe(revision);
+    expect(git(h.repo, 'diff', '--name-only', from!, to!)).toBe('lib.ts');
+  });
+
+  it('changes with a new commit of the same group with the same line counts, and after the merge', async () => {
+    current = await harness(MANUAL_CONFIG);
+    const h = current;
+    h.script({
+      code: [
+        { write: { 'lib.ts': 'export const value = 2;\n' } },
+        { write: { 'lib.ts': 'export const value = 3;\n' } },
+      ],
+      review: [
+        { waitFor: h.gate('round-1'), verdict: 'rejected', feedback: 'переделать' },
+        { waitFor: h.gate('round-2') },
+      ],
+    });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      workflow: 'feature',
+      groups: [{ title: 'Вход', task: 'вход' }],
+    })) as RunCreated;
+    const first = (
+      await h.waitFor(
+        runId,
+        (run) => run.groups[0]?.step === 'review' && (run.groups[0].diff?.files ?? 0) > 0,
+      )
+    ).groups[0]!;
+    expect(first.step).toBe('review');
+    h.open('round-1');
+
+    const second = (
+      await h.waitFor(
+        runId,
+        (run) =>
+          run.groups[0]?.diffRevision != null && run.groups[0].diffRevision !== first.diffRevision,
+      )
+    ).groups[0]!;
+    expect(second.diff).toEqual(first.diff);
+    expect(second.diffRevision).not.toBe(first.diffRevision);
+    expect((await h.group(runId, 'vhod')).diff?.revision).toBe(second.diffRevision);
+    h.open('round-2');
+
+    const merged = (
+      await h.waitFor(
+        runId,
+        (run) =>
+          run.groups[0]?.status === 'merged' && run.groups[0].diffRevision !== second.diffRevision,
+      )
+    ).groups[0]!;
+    // a merged group is shown as its merge commit against the first parent
+    const [from, to] = merged.diffRevision!.split('..');
+    expect(git(h.repo, 'rev-parse', `${to}^1`)).toBe(from);
   });
 });

@@ -21,7 +21,8 @@ export interface Route {
 function settingsRoute(first: string | null, second: string | null, third: string | null): Route {
   const { scope, group } = settingsLocationOf(first, second);
   // a shared specialist (or `new`) of the group «Specialists» is the third part
-  const step = scope === 'global' && group === 'specialists' ? third : null;
+  const step =
+    scope === 'global' && (group === 'specialists' || group === 'pipelines') ? third : null;
   return { view: 'settings', run: group, group: scope, step, tab: null };
 }
 
@@ -66,7 +67,8 @@ export function formatRoute(route: Route): string {
     const place = settingsLocationOf(route.group, route.run);
     // an old route with the group only (`run`) leads to its new place
     const { scope, group } = route.group === null ? settingsLocationOf(route.run, null) : place;
-    const slug = scope === 'global' && group === 'specialists' ? route.step : null;
+    const slug =
+      scope === 'global' && (group === 'specialists' || group === 'pipelines') ? route.step : null;
     return `#settings/${scope}/${group}${slug === null ? '' : `/${enc(slug)}`}`;
   }
   if (route.view === 'workflows') return route.run ? `#pipelines/${enc(route.run)}` : '#pipelines';

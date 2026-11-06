@@ -106,7 +106,7 @@ const SPECIALIST_KEYS = [
   'queue',
   'tags',
 ];
-const WORKFLOW_KEYS = ['name', 'split', 'steps'];
+const WORKFLOW_KEYS = ['name', 'split', 'steps', 'tags'];
 const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt', 'human_review'];
 const ON_REJECT_KEYS = ['goto', 'max_rounds'];
 
@@ -603,6 +603,8 @@ class Validator {
     const mapping = this.mapping(value, path);
     if (!mapping) return null;
     this.entries(mapping, path, WORKFLOW_KEYS);
+    // Tags are metadata for the panel: checked here, never part of the workflow.
+    if ('tags' in mapping) this.tagNames(mapping.tags, join(path, 'tags'));
     const name = 'name' in mapping ? this.string(mapping.name, join(path, 'name')) : null;
     const split = 'split' in mapping ? this.split(mapping.split, join(path, 'split'), known) : null;
     const stepsPath = join(path, 'steps');

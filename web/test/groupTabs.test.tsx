@@ -119,6 +119,7 @@ describe('summary of the changes', () => {
           diff: {
             added: 9,
             removed: 2,
+            revision: 'r1',
             files: [
               { path: 'a.ts', added: 5, removed: 1 },
               { path: 'b.ts', added: 4, removed: 1 },
@@ -133,6 +134,79 @@ describe('summary of the changes', () => {
     await waitFor(() => expect(panel.textContent).toContain('2 files +9 −2'));
     const region = screen.getByRole('region', { name: 'group Вход' });
     expect(region.querySelector('header')!.textContent).not.toContain('2 files');
+  });
+});
+
+describe('diff in the Changes tab while the step runs', () => {
+  /** The group as the server shows it now: fresh objects at every call, like a real response. */
+  const served = { revision: 'r1', added: 5 };
+  const diff = () => ({
+    added: served.added,
+    removed: 1,
+    revision: served.revision,
+    files: [{ path: 'a.ts', added: served.added, removed: 1 }],
+  });
+  const lines = (word: string) => ['@@ -1,2 +1,2 @@', ' same', '-old', `+${word}`];
+
+  async function openedDiff() {
+    served.revision = 'r1';
+    served.added = 5;
+    window.location.hash = '#runs/run1/login?tab=changes';
+    const api = fakeApi({
+      group: vi.fn(async () => groupView({ diff: diff() })),
+      fileDiff: vi.fn(async (_run: string, _group: string, path: string) => ({
+        path,
+        previousPath: null,
+        binary: false,
+        lines: lines(served.revision === 'r1' ? 'new' : 'newer'),
+        totalLines: 4,
+        truncated: false,
+      })),
+    });
+    render(<App api={api} openStream={openFake} />);
+    act(() =>
+      FakeEventSource.last!.send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [runView({ groups: [groupRow({ diff: { files: 1, added: 5, removed: 1 } })] })],
+      }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'a.ts' }));
+    await screen.findByText('new');
+    return api;
+  }
+
+  const send = (seq: number, added: number, overrides: Parameters<typeof groupRow>[0]) =>
+    act(() =>
+      FakeEventSource.last!.send({
+        event: 'run',
+        seq,
+        run: runView({
+          groups: [groupRow({ diff: { files: 1, added, removed: 1 }, ...overrides })],
+        }),
+      }),
+    );
+
+  it('reloads the group on growing tokens but neither asks for the diff again nor collapses it', async () => {
+    const api = await openedDiff();
+    const loads = vi.mocked(api.group).mock.calls.length;
+    served.added = 6; // a visible sign that the new answer is applied
+    send(2, 6, { usage: { inputTokens: 10, outputTokens: 2, costUsd: 0 } });
+    await waitFor(() => expect(vi.mocked(api.group).mock.calls.length).toBeGreaterThan(loads));
+    await waitFor(() => expect(screen.getByRole('tabpanel').textContent).toContain('+6 −1'));
+    expect(screen.queryByText('Loading the diff…')).toBeNull();
+    expect(screen.getByText('new')).toBeTruthy();
+    expect(api.fileDiff).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the new content when the diff revision changes, without collapsing the old one', async () => {
+    const api = await openedDiff();
+    served.revision = 'r2';
+    send(2, 5, { diffRevision: 'r2' });
+    await screen.findByText('newer');
+    expect(api.fileDiff).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Loading the diff…')).toBeNull();
+    expect(screen.queryByText('new')).toBeNull();
   });
 });
 

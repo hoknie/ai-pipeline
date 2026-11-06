@@ -84,6 +84,7 @@ export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
     warnings: 0,
     delivery: 'pending',
     diff: null,
+    diffRevision: null,
     limitUntil: null,
     usage: null,
     decisions: [],
@@ -657,6 +658,11 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     importSpecialists: vi.fn(async (_source: string, slugs: string[]) => ({
       ok: true as const,
       imported: slugs,
+    })),
+    sharedWorkflows: vi.fn(async () => ({ directory: '/xdg/aip/workflows', workflows: [] })),
+    importWorkflows: vi.fn(async (_source: string, ids: string[]) => ({
+      ok: true as const,
+      imported: ids,
     })),
     writeWorkflow: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     writeSettings: vi.fn(async () => ({

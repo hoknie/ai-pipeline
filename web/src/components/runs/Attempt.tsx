@@ -81,7 +81,7 @@ export function Attempt({
   initiallyOpen,
   rawLog,
   onlyReplies = false,
-  showJson = true,
+  showJson = false,
   onRetry,
   onMessage,
 }: {

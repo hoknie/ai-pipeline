@@ -21,6 +21,7 @@ import {
   type ConfigEditResult,
   type SpecialistTagsResult,
   type SpecialistsImportResult,
+  type WorkflowsImportResult,
   type DaemonCheck,
   type ArtifactContentView,
   type RunPatchView,
@@ -169,6 +170,13 @@ const importBody = z.object({
     message: 'source must be an absolute path',
   }),
   slugs: z.array(z.string().min(1)).min(1),
+});
+
+const workflowImportBody = z.object({
+  source: z.string().refine((value) => isAbsolute(value), {
+    message: 'source must be an absolute path',
+  }),
+  ids: z.array(z.string().min(1)).min(1),
 });
 
 const forceBody = z.object({ force: z.boolean().optional() });
@@ -672,6 +680,26 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
             level,
           })) as ConfigEditResult,
         );
+      },
+    },
+    {
+      method: 'GET',
+      pattern: /^\/api\/shared-workflows$/,
+      handle: () => call('shared_workflows', {}),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/config\/workflows\/import$/,
+      handle: async (_match, body, repository) => {
+        const result = (await call('workflows_import', {
+          repository,
+          ...parseBody(workflowImportBody, body),
+        })) as WorkflowsImportResult;
+        if (result.ok) return new Reply(200, result);
+        if (result.reason === 'conflict') {
+          return new Reply(409, { error: result.message, ids: result.ids ?? [] });
+        }
+        return new Reply(422, { errors: result.errors, references: [] });
       },
     },
     {

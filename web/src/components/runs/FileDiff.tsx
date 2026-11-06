@@ -17,14 +17,21 @@ const ROW_CLASS = {
   note: 'text-muted-foreground italic',
 } as const;
 
+/** Height of one table row of a diff, rem (`text-xs` line). */
+export const ROW_HEIGHT_REM = 1;
+
 const SIGN = { ctx: ' ', add: '+', del: '−', note: '' } as const;
 
 /** The diff of one file: hunks with line numbers, or a note when there is nothing to show. */
-export function FileDiff({ result }: { result: FileDiffState }) {
+export function FileDiff({ result, reserve }: { result: FileDiffState; reserve?: number }) {
   const { t } = useTranslation();
   if (result.state === 'loading') {
     return (
-      <p role="status" className="px-3 py-2 text-xs text-muted-foreground">
+      <p
+        role="status"
+        className="px-3 py-2 text-xs text-muted-foreground"
+        style={reserve ? { minHeight: `${reserve * ROW_HEIGHT_REM}rem` } : undefined}
+      >
         {t('runs.files.diffLoading')}
       </p>
     );

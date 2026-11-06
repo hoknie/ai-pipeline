@@ -601,6 +601,7 @@ describe('attempts and transcript', () => {
             ],
             added: 1,
             removed: 0,
+            revision: 'r1',
           },
         }),
       ),
@@ -884,7 +885,7 @@ describe('attempts and transcript', () => {
     const { rerender } = panel(logApi(), true);
     await screen.findByText('ответ специалиста');
     expect(screen.queryByText('Read')).toBeNull();
-    expect(screen.queryByLabelText('only specialist replies')).toBeNull();
+    expect(screen.queryByLabelText('Specialist replies')).toBeNull();
     rerender(
       <GroupScreen
         api={logApi()}
@@ -901,33 +902,18 @@ describe('attempts and transcript', () => {
     expect(await screen.findByText('Read')).toBeTruthy();
   });
 
-  it('has the switch of the filter in the head of the log', async () => {
+  it('has the switch of the filter in the group header', async () => {
     const onOnlyReplies = vi.fn();
     panel(logApi(), false, onOnlyReplies);
     await screen.findByText('ответ специалиста');
-    fireEvent.click(screen.getByRole('switch', { name: 'only specialist replies' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Specialist replies' }));
     expect(onOnlyReplies).toHaveBeenCalledWith(true);
   });
 
-  it('has the switch of JSON in the head of the log and none in the attempt', async () => {
-    const onShowJson = vi.fn();
-    render(
-      <GroupScreen
-        api={logApi()}
-        runId="run1"
-        row={groupRow()}
-        draftKey="run1/login"
-        drafts={{}}
-        onDraft={() => undefined}
-        onClearDrafts={() => undefined}
-        onError={() => undefined}
-        onShowJson={onShowJson}
-      />,
-    );
+  it('has no switch of JSON', async () => {
+    panel(logApi());
     await screen.findByText('ответ специалиста');
-    expect(screen.getAllByRole('switch', { name: 'show JSON' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('switch', { name: 'show JSON' }));
-    expect(onShowJson).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('switch', { name: /JSON/ })).toBeNull();
   });
 
   it('says so when there are no specialist answers yet', async () => {

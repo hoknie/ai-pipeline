@@ -51,6 +51,8 @@ function entry(id: string, overrides: Partial<EditorWorkflow> = {}): EditorWorkf
     file: `/repo/aip/workflows/${id}.yaml`,
     revision: `rev-${id}`,
     raw: RAW,
+    shared_tags: [] as string[],
+    own_tags: [] as string[],
     ...overrides,
   };
   return { ...base, sources: overrides.sources ?? sourcesFor('workflows', base) };
@@ -225,7 +227,7 @@ describe('the list', () => {
     expect(screen.getByRole('region', { name: 'configuration errors' })).toBeTruthy();
     expect(
       (screen.getAllByLabelText('additional step prompt')[0] as HTMLTextAreaElement).disabled,
-    ).toBe(false);
+    ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Override in the project' }));
     await waitFor(() =>
       expect(writeWorkflow).toHaveBeenCalledWith(
@@ -775,28 +777,20 @@ describe('global level', () => {
       raw: { steps: [{ id: 'code', specialist: 'coder' }] },
     });
 
-  it('edits a global workflow, previews and writes it with level global', async () => {
+  it('opens a shared workflow for viewing only, with a link to the settings', async () => {
     const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
     const previewWorkflow = vi.fn(async () => ({ topology: null, errors: [] }));
     const config = vi.fn(async () => configView({ specialists, workflows: [globalEntry()] }));
     render(<Page api={fakeApi({ config, writeWorkflow, previewWorkflow })} start="quick" />);
-    expect(await screen.findByText(/applies in every repository/)).toBeTruthy();
-    await waitFor(() =>
-      expect(previewWorkflow).toHaveBeenCalledWith('quick', expect.anything(), 'global'),
-    );
-    fireEvent.change(screen.getAllByLabelText('additional step prompt')[0]!, {
-      target: { value: 'build' },
-    });
-    openPreview();
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() =>
-      expect(writeWorkflow).toHaveBeenCalledWith(
-        'quick',
-        expect.anything(),
-        'global-quick.yaml',
-        'global',
-      ),
-    );
+    expect(await screen.findByText(/view only here/)).toBeTruthy();
+    expect(
+      (screen.getAllByLabelText('additional step prompt')[0] as HTMLTextAreaElement).disabled,
+    ).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    const link = screen.getByRole('link', { name: 'Edit in Settings' });
+    expect(link.getAttribute('href')).toBe('#settings/global/pipelines/quick');
+    expect(writeWorkflow).not.toHaveBeenCalled();
   });
 
   it('makes a project workflow global', async () => {
@@ -880,5 +874,213 @@ describe('step ids follow the specialist', () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
     expect(lastPreviewId()).toBe('reviewer');
+  });
+});
+
+describe('pipeline tags and filters', () => {
+  const tagged = () => [
+    entry('feature', {
+      shared_tags: ['backend'],
+      own_tags: ['legacy'],
+      raw: { ...RAW, tags: ['legacy'] },
+    }),
+    entry('epic', {
+      own_tags: ['fast'],
+      raw: {
+        steps: [{ id: 'plan', specialist: 'plan' }],
+        split: { specialist: 'writer' },
+        tags: ['fast'],
+      },
+    }),
+    entry('quick', {
+      level: 'global',
+      shared_tags: ['fast'],
+      file: '/xdg/aip/workflows/quick.yaml',
+      revision: null,
+      raw: { steps: [{ id: 'code', specialist: 'coder' }], tags: ['fast'] },
+    }),
+  ];
+  const configOf = (workflows = tagged()) =>
+    vi.fn(async () => configView({ specialists, workflows }));
+  const rows = () =>
+    within(screen.getByRole('list', { name: 'pipeline', hidden: true }))
+      .getAllByRole('listitem', { hidden: true })
+      .map((row) => row.textContent ?? '');
+  const pick = async (name: string, label: string) => {
+    const panel = await screen.findByRole('complementary', { name: 'Filters' });
+    fireEvent.click(await within(panel).findByRole('combobox', { name: label }));
+    fireEvent.click(await screen.findByRole('option', { name }));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  };
+
+  beforeEach(() => window.localStorage.clear());
+
+  it('shows the shared tag with a mark and the own tag without one', async () => {
+    render(<Page api={fakeApi({ config: configOf() })} />);
+    const chips = await screen.findByTestId('tags-feature');
+    expect(within(chips).getByText('Shared:')).toBeTruthy();
+    expect(within(chips).getByText('backend').closest('[data-shared]')).toBeTruthy();
+    expect(within(chips).getByText('legacy').closest('[data-shared]')).toBeNull();
+  });
+
+  it('shows the filters as a third column on a wide window', async () => {
+    render(<Page api={fakeApi({ config: configOf() })} />);
+    await screen.findByTestId('tags-feature');
+    expect(screen.getByRole('complementary', { name: 'Filters' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Filters' })).toBeNull();
+  });
+
+  it('keeps pipelines with any chosen tag and remembers the choice per repository', async () => {
+    const api = fakeApi({ config: configOf() });
+    const view = render(<Page api={api} />);
+    await screen.findByTestId('tags-feature');
+    expect(rows()).toHaveLength(3);
+    await pick('fast', 'Tags');
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    expect(rows().some((row) => row.includes('feature'))).toBe(false);
+    expect(JSON.parse(window.localStorage.getItem('aip.web.workflowFilters') ?? '{}')).toEqual({
+      '/repo': { level: 'all', tags: ['fast'], specialists: [] },
+    });
+    view.unmount();
+    render(<Page api={api} />);
+    await screen.findByTestId('tags-epic');
+    expect(rows()).toHaveLength(2);
+  });
+
+  it('filters by a specialist of the steps or of the split', async () => {
+    render(<Page api={fakeApi({ config: configOf() })} />);
+    await screen.findByTestId('tags-feature');
+    await pick('writer', 'Specialists');
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0]).toContain('epic');
+  });
+
+  it('resets the filters when nothing matches', async () => {
+    render(<Page api={fakeApi({ config: configOf() })} />);
+    await screen.findByTestId('tags-feature');
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search pipelines' }), {
+      target: { value: 'zzz' },
+    });
+    expect(await screen.findByText('No pipeline matches the filters.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    await waitFor(() => expect(rows()).toHaveLength(3));
+  });
+
+  it('hides the open pipeline from the list when the filter excludes it', async () => {
+    render(<Page api={fakeApi({ config: configOf() })} start="feature" />);
+    await screen.findByTestId('tags-epic');
+    await pick('fast', 'Tags');
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    expect(screen.getByRole('heading', { name: 'feature' })).toBeTruthy();
+  });
+
+  describe('behind a button', () => {
+    const original = window.matchMedia;
+    beforeEach(() => {
+      window.matchMedia = ((query: string) => ({
+        matches: (/min-width: (\d+)px/.test(query) ? Number(/(\d+)px/.exec(query)![1]) : 0) <= 1100,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      })) as unknown as typeof window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = original;
+    });
+
+    it('opens the filters from the button and counts them', async () => {
+      render(<Page api={fakeApi({ config: configOf() })} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Filters' }));
+      expect(screen.queryByRole('complementary', { name: 'Filters' })).toBeNull();
+      fireEvent.change(await screen.findByRole('searchbox', { name: 'Search pipelines' }), {
+        target: { value: 'epi' },
+      });
+      expect(rows()).toHaveLength(1);
+      expect(screen.getByRole('button', { name: 'Filters (1)', hidden: true })).toBeTruthy();
+    });
+  });
+});
+
+describe('the tags field of a pipeline', () => {
+  const withTags = () =>
+    configView({
+      specialists,
+      workflows: [
+        entry('feature', {
+          shared_tags: ['backend'],
+          own_tags: ['legacy'],
+          raw: { ...RAW, tags: ['legacy'] },
+        }),
+      ],
+    });
+
+  it('writes own tags to the project file and keeps the shared one out of it', async () => {
+    const writeWorkflow = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 'n',
+      file: '/f',
+    }));
+    render(
+      <Page
+        api={fakeApi({ writeWorkflow, config: vi.fn(async () => withTags()) })}
+        start="feature"
+      />,
+    );
+    const field = await screen.findByTestId('workflow-tags');
+    expect(within(field).getByText('backend')).toBeTruthy();
+    expect(within(field).queryByRole('button', { name: 'Remove backend' })).toBeNull();
+    fireEvent.click(within(field).getByRole('button', { name: 'Remove legacy' }));
+    fireEvent.click(within(field).getByRole('combobox'));
+    fireEvent.change(await screen.findByRole('combobox', { name: /Search in Tags/ }), {
+      target: { value: 'slow' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /slow/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
+    expect(writeWorkflow.mock.calls[0]?.[1]).toMatchObject({ tags: ['slow'] });
+    expect(writeWorkflow.mock.calls[0]?.[3]).toBe('project');
+  });
+
+  it('writes no tags key for an empty list', () => {
+    expect(valueOf({ ...draftOf(RAW), tags: [] })).not.toHaveProperty('tags');
+    expect(valueOf({ ...draftOf({ ...RAW, tags: ['a'] }) }).tags).toEqual(['a']);
+  });
+
+  it('shows the error of the tags at the field', async () => {
+    const previewWorkflow = vi.fn(async () => ({
+      topology: null,
+      errors: [{ path: 'swarm.workflows.feature.tags', message: 'bad tag' }],
+    }));
+    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    const field = await screen.findByTestId('workflow-tags');
+    expect(await within(field).findByText('bad tag')).toBeTruthy();
+  });
+
+  it('overrides a shared pipeline with the value of the shared file, tags included', async () => {
+    const writeWorkflow = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 'n',
+      file: '/f',
+    }));
+    const quick = entry('quick', {
+      level: 'global',
+      shared_tags: ['fast'],
+      file: '/xdg/aip/workflows/quick.yaml',
+      revision: null,
+      raw: { steps: [{ id: 'code', specialist: 'coder' }], tags: ['fast'] },
+    });
+    render(
+      <Page
+        api={fakeApi({
+          writeWorkflow,
+          config: vi.fn(async () => configView({ specialists, workflows: [quick] })),
+        })}
+        start="quick"
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Override in the project' }));
+    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
+    expect(writeWorkflow.mock.calls[0]?.[0]).toBe('quick');
+    expect(writeWorkflow.mock.calls[0]?.[3]).toBe('project');
   });
 });

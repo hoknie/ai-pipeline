@@ -1,4 +1,4 @@
-# Starter configuration created by `aip init`. Every field is described in docs/configuration.md.
+# Starter configuration created by `aip init`. Every field is described in docs/configuration/README.md.
 
 # How many specialists run at the same time.
 max: 2

@@ -94,7 +94,7 @@ function escapeText(text: string): string {
   return text.replace(/([\\`*_[\]])/g, '\\$1');
 }
 
-function fence(code: string, min: number): string {
+export function fence(code: string, min: number): string {
   let length = min;
   for (const run of code.match(/`+/g) ?? []) length = Math.max(length, run.length + 1);
   return '`'.repeat(length);

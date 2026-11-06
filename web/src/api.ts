@@ -19,6 +19,8 @@ import type {
   SharedSpecialistsView,
   SpecialistTagsView,
   SpecialistsImportResult,
+  SharedWorkflowsView,
+  WorkflowsImportResult,
   SystemView,
   TagView,
   Transcript,
@@ -152,6 +154,10 @@ export interface Api {
   specialistTags(): Promise<SpecialistTagsView>;
   /** Copies project specialists of another repository into the bound one. */
   importSpecialists(source: string, slugs: string[]): Promise<SpecialistsImportResult>;
+  /** The shared pipelines with the repositories of the registry that use them. */
+  sharedWorkflows(): Promise<SharedWorkflowsView>;
+  /** Copies project pipelines of another repository into the bound one. */
+  importWorkflows(source: string, ids: string[]): Promise<WorkflowsImportResult>;
   /** Writes one general setting (`null` removes it); problems come back as a result. */
   writeSetting(
     path: string,
@@ -352,6 +358,13 @@ function bound(repository: string | null): Api {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ source, slugs }),
       })) as unknown as SpecialistsImportResult,
+    sharedWorkflows: () => call('/api/shared-workflows'),
+    importWorkflows: async (source, ids) =>
+      (await edit(at('/api/config/workflows/import'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ source, ids }),
+      })) as unknown as WorkflowsImportResult,
     writeWorkflow: (id, value, revision, level) =>
       edit(at(`/api/config/workflows/${enc(id)}`), {
         method: 'PUT',

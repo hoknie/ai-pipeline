@@ -717,4 +717,12 @@ describe('specialist tag requests', () => {
     expect(parse('specialists_import', { ...base, slugs: [] })).toBe(false);
     expect(parse('specialists_import', { ...base, slugs: ['Bad Slug'] })).toBe(false);
   });
+
+  it('takes a pipeline import with at least one id', () => {
+    const base = { repository: '/app', source: '/lib', ids: ['quick'] };
+    expect(parse('workflows_import', base)).toBe(true);
+    expect(parse('workflows_import', { ...base, ids: [] })).toBe(false);
+    expect(parse('workflows_import', { ...base, ids: ['Bad Id'] })).toBe(false);
+    expect(parse('shared_workflows', {})).toBe(true);
+  });
 });

@@ -79,3 +79,13 @@ export function buildFileTree(files: FileStat[]): FileNode[] {
       left.kind === right.kind ? left.name.localeCompare(right.name) : left.kind === 'dir' ? -1 : 1,
     );
 }
+
+/**
+ * Rows of table height kept for the diff of a file while it loads, so that the loaded table does
+ * not push the content below it: a binary file takes one row, others the changed lines plus the
+ * hunk headers and context, within 3 to 40 rows.
+ */
+export function reservedDiffRows(node: Pick<FileNode, 'added' | 'removed' | 'binary'>): number {
+  if (node.binary) return 1;
+  return Math.min(40, Math.max(3, node.added + node.removed + 11));
+}

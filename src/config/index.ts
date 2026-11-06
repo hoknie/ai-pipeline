@@ -24,6 +24,7 @@ export {
   settingFieldOf,
   settingsFile,
   specialistReferences,
+  workflowReferences,
   type ConfigEditorView,
   type EditCommitted,
   type EditPlan,
@@ -65,6 +66,12 @@ export {
   type SharedSpecialistUsage,
   type SharedSpecialistsUsage,
 } from './shared-specialists.ts';
+export {
+  sharedWorkflowUsage,
+  type SharedWorkflowProject,
+  type SharedWorkflowUsage,
+  type SharedWorkflowsUsage,
+} from './shared-workflows.ts';
 export { TAG_NAME_MAX } from './tag-names.ts';
 export { formatDuration, parseDuration } from './duration.ts';
 export {

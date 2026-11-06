@@ -18,9 +18,7 @@ export const HELP_GROUPS: HelpGroup[] = [
 
 export const HELP_FOOTER = [
   "Run 'aip <command> --help' for details.",
-  'Docs: README.md and docs/install.md, docs/configuration.md,',
-  'docs/cli.md, docs/queue.md, docs/hosts.md, docs/web.md,',
-  'docs/development.md',
+  'Docs: README.md and docs/README.md',
 ].join('\n');
 
 /** The `Examples:` block of a command; every line is a full command starting with `aip`. */

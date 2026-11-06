@@ -1259,3 +1259,43 @@ describe('specialist tags in the editor', () => {
     expect(plan.text).toContain('tags:');
   });
 });
+
+describe('workflow tags in the editor', () => {
+  const body = 'steps:\n  - id: code\n    specialist: coder\n';
+  const file = (paths: ConfigPaths, level: 'global' | 'project') =>
+    join(paths[level].directory, 'workflows', 'quick.yaml');
+
+  it('splits the tags of the shared and the project file', () => {
+    const paths = setup();
+    write(specialistFile(paths, 'coder'), 'name: Coder\n');
+    write(file(paths, 'global'), `tags: [fast]\n${body}`);
+    write(file(paths, 'project'), `tags: [mine]\n${body}`);
+    const workflow = editorView(paths).workflows.find((item) => item.id === 'quick');
+    expect(workflow).toMatchObject({ shared_tags: ['fast'], own_tags: ['mine'] });
+  });
+
+  it('keeps a workflow with invalid tags and reports the error', () => {
+    const paths = setup();
+    write(specialistFile(paths, 'coder'), 'name: Coder\n');
+    write(file(paths, 'project'), `tags: backend\n${body}`);
+    const view = editorView(paths);
+    expect(view.workflows.map((item) => [item.id, item.own_tags])).toEqual([['quick', []]]);
+    expect(view.errors.map((error) => error.path)).toContain('swarm.workflows.quick.tags');
+  });
+
+  it('writes the tags of a shared workflow into the shared file', () => {
+    const paths = setup();
+    write(specialistFile(paths, 'coder', paths.global), 'name: Coder\n');
+    const plan = accepted(
+      planEdit(paths, {
+        kind: 'workflow',
+        id: 'quick',
+        value: { tags: ['fast'], steps: [{ id: 'code', specialist: 'coder' }] },
+        revision: null,
+        level: 'global',
+      }),
+    );
+    expect(plan.file).toBe(file(paths, 'global'));
+    expect(plan.text).toContain('fast');
+  });
+});

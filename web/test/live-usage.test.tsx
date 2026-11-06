@@ -140,7 +140,7 @@ describe('live update', () => {
       expect(rows()).toBe(1);
       scroll(false);
       await waitFor(() => expect(screen.getAllByText('12.3k/1.1k')).toHaveLength(3));
-      expect(rows()).toBe(2);
+      expect(rows()).toBe(1);
       scroll(true);
       await waitFor(() => expect(screen.getAllByText('12.3k/1.1k')).toHaveLength(2));
       expect(rows()).toBe(1);

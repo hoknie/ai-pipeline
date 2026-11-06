@@ -1,4 +1,16 @@
-import { Ban, CircleCheck, Clock, GripVertical, ListOrdered, TriangleAlert } from 'lucide-react';
+import {
+  Ban,
+  CircleCheck,
+  CirclePause,
+  Clock,
+  Eye,
+  GripVertical,
+  ListOrdered,
+  Play,
+  TriangleAlert,
+  Undo2,
+  X,
+} from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +35,6 @@ import { Alert } from '../ui/alert.tsx';
 import { Badge, badgeVariants } from '../ui/badge.tsx';
 import { Button } from '../ui/button.tsx';
 import { Empty } from '../ui/empty.tsx';
-import { Switch } from '../ui/switch.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
 
 import { TagChips } from './TagChip.tsx';
@@ -147,7 +158,7 @@ export function QueueList({
   const [message, setMessage] = useState<string | null>(null);
   const [started, setStarted] = useState<{ item: string; runId: string } | null>(null);
   const inFlight = useRef(false);
-  // the shown state of the switches while their request is on its way
+  // the shown state of the buttons while their request is on its way
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
   // a new queue (an event, another client) is the truth, except while our own move is on its way
@@ -392,21 +403,12 @@ export function QueueList({
                     {item.hold === 'paused' ? t('queue.onPause') : t('queue.returning')}
                   </a>
                 ) : null}
-                <Switch
-                  checked={!postponed}
-                  aria-label={t('queue.list.active')}
-                  title={t('queue.list.activeHint')}
-                  onCheckedChange={(active) => void setPostponed(item, !active)}
-                />
                 {postponed ? (
                   <Badge variant="warn" title={t('queue.list.activeHint')}>
                     {t('queue.list.postponed')}
                   </Badge>
                 ) : null}
                 <ReadinessBadge item={item} />
-                {item.after.map((ref) => (
-                  <DependencyChip key={ref.id} dependency={ref} />
-                ))}
                 {linked ? <span className="sr-only">{t('queue.list.linked')}</span> : null}
                 {item.autoDeliver === null ? null : (
                   <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
@@ -436,27 +438,53 @@ export function QueueList({
                 >
                   {when(item.createdAt, now, locale)}
                 </time>
-                <span className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <span className="ml-auto flex shrink-0 gap-1" data-actions="">
+                  <RowAction
+                    label={editing ? t('queue.list.cancel') : t('queue.list.edit')}
                     onClick={() => onDraft(`edit:${item.id}`, editing ? null : draftOf(item))}
                   >
-                    {editing ? t('queue.list.cancel') : t('queue.list.edit')}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => void remove(item)}>
-                    {t('queue.list.remove')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title={runNowTip(queue, item, t)}
+                    {editing ? <Undo2 /> : <Eye />}
+                  </RowAction>
+                  <RowAction
+                    label={t('queue.list.postpone')}
+                    hint={t('queue.list.activeHint')}
+                    pressed={postponed}
+                    className={cn(
+                      'text-status-run hover:text-status-run',
+                      postponed && 'bg-status-run-bg',
+                    )}
+                    onClick={() => void setPostponed(item, !postponed)}
+                  >
+                    <CirclePause />
+                  </RowAction>
+                  <RowAction
+                    label={item.hold === null ? t('queue.list.runNow') : t('queue.list.continue')}
+                    hint={runNowTip(queue, item, t)}
+                    className="text-status-ok hover:text-status-ok"
                     onClick={() => void runNow(item)}
                   >
-                    {item.hold === null ? t('queue.list.runNow') : t('queue.list.continue')}
-                  </Button>
+                    <Play />
+                  </RowAction>
+                  <RowAction
+                    label={t('queue.list.remove')}
+                    className="text-status-err hover:text-status-err"
+                    onClick={() => void remove(item)}
+                  >
+                    <X />
+                  </RowAction>
                 </span>
               </div>
+              {item.after.length > 0 ? (
+                <div
+                  className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[3.25rem] text-xs"
+                  data-dependencies=""
+                >
+                  <span className="text-muted-foreground">{t('queue.list.waitsFor')}</span>
+                  {item.after.map((ref) => (
+                    <DependencyChip key={ref.id} dependency={ref} />
+                  ))}
+                </div>
+              ) : null}
               {item.error ? (
                 <Alert variant="destructive" className="mt-2">
                   {t('queue.list.startFailed', { error: item.error })}
@@ -534,6 +562,45 @@ export function QueueList({
   );
 }
 
+/** An icon button of a row: the label is the accessible name, the tooltip shows it with an optional hint. */
+function RowAction({
+  label,
+  hint,
+  pressed,
+  className,
+  onClick,
+  children,
+}: {
+  label: string;
+  hint?: string | undefined;
+  pressed?: boolean;
+  className?: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={className}
+          aria-label={label}
+          aria-description={hint}
+          aria-pressed={pressed}
+          onClick={onClick}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{label}</p>
+        {hint ? <p className="opacity-80">{hint}</p> : null}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function ReadinessBadge({ item }: { item: QueueItemView }) {
   const { t } = useTranslation();
   const { Icon, tone } = stateLook(item.readiness);
@@ -574,7 +641,7 @@ function DependencyChip({ dependency }: { dependency: QueueItemView['after'][num
   );
   return dependency.kind === 'run' ? (
     <a
-      className={cn(badgeVariants({ variant: tone }), 'underline')}
+      className={cn(badgeVariants({ variant: tone }), 'max-w-full underline sm:max-w-[16rem]')}
       title={`${state}: ${name}`}
       data-state={dependency.state}
       href={formatRoute({ view: 'runs', run: dependency.id, group: null, step: null, tab: null })}
@@ -582,7 +649,12 @@ function DependencyChip({ dependency }: { dependency: QueueItemView['after'][num
       {body}
     </a>
   ) : (
-    <Badge variant={tone} title={`${state}: ${name}`} data-state={dependency.state}>
+    <Badge
+      variant={tone}
+      className="max-w-full sm:max-w-[16rem]"
+      title={`${state}: ${name}`}
+      data-state={dependency.state}
+    >
       {body}
     </Badge>
   );

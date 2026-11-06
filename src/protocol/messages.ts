@@ -304,6 +304,18 @@ export const requestSchema = z.discriminatedUnion('method', [
     }),
   }),
   z.object({
+    method: z.literal('shared_workflows'),
+    params: z.object({}),
+  }),
+  z.object({
+    method: z.literal('workflows_import'),
+    params: z.object({
+      repository: z.string().min(1),
+      source: z.string().min(1),
+      ids: z.array(entryIdSchema).min(1),
+    }),
+  }),
+  z.object({
     method: z.literal('config_delete'),
     params: z.object({
       repository: z.string().min(1),

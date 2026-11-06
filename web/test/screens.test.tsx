@@ -82,8 +82,18 @@ describe('group screen', () => {
   });
 
   it('keeps the chosen tab when the group moves to the next step', async () => {
-    const first = { files: [{ path: 'old.ts', added: 1, removed: 0 }], added: 1, removed: 0 };
-    const second = { files: [{ path: 'fresh.ts', added: 2, removed: 0 }], added: 2, removed: 0 };
+    const first = {
+      files: [{ path: 'old.ts', added: 1, removed: 0 }],
+      added: 1,
+      removed: 0,
+      revision: 'r1',
+    };
+    const second = {
+      files: [{ path: 'fresh.ts', added: 2, removed: 0 }],
+      added: 2,
+      removed: 0,
+      revision: 'r2',
+    };
     const group = vi
       .fn()
       .mockResolvedValueOnce(groupView({ diff: first }))
@@ -204,7 +214,7 @@ describe('group screen', () => {
       [runView({ finished: true, state: 'finished', groups: [groupRow({ status: 'merged' })] })],
       {
         group: vi.fn(async () =>
-          groupView({ status: 'merged', diff: { files, added: 366, removed: 0 } }),
+          groupView({ status: 'merged', diff: { files, added: 366, removed: 0, revision: 'r1' } }),
         ),
       },
     );
@@ -1018,6 +1028,7 @@ describe('usage in the group header', () => {
           onDraft={() => undefined}
           onClearDrafts={() => undefined}
           onError={() => undefined}
+          onOnlyReplies={() => undefined}
           {...(props.run === false ? {} : { run: runView() })}
           {...(props.showUsage ? { showUsage: true } : {})}
         />,
@@ -1033,16 +1044,78 @@ describe('usage in the group header', () => {
       expect(first.getByRole('button', cancel)).toBeTruthy();
     });
 
-    it('has two rows after scrolling: the title and buttons first, the step and usage second', () => {
+    it('has two rows after scrolling: the title with the statuses, then the step, usage and buttons', () => {
       mount({ showUsage: true });
-      expect(rows()).toHaveLength(2);
-      const first = within(rows()[0] as HTMLElement);
-      const second = within(rows()[1] as HTMLElement);
-      expect(first.getByText(/добавить вход/)).toBeTruthy();
-      expect(first.getByRole('button', cancel)).toBeTruthy();
-      expect(second.getByText(row.stepName ?? '')).toBeTruthy();
-      expect(second.getByText('$0.42')).toBeTruthy();
-      expect(second.queryAllByRole('button')).toHaveLength(0);
+      expect(rows()).toHaveLength(1);
+      const row0 = within(rows()[0] as HTMLElement);
+      expect(row0.getByText(row.stepName ?? '')).toBeTruthy();
+      expect(row0.getByText('$0.42')).toBeTruthy();
+      expect(row0.getByRole('button', cancel)).toBeTruthy();
+      expect(
+        row0.getByRole('switch', { name: /Specialist replies|Ответы специалиста/ }),
+      ).toBeTruthy();
+      const collapse = document.querySelector('[data-slot="group-header-collapse"]') as HTMLElement;
+      const titleRow = collapse.querySelector(
+        '[data-slot="group-header-title-row"]',
+      ) as HTMLElement;
+      expect(titleRow.className).not.toContain('flex-col');
+      expect(within(titleRow).getByText(/добавить вход/)).toBeTruthy();
+      const statuses = titleRow.querySelector('[data-slot="group-header-statuses"]') as HTMLElement;
+      expect(statuses.className).toContain('justify-end');
+      expect(within(statuses).getByText('Run:')).toBeTruthy();
+      expect(within(statuses).getByText('Group:')).toBeTruthy();
+    });
+
+    it('keeps the same header elements before and after scrolling, so the transition is animated', () => {
+      const { rerender } = mount({});
+      const collapse = document.querySelector('[data-slot="group-header-collapse"]');
+      expect(collapse?.className).toContain('grid-rows-[0fr]');
+      const gridChild = collapse?.firstElementChild as HTMLElement;
+      expect(gridChild.className).not.toMatch(/(^|\s)(p|py|pb|pt)-/);
+      rerender(
+        <GroupScreen
+          api={fakeApi({ group: vi.fn(async () => groupView()) })}
+          runId="run1"
+          row={withDiff}
+          draftKey="run1/login"
+          drafts={{}}
+          onDraft={() => undefined}
+          onClearDrafts={() => undefined}
+          onError={() => undefined}
+          run={runView()}
+          showUsage
+        />,
+      );
+      expect(document.querySelector('[data-slot="group-header-collapse"]')).toBe(collapse);
+      expect(collapse?.className).toContain('grid-rows-[1fr]');
+    });
+
+    it('keeps the statuses in the collapsing block until the transition ends', () => {
+      vi.useFakeTimers();
+      try {
+        const props = {
+          api: fakeApi({ group: vi.fn(async () => groupView()) }),
+          runId: 'run1',
+          row: withDiff,
+          draftKey: 'run1/login',
+          drafts: {},
+          onDraft: () => undefined,
+          onClearDrafts: () => undefined,
+          onError: () => undefined,
+          run: runView(),
+        };
+        const { rerender } = render(<GroupScreen {...props} showUsage />);
+        const statuses = () => document.querySelector('[data-slot="group-header-statuses"]');
+        expect(statuses()?.textContent).toContain('Run:');
+        rerender(<GroupScreen {...props} showUsage={false} />);
+        expect(statuses()?.textContent).toContain('Run:');
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+        expect(statuses()?.textContent ?? '').not.toContain('Run:');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('has two rows with the group title without a run', () => {

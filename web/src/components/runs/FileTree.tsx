@@ -8,15 +8,15 @@ import type { FileStat } from '../../types.ts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible.tsx';
 
 import { FileDiff, type FileDiffState } from './FileDiff.tsx';
-import { buildFileTree, type FileNode } from './fileTree.ts';
+import { buildFileTree, reservedDiffRows, type FileNode } from './fileTree.ts';
 
 /** What the tree needs to show the diff of a file when it is clicked. */
 export interface DiffSource {
   api: Api;
   runId: string;
   group: string;
-  /** Changes with the statistics of the group; loaded diffs are dropped when it changes. */
-  version: string;
+  /** Revision of the group's changes; loaded diffs are reloaded in place when it changes. */
+  revision: string;
 }
 
 interface Expansion {
@@ -82,7 +82,7 @@ function FileRow({ node, expansion }: { node: FileNode; expansion: Expansion | n
       </button>
       {isOpen ? (
         <div className="my-1 ml-2 overflow-hidden rounded border">
-          <FileDiff result={result ?? { state: 'loading' }} />
+          <FileDiff result={result ?? { state: 'loading' }} reserve={reservedDiffRows(node)} />
         </div>
       ) : null}
     </li>
@@ -121,7 +121,7 @@ function Row({ node, expansion }: { node: FileNode; expansion: Expansion | null 
 
 /**
  * Changed files of a group as a tree with line counts. With a `diff` source a click on a file
- * opens its diff below it; opened diffs are kept until the changes of the group change.
+ * opens its diff below it; an opened diff stays on screen while a newer revision of it loads.
  */
 export function FileTree({ files, diff }: { files: FileStat[]; diff?: DiffSource }) {
   const { t } = useTranslation();
@@ -130,6 +130,7 @@ export function FileTree({ files, diff }: { files: FileStat[]; diff?: DiffSource
   const [results, setResults] = useState<Record<string, FileDiffState>>({});
   const requested = useRef(new Set<string>());
   const alive = useRef(true);
+  const current = useRef<string | undefined>(undefined);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -140,15 +141,22 @@ export function FileTree({ files, diff }: { files: FileStat[]; diff?: DiffSource
   const api = diff?.api;
   const runId = diff?.runId;
   const group = diff?.group;
-  const version = diff?.version;
+  const revision = diff?.revision;
+  current.current = revision;
+  const paths = files.map((file) => file.path).join('\u0000');
   useEffect(() => {
-    if (!api || runId === undefined || group === undefined) return;
+    if (!api || runId === undefined || group === undefined || revision === undefined) return;
+    const known = new Set(paths.split('\u0000'));
     for (const path of open) {
-      const key = `${version}\u0000${path}`;
+      if (!known.has(path)) continue;
+      const key = `${revision}\u0000${path}`;
       if (requested.current.has(key)) continue;
       requested.current.add(key);
       const settle = (state: FileDiffState) => {
-        if (alive.current) setResults((current) => ({ ...current, [key]: state }));
+        // an answer for an older revision must not replace what is already shown
+        if (alive.current && current.current === revision) {
+          setResults((all) => ({ ...all, [path]: state }));
+        }
       };
       api.fileDiff(runId, group, path).then(
         (loaded) => settle({ state: 'ready', diff: loaded }),
@@ -158,7 +166,7 @@ export function FileTree({ files, diff }: { files: FileStat[]; diff?: DiffSource
         },
       );
     }
-  }, [open, api, runId, group, version]);
+  }, [open, api, runId, group, revision, paths]);
 
   if (!diff) {
     return (
@@ -172,10 +180,7 @@ export function FileTree({ files, diff }: { files: FileStat[]; diff?: DiffSource
   const expansion: Expansion = {
     open,
     results: Object.fromEntries(
-      [...open].map((path) => [
-        path,
-        results[`${version}\u0000${path}`] ?? ({ state: 'loading' } as const),
-      ]),
+      [...open].map((path) => [path, results[path] ?? ({ state: 'loading' } as const)]),
     ),
     previous: new Map(
       files.flatMap((file) => (file.previousPath ? [[file.path, file.previousPath] as const] : [])),

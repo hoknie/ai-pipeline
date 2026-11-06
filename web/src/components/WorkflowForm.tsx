@@ -4,6 +4,8 @@ import { Trans, useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, GitBranch, Trash2 } from 'lucide-react';
 
 import type { Api } from '../api.ts';
+import { repositoryLabel } from '../repositories.ts';
+import { sameTag } from '../specialistTags.ts';
 import { useConfirm } from '../confirm.tsx';
 import { Alert } from '../ui/alert.tsx';
 import { Badge } from '../ui/badge.tsx';
@@ -19,13 +21,18 @@ import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 import type {
   ConfigEditorResponse,
   EditorWorkflow,
+  EntryReference,
   FieldError,
+  SharedWorkflowView,
   WorkflowTopology,
   WriteLevel,
 } from '../types.ts';
 
 import { FILE_PATH_CLASS, FilePath } from './FilePath.tsx';
+import { SpecialistTagChip } from './SpecialistTagChip.tsx';
+import { describeReference } from './SpecialistForm.tsx';
 import { stepIds } from './stepIds.ts';
+import { ValuesPicker } from './ValuesPicker.tsx';
 import { formatRoute } from '../route.ts';
 import { WorkflowGraph } from './WorkflowGraph.tsx';
 import { rawName } from './workflowName.ts';
@@ -63,6 +70,8 @@ export interface SplitDraft {
 export interface Draft {
   /** Display name; empty: the file has none. */
   name: string;
+  /** Tags of the file being edited. */
+  tags: string[];
   steps: StepDraft[];
   split: SplitDraft | null;
 }
@@ -126,6 +135,9 @@ export function draftOf(raw: Record<string, unknown>): Draft {
   const split = raw.split === undefined ? null : record(raw.split);
   return {
     name: text(raw.name),
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
     steps,
     split: split
       ? {
@@ -145,6 +157,8 @@ const asNumber = (value: string): number | string =>
 export function valueOf(draft: Draft): Record<string, unknown> {
   const value: Record<string, unknown> = {};
   if (draft.name.trim() !== '') value.name = draft.name.trim();
+  const tags = draft.tags.map((tag) => tag.trim()).filter((tag) => tag !== '');
+  if (tags.length > 0) value.tags = tags;
   if (draft.split) {
     const split: Record<string, unknown> = { specialist: draft.split.specialist };
     if (draft.split.maxGroups.trim() !== '') split.max_groups = asNumber(draft.split.maxGroups);
@@ -191,6 +205,70 @@ function isNameError(path: string, id: string): boolean {
   return path === `swarm.workflows.${id}.name`;
 }
 
+function isTagsError(path: string, id: string): boolean {
+  return path === `swarm.workflows.${id}.tags`;
+}
+
+/** The shared-level view of the form: the usage of the pipeline by the projects. */
+export interface SharedWorkflowOnly {
+  /** Usage of the open pipeline; null while it is not loaded. */
+  usage: SharedWorkflowView | null;
+  usageError: string | null;
+  /** Reads the usage again, for example after the daemon refused a delete. */
+  onUsageStale: () => void;
+}
+
+function UsageBlock({ shared, view }: { shared: SharedWorkflowOnly; view: ConfigEditorResponse }) {
+  const { t } = useTranslation();
+  const { usage, usageError } = shared;
+  return (
+    <Card>
+      <section aria-labelledby="usage-title" className="flex flex-col gap-2 p-4">
+        <h3 id="usage-title" className="text-sm font-semibold">
+          {t('sharedWorkflows.usage.title')}
+        </h3>
+        {usageError ? (
+          <Alert variant="destructive">
+            {t('sharedWorkflows.usage.error', { message: usageError })}
+          </Alert>
+        ) : usage === null ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            {t('sharedWorkflows.usage.loading')}
+          </p>
+        ) : (
+          <>
+            <p className="text-sm" data-testid="usage-count">
+              {t('sharedWorkflows.usage.count', { count: usage.projects.length })}
+            </p>
+            {usage.projects.length === 0 && usage.global.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('sharedWorkflows.usage.none')}</p>
+            ) : null}
+            <ul aria-label={t('sharedWorkflows.usage.title')} className="flex flex-col gap-1">
+              {usage.global.length > 0 ? (
+                <li className="text-sm">
+                  <span className="font-medium">{t('sharedWorkflows.usage.shared')}</span>:{' '}
+                  {usage.global.map((reference) => describeReference(reference, view)).join(', ')}
+                </li>
+              ) : null}
+              {usage.projects.map((project) => (
+                <li key={project.repository} className="text-sm">
+                  <span className="font-medium" title={project.repository}>
+                    {repositoryLabel(project.repository)}
+                  </span>
+                  :{' '}
+                  {project.references
+                    .map((reference) => describeReference(reference, null))
+                    .join(', ')}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    </Card>
+  );
+}
+
 function fieldLabel(path: string): string {
   const match = /steps\[\d+\]\.(.+)$|split\.(.+)$|\.(steps)$/.exec(path);
   return match?.[1] ?? match?.[2] ?? match?.[3] ?? '';
@@ -215,6 +293,7 @@ export function WorkflowForm({
   onReload,
   onSaved,
   onDeleted,
+  sharedOnly,
 }: {
   api: Api;
   view: ConfigEditorResponse;
@@ -226,11 +305,13 @@ export function WorkflowForm({
   onReload: () => Promise<void>;
   onSaved: (id: string) => Promise<void>;
   onDeleted: () => Promise<void>;
+  /** Edits a shared pipeline at the shared level only, with the usage by the projects. */
+  sharedOnly?: SharedWorkflowOnly;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [level, setLevel] = useState<WriteLevel>(
-    workflow?.level === 'global' ? 'global' : 'project',
+    sharedOnly || workflow?.level === 'global' ? 'global' : 'project',
   );
   const sources = workflow?.sources ?? {};
   const source = sources[level];
@@ -244,6 +325,7 @@ export function WorkflowForm({
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
+  const [references, setReferences] = useState<EntryReference[]>([]);
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('form');
@@ -253,7 +335,8 @@ export function WorkflowForm({
   });
 
   const id = workflow?.id ?? newId;
-  const readOnly = false;
+  // a shared pipeline is view only on the project page; settings are where it is changed
+  const readOnly = Boolean(workflow) && level === 'global' && !sharedOnly;
   const value = useMemo(() => valueOf(draft), [draft]);
   const dirty = JSON.stringify(value) !== initialValue || (!workflow && newId !== '');
   useEffect(() => {
@@ -286,7 +369,9 @@ export function WorkflowForm({
   }, [api, id, value, level]);
 
   const ids = stepIds(draft.steps);
-  const slugs = view.specialists.map((specialist) => specialist.slug);
+  const slugs = view.specialists
+    .filter((specialist) => !sharedOnly || specialist.sources.global)
+    .map((specialist) => specialist.slug);
   const update = (change: (current: Draft) => Draft) => setDraft(change);
   const setStep = (key: number, patch: Partial<StepDraft>) =>
     update((current) => ({
@@ -324,7 +409,11 @@ export function WorkflowForm({
   const report = (result: Awaited<ReturnType<Api['writeWorkflow']>>): boolean => {
     if (result.ok) return true;
     if (result.reason === 'conflict') setConflict(result.message);
-    else setErrors(result.errors);
+    else {
+      setErrors(result.errors);
+      setReferences(result.references ?? []);
+      if (sharedOnly && (result.references ?? []).length > 0) sharedOnly.onUsageStale();
+    }
     return false;
   };
 
@@ -351,7 +440,9 @@ export function WorkflowForm({
   /** Copies the file that applies to the other level, which has none. */
   const copyTo = (target: WriteLevel) =>
     attempt(async () => {
-      const result = await api.writeWorkflow(id, workflow?.raw ?? {}, null, target);
+      // tags belong to the file they are written in: the copy starts without them
+      const { tags: _tags, ...rest } = workflow?.raw ?? {};
+      const result = await api.writeWorkflow(id, rest, null, target);
       if (report(result)) await onSaved(id);
     });
 
@@ -374,6 +465,16 @@ export function WorkflowForm({
     setLevel(next);
   };
 
+  const removeBlocked =
+    sharedOnly !== undefined &&
+    (sharedOnly.usage === null ||
+      sharedOnly.usage.projects.length > 0 ||
+      sharedOnly.usage.global.length > 0);
+  const removeBlockedReason =
+    sharedOnly?.usage === null
+      ? t('sharedWorkflows.usage.waiting')
+      : t('sharedWorkflows.usage.blocked');
+
   const removeLabel =
     level === 'project' && sources.global
       ? t('settings.editor.removeOverride')
@@ -392,6 +493,7 @@ export function WorkflowForm({
         destructive: true,
       });
       if (!yes) return;
+      setReferences([]);
       const result = await api.deleteWorkflow(workflow.id, source.revision, level);
       if (report(result)) await onDeleted();
     });
@@ -418,17 +520,67 @@ export function WorkflowForm({
   );
   const otherErrors = errors.filter((error) => {
     const place = stepOfError(error.path, id, draft.split !== null);
-    return place.step === null && !place.split && !isNameError(error.path, id);
+    return (
+      place.step === null &&
+      !place.split &&
+      !isNameError(error.path, id) &&
+      !isTagsError(error.path, id)
+    );
   });
+  const tagErrors = errors.filter((error) => isTagsError(error.path, id));
   const nameErrors = errors.filter((error) => isNameError(error.path, id));
 
   const targets = view.workflows
+    .filter((candidate) => !sharedOnly || candidate.sources.global)
     .filter((candidate) => candidate.id !== id && !record(record(candidate.raw).split).workflow)
     .map((candidate) => candidate.id);
   const nameOf = (target: string): string =>
     rawName(record(view.workflows.find((candidate) => candidate.id === target)?.raw)) ?? target;
   const ownTarget = draft.split?.workflow ?? '';
   if (ownTarget !== '' && !targets.includes(ownTarget)) targets.push(ownTarget);
+
+  const tagsInput = () => {
+    // the shared tags of a pipeline are view only on the project level
+    const shared = level === 'global' ? [] : (workflow?.shared_tags ?? []);
+    const suggestions = new Map<string, string>();
+    for (const entry of view.workflows) {
+      for (const name of level === 'global' ? entry.shared_tags : entry.own_tags) {
+        suggestions.set(name.toLocaleLowerCase(), name);
+      }
+    }
+    return (
+      <div className="flex flex-col gap-1.5" data-testid="workflow-tags">
+        <Label htmlFor="field-tags">{t('workflows.tagsField')}</Label>
+        {shared.length > 0 ? (
+          <ul aria-label={t('workflows.tagsSharedList')} className="flex flex-wrap gap-1.5">
+            {shared.map((name) => (
+              <li key={name}>
+                <SpecialistTagChip name={name} shared hint={t('workflows.tagsSharedHint')} />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <ValuesPicker
+          id="field-tags"
+          label={t('workflows.tagsField')}
+          values={draft.tags}
+          onChange={(tags) => update((current) => ({ ...current, tags }))}
+          options={[...suggestions.values()]
+            .filter((name) => !shared.some((known) => sameTag(known, name)))
+            .map((name) => ({ name, source: 'project' as const }))}
+          headings={{ project: t('workflows.tagsOwn') }}
+          disabled={readOnly || busy}
+          invalid={tagErrors.length > 0}
+        />
+        <p className="text-xs text-muted-foreground">{t('workflows.tagsHelp')}</p>
+        {tagErrors.map((error) => (
+          <p className="text-sm text-destructive" role="alert" key={error.message}>
+            {error.message}
+          </p>
+        ))}
+      </div>
+    );
+  };
 
   const specialistSelect = (current: string, onChange: (next: string) => void, label: string) => (
     <Select
@@ -463,6 +615,7 @@ export function WorkflowForm({
         </h2>
         {workflow ? <FilePath variant="line" path={source?.file ?? workflow.file} /> : null}
       </div>
+      {readOnly ? <Alert role="status">{t('workflows.sharedReadOnly')}</Alert> : null}
       {notice ? <Alert role="status">{notice}</Alert> : null}
       {problem ? <Alert variant="destructive">{problem}</Alert> : null}
       {conflict ? (
@@ -484,22 +637,35 @@ export function WorkflowForm({
           </ul>
         </Alert>
       ) : null}
-      {(workflow && bothLevels) || !workflow ? (
+      {references.length > 0 ? (
+        <Alert variant="destructive">
+          <p>{t('sharedWorkflows.usage.usedBy')}</p>
+          <ul className="list-disc pl-4">
+            {references.map((reference) => (
+              <li key={describeReference(reference, view)}>{describeReference(reference, view)}</li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
+      {sharedOnly ? (
+        <p className="text-sm text-muted-foreground">{t('workflows.sharedOnlyHint')}</p>
+      ) : null}
+      {sharedOnly && workflow ? <UsageBlock shared={sharedOnly} view={view} /> : null}
+      {!sharedOnly && workflow && bothLevels ? (
         <ToggleGroup
           type="single"
           value={level}
           aria-label={t('settings.editor.level')}
           onValueChange={(value) => {
             if (!value) return;
-            if (workflow) void switchLevel(value as WriteLevel);
-            else setLevel(value as WriteLevel);
+            void switchLevel(value as WriteLevel);
           }}
         >
           <ToggleGroupItem value="project">{t('settings.editor.project')}</ToggleGroupItem>
           <ToggleGroupItem value="global">{t('settings.editor.global')}</ToggleGroupItem>
         </ToggleGroup>
       ) : null}
-      {level === 'global' ? (
+      {level === 'global' && !sharedOnly ? (
         <p className="text-sm text-muted-foreground">
           {t('settings.editor.globalHint')}
           {sources.project ? t('settings.editor.globalOverridden') : ''}
@@ -528,7 +694,7 @@ export function WorkflowForm({
               id="field-workflow-name"
               type="text"
               value={draft.name}
-              disabled={busy}
+              disabled={readOnly || busy}
               onChange={(event) => update((current) => ({ ...current, name: event.target.value }))}
             />
             {nameErrors.map((error) => (
@@ -541,6 +707,7 @@ export function WorkflowForm({
               </p>
             ))}
           </div>
+          {tagsInput()}
           {!workflow ? (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="field-workflow-id">Id</Label>
@@ -849,20 +1016,37 @@ export function WorkflowForm({
       </Tabs>
 
       <div className="flex flex-wrap gap-2">
-        <Button disabled={busy || (!workflow && !newId)} onClick={() => void save()}>
-          {t('settings.editor.save')}
-        </Button>
-        {workflow && sources.global && !sources.project ? (
+        {readOnly ? null : (
+          <Button disabled={busy || (!workflow && !newId)} onClick={() => void save()}>
+            {t('settings.editor.save')}
+          </Button>
+        )}
+        {workflow && !sharedOnly && sources.global && !sources.project ? (
           <Button variant="outline" disabled={busy} onClick={() => void copyTo('project')}>
             {t('settings.editor.overrideInProject')}
           </Button>
         ) : null}
-        {workflow && sources.project && !sources.global ? (
+        {workflow && sources.project && !sources.global && !readOnly ? (
           <Button variant="outline" disabled={busy} onClick={() => void copyTo('global')}>
             {t('settings.editor.makeGlobal')}
           </Button>
         ) : null}
-        {workflow ? (
+        {readOnly ? (
+          <Button variant="outline" asChild>
+            <a
+              href={formatRoute({
+                view: 'settings',
+                run: 'pipelines',
+                group: 'global',
+                step: workflow?.id ?? null,
+                tab: null,
+              })}
+            >
+              {t('workflows.editInSettings')}
+            </a>
+          </Button>
+        ) : null}
+        {workflow && !readOnly ? (
           <Button
             variant="outline"
             disabled={busy}
@@ -871,12 +1055,22 @@ export function WorkflowForm({
             {t('settings.editor.saveAs')}
           </Button>
         ) : null}
-        {workflow && source ? (
-          <Button variant="destructive" disabled={busy} onClick={() => void remove()}>
+        {workflow && source && !readOnly ? (
+          <Button
+            variant="destructive"
+            disabled={busy || removeBlocked}
+            title={removeBlocked ? removeBlockedReason : undefined}
+            onClick={() => void remove()}
+          >
             {removeLabel}
           </Button>
         ) : null}
       </div>
+      {removeBlocked && workflow ? (
+        <p className="text-sm text-muted-foreground" data-testid="delete-blocked">
+          {removeBlockedReason}
+        </p>
+      ) : null}
       {saveAs !== null ? (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="field-save-as">{t('workflows.newId')}</Label>

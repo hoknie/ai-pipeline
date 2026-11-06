@@ -5,6 +5,8 @@ import {
   type DeliveryMode,
   type SharedSpecialistUsage,
   type SharedSpecialistsUsage,
+  type SharedWorkflowUsage,
+  type SharedWorkflowsUsage,
   type SpecialistTagFolder,
 } from '../config/index.ts';
 import {
@@ -122,6 +124,8 @@ export interface DiffStat {
   files: FileStat[];
   added: number;
   removed: number;
+  /** Commit range `<from>..<to>` the statistics were taken from; changes with every new commit. */
+  revision: string;
 }
 
 export interface DiffTotals {
@@ -234,6 +238,8 @@ export interface GroupRow {
   warnings: number;
   delivery: GroupDelivery['state'];
   diff: DiffTotals | null;
+  /** Revision of the group's changes (`DiffStat.revision`); null while the statistics are unknown. */
+  diffRevision: string | null;
   /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
   limitUntil: number | null;
   /** Tokens and cost of all attempts of the group so far, live ones included. */
@@ -517,6 +523,7 @@ export function groupRow(
       ).length,
     delivery: group.delivery.state,
     diff: totals(diffs(group.slug)),
+    diffRevision: diffs(group.slug)?.revision ?? null,
     limitUntil: groupLimitUntil(group),
     usage: groupUsage(group),
     decisions: group.decisions.map((decision) => ({ ...decision })),
@@ -973,6 +980,16 @@ export type SpecialistsImportResult =
   | { ok: true; imported: string[] }
   | { ok: false; reason: 'invalid'; errors: FieldError[] }
   | { ok: false; reason: 'conflict'; message: string; slugs?: string[] };
+
+/** The shared workflows with the repositories of the registry that use them. */
+export type SharedWorkflowsView = SharedWorkflowsUsage;
+export type SharedWorkflowView = SharedWorkflowUsage;
+
+/** The outcome of a pipeline import: the ids that were copied, or why nothing was. */
+export type WorkflowsImportResult =
+  | { ok: true; imported: string[] }
+  | { ok: false; reason: 'invalid'; errors: FieldError[] }
+  | { ok: false; reason: 'conflict'; message: string; ids?: string[] };
 
 /** The graph of a draft workflow, or the errors that keep it from being built. */
 export interface ConfigPreview {

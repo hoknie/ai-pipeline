@@ -918,6 +918,7 @@ describe('runView liveDiff', () => {
     files: files.map(([path, added, removed]) => ({ path, added, removed })),
     added: files.reduce((sum, file) => sum + file[1], 0),
     removed: files.reduce((sum, file) => sum + file[2], 0),
+    revision: 'aaa..bbb',
   });
 
   it('counts a running group before the merge', () => {
@@ -1215,5 +1216,24 @@ describe('a pause stopping the running attempt in the views', () => {
       reason: 'interrupted by a pause',
     });
     expect(runView(state, 3000)).toMatchObject({ state: 'paused', hold: 'paused' });
+  });
+});
+
+describe('groupRow diffRevision', () => {
+  it('carries the revision of the known statistics', () => {
+    const state = run(1);
+    const diff = {
+      files: [{ path: 'a.ts', added: 1, removed: 0 }],
+      added: 1,
+      removed: 0,
+      revision: 'aaa..bbb',
+    };
+    const row = runView(state, 2000, () => diff).groups[0];
+    expect(row?.diffRevision).toBe('aaa..bbb');
+    expect(row?.diff).toEqual({ files: 1, added: 1, removed: 0 });
+  });
+
+  it('is null without statistics', () => {
+    expect(runView(run(1), 2000).groups[0]?.diffRevision).toBeNull();
   });
 });

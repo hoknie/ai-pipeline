@@ -323,61 +323,63 @@ export function QueueForm({
       }}
     >
       <div className="grid gap-4 @3xl:grid-cols-2">
-        <fieldset disabled={locked} className="flex min-w-0 flex-col gap-3 border-0 p-0">
-          {repositoryField !== undefined ? (
+        <div className="flex min-w-0 flex-col gap-3">
+          <fieldset disabled={locked} className="flex min-w-0 flex-col gap-3 border-0 p-0">
+            {repositoryField !== undefined ? (
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor={`${idPrefix}-repository`}>{t('queue.form.repository')}</Label>
+                {repositoryField}
+              </div>
+            ) : null}
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor={`${idPrefix}-repository`}>{t('queue.form.repository')}</Label>
-              {repositoryField}
+              <Label htmlFor={`${idPrefix}-title`}>{t('queue.form.name')}</Label>
+              <Input
+                id={`${idPrefix}-title`}
+                value={effective.title}
+                maxLength={TITLE_LIMIT}
+                placeholder={t('queue.form.namePlaceholder')}
+                onChange={(event) => change({ title: event.target.value })}
+              />
             </div>
-          ) : null}
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={`${idPrefix}-title`}>{t('queue.form.name')}</Label>
-            <Input
-              id={`${idPrefix}-title`}
-              value={effective.title}
-              maxLength={TITLE_LIMIT}
-              placeholder={t('queue.form.namePlaceholder')}
-              onChange={(event) => change({ title: event.target.value })}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Label htmlFor={`${idPrefix}-workflow`}>{t('queue.form.workflow')}</Label>
-            <Select
-              value={effective.workflow}
-              onValueChange={(workflow) =>
-                change({
-                  workflow,
-                  skip: pruneSkip(
-                    effective.skip,
-                    stepsOf(
-                      workflows?.workflows.find((candidate) => candidate.id === workflow),
-                    ).map((step) => step.id),
-                  ),
-                })
-              }
-              disabled={options.length === 0}
-            >
-              <SelectTrigger id={`${idPrefix}-workflow`} className="w-48">
-                <SelectValue placeholder={t('queue.form.noWorkflow')} />
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((id) => (
-                  <SelectItem key={id} value={id}>
-                    {workflows?.workflows.find((candidate) => candidate.id === id)?.name ?? id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <ToggleGroup
-              type="single"
-              aria-label={t('queue.form.kind')}
-              value={effective.mode}
-              onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
-            >
-              <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
-              <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor={`${idPrefix}-workflow`}>{t('queue.form.workflow')}</Label>
+              <Select
+                value={effective.workflow}
+                onValueChange={(workflow) =>
+                  change({
+                    workflow,
+                    skip: pruneSkip(
+                      effective.skip,
+                      stepsOf(
+                        workflows?.workflows.find((candidate) => candidate.id === workflow),
+                      ).map((step) => step.id),
+                    ),
+                  })
+                }
+                disabled={options.length === 0}
+              >
+                <SelectTrigger id={`${idPrefix}-workflow`} className="w-48">
+                  <SelectValue placeholder={t('queue.form.noWorkflow')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((id) => (
+                    <SelectItem key={id} value={id}>
+                      {workflows?.workflows.find((candidate) => candidate.id === id)?.name ?? id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ToggleGroup
+                type="single"
+                aria-label={t('queue.form.kind')}
+                value={effective.mode}
+                onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
+              >
+                <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
+                <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </fieldset>
           {effective.mode === 'task' ? (
             <MarkdownField
               id={`${idPrefix}-task`}
@@ -385,6 +387,7 @@ export function QueueForm({
               rows={9}
               value={effective.task}
               placeholder={t('queue.form.taskPlaceholder')}
+              disabled={locked}
               onChange={(task) => change({ task })}
             />
           ) : (
@@ -396,6 +399,7 @@ export function QueueForm({
                   </legend>
                   <Input
                     id={`${idPrefix}-group-${index}-title`}
+                    disabled={locked}
                     aria-label={t('queue.form.groupTitle', { n: index + 1 })}
                     value={group.title}
                     placeholder={t('queue.form.titlePlaceholder')}
@@ -406,13 +410,14 @@ export function QueueForm({
                     rows={2}
                     value={group.task}
                     placeholder={t('queue.form.groupTaskPlaceholder')}
+                    disabled={locked}
                     onChange={(task) => setGroup(index, { task })}
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     className="w-fit"
-                    disabled={effective.groups.length <= 1}
+                    disabled={locked || effective.groups.length <= 1}
                     onClick={() =>
                       change({ groups: effective.groups.filter((_, at) => at !== index) })
                     }
@@ -425,13 +430,14 @@ export function QueueForm({
                 variant="outline"
                 size="sm"
                 className="w-fit"
+                disabled={locked}
                 onClick={() => change({ groups: [...effective.groups, { title: '', task: '' }] })}
               >
                 {t('queue.form.addGroup')}
               </Button>
             </div>
           )}
-        </fieldset>
+        </div>
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor={`${idPrefix}-after`}>{t('queue.form.after')}</Label>

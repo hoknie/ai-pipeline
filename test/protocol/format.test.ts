@@ -231,6 +231,7 @@ describe('text for people', () => {
       ],
       added: 367,
       removed: 2,
+      revision: 'aaa..bbb',
     };
     const view = runView(state, 2000, () => diff);
     expect(view.groups[0]?.diff).toEqual({ files: 3, added: 367, removed: 2 });
@@ -272,7 +273,12 @@ describe('text for people', () => {
     const state = run(1);
     state.groups[0]!.task = 'добавить команду aip version\nподробности';
     state.groups[0]!.status = 'merged';
-    const diff = { files: [{ path: 'a.ts', added: 5, removed: 1 }], added: 5, removed: 1 };
+    const diff = {
+      files: [{ path: 'a.ts', added: 5, removed: 1 }],
+      added: 5,
+      removed: 1,
+      revision: 'aaa..bbb',
+    };
     const list = formatRunList([runView(state, 2000, () => diff)]);
     expect(list).toContain('добавить команду aip version');
     expect(list).toContain('1 file +5 −1');

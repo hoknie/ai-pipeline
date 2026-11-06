@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { FileTree } from '../src/components/runs/FileTree.tsx';
-import { buildFileTree } from '../src/components/runs/fileTree.ts';
+import { buildFileTree, reservedDiffRows } from '../src/components/runs/fileTree.ts';
 
 import { fakeApi } from './fixtures.ts';
 import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
@@ -57,6 +57,15 @@ describe('FileTree', () => {
   });
 });
 
+describe('reservedDiffRows', () => {
+  it('reserves one row for a binary file and the changed lines plus 11 within 3..40 otherwise', () => {
+    expect(reservedDiffRows({ added: 0, removed: 0, binary: true })).toBe(1);
+    expect(reservedDiffRows({ added: 0, removed: 0, binary: false })).toBe(11);
+    expect(reservedDiffRows({ added: 5, removed: 1, binary: false })).toBe(17);
+    expect(reservedDiffRows({ added: 300, removed: 0, binary: false })).toBe(40);
+  });
+});
+
 describe('FileTree with diffs', () => {
   const small = [
     { path: 'a.ts', added: 1, removed: 1 },
@@ -64,11 +73,11 @@ describe('FileTree with diffs', () => {
     { path: 'logo.png', added: null, removed: null },
     { path: 'new.ts', added: 0, removed: 0, previousPath: 'old.ts' },
   ];
-  const source = (api = fakeApi(), version = 'v1') => ({
+  const source = (api = fakeApi(), revision = 'r1') => ({
     api,
     runId: 'run1',
     group: 'login',
-    version,
+    revision,
   });
 
   it('opens the diff of a file on a click, with line numbers, and closes it without a request', async () => {
@@ -96,13 +105,112 @@ describe('FileTree with diffs', () => {
     await waitFor(() => expect(screen.getAllByText('new')).toHaveLength(2));
   });
 
-  it('asks again after the changes of the group changed', async () => {
+  const pending = () => {
+    let resolve!: (value: Awaited<ReturnType<ReturnType<typeof fakeApi>['fileDiff']>>) => void;
+    const promise = new Promise<Awaited<ReturnType<ReturnType<typeof fakeApi>['fileDiff']>>>(
+      (done) => {
+        resolve = done;
+      },
+    );
+    return { promise, resolve };
+  };
+  const view = (path: string, text: string) => ({
+    path,
+    previousPath: null,
+    binary: false,
+    lines: ['@@ -1,1 +1,1 @@', '-old', `+${text}`],
+    totalLines: 3,
+    truncated: false,
+  });
+
+  it('does not ask again nor show the loading note for new files with the same revision', async () => {
     const api = fakeApi();
     const { rerender } = render(<FileTree files={small} diff={source(api)} />);
     fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
     await screen.findByText('new');
-    rerender(<FileTree files={small} diff={source(api, 'v2')} />);
-    await waitFor(() => expect(api.fileDiff).toHaveBeenCalledTimes(2));
+    rerender(<FileTree files={small.map((file) => ({ ...file }))} diff={source(api)} />);
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByText('new')).toBeTruthy();
+    expect(api.fileDiff).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the shown diff while a newer revision loads, then replaces it', async () => {
+    const reload = pending();
+    const fileDiff = vi
+      .fn()
+      .mockResolvedValueOnce(view('a.ts', 'first'))
+      .mockReturnValueOnce(reload.promise);
+    const api = fakeApi({ fileDiff });
+    const { rerender } = render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    await screen.findByText('first');
+    rerender(<FileTree files={small} diff={source(api, 'r2')} />);
+    await waitFor(() => expect(fileDiff).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('first')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+    reload.resolve(view('a.ts', 'second'));
+    await screen.findByText('second');
+    expect(screen.queryByText('first')).toBeNull();
+  });
+
+  it('ignores a late answer for an older revision', async () => {
+    const slow = pending();
+    const fileDiff = vi
+      .fn()
+      .mockReturnValueOnce(slow.promise)
+      .mockResolvedValueOnce(view('a.ts', 'fresh'));
+    const api = fakeApi({ fileDiff });
+    const { rerender } = render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    rerender(<FileTree files={small} diff={source(api, 'r2')} />);
+    await screen.findByText('fresh');
+    slow.resolve(view('a.ts', 'stale'));
+    await new Promise((done) => setTimeout(done, 0));
+    expect(screen.queryByText('stale')).toBeNull();
+    expect(screen.getByText('fresh')).toBeTruthy();
+  });
+
+  it('says the diff is not available when the reload fails', async () => {
+    const fileDiff = vi
+      .fn()
+      .mockResolvedValueOnce(view('a.ts', 'first'))
+      .mockRejectedValueOnce(new Error('gone'));
+    const api = fakeApi({ fileDiff });
+    const { rerender } = render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    await screen.findByText('first');
+    rerender(<FileTree files={small} diff={source(api, 'r2')} />);
+    await screen.findByText(/The diff is not available: gone/);
+  });
+
+  it('does not ask for a collapsed file when the revision changes, only after it is opened', async () => {
+    const api = fakeApi();
+    const { rerender } = render(<FileTree files={small} diff={source(api)} />);
+    rerender(<FileTree files={small} diff={source(api, 'r2')} />);
+    expect(api.fileDiff).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    await screen.findByText('new');
+    expect(api.fileDiff).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask for an open file that left the changes', async () => {
+    const api = fakeApi();
+    const { rerender } = render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'b.ts' }));
+    await screen.findByText('new');
+    rerender(<FileTree files={[small[0]!]} diff={source(api, 'r2')} />);
+    expect(api.fileDiff).toHaveBeenCalledTimes(1);
+  });
+
+  it('reserves the height of the loading note by the size of the file', async () => {
+    const hold = pending();
+    const api = fakeApi({ fileDiff: vi.fn(() => hold.promise) });
+    render(<FileTree files={small} diff={source(api)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'a.ts' }));
+    expect(screen.getByRole('status').style.minHeight).toBe('13rem');
+    hold.resolve(view('a.ts', 'done'));
+    await screen.findByText('done');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('says so for a binary file and when the diff is not available', async () => {

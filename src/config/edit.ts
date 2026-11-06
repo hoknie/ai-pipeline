@@ -205,6 +205,19 @@ export function specialistReferences(tree: unknown, slug: string): EntryReferenc
   return references;
 }
 
+/** Everything in a merged `{ swarm }` tree that delegates to the workflow through `split.workflow`. */
+export function workflowReferences(tree: unknown, id: string): EntryReference[] {
+  const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
+  const workflows = isMapping(swarm.workflows) ? swarm.workflows : {};
+  const references: EntryReference[] = [];
+  for (const [name, workflow] of Object.entries(workflows)) {
+    if (isMapping(workflow) && isMapping(workflow.split) && workflow.split.workflow === id) {
+      references.push({ workflow: name, split: true });
+    }
+  }
+  return references;
+}
+
 export interface EditRequest {
   kind: EntryKind;
   id: string;
@@ -887,6 +900,10 @@ export interface EditorWorkflow {
   revision: string | null;
   raw: Record<string, unknown>;
   sources: EntrySources;
+  /** Tags of the shared file; empty when it has none or they are not valid. */
+  shared_tags: string[];
+  /** Tags of the project file. */
+  own_tags: string[];
 }
 
 export interface EditorSetting {
@@ -1089,6 +1106,8 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
         revision: inProject ? revisionOf(inProject.text) : null,
         raw: rawOf(source),
         sources: sourcesFor(inProject, inGlobal),
+        shared_tags: tagsOf(rawOf(inGlobal)),
+        own_tags: tagsOf(rawOf(inProject)),
       };
     });
   const origins = mergeOrigins(global, project);

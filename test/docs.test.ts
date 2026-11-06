@@ -54,7 +54,8 @@ function proseLines(file: string): { line: number; text: string }[] {
   return result;
 }
 
-const docsPages = readdirSync(join(root, 'docs'))
+const docsPages = readdirSync(join(root, 'docs'), { recursive: true })
+  .map(String)
   .filter((name) => name.endsWith('.md'))
   .sort()
   .map((name) => `docs/${name}`);
@@ -85,10 +86,15 @@ describe('documentation examples', () => {
     expect(config.max).toBe(2);
   });
 
-  it('the specialist and workflow examples of docs/configuration.md are valid files', () => {
-    const blocks = yamlBlocks('docs/configuration.md');
-    const plan = blocks.find((block) => block.startsWith('name: Planner')) ?? '';
-    const workflow = blocks.find((block) => block.startsWith('name: New feature')) ?? '';
+  it('the specialist and workflow examples of the docs are valid files', () => {
+    const plan =
+      yamlBlocks('docs/configuration/specialists.md').find((block) =>
+        block.startsWith('name: Planner'),
+      ) ?? '';
+    const workflow =
+      yamlBlocks('docs/configuration/workflows.md').find((block) =>
+        block.startsWith('name: New feature'),
+      ) ?? '';
     const config = configFromFiles({
       specialists: {
         plan,
@@ -110,9 +116,11 @@ describe('documentation examples', () => {
     );
   });
 
-  it('the epic example of docs/configuration.md splits into another workflow', () => {
+  it('the epic example of docs/configuration/workflows.md splits into another workflow', () => {
     const epic =
-      yamlBlocks('docs/configuration.md').find((b) => b.startsWith('# aip/workflows/epic')) ?? '';
+      yamlBlocks('docs/configuration/workflows.md').find((b) =>
+        b.startsWith('# aip/workflows/epic'),
+      ) ?? '';
     const config = configFromFiles({
       specialists: { plan: 'name: P\n', coder: 'name: C\n' },
       workflows: { epic, explore: 'steps:\n  - { id: research, specialist: coder }\n' },
@@ -120,8 +128,9 @@ describe('documentation examples', () => {
     expect(findWorkflow(config, 'epic')?.split).toMatchObject({ workflow: 'explore' });
   });
 
-  it('the runtimes example of docs/configuration.md is valid in the global settings', () => {
-    const block = yamlBlocks('docs/configuration.md').find((b) => b.startsWith('runtimes:')) ?? '';
+  it('the runtimes example of docs/configuration/runtimes.md is valid in the global settings', () => {
+    const block =
+      yamlBlocks('docs/configuration/runtimes.md').find((b) => b.startsWith('runtimes:')) ?? '';
     const root = mkdtempSync(join(tmpdir(), 'aip-docs-runtimes-'));
     mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
     writeFileSync(join(root, 'xdg', 'aip', 'settings.yaml'), block);
@@ -132,8 +141,9 @@ describe('documentation examples', () => {
     expect(runtimes.claude.args).toEqual(['--debug']);
   });
 
-  it('the web example of docs/configuration.md is valid in the global settings', () => {
-    const web = yamlBlocks('docs/configuration.md').find((block) => block.startsWith('web:')) ?? '';
+  it('the web example of docs/configuration/README.md is valid in the global settings', () => {
+    const web =
+      yamlBlocks('docs/configuration/README.md').find((block) => block.startsWith('web:')) ?? '';
     const root = mkdtempSync(join(tmpdir(), 'aip-docs-web-'));
     mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
     writeFileSync(join(root, 'xdg', 'aip', 'settings.yaml'), web);
@@ -145,9 +155,10 @@ describe('documentation examples', () => {
     });
   });
 
-  it('the resolver example of docs/configuration.md is a valid specialist', () => {
+  it('the resolver example of docs/configuration/delivery.md is a valid specialist', () => {
     const resolver =
-      yamlBlocks('docs/configuration.md').find((block) => block.includes('Resolver')) ?? '';
+      yamlBlocks('docs/configuration/delivery.md').find((block) => block.includes('Resolver')) ??
+      '';
     const config = configFromFiles({
       settings: 'delivery: { resolver: resolver }\n',
       specialists: { resolver },
@@ -155,9 +166,10 @@ describe('documentation examples', () => {
     expect(config.delivery.resolver).toBe('resolver');
   });
 
-  it('the delivery example of docs/configuration.md is valid', () => {
+  it('the delivery example of docs/configuration/delivery.md is valid', () => {
     const delivery =
-      yamlBlocks('docs/configuration.md').find((block) => block.startsWith('delivery:')) ?? '';
+      yamlBlocks('docs/configuration/delivery.md').find((block) => block.startsWith('delivery:')) ??
+      '';
     const config = configFromFiles({
       settings: delivery,
       specialists: { writer: 'name: Writer\n', resolver: 'name: Resolver\n' },
@@ -165,9 +177,9 @@ describe('documentation examples', () => {
     expect(config.delivery).toMatchObject({ mode: 'worktree', messageSpecialist: 'writer' });
   });
 
-  it('the naming example of docs/configuration.md is valid', () => {
+  it('the naming example of docs/configuration/README.md is valid', () => {
     const naming =
-      yamlBlocks('docs/configuration.md').find((block) => block.startsWith('naming:')) ?? '';
+      yamlBlocks('docs/configuration/README.md').find((block) => block.startsWith('naming:')) ?? '';
     const config = configFromFiles({
       settings: naming,
       specialists: { coder: 'name: Coder\n' },
@@ -177,8 +189,8 @@ describe('documentation examples', () => {
 
   it('documents the tag commands and the flags', () => {
     const readme =
-      readFileSync(join(root, 'docs/queue.md'), 'utf8') +
-      readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+      readFileSync(join(root, 'docs/usage/tags.md'), 'utf8') +
+      readFileSync(join(root, 'docs/hosts/mcp-tools.md'), 'utf8');
     for (const text of [
       'aip tag add',
       'aip tag list',
@@ -195,8 +207,8 @@ describe('documentation examples', () => {
     }
   });
 
-  it('docs/install.md names every flag of aip setup', () => {
-    const install = readFileSync(join(root, 'docs/install.md'), 'utf8');
+  it('docs/getting-started/install.md names every flag of aip setup', () => {
+    const install = readFileSync(join(root, 'docs/getting-started/install.md'), 'utf8');
     const setup = readFileSync(join(root, 'src/cli/commands.ts'), 'utf8');
     const flags = [...setup.matchAll(/\.option\('(?:-\w, )?(--[\w-]+)/g)].map((m) => m[1]!);
     for (const flag of [
@@ -238,7 +250,7 @@ describe('documentation examples', () => {
   });
 
   it('document the queue settings', () => {
-    const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
+    const queue = readFileSync(join(root, 'docs/usage/queue.md'), 'utf8');
     for (const text of [
       'aip queue settings',
       '--autopilot on\\|off',
@@ -248,21 +260,21 @@ describe('documentation examples', () => {
     ]) {
       expect(queue).toContain(text);
     }
-    const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+    const hosts = readFileSync(join(root, 'docs/hosts/mcp-tools.md'), 'utf8');
     expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_settings`'))).toContain(
       'skip_failed?',
     );
-    const web = readFileSync(join(root, 'docs/web.md'), 'utf8');
+    const web = readFileSync(join(root, 'docs/web/queue.md'), 'utf8');
     expect(web).toContain('"Queue settings"');
     expect(web).toContain('"Skipped with a problem"');
   });
 
   it('documents the pause and the freezing of runs', () => {
-    const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
+    const queue = readFileSync(join(root, 'docs/usage/queue.md'), 'utf8');
     for (const text of ['### Pausing a run', 'aip run pause', '### Freezing', 'frozen <run-id>']) {
       expect(queue).toContain(text);
     }
-    const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+    const hosts = readFileSync(join(root, 'docs/hosts/mcp-tools.md'), 'utf8');
     expect(hosts).toContain('| `swarm_run_pause`');
     expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_run_now`'))).toContain(
       'frozen',
@@ -270,13 +282,13 @@ describe('documentation examples', () => {
   });
 
   it('document the dependencies of queue tasks', () => {
-    const queue = readFileSync(join(root, 'docs/queue.md'), 'utf8');
+    const queue = readFileSync(join(root, 'docs/usage/queue.md'), 'utf8');
     expect(queue).toContain('--after <id>');
     expect(queue).toContain('--no-after');
-    const web = readFileSync(join(root, 'docs/web.md'), 'utf8');
+    const web = readFileSync(join(root, 'docs/web/queue.md'), 'utf8');
     expect(web).toContain('"Waits for"');
     expect(web).toContain('Dependencies are not met');
-    const hosts = readFileSync(join(root, 'docs/hosts.md'), 'utf8');
+    const hosts = readFileSync(join(root, 'docs/hosts/mcp-tools.md'), 'utf8');
     expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_add`'))).toContain(
       'after?',
     );
@@ -285,9 +297,11 @@ describe('documentation examples', () => {
 
 describe('documentation structure', () => {
   it('proseLines skips fenced code blocks', () => {
-    const lines = proseLines('docs/queue.md').map((entry) => entry.text);
-    expect(lines).toContain('## Tags');
-    expect(lines).not.toContain('aip tag list                             # the catalog (--json)');
+    const lines = proseLines('docs/usage/tags.md').map((entry) => entry.text);
+    expect(lines).toContain('## Managing tags');
+    expect(lines).not.toContain(
+      'aip tag list                             # the catalog of the repository (--json)',
+    );
     expect(lines.some((line) => line.startsWith('```'))).toBe(false);
   });
 
@@ -316,15 +330,16 @@ describe('documentation structure', () => {
     expect(problems).toEqual([]);
   });
 
-  it('every docs page is listed in README', () => {
-    const readme = readFileSync(join(root, 'README.md'), 'utf8');
-    const learnMore = readme.slice(readme.indexOf('## Learn more'));
-    for (const page of docsPages) expect(learnMore).toContain(`(${page})`);
+  it('every docs page is listed in the docs index', () => {
+    const index = readFileSync(join(root, 'docs/README.md'), 'utf8');
+    for (const page of docsPages.filter((name) => name !== 'docs/README.md')) {
+      expect(index).toContain(`(${page.slice('docs/'.length)})`);
+    }
   });
 
-  it('every docs page is named in the help footer', () => {
-    const help = readFileSync(join(root, 'src/cli/help.ts'), 'utf8');
-    for (const page of docsPages) expect(help).toContain(page);
+  it('README and the help footer lead to the docs index', () => {
+    expect(readFileSync(join(root, 'README.md'), 'utf8')).toContain('(docs/README.md)');
+    expect(readFileSync(join(root, 'src/cli/help.ts'), 'utf8')).toContain('docs/README.md');
   });
 
   it('prose lines are short', () => {

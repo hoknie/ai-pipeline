@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, openTab, render, screen, waitFor, within } from './render.tsx';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  previewMarkdown,
+  render,
+  screen,
+  waitFor,
+  within,
+} from './render.tsx';
 import i18next from 'i18next';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -731,8 +740,46 @@ describe('automatic delivery switch', () => {
   it('previews the text of an item as Markdown in the edit form', async () => {
     show(queueOf({ items: [queueItem('q1', '**важно**', 1)] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-    openTab('Preview');
+    previewMarkdown();
     expect((await screen.findByText('важно')).tagName).toBe('STRONG');
+  });
+
+  it('keeps the view of a locked form working and its fields unavailable', async () => {
+    show(queueOf({ items: [queueItem('q1', '**важно**', 1, { run: 'run7', hold: 'paused' })] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const field = await screen.findByLabelText<HTMLTextAreaElement>('Task text');
+    expect(field.disabled).toBe(true);
+    previewMarkdown();
+    expect((await screen.findByText('важно')).tagName).toBe('STRONG');
+    previewMarkdown(null, false);
+    expect(field.disabled).toBe(true);
+    for (const name of ['Bold', 'Heading', 'Link', 'Code block']) {
+      expect(screen.getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(true);
+    }
+  });
+
+  it('locks the group fields of a locked form but not the view', async () => {
+    show(
+      queueOf({
+        items: [
+          queueItem('q1', '', 1, {
+            run: 'run7',
+            hold: 'paused',
+            groups: [{ title: 'Вход', task: 'форма' }],
+          }),
+        ],
+      }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Title of group 1').disabled).toBe(true);
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Text of group 1').disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Remove group 1' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Add group' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'MD' }).disabled).toBe(false);
   });
 
   it('returns an item to the setting with null when it is edited', async () => {
@@ -875,7 +922,7 @@ describe('added time and run now over the limit', () => {
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    expect(screen.getByRole('button', { name: 'Run now' }).getAttribute('title')).toBe(
+    expect(screen.getByRole('button', { name: 'Run now' }).getAttribute('aria-description')).toBe(
       'Over the limit: 3 of 2 places',
     );
   });
@@ -890,7 +937,9 @@ describe('added time and run now over the limit', () => {
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    expect(screen.getByRole('button', { name: 'Run now' }).getAttribute('title')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Run now' }).getAttribute('aria-description'),
+    ).toBeNull();
   });
 
   it('shows three runs of two places after run now', async () => {
@@ -927,7 +976,7 @@ describe('pause and freeze of runs', () => {
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    expect(screen.getByRole('button', { name: 'Run now' }).getAttribute('title')).toBe(
+    expect(screen.getByRole('button', { name: 'Run now' }).getAttribute('aria-description')).toBe(
       'Will freeze task #7',
     );
   });
@@ -1654,7 +1703,7 @@ describe('dependencies in the list', () => {
     expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
     expect(
       [...li.querySelectorAll('[data-state]')].filter(
-        (node) => !node.matches('[aria-label^="Pipeline"]') && !node.closest('[role="switch"]'),
+        (node) => !node.matches('[aria-label^="Pipeline"]') && !node.closest('[data-actions]'),
       ),
     ).toEqual([]);
     expect(li.className).not.toContain('border-destructive');
@@ -2016,34 +2065,80 @@ describe('delivery mode of a task', () => {
   });
 });
 
+describe('row layout', () => {
+  it('puts predecessors on a second line with a label and the full name in the title', async () => {
+    const long = 'A very long predecessor name that must be cut by the chip';
+    const ref = (id: string, number: number, title: string) => ({
+      id,
+      kind: 'item',
+      number,
+      title,
+      state: 'waiting',
+    });
+    show(
+      queueOf({
+        items: [
+          queueItem('q2', 'B', 3, { after: [ref('q0', 1, long), ref('q1', 2, 'Short')] } as never),
+        ],
+      }),
+    );
+    const row = (await screen.findByRole('listitem')) as HTMLElement;
+    const second = row.querySelector('[data-dependencies]') as HTMLElement;
+    expect(second).toBeTruthy();
+    expect(within(second).getByText('Waits for:')).toBeTruthy();
+    expect(second.querySelectorAll('[data-state]')).toHaveLength(2);
+    expect(second.querySelector('[data-state]')!.getAttribute('title')).toContain(long);
+    const actions = row.querySelector('[data-actions]') as HTMLElement;
+    expect(actions.parentElement!.textContent).not.toMatch(/after:/);
+    expect(actions.parentElement!.lastElementChild).toBe(actions);
+  });
+
+  it('has no second line without predecessors, and the buttons have no text', async () => {
+    show(queueOf({ items: [queueItem('q1', 'A', 1)] }));
+    const row = (await screen.findByRole('listitem')) as HTMLElement;
+    expect(row.querySelector('[data-dependencies]')).toBeNull();
+    expect(screen.queryByText('Waits for:')).toBeNull();
+    const buttons = [...row.querySelectorAll('[data-actions] button')];
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Edit',
+      'Postpone',
+      'Run now',
+      'Remove',
+    ]);
+    for (const button of buttons) {
+      expect(button.textContent).toBe('');
+    }
+  });
+});
+
 describe('postponed items', () => {
-  it('switches an item off, shows the badge, and sends only postponed', async () => {
+  it('presses the button, shows the badge, and sends only postponed', async () => {
     const after = queueOf({ items: [queueItem('q1', 'A', 1, { postponed: true })] });
     const api = show(queueOf({ items: [queueItem('q1', 'A', 1)] }), {
       queueEdit: vi.fn(async () => after),
     });
-    const toggle = await screen.findByRole('switch', { name: 'In work' });
-    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    const toggle = await screen.findByRole('button', { name: 'Postpone' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
     expect(screen.queryByText('Postponed')).toBeNull();
     fireEvent.click(toggle);
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalledWith('q1', { postponed: true }));
     await screen.findByText('Postponed');
-    expect(screen.getByRole('switch', { name: 'In work' }).getAttribute('aria-checked')).toBe(
-      'false',
+    expect(screen.getByRole('button', { name: 'Postpone' }).getAttribute('aria-pressed')).toBe(
+      'true',
     );
   });
 
-  it('puts the switch back and shows the error when the request fails', async () => {
+  it('puts the button back and shows the error when the request fails', async () => {
     show(queueOf({ items: [queueItem('q1', 'A', 1)] }), {
       queueEdit: vi.fn(async () => {
         throw new ApiError(500, 'boom');
       }),
     });
-    fireEvent.click(await screen.findByRole('switch', { name: 'In work' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Postpone' }));
     await screen.findAllByText('boom');
     await waitFor(() =>
-      expect(screen.getByRole('switch', { name: 'In work' }).getAttribute('aria-checked')).toBe(
-        'true',
+      expect(screen.getByRole('button', { name: 'Postpone' }).getAttribute('aria-pressed')).toBe(
+        'false',
       ),
     );
     expect(screen.queryByText('Postponed')).toBeNull();

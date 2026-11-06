@@ -444,7 +444,15 @@ const FILES = {
   project: { file: PROJECT_FILE, revision: 'p1' },
 };
 
-const GLOBAL_GROUPS = ['General', 'Agents', 'Delivery', 'Runtimes', 'Specialists', 'System'];
+const GLOBAL_GROUPS = [
+  'General',
+  'Agents',
+  'Delivery',
+  'Runtimes',
+  'Specialists',
+  'Pipeline',
+  'System',
+];
 const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Tags'];
 
 const groupNav = () => screen.getByRole('navigation', { name: 'groups of settings' });

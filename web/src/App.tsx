@@ -111,7 +111,6 @@ function Panel({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [queueDrafts, setQueueDrafts] = useState<Record<string, QueueDraft>>({});
   const [onlyReplies, setOnlyReplies] = usePreference('onlyReplies', false);
-  const [showJson, setShowJson] = usePreference('showJson', false);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [newTask, setNewTask] = useState(false);
@@ -376,6 +375,16 @@ function Panel({
                   tab: null,
                 })
               }
+              workflow={route.step}
+              onSelectWorkflow={(id) =>
+                setRoute({
+                  view: 'settings',
+                  run: 'pipelines',
+                  group: 'global',
+                  step: id,
+                  tab: null,
+                })
+              }
               repository={selected}
               repositories={repositories}
               onSelectRepository={(path) => void selectRepository(path)}
@@ -442,8 +451,6 @@ function Panel({
             onError={onError}
             onlyReplies={onlyReplies}
             onOnlyReplies={setOnlyReplies}
-            showJson={showJson}
-            onShowJson={setShowJson}
             onRoute={setRoute}
             repository={selected}
             repositoryPaths={repositoryPaths}

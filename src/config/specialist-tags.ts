@@ -10,6 +10,7 @@ import {
   readText,
   revisionOf,
   stemOf,
+  type EntryKind,
   type WriteLevel,
 } from './edit.ts';
 import type { FieldError } from './errors.ts';
@@ -88,11 +89,19 @@ export function tagFolder(paths: ConfigPaths, level: WriteLevel): SpecialistTagF
   return { directory: `${levelPaths.directory}/specialists`, specialists };
 }
 
-function invalid(slug: string, file: string, message: string): TagPlan {
+function invalid(
+  slug: string,
+  file: string,
+  message: string,
+  kind: EntryKind = 'specialist',
+): TagPlan {
+  const section = kind === 'workflow' ? 'workflows' : 'specialists';
   return {
     ok: false,
     reason: 'invalid',
-    errors: [{ file, path: `swarm.specialists.${slug}.tags`, message }],
+    errors: [
+      { file, path: `swarm.${section}.${slug}${kind === 'workflow' ? '' : '.tags'}`, message },
+    ],
   };
 }
 
@@ -204,17 +213,22 @@ export function planTagRemove(paths: ConfigPaths, level: WriteLevel, tag: string
  * Copies project specialist files of `source` into the project of `target` byte for byte.
  * All or nothing: a missing source file, a taken slug or a new configuration error refuses all.
  */
-export function planImport(target: ConfigPaths, source: ConfigPaths, slugs: string[]): TagPlan {
+export function planImport(
+  target: ConfigPaths,
+  source: ConfigPaths,
+  slugs: string[],
+  kind: EntryKind = 'specialist',
+): TagPlan {
   const unique = [...new Set(slugs)];
   const label = dirname(source.project.directory);
   const copies: { slug: string; file: string; text: string }[] = [];
   for (const slug of unique) {
-    if (!isValidSlug(slug)) return invalid(slug, '', 'slug is not valid');
-    const text = readText(entryFile(source, 'specialist', slug, 'project'));
+    if (!isValidSlug(slug)) return invalid(slug, '', 'slug is not valid', kind);
+    const text = readText(entryFile(source, kind, slug, 'project'));
     if (text === undefined) {
-      return invalid(slug, '', `specialist \`${slug}\` is not defined in ${label}`);
+      return invalid(slug, '', `${kind} \`${slug}\` is not defined in ${label}`, kind);
     }
-    copies.push({ slug, file: entryFile(target, 'specialist', slug, 'project'), text });
+    copies.push({ slug, file: entryFile(target, kind, slug, 'project'), text });
   }
   const taken = copies.filter((copy) => readText(copy.file) !== undefined).map((c) => c.slug);
   if (taken.length > 0) {
@@ -227,7 +241,7 @@ export function planImport(target: ConfigPaths, source: ConfigPaths, slugs: stri
   }
   const errors = draftProjectFiles(
     target,
-    copies.map((copy) => ({ kind: 'specialist' as const, id: copy.slug, ...copy })),
+    copies.map((copy) => ({ kind, id: copy.slug, ...copy })),
   );
   if (errors.length > 0) return { ok: false, reason: 'invalid', errors };
   return {

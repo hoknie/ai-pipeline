@@ -18,6 +18,7 @@ describe('groups of settings', () => {
       'delivery',
       'runtimes',
       'specialists',
+      'pipelines',
       'system',
     ]);
     expect(SETTINGS_GROUPS_BY_SCOPE.project).toEqual([
@@ -130,6 +131,20 @@ describe('settings addresses', () => {
     expect(formatRoute({ ...route('delivery', 'global'), step: 'qa' })).toBe(
       '#settings/global/delivery',
     );
+  });
+
+  it('keeps the shared pipeline in the address of its group only', () => {
+    expect(parseRoute('#settings/global/pipelines/quick')).toEqual({
+      ...route('pipelines', 'global'),
+      step: 'quick',
+    });
+    expect(parseRoute('#settings/global/pipelines/new').step).toBe('new');
+    expect(parseRoute('#settings/global/pipelines').step).toBeNull();
+    expect(parseRoute('#settings/project/pipelines')).toEqual(route('general', 'project'));
+    expect(formatRoute({ ...route('pipelines', 'global'), step: 'quick' })).toBe(
+      '#settings/global/pipelines/quick',
+    );
+    expect(formatRoute(route('pipelines', 'global'))).toBe('#settings/global/pipelines');
   });
 
   it('sends the former general settings address to the settings page', () => {

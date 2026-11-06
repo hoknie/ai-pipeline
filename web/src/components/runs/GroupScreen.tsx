@@ -79,8 +79,6 @@ export function GroupScreen({
   onError,
   onlyReplies = false,
   onOnlyReplies,
-  showJson = false,
-  onShowJson,
   deliverable = false,
   onDeliver,
   run,
@@ -111,8 +109,6 @@ export function GroupScreen({
   /** Show only the texts of the specialist in every log. */
   onlyReplies?: boolean;
   onOnlyReplies?: (value: boolean) => void;
-  showJson?: boolean;
-  onShowJson?: (value: boolean) => void;
   /** Whether delivery of the merged groups can be started now (for a failed delivery step). */
   deliverable?: boolean;
   onDeliver?: () => Promise<unknown>;
@@ -129,7 +125,17 @@ export function GroupScreen({
   const [messaging, setMessaging] = useState<number | null>(null);
   const [header, setHeader] = useState<HTMLElement | null>(null);
   const headerHeight = useElementHeight(header);
-  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}/${row.artifacts}/${row.artifactsRevision}`;
+  // The statuses stay in the DOM while the header collapses, so the collapse is animated too.
+  const [statusesMounted, setStatusesMounted] = useState(showUsage);
+  useEffect(() => {
+    if (showUsage) {
+      setStatusesMounted(true);
+      return;
+    }
+    const timer = setTimeout(() => setStatusesMounted(false), 250);
+    return () => clearTimeout(timer);
+  }, [showUsage]);
+  const version = `${row.status}/${row.step}/${row.round}/${row.diff?.added ?? ''}/${row.diffRevision ?? ''}/${row.delivery}/${row.usage?.inputTokens ?? ''}/${row.usage?.outputTokens ?? ''}/${run?.delivery.inProgress ?? ''}/${run?.delivery.finishedAt ?? ''}/${row.artifacts}/${row.artifactsRevision}`;
   const delivering = run?.delivery.inProgress ?? false;
   const caps = capabilities(row, deliverable, delivering);
   const skipper = useSkipStep(run, api, onError);
@@ -240,13 +246,8 @@ export function GroupScreen({
   const stage = run?.deliveryStage ?? null;
   const attemptAt = run?.delivery.finishedAt ?? null;
 
-  const compact = !!run && !showUsage;
   const heading = (
-    <h2
-      className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate text-base font-semibold'}
-      title={run ? undefined : title}
-      aria-hidden={run && !showUsage ? true : undefined}
-    >
+    <h2 className="min-w-0 flex-1 truncate text-base font-semibold" title={run ? undefined : title}>
       {run ? (
         <span
           aria-hidden={showUsage ? undefined : true}
@@ -267,16 +268,16 @@ export function GroupScreen({
   );
   const actions = (
     <>
+      {onOnlyReplies ? (
+        <div className="flex items-center gap-2 whitespace-nowrap">
+          <Switch id="only-replies" checked={onlyReplies} onCheckedChange={onOnlyReplies} />
+          <Label htmlFor="only-replies">{t('runs.group.onlyReplies')}</Label>
+        </div>
+      ) : null}
       {'kind' in row ? (
         <span className="text-xs text-muted-foreground">{t('runs.system.badge')}</span>
       ) : null}
-      {run ? (
-        showUsage ? (
-          <RunStatuses run={run} entry={row} onSelect={onSelectEntry} layout="inline" />
-        ) : null
-      ) : (
-        entryBadge(row, t)
-      )}
+      {run ? null : entryBadge(row, t)}
       {caps.retryDelivery ? (
         <Button
           variant="outline"
@@ -402,11 +403,31 @@ export function GroupScreen({
     >
       <header
         ref={setHeader}
-        className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur"
+        className={`sticky top-0 z-10 -mx-4 -mt-4 flex flex-col border-b bg-background/95 px-4 py-3 backdrop-blur ${run ? '' : 'gap-2'}`}
       >
-        {compact ? (
+        {run ? (
           <>
-            {heading}
+            <div
+              data-slot="group-header-collapse"
+              aria-hidden={showUsage ? undefined : true}
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none ${
+                showUsage ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div
+                  data-slot="group-header-title-row"
+                  className="flex items-center gap-3 pb-2 [&>h2]:min-w-32"
+                >
+                  {heading}
+                  <div data-slot="group-header-statuses" className="flex min-w-0 justify-end">
+                    {statusesMounted ? (
+                      <RunStatuses run={run} entry={row} onSelect={onSelectEntry} layout="inline" />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
             <div
               data-slot="group-header-row"
               className="flex flex-wrap items-center gap-x-3 gap-y-2"
@@ -623,26 +644,6 @@ export function GroupScreen({
             </TabsTrigger>
           </TabsList>
           <TabsContent value="log" className="flex flex-col gap-3">
-            {onOnlyReplies || onShowJson ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                {onOnlyReplies ? (
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="only-replies"
-                      checked={onlyReplies}
-                      onCheckedChange={onOnlyReplies}
-                    />
-                    <Label htmlFor="only-replies">{t('runs.group.onlyReplies')}</Label>
-                  </div>
-                ) : null}
-                {onShowJson ? (
-                  <div className="flex items-center gap-2">
-                    <Switch id="show-json" checked={showJson} onCheckedChange={onShowJson} />
-                    <Label htmlFor="show-json">{t('runs.group.showJson')}</Label>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             <AttemptTimeline
               api={api}
               runId={runId}
@@ -652,7 +653,7 @@ export function GroupScreen({
               lastSeq={lastSeq}
               rawLog={view.log ? view.log.lines : null}
               onlyReplies={onlyReplies}
-              showJson={showJson}
+              showJson={false}
               onMessage={() => setMessaging(lastSeq)}
               retryable={caps.retry && (row.status === 'failed' || row.status === 'cancelled')}
               onRetry={() =>
@@ -678,7 +679,7 @@ export function GroupScreen({
                   </div>
                   <FileTree
                     files={view.diff.files}
-                    diff={{ api, runId, group: row.slug, version }}
+                    diff={{ api, runId, group: row.slug, revision: view.diff.revision }}
                   />
                 </div>
               ) : (

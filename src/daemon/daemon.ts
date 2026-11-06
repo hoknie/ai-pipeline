@@ -29,6 +29,7 @@ import {
   loadConfig,
   planSettings,
   sharedSpecialistUsage,
+  sharedWorkflowUsage,
   socketPath,
   workflowNameOf,
   type DeliveryMode,
@@ -131,7 +132,6 @@ import {
   refExists,
   repositoryRoot,
   workspaceRoot,
-  type DiffStat,
 } from '../git/index.ts';
 import {
   catalogView,
@@ -161,6 +161,8 @@ import {
   type SpecialistTagsView,
   type SharedSpecialistsView,
   type SpecialistsImportResult,
+  type SharedWorkflowsView,
+  type WorkflowsImportResult,
   type ConfigPreview,
   type ConfigCatalogResponse,
   type ConfigEditorResponse,
@@ -174,6 +176,7 @@ import {
   type ArtifactContentView,
   type ArtifactView,
   type RunPatchView,
+  type DiffStat,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import { Store, type KnownRepository } from '../store/index.ts';
@@ -1052,7 +1055,10 @@ export class Daemon {
       const { repository } = state.run;
       const range = await this.groupRange(state, group);
       if (range === null) return;
-      this.diffs.set(key, await diffStat(repository, range[0], range[1]));
+      const from = await git(repository, 'rev-parse', range[0]);
+      const to = await git(repository, 'rev-parse', range[1]);
+      const stat = await diffStat(repository, from, to);
+      this.diffs.set(key, { ...stat, revision: `${from}..${to}` });
       this.broadcast(state);
     } catch {
       // the commits are gone (for example after git gc); leave the statistics unknown
@@ -1699,6 +1705,10 @@ export class Daemon {
         return this.specialistTagEdit(request.params.repository, (paths, level) =>
           planTagRemove(paths, level, request.params.tag),
         );
+      case 'shared_workflows':
+        return Promise.resolve(this.sharedWorkflows());
+      case 'workflows_import':
+        return this.workflowsImport(request.params);
       case 'specialists_import':
         return this.specialistsImport(request.params);
       case 'config_delete':
@@ -2347,8 +2357,15 @@ export class Daemon {
       throw error;
     }
     if (!plan.ok) return plan;
-    if (edit.kind === 'specialist' && edit.value === null && edit.level === 'global') {
-      const references = this.sharedUsageOf(repository, edit.id);
+    if (
+      (edit.kind === 'specialist' || edit.kind === 'workflow') &&
+      edit.value === null &&
+      edit.level === 'global'
+    ) {
+      const references =
+        edit.kind === 'specialist'
+          ? this.sharedUsageOf(repository, edit.id)
+          : this.sharedWorkflowUsageOf(repository, edit.id);
       if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };
     }
     const result = { ok: true as const, ...commitEdit(plan) };
@@ -2374,6 +2391,29 @@ export class Daemon {
       [...roots].map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
       slug,
     ).specialists[0];
+    return (usage?.projects ?? []).flatMap((project) =>
+      project.references.map((reference) => ({ ...reference, repository: project.repository })),
+    );
+  }
+
+  /** The shared workflows with the repositories of the registry that need them. */
+  private sharedWorkflows(): SharedWorkflowsView {
+    const roots = this.repositoryList().map((entry) => entry.path);
+    return sharedWorkflowUsage(
+      this.configPathsOf('/'),
+      roots.map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
+    );
+  }
+
+  /** References to a shared workflow from the registry and the requesting repository. */
+  private sharedWorkflowUsageOf(repository: string, id: string): EntryReference[] {
+    const roots = new Set(this.repositoryList().map((entry) => entry.path));
+    roots.add(repository);
+    const usage = sharedWorkflowUsage(
+      this.configPathsOf('/'),
+      [...roots].map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
+      id,
+    ).workflows[0];
     return (usage?.projects ?? []).flatMap((project) =>
       project.references.map((reference) => ({ ...reference, repository: project.repository })),
     );
@@ -2441,6 +2481,42 @@ export class Daemon {
     commitEdits(planned.edits);
     this.republishQueue(params.repository);
     return { ok: true, imported: [...new Set(params.slugs)] };
+  }
+
+  private async workflowsImport(
+    params: ParamsOf<'workflows_import'>,
+  ): Promise<WorkflowsImportResult> {
+    for (const path of [params.repository, params.source]) {
+      if (!this.registry.has(path)) throw new Rejection(`unknown repository ${path}`);
+    }
+    if (params.repository === params.source) {
+      throw new Rejection('the source must be another repository');
+    }
+    let planned: TagPlan;
+    try {
+      planned = planImport(
+        this.configPathsOf(params.repository),
+        this.configPathsOf(params.source),
+        params.ids,
+        'workflow',
+      );
+    } catch (error) {
+      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      throw error;
+    }
+    if (!planned.ok) {
+      return planned.reason === 'conflict'
+        ? {
+            ok: false,
+            reason: 'conflict',
+            message: planned.message,
+            ...(planned.slugs ? { ids: planned.slugs } : {}),
+          }
+        : planned;
+    }
+    commitEdits(planned.edits);
+    this.republishQueue(params.repository);
+    return { ok: true, imported: [...new Set(params.ids)] };
   }
 
   private async configSetting(params: ParamsOf<'config_setting'>): Promise<ConfigEditResult> {

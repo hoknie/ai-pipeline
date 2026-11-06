@@ -1,6 +1,6 @@
 # Installation
 
-How to install `aip`, connect it to Claude Code and OpenCode, update and remove it.
+How to install `aip`, connect it to Claude Code and OpenCode, update and remove it. After installing, go on with the [quick start](../../README.md#quick-start) and [how aip works](concepts.md).
 
 ## One command
 
@@ -65,7 +65,7 @@ A host that is not installed is skipped. Running it again changes nothing. If `a
 
 If your OpenCode configuration is `opencode.jsonc` (with comments) or is not valid JSON, `aip setup` does not touch it and prints the lines to add by hand.
 
-To install the plugin without npm, run this in Claude Code: `/plugin marketplace add hoknie/ai-pipeline`, then `/plugin install aip@aip`.
+To connect a host by hand, see [hosts/claude-code.md](../hosts/claude-code.md#connect-by-hand) and [hosts/opencode.md](../hosts/opencode.md#connect-by-hand).
 
 ## Update
 
@@ -76,7 +76,7 @@ npm install -g @hoknie/aip@latest
 aip setup
 ```
 
-A running daemon of an older build is replaced when it has nothing to do.
+A running daemon of an older build is replaced when it has nothing to do (see [Replacing an old build](../usage/daemon.md#replacing-an-old-build)).
 
 ## Remove
 
@@ -90,7 +90,9 @@ For OpenCode, delete the `aip` entry under `mcp` in `opencode.json`.
 
 ## Problems
 
-**`aip: command not found` after installing.** Add the npm global bin directory to `PATH`. It is `$(npm prefix -g)/bin`. With nvm, open a new shell. If Claude Code starts without your shell profile and cannot find `aip`, set the plugin option `aipCommand` to `["node", "/full/path/to/dist/cli/main.js"]`. `aip setup` already writes absolute paths for the MCP server when `aip` is not in `PATH`.
+**`aip: command not found` after installing.** Add the npm global bin directory to `PATH`. It is `$(npm prefix -g)/bin`. With nvm, open a new shell.
+
+If Claude Code starts without your shell profile and cannot find `aip`, set the [plugin option `aipCommand`](../hosts/claude-code.md#the-path-to-aip) to `["node", "/full/path/to/dist/cli/main.js"]`. `aip setup` already writes absolute paths for the MCP server when `aip` is not in `PATH`.
 
 **`EACCES` when installing globally.** npm cannot write to its global directory. Do not use `sudo`; give npm a prefix in your home directory and put its `bin` into `PATH`:
 

@@ -2276,3 +2276,63 @@ describe('aip web shared specialists', () => {
     expect(body.references).toEqual([expect.objectContaining({ repository: lib })]);
   });
 });
+
+describe('aip web shared pipelines and import', () => {
+  const post = (web: WebServer, url: string, body: unknown) =>
+    fetch(url, { method: 'POST', headers: authed(web, JSON_TYPE), body: JSON.stringify(body) });
+
+  it('needs the token and gives usage', async () => {
+    h = await harness(MANUAL_CONFIG, { HOME: mkdtempSync(join(tmpdir(), 'aip-web-home-')) });
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const shared = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip');
+    mkdirSync(join(shared, 'specialists'), { recursive: true });
+    mkdirSync(join(shared, 'workflows'), { recursive: true });
+    writeFileSync(join(shared, 'specialists', 'coder.yaml'), 'name: Coder\n');
+    writeFileSync(
+      join(shared, 'workflows', 'explore.yaml'),
+      'steps:\n  - id: code\n    specialist: coder\n',
+    );
+    const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-web-lib-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', lib]);
+    mkdirSync(join(lib, 'aip', 'workflows'), { recursive: true });
+    writeFileSync(
+      join(lib, 'aip', 'workflows', 'epic.yaml'),
+      'split:\n  specialist: coder\n  workflow: explore\n',
+    );
+    writeFileSync(
+      join(lib, 'aip', 'workflows', 'quick.yaml'),
+      'tags: [fast]\nsteps:\n  - id: code\n    specialist: coder\n',
+    );
+    await fetch(`${base}/api/config?repository=${encodeURIComponent(lib)}`, {
+      headers: authed(web),
+    });
+    await fetch(`${base}/api/config`, { headers: authed(web) });
+
+    expect((await fetch(`${base}/api/shared-workflows`)).status).toBe(401);
+    const usage = (await (
+      await fetch(`${base}/api/shared-workflows`, { headers: authed(web) })
+    ).json()) as { workflows: { id: string; projects: { repository: string }[] }[] };
+    expect(usage.workflows.find((entry) => entry.id === 'explore')?.projects).toEqual([
+      expect.objectContaining({ repository: lib }),
+    ]);
+
+    const url = `${base}/api/config/workflows/import`;
+    expect(
+      (
+        await fetch(url, {
+          method: 'POST',
+          headers: JSON_TYPE,
+          body: JSON.stringify({ source: lib, ids: ['quick'] }),
+        })
+      ).status,
+    ).toBe(401);
+    expect((await post(web, url, { source: 'lib', ids: ['quick'] })).status).toBe(400);
+    const done = await post(web, url, { source: lib, ids: ['quick'] });
+    expect(done.status).toBe(200);
+    expect(existsSync(join(h.repo, 'aip', 'workflows', 'quick.yaml'))).toBe(true);
+    const again = await post(web, url, { source: lib, ids: ['quick'] });
+    expect(again.status).toBe(409);
+    expect(((await again.json()) as { ids: string[] }).ids).toEqual(['quick']);
+  });
+});

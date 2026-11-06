@@ -568,3 +568,104 @@ describe('shared specialists', () => {
     expect(gone.ok).toBe(true);
   });
 });
+
+describe('shared workflows', () => {
+  const sharedDir = (h: Harness) => join(h.repo, '..', 'xdg', 'aip');
+
+  function put(path: string, text: string): void {
+    mkdirSync(join(path, '..'), { recursive: true });
+    writeFileSync(path, text);
+  }
+
+  async function registryWithLib(h: Harness): Promise<string> {
+    const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-lib-')));
+    execFileSync('git', ['init', '-q', '-b', 'main', lib]);
+    put(join(sharedDir(h), 'specialists', 'coder.yaml'), 'name: Coder\n');
+    put(
+      join(sharedDir(h), 'workflows', 'explore.yaml'),
+      'steps:\n  - id: code\n    specialist: coder\n',
+    );
+    put(
+      join(sharedDir(h), 'workflows', 'spare.yaml'),
+      'steps:\n  - id: code\n    specialist: coder\n',
+    );
+    put(
+      join(lib, 'aip', 'workflows', 'epic.yaml'),
+      'split:\n  specialist: coder\n  workflow: explore\n',
+    );
+    await h.call('config', { repository: lib });
+    await view(h);
+    return lib;
+  }
+
+  type Usage = {
+    directory: string;
+    workflows: { id: string; projects: { repository: string; references: unknown[] }[] }[];
+  };
+
+  const del = async (h: Harness, id: string, repository = h.repo) => {
+    const file = join(sharedDir(h), 'workflows', `${id}.yaml`);
+    return (await h.call('config_delete', {
+      repository,
+      kind: 'workflow',
+      id,
+      revision: revisionOf(readFileSync(file, 'utf8'))!,
+      level: 'global',
+    })) as ConfigEditResult;
+  };
+
+  it('reports the repositories that use each shared workflow', async () => {
+    const h = await start();
+    const lib = await registryWithLib(h);
+    const usage = (await h.call('shared_workflows', {})) as Usage;
+    expect(usage.directory).toBe(join(sharedDir(h), 'workflows'));
+    const explore = usage.workflows.find((w) => w.id === 'explore');
+    expect(explore?.projects).toEqual([
+      { repository: lib, references: [{ workflow: 'epic', split: true }] },
+    ]);
+    expect(usage.workflows.find((w) => w.id === 'spare')?.projects).toEqual([]);
+  });
+
+  it('refuses to delete a shared workflow another repository needs', async () => {
+    const h = await start();
+    const lib = await registryWithLib(h);
+    expect(await del(h, 'explore')).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+      references: [{ workflow: 'epic', split: true, repository: lib }],
+    });
+    // from the repository that holds the reference the draft check refuses it as well
+    expect(await del(h, 'explore', lib)).toMatchObject({ ok: false, reason: 'invalid' });
+    expect(existsSync(join(sharedDir(h), 'workflows', 'explore.yaml'))).toBe(true);
+  });
+
+  it('deletes an unused shared workflow', async () => {
+    const h = await start();
+    await registryWithLib(h);
+    expect((await del(h, 'spare')).ok).toBe(true);
+    expect(existsSync(join(sharedDir(h), 'workflows', 'spare.yaml'))).toBe(false);
+  });
+
+  it('imports project workflows and refuses bad requests', async () => {
+    const h = await start();
+    const lib = await registryWithLib(h);
+    const text = 'name: Mine\ntags: [x]\nsteps:\n  - id: code\n    specialist: coder\n';
+    put(join(lib, 'aip', 'workflows', 'mine.yaml'), text);
+    put(join(lib, 'aip', 'workflows', 'lost.yaml'), 'steps:\n  - id: s\n    specialist: nobody\n');
+    const ok = await h.call('workflows_import', { repository: h.repo, source: lib, ids: ['mine'] });
+    expect(ok).toEqual({ ok: true, imported: ['mine'] });
+    expect(readFileSync(join(h.repo, 'aip', 'workflows', 'mine.yaml'), 'utf8')).toBe(text);
+    expect(
+      await h.call('workflows_import', { repository: h.repo, source: lib, ids: ['mine'] }),
+    ).toMatchObject({ ok: false, reason: 'conflict', ids: ['mine'] });
+    expect(
+      await h.call('workflows_import', { repository: h.repo, source: lib, ids: ['lost'] }),
+    ).toMatchObject({ ok: false, reason: 'invalid' });
+    await expect(
+      h.call('workflows_import', { repository: h.repo, source: '/tmp/other', ids: ['mine'] }),
+    ).rejects.toThrow(/unknown repository/);
+    await expect(
+      h.call('workflows_import', { repository: h.repo, source: h.repo, ids: ['mine'] }),
+    ).rejects.toThrow(/another repository/);
+  });
+});

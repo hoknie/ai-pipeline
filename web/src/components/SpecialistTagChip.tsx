@@ -7,10 +7,13 @@ import { Badge } from '../ui/badge.tsx';
 export function SpecialistTagChip({
   name,
   shared = false,
+  hint,
   children,
 }: {
   name: string;
   shared?: boolean;
+  /** Tooltip of a shared tag; the one of specialists when omitted. */
+  hint?: string;
   /** Extra content after the name, such as a remove button. */
   children?: React.ReactNode;
 }) {
@@ -19,7 +22,7 @@ export function SpecialistTagChip({
     <Badge
       variant="outline"
       data-shared={shared ? 'true' : undefined}
-      title={shared ? t('specialists.tags.sharedHint') : undefined}
+      title={shared ? (hint ?? t('specialists.tags.sharedHint')) : undefined}
       className="gap-1"
     >
       {shared ? (

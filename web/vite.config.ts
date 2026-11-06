@@ -16,6 +16,25 @@ export default defineConfig({
     outDir: fileURLToPath(new URL('../dist/web', import.meta.url)),
     emptyOutDir: true,
     sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules\/(react|react-dom|scheduler)\//,
+              priority: 30,
+            },
+            {
+              name: 'vendor-markdown',
+              test: /node_modules\/(react-markdown|remark-|mdast-|micromark|hast-|unist-|unified|vfile|property-information)/,
+              priority: 20,
+            },
+            { name: 'locales', test: /web\/src\/i18n\/locales\//, priority: 20 },
+          ],
+        },
+      },
+    },
   },
   server: {
     proxy: {

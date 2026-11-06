@@ -1,6 +1,6 @@
 # Development
 
-How to check and build `aip` itself. For using `aip` see [README.md](../README.md).
+How to check and build `aip` itself. For using `aip` see the [documentation](README.md).
 
 ```sh
 npm run check     # prettier --check → tsc → vitest
@@ -31,7 +31,7 @@ just web-dev        # Vite dev server proxying to the running aip web
 
 ## Web panel from source
 
-The panel is a React application in the `web/` directory. `npm run build` builds it into `dist/web`, from where `aip web` serves it. Without a build, the page tells you to run `npm run build`.
+The [panel](web/README.md) is a React application in the `web/` directory. `npm run build` builds it into `dist/web`, from where `aip web` serves it. Without a build, the page tells you to run `npm run build`.
 
 For development, run `aip web` and, in another terminal, the Vite dev server with a proxy to it. Pass the token from the printed link:
 

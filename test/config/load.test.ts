@@ -1215,3 +1215,27 @@ describe('specialist tags', () => {
     );
   });
 });
+
+describe('workflow tags', () => {
+  const wf = (extra: string) =>
+    `swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n${extra}`;
+
+  it('accepts tags without changing the steps', () => {
+    const plain = parseConfig(wf(''));
+    const tagged = parseConfig(wf('      tags: [backend, release]\n'));
+    expect(tagged.workflows).toEqual(plain.workflows);
+  });
+
+  it('rejects tags that are not a list of names', () => {
+    expectError(
+      errorsOf(wf('      tags: backend\n')),
+      'swarm.workflows.feature.tags',
+      'must be a list of strings',
+    );
+    expectError(
+      errorsOf(wf(`      tags: [${'a'.repeat(31)}]\n`)),
+      'swarm.workflows.feature.tags',
+      'at most 30 characters',
+    );
+  });
+});

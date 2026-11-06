@@ -76,7 +76,7 @@ describe('answers-only switch of the run screen', () => {
   it('filters the logs', async () => {
     open();
     await screen.findByText('Read');
-    const toggle = screen.getByRole('switch', { name: 'only specialist replies' });
+    const toggle = screen.getByRole('switch', { name: 'Specialist replies' });
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle);
     expect(screen.queryByText('Read')).toBeNull();
@@ -86,27 +86,19 @@ describe('answers-only switch of the run screen', () => {
   it('keeps the filter on after the panel is opened again', async () => {
     const first = open();
     await screen.findByText('Read');
-    fireEvent.click(screen.getByRole('switch', { name: 'only specialist replies' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Specialist replies' }));
     first.unmount();
     open();
     await screen.findByText('ответ специалиста');
     expect(
-      screen.getByRole('switch', { name: 'only specialist replies' }).getAttribute('aria-checked'),
+      screen.getByRole('switch', { name: 'Specialist replies' }).getAttribute('aria-checked'),
     ).toBe('true');
     expect(screen.queryByText('Read')).toBeNull();
   });
 
-  it('keeps the JSON switch after the panel is opened again', async () => {
-    const first = open();
-    await screen.findByText('Read');
-    const toggle = screen.getByRole('switch', { name: 'show JSON' });
-    expect(toggle.getAttribute('aria-checked')).toBe('false');
-    fireEvent.click(toggle);
-    first.unmount();
+  it('has no JSON switch', async () => {
     open();
     await screen.findByText('Read');
-    expect(screen.getByRole('switch', { name: 'show JSON' }).getAttribute('aria-checked')).toBe(
-      'true',
-    );
+    expect(screen.queryByRole('switch', { name: /JSON/ })).toBeNull();
   });
 });
