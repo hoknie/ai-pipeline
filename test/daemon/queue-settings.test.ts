@@ -11,7 +11,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { settle, POLL_MS, WORKFLOW_CONFIG } from './harness.ts';
+import { settle, POLL_MS, PIPELINE_CONFIG } from './harness.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
 
 describe('queue settings', () => {
@@ -112,15 +112,15 @@ describe('queue settings', () => {
     const h = await start();
     await add(h, 'A');
     await add(h, 'B');
-    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('feature:', 'other:'));
+    writeConfigDirectory(h.repo, PIPELINE_CONFIG.replace('feature:', 'other:'));
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await h.call('queue_start', { repository: h.repo });
     const view = await waitQueue(h, (queue) => queue.items.every((item) => item.error !== null));
     expect(view.status).toBe('running');
     expect(view.stop).toBeNull();
     expect(view.items.map((item) => item.error)).toEqual([
-      expect.stringContaining('unknown workflow'),
-      expect.stringContaining('unknown workflow'),
+      expect.stringContaining('unknown pipeline'),
+      expect.stringContaining('unknown pipeline'),
     ]);
     expect(await allRuns(h)).toEqual([]);
   });
@@ -160,7 +160,7 @@ describe('delivery mode per task', () => {
   it('takes the setting when the task without a mode starts', async () => {
     const h = await start();
     await add(h, 'A');
-    writeConfigDirectory(h.repo, `${WORKFLOW_CONFIG}  delivery: { mode: commit }\n`);
+    writeConfigDirectory(h.repo, `${PIPELINE_CONFIG}  delivery: { mode: commit }\n`);
     expect((await queueOf(h)).deliveryMode).toBe('commit');
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.status === 'stopped');

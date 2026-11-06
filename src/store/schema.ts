@@ -255,6 +255,18 @@ export const MIGRATIONS: string[] = [
   DROP TABLE tag_map;
   DROP TABLE tag_use;
   `,
+  `
+  CREATE TABLE observers (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    settings_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  ALTER TABLE runs ADD COLUMN repair_json TEXT;
+  `,
+  `
+  ALTER TABLE runs RENAME COLUMN workflow TO pipeline;
+  ALTER TABLE queue_items RENAME COLUMN workflow TO pipeline;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

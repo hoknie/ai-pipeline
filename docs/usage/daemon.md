@@ -36,7 +36,7 @@ The daemon and its clients (the CLI, `aip mcp`, `aip web`) compare builds. A bui
 
 | Path | What it holds |
 |---|---|
-| `~/.config/aip/` (or `$XDG_CONFIG_HOME/aip/`) | The [shared configuration](../configuration/README.md#where-the-configuration-lives): `settings.yaml`, `specialists/`, `workflows/` |
+| `~/.config/aip/` (or `$XDG_CONFIG_HOME/aip/`) | The [shared configuration](../configuration/README.md#where-the-configuration-lives): `settings.yaml`, `specialists/`, `pipelines/` |
 | `aip/` in a repository | The project configuration, which takes precedence |
 | `<repository>/.aip/` | The group worktrees and step logs. The directory is added to `.git/info/exclude`; set another location with `workspace_dir` |
 | `~/.local/state/aip/` (or `$XDG_STATE_HOME/aip/`) | The state directory: the database, the socket, the daemon log, `web.json`, `artifacts/`, `patches/` |

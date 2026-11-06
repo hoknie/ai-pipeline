@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import type { QueueView, RunCreated } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, until, type Harness } from './harness.ts';
+import { PIPELINE_CONFIG, until, type Harness } from './harness.ts';
 import { start, queueOf, add, waitQueue } from './queue-harness.ts';
 
 /**
@@ -32,7 +32,7 @@ const retryOf = async (h: Harness, runId: string) => {
 
 describe('freezing for a priority run', () => {
   it('freezes the running run when a failed run returns, lets its step finish and continues it in a stopped queue', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
     const returned = (await h.call('queue_return', { runId: a })) as QueueView;
     expect(returned.runs.map((run) => run.id)).toEqual([a]);
@@ -163,7 +163,7 @@ describe('freezing for a priority run', () => {
   });
 
   it('skips a step of a returned run through its queue item and keeps its task', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
     await h.call('queue_return', { runId: a });
     const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;

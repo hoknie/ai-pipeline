@@ -21,8 +21,8 @@ import {
   queueRun,
   runView,
   topologyOf,
-  workflowOf,
-  workflowsView,
+  pipelineOf,
+  pipelinesView,
 } from './fixtures.ts';
 
 beforeEach(() => {
@@ -244,7 +244,7 @@ describe('queue card', () => {
 });
 
 describe('tokens of a step node', () => {
-  const workflow = workflowOf();
+  const pipeline = pipelineOf();
   const onStep = (id: string, input: number) => {
     const base = topologyOf();
     return runView({
@@ -259,8 +259,8 @@ describe('tokens of a step node', () => {
   };
 
   it('sums the tokens of the steps of the active runs', () => {
-    const live = liveState(workflow, [onStep('a', 5_000), onStep('b', 7_000)], '/repo');
-    const { nodes } = layout(workflow, live, i18next.t);
+    const live = liveState(pipeline, [onStep('a', 5_000), onStep('b', 7_000)], '/repo');
+    const { nodes } = layout(pipeline, live, i18next.t);
     const code = nodes.find((node) => node.id === 'step:code')!;
     expect(code.data).toMatchObject({ attempts: 2, inputTokens: 12_000, outputTokens: 1_000 });
   });
@@ -268,10 +268,10 @@ describe('tokens of a step node', () => {
   it('shows the attempts and the tokens in the node', async () => {
     render(
       <TopologyPage
-        api={fakeApi({ workflows: vi.fn(async () => workflowsView({ workflows: [workflow] })) })}
+        api={fakeApi({ pipelines: vi.fn(async () => pipelinesView({ pipelines: [pipeline] })) })}
         runs={[onStep('a', 5_000), onStep('b', 7_000)]}
-        workflow="feature"
-        onSelectWorkflow={vi.fn()}
+        pipeline="feature"
+        onSelectPipeline={vi.fn()}
         onOpenGroup={vi.fn()}
       />,
     );
@@ -295,7 +295,7 @@ describe('tokens of a step node', () => {
       });
     };
     const costOf = (runs: ReturnType<typeof runView>[]) =>
-      layout(workflow, liveState(workflow, runs, '/repo'), i18next.t).nodes.find(
+      layout(pipeline, liveState(pipeline, runs, '/repo'), i18next.t).nodes.find(
         (node) => node.id === 'step:code',
       )!.data.costUsd;
     expect(costOf([withCost('a', 0.4), withCost('b', 0.5)])).toBeCloseTo(0.9);
@@ -318,10 +318,10 @@ describe('tokens of a step node', () => {
     };
     render(
       <TopologyPage
-        api={fakeApi({ workflows: vi.fn(async () => workflowsView({ workflows: [workflow] })) })}
+        api={fakeApi({ pipelines: vi.fn(async () => pipelinesView({ pipelines: [pipeline] })) })}
         runs={[withCost('a', 5_000, 0.4), withCost('b', 7_000, 0.5)]}
-        workflow="feature"
-        onSelectWorkflow={vi.fn()}
+        pipeline="feature"
+        onSelectPipeline={vi.fn()}
         onOpenGroup={vi.fn()}
       />,
     );
@@ -332,10 +332,10 @@ describe('tokens of a step node', () => {
   it('leaves the line of a step without usage as it was', async () => {
     render(
       <TopologyPage
-        api={fakeApi({ workflows: vi.fn(async () => workflowsView({ workflows: [workflow] })) })}
+        api={fakeApi({ pipelines: vi.fn(async () => pipelinesView({ pipelines: [pipeline] })) })}
         runs={[]}
-        workflow="feature"
-        onSelectWorkflow={vi.fn()}
+        pipeline="feature"
+        onSelectPipeline={vi.fn()}
         onOpenGroup={vi.fn()}
       />,
     );

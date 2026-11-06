@@ -11,7 +11,14 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import { Document, Scalar, isMap, isScalar, parseDocument, visit } from 'yaml';
 
-import { SETTINGS_NAME, SPECIALISTS_DIR, WORKFLOWS_DIR, type ConfigPaths } from './discover.ts';
+import {
+  ACTIONS_DIR,
+  SETTINGS_NAME,
+  SPECIALISTS_DIR,
+  PIPELINES_DIR,
+  LEGACY_PIPELINES_DIR,
+  type ConfigPaths,
+} from './discover.ts';
 import { formatDuration, parseDuration } from './duration.ts';
 import { ConfigLoadError, type FieldError } from './errors.ts';
 import {
@@ -19,6 +26,7 @@ import {
   mergeOrigins,
   levelIsEmpty,
   parseYaml,
+  canonicalPipeline,
   readLevel,
   resolveLevels,
   type Level,
@@ -52,17 +60,19 @@ import {
 import { tagsOf } from './tag-names.ts';
 import { validateConfig, validateRuntimesSection, validateWebSection } from './validate.ts';
 
-export type EntryKind = 'specialist' | 'workflow';
+export type EntryKind = 'specialist' | 'pipeline' | 'action';
 
 const KIND_DIRECTORY: Record<EntryKind, string> = {
   specialist: SPECIALISTS_DIR,
-  workflow: WORKFLOWS_DIR,
+  pipeline: PIPELINES_DIR,
+  action: ACTIONS_DIR,
 };
 
 /** Key of the section of the configuration tree (`swarm.<section>.<id>`) that holds the kind. */
-const KIND_SECTION: Record<EntryKind, 'specialists' | 'workflows'> = {
+const KIND_SECTION: Record<EntryKind, 'specialists' | 'pipelines' | 'actions'> = {
   specialist: 'specialists',
-  workflow: 'workflows',
+  pipeline: 'pipelines',
+  action: 'actions',
 };
 
 export type EntryLevel = 'project' | 'global' | 'project_over_global';
@@ -79,7 +89,7 @@ export function revisionOf(text: string | undefined): string | null {
 }
 
 /**
- * The file of an entry on a level: `specialists/<id>.yaml` (`workflows/<id>.yaml`) in the directory of the level, or the
+ * The file of an entry on a level: `specialists/<id>.yaml` (`pipelines/<id>.yaml`) in the directory of the level, or the
  * `.yml` file when that one exists. The id must be a slug, so the path cannot leave the directory of the kind.
  */
 export function entryFile(
@@ -89,10 +99,19 @@ export function entryFile(
   level: WriteLevel = 'project',
 ): string {
   if (!isValidSlug(id)) throw new ConfigEditError(`id must match ${SLUG_PATTERN_TEXT}`);
-  const directory = resolve(paths[level].directory, KIND_DIRECTORY[kind]);
+  let directory = resolve(paths[level].directory, KIND_DIRECTORY[kind]);
   const yaml = join(directory, `${id}.yaml`);
   const yml = join(directory, `${id}.yml`);
-  const file = !existsSync(yaml) && existsSync(yml) ? yml : yaml;
+  let file = !existsSync(yaml) && existsSync(yml) ? yml : yaml;
+  if (kind === 'pipeline' && !existsSync(yaml) && !existsSync(yml)) {
+    const legacyDirectory = resolve(paths[level].directory, LEGACY_PIPELINES_DIR);
+    const legacyYaml = join(legacyDirectory, `${id}.yaml`);
+    const legacyYml = join(legacyDirectory, `${id}.yml`);
+    if (existsSync(legacyYaml) || existsSync(legacyYml)) {
+      directory = legacyDirectory;
+      file = existsSync(legacyYaml) ? legacyYaml : legacyYml;
+    }
+  }
   const inside = relative(directory, resolve(file));
   if (inside.startsWith('..') || inside !== basename(file)) {
     throw new ConfigEditError('the file must be inside the directory of its kind');
@@ -153,7 +172,8 @@ export function editDocument(text: string | undefined, value: Record<string, unk
     if (!(key in value) && document.has(key)) document.delete(key);
   }
   for (const [key, next] of Object.entries(value)) {
-    if (sameValue(current[key], next)) continue;
+    const oldSplit = key === 'split' && isMapping(current[key]) && 'workflow' in current[key];
+    if (!oldSplit && sameValue(current[key], next)) continue;
     const existing = document.get(key, true);
     if (isScalar(existing) && (typeof next === 'string' || typeof next === 'number')) {
       existing.value = next;
@@ -169,11 +189,15 @@ export function editDocument(text: string | undefined, value: Record<string, unk
 }
 
 export interface EntryReference {
-  workflow?: string;
+  pipeline?: string;
   step?: string;
   split?: boolean;
+  /** Id of an action (`actions/<id>.yaml`) that runs the specialist. */
+  action?: string;
   /** `delivery.resolver` or `delivery.message_specialist`. */
   field?: string;
+  /** Pipeline point (`swarm.stages.<point>` or `stages.<point>` of the pipeline) that names an action. */
+  point?: string;
   /** Root of the registry repository the reference comes from; set for shared specialists. */
   repository?: string;
 }
@@ -182,21 +206,25 @@ export interface EntryReference {
 export function specialistReferences(tree: unknown, slug: string): EntryReference[] {
   const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
   const references: EntryReference[] = [];
-  const workflows = isMapping(swarm.workflows) ? swarm.workflows : {};
-  for (const [id, workflow] of Object.entries(workflows)) {
-    if (!isMapping(workflow)) continue;
-    if (isMapping(workflow.split) && workflow.split.specialist === slug) {
-      references.push({ workflow: id, split: true });
+  const pipelines = isMapping(swarm.pipelines) ? swarm.pipelines : {};
+  for (const [id, pipeline] of Object.entries(pipelines)) {
+    if (!isMapping(pipeline)) continue;
+    if (isMapping(pipeline.split) && pipeline.split.specialist === slug) {
+      references.push({ pipeline: id, split: true });
     }
-    const steps = Array.isArray(workflow.steps) ? workflow.steps : [];
+    const steps = Array.isArray(pipeline.steps) ? pipeline.steps : [];
     for (const [index, step] of steps.entries()) {
       if (isMapping(step) && step.specialist === slug) {
         references.push({
-          workflow: id,
+          pipeline: id,
           step: typeof step.id === 'string' ? step.id : String(index),
         });
       }
     }
+  }
+  const actions = isMapping(swarm.actions) ? swarm.actions : {};
+  for (const [id, action] of Object.entries(actions)) {
+    if (isMapping(action) && action.specialist === slug) references.push({ action: id });
   }
   const delivery = isMapping(swarm.delivery) ? swarm.delivery : {};
   for (const field of ['resolver', 'message_specialist']) {
@@ -205,15 +233,33 @@ export function specialistReferences(tree: unknown, slug: string): EntryReferenc
   return references;
 }
 
-/** Everything in a merged `{ swarm }` tree that delegates to the workflow through `split.workflow`. */
-export function workflowReferences(tree: unknown, id: string): EntryReference[] {
+/** Everything in a merged `{ swarm }` tree that delegates to the pipeline through `split.pipeline`. */
+export function pipelineReferences(tree: unknown, id: string): EntryReference[] {
   const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
-  const workflows = isMapping(swarm.workflows) ? swarm.workflows : {};
+  const pipelines = isMapping(swarm.pipelines) ? swarm.pipelines : {};
   const references: EntryReference[] = [];
-  for (const [name, workflow] of Object.entries(workflows)) {
-    if (isMapping(workflow) && isMapping(workflow.split) && workflow.split.workflow === id) {
-      references.push({ workflow: name, split: true });
+  for (const [name, pipeline] of Object.entries(pipelines)) {
+    if (isMapping(pipeline) && isMapping(pipeline.split) && pipeline.split.pipeline === id) {
+      references.push({ pipeline: name, split: true });
     }
+  }
+  return references;
+}
+
+/** Everything in a merged `{ swarm }` tree that names the action in a pipeline point. */
+export function actionReferences(tree: unknown, id: string): EntryReference[] {
+  const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
+  const references: EntryReference[] = [];
+  const scan = (stages: unknown, owner: Partial<EntryReference>): void => {
+    if (!isMapping(stages)) return;
+    for (const [point, ids] of Object.entries(stages)) {
+      if (Array.isArray(ids) && ids.includes(id)) references.push({ ...owner, point });
+    }
+  };
+  scan(swarm.stages, {});
+  const pipelines = isMapping(swarm.pipelines) ? swarm.pipelines : {};
+  for (const [name, pipeline] of Object.entries(pipelines)) {
+    if (isMapping(pipeline)) scan(pipeline.stages, { pipeline: name });
   }
   return references;
 }
@@ -275,8 +321,9 @@ function withEntry(
   text: string | null,
 ): LevelFiles {
   const others = sourcesOf(files, kind).filter((source) => stemOf(source.path) !== id);
-  const list =
-    text === null ? others : [...others, { path: file, value: parseYaml(text, file), text }];
+  const parsed = text === null ? null : parseYaml(text, file);
+  const value = kind === 'pipeline' ? canonicalPipeline(parsed) : parsed;
+  const list = text === null ? others : [...others, { path: file, value, text }];
   list.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
   return { ...files, [KIND_SECTION[kind]]: list };
 }
@@ -343,7 +390,7 @@ function buildDraft(paths: ConfigPaths, edit: EditRequest, current: string | und
 }
 
 function emptyLevel(): Level {
-  return assembleLevel({ specialists: [], workflows: [], problems: [] });
+  return assembleLevel({ specialists: [], pipelines: [], actions: [], problems: [] });
 }
 
 /**
@@ -472,11 +519,13 @@ export function planEdit(paths: ConfigPaths, request: EditRequest): EditPlan {
       ],
     };
   }
-  if (edit.value === null && edit.kind === 'specialist') {
-    const inGlobal = sourcesOf(draft.files.global, 'specialist').some(
+  if (edit.value === null && (edit.kind === 'specialist' || edit.kind === 'action')) {
+    const kind = edit.kind;
+    const referencesTo = kind === 'specialist' ? specialistReferences : actionReferences;
+    const inGlobal = sourcesOf(draft.files.global, kind).some(
       (source) => stemOf(source.path) === edit.id,
     );
-    const inProject = sourcesOf(draft.files.project, 'specialist').some(
+    const inProject = sourcesOf(draft.files.project, kind).some(
       (source) => stemOf(source.path) === edit.id,
     );
     const globalTree = assembleLevel(draft.files.global).tree;
@@ -490,10 +539,10 @@ export function planEdit(paths: ConfigPaths, request: EditRequest): EditPlan {
       }
     };
     if (level === 'global') {
-      add(specialistReferences(globalTree, edit.id));
-      if (!inProject) add(specialistReferences(mergeConfigs(globalTree, projectTree), edit.id));
+      add(referencesTo(globalTree, edit.id));
+      if (!inProject) add(referencesTo(mergeConfigs(globalTree, projectTree), edit.id));
     } else if (!inGlobal) {
-      add(specialistReferences(mergeConfigs(globalTree, projectTree), edit.id));
+      add(referencesTo(mergeConfigs(globalTree, projectTree), edit.id));
     }
     if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };
   }
@@ -558,6 +607,8 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('delivery.message_specialist', 'specialist'),
   field('delivery.resolver', 'specialist'),
   field('delivery.resolver_rounds', 'integer', { range: RESOLVER_ROUNDS_RANGE }),
+  field('delivery.message_prompt', 'string'),
+  field('delivery.resolver_prompt', 'string'),
   field('workspace.base', 'choice', { options: WORKSPACE_BASES }),
   field('workspace.include', 'strings'),
   field('naming.enabled', 'boolean'),
@@ -892,8 +943,8 @@ export interface EditorSpecialistValues {
   max: number | null;
 }
 
-/** A workflow in the editor: where it lives and what its files say. */
-export interface EditorWorkflow {
+/** A pipeline in the editor: where it lives and what its files say. */
+export interface EditorPipeline {
   id: string;
   level: EntryLevel;
   file: string;
@@ -904,6 +955,16 @@ export interface EditorWorkflow {
   shared_tags: string[];
   /** Tags of the project file. */
   own_tags: string[];
+}
+
+/** An action in the editor: where it lives and what its files say. */
+export interface EditorAction {
+  id: string;
+  level: EntryLevel;
+  file: string;
+  revision: string | null;
+  raw: Record<string, unknown>;
+  sources: EntrySources;
 }
 
 export interface EditorSetting {
@@ -935,7 +996,8 @@ export interface ConfigEditorView {
   directories: { global: string; project: string };
   settingsFiles: { global: SettingsFileView; project: SettingsFileView };
   specialists: EditorSpecialist[];
-  workflows: EditorWorkflow[];
+  pipelines: EditorPipeline[];
+  actions: EditorAction[];
   settings: EditorSetting[];
   errors: FieldError[];
 }
@@ -975,6 +1037,8 @@ function settingsOf(config: ResolvedConfig): [string, unknown][] {
     ['delivery.message_specialist', config.delivery.messageSpecialist],
     ['delivery.resolver', config.delivery.resolver],
     ['delivery.resolver_rounds', config.delivery.resolverRounds],
+    ['delivery.message_prompt', config.delivery.messagePrompt ?? null],
+    ['delivery.resolver_prompt', config.delivery.resolverPrompt ?? null],
     ['workspace.base', config.workspace.base],
     ['workspace.include', config.workspace.include],
     ['naming.enabled', config.naming.enabled],
@@ -1091,13 +1155,13 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
       own_tags: tagsOf(rawOf(inProject)),
     };
   });
-  const globalWorkflows = byStem(files.global.workflows);
-  const projectWorkflows = byStem(files.project.workflows);
-  const workflows = [...new Set([...globalWorkflows.keys(), ...projectWorkflows.keys()])]
+  const globalPipelines = byStem(files.global.pipelines);
+  const projectPipelines = byStem(files.project.pipelines);
+  const pipelines = [...new Set([...globalPipelines.keys(), ...projectPipelines.keys()])]
     .sort()
-    .map((id): EditorWorkflow => {
-      const inProject = projectWorkflows.get(id);
-      const inGlobal = globalWorkflows.get(id);
+    .map((id): EditorPipeline => {
+      const inProject = projectPipelines.get(id);
+      const inGlobal = globalPipelines.get(id);
       const source = (inProject ?? inGlobal) as ConfigSource;
       return {
         id,
@@ -1108,6 +1172,23 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
         sources: sourcesFor(inProject, inGlobal),
         shared_tags: tagsOf(rawOf(inGlobal)),
         own_tags: tagsOf(rawOf(inProject)),
+      };
+    });
+  const globalActions = byStem(files.global.actions);
+  const projectActions = byStem(files.project.actions);
+  const actions = [...new Set([...globalActions.keys(), ...projectActions.keys()])]
+    .sort()
+    .map((id): EditorAction => {
+      const inProject = projectActions.get(id);
+      const inGlobal = globalActions.get(id);
+      const source = (inProject ?? inGlobal) as ConfigSource;
+      return {
+        id,
+        level: inProject ? (inGlobal ? 'project_over_global' : 'project') : 'global',
+        file: source.path,
+        revision: inProject ? revisionOf(inProject.text) : null,
+        raw: rawOf(source),
+        sources: sourcesFor(inProject, inGlobal),
       };
     });
   const origins = mergeOrigins(global, project);
@@ -1161,7 +1242,8 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
     directories: { global: paths.global.directory, project: paths.project.directory },
     settingsFiles: { global: settingsView('global'), project: settingsView('project') },
     specialists,
-    workflows,
+    pipelines,
+    actions,
     settings,
     errors,
   };

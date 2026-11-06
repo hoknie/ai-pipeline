@@ -40,17 +40,17 @@ describe('machineLoad', () => {
         id: 'r2',
         title: 'Второй',
         repository: LIB,
-        workflow: 'epic',
+        pipeline: 'epic',
         specialists: [specialistUse('coder', { level: 'global', max: 1, waiting: ['api'] })],
       }),
     ]);
     const coder = load.get('coder')!;
     expect(coder.max).toBe(1);
     expect(coder.running).toMatchObject([
-      { runId: 'r1', runTitle: 'Первый', repository: APP, workflow: 'feature', group: 'login' },
+      { runId: 'r1', runTitle: 'Первый', repository: APP, pipeline: 'feature', group: 'login' },
     ]);
     expect(coder.waiting).toMatchObject([
-      { runId: 'r2', repository: LIB, workflow: 'epic', group: 'api', status: 'queued' },
+      { runId: 'r2', repository: LIB, pipeline: 'epic', group: 'api', status: 'queued' },
     ]);
     const sections = loadSections(load, LIB);
     expect(sections.project).toEqual([]);

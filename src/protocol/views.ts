@@ -1,17 +1,25 @@
 import { z } from 'zod';
 
 import {
-  workflowNameOf,
+  pipelineNameOf,
+  type ActionPoint,
   type DeliveryMode,
   type SharedSpecialistUsage,
   type SharedSpecialistsUsage,
-  type SharedWorkflowUsage,
-  type SharedWorkflowsUsage,
+  type SharedPipelineUsage,
+  type SharedPipelinesUsage,
   type SpecialistTagFolder,
 } from '../config/index.ts';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
+  defaultObserverSettings,
+  repairAdmitted,
+  repairIncidents,
+  actionGroupsOf,
+  actionPointOf,
   allGroups,
+  findGroup,
+  parseActionSlug,
   attemptVerdict,
   stepProgress,
   type StepProgress,
@@ -65,11 +73,13 @@ import {
   specialistUse,
   type SpecialistUse,
   type Topology,
-  type WorkflowTopology,
+  type PipelineTopology,
+  type StagePerformer,
   GROUP_STATUSES,
   type GroupWait,
   canReturn,
 } from '../core/index.ts';
+import type { Incident, ObserverSettings } from '../core/index.ts';
 import type { ConfigEditorView, EntryReference, FieldError } from '../config/index.ts';
 
 /** A catalog tag as clients see it. */
@@ -195,6 +205,8 @@ export function displayStatus<S extends GroupStatus | 'done'>(
 
 /** Hold that applies to a group: delivery steps (commit message, resolver) run despite it. */
 function groupHold(state: RunState, group: Group): RunHold | null {
+  const point = actionPointOf(group);
+  if (point === 'before_delivery' || point === 'after_delivery') return null;
   return group === state.message || group === state.resolve ? null : state.run.hold;
 }
 
@@ -245,15 +257,18 @@ export interface GroupRow {
   /** Tokens and cost of all attempts of the group so far, live ones included. */
   usage: Usage | null;
   /** Answers accepted for the group, oldest first. */
-  decisions: HumanDecision[];
+  decisions: ViewDecision[];
   /** Artifacts the specialists published for the group. */
   artifacts: number;
   /** Changes whenever an artifact of the group is published or replaced. */
   artifactsRevision: number;
 }
 
+/** An accepted answer as the protocol shows it. */
+export type ViewDecision = HumanDecision;
+
 /** An accepted answer in the overview of a run, with the slug of its group. */
-export type RunDecision = HumanDecision & { group: string };
+export type RunDecision = ViewDecision & { group: string };
 
 export interface SplitRow {
   status: RowStatus;
@@ -264,12 +279,16 @@ export interface SplitRow {
   reason: string | null;
 }
 
-export type SystemStepKind = 'split' | 'message' | 'resolve';
+export type SystemStepKind = 'split' | 'message' | 'resolve' | 'repair' | 'action';
 
-/** A service step of the run (split, commit message, delivery resolver). */
+/** A service step of the run (split, commit message, delivery resolver, pipeline action). */
 export interface SystemStepRow extends Omit<GroupRow, 'status'> {
   kind: SystemStepKind;
   status: RowStatus;
+  /** Point of the pipeline of an action; absent for other steps. */
+  point?: ActionPoint;
+  /** Id of the action in the catalog; absent for other steps. */
+  action?: string;
 }
 
 /** Delivery of the merged result as the last system stage of a run; derived, not a group. */
@@ -283,7 +302,21 @@ export type DeliveryStage =
  * The state of a run in a view: its phase, `queued` for a finished run waiting as a return
  * item, or the hold (`paused`, `frozen`) of a run the scheduler keeps still.
  */
-export type RunViewState = RunPhase | 'queued' | RunHold;
+export type RunViewState = RunPhase | 'queued' | 'repair' | RunHold;
+
+/** The observer repairs of a run. */
+export interface RunRepairView {
+  /** An observer may take the incidents of the run. */
+  allowed: boolean;
+  /** The run is in the state `repair`: an observer repairs it or will when a worker is free. */
+  active: boolean;
+  /** Repairs started for the run. */
+  repairs: number;
+  /** The incident being repaired; null when none is. */
+  incident: Incident | null;
+  /** Why the observer cancelled the whole run; null when it did not. */
+  cancelReason: string | null;
+}
 
 export interface RunView {
   id: string;
@@ -293,9 +326,9 @@ export interface RunView {
   /** English kebab-case name; null until the run is named. */
   name: string | null;
   repository: string;
-  workflow: string;
-  /** Display name of the workflow in the configuration of the run. */
-  workflowName: string;
+  pipeline: string;
+  /** Display name of the pipeline in the configuration of the run. */
+  pipelineName: string;
   branch: string;
   createdAt: number;
   /** When the first attempt of any group started; null while the run waits for a free slot. */
@@ -348,9 +381,9 @@ export interface RunView {
    * shared by several groups counts once. Null when no group has statistics yet.
    */
   liveDiff: DiffTotals | null;
-  /** Steps of the workflow with the groups on them, for the topology view. */
+  /** Steps of the pipeline with the groups on them, for the topology view. */
   topology: Topology;
-  /** Each step of the group workflow: passed, under way or ahead, and whether it is skipped. */
+  /** Each step of the group pipeline: passed, under way or ahead, and whether it is skipped. */
   steps: StepState[];
   /** Specialists that run or are waited for in the run, for the load across the machine. */
   specialists: SpecialistUse[];
@@ -359,6 +392,8 @@ export interface RunView {
   system: SystemStepRow[];
   /** Answers accepted in the run (human and autopilot): split, work groups, message, resolve. */
   decisions: RunDecision[];
+  /** Observer repairs of the run; `runView` always sets it. */
+  repair?: RunRepairView;
 }
 
 export interface ResolverRow {
@@ -373,7 +408,7 @@ export interface ResolverRow {
 export interface AttemptDecision {
   question: string;
   answer: string;
-  by: 'human' | 'autopilot';
+  by: HumanDecision['by'];
 }
 
 export interface AttemptView {
@@ -426,7 +461,7 @@ export interface GroupView {
   questions: HumanQuestion[] | null;
   humanOnly: HumanOnly | null;
   /** Accepted answers to the questions of the group, a person's and the autopilot's, oldest first. */
-  decisions: HumanDecision[];
+  decisions: ViewDecision[];
   reason: string | null;
   /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
   limitUntil: number | null;
@@ -544,11 +579,29 @@ export function systemRow(
   wait: GroupWait | null = null,
   artifacts: ArtifactCounts = NO_ARTIFACTS,
 ): SystemStepRow {
+  const ref = kind === 'action' ? parseActionSlug(group.slug) : null;
   return {
     ...groupRow(state, group, now, NO_DIFFS, wait, artifacts),
     kind,
     status: displayStatus(serviceStatus(group), wait, groupHold(state, group)),
+    ...(ref ? { point: ref.point, action: ref.id } : {}),
   };
+}
+
+/** The service steps of a run in the order they run: actions around the split and the delivery. */
+export function systemGroups(state: RunState): { kind: SystemStepKind; group: Group }[] {
+  const actions = (point: ActionPoint) =>
+    actionGroupsOf(state, point).map((group) => ({ kind: 'action' as const, group }));
+  return [
+    ...actions('before_split'),
+    ...(state.split ? [{ kind: 'split' as const, group: state.split }] : []),
+    ...actions('after_split'),
+    ...actions('before_delivery'),
+    ...(state.message ? [{ kind: 'message' as const, group: state.message }] : []),
+    ...(state.resolve ? [{ kind: 'resolve' as const, group: state.resolve }] : []),
+    ...(state.repair ? [{ kind: 'repair' as const, group: state.repair }] : []),
+    ...actions('after_delivery'),
+  ];
 }
 
 function lastDeliveryAt(state: RunState): number | null {
@@ -634,13 +687,38 @@ function runLiveDiff(state: RunState, diffs: DiffLookup): DiffTotals | null {
 /** Marks the view with its return item; a finished run with one shows as `queued`. */
 export function withQueue(view: RunView, item: string | null): RunView {
   if (item === null) return view;
-  const state = view.hold !== null ? view.state : view.finished ? 'queued' : view.state;
+  const state =
+    view.hold !== null || view.state === 'repair'
+      ? view.state
+      : view.finished
+        ? 'queued'
+        : view.state;
   return { ...view, queueItem: item, state };
 }
 
 function runProgress(state: RunState): { done: number; total: number } {
   const { done, total } = stepProgress(state);
   return { done, total };
+}
+
+/** The incident being repaired, or a waiting one an observer may take; the run has no hold. */
+function repairActive(state: RunState, observers: ObserverSettings): boolean {
+  if (state.run.hold !== null) return false;
+  return (
+    state.run.repair.incident !== null ||
+    (repairAdmitted(state, observers) && repairIncidents(state, observers).length > 0)
+  );
+}
+
+function repairView(state: RunState, observers: ObserverSettings): RunRepairView {
+  const { repair } = state.run;
+  return {
+    allowed: repair.allowed,
+    active: repairActive(state, observers),
+    repairs: repair.repairs,
+    incident: repair.incident,
+    cancelReason: repair.cancelReason,
+  };
 }
 
 export function runView(
@@ -650,6 +728,7 @@ export function runView(
   catalog: readonly Tag[] = [],
   waits: WaitLookup = NO_WAITS,
   artifacts: ArtifactCounts = NO_ARTIFACTS,
+  observers: ObserverSettings = defaultObserverSettings(),
 ): RunView {
   const summary = summarize(state);
   const waitOf = (group: Group): GroupWait | null =>
@@ -682,21 +761,30 @@ export function runView(
   if (waitingTopology.delivery.resolverStatus && stages.resolve === 'waiting') {
     waitingTopology.delivery.resolverStatus = 'waiting';
   }
+  for (const stage of waitingTopology.stages) {
+    const found = stage.group === null ? undefined : findGroup(state, stage.group);
+    if (!found || stage.status !== 'queued') continue;
+    const shown = displayStatus('queued', waitOf(found), groupHold(state, found));
+    if (shown !== 'queued') stage.status = shown;
+  }
   return {
     id: state.run.id,
     number: state.run.number,
     title: runTitle(state),
     name: state.run.name ?? null,
     repository: state.run.repository,
-    workflow: state.run.workflow,
-    workflowName: workflowNameOf(state.run.config, state.run.workflow),
+    pipeline: state.run.pipeline,
+    pipelineName: pipelineNameOf(state.run.config, state.run.pipeline),
     branch: state.run.branch,
     createdAt: state.run.createdAt,
     startedAt: runStartedAt(state),
     finishedAt: state.run.finishedAt,
     finished: summary.finished,
-    state:
-      state.run.hold !== null && summary.state !== 'needs_human' ? state.run.hold : summary.state,
+    state: repairActive(state, observers)
+      ? 'repair'
+      : state.run.hold !== null && summary.state !== 'needs_human'
+        ? state.run.hold
+        : summary.state,
     hold: state.run.hold,
     clockStoppedAt: clockStoppedAt(state),
     waiting: summary.waiting,
@@ -746,21 +834,44 @@ export function runView(
     groups: state.groups.map((group) =>
       groupRow(state, group, now, diffs, waitOf(group), artifacts),
     ),
-    system: [
-      ...(state.split
-        ? [systemRow(state, state.split, 'split', now, waitOf(state.split), artifacts)]
-        : []),
-      ...(state.message
-        ? [systemRow(state, state.message, 'message', now, waitOf(state.message), artifacts)]
-        : []),
-      ...(state.resolve
-        ? [systemRow(state, state.resolve, 'resolve', now, waitOf(state.resolve), artifacts)]
-        : []),
-    ],
+    system: systemGroups(state).map(({ kind, group }) =>
+      systemRow(state, group, kind, now, waitOf(group), artifacts),
+    ),
     decisions: allGroups(state).flatMap((group) =>
       group.decisions.map((decision) => ({ ...decision, group: group.slug })),
     ),
+    repair: repairView(state, observers),
   };
+}
+
+/** Observers as the settings page shows them: the settings and the repairs under way or waiting. */
+export interface ObserversView {
+  settings: ObserverSettings;
+  workers: {
+    running: { runId: string; repository: string; incident: Incident }[];
+    waiting: number;
+  };
+}
+
+/** The result of `observers_set`: the stored view, or the errors of the values by field. */
+export type ObserversSetResult =
+  { ok: true; view: ObserversView } | { ok: false; reason: 'invalid'; errors: FieldError[] };
+
+export function observersView(
+  settings: ObserverSettings,
+  states: readonly RunState[],
+): ObserversView {
+  const running: ObserversView['workers']['running'] = [];
+  let waiting = 0;
+  for (const state of states) {
+    const { incident } = state.run.repair;
+    if (incident !== null) {
+      running.push({ runId: state.run.id, repository: state.run.repository, incident });
+    } else if (repairActive(state, settings)) {
+      waiting += 1;
+    }
+  }
+  return { settings, workers: { running, waiting } };
 }
 
 /**
@@ -880,7 +991,10 @@ export function groupView(
       groupHold(state, group),
     ),
     wait: groupHold(state, group) === null ? wait : null,
-    branch: isSplitGroup(group) ? state.run.branch : groupRef(state.run, group.slug),
+    branch:
+      isSplitGroup(group) || actionPointOf(group) !== undefined
+        ? state.run.branch
+        : groupRef(state.run, group.slug),
     worktree,
     question: group.question,
     questions: group.questions,
@@ -936,13 +1050,51 @@ export type {
   StepState,
   StepTopology,
   Topology,
-  WorkflowTopology,
+  PipelineTopology,
 } from '../core/index.ts';
 
-export interface WorkflowsView {
+export type {
+  PipelineStage,
+  StageCondition,
+  StageKind,
+  StagePerformer,
+  StageSection,
+  StageStatus,
+} from '../core/index.ts';
+
+/** Where the value of a setting comes from: the built-in default, the shared level or the project. */
+export type SettingLevel = 'default' | 'global' | 'project';
+
+/** A setting of a built-in stage with the level that sets it. */
+export interface SystemStageSetting {
+  /** Key path in settings.yaml, such as `delivery.resolver_prompt`. */
+  path: string;
+  value: unknown;
+  level: SettingLevel;
+}
+
+/** A built-in stage of the pipeline that is not an action: its task and its settings. */
+export interface SystemStageView {
+  kind: 'split' | 'message' | 'delivery' | 'resolve';
+  name: string;
+  /** Who runs the stage; null when it depends on the pipeline (the split). */
+  performer: StagePerformer | null;
+  /** The built-in task of the specialist; null for a stage without one. */
+  task: string | null;
+  settings: SystemStageSetting[];
+}
+
+export interface SystemStagesView {
   repository: string;
-  workflows: WorkflowTopology[];
-  /** Problems of the configuration; the list of workflows is empty when there are any. */
+  stages: SystemStageView[];
+  /** Problems of the configuration; the list of stages is empty when there are any. */
+  errors: { file?: string; path: string; message: string }[];
+}
+
+export interface PipelinesView {
+  repository: string;
+  pipelines: PipelineTopology[];
+  /** Problems of the configuration; the list of pipelines is empty when there are any. */
   errors: { file?: string; path: string; message: string }[];
 }
 
@@ -981,19 +1133,19 @@ export type SpecialistsImportResult =
   | { ok: false; reason: 'invalid'; errors: FieldError[] }
   | { ok: false; reason: 'conflict'; message: string; slugs?: string[] };
 
-/** The shared workflows with the repositories of the registry that use them. */
-export type SharedWorkflowsView = SharedWorkflowsUsage;
-export type SharedWorkflowView = SharedWorkflowUsage;
+/** The shared pipelines with the repositories of the registry that use them. */
+export type SharedPipelinesView = SharedPipelinesUsage;
+export type SharedPipelineView = SharedPipelineUsage;
 
 /** The outcome of a pipeline import: the ids that were copied, or why nothing was. */
-export type WorkflowsImportResult =
+export type PipelinesImportResult =
   | { ok: true; imported: string[] }
   | { ok: false; reason: 'invalid'; errors: FieldError[] }
   | { ok: false; reason: 'conflict'; message: string; ids?: string[] };
 
-/** The graph of a draft workflow, or the errors that keep it from being built. */
+/** The graph of a draft pipeline, or the errors that keep it from being built. */
 export interface ConfigPreview {
-  topology: WorkflowTopology | null;
+  topology: PipelineTopology | null;
   errors: FieldError[];
 }
 
@@ -1002,9 +1154,9 @@ export interface QueueItemView {
   /** Integer number of the task within the repository. */
   number: number;
   position: number;
-  workflow: string;
-  /** Display name of the workflow in the current configuration. */
-  workflowName: string;
+  pipeline: string;
+  /** Display name of the pipeline in the current configuration. */
+  pipelineName: string;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -1046,8 +1198,8 @@ export interface QueueRunView {
   number: number;
   title: string;
   state: RunPhase;
-  workflow: string;
-  workflowName: string;
+  pipeline: string;
+  pipelineName: string;
   tags: TagView[];
   createdAt: number;
   /** Work groups in a final status out of all work groups; `total` is 0 while the task is split. */
@@ -1056,8 +1208,8 @@ export interface QueueRunView {
   steps: StepProgress;
   /** Groups (service steps included) that run or merge now, with the step of their last attempt. */
   active: { group: string; step: string | null; stepName: string | null }[];
-  /** Service steps of the run in the order split, message, resolve. */
-  system: { kind: SystemStepKind; status: RowStatus }[];
+  /** Service steps of the run in the order they run: actions, split, message, resolve. */
+  system: { kind: SystemStepKind; status: RowStatus; title?: string }[];
   /** Delivery as the last system stage; null while nothing is merged. */
   delivery: DeliveryStage['status'] | null;
   /** Groups the scheduler holds back, with the step they wait to run. */
@@ -1119,8 +1271,8 @@ function queueRunView(
     number: state.run.number,
     title: runTitle(state),
     state: summarize(state).state,
-    workflow: state.run.workflow,
-    workflowName: workflowNameOf(state.run.config, state.run.workflow),
+    pipeline: state.run.pipeline,
+    pipelineName: pipelineNameOf(state.run.config, state.run.pipeline),
     tags: tagViews(catalog, state.run.tags),
     createdAt: state.run.createdAt,
     groups: {
@@ -1128,13 +1280,10 @@ function queueRunView(
       total: state.groups.length,
     },
     steps: stepProgress(state),
-    system: [
-      ...(state.split ? [{ kind: 'split' as const, group: state.split }] : []),
-      ...(state.message ? [{ kind: 'message' as const, group: state.message }] : []),
-      ...(state.resolve ? [{ kind: 'resolve' as const, group: state.resolve }] : []),
-    ].map(({ kind, group }) => ({
+    system: systemGroups(state).map(({ kind, group }) => ({
       kind,
       status: displayStatus(serviceStatus(group), waitOf(group), groupHold(state, group)),
+      ...(kind === 'action' ? { title: group.title } : {}),
     })),
     delivery: deliveryStage(state)?.status ?? null,
     waiting: allGroups(state).flatMap((group) => {
@@ -1229,8 +1378,8 @@ export function queueView(
       id: item.id,
       number: item.number,
       position: index + 1,
-      workflow: item.workflow,
-      workflowName: names(item.workflow),
+      pipeline: item.pipeline,
+      pipelineName: names(item.pipeline),
       ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,
@@ -1247,7 +1396,7 @@ export function queueView(
             kind: 'item',
             id: ref,
             number: other.number,
-            title: label ?? other.workflow,
+            title: label ?? other.pipeline,
             state,
           };
         }
@@ -1399,7 +1548,7 @@ export interface FileDiffView {
 /** One artifact in the list of a group (`group_artifacts`). */
 export interface ArtifactView {
   id: string;
-  /** Workflow step of the attempt that published it. */
+  /** Pipeline step of the attempt that published it. */
   step: string;
   stepName: string;
   /** Number of that attempt. */

@@ -97,7 +97,7 @@ describe('postponed items', () => {
     const a = await add(h, 'A');
     const queued = (await h.call('run', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'работа',
       title: 'R',
       after: [a.item],
@@ -110,7 +110,7 @@ describe('postponed items', () => {
     expect(view.items.find((item) => item.id === queued.item)?.postponed ?? false).toBe(false);
     const parsed = workerQueueAddParams.parse({
       token: 't',
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       postponed: true,
     });

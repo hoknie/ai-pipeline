@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { FileDiffView, RunCreated, RunPatchView } from '../../src/protocol/index.ts';
+import type { FileDiffView, RunCreated, RunPatchView, RunView } from '../../src/protocol/index.ts';
 
 import {
   CODE_ONLY_CONFIG,
@@ -27,11 +27,19 @@ async function finishedRun(h: Harness): Promise<string> {
   h.script(WRITE_LIB);
   const { runId } = (await startRun(h, {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     groups: [{ title: 'Вход', task: 'вход' }],
   })) as RunCreated;
   await h.waitFor(runId, (view) => view.finished);
   return runId;
+}
+
+/** The diff of a group moves to its merge commit just after the run ends: waits for that. */
+function mergedDiff(h: Harness, runId: string): Promise<RunView> {
+  return h.waitFor(
+    runId,
+    (run) => run.groups[0]?.diffRevision?.endsWith(git(h.repo, 'rev-parse', run.branch)) === true,
+  );
 }
 
 const text = (patch: RunPatchView) => Buffer.from(patch.base64, 'base64').toString('utf8');
@@ -108,6 +116,7 @@ describe('diff of a file of a group', () => {
     current = await harness(`${CODE_ONLY_CONFIG}  delivery: { auto: false }\n`);
     const h = current;
     const runId = await finishedRun(h);
+    await mergedDiff(h, runId);
     const diff = (await h.call('group_file_diff', {
       runId,
       group: 'vhod',
@@ -136,10 +145,11 @@ describe('diff of a file of a group', () => {
     h.script({ code: [{ write: { 'logo.bin': '\u0000\u0001\u0002' } }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.finished);
+    await mergedDiff(h, runId);
     const diff = (await h.call('group_file_diff', {
       runId,
       group: 'vhod',
@@ -154,7 +164,7 @@ describe('revision of the changes of a group', () => {
     current = await harness(`${CODE_ONLY_CONFIG}  delivery: { auto: false }\n`);
     const h = current;
     const runId = await finishedRun(h);
-    const view = await h.waitFor(runId, (run) => run.groups[0]?.diffRevision != null);
+    const view = await mergedDiff(h, runId);
     const revision = view.groups[0]?.diffRevision;
     expect(revision).toMatch(/^[0-9a-f]{40}\.\.[0-9a-f]{40}$/);
     const [from, to] = revision!.split('..');
@@ -178,7 +188,7 @@ describe('revision of the changes of a group', () => {
     });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     const first = (

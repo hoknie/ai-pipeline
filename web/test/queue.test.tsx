@@ -42,8 +42,8 @@ import {
   runView,
   configView,
   settingsOf,
-  workflowOf,
-  workflowsView,
+  pipelineOf,
+  pipelinesView,
 } from './fixtures.ts';
 
 beforeEach(() => {
@@ -138,14 +138,14 @@ describe('queue tab', () => {
               { title: 'c', task: 'd' },
             ],
           }),
-          queueItem('q2', 'длинный\nтекст', 2, { error: 'unknown workflow `feature`' }),
+          queueItem('q2', 'длинный\nтекст', 2, { error: 'unknown pipeline `feature`' }),
           queueItem('q3', 'x', 3, { title: 'Название' }),
         ],
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
     expect(labels()).toEqual(['1. 2 groups', '2. длинный', '3. Название']);
-    expect(screen.getByText(/unknown workflow/)).toBeTruthy();
+    expect(screen.getByText(/unknown pipeline/)).toBeTruthy();
   });
 
   it('shows the stop reason with a link to the group, and the running runs', async () => {
@@ -489,7 +489,7 @@ describe('runs from the queue', () => {
   });
 });
 
-describe('workflow badge in the queue', () => {
+describe('pipeline badge in the queue', () => {
   it('stands right after the state badge on the card, not in the time row', async () => {
     show(queueOf({ status: 'running', runs: [queueRun('run1', { title: 'Вход' })] }));
     const card = await screen.findByRole('group', { name: 'Вход' });
@@ -502,7 +502,7 @@ describe('workflow badge in the queue', () => {
   });
 
   it('shows the badge in the row of a waiting task', async () => {
-    show(queueOf({ items: [queueItem('q1', 'A', 1, { workflow: 'epic', readiness: 'waiting' })] }));
+    show(queueOf({ items: [queueItem('q1', 'A', 1, { pipeline: 'epic', readiness: 'waiting' })] }));
     const row = await screen.findByRole('listitem', { name: /A/ });
     expect(within(row).getByLabelText('Pipeline: epic')).toBeTruthy();
   });
@@ -546,7 +546,7 @@ describe('new task form', () => {
     expect(add.disabled).toBe(false);
     fireEvent.click(add);
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ workflow: 'feature', task: 'Сделать вход' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Сделать вход' }),
     );
     await screen.findByLabelText('tasks in the queue');
     await openNewTask();
@@ -588,7 +588,7 @@ describe('new task form', () => {
   it('does not announce anything when the queue refuses the task', async () => {
     show(queueOf(), {
       queueAdd: vi.fn(async () => {
-        throw new ApiError(400, 'unknown workflow');
+        throw new ApiError(400, 'unknown pipeline');
       }),
     });
     await openNewTask();
@@ -597,7 +597,7 @@ describe('new task form', () => {
     );
     fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: 'X' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await screen.findByText(/unknown workflow/);
+    await screen.findByText(/unknown pipeline/);
     expect(screen.queryAllByText(/^Task (#\d+ )?created$/)).toHaveLength(0);
   });
 
@@ -619,7 +619,7 @@ describe('new task form', () => {
     fireEvent.click(add);
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [
           { title: 'Вход', task: 'форма' },
           { title: 'Выход', task: 'кнопка' },
@@ -645,7 +645,7 @@ describe('new task form', () => {
   it('shows the server error and keeps what was typed', async () => {
     const api = show(queueOf(), {
       queueAdd: vi.fn(async () => {
-        throw new ApiError(400, 'unknown workflow `feature`; known: none');
+        throw new ApiError(400, 'unknown pipeline `feature`; known: none');
       }),
     });
     await openNewTask();
@@ -655,7 +655,7 @@ describe('new task form', () => {
     );
     fireEvent.change(text, { target: { value: 'Сделать вход' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await screen.findByText(/unknown workflow/);
+    await screen.findByText(/unknown pipeline/);
     expect(api.queueAdd).toHaveBeenCalled();
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('Сделать вход');
   });
@@ -722,7 +722,7 @@ describe('automatic delivery switch', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'Сделать вход',
         autoDeliver: false,
       }),
@@ -792,7 +792,7 @@ describe('automatic delivery switch', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'A',
         title: null,
         autoDeliver: null,
@@ -832,7 +832,7 @@ describe('items', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'A2',
         title: null,
         autoDeliver: null,
@@ -1245,14 +1245,14 @@ describe('store', () => {
   });
 });
 
-describe('workflows', () => {
-  it('offers the workflows of the repository', async () => {
+describe('pipelines', () => {
+  it('offers the pipelines of the repository', async () => {
     show(queueOf(), {
-      workflows: vi.fn(async () =>
-        workflowsView({
-          workflows: [
-            { ...workflowsView().workflows[0]!, id: 'feature' },
-            { ...workflowsView().workflows[0]!, id: 'fix', name: 'Исправление' },
+      pipelines: vi.fn(async () =>
+        pipelinesView({
+          pipelines: [
+            { ...pipelinesView().pipelines[0]!, id: 'feature' },
+            { ...pipelinesView().pipelines[0]!, id: 'fix', name: 'Исправление' },
           ],
         }),
       ),
@@ -1315,7 +1315,7 @@ describe('tags in the queue', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'Сделать вход',
         tags: ['auth', 'v2'],
       }),
@@ -1491,12 +1491,12 @@ describe('queue links', () => {
 });
 
 describe('task form layout', () => {
-  it('has the name as the first field, before the workflow', async () => {
+  it('has the name as the first field, before the pipeline', async () => {
     show(queueOf());
     await openNewTask();
     const name = await screen.findByLabelText('Name');
-    const workflow = screen.getByRole('combobox', { name: 'Pipeline' });
-    expect(name.compareDocumentPosition(workflow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const pipeline = screen.getByRole('combobox', { name: 'Pipeline' });
+    expect(name.compareDocumentPosition(pipeline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(name.id).toBe('new-title');
   });
 
@@ -1523,7 +1523,7 @@ describe('dependencies in the form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'API',
         after: ['q1'],
       }),
@@ -2038,7 +2038,7 @@ describe('delivery mode of a task', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'Сделать вход',
         deliveryMode: 'branch',
       }),
@@ -2053,7 +2053,7 @@ describe('delivery mode of a task', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'A',
         title: null,
         autoDeliver: null,
@@ -2213,7 +2213,7 @@ const STEP_NAMES: Record<string, string> = {
   qa: 'Тестировщик',
   deliver: 'Доставщик',
 };
-const stepOf = (id: string) => ({ ...workflowOf().steps[0]!, id, name: STEP_NAMES[id] ?? id });
+const stepOf = (id: string) => ({ ...pipelineOf().steps[0]!, id, name: STEP_NAMES[id] ?? id });
 const skipGroup = () => screen.getByText('Skip steps', { selector: 'legend' }).parentElement!;
 /** The segment of a step by its id; it is labelled with the name of the step. */
 const skipStep = (id: string) =>
@@ -2223,10 +2223,10 @@ const skipStepAsync = async (name: string) => {
   return skipStep(name);
 };
 
-const fiveSteps = workflowsView({
-  workflows: [
-    workflowOf({ steps: ['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf) }),
-    workflowOf({ id: 'small', steps: ['code', 'review'].map(stepOf) }),
+const fiveSteps = pipelinesView({
+  pipelines: [
+    pipelineOf({ steps: ['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf) }),
+    pipelineOf({ id: 'small', steps: ['code', 'review'].map(stepOf) }),
   ],
 });
 
@@ -2270,7 +2270,7 @@ describe('new task dialog', () => {
   it('closes after the task is added and stays open on an error', async () => {
     const queueAdd = vi
       .fn()
-      .mockRejectedValueOnce(new ApiError(400, 'unknown workflow `feature`; known: none'))
+      .mockRejectedValueOnce(new ApiError(400, 'unknown pipeline `feature`; known: none'))
       .mockResolvedValueOnce({ ...queueOf({ items: items('X') }), item: 'q1' });
     show(queueOf(), { queueAdd });
     await openNewTask();
@@ -2279,7 +2279,7 @@ describe('new task dialog', () => {
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await screen.findByText(/unknown workflow/);
+    await screen.findByText(/unknown pipeline/);
     expect(screen.getByRole('dialog')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -2304,7 +2304,7 @@ describe('new task dialog', () => {
 
 describe('two halves of the task form', () => {
   it('puts the task half first in the DOM and on a wide form', async () => {
-    show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     const dialog = await openNewTask();
     await skipStepAsync('plan');
     const order = [
@@ -2331,7 +2331,7 @@ describe('two halves of the task form', () => {
   });
 
   it('offers a segment for every step in order', async () => {
-    show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     await openNewTask();
     await skipStepAsync('plan');
     expect(
@@ -2342,7 +2342,7 @@ describe('two halves of the task form', () => {
   });
 
   it('does not let the last step be skipped', async () => {
-    show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     await openNewTask();
     for (const step of ['plan', 'code', 'review', 'qa']) fireEvent.click(await skipStepAsync(step));
     expect(skipStep('deliver').disabled).toBe(true);
@@ -2350,7 +2350,7 @@ describe('two halves of the task form', () => {
   });
 
   it('sends the skipped steps on create', async () => {
-    const api = show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+    const api = show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     await openNewTask();
     fireEvent.click(await skipStepAsync('review'));
     fireEvent.click(skipStep('qa'));
@@ -2358,15 +2358,15 @@ describe('two halves of the task form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'T',
         skip: ['review', 'qa'],
       }),
     );
   });
 
-  it('drops marks the new workflow does not have', async () => {
-    const api = show(queueOf(), { workflows: vi.fn(async () => fiveSteps) });
+  it('drops marks the new pipeline does not have', async () => {
+    const api = show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     await openNewTask();
     fireEvent.click(await skipStepAsync('qa'));
     fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
@@ -2375,7 +2375,7 @@ describe('two halves of the task form', () => {
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ workflow: 'small', task: 'T' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'small', task: 'T' }),
     );
   });
 
@@ -2384,7 +2384,7 @@ describe('two halves of the task form', () => {
       queueOf({
         items: [queueItem('q1', 'A', 1, { skip: ['review', 'qa'] }), queueItem('q2', 'B', 2)],
       }),
-      { workflows: vi.fn(async () => fiveSteps) },
+      { pipelines: vi.fn(async () => fiveSteps) },
     );
     await screen.findByLabelText('skips: Ревьюер, Тестировщик');
     expect(screen.getAllByLabelText(/^skips:/)).toHaveLength(1);
@@ -2404,7 +2404,7 @@ describe('two halves of the task form', () => {
 
   it('clears the skip of an item with an empty list', async () => {
     const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { skip: ['review'] })] }), {
-      workflows: vi.fn(async () => fiveSteps),
+      pipelines: vi.fn(async () => fiveSteps),
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     fireEvent.click(await skipStepAsync('review'));
@@ -2470,7 +2470,7 @@ describe('parent task in the form', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'Next',
         parent: 'run1',
       }),
@@ -2546,7 +2546,7 @@ describe('parent task in the form', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'Next',
         parent: 'new',
       }),

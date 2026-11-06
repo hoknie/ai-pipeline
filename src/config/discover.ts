@@ -3,10 +3,13 @@ import { isAbsolute, join } from 'node:path';
 export const CONFIG_DIR = 'aip';
 export const SETTINGS_NAME = 'settings';
 export const SPECIALISTS_DIR = 'specialists';
-export const WORKFLOWS_DIR = 'workflows';
+export const PIPELINES_DIR = 'pipelines';
+/** The old name of the pipelines directory; still read, never created. */
+export const LEGACY_PIPELINES_DIR = 'workflows';
+export const ACTIONS_DIR = 'actions';
 
 export interface LevelPaths {
-  /** Directory with settings.yaml, specialists/ and workflows/. */
+  /** Directory with settings.yaml, specialists/, pipelines/ and actions/. */
   directory: string;
   /** Files and directories of the old single-file layout; only used to explain the move. */
   legacy: string[];

@@ -4,7 +4,7 @@
 
 ## What it does
 
-- **Specialists and workflows** — agents with their own prompt, model and permissions, chained into steps with review loops and human checkpoints. → [docs/configuration/specialists.md](docs/configuration/specialists.md), [docs/configuration/workflows.md](docs/configuration/workflows.md)
+- **Specialists and pipelines** — agents with their own prompt, model and permissions, chained into steps with review loops and human checkpoints. → [docs/configuration/specialists.md](docs/configuration/specialists.md), [docs/configuration/pipelines.md](docs/configuration/pipelines.md)
 - **Isolated runs** — every group of work has its own worktree. Your branch, index and working tree stay untouched while the swarm works. → [docs/getting-started/concepts.md](docs/getting-started/concepts.md), [docs/usage/runs.md](docs/usage/runs.md)
 - **Delivery** — the result reaches you as uncommitted changes, one commit or a branch, merged with your own edits; a specialist can resolve conflicts. → [docs/configuration/delivery.md](docs/configuration/delivery.md)
 - **Task queue** — tasks run one after another or in parallel, with dependencies, an autopilot and waiting out usage limits. → [docs/usage/queue.md](docs/usage/queue.md), [docs/usage/tags.md](docs/usage/tags.md)
@@ -36,7 +36,7 @@ This installs the `aip` command and connects it to Claude Code and OpenCode. Det
    aip init
    ```
 
-   It writes `aip/settings.yaml`, two specialists and a workflow. Settings first:
+   It writes `aip/settings.yaml`, two specialists and a pipeline. Settings first:
 
    ```yaml
    max: 2
@@ -44,7 +44,7 @@ This installs the `aip` command and connects it to Claude Code and OpenCode. Det
      allow_commands: ["npm test*"]
    ```
 
-   The workflow `aip/workflows/feature.yaml`: write the code, then review it.
+   The pipeline `aip/pipelines/feature.yaml`: write the code, then review it.
 
    ```yaml
    steps:

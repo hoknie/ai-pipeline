@@ -1,7 +1,7 @@
 import { afterEach } from 'vitest';
 
 import type { QueueView, RunQueued, RunView } from '../../src/protocol/index.ts';
-import { CODE_ONLY_CONFIG, POLL_MS, WORKFLOW_CONFIG, harness, type Harness } from './harness.ts';
+import { CODE_ONLY_CONFIG, POLL_MS, PIPELINE_CONFIG, harness, type Harness } from './harness.ts';
 
 // Every queue test starts a daemon of its own on purpose: the fake agent counts the steps of its
 // script per group over the life of the state directory, and the task numbers, the queue stop
@@ -33,7 +33,7 @@ export const queueOf = async (h: Harness): Promise<QueueView> =>
 export async function add(h: Harness, task: string, extra: Record<string, unknown> = {}) {
   const view = (await h.call('queue_add', {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     // the fake agent counts its script per group: one task text makes the counter global
     task: 'работа',
     title: task,
@@ -61,7 +61,7 @@ export const allRuns = async (h: Harness): Promise<RunView[]> =>
 
 export const WRITE_LIB = { write: { 'lib.ts': 'export const value = 2;\n' } };
 
-export const WORKER_QUEUE_CONFIG = WORKFLOW_CONFIG.replace(
+export const WORKER_QUEUE_CONFIG = PIPELINE_CONFIG.replace(
   'coder: { name: Кодировщик }',
   'coder: { name: Кодировщик, queue: true }',
 );
@@ -72,7 +72,7 @@ export const itemById = (queue: QueueView, id: string) =>
 export async function run_(h: Harness, title: string, after: string[]): Promise<RunQueued> {
   return (await h.call('run', {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     task: 'работа',
     title,
     after,

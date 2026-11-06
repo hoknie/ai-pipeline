@@ -7,7 +7,7 @@ export interface LoadEntry {
   runId: string;
   runTitle: string;
   repository: string;
-  workflow: string;
+  pipeline: string;
   level: UseLevel;
   /** Slug of the group. */
   group: string;
@@ -54,7 +54,7 @@ export function machineLoad(runs: readonly RunView[]): MachineLoad {
         runId: run.id,
         runTitle: run.title,
         repository: run.repository,
-        workflow: run.workflow,
+        pipeline: run.pipeline,
         level: use.level,
       };
       for (const item of use.running) {

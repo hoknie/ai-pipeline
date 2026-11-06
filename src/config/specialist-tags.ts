@@ -95,12 +95,12 @@ function invalid(
   message: string,
   kind: EntryKind = 'specialist',
 ): TagPlan {
-  const section = kind === 'workflow' ? 'workflows' : 'specialists';
+  const section = kind === 'pipeline' ? 'pipelines' : 'specialists';
   return {
     ok: false,
     reason: 'invalid',
     errors: [
-      { file, path: `swarm.${section}.${slug}${kind === 'workflow' ? '' : '.tags'}`, message },
+      { file, path: `swarm.${section}.${slug}${kind === 'pipeline' ? '' : '.tags'}`, message },
     ],
   };
 }

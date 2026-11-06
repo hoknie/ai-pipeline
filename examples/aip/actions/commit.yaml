@@ -1,0 +1,3 @@
+name: Commit the result
+run: git add -A && git commit -m "$AIP_COMMIT_MESSAGE"
+on_failure: continue

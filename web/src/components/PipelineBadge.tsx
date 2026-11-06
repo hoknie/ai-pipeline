@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
  * unlike the colored rounded status badges and tags. Not interactive; `focusable={false}` inside
  * buttons and command items, where the tooltip is only shown on hover.
  */
-export function WorkflowBadge({
+export function PipelineBadge({
   id,
   name,
   focusable = true,
@@ -20,7 +20,7 @@ export function WorkflowBadge({
 }) {
   const { t } = useTranslation();
   const label =
-    name === id ? t('workflowBadge.labelSame', { id }) : t('workflowBadge.label', { name, id });
+    name === id ? t('pipelineBadge.labelSame', { id }) : t('pipelineBadge.label', { name, id });
   return (
     <Tooltip>
       <TooltipTrigger asChild>

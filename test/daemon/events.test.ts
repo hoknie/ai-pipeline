@@ -29,7 +29,7 @@ describe('event stream', () => {
     expect(events[0]).toMatchObject({ event: 'snapshot', runs: [] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.finished);
@@ -59,7 +59,7 @@ describe('event stream', () => {
   it('sends a queue event on every change and the queues in the snapshot', async () => {
     const h = (current = await harness());
     const events: StreamEvent[] = [];
-    const first = await h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'A' });
+    const first = await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'A' });
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
@@ -71,7 +71,7 @@ describe('event stream', () => {
     ).toEqual([h.repo]);
     const second = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'B',
     })) as { item: string };
     await h.call('queue_edit', { repository: h.repo, item: second.item, position: 1 });
@@ -119,7 +119,7 @@ describe('repositories event', () => {
     expect(repositories()).toHaveLength(1);
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');

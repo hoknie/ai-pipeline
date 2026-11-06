@@ -4,9 +4,11 @@ import { join } from 'node:path';
 import { parseDocument } from 'yaml';
 
 import {
+  ACTIONS_DIR,
   SETTINGS_NAME,
   SPECIALISTS_DIR,
-  WORKFLOWS_DIR,
+  PIPELINES_DIR,
+  LEGACY_PIPELINES_DIR,
   type ConfigPaths,
   type LevelPaths,
 } from './discover.ts';
@@ -25,15 +27,20 @@ export interface LoadedConfig {
   config: ResolvedConfig;
   /** Files read, in the order they are merged. */
   files: string[];
+  /** Files that still use old names; `aip config check` advises to rename them. */
+  legacy?: string[];
 }
 
 /** The files of one level as read from disk, before they are put together. */
 export interface LevelFiles {
   settings?: ConfigSource;
   specialists: ConfigSource[];
-  workflows: ConfigSource[];
+  pipelines: ConfigSource[];
+  actions: ConfigSource[];
   /** Problems found while reading, such as `x.yaml` next to `x.yml`. */
   problems: FieldError[];
+  /** Files that still use old names: the old pipelines directory and the old `split` key. */
+  legacy?: string[];
 }
 
 /** The logical tree of a level and the file each part of it comes from. */
@@ -53,7 +60,8 @@ export function levelIsEmpty(files: LevelFiles): boolean {
   return (
     files.settings === undefined &&
     files.specialists.length === 0 &&
-    files.workflows.length === 0 &&
+    files.pipelines.length === 0 &&
+    files.actions.length === 0 &&
     files.problems.length === 0
   );
 }
@@ -78,14 +86,16 @@ export function loadConfigSources(paths: ConfigPaths): LoadedConfig {
       expected: [paths.global.directory, paths.project.directory],
     });
   }
-  return resolveLevels(assembleLevel(global), assembleLevel(project));
+  const loaded = resolveLevels(assembleLevel(global), assembleLevel(project));
+  return { ...loaded, legacy: [...(global.legacy ?? []), ...(project.legacy ?? [])] };
 }
 
 /** One project level without a global one, built from texts; keys are file names without extension. */
 export function configFromFiles(files: {
   settings?: string;
   specialists?: Record<string, string>;
-  workflows?: Record<string, string>;
+  pipelines?: Record<string, string>;
+  actions?: Record<string, string>;
 }): ResolvedConfig {
   const source = (path: string, text: string): ConfigSource => ({
     path,
@@ -98,8 +108,12 @@ export function configFromFiles(files: {
     specialists: Object.entries(files.specialists ?? {}).map(([name, text]) =>
       source(`${SPECIALISTS_DIR}/${name}.yaml`, text),
     ),
-    workflows: Object.entries(files.workflows ?? {}).map(([name, text]) =>
-      source(`${WORKFLOWS_DIR}/${name}.yaml`, text),
+    pipelines: Object.entries(files.pipelines ?? {}).map(([name, text]) => {
+      const read = source(`${PIPELINES_DIR}/${name}.yaml`, text);
+      return { ...read, value: canonicalPipeline(read.value) };
+    }),
+    actions: Object.entries(files.actions ?? {}).map(([name, text]) =>
+      source(`${ACTIONS_DIR}/${name}.yaml`, text),
     ),
     problems: [],
   });
@@ -135,11 +149,19 @@ export function assembleLevel(files: LevelFiles): Level {
       problems.push({ file: settingsFile, path: 'swarm', message: 'must be a mapping' });
     } else {
       for (const [key, field] of Object.entries(value)) {
-        if (key === 'specialists' || key === 'workflows') {
+        if (key === 'specialists' || key === 'pipelines' || key === 'actions') {
           problems.push({
             file: settingsFile,
             path: `swarm.${key}`,
             message: `${key} are files of the ${key}/ directory, not a key of settings`,
+          });
+          continue;
+        }
+        if (key === 'workflows') {
+          problems.push({
+            file: settingsFile,
+            path: `swarm.${key}`,
+            message: `${key} are files of the pipelines/ directory, not a key of settings`,
           });
           continue;
         }
@@ -162,16 +184,19 @@ export function assembleLevel(files: LevelFiles): Level {
     swarm[section] = map;
   };
   entries('specialists', files.specialists);
-  entries('workflows', files.workflows);
+  entries('pipelines', files.pipelines);
+  entries('actions', files.actions);
   const present =
-    files.settings !== undefined || files.specialists.length + files.workflows.length > 0;
+    files.settings !== undefined ||
+    files.specialists.length + files.pipelines.length + files.actions.length > 0;
   return {
     tree: present ? { swarm } : undefined,
     origins,
     files: [
       ...(settingsFile === undefined ? [] : [settingsFile]),
       ...files.specialists.map((source) => source.path),
-      ...files.workflows.map((source) => source.path),
+      ...files.pipelines.map((source) => source.path),
+      ...files.actions.map((source) => source.path),
     ],
     problems,
   };
@@ -251,12 +276,18 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
   ];
   if (errors.length > 0 || !result.ok) throw new ConfigLoadError({ kind: 'invalid', errors });
   const projectSpecialists = isMapping(projectSwarm) ? projectSwarm.specialists : undefined;
+  const projectActions = isMapping(projectSwarm) ? projectSwarm.actions : undefined;
   const config: ResolvedConfig = {
     ...result.config,
     specialists: result.config.specialists.map((specialist) =>
       isMapping(projectSpecialists) && specialist.slug in projectSpecialists
         ? specialist
         : { ...specialist, level: 'global' },
+    ),
+    actions: result.config.actions.map((action) =>
+      isMapping(projectActions) && action.id in projectActions
+        ? action
+        : { ...action, level: 'global' },
     ),
   };
   return { config, files: [...global.files, ...project.files] };
@@ -317,35 +348,46 @@ export function loadRuntimeSettings(paths: ConfigPaths): RuntimeSettings {
   });
 }
 
-/** Reads settings.yaml, specialists/*.yaml and workflows/*.yaml of a level directory. */
+/** Reads settings.yaml, specialists/*.yaml, pipelines/*.yaml and actions/*.yaml of a level directory. */
 export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {}): LevelFiles {
   const problems: FieldError[] = [];
-  const pick = (directory: string, names: string[], section: string): ConfigSource[] => {
+  const legacy: string[] = [];
+  const pick = (
+    directories: string[],
+    section: string,
+    only?: string,
+    canonical?: (value: unknown) => unknown,
+  ): ConfigSource[] => {
     const byStem = new Map<string, string[]>();
-    for (const name of names) {
-      const key = stem(name);
-      byStem.set(key, [...(byStem.get(key) ?? []), name]);
+    for (const directory of directories) {
+      for (const name of listYaml(directory, only)) {
+        const key = stem(name);
+        byStem.set(key, [...(byStem.get(key) ?? []), join(directory, name)]);
+      }
     }
     const sources: ConfigSource[] = [];
     for (const [key, group] of byStem) {
       const [first, second] = group;
       if (first !== undefined && second !== undefined) {
         problems.push({
-          file: join(directory, first),
+          file: first,
           path: section === '' ? 'swarm' : `swarm.${section}.${key}`,
-          message: `defined by two files, ${join(directory, first)} and ${join(directory, second)}; keep one`,
+          message: `defined by two files, ${first} and ${second}; keep one`,
         });
         continue;
       }
       if (first === undefined) continue;
-      const path = join(directory, first);
       try {
-        const read = readYaml(path);
-        if (read.found) sources.push({ path, value: read.value, text: read.text });
+        const read = readYaml(first);
+        if (read.found) {
+          const value = canonical === undefined ? read.value : canonical(read.value);
+          sources.push({ path: first, value, text: read.text });
+          if (canonical !== undefined && hasLegacySplit(read.value)) legacy.push(first);
+        }
       } catch (error) {
         if (!options.tolerant || !(error instanceof ConfigLoadError)) throw error;
         problems.push({
-          file: path,
+          file: first,
           path: section === '' ? 'swarm' : `swarm.${section}.${key}`,
           message: error.message,
         });
@@ -353,13 +395,43 @@ export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {
     }
     return sources;
   };
-  const settings = pick(paths.directory, listYaml(paths.directory, SETTINGS_NAME), '');
-  const specialistsDirectory = join(paths.directory, SPECIALISTS_DIR);
-  const workflowsDirectory = join(paths.directory, WORKFLOWS_DIR);
-  const specialists = pick(specialistsDirectory, listYaml(specialistsDirectory), 'specialists');
-  const workflows = pick(workflowsDirectory, listYaml(workflowsDirectory), 'workflows');
+  const settings = pick([paths.directory], '', SETTINGS_NAME);
+  const specialists = pick([join(paths.directory, SPECIALISTS_DIR)], 'specialists');
+  const legacyDirectory = join(paths.directory, LEGACY_PIPELINES_DIR);
+  const pipelines = pick(
+    [join(paths.directory, PIPELINES_DIR), legacyDirectory],
+    'pipelines',
+    undefined,
+    canonicalPipeline,
+  );
+  for (const source of pipelines) {
+    if (source.path.startsWith(`${legacyDirectory}/`) && !legacy.includes(source.path)) {
+      legacy.push(source.path);
+    }
+  }
+  const actions = pick([join(paths.directory, ACTIONS_DIR)], 'actions');
   const [first] = settings;
-  return { ...(first ? { settings: first } : {}), specialists, workflows, problems };
+  return {
+    ...(first ? { settings: first } : {}),
+    specialists,
+    pipelines,
+    actions,
+    problems,
+    legacy: legacy.sort(),
+  };
+}
+
+function hasLegacySplit(value: unknown): boolean {
+  return isMapping(value) && isMapping(value.split) && 'workflow' in value.split;
+}
+
+/** Moves the old `split.workflow` key to `split.pipeline`; with both keys the value stays for validation to reject. */
+export function canonicalPipeline(value: unknown): unknown {
+  if (!hasLegacySplit(value) || !isMapping(value)) return value;
+  const split = value.split as Record<string, unknown>;
+  if ('pipeline' in split) return value;
+  const { workflow, ...rest } = split;
+  return { ...value, split: { ...rest, pipeline: workflow } };
 }
 
 /** *.yaml and *.yml files of a directory by code point; only `name` when given. */

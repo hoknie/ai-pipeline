@@ -35,8 +35,8 @@ aip group show <run-id> <group> # attempts, verdicts, remarks, tokens, changed f
 ```
 
 - `aip run list` shows each run with its task number (`#` column), the first line of its task and a summary of changes (`2 files +367 −0`). With a run id, it prints the table of that run's groups.
-- A workflow with a `name` is printed as `<name> (<id>)`; without a `name`, as the id.
-- `aip run show` prints a `System:` line with the system stages in the order split, commit message, resolver and delivery, for example `System: split done · message running · delivery pending`. A failed delivery shows its first reason there, even when no resolver ran.
+- A pipeline with a `name` is printed as `<name> (<id>)`; without a `name`, as the id.
+- `aip run show` prints a `System:` line with the system stages in the order split, commit message, resolver, observer and delivery, for example `System: split done · message running · delivery pending`. A failed delivery shows its first reason there, even when no resolver ran.
 - A waiting group has a `NOTE` saying what it waits for, for example `waiting for coder`. The `Groups:` line counts them as `waiting N`.
 
 For a live stream of changes, `aip events --json` prints a snapshot and then one JSON line per change.
@@ -49,7 +49,7 @@ A group in `needs_human` waits for you. Its question is in `aip run list` and `a
 aip group answer <run-id> <group> "Use the existing session table"
 ```
 
-The answer resumes the step, in the same session when the runtime can continue it. A specialist can ask [several questions at once](../configuration/workflows.md#questions). A running queue can [answer by itself](queue.md#answering-questions).
+The answer resumes the step, in the same session when the runtime can continue it. A specialist can ask [several questions at once](../configuration/pipelines.md#questions). A running queue can [answer by itself](queue.md#answering-questions).
 
 ## Retrying
 
@@ -67,7 +67,7 @@ An ordinary retry keeps the model, the runtime and the prompt of the snapshot, s
 
 - Every specialist of the snapshot that is also in the current configuration takes its whole definition from it: `model`, `runtime`, `prompt`, `skills`, `timeout`, `max`, `permissions`, `allow_commands`, `tools`, `queue`. `claude.edit_mode` and `claude.settings` are taken too.
 - A specialist removed from the configuration keeps its snapshot definition.
-- The workflow (steps, `on_reject`, `additional_prompt`, the split), the delivery settings and skipped steps stay as in the snapshot. Passed steps are not repeated.
+- The pipeline (steps, `on_reject`, `additional_prompt`, the split), the delivery settings and skipped steps stay as in the snapshot. Passed steps are not repeated.
 - The new definitions apply to all following steps of all groups of the run.
 - The retried group gets a warning with the changes, for example `config refreshed: reviewer model opsu → opus`. A changed prompt is listed as `reviewer prompt`, without its text. Nothing changed gives `config refreshed: no changes`.
 - If the configuration does not load or pass validation, the retry is refused with `configuration not loaded: …`, and the run does not change.
@@ -115,6 +115,37 @@ A specialist can publish files of its step as artifacts with `swarm_artifact`, b
 - Publishing a `file_name` again in the same attempt replaces the artifact; another attempt makes a new one. A group holds up to 200 artifacts.
 - Artifacts never enter a step commit, the merge of the group or the delivered diff. The bytes lie in `artifacts/` of the state directory and live as long as the run record; `aip run clean` leaves them.
 
+## Observers
+
+Observers are agents that take a task after an incident and try to repair it without a person. They are off by default; the [settings](../web/settings.md#observers) of the panel switch them on, and `swarm.yaml` and the CLI cannot change them.
+
+An incident is one of these states of a group:
+
+- a question (`needs_human`) that the queue auto-answers did not settle at this queue step. A question marked `human_only` is an incident only when the setting "Answer questions meant only for a human" is on;
+- a `failed` group, including a group interrupted by a daemon restart;
+- a `conflict` group;
+- a delivery in `apply_failed`. All groups in `apply_failed` are repaired together.
+
+A group cancelled by a person and a [usage limit](queue.md#usage-limit) are not incidents. The same state after a new attempt of the group is a new incident.
+
+An observer works in one task and has tools only for it: answer a question of a group, retry a group, cancel a group or the whole task with a reason.
+The daemon applies the rules a person has: a retry of a group a person cancelled, an answer to a `human_only` question without the setting, and any action on a service group other than split are refused. An answer is saved with the author `observer`, so a summary can read `answers: human 1, observer 2`.
+
+- While an incident is repaired or waits for a free worker, the run has the state `repair`.
+  Only an incident an observer has taken keeps the run unfinished: `finished` is `false`, `finishedAt` is empty, and `aip run show` prints the step `observer` in the `System:` line (in JSON it is `system` with kind `repair` and the service group `_repair`).
+  A task that waits for a free worker keeps `finished` as it was and may have no `_repair` group yet.
+  The group never changes the result of the run.
+- A delivery incident is repaired in a separate copy where the changes of the task lie over your working tree with conflict markers. When the observer reports `done`, the daemon checks that no marker is left and delivers without force; your edits are never lost. A failed delivery leaves `apply_failed`.
+- `done` ends the repair. `rejected` and `needs_human` end it as unsuccessful: the incident stays for a person, and the text of the report is shown in the task. An incident the observer reported on is not taken again.
+- A crash or a timeout of the observer agent uses up one repair, and the incident can be taken again. A task has at most `maxRepairs` repairs; after that it waits for a person. An incident a person resolves while it waits for a worker is not repaired.
+- A usage limit of the observer agent ends the attempt without waiting, does not use up a repair and does not stop the queue. The incident is taken again after the reset.
+- A task with a `hold` (`paused`, `frozen`) is not taken. Pausing a task during a repair stops the agent without using up a repair.
+- A task the observer cancelled shows the reason as `Observer cancelled: <reason>`. A cancelled group shows the reason as its `reason`, without the prefix.
+- `aip run cancel <run-id>` also stops a repair that is in progress.
+
+Switching observers off, or off for a project, does not interrupt repairs in progress; new incidents wait for a person. In the panel a person can forbid observers in one task, which stops its repair, and give the task back, which clears the ban and resets the repair count. The ban survives a daemon restart.
+The request for the ban is in the [HTTP API](../web/http-api.md#runs); the settings are in [Observers](../web/http-api.md#observers).
+
 ## Run states
 
 `state` in JSON and the `STATE` column in `aip run list`:
@@ -126,15 +157,21 @@ A specialist can publish files of its step as artifacts with `swarm_artifact`, b
 | `finished` | Everything is complete |
 | `failed` | The split step or a work group failed, or the delivery of a merged group ended in `apply_failed`. The state is recalculated after a retry or a successful delivery |
 | `cancelled` | The run was cancelled. This takes precedence over `failed` |
+| `repair` | An incident of the run is repaired by an [observer](#observers) or waits for a free worker |
 | `queued` | A finished run waits in its queue as a [returned task](queue.md#returning-a-run) |
 | `paused` | The run is [paused](queue.md#pausing-a-run) |
 | `frozen` | The queue [froze](queue.md#freezing) the run |
+
+A run with a `hold` (`paused`, `frozen`) never shows `repair`; its state follows the usual rules, so a `hold` with a question gives `needs_human`. Without a `hold`, `repair` takes precedence over `needs_human`.
+
+An incident that is repaired keeps the run in `repair`, also when observers are switched off meanwhile or the last allowed repair is running. An incident that waits for a worker counts only if an observer can take it: observers are on, the project is connected, the task is not forbidden, it has no `hold` and `maxRepairs` is not used up.
 
 A returned run keeps the statuses of its groups, and `finished` stays `true`, until the queue takes the task; then the state follows the groups again. A run that still has working groups keeps `active` or `needs_human`.
 
 Other fields of a run in JSON:
 
 - `finished`: use it to tell whether a run is unfinished; a run waiting for an answer is not `active`, and it is not finished either.
+- `repair`: `allowed` (observers may take the task), `active` (the state is `repair`), `repairs` (how many repairs were made), `incident` (the incident being repaired, or `null`) and `cancelReason` (why an observer cancelled the task, or `null`).
 - `waiting`: the number of waiting groups.
 - `queueItem`: the id of the queue task that retries the run, or `null`.
 - `deliveryStage`: `null` or an object with `status` (`pending`, `delivering`, `applied`, `apply_failed`). With `apply_failed` it also has the `reason` of the first failed group and their slugs in `groups`.

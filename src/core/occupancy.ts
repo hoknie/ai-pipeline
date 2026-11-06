@@ -1,6 +1,6 @@
 import { findSpecialist, type SpecialistLevel, type Step } from '../config/index.ts';
 
-import { allGroups, stepsOf, type RunState } from './model.ts';
+import { allGroups, isRepairGroup, stepsOf, type RunState } from './model.ts';
 import { attemptStepLabel, specialistName, stepLabel } from './topology.ts';
 
 export interface SpecialistRunning {
@@ -34,15 +34,18 @@ export interface SpecialistUse {
 export function specialistUse(state: RunState): SpecialistUse[] {
   if (state.run.finishedAt !== null) return [];
   const uses = new Map<string, SpecialistUse>();
-  const entry = (slug: string): SpecialistUse => {
+  const entry = (slug: string, repair: boolean): SpecialistUse => {
     let use = uses.get(slug);
     if (!use) {
-      const found = findSpecialist(state.run.config, slug);
+      // The repair group shows the profile the observer had when the repair started.
+      const found = repair
+        ? (state.run.repair.specialist ?? undefined)
+        : findSpecialist(state.run.config, slug);
       use = {
         specialist: slug,
-        name: specialistName(state.run.config, slug),
+        name: found?.name.trim() ? found.name : specialistName(state.run.config, slug),
         level: found?.level ?? 'project',
-        max: found?.max ?? null,
+        max: repair ? null : (found?.max ?? null),
         running: [],
         waiting: [],
       };
@@ -51,9 +54,10 @@ export function specialistUse(state: RunState): SpecialistUse[] {
     return use;
   };
   for (const group of allGroups(state)) {
+    const repair = isRepairGroup(group);
     for (const attempt of group.attempts) {
       if (attempt.status !== 'running') continue;
-      entry(attempt.specialist).running.push({
+      entry(attempt.specialist, repair).running.push({
         slug: group.slug,
         title: group.title,
         step: attempt.stepId,
@@ -71,7 +75,7 @@ export function specialistUse(state: RunState): SpecialistUse[] {
         step = undefined;
       }
       if (step) {
-        entry(step.specialist).waiting.push({
+        entry(step.specialist, repair).waiting.push({
           slug: group.slug,
           title: group.title,
           step: step.id,

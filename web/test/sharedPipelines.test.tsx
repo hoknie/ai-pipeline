@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App.tsx';
 import type { Api } from '../src/api.ts';
-import type { EditorWorkflow, SharedWorkflowView } from '../src/types.ts';
+import type { EditorPipeline, SharedPipelineView } from '../src/types.ts';
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { configView, fakeApi, openFake, queueOf, sourcesFor, specialistEntry } from './fixtures.ts';
 
-vi.mock('../src/components/WorkflowGraph.tsx', () => ({
-  WorkflowGraph: () => <div data-testid="graph" />,
+vi.mock('../src/components/PipelineGraph.tsx', () => ({
+  PipelineGraph: () => <div data-testid="graph" />,
 }));
 
 beforeEach(() => {
@@ -23,38 +23,38 @@ afterEach(() => {
 
 const STEPS = [{ id: 'code', specialist: 'coder' }];
 
-const shared = (id: string, raw: Record<string, unknown> = { steps: STEPS }): EditorWorkflow => {
+const shared = (id: string, raw: Record<string, unknown> = { steps: STEPS }): EditorPipeline => {
   const tags = Array.isArray(raw.tags) ? (raw.tags as string[]) : [];
   const base = {
     id,
     level: 'global' as const,
-    file: `/xdg/aip/workflows/${id}.yaml`,
+    file: `/xdg/aip/pipelines/${id}.yaml`,
     revision: `g-${id}`,
     raw,
     shared_tags: tags,
     own_tags: [] as string[],
   };
-  return { ...base, sources: sourcesFor('workflows', base) };
+  return { ...base, sources: sourcesFor('pipelines', base) };
 };
 
-const project = (id: string): EditorWorkflow => {
+const project = (id: string): EditorPipeline => {
   const base = {
     id,
     level: 'project' as const,
-    file: `/repo/aip/workflows/${id}.yaml`,
+    file: `/repo/aip/pipelines/${id}.yaml`,
     revision: `p-${id}`,
     raw: { steps: STEPS },
     shared_tags: [] as string[],
     own_tags: [] as string[],
   };
-  return { ...base, sources: sourcesFor('workflows', base) };
+  return { ...base, sources: sourcesFor('pipelines', base) };
 };
 
-const usageOf = (id: string, overrides: Partial<SharedWorkflowView> = {}): SharedWorkflowView => ({
+const usageOf = (id: string, overrides: Partial<SharedPipelineView> = {}): SharedPipelineView => ({
   id,
   name: null,
   tags: [],
-  file: `/xdg/aip/workflows/${id}.yaml`,
+  file: `/xdg/aip/pipelines/${id}.yaml`,
   revision: `g-${id}`,
   global: [],
   projects: [],
@@ -64,7 +64,7 @@ const usageOf = (id: string, overrides: Partial<SharedWorkflowView> = {}): Share
 const view = () =>
   configView({
     specialists: [specialistEntry('coder', { level: 'global' }), specialistEntry('local')],
-    workflows: [
+    pipelines: [
       project('feature'),
       shared('quick', { name: 'Quick', tags: ['fast'], steps: STEPS }),
       shared('explore'),
@@ -76,12 +76,12 @@ function show(overrides: Partial<Api> = {}, hash = '#settings/global/pipelines')
   const api = fakeApi({
     queue: vi.fn(async () => queueOf()),
     config: vi.fn(async () => view()),
-    sharedWorkflows: vi.fn(async () => ({
-      directory: '/xdg/aip/workflows',
-      workflows: [
+    sharedPipelines: vi.fn(async () => ({
+      directory: '/xdg/aip/pipelines',
+      pipelines: [
         usageOf('quick', {
-          projects: [{ repository: '/work/app', references: [{ workflow: 'epic', split: true }] }],
-          global: [{ workflow: 'other', split: true }],
+          projects: [{ repository: '/work/app', references: [{ pipeline: 'epic', split: true }] }],
+          global: [{ pipeline: 'other', split: true }],
         }),
         usageOf('explore'),
       ],
@@ -103,7 +103,7 @@ describe('shared pipelines group', () => {
     expect(entries.getByText('Quick')).toBeTruthy();
     expect(entries.getByText('fast')).toBeTruthy();
     const region = screen.getByRole('region', { name: 'Where the settings are saved' });
-    expect(within(region).getByText('/xdg/aip/workflows')).toBeTruthy();
+    expect(within(region).getByText('/xdg/aip/pipelines')).toBeTruthy();
     expect(screen.queryByLabelText('Project')).toBeNull();
   });
 
@@ -118,7 +118,7 @@ describe('shared pipelines group', () => {
   });
 
   it('shows the empty state without shared pipelines', async () => {
-    show({ config: vi.fn(async () => configView({ workflows: [project('feature')] })) });
+    show({ config: vi.fn(async () => configView({ pipelines: [project('feature')] })) });
     expect(await screen.findByText('No shared pipelines yet')).toBeTruthy();
   });
 
@@ -141,14 +141,14 @@ describe('shared pipelines group', () => {
     expect(screen.queryByRole('group', { name: 'Level' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Override in the project' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Remove fast' }));
-    fireEvent.click(within(screen.getByTestId('workflow-tags')).getByRole('combobox'));
+    fireEvent.click(within(screen.getByTestId('pipeline-tags')).getByRole('combobox'));
     fireEvent.change(await screen.findByRole('combobox', { name: /Search in Tags/ }), {
       target: { value: 'slow' },
     });
     fireEvent.click(await screen.findByRole('option', { name: /slow/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(api.writeWorkflow).toHaveBeenCalled());
-    expect(api.writeWorkflow).toHaveBeenCalledWith(
+    await waitFor(() => expect(api.writePipeline).toHaveBeenCalled());
+    expect(api.writePipeline).toHaveBeenCalledWith(
       'quick',
       { name: 'Quick', tags: ['slow'], steps: expect.anything() },
       'g-quick',
@@ -168,7 +168,7 @@ describe('shared pipelines group', () => {
 
   it('asks before leaving a pipeline with unsaved edits', async () => {
     show({}, '#settings/global/pipelines/quick');
-    const tags = await screen.findByTestId('workflow-tags');
+    const tags = await screen.findByTestId('pipeline-tags');
     fireEvent.click(within(tags).getByRole('button', { name: 'Remove fast' }));
     fireEvent.click(
       (await (await list()).findByRole('button', { name: /explore/ })) as HTMLElement,
@@ -185,9 +185,9 @@ describe('shared pipelines group', () => {
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'fresh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(api.writeWorkflow).toHaveBeenCalled());
-    expect(vi.mocked(api.writeWorkflow).mock.calls[0]?.[0]).toBe('fresh');
-    expect(vi.mocked(api.writeWorkflow).mock.calls[0]?.[3]).toBe('global');
+    await waitFor(() => expect(api.writePipeline).toHaveBeenCalled());
+    expect(vi.mocked(api.writePipeline).mock.calls[0]?.[0]).toBe('fresh');
+    expect(vi.mocked(api.writePipeline).mock.calls[0]?.[3]).toBe('global');
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/pipelines/fresh'));
   });
 });
@@ -213,7 +213,7 @@ describe('usage of a shared pipeline', () => {
 
   it('keeps the form when the usage cannot be loaded and blocks delete', async () => {
     show(
-      { sharedWorkflows: vi.fn(async () => Promise.reject(new Error('daemon is down'))) },
+      { sharedPipelines: vi.fn(async () => Promise.reject(new Error('daemon is down'))) },
       '#settings/global/pipelines/explore',
     );
     expect(await screen.findByText('Could not load usage: daemon is down')).toBeTruthy();
@@ -238,7 +238,7 @@ describe('usage of a shared pipeline', () => {
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() =>
-      expect(api.deleteWorkflow).toHaveBeenCalledWith('explore', 'g-explore', 'global'),
+      expect(api.deletePipeline).toHaveBeenCalledWith('explore', 'g-explore', 'global'),
     );
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/pipelines'));
   });
@@ -246,23 +246,23 @@ describe('usage of a shared pipeline', () => {
   it('shows the refusal of the daemon with repositories and rereads the usage', async () => {
     const usage = vi
       .fn()
-      .mockResolvedValueOnce({ directory: '/xdg/aip/workflows', workflows: [usageOf('explore')] })
+      .mockResolvedValueOnce({ directory: '/xdg/aip/pipelines', pipelines: [usageOf('explore')] })
       .mockResolvedValue({
-        directory: '/xdg/aip/workflows',
-        workflows: [
+        directory: '/xdg/aip/pipelines',
+        pipelines: [
           usageOf('explore', {
-            projects: [{ repository: '/work/lib', references: [{ workflow: 'f', split: true }] }],
+            projects: [{ repository: '/work/lib', references: [{ pipeline: 'f', split: true }] }],
           }),
         ],
       });
     const api = show(
       {
-        sharedWorkflows: usage,
-        deleteWorkflow: vi.fn(async () => ({
+        sharedPipelines: usage,
+        deletePipeline: vi.fn(async () => ({
           ok: false as const,
           reason: 'invalid' as const,
           errors: [],
-          references: [{ workflow: 'f', split: true, repository: '/work/lib' }],
+          references: [{ pipeline: 'f', split: true, repository: '/work/lib' }],
         })),
       },
       '#settings/global/pipelines/explore',
@@ -276,6 +276,6 @@ describe('usage of a shared pipeline', () => {
     expect(await screen.findByText('lib: f → split')).toBeTruthy();
     await waitFor(() => expect(usage).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(button.disabled).toBe(true));
-    expect(api.deleteWorkflow).toHaveBeenCalledTimes(1);
+    expect(api.deletePipeline).toHaveBeenCalledTimes(1);
   });
 });

@@ -49,7 +49,7 @@ async function waitQueue(
 async function add(h: Harness, title: string): Promise<string> {
   const view = (await h.call('queue_add', {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     task: 'работа',
     title,
   })) as QueueView & { item: string };

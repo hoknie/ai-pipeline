@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { RunCreated } from '../../src/protocol/index.ts';
 
-import { WORKFLOW_CONFIG, git, harness, startRun, statuses, type Harness } from './harness.ts';
+import { PIPELINE_CONFIG, git, harness, startRun, statuses, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -25,7 +25,7 @@ async function run(
 ): Promise<string> {
   const created = (await startRun(h, {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     groups,
   })) as RunCreated;
   return created.runId;
@@ -65,7 +65,7 @@ describe('daemon flow', () => {
 describe('specialist limit', () => {
   it('never runs more than one limited coder at a time and finishes every group', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+      PIPELINE_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
     );
     // the coders wait until the test has seen the other groups wait for the limited specialist
     h.script({ code: [{ waitFor: h.gate('code') }] });
@@ -93,7 +93,7 @@ describe('specialist limit', () => {
 
   it('reports the running and the waiting group of a limited specialist in the run view', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+      PIPELINE_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
     );
     h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, [
@@ -119,11 +119,11 @@ describe('specialist limit', () => {
 });
 
 describe('configuration directory', () => {
-  it('starts a run whose specialists and workflow live only in the project aip/', async () => {
+  it('starts a run whose specialists and pipeline live only in the project aip/', async () => {
     const h = await start();
     rmSync(join(h.repo, 'aip'), { recursive: true });
     mkdirSync(join(h.repo, 'aip', 'specialists'), { recursive: true });
-    mkdirSync(join(h.repo, 'aip', 'workflows'));
+    mkdirSync(join(h.repo, 'aip', 'pipelines'));
     writeFileSync(join(h.repo, 'aip', 'specialists', 'coder.yaml'), 'name: Кодировщик\n');
     writeFileSync(
       join(h.repo, 'aip', 'specialists', 'reviewer.yaml'),
@@ -131,7 +131,7 @@ describe('configuration directory', () => {
     );
     writeFileSync(join(h.repo, 'aip', 'settings.yaml'), 'delivery: { auto: false }\n');
     writeFileSync(
-      join(h.repo, 'aip', 'workflows', 'feature.yaml'),
+      join(h.repo, 'aip', 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: coder }\n  - { id: review, specialist: reviewer }\n',
     );
     const runId = await run(h);

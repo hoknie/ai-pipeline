@@ -20,7 +20,7 @@ export function run(id: string, groups: AipGroup[], overrides: Partial<AipRun> =
   return {
     id,
     repository: '/repo',
-    workflow: 'feature',
+    pipeline: 'feature',
     branch: `aip/${id}`,
     createdAt: 0,
     finishedAt: null,

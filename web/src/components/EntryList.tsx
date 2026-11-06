@@ -20,7 +20,7 @@ export interface Entry {
   extra?: ReactNode;
 }
 
-/** A list of configuration entries on the left: workflows, specialists. */
+/** A list of configuration entries on the left: pipelines, specialists. */
 export function EntryList({
   label,
   entries,

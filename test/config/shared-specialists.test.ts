@@ -39,29 +39,29 @@ describe('sharedSpecialistUsage', () => {
     expect(usage.specialists[0]?.revision).toEqual(expect.any(String));
   });
 
-  it('finds a reference from a project workflow, only in that repository', () => {
+  it('finds a reference from a project pipeline, only in that repository', () => {
     const { app, lib } = setup();
     write(shared(app, 'specialists', 'qa.yaml'), 'name: QA\n');
-    write(project(lib, 'workflows', 'feature.yaml'), 'steps:\n  - id: test\n    specialist: qa\n');
+    write(project(lib, 'pipelines', 'feature.yaml'), 'steps:\n  - id: test\n    specialist: qa\n');
     const [qa] = sharedSpecialistUsage(
       app,
       projects(['/work/app', app], ['/work/lib', lib]),
     ).specialists;
     expect(qa?.global).toEqual([]);
     expect(qa?.projects).toEqual([
-      { repository: '/work/lib', references: [{ workflow: 'feature', step: 'test' }] },
+      { repository: '/work/lib', references: [{ pipeline: 'feature', step: 'test' }] },
     ]);
   });
 
-  it('counts a shared workflow in every repository and in the shared level', () => {
+  it('counts a shared pipeline in every repository and in the shared level', () => {
     const { app, lib } = setup();
     write(shared(app, 'specialists', 'coder.yaml'), 'name: Coder\n');
-    write(shared(app, 'workflows', 'quick.yaml'), 'steps:\n  - id: code\n    specialist: coder\n');
+    write(shared(app, 'pipelines', 'quick.yaml'), 'steps:\n  - id: code\n    specialist: coder\n');
     const [coder] = sharedSpecialistUsage(
       app,
       projects(['/work/app', app], ['/work/lib', lib]),
     ).specialists;
-    expect(coder?.global).toEqual([{ workflow: 'quick', step: 'code' }]);
+    expect(coder?.global).toEqual([{ pipeline: 'quick', step: 'code' }]);
     expect(coder?.projects.map((entry) => entry.repository)).toEqual(['/work/app', '/work/lib']);
   });
 
@@ -70,7 +70,7 @@ describe('sharedSpecialistUsage', () => {
     write(shared(app, 'specialists', 'coder.yaml'), 'name: Coder\n');
     write(project(app, 'specialists', 'coder.yaml'), 'name: Own\n');
     for (const paths of [app, lib]) {
-      write(project(paths, 'workflows', 'f.yaml'), 'steps:\n  - id: s\n    specialist: coder\n');
+      write(project(paths, 'pipelines', 'f.yaml'), 'steps:\n  - id: s\n    specialist: coder\n');
     }
     const [coder] = sharedSpecialistUsage(
       app,
@@ -93,7 +93,7 @@ describe('sharedSpecialistUsage', () => {
     const { app, lib } = setup();
     write(shared(app, 'specialists', 'bad.yaml'), 'name: [unclosed\n');
     write(shared(app, 'specialists', 'good.yaml'), 'name: Good\n');
-    write(project(lib, 'workflows', 'f.yaml'), 'steps:\n  - id: s\n    specialist: bad\n');
+    write(project(lib, 'pipelines', 'f.yaml'), 'steps:\n  - id: s\n    specialist: bad\n');
     const { specialists } = sharedSpecialistUsage(app, projects(['/work/lib', lib]));
     const bad = specialists.find((entry) => entry.slug === 'bad');
     expect(bad?.error).toEqual(expect.any(String));
@@ -114,10 +114,10 @@ describe('sharedSpecialistUsage', () => {
     const { app, lib } = setup();
     write(shared(app, 'specialists', 'qa.yaml'), 'name: QA\n');
     write(project(lib, 'settings.yaml'), 'max: 0\n');
-    write(project(lib, 'workflows', 'feature.yaml'), 'steps:\n  - id: test\n    specialist: qa\n');
+    write(project(lib, 'pipelines', 'feature.yaml'), 'steps:\n  - id: test\n    specialist: qa\n');
     const [qa] = sharedSpecialistUsage(app, projects(['/work/lib', lib])).specialists;
     expect(qa?.projects).toEqual([
-      { repository: '/work/lib', references: [{ workflow: 'feature', step: 'test' }] },
+      { repository: '/work/lib', references: [{ pipeline: 'feature', step: 'test' }] },
     ]);
   });
 

@@ -237,8 +237,15 @@ describe('commit messages', () => {
 
   it('fills every placeholder', () => {
     const state = mergedRun(2);
-    expect(renderCommitMessage('[{run}/{workflow}] {title}\n{task}', state, state.groups)).toBe(
+    expect(renderCommitMessage('[{run}/{pipeline}] {title}\n{task}', state, state.groups)).toBe(
       `[${state.run.id}/feature] 2 groups: Группа 1, Группа 2\nзадача 1\n\nзадача 2`,
+    );
+  });
+
+  it('still fills the old {workflow} placeholder with the pipeline', () => {
+    const state = mergedRun(1);
+    expect(renderCommitMessage('[{workflow}] {title}', state, state.groups)).toBe(
+      `[${state.run.pipeline}] Группа 1`,
     );
   });
 
@@ -314,7 +321,7 @@ describe('automatic delivery of one run', () => {
       id: 'run000000002',
       number: 1,
       repository: '/repo',
-      workflow: 'feature',
+      pipeline: 'feature',
       baseCommit: 'abc',
       config: source.run.config,
       dirtyWarning: false,
@@ -337,7 +344,7 @@ describe('automatic delivery of one run', () => {
       id: 'run000000003',
       number: 1,
       repository: '/repo',
-      workflow: 'feature',
+      pipeline: 'feature',
       baseCommit: 'abc',
       config: base.run.config,
       dirtyWarning: false,

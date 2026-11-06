@@ -10,11 +10,13 @@ import {
   filterRuns,
   navRunCounts,
   optionCounts,
+  RUN_STATES,
   runSpecialists,
   type RunFilterState,
 } from '../src/components/runs/runFilter.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
+import type { RunView } from '../src/types.ts';
 import { groupRow, runView, tagView } from './fixtures.ts';
 
 beforeEach(() => window.localStorage.clear());
@@ -70,13 +72,19 @@ describe('navRunCounts', () => {
 });
 
 describe('filterRuns', () => {
-  it('searches without regard to case in the title, the name, the workflow, the id and the groups', () => {
+  it('searches without regard to case in the title, the name, the pipeline, the id and the groups', () => {
     expect(ids(find(runs, 'жДущИй'))).toEqual(['w']);
     expect(ids(find(runs, 'FEATURE-login'))).toEqual(['a']);
     expect(ids(find(runs, 'регистр'))).toEqual(['g']);
     expect(find(runs, 'feature')).toHaveLength(runs.length);
     expect(find(runs, '  ')).toHaveLength(runs.length);
     expect(find(runs, 'run1')).toHaveLength(0);
+  });
+
+  it('offers the state repair and filters by it', () => {
+    expect(RUN_STATES).toContain('repair');
+    const mending = runView({ id: 'r', state: 'repair' as string as RunView['state'] });
+    expect(ids(find([...runs, mending], '', only({ states: ['repair'] })))).toEqual(['r']);
   });
 
   it('filters by one or several of the eight states', () => {
@@ -131,7 +139,7 @@ describe('filterRuns', () => {
     expect(ids(find(mixed, '', state, 'repository', '/work/app'))).toEqual(['a1']);
   });
 
-  it('filters by workflow and by specialist, any of the choices and all the filters together', () => {
+  it('filters by pipeline and by specialist, any of the choices and all the filters together', () => {
     const steps = (...slugs: string[]) =>
       slugs.map((specialist, index) => ({
         id: `s${index}`,
@@ -141,12 +149,12 @@ describe('filterRuns', () => {
         state: 'upcoming' as const,
       }));
     const rows = [
-      runView({ id: 'f1', workflow: 'feature', steps: steps('planner', 'coder') }),
-      runView({ id: 'f2', workflow: 'feature', steps: steps('coder') }),
-      runView({ id: 'x1', workflow: 'fix', steps: steps('debugger') }),
+      runView({ id: 'f1', pipeline: 'feature', steps: steps('planner', 'coder') }),
+      runView({ id: 'f2', pipeline: 'feature', steps: steps('coder') }),
+      runView({ id: 'x1', pipeline: 'fix', steps: steps('debugger') }),
     ];
-    expect(ids(find(rows, '', only({ workflows: ['fix'] })))).toEqual(['x1']);
-    expect(ids(find(rows, '', only({ workflows: ['fix', 'feature'] })))).toEqual([
+    expect(ids(find(rows, '', only({ pipelines: ['fix'] })))).toEqual(['x1']);
+    expect(ids(find(rows, '', only({ pipelines: ['fix', 'feature'] })))).toEqual([
       'f1',
       'f2',
       'x1',
@@ -156,10 +164,10 @@ describe('filterRuns', () => {
       'f1',
       'x1',
     ]);
-    expect(ids(find(rows, '', only({ workflows: ['feature'], specialists: ['planner'] })))).toEqual(
+    expect(ids(find(rows, '', only({ pipelines: ['feature'], specialists: ['planner'] })))).toEqual(
       ['f1'],
     );
-    // the search covers the slug of the workflow and the specialists
+    // the search covers the slug of the pipeline and the specialists
     expect(ids(find(rows, 'debugger'))).toEqual(['x1']);
   });
 
@@ -176,17 +184,17 @@ describe('filterRuns', () => {
 
   it('counts the options by the other filters (faceted)', () => {
     const rows = [
-      runView({ id: 'a', workflow: 'feature', state: 'active' }),
-      runView({ id: 'b', workflow: 'feature', state: 'finished', finished: true }),
-      runView({ id: 'c', workflow: 'fix', state: 'finished', finished: true }),
+      runView({ id: 'a', pipeline: 'feature', state: 'active' }),
+      runView({ id: 'b', pipeline: 'feature', state: 'finished', finished: true }),
+      runView({ id: 'c', pipeline: 'fix', state: 'finished', finished: true }),
     ];
-    const state = only({ workflows: ['fix'] });
+    const state = only({ pipelines: ['fix'] });
     const states = optionCounts(rows, '', state, 'all', null, new Map(), 'states');
     expect(states.get('finished')).toBe(1);
     expect(states.get('active')).toBeUndefined();
-    const workflows = optionCounts(rows, '', state, 'all', null, new Map(), 'workflows');
-    expect(workflows.get('feature')).toBe(2);
-    expect(workflows.get('fix')).toBe(1);
+    const pipelines = optionCounts(rows, '', state, 'all', null, new Map(), 'pipelines');
+    expect(pipelines.get('feature')).toBe(2);
+    expect(pipelines.get('fix')).toBe(1);
     const searched = optionCounts(rows, 'нет', EMPTY_FILTERS, 'all', null, new Map(), 'states');
     expect(searched.size).toBe(0);
   });
@@ -359,7 +367,7 @@ describe('activeFilters', () => {
     expect(activeFilters('', only({ states: ['active'] }), 'all')).toBe(1);
     expect(activeFilters('', only({ tagIds: ['ta', 'tv'] }), 'all')).toBe(2);
     expect(
-      activeFilters('x', only({ states: ['failed'], workflows: ['fix'], tagIds: ['ta'] }), 'all'),
+      activeFilters('x', only({ states: ['failed'], pipelines: ['fix'], tagIds: ['ta'] }), 'all'),
     ).toBe(4);
   });
 
@@ -418,8 +426,8 @@ describe('filter by the tag of a linked task', () => {
 describe('search by the name of the pipeline', () => {
   it('finds a run by the name and by the id of its pipeline', () => {
     const named = [
-      runView({ id: 'a', title: 'Первый', workflow: 'feature', workflowName: 'Новая функция' }),
-      runView({ id: 'b', title: 'Второй', workflow: 'fix', workflowName: 'Исправление' }),
+      runView({ id: 'a', title: 'Первый', pipeline: 'feature', pipelineName: 'Новая функция' }),
+      runView({ id: 'b', title: 'Второй', pipeline: 'fix', pipelineName: 'Исправление' }),
     ];
     expect(ids(find(named, 'функци'))).toEqual(['a']);
     expect(ids(find(named, 'fix'))).toEqual(['b']);

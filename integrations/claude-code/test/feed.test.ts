@@ -230,14 +230,14 @@ describe('actions', () => {
 });
 
 describe('commands', () => {
-  test('/aip:run takes a workflow and the rest as the task', () => {
+  test('/aip:run takes a pipeline and the rest as the task', () => {
     expect(parseRunCommand('feature добавить вход')).toEqual({
       ok: true,
-      value: { workflow: 'feature', task: 'добавить вход' },
+      value: { pipeline: 'feature', task: 'добавить вход' },
     });
     expect(parseRunCommand('feature')).toEqual({
       ok: false,
-      error: 'Usage: /aip:run <workflow> <task>',
+      error: 'Usage: /aip:run <pipeline> <task>',
     });
     expect(parseRunCommand('').ok).toBe(false);
   });

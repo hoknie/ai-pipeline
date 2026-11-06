@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
-import { MANUAL_CONFIG, WORKFLOW_CONFIG } from '../daemon/harness.ts';
+import { MANUAL_CONFIG, PIPELINE_CONFIG } from '../daemon/harness.ts';
 import { aip, fakes, main, ownDaemon, root, runOf, sandbox, waitUntil } from './sandbox.ts';
 
 describe('cli', () => {
@@ -212,7 +212,7 @@ describe('cli', () => {
     const plain = await aip(sandbox(), 'config', 'check');
     expect(plain.stdout).toContain('settings: isolated');
     expect(plain.stdout).not.toContain('claude.edit_mode: auto');
-    const box = sandbox(`${WORKFLOW_CONFIG}  claude: { edit_mode: auto, settings: inherit }\n`);
+    const box = sandbox(`${PIPELINE_CONFIG}  claude: { edit_mode: auto, settings: inherit }\n`);
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('edit_mode: auto');
@@ -239,22 +239,22 @@ describe('cli', () => {
     expect(result.stdout).toContain(`claude: fake claude 0.0.0 (${command})`);
   });
 
-  it('shows split.workflow and no steps for such a workflow in config check', async () => {
+  it('shows split.pipeline and no steps for such a pipeline in config check', async () => {
     const box = sandbox(`swarm:
   specialists:
     plan: { name: Планировщик }
     coder: { name: Кодировщик }
-  workflows:
+  pipelines:
     explore:
       steps:
         - { id: research, specialist: coder }
     epic:
-      split: { specialist: plan, workflow: explore }
+      split: { specialist: plan, pipeline: explore }
 `);
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
     const epic = (result.stdout.split('    epic:')[1] ?? '').split('    explore:')[0] ?? '';
-    expect(epic).toContain('workflow: explore');
+    expect(epic).toContain('pipeline: explore');
     expect(epic).not.toContain('steps:');
   });
 
@@ -262,7 +262,7 @@ describe('cli', () => {
     const box = sandbox(`swarm:
   specialists:
     coder: { name: Кодировщик }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: code, specialist: coder }
@@ -273,11 +273,11 @@ describe('cli', () => {
     expect(result.stdout.match(/human_review: true/g)).toHaveLength(1);
   });
 
-  it('shows the name of a workflow in config check only when it is set', async () => {
+  it('shows the name of a pipeline in config check only when it is set', async () => {
     const box = sandbox(`swarm:
   specialists:
     coder: { name: Кодировщик }
-  workflows:
+  pipelines:
     feature:
       name: Новая функция
       steps:
@@ -295,14 +295,28 @@ describe('cli', () => {
 
   it('shows max of a specialist in config check only when it is set', async () => {
     const box = sandbox(
-      WORKFLOW_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+      PIPELINE_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
     );
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
     const coder = result.stdout.split('    coder:')[1]?.split('    reviewer:')[0] ?? '';
-    const reviewer = result.stdout.split('    reviewer:')[1]?.split('workflows:')[0] ?? '';
+    const reviewer = result.stdout.split('    reviewer:')[1]?.split('pipelines:')[0] ?? '';
     expect(coder).toContain('max: 1');
     expect(reviewer).not.toContain('max:');
+  });
+
+  it('lists the files with old names in config check without changing the exit code', async () => {
+    const box = sandbox();
+    const old = join(box.repo, 'aip', 'workflows', 'legacy.yaml');
+    mkdirSync(dirname(old), { recursive: true });
+    writeFileSync(old, 'steps:\n  - { id: code, specialist: coder }\n');
+    const result = await aip(box, 'config', 'check');
+    expect(result.code).toBe(0);
+    const hint = result.stdout.split('Old names (still read):\n')[1] ?? '';
+    expect(hint).toContain(old);
+    expect(hint).toContain('aip/pipelines/');
+    const clean = await aip(sandbox(), 'config', 'check');
+    expect(clean.stdout).not.toContain('Old names');
   });
 
   it('lists the configuration files in config check in the order they merge', async () => {
@@ -323,7 +337,7 @@ describe('cli', () => {
       join(box.repo, 'aip', 'specialists', 'b.yaml'),
       join(box.repo, 'aip', 'specialists', 'coder.yaml'),
       join(box.repo, 'aip', 'specialists', 'reviewer.yaml'),
-      join(box.repo, 'aip', 'workflows', 'feature.yaml'),
+      join(box.repo, 'aip', 'pipelines', 'feature.yaml'),
     ]);
   });
 
@@ -339,7 +353,7 @@ describe('cli', () => {
 
   it('shows the additional prompt of a step in config check, only where it is set', async () => {
     const box = sandbox(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         '- { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }',
         '- { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 }, additional_prompt: Только тесты }',
       ),

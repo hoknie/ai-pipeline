@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { RunView } from '../../types.ts';
 
-const AUTHORS = ['human', 'autopilot'] as const;
+const AUTHORS = ['human', 'autopilot', 'observer'] as const;
 
 /** Accepted answers of a run for its list card: counts by author, the answers in the tooltip. */
 export function RunDecisions({ run }: { run: RunView }) {

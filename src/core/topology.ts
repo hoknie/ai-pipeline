@@ -1,20 +1,23 @@
 import {
   findSpecialist,
-  findWorkflow,
-  groupWorkflow,
-  workflowName,
-  workflowNameOf,
+  findPipeline,
+  groupPipeline,
+  pipelineName,
+  pipelineNameOf,
   type OnReject,
   type Permissions,
   type ResolvedConfig,
   type Runtime,
   type Step,
-  type Workflow,
+  type Pipeline,
 } from '../config/index.ts';
 
+import { actionName, pipelineStages, type PipelineStage } from './stages.ts';
 import {
+  actionOf,
   addUsage,
-  runWorkflow,
+  isRepairGroup,
+  runPipeline,
   stepsOf,
   type Attempt,
   type Group,
@@ -54,9 +57,9 @@ export interface Topology {
   split: {
     specialist: string;
     maxGroups: number;
-    workflow: string | null;
-    /** Display name of `workflow`; null without it. */
-    workflowName: string | null;
+    pipeline: string | null;
+    /** Display name of `pipeline`; null without it. */
+    pipelineName: string | null;
     status: GroupStatus | 'waiting' | RunHold | null;
   } | null;
   steps: StepTopology[];
@@ -69,6 +72,8 @@ export interface Topology {
     resolver: string | null;
     resolverStatus: GroupStatus | 'waiting' | null;
   };
+  /** The stages of the pipeline in order, with the status of their groups. */
+  stages: PipelineStage[];
 }
 
 const AT_MERGE: GroupStatus[] = ['merging', 'conflict'];
@@ -86,20 +91,22 @@ function brief(group: Group): StepGroup {
   return { slug: group.slug, title: group.title, status: group.status };
 }
 
-export interface WorkflowTopology {
+export interface PipelineTopology {
   id: string;
-  /** Display name: `name` of the workflow, else the id. */
+  /** Display name: `name` of the pipeline, else the id. */
   name: string;
   split: {
     specialist: string;
     maxGroups: number;
-    workflow: string | null;
-    workflowName: string | null;
+    pipeline: string | null;
+    pipelineName: string | null;
   } | null;
   steps: StepInfo[];
   delivery: { mode: string; resolver: string | null };
   /** `max` of the specialists of the split, the steps and the resolver, by slug. */
   limits: Record<string, number | null>;
+  /** The stages of the pipeline in order; their status is null outside a run. */
+  stages: PipelineStage[];
 }
 
 /** The human name of a step: the name of its specialist, or the specialist slug without one. */
@@ -113,22 +120,28 @@ export function specialistName(config: ResolvedConfig, slug: string): string {
   return name ? name : slug;
 }
 
-/** The name of a step among the steps of its workflow: the id is added when another step has the same name. */
+/** The name of a step among the steps of its pipeline: the id is added when another step has the same name. */
 export function stepLabel(config: ResolvedConfig, steps: readonly Step[], step: Step): string {
   const name = stepName(config, step);
   const same = steps.some((other) => other.id !== step.id && stepName(config, other) === name);
   return same ? `${name} (${step.id})` : name;
 }
 
-/** The name of the step of an attempt: by the workflow of the group, else by the specialist of the attempt. */
+/** The name of the step of an attempt: by the pipeline of the group, else by the specialist of the attempt. */
 export function attemptStepLabel(state: RunState, group: Group, attempt: Attempt): string {
   const { config } = state.run;
+  const action = actionOf(state.run, group);
+  if (action) return actionName(action);
+  if (isRepairGroup(group) && state.run.repair.specialist) {
+    const { name, slug } = state.run.repair.specialist;
+    return name.trim() ? name : slug;
+  }
   try {
     const steps = stepsOf(state.run, group);
     const step = steps.find((candidate) => candidate.id === attempt.stepId);
     if (step) return stepLabel(config, steps, step);
   } catch {
-    // a split group of a workflow without a split: fall back to the specialist
+    // a split group of a pipeline without a split: fall back to the specialist
   }
   if (findSpecialist(config, attempt.specialist)) return specialistName(config, attempt.specialist);
   return attempt.stepId;
@@ -149,11 +162,11 @@ function stepInfo(config: ResolvedConfig, steps: readonly Step[], step: Step): S
 
 function limitsOf(
   config: ResolvedConfig,
-  workflow: Workflow,
+  pipeline: Pipeline,
   steps: Step[],
 ): Record<string, number | null> {
   const slugs = [
-    ...(workflow.split ? [workflow.split.specialist] : []),
+    ...(pipeline.split ? [pipeline.split.specialist] : []),
     ...steps.map((step) => step.specialist),
     ...(config.delivery.resolver ? [config.delivery.resolver] : []),
   ];
@@ -162,45 +175,46 @@ function limitsOf(
   return limits;
 }
 
-function splitTargetName(config: ResolvedConfig, workflow: Workflow): string | null {
-  const target = workflow.split?.workflow ?? null;
-  return target === null ? null : workflowNameOf(config, target);
+function splitTargetName(config: ResolvedConfig, pipeline: Pipeline): string | null {
+  const target = pipeline.split?.pipeline ?? null;
+  return target === null ? null : pipelineNameOf(config, target);
 }
 
-function shape(config: ResolvedConfig, workflow: Workflow): WorkflowTopology {
-  const steps = groupWorkflow(config, workflow).steps;
+function shape(config: ResolvedConfig, pipeline: Pipeline): PipelineTopology {
+  const steps = groupPipeline(config, pipeline).steps;
   return {
-    id: workflow.id,
-    name: workflowName(workflow),
-    split: workflow.split
+    id: pipeline.id,
+    name: pipelineName(pipeline),
+    split: pipeline.split
       ? {
-          specialist: workflow.split.specialist,
-          maxGroups: workflow.split.maxGroups,
-          workflow: workflow.split.workflow ?? null,
-          workflowName: splitTargetName(config, workflow),
+          specialist: pipeline.split.specialist,
+          maxGroups: pipeline.split.maxGroups,
+          pipeline: pipeline.split.pipeline ?? null,
+          pipelineName: splitTargetName(config, pipeline),
         }
       : null,
     steps: steps.map((step) => stepInfo(config, steps, step)),
     delivery: { mode: config.delivery.mode, resolver: config.delivery.resolver },
-    limits: limitsOf(config, workflow, steps),
+    limits: limitsOf(config, pipeline, steps),
+    stages: pipelineStages(config, pipeline),
   };
 }
 
-/** Every workflow of a configuration, without any run. */
-export function workflowTopologies(config: ResolvedConfig): WorkflowTopology[] {
-  return config.workflows.map((workflow) => shape(config, workflow));
+/** Every pipeline of a configuration, without any run. */
+export function pipelineTopologies(config: ResolvedConfig): PipelineTopology[] {
+  return config.pipelines.map((pipeline) => shape(config, pipeline));
 }
 
-export function workflowTopology(config: ResolvedConfig, id: string): WorkflowTopology | null {
-  const workflow = findWorkflow(config, id);
-  return workflow ? shape(config, workflow) : null;
+export function pipelineTopology(config: ResolvedConfig, id: string): PipelineTopology | null {
+  const pipeline = findPipeline(config, id);
+  return pipeline ? shape(config, pipeline) : null;
 }
 
-/** Steps of the workflow of a run with where each group is and what each step has cost. */
+/** Steps of the pipeline of a run with where each group is and what each step has cost. */
 export function topology(state: RunState): Topology {
   const { config } = state.run;
-  const workflow = runWorkflow(state.run);
-  const target = groupWorkflow(config, workflow);
+  const pipeline = runPipeline(state.run);
+  const target = groupPipeline(config, pipeline);
   const ids = target.steps.map((step) => step.id);
   const steps = target.steps.map((step): StepTopology => {
     let attempts = 0;
@@ -224,12 +238,12 @@ export function topology(state: RunState): Topology {
     };
   });
   return {
-    split: workflow.split
+    split: pipeline.split
       ? {
-          specialist: workflow.split.specialist,
-          maxGroups: workflow.split.maxGroups,
-          workflow: workflow.split.workflow ?? null,
-          workflowName: splitTargetName(config, workflow),
+          specialist: pipeline.split.specialist,
+          maxGroups: pipeline.split.maxGroups,
+          pipeline: pipeline.split.pipeline ?? null,
+          pipelineName: splitTargetName(config, pipeline),
           status: state.split?.status ?? null,
         }
       : null,
@@ -241,5 +255,6 @@ export function topology(state: RunState): Topology {
       resolver: config.delivery.resolver,
       resolverStatus: state.resolve?.status ?? null,
     },
+    stages: pipelineStages(config, pipeline, state),
   };
 }

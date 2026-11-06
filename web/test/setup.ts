@@ -33,7 +33,7 @@ if (typeof window !== 'undefined') {
   // test runs, and a loaded machine renders slower than that. Passing tests do not wait longer.
   // The pages the application loads on demand: the first import of each is transformed by Vite
   // and costs hundreds of milliseconds, so it is paid here and not by the first test that opens one.
-  // The pages that draw the workflow graph are not loaded here: a test file may replace the graph.
+  // The pages that draw the pipeline graph are not loaded here: a test file may replace the graph.
   await Promise.all([
     import('../src/components/NewTaskDialog.tsx'),
     import('../src/components/QueuePage.tsx'),

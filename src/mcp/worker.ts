@@ -26,6 +26,8 @@ export interface WorkerOptions {
   split: boolean;
   /** Also serve swarm_queue_add: the specialist may add tasks to the queue of the run's repository. */
   queue?: boolean;
+  /** Also serve swarm_repair_*: the observer of an incident answers, retries or cancels. */
+  repair?: boolean;
   send: Send;
 }
 
@@ -164,7 +166,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
         description:
           'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups; pass after with ids returned by earlier calls to order dependent tasks. The answer contains the id of the new item. It does not start the queue. Call swarm_report afterwards as usual.',
         inputSchema: {
-          workflow: z.string().min(1).describe('Workflow id of the configuration, e.g. feature'),
+          pipeline: z.string().min(1).describe('Pipeline id of the configuration, e.g. feature'),
           task: z.string().trim().min(1).optional().describe('One task text'),
           groups: z
             .array(z.object({ title: z.string().trim().min(1), task: z.string().trim().min(1) }))
@@ -189,7 +191,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
           skip: z
             .array(z.string())
             .optional()
-            .describe('Ids of workflow steps this task skips, e.g. ["review", "qa"]'),
+            .describe('Ids of pipeline steps this task skips, e.g. ["review", "qa"]'),
           after: z
             .array(z.string().min(1))
             .optional()
@@ -198,14 +200,14 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             ),
         },
       },
-      ({ workflow, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
+      ({ pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
         attempt(async () => {
           if ((task === undefined) === (groups === undefined)) {
             throw new Error('pass either task or groups');
           }
           const result = (await options.send('worker_queue_add', {
             token: options.token,
-            workflow,
+            pipeline,
             ...(task !== undefined ? { task } : {}),
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),
@@ -214,7 +216,84 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
             ...(skip !== undefined ? { skip } : {}),
             ...(after !== undefined ? { after } : {}),
           })) as { item?: string };
-          return `Queued ${result.item ?? 'the task'} for workflow ${workflow}. It starts when the queue runs.`;
+          return `Queued ${result.item ?? 'the task'} for pipeline ${pipeline}. It starts when the queue runs.`;
+        }),
+    );
+  }
+  if (options.repair) {
+    server.registerTool(
+      'swarm_repair_answer',
+      {
+        title: 'Answer a question of a group',
+        description:
+          'Answer the question a group of the task waits for. The group continues with your answer. Call swarm_report afterwards as usual.',
+        inputSchema: {
+          group: z.string().min(1).describe('Slug of the group that waits for an answer'),
+          answer: z
+            .string()
+            .trim()
+            .min(1)
+            .max(FEEDBACK_LIMIT)
+            .describe('The answer, written as a decision'),
+        },
+      },
+      ({ group, answer }) =>
+        attempt(async () => {
+          await options.send('repair_action', {
+            action: 'answer',
+            token: options.token,
+            group,
+            answer,
+          });
+          return `Recorded the answer for ${group}. Call swarm_report when you are done.`;
+        }),
+    );
+    server.registerTool(
+      'swarm_repair_retry',
+      {
+        title: 'Retry a group',
+        description:
+          'Run a failed or stopped group again. Pass refresh_config to read swarm.yaml again before the retry. Call swarm_report afterwards as usual.',
+        inputSchema: {
+          group: z.string().min(1).describe('Slug of the group to retry'),
+          refresh_config: z.boolean().optional().describe('Read swarm.yaml again before the retry'),
+        },
+      },
+      ({ group, refresh_config }) =>
+        attempt(async () => {
+          await options.send('repair_action', {
+            action: 'retry',
+            token: options.token,
+            group,
+            ...(refresh_config !== undefined ? { refreshConfig: refresh_config } : {}),
+          });
+          return `Recorded the retry of ${group}. Call swarm_report when you are done.`;
+        }),
+    );
+    server.registerTool(
+      'swarm_repair_cancel',
+      {
+        title: 'Cancel a group or the task',
+        description:
+          'Cancel one group, or the whole task when group is omitted. The reason is shown in the task. Call swarm_report afterwards as usual.',
+        inputSchema: {
+          group: z
+            .string()
+            .min(1)
+            .optional()
+            .describe('Slug of the group; omit to cancel the task'),
+          reason: z.string().trim().min(1).max(FEEDBACK_LIMIT).describe('Why it is cancelled'),
+        },
+      },
+      ({ group, reason }) =>
+        attempt(async () => {
+          await options.send('repair_action', {
+            action: 'cancel',
+            token: options.token,
+            ...(group !== undefined ? { group } : {}),
+            reason,
+          });
+          return `Recorded the cancellation${group !== undefined ? ` of ${group}` : ''}. Call swarm_report when you are done.`;
         }),
     );
   }

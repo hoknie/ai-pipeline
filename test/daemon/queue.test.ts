@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { type QueueView, type RunCreated } from '../../src/protocol/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { MANUAL_CONFIG, WORKFLOW_CONFIG } from './harness.ts';
+import { MANUAL_CONFIG, PIPELINE_CONFIG } from './harness.ts';
 import { start, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
 
 describe('queue contents', () => {
@@ -19,7 +19,7 @@ describe('queue contents', () => {
     mkdirSync(join(h.repo, 'app'), { recursive: true });
     await h.call('queue_add', {
       repository: join(h.repo, 'app'),
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'работа',
       title: 'A',
     });
@@ -43,7 +43,7 @@ describe('queue contents', () => {
     const h = await start();
     const view = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [
         { title: 'Вход', task: 'форма входа' },
         { title: 'Регистрация', task: 'форма регистрации' },
@@ -53,11 +53,11 @@ describe('queue contents', () => {
     expect(view.items[0]?.groups).toHaveLength(2);
   });
 
-  it('rejects an unknown workflow and leaves the queue unchanged', async () => {
+  it('rejects an unknown pipeline and leaves the queue unchanged', async () => {
     const h = await start();
     await expect(
-      h.call('queue_add', { repository: h.repo, workflow: 'nope', task: 'x' }),
-    ).rejects.toThrow('unknown workflow `nope`; known: feature');
+      h.call('queue_add', { repository: h.repo, pipeline: 'nope', task: 'x' }),
+    ).rejects.toThrow('unknown pipeline `nope`; known: feature');
     expect((await queueOf(h)).items).toEqual([]);
   });
 
@@ -79,23 +79,23 @@ describe('queue contents', () => {
   });
 });
 
-describe('name of the workflow in the queue', () => {
+describe('name of the pipeline in the queue', () => {
   it('takes the name from the current configuration and follows its edits', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace('    feature:\n', '    feature:\n      name: Новая функция\n'),
+      PIPELINE_CONFIG.replace('    feature:\n', '    feature:\n      name: Новая функция\n'),
     );
     await add(h, 'A');
     expect((await queueOf(h)).items[0]).toMatchObject({
-      workflow: 'feature',
-      workflowName: 'Новая функция',
+      pipeline: 'feature',
+      pipelineName: 'Новая функция',
     });
     writeConfigDirectory(
       h.repo,
-      WORKFLOW_CONFIG.replace('    feature:\n', '    feature:\n      name: Другое\n'),
+      PIPELINE_CONFIG.replace('    feature:\n', '    feature:\n      name: Другое\n'),
     );
-    expect((await queueOf(h)).items[0]?.workflowName).toBe('Другое');
-    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('feature:', 'other:'));
-    expect((await queueOf(h)).items[0]?.workflowName).toBe('feature');
+    expect((await queueOf(h)).items[0]?.pipelineName).toBe('Другое');
+    writeConfigDirectory(h.repo, PIPELINE_CONFIG.replace('feature:', 'other:'));
+    expect((await queueOf(h)).items[0]?.pipelineName).toBe('feature');
   });
 });
 
@@ -220,15 +220,15 @@ describe('running the queue', () => {
     expect(await allRuns(h)).toHaveLength(2);
   });
 
-  it('keeps an item first with an error when its workflow disappeared', async () => {
+  it('keeps an item first with an error when its pipeline disappeared', async () => {
     const h = await start();
     await add(h, 'A');
-    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('feature:', 'other:'));
+    writeConfigDirectory(h.repo, PIPELINE_CONFIG.replace('feature:', 'other:'));
     await h.call('queue_start', { repository: h.repo });
     const queue = await queueOf(h);
     expect(queue.status).toBe('stopped');
     expect(queue.stop).toMatchObject({ kind: 'item' });
-    expect(queue.items[0]?.error).toContain('unknown workflow');
+    expect(queue.items[0]?.error).toContain('unknown pipeline');
     expect(await allRuns(h)).toEqual([]);
   });
 

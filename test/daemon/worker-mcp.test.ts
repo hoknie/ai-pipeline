@@ -5,17 +5,17 @@ import { describe, expect, it } from 'vitest';
 
 import type { QueueView, RunCreated } from '../../src/protocol/index.ts';
 
-import { WORKFLOW_CONFIG, startRun, type Harness } from './harness.ts';
+import { PIPELINE_CONFIG, startRun, type Harness } from './harness.ts';
 import { queueOf, start } from './queue-harness.ts';
 
 // Every test here sends its requests through the real worker MCP server (`aip mcp --worker`)
 // with `realWorker: true`; the other daemon tests send the same requests straight to the socket.
 
-const SPLIT_CONFIG = WORKFLOW_CONFIG.replace(
+const SPLIT_CONFIG = PIPELINE_CONFIG.replace(
   '    feature:\n      steps:',
   '    feature:\n      split: { specialist: coder, max_groups: 3 }\n      steps:',
 );
-const QUEUE_CONFIG = WORKFLOW_CONFIG.replace(
+const QUEUE_CONFIG = PIPELINE_CONFIG.replace(
   'coder: { name: Кодировщик }',
   'coder: { name: Кодировщик, queue: true }',
 );
@@ -44,11 +44,11 @@ const textOf = (entry: ToolResult | undefined) => entry?.result.content[0]?.text
 
 describe('the worker MCP server through a real agent', () => {
   it('is only used when the agent asks for it', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     h.script({ code: [{ realWorker: true }], review: [{}] });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Логин', task: 'логин' }],
     })) as RunCreated;
     await h.waitFor(created.runId, (view) => view.finished);
@@ -79,7 +79,7 @@ describe('the worker MCP server through a real agent', () => {
     });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'вход и выход',
     })) as RunCreated;
     const final = await h.waitFor(created.runId, (view) => view.finished);
@@ -103,7 +103,7 @@ describe('the worker MCP server through a real agent', () => {
     });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'вход',
     })) as RunCreated;
     await h.waitFor(created.runId, (view) => view.finished);
@@ -119,11 +119,11 @@ describe('the worker MCP server through a real agent', () => {
         {
           realWorker: true,
           toolCalls: [
-            { name: 'swarm_queue_add', arguments: { workflow: 'feature', task: 'первая' } },
+            { name: 'swarm_queue_add', arguments: { pipeline: 'feature', task: 'первая' } },
             {
               name: 'swarm_queue_add',
               arguments: {
-                workflow: 'feature',
+                pipeline: 'feature',
                 groups: [{ title: 'Часть', task: 'часть' }],
                 title: 'Вторая',
               },
@@ -132,12 +132,12 @@ describe('the worker MCP server through a real agent', () => {
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const results = toolResults(h);
     expect(results.map((entry) => entry.result.isError)).toEqual([undefined, undefined]);
-    expect(textOf(results[0])).toMatch(/^Queued \S+ for workflow feature\. It starts when/);
+    expect(textOf(results[0])).toMatch(/^Queued \S+ for pipeline feature\. It starts when/);
     const queue: QueueView = await queueOf(h);
     expect(queue.items.map((item) => item.title)).toEqual([null, 'Вторая']);
   });
@@ -152,17 +152,17 @@ describe('the worker MCP server through a real agent', () => {
             {
               name: 'swarm_queue_add',
               arguments: {
-                workflow: 'feature',
+                pipeline: 'feature',
                 task: 'задача',
                 groups: [{ title: 'Часть', task: 'часть' }],
               },
             },
-            { name: 'swarm_queue_add', arguments: { workflow: 'feature' } },
+            { name: 'swarm_queue_add', arguments: { pipeline: 'feature' } },
           ],
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const results = toolResults(h);
@@ -181,13 +181,13 @@ describe('the worker MCP server through a real agent', () => {
         {
           realWorker: true,
           queueChain: [
-            { workflow: 'feature', task: 'первая', title: 'Первая' },
-            { workflow: 'feature', task: 'вторая', title: 'Вторая', after: ['$prev'] },
+            { pipeline: 'feature', task: 'первая', title: 'Первая' },
+            { pipeline: 'feature', task: 'вторая', title: 'Вторая', after: ['$prev'] },
           ],
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const queue = await queueOf(h);

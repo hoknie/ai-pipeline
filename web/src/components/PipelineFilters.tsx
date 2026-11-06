@@ -3,24 +3,24 @@ import { useTranslation } from 'react-i18next';
 import type { LevelFilter } from '../specialistFilters.ts';
 import { Input } from '../ui/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
-import type { WorkflowFilter, WorkflowFilterOptions } from '../workflowFilters.ts';
+import type { PipelineFilter, PipelineFilterOptions } from '../pipelineFilters.ts';
 
 import { ValuesPicker } from './ValuesPicker.tsx';
 
 const LEVELS: LevelFilter[] = ['all', 'project', 'global'];
 
 /** Search, level, tags and specialists of the pipelines list; chosen values are alternatives. */
-export function WorkflowFilters({
+export function PipelineFilters({
   filter,
   options,
   search,
   onFilter,
   onSearch,
 }: {
-  filter: WorkflowFilter;
-  options: WorkflowFilterOptions;
+  filter: PipelineFilter;
+  options: PipelineFilterOptions;
   search: string;
-  onFilter: (filter: WorkflowFilter) => void;
+  onFilter: (filter: PipelineFilter) => void;
   onSearch: (search: string) => void;
 }) {
   const { t } = useTranslation();
@@ -28,14 +28,14 @@ export function WorkflowFilters({
     <div className="flex flex-col gap-2">
       <Input
         type="search"
-        aria-label={t('workflows.filters.search')}
-        placeholder={t('workflows.filters.search')}
+        aria-label={t('pipelines.filters.search')}
+        placeholder={t('pipelines.filters.search')}
         value={search}
         onChange={(event) => onSearch(event.target.value)}
       />
       <ToggleGroup
         type="single"
-        aria-label={t('workflows.filters.level')}
+        aria-label={t('pipelines.filters.level')}
         value={filter.level}
         onValueChange={(value) => {
           if (value) onFilter({ ...filter, level: value as LevelFilter });
@@ -49,9 +49,9 @@ export function WorkflowFilters({
       </ToggleGroup>
       {options.tags.length > 0 ? (
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">{t('workflows.filters.tags')}</span>
+          <span className="text-xs text-muted-foreground">{t('pipelines.filters.tags')}</span>
           <ValuesPicker
-            label={t('workflows.filters.tags')}
+            label={t('pipelines.filters.tags')}
             values={filter.tags}
             onChange={(tags) => onFilter({ ...filter, tags })}
             options={options.tags.map((tag) => ({
@@ -66,10 +66,10 @@ export function WorkflowFilters({
       {options.specialists.length > 0 ? (
         <div className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">
-            {t('workflows.filters.specialists')}
+            {t('pipelines.filters.specialists')}
           </span>
           <ValuesPicker
-            label={t('workflows.filters.specialists')}
+            label={t('pipelines.filters.specialists')}
             values={filter.specialists}
             onChange={(specialists) => onFilter({ ...filter, specialists })}
             options={options.specialists.map((name) => ({ name, source: 'project' as const }))}

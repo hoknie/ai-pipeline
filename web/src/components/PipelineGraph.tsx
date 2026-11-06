@@ -16,7 +16,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { WorkflowTopology } from '../types.ts';
+import type { StagedTopology } from '../pipelineStages.ts';
 
 import { cost, usageText } from '../format.ts';
 import { cn } from '../lib/cn.ts';
@@ -38,16 +38,16 @@ import {
 const FIT_OPTIONS = { padding: 0.15, maxZoom: 1 };
 const NODE_ORIGIN: [number, number] = [0, 0.5];
 
-/** Fits the view when another workflow is opened, not on live updates. */
-function FitOnSwitch({ workflow }: { workflow: string }) {
+/** Fits the view when another pipeline is opened, not on live updates. */
+function FitOnSwitch({ pipeline }: { pipeline: string }) {
   const { fitView } = useReactFlow();
   const initialized = useNodesInitialized();
   const fitted = useRef<string | null>(null);
   useEffect(() => {
-    if (!initialized || fitted.current === workflow) return;
+    if (!initialized || fitted.current === pipeline) return;
     if (fitted.current !== null) void fitView(FIT_OPTIONS);
-    fitted.current = workflow;
-  }, [initialized, workflow, fitView]);
+    fitted.current = pipeline;
+  }, [initialized, pipeline, fitView]);
   return null;
 }
 
@@ -60,17 +60,28 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
     ]
       .filter(Boolean)
       .join(' · ') || '—';
+  const testId = data.step ?? (data.kind === 'action' ? data.stageId : data.kind);
   return (
     <Card
       className={cn(
-        'grid w-[170px] grid-cols-[minmax(0,1fr)] gap-1 px-3 py-2.5 text-xs',
+        'relative grid w-[170px] grid-cols-[minmax(0,1fr)] gap-1 px-3 py-2.5 text-xs',
         data.kind !== 'step' && 'bg-muted',
+        data.condition !== null && 'border-dashed',
         data.active && 'border-status-run ring-4 ring-status-run-bg',
         data.busy?.full && 'border-status-warn bg-status-warn-bg',
         selected && 'border-primary',
       )}
-      data-testid={`stage-${data.step ?? data.kind}`}
+      data-testid={`stage-${testId}`}
+      data-conditional={data.condition !== null ? 'true' : undefined}
     >
+      {data.sectionStart ? (
+        <div
+          className="pointer-events-none absolute -top-5 left-0 text-[10px] font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase"
+          data-testid={`section-${data.section}`}
+        >
+          {t(`topology.stages.section.${data.section}`)}
+        </div>
+      ) : null}
       <Handle type="target" position={Position.Left} id="in" />
       <Handle type="source" position={Position.Right} id="out" />
       <Handle type="target" position={Position.Top} id="back-in" />
@@ -83,6 +94,20 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
       <div className="truncate text-muted-foreground" title={data.subtitle}>
         {data.subtitle}
       </div>
+      {data.performer && data.performer !== data.subtitle ? (
+        <div
+          className="truncate text-muted-foreground"
+          data-testid={`performer-${testId}`}
+          title={data.performer}
+        >
+          {data.performer}
+        </div>
+      ) : null}
+      {data.condition !== null ? (
+        <div className="truncate font-medium" data-testid={`condition-${testId}`}>
+          {data.condition}
+        </div>
+      ) : null}
       {data.detail ? <div className="truncate text-muted-foreground">{data.detail}</div> : null}
       {data.groups.length > 0 ? (
         <div className="flex min-w-0 flex-wrap gap-1">
@@ -99,7 +124,7 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
       {data.busy && (data.busy.running > 0 || data.busy.max !== null) ? (
         <div
           className={cn('truncate text-muted-foreground', data.busy.full && 'font-medium')}
-          data-testid={`busy-${data.step ?? data.kind}`}
+          data-testid={`busy-${testId}`}
         >
           {data.busy.max === null
             ? t('topology.busyUnlimited', { n: data.busy.running })
@@ -130,11 +155,11 @@ function Stage({ data, selected }: NodeProps<StageNode>) {
 const NODE_TYPES = { stage: Stage };
 
 /**
- * The graph of a workflow. With `live` the nodes carry the groups of active runs; without it
+ * The graph of a pipeline. With `live` the nodes carry the groups of active runs; without it
  * the graph is the plain scheme, as the editor previews it.
  */
-export function WorkflowGraph({
-  workflow,
+export function PipelineGraph({
+  pipeline,
   live,
   load,
   selected = null,
@@ -142,7 +167,7 @@ export function WorkflowGraph({
   onNodes,
   className,
 }: {
-  workflow: WorkflowTopology;
+  pipeline: StagedTopology;
   live?: Live | null;
   /** Load of the specialists across the machine; without it nodes show no occupancy. */
   load?: MachineLoad | null;
@@ -155,7 +180,7 @@ export function WorkflowGraph({
 }) {
   const { t } = useTranslation();
   const { resolved } = useTheme();
-  const state = useMemo(() => live ?? liveState(workflow, [], null), [live, workflow]);
+  const state = useMemo(() => live ?? liveState(pipeline, [], null), [live, pipeline]);
   const sizes = useRef(new Map<string, Size>());
   const [sizeVersion, setSizeVersion] = useState(0);
   const onNodesChange = useCallback((changes: NodeChange[]) => {
@@ -174,13 +199,13 @@ export function WorkflowGraph({
   const previousEdges = useRef<Edge[]>([]);
   const graph = useMemo(() => {
     void sizeVersion;
-    const raw = layout(workflow, state, t, sizes.current, load ?? undefined);
+    const raw = layout(pipeline, state, t, sizes.current, load ?? undefined);
     const nodes = stabilize(previousNodes.current, raw.nodes, sizes.current, selected);
     const edges = stabilizeEdges(previousEdges.current, raw.edges);
     previousNodes.current = nodes;
     previousEdges.current = edges;
     return { nodes, edges };
-  }, [workflow, state, load, selected, sizeVersion, t]);
+  }, [pipeline, state, load, selected, sizeVersion, t]);
   useEffect(() => onNodes?.(graph.nodes), [graph.nodes, onNodes]);
 
   return (
@@ -202,7 +227,7 @@ export function WorkflowGraph({
           onNodeClick={(_, clicked) => onSelect?.(clicked.id)}
           onPaneClick={() => onSelect?.(null)}
         >
-          <FitOnSwitch workflow={workflow.id} />
+          <FitOnSwitch pipeline={pipeline.id} />
           <Background />
           <Controls showInteractive={false} />
         </ReactFlow>

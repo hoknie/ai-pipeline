@@ -1093,7 +1093,7 @@ describe('tag catalog and filter', () => {
       'aip.web.runFilters',
       JSON.stringify({
         states: ['finished'],
-        workflows: [],
+        pipelines: [],
         specialists: [],
         tagIds: [],
         repositories: [],

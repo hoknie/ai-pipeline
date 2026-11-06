@@ -5,9 +5,9 @@ export type {
   ConfigEditResult,
   SharedSpecialistView,
   SharedSpecialistsView,
-  SharedWorkflowView,
-  SharedWorkflowsView,
-  WorkflowsImportResult,
+  SharedPipelineView,
+  SharedPipelinesView,
+  PipelinesImportResult,
   SpecialistTagFolderView,
   SpecialistTagsResult,
   SpecialistTagsView,
@@ -32,6 +32,16 @@ export type {
   RowStatus,
   SystemStepKind,
   SystemStepRow,
+  SystemStageSetting,
+  SystemStageView,
+  SystemStagesView,
+  SettingLevel,
+  PipelineStage,
+  StageCondition,
+  StageKind,
+  StagePerformer,
+  StageSection,
+  StageStatus,
   GroupSpecView,
   GroupView,
   QueueItemView,
@@ -49,8 +59,8 @@ export type {
   TagColor,
   TagView,
   Topology,
-  WorkflowTopology,
-  WorkflowsView,
+  PipelineTopology,
+  PipelinesView,
   Transcript,
   TranscriptEntry,
 } from '../../src/protocol/index.ts';
@@ -69,7 +79,7 @@ export type DaemonMismatch = DaemonCheck['mismatch'];
 
 /** Fields of a task in the queue: either `task` or `groups`. */
 export interface QueueFields {
-  workflow: string;
+  pipeline: string;
   task?: string;
   groups?: { title: string; task: string }[];
   title?: string;
@@ -79,7 +89,7 @@ export interface QueueFields {
   deliveryMode?: DeliveryMode;
   /** Tag names. */
   tags?: string[];
-  /** Ids of workflow steps the task skips. */
+  /** Ids of pipeline steps the task skips. */
   skip?: string[];
   /** Ids of queue items and runs the task waits for. */
   after?: string[];
@@ -89,7 +99,7 @@ export interface QueueFields {
 
 /** Changes of a queued task; `title: null` removes the title. */
 export interface QueuePatch {
-  workflow?: string;
+  pipeline?: string;
   task?: string;
   groups?: { title: string; task: string }[];
   title?: string | null;
@@ -99,7 +109,7 @@ export interface QueuePatch {
   deliveryMode?: DeliveryMode | null;
   /** Tag names; replaces the tags of the item. */
   tags?: string[];
-  /** Ids of workflow steps to skip; replaces the list of the item. */
+  /** Ids of pipeline steps to skip; replaces the list of the item. */
   skip?: string[];
   /** Ids of queue items and runs the task waits for; replaces the list of the item. */
   after?: string[];
@@ -114,7 +124,7 @@ export type {
   EditorSpecialist,
   EditorSpecialistValues,
   SpecialistTagEntry,
-  EditorWorkflow,
+  EditorPipeline,
   EntryLevel,
   EntryReference,
   EntrySource,

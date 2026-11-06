@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyOutcome, deliveryBadge, settledOutcome } from '../src/components/runs/delivery.ts';
-import { groupView, runView } from './fixtures.ts';
+import {
+  applyOutcome,
+  deliveryBadge,
+  settledOutcome,
+  undeliveredMark,
+} from '../src/components/runs/delivery.ts';
+import { groupRow, groupView, runView } from './fixtures.ts';
 
 const withDelivery = (
   delivery: Partial<{
@@ -144,5 +149,62 @@ describe('settledOutcome', () => {
   it('reports a cancel only after the delivery was seen in progress', () => {
     expect(settledOutcome(stage('apply_failed', 1000), watch)).toEqual({ kind: 'cancelled' });
     expect(settledOutcome(stage('apply_failed', 1000), { ...watch, busy: false })).toBeNull();
+  });
+});
+
+describe('undeliveredMark', () => {
+  const merged = (diff: { files: number; added: number; removed: number } | null = null) =>
+    groupRow({ status: 'merged', delivery: 'pending', diff });
+  const run = (state: string, delivery = {}, groups = [merged()], extra = {}) =>
+    withDelivery({ merged: 1, ...delivery }, { state, groups, ...extra });
+
+  it('has no mark while a delivery goes on', () => {
+    expect(undeliveredMark(run('finished', { inProgress: true, failed: 1 }))).toBeNull();
+  });
+
+  it('marks a failure with its reason in any state', () => {
+    for (const state of ['active', 'needs_human', 'finished', 'failed', 'cancelled']) {
+      const mark = undeliveredMark(
+        run(state, { failed: 1 }, [merged()], {
+          deliveryStage: { status: 'apply_failed', reason: 'boom', groups: ['a'] },
+        }),
+      );
+      expect(mark).toMatchObject({ status: 'apply_failed', reason: 'boom' });
+    }
+  });
+
+  it('marks a pending result only in stopped states', () => {
+    for (const state of ['finished', 'failed', 'cancelled']) {
+      expect(undeliveredMark(run(state))).toMatchObject({ status: 'undelivered' });
+    }
+    for (const state of ['active', 'needs_human', 'queued', 'paused', 'frozen']) {
+      expect(undeliveredMark(run(state))).toBeNull();
+    }
+  });
+
+  it('counts delivered groups for a partial delivery', () => {
+    const mark = undeliveredMark(
+      run('finished', { merged: 2, applied: 1 }, [
+        merged(),
+        groupRow({ slug: 'b', status: 'merged', delivery: 'applied' }),
+      ]),
+    );
+    expect(mark).toMatchObject({ status: 'undelivered', delivered: 1, merged: 2 });
+  });
+
+  it('has no mark when all is delivered, also by hand, or nothing is merged', () => {
+    const done = groupRow({ status: 'merged', delivery: 'applied' });
+    expect(undeliveredMark(run('finished', { applied: 1 }, [done]))).toBeNull();
+    expect(undeliveredMark(run('finished', { merged: 0 }, [groupRow()]))).toBeNull();
+  });
+
+  it('ignores a merged group known to have no files, but not an unknown diff', () => {
+    expect(
+      undeliveredMark(run('finished', {}, [merged({ files: 0, added: 0, removed: 0 })])),
+    ).toBeNull();
+    expect(undeliveredMark(run('finished', {}, [merged(null)]))).not.toBeNull();
+    expect(
+      undeliveredMark(run('finished', {}, [merged({ files: 2, added: 1, removed: 0 })])),
+    ).not.toBeNull();
   });
 });

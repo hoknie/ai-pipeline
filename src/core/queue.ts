@@ -9,7 +9,10 @@ import { mergeTags } from './tags.ts';
 import {
   ON_LIMIT_MODES,
   RECOMMENDATION_LIMIT,
+  actionClosed,
   allGroups,
+  finishedApartFromRepair,
+  isRepairGroup,
   runPhase,
   type OnLimit,
   type RunState,
@@ -31,7 +34,7 @@ export interface QueueItem {
   id: string;
   /** Integer number of the task within the repository; never reused. */
   number: number;
-  workflow: string;
+  pipeline: string;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -41,7 +44,7 @@ export interface QueueItem {
   deliveryMode: DeliveryMode | null;
   /** Ids of catalog tags. */
   tags: string[];
-  /** Ids of workflow steps the task skips. */
+  /** Ids of pipeline steps the task skips. */
   skip: string[];
   /** Ids of queue items or runs of the repository that must be done first. */
   after: string[];
@@ -131,7 +134,7 @@ export interface Queue {
 }
 
 export interface ItemFields {
-  workflow: string;
+  pipeline: string;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;
@@ -201,9 +204,9 @@ function cleanBody(fields: {
   return { task: null, groups: cleanGroups(fields.groups ?? []) };
 }
 
-function cleanWorkflow(workflow: string): string {
-  if (workflow.trim() === '') throw new Rejection('workflow must not be empty');
-  return workflow;
+function cleanPipeline(pipeline: string): string {
+  if (pipeline.trim() === '') throw new Rejection('pipeline must not be empty');
+  return pipeline;
 }
 
 function cleanDeliveryMode(mode: DeliveryMode | null | undefined): DeliveryMode | null | undefined {
@@ -237,7 +240,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
   const item: QueueItem = {
     id,
     number: queue.nextNumber,
-    workflow: cleanWorkflow(fields.workflow),
+    pipeline: cleanPipeline(fields.pipeline),
     ...cleanBody(fields),
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,
@@ -257,7 +260,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
 }
 
 export interface ItemPatch {
-  workflow?: string | undefined;
+  pipeline?: string | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;
@@ -289,13 +292,13 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
     patch.task !== undefined || patch.groups !== undefined
       ? cleanBody({ task: patch.task, groups: patch.groups })
       : null;
-  const workflow = patch.workflow === undefined ? null : cleanWorkflow(patch.workflow);
+  const pipeline = patch.pipeline === undefined ? null : cleanPipeline(patch.pipeline);
   const title = patch.title === undefined ? undefined : cleanTitle(patch.title);
   if (patch.position !== undefined) checkPosition(queue, patch.position);
   const after = patch.after === undefined ? undefined : [...new Set(patch.after)];
   if (after !== undefined) checkDependencies(queue, id, after);
   const deliveryMode = cleanDeliveryMode(patch.deliveryMode);
-  if (workflow !== null) item.workflow = workflow;
+  if (pipeline !== null) item.pipeline = pipeline;
   if (body) Object.assign(item, body);
   if (title !== undefined) item.title = title;
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;
@@ -545,22 +548,25 @@ interface LimitHit {
 
 /** Attempts of a run that ran out of the usage limit, each a problem of its own. */
 function limitHits(state: RunState): LimitHit[] {
-  return allGroups(state).flatMap((group) =>
-    group.attempts.flatMap((attempt) => {
-      const resetsAt = limitResetsAt(attempt);
-      return resetsAt === null
-        ? []
-        : [
-            {
-              key: `${state.run.id}/${group.slug}/usage_limit/${attempt.seq}`,
-              run: state.run.id,
-              group: group.slug,
-              runtime: attempt.runtime,
-              resetsAt,
-            },
-          ];
-    }),
-  );
+  // A limit of the observer's agent is not a limit of the run's work.
+  return allGroups(state)
+    .filter((group) => !isRepairGroup(group))
+    .flatMap((group) =>
+      group.attempts.flatMap((attempt) => {
+        const resetsAt = limitResetsAt(attempt);
+        return resetsAt === null
+          ? []
+          : [
+              {
+                key: `${state.run.id}/${group.slug}/usage_limit/${attempt.seq}`,
+                run: state.run.id,
+                group: group.slug,
+                runtime: attempt.runtime,
+                resetsAt,
+              },
+            ];
+      }),
+    );
 }
 
 /** Keys of every problem and usage limit of a run now. */
@@ -578,7 +584,13 @@ export function problemKeys(state: RunState): string[] {
 export function runProblems(state: RunState): Problem[] {
   const id = state.run.id;
   const problems: Problem[] = [];
-  const work = state.split ? [state.split, ...state.groups] : state.groups;
+  const work = [
+    ...(state.split ? [state.split, ...state.groups] : state.groups),
+    // A failure that the pipeline goes on after is not a problem.
+    ...state.actions.filter(
+      (group) => group.status === 'needs_human' || !actionClosed(state.run, group),
+    ),
+  ];
   for (const group of work) {
     const attempts = group.attempts.length;
     if (
@@ -607,7 +619,9 @@ export function runProblems(state: RunState): Problem[] {
     }
   }
   if (runPhase(state) === 'cancelled') {
-    const total = allGroups(state).reduce((sum, group) => sum + group.attempts.length, 0);
+    const total = allGroups(state)
+      .filter((group) => !isRepairGroup(group))
+      .reduce((sum, group) => sum + group.attempts.length, 0);
     problems.push({
       key: `${id}/run/cancelled/${total}`,
       run: id,
@@ -621,10 +635,11 @@ export function runProblems(state: RunState): Problem[] {
 /** A run keeps its place until it is finished and, with auto delivery, delivered. */
 export function occupiesSlot(state: RunState): boolean {
   if (state.run.hold !== null) return false;
-  if (state.run.finishedAt === null) return true;
+  if (!finishedApartFromRepair(state)) return true;
   if (!state.run.config.delivery.auto) return false;
+  // The delivery a repair started is the observer's, not the place's.
   return (
-    state.run.pendingDelivery !== null ||
+    (state.run.pendingDelivery !== null && !state.run.pendingDelivery.repair) ||
     state.groups.some((group) => group.status === 'merged' && group.delivery.state === 'pending')
   );
 }
@@ -644,7 +659,7 @@ export function freezeCandidate(
     const state = byId.get(id);
     if (!state || id === claimant) continue;
     if (queue.priority.includes(id) || state.run.hold !== null) continue;
-    if (state.run.finishedAt !== null) continue;
+    if (finishedApartFromRepair(state)) continue;
     if (allGroups(state).some((group) => group.status === 'needs_human')) continue;
     return id;
   }
@@ -806,7 +821,12 @@ export function advance(
   for (const item of [...queue.items]) {
     if (item.run === null) continue;
     const state = lookup(item.run);
-    if (state && state.run.finishedAt !== null && retryableGroups(state).length === 0) {
+    if (
+      state &&
+      state.run.finishedAt !== null &&
+      state.run.hold === null &&
+      retryableGroups(state).length === 0
+    ) {
       queue.items = queue.items.filter((candidate) => candidate !== item);
       for (const other of queue.items) {
         other.after = [
@@ -851,6 +871,7 @@ export function advance(
           (item) =>
             !take.includes(item) &&
             !item.postponed &&
+            !(item.run !== null && lookup(item.run)?.run.hold === 'paused') &&
             !(queue.skipFailed && item.error !== null) &&
             itemReadiness(queue, item, lookup) === 'ready',
         )
@@ -894,7 +915,7 @@ function returnItem(state: RunState, id: string, now: number): QueueItem {
   return {
     id,
     number: state.run.number,
-    workflow: state.run.workflow,
+    pipeline: state.run.pipeline,
     task: null,
     groups: null,
     title: state.run.title,
@@ -912,8 +933,8 @@ function returnItem(state: RunState, id: string, now: number): QueueItem {
 
 /**
  * Puts a run on pause (checked before the hold is set): the run leaves its place and becomes the
- * last item of the queue; taking the item continues it. A frozen run already has its item: the
- * item moves to the end.
+ * last item of the queue. The queue never takes the item of a paused run by itself: only an
+ * explicit action lifts the hold. A frozen run already has its item: the item moves to the end.
  */
 export function pauseRun(queue: Queue, state: RunState, id: string, now: number): QueueItem {
   const run = state.run.id;

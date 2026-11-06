@@ -4,7 +4,7 @@ The [web panel](README.md) works through this API, served at its address. With `
 
 ## Conventions
 
-- The queue requests, `/api/config…` and `/api/workflows` accept `repository=<absolute path>`. Without it the most recently added repository is used; while the list is empty, the answer is 409.
+- The queue requests, `/api/config…` and `/api/pipelines` accept `repository=<absolute path>`. Without it the most recently added repository is used; while the list is empty, the answer is 409.
 - A relative path and a path outside a git repository are rejected with code 400. A `repository` field in the request body is ignored.
 - Daemon refusals come back with code 400 and the error text, unless a request below says otherwise.
 
@@ -13,6 +13,7 @@ The [web panel](README.md) works through this API, served at its address. With `
 `/api/events` is a one-way stream of server-sent events (`text/event-stream`), not a WebSocket; commands go as the requests below. Besides runs and queues it carries:
 
 - `repositories`: the list of repositories and its changes;
+- `observers`: the [observers](settings.md#observers) after a change: the same object as the answer of `GET /api/observers`, in the field `observers`;
 - `processes`: the background processes of the agents. The daemon looks at them every 2 seconds while someone is subscribed and sends the list when it changes.
 
 The panel asks `GET /api/processes` once on opening and then every 3 seconds only while the page is visible and the stream is down or has sent no list.
@@ -30,6 +31,7 @@ The panel asks `GET /api/processes` once on opening and then every 3 seconds onl
 | `POST /api/runs/<id>/cancel`, `POST /api/runs/<id>/pause` | Cancels or pauses a run |
 | `POST /api/runs/<id>/apply` | Delivers groups |
 | `POST /api/runs/<id>/delivered` | Marks groups as delivered |
+| `POST /api/runs/<id>/observer` | Allows or forbids observers in a run |
 | `GET /api/runs/<id>/patch` | Downloads the patch of the run |
 
 - `GET /api/finished-runs` returns `{runs, next}`, newest created first.
@@ -37,6 +39,7 @@ The panel asks `GET /api/processes` once on opening and then every 3 seconds onl
   - A `limit` out of range or a `before` that is not a cursor is answered with 400.
 - `POST /api/runs/<id>/title` takes `{"title": "<new title>"}` (trimmed, 1 to 60 characters) and returns the run. The short `name` stays, and a later answer of the naming model does not replace the title. An empty or too long title comes back with code 400, an unknown run with code 404.
 - `POST /api/runs/<id>/skip` takes `{"step": "<step id>", "skip": true}` (`false` brings it back) and returns the run. A refusal (unknown step, a step every group has passed) comes back with code 400.
+- `POST /api/runs/<id>/observer` takes `{"enabled": <boolean>}` and returns the run. `false` stops the repair in progress and forbids observers in this task; `true` gives it back and resets the repair count. A wrong body comes back with code 400, an unknown run with code 404.
 
 ### The patch of a run
 
@@ -96,19 +99,32 @@ All paths start with `/api/runs/<id>/groups/<group>`.
 - `POST /api/queue/dismiss` takes `{"run": "<run id>"}` and returns the queue. A run that is not skipped comes back with code 400, an unknown run with code 404.
 - `POST /api/queue/settings` takes `parallel`, `autopilot`, `autoAnswer`, `skipFailed`, `autopilotAnswer` and `onLimit`, all optional. An empty body is answered with 400.
 
+## Observers
+
+| Request | What it does |
+|---|---|
+| `GET /api/observers` | The settings of the observers and the repairs in progress and waiting |
+| `PUT /api/observers` | Saves the settings |
+
+- These requests do not read `repository` and work while the list of repositories is empty.
+- Both answer with `{"settings": {...}, "workers": {...}}`. `settings` has the fields of [Observers](settings.md#observers): `enabled`, `workers` (a number), `maxRepairs`, `answerHumanOnly`, `projects`, `specialist`. The outer `workers` is `{"running": [{runId, repository, incident}], "waiting": <number>}`.
+- `PUT /api/observers` takes the settings without a wrapper, not the answer of `GET`.
+  - The body may be partial: only the keys that are sent change, and an unknown key comes back with code 422.
+  - Code 200 returns the object above. Invalid values come back with code 422 and `{"errors": [...]}` with the path of each field, and the settings stay as they were. A body that is not an object comes back with code 400.
+
 ## Configuration
 
 | Request | What it does |
 |---|---|
 | `GET /api/config` | The configuration and its `revision` |
 | `GET /api/config/catalog` | The catalog of skills and tools for suggestions |
-| `GET /api/workflows` | The workflows of a repository |
+| `GET /api/pipelines` | The pipelines of a repository |
 | `PUT /api/config/settings`, `PUT /api/config/settings/<path>` | Writes several fields or one field of `settings.yaml` |
-| `PUT /api/config/specialists/<slug>`, `PUT /api/config/workflows/<id>` | Writes a file |
-| `DELETE /api/config/specialists/<slug>`, `DELETE /api/config/workflows/<id>` | Deletes a file |
-| `POST /api/config/workflows/<id>/preview` | The graph of a draft |
-| `POST /api/config/specialists/import`, `POST /api/config/workflows/import` | Imports from another repository |
-| `GET /api/shared-specialists`, `GET /api/shared-workflows` | Shared entries with their usage |
+| `PUT /api/config/specialists/<slug>`, `PUT /api/config/pipelines/<id>` | Writes a file |
+| `DELETE /api/config/specialists/<slug>`, `DELETE /api/config/pipelines/<id>` | Deletes a file |
+| `POST /api/config/pipelines/<id>/preview` | The graph of a draft |
+| `POST /api/config/specialists/import`, `POST /api/config/pipelines/import` | Imports from another repository |
+| `GET /api/shared-specialists`, `GET /api/shared-pipelines` | Shared entries with their usage |
 | `GET /api/specialist-tags` | The tags of specialists |
 | `PUT /api/specialist-tags/specialists/<slug>` | Sets the tags of a specialist |
 | `POST /api/specialist-tags/rename`, `POST /api/specialist-tags/remove` | Renames or removes a tag of specialists |

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import { parse as parseYaml } from 'yaml';
 
 import {
@@ -170,7 +170,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
     .description('Tasks waiting for a start: add, reorder and run them one by one or in parallel');
   const taskOptions = (command: Command): Command =>
     command
-      .option('-t, --task <text>', 'one task; the workflow may split it into groups')
+      .option('-t, --task <text>', 'one task; the pipeline may split it into groups')
       .option('-g, --groups <file>', 'YAML or JSON file with a list of { title, task }')
       .option('--title <text>', 'title of the run (at most 60 characters)')
       .option(
@@ -187,7 +187,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
         '--parent <run>',
         'run id or task number (161 or #161) whose linked task tag the task gets',
       )
-      .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
+      .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
       .option(
         '--after <id>',
         'queue item or run that must be done first; repeat for several',
@@ -210,7 +210,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
       queue
         .command('add')
         .description('Add a task to the end of the queue; it does not start the queue')
-        .argument('<workflow>', 'workflow id from swarm.yaml')
+        .argument('<pipeline>', 'pipeline id from swarm.yaml')
         .option('--postpone', 'postpone the task: a running queue does not take it'),
     ),
   )
@@ -225,14 +225,14 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
         'aip queue add feature --task "Later" --postpone',
       ]),
     )
-    .action(async (workflow: string, options: QueueTaskOptions) => {
+    .action(async (pipeline: string, options: QueueTaskOptions) => {
       if ((options.task === undefined) === (options.groups === undefined)) {
         throw new Error('pass exactly one of --task and --groups');
       }
       const deliveryMode = parseDeliveryMode(options.deliveryMode);
       const view = (await call(context(), 'queue_add', {
         repository: resolve(options.repo),
-        workflow,
+        pipeline,
         ...(options.task !== undefined ? { task: options.task } : {}),
         ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
         ...(options.title !== undefined ? { title: options.title } : {}),
@@ -262,12 +262,13 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
         .on('option:no-parent', () => (editNoParent = true))
         .description('Change a waiting task')
         .argument('<item>', 'item id from `aip queue list`')
-        .option('-w, --workflow <id>', 'new workflow id')
+        .option('-p, --pipeline <id>', 'new pipeline id')
+        .addOption(new Option('-w, --workflow <id>', 'old name of --pipeline').hideHelp())
         .option('--default-auto-deliver', 'follow delivery.auto of the configuration again')
         .option('--default-delivery-mode', 'follow delivery.mode of the configuration again')
         .option('--no-tags', 'remove all tags of the task')
         .option('--no-parent', 'remove the linked task tags of the task')
-        .option('--no-skips', 'run every step of the workflow again')
+        .option('--no-skips', 'run every step of the pipeline again')
         .option('--no-after', 'remove all predecessors of the task')
         .option('--postpone', 'postpone the task: a running queue does not take it')
         .option('--no-postpone', 'take the task into work again'),
@@ -277,7 +278,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
       'after',
       examples([
         'aip queue edit 1 --task "New wording"',
-        'aip queue edit 1 --workflow feature',
+        'aip queue edit 1 --pipeline feature',
         'aip queue edit 1 --skip qa',
         'aip queue edit 1 --no-skips',
         'aip queue edit 2 --after q1',
@@ -292,6 +293,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
       async (
         item: string,
         options: QueueTaskOptions & {
+          pipeline?: string;
           workflow?: string;
           defaultAutoDeliver?: boolean;
           defaultDeliveryMode?: boolean;
@@ -299,6 +301,10 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
           skips?: boolean;
         },
       ) => {
+        if (options.pipeline !== undefined && options.workflow !== undefined) {
+          throw new Error('--workflow is the old name of --pipeline; pass only --pipeline');
+        }
+        const pipeline = options.pipeline ?? options.workflow;
         if (editAfter && editNoAfter) {
           throw new Error('--no-after cannot be combined with --after');
         }
@@ -326,7 +332,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
           (await call(context(), 'queue_edit', {
             repository: resolve(options.repo),
             item,
-            ...(options.workflow !== undefined ? { workflow: options.workflow } : {}),
+            ...(pipeline !== undefined ? { pipeline } : {}),
             ...(options.task !== undefined ? { task: options.task } : {}),
             ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
             ...(options.title !== undefined ? { title: options.title } : {}),
@@ -704,15 +710,15 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
   const { print, output, examples, context, activeStyle } = bind(io, style);
   const run = program
     .command('run')
-    .description('Start, follow, deliver and clean up runs of a workflow');
+    .description('Start, follow, deliver and clean up runs of a pipeline');
 
   run
     .command('start')
     .description(
-      'Queue a workflow task of the aip/ configuration: it goes to the end of the repository queue, a stopped queue is started',
+      'Queue a pipeline task of the aip/ configuration: it goes to the end of the repository queue, a stopped queue is started',
     )
-    .argument('<workflow>', 'workflow id from the aip/ configuration')
-    .option('-t, --task <text>', 'one task; the workflow may split it into groups')
+    .argument('<pipeline>', 'pipeline id from the aip/ configuration')
+    .option('-t, --task <text>', 'one task; the pipeline may split it into groups')
     .option('-g, --groups <file>', 'YAML or JSON file with a list of { title, task }')
     .option('-r, --repo <path>', 'repository path', '.')
     .option(
@@ -733,7 +739,7 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
       '--parent <run>',
       'run id or task number (161 or #161) whose linked task tag the task gets',
     )
-    .option('--skip <step>', 'step of the workflow to skip; repeat for several', collect)
+    .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
     .option(
       '--after <id>',
       'queue item or run that must be done first; repeat for several',
@@ -753,7 +759,7 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
     )
     .action(
       async (
-        workflow: string,
+        pipeline: string,
         options: {
           task?: string;
           groups?: string;
@@ -775,7 +781,7 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
         const deliveryMode = parseDeliveryMode(options.deliveryMode);
         const queued = (await call(context(), 'run', {
           repository: resolve(options.repo),
-          workflow,
+          pipeline,
           ...(options.task !== undefined ? { task: options.task } : {}),
           ...(groups ? { groups } : {}),
           ...(options.title !== undefined ? { title: options.title } : {}),
@@ -873,7 +879,7 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
   run
     .command('pause')
     .description(
-      'Pause a run: the running agents stop, nothing new starts, and the run goes to the end of the queue; "aip queue run-now" continues the interrupted step in the same session',
+      'Pause a run: the running agents stop, nothing new starts, and the run goes to the end of the queue; "aip queue run <item>" continues the interrupted step in the same session',
     )
     .argument('<run-id>', 'run id')
     .option('-r, --repo <path>', 'repository path; defaults to the repository of the run')
@@ -1176,13 +1182,15 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
           );
         throw error;
       }
-      print(`aip web: ${web.url}`);
-      print('Press Ctrl+C to stop.');
-      if (options.open) openBrowser(web.url, io.stderr);
-      await new Promise<void>((resolve) => {
+      // Before the link: whoever reads it may stop this process at once.
+      const stopped = new Promise<void>((resolve) => {
         io.onSignal('SIGINT', resolve);
         io.onSignal('SIGTERM', resolve);
       });
+      print(`aip web: ${web.url}`);
+      print('Press Ctrl+C to stop.');
+      if (options.open) openBrowser(web.url, io.stderr);
+      await stopped;
       await web.close();
     });
 
@@ -1317,9 +1325,16 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
     .option('--socket <path>', 'daemon socket (worker mode)')
     .option('--split', 'also serve swarm_split (split step)')
     .option('--queue', 'also serve swarm_queue_add (specialist with queue: true)')
+    .option('--repair', 'also serve swarm_repair_* (observer of an incident)')
     .addHelpText('after', examples(['aip mcp', 'aip mcp --queue']))
     .action(
-      async (options: { worker?: string; socket?: string; split?: boolean; queue?: boolean }) => {
+      async (options: {
+        worker?: string;
+        socket?: string;
+        split?: boolean;
+        queue?: boolean;
+        repair?: boolean;
+      }) => {
         // Imported on demand: every attempt of a specialist starts a worker server.
         const [{ createHostServer, createWorkerServer }, { StdioServerTransport }] =
           await Promise.all([
@@ -1333,6 +1348,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
             token: options.worker,
             split: options.split ?? false,
             queue: options.queue ?? false,
+            repair: options.repair ?? false,
             send: (method, params) => request(socket, method as Method, params as never),
           });
           await server.connect(new StdioServerTransport());

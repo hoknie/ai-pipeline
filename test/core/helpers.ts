@@ -18,7 +18,7 @@ export const CONFIG_TEXT = `swarm:
     coder: { name: Кодировщик, runtime: opencode, model: anthropic/sonnet }
     reviewer: { name: Ревьюер, permissions: read }
     qa: { name: Тестировщик }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: plan, specialist: plan }
@@ -50,7 +50,7 @@ export function run(
     id: options.id ?? 'run000000001',
     number: 1,
     repository: '/repo',
-    workflow: 'feature',
+    pipeline: 'feature',
     baseCommit: 'abc',
     config: resolved,
     dirtyWarning: false,

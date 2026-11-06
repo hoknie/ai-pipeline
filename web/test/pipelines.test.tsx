@@ -5,24 +5,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/App.tsx';
 import type { Api } from '../src/api.ts';
-import { PREVIEW_DELAY_MS, draftOf, valueOf } from '../src/components/WorkflowForm.tsx';
-import WorkflowsPage from '../src/components/WorkflowsPage.tsx';
+import { PREVIEW_DELAY_MS, draftOf, valueOf } from '../src/components/PipelineForm.tsx';
+import PipelinesPage from '../src/components/PipelinesPage.tsx';
 import { formatRoute, parseRoute } from '../src/route.ts';
-import type { EditorWorkflow } from '../src/types.ts';
+import type { EditorPipeline } from '../src/types.ts';
 
 import {
+  actionEntry,
   configView,
   fakeApi,
   openFake,
   runView,
   specialistEntry,
-  workflowOf,
+  pipelineOf,
   sourcesFor,
+  systemStagesView,
 } from './fixtures.ts';
 
-vi.mock('../src/components/WorkflowGraph.tsx', () => ({
-  WorkflowGraph: ({ workflow }: { workflow: { id: string; steps: { id: string }[] } }) => (
-    <div data-testid="graph">{workflow.steps.map((step) => step.id).join(',')}</div>
+vi.mock('../src/components/PipelineGraph.tsx', () => ({
+  PipelineGraph: ({ pipeline }: { pipeline: { id: string; steps: { id: string }[] } }) => (
+    <div data-testid="graph">{pipeline.steps.map((step) => step.id).join(',')}</div>
   ),
 }));
 
@@ -44,25 +46,25 @@ const RAW = {
   ],
 };
 
-function entry(id: string, overrides: Partial<EditorWorkflow> = {}): EditorWorkflow {
+function entry(id: string, overrides: Partial<EditorPipeline> = {}): EditorPipeline {
   const base = {
     id,
     level: 'project' as const,
-    file: `/repo/aip/workflows/${id}.yaml`,
+    file: `/repo/aip/pipelines/${id}.yaml`,
     revision: `rev-${id}`,
     raw: RAW,
     shared_tags: [] as string[],
     own_tags: [] as string[],
     ...overrides,
   };
-  return { ...base, sources: overrides.sources ?? sourcesFor('workflows', base) };
+  return { ...base, sources: overrides.sources ?? sourcesFor('pipelines', base) };
 }
 
 const specialists = ['plan', 'coder', 'reviewer', 'writer'].map((slug) => specialistEntry(slug));
 
-function api(overrides: Partial<Api> = {}, workflows = [entry('feature')]): Api {
+function api(overrides: Partial<Api> = {}, pipelines = [entry('feature')]): Api {
   return fakeApi({
-    config: vi.fn(async () => configView({ specialists, workflows })),
+    config: vi.fn(async () => configView({ specialists, pipelines })),
     ...overrides,
   });
 }
@@ -77,7 +79,7 @@ function Page({
   runs?: ReturnType<typeof runView>[];
 }) {
   const [selected, setSelected] = useState<string | null>(start);
-  return <WorkflowsPage api={api} runs={runs} selected={selected} onSelect={setSelected} />;
+  return <PipelinesPage api={api} runs={runs} selected={selected} onSelect={setSelected} />;
 }
 
 const stepBox = async (index: number) =>
@@ -110,16 +112,16 @@ describe('the name of a pipeline', () => {
   });
 
   it('saves a new pipeline with the name from the field', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="new" />);
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="new" />);
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Мой пайплайн' } });
     fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'mine' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     const added = await stepBox(0);
     choose(within(added).getByRole('combobox', { name: 'step specialist' }), 'writer');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    const [id, value] = writeWorkflow.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const [id, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(id).toBe('mine');
     expect(Object.keys(value)[0]).toBe('name');
     expect(value.name).toBe('Мой пайплайн');
@@ -127,11 +129,11 @@ describe('the name of a pipeline', () => {
 
   it('shows the error of an empty name at the field', async () => {
     const named = entry('feature', { raw: { ...RAW, name: 'x' } });
-    const previewWorkflow = vi.fn(async () => ({
+    const previewPipeline = vi.fn(async () => ({
       topology: null,
-      errors: [{ path: 'swarm.workflows.feature.name', message: 'must not be empty' }],
+      errors: [{ path: 'swarm.pipelines.feature.name', message: 'must not be empty' }],
     }));
-    render(<Page api={api({ previewWorkflow }, [named])} start="feature" />);
+    render(<Page api={api({ previewPipeline }, [named])} start="feature" />);
     const field = await screen.findByLabelText('Name');
     fireEvent.change(field, { target: { value: ' ' } });
     expect(await screen.findByText('must not be empty')).toBeTruthy();
@@ -139,15 +141,15 @@ describe('the name of a pipeline', () => {
 });
 
 describe('routes and the tab', () => {
-  it('still reads the old workflows addresses', () => {
+  it('still reads the old addresses', () => {
     expect(parseRoute('#workflows/feature')).toEqual({
-      view: 'workflows',
+      view: 'pipelines',
       run: 'feature',
       group: null,
       step: null,
       tab: null,
     });
-    expect(parseRoute('#workflows').view).toBe('workflows');
+    expect(parseRoute('#workflows').view).toBe('pipelines');
   });
 
   it('replaces an old address with the new one', async () => {
@@ -157,21 +159,21 @@ describe('routes and the tab', () => {
     expect(window.location.hash).toBe('#pipelines/feature');
   });
 
-  it('reads and writes the workflows addresses', () => {
+  it('reads and writes the pipelines addresses', () => {
     expect(parseRoute('#pipelines/feature')).toEqual({
-      view: 'workflows',
+      view: 'pipelines',
       run: 'feature',
       group: null,
       step: null,
       tab: null,
     });
     expect(parseRoute('#pipelines').run).toBeNull();
-    expect(formatRoute({ view: 'workflows', run: 'new', group: null, step: null, tab: null })).toBe(
+    expect(formatRoute({ view: 'pipelines', run: 'new', group: null, step: null, tab: null })).toBe(
       '#pipelines/new',
     );
   });
 
-  it('shows the file of a workflow as a chip under the heading, none for a new one', async () => {
+  it('shows the file of a pipeline as a chip under the heading, none for a new one', async () => {
     window.location.hash = '#pipelines/feature';
     render(<App api={api()} openStream={openFake} />);
     const heading = await screen.findByRole('heading', { name: 'feature' });
@@ -189,7 +191,7 @@ describe('routes and the tab', () => {
     expect(created.closest('section')!.querySelector('code')).toBeNull();
   });
 
-  it('opens the form of the workflow from the address', async () => {
+  it('opens the form of the pipeline from the address', async () => {
     window.location.hash = '#pipelines/feature';
     render(<App api={api()} openStream={openFake} />);
     expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
@@ -201,7 +203,7 @@ describe('routes and the tab', () => {
 });
 
 describe('the list', () => {
-  it('shows the levels and the errors, and overrides a global workflow', async () => {
+  it('shows the levels and the errors, and overrides a global pipeline', async () => {
     let level: 'global' | 'project_over_global' = 'global';
     const quick = () =>
       entry('quick', {
@@ -212,15 +214,15 @@ describe('the list', () => {
     const config = vi.fn(async () =>
       configView({
         specialists,
-        workflows: [entry('feature'), quick()],
+        pipelines: [entry('feature'), quick()],
         errors: [{ file: '/repo/aip/settings.yaml', path: 'swarm.max', message: 'bad' }],
       }),
     );
-    const writeWorkflow = vi.fn(async () => {
+    const writePipeline = vi.fn(async () => {
       level = 'project_over_global';
       return { ok: true as const, revision: 'rev-quick', file: '/f' };
     });
-    render(<Page api={fakeApi({ config, writeWorkflow })} start="quick" />);
+    render(<Page api={fakeApi({ config, writePipeline })} start="quick" />);
     const list = await screen.findByRole('list', { name: 'pipeline' });
     await waitFor(() => expect(within(list).getByText('global')).toBeTruthy());
     expect(within(list).getByText('project')).toBeTruthy();
@@ -230,7 +232,7 @@ describe('the list', () => {
     ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Override in the project' }));
     await waitFor(() =>
-      expect(writeWorkflow).toHaveBeenCalledWith(
+      expect(writePipeline).toHaveBeenCalledWith(
         'quick',
         { steps: [{ id: 'code', specialist: 'coder' }] },
         null,
@@ -264,13 +266,13 @@ describe('steps', () => {
   });
 
   it('renames a step by changing its specialist and updates the steps that return to it', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="feature" />);
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="feature" />);
     const plan = await stepBox(0);
     choose(within(plan).getByRole('combobox', { name: 'step specialist' }), 'writer');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    const [, value, revision] = writeWorkflow.mock.calls[0] as unknown as [
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const [, value, revision] = writePipeline.mock.calls[0] as unknown as [
       string,
       { steps: { id: string; on_reject?: { goto: string } }[] },
       string,
@@ -281,17 +283,17 @@ describe('steps', () => {
   });
 
   it('adds, moves and removes steps, keeping the focus on the step', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="feature" />);
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="feature" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Add step' }));
     const added = await stepBox(3);
     choose(within(added).getByRole('combobox', { name: 'step specialist' }), 'writer');
     fireEvent.click(within(added).getByRole('button', { name: 'up' }));
     fireEvent.click(within(await stepBox(0)).getByRole('button', { name: 'delete step' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
     const value = (
-      writeWorkflow.mock.calls[0] as unknown as [string, ReturnType<typeof valueOf>]
+      writePipeline.mock.calls[0] as unknown as [string, ReturnType<typeof valueOf>]
     )[1];
     expect(value).toEqual({
       steps: [
@@ -303,22 +305,22 @@ describe('steps', () => {
   });
 
   it('keeps a return that points below after a move and shows the error of the check', async () => {
-    const previewWorkflow = vi.fn(async (_id: string, value: Record<string, unknown>) => {
+    const previewPipeline = vi.fn(async (_id: string, value: Record<string, unknown>) => {
       const steps = value.steps as { id: string }[];
       return steps[1]?.id === 'review'
         ? {
             topology: null,
             errors: [
               {
-                path: 'swarm.workflows.feature.steps[1].on_reject.goto',
+                path: 'swarm.pipelines.feature.steps[1].on_reject.goto',
                 message: 'must name an earlier step',
               },
             ],
           }
-        : { topology: workflowOf(), errors: [] };
+        : { topology: pipelineOf(), errors: [] };
     });
     vi.useFakeTimers();
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    render(<Page api={api({ previewPipeline })} start="feature" />);
     await act(async () => {});
     fireEvent.click(within(stepNow(2)).getByRole('button', { name: 'up' }));
     await act(async () => {
@@ -334,7 +336,7 @@ describe('steps', () => {
 
 describe('group steps of the split', () => {
   const epicRaw = { split: { specialist: 'plan' }, steps: [{ id: 'plan', specialist: 'plan' }] };
-  const targetRaw = { split: { specialist: 'plan', workflow: 'explore' } };
+  const targetRaw = { split: { specialist: 'plan', pipeline: 'explore' } };
   const epicApi = (overrides: Partial<Api> = {}, epic: Record<string, unknown> = epicRaw) =>
     api(overrides, [
       entry('epic', { raw: epic }),
@@ -344,9 +346,9 @@ describe('group steps of the split', () => {
   const picker = () => screen.findByRole('combobox', { name: 'group steps' });
   const saved = () => vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
 
-  it('hides the steps and links to the target, writing split.workflow without steps', async () => {
-    const writeWorkflow = saved();
-    render(<Page api={epicApi({ writeWorkflow })} start="epic" />);
+  it('hides the steps and links to the target, writing split.pipeline without steps', async () => {
+    const writePipeline = saved();
+    render(<Page api={epicApi({ writePipeline })} start="epic" />);
     choose(await picker(), 'explore');
     expect(screen.queryByRole('list', { name: 'steps' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add step' })).toBeNull();
@@ -354,9 +356,9 @@ describe('group steps of the split', () => {
       '#pipelines/explore',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    const [, value] = writeWorkflow.mock.calls[0] as unknown as [string, Record<string, unknown>];
-    expect(value).toEqual({ split: { specialist: 'plan', workflow: 'explore' } });
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const [, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(value).toEqual({ split: { specialist: 'plan', pipeline: 'explore' } });
   });
 
   it('keeps the own steps when switching back', async () => {
@@ -369,7 +371,7 @@ describe('group steps of the split', () => {
     expect(screen.getByRole('button', { name: 'Add step' })).toBeTruthy();
   });
 
-  it('does not offer a workflow with its own split.workflow or the workflow itself', async () => {
+  it('does not offer a pipeline with its own split.pipeline or the pipeline itself', async () => {
     render(<Page api={epicApi()} start="epic" />);
     fireEvent.keyDown(await picker(), { key: 'Enter' });
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
@@ -378,14 +380,14 @@ describe('group steps of the split', () => {
     ]);
   });
 
-  it('saves a workflow with a target unchanged', async () => {
-    const writeWorkflow = saved();
-    render(<Page api={epicApi({ writeWorkflow }, targetRaw)} start="epic" />);
+  it('saves a pipeline with a target unchanged', async () => {
+    const writePipeline = saved();
+    render(<Page api={epicApi({ writePipeline }, targetRaw)} start="epic" />);
     expect((await picker()).textContent).toBe('explore');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    const [, value] = writeWorkflow.mock.calls[0] as unknown as [string, Record<string, unknown>];
-    expect(value).toEqual({ split: { specialist: 'plan', workflow: 'explore' } });
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const [, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(value).toEqual({ split: { specialist: 'plan', pipeline: 'explore' } });
   });
 
   const failing = (path: string) =>
@@ -396,10 +398,10 @@ describe('group steps of the split', () => {
     }));
 
   it.each([
-    ['swarm.workflows.epic.split.workflow', targetRaw],
-    ['swarm.workflows.epic.steps', epicRaw],
+    ['swarm.pipelines.epic.split.pipeline', targetRaw],
+    ['swarm.pipelines.epic.steps', epicRaw],
   ])('shows the error of %s at the choice, not in the general block', async (path, raw) => {
-    render(<Page api={epicApi({ writeWorkflow: failing(path) }, raw)} start="epic" />);
+    render(<Page api={epicApi({ writePipeline: failing(path) }, raw)} start="epic" />);
     await picker();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const split = await screen.findByRole('group', { name: 'Task split' });
@@ -438,13 +440,13 @@ describe('human review', () => {
 describe('preview', () => {
   it('asks once for a series of edits, after the delay', async () => {
     vi.useFakeTimers();
-    const previewWorkflow = vi.fn(async () => ({ topology: workflowOf(), errors: [] }));
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    const previewPipeline = vi.fn(async () => ({ topology: pipelineOf(), errors: [] }));
+    render(<Page api={api({ previewPipeline })} start="feature" />);
     await act(async () => {});
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
-    expect(previewWorkflow).toHaveBeenCalledTimes(1);
+    expect(previewPipeline).toHaveBeenCalledTimes(1);
     const input = stepNow(0).querySelector('textarea[aria-label="additional step prompt"]')!;
     for (const text of ['p', 'pl', 'pla', 'plan2']) {
       fireEvent.change(input, { target: { value: text } });
@@ -452,12 +454,12 @@ describe('preview', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
     }
-    expect(previewWorkflow).toHaveBeenCalledTimes(1);
+    expect(previewPipeline).toHaveBeenCalledTimes(1);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
-    expect(previewWorkflow).toHaveBeenCalledTimes(2);
-    const last = previewWorkflow.mock.calls[1] as unknown as [
+    expect(previewPipeline).toHaveBeenCalledTimes(2);
+    const last = previewPipeline.mock.calls[1] as unknown as [
       string,
       { steps: { additional_prompt: string }[] },
     ];
@@ -469,19 +471,19 @@ describe('preview', () => {
 
   it('keeps the last graph marked as outdated while the draft is invalid', async () => {
     vi.useFakeTimers();
-    const previewWorkflow = vi
+    const previewPipeline = vi
       .fn()
-      .mockResolvedValueOnce({ topology: workflowOf(), errors: [] })
+      .mockResolvedValueOnce({ topology: pipelineOf(), errors: [] })
       .mockResolvedValue({
         topology: null,
         errors: [
           {
-            path: 'swarm.workflows.feature.steps[0].specialist',
+            path: 'swarm.pipelines.feature.steps[0].specialist',
             message: 'unknown specialist `reviewr`',
           },
         ],
       });
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    render(<Page api={api({ previewPipeline })} start="feature" />);
     await act(async () => {});
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
@@ -502,15 +504,15 @@ describe('preview', () => {
 
   it('drops the answer to an older draft', async () => {
     vi.useFakeTimers();
-    const resolvers: ((value: { topology: ReturnType<typeof workflowOf>; errors: [] }) => void)[] =
+    const resolvers: ((value: { topology: ReturnType<typeof pipelineOf>; errors: [] }) => void)[] =
       [];
-    const previewWorkflow = vi.fn(
+    const previewPipeline = vi.fn(
       () =>
-        new Promise<{ topology: ReturnType<typeof workflowOf>; errors: [] }>((resolve) => {
+        new Promise<{ topology: ReturnType<typeof pipelineOf>; errors: [] }>((resolve) => {
           resolvers.push(resolve);
         }),
     );
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    render(<Page api={api({ previewPipeline })} start="feature" />);
     await act(async () => {});
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
@@ -523,8 +525,8 @@ describe('preview', () => {
     });
     expect(resolvers).toHaveLength(2);
     const topology = (id: string) => ({
-      ...workflowOf(),
-      steps: [{ ...workflowOf().steps[0]!, id }],
+      ...pipelineOf(),
+      steps: [{ ...pipelineOf().steps[0]!, id }],
     });
     await act(async () => {
       resolvers[1]!({ topology: topology('fresh'), errors: [] });
@@ -539,13 +541,13 @@ describe('preview', () => {
 
 describe('tabs', () => {
   it('shows the form first and the graph on the preview tab, keeping the draft', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
-    const previewWorkflow = vi.fn(async () => ({ topology: workflowOf(), errors: [] }));
-    render(<Page api={api({ writeWorkflow, previewWorkflow })} start="feature" />);
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
+    const previewPipeline = vi.fn(async () => ({ topology: pipelineOf(), errors: [] }));
+    render(<Page api={api({ writePipeline, previewPipeline })} start="feature" />);
     await stepBox(0);
     expect(screen.getByRole('tab', { name: /Form/ }).getAttribute('aria-selected')).toBe('true');
     expect(screen.queryByTestId('graph')).toBeNull();
-    await waitFor(() => expect(previewWorkflow).toHaveBeenCalled());
+    await waitFor(() => expect(previewPipeline).toHaveBeenCalled());
     openPreview();
     expect(screen.getByTestId('graph')).toBeTruthy();
     expect(screen.queryAllByRole('listitem', { name: /^step \d+$/ })).toHaveLength(0);
@@ -556,8 +558,8 @@ describe('tabs', () => {
     });
     openPreview();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    const written = writeWorkflow.mock.calls[0] as unknown as [
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const written = writePipeline.mock.calls[0] as unknown as [
       string,
       { steps: { additional_prompt: string }[] },
     ];
@@ -565,15 +567,15 @@ describe('tabs', () => {
   });
 
   it('marks the preview tab as outdated and keeps the errors on the form', async () => {
-    const previewWorkflow = vi.fn(async () => ({
+    const previewPipeline = vi.fn(async () => ({
       topology: null,
       errors: [
-        { path: 'swarm.workflows.feature.steps[0].specialist', message: 'unknown specialist `x`' },
+        { path: 'swarm.pipelines.feature.steps[0].specialist', message: 'unknown specialist `x`' },
       ],
     }));
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    render(<Page api={api({ previewPipeline })} start="feature" />);
     await stepBox(0);
-    await waitFor(() => expect(previewWorkflow).toHaveBeenCalled());
+    await waitFor(() => expect(previewPipeline).toHaveBeenCalled());
     await waitFor(() =>
       expect(within(screen.getByRole('tab', { name: /Preview/ })).getByText('stale')).toBeTruthy(),
     );
@@ -585,8 +587,8 @@ describe('tabs', () => {
 
 describe('saving and deleting', () => {
   it('says that new runs get the change and clears the unsaved state', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="feature" />);
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="feature" />);
     fireEvent.change(
       (await stepBox(0)).querySelector('textarea[aria-label="additional step prompt"]')!,
       {
@@ -598,21 +600,21 @@ describe('saving and deleting', () => {
   });
 
   it('shows the errors of a refused save and offers to reread after a conflict', async () => {
-    const writeWorkflow = vi
+    const writePipeline = vi
       .fn()
       .mockResolvedValueOnce({
         ok: false,
         reason: 'invalid',
         errors: [
           {
-            path: 'swarm.workflows.feature.steps[1].on_reject.max_rounds',
+            path: 'swarm.pipelines.feature.steps[1].on_reject.max_rounds',
             message: 'must be an integer from 1 to 10',
           },
         ],
       })
       .mockResolvedValueOnce({ ok: false, reason: 'conflict', message: 'file changed' });
-    const config = vi.fn(async () => configView({ specialists, workflows: [entry('feature')] }));
-    render(<Page api={fakeApi({ config, writeWorkflow })} start="feature" />);
+    const config = vi.fn(async () => configView({ specialists, pipelines: [entry('feature')] }));
+    render(<Page api={fakeApi({ config, writePipeline })} start="feature" />);
     fireEvent.change(
       (await stepBox(0)).querySelector('textarea[aria-label="additional step prompt"]')!,
       {
@@ -636,15 +638,15 @@ describe('saving and deleting', () => {
     await waitFor(() => expect(config).toHaveBeenCalledTimes(2));
   });
 
-  it('names the active runs when deleting a workflow', async () => {
-    const deleteWorkflow = vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' }));
+  it('names the active runs when deleting a pipeline', async () => {
+    const deletePipeline = vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' }));
     render(
       <Page
-        api={api({ deleteWorkflow })}
+        api={api({ deletePipeline })}
         start="feature"
         runs={[
-          runView({ workflow: 'feature' }),
-          runView({ id: 'done', workflow: 'feature', finished: true }),
+          runView({ pipeline: 'feature' }),
+          runView({ id: 'done', pipeline: 'feature', finished: true }),
         ]}
       />,
     );
@@ -653,30 +655,30 @@ describe('saving and deleting', () => {
     expect(dialog.textContent).toContain('Runs in progress: 1');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() =>
-      expect(deleteWorkflow).toHaveBeenCalledWith('feature', 'rev-feature', 'project'),
+      expect(deletePipeline).toHaveBeenCalledWith('feature', 'rev-feature', 'project'),
     );
     expect((await screen.findAllByText('Pipeline «feature» deleted')).length).toBeGreaterThan(0);
   });
 
-  it('saves a copy under a new id and creates a workflow from an empty form', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="feature" />);
+  it('saves a copy under a new id and creates a pipeline from an empty form', async () => {
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="feature" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Save as…' }));
     fireEvent.change(screen.getByLabelText('New id'), { target: { value: 'feature-2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create a copy' }));
     await waitFor(() =>
-      expect(writeWorkflow).toHaveBeenCalledWith('feature-2', expect.anything(), null, 'project'),
+      expect(writePipeline).toHaveBeenCalledWith('feature-2', expect.anything(), null, 'project'),
     );
     cleanup();
-    writeWorkflow.mockClear();
-    render(<Page api={api({ writeWorkflow })} />);
+    writePipeline.mockClear();
+    render(<Page api={api({ writePipeline })} />);
     fireEvent.click(await screen.findByRole('button', { name: 'New pipeline' }));
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'quick' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     choose(within(await stepBox(0)).getByRole('combobox', { name: 'step specialist' }), 'coder');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(writeWorkflow).toHaveBeenCalledWith(
+      expect(writePipeline).toHaveBeenCalledWith(
         'quick',
         { steps: [{ id: 'coder', specialist: 'coder' }] },
         null,
@@ -687,7 +689,7 @@ describe('saving and deleting', () => {
 });
 
 describe('draft conversion', () => {
-  it('round-trips a workflow with split and a prompt on a step', () => {
+  it('round-trips a pipeline with split and a prompt on a step', () => {
     const raw = {
       split: { specialist: 'plan', max_groups: 5, additional_prompt: 'не больше модуля' },
       steps: [
@@ -746,7 +748,7 @@ describe('leaving with unsaved edits', () => {
   it('asks before leaving the form and stays on «Stay»', async () => {
     const view = configView({
       specialists,
-      workflows: [entry('feature'), entry('quick')],
+      pipelines: [entry('feature'), entry('quick')],
     });
     render(<Page api={fakeApi({ config: vi.fn(async () => view) })} start="feature" />);
     fireEvent.change(
@@ -772,16 +774,16 @@ describe('global level', () => {
   const globalEntry = () =>
     entry('quick', {
       level: 'global',
-      file: '/xdg/aip/workflows/quick.yaml',
+      file: '/xdg/aip/pipelines/quick.yaml',
       revision: null,
       raw: { steps: [{ id: 'code', specialist: 'coder' }] },
     });
 
-  it('opens a shared workflow for viewing only, with a link to the settings', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
-    const previewWorkflow = vi.fn(async () => ({ topology: null, errors: [] }));
-    const config = vi.fn(async () => configView({ specialists, workflows: [globalEntry()] }));
-    render(<Page api={fakeApi({ config, writeWorkflow, previewWorkflow })} start="quick" />);
+  it('opens a shared pipeline for viewing only, with a link to the settings', async () => {
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
+    const previewPipeline = vi.fn(async () => ({ topology: null, errors: [] }));
+    const config = vi.fn(async () => configView({ specialists, pipelines: [globalEntry()] }));
+    render(<Page api={fakeApi({ config, writePipeline, previewPipeline })} start="quick" />);
     expect(await screen.findByText(/view only here/)).toBeTruthy();
     expect(
       (screen.getAllByLabelText('additional step prompt')[0] as HTMLTextAreaElement).disabled,
@@ -790,21 +792,21 @@ describe('global level', () => {
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
     const link = screen.getByRole('link', { name: 'Edit in Settings' });
     expect(link.getAttribute('href')).toBe('#settings/global/pipelines/quick');
-    expect(writeWorkflow).not.toHaveBeenCalled();
+    expect(writePipeline).not.toHaveBeenCalled();
   });
 
-  it('makes a project workflow global', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="feature" />);
+  it('makes a project pipeline global', async () => {
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="feature" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Make global' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalledWith('feature', RAW, null, 'global'));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalledWith('feature', RAW, null, 'global'));
   });
 });
 
 describe('step ids follow the specialist', () => {
-  const saved = async (writeWorkflow: ReturnType<typeof vi.fn>) => {
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    return (writeWorkflow.mock.calls[0] as unknown as [string, ReturnType<typeof valueOf>])[1];
+  const saved = async (writePipeline: ReturnType<typeof vi.fn>) => {
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    return (writePipeline.mock.calls[0] as unknown as [string, ReturnType<typeof valueOf>])[1];
   };
 
   it('has no id field in the step card', async () => {
@@ -813,10 +815,10 @@ describe('step ids follow the specialist', () => {
     expect(screen.queryByLabelText('step id')).toBeNull();
   });
 
-  it('writes ids from the specialists of a new workflow, with a suffix for a repeat', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+  it('writes ids from the specialists of a new pipeline, with a suffix for a repeat', async () => {
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     window.location.hash = '#pipelines/new';
-    render(<App api={api({ writeWorkflow })} openStream={openFake} />);
+    render(<App api={api({ writePipeline })} openStream={openFake} />);
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'quick' } });
     for (const slug of ['plan', 'coder', 'coder']) {
       fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
@@ -824,7 +826,7 @@ describe('step ids follow the specialist', () => {
       choose(within(stepNow(index)).getByRole('combobox', { name: 'step specialist' }), slug);
     }
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    const value = await saved(writeWorkflow);
+    const value = await saved(writePipeline);
     expect(value).toEqual({
       steps: [
         { id: 'plan', specialist: 'plan' },
@@ -835,14 +837,14 @@ describe('step ids follow the specialist', () => {
   });
 
   it('keeps an own id from the file after another field is edited', async () => {
-    const writeWorkflow = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
-    render(<Page api={api({ writeWorkflow })} start="feature" />);
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(<Page api={api({ writePipeline })} start="feature" />);
     fireEvent.change(
       (await stepBox(1)).querySelector(`textarea[aria-label="additional step prompt"]`)!,
       { target: { value: 'be careful' } },
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    const value = await saved(writeWorkflow);
+    const value = await saved(writePipeline);
     expect((value.steps as { id: string }[]).map((step) => step.id)).toEqual([
       'plan',
       'code',
@@ -851,9 +853,9 @@ describe('step ids follow the specialist', () => {
   });
 
   it('shows the id of a new step in the preview after its specialist changes', async () => {
-    const previewWorkflow = vi.fn(async () => ({ topology: workflowOf(), errors: [] }));
+    const previewPipeline = vi.fn(async () => ({ topology: pipelineOf(), errors: [] }));
     const lastPreviewId = () => {
-      const last = previewWorkflow.mock.calls.at(-1) as unknown as [
+      const last = previewPipeline.mock.calls.at(-1) as unknown as [
         string,
         { steps: { id: string }[] },
       ];
@@ -861,7 +863,7 @@ describe('step ids follow the specialist', () => {
     };
     // the preview of a draft waits for the end of the edits: a fake clock instead of the real delay
     vi.useFakeTimers();
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
+    render(<Page api={api({ previewPipeline })} start="feature" />);
     await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), 'writer');
@@ -895,13 +897,13 @@ describe('pipeline tags and filters', () => {
     entry('quick', {
       level: 'global',
       shared_tags: ['fast'],
-      file: '/xdg/aip/workflows/quick.yaml',
+      file: '/xdg/aip/pipelines/quick.yaml',
       revision: null,
       raw: { steps: [{ id: 'code', specialist: 'coder' }], tags: ['fast'] },
     }),
   ];
-  const configOf = (workflows = tagged()) =>
-    vi.fn(async () => configView({ specialists, workflows }));
+  const configOf = (pipelines = tagged()) =>
+    vi.fn(async () => configView({ specialists, pipelines }));
   const rows = () =>
     within(screen.getByRole('list', { name: 'pipeline', hidden: true }))
       .getAllByRole('listitem', { hidden: true })
@@ -938,7 +940,7 @@ describe('pipeline tags and filters', () => {
     await pick('fast', 'Tags');
     await waitFor(() => expect(rows()).toHaveLength(2));
     expect(rows().some((row) => row.includes('feature'))).toBe(false);
-    expect(JSON.parse(window.localStorage.getItem('aip.web.workflowFilters') ?? '{}')).toEqual({
+    expect(JSON.parse(window.localStorage.getItem('aip.web.pipelineFilters') ?? '{}')).toEqual({
       '/repo': { level: 'all', tags: ['fast'], specialists: [] },
     });
     view.unmount();
@@ -1005,7 +1007,7 @@ describe('the tags field of a pipeline', () => {
   const withTags = () =>
     configView({
       specialists,
-      workflows: [
+      pipelines: [
         entry('feature', {
           shared_tags: ['backend'],
           own_tags: ['legacy'],
@@ -1015,18 +1017,18 @@ describe('the tags field of a pipeline', () => {
     });
 
   it('writes own tags to the project file and keeps the shared one out of it', async () => {
-    const writeWorkflow = vi.fn(async (..._args: unknown[]) => ({
+    const writePipeline = vi.fn(async (..._args: unknown[]) => ({
       ok: true as const,
       revision: 'n',
       file: '/f',
     }));
     render(
       <Page
-        api={fakeApi({ writeWorkflow, config: vi.fn(async () => withTags()) })}
+        api={fakeApi({ writePipeline, config: vi.fn(async () => withTags()) })}
         start="feature"
       />,
     );
-    const field = await screen.findByTestId('workflow-tags');
+    const field = await screen.findByTestId('pipeline-tags');
     expect(within(field).getByText('backend')).toBeTruthy();
     expect(within(field).queryByRole('button', { name: 'Remove backend' })).toBeNull();
     fireEvent.click(within(field).getByRole('button', { name: 'Remove legacy' }));
@@ -1036,9 +1038,9 @@ describe('the tags field of a pipeline', () => {
     });
     fireEvent.click(await screen.findByRole('option', { name: /slow/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    expect(writeWorkflow.mock.calls[0]?.[1]).toMatchObject({ tags: ['slow'] });
-    expect(writeWorkflow.mock.calls[0]?.[3]).toBe('project');
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(writePipeline.mock.calls[0]?.[1]).toMatchObject({ tags: ['slow'] });
+    expect(writePipeline.mock.calls[0]?.[3]).toBe('project');
   });
 
   it('writes no tags key for an empty list', () => {
@@ -1047,17 +1049,17 @@ describe('the tags field of a pipeline', () => {
   });
 
   it('shows the error of the tags at the field', async () => {
-    const previewWorkflow = vi.fn(async () => ({
+    const previewPipeline = vi.fn(async () => ({
       topology: null,
-      errors: [{ path: 'swarm.workflows.feature.tags', message: 'bad tag' }],
+      errors: [{ path: 'swarm.pipelines.feature.tags', message: 'bad tag' }],
     }));
-    render(<Page api={api({ previewWorkflow })} start="feature" />);
-    const field = await screen.findByTestId('workflow-tags');
+    render(<Page api={api({ previewPipeline })} start="feature" />);
+    const field = await screen.findByTestId('pipeline-tags');
     expect(await within(field).findByText('bad tag')).toBeTruthy();
   });
 
   it('overrides a shared pipeline with the value of the shared file, tags included', async () => {
-    const writeWorkflow = vi.fn(async (..._args: unknown[]) => ({
+    const writePipeline = vi.fn(async (..._args: unknown[]) => ({
       ok: true as const,
       revision: 'n',
       file: '/f',
@@ -1065,22 +1067,286 @@ describe('the tags field of a pipeline', () => {
     const quick = entry('quick', {
       level: 'global',
       shared_tags: ['fast'],
-      file: '/xdg/aip/workflows/quick.yaml',
+      file: '/xdg/aip/pipelines/quick.yaml',
       revision: null,
       raw: { steps: [{ id: 'code', specialist: 'coder' }], tags: ['fast'] },
     });
     render(
       <Page
         api={fakeApi({
-          writeWorkflow,
-          config: vi.fn(async () => configView({ specialists, workflows: [quick] })),
+          writePipeline,
+          config: vi.fn(async () => configView({ specialists, pipelines: [quick] })),
         })}
         start="quick"
       />,
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Override in the project' }));
-    await waitFor(() => expect(writeWorkflow).toHaveBeenCalled());
-    expect(writeWorkflow.mock.calls[0]?.[0]).toBe('quick');
-    expect(writeWorkflow.mock.calls[0]?.[3]).toBe('project');
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(writePipeline.mock.calls[0]?.[0]).toBe('quick');
+    expect(writePipeline.mock.calls[0]?.[3]).toBe('project');
+  });
+});
+
+describe('pipeline sections and addresses', () => {
+  it('reads and writes the addresses of actions and system stages', () => {
+    const route = (run: string | null, group: string | null) => ({
+      view: 'pipelines' as const,
+      run,
+      group,
+      step: null,
+      tab: null,
+    });
+    expect(parseRoute('#pipelines/actions/commit')).toEqual(route('commit', 'actions'));
+    expect(parseRoute('#pipelines/system/resolve')).toEqual(route('resolve', 'system'));
+    expect(parseRoute('#pipelines/actions/new')).toEqual(route('new', 'actions'));
+    expect(formatRoute(route('commit', 'actions'))).toBe('#pipelines/actions/commit');
+    expect(formatRoute(route('delivery', 'system'))).toBe('#pipelines/system/delivery');
+    expect(formatRoute(route('feature', null))).toBe('#pipelines/feature');
+    expect(formatRoute(route(null, 'actions'))).toBe('#pipelines');
+  });
+
+  it('keeps a one-part address as a pipeline, even when it is named like a section', () => {
+    expect(parseRoute('#pipelines/actions')).toEqual({
+      view: 'pipelines',
+      run: 'actions',
+      group: null,
+      step: null,
+      tab: null,
+    });
+    expect(parseRoute('#pipelines/system').group).toBeNull();
+    expect(parseRoute('#workflows/actions/commit').run).toBe('actions');
+    expect(parseRoute('#workflows/actions/commit').group).toBeNull();
+  });
+
+  const sectioned = () =>
+    api(
+      {
+        config: vi.fn(async () =>
+          configView({
+            specialists,
+            pipelines: [entry('feature')],
+            actions: [
+              actionEntry('commit', { name: 'Commit', run: 'git commit -am x' }),
+              actionEntry('notify', { specialist: 'writer' }, 'global'),
+            ],
+          }),
+        ),
+        systemStages: vi.fn(async () =>
+          systemStagesView({
+            stages: systemStagesView().stages.map((stage) =>
+              stage.kind === 'resolve'
+                ? {
+                    ...stage,
+                    settings: [
+                      { path: 'delivery.resolver_prompt', value: 'Be careful', level: 'project' },
+                    ],
+                  }
+                : stage,
+            ),
+          }),
+        ),
+      },
+      [entry('feature')],
+    );
+
+  it('lists the pipelines, the actions and the system stages with their levels', async () => {
+    render(<Page api={sectioned()} />);
+    for (const title of ['Pipelines', 'Actions', 'System stages']) {
+      expect(await screen.findByRole('heading', { name: title })).toBeTruthy();
+    }
+    const actions = within(await screen.findByRole('list', { name: 'Actions' }));
+    expect(actions.getByRole('button', { name: /Commit/ }).textContent).toContain('project');
+    expect(actions.getByRole('button', { name: /notify/ }).textContent).toContain('global');
+    const system = within(screen.getByRole('list', { name: 'System stages' }));
+    expect(system.getAllByRole('button')).toHaveLength(4);
+    await waitFor(() =>
+      expect(
+        system.getByRole('button', { name: /Delivery conflict resolution/ }).textContent,
+      ).toContain('project'),
+    );
+    expect(system.getByRole('button', { name: /Commit message/ }).textContent).toContain('global');
+    expect(system.getByRole('button', { name: /Task split/ }).textContent).toContain('global');
+  });
+
+  it('opens an action and a system stage from the address', async () => {
+    window.location.hash = '#pipelines/actions/commit';
+    render(<App api={sectioned()} openStream={openFake} />);
+    expect(await screen.findByRole('heading', { name: 'Commit' })).toBeTruthy();
+    cleanup();
+    window.location.hash = '#pipelines/system/message';
+    render(<App api={sectioned()} openStream={openFake} />);
+    expect(await screen.findByRole('heading', { name: 'Commit message' })).toBeTruthy();
+    expect(window.location.hash).toBe('#pipelines/system/message');
+  });
+
+  it('writes the address of the clicked entry', async () => {
+    window.location.hash = '#pipelines';
+    render(<App api={sectioned()} openStream={openFake} />);
+    fireEvent.click(await screen.findByRole('button', { name: /notify/ }));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/notify'));
+    fireEvent.click(
+      within(screen.getByRole('list', { name: 'System stages' })).getByRole('button', {
+        name: /^Delivery(?! conflict)/,
+      }),
+    );
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/delivery'));
+    fireEvent.click(within(screen.getByRole('list', { name: 'pipeline' })).getByRole('button'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/feature'));
+  });
+
+  it('keeps the four system stages when the list of them does not load', async () => {
+    const failing = api({
+      systemStages: vi.fn(async () => {
+        throw new Error('no stages');
+      }),
+    });
+    render(<Page api={failing} start={null} />);
+    const system = within(await screen.findByRole('list', { name: 'System stages' }));
+    expect(system.getAllByRole('button')).toHaveLength(4);
+  });
+});
+
+describe('actions at the points of a pipeline', () => {
+  const commit = actionEntry('commit', { run: 'git commit -am x' });
+  const lint = actionEntry('lint', { run: 'npm run lint' });
+  const review = actionEntry('review', { specialist: 'reviewer' });
+  const stage = (point: string, id: string) => ({
+    id: `action:${point}:${id}`,
+    kind: 'action' as const,
+    section: 'finish' as const,
+    name: id,
+    performer: { type: 'command' as const, command: 'x' },
+    condition: null,
+    status: null,
+    group: null,
+  });
+  const withActions = (
+    overrides: Partial<Api> = {},
+    raw: Record<string, unknown> = RAW,
+    stages = [stage('after_delivery', 'commit')],
+  ) =>
+    api(
+      {
+        config: vi.fn(async () =>
+          configView({
+            specialists,
+            pipelines: [entry('feature', { raw })],
+            actions: [commit, lint, review],
+          }),
+        ),
+        previewPipeline: vi.fn(async () => ({
+          topology: pipelineOf({ stages: stages as never }),
+          errors: [],
+        })),
+        ...overrides,
+      },
+      [entry('feature', { raw })],
+    );
+  const point = async (name: string) => within(await screen.findByRole('group', { name }));
+  const saved = () => vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+  const valueOfCall = (writePipeline: ReturnType<typeof saved>) =>
+    (writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>])[1];
+
+  it('shows the actions of swarm.stages as inherited', async () => {
+    render(<Page api={withActions()} start="feature" />);
+    const after = await point('After delivery');
+    await waitFor(() => expect(after.getByText('commit')).toBeTruthy());
+    expect(after.getByText('inherited')).toBeTruthy();
+    expect(after.queryByRole('button', { name: 'Back to inherited' })).toBeNull();
+  });
+
+  it('does not let a point be edited before the inherited actions are known', async () => {
+    const writePipeline = saved();
+    const previewPipeline = vi.fn(() => new Promise<never>(() => {}));
+    render(<Page api={withActions({ writePipeline, previewPipeline })} start="feature" />);
+    const after = await point('After delivery');
+    expect(after.getByText('Loading the inherited actions…')).toBeTruthy();
+    expect(after.queryByRole('combobox')).toBeNull();
+    expect(after.queryByText('none')).toBeNull();
+    expect(writePipeline).not.toHaveBeenCalled();
+  });
+
+  it('writes an empty list when the inherited action is removed', async () => {
+    const writePipeline = saved();
+    render(<Page api={withActions({ writePipeline })} start="feature" />);
+    const after = await point('After delivery');
+    fireEvent.click(await after.findByRole('button', { name: 'remove commit' }));
+    expect(after.getByText('No actions: the point is off.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(valueOfCall(writePipeline).stages).toEqual({ after_delivery: [] });
+  });
+
+  it('returns a point to the inheritance by dropping its key', async () => {
+    const writePipeline = saved();
+    render(
+      <Page
+        api={withActions({ writePipeline }, { ...RAW, stages: { after_delivery: ['lint'] } })}
+        start="feature"
+      />,
+    );
+    const after = await point('After delivery');
+    expect(after.queryByText('inherited')).toBeNull();
+    expect(after.getByText('lint')).toBeTruthy();
+    fireEvent.click(after.getByRole('button', { name: 'Back to inherited' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(valueOfCall(writePipeline).stages).toBeUndefined();
+  });
+
+  it('adds actions in order and moves them', async () => {
+    const writePipeline = saved();
+    render(<Page api={withActions({ writePipeline })} start="feature" />);
+    const before = await point('Before delivery');
+    choose(
+      await before.findByRole('combobox', { name: 'add an action: Before delivery' }),
+      'commit',
+    );
+    choose(before.getByRole('combobox', { name: 'add an action: Before delivery' }), 'lint');
+    fireEvent.click(before.getByRole('button', { name: 'move lint up' }));
+    expect(before.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'lint',
+      'commit',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(valueOfCall(writePipeline).stages).toEqual({ before_delivery: ['lint', 'commit'] });
+  });
+
+  it('offers only commands after the delivery', async () => {
+    render(<Page api={withActions()} start="feature" />);
+    const after = await point('After delivery');
+    await waitFor(() => expect(after.getByText('commit')).toBeTruthy());
+    fireEvent.keyDown(await after.findByRole('combobox', { name: /add an action/ }), {
+      key: 'Enter',
+    });
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'Add an action',
+      'lint',
+    ]);
+  });
+
+  it('does not offer the points around the split to a pipeline without one', async () => {
+    render(<Page api={withActions()} start="feature" />);
+    await point('Before delivery');
+    expect(screen.queryByRole('group', { name: 'Before the split' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'After the split' })).toBeNull();
+    fireEvent.click(screen.getByRole('switch', { name: 'Task split' }));
+    expect(await point('Before the split')).toBeTruthy();
+    expect(await point('After the split')).toBeTruthy();
+  });
+
+  it('keeps the stages with split.pipeline and drops the split points without a split', () => {
+    const raw = {
+      split: { specialist: 'plan', pipeline: 'explore' },
+      stages: { before_split: ['lint'], after_delivery: ['commit'] },
+    };
+    const draft = draftOf(raw);
+    expect(valueOf(draft)).toEqual(raw);
+    expect(valueOf({ ...draft, split: null }).stages).toEqual({ after_delivery: ['commit'] });
+    expect(valueOf(draftOf({ steps: [] })).stages).toBeUndefined();
+    expect(valueOf(draftOf({ steps: [], stages: { after_delivery: [] } })).stages).toEqual({
+      after_delivery: [],
+    });
   });
 });

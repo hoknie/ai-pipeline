@@ -266,7 +266,7 @@ describe('the reviewed mark survives interruptions', () => {
 describe('autopilot of the queue', () => {
   function queued(state: RunState) {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
     queue.autoAnswer = true;
     startQueue(queue, [], 3);
     itemStarted(queue, 'q1', state.run.id, 4);

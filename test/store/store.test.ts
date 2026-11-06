@@ -12,13 +12,30 @@ import {
 } from '../../src/config/index.ts';
 import { SCHEMA_VERSION, Store, migrate, type ArtifactRecord } from '../../src/store/index.ts';
 import { finish, run, step } from '../core/helpers.ts';
-import { addItem, emptyQueue, transition } from '../../src/core/index.ts';
+import {
+  addItem,
+  defaultObserverSettings,
+  dispatch,
+  emptyQueue,
+  emptyRepair,
+  transition,
+} from '../../src/core/index.ts';
 
 function temporaryStore(): Store {
   const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
   const store = new Store(databasePath(directory));
   store.database.exec('PRAGMA synchronous = OFF');
   return store;
+}
+
+/** Gives a database built from the current schema the column names of the builds before the rename. */
+function renameBack(database: import('node:sqlite').DatabaseSync): void {
+  for (const table of ['runs', 'queue_items']) {
+    const columns = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (columns.some((column) => column.name === 'pipeline')) {
+      database.exec(`ALTER TABLE ${table} RENAME COLUMN pipeline TO workflow`);
+    }
+  }
 }
 
 describe('state directory', () => {
@@ -95,7 +112,10 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('DROP TABLE run_patches');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (7 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -113,10 +133,10 @@ describe('queues', () => {
   it('keeps items, order, stop and known problems', () => {
     const store = temporaryStore();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'первая' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
     addItem(
       queue,
-      { workflow: 'feature', groups: [{ title: 'Вход', task: 'форма' }], title: 'Группы' },
+      { pipeline: 'feature', groups: [{ title: 'Вход', task: 'форма' }], title: 'Группы' },
       'q2',
       3,
     );
@@ -138,8 +158,8 @@ describe('queues', () => {
   it('keeps the skipped steps of an item and reads old rows as empty', () => {
     const store = temporaryStore();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A', skip: ['review', 'qa'] }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3);
+    addItem(queue, { pipeline: 'feature', task: 'A', skip: ['review', 'qa'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 3);
     store.saveQueue(queue);
     expect(store.loadQueue('/repo')?.items.map((item) => item.skip)).toEqual([
       ['review', 'qa'],
@@ -162,7 +182,7 @@ describe('queues', () => {
   it('keeps the dependencies of an item and the queue item of a run', () => {
     const store = temporaryStore();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a', after: ['r1', 'q0'] }, 'q1', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a', after: ['r1', 'q0'] }, 'q1', 1);
     store.saveQueue(queue);
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual(['r1', 'q0']);
     const state = run(1);
@@ -178,7 +198,7 @@ describe('queues', () => {
     const directory = mkdtempSync(join(tmpdir(), 'aip-store-'));
     const old = new Store(databasePath(directory));
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a' }, 'q0', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a' }, 'q0', 1);
     old.saveQueue(queue);
     old.saveRun(run(1));
     old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
@@ -201,7 +221,10 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (7 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (7 + 8 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.after).toEqual([]);
@@ -237,7 +260,10 @@ describe('queues', () => {
     old.saveQueue(off);
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (5 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/on')).toMatchObject({ autopilot: true, autoAnswer: true });
@@ -267,7 +293,10 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (6 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (6 + 8 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')).toMatchObject({
@@ -282,7 +311,7 @@ describe('queues', () => {
   it('keeps onLimit, a stop by a usage limit and a returned run', () => {
     const store = temporaryStore();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'первая' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
     queue.items[0]!.run = 'r1';
     queue.onLimit = 'stop';
     queue.stop = {
@@ -301,8 +330,8 @@ describe('queues', () => {
     const directory = mkdtempSync(join(tmpdir(), 'aip-store-'));
     const old = new Store(databasePath(directory));
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A', postponed: true }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3);
+    addItem(queue, { pipeline: 'feature', task: 'A', postponed: true }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 3);
     old.saveQueue(queue);
     expect(old.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([true, false]);
     old.database.exec('ALTER TABLE queue_items DROP COLUMN postponed');
@@ -316,7 +345,10 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (3 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (3 + 8 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([false, false]);
@@ -335,7 +367,10 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (1 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (1 + 8 + 1)}`);
     old.close();
   }
 
@@ -345,8 +380,8 @@ describe('queues', () => {
       old.saveRun(run(1, { id: 'run000000001', now: 20 }));
       old.saveRun(run(1, { id: 'run000000002', now: 10 }));
       const queue = emptyQueue('/repo', 1);
-      addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
-      addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3);
+      addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
+      addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 3);
       old.saveQueue(queue);
     });
     const store = new Store(databasePath(directory));
@@ -371,8 +406,8 @@ describe('queues', () => {
       old.saveRun(run(1, { id: 'run000000001', now: 10 }));
       old.saveRun(run(1, { id: 'run000000002', now: 20 }));
       const queue = emptyQueue('/repo', 1);
-      addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
-      addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3);
+      addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
+      addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 3);
       queue.items[1]!.task = null;
       queue.items[1]!.run = 'run000000001';
       old.saveQueue(queue);
@@ -390,7 +425,7 @@ describe('queues', () => {
     state.run.number = 7;
     store.saveRun(state);
     const queue = emptyQueue('/repo', 1, 8);
-    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
     store.saveQueue(queue);
     expect(store.loadRun(state.run.id)?.run.number).toBe(7);
     expect(store.loadQueue('/repo')?.items[0]?.number).toBe(8);
@@ -582,7 +617,7 @@ describe('split persistence', () => {
       configText: `swarm:
   specialists:
     plan: { name: P }
-  workflows:
+  pipelines:
     feature:
       split: { specialist: plan }
       steps:
@@ -623,8 +658,9 @@ describe('refused tool calls', () => {
     attempt.denials = [{ tool: 'Bash', command: 'python3 fix.py' }];
     store.saveRun(state);
     // As a database written before the column existed.
+    renameBack(store.database);
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; PRAGMA user_version = 3',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; ALTER TABLE runs DROP COLUMN repair_json; DROP TABLE observers; PRAGMA user_version = 3',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
@@ -634,7 +670,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.close();
-    expect(MIGRATIONS.at(-23)).toContain('denials_json');
+    expect(MIGRATIONS.at(-25)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -650,14 +686,15 @@ describe('refused tool calls', () => {
       'docs/a.md',
     ]);
     // As a database written before the column existed.
+    renameBack(store.database);
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; PRAGMA user_version = 4',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; ALTER TABLE runs DROP COLUMN repair_json; DROP TABLE observers; PRAGMA user_version = 4',
     );
     store.close();
     const reopened = new Store(databasePath(directory));
     expect(reopened.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.close();
-    expect(MIGRATIONS.at(-22)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-24)).toContain('outside_changes_json');
   });
 });
 
@@ -700,7 +737,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(26);
+    expect(SCHEMA_VERSION).toBe(28);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -751,7 +788,7 @@ describe('queue items and automatic delivery', () => {
     for (const [index, autoDeliver] of [true, false, null].entries()) {
       addItem(
         queue,
-        { workflow: 'feature', task: `t${index}`, autoDeliver: autoDeliver ?? undefined },
+        { pipeline: 'feature', task: `t${index}`, autoDeliver: autoDeliver ?? undefined },
         `q${index}`,
         1,
       );
@@ -767,8 +804,8 @@ describe('queue items and automatic delivery', () => {
   it('keeps the delivery mode of an item and the autopilot answer of a queue', () => {
     const store = temporaryStore();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a', deliveryMode: 'commit' }, 'q0', 1);
-    addItem(queue, { workflow: 'feature', task: 'b' }, 'q1', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a', deliveryMode: 'commit' }, 'q0', 1);
+    addItem(queue, { pipeline: 'feature', task: 'b' }, 'q1', 1);
     queue.autopilotAnswer = 'Согласен';
     store.saveQueue(queue);
     const loaded = store.loadQueue('/repo');
@@ -812,7 +849,7 @@ describe('queue items and automatic delivery', () => {
     const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
     const old = new Store(databasePath(directory));
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a', autoDeliver: false }, 'q0', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a', autoDeliver: false }, 'q0', 1);
     old.saveQueue(queue);
     old.database.exec('DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
@@ -836,7 +873,10 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (10 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (10 + 8 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();
@@ -877,7 +917,10 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (11 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (11 + 8 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.repositories()).toEqual([
@@ -936,7 +979,7 @@ describe('tags', () => {
     mine.run.tags = ['tg-a'];
     store.saveRun(mine);
     const queue = emptyQueue('/other', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-a-2'] }, 'q1', 1);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-a', 'tg-a-2'] }, 'q1', 1);
     store.saveQueue(queue);
     store.removeTag('/repo', 'tg-a');
     expect(store.tags().map((entry) => entry.id)).toEqual(['tg-a-2']);
@@ -973,7 +1016,7 @@ describe('tags', () => {
     expect(store.loadRun(state.run.id)!.run.tags).toEqual(['tg-b']);
     expect(store.recentRuns()[0]!.run.tags).toEqual(['tg-b']);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 1);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 1);
     store.saveQueue(queue);
     expect(store.loadQueue('/repo')!.items[0]!.tags).toEqual(['tg-a', 'tg-b']);
   });
@@ -984,7 +1027,7 @@ describe('tags', () => {
     const state = run(1);
     old.saveRun(state);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 1);
+    addItem(queue, { pipeline: 'feature', task: 'x' }, 'q1', 1);
     old.saveQueue(queue);
     old.database.exec('DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json');
     old.database.exec('ALTER TABLE queue_items DROP COLUMN after_json');
@@ -1007,7 +1050,10 @@ describe('tags', () => {
     old.database.exec('ALTER TABLE queues DROP COLUMN priority_json');
     old.database.exec('ALTER TABLE queues DROP COLUMN auto_answer');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - (9 + 8)}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (9 + 8 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.tags()).toEqual([]);
@@ -1028,7 +1074,7 @@ describe('tags', () => {
     other.run.tags = ['tg-b'];
     store.saveRun(other);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 1);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 1);
     store.saveQueue(queue);
     store.removeTag('/repo', 'tg-a');
     expect(store.tags().map((entry) => entry.id)).toEqual(['tg-b']);
@@ -1066,7 +1112,10 @@ describe('patch of a run', () => {
     old.saveRun(run(1));
     old.database.exec('DROP TABLE run_patches');
     old.database.exec('ALTER TABLE groups DROP COLUMN human_only');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (4 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.runPatchIds()).toEqual([]);
@@ -1138,7 +1187,10 @@ describe('artifacts', () => {
     const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
     const old = new Store(databasePath(directory));
     old.database.exec('DROP TABLE artifacts');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (2 + 1)}`);
     old.close();
     const store = new Store(databasePath(directory));
     expect(store.artifactUris().size).toBe(0);
@@ -1165,8 +1217,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../src/store/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -1).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    MIGRATIONS.slice(0, -3).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     prepare(database);
     migrate(database);
     return database;
@@ -1282,6 +1334,197 @@ describe('finishedRunsPage', () => {
     const second = store.finishedRunsPage(2, { createdAt: last.createdAt, id: last.id });
     expect(second.runs.map((state) => state.run.id)).toEqual(['run000000002', 'run000000001']);
     expect(second.more).toBe(false);
+    store.close();
+  });
+});
+
+describe('runs with pipeline actions', () => {
+  const ACTIONS_CONFIG = `swarm:
+  specialists:
+    plan: { name: Планировщик }
+    coder: { name: Кодировщик }
+  actions:
+    prepare: { run: make }
+    commit: { run: commit }
+  stages:
+    before_split: [prepare]
+    after_delivery: [commit]
+  pipelines:
+    feature:
+      split: { specialist: plan }
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+  it('saves and loads the groups of the actions apart from the groups of work', () => {
+    const store = temporaryStore();
+    const state = run(1, { split: true, configText: ACTIONS_CONFIG });
+    state.actions[0]!.status = 'failed';
+    state.actions[0]!.reason = 'exit code 3';
+    store.saveRun(state);
+    const loaded = store.loadRun(state.run.id);
+    expect(loaded?.actions.map((group) => [group.slug, group.status, group.reason])).toEqual([
+      ['_action-before-split-prepare', 'failed', 'exit code 3'],
+    ]);
+    expect(loaded?.groups).toEqual([]);
+    expect(loaded?.split?.slug).toBe('_split');
+    store.close();
+  });
+
+  it('keeps the attempts of a command and the delivery message', () => {
+    const store = temporaryStore();
+    const state = run(1, { split: true, configText: ACTIONS_CONFIG });
+    const action = state.actions[0]!;
+    action.attempts.push({
+      seq: 1,
+      stepId: 'prepare',
+      stepIndex: 0,
+      round: 1,
+      specialist: 'prepare',
+      runtime: 'command',
+      model: null,
+      status: 'failed',
+      input: {
+        prompt: 'make',
+        groupTitle: 'prepare',
+        stepId: 'prepare',
+        specialistName: 'prepare',
+        skills: [],
+        previous: [],
+        feedback: null,
+        humanAnswer: null,
+        decisions: [],
+      },
+      resumeSession: null,
+      sessionId: null,
+      report: null,
+      reason: { kind: 'exit_code', code: 3 },
+      startedAt: 1,
+      finishedAt: 2,
+      usage: null,
+      proposal: null,
+      denials: [],
+      outsideChanges: [],
+    });
+    store.saveRun(state);
+    const loaded = store.loadRun(state.run.id);
+    expect(loaded?.actions[0]?.attempts[0]).toMatchObject({
+      runtime: 'command',
+      reason: { kind: 'exit_code', code: 3 },
+    });
+    store.close();
+  });
+
+  it('marks a command that was running as interrupted when the daemon starts', () => {
+    const store = temporaryStore();
+    const state = run(1, { split: true, configText: ACTIONS_CONFIG });
+    dispatch([state], 1500);
+    expect(state.actions[0]?.status).toBe('running');
+    store.saveRun(state);
+    const [recovered] = store.recover(5000);
+    const action = recovered?.state.actions[0];
+    expect(action?.status).toBe('failed');
+    expect(action?.reason).toBe('interrupted');
+    expect(recovered?.effects).toEqual([]);
+    store.close();
+  });
+
+  it('loads a run saved before the actions existed', () => {
+    const store = temporaryStore();
+    const state = run(1);
+    store.saveRun(state);
+    const loaded = store.loadRun(state.run.id);
+    expect(loaded?.actions).toEqual([]);
+    expect(loaded?.run.config.actions).toEqual([]);
+    store.close();
+  });
+});
+
+describe('observers storage', () => {
+  it('reads an old database: default settings and default repair', async () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = new Store(databasePath(directory));
+    old.saveRun(run(1));
+    old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
+    old.database.exec('DROP TABLE observers');
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - 1}`);
+    old.close();
+    const store = new Store(databasePath(directory));
+    expect(store.loadObservers()).toEqual(defaultObserverSettings());
+    expect(store.activeRuns()[0]?.run.repair).toEqual(emptyRepair());
+    store.close();
+  });
+
+  it('keeps settings and the repair of a run after a restart', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const store = new Store(databasePath(directory));
+    const settings = {
+      ...defaultObserverSettings(),
+      enabled: true,
+      workers: 3,
+      projects: [{ repository: '/repo', maxWorkers: 2 }],
+      specialist: { name: 'W', timeout: '5m' },
+    };
+    store.saveObservers(settings);
+    store.saveObservers({ ...settings, workers: 4 });
+    const state = run(1);
+    state.run.repair = { ...emptyRepair(), allowed: false, repairs: 1, taken: ['k'] };
+    store.saveRun(state);
+    state.run.repair = { ...state.run.repair, repairs: 2, cancelReason: 'stop' };
+    store.saveRun(state);
+    store.close();
+    const again = new Store(databasePath(directory));
+    expect(again.loadObservers()).toEqual({ ...settings, workers: 4 });
+    expect(again.activeRuns()[0]?.run.repair).toMatchObject({
+      allowed: false,
+      repairs: 2,
+      taken: ['k'],
+      cancelReason: 'stop',
+    });
+    again.close();
+  });
+});
+
+describe('pipeline rename', () => {
+  it('opens a database with the old columns and a snapshot with the old names', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = new Store(databasePath(directory));
+    const state = run(1);
+    old.saveRun(state);
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
+    old.saveQueue(queue);
+    const snapshot = JSON.parse(JSON.stringify(state.run.config)) as Record<string, unknown>;
+    const pipelines = snapshot.pipelines as Record<string, unknown>[];
+    delete snapshot.pipelines;
+    snapshot.workflows = pipelines.map((entry, index) =>
+      index === 0
+        ? {
+            ...entry,
+            split: { specialist: 'coder', maxGroups: 2, additionalPrompt: null, workflow: 'other' },
+          }
+        : entry,
+    );
+    old.database
+      .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
+      .run(JSON.stringify(snapshot), state.run.id);
+    renameBack(old.database);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.close();
+    const store = new Store(databasePath(directory));
+    const loaded = store.loadRun(state.run.id)!;
+    expect(loaded.run.id).toBe(state.run.id);
+    expect(loaded.run.pipeline).toBe(state.run.pipeline);
+    const config = loaded.run.config as unknown as Record<string, unknown>;
+    expect(config.workflows).toBeUndefined();
+    expect(loaded.run.config.pipelines[0]?.split).toEqual({
+      specialist: 'coder',
+      maxGroups: 2,
+      additionalPrompt: null,
+      pipeline: 'other',
+    });
+    expect(store.loadQueue('/repo')?.items[0]).toMatchObject({ id: 'q1', pipeline: 'feature' });
     store.close();
   });
 });

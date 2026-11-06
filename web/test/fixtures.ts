@@ -1,6 +1,8 @@
 import { vi } from 'vitest';
 
 import { ApiError, type Api } from '../src/api.ts';
+import type { ObserverSettings, ObserversView } from '../src/observerTypes.ts';
+import type { ActionEntry, SystemStagesResponse } from '../src/pipelineEntries.ts';
 import type { EventSourceLike } from '../src/store.ts';
 import type {
   BackgroundProcessView,
@@ -22,11 +24,29 @@ import type {
   TagView,
   Topology,
   Transcript,
-  WorkflowTopology,
-  WorkflowsView,
+  PipelineTopology,
+  PipelinesView,
   SystemView,
   SpecialistTagFolderView,
 } from '../src/types.ts';
+
+/** The observers as the daemon sends them: off, one worker, nothing running. */
+export function observersView(
+  overrides: { settings?: Partial<ObserverSettings>; waiting?: number } = {},
+): ObserversView {
+  return {
+    settings: {
+      enabled: false,
+      workers: 1,
+      maxRepairs: 3,
+      answerHumanOnly: false,
+      projects: [],
+      specialist: {},
+      ...overrides.settings,
+    },
+    workers: { running: [], waiting: overrides.waiting ?? 0 },
+  };
+}
 
 export function topologyOf(overrides: Partial<Topology> = {}): Topology {
   const step = (id: string, specialist: string, extra: object = {}) => ({
@@ -63,6 +83,7 @@ export function topologyOf(overrides: Partial<Topology> = {}): Topology {
     merging: [],
     merged: [],
     delivery: { mode: 'worktree', resolver: null, resolverStatus: null },
+    stages: [],
     ...overrides,
   };
 }
@@ -129,8 +150,8 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     title: 'добавить вход',
     name: null,
     repository: '/repo',
-    workflow: 'feature',
-    workflowName: overrides.workflow ?? 'feature',
+    pipeline: 'feature',
+    pipelineName: overrides.pipeline ?? 'feature',
     branch: 'refs/aip/run1/run',
     createdAt: 1_000,
     startedAt: 1_000,
@@ -231,7 +252,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
   };
 }
 
-export function workflowOf(overrides: Partial<WorkflowTopology> = {}): WorkflowTopology {
+export function pipelineOf(overrides: Partial<PipelineTopology> = {}): PipelineTopology {
   return {
     id: 'feature',
     name: overrides.id ?? 'feature',
@@ -241,12 +262,13 @@ export function workflowOf(overrides: Partial<WorkflowTopology> = {}): WorkflowT
     ),
     delivery: { mode: 'worktree', resolver: null },
     limits: {},
+    stages: [],
     ...overrides,
   };
 }
 
-export function workflowsView(overrides: Partial<WorkflowsView> = {}): WorkflowsView {
-  return { repository: '/repo', workflows: [workflowOf()], errors: [], ...overrides };
+export function pipelinesView(overrides: Partial<PipelinesView> = {}): PipelinesView {
+  return { repository: '/repo', pipelines: [pipelineOf()], errors: [], ...overrides };
 }
 
 /** A catalog tag; the id follows the name unless given. */
@@ -266,8 +288,8 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     number: 1,
     title: id,
     state: 'active',
-    workflow: 'feature',
-    workflowName: overrides.workflow ?? 'feature',
+    pipeline: 'feature',
+    pipelineName: overrides.pipeline ?? 'feature',
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
@@ -338,9 +360,68 @@ export function specialistEntry(
   return { ...base, sources: overrides.sources ?? sourcesFor('specialists', base) };
 }
 
+/** An action of the catalog: its level, file and raw values; the id is the file name. */
+export function actionEntry(
+  id: string,
+  raw: Record<string, unknown>,
+  level: EntryLevel = 'project',
+): ActionEntry {
+  const base = {
+    id,
+    level,
+    file: `${level === 'global' ? '/xdg/aip' : '/repo/aip'}/actions/${id}.yaml`,
+    revision: `rev-${id}`,
+    raw,
+  };
+  return { ...base, sources: sourcesFor('actions', base) };
+}
+
+/** The built-in stages of the pipeline as the daemon lists them. */
+export function systemStagesView(
+  overrides: Partial<SystemStagesResponse> = {},
+): SystemStagesResponse {
+  return {
+    repository: '/repo',
+    errors: [],
+    stages: [
+      {
+        kind: 'split',
+        name: 'Split',
+        task: 'Split the task into at most {max_groups} groups.',
+        settings: [],
+      },
+      {
+        kind: 'message',
+        name: 'Commit message',
+        task: 'Write the commit message of {run}.',
+        settings: [{ path: 'delivery.message_prompt', value: '', level: 'default' }],
+      },
+      {
+        kind: 'delivery',
+        name: 'Delivery',
+        task: null,
+        settings: [
+          { path: 'delivery.mode', value: 'worktree', level: 'default' },
+          { path: 'delivery.keep', value: false, level: 'default' },
+        ],
+      },
+      {
+        kind: 'resolve',
+        name: 'Resolve conflicts',
+        task: 'Resolve the conflicts of {run}.',
+        settings: [
+          { path: 'delivery.resolver', value: 'coder', level: 'global' },
+          { path: 'delivery.resolver_prompt', value: '', level: 'default' },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
 /** The files of each level an entry has, derived from its level, file and raw values. */
 export function sourcesFor(
-  directory: 'specialists' | 'workflows',
+  directory: 'specialists' | 'pipelines' | 'actions',
   entry: { level: EntryLevel; file: string; revision: string | null; raw: Record<string, unknown> },
   globalRaw: Record<string, unknown> = entry.raw,
 ): EntrySources {
@@ -370,8 +451,8 @@ export function queueItem(
     id,
     number: position,
     position,
-    workflow: 'feature',
-    workflowName: extra.workflow ?? 'feature',
+    pipeline: 'feature',
+    pipelineName: extra.pipeline ?? 'feature',
     task,
     groups: null,
     title: null,
@@ -561,7 +642,8 @@ export function configView(overrides: Partial<ConfigEditorResponse> = {}): Confi
       project: { file: '/repo/aip/settings.yaml', revision: null },
     },
     specialists: [specialistEntry('coder', { raw: { name: 'Кодировщик', model: 'sonnet' } })],
-    workflows: [],
+    pipelines: [],
+    actions: [],
     settings: settingsOf(),
     errors: [],
     ...overrides,
@@ -592,7 +674,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     repositories: vi.fn(async () => []),
     addRepository: vi.fn(async () => []),
     removeRepository: vi.fn(async () => []),
-    workflows: vi.fn(async () => workflowsView()),
+    pipelines: vi.fn(async () => pipelinesView()),
     group: vi.fn(async () => groupView()),
     groupSpec: vi.fn(async () => null),
     groupArtifacts: vi.fn(async () => []),
@@ -659,12 +741,12 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
       ok: true as const,
       imported: slugs,
     })),
-    sharedWorkflows: vi.fn(async () => ({ directory: '/xdg/aip/workflows', workflows: [] })),
-    importWorkflows: vi.fn(async (_source: string, ids: string[]) => ({
+    sharedPipelines: vi.fn(async () => ({ directory: '/xdg/aip/pipelines', pipelines: [] })),
+    importPipelines: vi.fn(async (_source: string, ids: string[]) => ({
       ok: true as const,
       imported: ids,
     })),
-    writeWorkflow: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
+    writePipeline: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     writeSettings: vi.fn(async () => ({
       ok: true as const,
       revision: 'g2',
@@ -675,8 +757,17 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
       revision: 'g2',
       file: '/xdg/aip/settings.yaml',
     })),
-    deleteWorkflow: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
-    previewWorkflow: vi.fn(async () => ({ topology: workflowOf(), errors: [] })),
+    deletePipeline: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
+    previewPipeline: vi.fn(async () => ({ topology: pipelineOf(), errors: [] })),
+    writeAction: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
+    deleteAction: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
+    systemStages: vi.fn(async () => ({ repository: '/repo', stages: [], errors: [] })),
+    observers: vi.fn(async () => observersView()),
+    setObservers: vi.fn(async (settings: ObserverSettings) => ({
+      ok: true as const,
+      view: observersView({ settings }),
+    })),
+    setRunObserver: vi.fn(async () => ({})),
     ...overrides,
   };
   /** Methods that record the repository they were bound to, then call the shared mock. */

@@ -1,3 +1,10 @@
+import {
+  parseObserversView,
+  type ObserverSettings,
+  type ObserversResult,
+  type ObserversView,
+} from './observerTypes.ts';
+import type { SystemStagesResponse } from './pipelineEntries.ts';
 import type {
   ApplyResult,
   ArtifactView,
@@ -19,12 +26,12 @@ import type {
   SharedSpecialistsView,
   SpecialistTagsView,
   SpecialistsImportResult,
-  SharedWorkflowsView,
-  WorkflowsImportResult,
+  SharedPipelinesView,
+  PipelinesImportResult,
   SystemView,
   TagView,
   Transcript,
-  WorkflowsView,
+  PipelinesView,
   WriteLevel,
 } from './types.ts';
 
@@ -52,7 +59,7 @@ export interface QueueSettingsPatch {
 
 export interface Api {
   /**
-   * The same API bound to a repository: queue, configuration and workflow requests carry
+   * The same API bound to a repository: queue, configuration and pipeline requests carry
    * `repository=<path>`. `null` is the repository `aip web` runs in.
    */
   forRepository(repository: string | null): Api;
@@ -67,8 +74,8 @@ export interface Api {
   addRepository(path: string): Promise<RepositoryView[]>;
   /** Removes a repository from the list; the daemon refuses while it has work. */
   removeRepository(path: string): Promise<RepositoryView[]>;
-  /** Workflows of the bound repository, or of the one given. */
-  workflows(repository?: string): Promise<WorkflowsView>;
+  /** Pipelines of the bound repository, or of the one given. */
+  pipelines(repository?: string): Promise<PipelinesView>;
   group(runId: string, group: string): Promise<GroupView>;
   groupSpec(runId: string, group: string): Promise<GroupSpecView | null>;
   transcript(runId: string, group: string, seq: number, after: number): Promise<Transcript>;
@@ -155,9 +162,9 @@ export interface Api {
   /** Copies project specialists of another repository into the bound one. */
   importSpecialists(source: string, slugs: string[]): Promise<SpecialistsImportResult>;
   /** The shared pipelines with the repositories of the registry that use them. */
-  sharedWorkflows(): Promise<SharedWorkflowsView>;
+  sharedPipelines(): Promise<SharedPipelinesView>;
   /** Copies project pipelines of another repository into the bound one. */
-  importWorkflows(source: string, ids: string[]): Promise<WorkflowsImportResult>;
+  importPipelines(source: string, ids: string[]): Promise<PipelinesImportResult>;
   /** Writes one general setting (`null` removes it); problems come back as a result. */
   writeSetting(
     path: string,
@@ -171,19 +178,36 @@ export interface Api {
     revision: string | null,
     level?: WriteLevel,
   ): Promise<ConfigEditResult>;
-  writeWorkflow(
+  writePipeline(
     id: string,
     value: Record<string, unknown>,
     revision: string | null,
     level?: WriteLevel,
   ): Promise<ConfigEditResult>;
-  deleteWorkflow(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
-  /** The graph and the errors of a draft workflow; nothing is written. */
-  previewWorkflow(
+  deletePipeline(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
+  /** The graph and the errors of a draft pipeline; nothing is written. */
+  previewPipeline(
     id: string,
     value: Record<string, unknown>,
     level?: WriteLevel,
   ): Promise<ConfigPreview>;
+  /** Writes an action file; problems with the edit come back as a result, not an error. */
+  writeAction(
+    id: string,
+    value: Record<string, unknown>,
+    revision: string | null,
+    level?: WriteLevel,
+  ): Promise<ConfigEditResult>;
+  /** Refused with the places that name the action when a point still uses it. */
+  deleteAction(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
+  /** The built-in stages of the pipeline with their tasks and settings. */
+  systemStages(): Promise<SystemStagesResponse>;
+  /** The settings of the observers and their running repairs. */
+  observers(): Promise<ObserversView>;
+  /** Saves the settings of the observers; wrong fields come back as a result, not an error. */
+  setObservers(settings: ObserverSettings): Promise<ObserversResult>;
+  /** Forbids (`enabled: false`) or gives back the observer in one run. */
+  setRunObserver(run: string, repository: string, enabled: boolean): Promise<unknown>;
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -224,6 +248,28 @@ async function edit(path: string, init: RequestInit): Promise<ConfigEditResult> 
   throw new ApiError(response.status, String(body.error ?? response.statusText));
 }
 
+/** The view in an answer; an answer that is not one is a failure. */
+function viewOf(body: unknown): ObserversView {
+  const view = parseObserversView(body);
+  if (view === null) throw new ApiError(502, 'Malformed answer of /api/observers');
+  return view;
+}
+
+/** 200 is the saved view, 422 the errors of fields; anything else is a failure. */
+async function saveObservers(settings: ObserverSettings): Promise<ObserversResult> {
+  const response = await fetch('/api/observers', {
+    credentials: 'same-origin',
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (response.status === 200) return { ok: true, view: viewOf(body) };
+  if (response.status === 422)
+    return { ok: false, errors: (body.errors ?? []) as { path: string; message: string }[] };
+  throw new ApiError(response.status, String(body.error ?? response.statusText));
+}
+
 /** The address with `repository=<path>` added (`null` leaves it as it is). */
 /** How many finished runs one page of the run list loads. */
 const FINISHED_PAGE = 15;
@@ -245,7 +291,7 @@ function bound(repository: string | null): Api {
     addRepository: (path) => post('/api/repositories', { path }),
     removeRepository: (path) =>
       call(`/api/repositories?repository=${enc(path)}`, { method: 'DELETE' }),
-    workflows: (other) => call(withRepository('/api/workflows', other ?? repository)),
+    pipelines: (other) => call(withRepository('/api/pipelines', other ?? repository)),
     group: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}?tail=200`),
     groupSpec: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}/spec`),
     transcript: (runId, group, seq, after) =>
@@ -358,25 +404,40 @@ function bound(repository: string | null): Api {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ source, slugs }),
       })) as unknown as SpecialistsImportResult,
-    sharedWorkflows: () => call('/api/shared-workflows'),
-    importWorkflows: async (source, ids) =>
-      (await edit(at('/api/config/workflows/import'), {
+    sharedPipelines: () => call('/api/shared-pipelines'),
+    importPipelines: async (source, ids) =>
+      (await edit(at('/api/config/pipelines/import'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ source, ids }),
-      })) as unknown as WorkflowsImportResult,
-    writeWorkflow: (id, value, revision, level) =>
-      edit(at(`/api/config/workflows/${enc(id)}`), {
+      })) as unknown as PipelinesImportResult,
+    writePipeline: (id, value, revision, level) =>
+      edit(at(`/api/config/pipelines/${enc(id)}`), {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ value, revision, ...(level ? { level } : {}) }),
       }),
-    deleteWorkflow: (id, revision, level) =>
-      edit(at(`/api/config/workflows/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
+    deletePipeline: (id, revision, level) =>
+      edit(at(`/api/config/pipelines/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
         method: 'DELETE',
       }),
-    previewWorkflow: (id, value, level) =>
-      post(at(`/api/config/workflows/${enc(id)}/preview`), {
+    writeAction: (id, value, revision, level) =>
+      edit(at(`/api/config/actions/${enc(id)}`), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ value, revision, ...(level ? { level } : {}) }),
+      }),
+    deleteAction: (id, revision, level) =>
+      edit(at(`/api/config/actions/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
+        method: 'DELETE',
+      }),
+    systemStages: () => call(at('/api/system-stages')),
+    observers: async () => viewOf(await call<unknown>('/api/observers')),
+    setObservers: saveObservers,
+    setRunObserver: (run, runRepository, enabled) =>
+      post(withRepository(`/api/runs/${enc(run)}/observer`, runRepository), { enabled }),
+    previewPipeline: (id, value, level) =>
+      post(at(`/api/config/pipelines/${enc(id)}/preview`), {
         value,
         ...(level ? { level } : {}),
       }),

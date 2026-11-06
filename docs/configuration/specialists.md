@@ -1,6 +1,6 @@
 # Specialists
 
-A specialist is an agent role: a prompt, a model, a runtime and permissions. Every specialist is one file in `aip/specialists/` (see [File rules](README.md#file-rules)), and [workflows](workflows.md) name them in their steps.
+A specialist is an agent role: a prompt, a model, a runtime and permissions. Every specialist is one file in `aip/specialists/` (see [File rules](README.md#file-rules)), and [pipelines](pipelines.md) name them in their steps.
 
 The file `aip/specialists/plan.yaml` (the slug `plan` comes from the file name):
 
@@ -42,7 +42,7 @@ prompt: |
 
 Every `%s` in `prompt` is replaced by the group's task, and `%%` gives a literal `%`. If there is no `%s`, the task is added as a separate paragraph. Without `prompt` the specialist gets only the task.
 
-A step can narrow a specialist without a copy of it: see [`additional_prompt`](workflows.md#step-fields).
+A step can narrow a specialist without a copy of it: see [`additional_prompt`](pipelines.md#step-fields).
 
 ### What a specialist receives
 
@@ -99,10 +99,10 @@ mcp:
 `queue: true` gives the specialist the MCP tool [`swarm_queue_add`](../hosts/mcp-tools.md#tools-of-a-specialist). The field cannot be set in `defaults`. For Claude the tool is allowed in advance at every permission level.
 
 - The tool puts a task at the end of the queue of the run's repository, not of its own worktree. The queue does not start.
-- Parameters: `workflow`, `task` or `groups`, an optional `title`, and `after`.
+- Parameters: `pipeline`, `task` or `groups`, an optional `title`, and `after`.
 - `after` takes ids of queue items or runs that must be done first, for example ids returned by earlier `swarm_queue_add` calls. A specialist can queue a chain: a model first, then the API after it.
-- The last step of a workflow can pass results on, for example by queueing a `feature` task for each prepared change.
-- An unknown workflow, invalid parameters, or a call after the attempt has ended return an error to the specialist.
+- The last step of a pipeline can pass results on, for example by queueing a `feature` task for each prepared change.
+- An unknown pipeline, invalid parameters, or a call after the attempt has ended return an error to the specialist.
 - The task gets [tags automatically](../usage/tags.md#tags-of-tasks-a-specialist-queues); a specialist cannot set them.
 
 ## Tags

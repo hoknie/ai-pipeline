@@ -11,16 +11,33 @@ export {
   runName,
   slugify,
 } from './ids.ts';
-export { buildInput } from './input.ts';
+export { buildInput, splitInstructionText } from './input.ts';
 export {
   Rejection,
   transition,
   type AttemptExit,
   type Effect,
   type Event,
+  type ActionOutcome,
   type MergeOutcome,
 } from './machine.ts';
+export {
+  actionName,
+  enterPoint,
+  nextAction,
+  pipelineStages,
+  pointEntered,
+  runStages,
+  type NextAction,
+  type PipelineStage,
+  type StageCondition,
+  type StageKind,
+  type StagePerformer,
+  type StageSection,
+  type StageStatus,
+} from './stages.ts';
 export * from './model.ts';
+export * from './observer.ts';
 export { stepProgress, type StepProgress } from './progress.ts';
 export {
   applySkip,
@@ -33,7 +50,13 @@ export {
 } from './skip.ts';
 export type { StepPhase as StepStatePhase, StepState } from './skip.ts';
 export { questionsText, reviewQuestion } from './questions.ts';
-export { planDispatch, waitKey, type DispatchPlan, type GroupWait } from './plan.ts';
+export {
+  isCommandAction,
+  planDispatch,
+  waitKey,
+  type DispatchPlan,
+  type GroupWait,
+} from './plan.ts';
 export {
   dispatch,
   limitHolds,
@@ -43,6 +66,9 @@ export {
   runningBySpecialist,
 } from './scheduler.ts';
 export {
+  MESSAGE_INSTRUCTIONS,
+  RESOLVE_INSTRUCTIONS,
+  afterDeliveryDone,
   deliveryCounts,
   renderCommitMessage,
   type DeliveryEffect,
@@ -61,13 +87,13 @@ export {
   stepLabel,
   stepName,
   topology,
-  workflowTopologies,
-  workflowTopology,
+  pipelineTopologies,
+  pipelineTopology,
   type StepGroup,
   type StepInfo,
   type StepTopology,
   type Topology,
-  type WorkflowTopology,
+  type PipelineTopology,
 } from './topology.ts';
 export {
   commandParts,

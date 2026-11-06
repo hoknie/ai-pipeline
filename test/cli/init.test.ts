@@ -69,7 +69,7 @@ describe('aip init', () => {
       'settings.yaml',
       'specialists/coder.yaml',
       'specialists/reviewer.yaml',
-      'workflows/feature.yaml',
+      'pipelines/feature.yaml',
     ]) {
       expect(existsSync(join(repo, 'aip', file)), file).toBe(true);
     }
@@ -90,7 +90,7 @@ describe('aip init', () => {
     );
     expect(result.stdout).toContain('coder.yaml');
     expect(result.stdout).toContain('already exists');
-    expect(existsSync(join(repo, 'aip', 'workflows', 'feature.yaml'))).toBe(true);
+    expect(existsSync(join(repo, 'aip', 'pipelines', 'feature.yaml'))).toBe(true);
   });
 
   it('fails outside a repository and creates nothing', async () => {

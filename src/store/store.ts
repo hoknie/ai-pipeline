@@ -10,9 +10,13 @@ import {
   MESSAGE_GROUP,
   ON_LIMIT_MODES,
   RUN_HOLDS,
+  REPAIR_GROUP,
   RESOLVE_GROUP,
+  defaultObserverSettings,
+  emptyRepair,
   SPLIT_GROUP,
   allGroups,
+  isActionGroup,
   pendingDelivery,
   transition,
   type Attempt,
@@ -20,6 +24,7 @@ import {
   type Effect,
   type Group,
   type HumanDecision,
+  type ObserverSettings,
   type Queue,
   type QueueItem,
   type GroupStatus,
@@ -121,6 +126,29 @@ export class Store {
     }
   }
 
+  /** Settings of the observers; the defaults until they are saved. */
+  loadObservers(): ObserverSettings {
+    const row = this.database.prepare('SELECT settings_json FROM observers WHERE id = 1').get() as
+      Row | undefined;
+    const defaults = defaultObserverSettings();
+    if (!row) return defaults;
+    try {
+      const saved = JSON.parse(String(row.settings_json)) as Partial<ObserverSettings>;
+      return { ...defaults, ...saved };
+    } catch {
+      return defaults;
+    }
+  }
+
+  saveObservers(settings: ObserverSettings): void {
+    this.database
+      .prepare(
+        `INSERT INTO observers (id, settings_json, updated_at) VALUES (1, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET settings_json = excluded.settings_json, updated_at = excluded.updated_at`,
+      )
+      .run(JSON.stringify(settings), Date.now());
+  }
+
   saveRun(state: RunState): void {
     this.transaction(() => this.writeRun(state));
   }
@@ -129,14 +157,14 @@ export class Store {
     const { run } = state;
     this.database
       .prepare(
-        `INSERT INTO runs (id, repository, workflow, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number, hold)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json, hold = excluded.hold`,
+        `INSERT INTO runs (id, repository, pipeline, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number, hold, repair_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json, hold = excluded.hold, repair_json = excluded.repair_json`,
       )
       .run(
         run.id,
         run.repository,
-        run.workflow,
+        run.pipeline,
         run.baseCommit,
         run.branch,
         run.refStyle,
@@ -155,6 +183,7 @@ export class Store {
         JSON.stringify(run.skippedSteps),
         run.number,
         run.hold,
+        JSON.stringify(run.repair),
       );
     const groupStatement = this.database.prepare(
       `INSERT OR REPLACE INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict, merge_commit, delivery_json, questions_json, human_only)
@@ -573,7 +602,7 @@ export class Store {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, workflow, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number)
+        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
@@ -581,7 +610,7 @@ export class Store {
           item.id,
           queue.repository,
           position,
-          item.workflow,
+          item.pipeline,
           item.task,
           json(item.groups),
           item.title,
@@ -620,7 +649,7 @@ export class Store {
       items: items.map((item): QueueItem => ({
         id: String(item.id),
         number: Number(item.number),
-        workflow: String(item.workflow),
+        pipeline: String(item.pipeline),
         task: text(item.task ?? null),
         groups: nullable(item.groups_json ?? null),
         title: text(item.title ?? null),
@@ -657,7 +686,7 @@ export class Store {
       run: {
         id: runId,
         repository: String(row.repository),
-        workflow: String(row.workflow),
+        pipeline: String(row.pipeline),
         baseCommit: String(row.base_commit),
         branch: String(row.branch),
         refStyle: String(row.ref_style) as RefStyle,
@@ -676,14 +705,28 @@ export class Store {
         hold: RUN_HOLDS.find((hold) => hold === row.hold) ?? null,
         tags: row.tags_json ? parse(row.tags_json) : [],
         skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],
+        repair: hydrateRepair(row.repair_json ?? null),
       },
       split: groups.find((group) => group.slug === SPLIT_GROUP) ?? null,
       groups: groups.filter(
-        (group) => ![SPLIT_GROUP, MESSAGE_GROUP, RESOLVE_GROUP].includes(group.slug),
+        (group) =>
+          ![SPLIT_GROUP, MESSAGE_GROUP, RESOLVE_GROUP, REPAIR_GROUP].includes(group.slug) &&
+          !isActionGroup(group),
       ),
       message: groups.find((group) => group.slug === MESSAGE_GROUP) ?? null,
       resolve: groups.find((group) => group.slug === RESOLVE_GROUP) ?? null,
+      repair: groups.find((group) => group.slug === REPAIR_GROUP) ?? null,
+      actions: groups.filter(isActionGroup),
     };
+  }
+}
+
+function hydrateRepair(value: SQLInputValue): RunState['run']['repair'] {
+  if (typeof value !== 'string') return emptyRepair();
+  try {
+    return { ...emptyRepair(), ...(JSON.parse(value) as object) };
+  } catch {
+    return emptyRepair();
   }
 }
 

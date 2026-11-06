@@ -106,7 +106,7 @@ describe('top navigation', () => {
     const onNavigate = vi.fn();
     mount({ onNavigate });
     fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
-    expect(onNavigate).toHaveBeenCalledWith('workflows');
+    expect(onNavigate).toHaveBeenCalledWith('pipelines');
   });
 
   const corner = () => document.querySelector<HTMLElement>('[data-nav-icon] .absolute');

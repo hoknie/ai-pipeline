@@ -28,7 +28,7 @@ const TopologyPage = lazy(() => import('./components/TopologyPage.tsx'));
 const NewTaskDialog = lazy(() => import('./components/NewTaskDialog.tsx'));
 const QueuePage = lazy(() => import('./components/QueuePage.tsx'));
 const SpecialistsPage = lazy(() => import('./components/SpecialistsPage.tsx'));
-const WorkflowsPage = lazy(() => import('./components/WorkflowsPage.tsx'));
+const PipelinesPage = lazy(() => import('./components/PipelinesPage.tsx'));
 const SettingsPage = lazy(() => import('./components/settings/SettingsPage.tsx'));
 
 function readRoute(): Route {
@@ -98,12 +98,13 @@ function Panel({
     daemon,
     openedState,
     streamedProcesses,
+    streamedObservers,
     history,
   } = useRuns(api, openStream, chosen, route.view === 'runs' ? route.run : null, notifyError);
   // Every request names its repository, so it never depends on the server's default.
   const scopedApi = useMemo(() => api.forRepository(selected), [api, selected]);
   const pageKey = selected ?? '';
-  /** Whether the open specialist or workflow form has unsaved edits. */
+  /** Whether the open specialist or pipeline form has unsaved edits. */
   const dirty = useRef(false);
   useEffect(() => {
     dirty.current = false;
@@ -192,12 +193,12 @@ function Panel({
     route.view === 'runs' ? (runs.find((candidate) => candidate.id === route.run) ?? null) : null;
   const tabRoute = (view: View): Route => {
     if (view === route.view) return route;
-    if (view === 'queue' || view === 'specialists' || view === 'workflows')
+    if (view === 'queue' || view === 'specialists' || view === 'pipelines')
       return { view, run: null, group: null, step: null, tab: null };
     if (view === 'settings')
       return { view, run: 'general', group: 'global', step: null, tab: null };
     if (view === 'topology')
-      return { view, run: run?.workflow ?? null, group: null, step: null, tab: null };
+      return { view, run: run?.pipeline ?? null, group: null, step: null, tab: null };
     return { view, run: lastRun.current, group: null, step: null, tab: null };
   };
   const { working, waiting } = navRunCounts(runsOf(runs, scope === 'repository' ? selected : null));
@@ -375,8 +376,8 @@ function Panel({
                   tab: null,
                 })
               }
-              workflow={route.step}
-              onSelectWorkflow={(id) =>
+              pipeline={route.step}
+              onSelectPipeline={(id) =>
                 setRoute({
                   view: 'settings',
                   run: 'pipelines',
@@ -385,6 +386,17 @@ function Panel({
                   tab: null,
                 })
               }
+              observerTab={route.step}
+              onSelectObserverTab={(tab) =>
+                setRoute({
+                  view: 'settings',
+                  run: 'observers',
+                  group: 'global',
+                  step: tab,
+                  tab: null,
+                })
+              }
+              streamedObservers={streamedObservers}
               repository={selected}
               repositories={repositories}
               onSelectRepository={(path) => void selectRepository(path)}
@@ -394,16 +406,17 @@ function Panel({
               onError={onError}
             />
           </Suspense>
-        ) : route.view === 'workflows' ? (
-          <Suspense fallback={<Loading what="workflow" />}>
-            <WorkflowsPage
+        ) : route.view === 'pipelines' ? (
+          <Suspense fallback={<Loading what="pipeline" />}>
+            <PipelinesPage
               key={pageKey}
               dirty={dirty}
               api={scopedApi}
               runs={runs}
               selected={route.run}
-              onSelect={(id) =>
-                setRoute({ view: 'workflows', run: id, group: null, step: null, tab: null })
+              section={route.group}
+              onSelect={(id, section = null) =>
+                setRoute({ view: 'pipelines', run: id, group: section, step: null, tab: null })
               }
             />
           </Suspense>
@@ -425,12 +438,12 @@ function Panel({
               key={pageKey}
               api={scopedApi}
               runs={runs}
-              workflow={route.run}
-              onSelectWorkflow={(id) =>
+              pipeline={route.run}
+              onSelectPipeline={(id) =>
                 setRoute({ view: 'topology', run: id, group: null, step: null, tab: null })
               }
-              onEditWorkflow={(id) =>
-                setRoute({ view: 'workflows', run: id, group: null, step: null, tab: null })
+              onEditPipeline={(id) =>
+                setRoute({ view: 'pipelines', run: id, group: null, step: null, tab: null })
               }
               onOpenGroup={(target, step) =>
                 setRoute({ view: 'runs', run: target.runId, group: target.slug, step, tab: null })

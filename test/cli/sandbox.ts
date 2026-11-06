@@ -10,7 +10,7 @@ import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
 import { request } from '../../src/protocol/index.ts';
 import type { CliIo } from '../../src/cli/io.ts';
 import { runCli } from '../../src/cli/program.ts';
-import { TEST_TIMINGS, WORKFLOW_CONFIG } from '../daemon/harness.ts';
+import { TEST_TIMINGS, PIPELINE_CONFIG } from '../daemon/harness.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 import { waitUntil } from '../fixtures/wait-until.ts';
 
@@ -75,7 +75,7 @@ afterAll(() => teardown(shared));
 /** Sandboxes of a `beforeAll`: they live until the end of the file, not of one test. */
 const shared: Sandbox[] = [];
 
-export function sandbox(config = WORKFLOW_CONFIG, options: { shared?: boolean } = {}): Sandbox {
+export function sandbox(config = PIPELINE_CONFIG, options: { shared?: boolean } = {}): Sandbox {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-cli-')));
   const repo = join(base, 'repo');
   copyTemplateRepo(repo, config);

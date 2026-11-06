@@ -25,7 +25,7 @@ const RESET = 50_000;
 
 function queueOf(...tasks: string[]): Queue {
   const queue = emptyQueue('/repo', 1);
-  tasks.forEach((task, index) => addItem(queue, { workflow: 'feature', task }, `q${index + 1}`, 2));
+  tasks.forEach((task, index) => addItem(queue, { pipeline: 'feature', task }, `q${index + 1}`, 2));
   return queue;
 }
 
@@ -237,10 +237,10 @@ describe('return a run to the queue', () => {
   it('puts the run first and takes it off the skipped', () => {
     const { queue, a } = skippedRun();
     queue.items.splice(0); // the first tick took q1; keep the test about the order only
-    addItem(queue, { workflow: 'feature', task: 'b' }, 'q5', 5);
+    addItem(queue, { pipeline: 'feature', task: 'b' }, 'q5', 5);
     const item = returnRun(queue, a, 'q9', 10);
     expect(queue.items.map((entry) => entry.id)).toEqual(['q9', 'q5']);
-    expect(item).toMatchObject({ run: a.run.id, workflow: 'feature', task: null });
+    expect(item).toMatchObject({ run: a.run.id, pipeline: 'feature', task: null });
     expect(queue.skipped).toEqual([]);
     expect(group(a).status).toBe('failed');
   });

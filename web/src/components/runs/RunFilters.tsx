@@ -58,12 +58,12 @@ export function RunFilters({
     count: stateCounts.get(state) ?? 0,
   }));
 
-  const workflowCounts = counts('workflows');
-  const workflows = new Map<string, string>();
-  for (const run of scoped) workflows.set(run.workflow, run.workflowName || run.workflow);
-  for (const id of filters.workflows) if (!workflows.has(id)) workflows.set(id, id);
-  const workflowOptions: FilterOption[] = [...workflows]
-    .map(([value, label]) => ({ value, label, count: workflowCounts.get(value) ?? 0 }))
+  const pipelineCounts = counts('pipelines');
+  const pipelines = new Map<string, string>();
+  for (const run of scoped) pipelines.set(run.pipeline, run.pipelineName || run.pipeline);
+  for (const id of filters.pipelines) if (!pipelines.has(id)) pipelines.set(id, id);
+  const pipelineOptions: FilterOption[] = [...pipelines]
+    .map(([value, label]) => ({ value, label, count: pipelineCounts.get(value) ?? 0 }))
     .sort((left, right) => left.label.localeCompare(right.label));
 
   const specialistCounts = counts('specialists');
@@ -122,10 +122,10 @@ export function RunFilters({
         clearLabel={clear}
       />
       <FilterSelect
-        label={t('runs.list.workflow')}
-        options={workflowOptions}
-        selected={filters.workflows}
-        onChange={set('workflows')}
+        label={t('runs.list.pipeline')}
+        options={pipelineOptions}
+        selected={filters.pipelines}
+        onChange={set('pipelines')}
         clearLabel={clear}
       />
       <FilterSelect

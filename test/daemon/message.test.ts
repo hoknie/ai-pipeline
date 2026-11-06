@@ -44,7 +44,8 @@ describe('times of the log lines', () => {
     const h = await start();
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.finished);
-    const files = timesFiles(h.repo);
+    // only the logs: the cleanup of the run may be removing its worktrees right now
+    const files = timesFiles(join(h.repo, '.aip', 'logs'));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) rmSync(file);
     const full = (await h.call('transcript', { runId, group: 'g1', seq: 1 })) as Transcript;

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach } from 'vitest';
 
 import type { RunCreated } from '../../src/protocol/index.ts';
-import { POLL_MS, WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
+import { POLL_MS, PIPELINE_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 export { until };
 
@@ -26,7 +26,7 @@ export async function run(h: Harness, count = 1): Promise<string> {
     title: `g${index + 1}`,
     task: `task ${index + 1}`,
   }));
-  return ((await startRun(h, { repository: h.repo, workflow: 'feature', groups })) as RunCreated)
+  return ((await startRun(h, { repository: h.repo, pipeline: 'feature', groups })) as RunCreated)
     .runId;
 }
 
@@ -50,7 +50,7 @@ export function alive(pid: number): boolean {
  * `timeout: 1s` lasts `timeoutUnitMs` (50 ms) in the daemon of the harness, so a test of a timeout
  * takes a fraction of a second.
  */
-export const SHORT_TIMEOUT = WORKFLOW_CONFIG.replace(
+export const SHORT_TIMEOUT = PIPELINE_CONFIG.replace(
   'coder: { name: Кодировщик }',
   'coder: { name: Кодировщик, timeout: 1s }',
 );

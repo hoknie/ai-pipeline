@@ -15,7 +15,7 @@ import {
   queueOf,
   runView,
   tagView,
-  workflowsView,
+  pipelinesView,
 } from './fixtures.ts';
 import type { TagView } from '../src/types.ts';
 import { replaceTags } from '../src/store.ts';
@@ -112,7 +112,7 @@ describe('tag picker in the task form', () => {
   };
   const queueApi = (overrides: Partial<Api> = {}) => ({
     queue: vi.fn(async () => queueOf()),
-    workflows: vi.fn(async () => workflowsView()),
+    pipelines: vi.fn(async () => pipelinesView()),
     ...overrides,
   });
 

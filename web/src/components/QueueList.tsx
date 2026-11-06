@@ -28,7 +28,7 @@ import type {
   QueueItemView,
   QueueView,
   RunView,
-  WorkflowsView,
+  PipelinesView,
 } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
@@ -38,7 +38,7 @@ import { Empty } from '../ui/empty.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.tsx';
 
 import { TagChips } from './TagChip.tsx';
-import { WorkflowBadge } from './WorkflowBadge.tsx';
+import { PipelineBadge } from './PipelineBadge.tsx';
 import { QueueForm, draftOf, type QueueDraft } from './QueueForm.tsx';
 import { dropPosition, dropSlot, moveId } from './queueOrder.ts';
 import { afterOptions, dependents, depth, parentChoices, unmet } from './queueLinks.ts';
@@ -46,17 +46,17 @@ import { afterOptions, dependents, depth, parentChoices, unmet } from './queueLi
 const STATE_ICON = { done: CircleCheck, waiting: Clock, blocked: Ban } as const;
 const STATE_TONE = { done: 'ok', waiting: 'warn', blocked: 'err' } as const;
 
-/** A warning icon for a task that skips workflow steps; the tooltip lists the skipped steps. */
+/** A warning icon for a task that skips pipeline steps; the tooltip lists the skipped steps. */
 function SkippedSteps({
   item,
-  workflows,
+  pipelines,
 }: {
   item: QueueItemView;
-  workflows: WorkflowsView | null | undefined;
+  pipelines: PipelinesView | null | undefined;
 }) {
   const { t } = useTranslation();
   if (!item.skip || item.skip.length === 0) return null;
-  const steps = workflows?.workflows.find((candidate) => candidate.id === item.workflow)?.steps;
+  const steps = pipelines?.pipelines.find((candidate) => candidate.id === item.pipeline)?.steps;
   const skipped = item.skip.map((id) => ({
     id,
     name: steps?.find((step) => step.id === id)?.name ?? id,
@@ -126,7 +126,7 @@ export function QueueList({
   api,
   queue,
   runs = [],
-  workflows,
+  pipelines,
   now,
   drafts,
   onDraft,
@@ -138,7 +138,7 @@ export function QueueList({
   queue: QueueView;
   /** All runs of the panel: the parent choices come from them. */
   runs?: RunView[];
-  workflows: WorkflowsView | null;
+  pipelines: PipelinesView | null;
   now: number;
   drafts: Record<string, QueueDraft>;
   onDraft: (key: string, draft: QueueDraft | null) => void;
@@ -378,7 +378,7 @@ export function QueueList({
                 <span className="font-mono text-xs text-muted-foreground">
                   {taskNumber(item.number)}
                 </span>
-                <WorkflowBadge id={item.workflow} name={item.workflowName} />
+                <PipelineBadge id={item.pipeline} name={item.pipelineName} />
                 <span className="min-w-0 flex-1 truncate" title={itemLabel(item, t)}>
                   {itemLabel(item, t)}
                 </span>
@@ -422,7 +422,7 @@ export function QueueList({
                     {t('queue.list.deliveryMode', { mode: t(`deliveryMode.${item.deliveryMode}`) })}
                   </span>
                 )}
-                <SkippedSteps item={item} workflows={workflows} />
+                <SkippedSteps item={item} pipelines={pipelines} />
                 {item.title && item.groups ? (
                   <span className="text-muted-foreground">{groupsText(item.groups.length, t)}</span>
                 ) : null}
@@ -511,7 +511,7 @@ export function QueueList({
                 <QueueForm
                   idPrefix={`edit-${item.id}`}
                   draft={editing}
-                  workflows={workflows}
+                  pipelines={pipelines}
                   repository={queue.repository}
                   api={api}
                   autoDeliverDefault={queue.autoDeliver}
@@ -529,7 +529,7 @@ export function QueueList({
                         item.run !== null
                           ? { ...(fields.after !== undefined ? { after: fields.after } : {}) }
                           : {
-                              workflow: fields.workflow,
+                              pipeline: fields.pipeline,
                               ...(fields.task !== undefined ? { task: fields.task } : {}),
                               ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
                               title: fields.title ?? null,

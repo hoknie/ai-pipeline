@@ -17,11 +17,12 @@ import { orderEntries } from '../order.ts';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { entryBadge } from './RunStatuses.tsx';
 import { TagChips } from '../TagChip.tsx';
-import { WorkflowBadge } from '../WorkflowBadge.tsx';
+import { PipelineBadge } from '../PipelineBadge.tsx';
 import { RunDecisions } from './RunDecisions.tsx';
 import { RunFilters } from './RunFilters.tsx';
 import { RunProgress } from './RunProgress.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
+import { undeliveredMark } from './delivery.ts';
 
 import {
   activeFilters,
@@ -135,14 +136,17 @@ export function RunList({
             const open = run.id === selectedRun;
             const groups = orderEntries(run);
             const times = runTimes(run, now, locale);
+            const mark = undeliveredMark(run);
             return (
               <li key={run.id} data-run={run.id}>
                 <button
                   type="button"
                   className={cn(
                     'flex w-full flex-col gap-1 rounded-lg border bg-card p-2.5 text-left hover:bg-accent',
+                    mark && 'border-status-warn/40 bg-status-warn-bg/40',
                     open && 'border-primary bg-accent',
                   )}
+                  data-undelivered={mark ? '' : undefined}
                   aria-expanded={open}
                   title={`${runTitle(run)}\n${run.id}`}
                   onClick={() => onSelect(run.id, null)}
@@ -162,13 +166,31 @@ export function RunList({
                         {repositoryLabel(run.repository)}
                       </span>
                     ) : null}
-                    <WorkflowBadge id={run.workflow} name={run.workflowName} focusable={false} />
+                    <PipelineBadge id={run.pipeline} name={run.pipelineName} focusable={false} />
                     <TagChips tags={run.tags ?? []} nested />
                   </span>
                   <span className="grid grid-cols-2 items-center gap-2 text-xs text-muted-foreground">
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
                       <RunWarningsBadge run={run} />
+                      {mark ? (
+                        <StatusBadge
+                          status={mark.status}
+                          label={
+                            mark.status === 'apply_failed'
+                              ? t('runs.header.deliveryFailed', { n: run.delivery.failed })
+                              : undefined
+                          }
+                          tip={
+                            mark.status === 'apply_failed'
+                              ? (mark.reason ?? undefined)
+                              : t('runs.list.undeliveredTip', {
+                                  applied: mark.delivered,
+                                  merged: mark.merged,
+                                })
+                          }
+                        />
+                      ) : null}
                     </span>
                     {run.state === 'finished' ? null : (
                       <RunProgress done={run.progress.done} total={run.progress.total} />
@@ -202,7 +224,9 @@ export function RunList({
                           onClick={() => onSelect(run.id, group.slug)}
                         >
                           <span className="truncate" title={group.title}>
-                            {'kind' in group ? t(`runs.system.${group.kind}`) : group.title}
+                            {'kind' in group && group.kind !== 'action'
+                              ? t(`runs.system.${group.kind}`)
+                              : group.title}
                             {'kind' in group ? (
                               <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                                 {t('runs.system.badge')}

@@ -79,8 +79,8 @@ describe('additional prompt of a step', () => {
   it('keeps the prompt of runs saved before the field existed', () => {
     const fresh = run(1);
     const old = run(1);
-    for (const workflow of old.run.config.workflows) {
-      for (const entry of workflow.steps)
+    for (const pipeline of old.run.config.pipelines) {
+      for (const entry of pipeline.steps)
         delete (entry as { additionalPrompt?: unknown }).additionalPrompt;
     }
     step(fresh);

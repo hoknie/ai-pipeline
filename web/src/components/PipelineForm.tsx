@@ -4,6 +4,15 @@ import { Trans, useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, GitBranch, Trash2 } from 'lucide-react';
 
 import type { Api } from '../api.ts';
+import {
+  ACTION_POINTS,
+  SPLIT_POINTS,
+  actionsOf,
+  isCommandAction,
+  ownPointsOf,
+  pointsOfStages,
+  type ActionPoint,
+} from '../pipelineEntries.ts';
 import { repositoryLabel } from '../repositories.ts';
 import { sameTag } from '../specialistTags.ts';
 import { useConfirm } from '../confirm.tsx';
@@ -20,11 +29,11 @@ import { Textarea } from '../ui/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 import type {
   ConfigEditorResponse,
-  EditorWorkflow,
+  EditorPipeline,
   EntryReference,
   FieldError,
-  SharedWorkflowView,
-  WorkflowTopology,
+  SharedPipelineView,
+  PipelineTopology,
   WriteLevel,
 } from '../types.ts';
 
@@ -34,8 +43,8 @@ import { describeReference } from './SpecialistForm.tsx';
 import { stepIds } from './stepIds.ts';
 import { ValuesPicker } from './ValuesPicker.tsx';
 import { formatRoute } from '../route.ts';
-import { WorkflowGraph } from './WorkflowGraph.tsx';
-import { rawName } from './workflowName.ts';
+import { PipelineGraph } from './PipelineGraph.tsx';
+import { rawName } from './pipelineName.ts';
 
 export const PREVIEW_DELAY_MS = 300;
 
@@ -62,8 +71,8 @@ export interface StepDraft {
 export interface SplitDraft {
   specialist: string;
   maxGroups: string;
-  /** Workflow whose steps the groups follow; empty for the own steps. */
-  workflow: string;
+  /** Pipeline whose steps the groups follow; empty for the own steps. */
+  pipeline: string;
   additionalPrompt: string;
 }
 
@@ -74,6 +83,8 @@ export interface Draft {
   tags: string[];
   steps: StepDraft[];
   split: SplitDraft | null;
+  /** Own action lists by point; a point that is absent follows `swarm.stages`. */
+  stages: Partial<Record<ActionPoint, string[]>>;
 }
 
 let nextKey = 1;
@@ -139,11 +150,12 @@ export function draftOf(raw: Record<string, unknown>): Draft {
       ? raw.tags.filter((tag): tag is string => typeof tag === 'string')
       : [],
     steps,
+    stages: ownPointsOf(raw.stages),
     split: split
       ? {
           specialist: text(split.specialist),
           maxGroups: text(split.max_groups),
-          workflow: text(split.workflow),
+          pipeline: text(split.pipeline),
           additionalPrompt: text(split.additional_prompt),
         }
       : null,
@@ -163,10 +175,18 @@ export function valueOf(draft: Draft): Record<string, unknown> {
     const split: Record<string, unknown> = { specialist: draft.split.specialist };
     if (draft.split.maxGroups.trim() !== '') split.max_groups = asNumber(draft.split.maxGroups);
     if (draft.split.additionalPrompt !== '') split.additional_prompt = draft.split.additionalPrompt;
-    if (draft.split.workflow !== '') split.workflow = draft.split.workflow;
+    if (draft.split.pipeline !== '') split.pipeline = draft.split.pipeline;
     value.split = split;
   }
-  if (draft.split?.workflow) return value;
+  const stages: Record<string, string[]> = {};
+  for (const point of ACTION_POINTS) {
+    const list = draft.stages[point];
+    // a pipeline without a split has no points around it
+    if (list === undefined || (!draft.split && SPLIT_POINTS.includes(point))) continue;
+    stages[point] = list;
+  }
+  if (Object.keys(stages).length > 0) value.stages = stages;
+  if (draft.split?.pipeline) return value;
   const ids = stepIds(draft.steps);
   value.steps = draft.steps.map((step, index) => {
     const out: Record<string, unknown> = { id: ids[index], specialist: step.specialist };
@@ -191,7 +211,7 @@ function stepOfError(
   id: string,
   hasSplit: boolean,
 ): { step: number | null; split: boolean } {
-  const prefix = `swarm.workflows.${id}.`;
+  const prefix = `swarm.pipelines.${id}.`;
   if (!path.startsWith(prefix)) return { step: null, split: false };
   const rest = path.slice(prefix.length);
   const step = /^steps\[(\d+)\]/.exec(rest);
@@ -202,51 +222,51 @@ function stepOfError(
 }
 
 function isNameError(path: string, id: string): boolean {
-  return path === `swarm.workflows.${id}.name`;
+  return path === `swarm.pipelines.${id}.name`;
 }
 
 function isTagsError(path: string, id: string): boolean {
-  return path === `swarm.workflows.${id}.tags`;
+  return path === `swarm.pipelines.${id}.tags`;
 }
 
 /** The shared-level view of the form: the usage of the pipeline by the projects. */
-export interface SharedWorkflowOnly {
+export interface SharedPipelineOnly {
   /** Usage of the open pipeline; null while it is not loaded. */
-  usage: SharedWorkflowView | null;
+  usage: SharedPipelineView | null;
   usageError: string | null;
   /** Reads the usage again, for example after the daemon refused a delete. */
   onUsageStale: () => void;
 }
 
-function UsageBlock({ shared, view }: { shared: SharedWorkflowOnly; view: ConfigEditorResponse }) {
+function UsageBlock({ shared, view }: { shared: SharedPipelineOnly; view: ConfigEditorResponse }) {
   const { t } = useTranslation();
   const { usage, usageError } = shared;
   return (
     <Card>
       <section aria-labelledby="usage-title" className="flex flex-col gap-2 p-4">
         <h3 id="usage-title" className="text-sm font-semibold">
-          {t('sharedWorkflows.usage.title')}
+          {t('sharedPipelines.usage.title')}
         </h3>
         {usageError ? (
           <Alert variant="destructive">
-            {t('sharedWorkflows.usage.error', { message: usageError })}
+            {t('sharedPipelines.usage.error', { message: usageError })}
           </Alert>
         ) : usage === null ? (
           <p className="text-sm text-muted-foreground" role="status">
-            {t('sharedWorkflows.usage.loading')}
+            {t('sharedPipelines.usage.loading')}
           </p>
         ) : (
           <>
             <p className="text-sm" data-testid="usage-count">
-              {t('sharedWorkflows.usage.count', { count: usage.projects.length })}
+              {t('sharedPipelines.usage.count', { count: usage.projects.length })}
             </p>
             {usage.projects.length === 0 && usage.global.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('sharedWorkflows.usage.none')}</p>
+              <p className="text-sm text-muted-foreground">{t('sharedPipelines.usage.none')}</p>
             ) : null}
-            <ul aria-label={t('sharedWorkflows.usage.title')} className="flex flex-col gap-1">
+            <ul aria-label={t('sharedPipelines.usage.title')} className="flex flex-col gap-1">
               {usage.global.length > 0 ? (
                 <li className="text-sm">
-                  <span className="font-medium">{t('sharedWorkflows.usage.shared')}</span>:{' '}
+                  <span className="font-medium">{t('sharedPipelines.usage.shared')}</span>:{' '}
                   {usage.global.map((reference) => describeReference(reference, view)).join(', ')}
                 </li>
               ) : null}
@@ -283,10 +303,10 @@ function movedBy(steps: StepDraft[], index: number, delta: number): StepDraft[] 
   return copy;
 }
 
-export function WorkflowForm({
+export function PipelineForm({
   api,
   view,
-  workflow,
+  pipeline,
   activeRuns,
   notice,
   onDirty,
@@ -297,8 +317,8 @@ export function WorkflowForm({
 }: {
   api: Api;
   view: ConfigEditorResponse;
-  /** null for a new workflow. */
-  workflow: EditorWorkflow | null;
+  /** null for a new pipeline. */
+  pipeline: EditorPipeline | null;
   activeRuns: number;
   notice: string | null;
   onDirty: (dirty: boolean) => void;
@@ -306,18 +326,18 @@ export function WorkflowForm({
   onSaved: (id: string) => Promise<void>;
   onDeleted: () => Promise<void>;
   /** Edits a shared pipeline at the shared level only, with the usage by the projects. */
-  sharedOnly?: SharedWorkflowOnly;
+  sharedOnly?: SharedPipelineOnly;
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [level, setLevel] = useState<WriteLevel>(
-    sharedOnly || workflow?.level === 'global' ? 'global' : 'project',
+    sharedOnly || pipeline?.level === 'global' ? 'global' : 'project',
   );
-  const sources = workflow?.sources ?? {};
+  const sources = pipeline?.sources ?? {};
   const source = sources[level];
   const bothLevels = Boolean(sources.project && sources.global);
   // A level without a file starts from the file that applies.
-  const raw = source?.raw ?? workflow?.raw ?? {};
+  const raw = source?.raw ?? pipeline?.raw ?? {};
   const initial = useMemo(() => draftOf(raw), [raw]);
   const initialValue = useMemo(() => JSON.stringify(valueOf(initial)), [initial]);
   const [draft, setDraft] = useState<Draft>(initial);
@@ -329,16 +349,16 @@ export function WorkflowForm({
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('form');
-  const [preview, setPreview] = useState<{ topology: WorkflowTopology | null; stale: boolean }>({
+  const [preview, setPreview] = useState<{ topology: PipelineTopology | null; stale: boolean }>({
     topology: null,
     stale: false,
   });
 
-  const id = workflow?.id ?? newId;
+  const id = pipeline?.id ?? newId;
   // a shared pipeline is view only on the project page; settings are where it is changed
-  const readOnly = Boolean(workflow) && level === 'global' && !sharedOnly;
+  const readOnly = Boolean(pipeline) && level === 'global' && !sharedOnly;
   const value = useMemo(() => valueOf(draft), [draft]);
-  const dirty = JSON.stringify(value) !== initialValue || (!workflow && newId !== '');
+  const dirty = JSON.stringify(value) !== initialValue || (!pipeline && newId !== '');
   useEffect(() => {
     onDirty(dirty);
     return () => onDirty(false);
@@ -350,7 +370,7 @@ export function WorkflowForm({
     if (!/^[a-z][a-z0-9-]{0,31}$/.test(id)) return;
     const request = ++latest.current;
     const timer = setTimeout(() => {
-      api.previewWorkflow(id, value, level).then(
+      api.previewPipeline(id, value, level).then(
         (result) => {
           if (request !== latest.current) return;
           setErrors(result.errors);
@@ -387,7 +407,7 @@ export function WorkflowForm({
           : {
               specialist: '',
               maxGroups: '',
-              workflow: '',
+              pipeline: '',
               additionalPrompt: '',
               ...current.split,
               ...patch,
@@ -406,7 +426,7 @@ export function WorkflowForm({
     }
   };
 
-  const report = (result: Awaited<ReturnType<Api['writeWorkflow']>>): boolean => {
+  const report = (result: Awaited<ReturnType<Api['writePipeline']>>): boolean => {
     if (result.ok) return true;
     if (result.reason === 'conflict') setConflict(result.message);
     else {
@@ -420,10 +440,10 @@ export function WorkflowForm({
   const save = () =>
     attempt(async () => {
       setConflict(null);
-      const result = await api.writeWorkflow(
+      const result = await api.writePipeline(
         id,
         value,
-        workflow ? (source?.revision ?? null) : null,
+        pipeline ? (source?.revision ?? null) : null,
         level,
       );
       if (report(result)) await onSaved(id);
@@ -433,7 +453,7 @@ export function WorkflowForm({
     attempt(async () => {
       setConflict(null);
       const target = saveAs ?? '';
-      const result = await api.writeWorkflow(target, value, null, level);
+      const result = await api.writePipeline(target, value, null, level);
       if (report(result)) await onSaved(target);
     });
 
@@ -441,8 +461,8 @@ export function WorkflowForm({
   const copyTo = (target: WriteLevel) =>
     attempt(async () => {
       // tags belong to the file they are written in: the copy starts without them
-      const { tags: _tags, ...rest } = workflow?.raw ?? {};
-      const result = await api.writeWorkflow(id, rest, null, target);
+      const { tags: _tags, ...rest } = pipeline?.raw ?? {};
+      const result = await api.writePipeline(id, rest, null, target);
       if (report(result)) await onSaved(id);
     });
 
@@ -461,7 +481,7 @@ export function WorkflowForm({
       return;
     setErrors([]);
     setConflict(null);
-    setDraft(draftOf(workflow?.sources[next]?.raw ?? workflow?.raw ?? {}));
+    setDraft(draftOf(pipeline?.sources[next]?.raw ?? pipeline?.raw ?? {}));
     setLevel(next);
   };
 
@@ -472,8 +492,8 @@ export function WorkflowForm({
       sharedOnly.usage.global.length > 0);
   const removeBlockedReason =
     sharedOnly?.usage === null
-      ? t('sharedWorkflows.usage.waiting')
-      : t('sharedWorkflows.usage.blocked');
+      ? t('sharedPipelines.usage.waiting')
+      : t('sharedPipelines.usage.blocked');
 
   const removeLabel =
     level === 'project' && sources.global
@@ -482,11 +502,11 @@ export function WorkflowForm({
 
   const remove = () =>
     attempt(async () => {
-      if (!workflow || !source) return;
+      if (!pipeline || !source) return;
       const label = removeLabel;
-      const running = activeRuns > 0 ? t('workflows.runningRuns', { count: activeRuns }) : '';
+      const running = activeRuns > 0 ? t('pipelines.runningRuns', { count: activeRuns }) : '';
       const yes = await confirm({
-        title: t('settings.editor.removeTitle', { action: label, id: workflow.id }),
+        title: t('settings.editor.removeTitle', { action: label, id: pipeline.id }),
         description: `${t('settings.editor.removeDescription', { file: source.file })}${running}`,
         confirmLabel: label,
         cancelLabel: t('common.cancel'),
@@ -494,7 +514,7 @@ export function WorkflowForm({
       });
       if (!yes) return;
       setReferences([]);
-      const result = await api.deleteWorkflow(workflow.id, source.revision, level);
+      const result = await api.deletePipeline(pipeline.id, source.revision, level);
       if (report(result)) await onDeleted();
     });
 
@@ -502,7 +522,7 @@ export function WorkflowForm({
     if (
       dirty &&
       !(await confirm({
-        title: t('workflows.rereadTitle'),
+        title: t('pipelines.rereadTitle'),
         description: t('settings.editor.lostValues'),
         confirmLabel: t('settings.editor.reread'),
         destructive: true,
@@ -530,49 +550,208 @@ export function WorkflowForm({
   const tagErrors = errors.filter((error) => isTagsError(error.path, id));
   const nameErrors = errors.filter((error) => isNameError(error.path, id));
 
-  const targets = view.workflows
+  const targets = view.pipelines
     .filter((candidate) => !sharedOnly || candidate.sources.global)
-    .filter((candidate) => candidate.id !== id && !record(record(candidate.raw).split).workflow)
+    .filter((candidate) => candidate.id !== id && !record(record(candidate.raw).split).pipeline)
     .map((candidate) => candidate.id);
   const nameOf = (target: string): string =>
-    rawName(record(view.workflows.find((candidate) => candidate.id === target)?.raw)) ?? target;
-  const ownTarget = draft.split?.workflow ?? '';
+    rawName(record(view.pipelines.find((candidate) => candidate.id === target)?.raw)) ?? target;
+  const ownTarget = draft.split?.pipeline ?? '';
   if (ownTarget !== '' && !targets.includes(ownTarget)) targets.push(ownTarget);
+
+  const catalog = actionsOf(view).filter((entry) => !sharedOnly || entry.sources.global);
+  const nameOfAction = (actionId: string): string => {
+    const raw = actionsOf(view).find((entry) => entry.id === actionId)?.raw;
+    return typeof raw?.name === 'string' && raw.name !== '' ? raw.name : actionId;
+  };
+  // a point without a list of its own shows the list it inherits, as the preview computes it
+  const inherited = pointsOfStages(
+    (preview.topology as { stages?: { id: string; kind: string }[] } | null)?.stages,
+  );
+  const points = ACTION_POINTS.filter(
+    (point) => draft.split !== null || !SPLIT_POINTS.includes(point),
+  );
+  const listOf = (point: ActionPoint): string[] => draft.stages[point] ?? inherited[point];
+  const setPoint = (point: ActionPoint, list: string[] | null) =>
+    update((current) => {
+      const next = { ...current.stages };
+      if (list === null) delete next[point];
+      else next[point] = list;
+      return { ...current, stages: next };
+    });
+  const offered = (point: ActionPoint): string[] =>
+    catalog
+      .filter((entry) => point !== 'after_delivery' || isCommandAction(entry.raw))
+      .map((entry) => entry.id)
+      .filter((candidate) => !listOf(point).includes(candidate));
+
+  const pointsInput = () => (
+    <fieldset
+      className="flex flex-col gap-3 rounded-lg border p-3"
+      disabled={readOnly || busy}
+      data-testid="pipeline-points"
+    >
+      <legend className="px-1 text-sm font-medium">{t('pipeline.points.title')}</legend>
+      <p className="text-xs text-muted-foreground">{t('pipeline.points.help')}</p>
+      {points.map((point) => {
+        const own = draft.stages[point] !== undefined;
+        const list = listOf(point);
+        const label = t(`pipeline.points.names.${point}`);
+        // the inherited list is known only from the preview: until it arrives the point is not editable
+        const unknown = !own && preview.topology === null;
+        const options = unknown ? [] : offered(point);
+        return (
+          <div
+            key={point}
+            className="flex flex-col gap-1.5"
+            role="group"
+            aria-label={label}
+            data-testid={`point-${point}`}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">{label}</span>
+              {own ? null : <Badge variant="outline">{t('pipeline.points.inherited')}</Badge>}
+              {own ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={readOnly || busy}
+                  onClick={() => setPoint(point, null)}
+                >
+                  {t('pipeline.points.inherit')}
+                </Button>
+              ) : null}
+            </div>
+            {unknown ? (
+              <p className="text-xs text-muted-foreground">{t('pipeline.points.loading')}</p>
+            ) : list.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {own ? t('pipeline.points.disabled') : t('pipeline.points.none')}
+              </p>
+            ) : (
+              <ol className="flex flex-col gap-1" aria-label={label}>
+                {list.map((actionId, index) => (
+                  <li key={actionId} className="flex items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate" title={actionId}>
+                      {nameOfAction(actionId)}
+                      {!actionsOf(view).some((entry) => entry.id === actionId) ? (
+                        <span className="text-destructive"> ({t('pipeline.points.missing')})</span>
+                      ) : null}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('pipeline.points.up', { id: actionId })}
+                      disabled={readOnly || busy || index === 0}
+                      onClick={() => {
+                        const copy = [...list];
+                        [copy[index - 1], copy[index]] = [
+                          copy[index] as string,
+                          copy[index - 1] as string,
+                        ];
+                        setPoint(point, copy);
+                      }}
+                    >
+                      <ArrowUp />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('pipeline.points.down', { id: actionId })}
+                      disabled={readOnly || busy || index === list.length - 1}
+                      onClick={() => {
+                        const copy = [...list];
+                        [copy[index + 1], copy[index]] = [
+                          copy[index] as string,
+                          copy[index + 1] as string,
+                        ];
+                        setPoint(point, copy);
+                      }}
+                    >
+                      <ArrowDown />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('pipeline.points.remove', { id: actionId })}
+                      disabled={readOnly || busy}
+                      onClick={() =>
+                        setPoint(
+                          point,
+                          list.filter((_, at) => at !== index),
+                        )
+                      }
+                    >
+                      <Trash2 />
+                    </Button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {options.length > 0 ? (
+              <Select
+                value={NONE}
+                disabled={readOnly || busy}
+                onValueChange={(next) => {
+                  if (next !== NONE) setPoint(point, [...list, next]);
+                }}
+              >
+                <SelectTrigger
+                  aria-label={t('pipeline.points.add', { point: label })}
+                  className="w-64"
+                >
+                  <SelectValue placeholder={t('pipeline.points.addPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{t('pipeline.points.addPlaceholder')}</SelectItem>
+                  {options.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {nameOfAction(option)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
+        );
+      })}
+    </fieldset>
+  );
 
   const tagsInput = () => {
     // the shared tags of a pipeline are view only on the project level
-    const shared = level === 'global' ? [] : (workflow?.shared_tags ?? []);
+    const shared = level === 'global' ? [] : (pipeline?.shared_tags ?? []);
     const suggestions = new Map<string, string>();
-    for (const entry of view.workflows) {
+    for (const entry of view.pipelines) {
       for (const name of level === 'global' ? entry.shared_tags : entry.own_tags) {
         suggestions.set(name.toLocaleLowerCase(), name);
       }
     }
     return (
-      <div className="flex flex-col gap-1.5" data-testid="workflow-tags">
-        <Label htmlFor="field-tags">{t('workflows.tagsField')}</Label>
+      <div className="flex flex-col gap-1.5" data-testid="pipeline-tags">
+        <Label htmlFor="field-tags">{t('pipelines.tagsField')}</Label>
         {shared.length > 0 ? (
-          <ul aria-label={t('workflows.tagsSharedList')} className="flex flex-wrap gap-1.5">
+          <ul aria-label={t('pipelines.tagsSharedList')} className="flex flex-wrap gap-1.5">
             {shared.map((name) => (
               <li key={name}>
-                <SpecialistTagChip name={name} shared hint={t('workflows.tagsSharedHint')} />
+                <SpecialistTagChip name={name} shared hint={t('pipelines.tagsSharedHint')} />
               </li>
             ))}
           </ul>
         ) : null}
         <ValuesPicker
           id="field-tags"
-          label={t('workflows.tagsField')}
+          label={t('pipelines.tagsField')}
           values={draft.tags}
           onChange={(tags) => update((current) => ({ ...current, tags }))}
           options={[...suggestions.values()]
             .filter((name) => !shared.some((known) => sameTag(known, name)))
             .map((name) => ({ name, source: 'project' as const }))}
-          headings={{ project: t('workflows.tagsOwn') }}
+          headings={{ project: t('pipelines.tagsOwn') }}
           disabled={readOnly || busy}
           invalid={tagErrors.length > 0}
         />
-        <p className="text-xs text-muted-foreground">{t('workflows.tagsHelp')}</p>
+        <p className="text-xs text-muted-foreground">{t('pipelines.tagsHelp')}</p>
         {tagErrors.map((error) => (
           <p className="text-sm text-destructive" role="alert" key={error.message}>
             {error.message}
@@ -607,22 +786,22 @@ export function WorkflowForm({
   return (
     <section
       className="flex flex-col gap-3"
-      aria-label={t('workflows.section', { id: id || t('workflows.newName') })}
+      aria-label={t('pipelines.section', { id: id || t('pipelines.newName') })}
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">
-          {workflow ? (rawName(workflow.raw) ?? workflow.id) : t('workflows.new')}
+          {pipeline ? (rawName(pipeline.raw) ?? pipeline.id) : t('pipelines.new')}
         </h2>
-        {workflow ? <FilePath variant="line" path={source?.file ?? workflow.file} /> : null}
+        {pipeline ? <FilePath variant="line" path={source?.file ?? pipeline.file} /> : null}
       </div>
-      {readOnly ? <Alert role="status">{t('workflows.sharedReadOnly')}</Alert> : null}
+      {readOnly ? <Alert role="status">{t('pipelines.sharedReadOnly')}</Alert> : null}
       {notice ? <Alert role="status">{notice}</Alert> : null}
       {problem ? <Alert variant="destructive">{problem}</Alert> : null}
       {conflict ? (
         <Alert variant="destructive" className="flex flex-col items-start gap-2">
           <p>{t('settings.editor.conflict', { message: conflict })}</p>
           <Button variant="outline" size="sm" onClick={() => void reread()}>
-            {t('workflows.reread')}
+            {t('pipelines.reread')}
           </Button>
         </Alert>
       ) : null}
@@ -639,7 +818,7 @@ export function WorkflowForm({
       ) : null}
       {references.length > 0 ? (
         <Alert variant="destructive">
-          <p>{t('sharedWorkflows.usage.usedBy')}</p>
+          <p>{t('sharedPipelines.usage.usedBy')}</p>
           <ul className="list-disc pl-4">
             {references.map((reference) => (
               <li key={describeReference(reference, view)}>{describeReference(reference, view)}</li>
@@ -648,10 +827,10 @@ export function WorkflowForm({
         </Alert>
       ) : null}
       {sharedOnly ? (
-        <p className="text-sm text-muted-foreground">{t('workflows.sharedOnlyHint')}</p>
+        <p className="text-sm text-muted-foreground">{t('pipelines.sharedOnlyHint')}</p>
       ) : null}
-      {sharedOnly && workflow ? <UsageBlock shared={sharedOnly} view={view} /> : null}
-      {!sharedOnly && workflow && bothLevels ? (
+      {sharedOnly && pipeline ? <UsageBlock shared={sharedOnly} view={view} /> : null}
+      {!sharedOnly && pipeline && bothLevels ? (
         <ToggleGroup
           type="single"
           value={level}
@@ -680,18 +859,18 @@ export function WorkflowForm({
         </p>
       ) : null}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList aria-label={t('workflows.tabs')}>
-          <TabsTrigger value="form">{t('workflows.form')}</TabsTrigger>
+        <TabsList aria-label={t('pipelines.tabs')}>
+          <TabsTrigger value="form">{t('pipelines.form')}</TabsTrigger>
           <TabsTrigger value="preview">
-            {t('workflows.preview')}{' '}
-            {preview.stale ? <Badge variant="warn">{t('workflows.stale')}</Badge> : null}
+            {t('pipelines.preview')}{' '}
+            {preview.stale ? <Badge variant="warn">{t('pipelines.stale')}</Badge> : null}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="form" className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="field-workflow-name">{t('workflows.name')}</Label>
+            <Label htmlFor="field-pipeline-name">{t('pipelines.name')}</Label>
             <Input
-              id="field-workflow-name"
+              id="field-pipeline-name"
               type="text"
               value={draft.name}
               disabled={readOnly || busy}
@@ -708,11 +887,11 @@ export function WorkflowForm({
             ))}
           </div>
           {tagsInput()}
-          {!workflow ? (
+          {!pipeline ? (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="field-workflow-id">Id</Label>
+              <Label htmlFor="field-pipeline-id">Id</Label>
               <Input
-                id="field-workflow-id"
+                id="field-pipeline-id"
                 type="text"
                 value={newId}
                 disabled={busy}
@@ -726,31 +905,31 @@ export function WorkflowForm({
             className="flex flex-col gap-2 rounded-lg border p-3"
             disabled={readOnly || busy}
           >
-            <legend className="px-1 text-sm font-medium">{t('workflows.split')}</legend>
+            <legend className="px-1 text-sm font-medium">{t('pipelines.split')}</legend>
             <div className="flex items-center gap-2">
               <Switch
                 id="split-enabled"
                 checked={draft.split !== null}
                 disabled={readOnly || busy}
                 onCheckedChange={(on) => setSplit(on ? {} : null)}
-                aria-label={t('workflows.split')}
+                aria-label={t('pipelines.split')}
               />
               <Label htmlFor="split-enabled">
-                {draft.split ? t('workflows.removeSplit') : t('workflows.addSplit')}
+                {draft.split ? t('pipelines.removeSplit') : t('pipelines.addSplit')}
               </Label>
             </div>
             {draft.split ? (
               <>
                 <div className="flex flex-col gap-1.5">
-                  <Label>{t('workflows.splitSpecialist')}</Label>
+                  <Label>{t('pipelines.splitSpecialist')}</Label>
                   {specialistSelect(
                     draft.split.specialist,
                     (next) => setSplit({ specialist: next }),
-                    t('workflows.splitSpecialistLabel'),
+                    t('pipelines.splitSpecialistLabel'),
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="split-max">{t('workflows.maxGroups')}</Label>
+                  <Label htmlFor="split-max">{t('pipelines.maxGroups')}</Label>
                   <Input
                     id="split-max"
                     type="text"
@@ -759,17 +938,17 @@ export function WorkflowForm({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>{t('workflows.groupSteps')}</Label>
+                  <Label>{t('pipelines.groupSteps')}</Label>
                   <Select
-                    value={draft.split.workflow === '' ? NONE : draft.split.workflow}
+                    value={draft.split.pipeline === '' ? NONE : draft.split.pipeline}
                     disabled={readOnly || busy}
-                    onValueChange={(next) => setSplit({ workflow: next === NONE ? '' : next })}
+                    onValueChange={(next) => setSplit({ pipeline: next === NONE ? '' : next })}
                   >
-                    <SelectTrigger aria-label={t('workflows.groupStepsLabel')}>
+                    <SelectTrigger aria-label={t('pipelines.groupStepsLabel')}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NONE}>{t('workflows.ownSteps')}</SelectItem>
+                      <SelectItem value={NONE}>{t('pipelines.ownSteps')}</SelectItem>
                       {targets.map((target) => (
                         <SelectItem key={target} value={target}>
                           {nameOf(target)}
@@ -779,7 +958,7 @@ export function WorkflowForm({
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="split-prompt">{t('workflows.splitPrompt')}</Label>
+                  <Label htmlFor="split-prompt">{t('pipelines.splitPrompt')}</Label>
                   <Textarea
                     id="split-prompt"
                     rows={2}
@@ -800,43 +979,43 @@ export function WorkflowForm({
             ) : null}
           </fieldset>
 
-          {draft.split?.workflow ? (
+          {draft.split?.pipeline ? (
             <p className="text-sm">
-              {t('workflows.groupsFollow')}{' '}
+              {t('pipelines.groupsFollow')}{' '}
               <a
                 className="underline"
                 href={formatRoute({
-                  view: 'workflows',
-                  run: draft.split.workflow,
+                  view: 'pipelines',
+                  run: draft.split.pipeline,
                   group: null,
                   step: null,
                   tab: null,
                 })}
               >
-                {nameOf(draft.split.workflow)}
+                {nameOf(draft.split.pipeline)}
               </a>
             </p>
           ) : (
             <>
-              <ol className="flex flex-col gap-2" aria-label={t('workflows.steps')}>
+              <ol className="flex flex-col gap-2" aria-label={t('pipelines.steps')}>
                 {draft.steps.map((step, index) => {
                   const earlier = draft.steps.slice(0, index);
                   const target = draft.steps.find((candidate) => candidate.key === step.gotoKey);
                   const options =
                     target && !earlier.includes(target) ? [...earlier, target] : earlier;
                   return (
-                    <li key={step.key} aria-label={t('workflows.step', { index: index + 1 })}>
+                    <li key={step.key} aria-label={t('pipelines.step', { index: index + 1 })}>
                       <Card className="flex flex-col gap-2 p-3">
                         <div className="flex items-center gap-2">
                           {specialistSelect(
                             step.specialist,
                             (next) => setStep(step.key, { specialist: next }),
-                            t('workflows.stepSpecialist'),
+                            t('pipelines.stepSpecialist'),
                           )}
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={t('workflows.up')}
+                            aria-label={t('pipelines.up')}
                             disabled={readOnly || busy || index === 0}
                             onClick={() =>
                               update((c) => ({ ...c, steps: movedBy(c.steps, index, -1) }))
@@ -847,7 +1026,7 @@ export function WorkflowForm({
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={t('workflows.down')}
+                            aria-label={t('pipelines.down')}
                             disabled={readOnly || busy || index === draft.steps.length - 1}
                             onClick={() =>
                               update((c) => ({ ...c, steps: movedBy(c.steps, index, 1) }))
@@ -858,7 +1037,7 @@ export function WorkflowForm({
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={t('workflows.removeStep')}
+                            aria-label={t('pipelines.removeStep')}
                             disabled={readOnly || busy}
                             onClick={() =>
                               update((c) => ({
@@ -877,7 +1056,7 @@ export function WorkflowForm({
                           </Button>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-sm">
-                          <span>{t('workflows.onReject')}</span>
+                          <span>{t('pipelines.onReject')}</span>
                           <Select
                             value={
                               step.gotoKey === null
@@ -894,29 +1073,29 @@ export function WorkflowForm({
                               })
                             }
                           >
-                            <SelectTrigger aria-label={t('workflows.gotoStep')} className="w-48">
+                            <SelectTrigger aria-label={t('pipelines.gotoStep')} className="w-48">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={NONE}>{t('workflows.none')}</SelectItem>
+                              <SelectItem value={NONE}>{t('pipelines.none')}</SelectItem>
                               {step.gotoKey === null && step.gotoRaw ? (
                                 <SelectItem value="!raw" disabled>
-                                  {t('workflows.missingStep', { id: step.gotoRaw })}
+                                  {t('pipelines.missingStep', { id: step.gotoRaw })}
                                 </SelectItem>
                               ) : null}
                               {options.map((option) => (
                                 <SelectItem key={option.key} value={String(option.key)}>
                                   {ids[draft.steps.indexOf(option)] ||
-                                    t('workflows.step', { index: draft.steps.indexOf(option) + 1 })}
+                                    t('pipelines.step', { index: draft.steps.indexOf(option) + 1 })}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                           {step.gotoKey !== null || step.gotoRaw ? (
                             <label className="flex items-center gap-2">
-                              {t('workflows.rounds')}
+                              {t('pipelines.rounds')}
                               <Input
-                                aria-label={t('workflows.roundsLabel')}
+                                aria-label={t('pipelines.roundsLabel')}
                                 type="text"
                                 className="w-16"
                                 value={step.maxRounds}
@@ -929,11 +1108,11 @@ export function WorkflowForm({
                           ) : null}
                         </div>
                         <Textarea
-                          aria-label={t('workflows.stepPrompt')}
+                          aria-label={t('pipelines.stepPrompt')}
                           rows={2}
                           value={step.additionalPrompt}
                           disabled={readOnly || busy}
-                          placeholder={t('workflows.stepPrompt')}
+                          placeholder={t('pipelines.stepPrompt')}
                           onChange={(event) =>
                             setStep(step.key, { additionalPrompt: event.target.value })
                           }
@@ -945,7 +1124,7 @@ export function WorkflowForm({
                             disabled={readOnly || busy}
                             onCheckedChange={(humanReview) => setStep(step.key, { humanReview })}
                           />
-                          <Label htmlFor={`review-${step.key}`}>{t('workflows.humanReview')}</Label>
+                          <Label htmlFor={`review-${step.key}`}>{t('pipelines.humanReview')}</Label>
                         </div>
                         {stepErrors(index).map((error) => (
                           <p
@@ -985,31 +1164,32 @@ export function WorkflowForm({
                     }))
                   }
                 >
-                  {t('workflows.addStep')}
+                  {t('pipelines.addStep')}
                 </Button>
               </div>
             </>
           )}
+          {pointsInput()}
         </TabsContent>
 
         <TabsContent value="preview">
-          <section className="flex min-w-0 flex-col gap-2" aria-label={t('workflows.previewLabel')}>
+          <section className="flex min-w-0 flex-col gap-2" aria-label={t('pipelines.previewLabel')}>
             <h3 className="flex items-center gap-2 font-semibold">
               <GitBranch className="size-4" aria-hidden />
-              {t('workflows.preview')}{' '}
-              {preview.stale ? <Badge variant="warn">{t('workflows.stale')}</Badge> : null}
+              {t('pipelines.preview')}{' '}
+              {preview.stale ? <Badge variant="warn">{t('pipelines.stale')}</Badge> : null}
             </h3>
             {preview.stale ? (
-              <p className="text-sm text-muted-foreground">{t('workflows.previewInvalid')}</p>
+              <p className="text-sm text-muted-foreground">{t('pipelines.previewInvalid')}</p>
             ) : null}
             {preview.topology ? (
-              <WorkflowGraph
+              <PipelineGraph
                 key={id}
-                workflow={preview.topology}
+                pipeline={preview.topology}
                 className="h-[calc(100dvh-16rem)] min-h-[420px]"
               />
             ) : (
-              <p className="text-sm text-muted-foreground">{t('workflows.graphLater')}</p>
+              <p className="text-sm text-muted-foreground">{t('pipelines.graphLater')}</p>
             )}
           </section>
         </TabsContent>
@@ -1017,16 +1197,16 @@ export function WorkflowForm({
 
       <div className="flex flex-wrap gap-2">
         {readOnly ? null : (
-          <Button disabled={busy || (!workflow && !newId)} onClick={() => void save()}>
+          <Button disabled={busy || (!pipeline && !newId)} onClick={() => void save()}>
             {t('settings.editor.save')}
           </Button>
         )}
-        {workflow && !sharedOnly && sources.global && !sources.project ? (
+        {pipeline && !sharedOnly && sources.global && !sources.project ? (
           <Button variant="outline" disabled={busy} onClick={() => void copyTo('project')}>
             {t('settings.editor.overrideInProject')}
           </Button>
         ) : null}
-        {workflow && sources.project && !sources.global && !readOnly ? (
+        {pipeline && sources.project && !sources.global && !readOnly ? (
           <Button variant="outline" disabled={busy} onClick={() => void copyTo('global')}>
             {t('settings.editor.makeGlobal')}
           </Button>
@@ -1038,15 +1218,15 @@ export function WorkflowForm({
                 view: 'settings',
                 run: 'pipelines',
                 group: 'global',
-                step: workflow?.id ?? null,
+                step: pipeline?.id ?? null,
                 tab: null,
               })}
             >
-              {t('workflows.editInSettings')}
+              {t('pipelines.editInSettings')}
             </a>
           </Button>
         ) : null}
-        {workflow && !readOnly ? (
+        {pipeline && !readOnly ? (
           <Button
             variant="outline"
             disabled={busy}
@@ -1055,7 +1235,7 @@ export function WorkflowForm({
             {t('settings.editor.saveAs')}
           </Button>
         ) : null}
-        {workflow && source && !readOnly ? (
+        {pipeline && source && !readOnly ? (
           <Button
             variant="destructive"
             disabled={busy || removeBlocked}
@@ -1066,14 +1246,14 @@ export function WorkflowForm({
           </Button>
         ) : null}
       </div>
-      {removeBlocked && workflow ? (
+      {removeBlocked && pipeline ? (
         <p className="text-sm text-muted-foreground" data-testid="delete-blocked">
           {removeBlockedReason}
         </p>
       ) : null}
       {saveAs !== null ? (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="field-save-as">{t('workflows.newId')}</Label>
+          <Label htmlFor="field-save-as">{t('pipelines.newId')}</Label>
           <div className="flex gap-2">
             <Input
               id="field-save-as"

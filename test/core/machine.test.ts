@@ -701,10 +701,10 @@ describe('retry with the current config', () => {
     expect(group(state).warnings).toContain('config refreshed: no changes');
   });
 
-  it('keeps the workflow and the skipped steps of the snapshot', () => {
+  it('keeps the pipeline and the skipped steps of the snapshot', () => {
     const state = failedAtReview();
     state.run.skippedSteps = ['qa'];
-    const workflows = structuredClone(state.run.config.workflows);
+    const pipelines = structuredClone(state.run.config.pipelines);
     const text = FIXED(CONFIG_TEXT).replace(
       '        - { id: qa, specialist: qa }\n',
       '        - { id: qa, specialist: qa }\n        - { id: qa2, specialist: qa }\n',
@@ -714,7 +714,7 @@ describe('retry with the current config', () => {
       { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config(text)) },
       2500,
     );
-    expect(state.run.config.workflows).toEqual(workflows);
+    expect(state.run.config.pipelines).toEqual(pipelines);
     expect(state.run.skippedSteps).toEqual(['qa']);
   });
 

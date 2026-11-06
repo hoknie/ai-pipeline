@@ -40,7 +40,7 @@ import { config, finish, group, run, step } from './helpers.ts';
 
 function queueOf(...tasks: string[]): Queue {
   const queue = emptyQueue('/repo', 1);
-  tasks.forEach((task, index) => addItem(queue, { workflow: 'feature', task }, `q${index + 1}`, 2));
+  tasks.forEach((task, index) => addItem(queue, { pipeline: 'feature', task }, `q${index + 1}`, 2));
   return queue;
 }
 
@@ -71,7 +71,7 @@ const none = (): undefined => undefined;
 describe('items', () => {
   it('appends to the end and trims', () => {
     const queue = queueOf('A', 'B');
-    addItem(queue, { workflow: 'feature', task: '  C  ', title: ' Вход ' }, 'q3', 5);
+    addItem(queue, { pipeline: 'feature', task: '  C  ', title: ' Вход ' }, 'q3', 5);
     expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
     expect(queue.items[2]).toMatchObject({ task: 'C', groups: null, title: 'Вход', error: null });
   });
@@ -81,7 +81,7 @@ describe('items', () => {
     addItem(
       queue,
       {
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [
           { title: 'форма входа', task: 'x' },
           { title: 'форма регистрации', task: 'y' },
@@ -98,16 +98,16 @@ describe('items', () => {
     const queue = emptyQueue('/repo', 1);
     const fail = (fields: Parameters<typeof addItem>[1]) =>
       expect(() => addItem(queue, fields, 'q', 1)).toThrow();
-    fail({ workflow: 'feature' });
-    fail({ workflow: 'feature', task: 'x', groups: [{ title: 'a', task: 'b' }] });
-    fail({ workflow: 'feature', task: '  ' });
-    fail({ workflow: 'feature', groups: [] });
-    fail({ workflow: 'feature', groups: [{ title: ' ', task: 'b' }] });
-    fail({ workflow: 'feature', groups: [{ title: 'a', task: ' ' }] });
-    fail({ workflow: 'feature', task: 'x', title: '  ' });
-    fail({ workflow: 'feature', task: 'x', title: 'я'.repeat(61) });
+    fail({ pipeline: 'feature' });
+    fail({ pipeline: 'feature', task: 'x', groups: [{ title: 'a', task: 'b' }] });
+    fail({ pipeline: 'feature', task: '  ' });
+    fail({ pipeline: 'feature', groups: [] });
+    fail({ pipeline: 'feature', groups: [{ title: ' ', task: 'b' }] });
+    fail({ pipeline: 'feature', groups: [{ title: 'a', task: ' ' }] });
+    fail({ pipeline: 'feature', task: 'x', title: '  ' });
+    fail({ pipeline: 'feature', task: 'x', title: 'я'.repeat(61) });
     expect(() =>
-      addItem(queue, { workflow: 'feature', task: 'x', title: 'я'.repeat(60) }, 'q', 1),
+      addItem(queue, { pipeline: 'feature', task: 'x', title: 'я'.repeat(60) }, 'q', 1),
     ).not.toThrow();
     expect(queue.items).toHaveLength(1);
   });
@@ -138,9 +138,9 @@ describe('items', () => {
 
   it('does not change anything when an edit is refused', () => {
     const queue = queueOf('A', 'B');
-    expect(() => editItem(queue, 'q1', { workflow: 'other', task: ' ', position: 2 }, 9)).toThrow();
-    expect(() => editItem(queue, 'q1', { workflow: 'other', position: 5 }, 9)).toThrow();
-    expect(queue.items[0]).toMatchObject({ workflow: 'feature', task: 'A' });
+    expect(() => editItem(queue, 'q1', { pipeline: 'other', task: ' ', position: 2 }, 9)).toThrow();
+    expect(() => editItem(queue, 'q1', { pipeline: 'other', position: 5 }, 9)).toThrow();
+    expect(queue.items[0]).toMatchObject({ pipeline: 'feature', task: 'A' });
     expect(ids(queue)).toEqual(['q1', 'q2']);
   });
 
@@ -183,25 +183,25 @@ describe('task numbers', () => {
 
   it('starts from the given number', () => {
     const queue = emptyQueue('/repo', 1, 10);
-    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).number).toBe(10);
+    expect(addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2).number).toBe(10);
     expect(queue.nextNumber).toBe(11);
   });
 
   it('does not give a number of a removed task again', () => {
     const queue = queueOf('A', 'B', 'C');
     removeItem(queue, 'q3', 3);
-    expect(addItem(queue, { workflow: 'feature', task: 'D' }, 'q4', 4).number).toBe(4);
+    expect(addItem(queue, { pipeline: 'feature', task: 'D' }, 'q4', 4).number).toBe(4);
     expect(numbers(queue)).toEqual([1, 2, 4]);
   });
 
   it('does not spend a number on a refused task', () => {
     const queue = queueOf('A');
-    expect(() => addItem(queue, { workflow: 'feature', task: ' ' }, 'q2', 3)).toThrow();
+    expect(() => addItem(queue, { pipeline: 'feature', task: ' ' }, 'q2', 3)).toThrow();
     expect(() =>
-      addItem(queue, { workflow: 'feature', task: 'B', after: ['q2'] }, 'q2', 3),
+      addItem(queue, { pipeline: 'feature', task: 'B', after: ['q2'] }, 'q2', 3),
     ).toThrow('a task cannot depend on itself');
     expect(queue.nextNumber).toBe(2);
-    expect(addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 3).number).toBe(2);
+    expect(addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 3).number).toBe(2);
   });
 
   it('keeps the number when the task is moved, edited or postponed', () => {
@@ -307,18 +307,18 @@ describe('problems', () => {
 describe('automatic delivery of an item', () => {
   it('is null by default and stores false and true', () => {
     const queue = emptyQueue('/repo', 1);
-    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).autoDeliver).toBeNull();
+    expect(addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2).autoDeliver).toBeNull();
     expect(
-      addItem(queue, { workflow: 'feature', task: 'B', autoDeliver: false }, 'q2', 2).autoDeliver,
+      addItem(queue, { pipeline: 'feature', task: 'B', autoDeliver: false }, 'q2', 2).autoDeliver,
     ).toBe(false);
     expect(
-      addItem(queue, { workflow: 'feature', task: 'C', autoDeliver: true }, 'q3', 2).autoDeliver,
+      addItem(queue, { pipeline: 'feature', task: 'C', autoDeliver: true }, 'q3', 2).autoDeliver,
     ).toBe(true);
   });
 
   it('changes only when the patch names it, and null resets it', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A', autoDeliver: false }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A', autoDeliver: false }, 'q1', 2);
     editItem(queue, 'q1', { title: 'Имя' }, 3);
     expect(queue.items[0]?.autoDeliver).toBe(false);
     editItem(queue, 'q1', { autoDeliver: true }, 4);
@@ -331,16 +331,16 @@ describe('automatic delivery of an item', () => {
 describe('skip of an item', () => {
   it('is empty by default and collapses repeats', () => {
     const queue = emptyQueue('/repo', 1);
-    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).skip).toEqual([]);
+    expect(addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2).skip).toEqual([]);
     expect(
-      addItem(queue, { workflow: 'feature', task: 'B', skip: ['qa', 'review', 'qa'] }, 'q2', 2)
+      addItem(queue, { pipeline: 'feature', task: 'B', skip: ['qa', 'review', 'qa'] }, 'q2', 2)
         .skip,
     ).toEqual(['qa', 'review']);
   });
 
   it('is replaced as a whole, cleared by [] and kept by other edits', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A', skip: ['qa'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A', skip: ['qa'] }, 'q1', 2);
     editItem(queue, 'q1', { title: 'Имя' }, 3);
     expect(queue.items[0]?.skip).toEqual(['qa']);
     editItem(queue, 'q1', { skip: ['review', 'qa'] }, 4);
@@ -630,13 +630,13 @@ describe('start, pause, advance', () => {
   it('keeps an item first with its error when it cannot start', () => {
     const queue = queueOf('A', 'B');
     startQueue(queue, [], 3);
-    itemFailed(queue, 'q1', 'unknown workflow `feature`; known: none', 4);
+    itemFailed(queue, 'q1', 'unknown pipeline `feature`; known: none', 4);
     expect(queue).toMatchObject({
       status: 'stopped',
       stop: { kind: 'item', item: 'q1' },
     });
     expect(ids(queue)).toEqual(['q1', 'q2']);
-    expect(queue.items[0]?.error).toContain('unknown workflow');
+    expect(queue.items[0]?.error).toContain('unknown pipeline');
     expect(advance(queue, [], none, 5).take).toEqual([]);
     startQueue(queue, [], 6);
     expect(queue.items[0]?.error).toBeNull();
@@ -650,7 +650,7 @@ describe('run origin', () => {
       id: 'r',
       number: 1,
       repository: '/repo',
-      workflow: 'feature',
+      pipeline: 'feature',
       baseCommit: 'c',
       config: config(),
       dirtyWarning: false,
@@ -669,17 +669,17 @@ describe('tags of items', () => {
     const queue = emptyQueue('/repo', 1);
     const tagged = addItem(
       queue,
-      { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-b', 'tg-a'] },
+      { pipeline: 'feature', task: 'x', tags: ['tg-a', 'tg-b', 'tg-a'] },
       'q1',
       2,
     );
     expect(tagged.tags).toEqual(['tg-a', 'tg-b']);
-    expect(addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 2).tags).toEqual([]);
+    expect(addItem(queue, { pipeline: 'feature', task: 'y' }, 'q2', 2).tags).toEqual([]);
   });
 
   it('replaces the tags on edit only when they are passed', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 2);
     editItem(queue, 'q1', { task: 'new' }, 3);
     expect(queue.items[0]?.tags).toEqual(['tg-a', 'tg-b']);
     editItem(queue, 'q1', { tags: ['tg-b'] }, 4);
@@ -700,7 +700,7 @@ function runInput() {
     id: 'run000000009',
     number: 1,
     repository: '/repo',
-    workflow: 'feature',
+    pipeline: 'feature',
     baseCommit: 'abc',
     config: state.run.config,
     dirtyWarning: false,
@@ -741,7 +741,7 @@ describe('dependencies', () => {
     const queue = queueOf('A');
     const item = addItem(
       queue,
-      { workflow: 'feature', task: 'B', after: ['q1', 'q1', 'r9'] },
+      { pipeline: 'feature', task: 'B', after: ['q1', 'q1', 'r9'] },
       'q2',
       3,
     );
@@ -760,7 +760,7 @@ describe('dependencies', () => {
       'a task cannot depend on itself',
     );
     expect(() =>
-      addItem(queue, { workflow: 'feature', task: 'X', after: ['q4'] }, 'q4', 4),
+      addItem(queue, { pipeline: 'feature', task: 'X', after: ['q4'] }, 'q4', 4),
     ).toThrow('a task cannot depend on itself');
     expect(queue.items).toHaveLength(3);
     withAfter(queue, 'q2', ['q1']);
@@ -920,7 +920,7 @@ describe('autopilot', () => {
     merge(state);
     expect(advance(queue, [state], none, 5).take).toEqual([]);
     expect(queue).toMatchObject({ status: 'running', runs: [] });
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 6);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 6);
     expect(advance(queue, [], none, 7).take.map((item) => item.id)).toEqual(['q2']);
   });
 
@@ -941,7 +941,7 @@ describe('autopilot', () => {
     queue.autopilot = true;
     startQueue(queue, [], 2);
     pauseQueue(queue, 3);
-    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 4);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 4);
     expect(advance(queue, [], none, 5).take).toEqual([]);
     expect(queue.status).toBe('stopped');
   });
@@ -1070,9 +1070,9 @@ describe('skip failed', () => {
 
   it('keeps the item with an error and the running state when a start fails', () => {
     const queue = started('A', 'B');
-    itemFailed(queue, 'q1', 'unknown workflow `feature`', 5);
+    itemFailed(queue, 'q1', 'unknown pipeline `feature`', 5);
     expect(queue).toMatchObject({ status: 'running', stop: null });
-    expect(queue.items[0]).toMatchObject({ id: 'q1', error: 'unknown workflow `feature`' });
+    expect(queue.items[0]).toMatchObject({ id: 'q1', error: 'unknown pipeline `feature`' });
     expect(advance(queue, [], none, 6).take.map((item) => item.id)).toEqual(['q2']);
   });
 
@@ -1095,16 +1095,16 @@ describe('skip failed', () => {
 describe('tags along dependencies', () => {
   function tagged(): Queue {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a', tags: ['tg-a'] }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
-    addItem(queue, { workflow: 'feature', task: 'c', after: ['q2'] }, 'q3', 2);
-    addItem(queue, { workflow: 'feature', task: 'd' }, 'q4', 2);
+    addItem(queue, { pipeline: 'feature', task: 'a', tags: ['tg-a'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'c', after: ['q2'] }, 'q3', 2);
+    addItem(queue, { pipeline: 'feature', task: 'd' }, 'q4', 2);
     return queue;
   }
 
   it('dependencyTags takes the tags of items and runs in the order of references', () => {
     const queue = tagged();
-    addItem(queue, { workflow: 'feature', task: 'e', tags: ['tg-b', 'tg-a'] }, 'q5', 2);
+    addItem(queue, { pipeline: 'feature', task: 'e', tags: ['tg-b', 'tg-a'] }, 'q5', 2);
     const runTags = (id: string) => (id === 'r1' ? ['tg-c', 'tg-b'] : undefined);
     expect(dependencyTags(queue, ['q5', 'r1', 'q1', 'r-unknown'], runTags)).toEqual([
       'tg-b',
@@ -1124,8 +1124,8 @@ describe('tags along dependencies', () => {
 
   it('spreadTags works from a run id and skips items that already have the tag', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a', after: ['r1'], tags: ['tg-x'] }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'a', after: ['r1'], tags: ['tg-x'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
     expect(spreadTags(queue, 'r1', ['tg-x'], 9)).toEqual(['q2']);
     expect(queue.items[1]?.tags).toEqual(['tg-x']);
   });
@@ -1139,8 +1139,8 @@ describe('tags along dependencies', () => {
 
   it('spreadTags does not loop on a cycle in the data', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'a' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'b', after: ['q1'] }, 'q2', 2);
     queue.items[0]!.after = ['q2'];
     expect(spreadTags(queue, 'q1', ['tg-x'], 9).sort()).toEqual(['q2']);
     expect(queue.items[0]?.tags).toEqual([]);
@@ -1150,16 +1150,16 @@ describe('tags along dependencies', () => {
 describe('delivery mode of an item', () => {
   it('is null by default and stores a mode', () => {
     const queue = emptyQueue('/repo', 1);
-    expect(addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2).deliveryMode).toBeNull();
+    expect(addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2).deliveryMode).toBeNull();
     expect(
-      addItem(queue, { workflow: 'feature', task: 'B', deliveryMode: 'commit' }, 'q2', 2)
+      addItem(queue, { pipeline: 'feature', task: 'B', deliveryMode: 'commit' }, 'q2', 2)
         .deliveryMode,
     ).toBe('commit');
   });
 
   it('changes only when the patch names it, and null resets it', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A', deliveryMode: 'branch' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A', deliveryMode: 'branch' }, 'q1', 2);
     editItem(queue, 'q1', { title: 'Имя' }, 3);
     expect(queue.items[0]?.deliveryMode).toBe('branch');
     editItem(queue, 'q1', { deliveryMode: 'commit' }, 4);
@@ -1171,7 +1171,7 @@ describe('delivery mode of an item', () => {
   it('refuses an unknown mode', () => {
     const queue = emptyQueue('/repo', 1);
     expect(() =>
-      addItem(queue, { workflow: 'feature', task: 'A', deliveryMode: 'x' as never }, 'q1', 2),
+      addItem(queue, { pipeline: 'feature', task: 'A', deliveryMode: 'x' as never }, 'q1', 2),
     ).toThrow('delivery mode must be one of');
   });
 });
@@ -1344,7 +1344,7 @@ describe('postponed items', () => {
   it('is false by default, set by add and edit, and keeps position and order', () => {
     const queue = queueOf('A', 'B');
     expect(queue.items.every((item) => !item.postponed)).toBe(true);
-    addItem(queue, { workflow: 'feature', task: 'C', postponed: true }, 'q3', 3);
+    addItem(queue, { pipeline: 'feature', task: 'C', postponed: true }, 'q3', 3);
     expect(queue.items[2]!.postponed).toBe(true);
     editItem(queue, 'q1', { postponed: true }, 4);
     expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
@@ -1375,7 +1375,7 @@ describe('postponed items', () => {
 
   it('leaves dependants waiting and does not change readiness', () => {
     const queue = queueOf('A');
-    addItem(queue, { workflow: 'feature', task: 'B', after: ['q1'] }, 'q2', 3);
+    addItem(queue, { pipeline: 'feature', task: 'B', after: ['q1'] }, 'q2', 3);
     editItem(queue, 'q1', { postponed: true }, 4);
     startQueue(queue, [], 5);
     expect(itemReadiness(queue, queue.items[0]!, none)).toBe('ready');
@@ -1458,7 +1458,7 @@ describe('adopting a retried run', () => {
 
   it('removes the return item of the run', () => {
     const queue = stoppedQueue();
-    addItem(queue, { workflow: 'feature', task: 't' }, 'ret', 4).run = 'a';
+    addItem(queue, { pipeline: 'feature', task: 't' }, 'ret', 4).run = 'a';
     const { state, keys } = retried('a');
     expect(adoptRun(queue, state, keys, 9)).toEqual({ frozen: null });
     expect(ids(queue)).toEqual(['q1']);

@@ -1,8 +1,10 @@
 export {
+  ACTIONS_DIR,
   CONFIG_DIR,
   SETTINGS_NAME,
   SPECIALISTS_DIR,
-  WORKFLOWS_DIR,
+  PIPELINES_DIR,
+  LEGACY_PIPELINES_DIR,
   configPaths,
   configPathsFromEnvironment,
   type ConfigPaths,
@@ -23,16 +25,18 @@ export {
   revisionOf,
   settingFieldOf,
   settingsFile,
+  actionReferences,
   specialistReferences,
-  workflowReferences,
+  pipelineReferences,
   type ConfigEditorView,
   type EditCommitted,
   type EditPlan,
   type EditRequest,
+  type EditorAction,
   type EditorSetting,
   type EditorSpecialist,
   type EditorSpecialistValues,
-  type EditorWorkflow,
+  type EditorPipeline,
   type EntryKind,
   type EntryLevel,
   type EntryReference,
@@ -67,11 +71,11 @@ export {
   type SharedSpecialistsUsage,
 } from './shared-specialists.ts';
 export {
-  sharedWorkflowUsage,
-  type SharedWorkflowProject,
-  type SharedWorkflowUsage,
-  type SharedWorkflowsUsage,
-} from './shared-workflows.ts';
+  sharedPipelineUsage,
+  type SharedPipelineProject,
+  type SharedPipelineUsage,
+  type SharedPipelinesUsage,
+} from './shared-pipelines.ts';
 export { TAG_NAME_MAX } from './tag-names.ts';
 export { formatDuration, parseDuration } from './duration.ts';
 export {
@@ -80,6 +84,7 @@ export {
   type ConfigError,
   type FieldError,
 } from './errors.ts';
+export { validateObserverProfile, type ObserverProfileResult } from './validate.ts';
 export {
   assembleLevel,
   configFromFiles,
@@ -101,17 +106,27 @@ export {
   CLAUDE_EDIT_MODES,
   CLAUDE_MCP_MODES,
   CLAUDE_SETTINGS_SOURCES,
+  ACTION_FAILURES,
+  ACTION_POINTS,
+  DEFAULT_ACTION_TIMEOUT_SECONDS,
   DEFAULT_COMMIT_MESSAGE,
+  findAction,
+  pipelineActionIds,
+  type Action,
+  type ActionFailure,
+  type ActionPoint,
+  type StagePoints,
   DELIVERY_MODES,
   OUTSIDE_CHANGES,
   PERMISSIONS,
   RUNTIMES,
   findSpecialist,
-  findWorkflow,
-  groupWorkflow,
-  workflowName,
-  workflowNameOf,
+  findPipeline,
+  groupPipeline,
+  pipelineName,
+  pipelineNameOf,
   isValidSlug,
+  OBSERVER_SPECIALIST,
   SLUG_PATTERN_TEXT,
   stepIndex,
   withConfigDefaults,
@@ -146,7 +161,7 @@ export {
   type Specialist,
   type SpecialistLevel,
   type Step,
-  type Workflow,
+  type Pipeline,
 } from './model.ts';
 export {
   databasePath,

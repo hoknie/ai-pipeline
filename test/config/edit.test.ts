@@ -147,25 +147,25 @@ describe('entryFile', () => {
   });
 });
 
-describe('split.workflow target', () => {
-  it('refuses to delete a workflow another workflow splits into', () => {
+describe('split.pipeline target', () => {
+  it('refuses to delete a pipeline another pipeline splits into', () => {
     const paths = setup();
     write(specialistFile(paths, 'coder'), CODER);
     write(specialistFile(paths, 'plan'), 'name: Планировщик\n');
-    const explore = join(paths.project.directory, 'workflows', 'explore.yaml');
-    const epic = join(paths.project.directory, 'workflows', 'epic.yaml');
+    const explore = join(paths.project.directory, 'pipelines', 'explore.yaml');
+    const epic = join(paths.project.directory, 'pipelines', 'epic.yaml');
     const exploreText = 'steps:\n  - { id: research, specialist: coder }\n';
     write(explore, exploreText);
-    write(epic, 'split: { specialist: plan, workflow: explore }\n');
+    write(epic, 'split: { specialist: plan, pipeline: explore }\n');
     const plan = planEdit(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'explore',
       value: null,
       revision: revisionOf(exploreText),
     });
     expect(plan).toMatchObject({ ok: false, reason: 'invalid' });
     if (plan.ok || plan.reason !== 'invalid') throw new Error('expected invalid');
-    expect(plan.errors.map((error) => error.path)).toContain('swarm.workflows.epic.split.workflow');
+    expect(plan.errors.map((error) => error.path)).toContain('swarm.pipelines.epic.split.pipeline');
     expect(readFileSync(explore, 'utf8')).toBe(exploreText);
   });
 });
@@ -175,7 +175,7 @@ describe('planEdit and commitEdit', () => {
     write(specialistFile(paths, 'coder'), CODER);
     write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
     write(
-      join(paths.project.directory, 'workflows', 'feature.yaml'),
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: coder }\n  - { id: review, specialist: reviewer }\n',
     );
     write(join(paths.project.directory, 'settings.yaml'), 'delivery: { resolver: reviewer }\n');
@@ -221,7 +221,7 @@ describe('planEdit and commitEdit', () => {
     const paths = setup();
     project(paths);
     write(
-      join(paths.project.directory, 'workflows', 'feature.yaml'),
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: nobody }\n',
     );
     const plan = planEdit(paths, {
@@ -288,7 +288,7 @@ describe('planEdit and commitEdit', () => {
       ok: false,
       reason: 'invalid',
       errors: [],
-      references: [{ workflow: 'feature', step: 'review' }, { field: 'delivery.resolver' }],
+      references: [{ pipeline: 'feature', step: 'review' }, { field: 'delivery.resolver' }],
     });
     expect(existsSync(specialistFile(paths, 'reviewer'))).toBe(true);
   });
@@ -349,7 +349,7 @@ describe('specialistReferences', () => {
   it('finds steps, split and delivery fields', () => {
     const tree = {
       swarm: {
-        workflows: {
+        pipelines: {
           a: { split: { specialist: 'plan' }, steps: [{ id: 'one', specialist: 'plan' }] },
           b: { steps: [{ id: 'x', specialist: 'other' }] },
         },
@@ -357,10 +357,19 @@ describe('specialistReferences', () => {
       },
     };
     expect(specialistReferences(tree, 'plan')).toEqual([
-      { workflow: 'a', split: true },
-      { workflow: 'a', step: 'one' },
+      { pipeline: 'a', split: true },
+      { pipeline: 'a', step: 'one' },
       { field: 'delivery.message_specialist' },
     ]);
+  });
+
+  it('finds the actions that run the specialist', () => {
+    const tree = {
+      swarm: {
+        actions: { notes: { specialist: 'plan' }, lint: { run: 'x' }, other: { specialist: 'qa' } },
+      },
+    };
+    expect(specialistReferences(tree, 'plan')).toEqual([{ action: 'notes' }]);
   });
 });
 
@@ -405,7 +414,7 @@ describe('editorView', () => {
     write(specialistFile(paths, 'broken'), 'name: B\nmax: 0\n');
     write(specialistFile(paths, 'syntax'), 'name: [\n');
     write(
-      join(paths.project.directory, 'workflows', 'feature.yaml'),
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: nobody }\n',
     );
     const view = editorView(paths);
@@ -414,15 +423,15 @@ describe('editorView', () => {
     expect(view.specialists.find((s) => s.slug === 'coder')?.effective?.name).toBe('C');
     expect(view.errors).toContainEqual(
       expect.objectContaining({
-        file: join(paths.project.directory, 'workflows', 'feature.yaml'),
-        path: 'swarm.workflows.feature.steps[0].specialist',
+        file: join(paths.project.directory, 'pipelines', 'feature.yaml'),
+        path: 'swarm.pipelines.feature.steps[0].specialist',
       }),
     );
     expect(view.errors.some((error) => error.file === specialistFile(paths, 'syntax'))).toBe(true);
   });
 });
 
-describe('workflow entries', () => {
+describe('pipeline entries', () => {
   const FEATURE = [
     'steps:',
     '  - { id: code, specialist: coder }',
@@ -434,21 +443,21 @@ describe('workflow entries', () => {
   function project(paths: ConfigPaths, text = FEATURE): void {
     write(specialistFile(paths, 'coder'), 'name: Кодировщик\n');
     write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
-    write(join(paths.project.directory, 'workflows', 'feature.yaml'), text);
+    write(join(paths.project.directory, 'pipelines', 'feature.yaml'), text);
   }
 
-  const workflowFile = (paths: ConfigPaths) =>
-    join(paths.project.directory, 'workflows', 'feature.yaml');
+  const pipelineFile = (paths: ConfigPaths) =>
+    join(paths.project.directory, 'pipelines', 'feature.yaml');
 
   const steps = [
     { id: 'code', specialist: 'coder' },
     { id: 'review', specialist: 'reviewer', on_reject: { goto: 'code', max_rounds: 2 } },
   ];
 
-  it('points into aip/workflows and checks the id as a slug', () => {
+  it('points into aip/pipelines and checks the id as a slug', () => {
     const paths = setup();
-    expect(entryFile(paths, 'workflow', 'feature')).toBe(workflowFile(paths));
-    expect(() => entryFile(paths, 'workflow', '../x')).toThrow(/must match/);
+    expect(entryFile(paths, 'pipeline', 'feature')).toBe(pipelineFile(paths));
+    expect(() => entryFile(paths, 'pipeline', '../x')).toThrow(/must match/);
   });
 
   it('keeps the comment over split when only steps change', () => {
@@ -456,7 +465,7 @@ describe('workflow entries', () => {
     project(paths, WITH_SPLIT);
     const plan = accepted(
       planEdit(paths, {
-        kind: 'workflow',
+        kind: 'pipeline',
         id: 'feature',
         value: {
           split: { specialist: 'coder', max_groups: 3 },
@@ -466,11 +475,11 @@ describe('workflow entries', () => {
       }),
     );
     commitEdit(plan);
-    const text = readFileSync(workflowFile(paths), 'utf8');
+    const text = readFileSync(pipelineFile(paths), 'utf8');
     expect(
       text.startsWith('# деление на группы\nsplit: { specialist: coder, max_groups: 3 }'),
     ).toBe(true);
-    expect(loadConfig(paths).workflows[0]?.steps.map((step) => step.id)).toEqual([
+    expect(loadConfig(paths).pipelines[0]?.steps.map((step) => step.id)).toEqual([
       'code',
       'review',
       'docs',
@@ -481,7 +490,7 @@ describe('workflow entries', () => {
     const paths = setup();
     project(paths);
     const plan = planEdit(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: {
         steps: [
@@ -494,35 +503,35 @@ describe('workflow entries', () => {
     expect(plan).toMatchObject({
       ok: false,
       reason: 'invalid',
-      errors: [{ path: 'swarm.workflows.feature.steps[0].on_reject.goto' }],
+      errors: [{ path: 'swarm.pipelines.feature.steps[0].on_reject.goto' }],
     });
-    expect(readFileSync(workflowFile(paths), 'utf8')).toBe(FEATURE);
+    expect(readFileSync(pipelineFile(paths), 'utf8')).toBe(FEATURE);
   });
 
-  it('reports a conflict, creates a workflow and deletes without references', () => {
+  it('reports a conflict, creates a pipeline and deletes without references', () => {
     const paths = setup();
     project(paths);
-    const edit = { kind: 'workflow', id: 'feature', value: { steps }, revision: 'stale' } as const;
+    const edit = { kind: 'pipeline', id: 'feature', value: { steps }, revision: 'stale' } as const;
     expect(planEdit(paths, edit)).toMatchObject({ ok: false, reason: 'conflict' });
     commitEdit(
       accepted(
         planEdit(paths, {
-          kind: 'workflow',
+          kind: 'pipeline',
           id: 'quick',
           value: { steps: [{ id: 'code', specialist: 'coder' }] },
           revision: null,
         }),
       ),
     );
-    expect(loadConfig(paths).workflows.map((workflow) => workflow.id)).toEqual([
+    expect(loadConfig(paths).pipelines.map((pipeline) => pipeline.id)).toEqual([
       'feature',
       'quick',
     ]);
-    const quick = join(paths.project.directory, 'workflows', 'quick.yaml');
+    const quick = join(paths.project.directory, 'pipelines', 'quick.yaml');
     commitEdit(
       accepted(
         planEdit(paths, {
-          kind: 'workflow',
+          kind: 'pipeline',
           id: 'quick',
           value: null,
           revision: revisionOf(readFileSync(quick, 'utf8')),
@@ -532,42 +541,42 @@ describe('workflow entries', () => {
     expect(existsSync(quick)).toBe(false);
   });
 
-  it('gives the global workflow back when the project file is deleted', () => {
+  it('gives the global pipeline back when the project file is deleted', () => {
     const paths = setup();
     project(paths);
     write(
-      join(paths.global.directory, 'workflows', 'feature.yaml'),
+      join(paths.global.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: only, specialist: coder }\n',
     );
     commitEdit(
       accepted(
         planEdit(paths, {
-          kind: 'workflow',
+          kind: 'pipeline',
           id: 'feature',
           value: null,
           revision: revisionOf(FEATURE),
         }),
       ),
     );
-    expect(loadConfig(paths).workflows[0]?.steps.map((step) => step.id)).toEqual(['only']);
+    expect(loadConfig(paths).pipelines[0]?.steps.map((step) => step.id)).toEqual(['only']);
   });
 
   it('draftConfig shows the configuration without touching files, and agrees with planEdit', () => {
     const paths = setup();
     project(paths);
     const good = draftConfig(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: { steps: [...steps, { id: 'docs', specialist: 'coder' }] },
     });
     expect(good.errors).toEqual([]);
-    expect(good.config?.workflows[0]?.steps).toHaveLength(3);
-    expect(readFileSync(workflowFile(paths), 'utf8')).toBe(FEATURE);
+    expect(good.config?.pipelines[0]?.steps).toHaveLength(3);
+    expect(readFileSync(pipelineFile(paths), 'utf8')).toBe(FEATURE);
     const value = { steps: [{ id: 'code', specialist: 'reviewr' }] };
-    const bad = draftConfig(paths, { kind: 'workflow', id: 'feature', value });
+    const bad = draftConfig(paths, { kind: 'pipeline', id: 'feature', value });
     expect(bad.config).toBeNull();
     const plan = planEdit(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value,
       revision: revisionOf(FEATURE),
@@ -576,24 +585,24 @@ describe('workflow entries', () => {
     expect(bad.errors[0]?.message).toContain('known: coder, reviewer');
   });
 
-  it('lists the workflows with their levels in the editor view', () => {
+  it('lists the pipelines with their levels in the editor view', () => {
     const paths = setup();
     project(paths);
     write(
-      join(paths.global.directory, 'workflows', 'quick.yaml'),
+      join(paths.global.directory, 'pipelines', 'quick.yaml'),
       'steps:\n  - { id: a, specialist: coder }\n',
     );
-    write(join(paths.global.directory, 'workflows', 'feature.yaml'), FEATURE);
+    write(join(paths.global.directory, 'pipelines', 'feature.yaml'), FEATURE);
     const view = editorView(paths);
-    expect(view.workflows.map((workflow) => [workflow.id, workflow.level])).toEqual([
+    expect(view.pipelines.map((pipeline) => [pipeline.id, pipeline.level])).toEqual([
       ['feature', 'project_over_global'],
       ['quick', 'global'],
     ]);
-    expect(view.workflows[0]).toMatchObject({
-      file: workflowFile(paths),
+    expect(view.pipelines[0]).toMatchObject({
+      file: pipelineFile(paths),
       revision: revisionOf(FEATURE),
     });
-    expect(view.workflows[1]?.revision).toBeNull();
+    expect(view.pipelines[1]?.revision).toBeNull();
   });
 });
 
@@ -606,8 +615,8 @@ describe('global level', () => {
   ].join('\n');
   const globalSpecialist = (paths: ConfigPaths, slug: string) =>
     specialistFile(paths, slug, paths.global);
-  const globalWorkflow = (paths: ConfigPaths, id = 'feature') =>
-    join(paths.global.directory, 'workflows', `${id}.yaml`);
+  const globalPipeline = (paths: ConfigPaths, id = 'feature') =>
+    join(paths.global.directory, 'pipelines', `${id}.yaml`);
 
   it('points entryFile into the global directory and rejects bad slugs on both levels', () => {
     const paths = setup();
@@ -636,12 +645,12 @@ describe('global level', () => {
     expect(readdirSync(join(paths.project.directory, 'specialists'))).toEqual(['coder.yaml']);
   });
 
-  it('rejects a global workflow that names a project-only specialist', () => {
+  it('rejects a global pipeline that names a project-only specialist', () => {
     const paths = setup();
     write(globalSpecialist(paths, 'reviewer'), 'name: R\n');
     write(specialistFile(paths, 'coder'), 'name: Проект\n');
     const plan = planEdit(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: { steps: [{ id: 'code', specialist: 'coder' }] },
       revision: null,
@@ -650,11 +659,11 @@ describe('global level', () => {
     expect(plan.ok).toBe(false);
     if (plan.ok || plan.reason !== 'invalid') throw new Error('expected invalid');
     expect(plan.errors.map((error) => error.path)).toContain(
-      'swarm.workflows.feature.steps[0].specialist',
+      'swarm.pipelines.feature.steps[0].specialist',
     );
-    expect(existsSync(globalWorkflow(paths))).toBe(false);
+    expect(existsSync(globalPipeline(paths))).toBe(false);
     const sameInProject = planEdit(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: { steps: [{ id: 'code', specialist: 'coder' }] },
       revision: null,
@@ -665,7 +674,7 @@ describe('global level', () => {
   it('does not let an existing global error block an unrelated edit', () => {
     const paths = setup();
     write(globalSpecialist(paths, 'coder'), 'name: C\n');
-    write(globalWorkflow(paths, 'broken'), 'steps:\n  - { id: a, specialist: ghost }\n');
+    write(globalPipeline(paths, 'broken'), 'steps:\n  - { id: a, specialist: ghost }\n');
     write(specialistFile(paths, 'ghost'), 'name: G\n');
     const plan = planEdit(paths, {
       kind: 'specialist',
@@ -694,7 +703,7 @@ describe('global level', () => {
     const paths = setup();
     write(globalSpecialist(paths, 'coder'), 'name: C\n');
     write(globalSpecialist(paths, 'reviewer'), 'name: R\n');
-    write(globalWorkflow(paths), FEATURE);
+    write(globalPipeline(paths), FEATURE);
     write(specialistFile(paths, 'coder'), 'name: Проект\n');
     const plan = planEdit(paths, {
       kind: 'specialist',
@@ -706,9 +715,9 @@ describe('global level', () => {
     expect(plan).toMatchObject({
       ok: false,
       reason: 'invalid',
-      references: [{ workflow: 'feature', step: 'code' }],
+      references: [{ pipeline: 'feature', step: 'code' }],
     });
-    write(globalWorkflow(paths), 'steps:\n  - { id: only, specialist: reviewer }\n');
+    write(globalPipeline(paths), 'steps:\n  - { id: only, specialist: reviewer }\n');
     const free = planEdit(paths, {
       kind: 'specialist',
       id: 'coder',
@@ -719,17 +728,17 @@ describe('global level', () => {
     expect(free.ok).toBe(true);
   });
 
-  it('deletes a global workflow under a project one and keeps the project one', () => {
+  it('deletes a global pipeline under a project one and keeps the project one', () => {
     const paths = setup();
     write(globalSpecialist(paths, 'coder'), 'name: C\n');
     write(globalSpecialist(paths, 'reviewer'), 'name: R\n');
-    write(globalWorkflow(paths), FEATURE);
+    write(globalPipeline(paths), FEATURE);
     const projectText = 'steps:\n  - { id: one, specialist: coder }\n';
-    write(join(paths.project.directory, 'workflows', 'feature.yaml'), projectText);
+    write(join(paths.project.directory, 'pipelines', 'feature.yaml'), projectText);
     commitEdit(
       accepted(
         planEdit(paths, {
-          kind: 'workflow',
+          kind: 'pipeline',
           id: 'feature',
           value: null,
           revision: revisionOf(FEATURE),
@@ -737,8 +746,8 @@ describe('global level', () => {
         }),
       ),
     );
-    expect(existsSync(globalWorkflow(paths))).toBe(false);
-    expect(loadConfig(paths).workflows[0]?.steps.map((step) => step.id)).toEqual(['one']);
+    expect(existsSync(globalPipeline(paths))).toBe(false);
+    expect(loadConfig(paths).pipelines[0]?.steps.map((step) => step.id)).toEqual(['one']);
   });
 
   it('shows the files of both levels in sources', () => {
@@ -761,15 +770,15 @@ describe('global level', () => {
     expect(qa.revision).toBeNull();
   });
 
-  it('previews a global workflow under a project one with the draft steps', () => {
+  it('previews a global pipeline under a project one with the draft steps', () => {
     const paths = setup();
     write(globalSpecialist(paths, 'coder'), 'name: C\n');
     write(
-      join(paths.project.directory, 'workflows', 'feature.yaml'),
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: one, specialist: coder }\n',
     );
     const draft = draftConfig(paths, {
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: {
         steps: [
@@ -780,7 +789,7 @@ describe('global level', () => {
       level: 'global',
     });
     expect(draft.errors).toEqual([]);
-    expect(draft.config?.workflows[0]?.steps.map((step) => step.id)).toEqual(['a', 'b']);
+    expect(draft.config?.pipelines[0]?.steps.map((step) => step.id)).toEqual(['a', 'b']);
   });
 });
 
@@ -790,7 +799,7 @@ describe('general settings', () => {
     write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
     write(specialistFile(paths, 'coder'), 'name: Кодировщик\n');
     write(
-      join(paths.project.directory, 'workflows', 'feature.yaml'),
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: coder }\n',
     );
     write(join(paths.project.directory, 'settings.yaml'), projectText);
@@ -1260,35 +1269,35 @@ describe('specialist tags in the editor', () => {
   });
 });
 
-describe('workflow tags in the editor', () => {
+describe('pipeline tags in the editor', () => {
   const body = 'steps:\n  - id: code\n    specialist: coder\n';
   const file = (paths: ConfigPaths, level: 'global' | 'project') =>
-    join(paths[level].directory, 'workflows', 'quick.yaml');
+    join(paths[level].directory, 'pipelines', 'quick.yaml');
 
   it('splits the tags of the shared and the project file', () => {
     const paths = setup();
     write(specialistFile(paths, 'coder'), 'name: Coder\n');
     write(file(paths, 'global'), `tags: [fast]\n${body}`);
     write(file(paths, 'project'), `tags: [mine]\n${body}`);
-    const workflow = editorView(paths).workflows.find((item) => item.id === 'quick');
-    expect(workflow).toMatchObject({ shared_tags: ['fast'], own_tags: ['mine'] });
+    const pipeline = editorView(paths).pipelines.find((item) => item.id === 'quick');
+    expect(pipeline).toMatchObject({ shared_tags: ['fast'], own_tags: ['mine'] });
   });
 
-  it('keeps a workflow with invalid tags and reports the error', () => {
+  it('keeps a pipeline with invalid tags and reports the error', () => {
     const paths = setup();
     write(specialistFile(paths, 'coder'), 'name: Coder\n');
     write(file(paths, 'project'), `tags: backend\n${body}`);
     const view = editorView(paths);
-    expect(view.workflows.map((item) => [item.id, item.own_tags])).toEqual([['quick', []]]);
-    expect(view.errors.map((error) => error.path)).toContain('swarm.workflows.quick.tags');
+    expect(view.pipelines.map((item) => [item.id, item.own_tags])).toEqual([['quick', []]]);
+    expect(view.errors.map((error) => error.path)).toContain('swarm.pipelines.quick.tags');
   });
 
-  it('writes the tags of a shared workflow into the shared file', () => {
+  it('writes the tags of a shared pipeline into the shared file', () => {
     const paths = setup();
     write(specialistFile(paths, 'coder', paths.global), 'name: Coder\n');
     const plan = accepted(
       planEdit(paths, {
-        kind: 'workflow',
+        kind: 'pipeline',
         id: 'quick',
         value: { tags: ['fast'], steps: [{ id: 'code', specialist: 'coder' }] },
         revision: null,

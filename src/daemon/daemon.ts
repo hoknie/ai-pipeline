@@ -25,13 +25,15 @@ import {
   configPaths,
   databasePath,
   findSpecialist,
-  findWorkflow,
+  findPipeline,
   loadConfig,
   planSettings,
+  validateObserverProfile,
+  type FieldError,
   sharedSpecialistUsage,
-  sharedWorkflowUsage,
+  sharedPipelineUsage,
   socketPath,
-  workflowNameOf,
+  pipelineNameOf,
   type DeliveryMode,
 } from '../config/index.ts';
 import {
@@ -103,8 +105,12 @@ import {
   permissionsOf,
   specialistsOf,
   transition,
-  workflowTopologies,
-  workflowTopology,
+  pipelineTopologies,
+  pipelineTopology,
+  specialistName,
+  splitInstructionText,
+  MESSAGE_INSTRUCTIONS,
+  RESOLVE_INSTRUCTIONS,
   type Event,
   type PermissionsRefresh,
   type SpecialistsRefresh,
@@ -113,6 +119,13 @@ import {
   type QueueItem,
   type Group,
   isServiceGroup,
+  isSplitGroup,
+  REPAIR_GROUP,
+  defaultObserverSettings,
+  planRepairs,
+  repairAdmitted,
+  repairIncidents,
+  type ObserverSettings,
   type RunState,
   type Tag,
   type GroupWait,
@@ -136,6 +149,7 @@ import {
 import {
   catalogView,
   currentBuild,
+  observersView,
   groupView,
   pickSpecChange,
   queueView,
@@ -155,18 +169,23 @@ import {
   type RunView,
   type TagView,
   type Transcript,
+  type TranscriptEntry,
   type ConfigEditResult,
   type SpecialistTagFolderView,
   type SpecialistTagsResult,
   type SpecialistTagsView,
   type SharedSpecialistsView,
   type SpecialistsImportResult,
-  type SharedWorkflowsView,
-  type WorkflowsImportResult,
+  type SharedPipelinesView,
+  type PipelinesImportResult,
   type ConfigPreview,
   type ConfigCatalogResponse,
   type ConfigEditorResponse,
-  type WorkflowsView,
+  type PipelinesView,
+  type SystemStagesView,
+  type SystemStageView,
+  type SystemStageSetting,
+  type StagePerformer,
   type WebStartResult,
   type WebStatusResult,
   type BackgroundProcessesView,
@@ -177,12 +196,14 @@ import {
   type ArtifactView,
   type RunPatchView,
   type DiffStat,
+  type ObserversView,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import { Store, type KnownRepository } from '../store/index.ts';
 
 import { Executor, NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS, type AttemptKey } from './executor.ts';
 import { readLines, readTail, readTimes, timesPath } from './logs.ts';
+import { checkObserverSettings } from './observers.ts';
 import { FileArtifactStorage, artifactStorageFor, type ArtifactStorage } from './artifacts.ts';
 import { FilePatchStorage, storageFor, type PatchStorage } from './patches.ts';
 import { DRAIN_MS, STOP_GRACE_MS } from './supervisor.ts';
@@ -271,6 +292,12 @@ export interface DaemonOptions {
   socketCheckMs?: number;
 }
 
+/** The delivery of a group without the commit message, which only the actions after delivery need. */
+function deliveryOutcome(delivery: Group['delivery']): Group['delivery'] {
+  const { message: _message, ...rest } = delivery;
+  return rest;
+}
+
 export class Daemon {
   readonly store: Store;
   readonly socket: string;
@@ -292,6 +319,11 @@ export class Daemon {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly queues = new Map<string, Queue>();
   private readonly advanceRequested = new Set<string>();
+  private observers: ObserverSettings = defaultObserverSettings();
+  private observeRequested = false;
+  /** Incidents subscribers were told about, as `<run>:<incident key>`. */
+  private readonly incidentsSent = new Set<string>();
+  private observersJson = '';
   private readonly queueRuns = new Map<string, string>();
   /** Per repository: return item of each returned run, as subscribers last saw it. */
   private readonly returnItems = new Map<string, Map<string, string>>();
@@ -350,6 +382,7 @@ export class Daemon {
       for (const queue of this.store.queues()) this.queues.set(queue.repository, queue);
       this.catalog = this.store.tags();
       for (const entry of this.store.repositories()) this.registry.set(entry.path, entry);
+      this.observers = this.store.loadObservers();
       // A delivery cut off by the restart starts again.
       for (const { state, effects } of recovered) await this.executor.perform(state, effects);
       await this.schedule();
@@ -363,6 +396,8 @@ export class Daemon {
           await this.advanceQueue(queue.repository);
         }
       }
+      // Incidents from before the start, in finished runs too.
+      await this.observe(true);
     });
   }
 
@@ -379,6 +414,87 @@ export class Daemon {
     ) {
       this.requestAdvance(state.run.repository);
     }
+    // Any run, queued or not: an incident of a run started directly is noticed as well.
+    this.requestObserve();
+  }
+
+  /** Looks at the incidents of the runs once, however many changes arrive meanwhile. */
+  private requestObserve(): void {
+    if (this.stopping || this.observeRequested) return;
+    this.observeRequested = true;
+    void this.serial(async () => {
+      this.observeRequested = false;
+      if (!this.stopping) await this.observe();
+    }).catch(() => undefined);
+  }
+
+  /**
+   * Tells subscribers about new incidents and lets observers take the oldest ones. Runs of a
+   * repository with a queue look pending are left for after it: the autopilot answers first.
+   * `full` also looks at the recent finished runs, which the daemon does not keep in memory.
+   */
+  private async observe(full = false): Promise<void> {
+    if (this.stopping) return;
+    const settings = this.observers;
+    const pool = new Map<string, RunState>();
+    if (full) {
+      for (const stored of this.store.recentRuns()) {
+        if (this.states.has(stored.run.id)) continue;
+        // Through `state`, so the run lives in memory and `apply` changes the one that is kept.
+        pool.set(stored.run.id, this.state(stored.run.id));
+      }
+    }
+    for (const state of this.states.values()) pool.set(state.run.id, state);
+    const all = [...pool.values()];
+    const states = all.filter((state) => !this.advanceRequested.has(state.run.repository));
+    for (const state of states) {
+      for (const incident of repairIncidents(state, settings)) {
+        const key = `${state.run.id}:${incident.key}`;
+        if (this.incidentsSent.has(key)) continue;
+        this.incidentsSent.add(key);
+        if (this.subscribers.size === 0) continue;
+        this.seq += 1;
+        const line = JSON.stringify({
+          event: 'incident',
+          seq: this.seq,
+          runId: state.run.id,
+          repository: state.run.repository,
+          incident,
+        });
+        for (const send of this.subscribers) send(line);
+      }
+    }
+    const profile = validateObserverProfile(settings.specialist);
+    const specialist = profile.errors.length === 0 ? profile.specialist : null;
+    if (specialist) {
+      // Over all runs, so the repairs of the waiting repositories count against the workers.
+      const holds = limitHolds(all, this.now());
+      for (const { state, incident } of planRepairs(settings, all, holds)) {
+        if (this.advanceRequested.has(state.run.repository)) continue;
+        try {
+          await this.apply(state, { kind: 'repair_start', incident, specialist });
+        } catch (error) {
+          if (!(error instanceof Rejection)) throw error;
+        }
+      }
+    }
+    this.publishObservers();
+  }
+
+  /** The observers as the settings page shows them. */
+  private observersSnapshot(): ObserversView {
+    return observersView(this.observers, [...this.states.values()]);
+  }
+
+  private publishObservers(): void {
+    if (this.subscribers.size === 0) return;
+    const view = this.observersSnapshot();
+    const text = JSON.stringify(view);
+    if (text === this.observersJson) return;
+    this.observersJson = text;
+    this.seq += 1;
+    const line = JSON.stringify({ event: 'observers', seq: this.seq, observers: view });
+    for (const send of this.subscribers) send(line);
   }
 
   /** Looks at the queue of the repository once, however many changes arrive meanwhile. */
@@ -427,7 +543,7 @@ export class Daemon {
     );
   }
 
-  /** `delivery.auto`, `delivery.mode` and workflow names of the repository now; null when its configuration cannot be loaded. */
+  /** `delivery.auto`, `delivery.mode` and pipeline names of the repository now; null when its configuration cannot be loaded. */
   private deliverySettings(repository: string): {
     auto: boolean | null;
     mode: DeliveryMode | null;
@@ -438,7 +554,7 @@ export class Daemon {
       return {
         auto: config.delivery.auto,
         mode: config.delivery.mode,
-        names: (id) => workflowNameOf(config, id),
+        names: (id) => pipelineNameOf(config, id),
       };
     } catch (error) {
       if (error instanceof ConfigLoadError) return { auto: null, mode: null, names: (id) => id };
@@ -538,6 +654,14 @@ export class Daemon {
     }
     this.store.removeRepository(root);
     this.registry.delete(root);
+    if (this.observers.projects.some((project) => project.repository === root)) {
+      this.observers = {
+        ...this.observers,
+        projects: this.observers.projects.filter((project) => project.repository !== root),
+      };
+      this.store.saveObservers(this.observers);
+      this.publishObservers();
+    }
     this.publishRepositories();
     return this.repositoryList();
   }
@@ -551,6 +675,15 @@ export class Daemon {
       const state = this.lookupState(id);
       return state ? [state] : [];
     });
+    // An incident an observer takes does not stop the queue.
+    for (const state of states) {
+      if (
+        repairAdmitted(state, this.observers) &&
+        repairIncidents(state, this.observers).length > 0
+      ) {
+        acknowledgeRun(queue, state);
+      }
+    }
     const { take, freeze } = advance(queue, states, (id) => this.lookupState(id), this.now());
     let changed = fingerprint() !== before;
     for (const id of freeze) await this.freezeRun(id);
@@ -604,6 +737,8 @@ export class Daemon {
       this.requestAdvance(repository);
     }
     this.armWake();
+    // After the autopilot: the incidents it did not answer are the observers'.
+    this.requestObserve();
     return started;
   }
 
@@ -719,20 +854,20 @@ export class Daemon {
     });
   }
 
-  /** Rejects an unknown workflow or a `skip` that does not fit it. */
+  /** Rejects an unknown pipeline or a `skip` that does not fit it. */
   private async ensureItem(
     repository: string,
-    workflow: string,
+    pipeline: string,
     skip: readonly string[] = [],
   ): Promise<void> {
     const config = loadConfig(
       configPaths(repository, this.environment.XDG_CONFIG_HOME, this.environment.HOME),
     );
-    if (!findWorkflow(config, workflow)) {
-      const known = config.workflows.map((candidate) => candidate.id).join(', ') || 'none';
-      throw new Rejection(`unknown workflow \`${workflow}\`; known: ${known}`);
+    if (!findPipeline(config, pipeline)) {
+      const known = config.pipelines.map((candidate) => candidate.id).join(', ') || 'none';
+      throw new Rejection(`unknown pipeline \`${pipeline}\`; known: ${known}`);
     }
-    const error = checkSkip(config, workflow, skip);
+    const error = checkSkip(config, pipeline, skip);
     if (error !== null) throw new Rejection(error);
   }
 
@@ -754,7 +889,7 @@ export class Daemon {
         case 'queue_edit': {
           const {
             item,
-            workflow,
+            pipeline,
             task,
             groups,
             title,
@@ -777,7 +912,7 @@ export class Daemon {
             // A returned run has no item-level skip: the steps are skipped in the run itself.
             checkReturnedPatch(
               {
-                workflow,
+                pipeline,
                 task,
                 groups,
                 title,
@@ -793,7 +928,7 @@ export class Daemon {
             if (!state) throw new Rejection(`unknown run \`${returned.run}\``);
             const wanted = new Set(skip);
             const current = new Set(state.run.skippedSteps);
-            const skipError = checkSkip(state.run.config, state.run.workflow, [...wanted]);
+            const skipError = checkSkip(state.run.config, state.run.pipeline, [...wanted]);
             if (skipError !== null) throw new Rejection(skipError);
             const changes = [
               ...[...current].filter((step) => !wanted.has(step)).map((step) => [step, false]),
@@ -815,10 +950,10 @@ export class Daemon {
             }
             skip = undefined;
           }
-          if (workflow !== undefined || skip !== undefined) {
+          if (pipeline !== undefined || skip !== undefined) {
             const current = queue.items.find((candidate) => candidate.id === item);
             if (current) {
-              await this.ensureItem(repository, workflow ?? current.workflow, skip ?? current.skip);
+              await this.ensureItem(repository, pipeline ?? current.pipeline, skip ?? current.skip);
             }
           }
           const after =
@@ -837,7 +972,7 @@ export class Daemon {
           }
           const parentPending = existing !== undefined && parentParam !== undefined;
           const patch = {
-            workflow,
+            pipeline,
             task,
             groups,
             title,
@@ -964,6 +1099,7 @@ export class Daemon {
       this.catalogOf(state.run.repository),
       this.waitLookup,
       this.store.artifactCounts(state.run.id),
+      this.observers,
     );
     const queue = this.queues.get(state.run.repository);
     const item = queue ? returnItemOf(queue, state.run.id) : null;
@@ -1423,6 +1559,7 @@ export class Daemon {
     for (const queue of [...this.queues.values()]) {
       if (queue.stop?.kind === 'limit') await this.advanceQueue(queue.repository);
     }
+    this.requestObserve();
     this.armWake();
   }
 
@@ -1610,6 +1747,17 @@ export class Daemon {
         });
       case 'subscribe':
         return Promise.reject(new Rejection('subscribe is served on its own connection'));
+      case 'observers':
+        return Promise.resolve(this.observersSnapshot());
+      case 'observers_set':
+        return this.serial(() => this.observersSet(request.params.settings));
+      case 'run_observer':
+        return this.event(request.params.runId, {
+          kind: 'repair_allowed',
+          allowed: request.params.enabled,
+        });
+      case 'repair_action':
+        return this.repairAction(request.params);
       case 'processes':
         return this.processList();
       case 'process_kill':
@@ -1663,8 +1811,10 @@ export class Daemon {
         return this.artifactPublish(request.params);
       case 'transcript':
         return Promise.resolve(this.transcript(request.params));
-      case 'workflows':
-        return this.workflows(request.params.repository);
+      case 'pipelines':
+        return this.pipelines(request.params.repository);
+      case 'system_stages':
+        return this.systemStages(request.params.repository);
       case 'config':
         return this.configView(request.params.repository);
       case 'config_catalog':
@@ -1705,10 +1855,10 @@ export class Daemon {
         return this.specialistTagEdit(request.params.repository, (paths, level) =>
           planTagRemove(paths, level, request.params.tag),
         );
-      case 'shared_workflows':
-        return Promise.resolve(this.sharedWorkflows());
-      case 'workflows_import':
-        return this.workflowsImport(request.params);
+      case 'shared_pipelines':
+        return Promise.resolve(this.sharedPipelines());
+      case 'pipelines_import':
+        return this.pipelinesImport(request.params);
       case 'specialists_import':
         return this.specialistsImport(request.params);
       case 'config_delete':
@@ -1815,29 +1965,108 @@ export class Daemon {
 
   /** A direct retry works at once, and the revived run holds a place in the queue. */
   private retryGroup(params: ParamsOf<'retry'>): Promise<unknown> {
+    return this.serial(() => this.retryNow(this.state(params.runId), params));
+  }
+
+  /** The retry itself, for callers that already run inside `serial`. */
+  private async retryNow(
+    state: RunState,
+    params: { group: string; refreshConfig?: boolean },
+  ): Promise<unknown> {
+    const keys = problemKeys(state);
+    // Loaded before the event: a broken configuration refuses the retry with nothing changed.
+    const refresh =
+      params.refreshConfig === true
+        ? { specialists: this.currentSpecialists(state) }
+        : { permissions: this.currentPermissions(state) };
+    // A rejected retry leaves the hold in place; the hold is released only after it succeeds.
+    await this.apply(state, { kind: 'retry', group: params.group, ...refresh });
+    if (state.run.hold !== null) await this.apply(state, { kind: 'hold', hold: null });
+    const queue = this.queueFor(state.run.repository);
+    const now = this.now();
+    const adopted = adoptRun(queue, state, keys, now, {
+      states: queue.runs.flatMap((id) => this.lookupState(id) ?? []),
+      itemId: queueItemId(now, randomInt(36 ** 3)),
+    });
+    if (adopted) {
+      if (adopted.frozen !== null) await this.freezeRun(adopted.frozen);
+      this.saveQueue(queue);
+      this.requestAdvance(state.run.repository);
+    }
+    return this.view(state);
+  }
+
+  /** `observers_set`: new settings replace the old ones only when every value is right. */
+  private observersSet(
+    settings: Record<string, unknown>,
+  ): Promise<{ ok: true; observers: ObserversView } | { ok: false; errors: FieldError[] }> {
+    const checked = checkObserverSettings(settings, this.observers, new Set(this.registry.keys()));
+    if (checked.settings === null) return Promise.resolve({ ok: false, errors: checked.errors });
+    this.observers = checked.settings;
+    this.store.saveObservers(this.observers);
+    // The state `repair` of every run depends on the settings: send the runs again.
+    for (const state of this.states.values()) this.broadcast(state);
+    return this.observe(true).then(() => {
+      this.publishObservers();
+      return { ok: true as const, observers: this.observersSnapshot() };
+    });
+  }
+
+  /** An action of an observer: only on its own run, by the rules of a person. */
+  private repairAction(params: ParamsOf<'repair_action'>): Promise<unknown> {
     return this.serial(async () => {
-      const state = this.state(params.runId);
-      const keys = problemKeys(state);
-      // Loaded before the event: a broken configuration refuses the retry with nothing changed.
-      const refresh =
-        params.refreshConfig === true
-          ? { specialists: this.currentSpecialists(state) }
-          : { permissions: this.currentPermissions(state) };
-      // A rejected retry leaves the hold in place; the hold is released only after it succeeds.
-      await this.apply(state, { kind: 'retry', group: params.group, ...refresh });
-      if (state.run.hold !== null) await this.apply(state, { kind: 'hold', hold: null });
-      const queue = this.queueFor(state.run.repository);
-      const now = this.now();
-      const adopted = adoptRun(queue, state, keys, now, {
-        states: queue.runs.flatMap((id) => this.lookupState(id) ?? []),
-        itemId: queueItemId(now, randomInt(36 ** 3)),
-      });
-      if (adopted) {
-        if (adopted.frozen !== null) await this.freezeRun(adopted.frozen);
-        this.saveQueue(queue);
-        this.requestAdvance(state.run.repository);
+      const key = this.executor.attemptFor(params.token);
+      if (!key || key.group !== REPAIR_GROUP)
+        throw new Rejection('unknown or expired report token');
+      const state = this.state(key.run);
+      const attempt = state.repair?.attempts.find((candidate) => candidate.seq === key.seq);
+      if (!attempt || attempt.status !== 'running') {
+        throw new Rejection('unknown or expired report token');
       }
-      return this.view(state);
+      const target = (slug: string): Group => {
+        const group = findGroup(state, slug);
+        if (!group) throw new Rejection(`unknown group \`${slug}\` in run ${state.run.id}`);
+        if (isServiceGroup(group) && !isSplitGroup(group)) {
+          throw new Rejection(`group \`${slug}\` is a service group; observers do not touch it`);
+        }
+        return group;
+      };
+      switch (params.action) {
+        case 'answer': {
+          const group = target(params.group);
+          if (group.humanOnly !== null && !this.observers.answerHumanOnly) {
+            throw new Rejection(`the question of group \`${group.slug}\` is for a person only`);
+          }
+          await this.apply(state, {
+            kind: 'answer',
+            group: group.slug,
+            answer: params.answer,
+            by: 'observer',
+            permissions: this.currentPermissions(state),
+          });
+          break;
+        }
+        case 'retry': {
+          const group = target(params.group);
+          if (group.status === 'cancelled') {
+            throw new Rejection(
+              `group \`${group.slug}\` was cancelled; observers do not restart it`,
+            );
+          }
+          await this.retryNow(state, { group: group.slug, refreshConfig: params.refreshConfig });
+          break;
+        }
+        case 'cancel': {
+          const group = params.group === undefined ? null : target(params.group);
+          await this.apply(state, {
+            kind: 'cancel',
+            group: group?.slug ?? null,
+            reason: params.reason,
+          });
+          break;
+        }
+      }
+      return { recorded: true };
     });
   }
 
@@ -1866,7 +2095,7 @@ export class Daemon {
               ? requested.includes(group.slug)
               : group.status === 'merged' && !before.has(group.slug),
           )
-          .map((group) => ({ slug: group.slug, delivery: group.delivery })),
+          .map((group) => ({ slug: group.slug, delivery: deliveryOutcome(group.delivery) })),
       };
     });
   }
@@ -1890,7 +2119,7 @@ export class Daemon {
               ? requested.includes(group.slug)
               : group.status === 'merged' && !before.has(group.slug),
           )
-          .map((group) => ({ slug: group.slug, delivery: group.delivery })),
+          .map((group) => ({ slug: group.slug, delivery: deliveryOutcome(group.delivery) })),
       };
     });
   }
@@ -2008,8 +2237,8 @@ export class Daemon {
     const repository = await this.rootOf(params.repository);
     const queue = this.queueFor(repository);
     const now = this.now();
-    const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
-    await this.ensureItem(repository, workflow, skip);
+    const { pipeline, task, groups, title, autoDeliver, deliveryMode, skip } = params;
+    await this.ensureItem(repository, pipeline, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
     const manual = resolveManualTags(this.catalogOf(repository), params.tags ?? []);
     const parent =
@@ -2017,7 +2246,7 @@ export class Daemon {
     if (parent) {
       this.checkNewItem(
         queue,
-        { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after },
+        { pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after },
         now,
       );
     }
@@ -2025,7 +2254,7 @@ export class Daemon {
     const tags = this.inheritTags(queue, mergeTags(parentTag ? [parentTag.id] : [], manual), after);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
+      { pipeline, task, groups, title, autoDeliver, deliveryMode, tags, skip, after },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -2049,7 +2278,7 @@ export class Daemon {
     repository: string,
     params: Pick<
       ParamsOf<'queue_add'>,
-      | 'workflow'
+      | 'pipeline'
       | 'task'
       | 'groups'
       | 'title'
@@ -2062,17 +2291,17 @@ export class Daemon {
       Pick<ParamsOf<'queue_add'>, 'tags' | 'parent'>,
     inherited?: string[],
   ): Promise<unknown> {
-    const { workflow, task, groups, title, autoDeliver, deliveryMode, skip, postponed } = params;
+    const { pipeline, task, groups, title, autoDeliver, deliveryMode, skip, postponed } = params;
     const queue = this.queueFor(repository);
     const now = this.now();
-    await this.ensureItem(repository, workflow, skip);
+    await this.ensureItem(repository, pipeline, skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
     let own = inherited ?? resolveManualTags(this.catalogOf(repository), params.tags ?? []);
     if (params.parent !== undefined) {
       const parent = this.resolveParent(repository, params.parent);
       this.checkNewItem(
         queue,
-        { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after, postponed },
+        { pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after, postponed },
         now,
       );
       const parentTag = await this.parentTagFor(repository, parent);
@@ -2081,7 +2310,7 @@ export class Daemon {
     const tags = this.inheritTags(queue, own, after);
     const item = addItem(
       queue,
-      { workflow, task, groups, title, autoDeliver, deliveryMode, tags, skip, after, postponed },
+      { pipeline, task, groups, title, autoDeliver, deliveryMode, tags, skip, after, postponed },
       queueItemId(now, randomInt(36 ** 3)),
       now,
     );
@@ -2161,13 +2390,13 @@ export class Daemon {
       }
       // Every task carries the linked task tag of its run, then the other tags of the run.
       const repository = state.run.repository;
-      await this.ensureItem(repository, params.workflow, params.skip);
+      await this.ensureItem(repository, params.pipeline, params.skip);
       const queue = this.queueFor(repository);
       const after = this.resolveDependencies(queue, params.after ?? []);
-      const { workflow, task, groups, title, autoDeliver, deliveryMode, skip } = params;
+      const { pipeline, task, groups, title, autoDeliver, deliveryMode, skip } = params;
       this.checkNewItem(
         queue,
-        { workflow, task, groups, title, autoDeliver, deliveryMode, skip, after },
+        { pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after },
         this.now(),
       );
       const tag = await this.linkedTagFor(state);
@@ -2212,11 +2441,11 @@ export class Daemon {
     const config = loadConfig(
       configPaths(repository, this.environment.XDG_CONFIG_HOME, this.environment.HOME),
     );
-    if (!findWorkflow(config, params.workflow)) {
-      const known = config.workflows.map((workflow) => workflow.id).join(', ') || 'none';
-      throw new Rejection(`unknown workflow \`${params.workflow}\`; known: ${known}`);
+    if (!findPipeline(config, params.pipeline)) {
+      const known = config.pipelines.map((pipeline) => pipeline.id).join(', ') || 'none';
+      throw new Rejection(`unknown pipeline \`${params.pipeline}\`; known: ${known}`);
     }
-    const skipError = checkSkip(config, params.workflow, params.skip ?? []);
+    const skipError = checkSkip(config, params.pipeline, params.skip ?? []);
     if (skipError !== null) throw new Rejection(skipError);
     const id = runId(this.now(), randomInt(36 ** 4));
     const prepared = await prepareRunBranch(repository, `refs/aip/${id}/run`, {
@@ -2229,7 +2458,7 @@ export class Daemon {
     const state = createRun({
       id,
       repository,
-      workflow: params.workflow,
+      pipeline: params.pipeline,
       baseCommit: prepared.baseCommit,
       config,
       dirtyWarning: prepared.dirty,
@@ -2358,14 +2587,14 @@ export class Daemon {
     }
     if (!plan.ok) return plan;
     if (
-      (edit.kind === 'specialist' || edit.kind === 'workflow') &&
+      (edit.kind === 'specialist' || edit.kind === 'pipeline') &&
       edit.value === null &&
       edit.level === 'global'
     ) {
       const references =
         edit.kind === 'specialist'
           ? this.sharedUsageOf(repository, edit.id)
-          : this.sharedWorkflowUsageOf(repository, edit.id);
+          : this.sharedPipelineUsageOf(repository, edit.id);
       if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };
     }
     const result = { ok: true as const, ...commitEdit(plan) };
@@ -2396,24 +2625,24 @@ export class Daemon {
     );
   }
 
-  /** The shared workflows with the repositories of the registry that need them. */
-  private sharedWorkflows(): SharedWorkflowsView {
+  /** The shared pipelines with the repositories of the registry that need them. */
+  private sharedPipelines(): SharedPipelinesView {
     const roots = this.repositoryList().map((entry) => entry.path);
-    return sharedWorkflowUsage(
+    return sharedPipelineUsage(
       this.configPathsOf('/'),
       roots.map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
     );
   }
 
-  /** References to a shared workflow from the registry and the requesting repository. */
-  private sharedWorkflowUsageOf(repository: string, id: string): EntryReference[] {
+  /** References to a shared pipeline from the registry and the requesting repository. */
+  private sharedPipelineUsageOf(repository: string, id: string): EntryReference[] {
     const roots = new Set(this.repositoryList().map((entry) => entry.path));
     roots.add(repository);
-    const usage = sharedWorkflowUsage(
+    const usage = sharedPipelineUsage(
       this.configPathsOf('/'),
       [...roots].map((root) => ({ repository: root, paths: this.configPathsOf(root) })),
       id,
-    ).workflows[0];
+    ).pipelines[0];
     return (usage?.projects ?? []).flatMap((project) =>
       project.references.map((reference) => ({ ...reference, repository: project.repository })),
     );
@@ -2483,9 +2712,9 @@ export class Daemon {
     return { ok: true, imported: [...new Set(params.slugs)] };
   }
 
-  private async workflowsImport(
-    params: ParamsOf<'workflows_import'>,
-  ): Promise<WorkflowsImportResult> {
+  private async pipelinesImport(
+    params: ParamsOf<'pipelines_import'>,
+  ): Promise<PipelinesImportResult> {
     for (const path of [params.repository, params.source]) {
       if (!this.registry.has(path)) throw new Rejection(`unknown repository ${path}`);
     }
@@ -2498,7 +2727,7 @@ export class Daemon {
         this.configPathsOf(params.repository),
         this.configPathsOf(params.source),
         params.ids,
-        'workflow',
+        'pipeline',
       );
     } catch (error) {
       if (error instanceof ConfigEditError) throw new Rejection(error.message);
@@ -2555,20 +2784,20 @@ export class Daemon {
       value: params.value,
       level: params.level ?? 'project',
     });
-    return { topology: config ? workflowTopology(config, params.id) : null, errors };
+    return { topology: config ? pipelineTopology(config, params.id) : null, errors };
   }
 
   private configPathsOf(repository: string): ConfigPaths {
     return configPaths(repository, this.environment.XDG_CONFIG_HOME, this.environment.HOME);
   }
 
-  private async workflows(path: string): Promise<WorkflowsView> {
+  private async pipelines(path: string): Promise<PipelinesView> {
     const repository = await this.rootOf(path);
     try {
       const config = loadConfig(
         configPaths(repository, this.environment.XDG_CONFIG_HOME, this.environment.HOME),
       );
-      return { repository, workflows: workflowTopologies(config), errors: [] };
+      return { repository, pipelines: pipelineTopologies(config), errors: [] };
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
       const { detail } = error;
@@ -2576,7 +2805,91 @@ export class Daemon {
         detail.kind === 'invalid'
           ? detail.errors
           : [{ path: describePath(detail), message: error.message }];
-      return { repository, workflows: [], errors };
+      return { repository, pipelines: [], errors };
+    }
+  }
+
+  /** The built-in stages of the pipeline with their tasks and the settings that apply. */
+  private async systemStages(path: string): Promise<SystemStagesView> {
+    const repository = await this.rootOf(path);
+    const paths = this.configPathsOf(repository);
+    try {
+      const config = loadConfig(paths);
+      const settings = new Map(
+        editorView(paths).settings.map((setting) => [setting.path, setting]),
+      );
+      const pick = (keys: string[]): SystemStageSetting[] =>
+        keys.flatMap((key) => {
+          const setting = settings.get(key);
+          if (!setting) return [];
+          const level =
+            setting.written.project !== undefined
+              ? 'project'
+              : setting.written.global !== undefined
+                ? 'global'
+                : 'default';
+          return [{ path: key, value: setting.value, level }];
+        });
+      const { delivery } = config;
+      const named = (slug: string | null): StagePerformer | null =>
+        slug === null ? null : { type: 'specialist', slug, name: specialistName(config, slug) };
+      const stages: SystemStageView[] = [
+        {
+          kind: 'split',
+          name: 'Split',
+          performer: null,
+          task: splitInstructionText('{max_groups}'),
+          settings: [],
+        },
+        {
+          kind: 'message',
+          name: 'Commit message',
+          performer: named(delivery.messageSpecialist),
+          task: [
+            ...MESSAGE_INSTRUCTIONS('{run}'),
+            'Task:\n{task}',
+            'Groups:\n{groups}',
+            'Changed files:\n{files}',
+          ].join('\n\n'),
+          settings: pick([
+            'delivery.message_specialist',
+            'delivery.message_prompt',
+            'delivery.commit_message',
+          ]),
+        },
+        {
+          kind: 'delivery',
+          name: 'Delivery',
+          performer: { type: 'system' },
+          task: null,
+          settings: pick(['delivery.mode', 'delivery.auto', 'delivery.keep']),
+        },
+        {
+          kind: 'resolve',
+          name: 'Resolve conflicts',
+          performer: named(delivery.resolver),
+          task: [
+            ...RESOLVE_INSTRUCTIONS('{run}'),
+            'Conflicting files:\n{files}',
+            'Task of the run:\n{task}',
+            'Groups:\n{groups}',
+          ].join('\n\n'),
+          settings: pick([
+            'delivery.resolver',
+            'delivery.resolver_rounds',
+            'delivery.resolver_prompt',
+          ]),
+        },
+      ];
+      return { repository, stages, errors: [] };
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw error;
+      const { detail } = error;
+      const errors =
+        detail.kind === 'invalid'
+          ? detail.errors
+          : [{ path: describePath(detail), message: error.message }];
+      return { repository, stages: [], errors };
     }
   }
 
@@ -2598,7 +2911,12 @@ export class Daemon {
     const { lines, cursor } = readLines(logPath, after);
     const moments = readTimes(timesPath(logPath));
     const times = lines.map((_, index) => moments.get(after + index) ?? null);
-    const entries = runtimeFor(attempt.runtime, this.environment).transcript(lines, times);
+    const entries: TranscriptEntry[] =
+      attempt.runtime === 'command'
+        ? lines.flatMap((text, index): TranscriptEntry[] =>
+            text === '' ? [] : [{ kind: 'raw', text, at: times[index] ?? null }],
+          )
+        : runtimeFor(attempt.runtime, this.environment).transcript(lines, times);
     const verdict = attempt.report?.verdict ?? null;
     for (const entry of entries) if (entry.kind === 'result') entry.verdict = verdict;
     return { ...base, seq: attempt.seq, cursor, running: attempt.status === 'running', entries };
@@ -2642,7 +2960,7 @@ function hasMergedChanges(state: RunState): boolean {
 function itemParams(queue: Queue, item: QueueItem): ParamsOf<'run'> {
   return {
     repository: queue.repository,
-    workflow: item.workflow,
+    pipeline: item.pipeline,
     ...(item.task !== null ? { task: item.task } : {}),
     ...(item.groups !== null ? { groups: item.groups } : {}),
     ...(item.title !== null ? { title: item.title } : {}),

@@ -5,24 +5,24 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
 import { notifySuccess } from '../../notify.ts';
-import type { ConfigEditorResponse, EditorWorkflow, SharedWorkflowsView } from '../../types.ts';
+import type { ConfigEditorResponse, EditorPipeline, SharedPipelinesView } from '../../types.ts';
 import { Button } from '../../ui/button.tsx';
 import { Empty } from '../../ui/empty.tsx';
 import { Input } from '../../ui/input.tsx';
 
 import { ConfigErrors, EntryList, SplitPage } from '../EntryList.tsx';
 import { SpecialistTagChip } from '../SpecialistTagChip.tsx';
-import { WorkflowForm } from '../WorkflowForm.tsx';
-import { rawName } from '../workflowName.ts';
+import { PipelineForm } from '../PipelineForm.tsx';
+import { rawName } from '../pipelineName.ts';
 
-export const NEW_SHARED_WORKFLOW = 'new';
+export const NEW_SHARED_PIPELINE = 'new';
 
 /** The pipeline as its shared file has it: the only file this group edits. */
-function sharedOf(workflow: EditorWorkflow): EditorWorkflow | null {
-  const shared = workflow.sources.global;
+function sharedOf(pipeline: EditorPipeline): EditorPipeline | null {
+  const shared = pipeline.sources.global;
   if (!shared) return null;
   return {
-    ...workflow,
+    ...pipeline,
     level: 'global',
     file: shared.file,
     revision: shared.revision,
@@ -35,7 +35,7 @@ function sharedOf(workflow: EditorWorkflow): EditorWorkflow | null {
  * The group «Pipeline» of the shared tab: the files of the shared pipelines directory, editable,
  * with the repositories that use each of them.
  */
-export function SharedWorkflowsGroup({
+export function SharedPipelinesGroup({
   api,
   config,
   selected,
@@ -53,14 +53,14 @@ export function SharedWorkflowsGroup({
 }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
-  const [usage, setUsage] = useState<SharedWorkflowsView | null>(null);
+  const [usage, setUsage] = useState<SharedPipelinesView | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   const loadUsage = useCallback(async () => {
     try {
-      setUsage(await api.sharedWorkflows());
+      setUsage(await api.sharedPipelines());
       setUsageError(null);
     } catch (error) {
       setUsage(null);
@@ -72,10 +72,10 @@ export function SharedWorkflowsGroup({
   }, [loadUsage]);
 
   const shared = useMemo(
-    () => config.workflows.map(sharedOf).filter((entry): entry is EditorWorkflow => entry !== null),
+    () => config.pipelines.map(sharedOf).filter((entry): entry is EditorPipeline => entry !== null),
     [config],
   );
-  const directory = usage?.directory ?? `${config.directories.global}/workflows`;
+  const directory = usage?.directory ?? `${config.directories.global}/pipelines`;
   const fileErrors = config.errors.filter((error) => error.file?.startsWith(`${directory}/`));
   const query = search.trim().toLocaleLowerCase();
   const shown = shared.filter(
@@ -85,7 +85,7 @@ export function SharedWorkflowsGroup({
       (rawName(entry.raw) ?? '').toLocaleLowerCase().includes(query) ||
       entry.shared_tags.some((tag) => tag.toLocaleLowerCase().includes(query)),
   );
-  const workflow = shared.find((entry) => entry.id === selected) ?? null;
+  const pipeline = shared.find((entry) => entry.id === selected) ?? null;
 
   const go = async (id: string | null) => {
     if (id === selected) return;
@@ -117,24 +117,24 @@ export function SharedWorkflowsGroup({
       side={
         <>
           {fileErrors.length > 0 ? <ConfigErrors errors={fileErrors} /> : null}
-          <Button onClick={() => void go(NEW_SHARED_WORKFLOW)}>
+          <Button onClick={() => void go(NEW_SHARED_PIPELINE)}>
             <Plus />
-            {t('workflows.new')}
+            {t('pipelines.new')}
           </Button>
           <Input
             type="search"
             value={search}
-            aria-label={t('sharedWorkflows.search')}
-            placeholder={t('sharedWorkflows.search')}
+            aria-label={t('sharedPipelines.search')}
+            placeholder={t('sharedPipelines.search')}
             onChange={(event) => setSearch(event.target.value)}
           />
           {shared.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('sharedWorkflows.empty')}</p>
+            <p className="text-sm text-muted-foreground">{t('sharedPipelines.empty')}</p>
           ) : shown.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('sharedWorkflows.nothing')}</p>
+            <p className="text-sm text-muted-foreground">{t('sharedPipelines.nothing')}</p>
           ) : null}
           <EntryList
-            label={t('sharedWorkflows.list')}
+            label={t('sharedPipelines.list')}
             selected={selected}
             onSelect={(id) => void go(id)}
             entries={shown.map((entry) => ({
@@ -154,12 +154,12 @@ export function SharedWorkflowsGroup({
         </>
       }
     >
-      {selected === NEW_SHARED_WORKFLOW ? (
-        <WorkflowForm
+      {selected === NEW_SHARED_PIPELINE ? (
+        <PipelineForm
           key="new"
           api={api}
           view={config}
-          workflow={null}
+          pipeline={null}
           activeRuns={0}
           notice={null}
           sharedOnly={{ usage: null, usageError: null, onUsageStale: () => void loadUsage() }}
@@ -168,30 +168,30 @@ export function SharedWorkflowsGroup({
           onSaved={async (id) => {
             dirty.current = false;
             await refresh();
-            setNotice(t('workflows.saved'));
-            notifySuccess(t('workflows.savedToast'));
+            setNotice(t('pipelines.saved'));
+            notifySuccess(t('pipelines.savedToast'));
             onSelect(id);
           }}
           onDeleted={async () => undefined}
         />
-      ) : workflow ? (
-        <WorkflowForm
-          key={`${workflow.id}:${workflow.revision ?? ''}`}
+      ) : pipeline ? (
+        <PipelineForm
+          key={`${pipeline.id}:${pipeline.revision ?? ''}`}
           api={api}
           view={config}
-          workflow={workflow}
+          pipeline={pipeline}
           activeRuns={0}
           notice={notice}
           sharedOnly={{
             usage:
               usage === null
                 ? null
-                : (usage.workflows.find((entry) => entry.id === workflow.id) ?? {
-                    id: workflow.id,
+                : (usage.pipelines.find((entry) => entry.id === pipeline.id) ?? {
+                    id: pipeline.id,
                     name: null,
                     tags: [],
-                    file: workflow.file,
-                    revision: workflow.revision,
+                    file: pipeline.file,
+                    revision: pipeline.revision,
                     global: [],
                     projects: [],
                   }),
@@ -203,20 +203,20 @@ export function SharedWorkflowsGroup({
           onSaved={async () => {
             dirty.current = false;
             await refresh();
-            setNotice(t('workflows.saved'));
-            notifySuccess(t('workflows.savedToast'));
+            setNotice(t('pipelines.saved'));
+            notifySuccess(t('pipelines.savedToast'));
           }}
           onDeleted={async () => {
             dirty.current = false;
             setNotice(null);
-            const id = workflow.id;
+            const id = pipeline.id;
             await refresh();
-            notifySuccess(t('workflows.deletedToast', { id }));
+            notifySuccess(t('pipelines.deletedToast', { id }));
             onSelect(null);
           }}
         />
       ) : (
-        <Empty icon={<GitBranch />} title={t('workflows.empty')} />
+        <Empty icon={<GitBranch />} title={t('pipelines.empty')} />
       )}
     </SplitPage>
   );

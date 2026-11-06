@@ -27,7 +27,7 @@ async function finishedRun(
 ): Promise<string> {
   const { runId } = (await startRun(h, {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     groups,
   })) as RunCreated;
   await h.waitFor(runId, (view) => view.finished);
@@ -157,7 +157,7 @@ describe('delivery through the daemon', () => {
     h.script(WRITE_LIB);
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
       autoDeliver: true,
     })) as RunCreated;
@@ -171,7 +171,7 @@ describe('delivery through the daemon', () => {
     h.script(WRITE_LIB);
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
       autoDeliver: false,
     })) as RunCreated;
@@ -245,7 +245,7 @@ describe('runs from the working tree', () => {
     });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     expect(created.warnings).toEqual([]);
@@ -273,7 +273,7 @@ describe('runs from the working tree', () => {
     h.script({ code: [{ read: ['lib.ts', 'notes.md'] }] });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     expect(created.warnings).toEqual([
@@ -298,7 +298,7 @@ describe('delivery resolver', () => {
     });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     writeFileSync(join(h.repo, 'lib.ts'), 'export const value = 9;\n');

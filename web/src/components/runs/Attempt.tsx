@@ -13,6 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/co
 import { Label } from '../../ui/label.tsx';
 import { Skeleton } from '../../ui/skeleton.tsx';
 import { Switch } from '../../ui/switch.tsx';
+import { authorOf } from '../../observerTypes.ts';
 import { Markdown } from '../Markdown.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
 import { EntryTime, Transcript } from '../Transcript.tsx';
@@ -278,11 +279,7 @@ export function Attempt({
                     <p className="mt-2 text-sm">
                       <span className="font-medium">
                         {t('runs.attempt.answer', {
-                          by: t(
-                            attempt.decision.by === 'autopilot'
-                              ? 'runs.decisions.autopilot'
-                              : 'runs.decisions.human',
-                          ),
+                          by: t(`runs.decisions.${authorOf(attempt.decision.by)}`),
                         })}
                       </span>{' '}
                       {attempt.decision.answer}

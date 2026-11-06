@@ -2,7 +2,7 @@
 
 Tags are named colored labels for [tasks](queue.md) and [runs](runs.md). Every repository has its own catalog: a name can exist in two repositories, and a task or run sees only the tags of its repository. `aip tag` works with the repository of the current directory; `-r, --repo <path>` picks another one.
 
-The labels of specialists and workflows are a separate thing: see [configuration/specialists.md](../configuration/specialists.md#tags) and [configuration/workflows.md](../configuration/workflows.md#workflow-fields).
+The labels of specialists and pipelines are a separate thing: see [configuration/specialists.md](../configuration/specialists.md#tags) and [configuration/pipelines.md](../configuration/pipelines.md#pipeline-fields).
 
 ## Managing tags
 
@@ -43,7 +43,7 @@ A linked task tag ties tasks to the task they came from. It belongs to the task 
 - A task that a specialist puts in the queue with `swarm_queue_add` always gets the linked task tag of its run first, then all the other tags its run has at that moment.
 - A specialist cannot set tags itself.
 - When the run has no linked task tag yet, the first `swarm_queue_add` creates it and puts it on the run (first) and on the task. Later tasks of the run reuse it. A run that has other tags gets its own tag too, so every task shows which task it came from.
-- When the workflow or `after` of the task is wrong, the call fails and no tag is created.
+- When the pipeline or `after` of the task is wrong, the call fails and no tag is created.
 - Tags added to a run later do not move to tasks that were already queued, except tasks that wait for that run with `after`.
 
 ### Parent of a task

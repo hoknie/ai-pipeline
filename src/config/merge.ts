@@ -5,7 +5,9 @@ export const KEYED_SECTIONS = new Set([
   'workspace',
   'naming',
   'specialists',
-  'workflows',
+  'pipelines',
+  'actions',
+  'stages',
 ]);
 
 type Mapping = Record<string, unknown>;

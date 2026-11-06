@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api.ts';
 import { repositoryLabel } from '../repositories.ts';
 import { tagsOfSpecialist } from '../specialistTags.ts';
-import type { EditorWorkflow, FieldError } from '../types.ts';
+import type { EditorPipeline, FieldError } from '../types.ts';
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
 import { Checkbox } from '../ui/checkbox.tsx';
@@ -21,15 +21,15 @@ import { Skeleton } from '../ui/skeleton.tsx';
 
 import { RepositoryPicker } from './RepositoryPicker.tsx';
 import { SpecialistTagChip } from './SpecialistTagChip.tsx';
-import { rawName } from './workflowName.ts';
+import { rawName } from './pipelineName.ts';
 
 const NO_WAITING: ReadonlyMap<string, number> = new Map();
 
 /** Copies project pipelines of another repository of the registry into this one. */
-export function WorkflowImportDialog({
+export function PipelineImportDialog({
   api,
   repository,
-  workflows,
+  pipelines,
   open,
   onOpenChange,
   onImported,
@@ -38,7 +38,7 @@ export function WorkflowImportDialog({
   api: Api;
   repository: string;
   /** The pipelines of that repository: an id with a project file there is taken. */
-  workflows: readonly EditorWorkflow[];
+  pipelines: readonly EditorPipeline[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported: (ids: string[]) => Promise<void>;
@@ -47,7 +47,7 @@ export function WorkflowImportDialog({
   const [repositories, setRepositories] = useState<string[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
-  const [entries, setEntries] = useState<EditorWorkflow[] | null>(null);
+  const [entries, setEntries] = useState<EditorPipeline[] | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export function WorkflowImportDialog({
       .config()
       .then(
         (view) => {
-          if (!closed) setEntries(view.workflows.filter((entry) => entry.sources.project));
+          if (!closed) setEntries(view.pipelines.filter((entry) => entry.sources.project));
         },
         (error: Error) => {
           if (!closed) setLoadError(error.message);
@@ -104,7 +104,7 @@ export function WorkflowImportDialog({
   }, [api, open, current]);
 
   const taken = new Set(
-    workflows
+    pipelines
       .filter((entry) => entry.level === 'project' || entry.level === 'project_over_global')
       .map((entry) => entry.id),
   );
@@ -124,7 +124,7 @@ export function WorkflowImportDialog({
     setMessage(null);
     setErrors([]);
     try {
-      const result = await api.importWorkflows(current, chosen);
+      const result = await api.importPipelines(current, chosen);
       if (result.ok) {
         onOpenChange(false);
         await onImported(result.imported);
@@ -144,8 +144,8 @@ export function WorkflowImportDialog({
         aria-describedby="import-about"
       >
         <DialogHeader>
-          <DialogTitle>{t('workflows.import.title')}</DialogTitle>
-          <DialogDescription id="import-about">{t('workflows.import.about')}</DialogDescription>
+          <DialogTitle>{t('pipelines.import.title')}</DialogTitle>
+          <DialogDescription id="import-about">{t('pipelines.import.about')}</DialogDescription>
         </DialogHeader>
         {loadError ? (
           <Alert variant="destructive">{loadError}</Alert>
@@ -154,14 +154,14 @@ export function WorkflowImportDialog({
             <Skeleton className="h-24" />
           </div>
         ) : current === null ? (
-          <p className="text-sm text-muted-foreground">{t('workflows.import.noSources')}</p>
+          <p className="text-sm text-muted-foreground">{t('pipelines.import.noSources')}</p>
         ) : (
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="import-source">{t('workflows.import.source')}</Label>
+              <Label htmlFor="import-source">{t('pipelines.import.source')}</Label>
               <RepositoryPicker
                 id="import-source"
-                label={t('workflows.import.source')}
+                label={t('pipelines.import.source')}
                 repositories={others}
                 value={current}
                 waiting={NO_WAITING}
@@ -174,10 +174,10 @@ export function WorkflowImportDialog({
               </div>
             ) : entries.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                {t('workflows.import.empty', { name: repositoryLabel(current) })}
+                {t('pipelines.import.empty', { name: repositoryLabel(current) })}
               </p>
             ) : (
-              <ul aria-label={t('workflows.import.list')} className="flex flex-col gap-1">
+              <ul aria-label={t('pipelines.import.list')} className="flex flex-col gap-1">
                 {entries.map((entry) => {
                   const busyId = taken.has(entry.id);
                   const id = `import-${entry.id}`;
@@ -199,7 +199,7 @@ export function WorkflowImportDialog({
                         </span>
                         <span className="truncate text-xs text-muted-foreground">
                           {entry.id}
-                          {busyId ? ` · ${t('workflows.import.taken')}` : ''}
+                          {busyId ? ` · ${t('pipelines.import.taken')}` : ''}
                         </span>
                         {tags.length > 0 ? (
                           <span className="flex flex-wrap gap-1">
@@ -233,7 +233,7 @@ export function WorkflowImportDialog({
             {t('common.cancel')}
           </Button>
           <Button disabled={busy || chosen.length === 0} onClick={() => void run()}>
-            {t('workflows.import.run', { total: chosen.length })}
+            {t('pipelines.import.run', { total: chosen.length })}
           </Button>
         </DialogFooter>
       </DialogContent>

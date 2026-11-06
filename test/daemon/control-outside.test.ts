@@ -4,9 +4,11 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { databasePath } from '../../src/config/index.ts';
 import { startDaemon } from '../../src/daemon/index.ts';
 import type { RunCreated, Transcript } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG, startRun, statuses, until } from './harness.ts';
+import { Store } from '../../src/store/index.ts';
+import { PIPELINE_CONFIG, startRun, statuses, until } from './harness.ts';
 import { calls, run, start } from './control-harness.ts';
 
 describe('failures and control', () => {
@@ -20,8 +22,8 @@ describe('failures and control', () => {
     expect(warned.attempts[0]?.outsideChanges).toEqual(['README.md']);
     await warn.close();
     const stop = await start(
-      `${WORKFLOW_CONFIG}  outside_changes: stop\n`
-        .replace('  workflows:', '  outside_changes: stop\n  workflows:')
+      `${PIPELINE_CONFIG}  outside_changes: stop\n`
+        .replace('  pipelines:', '  outside_changes: stop\n  pipelines:')
         .replace(/\n  outside_changes: stop\n$/, '\n'),
     );
     stop.script({ code: [{ outside: { [join(stop.repo, 'README.md')]: 'stray\n' } }] });
@@ -40,7 +42,7 @@ describe('failures and control', () => {
     const first = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'first', task: 'one' }],
       })) as RunCreated
     ).runId;
@@ -52,7 +54,7 @@ describe('failures and control', () => {
     const second = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'second', task: 'two' }],
       })) as RunCreated
     ).runId;
@@ -68,9 +70,9 @@ describe('failures and control', () => {
 
   it('keeps an outside change of a file that another run delivers to a branch', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
-        '  workflows:',
-        '  delivery: { mode: branch, auto: true }\n  workflows:',
+      PIPELINE_CONFIG.replace(
+        '  pipelines:',
+        '  delivery: { mode: branch, auto: true }\n  pipelines:',
       ),
     );
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
@@ -80,7 +82,7 @@ describe('failures and control', () => {
     const first = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'first', task: 'one' }],
       })) as RunCreated
     ).runId;
@@ -90,7 +92,7 @@ describe('failures and control', () => {
     const second = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'second', task: 'two' }],
       })) as RunCreated
     ).runId;
@@ -103,7 +105,7 @@ describe('failures and control', () => {
 
   it('fails a step whose runtime is not installed', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         'coder: { name: Кодировщик, runtime: opencode }',
       ),
@@ -121,7 +123,7 @@ describe('failures and control', () => {
 
   it('runs a specialist through the opencode runtime', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         'coder: { name: Кодировщик, runtime: opencode, model: x/y }',
       ),
@@ -140,7 +142,7 @@ describe('failures and control', () => {
 
   it('splits a task into groups before the steps', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         '    feature:\n      steps:',
         '    feature:\n      split: { specialist: coder, max_groups: 3 }\n      steps:',
       ),
@@ -157,7 +159,7 @@ describe('failures and control', () => {
     });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'вход и выход',
     })) as RunCreated;
     expect(created.split).toBe(true);
@@ -169,19 +171,19 @@ describe('failures and control', () => {
     ]);
   });
 
-  it('runs the groups of a split through the steps of another workflow', async () => {
+  it('runs the groups of a split through the steps of another pipeline', async () => {
     const h = await start(`swarm:
   max: 3
   specialists:
     coder: { name: Кодировщик }
     reviewer: { name: Ревьюер, permissions: read }
-  workflows:
+  pipelines:
     explore:
       steps:
         - { id: research, specialist: reviewer }
         - { id: write, specialist: coder }
     epic:
-      split: { specialist: coder, workflow: explore }
+      split: { specialist: coder, pipeline: explore }
 `);
     h.script({
       split: [
@@ -195,7 +197,7 @@ describe('failures and control', () => {
     });
     const created = (await startRun(h, {
       repository: h.repo,
-      workflow: 'epic',
+      pipeline: 'epic',
       task: 'вход и выход',
     })) as RunCreated;
     const final = await h.waitFor(created.runId, (view) => view.finished);
@@ -207,8 +209,54 @@ describe('failures and control', () => {
     ]);
   });
 
+  it('retries a group of a run stored with the old names through the steps of the target', async () => {
+    const h = await start(`swarm:
+  max: 3
+  specialists:
+    coder: { name: Кодировщик }
+    reviewer: { name: Ревьюер, permissions: read }
+  pipelines:
+    explore:
+      steps:
+        - { id: research, specialist: reviewer }
+        - { id: write, specialist: coder }
+    epic:
+      split: { specialist: coder, pipeline: explore }
+`);
+    h.script({
+      split: [{ split: [{ title: 'Вход', task: 'вход' }] }],
+      write: [{ exitCode: 1, noReport: true }],
+    });
+    const created = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'epic',
+      task: 'вход',
+    })) as RunCreated;
+    await h.waitFor(created.runId, (view) => view.groups[0]?.status === 'failed');
+    await h.restart(() => {
+      // The snapshot as an older build stored it: `workflows` and `split.workflow`.
+      const store = new Store(databasePath(h.state));
+      const state = store.loadRun(created.runId)!;
+      const { pipelines, ...rest } = state.run.config as unknown as Record<string, unknown>;
+      const old = (pipelines as { split?: { pipeline?: string } }[]).map((pipeline) => {
+        if (!pipeline.split) return pipeline;
+        const { pipeline: target, ...split } = pipeline.split;
+        return { ...pipeline, split: { ...split, workflow: target } };
+      });
+      state.run.config = { ...rest, workflows: old } as unknown as typeof state.run.config;
+      store.saveRun(state);
+      store.close();
+    });
+    h.script({ split: [{ split: [{ title: 'Вход', task: 'вход' }] }], write: [{}] });
+    await h.call('retry', { runId: created.runId, group: 'vhod' });
+    const final = await h.waitFor(created.runId, (view) => view.finished);
+    expect(statuses(final)).toEqual(['merged']);
+    const detail = await h.group(created.runId, 'vhod');
+    expect(detail.attempts.map((attempt) => attempt.stepId)).toContain('write');
+  });
+
   it('marks running steps interrupted after a restart and keeps the queue', async () => {
-    const h = await start(WORKFLOW_CONFIG.replace('max: 3', 'max: 1'));
+    const h = await start(PIPELINE_CONFIG.replace('max: 3', 'max: 1'));
     h.script({ code: [{ hang: true }, {}] });
     const runId = await run(h, 2);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
@@ -244,7 +292,7 @@ describe('transcripts', () => {
     h.script({ code: [{ waitFor: h.gate('code') }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'Вход', task: 'вход' }],
     })) as RunCreated;
     let running = (await h.call('transcript', { runId, group: 'vhod' })) as Transcript;
@@ -271,16 +319,16 @@ describe('transcripts', () => {
   });
 });
 
-describe('workflows view', () => {
+describe('pipelines view', () => {
   it('names the file of a syntax error in aip/settings.yaml', async () => {
     const h = await start();
     const file = join(h.repo, 'aip', 'settings.yaml');
     writeFileSync(file, 'max: [\n');
-    const view = (await h.call('workflows', { repository: h.repo })) as {
-      workflows: unknown[];
+    const view = (await h.call('pipelines', { repository: h.repo })) as {
+      pipelines: unknown[];
       errors: { file?: string; path: string; message: string }[];
     };
-    expect(view.workflows).toEqual([]);
+    expect(view.pipelines).toEqual([]);
     expect(view.errors).toEqual([{ path: file, message: expect.stringContaining(file) }]);
   });
 
@@ -288,7 +336,7 @@ describe('workflows view', () => {
     const h = await start();
     const file = join(h.repo, 'aip', 'settings.yaml');
     writeFileSync(file, 'max: 0\n');
-    const view = (await h.call('workflows', { repository: h.repo })) as {
+    const view = (await h.call('pipelines', { repository: h.repo })) as {
       errors: { file?: string; path: string }[];
     };
     expect(view.errors).toContainEqual(expect.objectContaining({ file, path: 'swarm.max' }));

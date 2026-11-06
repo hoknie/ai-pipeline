@@ -1,10 +1,11 @@
 # `aip/` configuration
 
-The configuration is an `aip/` directory with settings, specialists and workflows. This page covers its layout, its two levels and the fields of `settings.yaml`. The larger parts have their own pages:
+The configuration is an `aip/` directory with settings, specialists and pipelines. This page covers its layout, its two levels and the fields of `settings.yaml`. The larger parts have their own pages:
 
 - [configuration/specialists.md](specialists.md): the files in `specialists/`;
-- [configuration/workflows.md](workflows.md): the files in `workflows/`;
+- [configuration/pipelines.md](pipelines.md): the files in `pipelines/`;
 - [configuration/permissions.md](permissions.md): `claude.edit_mode` and permission levels;
+- [configuration/actions.md](actions.md): the files in `actions/` and the pipeline points where they run;
 - [configuration/delivery.md](delivery.md): the `delivery` section;
 - [configuration/runtimes.md](runtimes.md): the `runtimes` section, `claude.mcp` and `claude.settings`.
 
@@ -25,19 +26,21 @@ aip/
   specialists/
     coder.yaml           # the coder specialist
     reviewer.yaml        # the reviewer specialist
-  workflows/
-    feature.yaml         # the feature workflow
+  pipelines/
+    feature.yaml         # the feature pipeline
+  actions/
+    lint.yaml            # the lint action
 ```
 
 `aip init` creates a starter set in the current repository, and `aip init --shared` in the shared directory.
 
 ## File rules
 
-Every specialist and every workflow has exactly one file.
+Every specialist and every pipeline has exactly one file.
 
-- The specialist slug and the workflow id are the file name without the extension (`coder.yaml` → `coder`). They must match `^[a-z][a-z0-9-]{0,31}$`.
-- The file holds the body of the entry without a key for its name: `name`, `model`, `prompt` … for a specialist, `steps` and `split` for a workflow.
-- Files named `*.yaml` and `*.yml` directly in `specialists/` and `workflows/` are read, and `settings.yaml` or `settings.yml` in `aip/`. A symlink to a file is read.
+- The specialist slug and the pipeline id are the file name without the extension (`coder.yaml` → `coder`). They must match `^[a-z][a-z0-9-]{0,31}$`.
+- The file holds the body of the entry without a key for its name: `name`, `model`, `prompt` … for a specialist, `steps` and `split` for a pipeline.
+- Files named `*.yaml` and `*.yml` directly in `specialists/` and `pipelines/` are read, and `settings.yaml` or `settings.yml` in `aip/`. A symlink to a file is read.
 - Subdirectories, hidden files and files with other extensions are skipped.
 - A pair `x.yaml` and `x.yml` is a validation error that names both files.
 - Unknown keys are an error.
@@ -53,14 +56,15 @@ The project level overrides the shared one:
 | `max`, `workspace_dir`, `outside_changes` | As a whole |
 | `defaults`, `claude`, `delivery`, `workspace`, `naming` | Field by field |
 | `web`, `runtimes` | Read from the shared level only; in a project file they are a validation error |
-| Specialists and workflows | As a whole, by name: a project file `coder.yaml` replaces the shared one |
+| Specialists, pipelines and actions | As a whole, by name: a project file `coder.yaml` replaces the shared one |
+| `stages` | By point: a point of the project level replaces the shared one |
 
 ## Checking the configuration
 
 `aip config check` works without the daemon. It prints all errors at once, each with the file and the path to the field. For a valid configuration it prints:
 
 - the result;
-- the files read in merge order (`Config files:`): on each level `settings.yaml` first, then specialists and workflows by name, the shared level before the project level;
+- the files read in merge order (`Config files:`): on each level `settings.yaml` first, then specialists and pipelines by name, the shared level before the project level;
 - the versions of the agent CLIs it found.
 
 A run keeps a snapshot of the configuration from the moment it starts, so editing the files does not affect it. Two exceptions are [refreshed permissions](permissions.md#refreshing-permissions) and a [retry with the current configuration](../usage/runs.md#retry-with-the-current-configuration).
@@ -80,6 +84,7 @@ claude:
   mcp: isolated           # isolated | inherit
   settings: isolated      # isolated | inherit
 delivery: { ... }
+stages: { ... }           # actions shared by the pipelines, see actions.md
 defaults: { ... }
 ```
 
@@ -96,6 +101,7 @@ defaults: { ... }
 | `claude.mcp` | [configuration/runtimes.md](runtimes.md#claudemcp) |
 | `claude.settings` | [configuration/runtimes.md](runtimes.md#claudesettings) |
 | `delivery` | [configuration/delivery.md](delivery.md) |
+| `stages` | [configuration/actions.md](actions.md#points) |
 | `defaults` | [`defaults`](#defaults) |
 
 ### `max`
@@ -194,5 +200,5 @@ The fields are described in [configuration/specialists.md](specialists.md#fields
 |---|---|
 | `swarm.max`, `workspace_dir`, `outside_changes`, `workspace`, `naming`, `web`, `runtimes`, `claude`, `delivery`, `defaults` | `aip/settings.yaml`, without the `swarm:` root |
 | `swarm.specialists.<slug>` | `aip/specialists/<slug>.yaml` |
-| `swarm.workflows.<id>` | `aip/workflows/<id>.yaml` |
+| `swarm.pipelines.<id>` | `aip/pipelines/<id>.yaml` |
 | shared `~/.config/aip/swarm.yaml` | these files in `~/.config/aip/` |

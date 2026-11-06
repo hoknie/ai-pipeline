@@ -136,7 +136,7 @@ describe('aip web', () => {
     h.script({ code: [{ write: { 'openspec/changes/add-login/tasks.md': '- [ ] one\n' } }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.finished);
@@ -168,6 +168,14 @@ describe('aip web', () => {
     }
     expect((await fetch(`${base}/api/finished-runs`)).status).toBe(401);
     expect((await fetch(`${base}/api/runs/nope`, { headers: authed(web) })).status).toBe(404);
+    // The old addresses of the pipelines are gone.
+    for (const old of [
+      '/api/workflows',
+      '/api/shared-workflows',
+      '/api/config/workflows/feature',
+    ]) {
+      expect((await fetch(`${base}${old}`, { headers: authed(web) })).status).toBe(404);
+    }
     expect(
       (await fetch(`${base}/api/runs/${runId}/groups/nope`, { headers: authed(web) })).status,
     ).toBe(404);
@@ -187,7 +195,7 @@ describe('aip web', () => {
     h = harnessed;
     const first = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(first.runId, (run) => run.finished);
@@ -222,7 +230,7 @@ describe('aip web', () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.finished);
@@ -258,7 +266,7 @@ describe('aip web', () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.finished);
@@ -298,7 +306,7 @@ describe('aip web', () => {
     h.script({ code: [{ exitCode: 1, noReport: true }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.groups[0]?.status === 'failed');
@@ -319,7 +327,7 @@ describe('aip web', () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     const controller = new AbortController();
@@ -395,10 +403,10 @@ describe('aip web', () => {
     };
     await read('"snapshot"');
     await h.call('queue_settings', { repository: h.repo, parallel: 2 });
-    await h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'x' });
+    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'x' });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await read(runId);
@@ -466,7 +474,7 @@ describe('aip web', () => {
     await h.call('tag_add', { repository: h.repo, name: 'auth' });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await read(runId);
@@ -505,7 +513,7 @@ describe('aip web', () => {
 
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     const set = await post(`/api/runs/${runId}/tags`, { add: ['login'] });
@@ -534,7 +542,7 @@ describe('aip web', () => {
       });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     const set = await post(`/api/runs/${runId}/title`, { title: '  Новое название ' });
@@ -587,7 +595,7 @@ describe('aip web', () => {
     await post('/api/tags', { name: 'auth' });
     await post('/api/tags', { name: 'ui' });
     const added = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'x', tags: ['auth', 'ui'] })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'x', tags: ['auth', 'ui'] })
     ).json()) as QueueView & { item: string };
     expect(added.items[0]?.tags.map((t) => t.name)).toEqual(['auth', 'ui']);
     const edited = (await (
@@ -595,7 +603,7 @@ describe('aip web', () => {
     ).json()) as QueueView;
     expect(edited.items[0]?.tags).toEqual([]);
     expect(
-      (await post('/api/queue/items', { workflow: 'feature', task: 'x', tags: ['nope'] })).status,
+      (await post('/api/queue/items', { pipeline: 'feature', task: 'x', tags: ['nope'] })).status,
     ).toBe(400);
   });
 
@@ -608,14 +616,14 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     const added = await post('/api/queue/items', {
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       parent: 'nope',
     });
     expect(added.status).toBe(400);
     expect(await added.text()).toContain('unknown parent `nope`');
     const item = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'x' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'x' })
     ).json()) as QueueView & { item: string };
     const edited = await post(`/api/queue/items/${item.item}`, { parent: 77 });
     expect(edited.status).toBe(400);
@@ -632,10 +640,10 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     const first = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'модель' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'модель' })
     ).json()) as QueueView & { item: string };
     const second = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'api', after: [first.item] })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'api', after: [first.item] })
     ).json()) as QueueView & { item: string };
     const added = second.items.find((item) => item.id === second.item);
     expect(added?.after.map((ref) => [ref.id, ref.state])).toEqual([[first.item, 'waiting']]);
@@ -656,7 +664,7 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     const added = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'x' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'x' })
     ).json()) as QueueView & { item: string };
     const edited = await post(`/api/queue/items/${added.item}`, { postponed: true });
     expect(edited.status).toBe(200);
@@ -676,10 +684,10 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     const first = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'модель' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'модель' })
     ).json()) as QueueView & { item: string };
     const second = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'api', after: [first.item] })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'api', after: [first.item] })
     ).json()) as QueueView & { item: string };
     const cycle = await post(`/api/queue/items/${first.item}`, { after: [second.item] });
     expect(cycle.status).toBe(400);
@@ -699,7 +707,7 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     h.script({ code: [{ noReport: true }, {}] });
-    await post('/api/queue/items', { workflow: 'feature', task: 'работа' });
+    await post('/api/queue/items', { pipeline: 'feature', task: 'работа' });
     await post('/api/queue/start', {});
     const run = await waitValue('the queue to stop on a problem', async () => {
       const queue = (await (
@@ -731,7 +739,7 @@ describe('aip web', () => {
       });
     h.script({ code: [{ waitFor: h.gate('a') }] });
     const added = (await (
-      await post('/api/queue/items', { workflow: 'feature', task: 'работа' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'работа' })
     ).json()) as QueueView & { item: string };
     await post(`/api/queue/items/${added.item}/run`, {});
     const run = await waitValue('a run in the queue', async () => {
@@ -761,7 +769,7 @@ describe('aip web', () => {
       });
     h.script({ code: [{ noReport: true }, {}] });
     await post('/api/queue/settings', { skipFailed: true });
-    await post('/api/queue/items', { workflow: 'feature', task: 'работа' });
+    await post('/api/queue/items', { pipeline: 'feature', task: 'работа' });
     await post('/api/queue/start', {});
     const run = await waitValue('a skipped run', async () => {
       const queue = (await (
@@ -790,19 +798,19 @@ describe('aip web', () => {
       (await (await fetch(`${base}/api/queue`, { headers: authed(web) })).json()) as QueueView;
     expect((await fetch(`${base}/api/queue`)).status).toBe(401);
     expect(
-      (await post('/api/queue/items', { workflow: 'feature', task: 'x' }, JSON_TYPE)).status,
+      (await post('/api/queue/items', { pipeline: 'feature', task: 'x' }, JSON_TYPE)).status,
     ).toBe(401);
     expect((await read()).items).toEqual([]);
     expect((await fetch(`${base}/api/queue/items`, { headers: authed(web) })).status).toBe(405);
     expect((await fetch(`${base}/api/queue/start`, { headers: authed(web) })).status).toBe(405);
     expect((await post('/api/queue', {})).status).toBe(405);
 
-    const added = await post('/api/queue/items', { workflow: 'feature', task: 'первая' });
+    const added = await post('/api/queue/items', { pipeline: 'feature', task: 'первая' });
     expect(added.status).toBe(200);
-    await post('/api/queue/items', { workflow: 'feature', task: 'вторая', title: 'Вторая' });
+    await post('/api/queue/items', { pipeline: 'feature', task: 'вторая', title: 'Вторая' });
     const third = (await (
       await post('/api/queue/items', {
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'a', task: 'b' }],
         // a body cannot choose another repository
         repository: '/elsewhere',
@@ -818,9 +826,9 @@ describe('aip web', () => {
     expect(edited.status).toBe(200);
 
     for (const [path, body] of [
-      ['/api/queue/items', { workflow: 'feature', task: '  ' }],
-      ['/api/queue/items', { workflow: 'feature' }],
-      ['/api/queue/items', { workflow: 'nope', task: 'x' }],
+      ['/api/queue/items', { pipeline: 'feature', task: '  ' }],
+      ['/api/queue/items', { pipeline: 'feature' }],
+      ['/api/queue/items', { pipeline: 'nope', task: 'x' }],
       ['/api/queue/settings', { parallel: 0 }],
       ['/api/queue/start', { parallel: 21 }],
     ] as const) {
@@ -912,7 +920,7 @@ describe('aip web', () => {
     };
     const first = await open();
     await first.until('"snapshot"');
-    await h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'из терминала' });
+    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'из терминала' });
     expect(await first.until('"event":"queue"')).toContain('из терминала');
     first.controller.abort();
     const second = await open();
@@ -928,7 +936,7 @@ describe('aip web', () => {
     h.script({ code: [{ waitFor: h.gate('hold') }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.groups.some((group) => group.status === 'running'));
@@ -953,7 +961,7 @@ describe('aip web', () => {
     h.script({ code: [{ waitFor: h.gate('code') }, { waitFor: h.gate('hold') }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.groups.some((group) => group.status === 'running'));
@@ -979,7 +987,7 @@ describe('aip web', () => {
     });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     const waiting = await h.waitFor(runId, (run) =>
@@ -1064,7 +1072,7 @@ describe('aip web', () => {
     const { h, web, base } = await setup();
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.finished);
@@ -1093,7 +1101,7 @@ describe('aip web', () => {
     h.script({ code: [{ write: { 'lib.ts': 'export const value = 2;\n' } }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.finished);
@@ -1137,7 +1145,7 @@ describe('aip web', () => {
     });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (run) => run.finished);
@@ -1199,26 +1207,26 @@ describe('aip web', () => {
     expect((await fetch(url('out.log'), { headers: authed(web) })).status).toBe(409);
   });
 
-  it('serves the workflows of the repository, and the errors of a broken configuration', async () => {
+  it('serves the pipelines of the repository, and the errors of a broken configuration', async () => {
     const { h, web, base } = await setup();
-    const ok = await fetch(`${base}/api/workflows?repository=${encodeURIComponent(h.repo)}`, {
+    const ok = await fetch(`${base}/api/pipelines?repository=${encodeURIComponent(h.repo)}`, {
       headers: authed(web),
     });
     expect(ok.status).toBe(200);
     const view = (await ok.json()) as {
-      workflows: { id: string; steps: { id: string }[] }[];
+      pipelines: { id: string; steps: { id: string }[] }[];
       errors: unknown[];
     };
     expect(view.errors).toEqual([]);
-    expect(view.workflows.map((workflow) => workflow.id)).toEqual(['feature']);
-    expect(view.workflows[0]?.steps.map((entry) => entry.id)).toEqual(['code', 'review']);
+    expect(view.pipelines.map((pipeline) => pipeline.id)).toEqual(['feature']);
+    expect(view.pipelines[0]?.steps.map((entry) => entry.id)).toEqual(['code', 'review']);
     writeConfigDirectory(h.repo, 'swarm:\n  max: 0\n');
     const broken = (await (
-      await fetch(`${base}/api/workflows?repository=${encodeURIComponent(h.repo)}`, {
+      await fetch(`${base}/api/pipelines?repository=${encodeURIComponent(h.repo)}`, {
         headers: authed(web),
       })
-    ).json()) as { workflows: unknown[]; errors: { path: string }[] };
-    expect(broken.workflows).toEqual([]);
+    ).json()) as { pipelines: unknown[]; errors: { path: string }[] };
+    expect(broken.pipelines).toEqual([]);
     expect(broken.errors).toContainEqual(
       expect.objectContaining({ path: 'swarm.max', file: join(h.repo, 'aip', 'settings.yaml') }),
     );
@@ -1369,6 +1377,45 @@ describe('aip web configuration editor', () => {
     expect(existsSync(join(h.repo, 'aip', 'specialists', 'qa.yaml'))).toBe(false);
   });
 
+  it('writes and deletes an action, and lists the system stages', async () => {
+    const { h, web, base } = await editor();
+    const url = `${base}/api/config/actions/lint`;
+    const file = join(h.repo, 'aip', 'actions', 'lint.yaml');
+    const write = (body: unknown) =>
+      fetch(url, { method: 'PUT', headers: authed(web, JSON_TYPE), body: JSON.stringify(body) });
+    const bad = await write({ value: { run: 'true', specialist: 'coder' }, revision: null });
+    expect(bad.status).toBe(422);
+    expect(existsSync(file)).toBe(false);
+    const created = await write({ value: { run: 'npm run lint' }, revision: null });
+    expect(created.status).toBe(200);
+    const { revision } = (await created.json()) as { revision: string };
+    expect(readFileSync(file, 'utf8')).toContain('npm run lint');
+    expect((await write({ value: { run: 'x' }, revision: 'stale' })).status).toBe(409);
+    const anonymous = await fetch(url, {
+      method: 'PUT',
+      headers: JSON_TYPE,
+      body: JSON.stringify({ value: { run: 'x' }, revision }),
+    });
+    expect(anonymous.status).toBe(401);
+    const remove = (query: string) =>
+      fetch(`${url}${query}`, { method: 'DELETE', headers: authed(web) });
+    expect((await remove('')).status).toBe(400);
+    expect((await remove(`?revision=${revision}`)).status).toBe(200);
+    expect(existsSync(file)).toBe(false);
+
+    const stages = await fetch(
+      `${base}/api/system-stages?repository=${encodeURIComponent(h.repo)}`,
+      {
+        headers: authed(web),
+      },
+    );
+    expect(stages.status).toBe(200);
+    const view = (await stages.json()) as { stages: { kind: string }[]; errors: unknown[] };
+    expect(view.errors).toEqual([]);
+    expect(view.stages.map((stage) => stage.kind)).toContain('delivery');
+    expect((await fetch(`${base}/api/system-stages`)).status).toBe(401);
+  });
+
   it('serves the catalog of the repository, live and behind the token', async () => {
     const { h, web, base } = await editor();
     const read = async () =>
@@ -1445,7 +1492,7 @@ describe('aip web configuration editor', () => {
     );
     expect(used.status).toBe(422);
     expect(((await used.json()) as { references: unknown[] }).references).toEqual([
-      { workflow: 'feature', step: 'review' },
+      { pipeline: 'feature', step: 'review' },
     ]);
     const removed = await fetch(`${base}/api/config/specialists/qa?revision=${qa.revision}`, {
       method: 'DELETE',
@@ -1490,16 +1537,16 @@ describe('aip web configuration editor', () => {
     expect(existsSync(file)).toBe(false);
   });
 
-  it('previews, writes and deletes workflows', async () => {
+  it('previews, writes and deletes pipelines', async () => {
     const { h, web, base } = await editor();
     const steps = [
       { id: 'code', specialist: 'coder' },
       { id: 'review', specialist: 'reviewer', on_reject: { goto: 'code', max_rounds: 2 } },
     ];
-    const file = join(h.repo, 'aip', 'workflows', 'feature.yaml');
+    const file = join(h.repo, 'aip', 'pipelines', 'feature.yaml');
     const before = readFileSync(file, 'utf8');
     const post = (value: unknown, headers: Record<string, string> = authed(web, JSON_TYPE)) =>
-      fetch(`${base}/api/config/workflows/feature/preview`, {
+      fetch(`${base}/api/config/pipelines/feature/preview`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ value }),
@@ -1514,15 +1561,15 @@ describe('aip web configuration editor', () => {
       errors: { path: string }[];
     };
     expect(bad.topology).toBeNull();
-    expect(bad.errors[0]?.path).toBe('swarm.workflows.feature.steps[0].specialist');
+    expect(bad.errors[0]?.path).toBe('swarm.pipelines.feature.steps[0].specialist');
     expect(readFileSync(file, 'utf8')).toBe(before);
 
     const view = (await (await fetch(`${base}/api/config`, { headers: authed(web) })).json()) as {
-      workflows: { id: string; revision: string }[];
+      pipelines: { id: string; revision: string }[];
     };
-    const feature = view.workflows.find((workflow) => workflow.id === 'feature')!;
+    const feature = view.pipelines.find((pipeline) => pipeline.id === 'feature')!;
     const put = (revision: string | null, value: unknown) =>
-      fetch(`${base}/api/config/workflows/feature`, {
+      fetch(`${base}/api/config/pipelines/feature`, {
         method: 'PUT',
         headers: authed(web, JSON_TYPE),
         body: JSON.stringify({ value, revision }),
@@ -1534,10 +1581,10 @@ describe('aip web configuration editor', () => {
     expect((await put(feature.revision, { steps: steps.slice(0, 1) })).status).toBe(200);
     expect(readFileSync(file, 'utf8')).not.toContain('review');
     const fresh = (await (await fetch(`${base}/api/config`, { headers: authed(web) })).json()) as {
-      workflows: { id: string; revision: string }[];
+      pipelines: { id: string; revision: string }[];
     };
     const removed = await fetch(
-      `${base}/api/config/workflows/feature?revision=${fresh.workflows[0]!.revision}`,
+      `${base}/api/config/pipelines/feature?revision=${fresh.pipelines[0]!.revision}`,
       { method: 'DELETE', headers: authed(web) },
     );
     expect(removed.status).toBe(200);
@@ -1576,7 +1623,7 @@ describe('aip web repository parameter', () => {
     const added = await fetch(`${base}/api/queue/items?repository=${enc(second)}`, {
       method: 'POST',
       headers: authed(web, JSON_TYPE),
-      body: JSON.stringify({ workflow: 'feature', task: 'x', repository: h.repo }),
+      body: JSON.stringify({ pipeline: 'feature', task: 'x', repository: h.repo }),
     });
     expect(((await added.json()) as QueueView).repository).toBe(second);
     expect((await get('')).items).toEqual([]);
@@ -1609,7 +1656,7 @@ describe('aip web repository parameter', () => {
     expect(((await relative.json()) as { error: string }).error).toBe(
       'repository must be an absolute path',
     );
-    for (const path of ['/api/queue', '/api/workflows', '/api/config']) {
+    for (const path of ['/api/queue', '/api/pipelines', '/api/config']) {
       const outside = await fetch(`${base}${path}?repository=${enc(secondRepository(true))}`, {
         headers: authed(web),
       });
@@ -1686,7 +1733,7 @@ describe('aip web repositories', () => {
     h.script({ code: [{ verdict: 'needs_human', feedback: 'вопрос?' }, {}] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
@@ -1968,7 +2015,7 @@ describe('default repository of the panel', () => {
     web = await startWebServer({ socket: h.socket, port: 0 });
     const base = `http://127.0.0.1:${web.port}`;
     const headers = authed(web);
-    for (const path of ['/api/queue', '/api/config', '/api/workflows']) {
+    for (const path of ['/api/queue', '/api/config', '/api/pipelines']) {
       const response = await fetch(`${base}${path}`, { headers });
       expect(response.status, path).toBe(409);
     }
@@ -2240,9 +2287,9 @@ describe('aip web shared specialists', () => {
     writeFileSync(join(shared, 'writer.yaml'), 'name: Writer\n');
     const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-web-lib-')));
     execFileSync('git', ['init', '-q', '-b', 'main', lib]);
-    mkdirSync(join(lib, 'aip', 'workflows'), { recursive: true });
+    mkdirSync(join(lib, 'aip', 'pipelines'), { recursive: true });
     writeFileSync(
-      join(lib, 'aip', 'workflows', 'feature.yaml'),
+      join(lib, 'aip', 'pipelines', 'feature.yaml'),
       'steps:\n  - id: test\n    specialist: qa\n',
     );
     await fetch(`${base}/api/config?repository=${encodeURIComponent(lib)}`, {
@@ -2287,21 +2334,21 @@ describe('aip web shared pipelines and import', () => {
     const base = `http://127.0.0.1:${web.port}`;
     const shared = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip');
     mkdirSync(join(shared, 'specialists'), { recursive: true });
-    mkdirSync(join(shared, 'workflows'), { recursive: true });
+    mkdirSync(join(shared, 'pipelines'), { recursive: true });
     writeFileSync(join(shared, 'specialists', 'coder.yaml'), 'name: Coder\n');
     writeFileSync(
-      join(shared, 'workflows', 'explore.yaml'),
+      join(shared, 'pipelines', 'explore.yaml'),
       'steps:\n  - id: code\n    specialist: coder\n',
     );
     const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-web-lib-')));
     execFileSync('git', ['init', '-q', '-b', 'main', lib]);
-    mkdirSync(join(lib, 'aip', 'workflows'), { recursive: true });
+    mkdirSync(join(lib, 'aip', 'pipelines'), { recursive: true });
     writeFileSync(
-      join(lib, 'aip', 'workflows', 'epic.yaml'),
-      'split:\n  specialist: coder\n  workflow: explore\n',
+      join(lib, 'aip', 'pipelines', 'epic.yaml'),
+      'split:\n  specialist: coder\n  pipeline: explore\n',
     );
     writeFileSync(
-      join(lib, 'aip', 'workflows', 'quick.yaml'),
+      join(lib, 'aip', 'pipelines', 'quick.yaml'),
       'tags: [fast]\nsteps:\n  - id: code\n    specialist: coder\n',
     );
     await fetch(`${base}/api/config?repository=${encodeURIComponent(lib)}`, {
@@ -2309,15 +2356,15 @@ describe('aip web shared pipelines and import', () => {
     });
     await fetch(`${base}/api/config`, { headers: authed(web) });
 
-    expect((await fetch(`${base}/api/shared-workflows`)).status).toBe(401);
+    expect((await fetch(`${base}/api/shared-pipelines`)).status).toBe(401);
     const usage = (await (
-      await fetch(`${base}/api/shared-workflows`, { headers: authed(web) })
-    ).json()) as { workflows: { id: string; projects: { repository: string }[] }[] };
-    expect(usage.workflows.find((entry) => entry.id === 'explore')?.projects).toEqual([
+      await fetch(`${base}/api/shared-pipelines`, { headers: authed(web) })
+    ).json()) as { pipelines: { id: string; projects: { repository: string }[] }[] };
+    expect(usage.pipelines.find((entry) => entry.id === 'explore')?.projects).toEqual([
       expect.objectContaining({ repository: lib }),
     ]);
 
-    const url = `${base}/api/config/workflows/import`;
+    const url = `${base}/api/config/pipelines/import`;
     expect(
       (
         await fetch(url, {
@@ -2330,9 +2377,177 @@ describe('aip web shared pipelines and import', () => {
     expect((await post(web, url, { source: 'lib', ids: ['quick'] })).status).toBe(400);
     const done = await post(web, url, { source: lib, ids: ['quick'] });
     expect(done.status).toBe(200);
-    expect(existsSync(join(h.repo, 'aip', 'workflows', 'quick.yaml'))).toBe(true);
+    expect(existsSync(join(h.repo, 'aip', 'pipelines', 'quick.yaml'))).toBe(true);
     const again = await post(web, url, { source: lib, ids: ['quick'] });
     expect(again.status).toBe(409);
     expect(((await again.json()) as { ids: string[] }).ids).toEqual(['quick']);
+  });
+});
+
+describe('API наблюдателей', () => {
+  const VIEW = {
+    settings: { enabled: false },
+    workers: { running: [], waiting: 0 },
+  };
+  const stubs: { close(): void }[] = [];
+  let stubWeb: WebServer | null = null;
+
+  afterEach(async () => {
+    await stubWeb?.close();
+    stubWeb = null;
+    for (const stub of stubs.splice(0)) stub.close();
+  });
+
+  /** A daemon that answers from a table, records requests and lets the test push stream lines. */
+  async function stubDaemon(answers: Record<string, (params: unknown) => unknown>) {
+    const received: { method: string; params: unknown }[] = [];
+    const subscribers: import('node:net').Socket[] = [];
+    const server = createServer((connection) => {
+      let buffer = '';
+      connection.setEncoding('utf8');
+      connection.on('error', () => undefined);
+      connection.on('data', (chunk: string) => {
+        buffer += chunk;
+        let end = buffer.indexOf('\n');
+        while (end !== -1) {
+          const message = JSON.parse(buffer.slice(0, end)) as {
+            id: number;
+            method: string;
+            params: unknown;
+          };
+          buffer = buffer.slice(end + 1);
+          end = buffer.indexOf('\n');
+          if (message.method === 'subscribe') {
+            subscribers.push(connection);
+            connection.write(
+              `${JSON.stringify({ event: 'snapshot', seq: 1, runs: [], queues: [], repositories: [], tags: [] })}\n`,
+            );
+            continue;
+          }
+          received.push({ method: message.method, params: message.params });
+          const answer = answers[message.method];
+          const reply = answer
+            ? { id: message.id, ok: true, result: answer(message.params) }
+            : { id: message.id, ok: false, error: `unknown run ${message.method}` };
+          connection.write(`${JSON.stringify(reply)}\n`);
+        }
+      });
+    });
+    const socket = join(mkdtempSync(join(tmpdir(), 'aip-stub-')), 's.sock');
+    await new Promise<void>((resolve) => server.listen(socket, resolve));
+    stubs.push({
+      close: () => {
+        for (const subscriber of subscribers) subscriber.destroy();
+        server.close();
+      },
+    });
+    stubWeb = await startWebServer({
+      socket,
+      port: 0,
+      auth: 'none',
+      defaultRepository: async () => null,
+      ensureDaemon: async () => ({ started: false, restarted: false, mismatch: null }),
+    });
+    const base = `http://127.0.0.1:${stubWeb.port}`;
+    return {
+      base,
+      received,
+      push: (event: unknown) => {
+        for (const subscriber of subscribers) subscriber.write(`${JSON.stringify(event)}\n`);
+      },
+    };
+  }
+
+  it('reads, saves and rejects the settings without a repository', async () => {
+    const stub = await stubDaemon({
+      observers: () => VIEW,
+      observers_set: (params) => {
+        const { settings } = params as { settings: { enabled?: unknown } };
+        return settings.enabled === 'maybe'
+          ? {
+              ok: false,
+              reason: 'invalid',
+              errors: [{ path: 'enabled', message: 'not a boolean' }],
+            }
+          : { ok: true, view: { ...VIEW, settings: { enabled: true } } };
+      },
+    });
+    const read = await fetch(`${stub.base}/api/observers`);
+    expect(read.status).toBe(200);
+    expect(await read.json()).toEqual(VIEW);
+
+    const saved = await fetch(`${stub.base}/api/observers`, {
+      method: 'PUT',
+      headers: JSON_TYPE,
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({ ...VIEW, settings: { enabled: true } });
+
+    const refused = await fetch(`${stub.base}/api/observers`, {
+      method: 'PUT',
+      headers: JSON_TYPE,
+      body: JSON.stringify({ enabled: 'maybe' }),
+    });
+    expect(refused.status).toBe(422);
+    expect(await refused.json()).toEqual({
+      errors: [{ path: 'enabled', message: 'not a boolean' }],
+    });
+
+    const wrongShape = await fetch(`${stub.base}/api/observers`, {
+      method: 'PUT',
+      headers: JSON_TYPE,
+      body: JSON.stringify([1]),
+    });
+    expect(wrongShape.status).toBe(400);
+    expect(stub.received.filter((item) => item.method === 'observers_set')).toEqual([
+      { method: 'observers_set', params: { settings: { enabled: true } } },
+      { method: 'observers_set', params: { settings: { enabled: 'maybe' } } },
+    ]);
+  });
+
+  it('forbids or allows the observer in a run', async () => {
+    const stub = await stubDaemon({ run_observer: () => ({ enabled: false }) });
+    const post = (runId: string, body: unknown) =>
+      fetch(`${stub.base}/api/runs/${runId}/observer`, {
+        method: 'POST',
+        headers: JSON_TYPE,
+        body: JSON.stringify(body),
+      });
+    expect((await post('run-1', { enabled: false })).status).toBe(200);
+    expect((await post('run-1', { enabled: 'no' })).status).toBe(400);
+    expect(stub.received).toEqual([
+      { method: 'run_observer', params: { runId: 'run-1', enabled: false } },
+    ]);
+  });
+
+  it('forwards the observers event to the browser and drops incident', async () => {
+    const stub = await stubDaemon({});
+    const controller = new AbortController();
+    const response = await fetch(`${stub.base}/api/events`, { signal: controller.signal });
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    const readUntil = async (needle: string) => {
+      const deadline = Date.now() + 10_000;
+      while (!text.includes(needle) && Date.now() < deadline) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value);
+      }
+    };
+    await readUntil('"snapshot"');
+    stub.push({
+      event: 'incident',
+      seq: 2,
+      runId: 'run-1',
+      repository: '/r',
+      incident: { key: 'k', kind: 'failed', group: 'g', detail: 'd' },
+    });
+    stub.push({ event: 'observers', seq: 3, observers: VIEW });
+    await readUntil('"observers"');
+    controller.abort();
+    expect(text).toContain('"event":"observers"');
+    expect(text).not.toContain('"event":"incident"');
   });
 });

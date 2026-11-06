@@ -52,9 +52,13 @@ describe('launchProcess onUsage', () => {
 });
 
 describe('launchProcess timesPath', () => {
+  // The pause starts once `one` reached the log: a busy supervisor reads it late, and a pause
+  // counted from the write would shrink between the two times.
   const script = `
+    import { readFileSync } from 'node:fs';
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     console.log('one');
+    while (!readFileSync('output.log', 'utf8').includes('one\\n')) await wait(5);
     await wait(60);
     process.stderr.write('warn a\\nwarn b\\n');
     await wait(60);

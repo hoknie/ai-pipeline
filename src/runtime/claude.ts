@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import { z } from 'zod';
 
+import { OBSERVER_SPECIALIST } from '../config/index.ts';
 import type { Denial, Usage } from '../core/index.ts';
 
 import { systemPrompt, userMessage } from './message.ts';
@@ -20,6 +21,11 @@ const REPORT_TOOL = 'mcp__aip__swarm_report';
 const ARTIFACT_TOOL = 'mcp__aip__swarm_artifact';
 const SPLIT_TOOL = 'mcp__aip__swarm_split';
 const QUEUE_TOOL = 'mcp__aip__swarm_queue_add';
+const REPAIR_TOOLS = [
+  'mcp__aip__swarm_repair_answer',
+  'mcp__aip__swarm_repair_retry',
+  'mcp__aip__swarm_repair_cancel',
+];
 
 /**
  * The aip tools the specialist may call without asking: the report, the artifact and the split
@@ -27,7 +33,10 @@ const QUEUE_TOOL = 'mcp__aip__swarm_queue_add';
  */
 function aipTools(context: LaunchContext): string[] {
   const tools = [REPORT_TOOL, ARTIFACT_TOOL, SPLIT_TOOL];
-  return context.specialist.queue === true ? [...tools, QUEUE_TOOL] : tools;
+  if (context.specialist.queue === true) tools.push(QUEUE_TOOL);
+  // Only the observer of an incident has these tools; its profile has the reserved slug.
+  if (context.specialist.slug === OBSERVER_SPECIALIST) tools.push(...REPAIR_TOOLS);
+  return tools;
 }
 
 /** Tools allowed without a prompt: those of aip and all of the specialist's own MCP servers. */

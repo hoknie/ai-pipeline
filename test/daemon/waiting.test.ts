@@ -13,7 +13,7 @@ import {
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
 
-import { settle, WORKFLOW_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
+import { settle, PIPELINE_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -22,7 +22,7 @@ afterEach(async () => {
   current = null;
 });
 
-const LIMITED = WORKFLOW_CONFIG.replace(
+const LIMITED = PIPELINE_CONFIG.replace(
   'coder: { name: Кодировщик }',
   'coder: { name: Кодировщик, max: 1 }',
 );
@@ -39,7 +39,7 @@ describe('groups waiting for a specialist', () => {
     );
     const { runId } = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [
         { title: 'login', task: 'x' },
         { title: 'signup', task: 'y' },
@@ -92,7 +92,7 @@ describe('groups waiting for a specialist', () => {
     );
     const { runId } = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [
         { title: 'login', task: 'x' },
         { title: 'signup', task: 'y' },
@@ -153,7 +153,7 @@ describe('groups waiting for a specialist', () => {
     );
     const first = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     });
     await h.waitFor(first.runId, (view) => row(view, 'login')?.status === 'running');
@@ -177,7 +177,7 @@ describe('groups waiting for a specialist', () => {
     ]);
     const second = await startRun(h, {
       repository: other,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'signup', task: 'y' }],
     });
     const secondId = second.runId;

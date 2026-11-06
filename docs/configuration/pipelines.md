@@ -1,8 +1,8 @@
-# Workflows
+# Pipelines
 
-A workflow is the order of work: which [specialists](specialists.md) act, in which steps, and what happens when one rejects the work. Every workflow is one file in `aip/workflows/` (see [File rules](README.md#file-rules)). The web panel calls a workflow a "Pipeline"; in the files and in the CLI it stays a workflow.
+A pipeline is the order of work: which [specialists](specialists.md) act, in which steps, and what happens when one rejects the work. Every pipeline is one file in `aip/pipelines/` (see [File rules](README.md#file-rules)). The web panel calls a pipeline a "Pipeline"; in the files and in the CLI it stays a pipeline.
 
-The file `aip/workflows/feature.yaml` (the id `feature` is the file name):
+The file `aip/pipelines/feature.yaml` (the id `feature` is the file name):
 
 ```yaml
 name: New feature                            # optional display name
@@ -21,13 +21,14 @@ steps:
     human_review: true
 ```
 
-## Workflow fields
+## Pipeline fields
 
-- **`name`** is the display name. The panel shows it instead of the id (the id stays in the tooltip), and `aip run list`, `aip run show` and the queue print `<name> (<id>)`. Without it the id is shown. Surrounding spaces are dropped, and an empty name is an error. Arguments such as `aip run start <workflow>` always take the id.
+- **`name`** is the display name. The panel shows it instead of the id (the id stays in the tooltip), and `aip run list`, `aip run show` and the queue print `<name> (<id>)`. Without it the id is shown. Surrounding spaces are dropped, and an empty name is an error. Arguments such as `aip run start <pipeline>` always take the id.
 - **`tags`** are labels for the filter and the import on the panel's [Pipeline](../web/config.md#pipeline) page. They do not change the steps, the run or its snapshot.
-  - A name is trimmed, 1 to 30 characters, without a line break; repeats that differ only in case are merged. A value that is not a list of such names is an error at `swarm.workflows.<id>.tags`.
+  - A name is trimmed, 1 to 30 characters, without a line break; repeats that differ only in case are merged. A value that is not a list of such names is an error at `swarm.pipelines.<id>.tags`.
   - The tags of the shared file and of the project file are kept apart, and a project file over a shared one shows both.
 - **`steps`** is the list of steps, see below.
+- **`stages`** lists the [actions](actions.md) by point; a point set here replaces the shared one.
 - **`split`** divides a task into groups, see [Split](#split).
 
 ## Step fields
@@ -92,24 +93,52 @@ Answer with [`aip group answer`](../usage/runs.md#answering-a-specialist), in th
 - A run created from a single text (`--task`) starts with `split.specialist`. It proposes from 1 to `max_groups` groups with the `swarm_split` tool, and each group goes through all the steps.
 - If the groups are passed as a list (`--groups`), the split is skipped.
 - In commands the split step is the `_split` group.
-- After the split each group starts at the first step of its own workflow, or, with `split.workflow`, at the first step of the named workflow.
+- After the split each group starts at the first step of its own pipeline, or, with `split.pipeline`, at the first step of the named pipeline.
 
-### Groups that follow another workflow's steps
+### Groups that follow another pipeline's steps
 
-The `split.workflow` field names the workflow whose steps the groups follow after the split. The groups of this epic go through the steps of the `explore` workflow:
+The `split.pipeline` field names the pipeline whose steps the groups follow after the split. The groups of this epic go through the steps of the `explore` pipeline:
 
 ```yaml
-# aip/workflows/epic.yaml
+# aip/pipelines/epic.yaml
 split:
   specialist: plan
-  workflow: explore
+  pipeline: explore
 ```
 
-- Such a workflow has no steps of its own: `steps` and `split.workflow` are mutually exclusive.
-- A workflow cannot target itself, and the target cannot have a `split.workflow` of its own.
-- A workflow that `split.workflow` refers to cannot be deleted.
+- Such a pipeline has no steps of its own: `steps` and `split.pipeline` are mutually exclusive.
+- A pipeline cannot target itself, and the target cannot have a `split.pipeline` of its own.
+- A pipeline that `split.pipeline` refers to cannot be deleted.
 - Changing `explore` after a run has started does not affect that run, because the steps come from the configuration snapshot.
 
 ## Skipping steps of one task
 
-`--skip <step>` makes one task skip steps without editing the workflow: see [Skipping steps](../usage/queue.md#skipping-steps). `aip run skip` skips a step of a run that has started: see [Skipping a step](../usage/runs.md#skipping-a-step).
+`--skip <step>` makes one task skip steps without editing the pipeline: see [Skipping steps](../usage/queue.md#skipping-steps). `aip run skip` skips a step of a run that has started: see [Skipping a step](../usage/runs.md#skipping-a-step).
+
+## Old names
+
+Before the term was unified, pipelines were called workflows. Files and runs made then keep working:
+
+- the directory `aip/workflows/` is read together with `aip/pipelines/`; an id in both is an error. The web panel edits and deletes a file where it lies, and creates new files in `aip/pipelines/`;
+- the key `split.workflow` is read as `split.pipeline`; both keys in one file are an error;
+- `{workflow}` in `delivery.commit_message` is read as `{pipeline}`;
+- `aip queue edit --workflow` and `-w` are read as `--pipeline` and `-p`; the old names are no longer in `--help`;
+- `#workflows…` addresses of the web panel open the pipeline pages;
+- the environment variable `AIP_WORKFLOW` of command actions is still set, with the same value as `AIP_PIPELINE`;
+- runs and queued tasks of an earlier version open as they were.
+
+`aip config check` lists the files with old names. To move them:
+
+```sh
+git mv aip/workflows aip/pipelines
+```
+
+and rename `split.workflow` to `split.pipeline` in them.
+
+These names are **not** accepted anymore, and a client has to change them:
+
+- the argument `workflow` of the MCP tools `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` is now `pipeline` (see [mcp-tools.md](../hosts/mcp-tools.md)); install the new Claude Code [plugin](../hosts/claude-code.md) together with the package;
+- the fields `workflow` and `workflowName` in `--json` and `aip events --json` are now `pipeline` and `pipelineName`;
+- the HTTP API addresses `/api/workflows`, `/api/shared-workflows` and `/api/config/workflows/…` are now `/api/pipelines`, `/api/shared-pipelines` and `/api/config/pipelines/…` (see [web/http-api.md](../web/http-api.md)).
+
+After the first start of a new version the state database cannot be opened by an older version. Keep a backup of the state directory before updating if you may roll back.

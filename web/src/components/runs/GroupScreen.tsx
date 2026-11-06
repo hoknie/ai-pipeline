@@ -44,6 +44,7 @@ import { FilePath } from '../FilePath.tsx';
 import { ApplyDialog } from './ApplyDialog.tsx';
 import { MessageDialog } from './MessageDialog.tsx';
 import { QuestionsForm } from './QuestionsForm.tsx';
+import { isRepairStep } from '../../observerTypes.ts';
 import { stepOfGroup, useSkipStep } from './skipStep.tsx';
 import { groupNotices, latestNotice, useDismissedNotice } from './groupNotices.ts';
 import { taskProgress } from './taskProgress.ts';
@@ -57,10 +58,12 @@ const REASON_LINES = 6;
 /** What the screen of a group or a system step offers. */
 function capabilities(row: GroupRow | SystemStepRow, deliverable: boolean, inProgress: boolean) {
   const system = 'kind' in row;
-  const delivery = system && row.kind !== 'split';
+  // The split and an action of the pipeline have no delivery of their own: a retry retries the step.
+  const delivery = system && row.kind !== 'split' && row.kind !== 'action' && !isRepairStep(row);
+  const repair = system && isRepairStep(row);
   const stopped = row.status === 'failed' || row.status === 'cancelled';
   return {
-    retry: !delivery && ['failed', 'cancelled', 'conflict'].includes(row.status),
+    retry: !delivery && !repair && ['failed', 'cancelled', 'conflict'].includes(row.status),
     retryDelivery: delivery && stopped && (deliverable || inProgress),
     cancel: !['merged', 'done', 'failed', 'cancelled'].includes(row.status),
     changes: !system,
@@ -169,7 +172,7 @@ export function GroupScreen({
     if (loaded && requestedTab !== null && !available.has(requestedTab)) onTab('log');
   });
   const progress = spec?.tasks != null ? taskProgress(spec.tasks) : null;
-  const title = 'kind' in row ? t(`runs.system.${row.kind}`) : row.title;
+  const title = 'kind' in row && row.kind !== 'action' ? t(`runs.system.${row.kind}`) : row.title;
 
   useEffect(() => {
     let stopped = false;
@@ -362,7 +365,11 @@ export function GroupScreen({
           {t('runs.group.limitUntil', { time: clock(row.limitUntil) })}
         </span>
       ) : null}
-      {'kind' in row && row.kind !== 'split' && stage ? (
+      {'kind' in row &&
+      row.kind !== 'split' &&
+      row.kind !== 'action' &&
+      !isRepairStep(row) &&
+      stage ? (
         <span
           role="status"
           aria-label={t('runs.system.delivery')}

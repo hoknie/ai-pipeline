@@ -50,7 +50,29 @@ export function presentConfig(config: ResolvedConfig): unknown {
       ...(config.delivery.resolver
         ? { resolver: config.delivery.resolver, resolver_rounds: config.delivery.resolverRounds }
         : {}),
+      ...(config.delivery.messagePrompt ? { message_prompt: config.delivery.messagePrompt } : {}),
+      ...(config.delivery.resolverPrompt
+        ? { resolver_prompt: config.delivery.resolverPrompt }
+        : {}),
     },
+    ...(config.actions.length > 0
+      ? {
+          actions: Object.fromEntries(
+            config.actions.map((action) => [
+              action.id,
+              {
+                ...(action.name ? { name: action.name } : {}),
+                ...(action.run !== null
+                  ? { run: action.run, timeout: action.timeoutSeconds }
+                  : { specialist: action.specialist }),
+                ...(action.additionalPrompt ? { additional_prompt: action.additionalPrompt } : {}),
+                on_failure: action.onFailure,
+              },
+            ]),
+          ),
+        }
+      : {}),
+    ...(Object.keys(config.stages).length > 0 ? { stages: config.stages } : {}),
     specialists: Object.fromEntries(
       config.specialists.map((specialist) => [
         specialist.slug,
@@ -70,27 +92,30 @@ export function presentConfig(config: ResolvedConfig): unknown {
         },
       ]),
     ),
-    workflows: Object.fromEntries(
-      config.workflows.map((workflow) => [
-        workflow.id,
+    pipelines: Object.fromEntries(
+      config.pipelines.map((pipeline) => [
+        pipeline.id,
         {
-          ...(workflow.name ? { name: workflow.name } : {}),
-          ...(workflow.split
+          ...(pipeline.name ? { name: pipeline.name } : {}),
+          ...(pipeline.stages && Object.keys(pipeline.stages).length > 0
+            ? { stages: pipeline.stages }
+            : {}),
+          ...(pipeline.split
             ? {
                 split: {
-                  specialist: workflow.split.specialist,
-                  max_groups: workflow.split.maxGroups,
-                  ...(workflow.split.workflow ? { workflow: workflow.split.workflow } : {}),
-                  ...(workflow.split.additionalPrompt
-                    ? { additional_prompt: workflow.split.additionalPrompt }
+                  specialist: pipeline.split.specialist,
+                  max_groups: pipeline.split.maxGroups,
+                  ...(pipeline.split.pipeline ? { pipeline: pipeline.split.pipeline } : {}),
+                  ...(pipeline.split.additionalPrompt
+                    ? { additional_prompt: pipeline.split.additionalPrompt }
                     : {}),
                 },
               }
             : {}),
-          ...(workflow.split?.workflow
+          ...(pipeline.split?.pipeline
             ? {}
             : {
-                steps: workflow.steps.map((step) => ({
+                steps: pipeline.steps.map((step) => ({
                   id: step.id,
                   specialist: step.specialist,
                   ...(step.onReject
@@ -141,9 +166,10 @@ export async function checkConfig(
   const environment = io.env;
   let config: ResolvedConfig;
   let files: string[];
+  let legacy: string[] = [];
   try {
     const repository = await repositoryRoot(directory);
-    ({ config, files } = loadConfigSources(configPathsFromEnvironment(repository)));
+    ({ config, files, legacy = [] } = loadConfigSources(configPathsFromEnvironment(repository)));
   } catch (error) {
     io.stderr(`${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`);
     return 1;
@@ -152,6 +178,13 @@ export async function checkConfig(
   const runtimes = [...new Set(config.specialists.map((specialist) => specialist.runtime))];
   io.stdout('\nConfig files:\n');
   for (const file of files) io.stdout(`  ${file}\n`);
+  if (legacy.length > 0) {
+    io.stdout('\nOld names (still read):\n');
+    for (const file of legacy) io.stdout(`  ${file}\n`);
+    io.stdout(
+      '  Move the files to aip/pipelines/ and rename split.workflow to split.pipeline in them.\n',
+    );
+  }
   io.stdout('\nAgent CLIs:\n');
   for (const name of runtimes) {
     const runtime = runtimeFor(name, environment, config.runtimes);

@@ -1,6 +1,15 @@
-import { findSpecialist } from '../config/index.ts';
-
-import { allGroups, stepsOf, type Group, type RunState } from './model.ts';
+import {
+  actionOf,
+  actionPointOf,
+  allGroups,
+  isRepairGroup,
+  openAction,
+  pointClosed,
+  specialistOfStep,
+  stepsOf,
+  type Group,
+  type RunState,
+} from './model.ts';
 import { specialistName } from './topology.ts';
 import {
   limitHolds,
@@ -27,7 +36,26 @@ export function waitKey(run: string, slug: string): string {
 }
 
 function isDeliveryGroup(state: RunState, group: Group): boolean {
+  const point = actionPointOf(group);
+  if (point !== undefined) return point === 'before_delivery' || point === 'after_delivery';
   return group === state.message || group === state.resolve;
+}
+
+/** A command action runs a shell command: no specialist, no limits of the swarm. */
+export function isCommandAction(state: RunState, group: Group): boolean {
+  const action = actionOf(state.run, group);
+  return action !== undefined && action.run !== null;
+}
+
+/** The pipeline has not reached the group yet: an action before it is not settled. */
+function gated(state: RunState, group: Group): boolean {
+  const point = actionPointOf(group);
+  // A check shares the tree of the run with the merges: it starts on a tree no merge is changing.
+  if (point === 'before_delivery' && state.groups.some((other) => other.mergeInFlight)) return true;
+  if (point !== undefined) return openAction(state, point) !== group;
+  if (group === state.split) return !pointClosed(state, 'before_split');
+  if (state.groups.includes(group)) return !pointClosed(state, 'after_split');
+  return false;
 }
 
 /**
@@ -51,17 +79,27 @@ export function planDispatch(states: RunState[], now: number): DispatchPlan {
     .flatMap((state) =>
       [...allGroups(state)]
         .sort((left, right) => left.position - right.position)
-        // A held run starts no worker groups and no split step; delivery groups still run.
+        // A held run starts no worker groups, no split step and no preparing action; delivery groups still run.
         .filter((group) => state.run.hold === null || isDeliveryGroup(state, group))
         .filter((group) => group.status === 'queued' && group.pending !== null)
+        .filter((group) => !gated(state, group))
         .map((group) => ({ state, group })),
     );
   for (const { state, group } of queue) {
+    if (isCommandAction(state, group)) {
+      start.push({ state, group });
+      continue;
+    }
     const slug = group.pending
       ? stepsOf(state.run, group)[group.pending.stepIndex]?.specialist
       : undefined;
-    const specialist = slug ? findSpecialist(state.run.config, slug) : undefined;
+    const specialist = slug ? specialistOfStep(state.run, group, slug) : undefined;
     const key = waitKey(state.run.id, group.slug);
+    // The repair waits for no limit here: an agent that hits one ends the repair.
+    if (isRepairGroup(group)) {
+      start.push({ state, group });
+      continue;
+    }
     const until = specialist ? holds.get(specialist.runtime) : undefined;
     if (specialist && until !== undefined) {
       waits.set(key, { reason: 'limit', runtime: specialist.runtime, until });

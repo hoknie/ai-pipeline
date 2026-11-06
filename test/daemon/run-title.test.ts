@@ -20,7 +20,7 @@ afterEach(async () => {
 async function create(h: Harness, extra: Record<string, unknown> = {}): Promise<string> {
   const { runId } = (await startRun(h, {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     task: 'Добавить флаг --json\nподробности',
     ...extra,
   })) as RunCreated;

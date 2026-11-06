@@ -77,15 +77,17 @@ export function launchProcess(
   } catch (error) {
     spawnError = (error as Error).message;
     stamp(1);
-    log.end(`[aip] spawn failed: ${spawnError}\n`);
+    const failure: ProcessExit = {
+      code: null,
+      signal: null,
+      outcome: options.parser.outcome(),
+      spawnError,
+    };
     return {
       pid: undefined,
       stop() {},
-      exited: Promise.resolve({
-        code: null,
-        signal: null,
-        outcome: options.parser.outcome(),
-        spawnError,
+      exited: new Promise((resolve) => {
+        log.end(`[aip] spawn failed: ${spawnError}\n`, () => resolve(failure));
       }),
     };
   }
@@ -134,10 +136,12 @@ export function launchProcess(
       if (killTimer) clearTimeout(killTimer);
       stdout.close();
       stamp(1);
+      const exit = { code, signal, outcome: options.parser.outcome(), spawnError };
+      // Resolved once the log is on disk: a reader after the exit sees its last line.
       log.end(
         `[aip] exited code=${code} signal=${signal}${spawnError ? ` error=${spawnError}` : ''}\n`,
+        () => resolve(exit),
       );
-      resolve({ code, signal, outcome: options.parser.outcome(), spawnError });
     };
     child.once('error', (error) => {
       spawnError = error.message;

@@ -237,7 +237,7 @@ describe('/api/system', () => {
   it('answers 409 daemon_busy for a busy daemon unless force is set', async () => {
     h = await harness(MANUAL_CONFIG);
     h.script({ code: [{ waitFor: h.gate('code') }] });
-    await startRun(h, { workflow: 'feature', task: 'x', repository: h.repo });
+    await startRun(h, { pipeline: 'feature', task: 'x', repository: h.repo });
     const calls: boolean[] = [];
     web = await startWebServer({
       socket: h.socket,

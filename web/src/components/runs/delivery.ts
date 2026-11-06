@@ -35,6 +35,35 @@ export function deliveryBadge(run: RunView): DeliveryBadge | null {
   return null;
 }
 
+export interface UndeliveredMark {
+  status: 'apply_failed' | 'undelivered';
+  /** Why the delivery failed; `null` for `undelivered`. */
+  reason: string | null;
+  /** Merged groups already delivered. */
+  delivered: number;
+  /** Merged groups in all. */
+  merged: number;
+}
+
+const STOPPED = new Set(['finished', 'failed', 'cancelled']);
+
+/** The mark of a run in the list whose result waits for a person, or `null`. */
+export function undeliveredMark(run: RunView): UndeliveredMark | null {
+  const { delivery } = run;
+  if (delivery.inProgress) return null;
+  const counts = { delivered: delivery.applied, merged: delivery.merged };
+  if (delivery.failed > 0) {
+    const reason =
+      run.deliveryStage?.status === 'apply_failed' ? (run.deliveryStage.reason ?? null) : null;
+    return { status: 'apply_failed', reason, ...counts };
+  }
+  if (!STOPPED.has(run.state)) return null;
+  const waiting = run.groups.some(
+    (group) => group.status === 'merged' && group.delivery === 'pending' && group.diff?.files !== 0,
+  );
+  return waiting ? { status: 'undelivered', reason: null, ...counts } : null;
+}
+
 /** What the answer of `apply` says about the delivery. */
 export type ApplyOutcome =
   { kind: 'pending' } | { kind: 'applied' } | { kind: 'failed'; reason: string | null };

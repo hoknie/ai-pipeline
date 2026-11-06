@@ -14,6 +14,8 @@ delivery:
   message_specialist: writer   # optional: this specialist writes the commit message
   resolver: writer          # optional: this specialist resolves delivery conflicts
   resolver_rounds: 1        # how many times to try to resolve a conflict, 1..10
+  message_prompt: Write the message in English.   # appended to the task of the message author
+  resolver_prompt: Keep the tests passing.        # appended to the task of the resolver
 ```
 
 ## Modes
@@ -84,13 +86,17 @@ prompt: |
 - `{title}` is the title of the only group, or the first line of the task;
 - `{task}` is the task text;
 - `{run}` is the run identifier;
-- `{workflow}` is the workflow name;
+- `{pipeline}` is the pipeline name (`{workflow}`, the name used before, means the same);
 - `{groups}` is the list of groups with their results.
 
 With `message_specialist`, this specialist writes the message before the commit, from the task, the group summaries and the list of changed files. If it fails, the template is used.
+
+`message_prompt` is appended to the task of `message_specialist`, and `resolver_prompt` to the task of the `resolver`.
 
 ## Cleanup
 
 After all ready groups are delivered, the worktrees and internal refs are removed; logs and history stay. `keep: true` turns the cleanup off, and [`aip run clean`](../usage/runs.md#cleaning-up) removes them by hand.
 
 A failed or cancelled delivery step (`_message`, `_resolve`) is repeated through `aip run apply`.
+
+Commands can also run after delivery, see [Pipeline actions](actions.md). With a failed action after delivery the result stays delivered and the cleanup waits.

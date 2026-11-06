@@ -39,12 +39,12 @@ export const TEST_TIMINGS: DaemonTimings = {
   processCacheMs: 20,
 };
 
-export const WORKFLOW_CONFIG = `swarm:
+export const PIPELINE_CONFIG = `swarm:
   max: 3
   specialists:
     coder: { name: Кодировщик }
     reviewer: { name: Ревьюер, permissions: read }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: code, specialist: coder }
@@ -57,13 +57,13 @@ export const CODE_ONLY_CONFIG = `swarm:
   specialists:
     coder: { name: Кодировщик }
     reviewer: { name: Ревьюер, permissions: read }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: code, specialist: coder }
 `;
 
-export const MANUAL_CONFIG = `${WORKFLOW_CONFIG}  delivery: { auto: false }\n`;
+export const MANUAL_CONFIG = `${PIPELINE_CONFIG}  delivery: { auto: false }\n`;
 
 export interface Harness {
   repo: string;
@@ -119,7 +119,7 @@ function sh(cwd: string, ...args: string[]): string {
 }
 
 export async function harness(
-  config = WORKFLOW_CONFIG,
+  config = PIPELINE_CONFIG,
   environment: NodeJS.ProcessEnv = {},
   options: Pick<
     DaemonOptions,
@@ -208,7 +208,7 @@ export function statuses(run: RunView): string[] {
   return run.groups.map((group) => group.status);
 }
 
-/** Queues a workflow task and returns the run the queue created for it; fails when the task waits. */
+/** Queues a pipeline task and returns the run the queue created for it; fails when the task waits. */
 export async function startRun(
   h: Pick<Harness, 'call'>,
   params: ParamsOf<'run'>,

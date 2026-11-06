@@ -112,12 +112,12 @@ describe('cli', () => {
     expect(JSON.parse(removed.stdout).items).toHaveLength(2);
   });
 
-  it('refuses an unknown workflow and both a task and groups', async () => {
+  it('refuses an unknown pipeline and both a task and groups', async () => {
     const box = sandbox();
     writeFileSync(join(box.repo, 'groups.yaml'), '- { title: Вход, task: форма }\n');
     const bad = await aip(box, 'queue', 'add', 'nope', '--task', 'x');
     expect(bad.code).not.toBe(0);
-    expect(`${bad.stdout}${bad.stderr}`).toContain('unknown workflow `nope`; known: feature');
+    expect(`${bad.stdout}${bad.stderr}`).toContain('unknown pipeline `nope`; known: feature');
     const both = await aip(
       box,
       'queue',
@@ -511,7 +511,7 @@ describe('cli', () => {
     ]);
     const added = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'Из Claude Code', title: 'Из очереди' },
+      arguments: { pipeline: 'feature', task: 'Из Claude Code', title: 'Из очереди' },
     });
     expect((added.content as { text: string }[])[0]!.text).toMatch(/Added item q\w+/);
     const raised = await client.callTool({
@@ -523,7 +523,7 @@ describe('cli', () => {
     expect((listed.content as { text: string }[])[0]!.text).toContain('Из очереди');
     const created = await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'Сделать вход', title: 'Вход в систему' },
+      arguments: { pipeline: 'feature', task: 'Сделать вход', title: 'Вход в систему' },
     });
     const text = (created.content as { text: string }[])[0]!.text;
     expect(text).toContain('started (refs/aip/');

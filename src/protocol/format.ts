@@ -53,8 +53,8 @@ export function table(rows: string[][], style: Style = plainStyle): string {
 }
 
 /** `#7`: how a task number is shown. */
-/** A workflow in text: `<name> (<id>)`, or the id alone when it has no other name. */
-export function workflowLabel(id: string, name: string): string {
+/** A pipeline in text: `<name> (<id>)`, or the id alone when it has no other name. */
+export function pipelineLabel(id: string, name: string): string {
   return name === id ? id : `${name} (${id})`;
 }
 
@@ -148,12 +148,12 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
   if (runs.length === 0) return 'No runs yet.';
   return table(
     [
-      ['#', 'RUN', 'STATE', 'WORKFLOW', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
+      ['#', 'RUN', 'STATE', 'PIPELINE', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
       ...runs.map((run) => [
         taskNumber(run.number),
         style.accent(run.id),
         statusBadge(run.state, style),
-        workflowLabel(run.workflow, run.workflowName),
+        pipelineLabel(run.pipeline, run.pipelineName),
         withTags(shortTitle(run.title), run.tags, style),
         [
           run.split && run.split.status !== 'done'
@@ -175,7 +175,7 @@ export function formatRunList(runs: RunView[], style: Style = plainStyle): strin
 
 export function formatRun(run: RunView, now: number, style: Style = plainStyle): string {
   const header = [
-    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${workflowLabel(run.workflow, run.workflowName)} · ${statusBadge(run.state, style)} · ${run.branch}`,
+    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${pipelineLabel(run.pipeline, run.pipelineName)} · ${statusBadge(run.state, style)} · ${run.branch}`,
     ...(run.title
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
       : []),
@@ -213,6 +213,9 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
     header.push(style.warning('Warning: uncommitted changes were not included in this run.'));
   const system = systemLine(run, style);
   if (system) header.push(system);
+  if (run.repair?.cancelReason) {
+    header.push(style.danger(`Observer cancelled: ${run.repair.cancelReason}`));
+  }
   const asked = run.system.find((step) => step.question);
   if (asked?.question) header.push(style.warning(`  question: ${asked.question}`));
   const answers = decisionLines(run, style);
@@ -248,10 +251,10 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
   return `${header.join('\n')}\n\n${rows}${answers.length > 0 ? `\n\n${answers.join('\n')}` : ''}`;
 }
 
-/** `answers: human N, autopilot M` for the list of runs; empty without answers. */
+/** `answers: human N, autopilot M, observer K` for the list of runs; empty without answers. */
 function answersText(run: RunView): string {
   const decisions = run.decisions ?? [];
-  const parts = (['human', 'autopilot'] as const)
+  const parts = (['human', 'autopilot', 'observer'] as const)
     .map((by) => [by, decisions.filter((decision) => decision.by === by).length] as const)
     .filter(([, count]) => count > 0)
     .map(([by, count]) => `${by} ${count}`);
@@ -280,13 +283,23 @@ export function waitNote(wait: GroupWait | null | undefined): string {
   return `waiting for a free place (swarm.max ${wait.max})`;
 }
 
-const SYSTEM_NAMES = { split: 'split', message: 'message', resolve: 'resolver' } as const;
+const SYSTEM_NAMES = {
+  split: 'split',
+  message: 'message',
+  resolve: 'resolver',
+  repair: 'observer',
+} as const;
 
-/** `System:` line: split, commit message, resolver and delivery in this order; null when none. */
+function systemName(step: RunView['system'][number]): string {
+  if (step.kind === 'action') return `${step.point ?? 'action'}:${step.action ?? step.slug}`;
+  return SYSTEM_NAMES[step.kind];
+}
+
+/** `System:` line: actions, split, commit message, resolver and delivery in order; null when none. */
 function systemLine(run: RunView, style: Style): string | null {
   const parts = (run.system ?? []).map((step) => {
     const detail = step.reason ? style.danger(step.reason) : waitNote(step.wait);
-    return `${SYSTEM_NAMES[step.kind]} ${statusBadge(step.status, style)}${detail ? ` (${detail})` : ''}`;
+    return `${systemName(step)} ${statusBadge(step.status, style)}${detail ? ` (${detail})` : ''}`;
   });
   const stage = run.deliveryStage;
   if (stage) {
@@ -316,7 +329,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     lines.push(style.warning(`Question${humanMark(group.humanOnly)}: ${group.question}`));
   }
   for (const decision of group.decisions ?? []) {
-    const who = decision.by === 'autopilot' ? 'autopilot' : 'human';
+    const who = decision.by;
     lines.push(
       `${style.muted(`Answer (${who}, ${decision.stepId}):`)} ${decision.question.split('\n')[0]} → ${decision.answer}`,
     );
@@ -439,7 +452,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
         : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
     const delivering = `${run.delivering ? ' · delivering' : ''}${run.priority ? ' · priority' : ''}`;
     lines.push(
-      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${workflowLabel(run.workflow, run.workflowName)}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
+      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${pipelineLabel(run.pipeline, run.pipelineName)}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
     );
     for (const active of run.active) {
       lines.push(
@@ -518,7 +531,7 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
     lines.push(
-      `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${workflowLabel(item.workflow, item.workflowName)}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
+      `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${pipelineLabel(item.pipeline, item.pipelineName)}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
     );
   }
   return lines.join('\n');

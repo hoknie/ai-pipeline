@@ -1,8 +1,9 @@
-import { findWorkflow, type DeliveryMode, type ResolvedConfig } from '../config/index.ts';
+import { findPipeline, type DeliveryMode, type ResolvedConfig } from '../config/index.ts';
 
 import { groupSlugs, runName } from './ids.ts';
 import { applySkip } from './skip.ts';
-import { SPLIT_GROUP, newGroup, type RunState } from './model.ts';
+import { SPLIT_GROUP, emptyRepair, newGroup, type RunState } from './model.ts';
+import { enterPoint } from './stages.ts';
 
 export interface NewGroup {
   title: string;
@@ -12,7 +13,7 @@ export interface NewGroup {
 export interface NewRun {
   id: string;
   repository: string;
-  workflow: string;
+  pipeline: string;
   baseCommit: string;
   config: ResolvedConfig;
   dirtyWarning: boolean;
@@ -33,21 +34,21 @@ export interface NewRun {
   deliveryMode?: DeliveryMode | undefined;
   /** Ids of catalog tags. */
   tags?: string[] | undefined;
-  /** Ids of workflow steps this run skips. */
+  /** Ids of pipeline steps this run skips. */
   skip?: string[] | undefined;
 }
 
 export function createRun(input: NewRun): RunState {
-  const workflow = findWorkflow(input.config, input.workflow);
-  if (!workflow) {
-    const known = input.config.workflows.map((workflow) => workflow.id).join(', ');
-    throw new Error(`unknown workflow \`${input.workflow}\`; known: ${known || 'none'}`);
+  const pipeline = findPipeline(input.config, input.pipeline);
+  if (!pipeline) {
+    const known = input.config.pipelines.map((pipeline) => pipeline.id).join(', ');
+    throw new Error(`unknown pipeline \`${input.pipeline}\`; known: ${known || 'none'}`);
   }
   if (input.groups.length === 0) throw new Error('a run needs at least one group');
   for (const group of input.groups) {
     if (group.task.trim() === '') throw new Error(`group \`${group.title}\` has an empty task`);
   }
-  const skipped = applySkip(input.config, input.workflow, input.skip ?? []);
+  const skipped = applySkip(input.config, input.pipeline, input.skip ?? []);
   const config =
     input.autoDeliver === undefined && input.deliveryMode === undefined
       ? skipped
@@ -59,14 +60,14 @@ export function createRun(input: NewRun): RunState {
             ...(input.deliveryMode !== undefined ? { mode: input.deliveryMode } : {}),
           },
         };
-  const splitting = input.split && workflow.split !== null && input.groups.length === 1;
+  const splitting = input.split && pipeline.split !== null && input.groups.length === 1;
   const slugs = groupSlugs(input.groups.map((group) => group.title));
   const task = input.groups[0]?.task ?? '';
-  return {
+  const state: RunState = {
     run: {
       id: input.id,
       repository: input.repository,
-      workflow: input.workflow,
+      pipeline: input.pipeline,
       baseCommit: input.baseCommit,
       branch: `refs/aip/${input.id}/run`,
       refStyle: 'refs',
@@ -85,6 +86,7 @@ export function createRun(input: NewRun): RunState {
       tags: [...(input.tags ?? [])],
       skippedSteps: [],
       hold: null,
+      repair: emptyRepair(),
     },
     split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,
     groups: splitting
@@ -94,7 +96,12 @@ export function createRun(input: NewRun): RunState {
         ),
     message: null,
     resolve: null,
+    repair: null,
+    actions: [],
   };
+  // The actions before the split exist from the start; the split waits for them.
+  if (state.split) enterPoint(state, 'before_split');
+  return state;
 }
 
 export function groupsFromTask(task: string): NewGroup[] {

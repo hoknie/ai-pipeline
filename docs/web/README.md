@@ -1,6 +1,6 @@
 # Web panel
 
-The web panel is a page in your browser. In it you follow runs, answer specialists, manage the queue and edit specialists, pipelines (workflows) and settings. The daemon serves it, so it is there whenever the daemon runs.
+The web panel is a page in your browser. In it you follow runs, answer specialists, manage the queue and edit specialists, pipelines (pipelines) and settings. The daemon serves it, so it is there whenever the daemon runs.
 
 | Section | What it does | Read more |
 |---|---|---|
@@ -8,7 +8,7 @@ The web panel is a page in your browser. In it you follow runs, answer specialis
 | "Queue" | Add, order and run tasks | [web/queue.md](queue.md) |
 | "Topology" | The graph of a pipeline with live groups | [web/config.md](config.md#topology) |
 | "Specialists" | Edit specialist files | [web/config.md](config.md#specialists) |
-| "Pipeline" | Edit workflow files | [web/config.md](config.md#pipeline) |
+| "Pipeline" | Edit pipeline files | [web/config.md](config.md#pipeline) |
 | "Settings" | Edit `settings.yaml`, shared specialists and pipelines; the system state | [web/settings.md](settings.md) |
 
 The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. The panel talks to the daemon through its [HTTP API](http-api.md).

@@ -18,6 +18,8 @@ claude --mcp-config '{"mcpServers":{"aip":{"type":"stdio","command":"aip","args"
 
 ## Install the plugin
 
+The plugin and the package are updated together: the plugin reads the `pipeline` field of the runs and sends `/aip:run <pipeline> <task>`, so a plugin of an earlier version does not show the runs of a new package. Run `aip setup` again after updating.
+
 `aip setup` installs the plugin from the marketplace in the package. Without npm, run this in Claude Code:
 
 ```
@@ -61,7 +63,7 @@ If `aip` is not found, the panel and the status line show an error with a hint a
 
 ## Commands
 
-- `/aip:run <workflow> <task>` starts a run in the repository of the current session;
+- `/aip:run <pipeline> <task>` starts a run in the repository of the current session;
 - `/aip:status [run-id]` lists the runs (icon, title, `id`, `3/5`, diff, cost) or the groups of one run, in Markdown;
 - `/aip:apply <run-id> [group...] [--force]` delivers a run;
 - `/aip:panel` opens the panel, `/aip:panel close` closes it;
@@ -87,9 +89,9 @@ The header is `aip · 2 active · 1 needs you`, with a connection indicator: `�
 
 - **Needs you.** A frame under the header. The questions of the selected run are expanded in it, with the text, the options and an answer field. Other things that wait for you (questions of other runs, a conflict, a failure, a rejected delivery) are one-line items, at most five, the rest collapse into `+N more`. With nothing to decide, the frame is hidden.
 - **Runs.** Active runs first, finished ones dimmed, the selected one marked with `›`. A row has a status icon, the title (the `id` if there is none), a progress bar `▰▰▰▰▰▰▱▱▱▱ 3/5`, the age and the cost. The keys `1`–`8` select the first eight runs.
-- **The selected run.** The title with a status icon, and "cancel run" and "apply run" buttons when they make sense. One line shows `id · workflow · phase · diff · delivery · cost`. Below are the groups, ordered by urgency: waiting for you, failed and conflicting, running, queued, merged and cancelled.
+- **The selected run.** The title with a status icon, and "cancel run" and "apply run" buttons when they make sense. One line shows `id · pipeline · phase · diff · delivery · cost`. Below are the groups, ordered by urgency: waiting for you, failed and conflicting, running, queued, merged and cancelled.
 - **A group.** An icon and a status label, the step, round, time, diff and delivery, and the failure reason as the first line.
-- **A group's question.** If the agent asked [structured questions](../configuration/workflows.md#questions), each one has buttons with options and a field for your own answer. The recommended option is marked `recommended` and is put in the field by default. "answer" sends all the answers as one text. While some question has no answer, the panel names its number and sends nothing.
+- **A group's question.** If the agent asked [structured questions](../configuration/pipelines.md#questions), each one has buttons with options and a field for your own answer. The recommended option is marked `recommended` and is put in the field by default. "answer" sends all the answers as one text. While some question has no answer, the panel names its number and sends nothing.
 - **Buttons.** "retry" for a failed group and a group with a conflict, "cancel" for a group in progress, "apply" for a merged group that is not delivered yet. For a run with a single group, cancel and apply are shown only on the run.
 - **Result of an action.** One line under the header. `✓ …` disappears after 8 seconds, `✕ …` stays until the next action.
 

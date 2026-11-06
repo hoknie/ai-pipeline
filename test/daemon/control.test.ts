@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import type { RunView } from '../../src/protocol/index.ts';
-import { CODE_ONLY_CONFIG, settle, WORKFLOW_CONFIG, statuses, until } from './harness.ts';
+import { CODE_ONLY_CONFIG, settle, PIPELINE_CONFIG, statuses, until } from './harness.ts';
 import { SHORT_TIMEOUT, alive, calls, run, start } from './control-harness.ts';
 
 describe('failures and control', () => {
@@ -217,7 +217,7 @@ describe('failures and control', () => {
     expect(asked.permissionHints).toEqual(['claude plugin *']);
     writeConfigDirectory(
       h.repo,
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         "coder: { name: Кодировщик, allow_commands: ['claude plugin *'] }",
       ),
@@ -235,7 +235,7 @@ describe('failures and control', () => {
     h.script({ code: [{ exitCode: 1, noReport: true }, {}] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'failed');
-    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('max: 3', 'max: 100'));
+    writeConfigDirectory(h.repo, PIPELINE_CONFIG.replace('max: 3', 'max: 100'));
     await h.call('retry', { runId, group: 'g1' });
     await h.waitFor(runId, (view) => view.finished);
     const detail = await h.group(runId, 'g1');
@@ -247,7 +247,7 @@ describe('failures and control', () => {
 
   it('retries with the current specialists only when asked to', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'reviewer: { name: Ревьюер, permissions: read }',
         'reviewer: { name: Ревьюер, permissions: read, model: opsu }',
       ),
@@ -257,7 +257,7 @@ describe('failures and control', () => {
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'failed');
     writeConfigDirectory(
       h.repo,
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'reviewer: { name: Ревьюер, permissions: read }',
         'reviewer: { name: Ревьюер, permissions: read, model: opus }',
       ),
@@ -281,7 +281,7 @@ describe('failures and control', () => {
     h.script({ code: [{ exitCode: 1, noReport: true }] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'failed');
-    writeConfigDirectory(h.repo, WORKFLOW_CONFIG.replace('max: 3', 'max: 100'));
+    writeConfigDirectory(h.repo, PIPELINE_CONFIG.replace('max: 3', 'max: 100'));
     await expect(h.call('retry', { runId, group: 'g1', refreshConfig: true })).rejects.toThrow(
       /^configuration not loaded: swarm\.max/,
     );

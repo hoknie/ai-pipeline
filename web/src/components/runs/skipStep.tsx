@@ -6,7 +6,7 @@ import { useConfirm } from '../../confirm.tsx';
 import { notifySuccess } from '../../notify.ts';
 import type { RunView } from '../../types.ts';
 
-/** The step of the workflow the group stands on, from the topology of the run; `null` when it stands on none. */
+/** The step of the pipeline the group stands on, from the topology of the run; `null` when it stands on none. */
 export function stepOfGroup(run: RunView, slug: string): string | null {
   return run.topology.steps.find((step) => step.groups.some((g) => g.slug === slug))?.id ?? null;
 }

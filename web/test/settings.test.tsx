@@ -451,6 +451,7 @@ const GLOBAL_GROUPS = [
   'Runtimes',
   'Specialists',
   'Pipeline',
+  'Observers',
   'System',
 ];
 const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Tags'];
@@ -550,6 +551,25 @@ describe('settings page', () => {
     show(queueOf(), {}, old);
     await screen.findByRole('navigation', { name: 'groups of settings' });
     await waitFor(() => expect(window.location.hash).toBe(now));
+  });
+
+  it.each([
+    ['#settings/global/observers', 'Main', '#settings/global/observers/general'],
+    ['#settings/global/observers/projects', 'Projects', '#settings/global/observers/projects'],
+    ['#settings/global/observers/nope', 'Main', '#settings/global/observers/general'],
+  ] as const)('opens the observers tab of the address %s', async (hash, tab, address) => {
+    show(queueOf(), {}, hash);
+    const tabs = await screen.findByRole('tablist', { name: 'observer settings' });
+    expect(within(tabs).getByRole('tab', { name: tab }).getAttribute('aria-selected')).toBe('true');
+    await waitFor(() => expect(window.location.hash).toBe(address));
+  });
+
+  it('changes the address when an observers tab is chosen', async () => {
+    show(queueOf(), {}, '#settings/global/observers/general');
+    const tabs = await screen.findByRole('tablist', { name: 'observer settings' });
+    fireEvent.mouseDown(within(tabs).getByRole('tab', { name: 'Specialist' }));
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Specialist' }));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/observers/specialist'));
   });
 
   it('shows the default on the Shared tab and where it comes from', async () => {

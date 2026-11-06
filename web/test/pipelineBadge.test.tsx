@@ -2,15 +2,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { TagLabel } from '../src/components/TagChip.tsx';
-import { WorkflowBadge } from '../src/components/WorkflowBadge.tsx';
+import { PipelineBadge } from '../src/components/PipelineBadge.tsx';
 
 import { cleanup, fireEvent, render, screen } from './render.tsx';
 
 afterEach(() => cleanup());
 
-describe('workflow badge', () => {
+describe('pipeline badge', () => {
   it('shows the name, with the id in the tooltip', async () => {
-    render(<WorkflowBadge id="feature" name="Новая функция" />);
+    render(<PipelineBadge id="feature" name="Новая функция" />);
     const badge = screen.getByLabelText('Pipeline: Новая функция (feature)');
     expect(badge.textContent).toBe('Новая функция');
     fireEvent.focus(badge);
@@ -18,7 +18,7 @@ describe('workflow badge', () => {
   });
 
   it('has the accessible name and a tooltip on focus', async () => {
-    render(<WorkflowBadge id="feature" name="feature" />);
+    render(<PipelineBadge id="feature" name="feature" />);
     const badge = screen.getByLabelText('Pipeline: feature');
     expect(badge.textContent).toBe('feature');
     fireEvent.focus(badge);
@@ -28,7 +28,7 @@ describe('workflow badge', () => {
   it('differs from a tag: rectangular, not monospace, with an icon', () => {
     render(
       <>
-        <WorkflowBadge id="feature" name="feature" />
+        <PipelineBadge id="feature" name="feature" />
         <TagLabel
           tag={{ id: 'auth', repository: '/repo', name: 'auth', color: 'blue', task: null }}
         />
@@ -43,9 +43,9 @@ describe('workflow badge', () => {
   });
 
   it('is focusable by default and not when focusable is false', () => {
-    const { rerender } = render(<WorkflowBadge id="feature" name="feature" />);
+    const { rerender } = render(<PipelineBadge id="feature" name="feature" />);
     expect(screen.getByLabelText('Pipeline: feature').getAttribute('tabindex')).toBe('0');
-    rerender(<WorkflowBadge id="feature" name="feature" focusable={false} />);
+    rerender(<PipelineBadge id="feature" name="feature" focusable={false} />);
     expect(screen.getByLabelText('Pipeline: feature').hasAttribute('tabindex')).toBe(false);
   });
 });

@@ -103,7 +103,7 @@ describe('ensureDaemon and the build of the daemon', () => {
     h.script({ code: [{ hang: true }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
@@ -177,7 +177,7 @@ describe('stopDaemon', () => {
     h.script({ code: [{ hang: true }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');

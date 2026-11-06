@@ -119,14 +119,14 @@ describe('specialist limit on the split step', () => {
   });
 });
 
-describe('split into another workflow', () => {
+describe('split into another pipeline', () => {
   const TEXT = `${CONFIG_TEXT}    explore:
       steps:
         - { id: research, specialist: reviewer }
         - { id: write, specialist: coder, on_reject: { goto: research, max_rounds: 2 } }
 `.replace(
     '    feature:\n      steps:',
-    '    feature:\n      split: { specialist: plan, workflow: explore }\n      steps_placeholder:',
+    '    feature:\n      split: { specialist: plan, pipeline: explore }\n      steps_placeholder:',
   );
   const CONFIG = TEXT.replace(/      steps_placeholder:\n(        - .*\n){4}/, '');
 
@@ -168,7 +168,7 @@ describe('split into another workflow', () => {
   it('keeps the steps of the run when the target changes in the configuration', () => {
     const state = run(1, { configText: CONFIG });
     const later = config(CONFIG);
-    later.workflows.find((item) => item.id === 'explore')!.steps.pop();
+    later.pipelines.find((item) => item.id === 'explore')!.steps.pop();
     expect(stepsOf(state.run, state.groups[0]!).map((item) => item.id)).toEqual([
       'research',
       'write',

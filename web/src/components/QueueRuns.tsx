@@ -19,7 +19,7 @@ import { Card } from '../ui/card.tsx';
 
 import { StatusBadge } from './StatusBadge.tsx';
 import { TagChips } from './TagChip.tsx';
-import { WorkflowBadge } from './WorkflowBadge.tsx';
+import { PipelineBadge } from './PipelineBadge.tsx';
 
 const REASONS = [
   'needs_human',
@@ -86,7 +86,7 @@ function RunCard({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={run.state} />
-        <WorkflowBadge id={run.workflow} name={run.workflowName} />
+        <PipelineBadge id={run.pipeline} name={run.pipelineName} />
         <TagChips tags={run.tags ?? []} />
         {run.priority ? (
           <Badge variant="run" title={t('queue.priorityHint')}>
@@ -102,9 +102,14 @@ function RunCard({
       </div>
       {run.system.length > 0 || run.delivery ? (
         <div className="flex flex-wrap items-center gap-2" aria-label={t('runs.system.stages')}>
-          {run.system.map((step) => (
-            <span key={step.kind} className="inline-flex items-center gap-1 text-muted-foreground">
-              {t(`runs.system.${step.kind}`)}
+          {run.system.map((step, index) => (
+            <span
+              key={`${step.kind}-${index}`}
+              className="inline-flex items-center gap-1 text-muted-foreground"
+            >
+              {step.kind === 'action'
+                ? (step.title ?? t('runs.system.action'))
+                : t(`runs.system.${step.kind}`)}
               <StatusBadge status={step.status} />
             </span>
           ))}
@@ -284,8 +289,10 @@ function SkippedRuns({
 /** Runs of the queue that hold a place, as cards, with the free places of a running queue. */
 /** A group slug; the slug of a system step (`_split`, `_message`, `_resolve`) becomes its name. */
 function groupLabel(slug: string, t: TFunction) {
-  const kind = /^_(split|message|resolve)$/.exec(slug)?.[1] as
-    'split' | 'message' | 'resolve' | undefined;
+  const kind = slug.startsWith('_action-')
+    ? 'action'
+    : (/^_(split|message|resolve|repair)$/.exec(slug)?.[1] as
+        'split' | 'message' | 'resolve' | 'repair' | undefined);
   return kind ? <span>{t(`runs.system.${kind}`)}</span> : <code>{slug}</code>;
 }
 

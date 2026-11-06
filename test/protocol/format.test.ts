@@ -15,7 +15,7 @@ import {
   queueView,
   runView,
   waitNote,
-  workflowLabel,
+  pipelineLabel,
 } from '../../src/protocol/index.ts';
 import {
   addItem,
@@ -285,7 +285,7 @@ describe('text for people', () => {
     expect(list.split('\n')[0]).toContain('TITLE');
   });
 
-  it('carries the workflow topology in the run view', () => {
+  it('carries the pipeline topology in the run view', () => {
     const state = run(1);
     step(state, 1000);
     const view = runView(state, 2000);
@@ -305,11 +305,11 @@ describe('queue text', () => {
     // local time: the expected text does not depend on the time zone of the machine
     const first = new Date(2026, 10, 1, 14, 32).getTime();
     const second = new Date(2026, 11, 3, 9, 5).getTime();
-    addItem(queue, { workflow: 'feature', task: 'первая строка\nвторая' }, 'q1', first);
+    addItem(queue, { pipeline: 'feature', task: 'первая строка\nвторая' }, 'q1', first);
     addItem(
       queue,
       {
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [
           { title: 'a', task: 'b' },
           { title: 'c', task: 'd' },
@@ -374,8 +374,8 @@ describe('queue text', () => {
 
   it('marks the skipped steps of an item', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', skip: ['review', 'qa'] }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', skip: ['review', 'qa'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y' }, 'q2', 2);
     const text = formatQueue(queueView(queue, () => undefined));
     expect(text).toMatch(/q1 {2}feature {2}x · skip: review, qa {2}added/);
     expect(text).not.toMatch(/q2.*skip/);
@@ -383,9 +383,9 @@ describe('queue text', () => {
 
   it('shows the predecessors and the readiness of an item', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'y', after: ['q1', 'gone'] }, 'q2', 2);
-    addItem(queue, { workflow: 'feature', task: 'z' }, 'q3', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y', after: ['q1', 'gone'] }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'z' }, 'q3', 2);
     const text = formatQueue(queueView(queue, () => undefined));
     expect(text).toMatch(/q2 {2}feature {2}y · after #1 q1, gone \(blocked\) {2}added/);
     expect(text).not.toMatch(/q1.*after/);
@@ -394,7 +394,7 @@ describe('queue text', () => {
 
   it('colours the blocked mark of an item', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'y', after: ['gone'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y', after: ['gone'] }, 'q1', 2);
     const view = queueView(queue, () => undefined);
     const style = createStyle(true);
     expect(formatQueue(view, style)).toContain(`after gone (${style.danger('blocked')})`);
@@ -402,9 +402,9 @@ describe('queue text', () => {
 
   it('marks the delivery of an item and of a run', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'y', autoDeliver: false }, 'q2', 2);
-    addItem(queue, { workflow: 'feature', task: 'z', autoDeliver: true }, 'q3', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y', autoDeliver: false }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'z', autoDeliver: true }, 'q3', 2);
     const lines = formatQueue(queueView(queue, () => undefined, true)).split('\n');
     expect(lines.find((line) => line.includes('q1'))).not.toContain('delivery');
     expect(lines.find((line) => line.includes('q2'))).toContain('manual delivery');
@@ -417,8 +417,8 @@ describe('queue text', () => {
 
   it('marks the delivery mode of an item and a custom autopilot answer', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', deliveryMode: 'commit' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', deliveryMode: 'commit' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y' }, 'q2', 2);
     const plain = formatQueue(queueView(queue, () => undefined)).split('\n');
     expect(plain.find((line) => line.includes('q1'))).toContain('delivery: commit');
     expect(plain.find((line) => line.includes('q2'))).not.toContain('delivery:');
@@ -432,11 +432,11 @@ describe('queue text', () => {
     expect(formatQueue(queueView(queue, () => undefined))).toBe(
       'Queue: stopped, parallel 1 (0 of 1 places taken), autopilot off, auto answer off, skip failed off\nNo tasks waiting.',
     );
-    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
-    queue.stop = { kind: 'item', item: 'q1', error: 'unknown workflow' };
-    queue.items[0]!.error = 'unknown workflow';
+    addItem(queue, { pipeline: 'feature', task: 'x' }, 'q1', 2);
+    queue.stop = { kind: 'item', item: 'q1', error: 'unknown pipeline' };
+    queue.items[0]!.error = 'unknown pipeline';
     expect(formatQueue(queueView(queue, () => undefined))).toContain(
-      'Stopped: item q1: unknown workflow',
+      'Stopped: item q1: unknown pipeline',
     );
     itemStarted(queue, 'q1', 'r', 3);
     expect(queueView(queue, () => undefined).items).toEqual([]);
@@ -582,7 +582,7 @@ describe('formatRunQueued', () => {
   function queueWith(taken: number, parallel: number) {
     const state = run(1);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x' }, 'q1', 2);
     queue.status = 'running';
     queue.parallel = parallel;
     queue.runs = Array.from({ length: taken }, () => state.run.id);
@@ -626,7 +626,7 @@ describe('tags in text', () => {
 
   it('puts #labels on waiting tasks', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-a', 'tg-b'] }, 'q1', 2);
     const catalog = tags.map((tag) => ({ ...tag, createdAt: 1 }));
     expect(formatQueue(queueView(queue, () => undefined, null, catalog))).toContain('#auth #v2');
   });
@@ -671,7 +671,7 @@ describe('usage limit in the text output', () => {
 
   it('shows the stop by a usage limit and a returned run in the queue', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'работа' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'работа' }, 'q1', 2);
     queue.items[0]!.run = 'run000000001';
     queue.stop = {
       kind: 'limit',
@@ -696,7 +696,7 @@ describe('usage limit in the text output', () => {
 
   it('marks the item of a paused run', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'работа' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'работа' }, 'q1', 2);
     queue.items[0]!.run = 'run000000001';
     const paused = run(1);
     paused.run.hold = 'paused';
@@ -706,7 +706,7 @@ describe('usage limit in the text output', () => {
 
   it('shows frozen for the item of a frozen run, priority on a card and frozen in the state column', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'работа' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'работа' }, 'q1', 2);
     queue.items[0]!.run = 'run000000001';
     const frozen = run(1);
     frozen.run.hold = 'frozen';
@@ -881,7 +881,7 @@ describe('skipped steps in text', () => {
   });
 });
 
-describe('name of the workflow in text', () => {
+describe('name of the pipeline in text', () => {
   const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n');
 
   it('prints «name (id)» in the run header, and the id alone without a name', () => {
@@ -892,8 +892,8 @@ describe('name of the workflow in text', () => {
   });
 
   it('prints «name (id)» in the run list and in the queue lines', () => {
-    expect(workflowLabel('feature', 'Новая функция')).toBe('Новая функция (feature)');
-    expect(workflowLabel('feature', 'feature')).toBe('feature');
+    expect(pipelineLabel('feature', 'Новая функция')).toBe('Новая функция (feature)');
+    expect(pipelineLabel('feature', 'feature')).toBe('feature');
     expect(formatRunList([runView(run(1, { configText: named }), 1000)])).toContain(
       'Новая функция (feature)',
     );
@@ -1041,5 +1041,74 @@ describe('accepted answers of a run', () => {
     delete view.decisions;
     expect(formatRun(view as ReturnType<typeof runView>, 2000)).not.toContain('Answers:');
     expect(formatRunList([view as ReturnType<typeof runView>])).not.toContain('answers:');
+  });
+});
+
+describe('actions in the System line', () => {
+  it('prints an action as point:id with its status and reason', () => {
+    const state = run(1, {
+      split: true,
+      configText: `swarm:
+  specialists:
+    plan: { name: Планировщик }
+    coder: { name: Кодировщик }
+  actions:
+    prepare: { run: make }
+    commit: { run: commit }
+  stages:
+    before_split: [prepare]
+    after_delivery: [commit]
+  pipelines:
+    feature:
+      split: { specialist: plan }
+      steps:
+        - { id: code, specialist: coder }
+`,
+    });
+    const prepare = state.actions[0]!;
+    prepare.status = 'failed';
+    prepare.reason = 'exit code 2';
+    const text = formatRun(runView(state, 3000), 3000);
+    expect(text).toContain('System: before_split:prepare failed (exit code 2) · split queued');
+  });
+});
+
+describe('observer in the text output', () => {
+  it('counts observer answers after the human ones', () => {
+    const state = run(1);
+    step(state, 1000);
+    state.groups[0]!.decisions.push(
+      { stepId: 'plan', question: 'q', answer: 'a', by: 'human' },
+      { stepId: 'code', question: 'a', answer: 'b', by: 'observer' },
+      { stepId: 'code', question: 'c', answer: 'd', by: 'observer' },
+    );
+    expect(formatRunList([runView(state, 2000)])).toContain('answers: human 1, observer 2');
+    expect(formatRun(runView(state, 2000), 2000)).toContain('(observer): a → b');
+    const found = groupView(state, state.groups[0]!, '/w', null, 5000);
+    expect(formatGroup(found)).toContain('Answer (observer, code): a → b');
+  });
+
+  it('shows the repair state, the observer step and why it cancelled the task', () => {
+    const state = run(1);
+    step(state, 1000);
+    state.groups[0]!.status = 'failed';
+    state.run.repair.incident = { key: 'k', kind: 'failed', group: 'gruppa-1', detail: 'x' };
+    state.repair = { ...state.groups[0]!, slug: '_repair', status: 'running' };
+    const view = runView(state, 2000);
+    expect(formatRunList([view])).toContain('repair');
+    const text = formatRun(view, 2000);
+    expect(text).toContain('repair');
+    expect(text).toMatch(/System: observer/);
+    expect(text).not.toContain('Observer cancelled');
+    state.run.repair.cancelReason = 'задача невыполнима';
+    expect(formatRun(runView(state, 2000), 2000)).toContain(
+      'Observer cancelled: задача невыполнима',
+    );
+  });
+
+  it('formats a view from a daemon without the repair field', () => {
+    const view: Partial<ReturnType<typeof runView>> = runView(run(1), 2000);
+    delete view.repair;
+    expect(formatRun(view as ReturnType<typeof runView>, 2000)).not.toContain('Observer');
   });
 });

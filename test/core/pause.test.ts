@@ -99,7 +99,7 @@ describe('pauseRun', () => {
   it('moves the run to the end of the queue and frees its place', () => {
     const state = run(1);
     const queue = queueWith(state);
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q1', 2);
     queue.acknowledged.push(`${state.run.id}/gruppa-1/failed/1`);
     const item = pauseRun(queue, state, 'q2', 3);
     expect(queue.runs).toEqual([]);
@@ -170,7 +170,7 @@ describe('queue with a held run', () => {
   it('keeps the item of a finished held run with failed groups behind the others', () => {
     const state = run(1);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 2);
     pauseRun(queue, state, 'q1', 3);
     state.run.hold = 'paused';
     state.run.finishedAt = 5;
@@ -201,7 +201,7 @@ describe('pauseRun: where the run was', () => {
     const state = run(1);
     step(state);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q2', 2);
     queue.skipped.push(state.run.id);
     pauseRun(queue, state, 'q1', 3);
     expect(queue.skipped).toEqual([]);

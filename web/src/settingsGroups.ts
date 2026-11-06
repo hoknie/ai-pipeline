@@ -6,7 +6,16 @@ export type SettingsScope = (typeof SETTINGS_SCOPES)[number];
 
 /** Groups of the settings page, per tab, in the order of the column on the left. */
 export const SETTINGS_GROUPS_BY_SCOPE = {
-  global: ['general', 'agents', 'delivery', 'runtimes', 'specialists', 'pipelines', 'system'],
+  global: [
+    'general',
+    'agents',
+    'delivery',
+    'runtimes',
+    'specialists',
+    'pipelines',
+    'observers',
+    'system',
+  ],
   project: ['general', 'agents', 'delivery', 'queue', 'tags'],
 } as const;
 
@@ -34,6 +43,15 @@ export const LEGACY_SETTINGS_GROUPS: Record<
   tags: { scope: 'project', group: 'tags' },
   system: { scope: 'global', group: 'system' },
 };
+
+/** The tabs of the group «Observers»; the third part of its address. */
+export const OBSERVER_TABS = ['general', 'specialist', 'projects'] as const;
+export type ObserverTab = (typeof OBSERVER_TABS)[number];
+
+/** The tab of the group «Observers» for the part of an address; an unknown one is the first. */
+export function observerTabOf(part: string | null): ObserverTab {
+  return OBSERVER_TABS.find((tab) => tab === part) ?? 'general';
+}
 
 const isScope = (key: string | null): key is SettingsScope =>
   SETTINGS_SCOPES.some((scope) => scope === key);
@@ -70,7 +88,7 @@ export function groupOf(path: string): SettingsGroup {
 
 /**
  * The group a validation error belongs to: `swarm.naming.runtime` is «general»; errors of
- * specialists and workflows, which have no group of their own, are shown in «general» too.
+ * specialists and pipelines, which have no group of their own, are shown in «general» too.
  */
 export function errorGroupOf(path: string): SettingsGroup {
   return groupOf(path);

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
-/** The marked steps that the workflow still has, in the order of its steps. */
+/** The marked steps that the pipeline still has, in the order of its steps. */
 export function pruneSkip(skip: string[], steps: string[]): string[] {
   return steps.filter((step) => skip.includes(step));
 }

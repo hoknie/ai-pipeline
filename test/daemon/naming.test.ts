@@ -23,7 +23,7 @@ async function start(script: Record<string, unknown>, config = MANUAL_CONFIG): P
 async function create(h: Harness, extra: Record<string, unknown> = {}): Promise<string> {
   const { runId } = (await startRun(h, {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     task: 'Добавить флаг --json к команде aip version\nподробности',
     ...extra,
   })) as RunCreated;

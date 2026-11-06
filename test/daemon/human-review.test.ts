@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { settle, WORKFLOW_CONFIG } from './harness.ts';
+import { settle, PIPELINE_CONFIG } from './harness.ts';
 import { add, allRuns, queueOf, start, waitQueue } from './queue-harness.ts';
 
-const REVIEW_CONFIG = WORKFLOW_CONFIG.replace(
+const REVIEW_CONFIG = PIPELINE_CONFIG.replace(
   'specialist: reviewer,',
   'specialist: reviewer, human_review: true,',
 );

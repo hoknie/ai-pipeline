@@ -46,7 +46,7 @@ describe('repository registry', () => {
     const previewed = newRepository();
     await h.call('config_preview', {
       repository: previewed,
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: { steps: [] },
     });
@@ -68,7 +68,7 @@ describe('repository registry', () => {
 
   it('keeps the registry after a restart', async () => {
     const h = (current = await harness());
-    await h.call('workflows', { repository: h.repo });
+    await h.call('pipelines', { repository: h.repo });
     await h.restart();
     expect(await paths(h)).toEqual([h.repo]);
   });
@@ -100,7 +100,7 @@ describe('repository registry', () => {
     h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
@@ -126,7 +126,7 @@ describe('repository registry', () => {
 
   it('refuses a queue with a task', async () => {
     const h = (current = await harness());
-    await h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'A' });
+    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'A' });
     await expect(h.call('repository_remove', { path: h.repo })).rejects.toThrow(
       'repository queue is not empty or running',
     );

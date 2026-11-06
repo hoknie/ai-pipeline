@@ -118,7 +118,7 @@ function AddRepositoryDialog({
   );
 }
 
-/** Picks the repository whose queue, configuration and workflows the panel shows. */
+/** Picks the repository whose queue, configuration and pipelines the panel shows. */
 export function RepositoryMenu({
   choice,
   compact = false,

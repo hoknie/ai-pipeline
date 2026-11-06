@@ -50,7 +50,7 @@ aip queue run <item>            # start a task right now
 
 - At most `parallel` runs go at the same time (1–20, 1 by default). A freed place goes to the next task.
 - When `parallel` grows, waiting tasks start at once if the queue is started. When it shrinks, running runs are not interrupted, and new tasks wait until the number of runs drops below the limit.
-- `aip queue list` shows how busy the queue is ("1 of 2 places taken"). For every run it shows the workflow, the progress by group and by step (`1/3 groups · steps 5/12`, or `splitting` while the task is being split), active steps, delivery mode and problem.
+- `aip queue list` shows how busy the queue is ("1 of 2 places taken"). For every run it shows the pipeline, the progress by group and by step (`1/3 groups · steps 5/12`, or `splitting` while the task is being split), active steps, delivery mode and problem.
 - When the tasks run out and all runs of the queue are finished, the queue stops by itself. A started queue keeps taking tasks after a daemon restart.
 
 ### When a task sees the previous result
@@ -106,7 +106,7 @@ A running queue with `auto answer` on answers the questions of specialists (a st
 
 - Turning `auto answer` on never starts a stopped queue; a paused or stopped queue does not answer.
 - It gives at most 3 answers in a row to one group, then the question waits for you.
-- Stops for the `max_rounds` limit or for changes outside the worktree are never answered, nor are [`human_review` and `human_only`](../configuration/workflows.md#asking-a-person) questions.
+- Stops for the `max_rounds` limit or for changes outside the worktree are never answered, nor are [`human_review` and `human_only`](../configuration/pipelines.md#asking-a-person) questions.
 
 ### Skip failed
 
@@ -114,7 +114,7 @@ A running queue with `auto answer` on answers the questions of specialists (a st
 - Such runs are listed under `Skipped with a problem:` (at most 10, the earliest is dropped first). A run leaves the list when the problem is gone.
 - A skipped run whose problem is fixed (a retry, an answer, a resolved conflict) goes back to the front of the queue's places, even over the `parallel` limit. New tasks wait until a place frees.
 - A task that waits for a skipped run is blocked.
-- A task that cannot start (for example, its workflow was removed) stays in the queue with the error. It is not taken again until it is edited or the queue is started, and the queue goes on with the other tasks. After an edit it goes to position 1.
+- A task that cannot start (for example, its pipeline was removed) stays in the queue with the error. It is not taken again until it is edited or the queue is started, and the queue goes on with the other tasks. After an edit it goes to position 1.
 - `aip queue dismiss <run-id>` removes a skipped run from the list; `--repo` defaults to the repository of the run. The run keeps its status, stays in the run list and can still be delivered. A run that is not in the list is refused. A task that waits for the removed run stays blocked.
 
 ## When the queue stops
@@ -122,8 +122,19 @@ A running queue with `auto answer` on answers the questions of specialists (a st
 - The queue stops when one of its runs gets a problem: a group in `failed` or `conflict`, a delivery error (`apply_failed`), or a [usage limit](#usage-limit). The reason is visible in `aip queue list`, and the run keeps its place.
 - `aip queue start` marks the current problems as known and continues the queue. A new problem stops it again.
 - A question for a human (`needs_human`) does not stop the queue. The run with the question keeps its place (with `parallel: 1` the next task waits). Once the question is answered, the queue goes on by itself.
-- If a run cannot be created (for example, the workflow file was removed), the task stays first with the error text, and the queue stops.
+- If a run cannot be created (for example, the pipeline file was removed), the task stays first with the error text, and the queue stops.
+- An incident of a task that an [observer](#observers) can take does not stop the queue.
 - A manual cancel of a run never stops the queue. The cancelled run frees its place, the next task takes it, and the run does not go into the skipped list. Tasks that depend on the cancelled run are blocked.
+
+### Observers
+
+An incident of a task that an [observer](runs.md#observers) can take does not stop the queue.
+
+- The task gets the state `repair` and the queue goes on. A task with unfinished work (a question) keeps its place. A failed task does not hold a place during the repair and gets it back only when its group is retried.
+- A new incident that no observer can take (observers are off, the project is not connected, the task is forbidden, or its repairs are used up) stops the queue by the rules above. An incident the queue already passed to observers does not stop it later, and the task waits for a person. A task with a `hold` is not watched and does not stop the queue.
+- Auto-answers of the queue come first: a question reaches an observer only when the queue did not settle it.
+- A repair is not counted in `max` or in the place limit of the queue. A failed task stays in the skipped list during a repair.
+- A usage limit of the observer agent does not stop the queue.
 
 ### Usage limit
 
@@ -142,12 +153,12 @@ aip queue add feature --task "Fix a typo" --skip review --skip qa  # this task s
 aip queue edit <item> --skip qa                      # replaces the list of skipped steps; --no-skips runs every step again
 ```
 
-`--skip <step>` is repeatable and also works on `aip run start`. It makes one task skip steps of its workflow without editing the configuration. `aip queue list` shows `skip: review, qa`.
+`--skip <step>` is repeatable and also works on `aip run start`. It makes one task skip steps of its pipeline without editing the configuration. `aip queue list` shows `skip: review, qa`.
 
 - It is refused when a step id is unknown (the answer lists the steps) or when no step is left.
 - It is refused when a remaining step has `on_reject.goto` to a skipped step. Skip the returning step too: in `feature`, `review` and `qa` both return to `code`, so `--skip review --skip qa` is fine.
-- For a workflow with `split.workflow` the steps of that workflow are meant.
-- The run gets the workflow without those steps, so retries skip them too.
+- For a pipeline with `split.pipeline` the steps of that pipeline are meant.
+- The run gets the pipeline without those steps, so retries skip them too.
 - A step removed from the configuration before the task starts gives the task an error.
 
 To skip a step of a run that has started, see [Skipping a step](runs.md#skipping-a-step).
@@ -185,7 +196,7 @@ aip queue edit <item> --no-after                       # clears the list
 
 - The run becomes the last task of the queue and shows as `paused` in `aip run list`, `aip run show` and `aip queue list` (`paused <run-id>`).
 - A paused run does not stop the queue: its problems are not watched. Tasks that wait for it keep waiting.
-- The task is taken in its turn, and `aip queue run <item>` ("Continue" in the web panel) continues it at once, whatever the limit. The stopped step continues in the same session; a failed or cancelled group is retried. `aip group retry` on a paused run also lifts the pause.
+- The queue never takes a paused run by itself, even on autopilot. `aip queue run <item>` ("Continue" in the web panel) continues it at once, whatever the limit. The stopped step continues in the same session; a failed or cancelled group is retried. `aip group retry` on a paused run also lifts the pause.
 - A paused run stays in the queue: removing its task is refused while the run is unfinished. Cancel the run instead; it stays `paused` until you continue or remove the task.
 - The pause is lifted by itself once the run is finished and has nothing to retry.
 - A finished run, one that is already paused, and one that is already in the queue as a returned task are refused.
@@ -213,6 +224,6 @@ What happens to a frozen run:
 - It continues by itself, in any state of the queue, as soon as a place is free and before any other task, regardless of `--after` and the postponed flag. Its failed groups are retried from where they stopped. "Continue" brings it back earlier; the run then holds a place over `parallel` if the priority run still holds one.
 - It can be paused (it then waits at the end of the queue), and its task cannot be removed while the run is unfinished.
 
-A task of a run on pause is taken only when its turn comes; a returned run on pause is not a priority task and freezes nobody.
+The queue does not take a task of a run on pause: a paused run is not a priority task and freezes nobody until you continue it.
 
 `aip queue list --json` shows `freezeCandidate` (the run a priority action would freeze now, or `null`) and `priority` on every run card.

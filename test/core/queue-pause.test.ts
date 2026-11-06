@@ -19,7 +19,7 @@ import { group, run, step } from './helpers.ts';
 
 function queueOf(...tasks: string[]): Queue {
   const queue = emptyQueue('/repo', 1);
-  tasks.forEach((task, index) => addItem(queue, { workflow: 'feature', task }, `q${index + 1}`, 2));
+  tasks.forEach((task, index) => addItem(queue, { pipeline: 'feature', task }, `q${index + 1}`, 2));
   return queue;
 }
 
@@ -91,7 +91,7 @@ describe('pause of a run', () => {
     expect(() => pauseRun(queue, a, 'r2', 8)).toThrow('run is already paused');
     const other = run(1, { id: 'o' });
     step(other);
-    addItem(queue, { workflow: 'feature', task: 't' }, 'ret2', 3).run = 'o';
+    addItem(queue, { pipeline: 'feature', task: 't' }, 'ret2', 3).run = 'o';
     expect(() => pauseRun(queue, other, 'r3', 8)).toThrow('run is already in the queue');
     expect(queue.items.filter((item) => item.run !== null)).toHaveLength(2);
   });
@@ -138,7 +138,7 @@ describe('a run on pause and the queue', () => {
 
   it('makes a dependent task wait', () => {
     const { queue, a } = setup();
-    addItem(queue, { workflow: 'feature', task: 'D', after: ['a'] }, 'q4', 3);
+    addItem(queue, { pipeline: 'feature', task: 'D', after: ['a'] }, 'q4', 3);
     pause(queue, a);
     group(a).status = 'failed';
     expect(dependencyState(queue, 'a', lookupOf(a))).toBe('waiting');
@@ -170,5 +170,71 @@ describe('a started item', () => {
     const { queue } = setup();
     itemStarted(queue, 'q1', 'z', 9);
     expect(queue.runs).toEqual(['a', 'z']);
+  });
+});
+
+describe('taking items while a run is on pause', () => {
+  it('does not take the paused run when a place is free and only dependants wait', () => {
+    const queue = emptyQueue('/repo', 2);
+    queue.status = 'running';
+    queue.parallel = 2;
+    const a = run(1, { id: 'a' });
+    step(a);
+    queue.runs.push('a');
+    addItem(queue, { pipeline: 'feature', task: 'D', after: ['a'] }, 'q1', 2);
+    pause(queue, a);
+    const { take } = advance(queue, [], lookupOf(a), 8);
+    expect(take).toEqual([]);
+    expect(a.run.hold).toBe('paused');
+    expect(queue.items.map((item) => item.id)).toEqual(['q1', 'ret']);
+  });
+
+  it('gives the place to the next task and keeps the paused run first in line', () => {
+    const queue = queueOf('B');
+    queue.status = 'running';
+    const a = run(1, { id: 'a' });
+    step(a);
+    pause(queue, a);
+    queue.items.reverse();
+    expect(queue.items.map((item) => item.id)).toEqual(['ret', 'q1']);
+    const { take } = advance(queue, [], lookupOf(a), 8);
+    expect(take.map((item) => item.id)).toEqual(['q1']);
+    expect(a.run.hold).toBe('paused');
+  });
+
+  it('starts a stopped queue with the task and leaves the paused run on pause', () => {
+    const queue = queueOf('B');
+    queue.status = 'stopped';
+    const a = run(1, { id: 'a' });
+    step(a);
+    pause(queue, a);
+    startQueue(queue, [], 8);
+    const { take } = advance(queue, [], lookupOf(a), 9);
+    expect(take.map((item) => item.id)).toEqual(['q1']);
+    expect(a.run.hold).toBe('paused');
+  });
+
+  it('keeps a queue of one paused item running without autopilot', () => {
+    const queue = emptyQueue('/repo', 1);
+    queue.status = 'running';
+    queue.autopilot = false;
+    const a = run(1, { id: 'a' });
+    step(a);
+    queue.runs.push('a');
+    pause(queue, a);
+    const { take } = advance(queue, [], lookupOf(a), 8);
+    expect(take).toEqual([]);
+    expect(queue.status).toBe('running');
+  });
+
+  it('still takes a frozen run when a place is free', () => {
+    const queue = emptyQueue('/repo', 1);
+    queue.status = 'running';
+    const a = run(1, { id: 'a' });
+    step(a);
+    pause(queue, a);
+    transition(a, { kind: 'hold', hold: 'frozen' }, 8);
+    const { take } = advance(queue, [], lookupOf(a), 9);
+    expect(take.map((item) => item.id)).toEqual(['ret']);
   });
 });

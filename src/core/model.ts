@@ -1,5 +1,20 @@
-import type { ResolvedConfig, Runtime, Step, Workflow } from '../config/index.ts';
-import { findWorkflow, groupWorkflow } from '../config/index.ts';
+import type {
+  Action,
+  ActionPoint,
+  ResolvedConfig,
+  Runtime,
+  Specialist,
+  Step,
+  Pipeline,
+} from '../config/index.ts';
+import {
+  ACTION_POINTS,
+  OBSERVER_SPECIALIST,
+  findAction,
+  findSpecialist,
+  findPipeline,
+  groupPipeline,
+} from '../config/index.ts';
 import type { Denial } from './permissions.ts';
 
 export const SPLIT_GROUP = '_split';
@@ -8,6 +23,16 @@ export const MESSAGE_GROUP = '_message';
 export const MESSAGE_STEP = 'message';
 export const RESOLVE_GROUP = '_resolve';
 export const RESOLVE_STEP = 'resolve';
+export const REPAIR_GROUP = '_repair';
+export const REPAIR_STEP = 'repair';
+/** Slug of the specialist of the observer; the profile itself lives in `Run.repair.specialist`. */
+export const REPAIR_SPECIALIST = OBSERVER_SPECIALIST;
+/** Prefix of the slugs of pipeline action groups: `_action-<point>-<id>`. */
+export const ACTION_GROUP_PREFIX = '_action-';
+export const ACTION_STEP = 'action';
+/** Runtime of the attempt of a command action: the daemon runs a shell command, not an agent. */
+export const COMMAND_RUNTIME = 'command';
+export type AttemptRuntime = Runtime | typeof COMMAND_RUNTIME;
 export const SUMMARY_LIMIT = 4000;
 export const FEEDBACK_LIMIT = 16000;
 
@@ -58,6 +83,8 @@ export type FailReason =
   | { kind: 'timeout' }
   | { kind: 'no_report' }
   | { kind: 'interrupted' }
+  /** A command action ended with a non-zero exit code. */
+  | { kind: 'exit_code'; code: number }
   | { kind: 'no_groups' }
   | { kind: 'runtime_not_found'; runtime: string }
   | { kind: 'spawn'; message: string }
@@ -92,6 +119,8 @@ export function describeFailReason(reason: FailReason): string {
       return 'no report';
     case 'interrupted':
       return 'interrupted';
+    case 'exit_code':
+      return `exit code ${reason.code}`;
     case 'no_groups':
       return 'no groups';
     case 'runtime_not_found':
@@ -202,8 +231,8 @@ export interface HumanDecision {
   stepId: string;
   question: string;
   answer: string;
-  /** Who answered: a person or the autopilot of the queue. */
-  by: 'human' | 'autopilot';
+  /** Who answered: a person, the autopilot of the queue or an observer. */
+  by: 'human' | 'autopilot' | 'observer';
   /** Number of the attempt that asked the question. */
   attemptSeq?: number;
 }
@@ -243,7 +272,7 @@ export interface Attempt {
   stepIndex: number;
   round: number;
   specialist: string;
-  runtime: Runtime;
+  runtime: AttemptRuntime;
   model: string | null;
   status: AttemptStatus;
   input: StepInput;
@@ -284,6 +313,8 @@ export interface GroupDelivery {
   conflicts: string[];
   /** Files committed whole together with uncommitted edits the user had in them. */
   userEdits: string[];
+  /** Commit message of the delivery; absent in runs stored before the field existed. */
+  message?: string | null;
   /** The user merged the result by hand and marked the group delivered; no git operation ran. */
   manual: boolean;
   /** When the last delivery attempt of the group ended (ms); null before the first attempt. */
@@ -371,7 +402,7 @@ export type RunHold = (typeof RUN_HOLDS)[number];
 export interface Run {
   id: string;
   repository: string;
-  workflow: string;
+  pipeline: string;
   baseCommit: string;
   branch: string;
   refStyle: RefStyle;
@@ -399,6 +430,45 @@ export interface Run {
   skippedSteps: string[];
   /** The run is held and starts no step; null when it runs normally. */
   hold: RunHold | null;
+  /** State of the observer repairs of the run. */
+  repair: RunRepair;
+}
+
+export const INCIDENT_KINDS = ['question', 'failed', 'conflict', 'delivery'] as const;
+export type IncidentKind = (typeof INCIDENT_KINDS)[number];
+
+/** A state of a group an observer repairs; `key` includes the attempts of the group. */
+export interface Incident {
+  key: string;
+  kind: IncidentKind;
+  group: string;
+  detail: string;
+}
+
+export interface RunRepair {
+  /** An observer may take the incidents of the run. */
+  allowed: boolean;
+  /** Repairs started for the run. */
+  repairs: number;
+  /** Keys of incidents the observer reported on. */
+  taken: string[];
+  /** The incident being repaired; set from the start of a repair to its end. */
+  incident: Incident | null;
+  /** Profile of the observer when the repair started. */
+  specialist: Specialist | null;
+  /** Why the observer cancelled the whole run. */
+  cancelReason: string | null;
+}
+
+export function emptyRepair(): RunRepair {
+  return {
+    allowed: true,
+    repairs: 0,
+    taken: [],
+    incident: null,
+    specialist: null,
+    cancelReason: null,
+  };
 }
 
 export interface PendingDelivery {
@@ -411,6 +481,12 @@ export interface PendingDelivery {
   round?: number;
   /** Files that conflicted in the last attempt. */
   conflicts?: string[];
+  /** Files the delivery changes, as the request named them; for the commit message author. */
+  files?: string[];
+  /** The delivery waits for the actions before it. */
+  checks?: boolean;
+  /** An observer repairs the delivery: no commit message author, no resolver rounds. */
+  repair?: boolean;
 }
 
 export interface RunState {
@@ -419,12 +495,16 @@ export interface RunState {
   groups: Group[];
   message: Group | null;
   resolve: Group | null;
+  /** The group of the repairs of an observer; one attempt per repair. */
+  repair: Group | null;
+  /** Groups of pipeline actions in the order of the points, then of the lists of the points. */
+  actions: Group[];
 }
 
-export function runWorkflow(run: Run): Workflow {
-  const workflow = findWorkflow(run.config, run.workflow);
-  if (!workflow) throw new Error(`run ${run.id} has no workflow ${run.workflow}`);
-  return workflow;
+export function runPipeline(run: Run): Pipeline {
+  const pipeline = findPipeline(run.config, run.pipeline);
+  if (!pipeline) throw new Error(`run ${run.id} has no pipeline ${run.pipeline}`);
+  return pipeline;
 }
 
 export type RefStyle = 'branches' | 'refs';
@@ -441,20 +521,130 @@ export function deliveryBranch(run: Run): string {
   return `aip/${run.id}`;
 }
 
+export function actionSlug(point: ActionPoint, id: string): string {
+  return `${ACTION_GROUP_PREFIX}${point.replaceAll('_', '-')}-${id}`;
+}
+
+export interface ActionRef {
+  point: ActionPoint;
+  id: string;
+}
+
+/** The point and the action id of an action group slug; null for any other slug. */
+export function parseActionSlug(slug: string): ActionRef | null {
+  if (!slug.startsWith(ACTION_GROUP_PREFIX)) return null;
+  const rest = slug.slice(ACTION_GROUP_PREFIX.length);
+  for (const point of ACTION_POINTS) {
+    const prefix = `${point.replaceAll('_', '-')}-`;
+    if (rest.startsWith(prefix) && rest.length > prefix.length) {
+      return { point, id: rest.slice(prefix.length) };
+    }
+  }
+  return null;
+}
+
+export function isActionGroup(group: Group): boolean {
+  return parseActionSlug(group.slug) !== null;
+}
+
+/** The point of an action group; undefined for any other group. */
+export function actionPointOf(group: Group): ActionPoint | undefined {
+  return parseActionSlug(group.slug)?.point;
+}
+
+/** The action a group runs, from the snapshot of the run. */
+export function actionOf(run: Run, group: Group): Action | undefined {
+  const ref = parseActionSlug(group.slug);
+  return ref ? findAction(run.config, ref.id) : undefined;
+}
+
 export function findGroup(state: RunState, slug: string): Group | undefined {
   if (slug === SPLIT_GROUP) return state.split ?? undefined;
   if (slug === MESSAGE_GROUP) return state.message ?? undefined;
   if (slug === RESOLVE_GROUP) return state.resolve ?? undefined;
+  if (slug === REPAIR_GROUP) return state.repair ?? undefined;
+  if (slug.startsWith(ACTION_GROUP_PREFIX)) {
+    return (state.actions ?? []).find((group) => group.slug === slug);
+  }
   return state.groups.find((group) => group.slug === slug);
+}
+
+/** The action groups of one point in the order of its list. */
+export function actionGroupsOf(state: RunState, point: ActionPoint): Group[] {
+  return (state.actions ?? []).filter((group) => actionPointOf(group) === point);
 }
 
 export function allGroups(state: RunState): Group[] {
   return [
+    ...actionGroupsOf(state, 'before_split'),
     ...(state.split ? [state.split] : []),
+    ...actionGroupsOf(state, 'after_split'),
     ...state.groups,
+    ...actionGroupsOf(state, 'before_delivery'),
     ...(state.message ? [state.message] : []),
     ...(state.resolve ? [state.resolve] : []),
+    ...(state.repair ? [state.repair] : []),
+    ...actionGroupsOf(state, 'after_delivery'),
   ];
+}
+
+/** Settled for the pipeline: the action is done, or failed and the pipeline goes on anyway. */
+export function actionClosed(run: Run, group: Group): boolean {
+  if (group.status === 'merged') return true;
+  const action = actionOf(run, group);
+  if (group.status === 'failed') return action?.onFailure === 'continue';
+  // Cancelling a command after delivery only releases the cleanup.
+  if (group.status === 'cancelled') {
+    return action?.onFailure === 'continue' || actionPointOf(group) === 'after_delivery';
+  }
+  return false;
+}
+
+/** Every action of the point is settled; also true for a point that has no actions. */
+export function pointClosed(state: RunState, point: ActionPoint): boolean {
+  return actionGroupsOf(state, point).every((group) => actionClosed(state.run, group));
+}
+
+/** The first action of the point that is not settled. */
+export function openAction(state: RunState, point: ActionPoint): Group | undefined {
+  return actionGroupsOf(state, point).find((group) => !actionClosed(state.run, group));
+}
+
+/** The open action of the point stopped the pipeline and waits for a retry. */
+export function pointStalled(state: RunState, point: ActionPoint): boolean {
+  const open = openAction(state, point);
+  return open !== undefined && (open.status === 'failed' || open.status === 'cancelled');
+}
+
+/** A queued group that waits for an action which stopped the pipeline: only a retry frees it. */
+export function isHeldByAction(state: RunState, group: Group): boolean {
+  if (group.status !== 'queued') return false;
+  const point = actionPointOf(group);
+  if (point !== undefined) {
+    const open = openAction(state, point);
+    return open !== undefined && open !== group && pointStalled(state, point);
+  }
+  if (group === state.split) return pointStalled(state, 'before_split');
+  if (state.groups.includes(group)) return pointStalled(state, 'after_split');
+  return false;
+}
+
+/**
+ * A check before delivery works in the tree of the run or is about to, and merges use that tree.
+ * A check that stopped the pipeline, and the ones held behind it, keep no merge waiting.
+ */
+export function deliveryCheckActive(state: RunState): boolean {
+  return actionGroupsOf(state, 'before_delivery').some(
+    (group) =>
+      group.status === 'running' || (group.status === 'queued' && !isHeldByAction(state, group)),
+  );
+}
+
+/** Action groups that failed or were cancelled and stop the pipeline. */
+export function stoppedActions(state: RunState, status: 'failed' | 'cancelled'): Group[] {
+  return (state.actions ?? []).filter(
+    (group) => group.status === status && !actionClosed(state.run, group),
+  );
 }
 
 export function isSplitGroup(group: Group): boolean {
@@ -469,12 +659,36 @@ export function isResolveGroup(group: Group): boolean {
   return group.slug === RESOLVE_GROUP;
 }
 
+export function isRepairGroup(group: Group): boolean {
+  return group.slug === REPAIR_GROUP;
+}
+
 export function isServiceGroup(group: Group): boolean {
-  return isSplitGroup(group) || isMessageGroup(group) || isResolveGroup(group);
+  return (
+    isSplitGroup(group) ||
+    isMessageGroup(group) ||
+    isResolveGroup(group) ||
+    isRepairGroup(group) ||
+    isActionGroup(group)
+  );
 }
 
 export function stepsOf(run: Run, group: Group): Step[] {
-  const workflow = runWorkflow(run);
+  const pipeline = runPipeline(run);
+  if (isActionGroup(group)) {
+    const action = actionOf(run, group);
+    const ref = parseActionSlug(group.slug);
+    if (!action || !ref) throw new Error(`group ${group.slug} has no action in the configuration`);
+    return [
+      {
+        id: ref.id,
+        specialist: action.specialist ?? action.id,
+        onReject: null,
+        additionalPrompt: action.additionalPrompt,
+        humanReview: false,
+      },
+    ];
+  }
   if (isMessageGroup(group)) {
     const specialist = run.config.delivery.messageSpecialist;
     if (!specialist) throw new Error('no delivery.message_specialist is configured');
@@ -489,23 +703,60 @@ export function stepsOf(run: Run, group: Group): Step[] {
       { id: RESOLVE_STEP, specialist, onReject: null, additionalPrompt: null, humanReview: false },
     ];
   }
-  if (!isSplitGroup(group)) return groupWorkflow(run.config, workflow).steps;
-  if (!workflow.split) throw new Error(`workflow ${workflow.id} has no split`);
+  if (isRepairGroup(group)) {
+    return [
+      {
+        id: REPAIR_STEP,
+        specialist: REPAIR_SPECIALIST,
+        onReject: null,
+        additionalPrompt: null,
+        humanReview: false,
+      },
+    ];
+  }
+  if (!isSplitGroup(group)) return groupPipeline(run.config, pipeline).steps;
+  if (!pipeline.split) throw new Error(`pipeline ${pipeline.id} has no split`);
   return [
     {
       id: SPLIT_STEP,
-      specialist: workflow.split.specialist,
+      specialist: pipeline.split.specialist,
       onReject: null,
       // Runs saved before the field existed have no value.
-      additionalPrompt: workflow.split.additionalPrompt ?? null,
+      additionalPrompt: pipeline.split.additionalPrompt ?? null,
       humanReview: false,
     },
   ];
 }
 
+function groupsSettled(state: RunState, units: Group[]): boolean {
+  return (
+    units.length > 0 &&
+    units.every((group) => isTerminal(group.status) || isHeldByAction(state, group))
+  );
+}
+
+/** A run with an incident under repair is not finished, even before the repair group exists. */
 export function isRunFinished(state: RunState): boolean {
-  const units = allGroups(state);
-  return units.length > 0 && units.every((group) => isTerminal(group.status));
+  return state.run.repair.incident === null && groupsSettled(state, allGroups(state));
+}
+
+/**
+ * Finished as `isRunFinished` is, but without the incident under repair and without the repair
+ * group: the view of the queue on a run an observer works on.
+ */
+export function finishedApartFromRepair(state: RunState): boolean {
+  // Without an incident the run is finished exactly when `finishedAt` is set.
+  if (state.run.repair.incident === null) return state.run.finishedAt !== null;
+  return groupsSettled(
+    state,
+    allGroups(state).filter((group) => !isRepairGroup(group)),
+  );
+}
+
+/** The specialist of a step: the snapshot of the observer for the repair group, else the config. */
+export function specialistOfStep(run: Run, group: Group, slug: string): Specialist | undefined {
+  if (isRepairGroup(group)) return run.repair.specialist ?? undefined;
+  return findSpecialist(run.config, slug);
 }
 
 export type RunPhase = 'needs_human' | 'active' | 'finished' | 'cancelled' | 'failed';
@@ -523,7 +774,8 @@ export function runPhase(state: RunState): RunPhase {
   }
   const cancelled =
     state.split?.status === 'cancelled' ||
-    state.groups.some((group) => group.status === 'cancelled');
+    state.groups.some((group) => group.status === 'cancelled') ||
+    stoppedActions(state, 'cancelled').length > 0;
   if (cancelled) return 'cancelled';
   const failed =
     state.split?.status === 'failed' ||
@@ -531,6 +783,7 @@ export function runPhase(state: RunState): RunPhase {
       (group) =>
         group.status === 'failed' ||
         (group.status === 'merged' && group.delivery.state === 'apply_failed'),
-    );
+    ) ||
+    stoppedActions(state, 'failed').length > 0;
   return failed ? 'failed' : 'finished';
 }

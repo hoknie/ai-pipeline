@@ -311,7 +311,7 @@ test(
   },
 );
 
-test('/aip:run starts a workflow in the session repository', SLOW, async ($, on) => {
+test('/aip:run starts a pipeline in the session repository', SLOW, async ($, on) => {
   const aip = world(on);
   aip.answer((argv) =>
     argv[1] === 'run' && argv[2] === 'start'
@@ -344,7 +344,7 @@ test('/aip:run starts a workflow in the session repository', SLOW, async ($, on)
   ]);
   expect(result.text).toBe('**r9** started on `aip/r9`\n\n- **dobavit-vhod** — добавить вход');
   expect((await $.command.run(typed('aip:run', 'feature'))).text).toBe(
-    'Usage: /aip:run <workflow> <task>',
+    'Usage: /aip:run <pipeline> <task>',
   );
 });
 

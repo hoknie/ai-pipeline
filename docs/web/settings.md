@@ -8,7 +8,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
+"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
 
 ## Project groups
 
@@ -27,25 +27,33 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 - On "Project" a field set in the project has the button "Inherit", which removes the key from the project file. A field without a project value shows the shared (or built-in) value with a mark of where it comes from.
 - Errors of validation are shown at the fields. If the file was changed after it was read, the form offers "Reload".
 - Leaving a group, a tab or a project with unsaved changes asks for confirmation.
-- A group with configuration errors gets a mark, and the errors are shown in the group. Errors of specialists and workflows are shown in "General".
+- A group with configuration errors gets a mark, and the errors are shown in the group. Errors of specialists and pipelines are shown in "General".
 - Of the runtime environment only the names of the variables are shown, never their values: a value can be added or replaced, not read. A change of `web.*` takes effect after the restart: see [System](#system).
 
 ## Shared specialists
 
 The group "Specialists" of "Shared" edits the files of the shared `specialists/` directory: a list on the left and a form on the right. The form saves to the shared file; there is no level switch.
 
-- The block "Used in projects" shows the number of repositories where the specialist is used and the list of them, with the workflow and step, `split` or delivery field that refer to it. References from the shared workflows and shared `delivery.*` get a separate line "Shared level".
+- The block "Used in projects" shows the number of repositories where the specialist is used and the list of them, with the pipeline and step, `split` or delivery field that refer to it. References from the shared pipelines and shared `delivery.*` get a separate line "Shared level".
 - A specialist is used in a repository when the configuration of the repository refers to it and the repository has no project file with that name.
 - "Delete" stays disabled while the specialist is used anywhere. The daemon checks this too, and refuses with the references and the repositories they come from.
 
 ## Shared pipelines
 
-The group "Pipeline" of "Shared" edits the files of the shared `workflows/` directory: a list with search by id, name and tag, and a form that saves to the shared file. The shared tags are edited here. Only shared specialists can be chosen for the steps. A change applies in every repository.
+The group "Pipeline" of "Shared" edits the files of the shared `pipelines/` directory: a list with search by id, name and tag, and a form that saves to the shared file. The shared tags are edited here. Only shared specialists can be chosen for the steps. A change applies in every repository.
 
-- The block "Used in projects" lists the repositories where a `split.workflow` refers to the pipeline. References from other shared pipelines get the line "Shared level". A repository with its own file of that id is not counted.
+- The block "Used in projects" lists the repositories where a `split.pipeline` refers to the pipeline. References from other shared pipelines get the line "Shared level". A repository with its own file of that id is not counted.
 - "Delete" stays disabled while the pipeline is used anywhere. The daemon checks this too, across all repositories of the panel, and refuses with the references.
 
 The addresses are `#settings/global/pipelines`, `#settings/global/pipelines/<id>` and `#settings/global/pipelines/new`.
+
+## Observers
+
+The group "Observers" of "Shared" sets the agents that take a task after an incident (a question, a failed step, a conflict or a refused delivery) and try to repair it. The address is `#settings/global/observers/<tab>`; an unknown tab opens "Main", and choosing a tab changes the address. The three tabs are one form: "Save" writes them together, and the errors of validation are shown at the fields.
+
+- "Main": the switch "Enable observers", "Workers" (1 to 20, how many observers work at once), "Repairs per task" (1 to 50) and the switch "Answer questions meant only for a human" (off: such a question waits for a person; on: the agent decides it). Under the fields are the repairs in progress and the number of tasks waiting for a worker; they follow the stream without a reload.
+- "Specialist": the fields of the specialist that works as the observer, as in a specialist form, but without the slug, tags, limit and queue.
+- "Projects": the repositories of the registry, each with a switch "Connect" and the field "Workers in the project", empty by default (no limit of its own).
 
 ## System
 

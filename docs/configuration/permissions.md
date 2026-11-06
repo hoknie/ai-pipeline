@@ -53,7 +53,7 @@ A run works from the configuration snapshot taken when it starts. On a retry or 
 
 - These are `permissions`, `allow_commands`, `tools`, `queue` and `claude.edit_mode`.
 - The new permissions apply to all following steps of all groups of the run.
-- Prompts, models, workflows and other settings stay as in the snapshot. To take them too, see [Retry with the current configuration](../usage/runs.md#retry-with-the-current-configuration).
+- Prompts, models, pipelines and other settings stay as in the snapshot. To take them too, see [Retry with the current configuration](../usage/runs.md#retry-with-the-current-configuration).
 - If the configuration does not pass validation, the retry or the answer goes ahead with the old permissions, and the group gets the warning `permissions not refreshed: …`.
 
 A hook in your own Claude Code settings can break `allow_commands` patterns: see [`claude.settings`](runtimes.md#claudesettings).

@@ -24,7 +24,7 @@ The daemon keeps the list in its database. A repository joins on the first reque
 ## Choosing a repository
 
 - **CLI.** `--repo <path>` exists on `aip run start`, `aip queue …`, `aip tag …` and `aip config check`. By default it is the current directory. Commands that take a run id work from any directory, and `aip run list` shows the runs of all repositories.
-- **MCP and the plugin.** `swarm_run` and `swarm_queue*` have `repo?`. `/aip:run` starts a workflow in the repository of the Claude Code session. The session's directory does not affect which repository the Claude Code panel selects.
+- **MCP and the plugin.** `swarm_run` and `swarm_queue*` have `repo?`. `/aip:run` starts a pipeline in the repository of the Claude Code session. The session's directory does not affect which repository the Claude Code panel selects.
 - **Web panel.** One panel serves all repositories: [pick the repository](../web/README.md#repositories) in it. `aip web --port 7342`, run from a repository, is only for a separate panel with its own token.
 
 ## Limits

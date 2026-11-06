@@ -49,7 +49,7 @@ export function createHostServer(options: HostOptions): McpServer {
     .array(z.string())
     .optional()
     .describe(
-      'Ids of workflow steps this task skips, e.g. ["review", "qa"]. Edit replaces the whole list; [] runs every step',
+      'Ids of pipeline steps this task skips, e.g. ["review", "qa"]. Edit replaces the whole list; [] runs every step',
     );
   const after = z
     .array(z.string())
@@ -68,9 +68,9 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Queue a swarm task',
       description:
-        'Queue a workflow from the aip/ configuration in a git repository: the task goes to the end of the repository queue, a stopped queue is started, and the run is created when the queue takes the task (the answer says whether it already exists). Pass either task (one text; the workflow may split it into groups) or groups (explicit list). The run works in its own branches; your working copy is not changed.',
+        'Queue a pipeline from the aip/ configuration in a git repository: the task goes to the end of the repository queue, a stopped queue is started, and the run is created when the queue takes the task (the answer says whether it already exists). Pass either task (one text; the pipeline may split it into groups) or groups (explicit list). The run works in its own branches; your working copy is not changed.',
       inputSchema: {
-        workflow: z.string().describe('Workflow id from the aip/ configuration'),
+        pipeline: z.string().describe('Pipeline id from the aip/ configuration'),
         task: z.string().optional().describe('One task text'),
         groups: z
           .array(z.object({ title: z.string(), task: z.string() }))
@@ -100,7 +100,7 @@ export function createHostServer(options: HostOptions): McpServer {
       },
     },
     ({
-      workflow,
+      pipeline,
       task,
       groups,
       repo,
@@ -115,7 +115,7 @@ export function createHostServer(options: HostOptions): McpServer {
       attempt(async () => {
         const queued = (await options.send('run', {
           repository: repo ?? options.cwd,
-          workflow,
+          pipeline,
           ...(task !== undefined ? { task } : {}),
           ...(groups !== undefined ? { groups } : {}),
           ...(title !== undefined ? { title } : {}),
@@ -185,7 +185,7 @@ export function createHostServer(options: HostOptions): McpServer {
     {
       title: 'Retry a group',
       description:
-        'Retry a failed or cancelled group from where it stopped, or its merge after a conflict. With refresh_config=true the run first takes the whole specialists (model, runtime, prompt, permissions) from the current configuration; the workflow stays as it started. If the run joins the queue and every place is taken, the last run that took a place is frozen: it finishes its current step and continues when a place is free.',
+        'Retry a failed or cancelled group from where it stopped, or its merge after a conflict. With refresh_config=true the run first takes the whole specialists (model, runtime, prompt, permissions) from the current configuration; the pipeline stays as it started. If the run joins the queue and every place is taken, the last run that took a place is frozen: it finishes its current step and continues when a place is free.',
       inputSchema: {
         run_id: runId,
         group,
@@ -313,7 +313,7 @@ export function createHostServer(options: HostOptions): McpServer {
       description:
         'Put a task at the end of the repository queue. Pass either task or groups. It does not start the queue: call swarm_queue_start.',
       inputSchema: {
-        workflow: z.string().describe('Workflow id from swarm.yaml'),
+        pipeline: z.string().describe('Pipeline id from swarm.yaml'),
         task: z.string().optional().describe('One task text'),
         groups: queueGroups.optional(),
         title: z.string().optional().describe('Title of the run, at most 60 characters'),
@@ -341,7 +341,7 @@ export function createHostServer(options: HostOptions): McpServer {
       },
     },
     ({
-      workflow,
+      pipeline,
       task,
       groups,
       title,
@@ -358,7 +358,7 @@ export function createHostServer(options: HostOptions): McpServer {
         showQueue(
           'queue_add',
           {
-            workflow,
+            pipeline,
             ...(task !== undefined ? { task } : {}),
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),
@@ -383,7 +383,7 @@ export function createHostServer(options: HostOptions): McpServer {
         'Change fields of a waiting task, or move it to a position (1 starts first). A task that already became a run cannot be changed, except `skip`: for a returned run it skips or restores the steps of the run at once.',
       inputSchema: {
         item,
-        workflow: z.string().optional(),
+        pipeline: z.string().optional(),
         task: z.string().optional(),
         groups: queueGroups.optional(),
         title: z.string().nullable().optional().describe('null removes the title'),
@@ -415,7 +415,7 @@ export function createHostServer(options: HostOptions): McpServer {
     },
     ({
       item: id,
-      workflow,
+      pipeline,
       task,
       groups,
       title,
@@ -434,7 +434,7 @@ export function createHostServer(options: HostOptions): McpServer {
           'queue_edit',
           {
             item: id,
-            ...(workflow !== undefined ? { workflow } : {}),
+            ...(pipeline !== undefined ? { pipeline } : {}),
             ...(task !== undefined ? { task } : {}),
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),

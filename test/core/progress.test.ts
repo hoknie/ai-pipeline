@@ -123,9 +123,9 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({ done: 0, total: 0, current: null });
   });
 
-  it('gives 0 of 0 when the workflow is missing', () => {
+  it('gives 0 of 0 when the pipeline is missing', () => {
     const state = run(1);
-    state.run.workflow = 'gone';
+    state.run.pipeline = 'gone';
     expect(stepProgress(state)).toEqual({ done: 0, total: 0, current: null });
   });
 });

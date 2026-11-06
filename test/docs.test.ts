@@ -16,7 +16,7 @@ import {
   configFromFiles,
   configPaths,
   findSpecialist,
-  findWorkflow,
+  findPipeline,
   loadRuntimeSettings,
   loadWebSettings,
 } from '../src/config/index.ts';
@@ -73,26 +73,26 @@ function anchor(heading: string): string {
 
 describe('documentation examples', () => {
   it('README files form a valid configuration', () => {
-    const [settings, workflow] = yamlBlocks('README.md');
+    const [settings, pipeline] = yamlBlocks('README.md');
     const config = configFromFiles({
       settings: settings ?? '',
       specialists: {
         coder: 'name: Coder\n',
         reviewer: 'name: Reviewer\npermissions: read\n',
       },
-      workflows: { feature: workflow ?? '' },
+      pipelines: { feature: pipeline ?? '' },
     });
-    expect(findWorkflow(config, 'feature')?.steps).toHaveLength(2);
+    expect(findPipeline(config, 'feature')?.steps).toHaveLength(2);
     expect(config.max).toBe(2);
   });
 
-  it('the specialist and workflow examples of the docs are valid files', () => {
+  it('the specialist and pipeline examples of the docs are valid files', () => {
     const plan =
       yamlBlocks('docs/configuration/specialists.md').find((block) =>
         block.startsWith('name: Planner'),
       ) ?? '';
-    const workflow =
-      yamlBlocks('docs/configuration/workflows.md').find((block) =>
+    const pipeline =
+      yamlBlocks('docs/configuration/pipelines.md').find((block) =>
         block.startsWith('name: New feature'),
       ) ?? '';
     const config = configFromFiles({
@@ -101,31 +101,55 @@ describe('documentation examples', () => {
         coder: 'name: Coder\n',
         reviewer: 'name: Reviewer\npermissions: read\n',
       },
-      workflows: { feature: workflow },
+      pipelines: { feature: pipeline },
     });
     expect(findSpecialist(config, 'plan')).toMatchObject({ max: 1, permissions: 'read' });
-    expect(findWorkflow(config, 'feature')?.name).toBe('New feature');
-    expect(findWorkflow(config, 'feature')?.split).toEqual({
+    expect(findPipeline(config, 'feature')?.name).toBe('New feature');
+    expect(findPipeline(config, 'feature')?.split).toEqual({
       specialist: 'plan',
       maxGroups: 5,
       additionalPrompt: 'At most one group per module.',
-      workflow: null,
+      pipeline: null,
     });
-    expect(findWorkflow(config, 'feature')?.steps[1]?.additionalPrompt).toBe(
+    expect(findPipeline(config, 'feature')?.steps[1]?.additionalPrompt).toBe(
       'Check only the tests and the error handling.',
     );
   });
 
-  it('the epic example of docs/configuration/workflows.md splits into another workflow', () => {
+  it('the action examples of docs/configuration/actions.md and the examples directory are valid', () => {
+    const blocks = yamlBlocks('docs/configuration/actions.md');
+    const lint = blocks.find((b) => b.startsWith('# aip/actions/lint')) ?? '';
+    const commit = blocks.find((b) => b.startsWith('# aip/actions/commit')) ?? '';
+    const stages = blocks.find((b) => b.startsWith('# aip/settings.yaml')) ?? '';
+    const config = configFromFiles({
+      settings: stages,
+      actions: { lint, commit },
+    });
+    expect(config.actions.map((a) => a.id).sort()).toEqual(['commit', 'lint']);
+    expect(config.stages).toEqual({ before_delivery: ['lint'], after_delivery: ['commit'] });
+
+    const read = (file: string): string => readFileSync(join(root, 'examples/aip', file), 'utf8');
+    const example = configFromFiles({
+      settings: read('settings.yaml'),
+      specialists: Object.fromEntries(
+        ['coder', 'plan', 'qa', 'reviewer'].map((s) => [s, read(`specialists/${s}.yaml`)]),
+      ),
+      pipelines: { feature: read('pipelines/feature.yaml') },
+      actions: { lint: read('actions/lint.yaml'), commit: read('actions/commit.yaml') },
+    });
+    expect(findPipeline(example, 'feature')?.stages).toEqual({ before_delivery: ['lint'] });
+  });
+
+  it('the epic example of docs/configuration/pipelines.md splits into another pipeline', () => {
     const epic =
-      yamlBlocks('docs/configuration/workflows.md').find((b) =>
-        b.startsWith('# aip/workflows/epic'),
+      yamlBlocks('docs/configuration/pipelines.md').find((b) =>
+        b.startsWith('# aip/pipelines/epic'),
       ) ?? '';
     const config = configFromFiles({
       specialists: { plan: 'name: P\n', coder: 'name: C\n' },
-      workflows: { epic, explore: 'steps:\n  - { id: research, specialist: coder }\n' },
+      pipelines: { epic, explore: 'steps:\n  - { id: research, specialist: coder }\n' },
     });
-    expect(findWorkflow(config, 'epic')?.split).toMatchObject({ workflow: 'explore' });
+    expect(findPipeline(config, 'epic')?.split).toMatchObject({ pipeline: 'explore' });
   });
 
   it('the runtimes example of docs/configuration/runtimes.md is valid in the global settings', () => {

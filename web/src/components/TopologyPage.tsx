@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../api.ts';
 import { formatRoute } from '../route.ts';
-import type { RunView, WorkflowsView } from '../types.ts';
+import type { RunView, PipelinesView } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
@@ -11,7 +11,7 @@ import { Skeleton } from '../ui/skeleton.tsx';
 
 import { ConfigErrors, EntryList, SplitPage } from './EntryList.tsx';
 import { StatusBadge } from './StatusBadge.tsx';
-import { WorkflowGraph } from './WorkflowGraph.tsx';
+import { PipelineGraph } from './PipelineGraph.tsx';
 import { repositoryLabel } from '../repositories.ts';
 import { machineLoad } from '../specialistLoad.ts';
 import { liveState, otherUse, type LiveGroup, type StageNode } from './topologyLayout.ts';
@@ -19,26 +19,26 @@ import { liveState, otherUse, type LiveGroup, type StageNode } from './topologyL
 export default function TopologyPage({
   api,
   runs,
-  workflow: selectedId,
-  onSelectWorkflow,
-  onEditWorkflow,
+  pipeline: selectedId,
+  onSelectPipeline,
+  onEditPipeline,
   onOpenGroup,
 }: {
   api: Api;
   runs: RunView[];
-  workflow: string | null;
-  onSelectWorkflow: (id: string) => void;
-  onEditWorkflow?: (id: string) => void;
+  pipeline: string | null;
+  onSelectPipeline: (id: string) => void;
+  onEditPipeline?: (id: string) => void;
   onOpenGroup: (group: LiveGroup, step: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [view, setView] = useState<WorkflowsView | null>(null);
+  const [view, setView] = useState<PipelinesView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
     let stopped = false;
-    api.workflows().then(
+    api.pipelines().then(
       (next) => !stopped && setView(next),
       (error: Error) => !stopped && setFailure(error.message),
     );
@@ -47,12 +47,12 @@ export default function TopologyPage({
     };
   }, [api]);
 
-  const workflow =
-    view?.workflows.find((candidate) => candidate.id === selectedId) ?? view?.workflows[0] ?? null;
+  const pipeline =
+    view?.pipelines.find((candidate) => candidate.id === selectedId) ?? view?.pipelines[0] ?? null;
   const counts = useMemo(
     () =>
       new Map(
-        (view?.workflows ?? []).map((candidate) => [
+        (view?.pipelines ?? []).map((candidate) => [
           candidate.id,
           liveState(candidate, runs, view?.repository ?? null).runs,
         ]),
@@ -60,8 +60,8 @@ export default function TopologyPage({
     [view, runs],
   );
   const live = useMemo(
-    () => (workflow ? liveState(workflow, runs, view?.repository ?? null) : null),
-    [workflow, runs, view],
+    () => (pipeline ? liveState(pipeline, runs, view?.repository ?? null) : null),
+    [pipeline, runs, view],
   );
   const load = useMemo(() => machineLoad(runs), [runs]);
   const [nodes, setNodes] = useState<StageNode[]>([]);
@@ -79,12 +79,12 @@ export default function TopologyPage({
           ) : null}
           <EntryList
             label="pipeline"
-            selected={workflow?.id ?? null}
+            selected={pipeline?.id ?? null}
             onSelect={(id) => {
               setSelected(null);
-              onSelectWorkflow(id);
+              onSelectPipeline(id);
             }}
-            entries={(view?.workflows ?? []).map((candidate) => ({
+            entries={(view?.pipelines ?? []).map((candidate) => ({
               id: candidate.id,
               title: candidate.name,
               hint: candidate.id,
@@ -105,26 +105,26 @@ export default function TopologyPage({
       <div className="flex flex-col gap-4">
         {failure ? <Alert variant="destructive">{failure}</Alert> : null}
         {view ? <ConfigErrors errors={view.errors} /> : null}
-        {workflow && live ? (
-          <section aria-label={`pipeline ${workflow.id}`} className="flex flex-col gap-3">
+        {pipeline && live ? (
+          <section aria-label={`pipeline ${pipeline.id}`} className="flex flex-col gap-3">
             <header className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold" title={workflow.id}>
-                  {workflow.name}
+                <h2 className="text-lg font-semibold" title={pipeline.id}>
+                  {pipeline.name}
                 </h2>
-                {onEditWorkflow ? (
+                {onEditPipeline ? (
                   <Button variant="link" size="sm" asChild>
                     <a
                       href={formatRoute({
-                        view: 'workflows',
-                        run: workflow.id,
+                        view: 'pipelines',
+                        run: pipeline.id,
                         group: null,
                         step: null,
                         tab: null,
                       })}
                       onClick={(event) => {
                         event.preventDefault();
-                        onEditWorkflow(workflow.id);
+                        onEditPipeline(pipeline.id);
                       }}
                     >
                       {t('topology.edit')}
@@ -134,7 +134,7 @@ export default function TopologyPage({
               </div>
               <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
                 <span>{view?.repository}</span>
-                <span>{t('topology.delivery', { mode: workflow.delivery.mode })}</span>
+                <span>{t('topology.delivery', { mode: pipeline.delivery.mode })}</span>
                 {live.runs > 0 ? (
                   <span>{t('topology.activeRuns', { n: live.runs })}</span>
                 ) : (
@@ -143,8 +143,8 @@ export default function TopologyPage({
               </div>
             </header>
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-              <WorkflowGraph
-                workflow={workflow}
+              <PipelineGraph
+                pipeline={pipeline}
                 live={live}
                 load={load}
                 selected={selected}
@@ -161,6 +161,27 @@ export default function TopologyPage({
                   <>
                     <h3 className="font-semibold">{node.data.title}</h3>
                     <p className="text-muted-foreground">{node.data.subtitle}</p>
+                    {node.data.kind !== 'step' ? (
+                      <div className="flex flex-col gap-1" data-testid="stage-about">
+                        <p>{t(`topology.stages.about.${node.data.kind}`)}</p>
+                        <p className="text-muted-foreground">
+                          {t('topology.stages.performer')}: {node.data.performer}
+                        </p>
+                        {node.data.condition !== null ? (
+                          <p className="text-muted-foreground">
+                            {t('topology.stages.conditionLabel')}: {node.data.condition}
+                          </p>
+                        ) : null}
+                        {node.data.link ? (
+                          <a
+                            className="text-primary underline-offset-4 hover:underline"
+                            href={node.data.link}
+                          >
+                            {t('topology.stages.open')}
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {node.data.groups.length === 0 ? (
                       <p className="text-muted-foreground">{t('topology.noGroups')}</p>
                     ) : null}

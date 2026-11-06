@@ -134,7 +134,7 @@ describe('requests', () => {
         JSON.stringify({
           id: 1,
           method: 'run',
-          params: { repository: '/r', workflow: 'f', ...params },
+          params: { repository: '/r', pipeline: 'f', ...params },
         }),
       );
     expect('request' in run({ task: 'x' })).toBe(true);
@@ -243,8 +243,8 @@ describe('queue requests', () => {
 
   it('accepts a task or groups', () => {
     ok('queue', { repository: '/r' });
-    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', title: 'Вход' });
-    ok('queue_add', { repository: '/r', workflow: 'feature', groups: [{ title: 'a', task: 'b' }] });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', title: 'Вход' });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', groups: [{ title: 'a', task: 'b' }] });
     ok('queue_edit', { repository: '/r', item: 'q1', position: 2, title: null });
     ok('queue_remove', { repository: '/r', item: 'q1' });
     ok('queue_start', { repository: '/r' });
@@ -275,57 +275,57 @@ describe('queue requests', () => {
   });
 
   it('takes parent as a task number or a non-empty string, null only on edit', () => {
-    ok('run', { repository: '/r', workflow: 'feature', task: 'x', parent: 115 });
-    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', parent: '#115' });
+    ok('run', { repository: '/r', pipeline: 'feature', task: 'x', parent: 115 });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', parent: '#115' });
     ok('queue_edit', { repository: '/r', item: 'q1', parent: 'r1' });
     ok('queue_edit', { repository: '/r', item: 'q1', parent: null });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', parent: null });
-    bad('run', { repository: '/r', workflow: 'feature', task: 'x', parent: 0 });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', parent: '' });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', parent: null });
+    bad('run', { repository: '/r', pipeline: 'feature', task: 'x', parent: 0 });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', parent: '' });
     bad('queue_edit', { repository: '/r', item: 'q1', parent: 1.5 });
   });
 
   it('takes skip as a list of non-empty step ids', () => {
-    ok('run', { repository: '/r', workflow: 'feature', task: 'x', skip: ['qa'] });
-    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', skip: ['review', 'qa'] });
-    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', after: ['q1', 'r1'] });
+    ok('run', { repository: '/r', pipeline: 'feature', task: 'x', skip: ['qa'] });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', skip: ['review', 'qa'] });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', after: ['q1', 'r1'] });
     ok('queue_edit', { repository: '/r', item: 'q1', after: [] });
-    ok('run', { repository: '/r', workflow: 'feature', task: 'x', after: ['q1'] });
-    ok('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', after: ['q1'] });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', after: [''] });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', after: 'q1' });
-    bad('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', after: [''] });
-    ok('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', skip: ['qa'] });
+    ok('run', { repository: '/r', pipeline: 'feature', task: 'x', after: ['q1'] });
+    ok('worker_queue_add', { token: 't', pipeline: 'feature', task: 'x', after: ['q1'] });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', after: [''] });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', after: 'q1' });
+    bad('worker_queue_add', { token: 't', pipeline: 'feature', task: 'x', after: [''] });
+    ok('worker_queue_add', { token: 't', pipeline: 'feature', task: 'x', skip: ['qa'] });
     ok('queue_edit', { repository: '/r', item: 'q1', skip: [] });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', skip: [''] });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', skip: [''] });
     bad('queue_edit', { repository: '/r', item: 'q1', skip: 'qa' });
   });
 
   it('takes autoDeliver as a boolean, and null only when editing', () => {
-    ok('run', { repository: '/r', workflow: 'feature', task: 'x', autoDeliver: false });
-    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', autoDeliver: true });
-    ok('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', autoDeliver: false });
+    ok('run', { repository: '/r', pipeline: 'feature', task: 'x', autoDeliver: false });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', autoDeliver: true });
+    ok('worker_queue_add', { token: 't', pipeline: 'feature', task: 'x', autoDeliver: false });
     ok('queue_edit', { repository: '/r', item: 'q1', autoDeliver: null });
     ok('queue_edit', { repository: '/r', item: 'q1', autoDeliver: false });
-    bad('run', { repository: '/r', workflow: 'feature', task: 'x', autoDeliver: 'no' });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', autoDeliver: null });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', autoDeliver: 1 });
-    bad('worker_queue_add', { token: 't', workflow: 'feature', task: 'x', autoDeliver: null });
+    bad('run', { repository: '/r', pipeline: 'feature', task: 'x', autoDeliver: 'no' });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', autoDeliver: null });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', autoDeliver: 1 });
+    bad('worker_queue_add', { token: 't', pipeline: 'feature', task: 'x', autoDeliver: null });
     bad('queue_edit', { repository: '/r', item: 'q1', autoDeliver: 'yes' });
   });
 
   it('takes a delivery mode of a task, and null only when editing', () => {
-    ok('run', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'commit' });
-    ok('queue_add', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'branch' });
+    ok('run', { repository: '/r', pipeline: 'feature', task: 'x', deliveryMode: 'commit' });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', deliveryMode: 'branch' });
     ok('worker_queue_add', {
       token: 't',
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       deliveryMode: 'worktree',
     });
     ok('queue_edit', { repository: '/r', item: 'q1', deliveryMode: null });
-    bad('run', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: 'patch' });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', deliveryMode: null });
+    bad('run', { repository: '/r', pipeline: 'feature', task: 'x', deliveryMode: 'patch' });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', deliveryMode: null });
     bad('queue_edit', { repository: '/r', item: 'q1', deliveryMode: true });
   });
 
@@ -389,14 +389,14 @@ describe('queue requests', () => {
   it('rejects both a task and groups, neither, an empty task and a long title', () => {
     bad('queue_add', {
       repository: '/r',
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       groups: [{ title: 'a', task: 'b' }],
     });
-    bad('queue_add', { repository: '/r', workflow: 'feature' });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: '   ' });
-    bad('queue_add', { repository: '/r', workflow: 'feature', task: 'x', title: 'я'.repeat(61) });
-    bad('queue_add', { repository: '/r', workflow: 'feature', groups: [] });
+    bad('queue_add', { repository: '/r', pipeline: 'feature' });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: '   ' });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', title: 'я'.repeat(61) });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', groups: [] });
     bad('queue_edit', {
       repository: '/r',
       item: 'q1',
@@ -460,9 +460,9 @@ describe('config requests', () => {
   });
 });
 
-describe('workflow config requests', () => {
-  it('accepts a workflow write and a preview', () => {
-    const base = { repository: '/repo', kind: 'workflow', id: 'feature', value: { steps: [] } };
+describe('pipeline config requests', () => {
+  it('accepts a pipeline write and a preview', () => {
+    const base = { repository: '/repo', kind: 'pipeline', id: 'feature', value: { steps: [] } };
     expect(
       requestSchema.safeParse({ method: 'config_write', params: { ...base, revision: null } })
         .success,
@@ -471,7 +471,7 @@ describe('workflow config requests', () => {
   });
 
   it('rejects a preview of a specialist, without a value, and with a bad id', () => {
-    const base = { repository: '/repo', kind: 'workflow', id: 'feature', value: {} };
+    const base = { repository: '/repo', kind: 'pipeline', id: 'feature', value: {} };
     expect(
       requestSchema.safeParse({ method: 'config_preview', params: { ...base, kind: 'specialist' } })
         .success,
@@ -581,21 +581,21 @@ describe('tag requests', () => {
   });
 
   it('takes tag names in run, queue_add and queue_edit and limits them', () => {
-    ok('run', { repository: '/r', workflow: 'f', task: 'x', tags: ['auth'] });
-    ok('queue_add', { repository: '/r', workflow: 'f', task: 'x', tags: ['auth', 'v2'] });
+    ok('run', { repository: '/r', pipeline: 'f', task: 'x', tags: ['auth'] });
+    ok('queue_add', { repository: '/r', pipeline: 'f', task: 'x', tags: ['auth', 'v2'] });
     ok('queue_edit', { repository: '/r', item: 'q1', tags: [] });
-    bad('queue_add', { repository: '/r', workflow: 'f', task: 'x', tags: ['x'.repeat(31)] });
-    bad('queue_add', { repository: '/r', workflow: 'f', task: 'x', tags: [''] });
+    bad('queue_add', { repository: '/r', pipeline: 'f', task: 'x', tags: ['x'.repeat(31)] });
+    bad('queue_add', { repository: '/r', pipeline: 'f', task: 'x', tags: [''] });
     bad('queue_add', {
       repository: '/r',
-      workflow: 'f',
+      pipeline: 'f',
       task: 'x',
       tags: Array.from({ length: 21 }, (_, index) => `t${index}`),
     });
   });
 
   it('drops tags from a task added by a specialist', () => {
-    const parsed = parse('worker_queue_add', { token: 't', workflow: 'f', task: 'x', tags: ['a'] });
+    const parsed = parse('worker_queue_add', { token: 't', pipeline: 'f', task: 'x', tags: ['a'] });
     expect('request' in parsed && parsed.request.params).not.toHaveProperty('tags');
   });
 });
@@ -720,9 +720,81 @@ describe('specialist tag requests', () => {
 
   it('takes a pipeline import with at least one id', () => {
     const base = { repository: '/app', source: '/lib', ids: ['quick'] };
-    expect(parse('workflows_import', base)).toBe(true);
-    expect(parse('workflows_import', { ...base, ids: [] })).toBe(false);
-    expect(parse('workflows_import', { ...base, ids: ['Bad Id'] })).toBe(false);
-    expect(parse('shared_workflows', {})).toBe(true);
+    expect(parse('pipelines_import', base)).toBe(true);
+    expect(parse('pipelines_import', { ...base, ids: [] })).toBe(false);
+    expect(parse('pipelines_import', { ...base, ids: ['Bad Id'] })).toBe(false);
+    expect(parse('shared_pipelines', {})).toBe(true);
+  });
+});
+
+describe('observer requests and events', () => {
+  const parse = (method: string, params: object) =>
+    requestSchema.safeParse({ method, params }).success;
+
+  it('parses observers without params', () => {
+    expect(requestSchema.safeParse({ method: 'observers' }).success).toBe(true);
+    expect(parse('observers', {})).toBe(true);
+  });
+
+  it('checks only the shape of observers_set', () => {
+    expect(parse('observers_set', { settings: { enabled: true, workers: -1 } })).toBe(true);
+    expect(parse('observers_set', {})).toBe(false);
+    expect(parse('observers_set', { settings: 'x' })).toBe(false);
+  });
+
+  it('takes run_observer with a run and a flag', () => {
+    expect(parse('run_observer', { runId: 'r', enabled: false })).toBe(true);
+    expect(parse('run_observer', { runId: '', enabled: false })).toBe(false);
+    expect(parse('run_observer', { runId: 'r' })).toBe(false);
+  });
+
+  it('takes the three repair actions with a token', () => {
+    const token = 't';
+    expect(parse('repair_action', { action: 'answer', token, group: 'g', answer: 'Да' })).toBe(
+      true,
+    );
+    expect(parse('repair_action', { action: 'answer', token, group: 'g', answer: '  ' })).toBe(
+      false,
+    );
+    expect(parse('repair_action', { action: 'retry', token, group: 'g' })).toBe(true);
+    expect(
+      parse('repair_action', { action: 'retry', token, group: 'g', refreshConfig: true }),
+    ).toBe(true);
+    expect(parse('repair_action', { action: 'retry', token })).toBe(false);
+    expect(parse('repair_action', { action: 'cancel', token, reason: 'нельзя' })).toBe(true);
+    expect(parse('repair_action', { action: 'cancel', token, group: 'g', reason: 'нельзя' })).toBe(
+      true,
+    );
+    expect(parse('repair_action', { action: 'cancel', token, reason: ' ' })).toBe(false);
+    expect(parse('repair_action', { action: 'cancel', token })).toBe(false);
+    expect(parse('repair_action', { action: 'answer', group: 'g', answer: 'x' })).toBe(false);
+    expect(parse('repair_action', { action: 'force', token, group: 'g' })).toBe(false);
+  });
+
+  it('parses the observers and incident events', () => {
+    const incident = { key: 'k', kind: 'failed', group: 'g', detail: 'd' };
+    expect(
+      streamEventSchema.safeParse({ event: 'observers', seq: 1, observers: { settings: {} } })
+        .success,
+    ).toBe(true);
+    expect(streamEventSchema.safeParse({ event: 'observers', seq: 1 }).success).toBe(false);
+    expect(
+      streamEventSchema.safeParse({
+        event: 'incident',
+        seq: 2,
+        runId: 'r',
+        repository: '/repo',
+        incident,
+      }).success,
+    ).toBe(true);
+    expect(
+      streamEventSchema.safeParse({
+        event: 'incident',
+        seq: 2,
+        runId: 'r',
+        repository: '/repo',
+        incident: { ...incident, kind: 'other' },
+      }).success,
+    ).toBe(false);
   });
 });

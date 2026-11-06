@@ -6,7 +6,7 @@ import type { Api } from '../api.ts';
 import { clock } from '../format.ts';
 import { takeFocusRequest } from '../hotkeys.ts';
 import { formatRoute } from '../route.ts';
-import type { QueueView, RunView, WorkflowsView } from '../types.ts';
+import type { QueueView, RunView, PipelinesView } from '../types.ts';
 
 import { Alert } from '../ui/alert.tsx';
 import { Button } from '../ui/button.tsx';
@@ -97,7 +97,7 @@ export default function QueuePage({
   runs?: RunView[];
 }) {
   const { t } = useTranslation();
-  const [workflows, setWorkflows] = useState<WorkflowsView | null>(null);
+  const [pipelines, setPipelines] = useState<PipelinesView | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [parallel, setParallel] = useState<string | null>(null);
 
@@ -106,9 +106,9 @@ export default function QueuePage({
   useEffect(() => {
     let closed = false;
     api
-      .workflows()
+      .pipelines()
       .then((view) => {
-        if (!closed) setWorkflows(view);
+        if (!closed) setPipelines(view);
       })
       .catch(() => undefined);
     return () => {
@@ -156,7 +156,7 @@ export default function QueuePage({
               api={api}
               queue={queue}
               runs={runs}
-              workflows={workflows}
+              pipelines={pipelines}
               now={now}
               drafts={drafts}
               onDraft={onDraft}

@@ -8,8 +8,9 @@ async function connect(
   split: boolean,
   send: (method: string, params: Record<string, unknown>) => Promise<unknown>,
   queue = false,
+  repair = false,
 ) {
-  const server = createWorkerServer({ token: 'token-1', split, queue, send });
+  const server = createWorkerServer({ token: 'token-1', split, queue, repair, send });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   const client = new Client({ name: 'test', version: '0' });
@@ -229,7 +230,7 @@ describe('worker MCP server', () => {
     expect(Object.keys(add?.inputSchema.properties ?? {})).not.toContain('parent');
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' },
+      arguments: { pipeline: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' },
     });
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('q-abc');
@@ -238,7 +239,7 @@ describe('worker MCP server', () => {
         method: 'worker_queue_add',
         params: {
           token: 'token-1',
-          workflow: 'feature',
+          pipeline: 'feature',
           task: 'Реализовать web-i18n',
           title: 'web-i18n',
         },
@@ -258,12 +259,12 @@ describe('worker MCP server', () => {
     );
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', autoDeliver: false },
+      arguments: { pipeline: 'feature', task: 'x', autoDeliver: false },
     });
     expect(calls).toEqual([
       {
         method: 'worker_queue_add',
-        params: { token: 'token-1', workflow: 'feature', task: 'x', autoDeliver: false },
+        params: { token: 'token-1', pipeline: 'feature', task: 'x', autoDeliver: false },
       },
     ]);
   });
@@ -280,12 +281,12 @@ describe('worker MCP server', () => {
     );
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+      arguments: { pipeline: 'feature', task: 'x', deliveryMode: 'branch' },
     });
     expect(calls).toEqual([
       {
         method: 'worker_queue_add',
-        params: { token: 'token-1', workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+        params: { token: 'token-1', pipeline: 'feature', task: 'x', deliveryMode: 'branch' },
       },
     ]);
   });
@@ -302,20 +303,20 @@ describe('worker MCP server', () => {
     );
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', skip: ['review'] },
+      arguments: { pipeline: 'feature', task: 'x', skip: ['review'] },
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x' },
+      arguments: { pipeline: 'feature', task: 'x' },
     });
     expect(calls).toEqual([
       {
         method: 'worker_queue_add',
-        params: { token: 'token-1', workflow: 'feature', task: 'x', skip: ['review'] },
+        params: { token: 'token-1', pipeline: 'feature', task: 'x', skip: ['review'] },
       },
       {
         method: 'worker_queue_add',
-        params: { token: 'token-1', workflow: 'feature', task: 'x' },
+        params: { token: 'token-1', pipeline: 'feature', task: 'x' },
       },
     ]);
   });
@@ -332,21 +333,21 @@ describe('worker MCP server', () => {
     );
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'API', after: ['q-prev'] },
+      arguments: { pipeline: 'feature', task: 'API', after: ['q-prev'] },
     });
     expect(textOf(result)).toContain('q-abc');
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x' },
+      arguments: { pipeline: 'feature', task: 'x' },
     });
     expect(calls).toEqual([
       {
         method: 'worker_queue_add',
-        params: { token: 'token-1', workflow: 'feature', task: 'API', after: ['q-prev'] },
+        params: { token: 'token-1', pipeline: 'feature', task: 'API', after: ['q-prev'] },
       },
       {
         method: 'worker_queue_add',
-        params: { token: 'token-1', workflow: 'feature', task: 'x' },
+        params: { token: 'token-1', pipeline: 'feature', task: 'x' },
       },
     ]);
     const tools = await client.listTools();
@@ -366,7 +367,7 @@ describe('worker MCP server', () => {
     );
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', skip: ['deploy'] },
+      arguments: { pipeline: 'feature', task: 'x', skip: ['deploy'] },
     });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('unknown step `deploy` in skip');
@@ -384,14 +385,98 @@ describe('worker MCP server', () => {
     );
     const neither = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature' },
+      arguments: { pipeline: 'feature' },
     });
     expect(neither.isError).toBe(true);
     const both = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'a', groups: [{ title: 'b', task: 'c' }] },
+      arguments: { pipeline: 'feature', task: 'a', groups: [{ title: 'b', task: 'c' }] },
     });
     expect(both.isError).toBe(true);
     expect(calls).toEqual([]);
+  });
+
+  it('offers swarm_repair_* only with the repair option', async () => {
+    const names = async (repair: boolean) =>
+      (await (await connect(false, async () => null, false, repair)).listTools()).tools
+        .map((tool) => tool.name)
+        .sort();
+    expect(await names(false)).toEqual(['swarm_artifact', 'swarm_report']);
+    expect(await names(true)).toEqual([
+      'swarm_artifact',
+      'swarm_repair_answer',
+      'swarm_repair_cancel',
+      'swarm_repair_retry',
+      'swarm_report',
+    ]);
+  });
+
+  it('forwards the repair actions with the token', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return null;
+      },
+      false,
+      true,
+    );
+    expect(
+      (
+        await client.callTool({
+          name: 'swarm_repair_answer',
+          arguments: { group: 'g1', answer: '  yes ' },
+        })
+      ).isError,
+    ).toBeFalsy();
+    await client.callTool({
+      name: 'swarm_repair_retry',
+      arguments: { group: 'g1', refresh_config: true },
+    });
+    await client.callTool({ name: 'swarm_repair_retry', arguments: { group: 'g2' } });
+    await client.callTool({
+      name: 'swarm_repair_cancel',
+      arguments: { group: 'g1', reason: 'broken' },
+    });
+    await client.callTool({ name: 'swarm_repair_cancel', arguments: { reason: 'all' } });
+    const invalid = await client.callTool({
+      name: 'swarm_repair_cancel',
+      arguments: { reason: '   ' },
+    });
+    expect(invalid.isError).toBe(true);
+    expect(calls).toEqual([
+      {
+        method: 'repair_action',
+        params: { action: 'answer', token: 'token-1', group: 'g1', answer: 'yes' },
+      },
+      {
+        method: 'repair_action',
+        params: { action: 'retry', token: 'token-1', group: 'g1', refreshConfig: true },
+      },
+      { method: 'repair_action', params: { action: 'retry', token: 'token-1', group: 'g2' } },
+      {
+        method: 'repair_action',
+        params: { action: 'cancel', token: 'token-1', group: 'g1', reason: 'broken' },
+      },
+      { method: 'repair_action', params: { action: 'cancel', token: 'token-1', reason: 'all' } },
+    ]);
+  });
+
+  it('returns a daemon error of a repair action as a tool error', async () => {
+    const client = await connect(
+      false,
+      async () => {
+        throw new Error('token is not an observer');
+      },
+      false,
+      true,
+    );
+    const result = await client.callTool({
+      name: 'swarm_repair_retry',
+      arguments: { group: 'g1' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('token is not an observer');
   });
 });

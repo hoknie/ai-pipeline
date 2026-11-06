@@ -19,9 +19,10 @@ import {
   streamEventSchema,
   subscribe,
   type ConfigEditResult,
+  type ObserversSetResult,
   type SpecialistTagsResult,
   type SpecialistsImportResult,
-  type WorkflowsImportResult,
+  type PipelinesImportResult,
   type DaemonCheck,
   type ArtifactContentView,
   type RunPatchView,
@@ -172,7 +173,7 @@ const importBody = z.object({
   slugs: z.array(z.string().min(1)).min(1),
 });
 
-const workflowImportBody = z.object({
+const pipelineImportBody = z.object({
   source: z.string().refine((value) => isAbsolute(value), {
     message: 'source must be an absolute path',
   }),
@@ -297,6 +298,8 @@ async function readJson(incoming: IncomingMessage): Promise<unknown> {
   }
 }
 
+const runObserverBody = z.object({ enabled: z.boolean() });
+
 function parseBody<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw new HttpError(400, z.prettifyError(parsed.error));
@@ -404,6 +407,10 @@ class Hub {
       this.broadcast(event);
     } else if (event.event === 'tags') {
       this.tags = event.tags;
+      this.seq = event.seq;
+      this.broadcast(event);
+    } else if (event.event === 'observers') {
+      // Not kept: the snapshot has no observers, a new tab reads GET /api/observers.
       this.seq = event.seq;
       this.broadcast(event);
     } else if (event.event === 'processes') {
@@ -578,8 +585,13 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'GET',
-      pattern: /^\/api\/workflows$/,
-      handle: (_match, _body, repository) => call('workflows', { repository }),
+      pattern: /^\/api\/pipelines$/,
+      handle: (_match, _body, repository) => call('pipelines', { repository }),
+    },
+    {
+      method: 'GET',
+      pattern: /^\/api\/system-stages$/,
+      handle: (_match, _body, repository) => call('system_stages', { repository }),
     },
     {
       method: 'GET',
@@ -684,17 +696,17 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'GET',
-      pattern: /^\/api\/shared-workflows$/,
-      handle: () => call('shared_workflows', {}),
+      pattern: /^\/api\/shared-pipelines$/,
+      handle: () => call('shared_pipelines', {}),
     },
     {
       method: 'POST',
-      pattern: /^\/api\/config\/workflows\/import$/,
+      pattern: /^\/api\/config\/pipelines\/import$/,
       handle: async (_match, body, repository) => {
-        const result = (await call('workflows_import', {
+        const result = (await call('pipelines_import', {
           repository,
-          ...parseBody(workflowImportBody, body),
-        })) as WorkflowsImportResult;
+          ...parseBody(pipelineImportBody, body),
+        })) as PipelinesImportResult;
         if (result.ok) return new Reply(200, result);
         if (result.reason === 'conflict') {
           return new Reply(409, { error: result.message, ids: result.ids ?? [] });
@@ -706,6 +718,27 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       method: 'GET',
       pattern: /^\/api\/shared-specialists$/,
       handle: () => call('shared_specialists', {}),
+    },
+    {
+      method: 'GET',
+      pattern: /^\/api\/observers$/,
+      handle: () => call('observers', {}),
+    },
+    {
+      method: 'PUT',
+      pattern: /^\/api\/observers$/,
+      handle: async (_match, body) => {
+        const settings = parseBody(z.record(z.string(), z.unknown()), body);
+        const result = (await call('observers_set', { settings })) as ObserversSetResult;
+        if (result.ok) return new Reply(200, result.view);
+        return new Reply(422, { errors: result.errors });
+      },
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/observer$`),
+      handle: async ([runId], body) =>
+        call('run_observer', { runId: runId ?? '', ...parseBody(runObserverBody, body) }),
     },
     {
       method: 'GET',
@@ -798,14 +831,19 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'DELETE',
-      pattern: new RegExp(`^/api/config/(specialists|workflows)/${segment}$`),
+      pattern: new RegExp(`^/api/config/(specialists|pipelines|actions)/${segment}$`),
       handle: async ([section, id], body, repository) => {
         const { revision, level } = body as { revision?: string; level?: 'project' | 'global' };
         if (!revision) throw new HttpError(400, 'revision is required');
         return editReply(
           (await call('config_delete', {
             repository,
-            kind: section === 'workflows' ? 'workflow' : 'specialist',
+            kind:
+              section === 'pipelines'
+                ? 'pipeline'
+                : section === 'actions'
+                  ? 'action'
+                  : 'specialist',
             id: entryId(id),
             revision,
             level,
@@ -815,13 +853,30 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'PUT',
-      pattern: new RegExp(`^/api/config/workflows/${segment}$`),
+      pattern: new RegExp(`^/api/config/pipelines/${segment}$`),
       handle: async ([id], body, repository) => {
         const { value, revision, level } = parseBody(writeBody, body);
         return editReply(
           (await call('config_write', {
             repository,
-            kind: 'workflow',
+            kind: 'pipeline',
+            id: entryId(id),
+            value,
+            revision,
+            level,
+          })) as ConfigEditResult,
+        );
+      },
+    },
+    {
+      method: 'PUT',
+      pattern: new RegExp(`^/api/config/actions/${segment}$`),
+      handle: async ([id], body, repository) => {
+        const { value, revision, level } = parseBody(writeBody, body);
+        return editReply(
+          (await call('config_write', {
+            repository,
+            kind: 'action',
             id: entryId(id),
             value,
             revision,
@@ -832,11 +887,11 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     },
     {
       method: 'POST',
-      pattern: new RegExp(`^/api/config/workflows/${segment}/preview$`),
+      pattern: new RegExp(`^/api/config/pipelines/${segment}/preview$`),
       handle: async ([id], body, repository) =>
         call('config_preview', {
           repository,
-          kind: 'workflow',
+          kind: 'pipeline',
           id: entryId(id),
           value: parseBody(previewBody, body).value,
           level: parseBody(previewBody, body).level,
@@ -1141,7 +1196,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       throw new HttpError(405, 'method not allowed');
     }
 
-    if (url.pathname.startsWith('/api/system')) {
+    if (url.pathname === '/api/system' || url.pathname.startsWith('/api/system/')) {
       await handleSystem(incoming, response, url.pathname, verb);
       return;
     }
@@ -1260,6 +1315,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         url.pathname === '/api/finished-runs' ||
         url.pathname.startsWith('/api/processes') ||
         url.pathname.startsWith('/api/specialist-tags') ||
+        url.pathname === '/api/observers' ||
         ownRepository
           ? ''
           : await requestRepository(url.searchParams);

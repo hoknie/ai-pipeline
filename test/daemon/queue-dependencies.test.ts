@@ -10,7 +10,7 @@ import {
   type RunCreated,
   type StreamEvent,
 } from '../../src/protocol/index.ts';
-import { settle, MANUAL_CONFIG, POLL_MS, WORKFLOW_CONFIG, startRun, until } from './harness.ts';
+import { settle, MANUAL_CONFIG, POLL_MS, PIPELINE_CONFIG, startRun, until } from './harness.ts';
 import {
   start,
   stop,
@@ -215,13 +215,13 @@ describe('dependencies of queue items', () => {
       code: [
         {
           queueChain: [
-            { workflow: 'feature', task: 'модель', title: 'модель' },
-            { workflow: 'feature', task: 'API', title: 'API', after: ['$prev'] },
+            { pipeline: 'feature', task: 'модель', title: 'модель' },
+            { pipeline: 'feature', task: 'API', title: 'API', after: ['$prev'] },
           ],
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const queue = await queueOf(h);
@@ -251,17 +251,17 @@ describe('dependencies of queue items', () => {
     expect(runs.every((run) => run.fromQueue)).toBe(true);
   });
 
-  it('reports a workflow error before an unknown dependency', async () => {
+  it('reports a pipeline error before an unknown dependency', async () => {
     const h = await start();
-    await expect(add(h, 'A', { workflow: 'nope', after: ['missing'] })).rejects.toThrow(
-      'unknown workflow',
+    await expect(add(h, 'A', { pipeline: 'nope', after: ['missing'] })).rejects.toThrow(
+      'unknown pipeline',
     );
     expect((await queueOf(h)).items).toEqual([]);
   });
 
   it('chains a task to an item queued by an earlier step', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         'coder: { name: Кодировщик, queue: true }',
       ).replace(
@@ -270,14 +270,14 @@ describe('dependencies of queue items', () => {
       ),
     );
     h.script({
-      code: [{ ...WRITE_LIB, queue: { workflow: 'feature', task: 'модель', title: 'модель' } }],
+      code: [{ ...WRITE_LIB, queue: { pipeline: 'feature', task: 'модель', title: 'модель' } }],
       review: [
         {
-          queue: { workflow: 'feature', task: 'API', title: 'API', after: ['$last'] },
+          queue: { pipeline: 'feature', task: 'API', title: 'API', after: ['$last'] },
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, workflow: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const queue = await queueOf(h);

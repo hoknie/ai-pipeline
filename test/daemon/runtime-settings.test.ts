@@ -39,7 +39,7 @@ function calls(log: string): { argv: string[]; env: Record<string, string | null
 }
 
 async function run(h: Harness): Promise<string> {
-  return (await startRun(h, { repository: h.repo, workflow: 'feature', task: 'сделать' })).runId;
+  return (await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'сделать' })).runId;
 }
 
 describe('runtimes in the shared settings.yaml', () => {

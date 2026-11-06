@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover.tsx';
 
 import { useSkipStep } from './skipStep.tsx';
 
-/** The steps of the group workflow in a list of checkboxes; a cleared box skips the step for the run. */
+/** The steps of the group pipeline in a list of checkboxes; a cleared box skips the step for the run. */
 export function RunSteps({
   run,
   api,

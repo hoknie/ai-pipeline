@@ -17,7 +17,7 @@ import {
 import {
   CODE_ONLY_CONFIG,
   POLL_MS,
-  WORKFLOW_CONFIG,
+  PIPELINE_CONFIG,
   harness,
   startRun,
   until,
@@ -33,11 +33,11 @@ afterEach(async () => {
 
 // one step in `feature`: the tests count tasks and runs, not the steps
 const SCOUT_CONFIG = `${CODE_ONLY_CONFIG.replace(
-  '  workflows:\n',
-  '    scout: { name: Разведчик, queue: true }\n  workflows:\n    explore:\n      steps:\n        - { id: explore, specialist: scout }\n',
+  '  pipelines:\n',
+  '    scout: { name: Разведчик, queue: true }\n  pipelines:\n    explore:\n      steps:\n        - { id: explore, specialist: scout }\n',
 )}`;
 
-async function start(config = WORKFLOW_CONFIG): Promise<Harness> {
+async function start(config = PIPELINE_CONFIG): Promise<Harness> {
   current = await harness(config);
   return current;
 }
@@ -99,7 +99,7 @@ async function secondRepo(h: Harness): Promise<string> {
     'i',
   ]);
   const { writeConfigDirectory } = await import('../fixtures/config.ts');
-  writeConfigDirectory(other, WORKFLOW_CONFIG);
+  writeConfigDirectory(other, PIPELINE_CONFIG);
   return other;
 }
 
@@ -107,7 +107,7 @@ async function secondRepo(h: Harness): Promise<string> {
 async function finishedRun(h: Harness, repository: string, title: string): Promise<RunView> {
   const added = (await h.call('queue_add', {
     repository,
-    workflow: 'feature',
+    pipeline: 'feature',
     task: 'p',
     title,
   })) as QueueView & { item: string };
@@ -123,7 +123,7 @@ describe('tag catalog', () => {
   // test); the one that restarts the daemon starts its own.
   let shared: Harness;
   beforeAll(async () => {
-    shared = await harness(WORKFLOW_CONFIG);
+    shared = await harness(PIPELINE_CONFIG);
   });
   afterAll(async () => {
     await shared.close();
@@ -188,7 +188,7 @@ describe('tag catalog', () => {
     await addTag(h, 'auth', 'blue');
     const queued = (await h.call('run', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth'],
     })) as RunQueued;
@@ -205,7 +205,7 @@ describe('tag catalog', () => {
     // a tag of another repository is unknown here
     expect(await h.call('tags', { repository: other })).toEqual([]);
     await expect(
-      h.call('queue_add', { repository: other, workflow: 'feature', task: 'b', tags: ['auth'] }),
+      h.call('queue_add', { repository: other, pipeline: 'feature', task: 'b', tags: ['auth'] }),
     ).rejects.toThrow('unknown tag `auth`');
     // the same name in both repositories gives two tags
     const added = (await h.call('tag_add', {
@@ -220,13 +220,13 @@ describe('tag catalog', () => {
     expect(mine.id).not.toBe(added[0]!.id);
     const first = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'a',
       tags: ['auth'],
     })) as QueueView;
     const second = (await h.call('queue_add', {
       repository: other,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'b',
       tags: ['auth'],
     })) as QueueView;
@@ -260,7 +260,7 @@ describe('tag removal', () => {
     await addTag(h, 'v2');
     const finished = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth', 'v2'],
     });
@@ -268,7 +268,7 @@ describe('tag removal', () => {
     await waitQueue(h, (queue) => queue.status === 'stopped');
     await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       tags: ['auth', 'v2'],
     });
@@ -323,7 +323,7 @@ describe('tag events', () => {
     await addTag(h, 'auth');
     const created = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
     });
     await h.waitFor(created.runId, (run) => run.finished);
@@ -349,7 +349,7 @@ describe('tags of tasks', () => {
     await addTag(h, 'v2');
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       tags: ['v2', 'AUTH', 'V2'],
     })) as QueueView & { item: string };
@@ -380,14 +380,14 @@ describe('tags of tasks', () => {
     await expect(
       h.call('queue_add', {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'x',
         tags: ['auth', 'nope'],
       }),
     ).rejects.toThrow('unknown tag `nope`; create it with `aip tag add nope`');
     expect((await queueOf(h)).items).toEqual([]);
     await expect(
-      h.call('run', { repository: h.repo, workflow: 'feature', task: 'x', tags: ['nope'] }),
+      h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', tags: ['nope'] }),
     ).rejects.toThrow('unknown tag');
     expect((await queueOf(h)).items).toEqual([]);
   });
@@ -398,7 +398,7 @@ describe('tags of tasks', () => {
     await addTag(h, 'v2');
     const created = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth', 'v2'],
     });
@@ -412,7 +412,7 @@ describe('tags of tasks', () => {
     await addTag(h, 'v2');
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth', 'v2'],
     })) as QueueView & { item: string };
@@ -430,7 +430,7 @@ describe('tags of tasks', () => {
     await addTag(h, 'v2');
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
       tags: ['auth', 'v2'],
     })) as QueueView & { item: string };
@@ -451,7 +451,7 @@ describe('tags of runs', () => {
     await addTag(h, 'v2');
     const created = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
     });
     const done = await h.waitFor(created.runId, (run) => run.finished);
@@ -480,7 +480,7 @@ describe('tags of runs', () => {
     );
     const created = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
     });
     await expect(
@@ -494,7 +494,7 @@ describe('tags of runs', () => {
 describe('tags of tasks from a specialist', () => {
   const EXPLORE = {
     repository: '',
-    workflow: 'explore',
+    pipeline: 'explore',
     groups: [
       { title: 'один', task: 'a' },
       { title: 'два', task: 'b' },
@@ -522,7 +522,7 @@ describe('tags of tasks from a specialist', () => {
   it('passes the tags of an explore run to its tasks and from them to the started runs', async () => {
     const h = await start(SCOUT_CONFIG);
     h.script({
-      explore: [{ queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } }],
+      explore: [{ queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } }],
     });
     await addTag(h, 'auth');
     await addTag(h, 'v2');
@@ -542,7 +542,7 @@ describe('tags of tasks from a specialist', () => {
     for (const run of runs) await h.waitFor(run.id, (view) => view.finished);
   });
 
-  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
 
   it('creates one tag for a run without tags and gives it to the run and both tasks', async () => {
     const h = await start(SCOUT_CONFIG);
@@ -613,7 +613,7 @@ describe('tags of tasks from a specialist', () => {
     await addTag(h, 'v2');
     const before = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 't' }],
       tags: ['v2'],
     })) as QueueView & { item: string };
@@ -643,15 +643,15 @@ describe('tags of tasks from a specialist', () => {
 
   it('creates a new tag when a run calls the queue again after its tag was removed', async () => {
     const config = SCOUT_CONFIG.replace(
-      '  workflows:\n',
-      '  workflows:\n    twice:\n      steps:\n        - { id: first, specialist: scout }\n        - { id: second, specialist: scout }\n',
+      '  pipelines:\n',
+      '  pipelines:\n    twice:\n      steps:\n        - { id: first, specialist: scout }\n        - { id: second, specialist: scout }\n',
     );
     const h = await start(config);
     // the second step calls the queue only after the test removed the tag
     h.script({ first: [ONE], second: [{ waitFor: h.gate('second'), ...ONE }] });
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'twice',
+      pipeline: 'twice',
       title: 'Fix login',
       groups: [{ title: 'g', task: 'a' }],
     })) as QueueView & { item: string };
@@ -680,7 +680,7 @@ describe('tags of tasks from a specialist', () => {
     const explore = await exploreNow(h, undefined);
     const waiter = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [{ title: 'g', task: 'w' }],
       after: [explore],
     })) as QueueView & { item: string };
@@ -693,10 +693,10 @@ describe('tags of tasks from a specialist', () => {
     expect(names(items.find((item) => item.id === waiter.item)?.tags ?? [])).toEqual([auto?.name]);
   });
 
-  it('creates no tag when the workflow of the task is unknown', async () => {
+  it('creates no tag when the pipeline of the task is unknown', async () => {
     const h = await start(SCOUT_CONFIG);
     h.script({
-      explore: [{ queue: { workflow: 'missing', groups: [{ title: 'g', task: 't' }] } }],
+      explore: [{ queue: { pipeline: 'missing', groups: [{ title: 'g', task: 't' }] } }],
     });
     const explore = await exploreNow(h, undefined);
     await h.waitFor(explore, (run) => run.finished);
@@ -719,7 +719,7 @@ describe('tags of tasks from a specialist', () => {
 });
 
 describe('tags along dependencies', () => {
-  const TASK = { workflow: 'feature', groups: [{ title: 'g', task: 't' }] };
+  const TASK = { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] };
 
   async function add(h: Harness, extra: Record<string, unknown>): Promise<string> {
     const added = (await h.call('queue_add', {
@@ -825,7 +825,7 @@ describe('tags along dependencies', () => {
 });
 
 describe('tags of linked tasks', () => {
-  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
 
   /** An explore run puts two tasks in the queue and gets the tag `fix-login` of a linked task. */
   async function chain(): Promise<{ h: Harness; explore: RunView }> {
@@ -833,7 +833,7 @@ describe('tags of linked tasks', () => {
     h.script({ explore: [ONE] });
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'explore',
+      pipeline: 'explore',
       groups: [
         { title: 'один', task: 'a' },
         { title: 'два', task: 'b' },
@@ -867,13 +867,13 @@ describe('tags of linked tasks', () => {
     await expect(
       h.call('queue_add', {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'x',
         tags: ['fix-login'],
       }),
     ).rejects.toThrow(message);
     await expect(
-      h.call('run', { repository: h.repo, workflow: 'feature', task: 'x', tags: ['fix-login'] }),
+      h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', tags: ['fix-login'] }),
     ).rejects.toThrow(message);
     await expect(
       h.call('queue_edit', {
@@ -928,13 +928,13 @@ describe('tags of linked tasks', () => {
 });
 
 describe('parent of a task', () => {
-  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
 
-  /** A run of the `feature` workflow made from the queue; the queue stays stopped. */
+  /** A run of the `feature` pipeline made from the queue; the queue stays stopped. */
   async function parentRun(h: Harness, title: string): Promise<RunView> {
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'parent',
       title,
     })) as QueueView & { item: string };
@@ -948,7 +948,7 @@ describe('parent of a task', () => {
   const add = async (h: Harness, extra: Record<string, unknown>): Promise<QueueView> =>
     (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'child',
       ...extra,
     })) as QueueView;
@@ -1003,7 +1003,7 @@ describe('parent of a task', () => {
     for (const value of ['nope', 9999, '#9999', waitingNumber]) {
       await expect(add(h, { parent: value })).rejects.toThrow(`unknown parent \`${value}\``);
       await expect(
-        h.call('run', { repository: h.repo, workflow: 'feature', task: 'x', parent: value }),
+        h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', parent: value }),
       ).rejects.toThrow('unknown parent');
       await expect(
         h.call('queue_edit', {
@@ -1019,10 +1019,10 @@ describe('parent of a task', () => {
     expect((await h.status(parent.id)).tags).toEqual([]);
   });
 
-  it('does not create a tag when the workflow is unknown', async () => {
+  it('does not create a tag when the pipeline is unknown', async () => {
     const h = await start();
     const parent = await parentRun(h, 'Fix login');
-    await expect(add(h, { workflow: 'missing', parent: parent.id })).rejects.toThrow();
+    await expect(add(h, { pipeline: 'missing', parent: parent.id })).rejects.toThrow();
     expect(await tagsOf(h)).toEqual([]);
     expect((await h.status(parent.id)).tags).toEqual([]);
   });
@@ -1069,7 +1069,7 @@ describe('parent of a task', () => {
       'pass either task or groups',
     );
     await expect(
-      h.call('run', { repository: h.repo, workflow: 'feature', parent: parent.id, ...both }),
+      h.call('run', { repository: h.repo, pipeline: 'feature', parent: parent.id, ...both }),
     ).rejects.toThrow('pass either task or groups');
     expect((await queueOf(h)).items.map((entry) => entry.tags)).toEqual(
       before.items.map((entry) => entry.tags).concat([[]]),
@@ -1100,7 +1100,7 @@ describe('parent of a task', () => {
     const parent = await parentRun(h, 'Fix login');
     const created = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'child',
       parent: parent.id,
     });
@@ -1142,12 +1142,12 @@ describe('parent of a task', () => {
 });
 
 describe('linked task tag of every task from a specialist', () => {
-  const ONE = { queue: { workflow: 'feature', groups: [{ title: 'g', task: 't' }] } };
+  const ONE = { queue: { pipeline: 'feature', groups: [{ title: 'g', task: 't' }] } };
 
   async function exploreWith(h: Harness, tags: string[], title: string): Promise<string> {
     const added = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'explore',
+      pipeline: 'explore',
       groups: [{ title: 'один', task: 'a' }],
       title,
       tags,
@@ -1175,7 +1175,7 @@ describe('linked task tag of every task from a specialist', () => {
     const h = await start(SCOUT_CONFIG);
     h.script({
       explore: [
-        { queue: { workflow: 'explore', groups: [{ title: 'g', task: 't' }] } },
+        { queue: { pipeline: 'explore', groups: [{ title: 'g', task: 't' }] } },
         { queue: ONE.queue },
       ],
     });
@@ -1222,7 +1222,7 @@ describe('tags of several repositories', () => {
     const parent = await finishedRun(h, other, 'Fix login');
     await h.call('queue_add', {
       repository: other,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'child',
       parent: parent.id,
     });
@@ -1266,7 +1266,7 @@ describe('tags of several repositories', () => {
     const parent = await finishedRun(h, other, 'Fix login');
     const view = (await h.call('queue_add', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'child',
       parent: parent.id,
     })) as QueueView;
@@ -1279,7 +1279,7 @@ describe('tags of several repositories', () => {
     expect(edited.items[0]!.tags).toEqual([]);
     const run = (await h.call('run', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
       parent: parent.id,
     })) as RunQueued;

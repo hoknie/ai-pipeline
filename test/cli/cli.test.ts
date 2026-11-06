@@ -1,13 +1,21 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
-import { WORKFLOW_CONFIG } from '../daemon/harness.ts';
+import { PIPELINE_CONFIG } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { aip, runOf, sandbox, waitUntil } from './sandbox.ts';
+
+interface QueueJson {
+  runs: { system?: { kind: string; status: string; title?: string }[] }[];
+}
+
+const goDirectory = mkdtempSync(join(tmpdir(), 'aip-go-'));
+const box0 = () => goDirectory;
 
 describe('cli', () => {
   it('starts the daemon on first use and shows that there are no runs', async () => {
@@ -50,12 +58,12 @@ describe('cli', () => {
       'exactly one of --task and --groups',
     );
     expect((await aip(box, 'run', 'start', 'nope', '--task', 'x')).stderr).toContain(
-      'unknown workflow `nope`; known: feature',
+      'unknown pipeline `nope`; known: feature',
     );
   });
 
   it('retries with the current specialists after --refresh-config', async () => {
-    const typo = WORKFLOW_CONFIG.replace(
+    const typo = PIPELINE_CONFIG.replace(
       'reviewer: { name: Ревьюер, permissions: read }',
       'reviewer: { name: Ревьюер, permissions: read, model: opsu }',
     );
@@ -70,7 +78,7 @@ describe('cli', () => {
     await waitUntil('the failed review', async () =>
       (await aip(box, 'run', 'show', runId)).stdout.includes('failed'),
     );
-    writeConfigDirectory(box.repo, WORKFLOW_CONFIG.replace('max: 3', 'max: 100'));
+    writeConfigDirectory(box.repo, PIPELINE_CONFIG.replace('max: 3', 'max: 100'));
     const broken = await aip(box, 'group', 'retry', runId, 'vhod', '--refresh-config');
     expect(broken.code).toBe(1);
     expect(broken.stderr).toContain('configuration not loaded: swarm.max');
@@ -188,7 +196,7 @@ describe('cli', () => {
 
   it('checks the configuration, prints CLI versions and warns about full permissions', async () => {
     const box = sandbox(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         'coder: { name: Кодировщик, permissions: full }',
       ),
@@ -205,5 +213,78 @@ describe('cli', () => {
     const broken = await aip(box, 'config', 'check');
     expect(broken.code).toBe(1);
     expect(broken.stderr).toContain('swarm.max: must be an integer from 1 to 32');
+  });
+
+  it('prints the actions and the pipeline points in aip config check', async () => {
+    const box = sandbox(
+      PIPELINE_CONFIG.replace(
+        '  pipelines:',
+        `  actions:
+    lint: { run: "npm run lint", timeout: 600 }
+  stages:
+    before_delivery: [lint]
+  pipelines:`,
+      ),
+    );
+    const result = await aip(box, 'config', 'check');
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('actions:');
+    expect(result.stdout).toMatch(
+      /lint:\n\s+run: npm run lint\n\s+timeout: 600\n\s+on_failure: stop/,
+    );
+    expect(result.stdout).toMatch(/stages:\n\s+before_delivery:\n\s+- lint/);
+  });
+
+  it('shows the action of a run in aip run show', async () => {
+    const box = sandbox(
+      PIPELINE_CONFIG.replace(
+        '  pipelines:',
+        `  actions:
+    lint: { run: "true" }
+  stages:
+    before_delivery: [lint]
+  pipelines:`,
+      ),
+    );
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Добавить логин', '--json');
+    const { runId } = runOf(started.stdout);
+    await aip(box, 'run', 'watch', runId);
+    const shown = await aip(box, 'run', 'show', runId);
+    expect(shown.stdout).toContain('before_delivery:lint');
+    const json = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
+      system: { kind: string; point: string | null; status: string }[];
+      groups: { slug: string }[];
+    };
+    expect(json.system).toContainEqual(
+      expect.objectContaining({ kind: 'action', point: 'before_delivery', status: 'done' }),
+    );
+    expect(json.groups.map((group) => group.slug).every((slug) => !slug.startsWith('_'))).toBe(
+      true,
+    );
+  });
+
+  it('shows a running action in aip queue list', async () => {
+    const box = sandbox(
+      PIPELINE_CONFIG.replace(
+        '  pipelines:',
+        `  actions:
+    wait: { run: "while [ ! -f ${join(box0(), 'go')} ]; do sleep 0.05; done" }
+  stages:
+    before_delivery: [wait]
+  pipelines:`,
+      ),
+    );
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Добавить логин', '--json');
+    const { runId } = runOf(started.stdout);
+    await waitUntil('the running action', async () => {
+      const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as QueueJson;
+      return json.runs.some((run) => run.system?.some((row) => row.status === 'running'));
+    });
+    const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as QueueJson;
+    const row = json.runs.flatMap((run) => run.system ?? []).find((step) => step.kind === 'action');
+    expect(row).toMatchObject({ kind: 'action', status: 'running', title: 'wait' });
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('wait');
+    writeFileSync(join(goDirectory, 'go'), '');
+    await aip(box, 'run', 'watch', runId);
   });
 });

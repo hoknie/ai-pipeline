@@ -1,9 +1,13 @@
-import { groupWorkflow } from '../config/index.ts';
+import { groupPipeline, type Specialist } from '../config/index.ts';
 
 import {
+  advanceChecks,
+  afterDeliveryDone,
   cancelDelivery,
   finishDelivery,
   finishMessage,
+  renderCommitMessage,
+  cleanupIfDelivered,
   markDelivered,
   requestDelivery,
   resolvePrepared,
@@ -12,6 +16,7 @@ import {
   type DeliveryResult,
 } from './delivery.ts';
 import { Rejection } from './errors.ts';
+import { closeRepair, openRepairGroup, repairTask } from './observer.ts';
 import { checkSkip, lastUnskipped, nextUnskipped, stepStates } from './skip.ts';
 import {
   refreshPermissions,
@@ -22,6 +27,7 @@ import {
 } from './permissions.ts';
 import { groupSlugs } from './ids.ts';
 import { retryableGroups } from './retryable.ts';
+import { enterPoint } from './stages.ts';
 import { attemptStepLabel } from './topology.ts';
 import { questionsText, reviewQuestion } from './questions.ts';
 import {
@@ -31,21 +37,30 @@ import {
   describeFailReason,
   findGroup,
   isMessageGroup,
+  isRepairGroup,
   isResolveGroup,
   isServiceGroup,
   isSplitGroup,
   newGroup,
   stepsOf,
   freshPending,
+  isActionGroup,
+  REPAIR_GROUP,
+  actionGroupsOf,
+  deliveryCheckActive,
+  actionPointOf,
+  pointClosed,
+  pointStalled,
   isRunFinished,
   isTerminal,
-  runWorkflow,
+  runPipeline,
   validateReport,
   type Attempt,
   type FailReason,
   type Group,
   type HumanOnly,
   type HumanQuestion,
+  type Incident,
   type OnLimit,
   type ProposedGroup,
   type Report,
@@ -59,7 +74,13 @@ export type Effect =
   | { kind: 'stop_attempt'; run: string; group: string; seq: number }
   | { kind: 'commit'; run: string; group: string; stepId: string; summary: string }
   | { kind: 'merge'; run: string; group: string; updateOnConflict: boolean }
+  /** The daemon runs the shell command of a pipeline action. */
+  | { kind: 'run_action'; run: string; group: string; seq: number }
   | DeliveryEffect;
+
+/** How a command action ended. */
+export type ActionOutcome =
+  { kind: 'exit'; code: number } | { kind: 'timeout' } | { kind: 'spawn'; message: string };
 
 export type MergeOutcome =
   | { kind: 'merged'; commit: string | null }
@@ -84,8 +105,10 @@ export type Event =
   | { kind: 'attempt_exited'; group: string; seq: number; exit: AttemptExit }
   | { kind: 'attempt_usage'; updates: { group: string; seq: number; usage: Usage }[] }
   | { kind: 'timed_out'; group: string; seq: number }
+  | { kind: 'action_finished'; group: string; seq: number; outcome: ActionOutcome }
   | { kind: 'message'; group: string; seq: number; text: string }
-  | { kind: 'cancel'; group: string | null }
+  /** `reason`: why an observer cancels; it is written to the cancelled groups. */
+  | { kind: 'cancel'; group: string | null; reason?: string }
   | {
       kind: 'retry';
       group: string;
@@ -97,7 +120,7 @@ export type Event =
       kind: 'answer';
       group: string;
       answer: string;
-      by?: 'human' | 'autopilot';
+      by?: 'human' | 'autopilot' | 'observer';
       permissions?: PermissionsRefresh;
     }
   | { kind: 'merge_finished'; group: string; outcome: MergeOutcome }
@@ -111,6 +134,10 @@ export type Event =
   | { kind: 'title_set'; title: string }
   | { kind: 'step_skip'; step: string; skip: boolean }
   | { kind: 'hold'; hold: RunHold | null }
+  /** An observer takes the incident; `specialist` is its profile at this moment. */
+  | { kind: 'repair_start'; incident: Incident; specialist: Specialist }
+  /** The user lets observers take the task (true) or forbids it (false). */
+  | { kind: 'repair_allowed'; allowed: boolean }
   | { kind: 'interrupted' };
 
 export { Rejection };
@@ -127,21 +154,36 @@ function updateFinished(state: RunState, now: number): void {
 export function transition(state: RunState, event: Event, now: number): Effect[] {
   const machine = new Machine(state, now);
   const wasFinished = state.run.finishedAt !== null;
+  const wasDone = afterDeliveryDone(state);
+  const heldBefore = state.run.hold !== null;
   machine.apply(event);
+  machine.pipeline(wasDone);
   machine.skipAhead();
   machine.startNextMerge();
   updateFinished(state, now);
-  if (state.run.finishedAt !== null && retryableGroups(state).length === 0) state.run.hold = null;
+  // A pause cancelled the repair of a task with nothing to retry (a delivery incident): the pause
+  // stays, or the incident would be taken again at once. A finished task that was held before the
+  // event is such a task.
+  const keepHold = machine.pausedRepair || (wasFinished && heldBefore);
+  if (state.run.finishedAt !== null && retryableGroups(state).length === 0 && !keepHold) {
+    state.run.hold = null;
+  }
   if (!wasFinished && state.run.finishedAt !== null && state.run.config.delivery.auto) {
     machine.autoDeliver();
     updateFinished(state, now);
   }
-  if (state.run.finishedAt !== null && retryableGroups(state).length === 0) state.run.hold = null;
+  if (state.run.finishedAt !== null && retryableGroups(state).length === 0 && !keepHold) {
+    state.run.hold = null;
+  }
   return machine.effects;
 }
 
 class Machine {
   readonly effects: Effect[] = [];
+  /** The whole run was cancelled while its delivery waited for the checks: no automatic delivery follows. */
+  private checksCancelled = false;
+  /** A pause ended the repair that went on. */
+  pausedRepair = false;
   private readonly state: RunState;
   private readonly now: number;
 
@@ -177,10 +219,12 @@ class Machine {
         return;
       case 'timed_out':
         return this.timedOut(event.group, event.seq);
+      case 'action_finished':
+        return this.actionFinished(event.group, event.seq, event.outcome);
       case 'message':
         return this.message(event.group, event.seq, event.text);
       case 'cancel':
-        return this.cancel(event.group);
+        return this.cancel(event.group, event.reason);
       case 'retry':
         return this.retry(event.group, event.permissions, event.specialists);
       case 'answer':
@@ -222,12 +266,27 @@ class Machine {
         this.effects.push(...resolvePrepared(this.state, event.conflicts));
         return;
       case 'commit_failed':
-        return this.failGroup(this.group(event.group), { kind: 'git', message: event.message });
+        return this.commitFailed(this.group(event.group), event.message);
       case 'hold':
         return this.hold(event.hold);
       case 'interrupted':
         return this.interrupted();
+      case 'repair_start':
+        return this.repairStart(event.incident, event.specialist);
+      case 'repair_allowed':
+        return this.repairAllowed(event.allowed);
     }
+  }
+
+  /** The commit of a step failed. The group of an action is merged by then: it fails, and the pipeline waits. */
+  private commitFailed(group: Group, message: string): void {
+    if (!isActionGroup(group)) {
+      this.failGroup(group, { kind: 'git', message });
+      return;
+    }
+    group.status = 'failed';
+    group.reason = describeFailReason({ kind: 'git', message });
+    group.pending = freshPending(0);
   }
 
   private hold(hold: RunHold | null): void {
@@ -238,12 +297,19 @@ class Machine {
     this.state.run.hold = hold;
     if (!pausing) return;
     // A pause stops the running agents; their steps go on in the same session after it.
-    const groups = [...(this.state.split ? [this.state.split] : []), ...this.state.groups];
+    const groups = [
+      ...actionGroupsOf(this.state, 'before_split'),
+      ...(this.state.split ? [this.state.split] : []),
+      ...actionGroupsOf(this.state, 'after_split'),
+      ...this.state.groups,
+    ];
     for (const group of groups) {
       for (const attempt of group.attempts) {
         if (attempt.status !== 'running' || attempt.report !== null || attempt.reason !== null) {
           continue;
         }
+        // A command cannot continue after a pause; it runs to its end.
+        if (attempt.runtime === 'command') continue;
         attempt.reason = { kind: 'paused', at: this.now };
         this.effects.push({
           kind: 'stop_attempt',
@@ -253,6 +319,8 @@ class Machine {
         });
       }
     }
+    // A repair does not continue after a pause: its incident is taken again, and it is not counted.
+    this.stopRepair({ reason: 'paused', refund: true });
   }
 
   private report(slug: string, seq: number, report: Report): void {
@@ -280,7 +348,7 @@ class Machine {
     const split = this.state.split;
     const attempt = split ? this.running(split, seq) : undefined;
     if (!split || !attempt) throw new Rejection(`attempt ${seq} is not a running split step`);
-    const maxGroups = runWorkflow(this.state.run).split?.maxGroups ?? 1;
+    const maxGroups = runPipeline(this.state.run).split?.maxGroups ?? 1;
     if (groups.length < 1 || groups.length > maxGroups) {
       throw new Rejection(`propose from 1 to ${maxGroups} groups, got ${groups.length}`);
     }
@@ -326,7 +394,11 @@ class Machine {
     if (failure !== null) {
       attempt.status = 'failed';
       attempt.reason = failure;
-      if (failure.kind === 'usage_limit' && (exit.onLimit ?? 'wait') === 'wait') {
+      if (
+        failure.kind === 'usage_limit' &&
+        (exit.onLimit ?? 'wait') === 'wait' &&
+        !isRepairGroup(group)
+      ) {
         this.waitForLimit(group, attempt);
         return;
       }
@@ -335,6 +407,17 @@ class Machine {
     }
     attempt.status = 'finished';
     const report = attempt.report as Report;
+    const point = actionPointOf(group);
+    const commitsToRun = point === 'before_split' || point === 'after_split';
+    if (report.verdict === 'done' && commitsToRun) {
+      this.effects.push({
+        kind: 'commit',
+        run: this.state.run.id,
+        group: slug,
+        stepId: attempt.stepId,
+        summary: report.summary,
+      });
+    }
     if (report.verdict !== 'needs_human' && !isServiceGroup(group)) {
       this.effects.push({
         kind: 'commit',
@@ -344,7 +427,11 @@ class Machine {
         summary: report.summary,
       });
     }
-    if (exit.outsideChanges.length > 0 && this.state.run.config.outsideChanges === 'stop') {
+    if (
+      exit.outsideChanges.length > 0 &&
+      this.state.run.config.outsideChanges === 'stop' &&
+      !isRepairGroup(group)
+    ) {
       const files = exit.outsideChanges.join(', ');
       this.askHuman(
         group,
@@ -354,7 +441,9 @@ class Machine {
       );
       return;
     }
-    if (isResolveGroup(group)) this.finishResolve(group, report);
+    if (isRepairGroup(group)) this.finishRepair(group, report);
+    else if (isResolveGroup(group)) this.finishResolve(group, report);
+    else if (isActionGroup(group)) this.finishAction(group, attempt, report);
     else if (report.verdict === 'done' && isMessageGroup(group))
       this.finishMessage(group, report.summary);
     else if (report.verdict === 'done' && isSplitGroup(group)) this.finishSplit(group, attempt);
@@ -401,6 +490,67 @@ class Machine {
     );
     split.status = 'merged';
     split.pending = null;
+    // The groups wait in `queued` for the actions after the split.
+    enterPoint(this.state, 'after_split');
+  }
+
+  /** A specialist reported on its pipeline action. */
+  private finishAction(group: Group, attempt: Attempt, report: Report): void {
+    if (report.verdict === 'done') {
+      group.status = 'merged';
+      group.pending = null;
+      group.reason = null;
+      return;
+    }
+    if (report.verdict === 'rejected') {
+      const detail = (report.feedback ?? report.summary).trim();
+      this.restorePending(group);
+      group.status = 'failed';
+      group.reason = `reported rejected${detail ? `: ${detail.split('\n')[0]}` : ''}`;
+      return;
+    }
+    this.askHuman(
+      group,
+      attempt.stepIndex,
+      report.feedback ?? '',
+      report.questions ?? null,
+      report.humanOnly ? 'request' : null,
+    );
+  }
+
+  /** A command action ended; the daemon says how. */
+  private actionFinished(slug: string, seq: number, outcome: ActionOutcome): void {
+    const group = this.group(slug);
+    const attempt = this.running(group, seq);
+    if (!attempt) return;
+    attempt.finishedAt = this.now;
+    if (outcome.kind === 'exit' && outcome.code === 0) {
+      attempt.status = 'finished';
+      attempt.report = { verdict: 'done', summary: 'exit code 0', feedback: null };
+      group.status = 'merged';
+      group.pending = null;
+      group.reason = null;
+      const point = actionPointOf(group);
+      if (point === 'before_split' || point === 'after_split') {
+        this.effects.push({
+          kind: 'commit',
+          run: this.state.run.id,
+          group: slug,
+          stepId: attempt.stepId,
+          summary: `action ${attempt.stepId}`,
+        });
+      }
+      return;
+    }
+    const reason: FailReason =
+      outcome.kind === 'exit'
+        ? { kind: 'exit_code', code: outcome.code }
+        : outcome.kind === 'timeout'
+          ? { kind: 'timeout' }
+          : { kind: 'spawn', message: outcome.message };
+    attempt.status = 'failed';
+    attempt.reason = reason;
+    this.failGroup(group, reason);
   }
 
   private finishResolve(group: Group, report: Report): void {
@@ -425,6 +575,117 @@ class Machine {
     );
   }
 
+  /** The observer reported. A delivery repair is closed by the delivery that follows `done`. */
+  private finishRepair(group: Group, report: Report): void {
+    group.pending = null;
+    const incident = this.state.run.repair.incident;
+    const taken = incident ? [incident.key] : [];
+    if (report.verdict === 'done') {
+      group.status = 'merged';
+      group.reason = null;
+      if (this.state.run.pendingDelivery?.repair) {
+        this.effects.push(...resolverDone(this.state));
+        return;
+      }
+      closeRepair(this.state, { taken, refund: false });
+      return;
+    }
+    const detail = (report.feedback ?? report.summary).trim();
+    group.status = 'failed';
+    group.reason = `observer reported ${report.verdict}${detail ? `: ${detail.split('\n')[0]}` : ''}`;
+    if (this.state.run.pendingDelivery?.repair) {
+      this.effects.push(
+        ...finishDelivery(
+          this.state,
+          {
+            kind: 'failed',
+            message: `the observer reported ${report.verdict}${detail ? `: ${detail}` : ''}`,
+          },
+          this.now,
+        ),
+      );
+      return;
+    }
+    closeRepair(this.state, { taken, refund: false });
+  }
+
+  private repairStart(incident: Incident, specialist: Specialist): void {
+    const { run } = this.state;
+    if (run.repair.incident !== null) throw new Rejection('a repair of this run is already going');
+    if (run.hold !== null) throw new Rejection(`run is ${run.hold}; observers do not take it`);
+    if (incident.kind === 'delivery') {
+      if (run.pendingDelivery !== null) {
+        throw new Rejection(`a delivery of run ${run.id} is already in progress`);
+      }
+      const groups = this.state.groups.filter(
+        (group) => group.status === 'merged' && group.delivery.state === 'apply_failed',
+      );
+      if (groups.length === 0) throw new Rejection('no delivery to repair');
+      run.repair.incident = incident;
+      run.repair.specialist = specialist;
+      run.repair.repairs += 1;
+      run.pendingDelivery = {
+        groups: groups.map((group) => group.slug),
+        force: false,
+        auto: false,
+        round: 1,
+        repair: true,
+        message: renderCommitMessage(run.config.delivery.commitMessage, this.state, groups),
+      };
+      this.effects.push({
+        kind: 'prepare_resolve',
+        run: run.id,
+        groups: run.pendingDelivery.groups,
+        round: 1,
+      });
+      return;
+    }
+    run.repair.incident = incident;
+    run.repair.specialist = specialist;
+    run.repair.repairs += 1;
+    openRepairGroup(this.state, repairTask(this.state, incident));
+  }
+
+  private repairAllowed(allowed: boolean): void {
+    const { repair } = this.state.run;
+    if (allowed === repair.allowed) return;
+    repair.allowed = allowed;
+    if (!allowed) {
+      this.stopRepair({ reason: null, refund: false });
+      return;
+    }
+    // Returning the task to observers starts its count again.
+    repair.repairs = 0;
+    repair.taken = [];
+  }
+
+  /**
+   * Ends the repair that goes on: the agent stops, the group is cancelled with `reason` and the
+   * incident is released. Nothing happens when no repair goes on.
+   */
+  private stopRepair(options: { reason: string | null; refund: boolean }): void {
+    if (this.state.run.repair.incident === null) return;
+    if (options.reason === 'paused') this.pausedRepair = true;
+    const group = this.state.repair;
+    if (group && !isTerminal(group.status)) {
+      group.status = 'cancelled';
+      group.pending = null;
+      if (options.reason !== null) group.reason = options.reason;
+      for (const attempt of group.attempts) {
+        if (attempt.status !== 'running') continue;
+        attempt.status = 'cancelled';
+        attempt.finishedAt = this.now;
+        this.effects.push({
+          kind: 'stop_attempt',
+          run: this.state.run.id,
+          group: group.slug,
+          seq: attempt.seq,
+        });
+      }
+    }
+    closeRepair(this.state, { taken: [], refund: options.refund });
+  }
+
   private finishMessage(group: Group, summary: string | null): void {
     if (summary !== null) {
       group.status = 'merged';
@@ -433,7 +694,20 @@ class Machine {
     this.effects.push(...finishMessage(this.state, summary));
   }
 
+  /**
+   * Moves the pipeline after an event: a delivery waits for the actions before it, and the run is
+   * cleaned up once the actions after delivery are done.
+   */
+  pipeline(wasDone: boolean): void {
+    this.effects.push(...advanceChecks(this.state));
+    if (!wasDone && afterDeliveryDone(this.state) && !this.state.run.config.delivery.keep) {
+      this.effects.push({ kind: 'cleanup', run: this.state.run.id });
+    }
+  }
+
   autoDeliver(): void {
+    // A check that failed or was cancelled stops the pipeline: only an explicit request starts it again.
+    if (this.checksCancelled || pointStalled(this.state, 'before_delivery')) return;
     if (
       !this.state.groups.some(
         (group) => group.status === 'merged' && group.delivery.state === 'pending',
@@ -534,6 +808,12 @@ class Machine {
     group.status = 'failed';
     group.reason = describeFailReason(reason);
     if (isMessageGroup(group)) this.finishMessage(group, null);
+    if (isRepairGroup(group)) {
+      // A crash, a timeout or an interruption: the incident is taken again; a usage limit gives
+      // the repair back and does not wait.
+      group.pending = null;
+      closeRepair(this.state, { taken: [], refund: reason.kind === 'usage_limit' });
+    }
     if (isResolveGroup(group)) {
       group.pending = null;
       this.effects.push(
@@ -566,6 +846,9 @@ class Machine {
     const group = this.group(slug);
     const attempt = this.running(group, seq);
     if (!attempt) throw new Rejection(`attempt ${seq} is not running`);
+    if (attempt.runtime === 'command') {
+      throw new Rejection(`attempt ${seq} is a command; it takes no messages`);
+    }
     if (attempt.report !== null) throw new Rejection(`attempt ${seq} already reported`);
     if (attempt.reason !== null) {
       throw new Rejection(`attempt ${seq} is already being interrupted`);
@@ -598,11 +881,19 @@ class Machine {
     this.waitForLimit(group, attempt);
   }
 
-  private cancel(only: string | null): void {
+  private cancel(only: string | null, reason?: string): void {
+    if (only === REPAIR_GROUP && this.state.repair === null) {
+      // The tree of a delivery repair is still being prepared: there is no group to cancel yet.
+      this.stopRepair({ reason: null, refund: false });
+      return;
+    }
     const groups = only === null ? allGroups(this.state) : [this.group(only)];
     for (const group of groups) {
-      if (isTerminal(group.status)) continue;
+      // A failed action can be cancelled by name: that releases the pipeline held by it.
+      const failedAction = only !== null && isActionGroup(group) && group.status === 'failed';
+      if (isTerminal(group.status) && !failedAction) continue;
       group.status = 'cancelled';
+      if (reason !== undefined) group.reason = reason;
       group.mergeInFlight = false;
       if (isMessageGroup(group) || isResolveGroup(group)) cancelDelivery(this.state);
       for (const attempt of group.attempts) {
@@ -617,11 +908,21 @@ class Machine {
         });
       }
     }
+    if (only === null || only === REPAIR_GROUP) {
+      if (only === null && reason !== undefined) this.state.run.repair.cancelReason = reason;
+      this.stopRepair({ reason: null, refund: false });
+    }
+    // Cancelling the whole run also cancels a delivery that waits for the checks, even when the
+    // cancelled checks do not stop the pipeline.
+    if (only === null && this.state.run.pendingDelivery?.checks) {
+      cancelDelivery(this.state);
+      this.checksCancelled = true;
+    }
   }
 
   private stepSkip(step: string, skip: boolean): void {
     const { run } = this.state;
-    const steps = groupWorkflow(run.config, runWorkflow(run)).steps;
+    const steps = groupPipeline(run.config, runPipeline(run)).steps;
     const index = steps.findIndex((candidate) => candidate.id === step);
     if (index === -1) {
       throw new Rejection(
@@ -637,7 +938,7 @@ class Machine {
       ? [...run.skippedSteps, step]
       : run.skippedSteps.filter((item) => item !== step);
     if (skip) {
-      const error = checkSkip(run.config, run.workflow, wanted);
+      const error = checkSkip(run.config, run.pipeline, wanted);
       if (error !== null) throw new Rejection(error);
     }
     run.skippedSteps = steps.map((item) => item.id).filter((id) => wanted.includes(id));
@@ -729,6 +1030,9 @@ class Machine {
         `group ${group.slug} is ${group.status}; delivery is retried with \`aip run apply\``,
       );
     }
+    if (isRepairGroup(group)) {
+      throw new Rejection(`group ${group.slug} is ${group.status}; observers take a repair again`);
+    }
   }
 
   private retryCancelled(group: Group): void {
@@ -741,7 +1045,7 @@ class Machine {
     if (
       group.pending === null &&
       last &&
-      !isSplitGroup(group) &&
+      !isServiceGroup(group) &&
       attemptVerdict(last) === 'done' &&
       last.stepIndex + 1 >= stepsOf(this.state.run, group).length
     ) {
@@ -762,7 +1066,7 @@ class Machine {
   private answer(
     slug: string,
     answer: string,
-    by: 'human' | 'autopilot',
+    by: 'human' | 'autopilot' | 'observer',
     permissions?: PermissionsRefresh,
   ): void {
     if (answer.trim() === '') throw new Rejection('answer must not be empty');
@@ -839,6 +1143,7 @@ class Machine {
 
   startNextMerge(): void {
     if (this.state.groups.some((group) => group.mergeInFlight)) return;
+    if (deliveryCheckActive(this.state)) return;
     const next = this.state.groups
       .filter((group) => group.status === 'merging')
       .sort((left, right) => (left.mergeSeq ?? 0) - (right.mergeSeq ?? 0))[0];
@@ -877,15 +1182,44 @@ class Machine {
       group.mergeInFlight = false;
       if (wasRunning) this.failGroup(group, { kind: 'interrupted' });
     }
-    if (delivery) {
+    if (delivery?.repair) {
+      // A repair delivery is not resumed: the incident is taken again.
+      const group = this.state.repair;
+      if (group && !isTerminal(group.status)) {
+        group.status = 'failed';
+        group.reason = 'interrupted';
+        group.pending = null;
+      }
+      closeRepair(this.state, { taken: [], refund: false });
+      return;
+    }
+    if (delivery?.checks) {
+      if (pointStalled(this.state, 'before_delivery')) {
+        for (const group of actionGroupsOf(this.state, 'before_delivery')) {
+          if (group.status !== 'queued') continue;
+          group.status = 'cancelled';
+          group.reason = 'delivery interrupted';
+        }
+      } else {
+        // The interrupted check may fail without stopping the pipeline: the delivery goes on
+        // after the remaining checks, without entering the point (and running the command) again.
+        this.state.run.pendingDelivery = delivery;
+      }
+    }
+    // An interrupted action before delivery is not started again: the delivery waits for a new request.
+    if (delivery && !delivery.checks && pointClosed(this.state, 'before_delivery')) {
       try {
         this.effects.push(
-          ...requestDelivery(this.state, {
-            groups: delivery.groups,
-            force: delivery.force,
-            files: [],
-            auto: delivery.auto,
-          }),
+          ...requestDelivery(
+            this.state,
+            {
+              groups: delivery.groups,
+              force: delivery.force,
+              files: delivery.files ?? [],
+              auto: delivery.auto,
+            },
+            { resume: true },
+          ),
         );
       } catch (error) {
         if (!(error instanceof Rejection)) throw error;

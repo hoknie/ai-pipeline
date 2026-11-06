@@ -11,14 +11,22 @@ import {
   type RuntimeSettings,
 } from '../config/index.ts';
 import {
+  REPAIR_GROUP,
   RESOLVE_GROUP,
   SPLIT_GROUP,
   findGroup,
+  isRepairGroup,
   isResolveGroup,
+  specialistOfStep,
   groupRef,
   runRef,
   isServiceGroup,
+  actionGroupsOf,
+  actionOf,
+  actionPointOf,
   deliveryBranch,
+  parseActionSlug,
+  type ActionOutcome,
   type DeliveryResult,
   type Attempt,
   type Effect,
@@ -64,6 +72,7 @@ import type { Daemon, DaemonTimings } from './daemon.ts';
 import type { AgentRoot } from './processes.ts';
 import { timesPath } from './logs.ts';
 import { launchProcess, type SupervisedProcess } from './supervisor.ts';
+import type { OutputParser } from '../runtime/index.ts';
 
 export interface AttemptKey {
   run: string;
@@ -152,11 +161,17 @@ export class Executor {
   }
 
   worktreePath(state: RunState, group: Group): string {
-    const name = isResolveGroup(group)
-      ? RESOLVE_GROUP
-      : isServiceGroup(group)
-        ? RUN_WORKTREE
-        : group.slug;
+    // The repair group is checked first: it is a service group, but it never works in the run tree.
+    if (isRepairGroup(group) && state.run.pendingDelivery?.repair) {
+      return this.resolveWorktree(state);
+    }
+    const name = isRepairGroup(group)
+      ? REPAIR_GROUP
+      : isResolveGroup(group)
+        ? RESOLVE_GROUP
+        : isServiceGroup(group)
+          ? RUN_WORKTREE
+          : group.slug;
     return join(runWorktreeRoot(this.workspace(state), state.run.id), name);
   }
 
@@ -242,6 +257,9 @@ export class Executor {
           }
           break;
         }
+        case 'run_action':
+          await this.runAction(state, effect.group, effect.seq);
+          break;
         case 'commit':
           await this.commit(state, effect.group, effect.stepId, effect.summary);
           break;
@@ -262,6 +280,152 @@ export class Executor {
           break;
       }
     }
+  }
+
+  /** The environment of a command action. */
+  private actionEnvironment(state: RunState, group: Group): Record<string, string> {
+    const ref = parseActionSlug(group.slug);
+    const { run } = state;
+    const environment: Record<string, string> = {
+      AIP_RUN_ID: run.id,
+      AIP_RUN_TITLE: run.title ?? '',
+      AIP_PIPELINE: run.pipeline,
+      // The name before the term was unified; scripts in user repositories still read it.
+      AIP_WORKFLOW: run.pipeline,
+      AIP_STAGE: ref?.point ?? '',
+      AIP_ACTION: ref?.id ?? '',
+      AIP_REPOSITORY: run.repository,
+    };
+    if (ref?.point === 'after_delivery') {
+      const delivered = state.groups.filter(
+        (candidate) => candidate.status === 'merged' && candidate.delivery.state === 'applied',
+      );
+      const last = [...delivered]
+        .filter((candidate) => candidate.delivery.message)
+        .sort(
+          (left, right) => (right.delivery.finishedAt ?? 0) - (left.delivery.finishedAt ?? 0),
+        )[0];
+      environment.AIP_DELIVERY_MODE = run.config.delivery.mode;
+      environment.AIP_COMMIT_MESSAGE = last?.delivery.message ?? '';
+      environment.AIP_CHANGED_FILES = [
+        ...new Set(delivered.flatMap((candidate) => candidate.delivery.files)),
+      ].join('\n');
+    }
+    return environment;
+  }
+
+  /** Where a command action runs: the tree of the run, or the repository of the user after delivery. */
+  private async actionDirectory(state: RunState, group: Group): Promise<string> {
+    if (actionPointOf(group) === 'after_delivery') return state.run.repository;
+    return this.ensureGroupWorktree(state, group);
+  }
+
+  /** The command of an action before delivery must not change the result: drop what it wrote. */
+  private async discardChanges(state: RunState, group: Group): Promise<void> {
+    // A repair works on a copy of the ref of the run: what it leaves there is dropped. The tree of
+    // a delivery repair is the resolver's and is kept for the delivery.
+    const repairCopy = isRepairGroup(group) && !state.run.pendingDelivery?.repair;
+    if (actionPointOf(group) !== 'before_delivery' && !repairCopy) return;
+    try {
+      await this.resetRunTree(state, await this.ensureGroupWorktree(state, group));
+    } catch {
+      // The tree may be gone with a cleaned run; there is nothing to drop then.
+    }
+  }
+
+  /** The tree sits on a detached HEAD: a commit of an action moves it, so reset to the ref of the run. */
+  private async resetRunTree(state: RunState, tree: string): Promise<void> {
+    await git(tree, 'reset', '--hard', runRef(state.run));
+    await git(tree, 'clean', '-fd');
+  }
+
+  /**
+   * A merge goes on the ref of the run, never on what a check left in the tree: a stopped check
+   * may still be working there, and one cut off by a restart never dropped its changes.
+   */
+  private async settleChecks(state: RunState, tree: string): Promise<void> {
+    const checks = actionGroupsOf(state, 'before_delivery');
+    if (checks.length === 0) return;
+    const keys = checks.flatMap((group) =>
+      group.attempts.map((attempt) =>
+        keyOf({ run: state.run.id, group: group.slug, seq: attempt.seq }),
+      ),
+    );
+    // The process itself: its exit handler waits in the same queue as this merge.
+    await Promise.allSettled(keys.map((key) => this.running.get(key)?.process.exited));
+    await this.resetRunTree(state, tree);
+  }
+
+  private async runAction(state: RunState, slug: string, seq: number): Promise<void> {
+    const group = findGroup(state, slug);
+    const attempt = group?.attempts.find((candidate) => candidate.seq === seq);
+    const action = group ? actionOf(state.run, group) : undefined;
+    if (!group || !attempt || !action || action.run === null) return;
+    const key = { run: state.run.id, group: slug, seq };
+    const finish = async (outcome: ActionOutcome): Promise<void> => {
+      await this.discardChanges(state, group);
+      await this.daemon.apply(state, { kind: 'action_finished', group: slug, seq, outcome });
+    };
+    let directory: string;
+    try {
+      // Leftovers of an interrupted check must not reach this one.
+      await this.discardChanges(state, group);
+      directory = await this.actionDirectory(state, group);
+    } catch (error) {
+      await finish({ kind: 'spawn', message: (error as Error).message });
+      return;
+    }
+    const logPath = this.logPath(state, slug, seq);
+    mkdirSync(attemptDirectory(this.workspace(state), state.run.id, slug, seq), {
+      recursive: true,
+    });
+    appendFileSync(logPath, `[aip] $ ${action.run}\n`);
+    const quiet: OutputParser = {
+      push() {},
+      usage: () => null,
+      outcome: () => ({ sessionId: null, usage: null, error: null, denials: [] }),
+    };
+    const process = launchProcess(
+      {
+        command: '/bin/sh',
+        args: ['-c', action.run],
+        env: this.actionEnvironment(state, group),
+        files: [],
+        sessionId: null,
+      },
+      {
+        cwd: directory,
+        logPath,
+        parser: quiet,
+        environment: this.daemon.environment,
+        graceMs: this.graceMs,
+        drainMs: this.timings.drainMs,
+        timesPath: timesPath(logPath),
+      },
+    );
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      process.stop();
+    }, action.timeoutSeconds * this.timings.timeoutUnitMs);
+    this.running.set(keyOf(key), { process, timer });
+    this.keys.set(keyOf(key), key);
+    void process.exited.then((exit) => {
+      clearTimeout(timer);
+      this.running.delete(keyOf(key));
+      this.keys.delete(keyOf(key));
+      if (process.pid !== undefined) {
+        this.daemon.agentGone({ pid: process.pid, run: key.run, group: key.group, seq: key.seq });
+      }
+      // A stopping daemon leaves the attempt running: the next start marks it interrupted.
+      if (this.daemon.stopping) return undefined;
+      const outcome: ActionOutcome = exit.spawnError
+        ? { kind: 'spawn', message: exit.spawnError }
+        : timedOut
+          ? { kind: 'timeout' }
+          : { kind: 'exit', code: exit.code ?? 1 };
+      return this.daemon.serial(() => finish(outcome));
+    });
   }
 
   /** Asks a cheap model for the title and the name of a run, in the background. */
@@ -323,6 +487,10 @@ export class Executor {
       branch,
       null,
     );
+    if (isRepairGroup(group)) {
+      if (state.run.pendingDelivery?.repair) return this.worktreePath(state, group);
+      return ensureWorktree(repository, this.worktreePath(state, group), branch, null);
+    }
     if (isResolveGroup(group)) return this.worktreePath(state, group);
     if (isServiceGroup(group)) return runTree;
     return ensureWorktree(
@@ -347,7 +515,7 @@ export class Executor {
   private async start(state: RunState, slug: string, seq: number): Promise<void> {
     const group = findGroup(state, slug);
     const attempt = group?.attempts.find((candidate) => candidate.seq === seq);
-    if (!group || !attempt) return;
+    if (!group || !attempt || attempt.runtime === 'command') return;
     const key = { run: state.run.id, group: slug, seq };
     const settings = this.runtimeSettings(state);
     if (typeof settings === 'string') {
@@ -366,8 +534,16 @@ export class Executor {
       await this.exit(state, key, { kind: 'git', message: (error as Error).message });
       return;
     }
-    const specialist = findSpecialist(state.run.config, attempt.specialist);
-    if (!specialist) return;
+    // Leftovers of an interrupted check must not reach this one.
+    await this.discardChanges(state, group);
+    // The observer works from the snapshot of its profile, which is not in the configuration.
+    const specialist = specialistOfStep(state.run, group, attempt.specialist);
+    if (!specialist) {
+      if (isRepairGroup(group)) {
+        await this.exit(state, key, { kind: 'spawn', message: 'the observer has no profile' });
+      }
+      return;
+    }
     const directory = attemptDirectory(this.workspace(state), state.run.id, slug, seq);
     const logPath = this.logPath(state, slug, seq);
     mkdirSync(directory, { recursive: true });
@@ -403,6 +579,7 @@ export class Executor {
         this.daemon.socket,
         ...(slug === SPLIT_GROUP ? ['--split'] : []),
         ...(specialist.queue === true ? ['--queue'] : []),
+        ...(isRepairGroup(group) ? ['--repair'] : []),
       ],
       sessionId: randomUUID(),
       resumeSession: attempt.resumeSession,
@@ -441,6 +618,7 @@ export class Executor {
       this.tokens.delete(token);
       if (this.daemon.stopping) return undefined;
       return this.daemon.serial(async () => {
+        await this.discardChanges(state, group);
         const baseline = this.baselines.get(keyOf(key));
         this.baselines.delete(keyOf(key));
         const after = baseline ? await this.snapshot(state, baseline.exclude) : null;
@@ -539,13 +717,15 @@ export class Executor {
     const group = findGroup(state, slug);
     if (!group) return;
     try {
+      // The actions around the split change the tree of the run itself, which the groups start from.
+      const actionPoint = actionPointOf(group);
       await commitAll(
         this.worktreePath(state, group),
         commitMessage(slug, stepId, summary),
-        groupRef(state.run, slug),
+        actionPoint === undefined ? groupRef(state.run, slug) : runRef(state.run),
         state.run.config.workspace.include,
       );
-      void this.daemon.refreshDiff(state, slug);
+      if (actionPoint === undefined) void this.daemon.refreshDiff(state, slug);
     } catch (error) {
       await this.daemon.apply(state, {
         kind: 'commit_failed',
@@ -561,6 +741,7 @@ export class Executor {
     let outcome: MergeOutcome;
     try {
       const runTree = await this.ensureGroupWorktree(state, { ...group, slug: SPLIT_GROUP });
+      await this.settleChecks(state, runTree);
       const source = groupRef(state.run, slug);
       const target = runRef(state.run);
       const message = `aip: merge ${slug}`;

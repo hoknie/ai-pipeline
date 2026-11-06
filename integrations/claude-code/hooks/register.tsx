@@ -54,11 +54,11 @@ export const register: Register = (on, options) => {
     const parsed = parseRunCommand(e.args);
     if (!parsed.ok) return { text: parsed.error };
     const repository = await $.session.cwd();
-    const { workflow, task } = parsed.value;
+    const { pipeline, task } = parsed.value;
     const outcome = await runAip($, argv, [
       'run',
       'start',
-      workflow,
+      pipeline,
       '--task',
       task,
       '--repo',

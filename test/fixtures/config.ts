@@ -15,14 +15,15 @@ export function writeConfigDirectory(repo: string, text: string): void {
 export function writeLevelDirectory(directory: string, text: string): void {
   rmSync(directory, { recursive: true, force: true });
   const root = (parse(text) ?? {}) as { swarm?: Record<string, unknown> };
-  const { specialists, workflows, ...settings } = root.swarm ?? {};
+  const { specialists, pipelines, actions, ...settings } = root.swarm ?? {};
   mkdirSync(directory, { recursive: true });
   if (root.swarm !== undefined) {
     writeFileSync(join(directory, 'settings.yaml'), stringify(settings));
   }
   for (const [section, entries] of [
     ['specialists', specialists],
-    ['workflows', workflows],
+    ['pipelines', pipelines],
+    ['actions', actions],
   ] as const) {
     if (entries === undefined || entries === null || typeof entries !== 'object') continue;
     mkdirSync(join(directory, section), { recursive: true });

@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { formatQueue, type QueueView, type RunView } from '../../src/protocol/index.ts';
-import { settle, WORKFLOW_CONFIG, git, until, type Harness } from './harness.ts';
+import { settle, PIPELINE_CONFIG, git, until, type Harness } from './harness.ts';
 import { calls } from './control-harness.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
@@ -17,7 +17,7 @@ const callsOf = (h: Harness): { step: string; group: string }[] =>
 
 const resetIn = (seconds: number) => Math.ceil(Date.now() / 1000) + seconds;
 
-const SPLIT_CONFIG = WORKFLOW_CONFIG.replace(
+const SPLIT_CONFIG = PIPELINE_CONFIG.replace(
   '    feature:\n      steps:',
   '    feature:\n      split: { specialist: coder, max_groups: 3 }\n      steps:',
 );
@@ -205,7 +205,7 @@ describe('pause a run: scenarios of the queue', () => {
   });
 
   it('stops the running step, starts no next one and continues the step in the same session', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     h.script({
       code: [{ waitFor: h.gate('a') }, { write: { 'lib.ts': 'export const value = 2;\n' } }],
     });
@@ -261,31 +261,64 @@ describe('pause a run: scenarios of the queue', () => {
     h.open('a');
   });
 
-  it('takes the return item of a paused run by advance and continues its steps', async () => {
-    const h = await start(WORKFLOW_CONFIG);
-    h.script({ code: [{ waitFor: h.gate('a') }, { waitFor: h.gate('b') }], review: [{}] });
+  it('does not take the return item of a paused run by advance; run-now continues its step', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    h.script({ code: [{ waitFor: h.gate('a') }, { waitFor: h.gate('b') }, {}], review: [{}, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
     const runId = (await allRuns(h))[0]!.id;
+    await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
+    const view = (await h.call('run_pause', { runId })) as QueueView & { item: string };
+    const slug = (await h.status(runId)).groups[0]!.slug;
+    await until('the code step is stopped', async () =>
+      (await h.group(runId, slug)).attempts.some((a) => a.status === 'cancelled'),
+    );
+    h.open('b');
+    const second = (await waitUntilRuns(h, 2)).find((run) => run.id !== runId)!;
+    await h.waitFor(second.id, (state) => state.finished);
+    await settle(h);
+    const queue = await queueOf(h);
+    expect(queue.items.map((item) => item.run)).toEqual([runId]);
+    expect(queue.items[0]).toMatchObject({ hold: 'paused' });
+    const state = await h.status(runId);
+    expect(state.hold).toBe('paused');
+    expect((await h.group(runId, slug)).attempts).toHaveLength(1);
+
+    await h.call('queue_run_now', { repository: h.repo, item: view.item });
+    const done = await h.waitFor(runId, (s) => s.finished);
+    expect(done.hold).toBeNull();
+    const codeCalls = calls(h).filter((call) => call.step === 'code');
+    expect(codeCalls.some((call) => call.args.includes('--resume'))).toBe(true);
+  });
+
+  it('keeps a paused run and its dependent task waiting with a free place', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    h.script({ code: [{ waitFor: h.gate('a') }, {}], review: [{}] });
+    const first = await add(h, 'A');
+    await add(h, 'B', { after: [first.item] });
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    await h.call('queue_start', { repository: h.repo });
+    const runId = (await waitUntilRuns(h, 1))[0]!.id;
     await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
     await h.call('run_pause', { runId });
     const slug = (await h.status(runId)).groups[0]!.slug;
     await until('the code step is stopped', async () =>
       (await h.group(runId, slug)).attempts.some((a) => a.status === 'cancelled'),
     );
-    expect(((await queueOf(h)).items.at(-1) ?? null)?.run).toBe(runId);
-    h.open('b');
-    const done = await h.waitFor(
-      runId,
-      (state) => state.hold === null && state.state === 'finished',
-    );
-    expect((await h.group(runId, slug)).attempts.map((attempt) => attempt.stepId)).toContain(
-      'review',
-    );
-    expect(done.hold).toBeNull();
-    const queue = await waitQueue(h, (view) => view.items.length === 0);
-    expect(queue.items).toEqual([]);
+    await settle(h);
+    await settle(h);
+    const detail = await h.group(runId, slug);
+    expect(detail.attempts).toHaveLength(1);
+    expect(detail.attempts[0]).toMatchObject({
+      status: 'cancelled',
+      reason: 'interrupted by a pause',
+    });
+    expect((await h.status(runId)).hold).toBe('paused');
+    const queue = await queueOf(h);
+    expect(queue.status).toBe('running');
+    expect(queue.items).toHaveLength(2);
+    expect(await allRuns(h)).toHaveLength(1);
   });
 
   it('continues a paused run with a failed group with run-now: the group is retried and the run holds a place', async () => {
@@ -356,13 +389,13 @@ describe('pause a run: daemon restart', () => {
   max: 3
   specialists:
     coder: { name: Кодировщик }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: code, specialist: coder }
 `;
 
-  it('keeps the hold and the return item and continues the stopped step after a restart', async () => {
+  it('keeps the hold and the return item after a restart', async () => {
     const h = await start();
     h.script({ code: [{ waitFor: h.gate('a') }, {}] });
     await add(h, 'A');
@@ -380,13 +413,41 @@ describe('pause a run: daemon restart', () => {
     expect(queue.items.map((item) => item.run)).toEqual([runId]);
   });
 
-  it('drops the hold of a single-step run that finished with nothing to retry', async () => {
+  it('keeps a paused run on pause after a restart of a running queue with a free place', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    h.script({ code: [{ waitFor: h.gate('a') }, {}], review: [{}] });
+    const first = await add(h, 'A');
+    await add(h, 'B', { after: [first.item] });
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    await h.call('queue_start', { repository: h.repo });
+    const runId = (await waitUntilRuns(h, 1))[0]!.id;
+    await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
+    await h.call('run_pause', { runId });
+    const slug = (await h.status(runId)).groups[0]!.slug;
+    await until('the code step is stopped', async () =>
+      (await h.group(runId, slug)).attempts.some((a) => a.status === 'cancelled'),
+    );
+    await h.restart();
+    await settle(h);
+    await settle(h);
+    expect((await h.status(runId)).hold).toBe('paused');
+    expect((await h.group(runId, slug)).attempts).toHaveLength(1);
+    expect(await allRuns(h)).toHaveLength(1);
+  });
+
+  it('a continued single-step run finishes without a hold and its item stays gone after a restart', async () => {
     const h = await start(SINGLE);
     h.script({ code: [{ waitFor: h.gate('a') }] });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     const runId = (await waitUntilRuns(h, 1))[0]!.id;
-    await h.call('run_pause', { runId });
+    const view = (await h.call('run_pause', { runId })) as QueueView & { item: string };
+    await until('the step is stopped', async () =>
+      (await h.group(runId, (await h.status(runId)).groups[0]!.slug)).attempts.some(
+        (attempt) => attempt.status === 'cancelled',
+      ),
+    );
+    await h.call('queue_run_now', { repository: h.repo, item: view.item });
     h.open('a');
     const done = await h.waitFor(runId, (state) => state.finished);
     expect(done.hold).toBeNull();

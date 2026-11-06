@@ -65,7 +65,7 @@ export function renderPane(elements: PaneElements, model: PaneModel, actions: Pa
       {note(view)}
       {resultLine(view)}
       {view.empty && (
-        <Text dimColor>No runs yet. Start one with /aip:run &lt;workflow&gt; &lt;task&gt;.</Text>
+        <Text dimColor>No runs yet. Start one with /aip:run &lt;pipeline&gt; &lt;task&gt;.</Text>
       )}
       {needsYou(view.needs)}
       {runList(view)}

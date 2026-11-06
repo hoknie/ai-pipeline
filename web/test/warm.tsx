@@ -7,7 +7,7 @@ import { fakeApi, openFake } from './fixtures.ts';
  * Draws the panel once before the tests of a file, so that the cold start of the renderer (the
  * first draw of the shell, of the queue page and of the form of a new task costs hundreds of
  * milliseconds) is not paid by the first test that happens to need it. Pages that draw the
- * workflow graph are not visited: a test file may replace the graph.
+ * pipeline graph are not visited: a test file may replace the graph.
  */
 export async function warmUp(): Promise<void> {
   const noise = vi.spyOn(console, 'error').mockImplementation(() => undefined);

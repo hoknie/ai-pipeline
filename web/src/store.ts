@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiError, type Api } from './api.ts';
+import { parseObserversView, type ObserversView } from './observerTypes.ts';
 import { repositoryList } from './repositories.ts';
 import type {
   BackgroundProcessView,
@@ -41,6 +42,31 @@ type StreamEvent =
   | { event: 'run'; run: RunView }
   | { event: 'queue'; queue: QueueView }
   | { event: 'processes'; processes?: BackgroundProcessView[]; error?: string };
+
+/**
+ * An event of the stream as it is read: the ones above, `observers` (the settings changed in
+ * another tab) and whatever a newer daemon may send, which is ignored.
+ */
+type ReadEvent = StreamEvent | { event: 'observers'; observers?: unknown } | { event: string };
+
+const STREAM_EVENTS = new Set([
+  'snapshot',
+  'daemon',
+  'repositories',
+  'tags',
+  'run',
+  'queue',
+  'processes',
+]);
+
+function isStreamEvent(event: ReadEvent): event is StreamEvent {
+  return STREAM_EVENTS.has(event.event);
+}
+
+/** The observers as they were when nothing in them changed. */
+function sameObservers(current: ObserversView | null, next: ObserversView): ObserversView {
+  return current !== null && JSON.stringify(current) === JSON.stringify(next) ? current : next;
+}
 
 /** What the stream last said about background processes. */
 export interface StreamedProcesses {
@@ -195,7 +221,10 @@ export function useRuns(
   streamedProcesses: StreamedProcesses | null;
   /** Older finished runs, loaded page by page on demand. */
   history: HistoryState;
+  /** The last `observers` event of the stream; null until one arrives. */
+  streamedObservers: ObserversView | null;
 } {
+  const [streamedObservers, setStreamedObservers] = useState<ObserversView | null>(null);
   const [streamedProcesses, setStreamedProcesses] = useState<StreamedProcesses | null>(null);
   const [runs, setRuns] = useState<Map<string, RunView>>(new Map());
   const [queues, setQueues] = useState<Map<string, QueueView>>(new Map());
@@ -304,15 +333,24 @@ export function useRuns(
       setConnection('live');
     };
     source.onmessage = (message) => {
-      let event: StreamEvent;
+      let raw: ReadEvent;
       try {
-        event = JSON.parse(message.data) as StreamEvent;
+        raw = JSON.parse(message.data) as ReadEvent;
       } catch {
         return;
       }
+      if (typeof raw !== 'object' || raw === null) return;
       stopPolling();
       setConnection('live');
       setLoaded(true);
+      if (raw.event === 'observers') {
+        const view = parseObserversView((raw as { observers?: unknown }).observers ?? raw);
+        if (view) setStreamedObservers((current) => sameObservers(current, view));
+        return;
+      }
+      // an event this panel does not know must not reach the branch of a run
+      if (!isStreamEvent(raw)) return;
+      const event: StreamEvent = raw;
       if (event.event === 'daemon') {
         setDaemon(event.daemon);
       } else if (event.event === 'snapshot') {
@@ -446,6 +484,7 @@ export function useRuns(
     runs: sorted,
     openedState,
     streamedProcesses,
+    streamedObservers,
     history: historyState,
     connection,
     loaded,

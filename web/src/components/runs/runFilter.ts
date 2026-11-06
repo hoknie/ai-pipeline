@@ -1,13 +1,15 @@
+import { isRepairing, type PanelRunState } from '../../observerTypes.ts';
 import { runTitle, taskNumber } from '../../format.ts';
-import type { RunView, RunViewState, TagView } from '../../types.ts';
+import type { RunView, TagView } from '../../types.ts';
 
 /** Whose runs the list shows: those of the selected repository or of every repository. */
 export type RunScope = 'repository' | 'all';
 
-/** The eight states a run can be in, in the order of the state filter. */
-export const RUN_STATES: RunViewState[] = [
+/** The nine states a run can be in, in the order of the state filter. */
+export const RUN_STATES: PanelRunState[] = [
   'needs_human',
   'active',
+  'repair',
   'queued',
   'paused',
   'frozen',
@@ -18,9 +20,9 @@ export const RUN_STATES: RunViewState[] = [
 
 /** Choices of the run filters; every list is empty when the filter is off. */
 export interface RunFilterState {
-  states: RunViewState[];
-  /** Workflow slugs. */
-  workflows: string[];
+  states: PanelRunState[];
+  /** Pipeline slugs. */
+  pipelines: string[];
   /** Specialist slugs. */
   specialists: string[];
   tagIds: string[];
@@ -30,7 +32,7 @@ export interface RunFilterState {
 
 export const EMPTY_FILTERS: RunFilterState = {
   states: [],
-  workflows: [],
+  pipelines: [],
   specialists: [],
   tagIds: [],
   repositories: [],
@@ -41,7 +43,7 @@ export type RunFilterKey = keyof RunFilterState;
 
 const FILTER_KEYS: RunFilterKey[] = [
   'states',
-  'workflows',
+  'pipelines',
   'specialists',
   'tagIds',
   'repositories',
@@ -71,14 +73,14 @@ export function inTags(
   );
 }
 
-/** Searched text of a run: title, name, workflow, id, group titles, tag names, specialists. */
+/** Searched text of a run: title, name, pipeline, id, group titles, tag names, specialists. */
 function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
   const tagNames = (run.tags ?? []).flatMap((tag) => catalog.get(tag.id)?.name ?? []);
   return [
     runTitle(run),
     run.name,
-    run.workflow,
-    run.workflowName,
+    run.pipeline,
+    run.pipelineName,
     run.id,
     taskNumber(run.number),
     ...run.groups.map((group) => group.title),
@@ -114,8 +116,8 @@ function passes(
   switch (key) {
     case 'states':
       return state.states.length === 0 || state.states.includes(run.state);
-    case 'workflows':
-      return state.workflows.length === 0 || state.workflows.includes(run.workflow);
+    case 'pipelines':
+      return state.pipelines.length === 0 || state.pipelines.includes(run.pipeline);
     case 'specialists':
       return (
         state.specialists.length === 0 ||
@@ -189,8 +191,8 @@ export function optionCounts(
       case 'states':
         add(run.state);
         break;
-      case 'workflows':
-        add(run.workflow);
+      case 'pipelines':
+        add(run.pipeline);
         break;
       case 'specialists':
         runSpecialists(run).forEach(add);
@@ -212,7 +214,7 @@ export function optionCounts(
 /** Navigation counters: unfinished runs and those among them waiting for an answer. */
 export function navRunCounts(runs: RunView[]): { working: number; waiting: number } {
   const waiting = runs.filter((run) => run.state === 'needs_human').length;
-  const active = runs.filter((run) => run.state === 'active').length;
+  const active = runs.filter((run) => run.state === 'active' || isRepairing(run)).length;
   return { working: active + waiting, waiting };
 }
 

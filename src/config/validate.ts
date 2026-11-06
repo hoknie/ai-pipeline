@@ -4,6 +4,13 @@ import { parseDuration } from './duration.ts';
 import type { FieldError } from './errors.ts';
 import { isMapping } from './merge.ts';
 import {
+  ACTION_FAILURES,
+  ACTION_POINTS,
+  DEFAULT_ACTION_TIMEOUT_SECONDS,
+  type Action,
+  type ActionFailure,
+  type ActionPoint,
+  type StagePoints,
   CLAUDE_EDIT_MODES,
   CLAUDE_MCP_MODES,
   CLAUDE_SETTINGS_SOURCES,
@@ -27,6 +34,7 @@ import {
   OUTSIDE_CHANGES,
   MAX_RANGE,
   MAX_ROUNDS_RANGE,
+  OBSERVER_SPECIALIST,
   PERMISSIONS,
   RUNTIMES,
   SLUG_PATTERN_TEXT,
@@ -50,7 +58,7 @@ import {
   type McpServer,
   type Specialist,
   type Step,
-  type Workflow,
+  type Pipeline,
 } from './model.ts';
 import { tagNameProblem } from './tag-names.ts';
 
@@ -67,7 +75,9 @@ const SWARM_KEYS = [
   'delivery',
   'defaults',
   'specialists',
-  'workflows',
+  'pipelines',
+  'actions',
+  'stages',
 ];
 const CLAUDE_KEYS = ['edit_mode', 'mcp', 'settings'];
 const DELIVERY_KEYS = [
@@ -78,7 +88,11 @@ const DELIVERY_KEYS = [
   'message_specialist',
   'resolver',
   'resolver_rounds',
+  'message_prompt',
+  'resolver_prompt',
 ];
+const ACTION_KEYS = ['name', 'run', 'specialist', 'additional_prompt', 'timeout', 'on_failure'];
+const ACTION_TIMEOUT_RANGE: Range = [1, 86400];
 const WORKSPACE_KEYS = ['base', 'include'];
 const WEB_KEYS = ['autostart', 'auth', 'port', 'host'];
 const WEB_PORT_RANGE: Range = [1, 65535];
@@ -89,7 +103,7 @@ const RESERVED_MCP_SERVER = 'aip';
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NAMING_KEYS = ['enabled', 'runtime', 'model'];
 const RESOLVER_ROUNDS_RANGE: Range = [1, 10];
-const SPLIT_KEYS = ['specialist', 'max_groups', 'additional_prompt', 'workflow'];
+const SPLIT_KEYS = ['specialist', 'max_groups', 'additional_prompt', 'pipeline', 'workflow'];
 const DEFAULTS_KEYS = ['runtime', 'permissions', 'timeout', 'allow_commands', 'tools'];
 const SPECIALIST_KEYS = [
   'name',
@@ -106,11 +120,17 @@ const SPECIALIST_KEYS = [
   'queue',
   'tags',
 ];
-const WORKFLOW_KEYS = ['name', 'split', 'steps', 'tags'];
+const PIPELINE_KEYS = ['name', 'split', 'steps', 'tags', 'stages'];
 const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt', 'human_review'];
 const ON_REJECT_KEYS = ['goto', 'max_rounds'];
 
 type Mapping = Record<string, unknown>;
+
+/** Action ids the pipeline points may name, and the actions that were read. */
+interface ActionLookup {
+  known: string[];
+  actions: Action[];
+}
 type Range = readonly [number, number];
 
 export type ValidationResult =
@@ -141,6 +161,48 @@ export function validateConfig(root: unknown): ValidationResult {
   return validator.errors.length === 0
     ? { ok: true, config }
     : { ok: false, errors: validator.errors };
+}
+
+/** Keys of the profile of the observer: a specialist that is never queued, limited or tagged. */
+const OBSERVER_KEYS = SPECIALIST_KEYS.filter((key) => !['max', 'queue', 'tags'].includes(key));
+const OBSERVER_DEFAULT_NAME = 'Observer';
+
+export interface ObserverProfileResult {
+  specialist: Specialist;
+  errors: FieldError[];
+}
+
+/**
+ * Checks the profile of the observer (settings of the panel, not `swarm.yaml`). Field paths
+ * start with `specialist`. A profile without a name gets the name `Observer`.
+ */
+export function validateObserverProfile(value: unknown): ObserverProfileResult {
+  const validator = new Validator();
+  const input =
+    isMapping(value) && !('name' in value) ? { ...value, name: OBSERVER_DEFAULT_NAME } : value;
+  const specialist = validator.specialist(
+    OBSERVER_SPECIALIST,
+    input,
+    'specialist',
+    defaultDefaults(),
+    OBSERVER_KEYS,
+  );
+  const fallback: Specialist = {
+    slug: OBSERVER_SPECIALIST,
+    name: OBSERVER_DEFAULT_NAME,
+    model: null,
+    runtime: defaultDefaults().runtime,
+    permissions: defaultDefaults().permissions,
+    timeoutSeconds: defaultDefaults().timeoutSeconds,
+    allowCommands: [],
+    tools: [],
+    skills: [],
+    prompt: null,
+    max: null,
+    queue: false,
+    level: 'project',
+  };
+  return { specialist: specialist ?? fallback, errors: validator.errors };
 }
 
 function join(path: string, key: string): string {
@@ -236,7 +298,9 @@ class Validator {
       delivery: defaultDelivery(),
       defaults: defaultDefaults(),
       specialists: [],
-      workflows: [],
+      pipelines: [],
+      actions: [],
+      stages: {},
     };
     if (!isMapping(root)) {
       this.error('swarm', 'the file must contain a `swarm` mapping');
@@ -302,31 +366,37 @@ class Validator {
     if ('defaults' in swarm) this.defaults(swarm.defaults, config.defaults);
     if ('specialists' in swarm)
       config.specialists = this.specialists(swarm.specialists, config.defaults);
-    if ('workflows' in swarm) {
-      const known = isMapping(swarm.specialists) ? Object.keys(swarm.specialists) : [];
-      config.workflows = this.workflows(swarm.workflows, known);
-      this.splitTargets(config.workflows);
+    const knownSpecialists = isMapping(swarm.specialists) ? Object.keys(swarm.specialists) : [];
+    if ('actions' in swarm) config.actions = this.actions(swarm.actions, knownSpecialists);
+    const knownActions = isMapping(swarm.actions) ? Object.keys(swarm.actions) : [];
+    const actionPoints: ActionLookup = { known: knownActions, actions: config.actions };
+    if ('stages' in swarm) {
+      config.stages = this.stagePoints(swarm.stages, 'swarm.stages', actionPoints, null);
+    }
+    if ('pipelines' in swarm) {
+      config.pipelines = this.pipelines(swarm.pipelines, knownSpecialists, actionPoints);
+      this.splitTargets(config.pipelines);
     }
     return config;
   }
 
-  splitTargets(workflows: Workflow[]): void {
-    for (const workflow of workflows) {
-      const target = workflow.split?.workflow;
+  splitTargets(pipelines: Pipeline[]): void {
+    for (const pipeline of pipelines) {
+      const target = pipeline.split?.pipeline;
       if (!target) continue;
-      const path = `swarm.workflows.${workflow.id}.split.workflow`;
-      const found = workflows.find((other) => other.id === target);
+      const path = `swarm.pipelines.${pipeline.id}.split.pipeline`;
+      const found = pipelines.find((other) => other.id === target);
       if (!found) {
         this.error(
           path,
-          `unknown workflow \`${target}\`; known: ${workflows.map((other) => other.id).join(', ')}`,
+          `unknown pipeline \`${target}\`; known: ${pipelines.map((other) => other.id).join(', ')}`,
         );
-      } else if (found.id === workflow.id) {
-        this.error(path, 'must not point to the workflow itself');
-      } else if (found.split?.workflow) {
+      } else if (found.id === pipeline.id) {
+        this.error(path, 'must not point to the pipeline itself');
+      } else if (found.split?.pipeline) {
         this.error(
           path,
-          `workflow \`${target}\` has its own \`split.workflow\`; chains are not allowed`,
+          `pipeline \`${target}\` has its own \`split.pipeline\`; chains are not allowed`,
         );
       }
     }
@@ -357,7 +427,128 @@ class Validator {
         delivery.resolverRounds =
           this.integer(field, path, RESOLVER_ROUNDS_RANGE) ?? delivery.resolverRounds;
       }
+      if (key === 'message_prompt') {
+        const prompt = this.string(field, path);
+        if (prompt !== null) delivery.messagePrompt = prompt;
+      }
+      if (key === 'resolver_prompt') {
+        const prompt = this.string(field, path);
+        if (prompt !== null) delivery.resolverPrompt = prompt;
+      }
     }
+  }
+
+  actions(value: unknown, known: string[]): Action[] {
+    const mapping = this.mapping(value, 'swarm.actions');
+    if (!mapping) return [];
+    return this.entries(mapping, 'swarm.actions', null).flatMap(([id, field]) => {
+      const path = join('swarm.actions', id);
+      if (!isValidSlug(id)) this.error(path, `id must match ${SLUG_PATTERN_TEXT}`);
+      const action = this.action(id, field, path, known);
+      return action ? [action] : [];
+    });
+  }
+
+  action(id: string, value: unknown, path: string, known: string[]): Action | null {
+    const mapping = this.mapping(value, path);
+    if (!mapping) return null;
+    const action: Action = {
+      id,
+      name: null,
+      run: null,
+      specialist: null,
+      additionalPrompt: null,
+      timeoutSeconds: DEFAULT_ACTION_TIMEOUT_SECONDS,
+      onFailure: 'stop',
+      level: 'project',
+    };
+    for (const [key, field] of this.entries(mapping, path, ACTION_KEYS)) {
+      const fieldPath = join(path, key);
+      switch (key) {
+        case 'name':
+          action.name = this.string(field, fieldPath)?.trim() ?? null;
+          break;
+        case 'run':
+          action.run = this.string(field, fieldPath);
+          break;
+        case 'specialist': {
+          const slug = this.string(field, fieldPath);
+          if (slug !== null && !known.includes(slug)) {
+            this.error(fieldPath, `unknown specialist \`${slug}\`; known: ${known.join(', ')}`);
+          }
+          action.specialist = slug;
+          break;
+        }
+        case 'additional_prompt':
+          action.additionalPrompt = this.string(field, fieldPath);
+          break;
+        case 'timeout':
+          action.timeoutSeconds =
+            this.integer(field, fieldPath, ACTION_TIMEOUT_RANGE) ?? action.timeoutSeconds;
+          break;
+        case 'on_failure':
+          action.onFailure =
+            this.choice<ActionFailure>(field, fieldPath, ACTION_FAILURES) ?? action.onFailure;
+          break;
+      }
+    }
+    if ('run' in mapping && 'specialist' in mapping) {
+      this.error(path, 'must have exactly one of `run` and `specialist`, not both');
+    } else if (!('run' in mapping) && !('specialist' in mapping)) {
+      this.error(path, 'must have one of `run` and `specialist`');
+    }
+    if ('timeout' in mapping && 'specialist' in mapping && !('run' in mapping)) {
+      this.error(join(path, 'timeout'), 'is allowed only with `run`');
+    }
+    if ('additional_prompt' in mapping && !('specialist' in mapping)) {
+      this.error(join(path, 'additional_prompt'), 'is allowed only with `specialist`');
+    }
+    return action;
+  }
+
+  /** The points of `swarm.stages` or of the `stages` of a pipeline. */
+  stagePoints(
+    value: unknown,
+    path: string,
+    lookup: ActionLookup,
+    pipeline: { split: boolean } | null,
+  ): StagePoints {
+    const points: StagePoints = {};
+    const mapping = this.mapping(value, path);
+    if (!mapping) return points;
+    for (const [point, field] of this.entries(mapping, path, [...ACTION_POINTS])) {
+      const pointPath = join(path, point);
+      if (!Array.isArray(field)) {
+        this.error(pointPath, 'must be a list of action ids');
+        continue;
+      }
+      if (pipeline && !pipeline.split && (point === 'before_split' || point === 'after_split')) {
+        this.error(pointPath, 'is allowed only in a pipeline with `split`');
+        continue;
+      }
+      const ids: string[] = [];
+      for (const [index, item] of field.entries()) {
+        const itemPath = `${pointPath}[${index}]`;
+        const id = this.string(item, itemPath);
+        if (id === null) continue;
+        if (!lookup.known.includes(id)) {
+          this.error(itemPath, `unknown action \`${id}\`; known: ${lookup.known.join(', ')}`);
+          continue;
+        }
+        if (ids.includes(id)) {
+          this.error(itemPath, `duplicate action \`${id}\``);
+          continue;
+        }
+        const action = lookup.actions.find((candidate) => candidate.id === id);
+        if (point === 'after_delivery' && action?.specialist) {
+          this.error(itemPath, 'only commands (`run`) are allowed after delivery');
+          continue;
+        }
+        ids.push(id);
+      }
+      points[point as ActionPoint] = ids;
+    }
+    return points;
   }
 
   known(value: unknown, path: string, known: string[]): string | null {
@@ -478,7 +669,13 @@ class Validator {
     });
   }
 
-  specialist(slug: string, value: unknown, path: string, defaults: Defaults): Specialist | null {
+  specialist(
+    slug: string,
+    value: unknown,
+    path: string,
+    defaults: Defaults,
+    allowed: readonly string[] = SPECIALIST_KEYS,
+  ): Specialist | null {
     const mapping = this.mapping(value, path);
     if (!mapping) return null;
     const specialist: Specialist = {
@@ -496,7 +693,7 @@ class Validator {
       queue: false,
       level: 'project',
     };
-    for (const [key, field] of this.entries(mapping, path, SPECIALIST_KEYS)) {
+    for (const [key, field] of this.entries(mapping, path, [...allowed])) {
       const fieldPath = join(path, key);
       switch (key) {
         case 'name':
@@ -588,32 +785,46 @@ class Validator {
     return server;
   }
 
-  workflows(value: unknown, known: string[]): Workflow[] {
-    const mapping = this.mapping(value, 'swarm.workflows');
+  pipelines(value: unknown, known: string[], lookup: ActionLookup): Pipeline[] {
+    const mapping = this.mapping(value, 'swarm.pipelines');
     if (!mapping) return [];
-    return this.entries(mapping, 'swarm.workflows', null).flatMap(([id, field]) => {
-      const path = join('swarm.workflows', id);
+    return this.entries(mapping, 'swarm.pipelines', null).flatMap(([id, field]) => {
+      const path = join('swarm.pipelines', id);
       if (!isValidSlug(id)) this.error(path, `id must match ${SLUG_PATTERN_TEXT}`);
-      const workflow = this.workflow(id, field, path, known);
-      return workflow ? [workflow] : [];
+      const pipeline = this.pipeline(id, field, path, known, lookup);
+      return pipeline ? [pipeline] : [];
     });
   }
 
-  workflow(id: string, value: unknown, path: string, known: string[]): Workflow | null {
+  pipeline(
+    id: string,
+    value: unknown,
+    path: string,
+    known: string[],
+    lookup: ActionLookup,
+  ): Pipeline | null {
     const mapping = this.mapping(value, path);
     if (!mapping) return null;
-    this.entries(mapping, path, WORKFLOW_KEYS);
-    // Tags are metadata for the panel: checked here, never part of the workflow.
+    this.entries(mapping, path, PIPELINE_KEYS);
+    // Tags are metadata for the panel: checked here, never part of the pipeline.
     if ('tags' in mapping) this.tagNames(mapping.tags, join(path, 'tags'));
     const name = 'name' in mapping ? this.string(mapping.name, join(path, 'name')) : null;
     const split = 'split' in mapping ? this.split(mapping.split, join(path, 'split'), known) : null;
+    const stages =
+      'stages' in mapping
+        ? this.stagePoints(mapping.stages, join(path, 'stages'), lookup, {
+            split: 'split' in mapping,
+          })
+        : undefined;
+    const withStages = <T extends Pipeline>(pipeline: T): Pipeline =>
+      stages === undefined ? pipeline : { ...pipeline, stages };
     const stepsPath = join(path, 'steps');
-    if (split?.workflow) {
+    if (split?.pipeline) {
       if ('steps' in mapping) {
-        this.error(stepsPath, 'must not be set together with `split.workflow`');
+        this.error(stepsPath, 'must not be set together with `split.pipeline`');
         return null;
       }
-      return { id, name: name?.trim() ?? null, split, steps: [] };
+      return withStages({ id, name: name?.trim() ?? null, split, steps: [] });
     }
     if (!('steps' in mapping)) {
       this.error(stepsPath, 'is required');
@@ -641,13 +852,16 @@ class Validator {
       if (target === -1) this.error(gotoPath, `unknown step \`${step.onReject.goto}\``);
       else if (target >= index) this.error(gotoPath, 'must point to an earlier step');
     });
-    return { id, name: name?.trim() ?? null, split, steps };
+    return withStages({ id, name: name?.trim() ?? null, split, steps });
   }
 
   split(value: unknown, path: string, known: string[]): Split | null {
     const mapping = this.mapping(value, path);
     if (!mapping) return null;
     this.entries(mapping, path, SPLIT_KEYS);
+    if ('pipeline' in mapping && 'workflow' in mapping) {
+      this.error(path, 'has both `pipeline` and the old `workflow`; keep `pipeline`');
+    }
     const specialistPath = join(path, 'specialist');
     if (!('specialist' in mapping)) {
       this.error(specialistPath, 'is required');
@@ -668,10 +882,10 @@ class Validator {
       'additional_prompt' in mapping
         ? this.string(mapping.additional_prompt, join(path, 'additional_prompt'))
         : null;
-    const workflow =
-      'workflow' in mapping ? this.string(mapping.workflow, join(path, 'workflow')) : null;
+    const pipeline =
+      'pipeline' in mapping ? this.string(mapping.pipeline, join(path, 'pipeline')) : null;
     return specialist !== null && maxGroups !== null
-      ? { specialist, maxGroups, additionalPrompt, workflow }
+      ? { specialist, maxGroups, additionalPrompt, pipeline }
       : null;
   }
 

@@ -29,6 +29,9 @@ export function copyTemplateRepo(
     execFileSync('git', ['init', '-q', '-b', 'main', template]);
     git(template, 'config', 'user.name', 'Test');
     git(template, 'config', 'user.email', 'test@example.com');
+    // A commit otherwise leaves a detached `git maintenance` behind: its lock file in .git/objects
+    // can vanish in the middle of the copy, and the copy fails with ENOENT.
+    git(template, 'config', 'maintenance.auto', 'false');
     for (const [name, text] of Object.entries(files)) writeFileSync(join(template, name), text);
     writeConfigDirectory(template, config);
     git(template, 'add', '-A');

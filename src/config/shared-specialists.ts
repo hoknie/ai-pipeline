@@ -19,7 +19,7 @@ export interface SharedSpecialistUsage {
   revision: string | null;
   /** Why the file cannot be read; there are no references then. */
   error?: string;
-  /** References from the shared level (shared workflows and shared `delivery.*`). */
+  /** References from the shared level (shared pipelines and shared `delivery.*`). */
   global: EntryReference[];
   /** Repositories where the shared specialist is used, in the order of `projects` of the call. */
   projects: SharedSpecialistProject[];

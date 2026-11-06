@@ -4,7 +4,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { defaultRuntimes, findSpecialist, type Specialist } from '../../src/config/index.ts';
+import {
+  OBSERVER_SPECIALIST,
+  defaultRuntimes,
+  findSpecialist,
+  type Specialist,
+} from '../../src/config/index.ts';
 import type { StepInput } from '../../src/core/index.ts';
 import {
   createClaudeRuntime,
@@ -464,6 +469,34 @@ describe('opencode adapter', () => {
       runtime.buildLaunch(context({ specialist: specialist({ permissions: 'read' }) })).files[0]!
         .content,
     ).toContain('"bash": "deny"');
+  });
+});
+
+describe('repair tools of the observer', () => {
+  const repairNames = ['answer', 'retry', 'cancel'].map((name) => `mcp__aip__swarm_repair_${name}`);
+  const allowedOf = (slug: string) => {
+    const args = createClaudeRuntime('claude').buildLaunch(
+      context({ specialist: specialist({ slug }) }),
+    ).args;
+    return args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools'));
+  };
+
+  it('allows them to the observer and not to an ordinary specialist', () => {
+    expect(allowedOf(OBSERVER_SPECIALIST)).toEqual(expect.arrayContaining(repairNames));
+    const ordinary = allowedOf('coder');
+    for (const name of repairNames) expect(ordinary).not.toContain(name);
+  });
+
+  it('passes --repair of the worker command to opencode.json without tool rules', () => {
+    const launch = createOpencodeRuntime('/bin/opencode').buildLaunch(
+      context({
+        specialist: specialist({ slug: OBSERVER_SPECIALIST }),
+        workerCommand: ['/usr/bin/node', '/aip/main.js', 'mcp', '--worker', 'token-1', '--repair'],
+      }),
+    );
+    const generated = JSON.parse(launch.files[0]!.content);
+    expect(generated.mcp.aip.command.at(-1)).toBe('--repair');
+    expect(launch.files[0]!.content).not.toContain('swarm_repair');
   });
 });
 

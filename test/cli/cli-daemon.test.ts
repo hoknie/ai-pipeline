@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
+import { PIPELINE_CONFIG } from '../daemon/harness.ts';
 import {
   aip as aipFast,
   aipProcess as aip,
@@ -795,6 +796,38 @@ describe('cli', () => {
     expect(
       (JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as typeof view).items,
     ).toHaveLength(1);
+  });
+
+  it('accepts the old -w/--workflow option of queue edit as -p/--pipeline', async () => {
+    const config = `${PIPELINE_CONFIG}    other:
+      steps:
+        - { id: code, specialist: coder }
+`;
+    const box = sandbox(config);
+    await aipFast(box, 'queue', 'add', 'feature', '--task', 'Форма входа');
+    const pipelineOf = async (): Promise<string> =>
+      (
+        JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as {
+          items: { id: string; pipeline: string }[];
+        }
+      ).items[0]!.pipeline;
+    const view = JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as {
+      items: { id: string }[];
+    };
+    const id = view.items[0]!.id;
+    expect((await aipFast(box, 'queue', 'edit', id, '-p', 'other')).code).toBe(0);
+    expect(await pipelineOf()).toBe('other');
+    expect((await aipFast(box, 'queue', 'edit', id, '-w', 'feature')).code).toBe(0);
+    expect(await pipelineOf()).toBe('feature');
+    expect((await aipFast(box, 'queue', 'edit', id, '--workflow', 'other')).code).toBe(0);
+    expect(await pipelineOf()).toBe('other');
+    const twice = await aipFast(box, 'queue', 'edit', id, '-p', 'feature', '-w', 'feature');
+    expect(twice.code).not.toBe(0);
+    expect(twice.stderr).toContain('--pipeline');
+    expect(await pipelineOf()).toBe('other');
+    const help = await aipFast(box, 'queue', 'edit', '--help');
+    expect(help.stdout).toContain('--pipeline');
+    expect(help.stdout).not.toContain('--workflow');
   });
 
   it('skips steps of queued tasks and edits the list', async () => {

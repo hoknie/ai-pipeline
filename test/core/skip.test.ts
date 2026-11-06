@@ -10,7 +10,7 @@ import {
   stepStates,
   stepsOf,
 } from '../../src/core/index.ts';
-import { findWorkflow } from '../../src/config/index.ts';
+import { findPipeline } from '../../src/config/index.ts';
 
 import { CONFIG_TEXT, config, finish, group, run, step } from './helpers.ts';
 
@@ -20,13 +20,13 @@ const EPIC_CONFIG = `${CONFIG_TEXT.trimEnd()}
         - { id: look, specialist: plan }
         - { id: check, specialist: reviewer, on_reject: { goto: look, max_rounds: 2 } }
     epic:
-      split: { specialist: plan, max_groups: 3, workflow: explore }
+      split: { specialist: plan, max_groups: 3, pipeline: explore }
 `;
 
-function ids(text: string, workflow: string, skip: string[]): string[] {
-  const resolved = applySkip(config(text), workflow, skip);
-  const found = findWorkflow(resolved, workflow)!;
-  return (found.split?.workflow ? findWorkflow(resolved, found.split.workflow)! : found).steps.map(
+function ids(text: string, pipeline: string, skip: string[]): string[] {
+  const resolved = applySkip(config(text), pipeline, skip);
+  const found = findPipeline(resolved, pipeline)!;
+  return (found.split?.pipeline ? findPipeline(resolved, found.split.pipeline)! : found).steps.map(
     (step) => step.id,
   );
 }
@@ -70,8 +70,8 @@ describe('checkSkip', () => {
     );
   });
 
-  it('refuses an unknown workflow', () => {
-    expect(checkSkip(resolved, 'nope', ['qa'])).toBe('unknown workflow `nope`');
+  it('refuses an unknown pipeline', () => {
+    expect(checkSkip(resolved, 'nope', ['qa'])).toBe('unknown pipeline `nope`');
   });
 });
 
@@ -85,10 +85,10 @@ describe('applySkip', () => {
     const resolved = config();
     expect(ids(CONFIG_TEXT, 'feature', ['review', 'qa', 'qa'])).toEqual(['plan', 'code']);
     applySkip(resolved, 'feature', ['qa']);
-    expect(findWorkflow(resolved, 'feature')!.steps).toHaveLength(4);
+    expect(findPipeline(resolved, 'feature')!.steps).toHaveLength(4);
   });
 
-  it('cuts the steps of split.workflow', () => {
+  it('cuts the steps of split.pipeline', () => {
     expect(ids(EPIC_CONFIG, 'epic', ['check'])).toEqual(['look']);
     expect(() => applySkip(config(EPIC_CONFIG), 'epic', ['plan'])).toThrow(/unknown step `plan`/);
   });
@@ -148,13 +148,13 @@ describe('stepStates', () => {
     expect(stepStates(state)[3]!.name).toBe('qa');
   });
 
-  it('adds the id to the names that two steps of a workflow share', () => {
+  it('adds the id to the names that two steps of a pipeline share', () => {
     const state = run(1, {
       configText: `swarm:
   specialists:
     coder: { name: Кодер }
     reviewer: { name: Ревьюер }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: code, specialist: coder }

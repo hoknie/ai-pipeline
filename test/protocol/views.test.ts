@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
   addItem,
+  defaultObserverSettings,
+  repairIncidents,
   advance,
   dispatch,
   emptyQueue,
@@ -10,15 +12,18 @@ import {
   startQueue,
   transition,
   type GroupWait,
+  type ObserverSettings,
 } from '../../src/core/index.ts';
 import {
   formatRepositories,
   groupView,
+  observersView,
   pickSpecChange,
   catalogView,
   queueView,
   repositoryViews,
   runView,
+  systemGroups,
   withQueue,
 } from '../../src/protocol/index.ts';
 import { CONFIG_TEXT, finish, group, run, step } from '../core/helpers.ts';
@@ -49,8 +54,8 @@ describe('repositoryViews', () => {
     const done = inRepository('/b', 'run00000000c');
     transition(done, { kind: 'cancel', group: null }, 10);
     const queue = emptyQueue('/b', 1);
-    addItem(queue, { workflow: 'feature', task: 'x' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 3);
+    addItem(queue, { pipeline: 'feature', task: 'x' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y' }, 'q2', 3);
     const views = repositoryViews(entries, [waiting, active, done], [queue]);
     expect(views.map((view) => view.path)).toEqual(['/a', '/b', '/c']);
     expect(views[0]).toMatchObject({ unfinished: 2, waiting: 1, queued: 0 });
@@ -98,8 +103,8 @@ describe('repositoryViews', () => {
 describe('task numbers in views', () => {
   it('carries the number of the run, of the queue item and of the predecessors', () => {
     const queue = emptyQueue('/repo', 1, 5);
-    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'B', after: ['q1', 'r'] }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B', after: ['q1', 'r'] }, 'q2', 2);
     const working = run(1, { id: 'r' });
     working.run.number = 3;
     const view = queueView(queue, (id) => (id === 'r' ? working : undefined));
@@ -114,9 +119,9 @@ describe('task numbers in views', () => {
 describe('queueView dependencies', () => {
   it('shows the readiness and the predecessors with their state', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'API', title: 'API' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'UI', after: ['q1', 'run00000000a'] }, 'q2', 2);
-    addItem(queue, { workflow: 'feature', task: 'free' }, 'q3', 2);
+    addItem(queue, { pipeline: 'feature', task: 'API', title: 'API' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'UI', after: ['q1', 'run00000000a'] }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'free' }, 'q3', 2);
     const working = run(1, { id: 'run00000000a' });
     const view = queueView(queue, (id) => (id === working.run.id ? working : undefined));
     expect(view.items.map((item) => item.readiness)).toEqual(['ready', 'waiting', 'ready']);
@@ -144,7 +149,7 @@ describe('queueView', () => {
     group(state, 'gruppa-1').status = 'merged';
     const view = queueView(queue, lookup(state)).runs[0]!;
     expect(view).toMatchObject({
-      workflow: 'feature',
+      pipeline: 'feature',
       createdAt: 1000,
       groups: { done: 1, total: 3 },
       // gruppa-1 is merged (4 steps), gruppa-2 runs `plan`, gruppa-3 waits at the start
@@ -275,8 +280,8 @@ describe('queueView settings and skipped runs', () => {
 describe('automatic delivery in views', () => {
   it('reports the setting of the repository and the choice of each item', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', autoDeliver: false }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'y' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', autoDeliver: false }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'y' }, 'q2', 2);
     const view = queueView(queue, () => undefined, true);
     expect(view.autoDeliver).toBe(true);
     expect(view.items.map((item) => item.autoDeliver)).toEqual([false, null]);
@@ -335,13 +340,13 @@ describe('tags in views', () => {
     expect(runView(state, 1000, undefined, [linked]).tags).toEqual([expected]);
     expect(catalogView([linked])).toEqual([expected]);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-l'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-l'] }, 'q1', 2);
     expect(queueView(queue, () => undefined, null, [linked]).items[0]!.tags).toEqual([expected]);
   });
 
   it('shows the tags of queue items and of queue runs', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'x', tags: ['tg-a', 'gone'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'x', tags: ['tg-a', 'gone'] }, 'q1', 2);
     const started = run(1);
     started.run.tags = ['tg-b'];
     queue.runs.push(started.run.id);
@@ -510,8 +515,8 @@ describe('accepted answers in rows and the run view', () => {
 describe('queueView delivery mode and autopilot answer', () => {
   it('shows the mode of the repository and of the items, and the answer text', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'a', deliveryMode: 'commit' }, 'q1', 2);
-    addItem(queue, { workflow: 'feature', task: 'b' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'a', deliveryMode: 'commit' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'b' }, 'q2', 2);
     const view = queueView(queue, () => undefined, true, [], 'branch');
     expect(view.deliveryMode).toBe('branch');
     expect(view.items.map((item) => item.deliveryMode)).toEqual(['commit', null]);
@@ -995,7 +1000,7 @@ describe('frozen runs in views', () => {
     state.run.hold = 'frozen';
     expect(runView(state, 1000)).toMatchObject({ state: 'frozen', hold: 'frozen' });
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'B' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'B' }, 'q1', 2);
     queue.items[0]!.run = 'b';
     const view = queueView(queue, (id) => (id === 'b' ? state : undefined));
     expect(view.items[0]).toMatchObject({ run: 'b', hold: 'frozen' });
@@ -1012,18 +1017,18 @@ describe('frozen runs in views', () => {
   });
 });
 
-describe('name of the workflow in views', () => {
+describe('name of the pipeline in views', () => {
   const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n');
 
   it('takes the name of a run from its snapshot and the id without a name', () => {
-    expect(runView(run(1, { configText: named }), 1).workflowName).toBe('Новая функция');
-    expect(runView(run(1), 1).workflowName).toBe('feature');
+    expect(runView(run(1, { configText: named }), 1).pipelineName).toBe('Новая функция');
+    expect(runView(run(1), 1).pipelineName).toBe('feature');
   });
 
   it('gives the name to the cards and items of the queue through the lookup', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { workflow: 'feature', task: 'A' }, 'q1', 2);
-    addItem(queue, { workflow: 'gone', task: 'B' }, 'q2', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
+    addItem(queue, { pipeline: 'gone', task: 'B' }, 'q2', 2);
     const working = run(1, { id: 'r', configText: named });
     queue.runs.push('r');
     const names = (id: string) => (id === 'feature' ? 'Новая функция' : id);
@@ -1036,9 +1041,9 @@ describe('name of the workflow in views', () => {
       undefined,
       names,
     );
-    expect(view.items.map((item) => item.workflowName)).toEqual(['Новая функция', 'gone']);
-    expect(view.runs[0]?.workflowName).toBe('Новая функция');
-    expect(queueView(queue, () => undefined).items[0]?.workflowName).toBe('feature');
+    expect(view.items.map((item) => item.pipelineName)).toEqual(['Новая функция', 'gone']);
+    expect(view.runs[0]?.pipelineName).toBe('Новая функция');
+    expect(queueView(queue, () => undefined).items[0]?.pipelineName).toBe('feature');
   });
 });
 
@@ -1235,5 +1240,248 @@ describe('groupRow diffRevision', () => {
 
   it('is null without statistics', () => {
     expect(runView(run(1), 2000).groups[0]?.diffRevision).toBeNull();
+  });
+});
+
+describe('pipeline actions in the views', () => {
+  const ACTIONS_CONFIG = `swarm:
+  specialists:
+    plan: { name: Планировщик }
+    coder: { name: Кодировщик }
+  actions:
+    prepare: { run: make, name: Подготовка }
+    lint: { run: lint }
+    commit: { run: commit }
+  stages:
+    before_split: [prepare]
+    before_delivery: [lint]
+    after_delivery: [commit]
+  pipelines:
+    feature:
+      split: { specialist: plan }
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+  function withActions() {
+    const state = run(1, { split: true, configText: ACTIONS_CONFIG });
+    return state;
+  }
+
+  it('lists the actions in the order they run, with the point and the id', () => {
+    const state = withActions();
+    const base = state.actions[0]!;
+    state.message = { ...base, slug: '_message', status: 'running', attempts: [] };
+    const after = { ...base, slug: '_action-after-delivery-commit', attempts: [] };
+    const before = { ...base, slug: '_action-before-delivery-lint', attempts: [] };
+    state.actions.push(before, after);
+    const view = runView(state, 5000);
+    expect(
+      view.system.map((row) => [row.kind, row.slug, row.point ?? null, row.action ?? null]),
+    ).toEqual([
+      ['action', '_action-before-split-prepare', 'before_split', 'prepare'],
+      ['split', '_split', null, null],
+      ['action', '_action-before-delivery-lint', 'before_delivery', 'lint'],
+      ['message', '_message', null, null],
+      ['action', '_action-after-delivery-commit', 'after_delivery', 'commit'],
+    ]);
+  });
+
+  it('does not count the actions among the groups', () => {
+    const state = withActions();
+    const view = runView(state, 5000);
+    expect(view.groups).toHaveLength(0);
+    expect(view.counts).toBe('');
+    expect(view.total).toBe(0);
+    expect(view.progress.total).toBe(0);
+  });
+
+  it('shows an action by its name in the row and the stage list', () => {
+    const state = withActions();
+    const view = runView(state, 5000);
+    expect(view.system[0]).toMatchObject({ kind: 'action', title: 'Подготовка', status: 'queued' });
+    expect(view.topology.stages.map((stage) => stage.id)).toEqual([
+      'action:before_split:prepare',
+      'split',
+      'step:code',
+      'merge',
+      'action:before_delivery:lint',
+      'delivery',
+      'action:after_delivery:commit',
+      'cleanup',
+    ]);
+    expect(view.topology.stages[0]).toMatchObject({
+      status: 'queued',
+      group: '_action-before-split-prepare',
+    });
+  });
+
+  it('puts a waiting action on its stage', () => {
+    const state = withActions();
+    const view = runView(
+      state,
+      5000,
+      () => null,
+      [],
+      (_run, slug) =>
+        slug === '_action-before-split-prepare' ? { reason: 'capacity', max: 1 } : null,
+    );
+    expect(view.system[0]?.status).toBe('waiting');
+    expect(view.topology.stages[0]?.status).toBe('waiting');
+  });
+
+  it('puts the actions on the card of a run of the queue without the delivery hold', () => {
+    const state = withActions();
+    state.run.hold = 'paused';
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    const card = queueView(
+      queue,
+      () => state,
+      null,
+      [],
+      null,
+      () => null,
+    ).runs[0]!;
+    expect(card.system).toEqual([
+      { kind: 'action', status: 'paused', title: expect.any(String) },
+      { kind: 'split', status: 'paused' },
+    ]);
+  });
+
+  it('shows the group view of an action on the branch of the run', () => {
+    const state = withActions();
+    const action = state.actions[0]!;
+    const view = groupView(state, action, '/w', null, 5000);
+    expect(view.branch).toBe(state.run.branch);
+    expect(view.slug).toBe('_action-before-split-prepare');
+  });
+});
+
+describe('observers in views', () => {
+  const observers = (patch: Partial<ObserverSettings> = {}): ObserverSettings => ({
+    ...defaultObserverSettings(),
+    enabled: true,
+    projects: [{ repository: '/repo', maxWorkers: null }],
+    ...patch,
+  });
+  const failedRun = (id = 'run00000000a') => {
+    const state = inRepository('/repo', id);
+    step(state);
+    const failed = group(state);
+    failed.status = 'failed';
+    failed.reason = 'сломалось';
+    return state;
+  };
+  const incident = { key: 'k1', kind: 'failed', group: 'gruppa-1', detail: 'сломалось' } as const;
+
+  it('shows a failed task an observer may take as repair', () => {
+    const state = failedRun();
+    expect(runView(state, 1000, undefined, [], undefined, undefined, observers())).toMatchObject({
+      state: 'repair',
+      repair: { allowed: true, active: true, repairs: 0, incident: null, cancelReason: null },
+    });
+  });
+
+  it('keeps the failure of a task the observer will not take', () => {
+    const state = failedRun();
+    const off = runView(state, 1000);
+    expect(off.state).toBe('failed');
+    expect(off.repair).toMatchObject({ active: false });
+    state.run.repair.allowed = false;
+    expect(runView(state, 1000, undefined, [], undefined, undefined, observers()).state).toBe(
+      'failed',
+    );
+    state.run.repair.allowed = true;
+    state.run.repair.repairs = 5;
+    expect(
+      runView(state, 1000, undefined, [], undefined, undefined, observers()).repair?.active,
+    ).toBe(false);
+    state.run.repair.repairs = 0;
+    expect(
+      runView(state, 1000, undefined, [], undefined, undefined, observers({ projects: [] })).state,
+    ).toBe('failed');
+  });
+
+  it('shows a task with an incident being repaired as repair, even with observers off', () => {
+    const state = failedRun();
+    state.run.repair.incident = incident;
+    expect(runView(state, 1000)).toMatchObject({
+      state: 'repair',
+      repair: { active: true, incident },
+    });
+  });
+
+  it('ends the repair view when the incident is cleared', () => {
+    const state = failedRun();
+    state.run.repair.incident = incident;
+    state.run.repair.taken = repairIncidents(state, observers()).map((found) => found.key);
+    state.run.repair.incident = null;
+    const view = runView(state, 1000, undefined, [], undefined, undefined, observers());
+    expect(view.state).toBe('failed');
+    expect(view.repair).toMatchObject({ active: false, incident: null });
+  });
+
+  it('puts a hold before repair, and repair before needs_human', () => {
+    const state = failedRun();
+    state.run.repair.incident = incident;
+    state.run.hold = 'paused';
+    expect(runView(state, 1000).state).toBe('paused');
+    state.run.hold = 'frozen';
+    expect(runView(state, 1000).state).toBe('frozen');
+    state.run.hold = null;
+    group(state).status = 'needs_human';
+    expect(runView(state, 1000).state).toBe('repair');
+  });
+
+  it('keeps repair when the task has a return item', () => {
+    const state = failedRun();
+    const view = runView(state, 1000, undefined, [], undefined, undefined, observers());
+    expect(withQueue(view, 'q9')).toMatchObject({ state: 'repair', queueItem: 'q9' });
+  });
+
+  it('lists the repair group in system after the resolver', () => {
+    const state = failedRun();
+    state.resolve = { ...group(state), slug: '_resolve' };
+    state.repair = { ...group(state), slug: '_repair', status: 'running' };
+    expect(runView(state, 1000).system.map((row) => row.kind)).toEqual(['resolve', 'repair']);
+    expect(systemGroups(state).map((entry) => entry.kind)).toEqual(['resolve', 'repair']);
+  });
+
+  it('shows why the observer cancelled the task', () => {
+    const state = failedRun();
+    state.run.repair.cancelReason = 'задача невыполнима';
+    expect(runView(state, 1000).repair?.cancelReason).toBe('задача невыполнима');
+  });
+
+  it('keeps the observer as the author of a decision and of an attempt', () => {
+    const state = run(1);
+    step(state);
+    group(state).decisions.push({
+      stepId: 'code',
+      question: 'Продолжать?',
+      answer: 'Да',
+      by: 'observer',
+      attemptSeq: 1,
+    });
+    const view = runView(state, 1000);
+    expect(view.decisions.map((d) => d.by)).toEqual(['observer']);
+    const found = groupView(state, group(state), '/w', null, 5000);
+    expect(found.attempts[0]?.decision?.by).toBe('observer');
+  });
+
+  it('counts repairs under way and tasks waiting for an observer', () => {
+    const repairing = failedRun('run00000000a');
+    repairing.run.repair.incident = incident;
+    const waiting = failedRun('run00000000b');
+    const idle = inRepository('/repo', 'run00000000c');
+    const settings = observers();
+    const view = observersView(settings, [repairing, waiting, idle]);
+    expect(view.settings).toBe(settings);
+    expect(view.workers).toEqual({
+      running: [{ runId: 'run00000000a', repository: '/repo', incident }],
+      waiting: 1,
+    });
+    expect(observersView(defaultObserverSettings(), [waiting]).workers.waiting).toBe(0);
   });
 });

@@ -12,7 +12,7 @@ import {
   type StreamEvent,
 } from '../../src/protocol/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import { settle, MANUAL_CONFIG, WORKFLOW_CONFIG, startRun, type Harness } from './harness.ts';
+import { settle, MANUAL_CONFIG, PIPELINE_CONFIG, startRun, type Harness } from './harness.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
 
 describe('live parallel', () => {
@@ -83,7 +83,7 @@ describe('live parallel', () => {
   });
 
   it('sends a queue event when the step of a queue run changes, and none without changes', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     h.script({ code: [{ waitFor: h.gate('code') }] });
     await add(h, 'A');
     const events: StreamEvent[] = [];
@@ -128,7 +128,7 @@ describe('live parallel', () => {
 describe('tasks from a specialist', () => {
   it('adds a task to the queue of the run repository, not of the worktree, and does not start it', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         'coder: { name: Кодировщик, queue: true }',
       ).replace(
@@ -137,12 +137,12 @@ describe('tasks from a specialist', () => {
       ),
     );
     h.script({
-      code: [{ ...WRITE_LIB, queue: { workflow: 'nope', task: 'никуда' } }],
-      review: [{ queue: { workflow: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' } }],
+      code: [{ ...WRITE_LIB, queue: { pipeline: 'nope', task: 'никуда' } }],
+      review: [{ queue: { pipeline: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' } }],
     });
     const created = await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'подвести итоги',
     });
     // a task of a specialist never starts the queue: pause it so the finished run does not take it
@@ -160,13 +160,13 @@ describe('tasks from a specialist', () => {
       );
     const code = queued.find((entry) => entry.step === 'code')!;
     expect(code.queued.isError).toBe(true);
-    expect(code.queued.content[0]?.text).toContain('unknown workflow `nope`');
+    expect(code.queued.content[0]?.text).toContain('unknown pipeline `nope`');
     expect(queued.find((entry) => entry.step === 'review')?.queued.isError).toBeFalsy();
     const queue = await queueOf(h);
     expect(queue.status).toBe('stopped');
     expect(queue.items).toHaveLength(1);
     expect(queue.items[0]).toMatchObject({
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'Реализовать web-i18n',
       title: 'web-i18n',
     });
@@ -237,7 +237,7 @@ describe('run goes through the queue', () => {
   const run = (h: Harness, extra: Record<string, unknown> = {}) =>
     h.call('run', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'работа',
       ...extra,
     } as never) as Promise<RunQueued>;
@@ -286,15 +286,15 @@ describe('run goes through the queue', () => {
     expect(a.item).not.toBe(queued.item);
   });
 
-  it('rejects an unknown workflow and leaves the queue unchanged', async () => {
+  it('rejects an unknown pipeline and leaves the queue unchanged', async () => {
     const h = await start();
-    await expect(run(h, { workflow: 'nope' })).rejects.toThrow('unknown workflow `nope`');
+    await expect(run(h, { pipeline: 'nope' })).rejects.toThrow('unknown pipeline `nope`');
     expect(await queueOf(h)).toMatchObject({ status: 'stopped', items: [], runs: [] });
   });
 
   it('reports an error of the run creation, keeps the item and stops the queue', async () => {
     const h = await start();
-    // the workflow exists, but the run cannot be prepared: the repository has no commits to branch from
+    // the pipeline exists, but the run cannot be prepared: the repository has no commits to branch from
     await h.call('queue', { repository: h.repo });
     const { rmSync } = await import('node:fs');
     rmSync(join(h.repo, '.git', 'refs', 'heads', 'main'));
@@ -309,7 +309,7 @@ describe('run goes through the queue', () => {
 
 describe('skipped steps of a task', () => {
   it('runs the task without the skipped step up to merged', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     h.script({ code: [WRITE_LIB] });
     const view = await add(h, 'A', { skip: ['review'] });
     expect(view.items[0]?.skip).toEqual(['review']);
@@ -324,17 +324,17 @@ describe('skipped steps of a task', () => {
   });
 
   it('rejects an unknown step with the list of steps and keeps the queue', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     await expect(
-      h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'x', skip: ['deploy'] }),
+      h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'x', skip: ['deploy'] }),
     ).rejects.toThrow('unknown step `deploy` in skip; steps: code, review');
     await expect(
-      h.call('queue_add', { repository: h.repo, workflow: 'feature', task: 'x', skip: ['code'] }),
+      h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'x', skip: ['code'] }),
     ).rejects.toThrow('step `review` returns to skipped step `code`');
     await expect(
       h.call('run', {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         task: 'x',
         skip: ['code', 'review'],
       }),
@@ -343,7 +343,7 @@ describe('skipped steps of a task', () => {
   });
 
   it('replaces and clears skip when editing and checks the final combination', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     const { item } = await add(h, 'A');
     const edited = (await h.call('queue_edit', {
       repository: h.repo,
@@ -369,33 +369,33 @@ describe('skipped steps of a task', () => {
     expect(cleared.items[0]?.skip).toEqual([]);
   });
 
-  it('refuses to change the workflow to one without the skipped step', async () => {
+  it('refuses to change the pipeline to one without the skipped step', async () => {
     const h = await start(
-      `${WORKFLOW_CONFIG}    other:\n      steps:\n        - { id: code, specialist: coder }\n`,
+      `${PIPELINE_CONFIG}    other:\n      steps:\n        - { id: code, specialist: coder }\n`,
     );
     const { item } = await add(h, 'A', { skip: ['review'] });
     await expect(
-      h.call('queue_edit', { repository: h.repo, item, workflow: 'other' }),
+      h.call('queue_edit', { repository: h.repo, item, pipeline: 'other' }),
     ).rejects.toThrow('unknown step `review` in skip');
     const unchanged = (await queueOf(h)).items[0];
-    expect(unchanged?.workflow).toBe('feature');
+    expect(unchanged?.pipeline).toBe('feature');
     expect(unchanged?.skip).toEqual(['review']);
     const moved = (await h.call('queue_edit', {
       repository: h.repo,
       item,
-      workflow: 'other',
+      pipeline: 'other',
       skip: [],
     })) as QueueView;
-    expect(moved.items[0]?.workflow).toBe('other');
+    expect(moved.items[0]?.pipeline).toBe('other');
     expect(moved.items[0]?.skip).toEqual([]);
   });
 
   it('puts a task with a step removed from swarm.yaml first with an error and stops the queue', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     await add(h, 'A', { skip: ['review'] });
     writeConfigDirectory(
       h.repo,
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         '        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }\n',
         '',
       ),
@@ -408,7 +408,7 @@ describe('skipped steps of a task', () => {
   });
 
   it('passes skip to a run started now', async () => {
-    const h = await start(WORKFLOW_CONFIG);
+    const h = await start(PIPELINE_CONFIG);
     h.script({ code: [WRITE_LIB] });
     const { item } = await add(h, 'A', { skip: ['review'] });
     const created = (await h.call('queue_run_now', { repository: h.repo, item })) as RunCreated;

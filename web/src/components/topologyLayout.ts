@@ -2,9 +2,17 @@ import type { Edge, Node } from '@xyflow/react';
 import type { TFunction } from 'i18next';
 
 import type { LoadEntry, MachineLoad } from '../specialistLoad.ts';
-import type { RunView, WorkflowTopology } from '../types.ts';
+import {
+  pipelineStagesOf,
+  stageLink,
+  stageNodeId,
+  type PipelineStage,
+  type StagedTopology,
+  type StageSection,
+} from '../pipelineStages.ts';
+import type { RunView, PipelineTopology } from '../types.ts';
 
-/** A group of an active run, placed on a node of the workflow graph. */
+/** A group of an active run, placed on a node of the pipeline graph. */
 export interface LiveGroup {
   runId: string;
   runTitle: string;
@@ -29,9 +37,9 @@ export interface Live {
   runIds: string[];
 }
 
-/** Where the groups of the active runs of a workflow are now. */
+/** Where the groups of the active runs of a pipeline are now. */
 export function liveState(
-  workflow: WorkflowTopology,
+  pipeline: PipelineTopology,
   runs: RunView[],
   repository: string | null,
 ): Live {
@@ -48,9 +56,9 @@ export function liveState(
     runs: 0,
     runIds: [],
   };
-  const known = new Set(workflow.steps.map((step) => step.id));
+  const known = new Set(pipeline.steps.map((step) => step.id));
   for (const run of runs) {
-    if (run.finished || run.workflow !== workflow.id) continue;
+    if (run.finished || run.pipeline !== pipeline.id) continue;
     if (repository !== null && run.repository !== repository) continue;
     live.runs += 1;
     live.runIds.push(run.id);
@@ -105,7 +113,7 @@ export interface Busy {
 }
 
 export interface StageData extends Record<string, unknown> {
-  kind: 'split' | 'step' | 'merge' | 'delivery' | 'resolver';
+  kind: 'split' | 'step' | 'merge' | 'delivery' | 'resolver' | 'action' | 'message' | 'cleanup';
   title: string;
   subtitle: string;
   detail: string | null;
@@ -120,6 +128,17 @@ export interface StageData extends Record<string, unknown> {
   /** Slug of the specialist of the node; null for nodes without one. */
   specialist: string | null;
   busy: Busy | null;
+  /** Id of the stage in the list of stages. */
+  stageId: string;
+  section: StageSection;
+  /** The node opens its section of the graph. */
+  sectionStart: boolean;
+  /** Who performs the stage: a specialist, a command or the system. */
+  performer: string;
+  /** Label of the condition of the stage; null — the stage always runs. */
+  condition: string | null;
+  /** Address of the entry of the stage in the Pipeline tab. */
+  link: string | null;
 }
 
 export type StageNode = Node<StageData, 'stage'>;
@@ -191,13 +210,13 @@ export function otherUse(
 }
 
 function busyOf(
-  workflow: WorkflowTopology,
+  pipeline: PipelineTopology,
   live: Live,
   load: MachineLoad,
   specialist: string,
 ): Busy {
   const slug = load.get(specialist);
-  const limits = [slug?.max ?? null, workflow.limits?.[specialist] ?? null].filter(
+  const limits = [slug?.max ?? null, pipeline.limits?.[specialist] ?? null].filter(
     (limit): limit is number => limit !== null && limit > 0,
   );
   const max = limits.length > 0 ? Math.min(...limits) : null;
@@ -214,9 +233,27 @@ function active(groups: LiveGroup[]): boolean {
   return groups.some((group) => group.status === 'running' || group.status === 'merging');
 }
 
-/** Nodes left to right: split, steps, merge, delivery; the resolver under the delivery. */
+function performerText(stage: PipelineStage, t: TFunction): string {
+  switch (stage.performer.type) {
+    case 'specialist':
+      return stage.performer.name || stage.performer.slug;
+    case 'command':
+      return stage.performer.command;
+    default:
+      return t('topology.stages.system');
+  }
+}
+
+const CONDITIONS = new Set(['delivery_commit', 'conflict', 'not_keep']);
+
+function conditionText(key: string | null, t: TFunction): string | null {
+  if (key === null) return null;
+  return CONDITIONS.has(key) ? t(`topology.stages.condition.${key as 'conflict'}`) : key;
+}
+
+/** Nodes left to right by the list of stages; the resolver under the delivery. */
 export function layout(
-  workflow: WorkflowTopology,
+  pipeline: StagedTopology,
   live: Live,
   t: TFunction,
   sizes: ReadonlyMap<string, Size> = new Map(),
@@ -225,13 +262,17 @@ export function layout(
   const nodes: StageNode[] = [];
   const edges: Edge[] = [];
   let x = 0;
+  /** The last node of the main line; the resolver is not on it. */
+  let last: StageNode | null = null;
+  let previousSection: StageSection | null = null;
   const place = (id: string, data: StageData) => {
-    nodes.push({ id, type: 'stage', position: { x, y: 0 }, data });
-    const previous = nodes.at(-2);
-    if (previous) {
+    const node: StageNode = { id, type: 'stage', position: { x, y: 0 }, data };
+    nodes.push(node);
+    previousSection = data.section;
+    if (last) {
       edges.push({
-        id: `${previous.id}->${id}`,
-        source: previous.id,
+        id: `${last.id}->${id}`,
+        source: last.id,
         target: id,
         sourceHandle: 'out',
         targetHandle: 'in',
@@ -239,6 +280,7 @@ export function layout(
         className: 'edge-forward',
       });
     }
+    last = node;
     x += GAP;
   };
   const empty = {
@@ -250,97 +292,148 @@ export function layout(
     specialist: null,
     busy: null,
   };
-  if (workflow.split) {
-    place('split', {
-      kind: 'split',
-      title: t('topology.split'),
-      subtitle: workflow.split.specialist,
-      detail: [
-        t('topology.splitDetail', { n: workflow.split.maxGroups }),
-        ...(workflow.split.workflow
-          ? [
-              t('topology.splitWorkflow', {
-                id: workflow.split.workflowName ?? workflow.split.workflow,
-              }),
-            ]
-          : []),
-      ].join(' · '),
-      groups: live.splitting,
-      active: live.splitting.some((group) => group.status === 'running'),
-      ...empty,
-      specialist: workflow.split.specialist,
-      busy: busyOf(workflow, live, load, workflow.split.specialist),
-    });
+  const stages = pipelineStagesOf(pipeline);
+  for (const stage of stages) {
+    const common = {
+      stageId: stage.id,
+      section: stage.section,
+      sectionStart: stage.section !== previousSection,
+      performer: performerText(stage, t),
+      condition: conditionText(stage.condition, t),
+      link: stageLink(stage),
+    };
+    const slug = stage.performer.type === 'specialist' ? stage.performer.slug : null;
+    switch (stage.kind) {
+      case 'split': {
+        if (!pipeline.split) break;
+        place('split', {
+          kind: 'split',
+          title: t('topology.split'),
+          subtitle: pipeline.split.specialist,
+          detail: [
+            t('topology.splitDetail', { n: pipeline.split.maxGroups }),
+            ...(pipeline.split.pipeline
+              ? [
+                  t('topology.splitPipeline', {
+                    id: pipeline.split.pipelineName ?? pipeline.split.pipeline,
+                  }),
+                ]
+              : []),
+          ].join(' · '),
+          groups: live.splitting,
+          active: live.splitting.some((group) => group.status === 'running'),
+          ...empty,
+          ...common,
+          specialist: pipeline.split.specialist,
+          busy: busyOf(pipeline, live, load, pipeline.split.specialist),
+        });
+        break;
+      }
+      case 'step': {
+        const step = pipeline.steps.find((candidate) => `step:${candidate.id}` === stage.id);
+        if (!step) break;
+        const groups = live.steps.get(step.id) ?? [];
+        place(`step:${step.id}`, {
+          kind: 'step',
+          title: step.name,
+          subtitle: step.specialist,
+          detail: `${step.runtime}${step.model ? ` ${step.model}` : ''} · ${step.permissions}`,
+          groups,
+          attempts: live.attempts.get(step.id) ?? 0,
+          costUsd: live.cost.get(step.id) ?? null,
+          inputTokens: live.inputTokens.get(step.id) ?? 0,
+          outputTokens: live.outputTokens.get(step.id) ?? 0,
+          active: active(groups),
+          step: step.id,
+          specialist: step.specialist,
+          busy: busyOf(pipeline, live, load, step.specialist),
+          ...common,
+        });
+        break;
+      }
+      case 'merge':
+        place('merge', {
+          kind: 'merge',
+          title: t('topology.merge'),
+          subtitle: t('topology.mergeSubtitle'),
+          detail: null,
+          groups: live.merging,
+          active: active(live.merging),
+          ...empty,
+          ...common,
+        });
+        break;
+      case 'delivery':
+        place('delivery', {
+          kind: 'delivery',
+          title: t('topology.deliveryNode'),
+          subtitle: pipeline.delivery.mode,
+          detail: null,
+          groups: live.merged,
+          active: false,
+          ...empty,
+          ...common,
+        });
+        break;
+      case 'resolve': {
+        const resolver = pipeline.delivery.resolver ?? slug;
+        const delivery = nodes.find((node) => node.id === 'delivery');
+        if (!resolver || !delivery) break;
+        const height = (id: string) => sizes.get(id)?.height ?? FALLBACK_HEIGHT;
+        nodes.push({
+          id: 'resolver',
+          type: 'stage',
+          position: {
+            x: delivery.position.x,
+            y: height('delivery') / 2 + RESOLVER_GAP + height('resolver') / 2,
+          },
+          data: {
+            kind: 'resolver',
+            title: t('topology.resolver'),
+            subtitle: resolver,
+            detail: null,
+            groups: [],
+            active: false,
+            ...empty,
+            ...common,
+            sectionStart: false,
+            specialist: resolver,
+            busy: busyOf(pipeline, live, load, resolver),
+          },
+        });
+        edges.push({
+          id: 'delivery->resolver',
+          source: 'delivery',
+          target: 'resolver',
+          sourceHandle: 'down',
+          targetHandle: 'up',
+          label: t('topology.conflict'),
+          className: 'edge-resolver',
+        });
+        break;
+      }
+      default: {
+        place(stageNodeId(stage), {
+          kind: stage.kind === 'action' || stage.kind === 'message' ? stage.kind : 'cleanup',
+          title:
+            stage.kind === 'message'
+              ? t('topology.stages.name.message')
+              : stage.kind === 'cleanup'
+                ? t('topology.stages.name.cleanup')
+                : stage.name,
+          subtitle: performerText(stage, t),
+          detail: null,
+          groups: [],
+          active: false,
+          ...empty,
+          ...common,
+          specialist: slug,
+          busy: slug ? busyOf(pipeline, live, load, slug) : null,
+        });
+      }
+    }
   }
-  for (const step of workflow.steps) {
-    const groups = live.steps.get(step.id) ?? [];
-    place(`step:${step.id}`, {
-      kind: 'step',
-      title: step.name,
-      subtitle: step.specialist,
-      detail: `${step.runtime}${step.model ? ` ${step.model}` : ''} · ${step.permissions}`,
-      groups,
-      attempts: live.attempts.get(step.id) ?? 0,
-      costUsd: live.cost.get(step.id) ?? null,
-      inputTokens: live.inputTokens.get(step.id) ?? 0,
-      outputTokens: live.outputTokens.get(step.id) ?? 0,
-      active: active(groups),
-      step: step.id,
-      specialist: step.specialist,
-      busy: busyOf(workflow, live, load, step.specialist),
-    });
-  }
-  place('merge', {
-    kind: 'merge',
-    title: t('topology.merge'),
-    subtitle: t('topology.mergeSubtitle'),
-    detail: null,
-    groups: live.merging,
-    active: active(live.merging),
-    ...empty,
-  });
-  place('delivery', {
-    kind: 'delivery',
-    title: t('topology.deliveryNode'),
-    subtitle: workflow.delivery.mode,
-    detail: null,
-    groups: live.merged,
-    active: false,
-    ...empty,
-  });
-  if (workflow.delivery.resolver) {
-    const delivery = nodes.at(-1);
-    const height = (id: string) => sizes.get(id)?.height ?? FALLBACK_HEIGHT;
-    nodes.push({
-      id: 'resolver',
-      type: 'stage',
-      position: {
-        x: delivery?.position.x ?? 0,
-        y: height('delivery') / 2 + RESOLVER_GAP + height('resolver') / 2,
-      },
-      data: {
-        kind: 'resolver',
-        title: t('topology.resolver'),
-        subtitle: workflow.delivery.resolver,
-        detail: null,
-        groups: [],
-        active: false,
-        ...empty,
-        specialist: workflow.delivery.resolver,
-        busy: busyOf(workflow, live, load, workflow.delivery.resolver),
-      },
-    });
-    edges.push({
-      id: 'delivery->resolver',
-      source: 'delivery',
-      target: 'resolver',
-      sourceHandle: 'down',
-      targetHandle: 'up',
-      label: t('topology.conflict'),
-      className: 'edge-resolver',
-    });
-  }
-  for (const step of workflow.steps) {
+  for (const step of pipeline.steps) {
     if (!step.onReject) continue;
     edges.push({
       id: `reject:${step.id}->${step.onReject.goto}`,

@@ -15,8 +15,8 @@ import {
   runView,
   systemRow,
   topologyOf,
-  workflowOf,
-  workflowsView,
+  pipelineOf,
+  pipelinesView,
 } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
@@ -151,6 +151,49 @@ describe('system steps in the runs section', () => {
   });
 });
 
+describe('actions of the pipeline in the runs section', () => {
+  const action = (overrides = {}) =>
+    systemRow('action', {
+      slug: '_action-before-delivery-lint',
+      title: 'Проверка стиля',
+      ...overrides,
+    });
+
+  it('lists an action by its title with the system mark', async () => {
+    mount([runView({ groups: [groupRow({ slug: 'a', title: 'Альфа' })], system: [action()] })]);
+    const list = await screen.findByRole('list', { name: 'run groups' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items[1]!.textContent).toContain('Проверка стиля');
+    expect(items[1]!.textContent).toContain('system step');
+  });
+
+  it('opens an action by its address and retries it as a step', async () => {
+    window.location.hash = '#runs/run1/_action-before-delivery-lint';
+    const api = mount(
+      [
+        runView({
+          groups: [groupRow({ status: 'merged' })],
+          system: [action({ status: 'failed' })],
+        }),
+      ],
+      {
+        group: vi.fn(async () =>
+          groupView({ slug: '_action-before-delivery-lint', status: 'failed' }),
+        ),
+      },
+    );
+    expect(await screen.findByRole('region', { name: 'group Проверка стиля' })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: /Changes/ })).toBeNull();
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'More actions: Проверка стиля' }), {
+      key: 'Enter',
+    });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(api.retry).toHaveBeenCalledWith('run1', '_action-before-delivery-lint'),
+    );
+  });
+});
+
 describe('retry of system steps', () => {
   const screenOf = (row: ReturnType<typeof systemRow>, deliverable: boolean) => {
     const api = fakeApi({ group: vi.fn(async () => groupView({ slug: row.slug, attempts: [] })) });
@@ -214,9 +257,9 @@ describe('retry of system steps', () => {
 
 describe('opening a split from the topology', () => {
   it('opens the runs section with the split screen', async () => {
-    const workflow = workflowOf({
+    const pipeline = pipelineOf({
       id: 'feature',
-      split: { specialist: 'plan', maxGroups: 3, workflow: null, workflowName: null },
+      split: { specialist: 'plan', maxGroups: 3, pipeline: null, pipelineName: null },
     });
     const run = runView({
       split: {
@@ -232,7 +275,7 @@ describe('opening a split from the topology', () => {
       topology: topologyOf(),
     });
     const api = fakeApi({
-      workflows: vi.fn(async () => workflowsView({ workflows: [workflow] })),
+      pipelines: vi.fn(async () => pipelinesView({ pipelines: [pipeline] })),
       group: vi.fn(async () => groupView({ slug: '_split' })),
     });
     window.location.hash = '#topology/feature';

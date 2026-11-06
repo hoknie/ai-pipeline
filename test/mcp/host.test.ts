@@ -25,8 +25,8 @@ const VIEW: QueueView & { item: string } = {
       id: 'q1',
       number: 1,
       position: 1,
-      workflow: 'feature',
-      workflowName: 'feature',
+      pipeline: 'feature',
+      pipelineName: 'feature',
       task: 'Сделать вход',
       groups: null,
       title: null,
@@ -84,24 +84,24 @@ describe('host MCP parent of a task', () => {
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', parent: 115 },
+      arguments: { pipeline: 'feature', task: 'x', parent: 115 },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', parent: '#115' } });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', parent: null } });
     await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x', parent: 'r115' },
+      arguments: { pipeline: 'feature', task: 'x', parent: 'r115' },
     });
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', parent: 115 },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', parent: 115 },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', parent: '#115' } },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', parent: null } },
       {
         method: 'run',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', parent: 'r115' },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', parent: 'r115' },
       },
     ]);
   });
@@ -128,7 +128,7 @@ describe('host MCP parent of a task', () => {
     });
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', parent: 'nope' },
+      arguments: { pipeline: 'feature', task: 'x', parent: 'nope' },
     });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('unknown parent `nope`');
@@ -212,7 +212,7 @@ describe('host MCP queue tools', () => {
     });
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'Сделать вход' },
+      arguments: { pipeline: 'feature', task: 'Сделать вход' },
     });
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('Added item q1.');
@@ -220,9 +220,24 @@ describe('host MCP queue tools', () => {
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'Сделать вход' },
+        params: { repository: '/repo', pipeline: 'feature', task: 'Сделать вход' },
       },
     ]);
+  });
+
+  it('rejects the old workflow argument and adds no task', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { workflow: 'feature', task: 'x' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('pipeline');
+    expect(calls).toEqual([]);
   });
 
   it('passes autoDeliver only when it is given', async () => {
@@ -233,7 +248,7 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', autoDeliver: false },
+      arguments: { pipeline: 'feature', task: 'x', autoDeliver: false },
     });
     await client.callTool({
       name: 'swarm_queue_edit',
@@ -241,23 +256,23 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x', autoDeliver: true },
+      arguments: { pipeline: 'feature', task: 'x', autoDeliver: true },
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'y' },
+      arguments: { pipeline: 'feature', task: 'y' },
     });
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', autoDeliver: false },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', autoDeliver: false },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', autoDeliver: null } },
       {
         method: 'run',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', autoDeliver: true },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', autoDeliver: true },
       },
-      { method: 'queue_add', params: { repository: '/repo', workflow: 'feature', task: 'y' } },
+      { method: 'queue_add', params: { repository: '/repo', pipeline: 'feature', task: 'y' } },
     ]);
   });
 
@@ -277,14 +292,14 @@ describe('host MCP queue tools', () => {
     expect(textOf(edited)).toContain('postponed');
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'y', postponed: true },
+      arguments: { pipeline: 'feature', task: 'y', postponed: true },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 't' } });
     expect(calls).toEqual([
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', postponed: true } },
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'y', postponed: true },
+        params: { repository: '/repo', pipeline: 'feature', task: 'y', postponed: true },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 't' } },
     ]);
@@ -298,7 +313,7 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'commit' },
+      arguments: { pipeline: 'feature', task: 'x', deliveryMode: 'commit' },
     });
     await client.callTool({
       name: 'swarm_queue_edit',
@@ -306,22 +321,22 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+      arguments: { pipeline: 'feature', task: 'x', deliveryMode: 'branch' },
     });
     const wrong = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', deliveryMode: 'tar' },
+      arguments: { pipeline: 'feature', task: 'x', deliveryMode: 'tar' },
     });
     expect(wrong.isError).toBe(true);
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', deliveryMode: 'commit' },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', deliveryMode: 'commit' },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', deliveryMode: null } },
       {
         method: 'run',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', deliveryMode: 'branch' },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', deliveryMode: 'branch' },
       },
     ]);
   });
@@ -363,23 +378,23 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', tags: ['auth'] },
+      arguments: { pipeline: 'feature', task: 'x', tags: ['auth'] },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', tags: [] } });
     await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x', tags: ['auth', 'v2'] },
+      arguments: { pipeline: 'feature', task: 'x', tags: ['auth', 'v2'] },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 'T' } });
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', tags: ['auth'] },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', tags: ['auth'] },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', tags: [] } },
       {
         method: 'run',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', tags: ['auth', 'v2'] },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', tags: ['auth', 'v2'] },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 'T' } },
     ]);
@@ -393,23 +408,23 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x', skip: ['review', 'qa'] },
+      arguments: { pipeline: 'feature', task: 'x', skip: ['review', 'qa'] },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', skip: [] } });
     await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x', skip: ['qa'] },
+      arguments: { pipeline: 'feature', task: 'x', skip: ['qa'] },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 'T' } });
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', skip: ['review', 'qa'] },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', skip: ['review', 'qa'] },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', skip: [] } },
       {
         method: 'run',
-        params: { repository: '/repo', workflow: 'feature', task: 'x', skip: ['qa'] },
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', skip: ['qa'] },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 'T' } },
     ]);
@@ -423,33 +438,33 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'API', after: ['q1'] },
+      arguments: { pipeline: 'feature', task: 'API', after: ['q1'] },
     });
     await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q2', after: [] } });
     await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'UI', after: ['q1', 'r1'] },
+      arguments: { pipeline: 'feature', task: 'UI', after: ['q1', 'r1'] },
     });
     await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { workflow: 'feature', task: 'x' },
+      arguments: { pipeline: 'feature', task: 'x' },
     });
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', workflow: 'feature', task: 'API', after: ['q1'] },
+        params: { repository: '/repo', pipeline: 'feature', task: 'API', after: ['q1'] },
       },
       { method: 'queue_edit', params: { repository: '/repo', item: 'q2', after: [] } },
       {
         method: 'run',
         params: {
           repository: '/repo',
-          workflow: 'feature',
+          pipeline: 'feature',
           task: 'UI',
           after: ['q1', 'r1'],
         },
       },
-      { method: 'queue_add', params: { repository: '/repo', workflow: 'feature', task: 'x' } },
+      { method: 'queue_add', params: { repository: '/repo', pipeline: 'feature', task: 'x' } },
     ]);
   });
 
@@ -644,7 +659,7 @@ describe('host MCP queue tools', () => {
       throw new Error('unknown step `deploy` in skip; steps: code, review');
     });
     for (const [name, args] of [
-      ['swarm_queue_add', { workflow: 'feature', task: 'x', skip: ['deploy'] }],
+      ['swarm_queue_add', { pipeline: 'feature', task: 'x', skip: ['deploy'] }],
       ['swarm_queue_edit', { item: 'q1', skip: ['deploy'] }],
     ] as const) {
       const result = await client.callTool({ name, arguments: args });
@@ -691,14 +706,14 @@ describe('host MCP queue tools', () => {
     });
     const started = await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x' },
+      arguments: { pipeline: 'feature', task: 'x' },
     });
     expect(sent).toEqual(['run']);
     expect(textOf(started)).toContain('Run #1 r1 started');
     answer = { item: 'q1', number: 1, run: null, queue: { ...VIEW, status: 'running' } };
     const waiting = await client.callTool({
       name: 'swarm_run',
-      arguments: { workflow: 'feature', task: 'x' },
+      arguments: { pipeline: 'feature', task: 'x' },
     });
     expect(textOf(waiting)).toContain(
       'Task #1 q1 queued at position 1 (queue running, 0 of 1 places taken).',

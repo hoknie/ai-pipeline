@@ -93,7 +93,7 @@ describe('claim of a place', () => {
   it('freezes the last taken run: it leaves the places and its item goes first', () => {
     const [a, b] = [working('a'), working('b')];
     const queue = queueWith(2, 'a', 'b');
-    addItem(queue, { workflow: 'feature', task: 'W' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'W' }, 'q1', 2);
     queue.acknowledged = ['b/gruppa-1/failed/1'];
     expect(claimPlace(queue, [a, b], 'c', 'ret', 5)).toBe('b');
     expect(queue.runs).toEqual(['a', 'c']);
@@ -126,7 +126,7 @@ describe('advance with frozen runs', () => {
   function frozenQueue(): { queue: Queue; frozen: RunState; c: RunState } {
     const queue = queueWith(1, 'c');
     const frozen = working('b');
-    addItem(queue, { workflow: 'feature', task: 'W' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'W' }, 'q1', 2);
     queue.items.unshift({ ...queue.items[0]!, id: 'rb', run: 'b', task: null });
     queue.priority = ['c'];
     freezeIt(frozen);
@@ -225,7 +225,7 @@ describe('pause and removal of a frozen run', () => {
   function frozenQueue(finished: boolean): { queue: Queue; b: RunState } {
     const queue = queueWith(1, 'c');
     const b = working('b');
-    addItem(queue, { workflow: 'feature', task: 'D' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'D' }, 'q1', 2);
     claimPlace(queue, [b], 'x', 'rb', 3);
     queue.runs = ['c'];
     freezeIt(b);

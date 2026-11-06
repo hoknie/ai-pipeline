@@ -22,7 +22,7 @@ import type { DeliveryMode } from '../../../src/config/index.ts';
 import { DELIVERY_MODES } from '../deliveryModes.ts';
 import { taskNumber } from '../format.ts';
 import { useTags } from '../tags.tsx';
-import type { QueueFields, WorkflowsView } from '../types.ts';
+import type { QueueFields, PipelinesView } from '../types.ts';
 import { MarkdownField } from './MarkdownField.tsx';
 import { SkipSteps, pruneSkip } from './SkipSteps.tsx';
 import { TagPicker } from './TagPicker.tsx';
@@ -31,7 +31,7 @@ import { ValuesPicker, type PickerOption } from './ValuesPicker.tsx';
 
 /** What the user has typed into a task form; kept outside the form so updates do not erase it. */
 export interface QueueDraft {
-  workflow: string;
+  pipeline: string;
   mode: 'task' | 'groups';
   task: string;
   groups: { title: string; task: string }[];
@@ -44,7 +44,7 @@ export interface QueueDraft {
   tags: string[];
   /** Ids of the items and runs the task waits for, in the order of choice. */
   after: string[];
-  /** Ids of the workflow steps the task skips. */
+  /** Ids of the pipeline steps the task skips. */
   skip: string[];
   /** The user changed the field: an edit sends `after` only then. */
   afterTouched: boolean;
@@ -64,16 +64,16 @@ const NO_PARENT = '__none__';
 /** Picker group of each kind of predecessor. */
 const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global' } as const;
 
-function stepsOf(workflow: { steps: { id: string; name?: string }[] } | undefined): {
+function stepsOf(pipeline: { steps: { id: string; name?: string }[] } | undefined): {
   id: string;
   name: string;
 }[] {
-  return workflow?.steps.map((step) => ({ id: step.id, name: step.name ?? step.id })) ?? [];
+  return pipeline?.steps.map((step) => ({ id: step.id, name: step.name ?? step.id })) ?? [];
 }
 
-export function emptyDraft(workflow = ''): QueueDraft {
+export function emptyDraft(pipeline = ''): QueueDraft {
   return {
-    workflow,
+    pipeline,
     mode: 'task',
     task: '',
     groups: [{ title: '', task: '' }],
@@ -91,7 +91,7 @@ export function emptyDraft(workflow = ''): QueueDraft {
 
 /** The draft of an existing item, for editing. */
 export function draftOf(item: {
-  workflow: string;
+  pipeline: string;
   task: string | null;
   groups: { title: string; task: string }[] | null;
   title: string | null;
@@ -102,7 +102,7 @@ export function draftOf(item: {
   skip?: string[];
 }): QueueDraft {
   return {
-    workflow: item.workflow,
+    pipeline: item.pipeline,
     mode: item.groups ? 'groups' : 'task',
     task: item.task ?? '',
     groups: item.groups ? item.groups.map((group) => ({ ...group })) : [{ title: '', task: '' }],
@@ -120,32 +120,32 @@ export function draftOf(item: {
 
 /**
  * The draft moved to another repository: the links to its items and runs are cleared, the
- * workflow stays when the new repository has it and is replaced by the first one otherwise.
+ * pipeline stays when the new repository has it and is replaced by the first one otherwise.
  * The tags are cleared (every repository has its own catalog); the text, the name and the
  * delivery settings are kept.
  */
 export function retarget(
   draft: QueueDraft,
-  workflowIds: readonly string[],
-  stepIdsOf: (workflow: string) => string[],
+  pipelineIds: readonly string[],
+  stepIdsOf: (pipeline: string) => string[],
 ): QueueDraft {
-  const workflow = workflowIds.includes(draft.workflow)
-    ? draft.workflow
-    : (workflowIds[0] ?? draft.workflow);
+  const pipeline = pipelineIds.includes(draft.pipeline)
+    ? draft.pipeline
+    : (pipelineIds[0] ?? draft.pipeline);
   return {
     ...draft,
-    workflow,
+    pipeline,
     after: [],
     afterTouched: false,
     parent: null,
     parentTouched: false,
-    skip: pruneSkip(draft.skip, stepIdsOf(workflow)),
+    skip: pruneSkip(draft.skip, stepIdsOf(pipeline)),
     tags: [],
   };
 }
 
 export function draftValid(draft: QueueDraft): boolean {
-  if (draft.workflow === '') return false;
+  if (draft.pipeline === '') return false;
   if ([...draft.title.trim()].length > TITLE_LIMIT) return false;
   if (draft.mode === 'task') return draft.task.trim() !== '';
   return (
@@ -166,7 +166,7 @@ export function fieldsOf(
   const title = draft.title.trim();
   const tags = draft.tags.flatMap((id) => tagName(id) ?? []);
   return {
-    workflow: draft.workflow,
+    pipeline: draft.pipeline,
     ...(draft.mode === 'task'
       ? { task: draft.task.trim() }
       : {
@@ -200,7 +200,7 @@ export function fieldsOf(
 export function QueueForm({
   idPrefix,
   draft,
-  workflows,
+  pipelines,
   repository,
   api,
   autoDeliverDefault = null,
@@ -217,7 +217,7 @@ export function QueueForm({
 }: {
   idPrefix: string;
   draft: QueueDraft;
-  workflows: WorkflowsView | null;
+  pipelines: PipelinesView | null;
   /** The repository of the task; its tag catalog is the one the tag field offers. */
   repository: string | null;
   /** Lets the tag field create tags; without it the field only picks. */
@@ -246,10 +246,10 @@ export function QueueForm({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const catalog = useTags();
-  const ids = workflows?.workflows.map((workflow) => workflow.id) ?? [];
-  // a draft started before the workflows were known takes the first one
+  const ids = pipelines?.pipelines.map((pipeline) => pipeline.id) ?? [];
+  // a draft started before the pipelines were known takes the first one
   const effective: QueueDraft =
-    draft.workflow === '' && ids[0] ? { ...draft, workflow: ids[0] } : draft;
+    draft.pipeline === '' && ids[0] ? { ...draft, pipeline: ids[0] } : draft;
   const change = (patch: Partial<QueueDraft>) => onDraft({ ...effective, ...patch });
   const setGroup = (index: number, patch: Partial<QueueDraft['groups'][number]>) =>
     change({
@@ -312,8 +312,8 @@ export function QueueForm({
     choices: parentChoices.filter((choice) => choice.section === section),
   }));
   const options = [...ids];
-  if (effective.workflow !== '' && !ids.includes(effective.workflow))
-    options.push(effective.workflow);
+  if (effective.pipeline !== '' && !ids.includes(effective.pipeline))
+    options.push(effective.pipeline);
   return (
     <form
       className="@container flex flex-col gap-3 rounded-lg border bg-card p-3"
@@ -342,29 +342,29 @@ export function QueueForm({
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Label htmlFor={`${idPrefix}-workflow`}>{t('queue.form.workflow')}</Label>
+              <Label htmlFor={`${idPrefix}-pipeline`}>{t('queue.form.pipeline')}</Label>
               <Select
-                value={effective.workflow}
-                onValueChange={(workflow) =>
+                value={effective.pipeline}
+                onValueChange={(pipeline) =>
                   change({
-                    workflow,
+                    pipeline,
                     skip: pruneSkip(
                       effective.skip,
                       stepsOf(
-                        workflows?.workflows.find((candidate) => candidate.id === workflow),
+                        pipelines?.pipelines.find((candidate) => candidate.id === pipeline),
                       ).map((step) => step.id),
                     ),
                   })
                 }
                 disabled={options.length === 0}
               >
-                <SelectTrigger id={`${idPrefix}-workflow`} className="w-48">
-                  <SelectValue placeholder={t('queue.form.noWorkflow')} />
+                <SelectTrigger id={`${idPrefix}-pipeline`} className="w-48">
+                  <SelectValue placeholder={t('queue.form.noPipeline')} />
                 </SelectTrigger>
                 <SelectContent>
                   {options.map((id) => (
                     <SelectItem key={id} value={id}>
-                      {workflows?.workflows.find((candidate) => candidate.id === id)?.name ?? id}
+                      {pipelines?.pipelines.find((candidate) => candidate.id === id)?.name ?? id}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -553,7 +553,7 @@ export function QueueForm({
             <SkipSteps
               idPrefix={idPrefix}
               steps={stepsOf(
-                workflows?.workflows.find((candidate) => candidate.id === effective.workflow),
+                pipelines?.pipelines.find((candidate) => candidate.id === effective.pipeline),
               )}
               skip={effective.skip}
               onChange={(skip) => change({ skip })}

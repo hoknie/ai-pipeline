@@ -20,7 +20,7 @@ export function describeConfigError(error: ConfigError): string {
       return `no configuration found: expected ${paths.join(', ')} or ${last ?? ''}`;
     }
     case 'legacy':
-      return `found ${error.found}, but the configuration now lives in ${error.expected} (settings.yaml, specialists/*.yaml, workflows/*.yaml); move it there`;
+      return `found ${error.found}, but the configuration now lives in ${error.expected} (settings.yaml, specialists/*.yaml, pipelines/*.yaml); move it there`;
     case 'read':
       return `cannot read ${error.path}: ${error.message}`;
     case 'syntax':

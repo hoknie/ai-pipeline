@@ -137,7 +137,7 @@ function specialistChanges(before: Specialist, after: Specialist): string[] {
 
 /**
  * Replaces the definitions of the snapshot's specialists with the current ones; specialists missing
- * from the refresh keep theirs, and no specialist is added. The workflow and the rest of the
+ * from the refresh keep theirs, and no specialist is added. The pipeline and the rest of the
  * snapshot stay. Returns the changes, empty when nothing changed.
  */
 export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsRefresh): string[] {

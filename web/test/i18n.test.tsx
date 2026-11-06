@@ -244,6 +244,8 @@ const SAME_AS_ENGLISH = new Set([
   'Plain',
   'MD',
   'Pipeline',
+  'Pipelines',
+  'Repair',
   'OpenCode',
   'Tokens',
   'pipeline {{id}}',
@@ -328,10 +330,10 @@ describe('the term «Pipeline»', () => {
     ['ru', ru],
     ['es', es],
     ['zh', zh],
-  ])('does not call the pipeline a workflow in the %s dictionary', (_language, dictionary) => {
-    // interpolation variables such as {{workflow}} are not texts
+  ])('uses only the word pipeline in the %s dictionary', (_language, dictionary) => {
+    // interpolation variables such as {{pipeline}} are not texts
     const texts = values(dictionary).map((text) => text.replace(/\{\{[^}]*\}\}/g, ''));
-    expect(texts.filter((text) => /workflow/i.test(text))).toEqual([]);
+    expect(texts.filter((text) => /workflow|工作流|流水线|конвейер|flujo/i.test(text))).toEqual([]);
   });
 });
 

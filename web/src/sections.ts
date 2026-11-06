@@ -4,7 +4,7 @@ import {
   ListOrdered,
   Settings,
   Users,
-  Workflow,
+  Waypoints,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -14,7 +14,7 @@ import type { View } from './route.ts';
 
 export interface Section {
   view: View;
-  labelKey: 'runs' | 'queue' | 'topology' | 'specialists' | 'workflows' | 'settings';
+  labelKey: 'runs' | 'queue' | 'topology' | 'specialists' | 'pipelines' | 'settings';
   icon: LucideIcon;
 }
 
@@ -22,9 +22,9 @@ export interface Section {
 export const SECTIONS: Section[] = [
   { view: 'runs', labelKey: 'runs', icon: Activity },
   { view: 'queue', labelKey: 'queue', icon: ListOrdered },
-  { view: 'topology', labelKey: 'topology', icon: Workflow },
+  { view: 'topology', labelKey: 'topology', icon: Waypoints },
   { view: 'specialists', labelKey: 'specialists', icon: Users },
-  { view: 'workflows', labelKey: 'workflows', icon: GitBranch },
+  { view: 'pipelines', labelKey: 'pipelines', icon: GitBranch },
   { view: 'settings', labelKey: 'settings', icon: Settings },
 ];
 

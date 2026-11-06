@@ -84,16 +84,16 @@ describe('specialists list', () => {
     const view = configView({
       errors: [
         {
-          file: '/repo/aip/workflows/feature.yaml',
-          path: 'swarm.workflows.feature.steps[0].specialist',
+          file: '/repo/aip/pipelines/feature.yaml',
+          path: 'swarm.pipelines.feature.steps[0].specialist',
           message: 'unknown specialist',
         },
       ],
     });
     render(<Page api={fakeApi({ config: vi.fn(async () => view) })} />);
     const errors = await screen.findByRole('region', { name: 'configuration errors' });
-    expect(within(errors).getByText('/repo/aip/workflows/feature.yaml')).toBeTruthy();
-    expect(within(errors).getByText('swarm.workflows.feature.steps[0].specialist')).toBeTruthy();
+    expect(within(errors).getByText('/repo/aip/pipelines/feature.yaml')).toBeTruthy();
+    expect(within(errors).getByText('swarm.pipelines.feature.steps[0].specialist')).toBeTruthy();
   });
 });
 
@@ -272,7 +272,7 @@ describe('creating, copying and deleting', () => {
       ok: false as const,
       reason: 'invalid' as const,
       errors: [],
-      references: [{ workflow: 'feature', step: 'review' }, { field: 'delivery.resolver' }],
+      references: [{ pipeline: 'feature', step: 'review' }, { field: 'delivery.resolver' }],
     }));
     const view = configView({ specialists: [specialistEntry('reviewer')] });
     render(

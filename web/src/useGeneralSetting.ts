@@ -35,6 +35,8 @@ export function useSetting<T extends boolean | string>(
   kind: 'boolean' | 'string',
   source?: Source,
   onChanged?: () => Promise<void> | void,
+  /** Writes to this level instead of the one the value comes from. */
+  writeLevel?: 'global' | 'project',
 ): Setting<T> {
   const { t } = useTranslation();
   const [read, setRead] = useState<Source | null>(null);
@@ -57,7 +59,7 @@ export function useSetting<T extends boolean | string>(
   const raw: unknown = setting?.value;
   const overridden =
     setting !== undefined && files !== undefined && setting.file === files.project.file;
-  const level = overridden ? 'project' : 'global';
+  const level = writeLevel ?? (overridden ? 'project' : 'global');
 
   const set = async (value: T) => {
     if (!api || !files) return;
@@ -98,7 +100,8 @@ export function useGeneralSetting(
   path: string,
   source?: Source,
   onChanged?: () => Promise<void> | void,
+  writeLevel?: 'global' | 'project',
 ): GeneralSetting {
-  const setting = useSetting<boolean>(api, path, 'boolean', source, onChanged);
+  const setting = useSetting<boolean>(api, path, 'boolean', source, onChanged, writeLevel);
   return { ...setting, value: setting.value === true };
 }

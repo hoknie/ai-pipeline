@@ -19,9 +19,12 @@ import {
   SETTINGS_GROUPS_BY_SCOPE,
   SETTINGS_SCOPES,
   errorsByGroup,
+  observerTabOf,
+  type ObserverTab,
   type SettingsGroup,
   type SettingsScope,
 } from '../../settingsGroups.ts';
+import type { ObserversView } from '../../observerTypes.ts';
 import type { ConfigEditorResponse, QueueView } from '../../types.ts';
 
 import { Alert } from '../../ui/alert.tsx';
@@ -32,12 +35,13 @@ import { TagsSettings } from '../TagsSettings.tsx';
 import { SharedSpecialistsGroup } from './SharedSpecialistsGroup.tsx';
 import { QueueModes } from './QueueModes.tsx';
 import { SettingsForm } from './SettingsForm.tsx';
+import { ObserversGroup } from './ObserversGroup.tsx';
 import { SettingsTarget } from './SettingsTarget.tsx';
 import { SystemGroup } from './SystemGroup.tsx';
 
-// loaded on demand: it draws the workflow graph
-const SharedWorkflowsGroup = lazy(() =>
-  import('./SharedWorkflowsGroup.tsx').then((module) => ({ default: module.SharedWorkflowsGroup })),
+// loaded on demand: it draws the pipeline graph
+const SharedPipelinesGroup = lazy(() =>
+  import('./SharedPipelinesGroup.tsx').then((module) => ({ default: module.SharedPipelinesGroup })),
 );
 
 /** Where the state and the restarts of the panel and the daemon are. */
@@ -62,8 +66,11 @@ export default function SettingsPage({
   group,
   specialist,
   onSelectSpecialist,
-  workflow,
-  onSelectWorkflow,
+  pipeline,
+  onSelectPipeline,
+  observerTab,
+  onSelectObserverTab,
+  streamedObservers,
   repository,
   repositories,
   onSelectRepository,
@@ -79,8 +86,13 @@ export default function SettingsPage({
   specialist: string | null;
   onSelectSpecialist: (slug: string | null) => void;
   /** The open shared pipeline of the group «Pipeline» (an id or `new`); null for none. */
-  workflow: string | null;
-  onSelectWorkflow: (id: string | null) => void;
+  pipeline: string | null;
+  onSelectPipeline: (id: string | null) => void;
+  /** The open tab of the group «Observers»; null for the first. */
+  observerTab: string | null;
+  onSelectObserverTab: (tab: ObserverTab) => void;
+  /** The last `observers` event of the stream; null until one arrives. */
+  streamedObservers: ObserversView | null;
   /** The selected repository; null while none is known. */
   repository: string | null;
   /** The repositories of the panel, the choices of «Project». */
@@ -135,9 +147,13 @@ export default function SettingsPage({
   const file = config?.settingsFiles[scope].file ?? null;
   const noProjects = scope === 'project' && repositories.length === 0;
   const isForm =
-    group !== 'tags' && group !== 'queue' && group !== 'specialists' && group !== 'pipelines';
+    group !== 'tags' &&
+    group !== 'queue' &&
+    group !== 'specialists' &&
+    group !== 'pipelines' &&
+    group !== 'observers';
   const sharedDirectory = config
-    ? `${config.directories.global}/${group === 'pipelines' ? 'workflows' : 'specialists'}`
+    ? `${config.directories.global}/${group === 'pipelines' ? 'pipelines' : 'specialists'}`
     : null;
 
   return (
@@ -232,6 +248,15 @@ export default function SettingsPage({
                   <Skeleton className="h-24" />
                 </div>
               )
+            ) : group === 'observers' ? (
+              <ObserversGroup
+                api={api}
+                tab={observerTabOf(observerTab)}
+                onTab={onSelectObserverTab}
+                streamed={streamedObservers}
+                repositories={repositories}
+                onDirty={setDirty}
+              />
             ) : group === 'pipelines' ? (
               config ? (
                 <Suspense
@@ -241,11 +266,11 @@ export default function SettingsPage({
                     </div>
                   }
                 >
-                  <SharedWorkflowsGroup
+                  <SharedPipelinesGroup
                     api={api}
                     config={config}
-                    selected={workflow}
-                    onSelect={onSelectWorkflow}
+                    selected={pipeline}
+                    onSelect={onSelectPipeline}
                     onReload={reload}
                     dirty={dirty}
                   />

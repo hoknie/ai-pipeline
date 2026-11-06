@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findGroup } from '../../src/core/index.ts';
+import { dispatch, findGroup } from '../../src/core/index.ts';
 import {
   attemptStepLabel,
   stepLabel,
@@ -8,8 +8,8 @@ import {
   stepName,
   topology,
   transition,
-  workflowTopologies,
-  workflowTopology,
+  pipelineTopologies,
+  pipelineTopology,
 } from '../../src/core/index.ts';
 
 import { CONFIG_TEXT, config, finish, run, step } from './helpers.ts';
@@ -93,10 +93,10 @@ describe('topology', () => {
   });
 });
 
-describe('workflow topology', () => {
-  it('describes every workflow of a configuration without runs', () => {
-    const all = workflowTopologies(config());
-    expect(all.map((workflow) => workflow.id)).toEqual(['feature']);
+describe('pipeline topology', () => {
+  it('describes every pipeline of a configuration without runs', () => {
+    const all = pipelineTopologies(config());
+    expect(all.map((pipeline) => pipeline.id)).toEqual(['feature']);
     expect(all[0]?.steps[2]).toEqual({
       id: 'review',
       specialist: 'reviewer',
@@ -107,7 +107,7 @@ describe('workflow topology', () => {
       onReject: { goto: 'code', maxRounds: 3 },
     });
     expect(all[0]).toMatchObject({ split: null, delivery: { mode: 'worktree', resolver: null } });
-    expect(workflowTopology(config(), 'missing')).toBeNull();
+    expect(pipelineTopology(config(), 'missing')).toBeNull();
   });
 
   it('gives the limit of the specialists of the split, the steps and the resolver', () => {
@@ -118,13 +118,13 @@ describe('workflow topology', () => {
         '    feature:\n      steps:',
         '    feature:\n      split: { specialist: plan, max_groups: 3 }\n      steps:',
       );
-    expect(workflowTopology(config(text), 'feature')?.limits).toEqual({
+    expect(pipelineTopology(config(text), 'feature')?.limits).toEqual({
       plan: 2,
       coder: 1,
       reviewer: null,
       qa: null,
     });
-    expect(workflowTopology(config(), 'feature')?.limits).toEqual({
+    expect(pipelineTopology(config(), 'feature')?.limits).toEqual({
       plan: null,
       coder: null,
       reviewer: null,
@@ -133,23 +133,23 @@ describe('workflow topology', () => {
   });
 });
 
-describe('topology of a workflow that splits into another', () => {
+describe('topology of a pipeline that splits into another', () => {
   const text = `${CONFIG_TEXT}    explore:
       steps:
         - { id: research, specialist: reviewer }
         - { id: write, specialist: coder }
 `.replace(
     /    feature:\n      steps:\n(        - .*\n){4}/,
-    '    feature:\n      split: { specialist: plan, workflow: explore }\n',
+    '    feature:\n      split: { specialist: plan, pipeline: explore }\n',
   );
 
   it('shows the steps of the target and the link', () => {
-    const view = workflowTopology(config(text), 'feature');
+    const view = pipelineTopology(config(text), 'feature');
     expect(view?.split).toEqual({
       specialist: 'plan',
       maxGroups: 5,
-      workflow: 'explore',
-      workflowName: 'explore',
+      pipeline: 'explore',
+      pipelineName: 'explore',
     });
     expect(view?.steps.map((entry) => entry.id)).toEqual(['research', 'write']);
   });
@@ -158,7 +158,7 @@ describe('topology of a workflow that splits into another', () => {
     const state = run(1, { configText: text });
     step(state);
     const view = topology(state);
-    expect(view.split?.workflow).toBe('explore');
+    expect(view.split?.pipeline).toBe('explore');
     expect(view.steps[0]).toMatchObject({ id: 'research', groups: [{ slug: 'gruppa-1' }] });
   });
 });
@@ -168,7 +168,7 @@ const TWINS = `swarm:
     coder: { name: Кодер }
     reviewer: { name: Ревьюер }
     mute: { name: Тихий }
-  workflows:
+  pipelines:
     feature:
       steps:
         - { id: code, specialist: coder }
@@ -197,14 +197,14 @@ describe('human names of specialists', () => {
 describe('human names of steps', () => {
   it('names a step after its specialist, or by the specialist slug when the name is empty', () => {
     const state = twins();
-    const steps = state.run.config.workflows[0]!.steps;
+    const steps = state.run.config.pipelines[0]!.steps;
     expect(stepName(state.run.config, steps[0]!)).toBe('Кодер');
     expect(stepName(state.run.config, steps[3]!)).toBe('mute');
   });
 
-  it('adds the id to a name that another step of the workflow has', () => {
+  it('adds the id to a name that another step of the pipeline has', () => {
     const state = twins();
-    const steps = state.run.config.workflows[0]!.steps;
+    const steps = state.run.config.pipelines[0]!.steps;
     expect(steps.map((item) => stepLabel(state.run.config, steps, item))).toEqual([
       'Кодер',
       'Ревьюер (review)',
@@ -234,22 +234,163 @@ describe('human names of steps', () => {
   });
 });
 
-describe('name of a workflow in the topology', () => {
-  const named = `${CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n')}    epic:\n      split: { specialist: plan, workflow: feature }\n`;
+describe('name of a pipeline in the topology', () => {
+  const named = `${CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n')}    epic:\n      split: { specialist: plan, pipeline: feature }\n`;
 
   it('carries the name, or the id without one, and the name of the split target', () => {
-    const topologies = workflowTopologies(config(named));
+    const topologies = pipelineTopologies(config(named));
     const feature = topologies.find((entry) => entry.id === 'feature')!;
     expect(feature.name).toBe('Новая функция');
     const epic = topologies.find((entry) => entry.id === 'epic')!;
     expect(epic.name).toBe('epic');
-    expect(epic.split?.workflowName).toBe('Новая функция');
-    expect(workflowTopology(config(), 'feature')?.name).toBe('feature');
+    expect(epic.split?.pipelineName).toBe('Новая функция');
+    expect(pipelineTopology(config(), 'feature')?.name).toBe('feature');
   });
 
   it('takes the name of the split target from the snapshot of the run', () => {
     const state = run(1, { configText: named, split: true });
-    state.run.workflow = 'epic';
-    expect(topology(state).split?.workflowName).toBe('Новая функция');
+    state.run.pipeline = 'epic';
+    expect(topology(state).split?.pipelineName).toBe('Новая функция');
+  });
+});
+
+describe('stages in the topology', () => {
+  const TEXT = `swarm:
+  specialists:
+    plan: { name: Планировщик }
+    coder: { name: Кодировщик }
+    writer: { name: Писатель }
+  actions:
+    lint: { run: lint }
+    commit: { run: commit }
+  stages:
+    before_delivery: [lint]
+    after_delivery: [commit]
+  delivery: { message_specialist: writer }
+  pipelines:
+    feature:
+      split: { specialist: plan }
+      steps:
+        - { id: code, specialist: coder }
+    plain:
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+  it('gives the topology of a pipeline the stages without statuses', () => {
+    const shape = pipelineTopology(config(TEXT), 'feature');
+    expect(shape?.stages.map((stage) => [stage.id, stage.status, stage.group])).toEqual([
+      ['split', null, null],
+      ['step:code', null, null],
+      ['merge', null, null],
+      ['action:before_delivery:lint', null, null],
+      ['message', null, null],
+      ['delivery', null, null],
+      ['action:after_delivery:commit', null, null],
+      ['cleanup', null, null],
+    ]);
+    expect(shape?.steps.map((entry) => entry.id)).toEqual(['code']);
+  });
+
+  it('lists the stages of every pipeline', () => {
+    const all = pipelineTopologies(config(TEXT));
+    expect(all.map((entry) => entry.stages.length)).toEqual([8, 7]);
+  });
+
+  it('gives the topology of a run the statuses and the groups of its stages', () => {
+    const plain = `${TEXT.slice(0, TEXT.indexOf('  pipelines:'))}  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+    const state = run(1, { configText: plain });
+    const view = topology(state);
+    expect(view.stages.map((stage) => stage.id)).toEqual([
+      'step:code',
+      'merge',
+      'action:before_delivery:lint',
+      'message',
+      'delivery',
+      'action:after_delivery:commit',
+      'cleanup',
+    ]);
+    expect(view.stages[0]?.status).toBe('queued');
+    expect(view.split).toBeNull();
+  });
+
+  it('keeps the old fields of the topology', () => {
+    const view = topology(run(1));
+    expect(view).toMatchObject({ steps: expect.any(Array), merging: [], merged: [] });
+    expect(view.stages.map((stage) => stage.id)).toEqual([
+      'step:plan',
+      'step:code',
+      'step:review',
+      'step:qa',
+      'merge',
+      'delivery',
+      'cleanup',
+    ]);
+  });
+
+  it('gives merge, delivery and cleanup a status from the run', () => {
+    const plain = `${TEXT.slice(0, TEXT.indexOf('  pipelines:'))}  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+    const state = run(1, { configText: plain });
+    const status = (id: string) => topology(state).stages.find((stage) => stage.id === id)?.status;
+    expect(status('merge')).toBeNull();
+    expect(status('delivery')).toBeNull();
+    expect(status('cleanup')).toBeNull();
+    dispatch([state], 1500);
+    finish(state, 'done');
+    expect(status('merge')).toBe('merging');
+    transition(
+      state,
+      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'm1' } },
+      2500,
+    );
+    expect(status('merge')).toBe('done');
+    // The automatic delivery waits for the check.
+    expect(status('delivery')).toBe('waiting');
+    expect(status('action:before_delivery:lint')).toBe('queued');
+    transition(state, { kind: 'hold', hold: 'paused' }, 3050);
+    expect(status('action:before_delivery:lint')).toBe('queued');
+    transition(state, { kind: 'hold', hold: null }, 3060);
+    dispatch([state], 3100);
+    transition(
+      state,
+      {
+        kind: 'action_finished',
+        group: '_action-before-delivery-lint',
+        seq: 1,
+        outcome: { kind: 'exit', code: 0 },
+      },
+      3200,
+    );
+    expect(status('delivery')).toBe('running');
+    transition(
+      state,
+      {
+        kind: 'delivery_finished',
+        result: { kind: 'applied', files: ['a'], conflicts: [], commit: null },
+      },
+      3300,
+    );
+    expect(status('delivery')).toBe('done');
+    expect(status('cleanup')).toBe('waiting');
+    dispatch([state], 3400);
+    transition(
+      state,
+      {
+        kind: 'action_finished',
+        group: '_action-after-delivery-commit',
+        seq: 1,
+        outcome: { kind: 'exit', code: 0 },
+      },
+      3500,
+    );
+    expect(status('cleanup')).toBe('done');
   });
 });

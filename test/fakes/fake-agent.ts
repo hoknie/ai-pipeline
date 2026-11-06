@@ -15,6 +15,8 @@ interface Action {
   summary?: string;
   feedback?: string;
   questions?: { text: string; options?: string[]; recommendation?: string }[];
+  /** The questions are for a person only (`human_only` of the report). */
+  humanOnly?: boolean;
   write?: Record<string, string>;
   /** Symlinks created in the worktree: link path → target. */
   link?: Record<string, string>;
@@ -173,6 +175,7 @@ function connectDirect(workerArgs: string[]) {
             summary: input.summary,
             feedback: input.feedback ?? null,
             questions: input.questions ?? null,
+            ...(input.human_only === true ? { human_only: true } : {}),
           });
           return toolText(`Recorded verdict ${String(input.verdict)}. You can stop now.`);
         }
@@ -190,6 +193,18 @@ function connectDirect(workerArgs: string[]) {
             `Recorded artifact ${result.id ?? ''} (${String(input.file_name)}). Call swarm_report when you are done.`,
           );
         }
+        if (request.name.startsWith('swarm_repair_')) {
+          // The tools of an observer (`--repair`): one request, the daemon keeps the limits.
+          await ipc(socket, 'repair_action', {
+            token,
+            action: request.name.slice('swarm_repair_'.length),
+            ...(input.group !== undefined ? { group: input.group } : {}),
+            ...(input.answer !== undefined ? { answer: input.answer } : {}),
+            ...(input.reason !== undefined ? { reason: input.reason } : {}),
+            ...(input.refresh_config !== undefined ? { refreshConfig: input.refresh_config } : {}),
+          });
+          return toolText(`Done: ${request.name}.`);
+        }
         if (request.name === 'swarm_split') {
           const groups = input.groups as unknown[];
           await ipc(socket, 'split', { token, groups });
@@ -199,14 +214,14 @@ function connectDirect(workerArgs: string[]) {
         }
         if ((input.task === undefined) === (input.groups === undefined))
           throw new Error('pass either task or groups');
-        const { workflow, ...rest } = input;
+        const { pipeline, ...rest } = input;
         const result = (await ipc(socket, 'worker_queue_add', {
           token,
-          workflow,
+          pipeline,
           ...rest,
         })) as { item?: string };
         return toolText(
-          `Queued ${result.item ?? 'the task'} for workflow ${String(workflow)}. It starts when the queue runs.`,
+          `Queued ${result.item ?? 'the task'} for pipeline ${String(pipeline)}. It starts when the queue runs.`,
         );
       } catch (error) {
         return toolText((error as Error).message, true);
@@ -547,6 +562,7 @@ if (!action.noReport) {
         ? { feedback: action.feedback ?? 'remarks' }
         : {}),
       ...(action.questions ? { questions: action.questions } : {}),
+      ...(action.humanOnly ? { human_only: true } : {}),
     },
   });
   appendFileSync(join(state, 'reports.jsonl'), `${JSON.stringify({ step, group, result })}\n`);

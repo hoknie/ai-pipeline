@@ -1,6 +1,7 @@
 import i18next from 'i18next';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { isRepairing } from './observerTypes.ts';
 import { usePreference } from './preferences.ts';
 import { statusInfo, type Tone } from './status.ts';
 import type { RunView } from './types.ts';
@@ -44,6 +45,8 @@ function firstLine(text: string | null): string {
 export function notificationItems(runs: readonly RunView[]): NotificationItem[] {
   const items: { item: NotificationItem; order: number; position: number }[] = [];
   for (const run of runs) {
+    // an observer works on the task: its incidents are not for a person
+    if (isRepairing(run)) continue;
     run.groups.forEach((group, index) => {
       const kinds: NotificationKind[] = [];
       if (

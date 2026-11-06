@@ -19,6 +19,7 @@ describe('groups of settings', () => {
       'runtimes',
       'specialists',
       'pipelines',
+      'observers',
       'system',
     ]);
     expect(SETTINGS_GROUPS_BY_SCOPE.project).toEqual([

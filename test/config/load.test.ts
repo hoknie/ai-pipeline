@@ -9,16 +9,16 @@ import {
   configFromFiles,
   configPaths,
   findSpecialist,
-  findWorkflow,
-  groupWorkflow,
+  findPipeline,
+  groupPipeline,
   loadConfig,
   loadConfigSources,
   loadRuntimeSettings,
   loadWebSettings,
   parseConfig,
   withConfigDefaults,
-  workflowName,
-  workflowNameOf,
+  pipelineName,
+  pipelineNameOf,
   type ConfigPaths,
   type FieldError,
   type LevelPaths,
@@ -210,13 +210,13 @@ describe('validation', () => {
 
   it('treats unknown keys as errors at every level', () => {
     const errors = errorsOf(
-      'extra: 1\nswarm:\n  maxx: 2\n  specialists:\n    coder: { name: C, modle: x }\n  workflows:\n    f:\n      stepz: []\n',
+      'extra: 1\nswarm:\n  maxx: 2\n  specialists:\n    coder: { name: C, modle: x }\n  pipelines:\n    f:\n      stepz: []\n',
     );
     expectError(errors, 'extra', 'unknown key');
     expectError(errors, 'swarm.maxx', 'unknown key');
     expectError(errors, 'swarm.specialists.coder.modle', 'unknown key');
-    expectError(errors, 'swarm.workflows.f.stepz', 'unknown key');
-    expectError(errors, 'swarm.workflows.f.steps', 'required');
+    expectError(errors, 'swarm.pipelines.f.stepz', 'unknown key');
+    expectError(errors, 'swarm.pipelines.f.steps', 'required');
   });
 
   it('reads the MCP servers of a specialist', () => {
@@ -253,49 +253,49 @@ describe('validation', () => {
 
   it('lists known slugs for a reference to an unknown specialist', () => {
     const errors = errorsOf(
-      'swarm:\n  specialists:\n    coder: { name: C }\n    reviewer: { name: R }\n  workflows:\n    feature:\n      steps:\n        - { id: plan, specialist: coder }\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewr }\n',
+      'swarm:\n  specialists:\n    coder: { name: C }\n    reviewer: { name: R }\n  pipelines:\n    feature:\n      steps:\n        - { id: plan, specialist: coder }\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewr }\n',
     );
-    expectError(errors, 'swarm.workflows.feature.steps[2].specialist', 'known: coder, reviewer');
+    expectError(errors, 'swarm.pipelines.feature.steps[2].specialist', 'known: coder, reviewer');
   });
 
   it('requires goto to point to an earlier step', () => {
     const errors = errorsOf(
-      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder, on_reject: { goto: qa, max_rounds: 2 } }\n        - { id: qa, specialist: coder }\n',
+      'swarm:\n  specialists:\n    coder: { name: C }\n  pipelines:\n    feature:\n      steps:\n        - { id: code, specialist: coder, on_reject: { goto: qa, max_rounds: 2 } }\n        - { id: qa, specialist: coder }\n',
     );
-    expectError(errors, 'swarm.workflows.feature.steps[0].on_reject.goto', 'earlier step');
+    expectError(errors, 'swarm.pipelines.feature.steps[0].on_reject.goto', 'earlier step');
   });
 
   it('rejects goto to the same step and to an unknown step', () => {
     const errors = errorsOf(
-      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder, on_reject: { goto: code, max_rounds: 1 } }\n        - { id: qa, specialist: coder, on_reject: { goto: nope, max_rounds: 1 } }\n',
+      'swarm:\n  specialists:\n    coder: { name: C }\n  pipelines:\n    feature:\n      steps:\n        - { id: code, specialist: coder, on_reject: { goto: code, max_rounds: 1 } }\n        - { id: qa, specialist: coder, on_reject: { goto: nope, max_rounds: 1 } }\n',
     );
-    expectError(errors, 'swarm.workflows.feature.steps[0].on_reject.goto', 'earlier step');
-    expectError(errors, 'swarm.workflows.feature.steps[1].on_reject.goto', 'unknown step');
+    expectError(errors, 'swarm.pipelines.feature.steps[0].on_reject.goto', 'earlier step');
+    expectError(errors, 'swarm.pipelines.feature.steps[1].on_reject.goto', 'unknown step');
   });
 
   it('checks the range and presence of max_rounds', () => {
     const errors = errorsOf(
-      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: coder, on_reject: { goto: code, max_rounds: 11 } }\n        - { id: qa, specialist: coder, on_reject: { goto: code } }\n',
+      'swarm:\n  specialists:\n    coder: { name: C }\n  pipelines:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: coder, on_reject: { goto: code, max_rounds: 11 } }\n        - { id: qa, specialist: coder, on_reject: { goto: code } }\n',
     );
-    expectError(errors, 'swarm.workflows.feature.steps[1].on_reject.max_rounds', 'from 1 to 10');
-    expectError(errors, 'swarm.workflows.feature.steps[2].on_reject.max_rounds', 'required');
+    expectError(errors, 'swarm.pipelines.feature.steps[1].on_reject.max_rounds', 'from 1 to 10');
+    expectError(errors, 'swarm.pipelines.feature.steps[2].on_reject.max_rounds', 'required');
   });
 
   it('rejects duplicate step ids and empty steps', () => {
     const errors = errorsOf(
-      'swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    a:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: code, specialist: coder }\n    b:\n      steps: []\n',
+      'swarm:\n  specialists:\n    coder: { name: C }\n  pipelines:\n    a:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: code, specialist: coder }\n    b:\n      steps: []\n',
     );
-    expectError(errors, 'swarm.workflows.a.steps[1].id', 'duplicate');
-    expectError(errors, 'swarm.workflows.b.steps', 'must not be empty');
+    expectError(errors, 'swarm.pipelines.a.steps[1].id', 'duplicate');
+    expectError(errors, 'swarm.pipelines.b.steps', 'must not be empty');
   });
 
   it('reports every error at once', () => {
     const errors = errorsOf(
-      'swarm:\n  max: 100\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialst: coder }\n',
+      'swarm:\n  max: 100\n  specialists:\n    coder: { name: C }\n  pipelines:\n    feature:\n      steps:\n        - { id: code, specialst: coder }\n',
     );
     expectError(errors, 'swarm.max', 'from 1 to 32');
-    expectError(errors, 'swarm.workflows.feature.steps[0].specialst', 'unknown key');
-    expectError(errors, 'swarm.workflows.feature.steps[0].specialist', 'required');
+    expectError(errors, 'swarm.pipelines.feature.steps[0].specialst', 'unknown key');
+    expectError(errors, 'swarm.pipelines.feature.steps[0].specialist', 'required');
   });
 });
 
@@ -342,7 +342,7 @@ describe('yaml features and examples', () => {
     );
     const loaded = loadConfigSources(paths);
     expect(loaded.files[0]).toBe(join(repositoryRoot, 'examples', 'aip', 'settings.yaml'));
-    const feature = findWorkflow(loaded.config, 'feature');
+    const feature = findPipeline(loaded.config, 'feature');
     expect(feature?.steps).toHaveLength(4);
     expect(feature?.steps[2]?.onReject?.goto).toBe('code');
   });
@@ -387,26 +387,26 @@ describe('project settings', () => {
 });
 
 describe('split', () => {
-  const workflow = (split: string) =>
-    `${BASE}  workflows:\n    feature:\n      split: ${split}\n      steps:\n        - { id: code, specialist: coder }\n`;
+  const pipeline = (split: string) =>
+    `${BASE}  pipelines:\n    feature:\n      split: ${split}\n      steps:\n        - { id: code, specialist: coder }\n`;
 
   it('reads the splitting specialist and defaults max_groups to five', () => {
-    expect(findWorkflow(parseConfig(workflow('{ specialist: coder }')), 'feature')?.split).toEqual({
+    expect(findPipeline(parseConfig(pipeline('{ specialist: coder }')), 'feature')?.split).toEqual({
       specialist: 'coder',
       maxGroups: 5,
       additionalPrompt: null,
-      workflow: null,
+      pipeline: null,
     });
     expect(
-      findWorkflow(parseConfig(workflow('{ specialist: coder, max_groups: 2 }')), 'feature')?.split
+      findPipeline(parseConfig(pipeline('{ specialist: coder, max_groups: 2 }')), 'feature')?.split
         ?.maxGroups,
     ).toBe(2);
   });
 
   it('has no split by default', () => {
     expect(
-      findWorkflow(
-        parseConfig(workflow('{ specialist: coder }').replace(/      split.*\n/, '')),
+      findPipeline(
+        parseConfig(pipeline('{ specialist: coder }').replace(/      split.*\n/, '')),
         'feature',
       )?.split,
     ).toBeNull();
@@ -414,18 +414,18 @@ describe('split', () => {
 
   it('rejects an unknown splitting specialist and max_groups out of range', () => {
     expectError(
-      errorsOf(workflow('{ specialist: splitter }')),
-      'swarm.workflows.feature.split.specialist',
+      errorsOf(pipeline('{ specialist: splitter }')),
+      'swarm.pipelines.feature.split.specialist',
       'unknown specialist',
     );
     expectError(
-      errorsOf(workflow('{ specialist: coder, max_groups: 21 }')),
-      'swarm.workflows.feature.split.max_groups',
+      errorsOf(pipeline('{ specialist: coder, max_groups: 21 }')),
+      'swarm.pipelines.feature.split.max_groups',
       'from 1 to 20',
     );
     expectError(
-      errorsOf(workflow('{ max_groups: 2 }')),
-      'swarm.workflows.feature.split.specialist',
+      errorsOf(pipeline('{ max_groups: 2 }')),
+      'swarm.pipelines.feature.split.specialist',
       'required',
     );
   });
@@ -608,18 +608,18 @@ describe('specialist tools', () => {
 });
 
 describe('human review', () => {
-  const WORKFLOW = (step: string) =>
-    `${BASE}    reviewer: { name: R }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
+  const PIPELINE = (step: string) =>
+    `${BASE}    reviewer: { name: R }\n  pipelines:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
 
   it('reads human_review, false by default', () => {
-    const config = parseConfig(WORKFLOW(', human_review: true'));
-    expect(config.workflows[0]!.steps.map((step) => step.humanReview)).toEqual([false, true]);
+    const config = parseConfig(PIPELINE(', human_review: true'));
+    expect(config.pipelines[0]!.steps.map((step) => step.humanReview)).toEqual([false, true]);
   });
 
   it('rejects a value that is not a boolean', () => {
     expectError(
-      errorsOf(WORKFLOW(', human_review: "yes"')),
-      'swarm.workflows.feature.steps[1].human_review',
+      errorsOf(PIPELINE(', human_review: "yes"')),
+      'swarm.pipelines.feature.steps[1].human_review',
       'true or false',
     );
   });
@@ -627,18 +627,18 @@ describe('human review', () => {
   it('does not accept the key in split', () => {
     expectError(
       errorsOf(
-        `${BASE}  workflows:\n    feature:\n      split: { specialist: coder, human_review: true }\n      steps:\n        - { id: code, specialist: coder }\n`,
+        `${BASE}  pipelines:\n    feature:\n      split: { specialist: coder, human_review: true }\n      steps:\n        - { id: code, specialist: coder }\n`,
       ),
-      'swarm.workflows.feature.split.human_review',
+      'swarm.pipelines.feature.split.human_review',
       'unknown key',
     );
   });
 
   it('fills false in a snapshot stored before the field existed', () => {
-    const stored = structuredClone(parseConfig(WORKFLOW(', human_review: true')));
-    for (const step of stored.workflows[0]!.steps)
+    const stored = structuredClone(parseConfig(PIPELINE(', human_review: true')));
+    for (const step of stored.pipelines[0]!.steps)
       delete (step as { humanReview?: boolean }).humanReview;
-    expect(withConfigDefaults(stored).workflows[0]!.steps.map((step) => step.humanReview)).toEqual([
+    expect(withConfigDefaults(stored).pipelines[0]!.steps.map((step) => step.humanReview)).toEqual([
       false,
       false,
     ]);
@@ -646,31 +646,31 @@ describe('human review', () => {
 });
 
 describe('additional prompts', () => {
-  const WORKFLOW = (step: string, split = '') =>
-    `${BASE}    reviewer: { name: R }\n  workflows:\n    feature:\n${split}      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
+  const PIPELINE = (step: string, split = '') =>
+    `${BASE}    reviewer: { name: R }\n  pipelines:\n    feature:\n${split}      steps:\n        - { id: code, specialist: coder }\n        - { id: review, specialist: reviewer${step} }\n`;
 
   it('reads the additional prompt of a step and of the split, null by default', () => {
     const config = parseConfig(
-      WORKFLOW(
+      PIPELINE(
         ', additional_prompt: "Только тесты"',
         '      split: { specialist: coder, additional_prompt: Не больше двух групп }\n',
       ),
     );
-    const feature = config.workflows[0]!;
+    const feature = config.pipelines[0]!;
     expect(feature.steps.map((step) => step.additionalPrompt)).toEqual([null, 'Только тесты']);
     expect(feature.split?.additionalPrompt).toBe('Не больше двух групп');
-    expect(parseConfig(WORKFLOW('')).workflows[0]?.split).toBeNull();
+    expect(parseConfig(PIPELINE('')).pipelines[0]?.split).toBeNull();
   });
 
   it('rejects an empty or non-text additional prompt', () => {
     expectError(
-      errorsOf(WORKFLOW(', additional_prompt: ""')),
-      'swarm.workflows.feature.steps[1].additional_prompt',
+      errorsOf(PIPELINE(', additional_prompt: ""')),
+      'swarm.pipelines.feature.steps[1].additional_prompt',
       'empty',
     );
     expectError(
-      errorsOf(WORKFLOW('', '      split: { specialist: coder, additional_prompt: [a, b] }\n')),
-      'swarm.workflows.feature.split.additional_prompt',
+      errorsOf(PIPELINE('', '      split: { specialist: coder, additional_prompt: [a, b] }\n')),
+      'swarm.pipelines.feature.split.additional_prompt',
       'string',
     );
   });
@@ -684,7 +684,7 @@ describe('configuration directory', () => {
     return paths.project.directory;
   }
 
-  it('reads settings, then specialists and workflows by name, skipping other and hidden files', () => {
+  it('reads settings, then specialists and pipelines by name, skipping other and hidden files', () => {
     const paths = temporaryPaths();
     const dir = files(paths);
     write(join(dir, 'settings.yaml'), 'max: 2\n');
@@ -693,13 +693,13 @@ describe('configuration directory', () => {
     write(join(dir, 'specialists', 'README.md'), 'not yaml');
     write(join(dir, 'specialists', '.draft.yaml'), 'max: 9\n');
     write(join(dir, 'specialists', 'old', 'x.yaml'), 'name: X\n');
-    write(join(dir, 'workflows', 'feature.yaml'), 'steps:\n  - { id: code, specialist: a }\n');
+    write(join(dir, 'pipelines', 'feature.yaml'), 'steps:\n  - { id: code, specialist: a }\n');
     const loaded = loadConfigSources(paths);
     expect(loaded.files).toEqual([
       join(dir, 'settings.yaml'),
       join(dir, 'specialists', 'a.yaml'),
       join(dir, 'specialists', 'b.yml'),
-      join(dir, 'workflows', 'feature.yaml'),
+      join(dir, 'pipelines', 'feature.yaml'),
     ]);
     expect(loaded.config.max).toBe(2);
     expect(loaded.config.specialists.map((specialist) => specialist.slug)).toEqual(['a', 'b']);
@@ -709,12 +709,12 @@ describe('configuration directory', () => {
     const paths = temporaryPaths();
     write(join(paths.global.directory, 'specialists', 'coder.yaml'), 'name: C\nmodel: a\n');
     write(join(paths.project.directory, 'specialists', 'coder.yaml'), 'name: C\nmodel: b\n');
-    write(join(paths.project.directory, 'workflows', 'feature.yaml'), FEATURE);
+    write(join(paths.project.directory, 'pipelines', 'feature.yaml'), FEATURE);
     const loaded = loadConfigSources(paths);
     expect(loaded.files).toEqual([
       join(paths.global.directory, 'specialists', 'coder.yaml'),
       join(paths.project.directory, 'specialists', 'coder.yaml'),
-      join(paths.project.directory, 'workflows', 'feature.yaml'),
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
     ]);
     expect(findSpecialist(loaded.config, 'coder')?.model).toBe('b');
   });
@@ -759,7 +759,7 @@ describe('configuration directory', () => {
     const dir = files(paths);
     write(join(dir, 'settings.yaml'), 'max: 0\nswarm: {}\n');
     write(join(dir, 'specialists', 'coder.yaml'), 'name: C\nslug: coder\n');
-    write(join(dir, 'workflows', 'feature.yaml'), 'steps:\n  - { id: code, specialist: nobody }\n');
+    write(join(dir, 'pipelines', 'feature.yaml'), 'steps:\n  - { id: code, specialist: nobody }\n');
     const errors = (thrown(() => loadConfig(paths)).detail as { errors: FieldError[] }).errors;
     expect(errors).toContainEqual({
       file: join(dir, 'settings.yaml'),
@@ -777,8 +777,8 @@ describe('configuration directory', () => {
       message: expect.stringContaining('unknown'),
     });
     expect(errors).toContainEqual({
-      file: join(dir, 'workflows', 'feature.yaml'),
-      path: 'swarm.workflows.feature.steps[0].specialist',
+      file: join(dir, 'pipelines', 'feature.yaml'),
+      path: 'swarm.pipelines.feature.steps[0].specialist',
       message: expect.stringContaining('unknown specialist'),
     });
   });
@@ -791,15 +791,15 @@ describe('configuration directory', () => {
     expect(errors[0]?.file).toBe(join(paths.project.directory, 'specialists', 'coder.yaml'));
   });
 
-  it('checks the workflow id as a slug', () => {
+  it('checks the pipeline id as a slug', () => {
     const paths = temporaryPaths();
     const dir = files(paths);
     write(join(dir, 'specialists', 'coder.yaml'), CODER);
-    write(join(dir, 'workflows', 'Feature_1.yaml'), FEATURE);
+    write(join(dir, 'pipelines', 'Feature_1.yaml'), FEATURE);
     const errors = (thrown(() => loadConfig(paths)).detail as { errors: FieldError[] }).errors;
     expect(errors).toContainEqual({
-      file: join(dir, 'workflows', 'Feature_1.yaml'),
-      path: 'swarm.workflows.Feature_1',
+      file: join(dir, 'pipelines', 'Feature_1.yaml'),
+      path: 'swarm.pipelines.Feature_1',
       message: expect.stringContaining('^[a-z][a-z0-9-]{0,31}$'),
     });
   });
@@ -831,10 +831,10 @@ describe('configuration directory', () => {
     const config = configFromFiles({
       settings: 'max: 4\n',
       specialists: { coder: CODER },
-      workflows: { feature: FEATURE },
+      pipelines: { feature: FEATURE },
     });
     expect(config.max).toBe(4);
-    expect(findWorkflow(config, 'feature')?.steps).toHaveLength(1);
+    expect(findPipeline(config, 'feature')?.steps).toHaveLength(1);
     const error = thrown(() => configFromFiles({ specialists: { coder: 'name: C\nmax: 0\n' } }));
     expect(error.message).toContain('specialists/coder.yaml');
   });
@@ -1054,72 +1054,72 @@ describe('runtimes settings', () => {
   });
 });
 
-describe('split.workflow', () => {
+describe('split.pipeline', () => {
   const SPEC = `${BASE}    plan: { name: П }\n`;
   const epic = (body: string, extra = '') =>
-    `${SPEC}  workflows:\n    explore:\n      steps:\n        - { id: research, specialist: coder }\n${extra}    epic:\n${body}`;
-  const WITH = '      split: { specialist: plan, workflow: explore }\n';
+    `${SPEC}  pipelines:\n    explore:\n      steps:\n        - { id: research, specialist: coder }\n${extra}    epic:\n${body}`;
+  const WITH = '      split: { specialist: plan, pipeline: explore }\n';
 
-  it('reads the target and gives the workflow no steps of its own', () => {
+  it('reads the target and gives the pipeline no steps of its own', () => {
     const config = parseConfig(epic(WITH));
-    const found = findWorkflow(config, 'epic');
-    expect(found?.split?.workflow).toBe('explore');
+    const found = findPipeline(config, 'epic');
+    expect(found?.split?.pipeline).toBe('explore');
     expect(found?.steps).toEqual([]);
-    expect(groupWorkflow(config, found!).id).toBe('explore');
+    expect(groupPipeline(config, found!).id).toBe('explore');
   });
 
-  it('uses the workflow itself without the field, also for a snapshot without it', () => {
-    const config = parseConfig(workflowWithSteps());
-    const found = findWorkflow(config, 'feature')!;
-    expect(groupWorkflow(config, found)).toBe(found);
-    delete (found.split as unknown as Record<string, unknown>).workflow;
-    expect(groupWorkflow(config, found)).toBe(found);
+  it('uses the pipeline itself without the field, also for a snapshot without it', () => {
+    const config = parseConfig(pipelineWithSteps());
+    const found = findPipeline(config, 'feature')!;
+    expect(groupPipeline(config, found)).toBe(found);
+    delete (found.split as unknown as Record<string, unknown>).pipeline;
+    expect(groupPipeline(config, found)).toBe(found);
   });
 
   it('throws when the target is gone from the configuration', () => {
     const config = parseConfig(epic(WITH));
-    config.workflows = config.workflows.filter((item) => item.id !== 'explore');
-    expect(() => groupWorkflow(config, findWorkflow(config, 'epic')!)).toThrow(/explore/);
+    config.pipelines = config.pipelines.filter((item) => item.id !== 'explore');
+    expect(() => groupPipeline(config, findPipeline(config, 'epic')!)).toThrow(/explore/);
   });
 
-  it('rejects steps together with split.workflow', () => {
+  it('rejects steps together with split.pipeline', () => {
     expectError(
       errorsOf(epic(`${WITH}      steps:\n        - { id: a, specialist: coder }\n`)),
-      'swarm.workflows.epic.steps',
-      'split.workflow',
+      'swarm.pipelines.epic.steps',
+      'split.pipeline',
     );
   });
 
-  it('requires steps or split.workflow', () => {
+  it('requires steps or split.pipeline', () => {
     expectError(
       errorsOf(epic('      split: { specialist: plan }\n')),
-      'swarm.workflows.epic.steps',
+      'swarm.pipelines.epic.steps',
       'is required',
     );
   });
 
   it('rejects an unknown target', () => {
-    const errors = errorsOf(epic('      split: { specialist: plan, workflow: nope }\n'));
+    const errors = errorsOf(epic('      split: { specialist: plan, pipeline: nope }\n'));
     expectError(
       errors,
-      'swarm.workflows.epic.split.workflow',
-      'unknown workflow `nope`; known: explore',
+      'swarm.pipelines.epic.split.pipeline',
+      'unknown pipeline `nope`; known: explore',
     );
   });
 
   it('rejects a link to itself', () => {
     expectError(
-      errorsOf(epic('      split: { specialist: plan, workflow: epic }\n')),
-      'swarm.workflows.epic.split.workflow',
+      errorsOf(epic('      split: { specialist: plan, pipeline: epic }\n')),
+      'swarm.pipelines.epic.split.pipeline',
       'itself',
     );
   });
 
   it('rejects a chain', () => {
-    const extra = '    mid:\n      split: { specialist: plan, workflow: explore }\n';
+    const extra = '    mid:\n      split: { specialist: plan, pipeline: explore }\n';
     expectError(
-      errorsOf(epic('      split: { specialist: plan, workflow: mid }\n', extra)),
-      'swarm.workflows.epic.split.workflow',
+      errorsOf(epic('      split: { specialist: plan, pipeline: mid }\n', extra)),
+      'swarm.pipelines.epic.split.pipeline',
       'chains',
     );
   });
@@ -1131,55 +1131,55 @@ describe('split.workflow', () => {
       `swarm:\n  specialists:\n    coder: { name: C }\n    plan: { name: П }\n`,
     );
     write(
-      join(paths.global.directory, 'workflows', 'explore.yaml'),
+      join(paths.global.directory, 'pipelines', 'explore.yaml'),
       'steps:\n  - { id: research, specialist: coder }\n',
     );
     write(
-      join(paths.project.directory, 'workflows', 'epic.yaml'),
-      'split: { specialist: plan, workflow: explore }\n',
+      join(paths.project.directory, 'pipelines', 'epic.yaml'),
+      'split: { specialist: plan, pipeline: explore }\n',
     );
     const config = loadConfig(paths);
-    expect(groupWorkflow(config, findWorkflow(config, 'epic')!).steps[0]?.id).toBe('research');
+    expect(groupPipeline(config, findPipeline(config, 'epic')!).steps[0]?.id).toBe('research');
   });
 });
 
-function workflowWithSteps(): string {
-  return `${BASE}  workflows:\n    feature:\n      split: { specialist: coder }\n      steps:\n        - { id: code, specialist: coder }\n`;
+function pipelineWithSteps(): string {
+  return `${BASE}  pipelines:\n    feature:\n      split: { specialist: coder }\n      steps:\n        - { id: code, specialist: coder }\n`;
 }
 
-describe('name of a workflow', () => {
+describe('name of a pipeline', () => {
   const STEPS = '      steps:\n        - { id: code, specialist: coder }\n';
-  const text = (extra: string) => `${BASE}  workflows:\n    feature:\n${extra}${STEPS}`;
+  const text = (extra: string) => `${BASE}  pipelines:\n    feature:\n${extra}${STEPS}`;
 
   it('reads the name, trimmed, and falls back to the id without it', () => {
     const named = parseConfig(text('      name: "  Новая функция "\n'));
-    expect(findWorkflow(named, 'feature')?.name).toBe('Новая функция');
-    expect(workflowName(findWorkflow(named, 'feature')!)).toBe('Новая функция');
-    expect(workflowNameOf(named, 'feature')).toBe('Новая функция');
+    expect(findPipeline(named, 'feature')?.name).toBe('Новая функция');
+    expect(pipelineName(findPipeline(named, 'feature')!)).toBe('Новая функция');
+    expect(pipelineNameOf(named, 'feature')).toBe('Новая функция');
     const plain = parseConfig(text(''));
-    expect(findWorkflow(plain, 'feature')?.name).toBeNull();
-    expect(workflowNameOf(plain, 'feature')).toBe('feature');
+    expect(findPipeline(plain, 'feature')?.name).toBeNull();
+    expect(pipelineNameOf(plain, 'feature')).toBe('feature');
   });
 
-  it('gives the id for an unknown workflow and for a snapshot without the field', () => {
+  it('gives the id for an unknown pipeline and for a snapshot without the field', () => {
     const config = parseConfig(text(''));
-    expect(workflowNameOf(config, 'ghost')).toBe('ghost');
+    expect(pipelineNameOf(config, 'ghost')).toBe('ghost');
     const old = { id: 'old', split: null, steps: [] } as unknown as Parameters<
-      typeof workflowName
+      typeof pipelineName
     >[0];
-    expect(workflowName(old)).toBe('old');
+    expect(pipelineName(old)).toBe('old');
   });
 
-  it('accepts a name together with split.workflow', () => {
+  it('accepts a name together with split.pipeline', () => {
     const config = parseConfig(
-      `${BASE}  workflows:\n    explore:\n${STEPS}    epic:\n      name: Эпик\n      split: { specialist: coder, workflow: explore }\n`,
+      `${BASE}  pipelines:\n    explore:\n${STEPS}    epic:\n      name: Эпик\n      split: { specialist: coder, pipeline: explore }\n`,
     );
-    expect(workflowNameOf(config, 'epic')).toBe('Эпик');
+    expect(pipelineNameOf(config, 'epic')).toBe('Эпик');
   });
 
   it('rejects an empty name and a name that is not a string', () => {
-    expectError(errorsOf(text('      name: "  "\n')), 'swarm.workflows.feature.name', 'empty');
-    expectError(errorsOf(text('      name: 5\n')), 'swarm.workflows.feature.name', 'string');
+    expectError(errorsOf(text('      name: "  "\n')), 'swarm.pipelines.feature.name', 'empty');
+    expectError(errorsOf(text('      name: 5\n')), 'swarm.pipelines.feature.name', 'string');
   });
 });
 
@@ -1216,25 +1216,25 @@ describe('specialist tags', () => {
   });
 });
 
-describe('workflow tags', () => {
+describe('pipeline tags', () => {
   const wf = (extra: string) =>
-    `swarm:\n  specialists:\n    coder: { name: C }\n  workflows:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n${extra}`;
+    `swarm:\n  specialists:\n    coder: { name: C }\n  pipelines:\n    feature:\n      steps:\n        - { id: code, specialist: coder }\n${extra}`;
 
   it('accepts tags without changing the steps', () => {
     const plain = parseConfig(wf(''));
     const tagged = parseConfig(wf('      tags: [backend, release]\n'));
-    expect(tagged.workflows).toEqual(plain.workflows);
+    expect(tagged.pipelines).toEqual(plain.pipelines);
   });
 
   it('rejects tags that are not a list of names', () => {
     expectError(
       errorsOf(wf('      tags: backend\n')),
-      'swarm.workflows.feature.tags',
+      'swarm.pipelines.feature.tags',
       'must be a list of strings',
     );
     expectError(
       errorsOf(wf(`      tags: [${'a'.repeat(31)}]\n`)),
-      'swarm.workflows.feature.tags',
+      'swarm.pipelines.feature.tags',
       'at most 30 characters',
     );
   });

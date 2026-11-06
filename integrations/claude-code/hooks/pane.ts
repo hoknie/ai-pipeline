@@ -256,7 +256,7 @@ function phaseOf(run: AipRun): string {
 }
 
 export function runHeader(run: AipRun, options: PanelOptions): RunHeader {
-  const head = [run.id, run.workflow, phaseOf(run)];
+  const head = [run.id, run.pipeline, phaseOf(run)];
   const rest = options.compact
     ? []
     : [

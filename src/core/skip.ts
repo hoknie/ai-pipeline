@@ -1,7 +1,7 @@
-import { findWorkflow, groupWorkflow, type ResolvedConfig } from '../config/index.ts';
+import { findPipeline, groupPipeline, type ResolvedConfig } from '../config/index.ts';
 
 import { Rejection } from './errors.ts';
-import { runWorkflow, stepsOf, type Group, type Run, type RunState } from './model.ts';
+import { runPipeline, stepsOf, type Group, type Run, type RunState } from './model.ts';
 import { stepLabel } from './topology.ts';
 
 /** Collapses repeats, keeping the order. */
@@ -9,17 +9,17 @@ export function cleanSkip(skip: readonly string[]): string[] {
   return [...new Set(skip)];
 }
 
-/** The error text of a `skip` that does not fit the workflow, or `null`. */
+/** The error text of a `skip` that does not fit the pipeline, or `null`. */
 export function checkSkip(
   config: ResolvedConfig,
-  workflowId: string,
+  pipelineId: string,
   skip: readonly string[],
 ): string | null {
   const wanted = cleanSkip(skip);
   if (wanted.length === 0) return null;
-  const workflow = findWorkflow(config, workflowId);
-  if (!workflow) return `unknown workflow \`${workflowId}\``;
-  const steps = groupWorkflow(config, workflow).steps;
+  const pipeline = findPipeline(config, pipelineId);
+  if (!pipeline) return `unknown pipeline \`${pipelineId}\``;
+  const steps = groupPipeline(config, pipeline).steps;
   const ids = steps.map((step) => step.id);
   for (const id of wanted) {
     if (!ids.includes(id)) {
@@ -37,22 +37,22 @@ export function checkSkip(
   return null;
 }
 
-/** A copy of the configuration without the skipped steps in the workflow the groups follow. */
+/** A copy of the configuration without the skipped steps in the pipeline the groups follow. */
 export function applySkip(
   config: ResolvedConfig,
-  workflowId: string,
+  pipelineId: string,
   skip: readonly string[],
 ): ResolvedConfig {
   const wanted = cleanSkip(skip);
   if (wanted.length === 0) return config;
-  const error = checkSkip(config, workflowId, wanted);
+  const error = checkSkip(config, pipelineId, wanted);
   if (error !== null) throw new Rejection(error);
-  const workflow = findWorkflow(config, workflowId);
-  if (!workflow) throw new Rejection(`unknown workflow \`${workflowId}\``);
-  const target = groupWorkflow(config, workflow);
+  const pipeline = findPipeline(config, pipelineId);
+  if (!pipeline) throw new Rejection(`unknown pipeline \`${pipelineId}\``);
+  const target = groupPipeline(config, pipeline);
   return {
     ...config,
-    workflows: config.workflows.map((candidate) =>
+    pipelines: config.pipelines.map((candidate) =>
       candidate.id === target.id
         ? { ...candidate, steps: candidate.steps.filter((step) => !wanted.includes(step.id)) }
         : candidate,
@@ -106,9 +106,9 @@ function position(state: RunState, group: Group, count: number): number {
   return group.attempts.at(-1)?.stepIndex ?? 0;
 }
 
-/** Each step of the group workflow: passed by every group, under way, or still ahead. */
+/** Each step of the group pipeline: passed by every group, under way, or still ahead. */
 export function stepStates(state: RunState): StepState[] {
-  const steps = groupWorkflow(state.run.config, runWorkflow(state.run)).steps;
+  const steps = groupPipeline(state.run.config, runPipeline(state.run)).steps;
   const positions = state.groups.map((group) => position(state, group, steps.length));
   return steps.map((step, index): StepState => {
     let progress: StepPhase = 'done';

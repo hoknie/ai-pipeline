@@ -501,9 +501,9 @@ describe('delivery in progress on the group screen', () => {
   });
 });
 
-describe('workflow badge in runs', () => {
+describe('pipeline badge in runs', () => {
   it('shows the badge in the run list instead of plain text', async () => {
-    mount([runView({ id: 'a', title: 'Первый', workflow: 'feature' })]);
+    mount([runView({ id: 'a', title: 'Первый', pipeline: 'feature' })]);
     const badge = await screen.findByLabelText('Pipeline: feature');
     expect(badge.closest('button')).toBeTruthy();
     expect(badge.hasAttribute('tabindex')).toBe(false);
@@ -887,7 +887,7 @@ describe('runs section columns', () => {
       'aip.web.runFilters',
       JSON.stringify({
         states: ['active', 'failed'],
-        workflows: [],
+        pipelines: [],
         specialists: [],
         tagIds: [],
         repositories: [],

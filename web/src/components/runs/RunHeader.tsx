@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
 import { notifySuccess } from '../../notify.ts';
+import { repairOf } from '../../observerTypes.ts';
 import type { GroupRow, RunView, SystemStepRow, TagView } from '../../types.ts';
 import { Alert } from '../../ui/alert.tsx';
 import { Button } from '../../ui/button.tsx';
@@ -16,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '../../ui/dropdown-menu.tsx';
 import { useTags } from '../../tags.tsx';
-import { WorkflowBadge } from '../WorkflowBadge.tsx';
+import { PipelineBadge } from '../PipelineBadge.tsx';
 import { TagPicker } from '../TagPicker.tsx';
 import { RunTitle } from './RunTitle.tsx';
 import { RunSteps } from './RunSteps.tsx';
@@ -66,6 +67,20 @@ export function RunHeader({
       onError((error as Error).message);
     } finally {
       setReturning(false);
+    }
+  };
+  const repair = repairOf(run);
+  const [observing, setObserving] = useState(false);
+  const [observerError, setObserverError] = useState<string | null>(null);
+  const setObserver = async (enabled: boolean) => {
+    setObserving(true);
+    setObserverError(null);
+    try {
+      await api.setRunObserver(run.id, run.repository, enabled);
+    } catch (error) {
+      setObserverError((error as Error).message);
+    } finally {
+      setObserving(false);
     }
   };
   const [pausing, setPausing] = useState(false);
@@ -185,7 +200,7 @@ export function RunHeader({
             <RunTitle run={run} api={api} />
           </div>
           <div>
-            <WorkflowBadge id={run.workflow} name={run.workflowName} />
+            <PipelineBadge id={run.pipeline} name={run.pipelineName} />
           </div>
           {run.name ? (
             <div className="font-mono text-xs text-muted-foreground">{run.name}</div>
@@ -204,7 +219,32 @@ export function RunHeader({
             {tagError ? <Alert variant="destructive">{tagError}</Alert> : null}
           </div>
           {run.dirtyWarning ? <Alert variant="warn">{t('runs.header.dirty')}</Alert> : null}
+          {repair && !repair.allowed ? (
+            <Alert variant="warn" data-testid="observer-forbidden">
+              {t('runs.header.observerForbidden')}
+            </Alert>
+          ) : null}
+          {repair?.cancelReason ? (
+            <Alert variant="warn" data-testid="observer-cancel-reason">
+              {t('runs.header.observerCancelReason', { reason: repair.cancelReason })}
+            </Alert>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
+            {repair?.active ? (
+              <Button variant="outline" loading={observing} onClick={() => void setObserver(false)}>
+                {t('runs.header.observerCancel')}
+              </Button>
+            ) : null}
+            {repair && !repair.allowed ? (
+              <Button variant="outline" loading={observing} onClick={() => void setObserver(true)}>
+                {t('runs.header.observerGiveBack')}
+              </Button>
+            ) : null}
+            {observerError ? (
+              <span role="alert" className="text-sm text-destructive">
+                {observerError}
+              </span>
+            ) : null}
             {continueItem !== null ? (
               <Button
                 variant="outline"

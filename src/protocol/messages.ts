@@ -6,6 +6,7 @@ import {
   ARTIFACT_FILE_NAME_LIMIT,
   ARTIFACT_TITLE_LIMIT,
   FEEDBACK_LIMIT,
+  INCIDENT_KINDS,
   OPTIONS_LIMIT,
   OPTION_LIMIT,
   RECOMMENDATION_LIMIT,
@@ -17,6 +18,27 @@ import {
   VERDICTS,
   validArtifactFileName,
 } from '../core/index.ts';
+
+const repairActionParams = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('answer'),
+    token: z.string().min(1),
+    group: z.string().min(1),
+    answer: z.string().trim().min(1),
+  }),
+  z.object({
+    action: z.literal('retry'),
+    token: z.string().min(1),
+    group: z.string().min(1),
+    refreshConfig: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal('cancel'),
+    token: z.string().min(1),
+    group: z.string().min(1).optional(),
+    reason: z.string().trim().min(1),
+  }),
+]);
 
 export const proposedGroupSchema = z.object({
   title: z.string().trim().min(1),
@@ -41,7 +63,7 @@ export const reportParamsSchema = z.object({
 /** Tag names, as the user sees them; the daemon resolves them to ids. */
 const tagNames = z.array(z.string().trim().min(1).max(TAG_NAME_LIMIT)).max(20);
 
-/** Ids of workflow steps a task skips. */
+/** Ids of pipeline steps a task skips. */
 const skipSteps = z.array(z.string().trim().min(1)).max(50);
 
 /** Ids of queue items or runs a task waits for. */
@@ -65,7 +87,7 @@ const parentRef = z.union([z.string().trim().min(1), z.number().int().positive()
 const runParams = z
   .object({
     repository: z.string().min(1),
-    workflow: z.string().min(1),
+    pipeline: z.string().min(1),
     task: z.string().trim().min(1).optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),
@@ -88,7 +110,7 @@ const queueTitle = z.string().trim().min(1).max(RUN_TITLE_LIMIT);
 const queueAddParams = z
   .object({
     repository: queueRepository,
-    workflow: z.string().min(1),
+    pipeline: z.string().min(1),
     task: queueTask.optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
@@ -108,7 +130,7 @@ const queueAddParams = z
 export const workerQueueAddParams = z
   .object({
     token: z.string().min(1),
-    workflow: z.string().min(1),
+    pipeline: z.string().min(1),
     task: queueTask.optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
@@ -141,7 +163,7 @@ const queueEditParams = z
   .object({
     repository: queueRepository,
     item: queueItem,
-    workflow: z.string().min(1).optional(),
+    pipeline: z.string().min(1).optional(),
     task: queueTask.optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.nullable().optional(),
@@ -163,7 +185,7 @@ export const entryIdSchema = z
   .string()
   .refine(isValidSlug, { message: `id must match ${SLUG_PATTERN_TEXT}` });
 
-const entryKindSchema = z.enum(['specialist', 'workflow']);
+const entryKindSchema = z.enum(['specialist', 'pipeline', 'action']);
 /** Repository of the project level; null is the shared level. */
 const levelRepository = z.string().min(1).nullable();
 const writeLevelSchema = z.enum(['project', 'global']);
@@ -211,7 +233,11 @@ export const requestSchema = z.discriminatedUnion('method', [
     params: z.object({ runId: z.string().min(1) }),
   }),
   z.object({
-    method: z.literal('workflows'),
+    method: z.literal('pipelines'),
+    params: z.object({ repository: z.string().min(1) }),
+  }),
+  z.object({
+    method: z.literal('system_stages'),
     params: z.object({ repository: z.string().min(1) }),
   }),
   z.object({
@@ -260,7 +286,7 @@ export const requestSchema = z.discriminatedUnion('method', [
     method: z.literal('config_preview'),
     params: z.object({
       repository: z.string().min(1),
-      kind: z.literal('workflow'),
+      kind: z.literal('pipeline'),
       id: entryIdSchema,
       value: z.record(z.string(), z.unknown()),
       level: writeLevelSchema.optional(),
@@ -304,11 +330,11 @@ export const requestSchema = z.discriminatedUnion('method', [
     }),
   }),
   z.object({
-    method: z.literal('shared_workflows'),
+    method: z.literal('shared_pipelines'),
     params: z.object({}),
   }),
   z.object({
-    method: z.literal('workflows_import'),
+    method: z.literal('pipelines_import'),
     params: z.object({
       repository: z.string().min(1),
       source: z.string().min(1),
@@ -473,6 +499,17 @@ export const requestSchema = z.discriminatedUnion('method', [
     method: z.literal('run_title'),
     params: z.object({ runId: z.string().min(1), title: queueTitle }),
   }),
+  z.object({ method: z.literal('observers'), params: z.object({}).default({}) }),
+  z.object({
+    // The shape only: the daemon checks the values, so a mistake comes back as field errors.
+    method: z.literal('observers_set'),
+    params: z.object({ settings: z.record(z.string(), z.unknown()) }),
+  }),
+  z.object({
+    method: z.literal('run_observer'),
+    params: z.object({ runId: z.string().min(1), enabled: z.boolean() }),
+  }),
+  z.object({ method: z.literal('repair_action'), params: repairActionParams }),
   z.object({ method: z.literal('processes'), params: z.object({}).default({}) }),
   z.object({
     method: z.literal('process_kill'),
@@ -605,6 +642,23 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     event: z.literal('run'),
     seq: z.number().int(),
     run: z.looseObject({ id: z.string() }),
+  }),
+  z.object({
+    event: z.literal('observers'),
+    seq: z.number().int(),
+    observers: z.looseObject({}),
+  }),
+  z.object({
+    event: z.literal('incident'),
+    seq: z.number().int(),
+    runId: z.string(),
+    repository: z.string(),
+    incident: z.object({
+      key: z.string(),
+      kind: z.enum(INCIDENT_KINDS),
+      group: z.string(),
+      detail: z.string(),
+    }),
   }),
   z.object({
     event: z.literal('processes'),

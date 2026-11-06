@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { TagsProvider } from '../src/tags.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
-import { cleanup, render, screen, within } from './render.tsx';
+import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 import { groupRow, runView, tagView } from './fixtures.ts';
 
 afterEach(cleanup);
@@ -214,5 +214,117 @@ describe('groups of a held run in the list', () => {
     cleanup();
     const second = show(run, { now: 600_000 }).textContent;
     expect(second).toBe(first);
+  });
+});
+
+describe('undelivered result in the list', () => {
+  const delivery = (over: Partial<ReturnType<typeof runView>['delivery']> = {}) => ({
+    applied: 0,
+    merged: 2,
+    failed: 0,
+    inProgress: false,
+    finishedAt: null,
+    ...over,
+  });
+  const stopped = (over: Partial<ReturnType<typeof runView>> = {}) =>
+    runView({
+      state: 'finished',
+      finished: true,
+      delivery: delivery(),
+      groups: [
+        groupRow({ slug: 'a', status: 'merged', delivery: 'pending' }),
+        groupRow({ slug: 'b', status: 'merged', delivery: 'applied' }),
+      ],
+      ...over,
+    });
+
+  it('marks the run with a label, a tooltip text and a tint', async () => {
+    const row = show(stopped({ delivery: delivery({ applied: 1 }) }));
+    const badge = within(row).getByLabelText('Not delivered (undelivered)');
+    fireEvent.focus(badge);
+    expect((await screen.findByRole('tooltip')).textContent).toContain('1 of 2 groups delivered');
+    expect(row.hasAttribute('data-undelivered')).toBe(true);
+    expect(row.className).toContain('border-status-warn/40');
+    expect(row.className).toContain('bg-status-warn-bg/40');
+  });
+
+  it('puts the label after the state and warnings badges', () => {
+    const row = show(stopped({ groups: [groupRow({ status: 'merged', warnings: 2 })] }));
+    const text = row.textContent!;
+    const at = ['Finished', 'Warnings: 2', 'Not delivered'].map((part) => text.indexOf(part));
+    expect(at.every((index) => index >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
+  it('shows a failed delivery with its count in any state', async () => {
+    const row = show(
+      runView({
+        state: 'active',
+        delivery: delivery({ failed: 1 }),
+        deliveryStage: { status: 'apply_failed', reason: 'boom', groups: ['a'] },
+      }),
+    );
+    expect(row.textContent).toContain('Delivery failed 1');
+    fireEvent.focus(within(row).getByLabelText(/^Delivery failed 1/));
+    expect((await screen.findByRole('tooltip')).textContent).toContain('boom');
+    expect(row.hasAttribute('data-undelivered')).toBe(true);
+  });
+
+  it('has no mark when everything is delivered', () => {
+    const row = show(
+      stopped({
+        delivery: delivery({ applied: 2 }),
+        groups: [groupRow({ status: 'merged', delivery: 'applied' })],
+      }),
+    );
+    expect(row.hasAttribute('data-undelivered')).toBe(false);
+    expect(row.textContent).not.toContain('Not delivered');
+    expect(row.className).not.toContain('border-status-warn');
+  });
+
+  it('keeps the selected border and the label on the selected run', () => {
+    const row = show(stopped(), { selectedRun: 'run1' });
+    expect(row.className).toContain('border-primary');
+    expect(row.classList.contains('bg-accent')).toBe(true);
+    expect(row.classList.contains('border-status-warn/40')).toBe(false);
+    expect(row.classList.contains('bg-status-warn-bg/40')).toBe(false);
+    expect(row.textContent).toContain('Not delivered');
+  });
+
+  it('drops the mark when the delivery finishes or starts, without a remount', () => {
+    const props = {
+      selectedRun: null,
+      selectedGroup: null,
+      now: 2_000,
+      query: '',
+      onQuery: () => undefined,
+      filters: EMPTY_FILTERS,
+      onFilters: () => undefined,
+      onSelect: () => undefined,
+      scope: 'repository' as const,
+      onScope: () => undefined,
+      repository: '/repo',
+    };
+    const view = render(<RunList runs={[stopped()]} {...props} />);
+    const row = () => view.container.querySelector('[data-run] button')!;
+    expect(row().hasAttribute('data-undelivered')).toBe(true);
+    const element = row();
+    view.rerender(
+      <RunList runs={[stopped({ delivery: delivery({ inProgress: true }) })]} {...props} />,
+    );
+    expect(row().hasAttribute('data-undelivered')).toBe(false);
+    view.rerender(
+      <RunList
+        runs={[
+          stopped({
+            delivery: delivery({ applied: 2 }),
+            groups: [groupRow({ status: 'merged', delivery: 'applied' })],
+          }),
+        ]}
+        {...props}
+      />,
+    );
+    expect(row()).toBe(element);
+    expect(row().textContent).not.toContain('Not delivered');
   });
 });

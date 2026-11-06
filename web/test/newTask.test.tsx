@@ -25,8 +25,8 @@ import {
   queueOf,
   repositoryView,
   runView,
-  workflowOf,
-  workflowsView,
+  pipelineOf,
+  pipelinesView,
 } from './fixtures.ts';
 
 beforeEach(() => {
@@ -144,9 +144,9 @@ describe('retarget', () => {
     repository: '/work/app',
   };
 
-  it('keeps a workflow the new repository has and clears the links', () => {
+  it('keeps a pipeline the new repository has and clears the links', () => {
     const moved = retarget(draft, ['docs', 'feature'], steps);
-    expect(moved.workflow).toBe('feature');
+    expect(moved.pipeline).toBe('feature');
     expect(moved.after).toEqual([]);
     expect(moved.parent).toBeNull();
     expect(moved.afterTouched).toBe(false);
@@ -161,9 +161,9 @@ describe('retarget', () => {
     ]);
   });
 
-  it('replaces a missing workflow with the first one and drops its skipped steps', () => {
+  it('replaces a missing pipeline with the first one and drops its skipped steps', () => {
     const moved = retarget(draft, ['docs'], steps);
-    expect(moved.workflow).toBe('docs');
+    expect(moved.pipeline).toBe('docs');
     expect(moved.skip).toEqual([]);
   });
 
@@ -177,21 +177,21 @@ const LIB = '/work/lib';
 
 /** A panel started in /work/app that knows a second repository, /work/lib. */
 function twoRepositories(
-  options: { libWorkflows?: string[]; libWorkflowsLate?: boolean; runs?: RunView[] } = {},
+  options: { libPipelines?: string[]; libPipelinesLate?: boolean; runs?: RunView[] } = {},
 ) {
-  const libIds = options.libWorkflows ?? ['docs'];
+  const libIds = options.libPipelines ?? ['docs'];
   let release: (() => void) | undefined;
-  const libView = workflowsView({
+  const libView = pipelinesView({
     repository: LIB,
-    workflows: libIds.map((id) => workflowOf({ id })),
+    pipelines: libIds.map((id) => pipelineOf({ id })),
   });
   const appQueue = queueOf({ repository: APP, items: [queueItem('qa', 'app task', 1)] });
   const api = fakeApi({
     queue: vi.fn(async () => appQueue),
     runs: vi.fn(async () => []),
-    workflows: vi.fn(async (repository?: string) => {
-      if (repository !== LIB) return workflowsView({ repository: APP });
-      if (options.libWorkflowsLate)
+    pipelines: vi.fn(async (repository?: string) => {
+      if (repository !== LIB) return pipelinesView({ repository: APP });
+      if (options.libPipelinesLate)
         await new Promise<void>((resolve) => {
           release = resolve;
         });
@@ -267,8 +267,8 @@ describe('repository of the new task', () => {
     );
   });
 
-  it('keeps the workflow the chosen repository has', async () => {
-    twoRepositories({ libWorkflows: ['docs', 'feature'] });
+  it('keeps the pipeline the chosen repository has', async () => {
+    twoRepositories({ libPipelines: ['docs', 'feature'] });
     const dialog = await openDialog();
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'text' } });
     await waitFor(() =>
@@ -282,8 +282,8 @@ describe('repository of the new task', () => {
     expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature');
   });
 
-  it('replaces a workflow the chosen repository lacks with its first one', async () => {
-    twoRepositories({ libWorkflows: ['docs'] });
+  it('replaces a pipeline the chosen repository lacks with its first one', async () => {
+    twoRepositories({ libPipelines: ['docs'] });
     const other = await openDialog();
     fireEvent.change(within(other).getByLabelText('Task text'), { target: { value: 'text' } });
     await waitFor(() =>
@@ -329,8 +329,8 @@ describe('repository of the new task', () => {
     );
   });
 
-  it('keeps Add disabled until the workflows of the chosen repository are loaded', async () => {
-    const { release } = twoRepositories({ libWorkflowsLate: true });
+  it('keeps Add disabled until the pipelines of the chosen repository are loaded', async () => {
+    const { release } = twoRepositories({ libPipelinesLate: true });
     const dialog = await openDialog();
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'text' } });
     const add = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
@@ -464,7 +464,7 @@ describe('subtask from the run header', () => {
     fireEvent.click(await screen.findByText('Библиотека'));
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#42 Библиотека'));
-    await waitFor(() => expect(api.workflows).toHaveBeenCalledWith(LIB));
+    await waitFor(() => expect(api.pipelines).toHaveBeenCalledWith(LIB));
     await waitFor(() =>
       expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('docs'),
     );

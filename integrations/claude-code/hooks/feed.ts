@@ -30,7 +30,7 @@ export type RunAction = 'cancel' | 'apply';
 
 export type Notice = { key: string; text: string };
 
-export type RunCommand = { workflow: string; task: string };
+export type RunCommand = { pipeline: string; task: string };
 export type ApplyCommand = { runId: string; groups: string[]; force: boolean };
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -83,7 +83,7 @@ function isRun(value: unknown): value is AipRun {
   return (
     isObject(value) &&
     typeof value.id === 'string' &&
-    typeof value.workflow === 'string' &&
+    typeof value.pipeline === 'string' &&
     typeof value.finished === 'boolean' &&
     Array.isArray(value.groups) &&
     value.groups.every(
@@ -246,7 +246,7 @@ export function currentNotices(runs: readonly AipRun[]): Notice[] {
     if (run.finished)
       notices.push({
         key: `${run.id}/finished`,
-        text: `run ${runLabel(run)} (${run.workflow}) finished: ${run.counts}`,
+        text: `run ${runLabel(run)} (${run.pipeline}) finished: ${run.counts}`,
       });
   }
   return notices;
@@ -371,8 +371,8 @@ export function parseRunCommand(args: string): Parsed<RunCommand> {
   const trimmed = args.trim();
   const match = /^(\S+)\s+([\s\S]+)$/.exec(trimmed);
   if (!match?.[1] || !match[2]?.trim())
-    return { ok: false, error: 'Usage: /aip:run <workflow> <task>' };
-  return { ok: true, value: { workflow: match[1], task: match[2].trim() } };
+    return { ok: false, error: 'Usage: /aip:run <pipeline> <task>' };
+  return { ok: true, value: { pipeline: match[1], task: match[2].trim() } };
 }
 
 export function parseStatusCommand(args: string): Parsed<string | null> {
@@ -584,7 +584,7 @@ export type GroupCard = {
 export type RunCard = {
   id: string;
   label: string;
-  workflow: string;
+  pipeline: string;
   phase: string;
   style: StatusStyle;
   diff: string | null;
@@ -705,7 +705,7 @@ export function paneView(
       ? {
           id: current.id,
           label: runLabel(current),
-          workflow: current.workflow,
+          pipeline: current.pipeline,
           phase: phaseOf(current),
           style: STATUS[runStatus(current)],
           diff: formatDiff(current.diff),
@@ -765,7 +765,7 @@ function runLine(run: AipRun): string {
 }
 
 export function statusMarkdown(runs: readonly AipRun[]): string {
-  if (runs.length === 0) return 'No runs yet. Start one with `/aip:run <workflow> <task>`.';
+  if (runs.length === 0) return 'No runs yet. Start one with `/aip:run <pipeline> <task>`.';
   return sortRuns(runs).map(runLine).join('\n');
 }
 
@@ -775,7 +775,7 @@ export function runMarkdown(run: AipRun): string {
     `### ${STATUS[runStatus(run)].icon} ${runLabel(run)} · \`${run.id}\``,
     '',
     [
-      run.workflow,
+      run.pipeline,
       phaseOf(run),
       `${progress.done}/${progress.total}`,
       formatDiff(run.diff),

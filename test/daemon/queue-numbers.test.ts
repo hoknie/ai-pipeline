@@ -9,14 +9,14 @@ describe('task numbers', () => {
     h.script({ code: [{ noReport: true }, {}, {}] });
     const first = (await h.call('run', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'работа',
       title: 'A',
     })) as RunQueued;
     expect(first.number).toBe(1);
     const second = (await h.call('run', {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'работа',
       title: 'B',
     })) as RunQueued;

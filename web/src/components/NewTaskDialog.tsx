@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../api.ts';
 import { taskNumber } from '../format.ts';
 import { notifySuccess } from '../notify.ts';
-import type { QueueView, RunView, WorkflowsView } from '../types.ts';
+import type { QueueView, RunView, PipelinesView } from '../types.ts';
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog.tsx';
 
 import { QueueForm, emptyDraft, retarget, type QueueDraft } from './QueueForm.tsx';
@@ -12,8 +12,8 @@ import { itemLabel } from './QueueList.tsx';
 import { afterOptions, parentChoices } from './queueLinks.ts';
 import { RepositoryPicker } from './RepositoryPicker.tsx';
 
-function stepIds(workflow: { steps: { id: string }[] } | undefined): string[] {
-  return workflow?.steps.map((step) => step.id) ?? [];
+function stepIds(pipeline: { steps: { id: string }[] } | undefined): string[] {
+  return pipeline?.steps.map((step) => step.id) ?? [];
 }
 
 /** The one dialog of a new task: opened from the top strip, the queue page and the palette. */
@@ -56,9 +56,9 @@ export default function NewTaskDialog({
   const { t } = useTranslation();
   // the choice is local to the dialog: it neither moves the panel nor outlives the opening
   const [target, setTarget] = useState(preset?.repository ?? selected);
-  const [workflowsOf, setWorkflowsOf] = useState<ReadonlyMap<string, WorkflowsView>>(new Map());
+  const [pipelinesOf, setPipelinesOf] = useState<ReadonlyMap<string, PipelinesView>>(new Map());
   const scoped = useMemo(() => api.forRepository(target), [api, target]);
-  const workflows = workflowsOf.get(target) ?? null;
+  const pipelines = pipelinesOf.get(target) ?? null;
   const queue = queues.get(target);
   const current = draft ?? emptyDraft();
   const mode = useRef<'task' | 'groups'>('task');
@@ -76,18 +76,18 @@ export default function NewTaskDialog({
   }, [open]);
 
   useEffect(() => {
-    if (workflowsOf.has(target)) return;
+    if (pipelinesOf.has(target)) return;
     let closed = false;
     api
-      .workflows(target)
+      .pipelines(target)
       .then((view) => {
-        if (!closed) setWorkflowsOf((known) => new Map(known).set(target, view));
+        if (!closed) setPipelinesOf((known) => new Map(known).set(target, view));
       })
       .catch(() => undefined);
     return () => {
       closed = true;
     };
-  }, [api, target, workflowsOf]);
+  }, [api, target, pipelinesOf]);
 
   // a repository without a queue in the snapshot: load it once
   const queueKnown = queue !== undefined;
@@ -105,29 +105,29 @@ export default function NewTaskDialog({
     };
   }, [scoped, queueKnown, onQueue]);
 
-  // a draft typed for another repository moves to the chosen one once its workflows are known
+  // a draft typed for another repository moves to the chosen one once its pipelines are known
   const draftTarget = draft ? (draft.repository ?? selected) : null;
   useEffect(() => {
-    if (!open || !draft || !workflows || draftTarget === target) return;
-    const ids = workflows.workflows.map((workflow) => workflow.id);
+    if (!open || !draft || !pipelines || draftTarget === target) return;
+    const ids = pipelines.pipelines.map((pipeline) => pipeline.id);
     onDraft({
       ...retarget(draft, ids, (id) =>
-        stepIds(workflows.workflows.find((workflow) => workflow.id === id)),
+        stepIds(pipelines.pipelines.find((pipeline) => pipeline.id === id)),
       ),
       repository: target,
     });
-  }, [open, draft, workflows, draftTarget, target, onDraft]);
+  }, [open, draft, pipelines, draftTarget, target, onDraft]);
 
   // the preset parent goes into the draft once, when the draft belongs to the target repository
   const parents = useMemo(() => parentChoices(runs, target), [runs, target]);
   useEffect(() => {
     if (!open || !preset || target !== preset.repository) return;
     if (draft && draftTarget !== target) return;
-    if (!workflows) return;
-    const base = draft ?? emptyDraft(workflows.workflows[0]?.id);
+    if (!pipelines) return;
+    const base = draft ?? emptyDraft(pipelines.pipelines[0]?.id);
     onDraft({ ...base, repository: target, parent: preset.parent, parentTouched: true });
     onPresetApplied();
-  }, [open, preset, target, draft, draftTarget, workflows, onDraft, onPresetApplied]);
+  }, [open, preset, target, draft, draftTarget, pipelines, onDraft, onPresetApplied]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,7 +144,7 @@ export default function NewTaskDialog({
         <QueueForm
           idPrefix="new"
           draft={current}
-          workflows={workflows}
+          pipelines={pipelines}
           repository={target}
           api={scoped}
           autoDeliverDefault={queue?.autoDeliver ?? null}
@@ -152,7 +152,7 @@ export default function NewTaskDialog({
           afterChoices={queue ? afterOptions(queue, (item) => itemLabel(item, t)) : []}
           parentChoices={parents}
           pending={
-            workflows === null ||
+            pipelines === null ||
             queue === undefined ||
             (draft !== undefined && draftTarget !== target)
           }
@@ -171,7 +171,7 @@ export default function NewTaskDialog({
           onSubmit={async (fields) => {
             const view = await scoped.queueAdd(fields);
             onQueue(view);
-            onDraft({ ...emptyDraft(fields.workflow), repository: target });
+            onDraft({ ...emptyDraft(fields.pipeline), repository: target });
             onOpenChange(false);
             const number = view.items.find((item) => item.id === view.item)?.number;
             notifySuccess(

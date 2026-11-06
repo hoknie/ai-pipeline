@@ -23,7 +23,7 @@ export {
   taskNumber,
   formatRunQueued,
   formatRunList,
-  workflowLabel,
+  pipelineLabel,
   formatTagLabels,
   formatTagList,
   filterByTags,

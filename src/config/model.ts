@@ -20,6 +20,20 @@ export type ClaudeSettingsSource = (typeof CLAUDE_SETTINGS_SOURCES)[number];
 export const DELIVERY_MODES = ['worktree', 'commit', 'branch'] as const;
 export type DeliveryMode = (typeof DELIVERY_MODES)[number];
 
+/** Points of the pipeline where actions run, in the order of the pipeline. */
+export const ACTION_POINTS = [
+  'before_split',
+  'after_split',
+  'before_delivery',
+  'after_delivery',
+] as const;
+export type ActionPoint = (typeof ACTION_POINTS)[number];
+
+export const ACTION_FAILURES = ['stop', 'continue'] as const;
+export type ActionFailure = (typeof ACTION_FAILURES)[number];
+
+export const DEFAULT_ACTION_TIMEOUT_SECONDS = 600;
+
 export const DEFAULT_COMMIT_MESSAGE = '{title}\n\n{groups}';
 
 export const DEFAULT_MAX = 3;
@@ -73,6 +87,25 @@ export interface Specialist {
   level: SpecialistLevel;
 }
 
+/** A pipeline action: a shell command (`run`) or a step of a specialist (`specialist`). */
+export interface Action {
+  id: string;
+  /** Display name; null: the id is shown. */
+  name: string | null;
+  run: string | null;
+  specialist: string | null;
+  /** Text appended to the prompt of the specialist; only with `specialist`. */
+  additionalPrompt: string | null;
+  /** Seconds a command may run; only with `run`. */
+  timeoutSeconds: number;
+  onFailure: ActionFailure;
+  /** Level of the definition. */
+  level: SpecialistLevel;
+}
+
+/** Ids of actions by pipeline point; a point that is absent has no value of its own. */
+export type StagePoints = Partial<Record<ActionPoint, string[]>>;
+
 export interface OnReject {
   goto: string;
   maxRounds: number;
@@ -93,16 +126,18 @@ export interface Split {
   maxGroups: number;
   /** Text appended to the prompt of the split specialist. */
   additionalPrompt: string | null;
-  /** Workflow whose steps the groups follow after the split; null: the workflow itself. */
-  workflow: string | null;
+  /** Pipeline whose steps the groups follow after the split; null: the pipeline itself. */
+  pipeline: string | null;
 }
 
-export interface Workflow {
+export interface Pipeline {
   id: string;
   /** Display name; null: the id is shown. */
   name: string | null;
   split: Split | null;
   steps: Step[];
+  /** Actions of this pipeline by point; a point replaces the one of `swarm.stages` entirely. */
+  stages?: StagePoints;
 }
 
 export interface ClaudeSettings {
@@ -119,6 +154,10 @@ export interface DeliverySettings {
   messageSpecialist: string | null;
   resolver: string | null;
   resolverRounds: number;
+  /** Text appended to the task of the commit message author. */
+  messagePrompt?: string;
+  /** Text appended to the task of the resolver. */
+  resolverPrompt?: string;
 }
 
 export const WORKSPACE_BASES = ['working_tree', 'head'] as const;
@@ -192,9 +231,23 @@ export function defaultDelivery(): DeliverySettings {
   };
 }
 
+function normalizedSplit(split: Split | null | undefined): Split | null {
+  if (!split) return split ?? null;
+  const { workflow, ...rest } = split as Split & { workflow?: string | null };
+  return workflow === undefined ? split : { ...rest, pipeline: rest.pipeline ?? workflow };
+}
+
 /** Fills settings added after a run was stored, so older runs keep working. */
 export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
-  const stored = config as Omit<ResolvedConfig, 'workspace' | 'delivery'> & {
+  const stored = config as Omit<
+    ResolvedConfig,
+    'workspace' | 'delivery' | 'actions' | 'stages' | 'pipelines'
+  > & {
+    pipelines?: Pipeline[];
+    /** Name of the pipelines in snapshots stored by older builds. */
+    workflows?: Pipeline[];
+    actions?: Action[];
+    stages?: StagePoints;
     workspace?: Partial<WorkspaceSettings>;
     delivery: Partial<DeliverySettings>;
     naming?: Partial<NamingSettings>;
@@ -222,14 +275,32 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     settings: (stored.claude as Partial<ClaudeSettings>).settings ?? 'isolated',
   };
   // Runs stored before `human_review` existed have no such steps.
-  const workflows = stored.workflows.map((workflow) => ({
-    ...workflow,
-    steps: workflow.steps.map((step) => ({
+  const pipelines = (stored.pipelines ?? stored.workflows ?? []).map((pipeline) => ({
+    ...pipeline,
+    // Snapshots of older builds name the pipeline of a split `workflow`.
+    split: normalizedSplit(pipeline.split),
+    steps: pipeline.steps.map((step) => ({
       ...step,
       humanReview: (step as Partial<Step>).humanReview ?? false,
     })),
   }));
-  return { ...stored, workspace, delivery, naming, web, runtimes, specialists, claude, workflows };
+  // Runs stored before pipeline actions existed have none.
+  const actions = stored.actions ?? [];
+  const stages = stored.stages ?? {};
+  const { workflows: _old, ...current } = stored;
+  return {
+    ...current,
+    workspace,
+    delivery,
+    naming,
+    web,
+    runtimes,
+    specialists,
+    claude,
+    pipelines,
+    actions,
+    stages,
+  };
 }
 
 export interface ResolvedConfig {
@@ -246,7 +317,11 @@ export interface ResolvedConfig {
   delivery: DeliverySettings;
   defaults: Defaults;
   specialists: Specialist[];
-  workflows: Workflow[];
+  pipelines: Pipeline[];
+  /** Pipeline actions by id. */
+  actions: Action[];
+  /** Actions of the pipeline points shared by the pipelines. */
+  stages: StagePoints;
 }
 
 export function defaultDefaults(): Defaults {
@@ -263,34 +338,53 @@ export function findSpecialist(config: ResolvedConfig, slug: string): Specialist
   return config.specialists.find((specialist) => specialist.slug === slug);
 }
 
-export function findWorkflow(config: ResolvedConfig, id: string): Workflow | undefined {
-  return config.workflows.find((workflow) => workflow.id === id);
+export function findAction(config: ResolvedConfig, id: string): Action | undefined {
+  return (config.actions ?? []).find((action) => action.id === id);
 }
 
-/** Display name of a workflow: `name`, else the id. Tolerates snapshots saved before the field existed. */
-export function workflowName(workflow: Workflow): string {
-  return workflow.name ?? workflow.id;
+/** Ids of the actions of a point of a pipeline: its own list, else the shared one. */
+export function pipelineActionIds(
+  config: ResolvedConfig,
+  pipeline: Pipeline,
+  point: ActionPoint,
+): string[] {
+  if (pipeline.stages?.[point] !== undefined) return pipeline.stages[point];
+  // A pipeline without a split has no points around the split.
+  if ((point === 'before_split' || point === 'after_split') && pipeline.split === null) return [];
+  return config.stages?.[point] ?? [];
 }
 
-/** Display name of the workflow `id`; the id itself when there is no such workflow. */
-export function workflowNameOf(config: ResolvedConfig, id: string): string {
-  const found = findWorkflow(config, id);
-  return found ? workflowName(found) : id;
+export function findPipeline(config: ResolvedConfig, id: string): Pipeline | undefined {
+  return config.pipelines.find((pipeline) => pipeline.id === id);
 }
 
-/** The workflow whose steps the groups of `workflow` follow. */
-export function groupWorkflow(config: ResolvedConfig, workflow: Workflow): Workflow {
+/** Display name of a pipeline: `name`, else the id. Tolerates snapshots saved before the field existed. */
+export function pipelineName(pipeline: Pipeline): string {
+  return pipeline.name ?? pipeline.id;
+}
+
+/** Display name of the pipeline `id`; the id itself when there is no such pipeline. */
+export function pipelineNameOf(config: ResolvedConfig, id: string): string {
+  const found = findPipeline(config, id);
+  return found ? pipelineName(found) : id;
+}
+
+/** The pipeline whose steps the groups of `pipeline` follow. */
+export function groupPipeline(config: ResolvedConfig, pipeline: Pipeline): Pipeline {
   // Runs saved before the field existed have no value.
-  const target = workflow.split?.workflow ?? null;
-  if (target === null) return workflow;
-  const found = findWorkflow(config, target);
-  if (!found) throw new Error(`workflow ${workflow.id} splits into unknown workflow ${target}`);
+  const target = pipeline.split?.pipeline ?? null;
+  if (target === null) return pipeline;
+  const found = findPipeline(config, target);
+  if (!found) throw new Error(`pipeline ${pipeline.id} splits into unknown pipeline ${target}`);
   return found;
 }
 
-export function stepIndex(workflow: Workflow, stepId: string): number {
-  return workflow.steps.findIndex((step) => step.id === stepId);
+export function stepIndex(pipeline: Pipeline, stepId: string): number {
+  return pipeline.steps.findIndex((step) => step.id === stepId);
 }
+
+/** Slug of the specialist of the observer; it is not a slug of `swarm.yaml` (starts with `_`). */
+export const OBSERVER_SPECIALIST = '_observer';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{0,31}$/;
 export const SLUG_PATTERN_TEXT = '^[a-z][a-z0-9-]{0,31}$';

@@ -16,3 +16,6 @@ steps:
     on_reject:
       goto: code
       max_rounds: 2
+# commands run by the daemon around delivery; ids are files in actions/
+stages:
+  before_delivery: [lint]

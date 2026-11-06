@@ -43,7 +43,7 @@ async function runWith(h: Harness, action: Record<string, unknown>): Promise<str
   h.script({ code: [action] });
   const { runId } = (await startRun(h, {
     repository: h.repo,
-    workflow: 'feature',
+    pipeline: 'feature',
     groups: [{ title: 'Вход', task: 'вход' }],
   })) as RunCreated;
   await h.waitFor(runId, (view) => view.finished);
@@ -220,7 +220,7 @@ describe('step artifacts', () => {
     h.script({ code: [{ toolCalls: [publish({ file_name: 'a.md', content: 'x' })] }] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       groups: [
         { title: 'Вход', task: 'вход' },
         { title: 'Выход', task: 'выход' },

@@ -20,7 +20,7 @@ import type {
   RunCreated,
 } from '../../src/protocol/index.ts';
 
-import { WORKFLOW_CONFIG, harness, startRun, type Harness } from './harness.ts';
+import { PIPELINE_CONFIG, harness, startRun, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -124,7 +124,7 @@ describe('config editor', () => {
     expect(refused).toMatchObject({
       ok: false,
       reason: 'invalid',
-      references: [{ workflow: 'feature', step: 'review' }],
+      references: [{ pipeline: 'feature', step: 'review' }],
     });
     expect(existsSync(reviewer.file)).toBe(true);
     await write(h, 'extra', { name: 'Extra' }, null);
@@ -148,7 +148,7 @@ describe('config editor', () => {
 
   it('keeps the snapshot of a running run and gives the new model to new runs', async () => {
     const h = await start(
-      WORKFLOW_CONFIG.replace(
+      PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
         'coder: { name: Кодировщик, model: sonnet }',
       ),
@@ -157,7 +157,7 @@ describe('config editor', () => {
     const first = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'g1', task: 'task' }],
       })) as RunCreated
     ).runId;
@@ -172,7 +172,7 @@ describe('config editor', () => {
     const second = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'g2', task: 'task' }],
       })) as RunCreated
     ).runId;
@@ -187,8 +187,8 @@ describe('config editor', () => {
   });
 });
 
-describe('workflow editing', () => {
-  const featureFile = (h: Harness) => join(h.repo, 'aip', 'workflows', 'feature.yaml');
+describe('pipeline editing', () => {
+  const featureFile = (h: Harness) => join(h.repo, 'aip', 'pipelines', 'feature.yaml');
   const steps = [
     { id: 'code', specialist: 'coder' },
     { id: 'review', specialist: 'reviewer', on_reject: { goto: 'code', max_rounds: 2 } },
@@ -197,7 +197,7 @@ describe('workflow editing', () => {
   async function preview(h: Harness, value: Record<string, unknown>): Promise<ConfigPreview> {
     return (await h.call('config_preview', {
       repository: h.repo,
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value,
     })) as ConfigPreview;
@@ -220,20 +220,20 @@ describe('workflow editing', () => {
     expect(result.topology).toBeNull();
     expect(result.errors).toContainEqual(
       expect.objectContaining({
-        path: 'swarm.workflows.feature.steps[2].specialist',
+        path: 'swarm.pipelines.feature.steps[2].specialist',
         message: expect.stringContaining('known: coder, reviewer'),
       }),
     );
   });
 
-  it('lists the workflows and writes one', async () => {
+  it('lists the pipelines and writes one', async () => {
     const h = await start();
     const listed = await view(h);
-    const feature = listed.workflows.find((workflow) => workflow.id === 'feature')!;
+    const feature = listed.pipelines.find((pipeline) => pipeline.id === 'feature')!;
     expect(feature.level).toBe('project');
     const result = (await h.call('config_write', {
       repository: h.repo,
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: { steps: steps.slice(0, 1) },
       revision: feature.revision,
@@ -242,21 +242,21 @@ describe('workflow editing', () => {
     expect(readFileSync(featureFile(h), 'utf8')).toContain('code');
   });
 
-  it('deletes a workflow while its run goes on, and refuses new runs of it', async () => {
+  it('deletes a pipeline while its run goes on, and refuses new runs of it', async () => {
     const h = await start();
     h.script({ code: [{ exitCode: 1, noReport: true }, {}] });
     const runId = (
       (await startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'g1', task: 'task' }],
       })) as RunCreated
     ).runId;
     await h.waitFor(runId, (run) => run.groups[0]?.status === 'failed');
-    const feature = (await view(h)).workflows.find((workflow) => workflow.id === 'feature')!;
+    const feature = (await view(h)).pipelines.find((pipeline) => pipeline.id === 'feature')!;
     const deleted = await h.call('config_delete', {
       repository: h.repo,
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       revision: feature.revision!,
     });
@@ -267,10 +267,10 @@ describe('workflow editing', () => {
     await expect(
       startRun(h, {
         repository: h.repo,
-        workflow: 'feature',
+        pipeline: 'feature',
         groups: [{ title: 'g2', task: 'task' }],
       }),
-    ).rejects.toThrow(/unknown workflow `feature`/);
+    ).rejects.toThrow(/unknown pipeline `feature`/);
   });
 });
 
@@ -315,17 +315,17 @@ describe('config editor levels', () => {
     expect(existsSync(globalFile(h, 'qa'))).toBe(false);
   });
 
-  it('previews a workflow draft on the global level', async () => {
+  it('previews a pipeline draft on the global level', async () => {
     const h = await start();
     const preview = (await h.call('config_preview', {
       repository: h.repo,
-      kind: 'workflow',
+      kind: 'pipeline',
       id: 'feature',
       value: { steps: [{ id: 'code', specialist: 'coder' }] },
       level: 'global',
     })) as ConfigPreview;
     expect(preview.errors.map((error) => error.path)).toContain(
-      'swarm.workflows.feature.steps[0].specialist',
+      'swarm.pipelines.feature.steps[0].specialist',
     );
   });
 });
@@ -348,7 +348,7 @@ describe('general setting', () => {
     expect(before.settingsFiles.global).toEqual({ file: globalFile(h), revision: null });
     const running = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'x',
     })) as RunCreated;
     const result = await setting(h, false, null);
@@ -364,7 +364,7 @@ describe('general setting', () => {
     await h.waitFor(running.runId, (run) => run.finished);
     const next = (await startRun(h, {
       repository: h.repo,
-      workflow: 'feature',
+      pipeline: 'feature',
       task: 'y',
     })) as RunCreated;
     expect((await h.status(next.runId)).autoDeliver).toBe(false);
@@ -451,7 +451,7 @@ describe('config catalog', () => {
       join(home, '.claude', 'skills', 'tdd', 'SKILL.md'),
       '---\ndescription: Tests\n---\n',
     );
-    const h = await harness(`${WORKFLOW_CONFIG}  claude: { mcp: inherit }\n`, { HOME: home });
+    const h = await harness(`${PIPELINE_CONFIG}  claude: { mcp: inherit }\n`, { HOME: home });
     current = h;
     mkdirSync(join(h.repo, '.claude', 'skills', 'local'), { recursive: true });
     writeFileSync(join(h.repo, '.claude', 'skills', 'local', 'SKILL.md'), '');
@@ -481,12 +481,12 @@ describe('shared specialists', () => {
     writeFileSync(path, text);
   }
 
-  /** A second repository of the registry, with a project workflow that needs the shared `qa`. */
+  /** A second repository of the registry, with a project pipeline that needs the shared `qa`. */
   async function registryWithLib(h: Harness): Promise<string> {
     const lib = realpathSync(mkdtempSync(join(tmpdir(), 'aip-lib-')));
     execFileSync('git', ['init', '-q', '-b', 'main', lib]);
     put(
-      join(lib, 'aip', 'workflows', 'feature.yaml'),
+      join(lib, 'aip', 'pipelines', 'feature.yaml'),
       'steps:\n  - id: test\n    specialist: qa\n',
     );
     put(join(sharedDir(h), 'specialists', 'qa.yaml'), 'name: QA\n');
@@ -515,7 +515,7 @@ describe('shared specialists', () => {
     const [qa, writer] = usage.specialists;
     expect(qa?.global).toEqual([]);
     expect(qa?.projects).toEqual([
-      { repository: lib, references: [{ workflow: 'feature', step: 'test' }] },
+      { repository: lib, references: [{ pipeline: 'feature', step: 'test' }] },
     ]);
     expect(writer?.projects).toEqual([]);
   });
@@ -534,7 +534,7 @@ describe('shared specialists', () => {
     expect(result).toMatchObject({
       ok: false,
       reason: 'invalid',
-      references: [{ workflow: 'feature', step: 'test', repository: lib }],
+      references: [{ pipeline: 'feature', step: 'test', repository: lib }],
     });
     expect(existsSync(qa)).toBe(true);
   });
@@ -569,7 +569,7 @@ describe('shared specialists', () => {
   });
 });
 
-describe('shared workflows', () => {
+describe('shared pipelines', () => {
   const sharedDir = (h: Harness) => join(h.repo, '..', 'xdg', 'aip');
 
   function put(path: string, text: string): void {
@@ -582,16 +582,16 @@ describe('shared workflows', () => {
     execFileSync('git', ['init', '-q', '-b', 'main', lib]);
     put(join(sharedDir(h), 'specialists', 'coder.yaml'), 'name: Coder\n');
     put(
-      join(sharedDir(h), 'workflows', 'explore.yaml'),
+      join(sharedDir(h), 'pipelines', 'explore.yaml'),
       'steps:\n  - id: code\n    specialist: coder\n',
     );
     put(
-      join(sharedDir(h), 'workflows', 'spare.yaml'),
+      join(sharedDir(h), 'pipelines', 'spare.yaml'),
       'steps:\n  - id: code\n    specialist: coder\n',
     );
     put(
-      join(lib, 'aip', 'workflows', 'epic.yaml'),
-      'split:\n  specialist: coder\n  workflow: explore\n',
+      join(lib, 'aip', 'pipelines', 'epic.yaml'),
+      'split:\n  specialist: coder\n  pipeline: explore\n',
     );
     await h.call('config', { repository: lib });
     await view(h);
@@ -600,72 +600,72 @@ describe('shared workflows', () => {
 
   type Usage = {
     directory: string;
-    workflows: { id: string; projects: { repository: string; references: unknown[] }[] }[];
+    pipelines: { id: string; projects: { repository: string; references: unknown[] }[] }[];
   };
 
   const del = async (h: Harness, id: string, repository = h.repo) => {
-    const file = join(sharedDir(h), 'workflows', `${id}.yaml`);
+    const file = join(sharedDir(h), 'pipelines', `${id}.yaml`);
     return (await h.call('config_delete', {
       repository,
-      kind: 'workflow',
+      kind: 'pipeline',
       id,
       revision: revisionOf(readFileSync(file, 'utf8'))!,
       level: 'global',
     })) as ConfigEditResult;
   };
 
-  it('reports the repositories that use each shared workflow', async () => {
+  it('reports the repositories that use each shared pipeline', async () => {
     const h = await start();
     const lib = await registryWithLib(h);
-    const usage = (await h.call('shared_workflows', {})) as Usage;
-    expect(usage.directory).toBe(join(sharedDir(h), 'workflows'));
-    const explore = usage.workflows.find((w) => w.id === 'explore');
+    const usage = (await h.call('shared_pipelines', {})) as Usage;
+    expect(usage.directory).toBe(join(sharedDir(h), 'pipelines'));
+    const explore = usage.pipelines.find((w) => w.id === 'explore');
     expect(explore?.projects).toEqual([
-      { repository: lib, references: [{ workflow: 'epic', split: true }] },
+      { repository: lib, references: [{ pipeline: 'epic', split: true }] },
     ]);
-    expect(usage.workflows.find((w) => w.id === 'spare')?.projects).toEqual([]);
+    expect(usage.pipelines.find((w) => w.id === 'spare')?.projects).toEqual([]);
   });
 
-  it('refuses to delete a shared workflow another repository needs', async () => {
+  it('refuses to delete a shared pipeline another repository needs', async () => {
     const h = await start();
     const lib = await registryWithLib(h);
     expect(await del(h, 'explore')).toMatchObject({
       ok: false,
       reason: 'invalid',
-      references: [{ workflow: 'epic', split: true, repository: lib }],
+      references: [{ pipeline: 'epic', split: true, repository: lib }],
     });
     // from the repository that holds the reference the draft check refuses it as well
     expect(await del(h, 'explore', lib)).toMatchObject({ ok: false, reason: 'invalid' });
-    expect(existsSync(join(sharedDir(h), 'workflows', 'explore.yaml'))).toBe(true);
+    expect(existsSync(join(sharedDir(h), 'pipelines', 'explore.yaml'))).toBe(true);
   });
 
-  it('deletes an unused shared workflow', async () => {
+  it('deletes an unused shared pipeline', async () => {
     const h = await start();
     await registryWithLib(h);
     expect((await del(h, 'spare')).ok).toBe(true);
-    expect(existsSync(join(sharedDir(h), 'workflows', 'spare.yaml'))).toBe(false);
+    expect(existsSync(join(sharedDir(h), 'pipelines', 'spare.yaml'))).toBe(false);
   });
 
-  it('imports project workflows and refuses bad requests', async () => {
+  it('imports project pipelines and refuses bad requests', async () => {
     const h = await start();
     const lib = await registryWithLib(h);
     const text = 'name: Mine\ntags: [x]\nsteps:\n  - id: code\n    specialist: coder\n';
-    put(join(lib, 'aip', 'workflows', 'mine.yaml'), text);
-    put(join(lib, 'aip', 'workflows', 'lost.yaml'), 'steps:\n  - id: s\n    specialist: nobody\n');
-    const ok = await h.call('workflows_import', { repository: h.repo, source: lib, ids: ['mine'] });
+    put(join(lib, 'aip', 'pipelines', 'mine.yaml'), text);
+    put(join(lib, 'aip', 'pipelines', 'lost.yaml'), 'steps:\n  - id: s\n    specialist: nobody\n');
+    const ok = await h.call('pipelines_import', { repository: h.repo, source: lib, ids: ['mine'] });
     expect(ok).toEqual({ ok: true, imported: ['mine'] });
-    expect(readFileSync(join(h.repo, 'aip', 'workflows', 'mine.yaml'), 'utf8')).toBe(text);
+    expect(readFileSync(join(h.repo, 'aip', 'pipelines', 'mine.yaml'), 'utf8')).toBe(text);
     expect(
-      await h.call('workflows_import', { repository: h.repo, source: lib, ids: ['mine'] }),
+      await h.call('pipelines_import', { repository: h.repo, source: lib, ids: ['mine'] }),
     ).toMatchObject({ ok: false, reason: 'conflict', ids: ['mine'] });
     expect(
-      await h.call('workflows_import', { repository: h.repo, source: lib, ids: ['lost'] }),
+      await h.call('pipelines_import', { repository: h.repo, source: lib, ids: ['lost'] }),
     ).toMatchObject({ ok: false, reason: 'invalid' });
     await expect(
-      h.call('workflows_import', { repository: h.repo, source: '/tmp/other', ids: ['mine'] }),
+      h.call('pipelines_import', { repository: h.repo, source: '/tmp/other', ids: ['mine'] }),
     ).rejects.toThrow(/unknown repository/);
     await expect(
-      h.call('workflows_import', { repository: h.repo, source: h.repo, ids: ['mine'] }),
+      h.call('pipelines_import', { repository: h.repo, source: h.repo, ids: ['mine'] }),
     ).rejects.toThrow(/another repository/);
   });
 });

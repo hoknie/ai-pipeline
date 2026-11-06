@@ -17,7 +17,7 @@ import {
   queueOf,
   runView,
   specialistEntry,
-  workflowsView,
+  pipelinesView,
 } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
@@ -79,7 +79,7 @@ describe('Api.forRepository', () => {
     );
   });
 
-  it('sends queue, config, workflow and delete requests with the repository', async () => {
+  it('sends queue, config, pipeline and delete requests with the repository', async () => {
     const fetched: { url: string; method: string }[] = [];
     vi.stubGlobal(
       'fetch',
@@ -94,7 +94,7 @@ describe('Api.forRepository', () => {
       await api.queue();
       await api.queuePause();
       await api.config();
-      await api.workflows();
+      await api.pipelines();
       await api.deleteSpecialist('coder', 'r1');
       await httpApi.queue();
       const repository = 'repository=%2Fwork%2Flib';
@@ -102,7 +102,7 @@ describe('Api.forRepository', () => {
         { url: `/api/queue?${repository}`, method: 'GET' },
         { url: `/api/queue/pause?${repository}`, method: 'POST' },
         { url: `/api/config?${repository}`, method: 'GET' },
-        { url: `/api/workflows?${repository}`, method: 'GET' },
+        { url: `/api/pipelines?${repository}`, method: 'GET' },
         {
           url: `/api/config/specialists/coder?revision=r1&${repository}`,
           method: 'DELETE',
@@ -135,9 +135,9 @@ function twoRepositories(overrides: Partial<Api> = {}) {
           specialists: [specialistEntry(lib ? 'writer' : 'coder')],
         });
       },
-      workflows: async () => {
-        await scoped.workflows();
-        return workflowsView({ repository: lib ? LIB : APP });
+      pipelines: async () => {
+        await scoped.pipelines();
+        return pipelinesView({ repository: lib ? LIB : APP });
       },
     };
   };
@@ -264,7 +264,7 @@ describe('repository selector', () => {
     ]);
   });
 
-  it('shows the specialists and workflows of the chosen repository', async () => {
+  it('shows the specialists and pipelines of the chosen repository', async () => {
     window.location.hash = '#specialists';
     const { api, base } = twoRepositories();
     render(<App api={api} openStream={openFake} />);
@@ -280,7 +280,7 @@ describe('repository selector', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
     await waitFor(() => expect(calls).toContainEqual(['config', LIB]));
     fireEvent.click(screen.getByRole('link', { name: 'Topology' }));
-    await waitFor(() => expect(calls).toContainEqual(['workflows', LIB]));
+    await waitFor(() => expect(calls).toContainEqual(['pipelines', LIB]));
   });
 
   it('asks before switching away from a form with unsaved edits', async () => {
@@ -321,7 +321,7 @@ describe('repository selector', () => {
     await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: lib'));
     await waitFor(() =>
       expect((base as Api & { calls: [string, string | null][] }).calls).toContainEqual([
-        'workflows',
+        'pipelines',
         LIB,
       ]),
     );

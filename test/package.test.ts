@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { configFromFiles, findWorkflow } from '../src/config/index.ts';
+import { configFromFiles, findPipeline } from '../src/config/index.ts';
 
 const root = join(import.meta.dirname, '..');
 
@@ -52,16 +52,16 @@ describe('npm package', () => {
     expect(mod.version).toBe(manifest.version);
   });
 
-  it('the starter template is a valid configuration with a two step feature workflow', () => {
+  it('the starter template is a valid configuration with a two step feature pipeline', () => {
     const config = configFromFiles({
       settings: template('settings.yaml'),
       specialists: {
         coder: template('specialists/coder.yaml'),
         reviewer: template('specialists/reviewer.yaml'),
       },
-      workflows: { feature: template('workflows/feature.yaml') },
+      pipelines: { feature: template('pipelines/feature.yaml') },
     });
-    expect(findWorkflow(config, 'feature')?.steps.map((step) => step.id)).toEqual([
+    expect(findPipeline(config, 'feature')?.steps.map((step) => step.id)).toEqual([
       'code',
       'review',
     ]);

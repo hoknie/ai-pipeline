@@ -7,7 +7,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | Page | What it covers |
 |---|---|
 | [getting-started/install.md](getting-started/install.md) | installing, connecting hosts, updating, removing, common problems |
-| [getting-started/concepts.md](getting-started/concepts.md) | how a run works: specialists, workflows, groups, steps, the queue, delivery, the daemon |
+| [getting-started/concepts.md](getting-started/concepts.md) | how a run works: specialists, pipelines, groups, steps, the queue, delivery, the daemon |
 
 ## Configuring
 
@@ -15,7 +15,8 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 |---|---|
 | [configuration/README.md](configuration/README.md) | the `aip/` directory, shared and project levels, `settings.yaml`, `defaults`, the `web` section |
 | [configuration/specialists.md](configuration/specialists.md) | the fields of a specialist: prompt, model, limits, skills, tools, MCP servers, queueing tasks, tags |
-| [configuration/workflows.md](configuration/workflows.md) | steps, verdicts, returns, human review, questions, splitting a task into groups |
+| [configuration/pipelines.md](configuration/pipelines.md) | steps, verdicts, returns, human review, questions, splitting a task into groups |
+| [configuration/actions.md](configuration/actions.md) | pipeline actions: commands and specialist steps around the split and the delivery, points, environment |
 | [configuration/permissions.md](configuration/permissions.md) | permission levels, `claude.edit_mode`, denied commands and how to allow them |
 | [configuration/delivery.md](configuration/delivery.md) | how a result reaches you: modes, safety, conflicts and the resolver, commit messages |
 | [configuration/runtimes.md](configuration/runtimes.md) | which agent CLI starts and how: `runtimes`, `claude.mcp`, `claude.settings` |

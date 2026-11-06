@@ -66,7 +66,7 @@ const view = () =>
         { name: 'Project plan' },
       ),
     ],
-    workflows: [],
+    pipelines: [],
   });
 
 function show(overrides: Partial<Api> = {}, hash = '#settings/global/specialists') {
@@ -81,11 +81,11 @@ function show(overrides: Partial<Api> = {}, hash = '#settings/global/specialists
           projects: [
             {
               repository: '/work/app',
-              references: [{ workflow: 'feature', step: 'test' }, { field: 'delivery.resolver' }],
+              references: [{ pipeline: 'feature', step: 'test' }, { field: 'delivery.resolver' }],
             },
-            { repository: '/work/lib', references: [{ workflow: 'feature', split: true }] },
+            { repository: '/work/lib', references: [{ pipeline: 'feature', split: true }] },
           ],
-          global: [{ workflow: 'quick', step: 'check' }],
+          global: [{ pipeline: 'quick', step: 'check' }],
         }),
         usageOf('writer'),
         usageOf('plan'),
@@ -305,7 +305,7 @@ describe('usage of a shared specialist', () => {
         directory: '/xdg/aip/specialists',
         specialists: [
           usageOf('writer', {
-            projects: [{ repository: '/work/lib', references: [{ workflow: 'f', step: 's' }] }],
+            projects: [{ repository: '/work/lib', references: [{ pipeline: 'f', step: 's' }] }],
           }),
         ],
       });
@@ -316,7 +316,7 @@ describe('usage of a shared specialist', () => {
           ok: false as const,
           reason: 'invalid' as const,
           errors: [],
-          references: [{ workflow: 'f', step: 's', repository: '/work/lib' }],
+          references: [{ pipeline: 'f', step: 's', repository: '/work/lib' }],
         })),
       },
       '#settings/global/specialists/writer',

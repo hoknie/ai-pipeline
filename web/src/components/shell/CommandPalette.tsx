@@ -8,7 +8,7 @@ import { LANGUAGES, useLanguage, type LanguageChoice } from '../../i18n/index.ts
 import { SECTIONS } from '../../sections.ts';
 import type { Route } from '../../route.ts';
 import { runStatusLabel } from '../../status.ts';
-import type { EditorSpecialist, EditorWorkflow, RunView } from '../../types.ts';
+import type { EditorSpecialist, EditorPipeline, RunView } from '../../types.ts';
 import {
   CommandDialog,
   CommandEmpty,
@@ -18,16 +18,16 @@ import {
   CommandList,
 } from '../../ui/command.tsx';
 import { orderGroups } from '../order.ts';
-import { WorkflowBadge } from '../WorkflowBadge.tsx';
-import { rawName } from '../workflowName.ts';
+import { PipelineBadge } from '../PipelineBadge.tsx';
+import { rawName } from '../pipelineName.ts';
 
 interface Entries {
-  workflows: EditorWorkflow[];
+  pipelines: EditorPipeline[];
   specialists: EditorSpecialist[];
 }
 
 /**
- * Palette of commands: sections, runs (waiting ones first), groups, workflows, specialists,
+ * Palette of commands: sections, runs (waiting ones first), groups, pipelines, specialists,
  * actions and languages. Sections and actions are searched by their labels in the active language.
  */
 export function CommandPalette({
@@ -53,8 +53,8 @@ export function CommandPalette({
   useEffect(() => {
     if (!open || entries) return;
     api.config().then(
-      (config) => setEntries({ workflows: config.workflows, specialists: config.specialists }),
-      () => setEntries({ workflows: [], specialists: [] }),
+      (config) => setEntries({ pipelines: config.pipelines, specialists: config.specialists }),
+      () => setEntries({ pipelines: [], specialists: [] }),
     );
   }, [open, entries, api]);
 
@@ -97,7 +97,7 @@ export function CommandPalette({
           {sorted.map((run) => (
             <CommandItem
               key={run.id}
-              value={`${t('palette.run')} ${taskNumber(run.number)} ${runTitle(run)} ${run.id} ${run.workflowName} ${run.workflow}`}
+              value={`${t('palette.run')} ${taskNumber(run.number)} ${runTitle(run)} ${run.id} ${run.pipelineName} ${run.pipeline}`}
               onSelect={() => go({ view: 'runs', run: run.id, group: null, step: null, tab: null })}
             >
               <span className="truncate">
@@ -107,7 +107,7 @@ export function CommandPalette({
                 {runTitle(run)}
               </span>
               <span className="ml-auto flex items-center gap-2">
-                <WorkflowBadge id={run.workflow} name={run.workflowName} focusable={false} />
+                <PipelineBadge id={run.pipeline} name={run.pipelineName} focusable={false} />
                 <span className="text-xs text-muted-foreground">{runStatusLabel(run, t)}</span>
               </span>
             </CommandItem>
@@ -128,16 +128,16 @@ export function CommandPalette({
             ))}
           </CommandGroup>
         ) : null}
-        {entries && entries.workflows.length > 0 ? (
-          <CommandGroup heading={t('palette.workflows')}>
-            {entries.workflows.map((workflow) => {
-              const name = rawName(workflow.raw) ?? workflow.id;
+        {entries && entries.pipelines.length > 0 ? (
+          <CommandGroup heading={t('palette.pipelines')}>
+            {entries.pipelines.map((pipeline) => {
+              const name = rawName(pipeline.raw) ?? pipeline.id;
               return (
                 <CommandItem
-                  key={workflow.id}
-                  value={`${t('palette.workflows')} ${name} ${workflow.id}`}
-                  title={workflow.id}
-                  onSelect={() => go(to('workflows', workflow.id))}
+                  key={pipeline.id}
+                  value={`${t('palette.pipelines')} ${name} ${pipeline.id}`}
+                  title={pipeline.id}
+                  onSelect={() => go(to('pipelines', pipeline.id))}
                 >
                   {name}
                 </CommandItem>

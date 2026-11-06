@@ -34,9 +34,9 @@ function mount(runs = [runView()], extra: Parameters<typeof fakeApi>[0] = {}) {
   return api;
 }
 
-describe('workflow badge in the palette', () => {
+describe('pipeline badge in the palette', () => {
   it('shows the badge on a run item', async () => {
-    mount([runView({ id: 'a', title: 'First run', workflow: 'feature' })]);
+    mount([runView({ id: 'a', title: 'First run', pipeline: 'feature' })]);
     openPalette();
     const badge = (await screen.findAllByLabelText('Pipeline: feature')).find((node) =>
       node.closest('[cmdk-item]'),
@@ -114,11 +114,11 @@ describe('command palette', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
-  it('loads workflows and specialists once, when the palette is first opened', async () => {
+  it('loads pipelines and specialists once, when the palette is first opened', async () => {
     const api = mount([runView()], {
       config: vi.fn(async () =>
         configView({
-          workflows: [
+          pipelines: [
             {
               id: 'feature',
               level: 'project',
@@ -149,7 +149,7 @@ describe('command palette', () => {
     mount([runView()], {
       config: vi.fn(async () =>
         configView({
-          workflows: [
+          pipelines: [
             {
               id: 'feature',
               level: 'project',

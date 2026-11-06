@@ -44,7 +44,7 @@ export type AipRun = {
   waiting?: number;
   diff?: AipDiff | null;
   repository: string;
-  workflow: string;
+  pipeline: string;
   branch: string;
   createdAt: number;
   finishedAt: number | null;
