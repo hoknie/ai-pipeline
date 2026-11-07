@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TagsProvider } from '../src/tags.tsx';
-import { RunList } from '../src/components/runs/RunList.tsx';
+import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
+import { RunList } from '../src/features/runs/list/RunList.tsx';
 import {
   activeFilters,
   EMPTY_FILTERS,
@@ -13,10 +13,10 @@ import {
   RUN_STATES,
   runSpecialists,
   type RunFilterState,
-} from '../src/components/runs/runFilter.ts';
+} from '../src/features/runs/list/runFilter.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
-import type { RunView } from '../src/types.ts';
+import type { RunView } from '../src/shared/api/types.ts';
 import { groupRow, runView, tagView } from './fixtures.ts';
 
 beforeEach(() => window.localStorage.clear());

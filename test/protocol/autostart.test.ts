@@ -7,17 +7,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { lockPath, socketPath } from '../../src/platform/paths/index.ts';
 import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
+import { currentBuild, fingerprintTree, type BuildInfo } from '../../src/platform/build/index.ts';
 import {
-  currentBuild,
   daemonMismatchMessage,
   ensureDaemon,
-  fingerprintTree,
   pingDaemon,
   request,
   stopDaemon,
-  type BuildInfo,
-  type RunCreated,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/client/index.ts';
+import type { RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 import { harness, startRun, type Harness } from '../daemon/harness.ts';
 
 const root = join(import.meta.dirname, '..', '..');

@@ -2,8 +2,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { clock } from '../src/format.ts';
+import { App } from '../src/app/App.tsx';
+import { clock } from '../src/shared/lib/format.ts';
 
 import {
   FakeEventSource,

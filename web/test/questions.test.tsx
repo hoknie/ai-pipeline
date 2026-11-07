@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { answerText, questionKey } from '../src/format.ts';
+import { answerText, questionKey } from '../src/shared/lib/format.ts';
 
 describe('answerText', () => {
   it('numbers questions and answers and separates them with a blank line', () => {

@@ -1,9 +1,9 @@
 import { cleanup, render as baseRender, type RenderOptions } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { ConfirmProvider } from '../src/confirm.tsx';
-import { Toaster } from '../src/ui/toaster.tsx';
-import { TooltipProvider } from '../src/ui/tooltip.tsx';
+import { ConfirmProvider } from '../src/shared/ui/overlays/confirm.tsx';
+import { Toaster } from '../src/shared/ui/feedback/toaster.tsx';
+import { TooltipProvider } from '../src/shared/ui/feedback/tooltip.tsx';
 
 function Providers({ children }: { children: ReactNode }) {
   return (

@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { request } from '../../src/protocol/index.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
 import { MANUAL_CONFIG, PIPELINE_CONFIG } from '../daemon/harness.ts';
 import { aip, fakes, main, ownDaemon, root, runOf, sandbox, waitUntil } from './sandbox.ts';
 

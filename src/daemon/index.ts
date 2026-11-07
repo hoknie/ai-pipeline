@@ -1,4 +1,4 @@
-export { Daemon, type DaemonOptions, type DaemonParts, type PanelControl } from './daemon.ts';
+export { Daemon, type DaemonOptions, type DaemonParts } from './daemon.ts';
 export type { DaemonRepositories } from './repositories.ts';
 export { DEFAULT_TIMINGS, type DaemonTimings } from './timings.ts';
 export { Executor } from './executor.ts';

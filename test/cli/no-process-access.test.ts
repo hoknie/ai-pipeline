@@ -3,7 +3,8 @@ import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-const cli = join(import.meta.dirname, '..', '..', 'src', 'cli');
+const src = join(import.meta.dirname, '..', '..', 'src');
+const roots = [join(src, 'presentation', 'cli'), join(src, 'presentation', 'web')];
 
 function sources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -26,16 +27,22 @@ const FORBIDDEN = [
   'console.log(',
 ];
 
-describe('src/cli outside main.ts', () => {
-  const files = sources(cli).filter((file) => relative(cli, file) !== 'main.ts');
+describe('src/cli', () => {
+  it('holds only the entry point', () => {
+    expect(readdirSync(join(src, 'cli'))).toEqual(['main.ts']);
+  });
+});
 
-  it('finds the sources of the CLI', () => {
+describe('src/presentation/cli and src/presentation/web', () => {
+  const files = roots.flatMap(sources);
+
+  it('finds the sources of the CLI and the panel', () => {
     expect(files.length).toBeGreaterThan(10);
   });
 
   it.each(FORBIDDEN)('does not use %s', (pattern) => {
     const offenders = files.filter((file) => readFileSync(file, 'utf8').includes(pattern));
-    expect(offenders.map((file) => relative(cli, file))).toEqual([]);
+    expect(offenders.map((file) => relative(src, file))).toEqual([]);
   });
 
   it('keeps no module-level style of the call', () => {

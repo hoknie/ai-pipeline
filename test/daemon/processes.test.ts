@@ -12,10 +12,10 @@ import {
 } from '../../src/platform/process/index.ts';
 import {
   streamEventSchema,
-  subscribe,
   type BackgroundProcessesView,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 import { alive, run, start } from './control-harness.ts';
 import { harness, until, type Harness } from './harness.ts';
 

@@ -15,8 +15,8 @@ import {
 } from '../../src/feature/observers/types/index.ts';
 import { dispatch, transition } from '../../src/feature/runs/machine/index.ts';
 import type { GroupWait } from '../../src/feature/runs/types/index.ts';
+import { formatRepositories } from '../../src/presentation/format/index.ts';
 import {
-  formatRepositories,
   groupView,
   observersView,
   pickSpecChange,
@@ -26,7 +26,7 @@ import {
   runView,
   systemGroups,
   withQueue,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/views/index.ts';
 import { CONFIG_TEXT, finish, group, run, step } from '../feature/runs/helpers.ts';
 
 const SPLIT_CONFIG = CONFIG_TEXT.replace(

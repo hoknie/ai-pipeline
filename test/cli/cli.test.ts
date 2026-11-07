@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { request } from '../../src/protocol/index.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
 import { PIPELINE_CONFIG } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { aip, runOf, sandbox, waitUntil } from './sandbox.ts';

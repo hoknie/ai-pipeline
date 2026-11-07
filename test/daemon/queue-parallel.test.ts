@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type QueueView,
   type RunCreated,
   type RunQueued,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { settle, MANUAL_CONFIG, PIPELINE_CONFIG, startRun, type Harness } from './harness.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';

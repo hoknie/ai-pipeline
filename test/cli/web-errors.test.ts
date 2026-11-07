@@ -5,10 +5,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PanelError, renderPanelError, type PanelKind } from '../../src/cli/web/errors.ts';
+import { PanelError, renderPanelError, type PanelKind } from '../../src/presentation/web/errors.ts';
 import { appError, rejected } from '../../src/platform/errors/index.ts';
-import { DaemonUnavailable, IpcError } from '../../src/protocol/index.ts';
-import { startWebServer, type WebServer } from '../../src/cli/web/server.ts';
+import { DaemonUnavailable, IpcError } from '../../src/presentation/ipc/client/index.ts';
+import { startWebServer, type WebServer } from '../../src/presentation/web/server.ts';
 
 let web: WebServer | null = null;
 let fake: Server | null = null;

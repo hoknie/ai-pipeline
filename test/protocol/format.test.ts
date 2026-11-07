@@ -11,12 +11,10 @@ import {
   formatRun,
   formatRunList,
   formatRunQueued,
-  groupView,
-  queueView,
-  runView,
   waitNote,
   pipelineLabel,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/format/index.ts';
+import { groupView, queueView, runView } from '../../src/presentation/ipc/views/index.ts';
 import { addItem, emptyQueue, itemStarted } from '../../src/feature/queue/types/index.ts';
 import { transition } from '../../src/feature/runs/machine/index.ts';
 import type { GroupWait } from '../../src/feature/runs/types/index.ts';
@@ -223,7 +221,7 @@ describe('text for people', () => {
       files: [
         { path: 'README.md', added: 1, removed: 0 },
         { path: 'logo.png', added: null, removed: null },
-        { path: 'src/cli/web/server.ts', added: 366, removed: 2 },
+        { path: 'src/presentation/web/server.ts', added: 366, removed: 2 },
       ],
       added: 367,
       removed: 2,
@@ -238,7 +236,7 @@ describe('text for people', () => {
         'Changes: 3 files +367 −2',
         '  README.md +1 −0',
         '  logo.png (binary)',
-        '  src/cli/web/server.ts +366 −2',
+        '  src/presentation/web/server.ts +366 −2',
       ].join('\n'),
     );
   });

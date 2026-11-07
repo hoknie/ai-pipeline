@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { TagLabel } from '../src/components/TagChip.tsx';
-import { PipelineBadge } from '../src/components/PipelineBadge.tsx';
+import { TagLabel } from '../src/shared/ui/feedback/TagChip.tsx';
+import { PipelineBadge } from '../src/shared/ui/feedback/PipelineBadge.tsx';
 
 import { cleanup, fireEvent, render, screen } from './render.tsx';
 

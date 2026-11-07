@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { databasePath } from '../../src/platform/paths/index.ts';
-import { requestSchema } from '../../src/protocol/index.ts';
+import { requestSchema } from '../../src/presentation/ipc/contract/index.ts';
 import { openStorage } from '../feature/storage.ts';
 import { run } from '../feature/runs/helpers.ts';
 

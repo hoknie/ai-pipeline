@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useGroupSpec } from '../src/components/runs/useGroupSpec.ts';
+import { useGroupSpec } from '../src/features/runs/group/useGroupSpec.ts';
 
-import { App } from '../src/App.tsx';
-import { taskProgress } from '../src/components/runs/taskProgress.ts';
-import { SPEC_POLL_MS } from '../src/components/runs/useGroupSpec.ts';
-import { formatRoute, parseRoute } from '../src/route.ts';
-import type { GroupSpecView } from '../src/types.ts';
+import { App } from '../src/app/App.tsx';
+import { taskProgress } from '../src/features/runs/group/taskProgress.ts';
+import { SPEC_POLL_MS } from '../src/features/runs/group/useGroupSpec.ts';
+import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
+import type { GroupSpecView } from '../src/shared/api/types.ts';
 
 import { FakeEventSource, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
 import {

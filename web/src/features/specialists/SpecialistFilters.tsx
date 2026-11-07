@@ -1,0 +1,92 @@
+import { useTranslation } from 'react-i18next';
+
+import {
+  LIST_FIELDS,
+  type FilterOptions,
+  type LevelFilter,
+  type SpecialistFilter,
+} from './specialistFilters.ts';
+import { Input } from '../../shared/ui/forms/input.tsx';
+import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
+
+import { ValuesPicker, type PickerOption } from '../../shared/ui/forms/ValuesPicker.tsx';
+
+const LEVELS: LevelFilter[] = ['all', 'project', 'global'];
+
+/** Search, level and the multiselects of the specialists list; chosen values are alternatives. */
+export function SpecialistFilters({
+  filter,
+  options,
+  search,
+  onFilter,
+  onSearch,
+}: {
+  filter: SpecialistFilter;
+  options: FilterOptions;
+  search: string;
+  onFilter: (filter: SpecialistFilter) => void;
+  onSearch: (search: string) => void;
+}) {
+  const { t } = useTranslation();
+  const plain = (names: string[]): PickerOption[] =>
+    names.map((name) => ({ name, source: 'project' }));
+  return (
+    <div className="flex flex-col gap-2">
+      <Input
+        type="search"
+        aria-label={t('specialists.filters.search')}
+        placeholder={t('specialists.filters.search')}
+        value={search}
+        onChange={(event) => onSearch(event.target.value)}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <ToggleGroup
+          type="single"
+          aria-label={t('specialists.filters.level')}
+          value={filter.level}
+          onValueChange={(value) => {
+            if (value) onFilter({ ...filter, level: value as LevelFilter });
+          }}
+        >
+          {LEVELS.map((level) => (
+            <ToggleGroupItem key={level} value={level}>
+              {t(`specialists.filters.levels.${level}`)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      {options.tags.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">{t('specialists.filters.tags')}</span>
+          <ValuesPicker
+            label={t('specialists.filters.tags')}
+            values={filter.tags}
+            onChange={(tags) => onFilter({ ...filter, tags })}
+            options={options.tags.map((tag) => ({
+              name: tag.name,
+              source: tag.shared ? 'global' : 'project',
+            }))}
+            creatable={false}
+            headings={{
+              global: t('specialists.tags.shared'),
+              project: t('specialists.tags.own'),
+            }}
+          />
+        </div>
+      ) : null}
+      {LIST_FIELDS.filter((field) => options[field].length > 0).map((field) => (
+        <div key={field} className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">{t(`specialists.filters.${field}`)}</span>
+          <ValuesPicker
+            label={t(`specialists.filters.${field}`)}
+            values={filter[field]}
+            onChange={(values) => onFilter({ ...filter, [field]: values })}
+            options={plain(options[field])}
+            creatable={false}
+            headings={{ project: '' }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}

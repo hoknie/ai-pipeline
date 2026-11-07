@@ -2,24 +2,24 @@
 import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import { Attempt } from '../src/components/runs/Attempt.tsx';
-import { RunDecisions } from '../src/components/runs/RunDecisions.tsx';
-import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
-import { TagsProvider } from '../src/tags.tsx';
-import { RunHeader } from '../src/components/runs/RunHeader.tsx';
-import { RunList } from '../src/components/runs/RunList.tsx';
-import { navRunCounts } from '../src/components/runs/runFilter.ts';
-import { notificationItems } from '../src/notifications.ts';
+import { App } from '../src/app/App.tsx';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import { Attempt } from '../src/features/runs/group/Attempt.tsx';
+import { RunDecisions } from '../src/features/runs/list/RunDecisions.tsx';
+import { EMPTY_FILTERS } from '../src/features/runs/list/runFilter.ts';
+import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
+import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
+import { RunList } from '../src/features/runs/list/RunList.tsx';
+import { navRunCounts } from '../src/features/runs/list/runFilter.ts';
+import { notificationItems } from '../src/app/notifications.ts';
 import {
   parseObserversView,
   repairOf,
   type RunRepair,
   type ObserverSettings,
-} from '../src/observerTypes.ts';
-import { statusInfo } from '../src/status.ts';
-import type { RunView } from '../src/types.ts';
+} from '../src/shared/api/observerTypes.ts';
+import { statusInfo } from '../src/shared/lib/status.ts';
+import type { RunView } from '../src/shared/api/types.ts';
 
 import {
   FakeEventSource,
@@ -81,7 +81,7 @@ describe('the observers as the panel reads them', () => {
   it('reads the answers of GET and PUT through the same check', async () => {
     const answer = (status: number, body: unknown) =>
       vi.fn(async () => new Response(JSON.stringify(body), { status }));
-    const { httpApi: api } = await import('../src/api.ts');
+    const { httpApi: api } = await import('../src/shared/api/api.ts');
     vi.stubGlobal('fetch', answer(200, { settings: {} }));
     await expect(api.observers()).rejects.toMatchObject({ status: 502 });
     await expect(api.setObservers(observersView().settings)).rejects.toMatchObject({ status: 502 });

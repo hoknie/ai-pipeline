@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { Api } from '../src/api.ts';
-import { DeliveryFields } from '../src/components/settings/DeliveryFields.tsx';
-import { SettingsTarget } from '../src/components/settings/SettingsTarget.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import { DeliveryFields } from '../src/features/settings/DeliveryFields.tsx';
+import { SettingsTarget } from '../src/features/settings/SettingsTarget.tsx';
 import { cleanup, render, screen } from './render.tsx';
 
 // The guard in setup.ts fails a test when a select switches between uncontrolled and controlled.

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
+import { EMPTY_FILTERS } from '../src/features/runs/list/runFilter.ts';
 import i18next from 'i18next';
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { TagsProvider } from '../src/tags.tsx';
-import { RunList } from '../src/components/runs/RunList.tsx';
+import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
+import { RunList } from '../src/features/runs/list/RunList.tsx';
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 import { groupRow, runView, tagView } from './fixtures.ts';
 

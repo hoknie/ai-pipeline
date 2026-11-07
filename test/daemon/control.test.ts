@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { writeConfigDirectory } from '../fixtures/config.ts';
-import type { RunView } from '../../src/protocol/index.ts';
+import type { RunView } from '../../src/presentation/ipc/contract/index.ts';
 import { CODE_ONLY_CONFIG, settle, PIPELINE_CONFIG, statuses, until } from './harness.ts';
 import { SHORT_TIMEOUT, alive, calls, run, start } from './control-harness.ts';
 

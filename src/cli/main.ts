@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
 
-import type { CliIo } from './io.ts';
-import { runCli } from './program.ts';
+import type { CliIo } from '../presentation/cli/io.ts';
+import { runCli } from '../presentation/cli/program.ts';
 
 const io: CliIo = {
   cwd: process.cwd(),

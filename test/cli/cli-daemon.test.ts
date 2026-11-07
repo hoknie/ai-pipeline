@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { request } from '../../src/protocol/index.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
 import { PIPELINE_CONFIG } from '../daemon/harness.ts';
 import {
   aip as aipFast,

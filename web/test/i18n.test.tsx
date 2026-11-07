@@ -2,14 +2,14 @@
 import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { files, when } from '../src/format.ts';
-import { applyStoredLanguage, detectLanguage, LANGUAGES } from '../src/i18n/index.ts';
-import { en } from '../src/i18n/locales/en.ts';
-import { es } from '../src/i18n/locales/es.ts';
-import { ru } from '../src/i18n/locales/ru.ts';
-import { zh } from '../src/i18n/locales/zh.ts';
-import type { Dictionary } from '../src/i18n/types.ts';
+import { App } from '../src/app/App.tsx';
+import { files, when } from '../src/shared/lib/format.ts';
+import { applyStoredLanguage, detectLanguage, LANGUAGES } from '../src/shared/i18n/index.ts';
+import { en } from '../src/shared/i18n/locales/en.ts';
+import { es } from '../src/shared/i18n/locales/es.ts';
+import { ru } from '../src/shared/i18n/locales/ru.ts';
+import { zh } from '../src/shared/i18n/locales/zh.ts';
+import type { Dictionary } from '../src/shared/i18n/types.ts';
 
 import { FakeEventSource, configView, fakeApi, groupView, openFake, runView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';

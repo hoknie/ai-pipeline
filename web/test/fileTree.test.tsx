@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { FileTree } from '../src/components/runs/FileTree.tsx';
-import { buildFileTree, reservedDiffRows } from '../src/components/runs/fileTree.ts';
+import { FileTree } from '../src/features/runs/files/FileTree.tsx';
+import { buildFileTree, reservedDiffRows } from '../src/features/runs/files/fileTree.ts';
 
 import { fakeApi } from './fixtures.ts';
 import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';

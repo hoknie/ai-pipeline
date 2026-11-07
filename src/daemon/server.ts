@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
 
-import { parseRequest, type Response } from '../protocol/index.ts';
+import { parseRequest, type Response } from '../presentation/ipc/contract/index.ts';
 
 import type { Daemon } from './daemon.ts';
 

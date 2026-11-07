@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { toast } from 'sonner';
 
-import { App } from '../src/App.tsx';
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import { DiffStat } from '../src/components/runs/DiffStat.tsx';
-import { RunHeader } from '../src/components/runs/RunHeader.tsx';
+import { App } from '../src/app/App.tsx';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import { DiffStat } from '../src/features/runs/files/DiffStat.tsx';
+import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
 
 import { FakeEventSource, fakeApi, groupRow, groupView, openFake, runView } from './fixtures.ts';
 import { setWindowWidth } from './media.ts';

@@ -1,4 +1,4 @@
-import type { BackgroundProcessView } from '../protocol/index.ts';
+import type { BackgroundProcessView } from '../presentation/ipc/contract/index.ts';
 import type { PsRow } from '../platform/process/index.ts';
 
 /** Pause between SIGTERM and SIGKILL of a terminated process tree. */

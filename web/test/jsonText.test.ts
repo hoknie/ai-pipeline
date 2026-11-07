@@ -5,7 +5,7 @@ import {
   parseJson,
   readableJson,
   readableSummary,
-} from '../src/components/jsonText.ts';
+} from '../src/features/runs/transcript/jsonText.ts';
 
 describe('parseJson', () => {
   it('returns objects and arrays only', () => {

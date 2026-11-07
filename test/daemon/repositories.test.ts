@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { RepositoryView, RunCreated } from '../../src/protocol/index.ts';
+import type { RepositoryView, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 
 import { harness, startRun, type Harness } from './harness.ts';
 

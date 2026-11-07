@@ -35,10 +35,10 @@ if (typeof window !== 'undefined') {
   // and costs hundreds of milliseconds, so it is paid here and not by the first test that opens one.
   // The pages that draw the pipeline graph are not loaded here: a test file may replace the graph.
   await Promise.all([
-    import('../src/components/NewTaskDialog.tsx'),
-    import('../src/components/QueuePage.tsx'),
-    import('../src/components/SpecialistsPage.tsx'),
-    import('../src/components/settings/SettingsPage.tsx'),
+    import('../src/features/queue/NewTaskDialog.tsx'),
+    import('../src/features/queue/QueuePage.tsx'),
+    import('../src/features/specialists/SpecialistsPage.tsx'),
+    import('../src/features/settings/SettingsPage.tsx'),
   ]);
   const { configure } = await import('@testing-library/react');
   configure({ asyncUtilTimeout: 5_000 });
@@ -59,7 +59,7 @@ if (typeof window !== 'undefined') {
     if (found.length > 0) throw new Error(found.join('\n'));
   });
   const { default: i18next } = await import('i18next');
-  await import('../src/i18n/index.ts');
+  await import('../src/shared/i18n/index.ts');
   // Only a file that draws the whole application needs it; the others test small pieces.
   const { readFileSync } = await import('node:fs');
   const { expect } = await import('vitest');

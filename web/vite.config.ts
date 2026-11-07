@@ -30,7 +30,7 @@ export default defineConfig({
               test: /node_modules\/(react-markdown|remark-|mdast-|micromark|hast-|unist-|unified|vfile|property-information)/,
               priority: 20,
             },
-            { name: 'locales', test: /web\/src\/i18n\/locales\//, priority: 20 },
+            { name: 'locales', test: /web\/src\/shared\/i18n\/locales\//, priority: 20 },
           ],
         },
       },

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { formatQueue, type QueueView, type RunView } from '../../src/protocol/index.ts';
+import { formatQueue } from '../../src/presentation/format/index.ts';
+import type { QueueView, RunView } from '../../src/presentation/ipc/contract/index.ts';
 import { settle, PIPELINE_CONFIG, git, until, type Harness } from './harness.ts';
 import { calls } from './control-harness.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { NotificationCenterState } from '../src/notifications.ts';
-import { NavSidebar, type NavProps } from '../src/components/shell/NavSidebar.tsx';
-import { MobileNav } from '../src/components/shell/MobileNav.tsx';
-import { AppShell } from '../src/components/shell/AppShell.tsx';
-import { TopNav } from '../src/components/shell/TopNav.tsx';
-import { TooltipProvider } from '../src/ui/tooltip.tsx';
+import type { NotificationCenterState } from '../src/app/notifications.ts';
+import { NavSidebar, type NavProps } from '../src/app/shell/nav/NavSidebar.tsx';
+import { MobileNav } from '../src/app/shell/nav/MobileNav.tsx';
+import { AppShell } from '../src/app/shell/AppShell.tsx';
+import { TopNav } from '../src/app/shell/nav/TopNav.tsx';
+import { TooltipProvider } from '../src/shared/ui/feedback/tooltip.tsx';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 

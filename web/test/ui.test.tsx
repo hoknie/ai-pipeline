@@ -2,17 +2,21 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../src/ui/collapsible.tsx';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '../src/shared/ui/layout/collapsible.tsx';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../src/ui/select.tsx';
-import { Input } from '../src/ui/input.tsx';
-import { Switch } from '../src/ui/switch.tsx';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../src/ui/tabs.tsx';
+} from '../src/shared/ui/forms/select.tsx';
+import { Input } from '../src/shared/ui/forms/input.tsx';
+import { Switch } from '../src/shared/ui/forms/switch.tsx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../src/shared/ui/layout/tabs.tsx';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +25,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '../src/ui/alert-dialog.tsx';
+} from '../src/shared/ui/overlays/alert-dialog.tsx';
 
 import { choose, cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
 

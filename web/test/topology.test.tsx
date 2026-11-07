@@ -3,9 +3,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from './rend
 import i18next from 'i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import TopologyPage from '../src/components/TopologyPage.tsx';
+import { App } from '../src/app/App.tsx';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import TopologyPage from '../src/features/topology/TopologyPage.tsx';
 import {
   FALLBACK_HEIGHT,
   RESOLVER_GAP,
@@ -14,10 +14,10 @@ import {
   stabilize,
   stabilizeEdges,
   type Size,
-} from '../src/components/topologyLayout.ts';
-import { pipelineStagesOf, type PipelineStage } from '../src/pipelineStages.ts';
-import { formatRoute, parseRoute } from '../src/route.ts';
-import { machineLoad } from '../src/specialistLoad.ts';
+} from '../src/features/topology/topologyLayout.ts';
+import { pipelineStagesOf, type PipelineStage } from '../src/shared/lib/pipeline/pipelineStages.ts';
+import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
+import { machineLoad } from '../src/shared/lib/pipeline/specialistLoad.ts';
 
 import {
   FakeEventSource,

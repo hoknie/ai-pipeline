@@ -12,7 +12,7 @@ import {
   removePanelState,
   writePanelState,
   type PanelState,
-} from '../../src/cli/web/state.ts';
+} from '../../src/presentation/web/panel/state.ts';
 
 const directory = (): string => mkdtempSync(join(tmpdir(), 'aip-web-state-'));
 

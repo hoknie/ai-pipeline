@@ -7,7 +7,7 @@ import {
   plainStyle,
   statusBadge,
   visibleWidth,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/format/index.ts';
 
 const base = { noColorFlag: false, env: {}, isTTY: false };
 

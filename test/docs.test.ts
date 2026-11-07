@@ -232,7 +232,7 @@ describe('documentation examples', () => {
 
   it('docs/getting-started/install.md names every flag of aip setup', () => {
     const install = readFileSync(join(root, 'docs/getting-started/install.md'), 'utf8');
-    const setup = readFileSync(join(root, 'src/cli/commands.ts'), 'utf8');
+    const setup = readFileSync(join(root, 'src/presentation/cli/commands/setup.ts'), 'utf8');
     const flags = [...setup.matchAll(/\.option\('(?:-\w, )?(--[\w-]+)/g)].map((m) => m[1]!);
     for (const flag of [
       '--yes',
@@ -362,7 +362,9 @@ describe('documentation structure', () => {
 
   it('README and the help footer lead to the docs index', () => {
     expect(readFileSync(join(root, 'README.md'), 'utf8')).toContain('(docs/README.md)');
-    expect(readFileSync(join(root, 'src/cli/help.ts'), 'utf8')).toContain('docs/README.md');
+    expect(readFileSync(join(root, 'src/presentation/cli/help.ts'), 'utf8')).toContain(
+      'docs/README.md',
+    );
   });
 
   it('prose lines are short', () => {

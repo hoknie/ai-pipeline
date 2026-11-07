@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { RunHeader } from '../src/components/runs/RunHeader.tsx';
+import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
 
 import { fakeApi, runView } from './fixtures.ts';
 import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cost } from '../src/format.ts';
+import { cost } from '../src/shared/lib/format.ts';
 
 describe('cost', () => {
   it('formats a positive cost', () => {

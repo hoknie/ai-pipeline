@@ -9,8 +9,8 @@ import {
   savedPipelineFilter,
   specialistsOfPipeline,
   pipelineFilterOptions,
-} from '../src/pipelineFilters.ts';
-import type { EditorPipeline } from '../src/types.ts';
+} from '../src/features/pipelines/pipelineFilters.ts';
+import type { EditorPipeline } from '../src/shared/api/types.ts';
 
 function pipeline(id: string, overrides: Partial<EditorPipeline> = {}): EditorPipeline {
   return {

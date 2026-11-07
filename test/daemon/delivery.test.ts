@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { databasePath } from '../../src/platform/paths/index.ts';
-import type { ApplyResult, RunCreated } from '../../src/protocol/index.ts';
+import type { ApplyResult, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 import { openStorage } from '../feature/storage.ts';
 
 import { POLL_MS, CODE_ONLY_CONFIG, git, harness, startRun, type Harness } from './harness.ts';

@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Api } from '../src/api.ts';
-import PipelinesPage from '../src/components/PipelinesPage.tsx';
-import type { ConfigEditorResponse, EditorSetting } from '../src/types.ts';
+import type { Api } from '../src/shared/api/api.ts';
+import PipelinesPage from '../src/features/pipelines/PipelinesPage.tsx';
+import type { ConfigEditorResponse, EditorSetting } from '../src/shared/api/types.ts';
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { configView, fakeApi, settingsOf, systemStagesView } from './fixtures.ts';

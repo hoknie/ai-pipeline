@@ -5,19 +5,17 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { DaemonUnavailable, IpcError, request } from '../../src/presentation/ipc/client/index.ts';
 import {
-  DaemonUnavailable,
   MESSAGE_TEXT_LIMIT,
   transcriptEntrySchema,
-  IpcError,
   parseRequest,
-  request,
   requestSchema,
   streamEventSchema,
   webStartResultSchema,
   webStatusResultSchema,
   webStopResultSchema,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
 
 describe('requests', () => {
   it('parses a group_spec request and rejects one without a group', () => {
@@ -209,7 +207,7 @@ describe('client', () => {
 
 describe('stream events', () => {
   it('parses snapshots and run events and rejects anything else', async () => {
-    const { streamEventSchema } = await import('../../src/protocol/index.ts');
+    const { streamEventSchema } = await import('../../src/presentation/ipc/contract/index.ts');
     expect(streamEventSchema.parse({ event: 'snapshot', seq: 1, runs: [{ id: 'r' }] }).event).toBe(
       'snapshot',
     );
@@ -500,7 +498,7 @@ describe('repository registry requests', () => {
   });
 
   it('parses snapshots with and without repositories and the repositories event', async () => {
-    const { streamEventSchema } = await import('../../src/protocol/index.ts');
+    const { streamEventSchema } = await import('../../src/presentation/ipc/contract/index.ts');
     expect(streamEventSchema.safeParse({ event: 'snapshot', seq: 1, runs: [] }).success).toBe(true);
     expect(
       streamEventSchema.safeParse({

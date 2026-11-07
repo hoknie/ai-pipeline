@@ -5,11 +5,15 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { PanelControl } from '../../src/daemon/index.ts';
-import { createDaemonPanel, type DaemonPanelController } from '../../src/cli/web/daemon-panel.ts';
-import { runStandbyPanel, type StandbyEnd } from '../../src/cli/web/standby.ts';
-import { panelStatePath, readPanelState } from '../../src/cli/web/state.ts';
-import type { systemView } from '../../src/cli/web/system.ts';
+import type { PanelControl } from '../../src/presentation/ipc/contract/index.ts';
+import {
+  createDaemonPanel,
+  type DaemonPanelController,
+} from '../../src/presentation/web/panel/daemon-panel.ts';
+import { settingsFrom, withSettings } from './settings.ts';
+import { runStandbyPanel, type StandbyEnd } from '../../src/presentation/web/panel/standby.ts';
+import { panelStatePath, readPanelState } from '../../src/presentation/web/panel/state.ts';
+import type { systemView } from '../../src/presentation/web/panel/system.ts';
 import { MANUAL_CONFIG, harness, until, type Harness } from '../daemon/harness.ts';
 
 const TOKEN = 'standby-token-0123456789';
@@ -55,11 +59,13 @@ async function stoppedDaemon(port: number): Promise<{ config: string }> {
     stop: () => controller!.stop(),
   };
   h = await harness(MANUAL_CONFIG, {}, { panel });
-  controller = createDaemonPanel({
-    stateDirectory: h.state,
-    socket: h.socket,
-    environment: { XDG_CONFIG_HOME: config },
-  });
+  controller = createDaemonPanel(
+    withSettings({
+      stateDirectory: h.state,
+      socket: h.socket,
+      environment: { XDG_CONFIG_HOME: config },
+    }),
+  );
   await h.running.close();
   return { config };
 }
@@ -76,7 +82,7 @@ describe('runStandbyPanel', () => {
       stateDirectory: h!.state,
       entry: ['node', 'aip.js'],
       environment: { XDG_CONFIG_HOME: config, AIP_WEB_TOKEN: TOKEN },
-      cwd: h!.repo,
+      readSettings: settingsFrom({ XDG_CONFIG_HOME: config, AIP_WEB_TOKEN: TOKEN }, h!.repo),
       pid: process.pid,
       log: (line) => void lines.push(line),
       stop: new Promise(() => undefined),
@@ -125,7 +131,7 @@ describe('runStandbyPanel', () => {
       stateDirectory: h!.state,
       entry: ['node', 'aip.js'],
       environment: { XDG_CONFIG_HOME: config, AIP_WEB_TOKEN: TOKEN },
-      cwd: h!.repo,
+      readSettings: settingsFrom({ XDG_CONFIG_HOME: config, AIP_WEB_TOKEN: TOKEN }, h!.repo),
       pid: process.pid,
       log: () => undefined,
       stop: new Promise((resolve) => {

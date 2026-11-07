@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { PanelControl } from '../../src/daemon/index.ts';
+import type { PanelControl } from '../../src/presentation/ipc/contract/index.ts';
 import {
   webStartResultSchema,
   webStatusResultSchema,
   webStopResultSchema,
   type WebStatusResult,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
 
 import { harness, type Harness } from './harness.ts';
 

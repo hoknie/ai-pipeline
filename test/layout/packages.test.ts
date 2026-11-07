@@ -69,7 +69,8 @@ describe('packageViolations', () => {
   });
 
   it('keeps old folders in the table', () => {
-    expect(paths({ 'protocol/a.ts': using('zod'), 'daemon/b.ts': using('zod') })).toEqual([
+    expect(paths({ 'cli/a.ts': using('zod'), 'daemon/b.ts': using('zod') })).toEqual([
+      'cli/a.ts',
       'daemon/b.ts',
     ]);
   });

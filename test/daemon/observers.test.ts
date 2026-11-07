@@ -5,13 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type ObserversView,
   type QueueView,
   type RunCreated,
   type RunView,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
 import { CODE_ONLY_CONFIG, harness, settle, startRun, until, type Harness } from './harness.ts';
 

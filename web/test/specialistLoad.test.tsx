@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadSections, machineLoad } from '../src/specialistLoad.ts';
+import { loadSections, machineLoad } from '../src/shared/lib/pipeline/specialistLoad.ts';
 
 import { runView, specialistUse } from './fixtures.ts';
 

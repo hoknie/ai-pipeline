@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { stepIds } from '../src/components/stepIds.ts';
+import { stepIds } from '../src/features/pipelines/stepIds.ts';
 
 const auto = (specialist: string) => ({ specialist, autoId: true, fixedId: '' });
 const own = (specialist: string, fixedId: string) => ({ specialist, autoId: false, fixedId });

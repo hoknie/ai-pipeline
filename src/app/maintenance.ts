@@ -4,6 +4,11 @@ import { databasePath } from '../platform/paths/index.ts';
 import { Database } from '../platform/sqlite/index.ts';
 import { FinishedRunRepository, RunRepository } from '../feature/runs/repositories/index.ts';
 import type { RunState } from '../feature/runs/types/index.ts';
+import type {
+  Runtime as RuntimeName,
+  RuntimeSettings,
+} from '../feature/swarm-config/types/index.ts';
+import { runtimeFor } from '../runtime/index.ts';
 
 /** The runs of the state directory, read without a daemon. */
 export interface Maintenance {
@@ -35,4 +40,13 @@ export function openMaintenance(stateDirectory: string): Maintenance {
     finishedRuns: () => (opened || existsSync(path) ? open().finished.finishedRuns() : []),
     close: () => opened?.database.close(),
   };
+}
+
+/** The executable an agent CLI is started with, as the environment and the settings say. */
+export function agentExecutable(
+  name: RuntimeName,
+  environment: NodeJS.ProcessEnv,
+  settings: RuntimeSettings,
+): string {
+  return runtimeFor(name, environment, settings).executable;
 }

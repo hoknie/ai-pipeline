@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type RunCreated,
   type RunView,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
 import { harness, startRun, type Harness } from './harness.ts';
 

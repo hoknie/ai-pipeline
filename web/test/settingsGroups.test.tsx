@@ -7,8 +7,8 @@ import {
   errorsByGroup,
   groupOf,
   settingsLocationOf,
-} from '../src/settingsGroups.ts';
-import { formatRoute, parseRoute } from '../src/route.ts';
+} from '../src/shared/lib/nav/settingsGroups.ts';
+import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 
 describe('groups of settings', () => {
   it('has the groups of both tabs', () => {

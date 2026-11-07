@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { RunList } from '../src/components/runs/RunList.tsx';
-import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
-import { useNotificationCenter } from '../src/notifications.ts';
-import { useRuns } from '../src/store.ts';
-import { useNearEnd } from '../src/useNearEnd.ts';
-import { TagsProvider } from '../src/tags.tsx';
+import { App } from '../src/app/App.tsx';
+import { RunList } from '../src/features/runs/list/RunList.tsx';
+import { EMPTY_FILTERS } from '../src/features/runs/list/runFilter.ts';
+import { useNotificationCenter } from '../src/app/notifications.ts';
+import { useRuns } from '../src/shared/api/runs/useRuns.ts';
+import { useNearEnd } from '../src/shared/lib/browser/useNearEnd.ts';
+import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
 
 import { FakeEventSource, fakeApi, groupRow, openFake, runView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from './render.tsx';

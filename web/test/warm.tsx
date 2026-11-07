@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
 import { vi } from 'vitest';
-import { App } from '../src/App.tsx';
+import { App } from '../src/app/App.tsx';
 import { fakeApi, openFake } from './fixtures.ts';
 
 /**

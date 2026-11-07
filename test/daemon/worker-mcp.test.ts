@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { QueueView, RunCreated } from '../../src/protocol/index.ts';
+import type { QueueView, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 
 import { PIPELINE_CONFIG, startRun, type Harness } from './harness.ts';
 import { queueOf, start } from './queue-harness.ts';

@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { FilterSelect } from '../src/components/FilterSelect.tsx';
-import '../src/i18n/index.ts';
+import { FilterSelect } from '../src/shared/ui/forms/FilterSelect.tsx';
+import '../src/shared/i18n/index.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 

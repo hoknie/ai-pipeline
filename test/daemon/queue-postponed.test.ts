@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type QueueView,
   type RunCreated,
   type RunQueued,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
-import { workerQueueAddParams } from '../../src/protocol/messages.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
+import { workerQueueAddParams } from '../../src/presentation/ipc/contract/index.ts';
 import { start, stop, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
 describe('fixed run goes first', () => {

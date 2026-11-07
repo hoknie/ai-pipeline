@@ -14,12 +14,25 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createDaemonPanel, startDaemonPanel } from '../../src/cli/web/daemon-panel.ts';
-import { readPanelState, writePanelState } from '../../src/cli/web/state.ts';
+import {
+  createDaemonPanel,
+  startDaemonPanel,
+} from '../../src/presentation/web/panel/daemon-panel.ts';
+import { settingsFrom, withSettings } from './settings.ts';
+import { readPanelState, writePanelState } from '../../src/presentation/web/panel/state.ts';
 import { databasePath } from '../../src/platform/paths/index.ts';
 import { openStorage } from '../feature/storage.ts';
-import { startWebServer, webTokenFromEnv, type WebServer } from '../../src/cli/web/server.ts';
-import type { GroupView, QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
+import {
+  startWebServer,
+  webTokenFromEnv,
+  type WebServer,
+} from '../../src/presentation/web/server.ts';
+import type {
+  GroupView,
+  QueueView,
+  RunCreated,
+  RunView,
+} from '../../src/presentation/ipc/contract/index.ts';
 import { MANUAL_CONFIG, harness, startRun, until, type Harness } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { waitValue } from '../fixtures/wait-until.ts';
@@ -2043,10 +2056,12 @@ describe('startDaemonPanel', () => {
     mkdirSync(join(config, 'aip'));
     writeFileSync(join(config, 'aip', 'settings.yaml'), settings);
     const lines: string[] = [];
+    const environment = { XDG_CONFIG_HOME: config, ...extra };
     const options = {
       stateDirectory: h.state,
       socket: h.socket,
-      environment: { XDG_CONFIG_HOME: config, ...extra },
+      environment,
+      readSettings: settingsFrom(environment),
       log: (line: string) => void lines.push(line),
     };
     return { options, lines };
@@ -2104,10 +2119,12 @@ describe('startDaemonPanel', () => {
     } finally {
       await second?.close();
     }
-    const fixed = await startDaemonPanel({
-      ...options,
-      environment: { ...options.environment, AIP_WEB_TOKEN: 'abcdefghijklmnop1234' },
-    });
+    const fixed = await startDaemonPanel(
+      withSettings({
+        ...options,
+        environment: { ...options.environment, AIP_WEB_TOKEN: 'abcdefghijklmnop1234' },
+      }),
+    );
     try {
       expect(fixed?.url).toContain('token=abcdefghijklmnop1234');
     } finally {
@@ -2167,12 +2184,14 @@ describe('createDaemonPanel', () => {
     const file = join(config, 'aip', 'settings.yaml');
     writeFileSync(file, settings);
     const lines: string[] = [];
-    const controller = createDaemonPanel({
-      stateDirectory: h.state,
-      socket: h.socket,
-      environment: { XDG_CONFIG_HOME: config, ...extra },
-      log: (line) => void lines.push(line),
-    });
+    const controller = createDaemonPanel(
+      withSettings({
+        stateDirectory: h.state,
+        socket: h.socket,
+        environment: { XDG_CONFIG_HOME: config, ...extra },
+        log: (line) => void lines.push(line),
+      }),
+    );
     return { controller, lines, file, state: h.state };
   }
 

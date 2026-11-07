@@ -17,7 +17,7 @@ import type {
   SpecialistTagsResult,
   SpecialistTagsView,
   SpecialistsImportResult,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
 
 import { harness, type Harness } from './harness.ts';
 

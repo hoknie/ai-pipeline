@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach } from 'vitest';
 
-import type { RunCreated } from '../../src/protocol/index.ts';
+import type { RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 import { POLL_MS, PIPELINE_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 export { until };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { daemonStatus, formatDaemonStatus } from '../../src/cli/daemon.ts';
-import type { DaemonCheck } from '../../src/protocol/index.ts';
+import { daemonStatus, formatDaemonStatus } from '../../src/presentation/cli/commands/daemon.ts';
+import type { DaemonCheck } from '../../src/presentation/ipc/contract/index.ts';
 
 const build = { version: '1.2.3', fingerprint: 'abc', builtAt: 5 };
 

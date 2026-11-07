@@ -8,7 +8,7 @@ import type {
   RunView,
   SystemStagesView,
   PipelinesView,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
 
 import { git, harness, startRun, until, type Harness } from './harness.ts';
 

@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
-import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
+import { EMPTY_FILTERS } from '../src/features/runs/list/runFilter.ts';
 import { act, cleanup, render, screen, waitFor, within } from './render.tsx';
 import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { RunHeader } from '../src/components/runs/RunHeader.tsx';
-import { RunList } from '../src/components/runs/RunList.tsx';
-import TopologyPage from '../src/components/TopologyPage.tsx';
-import { layout, liveState } from '../src/components/topologyLayout.ts';
-import { usageText } from '../src/format.ts';
+import { App } from '../src/app/App.tsx';
+import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
+import { RunList } from '../src/features/runs/list/RunList.tsx';
+import TopologyPage from '../src/features/topology/TopologyPage.tsx';
+import { layout, liveState } from '../src/features/topology/topologyLayout.ts';
+import { usageText } from '../src/shared/lib/format.ts';
 
 import {
   FakeEventSource,

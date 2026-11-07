@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { request } from '../../src/protocol/index.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
 import { socketPath } from '../../src/platform/paths/index.ts';
 
 const main = join(import.meta.dirname, '..', '..', 'src', 'cli', 'main.ts');

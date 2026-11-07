@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { NotificationCenter } from '../src/components/shell/NotificationCenter.tsx';
-import { useNotificationCenter, type BrowserPermission } from '../src/notifications.ts';
+import { NotificationCenter } from '../src/app/shell/menus/NotificationCenter.tsx';
+import { useNotificationCenter, type BrowserPermission } from '../src/app/notifications.ts';
 
 import { groupRow, runView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';

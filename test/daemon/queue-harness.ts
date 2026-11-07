@@ -1,6 +1,6 @@
 import { afterEach } from 'vitest';
 
-import type { QueueView, RunQueued, RunView } from '../../src/protocol/index.ts';
+import type { QueueView, RunQueued, RunView } from '../../src/presentation/ipc/contract/index.ts';
 import { CODE_ONLY_CONFIG, POLL_MS, PIPELINE_CONFIG, harness, type Harness } from './harness.ts';
 
 // Every queue test starts a daemon of its own on purpose: the fake agent counts the steps of its

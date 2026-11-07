@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { createInstance } from 'i18next';
 
-import { en } from '../src/i18n/locales/en.ts';
-import { ru } from '../src/i18n/locales/ru.ts';
-import { formatBytes, progressPercent, runClockEnd, runTimes } from '../src/format.ts';
+import { en } from '../src/shared/i18n/locales/en.ts';
+import { ru } from '../src/shared/i18n/locales/ru.ts';
+import { formatBytes, progressPercent, runClockEnd, runTimes } from '../src/shared/lib/format.ts';
 
 describe('progressPercent', () => {
   it('rounds the share of passed steps', () => {

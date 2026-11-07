@@ -7,9 +7,9 @@ import { afterAll, afterEach } from 'vitest';
 
 import { socketPath } from '../../src/platform/paths/index.ts';
 import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
-import { request } from '../../src/protocol/index.ts';
-import type { CliIo } from '../../src/cli/io.ts';
-import { runCli } from '../../src/cli/program.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
+import type { CliIo } from '../../src/presentation/cli/io.ts';
+import { runCli } from '../../src/presentation/cli/program.ts';
 import { TEST_TIMINGS, PIPELINE_CONFIG } from '../daemon/harness.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 import { waitUntil } from '../fixtures/wait-until.ts';

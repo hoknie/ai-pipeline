@@ -19,7 +19,7 @@ import type {
   ConfigEditResult,
   ConfigPreview,
   RunCreated,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
 
 import { PIPELINE_CONFIG, harness, startRun, type Harness } from './harness.ts';
 

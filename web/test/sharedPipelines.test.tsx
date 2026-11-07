@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import type { Api } from '../src/api.ts';
-import type { EditorPipeline, SharedPipelineView } from '../src/types.ts';
+import { App } from '../src/app/App.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import type { EditorPipeline, SharedPipelineView } from '../src/shared/api/types.ts';
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { configView, fakeApi, openFake, queueOf, sourcesFor, specialistEntry } from './fixtures.ts';
 
-vi.mock('../src/components/PipelineGraph.tsx', () => ({
+vi.mock('../src/features/topology/PipelineGraph.tsx', () => ({
   PipelineGraph: () => <div data-testid="graph" />,
 }));
 

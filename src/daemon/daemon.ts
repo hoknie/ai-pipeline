@@ -162,7 +162,6 @@ import {
 } from '../platform/git/index.ts';
 import {
   catalogView,
-  currentBuild,
   observersView,
   groupView,
   pickSpecChange,
@@ -170,48 +169,51 @@ import {
   repositoryViews,
   runView,
   withQueue,
-  type BuildInfo,
-  type GroupSpecView,
-  type PingResult,
-  type RepositoryView,
-  type ParamsOf,
-  type Request,
-  type ApplyResult,
-  type RunCreated,
-  type RunQueued,
-  type QueueView,
-  type RunView,
-  type TagView,
-  type Transcript,
-  type TranscriptEntry,
-  type ConfigEditResult,
-  type SpecialistTagFolderView,
-  type SpecialistTagsResult,
-  type SpecialistTagsView,
-  type SharedSpecialistsView,
-  type SpecialistsImportResult,
-  type SharedPipelinesView,
-  type PipelinesImportResult,
-  type ConfigPreview,
-  type ConfigCatalogResponse,
-  type ConfigEditorResponse,
-  type PipelinesView,
-  type SystemStagesView,
-  type SystemStageView,
-  type SystemStageSetting,
-  type StagePerformer,
-  type WebStartResult,
-  type WebStatusResult,
-  type BackgroundProcessesView,
-  runTitle,
-  type WebStopResult,
-  type FileDiffView,
-  type ArtifactContentView,
-  type ArtifactView,
-  type RunPatchView,
-  type DiffStat,
-  type ObserversView,
-} from '../protocol/index.ts';
+} from '../presentation/ipc/views/index.ts';
+import { currentBuild, type BuildInfo } from '../platform/build/index.ts';
+import type {
+  GroupSpecView,
+  PingResult,
+  RepositoryView,
+  ParamsOf,
+  Request,
+  ApplyResult,
+  RunCreated,
+  RunQueued,
+  QueueView,
+  RunView,
+  TagView,
+  Transcript,
+  TranscriptEntry,
+  ConfigEditResult,
+  SpecialistTagFolderView,
+  SpecialistTagsResult,
+  SpecialistTagsView,
+  SharedSpecialistsView,
+  SpecialistsImportResult,
+  SharedPipelinesView,
+  PipelinesImportResult,
+  ConfigPreview,
+  ConfigCatalogResponse,
+  ConfigEditorResponse,
+  PipelinesView,
+  SystemStagesView,
+  SystemStageView,
+  SystemStageSetting,
+  StagePerformer,
+  WebStartResult,
+  WebStatusResult,
+  BackgroundProcessesView,
+  WebStopResult,
+  FileDiffView,
+  ArtifactContentView,
+  ArtifactView,
+  RunPatchView,
+  DiffStat,
+  ObserversView,
+  PanelControl,
+} from '../presentation/ipc/contract/index.ts';
+import { runTitle } from '../feature/runs/types/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
 import type { Database } from '../platform/sqlite/index.ts';
 import {
@@ -235,13 +237,6 @@ import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
 const NO_PANEL = 'this daemon serves no web panel';
 /** The longest delay `setTimeout` keeps. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
-
-/** The web panel the daemon serves; implemented outside the daemon layer and passed in. */
-export interface PanelControl {
-  status(): WebStatusResult;
-  start(options: { token?: string; restart?: boolean }): Promise<WebStartResult>;
-  stop(): Promise<WebStopResult>;
-}
 
 export interface DaemonOptions {
   stateDirectory: string;

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { StatusBar } from '../src/components/shell/StatusBar.tsx';
-import type { StreamedProcesses } from '../src/store.ts';
+import { App } from '../src/app/App.tsx';
+import { StatusBar } from '../src/app/shell/status/StatusBar.tsx';
+import type { StreamedProcesses } from '../src/shared/api/runs/runsState.ts';
 
 import {
   FakeEventSource,

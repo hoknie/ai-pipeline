@@ -3,12 +3,16 @@ import { act, choose, cleanup, fireEvent, render, screen, waitFor, within } from
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import type { Api } from '../src/api.ts';
-import { PREVIEW_DELAY_MS, draftOf, valueOf } from '../src/components/PipelineForm.tsx';
-import PipelinesPage from '../src/components/PipelinesPage.tsx';
-import { formatRoute, parseRoute } from '../src/route.ts';
-import type { EditorPipeline } from '../src/types.ts';
+import { App } from '../src/app/App.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import {
+  PREVIEW_DELAY_MS,
+  draftOf,
+  valueOf,
+} from '../src/features/pipelines/form/PipelineForm.tsx';
+import PipelinesPage from '../src/features/pipelines/PipelinesPage.tsx';
+import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
+import type { EditorPipeline } from '../src/shared/api/types.ts';
 
 import {
   actionEntry,
@@ -22,7 +26,7 @@ import {
   systemStagesView,
 } from './fixtures.ts';
 
-vi.mock('../src/components/PipelineGraph.tsx', () => ({
+vi.mock('../src/features/topology/PipelineGraph.tsx', () => ({
   PipelineGraph: ({ pipeline }: { pipeline: { id: string; steps: { id: string }[] } }) => (
     <div data-testid="graph">{pipeline.steps.map((step) => step.id).join(',')}</div>
   ),

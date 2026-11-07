@@ -11,7 +11,7 @@ import {
   type ExecResult,
   type SetupDeps,
   type SetupOptions,
-} from '../../src/cli/setup.ts';
+} from '../../src/presentation/cli/setup/index.ts';
 
 const options: SetupOptions = {
   yes: true,

@@ -10,18 +10,6 @@
 export const oldLayers: Record<string, string[]> = {
   platform: [],
   runtime: ['feature/swarm-config/types/index', 'feature/agents/types/index'],
-  protocol: [
-    'platform',
-    'feature/swarm-config/types/index',
-    'feature/swarm-edit/types/index',
-    'feature/agents/types/index',
-    'feature/artifacts/types/index',
-    'feature/observers/types/index',
-    'feature/queue/types/index',
-    'feature/runs/services/index',
-    'feature/runs/types/index',
-    'feature/tags/types/index',
-  ],
   daemon: [
     'feature/swarm-config/types/index',
     'feature/swarm-config/services/index',
@@ -44,34 +32,15 @@ export const oldLayers: Record<string, string[]> = {
     'feature/tags/repositories/index',
     'platform',
     'runtime',
-    'protocol',
+    'presentation/ipc/contract',
+    'presentation/ipc/views',
   ],
-  mcp: [
-    'feature/swarm-config/types/index',
-    'feature/agents/types/index',
-    'feature/artifacts/types/index',
-    'feature/runs/types/index',
-    'platform',
-    'protocol',
-  ],
-  cli: [
-    'feature/swarm-config/types/index',
-    'feature/swarm-config/services/index',
-    'feature/swarm-edit/types/index',
-    'feature/agents/types/index',
-    'feature/artifacts/types/index',
-    'feature/runs/types/index',
-    'platform',
-    'runtime',
-    'protocol',
-    'daemon',
-    'mcp',
-    'app',
-  ],
+  // `src/cli/main.ts`: the entry point only calls the CLI.
+  cli: ['presentation/cli'],
 };
 
 /** Старые слои, которые видит `app`: он собирает приложение из них. */
-export const appOldLayers: readonly string[] = ['runtime', 'protocol', 'daemon'];
+export const appOldLayers: readonly string[] = ['runtime', 'daemon'];
 
 /** Виды папок фичи (§5). */
 export const featureViews = [
@@ -225,17 +194,16 @@ export const appPresentation: readonly string[] = [
  * Старые папки стоят рядом с целевыми и уходят вместе со слоем.
  */
 export const packagePlaces: Record<string, readonly string[]> = {
-  zod: ['protocol', 'mcp', 'cli', 'runtime', 'presentation', 'feature/*/clients'],
+  zod: ['runtime', 'presentation', 'feature/*/clients'],
   yaml: [
     'runtime',
-    'cli',
     'feature/swarm-config',
     'feature/swarm-edit',
     'feature/agents',
     'presentation/cli',
   ],
-  commander: ['cli', 'presentation/cli'],
-  '@modelcontextprotocol/sdk': ['mcp', 'cli', 'presentation/mcp', 'presentation/cli'],
+  commander: ['presentation/cli'],
+  '@modelcontextprotocol/sdk': ['presentation/mcp', 'presentation/cli'],
 };
 
 /** Классы, чьё создание через `new` допустимо только в `app` и `<фича>/services/create.ts`. */
@@ -253,4 +221,33 @@ export const purePaths: readonly string[] = ['platform/errors'];
 export const sizeLimits = { file: 300, function: 80, folder: 12, classMethods: 12 };
 
 /** Пути от корня, которым пределы размера не нужны: словари интерфейса. */
-export const sizeExempt: readonly string[] = ['i18n/locales'];
+export const sizeExempt: readonly string[] = ['shared/i18n/locales'];
+
+/** Области `shared` панели (`web/src/shared/<область>`). */
+export const webSharedAreas: readonly string[] = ['api', 'ui', 'lib', 'i18n'];
+
+/** Группы дизайн-системы: файл `shared/ui` лежит в одной из них. */
+export const webUiGroups: readonly string[] = ['forms', 'feedback', 'layout', 'overlays'];
+
+/** Граф областей панели: ключ видит перечисленные области (только через их `index.ts`). Ацикличен. */
+export const webGraph: Record<string, readonly string[]> = {
+  topology: [],
+  tags: [],
+  repositories: [],
+  specialists: ['tags', 'repositories'],
+  pipelines: ['specialists', 'topology', 'repositories'],
+  runs: ['pipelines', 'tags', 'repositories'],
+  queue: ['runs', 'tags', 'repositories'],
+  settings: ['specialists', 'pipelines', 'repositories'],
+};
+
+/**
+ * Что панель берёт из `src/` (пути от корня `src`; `*` заменяет один сегмент) и только как
+ * `import type`. Пока контракт лежит в `protocol/`, его вход `protocol/index.ts` стоит рядом с
+ * целевым `presentation/ipc/contract/index.ts`.
+ */
+export const webSrcPlaces: readonly string[] = [
+  'presentation/ipc/contract/index.ts',
+  'protocol/index.ts',
+  'feature/*/types/index.ts',
+];

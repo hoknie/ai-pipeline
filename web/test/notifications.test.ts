@@ -7,7 +7,7 @@ import {
   pruneKeys,
   readPermission,
   useNotificationCenter,
-} from '../src/notifications.ts';
+} from '../src/app/notifications.ts';
 
 import { groupRow, runView } from './fixtures.ts';
 

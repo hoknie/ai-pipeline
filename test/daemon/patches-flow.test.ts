@@ -3,7 +3,12 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { FileDiffView, RunCreated, RunPatchView, RunView } from '../../src/protocol/index.ts';
+import type {
+  FileDiffView,
+  RunCreated,
+  RunPatchView,
+  RunView,
+} from '../../src/presentation/ipc/contract/index.ts';
 
 import {
   CODE_ONLY_CONFIG,

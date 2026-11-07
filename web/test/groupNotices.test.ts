@@ -7,7 +7,7 @@ import {
   groupNotices,
   latestNotice,
   useDismissedNotice,
-} from '../src/components/runs/groupNotices.ts';
+} from '../src/features/runs/group/groupNotices.ts';
 
 import { groupRow, groupView } from './fixtures.ts';
 

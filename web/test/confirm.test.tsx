@@ -2,8 +2,8 @@
 import { render as plainRender } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { useConfirm } from '../src/confirm.tsx';
-import { notifyError, notifySuccess } from '../src/notify.ts';
+import { useConfirm } from '../src/shared/ui/overlays/confirm.tsx';
+import { notifyError, notifySuccess } from '../src/shared/lib/browser/notify.ts';
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
 

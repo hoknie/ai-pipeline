@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { requestFocus, takeFocusRequest, useHotkey } from '../src/hotkeys.ts';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../src/ui/dialog.tsx';
+import { requestFocus, takeFocusRequest, useHotkey } from '../src/shared/lib/browser/hotkeys.ts';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '../src/shared/ui/overlays/dialog.tsx';
 
 import { cleanup, fireEvent, render, screen } from './render.tsx';
 

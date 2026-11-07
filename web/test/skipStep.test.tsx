@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
-import { busyStep, stepOfGroup } from '../src/components/runs/skipStep.tsx';
+import { busyStep, stepOfGroup } from '../src/features/runs/header/skipStep.tsx';
 
 import { runView, topologyOf } from './fixtures.ts';
 

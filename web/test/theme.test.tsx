@@ -2,10 +2,10 @@
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ThemeMenu } from '../src/components/shell/ThemeMenu.tsx';
-import { applyStoredTheme, useTheme } from '../src/theme.ts';
+import { ThemeMenu } from '../src/app/shell/menus/ThemeMenu.tsx';
+import { applyStoredTheme, useTheme } from '../src/shared/lib/browser/theme.ts';
 
-import { TooltipProvider } from '../src/ui/tooltip.tsx';
+import { TooltipProvider } from '../src/shared/ui/feedback/tooltip.tsx';
 
 let dark = false;
 const listeners = new Set<() => void>();

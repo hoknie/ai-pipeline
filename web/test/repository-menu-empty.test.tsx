@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { RepositoryMenu } from '../src/components/shell/RepositoryMenu.tsx';
-import '../src/i18n/index.ts';
+import { RepositoryMenu } from '../src/app/shell/menus/RepositoryMenu.tsx';
+import '../src/shared/i18n/index.ts';
 
 import { cleanup, fireEvent, render, screen } from './render.tsx';
 

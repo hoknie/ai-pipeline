@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { configCatalogResponseSchema } from '../../src/protocol/index.ts';
+import { configCatalogResponseSchema } from '../../src/presentation/ipc/contract/index.ts';
 
 const empty = { tools: [], skills: [] };
 

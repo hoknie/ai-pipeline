@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type QueueView,
   type RunCreated,
   type RunView,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
 import { POLL_MS, harness, until, type Harness } from './harness.ts';
 

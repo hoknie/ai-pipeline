@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import { RunHeader } from '../src/components/runs/RunHeader.tsx';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
 
 import { fakeApi, groupRow, groupView, runView } from './fixtures.ts';
 

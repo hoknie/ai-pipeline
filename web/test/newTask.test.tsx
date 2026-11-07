@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { emptyDraft, fieldsOf, retarget } from '../src/components/QueueForm.tsx';
-import type { Api } from '../src/api.ts';
-import type { QueueView, RunView } from '../src/types.ts';
+import { App } from '../src/app/App.tsx';
+import { emptyDraft, fieldsOf, retarget } from '../src/features/queue/QueueForm.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import type { QueueView, RunView } from '../src/shared/api/types.ts';
 
 import {
   act,

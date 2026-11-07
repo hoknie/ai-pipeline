@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCleanable } from '../../src/cli/clean.ts';
-import { createStyle } from '../../src/protocol/index.ts';
+import { formatCleanable } from '../../src/presentation/cli/local/clean.ts';
+import { createStyle } from '../../src/presentation/format/index.ts';
 
 const RUNS = [
   { id: 'run1', title: 'Первый', finishedAt: Date.UTC(2026, 0, 2, 12, 0), repository: '/r' },

@@ -7,7 +7,7 @@ import {
   nextChosenHeight,
   statusBarMaxHeight,
   useStatusBarHeight,
-} from '../src/statusBarHeight.ts';
+} from '../src/app/shell/status/statusBarHeight.ts';
 
 const setWindow = (height: number) => {
   Object.defineProperty(window, 'innerHeight', { value: height, configurable: true });

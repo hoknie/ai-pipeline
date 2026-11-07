@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from './render.ts
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import type { Api } from '../src/api.ts';
-import SpecialistsPage from '../src/components/SpecialistsPage.tsx';
-import { valueOf } from '../src/components/SpecialistForm.tsx';
-import { formatRoute, parseRoute } from '../src/route.ts';
+import { App } from '../src/app/App.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import SpecialistsPage from '../src/features/specialists/SpecialistsPage.tsx';
+import { valueOf } from '../src/features/specialists/form/SpecialistForm.tsx';
+import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 
 import {
   catalogView,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
-import { applyMarkup, type MarkupAction } from '../src/lib/markdownMarkup.ts';
+import { applyMarkup, type MarkupAction } from '../src/shared/lib/markdown/markdownMarkup.ts';
 
 /** Applies the edit to the text and returns the text and the selected part (`|` marks a cursor). */
 function run(value: string, start: number, end: number, action: MarkupAction): string {

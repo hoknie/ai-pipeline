@@ -73,6 +73,6 @@ describe('sizeViolations', () => {
   });
 
   it('does not apply the limits to interface dictionaries', () => {
-    expect(found({ 'i18n/locales/ru.ts': lines(400).join('\n') })).toEqual([]);
+    expect(found({ 'shared/i18n/locales/ru.ts': lines(400).join('\n') })).toEqual([]);
   });
 });

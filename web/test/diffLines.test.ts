@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseHunks } from '../src/components/runs/diffLines.ts';
+import { parseHunks } from '../src/features/runs/files/diffLines.ts';
 
 describe('parseHunks', () => {
   it('numbers the old and the new lines of each hunk', () => {

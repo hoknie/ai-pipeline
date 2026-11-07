@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type QueueView,
   type RunCreated,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 import { settle, MANUAL_CONFIG, POLL_MS, PIPELINE_CONFIG, startRun, until } from './harness.ts';
 import {
   start,

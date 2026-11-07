@@ -31,7 +31,7 @@ describe('importViolations: old layers', () => {
 
   it('rejects layers outside the table and unknown layers', () => {
     bad(check('runtime/a.ts', 'daemon/b.ts'));
-    expect(check('weird/a.ts', 'protocol/b.ts')[0]).toContain('unknown layer');
+    expect(check('weird/a.ts', 'daemon/b.ts')[0]).toContain('unknown layer');
   });
 
   it('counts type imports like value imports', () => {
@@ -116,7 +116,7 @@ describe('importViolations: platform and app', () => {
     ok(check('app/a.ts', 'daemon/b.ts'));
     ok(check('app/a.ts', 'runtime/b.ts'));
     bad(check('app/a.ts', 'cli/b.ts'));
-    bad(check('app/a.ts', 'mcp/b.ts'));
+    bad(check('app/a.ts', 'protocol/b.ts'));
   });
 
   it('lets app see services, clients and (for now) repositories, only through index.ts', () => {

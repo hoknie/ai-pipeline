@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import { MessageDialog } from '../src/components/runs/MessageDialog.tsx';
-import { Transcript } from '../src/components/Transcript.tsx';
-import { clockSeconds, dateTime } from '../src/format.ts';
-import { useElementHeight } from '../src/useElementHeight.ts';
-import type { TranscriptEntry } from '../src/types.ts';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import { MessageDialog } from '../src/features/runs/group/MessageDialog.tsx';
+import { Transcript } from '../src/features/runs/transcript/Transcript.tsx';
+import { clockSeconds, dateTime } from '../src/shared/lib/format.ts';
+import { useElementHeight } from '../src/shared/lib/browser/useElementHeight.ts';
+import type { TranscriptEntry } from '../src/shared/api/types.ts';
 
 import { fakeApi, groupRow, groupView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';

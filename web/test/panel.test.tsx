@@ -13,14 +13,15 @@ import {
 import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import { Transcript } from '../src/components/Transcript.tsx';
-import { RunHeader } from '../src/components/runs/RunHeader.tsx';
-import { RunList } from '../src/components/runs/RunList.tsx';
-import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
-import { files } from '../src/format.ts';
-import { sortRuns, useRuns } from '../src/store.ts';
+import { App } from '../src/app/App.tsx';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import { Transcript } from '../src/features/runs/transcript/Transcript.tsx';
+import { RunHeader } from '../src/features/runs/header/RunHeader.tsx';
+import { RunList } from '../src/features/runs/list/RunList.tsx';
+import { EMPTY_FILTERS } from '../src/features/runs/list/runFilter.ts';
+import { files } from '../src/shared/lib/format.ts';
+import { sortRuns } from '../src/shared/api/runs/runsState.ts';
+import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
 import {
   FakeEventSource,

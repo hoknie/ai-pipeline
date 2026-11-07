@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { databasePath } from '../../src/platform/paths/index.ts';
 import { startDaemon } from '../../src/app/index.ts';
-import type { RunCreated, Transcript } from '../../src/protocol/index.ts';
+import type { RunCreated, Transcript } from '../../src/presentation/ipc/contract/index.ts';
 import { openStorage } from '../feature/storage.ts';
 import { PIPELINE_CONFIG, startRun, statuses, until } from './harness.ts';
 import { calls, run, start } from './control-harness.ts';

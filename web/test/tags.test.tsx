@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import type { Api } from '../src/api.ts';
-import { TAG_CLASSES } from '../src/tagColors.ts';
-import { ApiError } from '../src/api.ts';
+import { App } from '../src/app/App.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import { TAG_CLASSES } from '../src/shared/lib/catalog/tagColors.ts';
+import { ApiError } from '../src/shared/api/api.ts';
 import { CHAIN_TAG_COLOR, TAG_COLORS } from '../../src/feature/tags/types/index.ts';
 
 import { act, cleanup, choose, fireEvent, render, screen, waitFor, within } from './render.tsx';
@@ -17,8 +17,8 @@ import {
   tagView,
   pipelinesView,
 } from './fixtures.ts';
-import type { TagView } from '../src/types.ts';
-import { replaceTags } from '../src/store.ts';
+import type { TagView } from '../src/shared/api/types.ts';
+import { replaceTags } from '../src/shared/api/runs/runsState.ts';
 
 beforeEach(() => {
   window.localStorage.clear();

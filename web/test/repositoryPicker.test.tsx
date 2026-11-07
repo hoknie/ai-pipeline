@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { RepositoryPicker, matchRepositories } from '../src/components/RepositoryPicker.tsx';
+import {
+  RepositoryPicker,
+  matchRepositories,
+} from '../src/features/repositories/RepositoryPicker.tsx';
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 

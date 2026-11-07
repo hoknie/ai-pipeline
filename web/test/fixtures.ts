@@ -1,9 +1,12 @@
 import { vi } from 'vitest';
 
-import { ApiError, type Api } from '../src/api.ts';
-import type { ObserverSettings, ObserversView } from '../src/observerTypes.ts';
-import type { ActionEntry, SystemStagesResponse } from '../src/pipelineEntries.ts';
-import type { EventSourceLike } from '../src/store.ts';
+import { ApiError, type Api } from '../src/shared/api/api.ts';
+import type { ObserverSettings, ObserversView } from '../src/shared/api/observerTypes.ts';
+import type {
+  ActionEntry,
+  SystemStagesResponse,
+} from '../src/shared/lib/pipeline/pipelineEntries.ts';
+import type { EventSourceLike } from '../src/shared/api/stream.ts';
 import type {
   BackgroundProcessView,
   ConfigCatalogResponse,
@@ -28,7 +31,7 @@ import type {
   PipelinesView,
   SystemView,
   SpecialistTagFolderView,
-} from '../src/types.ts';
+} from '../src/shared/api/types.ts';
 
 /** The observers as the daemon sends them: off, one worker, nothing running. */
 export function observersView(

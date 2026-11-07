@@ -5,7 +5,7 @@ import {
   deliveryBadge,
   settledOutcome,
   undeliveredMark,
-} from '../src/components/runs/delivery.ts';
+} from '../src/features/runs/header/delivery.ts';
 import { groupRow, groupView, runView } from './fixtures.ts';
 
 const withDelivery = (

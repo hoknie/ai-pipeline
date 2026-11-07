@@ -5,9 +5,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createDaemonPanel } from '../../src/cli/web/daemon-panel.ts';
-import { startWebServer, type WebServer } from '../../src/cli/web/server.ts';
-import { spawnDaemonRestart, systemView } from '../../src/cli/web/system.ts';
+import { createDaemonPanel } from '../../src/presentation/web/panel/daemon-panel.ts';
+import { withSettings } from './settings.ts';
+import { startWebServer, type WebServer } from '../../src/presentation/web/server.ts';
+import { spawnDaemonRestart, systemView } from '../../src/presentation/web/panel/system.ts';
 import { MANUAL_CONFIG, harness, startRun, until, type Harness } from '../daemon/harness.ts';
 
 const BUILD = { version: '1.2.3', fingerprint: 'abc', builtAt: 1 };
@@ -295,19 +296,21 @@ describe('restart from the panel of the daemon', () => {
       force: boolean;
       token: string | undefined;
     }[] = [];
-    const controller = createDaemonPanel({
-      stateDirectory: h.state,
-      socket: h.socket,
-      environment: { XDG_CONFIG_HOME: config },
-      entry: ['node', 'aip.js'],
-      spawnRestart: (options) =>
-        void spawned.push({
-          entry: options.entry,
-          command: options.command,
-          force: options.force,
-          token: options.environment?.AIP_WEB_TOKEN,
-        }),
-    });
+    const controller = createDaemonPanel(
+      withSettings({
+        stateDirectory: h.state,
+        socket: h.socket,
+        environment: { XDG_CONFIG_HOME: config },
+        entry: ['node', 'aip.js'],
+        spawnRestart: (options) =>
+          void spawned.push({
+            entry: options.entry,
+            command: options.command,
+            force: options.force,
+            token: options.environment?.AIP_WEB_TOKEN,
+          }),
+      }),
+    );
     try {
       const started = await controller.start({});
       const token = new URL(started.status.url ?? '').searchParams.get('token') ?? '';
@@ -365,13 +368,15 @@ describe('restart from the panel of the daemon', () => {
     const port = await freePort();
     writeFileSync(join(config, 'aip', 'settings.yaml'), `web: { port: ${port}, auth: none }\n`);
     const tokens: (string | undefined)[] = [];
-    const controller = createDaemonPanel({
-      stateDirectory: h.state,
-      socket: h.socket,
-      environment: { XDG_CONFIG_HOME: config },
-      entry: ['node', 'aip.js'],
-      spawnRestart: (options) => void tokens.push(options.environment?.AIP_WEB_TOKEN),
-    });
+    const controller = createDaemonPanel(
+      withSettings({
+        stateDirectory: h.state,
+        socket: h.socket,
+        environment: { XDG_CONFIG_HOME: config },
+        entry: ['node', 'aip.js'],
+        spawnRestart: (options) => void tokens.push(options.environment?.AIP_WEB_TOKEN),
+      }),
+    );
     try {
       await controller.start({});
       const response = await post(`http://127.0.0.1:${port}`, '/api/system/daemon/restart', '');

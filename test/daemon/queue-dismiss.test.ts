@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type QueueView,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
 // Each test needs a daemon of its own: the fake agent counts its script steps per group over the

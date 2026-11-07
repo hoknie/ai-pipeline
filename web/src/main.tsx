@@ -1,11 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { httpApi } from './api.ts';
-import { App } from './App.tsx';
-import { applyStoredLanguage } from './i18n/index.ts';
+import { httpApi } from './shared/api/api.ts';
+import { App } from './app/index.ts';
+import { applyStoredLanguage } from './shared/i18n/index.ts';
 import './index.css';
-import { applyStoredTheme } from './theme.ts';
+import { applyStoredTheme } from './shared/lib/browser/theme.ts';
 
 // The token lives in an HttpOnly cookie after the first load; keep it out of the address bar.
 const url = new URL(window.location.href);

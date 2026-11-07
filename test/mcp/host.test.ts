@@ -2,8 +2,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createHostServer } from '../../src/mcp/host.ts';
-import { groupView, runView, type QueueView } from '../../src/protocol/index.ts';
+import { createHostServer } from '../../src/presentation/mcp/host.ts';
+import { groupView, runView } from '../../src/presentation/ipc/views/index.ts';
+import type { QueueView } from '../../src/presentation/ipc/contract/index.ts';
 import { run } from '../feature/runs/helpers.ts';
 
 const VIEW: QueueView & { item: string } = {

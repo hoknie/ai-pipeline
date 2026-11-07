@@ -5,15 +5,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
-  subscribe,
   type ArtifactContentView,
   type ArtifactView,
   type RunCreated,
   type StreamEvent,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
-import { cleanRun } from '../../src/cli/clean.ts';
-import type { Context } from '../../src/cli/commands.ts';
+import { cleanRun } from '../../src/presentation/cli/local/clean.ts';
+import type { Context } from '../../src/presentation/cli/context.ts';
 import { CODE_ONLY_CONFIG, git, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;

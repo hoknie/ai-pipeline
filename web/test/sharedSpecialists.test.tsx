@@ -2,9 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import type { Api } from '../src/api.ts';
-import type { SharedSpecialistView } from '../src/types.ts';
+import { App } from '../src/app/App.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import type { SharedSpecialistView } from '../src/shared/api/types.ts';
 
 import { configView, fakeApi, openFake, queueOf, settingsOf, specialistEntry } from './fixtures.ts';
 

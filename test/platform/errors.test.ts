@@ -9,7 +9,7 @@ import {
   rejected,
 } from '../../src/platform/errors/index.ts';
 import { GitError } from '../../src/platform/git/index.ts';
-import { DaemonUnavailable, IpcError } from '../../src/protocol/index.ts';
+import { DaemonUnavailable, IpcError } from '../../src/presentation/ipc/client/index.ts';
 import { ConfigLoadError } from '../../src/feature/swarm-config/types/index.ts';
 import { ConfigEditError } from '../../src/feature/swarm-edit/types/index.ts';
 import { AlreadyRunning } from '../../src/app/daemon.ts';

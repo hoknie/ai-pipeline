@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { Transcript } from '../../src/protocol/index.ts';
+import type { Transcript } from '../../src/presentation/ipc/contract/index.ts';
 import { statuses } from './harness.ts';
 import { calls, run, start, until } from './control-harness.ts';
 

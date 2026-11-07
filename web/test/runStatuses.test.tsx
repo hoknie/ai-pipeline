@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { RunStatuses } from '../src/components/runs/RunStatuses.tsx';
+import { RunStatuses } from '../src/features/runs/list/RunStatuses.tsx';
 import { cleanup, fireEvent, render, screen } from './render.tsx';
 import { groupRow, runView } from './fixtures.ts';
 

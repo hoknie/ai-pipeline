@@ -4,8 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { CliIo } from '../../src/cli/io.ts';
-import { runCli } from '../../src/cli/program.ts';
+import type { CliIo } from '../../src/presentation/cli/io.ts';
+import { runCli } from '../../src/presentation/cli/program.ts';
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-context-')));
 const main = join(import.meta.dirname, '..', '..', 'src', 'cli', 'main.ts');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { QueueView, RunQueued } from '../../src/protocol/index.ts';
+import type { QueueView, RunQueued } from '../../src/presentation/ipc/contract/index.ts';
 import { start, queueOf, add, waitQueue, allRuns } from './queue-harness.ts';
 
 describe('task numbers', () => {

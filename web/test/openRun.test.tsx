@@ -2,9 +2,9 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from './render.tsx';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { ApiError } from '../src/api.ts';
-import { useRuns } from '../src/store.ts';
+import { App } from '../src/app/App.tsx';
+import { ApiError } from '../src/shared/api/api.ts';
+import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
 import {
   FakeEventSource,

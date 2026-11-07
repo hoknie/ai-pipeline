@@ -5,14 +5,14 @@ import { join } from 'node:path';
 
 import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
 import type { DaemonOptions, DaemonTimings } from '../../src/daemon/index.ts';
-import {
-  request,
-  type GroupView,
-  type ParamsOf,
-  type RunCreated,
-  type RunQueued,
-  type RunView,
-} from '../../src/protocol/index.ts';
+import { request } from '../../src/presentation/ipc/client/index.ts';
+import type {
+  GroupView,
+  ParamsOf,
+  RunCreated,
+  RunQueued,
+  RunView,
+} from '../../src/presentation/ipc/contract/index.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 
 const root = join(import.meta.dirname, '..', '..');

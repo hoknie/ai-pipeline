@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatWebStatus, webStatusView } from '../../src/cli/web-control.ts';
-import type { WebStatusResult } from '../../src/protocol/index.ts';
+import { formatWebStatus, webStatusView } from '../../src/presentation/cli/web-control.ts';
+import type { WebStatusResult } from '../../src/presentation/ipc/contract/index.ts';
 
 const running: WebStatusResult = {
   running: true,

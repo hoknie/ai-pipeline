@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ArtifactsTab } from '../src/components/runs/ArtifactsTab.tsx';
-import type { ArtifactView } from '../src/types.ts';
+import { ArtifactsTab } from '../src/features/runs/files/ArtifactsTab.tsx';
+import type { ArtifactView } from '../src/shared/api/types.ts';
 
 import { fakeApi } from './fixtures.ts';
 import { setWindowWidth } from './media.ts';

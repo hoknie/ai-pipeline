@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { FilePath } from '../src/components/FilePath.tsx';
+import { FilePath } from '../src/shared/ui/layout/FilePath.tsx';
 
 afterEach(cleanup);
 

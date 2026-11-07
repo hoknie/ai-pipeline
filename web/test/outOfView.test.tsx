@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { useOutOfView } from '../src/useOutOfView.ts';
+import { useOutOfView } from '../src/shared/lib/browser/useOutOfView.ts';
 
 import { act, cleanup, render, screen } from './render.tsx';
 

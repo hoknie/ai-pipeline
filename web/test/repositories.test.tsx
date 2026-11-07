@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import type { Api } from '../src/api.ts';
-import { httpApi, withRepository } from '../src/api.ts';
-import type { RepositoryView } from '../src/types.ts';
-import { repositoryLabel, repositoryList, waitingByRepository } from '../src/repositories.ts';
+import { App } from '../src/app/App.tsx';
+import type { Api } from '../src/shared/api/api.ts';
+import { httpApi, withRepository } from '../src/shared/api/api.ts';
+import type { RepositoryView } from '../src/shared/api/types.ts';
+import {
+  repositoryLabel,
+  repositoryList,
+  waitingByRepository,
+} from '../src/shared/lib/catalog/repositories.ts';
 
 import {
   FakeEventSource,

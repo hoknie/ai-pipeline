@@ -6,11 +6,11 @@ import {
   PROCESS_POLL_MS,
   groupProcessesByTask,
   useBackgroundProcesses,
-} from '../src/backgroundProcesses.ts';
-import { formatCpu, formatMemory, formatUptime } from '../src/format.ts';
-import type { StreamedProcesses } from '../src/store.ts';
-import { en } from '../src/i18n/locales/en.ts';
-import { ru } from '../src/i18n/locales/ru.ts';
+} from '../src/app/shell/status/backgroundProcesses.ts';
+import { formatCpu, formatMemory, formatUptime } from '../src/shared/lib/format.ts';
+import type { StreamedProcesses } from '../src/shared/api/runs/runsState.ts';
+import { en } from '../src/shared/i18n/locales/en.ts';
+import { ru } from '../src/shared/i18n/locales/ru.ts';
 
 import { fakeApi, processView } from './fixtures.ts';
 import { act, cleanup, renderHook } from './render.tsx';

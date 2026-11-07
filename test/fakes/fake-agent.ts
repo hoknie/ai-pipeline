@@ -128,7 +128,7 @@ async function connectWorker(command: string, commandArgs: string[]) {
   };
 }
 
-/** One request to the daemon socket: the same line protocol as `src/protocol/client.ts`. */
+/** One request to the daemon socket: the same line protocol as `src/presentation/ipc/client/client.ts`. */
 function ipc(socket: string, method: string, params: Record<string, unknown>): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const connection = createConnection(socket);

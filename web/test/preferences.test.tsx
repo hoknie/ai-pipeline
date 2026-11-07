@@ -2,8 +2,8 @@
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { usePreference } from '../src/preferences.ts';
+import { App } from '../src/app/App.tsx';
+import { usePreference } from '../src/shared/lib/browser/preferences.ts';
 
 import { FakeEventSource, fakeApi, groupView, openFake, runView } from './fixtures.ts';
 

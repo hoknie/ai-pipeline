@@ -2,7 +2,11 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ValuesPicker, withValues, type PickerOption } from '../src/components/ValuesPicker.tsx';
+import {
+  ValuesPicker,
+  withValues,
+  type PickerOption,
+} from '../src/shared/ui/forms/ValuesPicker.tsx';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 

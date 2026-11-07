@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { RunCreated } from '../../src/protocol/index.ts';
+import type { RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 
 import { PIPELINE_CONFIG, git, harness, startRun, statuses, type Harness } from './harness.ts';
 

@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { Command } from 'commander';
 import { describe, expect, it } from 'vitest';
 
-import { registerCommands } from '../../src/cli/commands.ts';
-import { HELP_GROUPS } from '../../src/cli/help.ts';
+import { registerCommands } from '../../src/presentation/cli/program.ts';
+import { HELP_GROUPS } from '../../src/presentation/cli/help.ts';
 
 const root = join(import.meta.dirname, '..', '..');
 const main = join(root, 'src', 'cli', 'main.ts');

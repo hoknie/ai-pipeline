@@ -14,7 +14,7 @@ import {
   runtimeCatalogSchema,
   transcriptEntrySchema,
   transcriptSchema,
-} from '../../src/protocol/index.ts';
+} from '../../src/presentation/ipc/contract/index.ts';
 
 // The types of `agents` are written by hand; the schemas of the contract must describe the same
 // values. `tsc` covers `test`, so a field removed on one side fails the gate.

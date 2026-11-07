@@ -13,9 +13,9 @@ import i18next from 'i18next';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../src/App.tsx';
-import { ApiError } from '../src/api.ts';
-import { dropPosition, dropSlot, moveId } from '../src/components/queueOrder.ts';
+import { App } from '../src/app/App.tsx';
+import { ApiError } from '../src/shared/api/api.ts';
+import { dropPosition, dropSlot, moveId } from '../src/features/queue/queueOrder.ts';
 import {
   afterOptions,
   dependents,
@@ -23,12 +23,12 @@ import {
   parentChoices,
   related,
   unmet,
-} from '../src/components/queueLinks.ts';
-import { parseParallel } from '../src/components/QueuePage.tsx';
-import { draftOf, emptyDraft, fieldsOf } from '../src/components/QueueForm.tsx';
-import { pruneSkip } from '../src/components/SkipSteps.tsx';
-import { formatRoute, parseRoute } from '../src/route.ts';
-import { useRuns } from '../src/store.ts';
+} from '../src/features/queue/queueLinks.ts';
+import { parseParallel } from '../src/features/queue/QueuePage.tsx';
+import { draftOf, emptyDraft, fieldsOf } from '../src/features/queue/QueueForm.tsx';
+import { pruneSkip } from '../src/features/queue/SkipSteps.tsx';
+import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
+import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
 import { setWindowWidth } from './media.ts';
 import {

@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { act } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { StatusBadge } from '../src/components/StatusBadge.tsx';
+import { StatusBadge } from '../src/shared/ui/feedback/StatusBadge.tsx';
 import {
   connectionLabel,
   queueStateLabel,
@@ -12,7 +12,7 @@ import {
   STATUS,
   statusInfo,
   waitText,
-} from '../src/status.ts';
+} from '../src/shared/lib/status.ts';
 
 import { cleanup, fireEvent, render, screen } from './render.tsx';
 

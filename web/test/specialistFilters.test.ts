@@ -9,7 +9,7 @@ import {
   matchesLevel,
   matchesSearch,
   specialistValues,
-} from '../src/specialistFilters.ts';
+} from '../src/features/specialists/specialistFilters.ts';
 
 import { specialistEntry } from './fixtures.ts';
 

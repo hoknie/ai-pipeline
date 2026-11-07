@@ -2,9 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 
-import { App } from '../src/App.tsx';
-import { GroupScreen } from '../src/components/runs/GroupScreen.tsx';
-import { defaultEntry, orderEntries } from '../src/components/order.ts';
+import { App } from '../src/app/App.tsx';
+import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
+import { defaultEntry, orderEntries } from '../src/shared/lib/order.ts';
 
 import {
   FakeEventSource,

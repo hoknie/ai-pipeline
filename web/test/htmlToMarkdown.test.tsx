@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 
-import { htmlToMarkdown } from '../src/lib/htmlToMarkdown.ts';
+import { htmlToMarkdown } from '../src/shared/lib/markdown/htmlToMarkdown.ts';
 
 describe('htmlToMarkdown', () => {
   it('returns null without meaningful markup', () => {

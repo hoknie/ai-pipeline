@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { GroupSpecView, RunCreated } from '../../src/protocol/index.ts';
+import type { GroupSpecView, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 
 import { CODE_ONLY_CONFIG, git, harness, startRun, until, type Harness } from './harness.ts';
 
