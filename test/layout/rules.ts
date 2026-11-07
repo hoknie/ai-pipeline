@@ -8,17 +8,8 @@
  * Слой исчезает из таблицы вместе с папкой; подпуть вроде `platform/errors` разрешает только его.
  */
 export const oldLayers: Record<string, string[]> = {
-  store: [
-    'feature/swarm-config/types/index',
-    'feature/agents/types/index',
-    'feature/observers/types/index',
-    'feature/queue/types/index',
-    'feature/runs/types/index',
-    'feature/runs/machine/index',
-    'feature/tags/types/index',
-  ],
   platform: [],
-  runtime: ['feature/swarm-config/types/index', 'feature/agents/types/index', 'protocol'],
+  runtime: ['feature/swarm-config/types/index', 'feature/agents/types/index'],
   protocol: [
     'platform',
     'feature/swarm-config/types/index',
@@ -43,7 +34,14 @@ export const oldLayers: Record<string, string[]> = {
     'feature/runs/machine/index',
     'feature/runs/types/index',
     'feature/tags/types/index',
-    'store',
+    'feature/artifacts/repositories/index',
+    'feature/delivery/repositories/index',
+    'feature/observers/repositories/index',
+    'feature/queue/repositories/index',
+    'feature/repos/repositories/index',
+    'feature/runs/repositories/index',
+    'feature/runs/services/index',
+    'feature/tags/repositories/index',
     'platform',
     'runtime',
     'protocol',
@@ -73,7 +71,7 @@ export const oldLayers: Record<string, string[]> = {
 };
 
 /** Старые слои, которые видит `app`: он собирает приложение из них. */
-export const appOldLayers: readonly string[] = ['store', 'runtime', 'protocol', 'daemon'];
+export const appOldLayers: readonly string[] = ['runtime', 'protocol', 'daemon'];
 
 /** Виды папок фичи (§5). */
 export const featureViews = [
@@ -207,7 +205,14 @@ export const presentationRules: Record<PresentationSub, PresentationRule> = {
 export const entryOnlySubs: readonly string[] = ['mcp', 'web'];
 
 /** Что `app` видит в фичах и в представлении. */
-export const appViews: readonly FeatureView[] = ['types', 'ports', 'services', 'clients'];
+export const appViews: readonly FeatureView[] = [
+  'types',
+  'ports',
+  'services',
+  'clients',
+  // Временно: пока `Daemon` один, `app` создаёт репозитории фич и передаёт их ему.
+  'repositories',
+];
 export const appPresentation: readonly string[] = [
   'ipc',
   'ipc/views',

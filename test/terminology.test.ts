@@ -15,7 +15,7 @@ const OTHER_MEANING = [/^\.github\//, /^\.claude\//, /^openspec\//, /^docs\/deve
  * The list only shrinks.
  */
 const COMPATIBILITY = [
-  'src/store/schema.ts',
+  'src/platform/sqlite/migrations.ts',
   'src/daemon/executor.ts',
   'test/daemon/actions.test.ts',
   'src/feature/swarm-config/repositories/config-files.ts',
@@ -34,7 +34,8 @@ const COMPATIBILITY = [
   'test/feature/swarm-edit/legacy-names.test.ts',
   'test/feature/swarm-edit/pipeline-import.test.ts',
   'test/daemon/control-outside.test.ts',
-  'test/store/store.test.ts',
+  'test/feature/storage.ts',
+  'test/platform/sqlite/migrations.test.ts',
   'test/feature/runs/delivery.test.ts',
   'test/cli/cli-output.test.ts',
   'test/cli/cli-daemon.test.ts',

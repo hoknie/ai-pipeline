@@ -3,7 +3,7 @@ import { join, sep } from 'node:path';
 
 import { parse } from 'yaml';
 
-import type { CatalogEntry } from '../protocol/index.ts';
+import type { CatalogEntry } from '../feature/agents/types/index.ts';
 
 const DESCRIPTION_LIMIT = 300;
 const SOURCE_ORDER = { builtin: 0, project: 1, global: 2 } as const;

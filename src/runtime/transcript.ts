@@ -1,4 +1,4 @@
-import { clip, type TranscriptEntry } from '../protocol/index.ts';
+import { clip, type TranscriptEntry } from '../feature/agents/types/index.ts';
 
 type Json = Record<string, unknown>;
 

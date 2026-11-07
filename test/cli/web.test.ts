@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createDaemonPanel, startDaemonPanel } from '../../src/cli/web/daemon-panel.ts';
 import { readPanelState, writePanelState } from '../../src/cli/web/state.ts';
 import { databasePath } from '../../src/platform/paths/index.ts';
-import { Store } from '../../src/store/index.ts';
+import { openStorage } from '../feature/storage.ts';
 import { startWebServer, webTokenFromEnv, type WebServer } from '../../src/cli/web/server.ts';
 import type { GroupView, QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';
 import { MANUAL_CONFIG, harness, startRun, until, type Harness } from '../daemon/harness.ts';
@@ -202,17 +202,17 @@ describe('aip web', () => {
     const ids = [first.runId];
     // Ten later finished runs are copies of the first one, written while the daemon is down.
     await h.restart(() => {
-      const store = new Store(databasePath(harnessed.state));
-      const original = store.loadRun(first.runId)!;
+      const store = openStorage(databasePath(harnessed.state));
+      const original = store.runs.loadRun(first.runId)!;
       for (let index = 1; index <= 10; index++) {
         const copy = structuredClone(original);
         copy.run.id = `${first.runId}-copy${index}`;
         copy.run.createdAt = original.run.createdAt + index;
         copy.run.number = original.run.number + index;
-        store.saveRun(copy);
+        store.runs.saveRun(copy);
         ids.push(copy.run.id);
       }
-      store.close();
+      store.database.close();
     });
     web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
     const base = `http://127.0.0.1:${web.port}`;
@@ -1217,7 +1217,7 @@ describe('aip web', () => {
       405,
     );
     expect((await fetch(`${listUrl}/nope`, { headers: authed(web) })).status).toBe(404);
-    h.running.daemon.store.database.prepare("UPDATE artifacts SET uri = 's3://b/x'").run();
+    h.running.daemon.database.prepare("UPDATE artifacts SET uri = 's3://b/x'").run();
     expect((await fetch(url('out.log'), { headers: authed(web) })).status).toBe(409);
   });
 

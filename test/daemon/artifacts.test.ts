@@ -4,7 +4,10 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { FileArtifactStorage, artifactStorageFor } from '../../src/daemon/artifacts.ts';
+import {
+  FileArtifactStorage,
+  artifactStorageFor,
+} from '../../src/feature/artifacts/repositories/index.ts';
 
 function storage(): FileArtifactStorage {
   return new FileArtifactStorage(join(mkdtempSync(join(tmpdir(), 'aip-artifacts-')), 'artifacts'));

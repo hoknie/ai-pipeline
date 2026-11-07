@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-/** Longest text kept in one transcript entry; the rest is cut with a marker. */
-export const TRANSCRIPT_TEXT_LIMIT = 20_000;
+export { TRANSCRIPT_TEXT_LIMIT, clip } from '../feature/agents/types/index.ts';
 
 /** Moment (ms since epoch) the daemon received the log line the entry came from. */
 const at = z.number().nullable().optional();
@@ -49,9 +48,3 @@ export const transcriptSchema = z.object({
 });
 
 export type Transcript = z.infer<typeof transcriptSchema>;
-
-export function clip(text: string, limit = TRANSCRIPT_TEXT_LIMIT): string {
-  return text.length > limit
-    ? `${text.slice(0, limit)}\n… (${text.length - limit} more characters)`
-    : text;
-}

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { databasePath } from '../../src/platform/paths/index.ts';
 import { startDaemon } from '../../src/app/index.ts';
 import type { RunCreated, Transcript } from '../../src/protocol/index.ts';
-import { Store } from '../../src/store/index.ts';
+import { openStorage } from '../feature/storage.ts';
 import { PIPELINE_CONFIG, startRun, statuses, until } from './harness.ts';
 import { calls, run, start } from './control-harness.ts';
 
@@ -235,8 +235,8 @@ describe('failures and control', () => {
     await h.waitFor(created.runId, (view) => view.groups[0]?.status === 'failed');
     await h.restart(() => {
       // The snapshot as an older build stored it: `workflows` and `split.workflow`.
-      const store = new Store(databasePath(h.state));
-      const state = store.loadRun(created.runId)!;
+      const store = openStorage(databasePath(h.state));
+      const state = store.runs.loadRun(created.runId)!;
       const { pipelines, ...rest } = state.run.config as unknown as Record<string, unknown>;
       const old = (pipelines as { split?: { pipeline?: string } }[]).map((pipeline) => {
         if (!pipeline.split) return pipeline;
@@ -244,8 +244,8 @@ describe('failures and control', () => {
         return { ...pipeline, split: { ...split, workflow: target } };
       });
       state.run.config = { ...rest, workflows: old } as unknown as typeof state.run.config;
-      store.saveRun(state);
-      store.close();
+      store.runs.saveRun(state);
+      store.database.close();
     });
     h.script({ split: [{ split: [{ title: 'Вход', task: 'вход' }] }], write: [{}] });
     await h.call('retry', { runId: created.runId, group: 'vhod' });

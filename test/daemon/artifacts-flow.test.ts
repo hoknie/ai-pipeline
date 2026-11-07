@@ -201,7 +201,7 @@ describe('step artifacts', () => {
     await expect(h.call('group_artifacts', { runId: 'unknown', group: 'Вход' })).rejects.toThrow(
       'unknown run',
     );
-    h.running.daemon.store.database.prepare("UPDATE artifacts SET uri = 's3://bucket/x'").run();
+    h.running.daemon.database.prepare("UPDATE artifacts SET uri = 's3://bucket/x'").run();
     await expect(
       h.call('artifact', { runId, group: await slugOf(h, runId), id: artifact!.id }),
     ).rejects.toThrow('is not available');

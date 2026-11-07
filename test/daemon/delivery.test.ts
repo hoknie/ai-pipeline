@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { databasePath } from '../../src/platform/paths/index.ts';
 import type { ApplyResult, RunCreated } from '../../src/protocol/index.ts';
-import { Store } from '../../src/store/index.ts';
+import { openStorage } from '../feature/storage.ts';
 
 import { POLL_MS, CODE_ONLY_CONFIG, git, harness, startRun, type Harness } from './harness.ts';
 
@@ -198,11 +198,11 @@ describe('delivery through the daemon', () => {
     const runId = await finishedRun(h);
     await h.restart(() => {
       // The daemon stopped after it recorded the delivery and before it did the git work.
-      const store = new Store(databasePath(h.state));
-      const state = store.loadRun(runId)!;
+      const store = openStorage(databasePath(h.state));
+      const state = store.runs.loadRun(runId)!;
       state.run.pendingDelivery = { groups: ['vhod'], force: false, auto: true };
-      store.saveRun(state);
-      store.close();
+      store.runs.saveRun(state);
+      store.database.close();
     });
     const final = await h.waitFor(runId, (view) => view.delivery.applied === 1);
     expect(final.delivery.inProgress).toBe(false);

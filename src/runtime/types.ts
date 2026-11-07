@@ -1,4 +1,4 @@
-import type { TranscriptEntry } from '../protocol/index.ts';
+import type { TranscriptEntry } from '../feature/agents/types/index.ts';
 import type {
   ClaudeEditMode,
   ClaudeMcpMode,

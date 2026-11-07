@@ -1,4 +1,4 @@
-import type { ConfigCatalogResponse } from '../protocol/index.ts';
+import type { RuntimeCatalogs } from '../feature/agents/types/index.ts';
 import {
   defaultRuntimes,
   type Runtime as RuntimeName,
@@ -41,7 +41,7 @@ export function runtimeCatalog(
   repository: string,
   home: string,
   environment: NodeJS.ProcessEnv,
-): ConfigCatalogResponse['runtimes'] {
+): RuntimeCatalogs {
   const build = (name: RuntimeName) => {
     const runtime = runtimeFor(name, environment);
     const servers = name === 'claude' ? mcpServers(repository, home) : [];

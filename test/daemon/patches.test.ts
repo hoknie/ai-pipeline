@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { FilePatchStorage, storageFor } from '../../src/daemon/patches.ts';
+import { FilePatchStorage, storageFor } from '../../src/feature/delivery/repositories/index.ts';
 
 function storage(): FilePatchStorage {
   return new FilePatchStorage(join(mkdtempSync(join(tmpdir(), 'aip-patches-')), 'patches'));

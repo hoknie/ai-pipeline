@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { databasePath } from '../../src/platform/paths/index.ts';
 import { requestSchema } from '../../src/protocol/index.ts';
-import { Store } from '../../src/store/index.ts';
+import { openStorage } from '../feature/storage.ts';
 import { run } from '../feature/runs/helpers.ts';
 
 import { harness, type Harness } from './harness.ts';
@@ -34,13 +34,13 @@ describe('finished_runs', () => {
   it('returns pages by cursor and rejects a garbled cursor', async () => {
     const h = (current = await harness());
     await h.restart(() => {
-      const store = new Store(databasePath(h.state));
+      const store = openStorage(databasePath(h.state));
       for (let index = 1; index <= 5; index += 1) {
         const state = run(1, { id: `run00000000${index}`, now: index * 10 });
         state.run.finishedAt = index * 10 + 1;
-        store.saveRun(state);
+        store.runs.saveRun(state);
       }
-      store.close();
+      store.database.close();
     });
     const first = (await h.call('finished_runs', { limit: 2 })) as Page;
     expect(first.runs.map((view) => view.id)).toEqual(['run000000005', 'run000000004']);

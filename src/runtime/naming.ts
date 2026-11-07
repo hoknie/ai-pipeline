@@ -5,7 +5,7 @@ import {
   RUN_NAME_PATTERN,
   RUN_TITLE_LIMIT,
 } from '../feature/agents/types/index.ts';
-import type { TranscriptEntry } from '../protocol/index.ts';
+import type { TranscriptEntry } from '../feature/agents/types/index.ts';
 
 export interface RunNaming {
   title: string;

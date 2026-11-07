@@ -213,15 +213,21 @@ import {
   type ObserversView,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
-import type { KnownRepository, Store } from '../store/index.ts';
+import type { Database } from '../platform/sqlite/index.ts';
+import {
+  artifactStorageFor,
+  type ArtifactStorage,
+} from '../feature/artifacts/repositories/index.ts';
+import { storageFor, type PatchStorage } from '../feature/delivery/repositories/index.ts';
+import type { KnownRepository } from '../feature/repos/repositories/index.ts';
+import { recoverRuns } from '../feature/runs/services/index.ts';
 
 import type { Executor, AttemptKey } from './executor.ts';
 import type { ExecutorHost } from './ports.ts';
+import type { DaemonRepositories } from './repositories.ts';
 import type { DaemonTimings } from './timings.ts';
 import { readLines, readTail, readTimes, timesPath } from './logs.ts';
 import { checkObserverSettings } from './observers.ts';
-import { artifactStorageFor, type ArtifactStorage } from './artifacts.ts';
-import { storageFor, type PatchStorage } from './patches.ts';
 import { selectBackground, terminateTree, type AgentRoot } from './processes.ts';
 import { isRejected, rejected } from '../platform/errors/index.ts';
 import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
@@ -266,7 +272,8 @@ function deliveryOutcome(delivery: Group['delivery']): Group['delivery'] {
 
 /** What `createApplication` builds and hands to the daemon. */
 export interface DaemonParts {
-  store: Store;
+  database: Database;
+  repositories: DaemonRepositories;
   socket: string;
   environment: NodeJS.ProcessEnv;
   /** Defaults merged with the overrides. */
@@ -278,7 +285,8 @@ export interface DaemonParts {
 }
 
 export class Daemon implements ExecutorHost {
-  readonly store: Store;
+  readonly database: Database;
+  readonly repositories: DaemonRepositories;
   readonly socket: string;
   readonly environment: NodeJS.ProcessEnv;
   readonly now: () => number;
@@ -327,7 +335,8 @@ export class Daemon implements ExecutorHost {
   private sentProcessesError: string | null = null;
 
   constructor(options: DaemonOptions, parts: DaemonParts) {
-    this.store = parts.store;
+    this.database = parts.database;
+    this.repositories = parts.repositories;
     this.socket = parts.socket;
     this.patchStorages = parts.patchStorages;
     this.artifactStorages = parts.artifactStorages;
@@ -345,18 +354,19 @@ export class Daemon implements ExecutorHost {
     await this.sweepPatches();
     await this.sweepArtifacts();
     await this.serial(async () => {
-      const recovered = this.store.recover(this.now());
+      const recovered = recoverRuns(this.database, this.repositories.runs, this.now());
       for (const { state } of recovered) this.states.set(state.run.id, state);
       // Finished runs whose usage limit may still hold a runtime.
-      for (const id of this.store.limitedRunIds()) {
+      for (const id of this.repositories.runs.limitedRunIds()) {
         if (this.states.has(id)) continue;
-        const state = this.store.loadRun(id);
+        const state = this.repositories.runs.loadRun(id);
         if (state && limitHolds([state], this.now()).size > 0) this.states.set(id, state);
       }
-      for (const queue of this.store.queues()) this.queues.set(queue.repository, queue);
-      this.catalog = this.store.tags();
-      for (const entry of this.store.repositories()) this.registry.set(entry.path, entry);
-      this.observers = this.store.loadObservers();
+      const { queues, tags, known, observers } = this.repositories;
+      for (const queue of queues.queues()) this.queues.set(queue.repository, queue);
+      this.catalog = tags.tags();
+      for (const entry of known.repositories()) this.registry.set(entry.path, entry);
+      this.observers = observers.loadObservers();
       // A delivery cut off by the restart starts again.
       for (const { state, effects } of recovered) await this.executor.perform(state, effects);
       await this.schedule();
@@ -376,7 +386,7 @@ export class Daemon implements ExecutorHost {
   }
 
   save(state: RunState): void {
-    this.store.saveRun(state);
+    this.repositories.runs.saveRun(state);
     this.broadcast(state);
     this.publishRepositories();
     const queue = this.queues.get(state.run.repository);
@@ -412,7 +422,7 @@ export class Daemon implements ExecutorHost {
     const settings = this.observers;
     const pool = new Map<string, RunState>();
     if (full) {
-      for (const stored of this.store.recentRuns()) {
+      for (const stored of this.repositories.finished.recentRuns()) {
         if (this.states.has(stored.run.id)) continue;
         // Through `state`, so the run lives in memory and `apply` changes the one that is kept.
         pool.set(stored.run.id, this.state(stored.run.id));
@@ -489,9 +499,9 @@ export class Daemon implements ExecutorHost {
   private queueFor(repository: string): Queue {
     const cached = this.queues.get(repository);
     if (cached) return cached;
-    const queue =
-      this.store.loadQueue(repository) ??
-      emptyQueue(repository, this.now(), this.store.maxTaskNumber(repository) + 1);
+    const { runs, queues } = this.repositories;
+    const next = Math.max(runs.maxNumber(repository), queues.maxItemNumber(repository)) + 1;
+    const queue = queues.loadQueue(repository) ?? emptyQueue(repository, this.now(), next);
     this.queues.set(repository, queue);
     return queue;
   }
@@ -543,7 +553,7 @@ export class Daemon implements ExecutorHost {
   }
 
   private saveQueue(queue: Queue): QueueView {
-    this.store.saveQueue(queue);
+    this.repositories.queues.saveQueue(queue);
     return this.publishQueue(queue);
   }
 
@@ -599,7 +609,7 @@ export class Daemon implements ExecutorHost {
   private remember(root: string): void {
     if (this.registry.has(root)) return;
     const addedAt = this.now();
-    this.store.addRepository(root, addedAt);
+    this.repositories.known.addRepository(root, addedAt);
     this.registry.set(root, { path: root, addedAt });
     this.publishRepositories();
   }
@@ -626,14 +636,14 @@ export class Daemon implements ExecutorHost {
     if (queue && (queue.status === 'running' || queue.items.length > 0)) {
       throw rejected('repository queue is not empty or running');
     }
-    this.store.removeRepository(root);
+    this.repositories.known.removeRepository(root);
     this.registry.delete(root);
     if (this.observers.projects.some((project) => project.repository === root)) {
       this.observers = {
         ...this.observers,
         projects: this.observers.projects.filter((project) => project.repository !== root),
       };
-      this.store.saveObservers(this.observers);
+      this.repositories.observers.saveObservers(this.observers);
       this.publishObservers();
     }
     this.publishRepositories();
@@ -682,7 +692,7 @@ export class Daemon implements ExecutorHost {
       try {
         if (item.run !== null) {
           await this.takeReturned(queue, item);
-          this.store.saveQueue(queue);
+          this.repositories.queues.saveQueue(queue);
           changed = true;
           continue;
         }
@@ -693,7 +703,7 @@ export class Daemon implements ExecutorHost {
         );
         itemStarted(queue, item.id, created.runId, this.now());
         started.set(item.id, created);
-        this.store.saveQueue(queue);
+        this.repositories.queues.saveQueue(queue);
       } catch (error) {
         itemFailed(queue, item.id, (error as Error).message, this.now());
         changed = true;
@@ -1072,7 +1082,7 @@ export class Daemon implements ExecutorHost {
       (slug) => this.diffs.get(`${state.run.id}/${slug}`) ?? null,
       this.catalogOf(state.run.repository),
       this.waitLookup,
-      this.store.artifactCounts(state.run.id),
+      this.repositories.artifacts.artifactCounts(state.run.id),
       this.observers,
     );
     const queue = this.queues.get(state.run.repository);
@@ -1200,11 +1210,12 @@ export class Daemon implements ExecutorHost {
     const ref = runRef(state.run);
     if (!(await refExists(repository, ref))) return;
     const commit = await git(repository, 'rev-parse', ref);
-    const stored = this.store.runPatch(id);
+    const { patches } = this.repositories;
+    const stored = patches.runPatch(id);
     if (stored?.commit === commit) return;
     const bytes = await rangePatch(repository, state.run.baseCommit, commit);
     const uri = await this.patchStorages[0]!.put(id, commit, bytes);
-    this.store.setRunPatch(id, { uri, commit, size: bytes.length, createdAt: this.now() });
+    patches.setRunPatch(id, { uri, commit, size: bytes.length, createdAt: this.now() });
     if (stored && stored.uri !== uri) {
       await storageFor(this.patchStorages, stored.uri)
         ?.remove(stored.uri)
@@ -1215,8 +1226,8 @@ export class Daemon implements ExecutorHost {
   /** Removes patch files of runs the database does not know and superseded ones. */
   private async sweepPatches(): Promise<void> {
     const keep = new Map<string, string>();
-    for (const id of this.store.runPatchIds()) {
-      const record = this.store.runPatch(id);
+    for (const id of this.repositories.patches.runPatchIds()) {
+      const record = this.repositories.patches.runPatch(id);
       if (record) keep.set(id, record.uri);
     }
     for (const storage of this.patchStorages) await storage.sweep(keep).catch(() => undefined);
@@ -1224,7 +1235,7 @@ export class Daemon implements ExecutorHost {
 
   /** Removes artifact files of runs the database does not know and files it has no record of. */
   private async sweepArtifacts(): Promise<void> {
-    const keep = this.store.artifactUris();
+    const keep = this.repositories.artifacts.artifactUris();
     for (const storage of this.artifactStorages) await storage.sweep(keep).catch(() => undefined);
   }
 
@@ -1232,7 +1243,7 @@ export class Daemon implements ExecutorHost {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
     if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
-    return this.store.artifacts(state.run.id, group.slug).map((record) => {
+    return this.repositories.artifacts.artifacts(state.run.id, group.slug).map((record) => {
       const attempt = group.attempts.find((candidate) => candidate.seq === record.seq);
       return {
         id: record.id,
@@ -1253,7 +1264,7 @@ export class Daemon implements ExecutorHost {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
     if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
-    const record = this.store.artifact(state.run.id, params.id);
+    const record = this.repositories.artifacts.artifact(state.run.id, params.id);
     if (!record || record.group !== group.slug) {
       throw rejected(`unknown artifact \`${params.id}\``);
     }
@@ -1278,14 +1289,15 @@ export class Daemon implements ExecutorHost {
         : await this.readArtifactFile(this.executor.worktreePath(state, group), params.path ?? '');
     const runId = state.run.id;
     const fileName = params.fileName;
+    const { artifacts } = this.repositories;
     return this.serial(async () => {
-      const existing = this.store.findArtifact(runId, group.slug, attempt.seq, fileName);
-      if (!existing && this.store.artifactCount(runId, group.slug) >= ARTIFACTS_PER_GROUP) {
+      const existing = artifacts.findArtifact(runId, group.slug, attempt.seq, fileName);
+      if (!existing && artifacts.artifactCount(runId, group.slug) >= ARTIFACTS_PER_GROUP) {
         throw rejected(`a group may have at most ${ARTIFACTS_PER_GROUP} artifacts`);
       }
       const id = existing?.id ?? randomUUID();
       const uri = await this.artifactStorages[0]!.put(runId, id, bytes);
-      const { artifact, previousUri } = this.store.addArtifact({
+      const { artifact, previousUri } = artifacts.addArtifact({
         id,
         runId,
         group: group.slug,
@@ -1350,7 +1362,7 @@ export class Daemon implements ExecutorHost {
     const ref = runRef(state.run);
     const present = await refExists(repository, ref);
     if (present) await this.savePatch(state);
-    const record = this.store.runPatch(id);
+    const record = this.repositories.patches.runPatch(id);
     let bytes: Buffer | null = null;
     if (record) bytes = (await storageFor(this.patchStorages, record.uri)?.get(record.uri)) ?? null;
     if (bytes === null && present) {
@@ -1409,7 +1421,7 @@ export class Daemon implements ExecutorHost {
 
   subscribe(send: (line: string) => void): () => void {
     this.seq += 1;
-    const runs = this.store
+    const runs = this.repositories.finished
       .recentRuns()
       .map((stored) => this.view(this.states.get(stored.run.id) ?? stored));
     const queues = [...this.queues.values()]
@@ -1545,7 +1557,7 @@ export class Daemon implements ExecutorHost {
     this.processTimer = null;
     await this.executor.stopAll();
     await this.queue.catch(() => undefined);
-    this.store.close();
+    this.database.close();
   }
 
   /** An agent exited; what it left in its process group is still shown as background. */
@@ -1635,7 +1647,7 @@ export class Daemon implements ExecutorHost {
   state(runIdentifier: string): RunState {
     const cached = this.states.get(runIdentifier);
     if (cached) return cached;
-    const loaded = this.store.loadRun(runIdentifier);
+    const loaded = this.repositories.runs.loadRun(runIdentifier);
     if (!loaded) throw rejected(`unknown run \`${runIdentifier}\``);
     this.states.set(runIdentifier, loaded);
     return loaded;
@@ -1975,7 +1987,7 @@ export class Daemon implements ExecutorHost {
     const checked = checkObserverSettings(settings, this.observers, new Set(this.registry.keys()));
     if (checked.settings === null) return Promise.resolve({ ok: false, errors: checked.errors });
     this.observers = checked.settings;
-    this.store.saveObservers(this.observers);
+    this.repositories.observers.saveObservers(this.observers);
     // The state `repair` of every run depends on the settings: send the runs again.
     for (const state of this.states.values()) this.broadcast(state);
     return this.observe(true).then(() => {
@@ -2130,7 +2142,7 @@ export class Daemon implements ExecutorHost {
           now,
         )
       : addTag(this.catalogOf(input.repository), input, id, now);
-    this.store.saveTag(tag);
+    this.repositories.tags.saveTag(tag);
     this.catalog = [...this.catalog, tag];
     return tag;
   }
@@ -2144,16 +2156,21 @@ export class Daemon implements ExecutorHost {
   private async tagEdit(params: ParamsOf<'tag_edit'>): Promise<TagView[]> {
     const repository = await this.rootOf(params.repository);
     const tag = editTag(this.catalogOf(repository), params.tag, params);
-    this.store.saveTag(tag);
+    this.repositories.tags.saveTag(tag);
     this.catalog = this.catalog.map((candidate) => (candidate.id === tag.id ? tag : candidate));
     return this.publishTags(repository);
   }
 
-  /** Takes the tag off every run and queue item, in memory and in the store, then publishes. */
+  /** Takes the tag off every run and queue item, in memory and in the database, then publishes. */
   private async tagRemove(params: ParamsOf<'tag_remove'>): Promise<TagView[]> {
     const repository = await this.rootOf(params.repository);
     const { id } = removeTag(this.catalogOf(repository), params.tag);
-    this.store.removeTag(repository, id);
+    // Three tables, one transaction: the scenario is opened here, each repository changes its own.
+    this.database.transaction(() => {
+      this.repositories.tags.deleteTag(repository, id);
+      this.repositories.runs.dropTag(repository, id);
+      this.repositories.queues.dropItemTag(repository, id);
+    });
     this.catalog = this.catalog.filter((tag) => tag.id !== id);
     for (const state of [...this.states.values()]) {
       if (state.run.repository === repository && state.run.tags.includes(id)) {
@@ -2301,7 +2318,7 @@ export class Daemon implements ExecutorHost {
       if (state) return state;
     }
     if (parsed.number !== null) {
-      const id = this.store.runIdByNumber(repository, parsed.number);
+      const id = this.repositories.runs.runIdByNumber(repository, parsed.number);
       const state = id === null ? undefined : this.lookupState(id);
       if (state) return state;
     }
@@ -2395,7 +2412,7 @@ export class Daemon implements ExecutorHost {
       if (queue.items.some((item) => item.id === id)) return id;
       const own = this.lookupState(id);
       if (own?.run.repository === queue.repository) return id;
-      const started = this.store.runOfQueueItem(queue.repository, id);
+      const started = this.repositories.runs.runOfQueueItem(queue.repository, id);
       if (started) return started.run.id;
       throw rejected(`unknown dependency \`${id}\``);
     });
@@ -2463,7 +2480,7 @@ export class Daemon implements ExecutorHost {
   private status(runIdentifier: string | undefined): unknown {
     const now = this.now();
     if (runIdentifier) return this.view(this.state(runIdentifier), now);
-    return this.store
+    return this.repositories.finished
       .recentRuns()
       .map((stored) => this.view(this.states.get(stored.run.id) ?? stored, now));
   }
@@ -2477,7 +2494,7 @@ export class Daemon implements ExecutorHost {
       before = { createdAt: Number(match[1]), id: match[2] ?? '' };
     }
     const now = this.now();
-    const page = this.store.finishedRunsPage(params.limit, before);
+    const page = this.repositories.finished.finishedRunsPage(params.limit, before);
     const runs = page.runs.map((stored) =>
       this.view(this.states.get(stored.run.id) ?? stored, now),
     );

@@ -1,0 +1,225 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { databasePath, ensureDirectory } from '../../../src/platform/paths/index.ts';
+import { SCHEMA_VERSION, migrate } from '../../../src/platform/sqlite/index.ts';
+import { openStorage, temporaryStorage, renameBack } from '../../feature/storage.ts';
+import { run } from '../../feature/runs/helpers.ts';
+import { addItem, emptyQueue } from '../../../src/feature/queue/types/index.ts';
+
+describe('migrations', () => {
+  it('sets the schema version and changes nothing when run again', () => {
+    const store = temporaryStorage();
+    const version = () =>
+      (store.database.prepare('PRAGMA user_version').get() as { user_version: number })
+        .user_version;
+    expect(version()).toBe(SCHEMA_VERSION);
+    const tables = () =>
+      store.database
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .all();
+    const before = tables();
+    migrate(store.database.connection);
+    expect(version()).toBe(SCHEMA_VERSION);
+    expect(tables()).toEqual(before);
+    const mode = store.database.prepare('PRAGMA journal_mode').get() as { journal_mode: string };
+    expect(mode.journal_mode).toBe('wal');
+  });
+});
+
+describe('migration to hidden refs', () => {
+  it('keeps runs created before the change on visible branches', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const legacy = new DatabaseSync(databasePath(directory));
+    legacy.exec(MIGRATIONS[0] ?? '');
+    legacy.exec('PRAGMA user_version = 1');
+    const state = run(1);
+    legacy
+      .prepare(
+        'INSERT INTO runs (id, repository, workflow, base_commit, branch, created_at, finished_at, config_json, dirty_warning, next_merge_seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)',
+      )
+      .run(
+        'legacyrun001',
+        '/repo',
+        'feature',
+        'abc',
+        'aip/legacyrun001',
+        1,
+        2,
+        JSON.stringify({
+          ...state.run.config,
+          claude: { editMode: 'allowlist', mcp: 'isolated' },
+        }),
+      );
+    legacy
+      .prepare(
+        "INSERT INTO groups (run_id, slug, position, title, task, status, pending_json, rejections_json, question, reason, warnings_json, decisions_json, conflict_files_json, merge_seq, merge_in_flight, update_on_conflict) VALUES ('legacyrun001', 'g', 0, 'G', 't', 'merged', NULL, '{}', NULL, NULL, '[]', '[]', '[]', 0, 0, 0)",
+      )
+      .run();
+    legacy.close();
+    const store = openStorage(databasePath(directory));
+    const loaded = store.runs.loadRun('legacyrun001')!;
+    expect(loaded.run.refStyle).toBe('branches');
+    expect(loaded.groups[0]).toMatchObject({ mergeCommit: null, delivery: { state: 'pending' } });
+    expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
+    expect(loaded.run.fromQueue).toBe(false);
+    expect(loaded.run.config.claude.settings).toBe('isolated');
+    expect(SCHEMA_VERSION).toBe(28);
+    expect(loaded.groups[0]!.questions).toBeNull();
+  });
+});
+
+describe('migration to project tags', () => {
+  const runSql =
+    "INSERT INTO runs (id, repository, workflow, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq, tags_json) VALUES (?, ?, 'f', 'abc', 'b', ?, '{}', 0, 0, ?)";
+
+  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
+    const database = new DatabaseSync(':memory:');
+    MIGRATIONS.slice(0, -3).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    prepare(database);
+    migrate(database);
+    return database;
+  }
+
+  const tagRow = (database: import('node:sqlite').DatabaseSync, id: string, name: string) =>
+    database
+      .prepare(
+        'INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(id, name, id === 'lk' ? 'indigo' : 'blue', 1, null, null);
+
+  it('copies a tag into every repository it is used in, keeping the order of tags', async () => {
+    const database = await before((db) => {
+      tagRow(db, 'ta', 'auth');
+      tagRow(db, 'tb', 'v2');
+      db.prepare(runSql).run('run1', '/b', 1, JSON.stringify(['tb', 'ta']));
+      db.prepare(
+        "INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, updated_at) VALUES ('/a', 'stopped', 1, '[]', '[]', 1)",
+      ).run();
+      db.prepare(
+        "INSERT INTO queue_items (id, repository, position, workflow, created_at, tags_json) VALUES ('q1', '/a', 0, 'f', 1, ?)",
+      ).run(JSON.stringify(['ta']));
+    });
+    const tags = database
+      .prepare('SELECT id, repository, name FROM tags ORDER BY id, repository')
+      .all() as { id: string; repository: string; name: string }[];
+    expect(tags.map((tag) => [tag.id, tag.repository])).toEqual([
+      ['ta', '/a'],
+      ['ta-2', '/b'],
+      ['tb', '/b'],
+    ]);
+    const runTags = database.prepare("SELECT tags_json FROM runs WHERE id = 'run1'").get() as {
+      tags_json: string;
+    };
+    expect(JSON.parse(runTags.tags_json)).toEqual(['tb', 'ta-2']);
+    const itemTags = database
+      .prepare("SELECT tags_json FROM queue_items WHERE id = 'q1'")
+      .get() as {
+      tags_json: string;
+    };
+    expect(JSON.parse(itemTags.tags_json)).toEqual(['ta']);
+    database.close();
+  });
+
+  it('copies an unused tag into every known repository, or drops it without repositories', async () => {
+    const two = await before((db) => {
+      tagRow(db, 'tu', 'unused');
+      db.prepare("INSERT INTO repositories (path, added_at) VALUES ('/b', 1), ('/a', 2)").run();
+    });
+    const rows = two.prepare('SELECT id, repository FROM tags ORDER BY repository').all() as {
+      id: string;
+      repository: string;
+    }[];
+    expect(rows.map((row) => [row.id, row.repository])).toEqual([
+      ['tu', '/a'],
+      ['tu-2', '/b'],
+    ]);
+    two.close();
+    const none = await before((db) => tagRow(db, 'tu', 'unused'));
+    expect(none.prepare('SELECT COUNT(*) AS n FROM tags').get()).toEqual({ n: 0 });
+    none.close();
+  });
+
+  it('puts a linked tag into the repository of its source run first, and drops it without one', async () => {
+    const database = await before((db) => {
+      db.prepare(
+        "INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES ('lk', 'cards', 'indigo', 1, 'src', 3)",
+      ).run();
+      db.prepare(
+        "INSERT INTO tags (id, name, color, created_at, task_run, task_number) VALUES ('lost', 'lost', 'indigo', 1, 'gone', 4)",
+      ).run();
+      db.prepare(runSql).run('src', '/z', 1, '[]');
+      db.prepare(runSql).run('child', '/a', 2, JSON.stringify(['lk']));
+    });
+    const rows = database
+      .prepare('SELECT id, repository, task_run FROM tags ORDER BY repository')
+      .all() as {
+      id: string;
+      repository: string;
+      task_run: string;
+    }[];
+    expect(rows.map((row) => [row.id, row.repository, row.task_run])).toEqual([
+      ['lk-2', '/a', 'src'],
+      ['lk', '/z', 'src'],
+    ]);
+    const child = database.prepare("SELECT tags_json FROM runs WHERE id = 'child'").get() as {
+      tags_json: string;
+    };
+    expect(JSON.parse(child.tags_json)).toEqual(['lk-2']);
+    database.close();
+  });
+});
+
+describe('pipeline rename', () => {
+  it('opens a database with the old columns and a snapshot with the old names', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = openStorage(databasePath(directory));
+    const state = run(1);
+    old.runs.saveRun(state);
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
+    old.queues.saveQueue(queue);
+    const snapshot = JSON.parse(JSON.stringify(state.run.config)) as Record<string, unknown>;
+    const pipelines = snapshot.pipelines as Record<string, unknown>[];
+    delete snapshot.pipelines;
+    snapshot.workflows = pipelines.map((entry, index) =>
+      index === 0
+        ? {
+            ...entry,
+            split: { specialist: 'coder', maxGroups: 2, additionalPrompt: null, workflow: 'other' },
+          }
+        : entry,
+    );
+    old.database
+      .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
+      .run(JSON.stringify(snapshot), state.run.id);
+    renameBack(old.database.connection);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.close();
+    const store = openStorage(databasePath(directory));
+    const loaded = store.runs.loadRun(state.run.id)!;
+    expect(loaded.run.id).toBe(state.run.id);
+    expect(loaded.run.pipeline).toBe(state.run.pipeline);
+    const config = loaded.run.config as unknown as Record<string, unknown>;
+    expect(config.workflows).toBeUndefined();
+    expect(loaded.run.config.pipelines[0]?.split).toEqual({
+      specialist: 'coder',
+      maxGroups: 2,
+      additionalPrompt: null,
+      pipeline: 'other',
+    });
+    expect(store.queues.loadQueue('/repo')?.items[0]).toMatchObject({
+      id: 'q1',
+      pipeline: 'feature',
+    });
+    store.database.close();
+  });
+});
