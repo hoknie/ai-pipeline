@@ -1,5 +1,10 @@
 import { openMaintenance } from '../app/maintenance.ts';
-import { deliveryBranch, groupRef, isRunFinished, type RunState } from '../core/index.ts';
+import {
+  type RunState,
+  deliveryBranch,
+  groupRef,
+  isRunFinished,
+} from '../feature/runs/types/index.ts';
 import {
   cleanRun as cleanWorkspace,
   hasRunLeftovers,
@@ -10,6 +15,7 @@ import {
 import { plainStyle, runTitle, table, type Style } from '../protocol/index.ts';
 
 import type { Context } from './commands.ts';
+import { notFound } from '../platform/errors/index.ts';
 
 export interface CleanableRun {
   id: string;
@@ -39,7 +45,7 @@ export async function cleanRun(ctx: Context, runId: string, all: boolean): Promi
   const maintenance = openMaintenance(ctx.stateDirectory);
   try {
     const state = maintenance.loadRun(runId);
-    if (!state) throw new Error(`unknown run \`${runId}\``);
+    if (!state) throw notFound('cli.clean', `unknown run \`${runId}\``);
     return await cleanWorkspace(planFor(state, all));
   } finally {
     maintenance.close();

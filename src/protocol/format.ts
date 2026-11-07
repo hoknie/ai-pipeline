@@ -1,4 +1,4 @@
-import { clockTime, type GroupWait, type Usage } from '../core/index.ts';
+import { type GroupWait, clockTime } from '../feature/runs/types/index.ts';
 
 import { plainStyle, statusBadge, visibleWidth, type Style } from './style.ts';
 
@@ -24,7 +24,7 @@ function seconds(milliseconds: number): string {
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
 }
 
-export function formatUsage(usage: Usage | null): string {
+export function formatUsage(usage: RunView['usage']): string {
   if (!usage) return '—';
   const tokens = `${usage.inputTokens} in / ${usage.outputTokens} out`;
   return usage.costUsd === null ? tokens : `${tokens} · $${usage.costUsd.toFixed(4)}`;

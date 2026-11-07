@@ -1,5 +1,9 @@
-import { pipelineNameOf } from '../feature/swarm-config/types/index.ts';
-import type { ActionPoint, DeliveryMode, FieldError } from '../feature/swarm-config/types/index.ts';
+import {
+  type ActionPoint,
+  type DeliveryMode,
+  type FieldError,
+  pipelineNameOf,
+} from '../feature/swarm-config/types/index.ts';
 import {
   type SharedSpecialistUsage,
   type SharedSpecialistsUsage,
@@ -10,18 +14,51 @@ import {
   type EntryReference,
 } from '../feature/swarm-edit/types/index.ts';
 import {
+  type DependencyState,
+  type ItemReadiness,
+  type Queue,
+  type QueueItem,
+  type QueueStop,
   DEFAULT_AUTOPILOT_ANSWER,
+  itemReadiness,
+  dependencyState,
+  freezeCandidate,
+  occupiesSlot,
+  canReturn,
+} from '../feature/queue/types/index.ts';
+import {
+  type ObserverSettings,
   defaultObserverSettings,
   repairAdmitted,
   repairIncidents,
+} from '../feature/observers/types/index.ts';
+import {
+  type StepProgress,
+  type Attempt,
+  type RunHold,
+  type Group,
+  type NewGroup,
+  type OnLimit,
+  type ProblemReason,
+  type GroupDelivery,
+  type HumanOnly,
+  type HumanQuestion,
+  type RunPhase,
+  type GroupStatus,
+  type RunState,
+  type StepState,
+  type SpecialistUse,
+  type Topology,
+  type PipelineTopology,
+  type StagePerformer,
+  type GroupWait,
+  type Incident,
   actionGroupsOf,
   actionPointOf,
   allGroups,
   findGroup,
   parseActionSlug,
   attemptVerdict,
-  stepProgress,
-  type StepProgress,
   describeFailReason,
   deliveryCounts,
   groupRef,
@@ -30,56 +67,30 @@ import {
   isServiceGroup,
   isSplitGroup,
   isTerminal,
-  itemReadiness,
   limitResetsAt,
-  dependencyState,
-  freezeCandidate,
-  knownTags,
-  occupiesSlot,
   runPhase,
-  runStartedAt,
-  suggestPatterns,
-  summarize,
-  type Attempt,
-  type RunHold,
-  type Suggestion,
-  type DependencyState,
-  type Group,
-  type ItemReadiness,
-  type NewGroup,
-  type OnLimit,
-  type Queue,
-  type QueueItem,
-  type QueueStop,
-  type ProblemReason,
+  runTitle,
   runProblems,
   stepsOf,
-  type GroupDelivery,
-  type HumanDecision,
-  type HumanOnly,
-  type HumanQuestion,
-  type RunPhase,
-  type GroupStatus,
-  type RunState,
-  type Tag,
-  type TagColor,
-  type Usage,
   topology,
   stepStates,
   stepLabel,
   attemptStepLabel,
-  type StepState,
-  specialistUse,
-  type SpecialistUse,
-  type Topology,
-  type PipelineTopology,
-  type StagePerformer,
   GROUP_STATUSES,
-  type GroupWait,
-  canReturn,
-  type Incident,
-  type ObserverSettings,
-} from '../core/index.ts';
+} from '../feature/runs/types/index.ts';
+import {
+  stepProgress,
+  runStartedAt,
+  summarize,
+  specialistUse,
+} from '../feature/runs/services/index.ts';
+import { type Tag, type TagColor, knownTags } from '../feature/tags/types/index.ts';
+import {
+  type Suggestion,
+  type HumanDecision,
+  type Usage,
+  suggestPatterns,
+} from '../feature/agents/types/index.ts';
 
 /** A catalog tag as clients see it. */
 export interface TagView {
@@ -152,20 +163,7 @@ function totals(diff: DiffStat | null): DiffTotals | null {
   return diff ? { files: diff.files.length, added: diff.added, removed: diff.removed } : null;
 }
 
-/** Title of a run: the one it was named with, or the first line of its task. */
-export function runTitle(state: RunState): string {
-  if (state.run.title) return state.run.title;
-  const source =
-    state.split?.task ?? (state.groups.length === 1 ? state.groups[0]?.task : undefined);
-  const line =
-    source
-      ?.split('\n')
-      .find((part) => part.trim() !== '')
-      ?.trim() ?? state.groups.map((group) => group.title).join(', ');
-  return line.length > 80 ? `${line.slice(0, 79)}…` : line;
-}
-
-export type { GroupWait } from '../core/index.ts';
+export { runTitle, type GroupWait } from '../feature/runs/types/index.ts';
 
 /** Status of a row: the stored one, `done` for a merged service step, or the derived `waiting`. */
 export type RowStatus = GroupStatus | 'done' | 'waiting' | RunHold;
@@ -1050,16 +1048,13 @@ export type {
   StepTopology,
   Topology,
   PipelineTopology,
-} from '../core/index.ts';
-
-export type {
   PipelineStage,
   StageCondition,
   StageKind,
   StagePerformer,
   StageSection,
   StageStatus,
-} from '../core/index.ts';
+} from '../feature/runs/types/index.ts';
 
 /** Where the value of a setting comes from: the built-in default, the shared level or the project. */
 export type SettingLevel = 'default' | 'global' | 'project';

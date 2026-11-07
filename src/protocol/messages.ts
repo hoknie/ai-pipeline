@@ -10,6 +10,9 @@ import {
   ARTIFACT_CONTENT_LIMIT,
   ARTIFACT_FILE_NAME_LIMIT,
   ARTIFACT_TITLE_LIMIT,
+  validArtifactFileName,
+} from '../feature/artifacts/types/index.ts';
+import {
   FEEDBACK_LIMIT,
   INCIDENT_KINDS,
   OPTIONS_LIMIT,
@@ -17,12 +20,10 @@ import {
   RECOMMENDATION_LIMIT,
   QUESTIONS_LIMIT,
   QUESTION_TEXT_LIMIT,
-  RUN_TITLE_LIMIT,
   SUMMARY_LIMIT,
-  TAG_NAME_LIMIT,
-  VERDICTS,
-  validArtifactFileName,
-} from '../core/index.ts';
+} from '../feature/runs/types/index.ts';
+import { RUN_TITLE_LIMIT, VERDICTS } from '../feature/agents/types/index.ts';
+import { TAG_NAME_LIMIT } from '../feature/tags/types/index.ts';
 
 const repairActionParams = z.discriminatedUnion('action', [
   z.object({

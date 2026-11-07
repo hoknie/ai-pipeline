@@ -5,7 +5,7 @@ import { App } from '../src/App.tsx';
 import type { Api } from '../src/api.ts';
 import { TAG_CLASSES } from '../src/tagColors.ts';
 import { ApiError } from '../src/api.ts';
-import { CHAIN_TAG_COLOR, TAG_COLORS } from '../../src/core/tags.ts';
+import { CHAIN_TAG_COLOR, TAG_COLORS } from '../../src/feature/tags/types/index.ts';
 
 import { act, cleanup, choose, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import {

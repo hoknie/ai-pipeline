@@ -1,11 +1,11 @@
 import { validateObserverProfile } from '../feature/swarm-config/services/index.ts';
 import { type FieldError } from '../feature/swarm-config/types/index.ts';
 import {
-  OBSERVER_REPAIRS_MAX,
-  OBSERVER_WORKERS_MAX,
   type ObserverProject,
   type ObserverSettings,
-} from '../core/index.ts';
+  OBSERVER_REPAIRS_MAX,
+  OBSERVER_WORKERS_MAX,
+} from '../feature/observers/types/index.ts';
 
 const KEYS = ['enabled', 'workers', 'maxRepairs', 'answerHumanOnly', 'projects', 'specialist'];
 

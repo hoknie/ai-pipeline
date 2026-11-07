@@ -10,7 +10,7 @@ import {
   findSpecialist,
   type Specialist,
 } from '../../src/feature/swarm-config/types/index.ts';
-import type { StepInput } from '../../src/core/index.ts';
+import type { StepInput } from '../../src/feature/agents/types/index.ts';
 import {
   createClaudeRuntime,
   createOpencodeRuntime,
@@ -21,7 +21,7 @@ import {
   type LaunchContext,
 } from '../../src/runtime/index.ts';
 import { findExecutable } from '../../src/platform/process/index.ts';
-import { config } from '../core/helpers.ts';
+import { config } from '../feature/runs/helpers.ts';
 
 const fixtures = join(import.meta.dirname, '..', 'fixtures');
 

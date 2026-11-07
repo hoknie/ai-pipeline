@@ -10,7 +10,6 @@ import { z } from 'zod';
 import { settingFieldOf } from '../../feature/swarm-edit/types/index.ts';
 import { SLUG_PATTERN_TEXT, isValidSlug } from '../../feature/swarm-config/types/index.ts';
 import {
-  IpcError,
   checkDaemon,
   currentBuild,
   MESSAGE_TEXT_LIMIT,
@@ -30,8 +29,10 @@ import {
   type Method,
   type ParamsOf,
 } from '../../protocol/index.ts';
-import { artifactPreview, RUN_TITLE_LIMIT } from '../../core/index.ts';
+import { artifactPreview } from '../../feature/artifacts/types/index.ts';
+import { RUN_TITLE_LIMIT } from '../../feature/agents/types/index.ts';
 
+import { TOKEN_HINT, configError, panel, renderPanelError } from './errors.ts';
 import { systemView } from './system.ts';
 
 export interface WebOptions {
@@ -231,18 +232,8 @@ function tagReply(result: SpecialistTagsResult | SpecialistsImportResult): Reply
 
 function entryId(value: string | undefined): string {
   const id = value ?? '';
-  if (!isValidSlug(id)) throw new HttpError(400, `id must match ${SLUG_PATTERN_TEXT}`);
+  if (!isValidSlug(id)) throw panel('invalid', `id must match ${SLUG_PATTERN_TEXT}`);
   return id;
-}
-
-class HttpError extends Error {
-  readonly status: number;
-  readonly code: string | undefined;
-  constructor(status: number, message: string, code?: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
 }
 
 function sameToken(given: string | undefined, expected: string): boolean {
@@ -283,19 +274,19 @@ function json(response: ServerResponse, status: number, value: unknown): void {
 
 async function readJson(incoming: IncomingMessage): Promise<unknown> {
   if (!(incoming.headers['content-type'] ?? '').startsWith('application/json'))
-    throw new HttpError(415, 'content-type must be application/json');
+    throw panel('unsupported', 'content-type must be application/json');
   let size = 0;
   const chunks: Buffer[] = [];
   for await (const chunk of incoming as AsyncIterable<Buffer>) {
     size += chunk.length;
-    if (size > BODY_LIMIT) throw new HttpError(413, 'request body is too large');
+    if (size > BODY_LIMIT) throw panel('too_large', 'request body is too large');
     chunks.push(chunk);
   }
   if (size === 0) return {};
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
-    throw new HttpError(400, 'invalid JSON');
+    throw panel('invalid', 'invalid JSON');
   }
 }
 
@@ -303,7 +294,7 @@ const runObserverBody = z.object({ enabled: z.boolean() });
 
 function parseBody<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new HttpError(400, z.prettifyError(parsed.error));
+  if (!parsed.success) throw panel('invalid', z.prettifyError(parsed.error));
   return parsed.data;
 }
 
@@ -482,7 +473,7 @@ function transcriptQuery(search: URLSearchParams): { seq?: number; after?: numbe
     if (value === null) continue;
     const number = Number(value);
     if (!Number.isInteger(number) || number < low)
-      throw new HttpError(400, `${key} must be an integer from ${low}`);
+      throw panel('invalid', `${key} must be an integer from ${low}`);
     query[key] = number;
   }
   return query;
@@ -490,7 +481,7 @@ function transcriptQuery(search: URLSearchParams): { seq?: number; after?: numbe
 
 export function assertLoopbackHost(host: string): void {
   if (!['127.0.0.1', 'localhost', '::1'].includes(host))
-    throw new Error('the web panel only listens on loopback: use 127.0.0.1, localhost or ::1');
+    throw configError('the web panel only listens on loopback: use 127.0.0.1, localhost or ::1');
 }
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
@@ -500,7 +491,7 @@ export function webTokenFromEnv(env: NodeJS.ProcessEnv): string | undefined {
   const value = env.AIP_WEB_TOKEN;
   if (value === undefined || value === '') return undefined;
   if (!TOKEN_PATTERN.test(value))
-    throw new Error('AIP_WEB_TOKEN must be 16-128 characters of A-Z, a-z, 0-9, - and _');
+    throw configError('AIP_WEB_TOKEN must be 16-128 characters of A-Z, a-z, 0-9, - and _');
   return value;
 }
 
@@ -522,10 +513,10 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     if (chosen === null || chosen === '') {
       if (options.repository !== undefined) return options.repository;
       const found = (await options.defaultRepository?.()) ?? null;
-      if (found === null) throw new HttpError(409, 'no repository yet: add one in the panel');
+      if (found === null) throw panel('conflict', 'no repository yet: add one in the panel');
       return found;
     }
-    if (!isAbsolute(chosen)) throw new HttpError(400, 'repository must be an absolute path');
+    if (!isAbsolute(chosen)) throw panel('invalid', 'repository must be an absolute path');
     return chosen;
   };
   /** Fields of a queue request body; the repository comes from the query string, never the body. */
@@ -797,9 +788,9 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         const { values, revision, level } = parseBody(settingsBody, body);
         const unknown = Object.keys(values).filter((path) => settingFieldOf(path) === undefined);
         if (unknown.length > 0) {
-          throw new HttpError(404, `setting \`${unknown.join('`, `')}\` cannot be written`);
+          throw panel('not_found', `setting \`${unknown.join('`, `')}\` cannot be written`);
         }
-        if (Object.keys(values).length === 0) throw new HttpError(400, 'values must not be empty');
+        if (Object.keys(values).length === 0) throw panel('invalid', 'values must not be empty');
         return editReply(
           (await call('config_settings', {
             repository,
@@ -816,7 +807,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       handle: async ([path], body, repository) => {
         const known = path !== undefined && settingFieldOf(path) !== undefined ? path : undefined;
         if (known === undefined) {
-          throw new HttpError(404, `setting \`${path ?? ''}\` cannot be written`);
+          throw panel('not_found', `setting \`${path ?? ''}\` cannot be written`);
         }
         const { value, revision, level } = parseBody(settingBody, body);
         return editReply(
@@ -835,7 +826,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       pattern: new RegExp(`^/api/config/(specialists|pipelines|actions)/${segment}$`),
       handle: async ([section, id], body, repository) => {
         const { revision, level } = body as { revision?: string; level?: 'project' | 'global' };
-        if (!revision) throw new HttpError(400, 'revision is required');
+        if (!revision) throw panel('invalid', 'revision is required');
         return editReply(
           (await call('config_delete', {
             repository,
@@ -942,7 +933,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       method: 'POST',
       pattern: /^\/api\/processes\/([^/]+)\/kill$/,
       handle: ([pid]) => {
-        if (!/^\d+$/.test(pid ?? '')) throw new HttpError(400, 'pid must be a positive integer');
+        if (!/^\d+$/.test(pid ?? '')) throw panel('invalid', 'pid must be a positive integer');
         return call('process_kill', { pid: Number(pid) });
       },
     },
@@ -1054,7 +1045,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
   ): Promise<void> {
     const hooks = options.system;
     if (path === '/api/system') {
-      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
       const ping = await pingDaemon(options.socket).catch(() => null);
       const check =
         ping === null
@@ -1074,16 +1065,16 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       );
     }
     const action = SYSTEM_ACTIONS[path];
-    if (action === undefined) throw new HttpError(404, 'not found');
-    if (verb !== 'POST') throw new HttpError(405, 'method not allowed');
+    if (action === undefined) throw panel('not_found', 'not found');
+    if (verb !== 'POST') throw panel('method_not_allowed', 'method not allowed');
     const body = parseBody(
       action === 'web_restart' ? z.object({}) : forceBody,
       await readJson(incoming),
     );
     const force = (body as { force?: boolean }).force === true;
     if (hooks === undefined) {
-      throw new HttpError(
-        409,
+      throw panel(
+        'conflict',
         'this panel was started by `aip web`: control the daemon in the terminal',
         'web_standalone',
       );
@@ -1098,14 +1089,14 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
             : hooks.startDaemon;
     if (hook === undefined) {
       if (action === 'daemon_start')
-        throw new HttpError(409, 'the daemon is already running', 'daemon_running');
-      throw new HttpError(409, 'the daemon is stopped: start it first', 'daemon_stopped');
+        throw panel('conflict', 'the daemon is already running', 'daemon_running');
+      throw panel('conflict', 'the daemon is stopped: start it first', 'daemon_stopped');
     }
     if ((action === 'daemon_restart' || action === 'daemon_stop') && !force) {
       const ping = await pingDaemon(options.socket).catch(() => null);
       if (ping?.busy === true)
-        throw new HttpError(
-          409,
+        throw panel(
+          'conflict',
           `agents are running: ${action === 'daemon_stop' ? 'stop' : 'restart'} anyway to stop them`,
           'daemon_busy',
         );
@@ -1122,19 +1113,19 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
   }
 
   async function handle(incoming: IncomingMessage, response: ServerResponse): Promise<void> {
-    if (!hostAllowed(incoming)) throw new HttpError(403, 'forbidden host or origin');
+    if (!hostAllowed(incoming)) throw panel('forbidden', 'forbidden host or origin');
     const url = new URL(incoming.url ?? '/', `http://${incoming.headers.host}`);
     const verb = incoming.method ?? 'GET';
 
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
       const fromQuery = url.searchParams.get('token') ?? undefined;
       if (
         token !== null &&
         !sameToken(fromQuery, token) &&
         !sameToken(cookieToken(incoming.headers.cookie), token)
       )
-        throw new HttpError(401, 'open the URL printed by `aip web`: it contains the access token');
+        throw panel('unauthorized', TOKEN_HINT);
       const index = join(assets, 'index.html');
       const page = existsSync(index) ? readFileSync(index, 'utf8') : MISSING_BUILD;
       send(response, 200, page, 'text/html', {
@@ -1148,10 +1139,10 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     }
 
     if (url.pathname.startsWith('/assets/')) {
-      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
       const file = normalize(join(assets, decodeURIComponent(url.pathname)));
       if (!file.startsWith(assets.endsWith(sep) ? assets : `${assets}${sep}`) || !existsSync(file))
-        throw new HttpError(404, 'not found');
+        throw panel('not_found', 'not found');
       const type = TYPES[extname(file)] ?? 'application/octet-stream';
       response.writeHead(200, {
         'content-type': type.startsWith('text/') ? `${type}; charset=utf-8` : type,
@@ -1163,16 +1154,16 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       return;
     }
 
-    if (!url.pathname.startsWith('/api/')) throw new HttpError(404, 'not found');
+    if (!url.pathname.startsWith('/api/')) throw panel('not_found', 'not found');
     if (token !== null) {
       const given =
         (incoming.headers['x-aip-token'] as string | undefined) ??
         cookieToken(incoming.headers.cookie);
-      if (!sameToken(given, token)) throw new HttpError(401, 'missing or invalid token');
+      if (!sameToken(given, token)) throw panel('unauthorized', 'missing or invalid token');
     }
 
     if (url.pathname === '/api/events') {
-      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
       hub.attach(incoming, response);
       return;
     }
@@ -1181,17 +1172,17 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       if (verb === 'GET') return json(response, 200, await call('repositories', {}));
       if (verb === 'POST') {
         const { path } = parseBody(z.object({ path: z.string().min(1) }), await readJson(incoming));
-        if (!isAbsolute(path)) throw new HttpError(400, 'path must be an absolute path');
+        if (!isAbsolute(path)) throw panel('invalid', 'path must be an absolute path');
         return json(response, 200, await call('repository_add', { path }));
       }
       if (verb === 'DELETE') {
         const path = url.searchParams.get('repository');
         if (path === null || !isAbsolute(path)) {
-          throw new HttpError(400, 'repository must be an absolute path');
+          throw panel('invalid', 'repository must be an absolute path');
         }
         return json(response, 200, await call('repository_remove', { path }));
       }
-      throw new HttpError(405, 'method not allowed');
+      throw panel('method_not_allowed', 'method not allowed');
     }
 
     if (url.pathname === '/api/system' || url.pathname.startsWith('/api/system/')) {
@@ -1201,12 +1192,12 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
 
     const patchMatch = new RegExp(`^/api/runs/${segment}/patch$`).exec(url.pathname);
     if (patchMatch) {
-      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
       let runId: string;
       try {
         runId = decodeURIComponent(patchMatch[1] ?? '');
       } catch {
-        throw new HttpError(400, 'malformed percent-encoding in path');
+        throw panel('invalid', 'malformed percent-encoding in path');
       }
       const patch = (await call('run_patch', { runId })) as RunPatchView;
       const bytes = Buffer.from(patch.base64, 'base64');
@@ -1224,19 +1215,19 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       `^/api/runs/${segment}/groups/${segment}/artifacts/${segment}$`,
     ).exec(url.pathname);
     if (artifactMatch) {
-      if (verb !== 'GET') throw new HttpError(405, 'method not allowed');
+      if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
       let parts: string[];
       try {
         parts = artifactMatch.slice(1).map((part) => decodeURIComponent(part));
       } catch {
-        throw new HttpError(400, 'malformed percent-encoding in path');
+        throw panel('invalid', 'malformed percent-encoding in path');
       }
       const [runId = '', group = '', id = ''] = parts;
       const inline = url.searchParams.get('inline') === '1';
       const artifact = (await call('artifact', { runId, group, id })) as ArtifactContentView;
       const preview = artifactPreview(artifact.fileName);
       if (inline && preview === null) {
-        throw new HttpError(400, 'only .md and .log artifacts can be shown inline');
+        throw panel('invalid', 'only .md and .log artifacts can be shown inline');
       }
       const bytes = Buffer.from(artifact.base64, 'base64');
       const headers: Record<string, string | number> = {
@@ -1274,7 +1265,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       try {
         parts = match.slice(1).map((part) => decodeURIComponent(part));
       } catch {
-        throw new HttpError(400, 'malformed percent-encoding in path');
+        throw panel('invalid', 'malformed percent-encoding in path');
       }
       let body: unknown = {};
       if (verb === 'POST' || verb === 'PUT') body = await readJson(incoming);
@@ -1282,25 +1273,25 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         const revision = url.searchParams.get('revision');
         const level = url.searchParams.get('level');
         if (level !== null && level !== 'project' && level !== 'global') {
-          throw new HttpError(400, 'level must be project or global');
+          throw panel('invalid', 'level must be project or global');
         }
         body = { ...(revision ? { revision } : {}), ...(level ? { level } : {}) };
       } else if (/\/groups\/[^/]+$/.test(url.pathname)) {
         const tail = Number(url.searchParams.get('tail') ?? 40);
         if (!Number.isInteger(tail) || tail < 1 || tail > 500)
-          throw new HttpError(400, 'tail must be an integer from 1 to 500');
+          throw panel('invalid', 'tail must be an integer from 1 to 500');
         body = { tail };
       } else if (url.pathname === '/api/finished-runs') {
         const limit = Number(url.searchParams.get('limit') ?? 15);
         if (!Number.isInteger(limit) || limit < 1 || limit > 100)
-          throw new HttpError(400, 'limit must be an integer from 1 to 100');
+          throw panel('invalid', 'limit must be an integer from 1 to 100');
         const before = url.searchParams.get('before');
         body = { limit, ...(before ? { before } : {}) };
       } else if (url.pathname.endsWith('/transcript')) {
         body = transcriptQuery(url.searchParams);
       } else if (url.pathname.endsWith('/diff')) {
         const path = url.searchParams.get('path');
-        if (path === null || path === '') throw new HttpError(400, 'path is required');
+        if (path === null || path === '') throw panel('invalid', 'path is required');
         body = { path };
       }
       // Runs belong to the daemon, not to a repository: they work without one.
@@ -1322,8 +1313,8 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       else json(response, 200, result);
       return;
     }
-    if (wrongMethod) throw new HttpError(405, 'method not allowed');
-    throw new HttpError(404, 'not found');
+    if (wrongMethod) throw panel('method_not_allowed', 'method not allowed');
+    throw panel('not_found', 'not found');
   }
 
   const server = createServer((incoming, response) => {
@@ -1332,28 +1323,8 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
         response.end();
         return;
       }
-      if (error instanceof HttpError)
-        json(response, error.status, {
-          error: error.message,
-          ...(error.code === undefined ? {} : { code: error.code }),
-        });
-      else if (error instanceof IpcError) {
-        const status =
-          /^(unknown (run|group|attempt|queue item|artifact)\b|not a background process)/.test(
-            error.message,
-          )
-            ? 404
-            : /is not changed in group/.test(error.message)
-              ? 404
-              : /has no merged changes|is not available/.test(error.message)
-                ? 409
-                : /^aip daemon did not answer/.test(error.message)
-                  ? 504
-                  : error.message.startsWith('malformed response')
-                    ? 502
-                    : 400;
-        json(response, status, { error: error.message });
-      } else json(response, 502, { error: (error as Error).message });
+      const rendered = renderPanelError(error);
+      json(response, rendered.status, rendered.body);
     });
   });
 

@@ -180,7 +180,9 @@ function featureImportProblem(
   if (source.feature === 'compose' && !composeViews.includes(view)) return undefined;
   if (target.kind === 'platform') {
     const open = ['services', 'repositories', 'usecases', 'clients'].includes(view);
-    if (open || (target.sub === 'errors' && view === 'types')) return undefined;
+    if (open || (target.sub === 'errors' && (view === 'types' || view === 'machine'))) {
+      return undefined;
+    }
     return `view \`${view}\` must not import \`platform/${target.sub}\``;
   }
   if (target.kind !== 'feature') {

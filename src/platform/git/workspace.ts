@@ -10,18 +10,18 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 
-import { GitError, git, runGit } from './runner.ts';
+import { GitError, git, gitFailure, runGit } from './runner.ts';
 
 export const MINIMUM_GIT_VERSION = [2, 20] as const;
 
 export async function gitVersion(): Promise<string> {
   const output = await git(process.cwd(), '--version');
   const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(output);
-  if (!match) throw new Error(`cannot parse git version from "${output}"`);
+  if (!match) throw gitFailure(`cannot parse git version from "${output}"`);
   const [major, minor] = [Number(match[1]), Number(match[2])];
   const [needMajor, needMinor] = MINIMUM_GIT_VERSION;
   if (major < needMajor || (major === needMajor && minor < needMinor)) {
-    throw new Error(`git ${match[0]} is too old; aip needs ${needMajor}.${needMinor} or newer`);
+    throw gitFailure(`git ${match[0]} is too old; aip needs ${needMajor}.${needMinor} or newer`);
   }
   return match[0];
 }
@@ -30,7 +30,7 @@ export async function repositoryRoot(directory: string): Promise<string> {
   try {
     return await git(directory, 'rev-parse', '--show-toplevel');
   } catch (error) {
-    if (error instanceof GitError) throw new Error(`${directory} is not inside a git repository`);
+    if (error instanceof GitError) throw gitFailure(`${directory} is not inside a git repository`);
     throw error;
   }
 }
@@ -429,7 +429,7 @@ export async function hasRunLeftovers(plan: CleanPlan): Promise<boolean> {
 }
 
 export async function cleanRun(plan: CleanPlan): Promise<string[]> {
-  if (plan.active) throw new Error('the run is still active; cancel it or wait for it to finish');
+  if (plan.active) throw gitFailure('the run is still active; cancel it or wait for it to finish');
   const removed: string[] = [];
   if (existsSync(plan.root)) {
     const list = await git(plan.repository, 'worktree', 'list', '--porcelain');

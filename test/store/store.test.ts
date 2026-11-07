@@ -11,15 +11,11 @@ import {
   stateDirectory,
 } from '../../src/platform/paths/index.ts';
 import { SCHEMA_VERSION, Store, migrate, type ArtifactRecord } from '../../src/store/index.ts';
-import { finish, run, step } from '../core/helpers.ts';
-import {
-  addItem,
-  defaultObserverSettings,
-  dispatch,
-  emptyQueue,
-  emptyRepair,
-  transition,
-} from '../../src/core/index.ts';
+import { finish, run, step } from '../feature/runs/helpers.ts';
+import { addItem, emptyQueue } from '../../src/feature/queue/types/index.ts';
+import { defaultObserverSettings } from '../../src/feature/observers/types/index.ts';
+import { dispatch, transition } from '../../src/feature/runs/machine/index.ts';
+import { emptyRepair } from '../../src/feature/runs/types/index.ts';
 
 function temporaryStore(): Store {
   const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));

@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { git, runGit, runGitBuffer } from './runner.ts';
+import { git, gitFailure, runGit, runGitBuffer } from './runner.ts';
 import { commitAll, existingPaths, snapshotCommit } from './workspace.ts';
 
 export interface GroupChange {
@@ -110,7 +110,7 @@ async function combinedPatch(
   directory: string,
 ): Promise<string> {
   const [first] = changes;
-  if (!first) throw new Error('no changes to combine');
+  if (!first) throw gitFailure('no changes to combine');
   if (changes.length === 1) return patchFile(repository, first, directory);
   const environment = { GIT_INDEX_FILE: join(directory, 'combined.index') };
   await runGitWith(repository, ['read-tree', first.from], environment);
@@ -123,7 +123,7 @@ async function combinedPatch(
       true,
     );
     if (result.code !== 0) {
-      throw new Error(
+      throw gitFailure(
         `the changes of group ${change.group} do not apply on top of the groups before it: ${result.stderr.trim()}`,
       );
     }
@@ -182,7 +182,7 @@ export async function probe(
     );
     if (result.code !== 0) {
       const files = await unmerged(repository, environment);
-      if (files.length === 0) throw new Error(`patch does not apply: ${result.stderr.trim()}`);
+      if (files.length === 0) throw gitFailure(`patch does not apply: ${result.stderr.trim()}`);
       for (const file of files) conflicts.add(file);
       break;
     }
@@ -206,7 +206,7 @@ async function applyToWorktree(
     const result = await runGitWith(repository, ['apply', '--3way', patch], environment, true);
     if (result.code !== 0) {
       const files = await unmerged(repository, environment);
-      if (files.length === 0) throw new Error(`patch does not apply: ${result.stderr.trim()}`);
+      if (files.length === 0) throw gitFailure(`patch does not apply: ${result.stderr.trim()}`);
       for (const file of files) conflicts.add(file);
     }
   }
@@ -305,7 +305,7 @@ export async function prepareResolve(request: ResolveRequest): Promise<PreparedR
       const patch = await combinedPatch(repository, changes, directory);
       const result = await runGit(worktree, ['apply', '--3way', patch], { allowFailure: true });
       if (result.code !== 0 && (await unmergedIn(worktree)).length === 0) {
-        throw new Error(`patch does not apply: ${result.stderr.trim()}`);
+        throw gitFailure(`patch does not apply: ${result.stderr.trim()}`);
       }
     }
     return { base, conflicts: await unmergedIn(worktree) };

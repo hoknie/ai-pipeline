@@ -3,6 +3,7 @@ import { closeSync, mkdirSync, openSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { BuildInfo, DaemonCheck, PingResult } from '../../protocol/index.ts';
+import { unavailable } from '../../platform/errors/index.ts';
 
 /**
  * Who serves the panel: the daemon (it can restart the panel), a standalone `aip web`, or the
@@ -101,7 +102,7 @@ export interface SpawnRestartOptions {
  */
 export function spawnDaemonRestart(options: SpawnRestartOptions): void {
   const [executable, ...args] = options.entry;
-  if (!executable) throw new Error('no command to run aip');
+  if (!executable) throw unavailable('web.system', 'no command to run aip');
   mkdirSync(options.stateDirectory, { recursive: true, mode: 0o700 });
   const output = openSync(join(options.stateDirectory, 'daemon.log'), 'a');
   try {

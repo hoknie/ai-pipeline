@@ -1,17 +1,22 @@
 import { createConnection, type Socket } from 'node:net';
 
+import { AppError, errorMessage } from '../platform/errors/index.ts';
+
 import { responseSchema, type Method, type ParamsOf } from './messages.ts';
 
-export class IpcError extends Error {
+export class IpcError extends AppError {
   constructor(message: string) {
-    super(message);
+    super('rejected', message, { code: 'ipc.error' });
     this.name = 'IpcError';
   }
 }
 
-export class DaemonUnavailable extends Error {
+export class DaemonUnavailable extends AppError {
   constructor(path: string, cause: unknown) {
-    super(`aip daemon is not reachable at ${path}: ${(cause as Error).message}`);
+    super('unavailable', `aip daemon is not reachable at ${path}: ${errorMessage(cause)}`, {
+      code: 'ipc.unavailable',
+      cause,
+    });
     this.name = 'DaemonUnavailable';
   }
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { OBSERVER_SPECIALIST, findSpecialist } from '../../src/feature/swarm-config/types/index.ts';
 import { createWorkerServer } from '../../src/mcp/worker.ts';
 import { createClaudeRuntime } from '../../src/runtime/index.ts';
-import { config } from '../core/helpers.ts';
+import { config } from '../feature/runs/helpers.ts';
 
 describe('aip tools of the worker server and the claude allowlist', () => {
   it('allows every tool the worker server offers', async () => {

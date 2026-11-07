@@ -17,14 +17,10 @@ import {
   waitNote,
   pipelineLabel,
 } from '../../src/protocol/index.ts';
-import {
-  addItem,
-  emptyQueue,
-  itemStarted,
-  transition,
-  type GroupWait,
-} from '../../src/core/index.ts';
-import { CONFIG_TEXT, finish, group, run, step } from '../core/helpers.ts';
+import { addItem, emptyQueue, itemStarted } from '../../src/feature/queue/types/index.ts';
+import { transition } from '../../src/feature/runs/machine/index.ts';
+import type { GroupWait } from '../../src/feature/runs/types/index.ts';
+import { CONFIG_TEXT, finish, group, run, step } from '../feature/runs/helpers.ts';
 
 describe('text for people', () => {
   it('shows the run header, counts and one line per group', () => {

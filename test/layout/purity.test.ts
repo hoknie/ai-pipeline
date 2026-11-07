@@ -29,15 +29,18 @@ describe('purityViolations', () => {
 
   it('reports a direct node:* import even when a recorded chain already reaches it', () => {
     const root = makeTree({
-      'core/a.ts': `import { readFileSync } from 'node:fs';\nimport { b } from './b.ts';\nexport const a = [readFileSync, b];\n`,
-      'core/b.ts': `import { writeFileSync } from 'node:fs';\nexport const b = writeFileSync;\n`,
+      'feature/tags/types/a.ts': `import { readFileSync } from 'node:fs';\nimport { b } from './b.ts';\nexport const a = [readFileSync, b];\n`,
+      'feature/tags/types/b.ts': `import { writeFileSync } from 'node:fs';\nexport const b = writeFileSync;\n`,
     });
     const found = purityViolations(root);
     const direct = found.filter((item) => item.rule === 'direct-import');
-    expect(direct.map((item) => item.path)).toEqual(['core/a.ts', 'core/b.ts']);
+    expect(direct.map((item) => item.path)).toEqual([
+      'feature/tags/types/a.ts',
+      'feature/tags/types/b.ts',
+    ]);
     const recorded: ExceptionEntry[] = [
-      { rule: 'purity', path: 'core/a.ts', name: 'node:fs', size: 1 },
-      { rule: 'purity', path: 'core/b.ts', name: 'node:fs', size: 1 },
+      { rule: 'purity', path: 'feature/tags/types/a.ts', name: 'node:fs', size: 1 },
+      { rule: 'purity', path: 'feature/tags/types/b.ts', name: 'node:fs', size: 1 },
     ];
     const problems = reconcile(found, recorded);
     expect(problems).toHaveLength(2);
@@ -52,9 +55,9 @@ describe('purityViolations', () => {
     expect(purityViolations(root)).toEqual([]);
   });
 
-  it('reports an external package in core and platform/errors', () => {
+  it('reports an external package in pure views and platform/errors', () => {
     const root = makeTree({
-      'core/a.ts': `import { z } from 'zod';\nexport const a = z;\n`,
+      'feature/tags/types/a.ts': `import { z } from 'zod';\nexport const a = z;\n`,
       'platform/errors/b.ts': `import { z } from 'zod';\nexport const b = z;\n`,
       'platform/git/c.ts': `import { z } from 'zod';\nexport const c = z;\n`,
     });
@@ -63,25 +66,27 @@ describe('purityViolations', () => {
         .filter((item) => item.rule === 'purity')
         .map((item) => item.path)
         .sort(),
-    ).toEqual(['core/a.ts', 'platform/errors/b.ts']);
+    ).toEqual(['feature/tags/types/a.ts', 'platform/errors/b.ts']);
   });
 
   it('reports a swapped dependency behind a recorded chain', () => {
     const entries: ExceptionEntry[] = [
-      { rule: 'purity', path: 'core/a.ts', name: 'node:os', size: 1 },
+      { rule: 'purity', path: 'feature/tags/types/a.ts', name: 'node:os', size: 1 },
     ];
     const before = makeTree({
-      'core/a.ts': `import { b } from './b.ts';\nexport const a = b;\n`,
-      'core/b.ts': `import { x } from './c.ts';\nexport const b = x;\n`,
-      'core/c.ts': `export { arch } from 'node:os';\n`,
+      'feature/tags/types/a.ts': `import { b } from './b.ts';\nexport const a = b;\n`,
+      'feature/tags/types/b.ts': `import { x } from './c.ts';\nexport const b = x;\n`,
+      'feature/tags/types/c.ts': `export { arch } from 'node:os';\n`,
     });
     const onlyA = (root: string) =>
-      purityViolations(root).filter((item) => item.rule === 'purity' && item.path === 'core/a.ts');
+      purityViolations(root).filter(
+        (item) => item.rule === 'purity' && item.path === 'feature/tags/types/a.ts',
+      );
     expect(reconcile(onlyA(before), entries)).toEqual([]);
     const after = makeTree({
-      'core/a.ts': `import { b } from './b.ts';\nexport const a = b;\n`,
-      'core/b.ts': `import { x } from './c.ts';\nexport const b = x;\n`,
-      'core/c.ts': `export { cwd } from 'node:child_process';\n`,
+      'feature/tags/types/a.ts': `import { b } from './b.ts';\nexport const a = b;\n`,
+      'feature/tags/types/b.ts': `import { x } from './c.ts';\nexport const b = x;\n`,
+      'feature/tags/types/c.ts': `export { cwd } from 'node:child_process';\n`,
     });
     const problems = reconcile(onlyA(after), entries);
     expect(problems).toHaveLength(2);

@@ -38,7 +38,7 @@ import {
 } from '../protocol/index.ts';
 
 import { examples as renderExamples, HELP_GROUPS } from './help.ts';
-import { writeLine, failLine, type CliIo } from './io.ts';
+import { writeLine, failLine, usage, type CliIo } from './io.ts';
 import { VERSION } from './version.ts';
 import { latestRepository } from './web/default-repository.ts';
 import { daemon, registerDaemon } from './daemon.ts';
@@ -121,7 +121,7 @@ function parseDeliveryMode(value: string | undefined): DeliveryMode | undefined 
   if (value === undefined) return undefined;
   const mode = DELIVERY_MODES.find((candidate) => candidate === value);
   if (mode === undefined) {
-    throw new Error(`--delivery-mode must be one of: ${DELIVERY_MODES.join(', ')}`);
+    throw usage(`--delivery-mode must be one of: ${DELIVERY_MODES.join(', ')}`);
   }
   return mode;
 }
@@ -130,7 +130,7 @@ function parseSwitch(flag: string, value: string | undefined): boolean | undefin
   if (value === undefined) return undefined;
   if (value === 'on') return true;
   if (value === 'off') return false;
-  throw new Error(`${flag} must be on or off`);
+  throw usage(`${flag} must be on or off`);
 }
 
 function registerQueue(program: Command, io: CliIo, style: Style): void {
@@ -199,7 +199,7 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
     )
     .action(async (pipeline: string, options: QueueTaskOptions) => {
       if ((options.task === undefined) === (options.groups === undefined)) {
-        throw new Error('pass exactly one of --task and --groups');
+        throw usage('pass exactly one of --task and --groups');
       }
       const deliveryMode = parseDeliveryMode(options.deliveryMode);
       const view = (await call(context(), 'queue_add', {
@@ -274,29 +274,29 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
         },
       ) => {
         if (options.pipeline !== undefined && options.workflow !== undefined) {
-          throw new Error('--workflow is the old name of --pipeline; pass only --pipeline');
+          throw usage('--workflow is the old name of --pipeline; pass only --pipeline');
         }
         const pipeline = options.pipeline ?? options.workflow;
         if (editAfter && editNoAfter) {
-          throw new Error('--no-after cannot be combined with --after');
+          throw usage('--no-after cannot be combined with --after');
         }
         if (editParent && editNoParent) {
-          throw new Error('--no-parent cannot be combined with --parent');
+          throw usage('--no-parent cannot be combined with --parent');
         }
         if (options.tags === false && options.tag !== undefined) {
-          throw new Error('--no-tags cannot be combined with --tag');
+          throw usage('--no-tags cannot be combined with --tag');
         }
         if (options.skips === false && options.skip !== undefined) {
-          throw new Error('--no-skips cannot be combined with --skip');
+          throw usage('--no-skips cannot be combined with --skip');
         }
         if (options.task !== undefined && options.groups !== undefined) {
-          throw new Error('pass at most one of --task and --groups');
+          throw usage('pass at most one of --task and --groups');
         }
         if (options.defaultAutoDeliver && options.autoDeliver !== undefined) {
-          throw new Error('--default-auto-deliver cannot be combined with --auto-deliver');
+          throw usage('--default-auto-deliver cannot be combined with --auto-deliver');
         }
         if (options.defaultDeliveryMode && options.deliveryMode !== undefined) {
-          throw new Error('--default-delivery-mode cannot be combined with --delivery-mode');
+          throw usage('--default-delivery-mode cannot be combined with --delivery-mode');
         }
         const deliveryMode = parseDeliveryMode(options.deliveryMode);
         showQueue(
@@ -440,10 +440,10 @@ function registerQueue(program: Command, io: CliIo, style: Style): void {
         json?: boolean;
       }) => {
         if (options.onLimit !== undefined && !['wait', 'stop'].includes(options.onLimit)) {
-          throw new Error('--on-limit must be wait or stop');
+          throw usage('--on-limit must be wait or stop');
         }
         if (options.defaultAutopilotAnswer && options.autopilotAnswer !== undefined) {
-          throw new Error('--default-autopilot-answer cannot be combined with --autopilot-answer');
+          throw usage('--default-autopilot-answer cannot be combined with --autopilot-answer');
         }
         const autopilot = parseSwitch('--autopilot', options.autopilot);
         const autoAnswer = parseSwitch('--auto-answer', options.autoAnswer);
@@ -646,7 +646,7 @@ function registerTag(program: Command, io: CliIo, style: Style): void {
         options: { name?: string; color?: string; repo: string; json?: boolean },
       ) => {
         if (options.name === undefined && options.color === undefined) {
-          throw new Error('pass --name or --color');
+          throw usage('pass --name or --color');
         }
         show(
           options.json,
@@ -747,7 +747,7 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
         },
       ) => {
         if ((options.task === undefined) === (options.groups === undefined)) {
-          throw new Error('pass exactly one of --task and --groups');
+          throw usage('pass exactly one of --task and --groups');
         }
         const groups = options.groups ? readGroups(options.groups) : undefined;
         const deliveryMode = parseDeliveryMode(options.deliveryMode);
@@ -958,13 +958,13 @@ function registerRun(program: Command, io: CliIo, style: Style): void {
     )
     .action(async (runId: string | undefined, options: { all?: boolean; json?: boolean }) => {
       if (runId === undefined) {
-        if (options.all) throw new Error('--all needs a <run-id>');
+        if (options.all) throw usage('--all needs a <run-id>');
         const { cleanableRuns, formatCleanable } = await import('./clean.ts');
         const runs = await cleanableRuns(context());
         output(options.json, formatCleanable(runs, activeStyle), runs);
         return;
       }
-      if (options.json) throw new Error('--json lists runs and cannot be used with a <run-id>');
+      if (options.json) throw usage('--json lists runs and cannot be used with a <run-id>');
       const { cleanRun } = await import('./clean.ts');
       for (const removed of await cleanRun(context(), runId, options.all ?? false))
         print(`removed ${removed}`);
@@ -1093,7 +1093,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
       const host = options.host ?? settings.host;
       const port = options.port === undefined ? settings.port : Number(options.port);
       if (!Number.isInteger(port) || port < 0 || port > 65535)
-        throw new Error('--port must be an integer from 0 to 65535');
+        throw usage('--port must be an integer from 0 to 65535');
       const { assertLoopbackHost, startWebServer, webTokenFromEnv } =
         await import('./web/server.ts');
       assertLoopbackHost(host);
@@ -1149,7 +1149,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
         });
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE')
-          throw new Error(
+          throw usage(
             `port ${host}:${port} is already in use, maybe by another aip web: open that panel and choose the repository there, or pass --port <n>`,
           );
         throw error;
@@ -1315,7 +1315,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
           ]);
         if (options.worker) {
           const socket = options.socket;
-          if (!socket) throw new Error('--worker needs --socket');
+          if (!socket) throw usage('--worker needs --socket');
           const server = createWorkerServer({
             token: options.worker,
             split: options.split ?? false,

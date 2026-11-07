@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { Usage } from '../../src/core/index.ts';
+import type { Usage } from '../../src/feature/agents/types/index.ts';
 import { readLines, readTimes, timesPath } from '../../src/daemon/logs.ts';
 import { launchProcess } from '../../src/daemon/supervisor.ts';
 import type { OutputParser } from '../../src/runtime/index.ts';

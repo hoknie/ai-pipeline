@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { Usage } from '../core/index.ts';
+import type { Usage } from '../feature/agents/types/index.ts';
 
 import { systemPrompt, userMessage } from './message.ts';
 import {

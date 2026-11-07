@@ -32,7 +32,7 @@ export {
 } from './format.ts';
 export * from './messages.ts';
 export * from './views.ts';
-export { TAG_COLORS, type TagColor } from '../core/index.ts';
+export { type TagColor, TAG_COLORS } from '../feature/tags/types/index.ts';
 export * from './transcript.ts';
 export * from './style.ts';
 export * from './catalog.ts';

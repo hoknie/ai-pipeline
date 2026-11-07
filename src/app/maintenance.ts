@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 
 import { databasePath } from '../platform/paths/index.ts';
-import type { RunState } from '../core/index.ts';
+import type { RunState } from '../feature/runs/types/index.ts';
 import { Store } from '../store/index.ts';
 
 /** The runs of the state directory, read without a daemon. */

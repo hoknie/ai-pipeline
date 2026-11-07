@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { configPaths, loadRuntimeSettings } from '../feature/swarm-config/services/index.ts';
 import { findExecutable } from '../platform/process/index.ts';
 import type { Style } from '../protocol/index.ts';
+import { setupFailure } from './io.ts';
 
 export interface SetupOptions {
   yes: boolean;
@@ -195,7 +196,7 @@ function claudeMcp(deps: SetupDeps, command: string[]): SetupAction {
         '--',
         ...wanted,
       ]);
-      if (result.code !== 0) throw new Error(`${failure(result)} (manual: ${manual})`);
+      if (result.code !== 0) throw setupFailure(`${failure(result)} (manual: ${manual})`);
     },
   };
 }
@@ -254,17 +255,17 @@ function claudePlugin(deps: SetupDeps): SetupAction {
         const manualUpdate = 'claude plugin marketplace update aip && claude plugin update aip@aip';
         const refreshed = await deps.exec(bin, ['plugin', 'marketplace', 'update', 'aip']);
         if (refreshed.code !== 0)
-          throw new Error(`${failure(refreshed)} (manual: ${manualUpdate})`);
+          throw setupFailure(`${failure(refreshed)} (manual: ${manualUpdate})`);
         const updated = await deps.exec(bin, ['plugin', 'update', 'aip@aip']);
-        if (updated.code !== 0) throw new Error(`${failure(updated)} (manual: ${manualUpdate})`);
+        if (updated.code !== 0) throw setupFailure(`${failure(updated)} (manual: ${manualUpdate})`);
         return;
       }
       const added = await deps.exec(bin, ['plugin', 'marketplace', 'add', marketplace]);
       if (added.code !== 0 && !/already/i.test(added.stderr + added.stdout)) {
-        throw new Error(`${failure(added)} (manual: ${manual})`);
+        throw setupFailure(`${failure(added)} (manual: ${manual})`);
       }
       const installed = await deps.exec(bin, ['plugin', 'install', 'aip@aip']);
-      if (installed.code !== 0) throw new Error(`${failure(installed)} (manual: ${manual})`);
+      if (installed.code !== 0) throw setupFailure(`${failure(installed)} (manual: ${manual})`);
     },
   };
 }
@@ -321,7 +322,7 @@ function opencodeMcp(deps: SetupDeps, command: string[]): SetupAction {
     },
     apply: async () => {
       const loaded = read();
-      if (!('config' in loaded)) throw new Error('the configuration changed while setup ran');
+      if (!('config' in loaded)) throw setupFailure('the configuration changed while setup ran');
       const config = loaded.config;
       config.mcp = { ...(config.mcp ?? {}), aip: entry };
       if (config.$schema === undefined) config.$schema = 'https://opencode.ai/config.json';

@@ -6,20 +6,22 @@ import {
   ARTIFACT_CONTENT_LIMIT,
   ARTIFACT_FILE_NAME_LIMIT,
   ARTIFACT_TITLE_LIMIT,
+  validArtifactFileName,
+} from '../feature/artifacts/types/index.ts';
+import {
   FEEDBACK_LIMIT,
   OPTIONS_LIMIT,
   OPTION_LIMIT,
   RECOMMENDATION_LIMIT,
   QUESTIONS_LIMIT,
   QUESTION_TEXT_LIMIT,
-  RUN_TITLE_LIMIT,
   SUMMARY_LIMIT,
-  VERDICTS,
-  validArtifactFileName,
-} from '../core/index.ts';
+} from '../feature/runs/types/index.ts';
+import { RUN_TITLE_LIMIT, VERDICTS } from '../feature/agents/types/index.ts';
 import { VERSION } from './version.ts';
 
 import { attempt, type Send } from './tools.ts';
+import { invalid } from '../platform/errors/index.ts';
 
 export interface WorkerOptions {
   token: string;
@@ -125,7 +127,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
     ({ file_name, title, content, path }) =>
       attempt(async () => {
         if ((content === undefined) === (path === undefined)) {
-          throw new Error('pass either content or path');
+          throw invalid('mcp.invalid_arguments', 'pass either content or path');
         }
         const result = (await options.send('artifact_publish', {
           token: options.token,
@@ -203,7 +205,7 @@ export function createWorkerServer(options: WorkerOptions): McpServer {
       ({ pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
         attempt(async () => {
           if ((task === undefined) === (groups === undefined)) {
-            throw new Error('pass either task or groups');
+            throw invalid('mcp.invalid_arguments', 'pass either task or groups');
           }
           const result = (await options.send('worker_queue_add', {
             token: options.token,

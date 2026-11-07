@@ -6,6 +6,9 @@ import { isAbsolute, join, relative, sep } from 'node:path';
 import { ConfigLoadError, type RuntimeSettings } from '../feature/swarm-config/types/index.ts';
 import { configPaths, loadRuntimeSettings } from '../feature/swarm-config/services/index.ts';
 import {
+  type Attempt,
+  type Group,
+  type RunState,
   REPAIR_GROUP,
   RESOLVE_GROUP,
   SPLIT_GROUP,
@@ -21,15 +24,14 @@ import {
   actionPointOf,
   deliveryBranch,
   parseActionSlug,
-  type ActionOutcome,
-  type DeliveryResult,
-  type Attempt,
-  type Effect,
-  type Group,
-  type MergeOutcome,
-  type RunState,
-  type Usage,
-} from '../core/index.ts';
+} from '../feature/runs/types/index.ts';
+import type {
+  ActionOutcome,
+  DeliveryResult,
+  Effect,
+  MergeOutcome,
+} from '../feature/runs/machine/index.ts';
+import type { Usage } from '../feature/agents/types/index.ts';
 import {
   RUN_WORKTREE,
   attemptDirectory,

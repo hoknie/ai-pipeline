@@ -1,3 +1,5 @@
+import { AppError } from '../../../platform/errors/index.ts';
+
 export interface FieldError {
   /** File the error comes from, when known. */
   file?: string;
@@ -35,11 +37,11 @@ export function describeConfigError(error: ConfigError): string {
   }
 }
 
-export class ConfigLoadError extends Error {
+export class ConfigLoadError extends AppError {
   readonly detail: ConfigError;
 
   constructor(detail: ConfigError) {
-    super(describeConfigError(detail));
+    super('invalid', describeConfigError(detail), { code: 'config.load' });
     this.name = 'ConfigLoadError';
     this.detail = detail;
   }

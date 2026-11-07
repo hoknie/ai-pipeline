@@ -3,17 +3,18 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
   addItem,
-  defaultObserverSettings,
-  repairIncidents,
   advance,
-  dispatch,
   emptyQueue,
   pauseRun,
   startQueue,
-  transition,
-  type GroupWait,
+} from '../../src/feature/queue/types/index.ts';
+import {
   type ObserverSettings,
-} from '../../src/core/index.ts';
+  defaultObserverSettings,
+  repairIncidents,
+} from '../../src/feature/observers/types/index.ts';
+import { dispatch, transition } from '../../src/feature/runs/machine/index.ts';
+import type { GroupWait } from '../../src/feature/runs/types/index.ts';
 import {
   formatRepositories,
   groupView,
@@ -26,7 +27,7 @@ import {
   systemGroups,
   withQueue,
 } from '../../src/protocol/index.ts';
-import { CONFIG_TEXT, finish, group, run, step } from '../core/helpers.ts';
+import { CONFIG_TEXT, finish, group, run, step } from '../feature/runs/helpers.ts';
 
 const SPLIT_CONFIG = CONFIG_TEXT.replace(
   '    feature:\n      steps:',

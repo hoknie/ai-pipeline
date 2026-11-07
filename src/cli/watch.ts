@@ -1,6 +1,7 @@
 import { formatRun, type RunView } from '../protocol/index.ts';
 
 import { call, type Context } from './commands.ts';
+import { invalid } from '../platform/errors/index.ts';
 
 export const WATCH_INTERVAL_MS = 1000;
 
@@ -23,6 +24,6 @@ export async function watch(
 async function latestActive(ctx: Context): Promise<string> {
   const runs = (await call(ctx, 'status', {})) as RunView[];
   const active = runs.filter((run) => !run.finished).sort((a, b) => b.createdAt - a.createdAt)[0];
-  if (!active) throw new Error('no active runs; pass a run id');
+  if (!active) throw invalid('cli.watch', 'no active runs; pass a run id');
   return active.id;
 }

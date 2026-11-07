@@ -1,5 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+import { errorMessage } from '../platform/errors/index.ts';
+
 export type Send = (method: string, params: Record<string, unknown>) => Promise<unknown>;
 
 export function text(value: string): CallToolResult {
@@ -8,7 +10,7 @@ export function text(value: string): CallToolResult {
 
 export function failure(error: unknown): CallToolResult {
   return {
-    content: [{ type: 'text', text: (error as Error).message ?? String(error) }],
+    content: [{ type: 'text', text: errorMessage(error) }],
     isError: true,
   };
 }

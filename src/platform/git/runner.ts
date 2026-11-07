@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
 
+import { AppError, rejected } from '../errors/index.ts';
+
 export interface GitCall {
   cwd: string;
   args: string[];
@@ -11,16 +13,22 @@ export interface GitResult {
   code: number;
 }
 
-export class GitError extends Error {
+export class GitError extends AppError {
   readonly args: string[];
-  readonly code: number;
+  readonly exitCode: number;
   readonly stderr: string;
 
-  constructor(args: string[], code: number, stderr: string) {
-    super(`git ${args.join(' ')} failed (${code}): ${stderr.trim() || 'no output'}`);
+  constructor(args: string[], exitCode: number, stderr: string) {
+    super(
+      'internal',
+      `git ${args.join(' ')} failed (${exitCode}): ${stderr.trim() || 'no output'}`,
+      {
+        code: 'git.failed',
+      },
+    );
     this.name = 'GitError';
     this.args = args;
-    this.code = code;
+    this.exitCode = exitCode;
     this.stderr = stderr;
   }
 }
@@ -90,3 +98,6 @@ export function runGitBuffer(
     );
   });
 }
+
+/** A git operation that cannot be done in the current state. */
+export const gitFailure = (message: string): AppError => rejected(message, 'git.rejected');

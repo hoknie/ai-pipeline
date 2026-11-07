@@ -8,28 +8,61 @@
  * Слой исчезает из таблицы вместе с папкой; подпуть вроде `platform/errors` разрешает только его.
  */
 export const oldLayers: Record<string, string[]> = {
-  core: ['feature/swarm-config/types/index'],
-  store: ['feature/swarm-config/types/index', 'core'],
+  store: [
+    'feature/swarm-config/types/index',
+    'feature/agents/types/index',
+    'feature/observers/types/index',
+    'feature/queue/types/index',
+    'feature/runs/types/index',
+    'feature/runs/machine/index',
+    'feature/tags/types/index',
+  ],
   platform: [],
-  runtime: ['feature/swarm-config/types/index', 'core', 'protocol'],
-  protocol: ['feature/swarm-config/types/index', 'feature/swarm-edit/types/index', 'core'],
+  runtime: ['feature/swarm-config/types/index', 'feature/agents/types/index', 'protocol'],
+  protocol: [
+    'platform',
+    'feature/swarm-config/types/index',
+    'feature/swarm-edit/types/index',
+    'feature/agents/types/index',
+    'feature/artifacts/types/index',
+    'feature/observers/types/index',
+    'feature/queue/types/index',
+    'feature/runs/services/index',
+    'feature/runs/types/index',
+    'feature/tags/types/index',
+  ],
   daemon: [
     'feature/swarm-config/types/index',
     'feature/swarm-config/services/index',
     'feature/swarm-edit/types/index',
     'feature/swarm-edit/services/index',
-    'core',
+    'feature/agents/types/index',
+    'feature/artifacts/types/index',
+    'feature/observers/types/index',
+    'feature/queue/types/index',
+    'feature/runs/machine/index',
+    'feature/runs/types/index',
+    'feature/tags/types/index',
     'store',
     'platform',
     'runtime',
     'protocol',
   ],
-  mcp: ['feature/swarm-config/types/index', 'core', 'protocol'],
+  mcp: [
+    'feature/swarm-config/types/index',
+    'feature/agents/types/index',
+    'feature/artifacts/types/index',
+    'feature/runs/types/index',
+    'platform',
+    'protocol',
+  ],
   cli: [
     'feature/swarm-config/types/index',
     'feature/swarm-config/services/index',
     'feature/swarm-edit/types/index',
-    'core',
+    'feature/agents/types/index',
+    'feature/artifacts/types/index',
+    'feature/runs/types/index',
     'platform',
     'runtime',
     'protocol',
@@ -40,7 +73,7 @@ export const oldLayers: Record<string, string[]> = {
 };
 
 /** Старые слои, которые видит `app`: он собирает приложение из них. */
-export const appOldLayers: readonly string[] = ['core', 'store', 'runtime', 'protocol', 'daemon'];
+export const appOldLayers: readonly string[] = ['store', 'runtime', 'protocol', 'daemon'];
 
 /** Виды папок фичи (§5). */
 export const featureViews = [
@@ -210,7 +243,7 @@ export const assemblyCheckedTops: readonly string[] = ['feature', 'presentation'
 export const environmentPlaces: readonly string[] = ['cli/main.ts', 'app', 'platform'];
 
 /** Файлы, чистота которых проверяется, помимо видов `types/` и `machine/` фич. */
-export const purePaths: readonly string[] = ['core', 'platform/errors'];
+export const purePaths: readonly string[] = ['platform/errors'];
 
 export const sizeLimits = { file: 300, function: 80, folder: 12, classMethods: 12 };
 

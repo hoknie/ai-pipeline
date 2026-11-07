@@ -3,6 +3,7 @@ import { dirname, join, relative } from 'node:path';
 
 import { configPaths } from '../feature/swarm-config/services/index.ts';
 import { repositoryRoot } from '../platform/git/index.ts';
+import { invalid } from '../platform/errors/index.ts';
 
 /** The starter configuration shipped with the package. */
 const TEMPLATE = join(import.meta.dirname, '..', '..', 'templates', 'aip');
@@ -41,7 +42,8 @@ export async function initConfig(options: InitOptions): Promise<InitResult> {
     directory = configPaths('', options.env.XDG_CONFIG_HOME, options.env.HOME).global.directory;
   } else {
     const repository = await repositoryRoot(options.cwd).catch(() => {
-      throw new Error(
+      throw invalid(
+        'cli.init',
         `${options.cwd} is not inside a git repository. Run \`git init\` first, or use \`aip init --shared\` for the shared configuration.`,
       );
     });

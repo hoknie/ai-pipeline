@@ -7,7 +7,7 @@ import type {
   Runtime as RuntimeName,
   Specialist,
 } from '../feature/swarm-config/types/index.ts';
-import type { Denial, StepInput, Usage } from '../core/index.ts';
+import type { Denial, StepInput, Usage } from '../feature/agents/types/index.ts';
 
 export interface LaunchContext {
   specialist: Specialist;

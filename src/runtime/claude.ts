@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 import { OBSERVER_SPECIALIST } from '../feature/swarm-config/types/index.ts';
-import type { Denial, Usage } from '../core/index.ts';
+import type { Denial, Usage } from '../feature/agents/types/index.ts';
 
 import { systemPrompt, userMessage } from './message.ts';
 import {

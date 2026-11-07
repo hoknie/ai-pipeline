@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { databasePath } from '../../src/platform/paths/index.ts';
 import { requestSchema } from '../../src/protocol/index.ts';
 import { Store } from '../../src/store/index.ts';
-import { run } from '../core/helpers.ts';
+import { run } from '../feature/runs/helpers.ts';
 
 import { harness, type Harness } from './harness.ts';
 

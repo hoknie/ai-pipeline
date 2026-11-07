@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createHostServer } from '../../src/mcp/host.ts';
 import { groupView, runView, type QueueView } from '../../src/protocol/index.ts';
-import { run } from '../core/helpers.ts';
+import { run } from '../feature/runs/helpers.ts';
 
 const VIEW: QueueView & { item: string } = {
   repository: '/repo',

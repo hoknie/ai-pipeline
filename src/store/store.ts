@@ -7,32 +7,31 @@ import {
   type Runtime,
 } from '../feature/swarm-config/types/index.ts';
 import {
+  type Attempt,
+  type AttemptStatus,
+  type Group,
+  type GroupStatus,
+  type RefStyle,
+  type RunState,
   MESSAGE_GROUP,
   ON_LIMIT_MODES,
   RUN_HOLDS,
   REPAIR_GROUP,
   RESOLVE_GROUP,
-  defaultObserverSettings,
   emptyRepair,
   SPLIT_GROUP,
   allGroups,
   isActionGroup,
   pendingDelivery,
-  transition,
-  type Attempt,
-  type AttemptStatus,
-  type Effect,
-  type Group,
-  type HumanDecision,
+} from '../feature/runs/types/index.ts';
+import {
   type ObserverSettings,
-  type Queue,
-  type QueueItem,
-  type GroupStatus,
-  type RefStyle,
-  type RunState,
-  type Tag,
-  type TagColor,
-} from '../core/index.ts';
+  defaultObserverSettings,
+} from '../feature/observers/types/index.ts';
+import { type Effect, transition } from '../feature/runs/machine/index.ts';
+import type { HumanDecision } from '../feature/agents/types/index.ts';
+import type { Queue, QueueItem } from '../feature/queue/types/index.ts';
+import type { Tag, TagColor } from '../feature/tags/types/index.ts';
 
 import { migrate } from './schema.ts';
 

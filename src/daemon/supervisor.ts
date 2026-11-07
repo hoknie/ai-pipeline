@@ -3,7 +3,7 @@ import { appendFileSync, createWriteStream, mkdirSync, readFileSync, writeFileSy
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import type { Usage } from '../core/index.ts';
+import type { Usage } from '../feature/agents/types/index.ts';
 import type { Launch, OutputParser, RunOutcome } from '../runtime/index.ts';
 
 export const STOP_GRACE_MS = 10_000;

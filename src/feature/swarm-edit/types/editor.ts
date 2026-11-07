@@ -1,3 +1,5 @@
+import { AppError } from '../../../platform/errors/index.ts';
+
 import {
   ACTIONS_DIR,
   type FieldError,
@@ -27,7 +29,12 @@ export type EntryLevel = 'project' | 'global' | 'project_over_global';
 export type WriteLevel = 'project' | 'global';
 
 /** Thrown for a request that is wrong by itself, before any file is looked at. */
-export class ConfigEditError extends Error {}
+export class ConfigEditError extends AppError {
+  constructor(message: string) {
+    super('invalid', message, { code: 'config.edit' });
+    this.name = 'ConfigEditError';
+  }
+}
 
 export interface EntryReference {
   pipeline?: string;

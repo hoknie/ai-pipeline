@@ -1,5 +1,6 @@
 import { Command, CommanderError } from 'commander';
 
+import { errorMessage } from '../platform/errors/index.ts';
 import { colorEnabled, createStyle } from '../protocol/index.ts';
 
 import { registerCommands } from './commands.ts';
@@ -46,6 +47,6 @@ export async function runCli(argv: string[], io: CliIo): Promise<void> {
   } catch (error) {
     // commander has already printed its message (help, version or a parse error)
     if (error instanceof CommanderError) io.setExitCode(error.exitCode);
-    else failLine(io, 'aip', (error as Error).message);
+    else failLine(io, 'aip', errorMessage(error));
   }
 }

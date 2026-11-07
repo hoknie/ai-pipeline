@@ -25,19 +25,19 @@ const ok = (messages: string[]) => expect(messages).toEqual([]);
 
 describe('importViolations: old layers', () => {
   it('allows listed layers and the same layer', () => {
-    ok(check('store/a.ts', 'core/b.ts'));
-    ok(check('core/a.ts', 'core/b.ts'));
+    ok(check('runtime/a.ts', 'protocol/b.ts'));
+    ok(check('runtime/a.ts', 'runtime/b.ts'));
   });
 
   it('rejects layers outside the table and unknown layers', () => {
-    bad(check('core/a.ts', 'store/b.ts'));
-    bad(check('core/a.ts', 'daemon/b.ts'));
-    expect(check('weird/a.ts', 'core/b.ts')[0]).toContain('unknown layer');
+    bad(check('runtime/a.ts', 'store/b.ts'));
+    bad(check('runtime/a.ts', 'daemon/b.ts'));
+    expect(check('weird/a.ts', 'protocol/b.ts')[0]).toContain('unknown layer');
   });
 
   it('counts type imports like value imports', () => {
     const root = makeTree({
-      'core/a.ts': `import type { X } from '../store/b.ts';\n`,
+      'runtime/a.ts': `import type { X } from '../store/b.ts';\n`,
       'store/b.ts': 'export type X = 1;\n',
     });
     expect(importViolations(root)).toHaveLength(1);
@@ -45,14 +45,16 @@ describe('importViolations: old layers', () => {
 
   it('flags import() with a string like a static import', () => {
     const root = makeTree({
-      'core/a.ts': `export const f = () => import('../store/b.ts');\n`,
+      'runtime/a.ts': `export const f = () => import('../store/b.ts');\n`,
       'store/b.ts': stub,
     });
     expect(importViolations(root)).toHaveLength(1);
   });
 
   it('rejects an import that leaves the tree', () => {
-    const root = makeTree({ 'core/a.ts': `import data from '../../x.json';\nexport { data };\n` });
+    const root = makeTree({
+      'runtime/a.ts': `import data from '../../x.json';\nexport { data };\n`,
+    });
     expect(importViolations(root)[0]?.message).toContain('leaves the source tree');
   });
 });
@@ -89,7 +91,7 @@ describe('importViolations: features', () => {
   it('does not let features import presentation, app or old layers', () => {
     bad(check('feature/tags/services/a.ts', 'presentation/cli/a.ts'));
     bad(check('feature/tags/services/a.ts', 'app/a.ts'));
-    bad(check('feature/tags/services/a.ts', 'core/a.ts'));
+    bad(check('feature/tags/services/a.ts', 'store/a.ts'));
   });
 });
 
@@ -99,10 +101,10 @@ describe('importViolations: platform and app', () => {
     bad(check('platform/git/a.ts', 'feature/tags/types/index.ts'));
   });
 
-  it('lets platform/errors in only for types', () => {
+  it('lets platform/errors in for types, machine and the open views', () => {
     ok(check('feature/tags/types/a.ts', 'platform/errors/b.ts'));
     ok(check('feature/tags/services/a.ts', 'platform/errors/b.ts'));
-    bad(check('feature/runs/machine/a.ts', 'platform/errors/b.ts'));
+    ok(check('feature/runs/machine/a.ts', 'platform/errors/b.ts'));
     bad(check('feature/tags/ports/a.ts', 'platform/errors/b.ts'));
   });
 

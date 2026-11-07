@@ -1,13 +1,14 @@
 import { linkSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
+import { AppError, unavailable } from '../platform/errors/index.ts';
 import { ensureDirectory, lockPath as daemonLockPath } from '../platform/paths/index.ts';
 import { serveDaemon, type Daemon, type DaemonOptions } from '../daemon/index.ts';
 
 import { createApplication } from './application.ts';
 
-export class AlreadyRunning extends Error {
+export class AlreadyRunning extends AppError {
   constructor(pid: number) {
-    super(`already running (pid ${pid})`);
+    super('conflict', `already running (pid ${pid})`, { code: 'daemon.already_running' });
     this.name = 'AlreadyRunning';
   }
 }
@@ -45,7 +46,7 @@ export function acquireLock(path: string): void {
   } finally {
     rmSync(draft, { force: true });
   }
-  throw new Error(`cannot take the daemon lock ${path}`);
+  throw unavailable('daemon.lock', `cannot take the daemon lock ${path}`);
 }
 
 export interface RunningDaemon {

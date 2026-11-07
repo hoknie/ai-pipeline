@@ -1,3 +1,4 @@
+import { errorMessage } from '../platform/errors/index.ts';
 import {
   chmodSync,
   existsSync,
@@ -63,7 +64,7 @@ async function answer(daemon: Daemon, line: string): Promise<Response> {
   try {
     return { id: parsed.id, ok: true, result: await daemon.handle(parsed.request) };
   } catch (error) {
-    return { id: parsed.id, ok: false, error: (error as Error).message };
+    return { id: parsed.id, ok: false, error: errorMessage(error) };
   }
 }
 

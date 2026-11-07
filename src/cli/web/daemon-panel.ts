@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { unavailable } from '../../platform/errors/index.ts';
 
 import type { PanelControl } from '../../daemon/index.ts';
 import type { WebStartResult, WebStatusResult, WebStopResult } from '../../protocol/index.ts';
@@ -36,6 +37,8 @@ export interface DaemonPanelController extends PanelControl {
 }
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
+const daemonPanelError = (message: string) => unavailable('web.daemon', message);
 
 function failureReason(error: unknown, address: string): string {
   return (error as NodeJS.ErrnoException).code === 'EADDRINUSE'
@@ -93,7 +96,7 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
    * browser keeps its access.
    */
   function helper(command: 'restart' | 'stop', force: boolean): void {
-    if (options.entry === undefined) throw new Error('the command to run aip is unknown');
+    if (options.entry === undefined) throw daemonPanelError('the command to run aip is unknown');
     const token = auth === 'token' ? (web?.token ?? lastToken) : null;
     (options.spawnRestart ?? spawnDaemonRestart)({
       entry: options.entry,
@@ -155,7 +158,7 @@ export function createDaemonPanel(options: DaemonPanelOptions): DaemonPanelContr
       stopped = false;
     } catch (error) {
       reason = failureReason(error, address);
-      throw new Error(reason);
+      throw daemonPanelError(reason);
     }
   }
 

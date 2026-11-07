@@ -1,4 +1,5 @@
-import type { Event, OnLimit, RunState } from '../core/index.ts';
+import type { Event } from '../feature/runs/machine/index.ts';
+import type { OnLimit, RunState } from '../feature/runs/types/index.ts';
 
 import type { AgentRoot } from './processes.ts';
 

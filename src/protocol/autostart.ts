@@ -5,6 +5,7 @@ import { dirname } from 'node:path';
 import { currentBuild, type BuildInfo } from './build.ts';
 import { DaemonUnavailable, request } from './client.ts';
 import { pingResultSchema, shutdownIdleResultSchema, type PingResult } from './messages.ts';
+import { unavailable } from '../platform/errors/index.ts';
 
 /**
  * What the client found at the socket. `mismatch` is set when the daemon keeps running a build
@@ -157,7 +158,7 @@ export async function spawnDaemon(
   options: EnsureOptions,
 ): Promise<void> {
   const [executable, ...args] = command;
-  if (!executable) throw new Error('no command to start the aip daemon');
+  if (!executable) throw unavailable('daemon.autostart', 'no command to start the aip daemon');
   let output: number | 'ignore' = 'ignore';
   if (options.logPath) {
     mkdirSync(dirname(options.logPath), { recursive: true, mode: 0o700 });
@@ -174,7 +175,8 @@ export async function spawnDaemon(
     await sleep(POLL_MS);
     if ((await pingDaemon(socket)) !== null) return;
   }
-  throw new Error(
+  throw unavailable(
+    'daemon.autostart',
     `aip daemon did not start within ${options.timeoutMs ?? 5000} ms${options.logPath ? `; see ${options.logPath}` : ''}`,
   );
 }
@@ -195,7 +197,10 @@ async function waitGone(
     if (unreachable && (pid === null || !holdsLock(pid, options.lockPath))) return;
     await sleep(POLL_MS);
   }
-  throw new Error(`the old aip daemon${pid === null ? '' : ` (pid ${pid})`} did not stop in time`);
+  throw unavailable(
+    'daemon.autostart',
+    `the old aip daemon${pid === null ? '' : ` (pid ${pid})`} did not stop in time`,
+  );
 }
 
 function holdsLock(pid: number, lockPath: string | undefined): boolean {

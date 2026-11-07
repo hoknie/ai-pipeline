@@ -41,37 +41,25 @@ import {
   validateObserverProfile,
 } from '../feature/swarm-config/services/index.ts';
 import {
-  Rejection,
-  addItem,
   type ItemFields,
-  checkSkip,
-  stepStates,
-  addLinkedTag,
-  tagsOfRepository,
-  addTag,
-  autoTagName,
-  runName,
+  type Queue,
+  type QueueItem,
+  addItem,
   advance,
   autopilotAnswers,
-  allGroups,
-  createRun,
   dependencyTags,
   checkReturnedPatch,
   checkPosition,
   checkDependencies,
   editItem,
   spreadTags,
-  editTag,
   emptyQueue,
   itemFailed,
   itemStarted,
-  knownTags,
-  mergeTags,
   pauseQueue,
   acknowledgeRun,
   adoptRun,
   problemKeys,
-  retryableGroups,
   returnRun,
   pauseRun,
   claimPlace,
@@ -79,9 +67,50 @@ import {
   dismissRun,
   returnItemOf,
   queueWakeAt,
-  limitHolds,
   queueItemId,
   removeItem,
+  setParallel,
+  setQueueSettings,
+  startQueue,
+} from '../feature/queue/types/index.ts';
+import {
+  type OnLimit,
+  type Group,
+  type RunState,
+  type GroupWait,
+  checkSkip,
+  stepStates,
+  runName,
+  allGroups,
+  createRun,
+  retryableGroups,
+  limitHolds,
+  findGroup,
+  attemptStepLabel,
+  groupRef,
+  isRunFinished,
+  groupsFromTask,
+  runId,
+  runRef,
+  pipelineTopologies,
+  pipelineTopology,
+  specialistName,
+  splitInstructionText,
+  MESSAGE_INSTRUCTIONS,
+  RESOLVE_INSTRUCTIONS,
+  isServiceGroup,
+  isSplitGroup,
+  REPAIR_GROUP,
+} from '../feature/runs/types/index.ts';
+import {
+  type Tag,
+  addLinkedTag,
+  tagsOfRepository,
+  addTag,
+  autoTagName,
+  editTag,
+  knownTags,
+  mergeTags,
   removeTag,
   keepLinkedTags,
   linkedTagOf,
@@ -89,52 +118,34 @@ import {
   withoutLinkedTags,
   resolveManualTags,
   resolveTags,
-  setParallel,
-  setQueueSettings,
-  startQueue,
+  tagId,
+} from '../feature/tags/types/index.ts';
+import {
+  type Event,
   dispatch,
-  findGroup,
+  transition,
+  planDispatch,
+  waitKey,
+} from '../feature/runs/machine/index.ts';
+import {
   ARTIFACTS_PER_GROUP,
   ARTIFACT_FILE_LIMIT,
   artifactPreview,
   artifactTitle,
-  attemptStepLabel,
-  groupRef,
-  isRunFinished,
-  groupsFromTask,
-  runId,
-  runRef,
-  tagId,
-  permissionsOf,
-  specialistsOf,
-  transition,
-  pipelineTopologies,
-  pipelineTopology,
-  specialistName,
-  splitInstructionText,
-  MESSAGE_INSTRUCTIONS,
-  RESOLVE_INSTRUCTIONS,
-  type Event,
+} from '../feature/artifacts/types/index.ts';
+import {
   type PermissionsRefresh,
   type SpecialistsRefresh,
-  type OnLimit,
-  type Queue,
-  type QueueItem,
-  type Group,
-  isServiceGroup,
-  isSplitGroup,
-  REPAIR_GROUP,
+  permissionsOf,
+  specialistsOf,
+} from '../feature/agents/types/index.ts';
+import {
+  type ObserverSettings,
   defaultObserverSettings,
   planRepairs,
   repairAdmitted,
   repairIncidents,
-  type ObserverSettings,
-  type RunState,
-  type Tag,
-  type GroupWait,
-  planDispatch,
-  waitKey,
-} from '../core/index.ts';
+} from '../feature/observers/types/index.ts';
 import {
   changedPathsBetween,
   changedPathsSince,
@@ -212,6 +223,7 @@ import { checkObserverSettings } from './observers.ts';
 import { artifactStorageFor, type ArtifactStorage } from './artifacts.ts';
 import { storageFor, type PatchStorage } from './patches.ts';
 import { selectBackground, terminateTree, type AgentRoot } from './processes.ts';
+import { isRejected, rejected } from '../platform/errors/index.ts';
 import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
 
 const NO_PANEL = 'this daemon serves no web panel';
@@ -436,7 +448,7 @@ export class Daemon implements ExecutorHost {
         try {
           await this.apply(state, { kind: 'repair_start', incident, specialist });
         } catch (error) {
-          if (!(error instanceof Rejection)) throw error;
+          if (!isRejected(error)) throw error;
         }
       }
     }
@@ -605,14 +617,14 @@ export class Daemon implements ExecutorHost {
     } catch {
       root = resolve(path);
     }
-    if (!this.registry.has(root)) throw new Rejection(`unknown repository ${root}`);
+    if (!this.registry.has(root)) throw rejected(`unknown repository ${root}`);
     const unfinished = [...this.states.values()].filter(
       (state) => state.run.repository === root && !isRunFinished(state),
     ).length;
-    if (unfinished > 0) throw new Rejection(`repository has unfinished runs: ${unfinished}`);
+    if (unfinished > 0) throw rejected(`repository has unfinished runs: ${unfinished}`);
     const queue = this.queues.get(root);
     if (queue && (queue.status === 'running' || queue.items.length > 0)) {
-      throw new Rejection('repository queue is not empty or running');
+      throw rejected('repository queue is not empty or running');
     }
     this.store.removeRepository(root);
     this.registry.delete(root);
@@ -662,7 +674,7 @@ export class Daemon implements ExecutorHost {
           permissions: this.currentPermissions(state),
         });
       } catch (error) {
-        if (!(error instanceof Rejection)) throw error;
+        if (!isRejected(error)) throw error;
       }
     }
     let failed = false;
@@ -711,7 +723,7 @@ export class Daemon implements ExecutorHost {
     try {
       await this.apply(state, { kind: 'hold', hold: 'frozen' });
     } catch (error) {
-      if (!(error instanceof Rejection)) throw error;
+      if (!isRejected(error)) throw error;
     }
   }
 
@@ -730,12 +742,12 @@ export class Daemon implements ExecutorHost {
   private async takeReturned(queue: Queue, item: QueueItem): Promise<RunCreated> {
     const id = item.run as string;
     const state = this.lookupState(id);
-    if (!state) throw new Rejection(`unknown run \`${id}\``);
+    if (!state) throw rejected(`unknown run \`${id}\``);
     const held = state.run.hold !== null;
     if (held) await this.apply(state, { kind: 'hold', hold: null });
     const groups = retryableGroups(state);
     if (groups.length === 0 && !held) {
-      throw new Rejection('run has no failed or cancelled groups');
+      throw rejected('run has no failed or cancelled groups');
     }
     for (const group of groups) {
       await this.apply(state, {
@@ -763,7 +775,7 @@ export class Daemon implements ExecutorHost {
       if (params.repository !== undefined) {
         const root = await this.rootOf(params.repository);
         if (root !== state.run.repository) {
-          throw new Rejection('run belongs to another repository');
+          throw rejected('run belongs to another repository');
         }
       }
       const queue = this.queueFor(state.run.repository);
@@ -785,7 +797,7 @@ export class Daemon implements ExecutorHost {
       if (params.repository !== undefined) {
         const root = await this.rootOf(params.repository);
         if (root !== state.run.repository) {
-          throw new Rejection('run belongs to another repository');
+          throw rejected('run belongs to another repository');
         }
       }
       const queue = this.queueFor(state.run.repository);
@@ -805,7 +817,7 @@ export class Daemon implements ExecutorHost {
       if (params.repository !== undefined) {
         const root = await this.rootOf(params.repository);
         if (root !== state.run.repository) {
-          throw new Rejection('run belongs to another repository');
+          throw rejected('run belongs to another repository');
         }
       }
       const queue = this.queueFor(state.run.repository);
@@ -827,10 +839,10 @@ export class Daemon implements ExecutorHost {
     );
     if (!findPipeline(config, pipeline)) {
       const known = config.pipelines.map((candidate) => candidate.id).join(', ') || 'none';
-      throw new Rejection(`unknown pipeline \`${pipeline}\`; known: ${known}`);
+      throw rejected(`unknown pipeline \`${pipeline}\`; known: ${known}`);
     }
     const error = checkSkip(config, pipeline, skip);
-    if (error !== null) throw new Rejection(error);
+    if (error !== null) throw rejected(error);
   }
 
   private queueRequest(
@@ -864,7 +876,7 @@ export class Daemon implements ExecutorHost {
           const returned = queue.items.find((candidate) => candidate.id === item);
           const parentParam = request.params.parent;
           if (returned?.run && parentParam !== undefined) {
-            throw new Rejection('a returned run keeps its own task');
+            throw rejected('a returned run keeps its own task');
           }
           const parentState =
             parentParam === undefined || parentParam === null
@@ -887,18 +899,18 @@ export class Daemon implements ExecutorHost {
               true,
             );
             const state = this.lookupState(returned.run);
-            if (!state) throw new Rejection(`unknown run \`${returned.run}\``);
+            if (!state) throw rejected(`unknown run \`${returned.run}\``);
             const wanted = new Set(skip);
             const current = new Set(state.run.skippedSteps);
             const skipError = checkSkip(state.run.config, state.run.pipeline, [...wanted]);
-            if (skipError !== null) throw new Rejection(skipError);
+            if (skipError !== null) throw rejected(skipError);
             const changes = [
               ...[...current].filter((step) => !wanted.has(step)).map((step) => [step, false]),
               ...[...wanted].filter((step) => !current.has(step)).map((step) => [step, true]),
             ] as [string, boolean][];
             for (const [step] of changes) {
               if (stepStates(state).find((entry) => entry.id === step)?.state === 'done') {
-                throw new Rejection(`step \`${step}\` is already passed by every group`);
+                throw rejected(`step \`${step}\` is already passed by every group`);
               }
             }
             if (position !== undefined) checkPosition(queue, position);
@@ -1019,12 +1031,12 @@ export class Daemon implements ExecutorHost {
         }
         case 'queue_run_now': {
           const item = queue.items.find((candidate) => candidate.id === request.params.item);
-          if (!item) throw new Rejection('unknown queue item');
+          if (!item) throw rejected('unknown queue item');
           if (item.run !== null) {
             const target = this.lookupState(item.run);
-            if (!target) throw new Rejection(`unknown run \`${item.run}\``);
+            if (!target) throw rejected(`unknown run \`${item.run}\``);
             if (target.run.hold === null && retryableGroups(target).length === 0) {
-              throw new Rejection('run has no failed or cancelled groups');
+              throw rejected('run has no failed or cancelled groups');
             }
             await this.claimPlaceFor(queue, item.run);
             const resumed = await this.takeReturned(queue, item);
@@ -1102,7 +1114,7 @@ export class Daemon implements ExecutorHost {
   private async groupSpec(params: ParamsOf<'group_spec'>): Promise<GroupSpecView | null> {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
-    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
     if (isServiceGroup(group)) return null;
     const { repository } = state.run;
     const pathspec = 'openspec/changes';
@@ -1219,7 +1231,7 @@ export class Daemon implements ExecutorHost {
   private groupArtifacts(params: ParamsOf<'group_artifacts'>): ArtifactView[] {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
-    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
     return this.store.artifacts(state.run.id, group.slug).map((record) => {
       const attempt = group.attempts.find((candidate) => candidate.seq === record.seq);
       return {
@@ -1240,25 +1252,25 @@ export class Daemon implements ExecutorHost {
   private async artifactContent(params: ParamsOf<'artifact'>): Promise<ArtifactContentView> {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
-    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
     const record = this.store.artifact(state.run.id, params.id);
     if (!record || record.group !== group.slug) {
-      throw new Rejection(`unknown artifact \`${params.id}\``);
+      throw rejected(`unknown artifact \`${params.id}\``);
     }
     const bytes =
       (await artifactStorageFor(this.artifactStorages, record.uri)?.get(record.uri)) ?? null;
-    if (bytes === null) throw new Rejection(`artifact \`${params.id}\` is not available`);
+    if (bytes === null) throw rejected(`artifact \`${params.id}\` is not available`);
     return { fileName: record.fileName, size: bytes.length, base64: bytes.toString('base64') };
   }
 
   private async artifactPublish(params: ParamsOf<'artifact_publish'>): Promise<{ id: string }> {
     const key = this.executor.attemptFor(params.token);
-    if (!key) throw new Rejection('unknown or expired report token');
+    if (!key) throw rejected('unknown or expired report token');
     const state = this.state(key.run);
     const group = findGroup(state, key.group);
     const attempt = group?.attempts.find((candidate) => candidate.seq === key.seq);
     if (!group || !attempt || attempt.status !== 'running') {
-      throw new Rejection('unknown or expired report token');
+      throw rejected('unknown or expired report token');
     }
     const bytes =
       params.content !== undefined
@@ -1269,7 +1281,7 @@ export class Daemon implements ExecutorHost {
     return this.serial(async () => {
       const existing = this.store.findArtifact(runId, group.slug, attempt.seq, fileName);
       if (!existing && this.store.artifactCount(runId, group.slug) >= ARTIFACTS_PER_GROUP) {
-        throw new Rejection(`a group may have at most ${ARTIFACTS_PER_GROUP} artifacts`);
+        throw rejected(`a group may have at most ${ARTIFACTS_PER_GROUP} artifacts`);
       }
       const id = existing?.id ?? randomUUID();
       const uri = await this.artifactStorages[0]!.put(runId, id, bytes);
@@ -1304,23 +1316,23 @@ export class Daemon implements ExecutorHost {
       root = await realpath(worktree);
       target = await realpath(isAbsolute(path) ? path : resolve(root, path));
     } catch {
-      throw new Rejection(`cannot read \`${path}\`: no such file in the worktree`);
+      throw rejected(`cannot read \`${path}\`: no such file in the worktree`);
     }
     const inside = target.startsWith(root + sep) ? target.slice(root.length + 1) : null;
     if (inside === null || inside.split(sep)[0] === '.git') {
-      throw new Rejection(`\`${path}\` is outside of the worktree of the group`);
+      throw rejected(`\`${path}\` is outside of the worktree of the group`);
     }
     const before = await stat(target);
-    if (!before.isFile()) throw new Rejection(`\`${path}\` is not a regular file`);
+    if (!before.isFile()) throw rejected(`\`${path}\` is not a regular file`);
     if (before.size > ARTIFACT_FILE_LIMIT) {
-      throw new Rejection(`\`${path}\` is larger than ${ARTIFACT_FILE_LIMIT} bytes`);
+      throw rejected(`\`${path}\` is larger than ${ARTIFACT_FILE_LIMIT} bytes`);
     }
     const handle = await open(target, 'r');
     try {
       const info = await handle.stat();
-      if (!info.isFile()) throw new Rejection(`\`${path}\` is not a regular file`);
+      if (!info.isFile()) throw rejected(`\`${path}\` is not a regular file`);
       if (info.size > ARTIFACT_FILE_LIMIT) {
-        throw new Rejection(`\`${path}\` is larger than ${ARTIFACT_FILE_LIMIT} bytes`);
+        throw rejected(`\`${path}\` is larger than ${ARTIFACT_FILE_LIMIT} bytes`);
       }
       const buffer = Buffer.alloc(Math.min(info.size, ARTIFACT_FILE_LIMIT));
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
@@ -1333,7 +1345,7 @@ export class Daemon implements ExecutorHost {
   private async runPatch(params: ParamsOf<'run_patch'>): Promise<RunPatchView> {
     const state = this.state(params.runId);
     const id = state.run.id;
-    if (!hasMergedChanges(state)) throw new Rejection(`run ${id} has no merged changes`);
+    if (!hasMergedChanges(state)) throw rejected(`run ${id} has no merged changes`);
     const { repository } = state.run;
     const ref = runRef(state.run);
     const present = await refExists(repository, ref);
@@ -1349,7 +1361,7 @@ export class Daemon implements ExecutorHost {
       );
     }
     if (bytes === null) {
-      throw new Rejection(
+      throw rejected(
         present || record
           ? `the patch of run ${id} is not available`
           : `the patch of run ${id} is not available: run refs are removed`,
@@ -1361,13 +1373,13 @@ export class Daemon implements ExecutorHost {
   private async groupFileDiff(params: ParamsOf<'group_file_diff'>): Promise<FileDiffView> {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
-    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
     const key = `${state.run.id}/${group.slug}`;
     if (!this.diffs.has(key)) await this.refreshDiff(state, group.slug);
     const stat = this.diffs.get(key);
-    if (!stat) throw new Rejection(`the diff of group ${group.slug} is not available`);
+    if (!stat) throw rejected(`the diff of group ${group.slug} is not available`);
     const file = stat.files.find((entry) => entry.path === params.path);
-    if (!file) throw new Rejection(`${params.path} is not changed in group ${group.slug}`);
+    if (!file) throw rejected(`${params.path} is not changed in group ${group.slug}`);
     const previousPath = file.previousPath ?? null;
     if (file.added === null) {
       return {
@@ -1391,7 +1403,7 @@ export class Daemon implements ExecutorHost {
       );
       return { path: file.path, previousPath, binary: false, ...diff };
     } catch {
-      throw new Rejection(`the diff of ${params.path} is not available`);
+      throw rejected(`the diff of ${params.path} is not available`);
     }
   }
 
@@ -1589,7 +1601,7 @@ export class Daemon implements ExecutorHost {
   private async processKill(pid: number): Promise<{ ok: true }> {
     const { rows, found } = await this.backgroundProcesses(true);
     if (!found.some((process) => process.pid === pid)) {
-      throw new Rejection(`not a background process: ${pid}`);
+      throw rejected(`not a background process: ${pid}`);
     }
     const look = (): void => void this.lookAtProcesses(true);
     setTimeout(look, this.timings.processKillLookMs).unref();
@@ -1624,7 +1636,7 @@ export class Daemon implements ExecutorHost {
     const cached = this.states.get(runIdentifier);
     if (cached) return cached;
     const loaded = this.store.loadRun(runIdentifier);
-    if (!loaded) throw new Rejection(`unknown run \`${runIdentifier}\``);
+    if (!loaded) throw rejected(`unknown run \`${runIdentifier}\``);
     this.states.set(runIdentifier, loaded);
     return loaded;
   }
@@ -1708,7 +1720,7 @@ export class Daemon implements ExecutorHost {
           return Promise.resolve({ stopping: true });
         });
       case 'subscribe':
-        return Promise.reject(new Rejection('subscribe is served on its own connection'));
+        return Promise.reject(rejected('subscribe is served on its own connection'));
       case 'observers':
         return Promise.resolve(this.observersSnapshot());
       case 'observers_set':
@@ -1737,11 +1749,9 @@ export class Daemon implements ExecutorHost {
           },
         );
       case 'web_start':
-        return this.panel
-          ? this.panel.start(request.params)
-          : Promise.reject(new Rejection(NO_PANEL));
+        return this.panel ? this.panel.start(request.params) : Promise.reject(rejected(NO_PANEL));
       case 'web_stop':
-        return this.panel ? this.panel.stop() : Promise.reject(new Rejection(NO_PANEL));
+        return this.panel ? this.panel.stop() : Promise.reject(rejected(NO_PANEL));
       case 'repositories':
         return Promise.resolve(this.repositoryList());
       case 'repository_add':
@@ -1978,18 +1988,17 @@ export class Daemon implements ExecutorHost {
   private repairAction(params: ParamsOf<'repair_action'>): Promise<unknown> {
     return this.serial(async () => {
       const key = this.executor.attemptFor(params.token);
-      if (!key || key.group !== REPAIR_GROUP)
-        throw new Rejection('unknown or expired report token');
+      if (!key || key.group !== REPAIR_GROUP) throw rejected('unknown or expired report token');
       const state = this.state(key.run);
       const attempt = state.repair?.attempts.find((candidate) => candidate.seq === key.seq);
       if (!attempt || attempt.status !== 'running') {
-        throw new Rejection('unknown or expired report token');
+        throw rejected('unknown or expired report token');
       }
       const target = (slug: string): Group => {
         const group = findGroup(state, slug);
-        if (!group) throw new Rejection(`unknown group \`${slug}\` in run ${state.run.id}`);
+        if (!group) throw rejected(`unknown group \`${slug}\` in run ${state.run.id}`);
         if (isServiceGroup(group) && !isSplitGroup(group)) {
-          throw new Rejection(`group \`${slug}\` is a service group; observers do not touch it`);
+          throw rejected(`group \`${slug}\` is a service group; observers do not touch it`);
         }
         return group;
       };
@@ -1997,7 +2006,7 @@ export class Daemon implements ExecutorHost {
         case 'answer': {
           const group = target(params.group);
           if (group.humanOnly !== null && !this.observers.answerHumanOnly) {
-            throw new Rejection(`the question of group \`${group.slug}\` is for a person only`);
+            throw rejected(`the question of group \`${group.slug}\` is for a person only`);
           }
           await this.apply(state, {
             kind: 'answer',
@@ -2011,9 +2020,7 @@ export class Daemon implements ExecutorHost {
         case 'retry': {
           const group = target(params.group);
           if (group.status === 'cancelled') {
-            throw new Rejection(
-              `group \`${group.slug}\` was cancelled; observers do not restart it`,
-            );
+            throw rejected(`group \`${group.slug}\` was cancelled; observers do not restart it`);
           }
           await this.retryNow(state, { group: group.slug, refreshConfig: params.refreshConfig });
           break;
@@ -2231,7 +2238,7 @@ export class Daemon implements ExecutorHost {
     const started = await this.advanceQueue(repository);
     const run = started.get(item.id) ?? null;
     if (!run && queue.stop?.kind === 'item' && queue.stop.item === item.id) {
-      throw new Rejection(queue.stop.error);
+      throw rejected(queue.stop.error);
     }
     return { item: item.id, number: item.number, run, queue: this.queueSnapshot(queue) };
   }
@@ -2298,7 +2305,7 @@ export class Daemon implements ExecutorHost {
       const state = id === null ? undefined : this.lookupState(id);
       if (state) return state;
     }
-    throw new Rejection(`unknown parent \`${ref}\``);
+    throw rejected(`unknown parent \`${ref}\``);
   }
 
   /**
@@ -2339,16 +2346,16 @@ export class Daemon implements ExecutorHost {
   private workerQueueAdd(params: ParamsOf<'worker_queue_add'>): Promise<unknown> {
     return this.serial(async () => {
       const key = this.executor.attemptFor(params.token);
-      if (!key) throw new Rejection('unknown or expired report token');
+      if (!key) throw rejected('unknown or expired report token');
       const state = this.state(key.run);
       const attempt = state.groups
         .find((group) => group.slug === key.group)
         ?.attempts.find((candidate) => candidate.seq === key.seq);
       if (!attempt || attempt.status !== 'running') {
-        throw new Rejection('unknown or expired report token');
+        throw rejected('unknown or expired report token');
       }
       if (findSpecialist(state.run.config, attempt.specialist)?.queue !== true) {
-        throw new Rejection(`specialist \`${attempt.specialist}\` may not add tasks to the queue`);
+        throw rejected(`specialist \`${attempt.specialist}\` may not add tasks to the queue`);
       }
       // Every task carries the linked task tag of its run, then the other tags of the run.
       const repository = state.run.repository;
@@ -2373,7 +2380,7 @@ export class Daemon implements ExecutorHost {
   private workerEvent(token: string, build: (key: AttemptKey) => Event): Promise<unknown> {
     return this.serial(async () => {
       const key = this.executor.attemptFor(token);
-      if (!key) throw new Rejection('unknown or expired report token');
+      if (!key) throw rejected('unknown or expired report token');
       await this.apply(this.state(key.run), build(key));
       return { recorded: true };
     });
@@ -2390,7 +2397,7 @@ export class Daemon implements ExecutorHost {
       if (own?.run.repository === queue.repository) return id;
       const started = this.store.runOfQueueItem(queue.repository, id);
       if (started) return started.run.id;
-      throw new Rejection(`unknown dependency \`${id}\``);
+      throw rejected(`unknown dependency \`${id}\``);
     });
   }
 
@@ -2405,10 +2412,10 @@ export class Daemon implements ExecutorHost {
     );
     if (!findPipeline(config, params.pipeline)) {
       const known = config.pipelines.map((pipeline) => pipeline.id).join(', ') || 'none';
-      throw new Rejection(`unknown pipeline \`${params.pipeline}\`; known: ${known}`);
+      throw rejected(`unknown pipeline \`${params.pipeline}\`; known: ${known}`);
     }
     const skipError = checkSkip(config, params.pipeline, params.skip ?? []);
-    if (skipError !== null) throw new Rejection(skipError);
+    if (skipError !== null) throw rejected(skipError);
     const id = runId(this.now(), randomInt(36 ** 4));
     const prepared = await prepareRunBranch(repository, `refs/aip/${id}/run`, {
       workingTree: config.workspace.base === 'working_tree',
@@ -2466,7 +2473,7 @@ export class Daemon implements ExecutorHost {
     let before: { createdAt: number; id: string } | undefined;
     if (params.before !== undefined) {
       const match = /^(\d+)\.(.+)$/.exec(params.before);
-      if (!match) throw new Rejection('before is not a valid cursor');
+      if (!match) throw rejected('before is not a valid cursor');
       before = { createdAt: Number(match[1]), id: match[2] ?? '' };
     }
     const now = this.now();
@@ -2489,10 +2496,10 @@ export class Daemon implements ExecutorHost {
     try {
       return specialistsOf(loadConfig(this.configPathsOf(state.run.repository)));
     } catch (error) {
-      if (!(error instanceof ConfigLoadError)) throw new Rejection((error as Error).message);
+      if (!(error instanceof ConfigLoadError)) throw rejected((error as Error).message);
       const { detail } = error;
       const first = detail.kind === 'invalid' ? detail.errors[0] : undefined;
-      throw new Rejection(
+      throw rejected(
         `configuration not loaded: ${first ? `${first.path}: ${first.message}` : error.message}`,
       );
     }
@@ -2544,7 +2551,7 @@ export class Daemon implements ExecutorHost {
     try {
       plan = planEdit(paths, edit);
     } catch (error) {
-      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      if (error instanceof ConfigEditError) throw rejected(error.message);
       throw error;
     }
     if (!plan.ok) return plan;
@@ -2630,7 +2637,7 @@ export class Daemon implements ExecutorHost {
     plan: (paths: ConfigPaths, level: 'global' | 'project') => TagPlan,
   ): Promise<SpecialistTagsResult> {
     if (repository !== null && !this.registry.has(repository)) {
-      throw new Rejection(`unknown repository ${repository}`);
+      throw rejected(`unknown repository ${repository}`);
     }
     let planned: TagPlan;
     try {
@@ -2639,7 +2646,7 @@ export class Daemon implements ExecutorHost {
         repository === null ? 'global' : 'project',
       );
     } catch (error) {
-      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      if (error instanceof ConfigEditError) throw rejected(error.message);
       throw error;
     }
     if (!planned.ok) return planned;
@@ -2652,10 +2659,10 @@ export class Daemon implements ExecutorHost {
     params: ParamsOf<'specialists_import'>,
   ): Promise<SpecialistsImportResult> {
     for (const path of [params.repository, params.source]) {
-      if (!this.registry.has(path)) throw new Rejection(`unknown repository ${path}`);
+      if (!this.registry.has(path)) throw rejected(`unknown repository ${path}`);
     }
     if (params.repository === params.source) {
-      throw new Rejection('the source must be another repository');
+      throw rejected('the source must be another repository');
     }
     let planned: TagPlan;
     try {
@@ -2665,7 +2672,7 @@ export class Daemon implements ExecutorHost {
         params.slugs,
       );
     } catch (error) {
-      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      if (error instanceof ConfigEditError) throw rejected(error.message);
       throw error;
     }
     if (!planned.ok) return planned;
@@ -2678,10 +2685,10 @@ export class Daemon implements ExecutorHost {
     params: ParamsOf<'pipelines_import'>,
   ): Promise<PipelinesImportResult> {
     for (const path of [params.repository, params.source]) {
-      if (!this.registry.has(path)) throw new Rejection(`unknown repository ${path}`);
+      if (!this.registry.has(path)) throw rejected(`unknown repository ${path}`);
     }
     if (params.repository === params.source) {
-      throw new Rejection('the source must be another repository');
+      throw rejected('the source must be another repository');
     }
     let planned: TagPlan;
     try {
@@ -2692,7 +2699,7 @@ export class Daemon implements ExecutorHost {
         'pipeline',
       );
     } catch (error) {
-      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      if (error instanceof ConfigEditError) throw rejected(error.message);
       throw error;
     }
     if (!planned.ok) {
@@ -2729,7 +2736,7 @@ export class Daemon implements ExecutorHost {
         level: params.level,
       });
     } catch (error) {
-      if (error instanceof ConfigEditError) throw new Rejection(error.message);
+      if (error instanceof ConfigEditError) throw rejected(error.message);
       throw error;
     }
     if (!plan.ok) return plan;
@@ -2858,13 +2865,13 @@ export class Daemon implements ExecutorHost {
   private transcript(params: ParamsOf<'transcript'>): Transcript {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
-    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
     const attempt =
       params.seq === undefined
         ? group.attempts.at(-1)
         : group.attempts.find((candidate) => candidate.seq === params.seq);
     if (params.seq !== undefined && !attempt) {
-      throw new Rejection(`unknown attempt ${params.seq} of group \`${params.group}\``);
+      throw rejected(`unknown attempt ${params.seq} of group \`${params.group}\``);
     }
     const base = { runId: state.run.id, group: group.slug };
     if (!attempt) return { ...base, seq: null, cursor: 0, running: false, entries: [] };
@@ -2887,7 +2894,7 @@ export class Daemon implements ExecutorHost {
   private group(params: ParamsOf<'group'>): unknown {
     const state = this.state(params.runId);
     const group = findGroup(state, params.group);
-    if (!group) throw new Rejection(`unknown group \`${params.group}\` in run ${params.runId}`);
+    if (!group) throw rejected(`unknown group \`${params.group}\` in run ${params.runId}`);
     const last = group.attempts.at(-1);
     const log = last
       ? {

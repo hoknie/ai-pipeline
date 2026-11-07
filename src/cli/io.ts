@@ -1,3 +1,5 @@
+import { AppError, invalid, rejected } from '../platform/errors/index.ts';
+
 /**
  * What a command of the CLI needs from the process around it: the working directory, the
  * environment, the output streams and the exit code. `src/cli/main.ts` builds it from `process`;
@@ -37,3 +39,9 @@ export function failLine(io: CliIo, prefix: string, message: string): void {
   io.stderr(`${prefix}: ${message}\n`);
   io.setExitCode(1);
 }
+
+/** A wrong combination or value of command flags. */
+export const usage = (message: string): AppError => invalid('cli.usage', message);
+
+/** A step of `aip setup` that failed. */
+export const setupFailure = (message: string): AppError => rejected(message, 'cli.setup');
