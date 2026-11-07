@@ -36,6 +36,8 @@ export interface QueueDraft {
   task: string;
   groups: { title: string; task: string }[];
   title: string;
+  /** Add the task postponed; only the new-task form sets it. */
+  postponed?: boolean;
   /** `null`: follow the setting. */
   autoDeliver: boolean | null;
   /** `null`: follow the setting. */
@@ -176,6 +178,7 @@ export function fieldsOf(
           })),
         }),
     ...(title !== '' ? { title } : {}),
+    ...(draft.postponed ? { postponed: true } : {}),
     ...(draft.autoDeliver !== null ? { autoDeliver: draft.autoDeliver } : {}),
     ...(draft.deliveryMode !== null ? { deliveryMode: draft.deliveryMode } : {}),
     ...(allTags || tags.length > 0 ? { tags } : {}),
@@ -502,6 +505,17 @@ export function QueueForm({
             />
           </fieldset>
           <fieldset disabled={locked} className="contents">
+            {idPrefix === 'new' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Switch
+                  id={`${idPrefix}-postponed`}
+                  checked={effective.postponed === true}
+                  onCheckedChange={(postponed) => change({ postponed })}
+                />
+                <Label htmlFor={`${idPrefix}-postponed`}>{t('queue.form.postpone')}</Label>
+                <span className="text-xs text-muted-foreground">{t('queue.list.activeHint')}</span>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <Switch
                 id={`${idPrefix}-auto-deliver`}

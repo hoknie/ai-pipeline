@@ -191,6 +191,8 @@ export function useRuns(
   onError: (message: string) => void = () => undefined,
 ): {
   runs: RunView[];
+  /** Ids of the runs of the live list (snapshot and run events), not of loaded pages. */
+  listedRuns: ReadonlySet<string>;
   /** Where the opened run came from: the list, a fetch in flight, or unknown to the daemon. */
   openedState: OpenedState;
   connection: Connection;
@@ -342,7 +344,6 @@ export function useRuns(
       if (typeof raw !== 'object' || raw === null) return;
       stopPolling();
       setConnection('live');
-      setLoaded(true);
       if (raw.event === 'observers') {
         const view = parseObserversView((raw as { observers?: unknown }).observers ?? raw);
         if (view) setStreamedObservers((current) => sameObservers(current, view));
@@ -355,6 +356,7 @@ export function useRuns(
         setDaemon(event.daemon);
       } else if (event.event === 'snapshot') {
         setDaemon(event.daemon ?? null);
+        setLoaded(true);
         const list = event.runs;
         setRuns((current) => mergeRuns(current, list));
         refreshOpened(list);
@@ -405,6 +407,7 @@ export function useRuns(
     for (const [id, run] of runs) all.set(id, run);
     return sortRuns(all.values());
   }, [runs, extra, history]);
+  const listedRuns = useMemo(() => new Set(runs.keys()), [runs]);
   const loadMore = useCallback(() => {
     if (pagingRef.current || cursorRef.current === null) return;
     pagingRef.current = true;
@@ -482,6 +485,7 @@ export function useRuns(
   }, [api, missing, selected]);
   return {
     runs: sorted,
+    listedRuns,
     openedState,
     streamedProcesses,
     streamedObservers,

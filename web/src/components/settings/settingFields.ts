@@ -44,6 +44,30 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
   system: [{ key: 'panel', paths: ['web.autostart', 'web.auth', 'web.host', 'web.port'] }],
 };
 
+/** The cards of the settings of a built-in stage; the group of the titles is `delivery`. */
+export const STAGE_SECTIONS: Record<'message' | 'resolve' | 'delivery', SettingsSection[]> = {
+  message: [
+    {
+      key: 'message',
+      paths: ['delivery.message_specialist', 'delivery.commit_message', 'delivery.message_prompt'],
+    },
+  ],
+  resolve: [
+    {
+      key: 'conflicts',
+      paths: ['delivery.resolver', 'delivery.resolver_rounds', 'delivery.resolver_prompt'],
+    },
+  ],
+  delivery: [{ key: 'delivery', paths: ['delivery.mode', 'delivery.auto', 'delivery.keep'] }],
+};
+
+/** Fields shown as a text area: a long text, not a one-line value. */
+export const MULTILINE_FIELDS: ReadonlySet<string> = new Set([
+  'delivery.commit_message',
+  'delivery.message_prompt',
+  'delivery.resolver_prompt',
+]);
+
 /** The locale key of a field: dots become underscores, the runtime name is not part of it. */
 export function fieldKey(path: string): string {
   return path.replace(/^runtimes\.[a-z]+\./, 'runtimes.').replaceAll('.', '_');

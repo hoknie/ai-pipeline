@@ -2144,6 +2144,104 @@ describe('postponed items', () => {
     expect(screen.queryByText('Postponed')).toBeNull();
   });
 
+  async function fillNewTask(text = 'X') {
+    await openNewTask();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(await screen.findByLabelText('Task text'), { target: { value: text } });
+  }
+
+  it('adds a task without postponed while the new-task switch is off', async () => {
+    const api = show(queueOf());
+    await fillNewTask();
+    expect(screen.getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked')).toBe(
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
+    expect((api.queueAdd as ReturnType<typeof vi.fn>).mock.calls[0]![0]).not.toHaveProperty(
+      'postponed',
+    );
+  });
+
+  it('adds a postponed task when the new-task switch is on', async () => {
+    const api = show(queueOf(), {
+      queueAdd: vi.fn(async () => ({
+        ...queueOf({ items: [queueItem('q1', 'X', 1, { postponed: true })] }),
+        item: 'q1',
+      })),
+    });
+    await fillNewTask();
+    fireEvent.click(screen.getByRole('switch', { name: 'Postpone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        task: 'X',
+        postponed: true,
+      }),
+    );
+    await screen.findByText('Postponed');
+  });
+
+  it('does not send postponed after the switch is turned on and off', async () => {
+    const api = show(queueOf());
+    await fillNewTask();
+    const toggle = screen.getByRole('switch', { name: 'Postpone' });
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
+    expect((api.queueAdd as ReturnType<typeof vi.fn>).mock.calls[0]![0]).not.toHaveProperty(
+      'postponed',
+    );
+  });
+
+  it('keeps the switch in the draft after Escape and resets it after adding', async () => {
+    show(queueOf(), {
+      queueAdd: vi.fn(async () => ({ ...queueOf({ items: items('X') }), item: 'q1' })),
+    });
+    await fillNewTask();
+    fireEvent.click(screen.getByRole('switch', { name: 'Postpone' }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+    await openNewTask();
+    expect(screen.getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+    await openNewTask();
+    expect(screen.getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked')).toBe(
+      'false',
+    );
+  });
+
+  it('keeps the switch and shows the error when the queue refuses the task', async () => {
+    show(queueOf(), {
+      queueAdd: vi.fn(async () => {
+        throw new ApiError(400, 'unknown pipeline');
+      }),
+    });
+    await fillNewTask();
+    fireEvent.click(screen.getByRole('switch', { name: 'Postpone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/unknown pipeline/);
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+  });
+
+  it('has no switch in the edit form', async () => {
+    show(queueOf({ items: [queueItem('q1', 'A', 1)] }));
+    await screen.findByText('A');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('button', { name: 'Save' });
+    expect(screen.queryByRole('switch', { name: 'Postpone' })).toBeNull();
+  });
+
   it('does not send postponed when the form is saved', async () => {
     const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { postponed: true })] }));
     await screen.findByText('Postponed');
@@ -2313,6 +2411,7 @@ describe('two halves of the task form', () => {
       screen.getByLabelText('Task text'),
       screen.getByRole('combobox', { name: 'Waits for' }),
       screen.getByRole('combobox', { name: 'Tags' }),
+      screen.getByRole('switch', { name: 'Postpone' }),
       screen.getByRole('switch', { name: 'Auto delivery' }),
       screen.getByRole('combobox', { name: 'Delivery mode' }),
       screen.getByText('Skip steps'),

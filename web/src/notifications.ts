@@ -41,6 +41,15 @@ function firstLine(text: string | null): string {
   );
 }
 
+/** The kinds of notification a group raises: the states that wait for a person. */
+function groupKinds(group: RunView['groups'][number]): NotificationKind[] {
+  const kinds: NotificationKind[] = [];
+  if (group.status === 'needs_human' || group.status === 'failed' || group.status === 'conflict')
+    kinds.push(group.status);
+  if (group.delivery === 'apply_failed') kinds.push('apply_failed');
+  return kinds;
+}
+
 /** Groups of all runs that wait for a person, in the order the list shows them. */
 export function notificationItems(runs: readonly RunView[]): NotificationItem[] {
   const items: { item: NotificationItem; order: number; position: number }[] = [];
@@ -48,15 +57,7 @@ export function notificationItems(runs: readonly RunView[]): NotificationItem[] 
     // an observer works on the task: its incidents are not for a person
     if (isRepairing(run)) continue;
     run.groups.forEach((group, index) => {
-      const kinds: NotificationKind[] = [];
-      if (
-        group.status === 'needs_human' ||
-        group.status === 'failed' ||
-        group.status === 'conflict'
-      )
-        kinds.push(group.status);
-      if (group.delivery === 'apply_failed') kinds.push('apply_failed');
-      for (const kind of kinds) {
+      for (const kind of groupKinds(group)) {
         const text = kind === 'needs_human' ? group.question : group.reason;
         items.push({
           item: {
@@ -84,10 +85,32 @@ export function notificationItems(runs: readonly RunView[]): NotificationItem[] 
     .map(({ item }) => item);
 }
 
-/** The keys that still name a current item; marks of items that left their state are dropped. */
-export function pruneKeys(keys: readonly string[], items: readonly NotificationItem[]): string[] {
-  const current = new Set(items.map((item) => item.key));
-  return keys.filter((key) => current.has(key));
+/** The keys of all groups in a state of notification, including runs an observer repairs. */
+export function stateKeys(runs: readonly RunView[]): Set<string> {
+  const keys = new Set<string>();
+  for (const run of runs) {
+    for (const group of run.groups) {
+      for (const kind of groupKinds(group)) keys.add(`${run.id}/${group.slug}/${kind}`);
+    }
+  }
+  return keys;
+}
+
+/** How many marks of one kind are kept; the oldest are dropped first. */
+export const MARKS_LIMIT = 1000;
+
+/**
+ * The marks that stay: a mark is dropped only when the loaded copy of its run shows the group out
+ * of that state. A run the panel has not loaded says nothing, so its marks stay.
+ */
+export function pruneKeys(keys: readonly string[], runs: readonly RunView[]): string[] {
+  const loaded = new Set(runs.map((run) => run.id));
+  const inState = stateKeys(runs);
+  const kept = keys.filter((key) => {
+    const runId = key.slice(0, Math.max(key.indexOf('/'), 0));
+    return !loaded.has(runId) || inState.has(key);
+  });
+  return kept.length > MARKS_LIMIT ? kept.slice(-MARKS_LIMIT) : kept;
 }
 
 export type BrowserPermission = 'default' | 'granted' | 'denied' | 'unsupported';
@@ -121,15 +144,17 @@ export interface NotificationCenterState {
  * The notification centre: the items derived from the runs, which of them are read or hidden
  * (kept in the browser), the browser permission and the system notifications of new items.
  * `ready` is false until the first state of the runs has arrived, so a reload neither forgets
- * the marks nor announces what was already there.
+ * the marks nor announces what was already there. `listedRuns` names the runs of the live list
+ * (null: all); only they raise system notifications.
  */
 export function useNotificationCenter(
   runs: readonly RunView[],
   onOpenGroup: (item: NotificationItem) => void,
   ready = true,
+  listedRuns: ReadonlySet<string> | null = null,
 ): NotificationCenterState {
-  const [read, setRead] = usePreference<string[]>('notificationsRead', []);
-  const [hidden, setHidden] = usePreference<string[]>('notificationsHidden', []);
+  const [read, setRead] = usePreference<string[]>('notificationsRead', [], { shared: true });
+  const [hidden, setHidden] = usePreference<string[]>('notificationsHidden', [], { shared: true });
   const [permission, setPermission] = useState<BrowserPermission>(readPermission);
   const all = useMemo(() => notificationItems(runs), [runs]);
   const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
@@ -140,16 +165,20 @@ export function useNotificationCenter(
   // A group that left its state and came back is a new notification.
   useEffect(() => {
     if (!ready) return;
-    const nextRead = pruneKeys(read, all);
+    const nextRead = pruneKeys(read, runs);
     if (nextRead.length !== read.length) setRead(nextRead);
-    const nextHidden = pruneKeys(hidden, all);
+    const nextHidden = pruneKeys(hidden, runs);
     if (nextHidden.length !== hidden.length) setHidden(nextHidden);
-  }, [ready, all, read, hidden, setRead, setHidden]);
+  }, [ready, runs, read, hidden, setRead, setHidden]);
 
   // System notifications: only for items that appeared after the first state.
   const known = useRef<Set<string> | null>(null);
   const latest = useRef(onOpenGroup);
   latest.current = onOpenGroup;
+  const listedRef = useRef(listedRuns);
+  listedRef.current = listedRuns;
+  const hiddenRef = useRef(hiddenSet);
+  hiddenRef.current = hiddenSet;
   useEffect(() => {
     if (!ready) return;
     const before = known.current;
@@ -157,6 +186,10 @@ export function useNotificationCenter(
     if (before === null || readPermission() !== 'granted') return;
     for (const item of all) {
       if (before.has(item.key)) continue;
+      // a live hide mark means the panel saw no exit from the state (e.g. a repair ended)
+      if (hiddenRef.current.has(item.key)) continue;
+      // a run loaded page by page or by id is not a transition
+      if (listedRef.current !== null && !listedRef.current.has(item.runId)) continue;
       const base = statusInfo(item.kind, i18next.t).label;
       const label = item.humanOnly
         ? `${base} · ${i18next.t(`runs.humanOnly.${item.humanOnly}`)}`

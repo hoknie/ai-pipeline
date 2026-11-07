@@ -590,6 +590,7 @@ export const es: Dictionary = {
       afterItems: 'Tareas en espera',
       afterRuns: 'Ejecuciones de la cola',
       tags: 'Etiquetas',
+      postpone: 'Aplazar',
       autoDeliver: 'Entrega automática',
       autoDeliverBySetting: 'según la configuración',
       autoDeliverForTask: 'para esta tarea',
@@ -924,6 +925,7 @@ export const es: Dictionary = {
   },
   pipeline: {
     sections: { pipelines: 'Pipelines', actions: 'Acciones', system: 'Etapas del sistema' },
+    tabs: 'secciones de Pipeline',
     actions: {
       section: 'acción {{id}}',
       newName: 'nueva',
@@ -967,19 +969,12 @@ export const es: Dictionary = {
       },
       section: 'etapa del sistema {{kind}}',
       empty: 'Elige una etapa del sistema.',
-      saved: 'Guardado en {{file}}. Las nuevas ejecuciones reciben el cambio.',
       loadFailed: 'Las etapas del sistema no se cargaron: {{message}}',
       task: 'Tarea integrada',
       taskLabel: 'tarea integrada: {{name}}',
       noTask: 'La etapa no tiene tarea: la hace el sistema.',
       taskHelp:
         'La tarea integrada es de solo lectura; el prompt adicional de abajo se añade a ella.',
-      settings: 'Ajustes',
-      prompt: 'Prompt adicional',
-      promptHelp: 'Se añade al final de la tarea. Se escribe en {{path}}; vacío lo elimina.',
-      readOnly: 'Otros ajustes de la etapa',
-      readOnlyHelp: 'Se cambian en los ajustes.',
-      source: { default: 'por defecto', global: 'compartido', project: 'proyecto' },
       splitSettings: 'La división no tiene ajustes propios: se fija en el pipeline.',
     },
     points: {
@@ -1322,6 +1317,10 @@ export const es: Dictionary = {
         label: 'Autor del mensaje',
         hint: 'Especialista que escribe el mensaje del commit.',
       },
+      delivery_message_prompt: {
+        label: 'Prompt adicional',
+        hint: 'Se añade al final de la tarea integrada del mensaje de commit.',
+      },
       delivery_resolver: {
         label: 'Resolutor de conflictos',
         hint: 'Especialista que resuelve los conflictos de entrega.',
@@ -1329,6 +1328,10 @@ export const es: Dictionary = {
       delivery_resolver_rounds: {
         label: 'Rondas del resolutor',
         hint: 'Cuántas veces puede intentarlo el resolutor.',
+      },
+      delivery_resolver_prompt: {
+        label: 'Prompt adicional',
+        hint: 'Se añade al final de la tarea integrada de resolución de conflictos.',
       },
       web_autostart: {
         label: 'Iniciar con el daemon',

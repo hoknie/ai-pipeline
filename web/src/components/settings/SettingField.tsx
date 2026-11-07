@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../../ui/button.tsx';
 import { Input } from '../../ui/input.tsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select.tsx';
+import { Textarea } from '../../ui/textarea.tsx';
 import { Switch } from '../../ui/switch.tsx';
 import type { EditorSetting, SettingValue } from '../../types.ts';
 import type { SettingsScope } from '../../settingsGroups.ts';
 import { ValuesPicker } from '../ValuesPicker.tsx';
 
-import { fieldKey } from './settingFields.ts';
+import { MULTILINE_FIELDS, fieldKey } from './settingFields.ts';
 
 /** The draft value that returns a field of the project to the shared value (the key is removed). */
 export const INHERIT = Symbol('inherit');
@@ -135,6 +136,20 @@ export function SettingField({
           />
         );
       default:
+        if (MULTILINE_FIELDS.has(setting.path))
+          return (
+            <Textarea
+              id={id}
+              rows={5}
+              value={typeof shown === 'string' ? shown : ''}
+              disabled={locked}
+              aria-invalid={invalid}
+              aria-describedby={describedBy}
+              onChange={(event) =>
+                onChange(event.target.value.trim() === '' ? null : event.target.value)
+              }
+            />
+          );
         return (
           <Input
             id={id}

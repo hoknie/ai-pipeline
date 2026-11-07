@@ -13,6 +13,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import type { Api } from '../../api.ts';
 import { useConfirm } from '../../confirm.tsx';
 import { cn } from '../../lib/cn.ts';
+import { LinkTabs } from '../LinkTabs.tsx';
 import { repositoryLabel } from '../../repositories.ts';
 import { formatRoute } from '../../route.ts';
 import {
@@ -158,25 +159,16 @@ export default function SettingsPage({
 
   return (
     <div className="flex w-full flex-col gap-4 p-4">
-      <div className="border-b">
-        <div role="tablist" aria-label={t('settingsPage.tabs')} className="flex gap-1">
-          {SETTINGS_SCOPES.map((tab) => (
-            <a
-              key={tab}
-              role="tab"
-              aria-selected={tab === scope}
-              href={hrefOf(tab, tabGroup(tab))}
-              onClick={leave(hrefOf(tab, tabGroup(tab)))}
-              className={cn(
-                '-mb-px border-b-2 border-transparent px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground',
-                tab === scope && 'border-primary text-foreground',
-              )}
-            >
-              {t(`settingsPage.scope.${tab}`)}
-            </a>
-          ))}
-        </div>
-      </div>
+      <LinkTabs
+        label={t('settingsPage.tabs')}
+        tabs={SETTINGS_SCOPES.map((tab) => ({
+          key: tab,
+          label: t(`settingsPage.scope.${tab}`),
+          href: hrefOf(tab, tabGroup(tab)),
+          selected: tab === scope,
+          onClick: leave(hrefOf(tab, tabGroup(tab))),
+        }))}
+      />
       <SettingsTarget
         scope={scope}
         repository={repository}

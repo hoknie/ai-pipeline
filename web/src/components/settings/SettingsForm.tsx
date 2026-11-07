@@ -12,7 +12,7 @@ import { Card } from '../../ui/card.tsx';
 
 import { EnvField } from './EnvField.tsx';
 import { INHERIT, SettingField, savedValue, type DraftValue } from './SettingField.tsx';
-import { SETTINGS_SECTIONS, envPath } from './settingFields.ts';
+import { SETTINGS_SECTIONS, envPath, type SettingsSection } from './settingFields.ts';
 
 type Drafts = Record<string, DraftValue>;
 
@@ -35,6 +35,7 @@ export function SettingsForm({
   config,
   scope,
   group,
+  sections: shownSections,
   onSaved,
   onDirty,
 }: {
@@ -42,6 +43,8 @@ export function SettingsForm({
   config: ConfigEditorResponse;
   scope: SettingsScope;
   group: SettingsGroup;
+  /** The cards to show instead of those of the group (the settings of a built-in stage). */
+  sections?: SettingsSection[];
   /** Called after a write, and by «Reload»: the page reads the configuration again. */
   onSaved: () => Promise<void> | void;
   onDirty: (dirty: boolean) => void;
@@ -54,7 +57,7 @@ export function SettingsForm({
   const [saveErrors, setSaveErrors] = useState<Map<string, string>>(new Map());
   const [otherErrors, setOtherErrors] = useState<string[]>([]);
 
-  const sections = SETTINGS_SECTIONS[group] ?? [];
+  const sections = shownSections ?? SETTINGS_SECTIONS[group] ?? [];
   const byPath = useMemo(
     () => new Map(config.settings.map((setting) => [setting.path, setting])),
     [config.settings],

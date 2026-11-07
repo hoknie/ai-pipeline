@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const PREFIX = 'aip.web.';
 
@@ -14,9 +14,26 @@ function read<T>(key: string, initial: T): T {
 /**
  * A setting of the person using the panel, kept in the browser between runs and page loads.
  * Without a usable localStorage it lives for the page only.
+ * With `shared`, a change made by another tab of the same browser is followed.
  */
-export function usePreference<T>(key: string, initial: T): [T, (value: T) => void] {
+export function usePreference<T>(
+  key: string,
+  initial: T,
+  options: { shared?: boolean } = {},
+): [T, (value: T) => void] {
   const [value, setValue] = useState<T>(() => read(key, initial));
+  const shared = options.shared === true;
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
+  useEffect(() => {
+    if (!shared) return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== PREFIX + key) return;
+      setValue(read(key, initialRef.current));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [key, shared]);
   const update = useCallback(
     (next: T) => {
       setValue(next);

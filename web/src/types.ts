@@ -83,6 +83,8 @@ export interface QueueFields {
   task?: string;
   groups?: { title: string; task: string }[];
   title?: string;
+  /** Only `true` is sent: the task is added postponed. */
+  postponed?: boolean;
   /** Absent: follow `delivery.auto` when the task starts. */
   autoDeliver?: boolean;
   /** Absent: follow `delivery.mode` when the task starts. */

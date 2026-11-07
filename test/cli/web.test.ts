@@ -663,6 +663,20 @@ describe('aip web', () => {
         headers: authed(web, JSON_TYPE),
         body: JSON.stringify(body),
       });
+    const created = await post('/api/queue/items', {
+      pipeline: 'feature',
+      task: 'y',
+      postponed: true,
+    });
+    expect(created.status).toBe(200);
+    const createdId = ((await created.json()) as { item: string }).item;
+    const afterCreate = (await (
+      await fetch(`${base}/api/queue`, { headers: authed(web) })
+    ).json()) as QueueView;
+    expect(afterCreate.items.find((item) => item.id === createdId)?.postponed).toBe(true);
+    expect(
+      (await post('/api/queue/items', { pipeline: 'feature', task: 'z', postponed: 'yes' })).status,
+    ).toBe(400);
     const added = (await (
       await post('/api/queue/items', { pipeline: 'feature', task: 'x' })
     ).json()) as QueueView & { item: string };
@@ -671,7 +685,7 @@ describe('aip web', () => {
     const read = (await (
       await fetch(`${base}/api/queue`, { headers: authed(web) })
     ).json()) as QueueView;
-    expect(read.items[0]?.postponed).toBe(true);
+    expect(read.items.find((item) => item.id === added.item)?.postponed).toBe(true);
     expect((await post(`/api/queue/items/${added.item}`, { postponed: 'yes' })).status).toBe(400);
   });
 

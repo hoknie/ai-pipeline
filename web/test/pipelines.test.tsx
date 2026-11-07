@@ -1105,6 +1105,31 @@ describe('pipeline sections and addresses', () => {
     expect(formatRoute(route(null, 'actions'))).toBe('#pipelines');
   });
 
+  it('reads and writes the shared level of a system stage', () => {
+    const route = (run: string, group: string, step: string | null) => ({
+      view: 'pipelines' as const,
+      run,
+      group,
+      step,
+      tab: null,
+    });
+    expect(parseRoute('#pipelines/system/resolve/global')).toEqual(
+      route('resolve', 'system', 'global'),
+    );
+    expect(parseRoute('#pipelines/system/resolve/other')).toEqual(route('resolve', 'system', null));
+    expect(parseRoute('#pipelines/actions/commit/global')).toEqual(
+      route('commit', 'actions', null),
+    );
+    expect(formatRoute(route('resolve', 'system', 'global'))).toBe(
+      '#pipelines/system/resolve/global',
+    );
+    expect(formatRoute(route('resolve', 'system', null))).toBe('#pipelines/system/resolve');
+    expect(formatRoute(route('commit', 'actions', 'global'))).toBe('#pipelines/actions/commit');
+    expect(formatRoute(route('feature', null as unknown as string, 'global'))).toBe(
+      '#pipelines/feature',
+    );
+  });
+
   it('keeps a one-part address as a pipeline, even when it is named like a section', () => {
     expect(parseRoute('#pipelines/actions')).toEqual({
       view: 'pipelines',
@@ -1149,15 +1174,36 @@ describe('pipeline sections and addresses', () => {
       [entry('feature')],
     );
 
-  it('lists the pipelines, the actions and the system stages with their levels', async () => {
-    render(<Page api={sectioned()} />);
-    for (const title of ['Pipelines', 'Actions', 'System stages']) {
-      expect(await screen.findByRole('heading', { name: title })).toBeTruthy();
-    }
+  const open = async (hash: string, stageApi: Api = sectioned()) => {
+    window.location.hash = hash;
+    render(<App api={stageApi} openStream={openFake} />);
+    await screen.findByRole('tablist', { name: 'Pipeline sections' });
+  };
+  const tabNamed = (name: string) => screen.getByRole('tab', { name });
+
+  it('shows the three tabs and only the list of the open one', async () => {
+    await open('#pipelines');
+    expect(tabNamed('Pipelines').getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByRole('list', { name: 'pipeline' })).toBeTruthy();
+    expect(screen.queryByRole('list', { name: 'Actions' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'System stages' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Actions' })).toBeNull();
+  });
+
+  it('lists the actions with their levels on the tab «Actions»', async () => {
+    await open('#pipelines/actions/commit');
+    expect(tabNamed('Actions').getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByRole('list', { name: 'pipeline' })).toBeNull();
     const actions = within(await screen.findByRole('list', { name: 'Actions' }));
     expect(actions.getByRole('button', { name: /Commit/ }).textContent).toContain('project');
     expect(actions.getByRole('button', { name: /notify/ }).textContent).toContain('global');
-    const system = within(screen.getByRole('list', { name: 'System stages' }));
+  });
+
+  it('lists the system stages with their levels on the tab «System stages»', async () => {
+    await open('#pipelines/system/resolve');
+    expect(tabNamed('System stages').getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByRole('list', { name: 'Actions' })).toBeNull();
+    const system = within(await screen.findByRole('list', { name: 'System stages' }));
     expect(system.getAllByRole('button')).toHaveLength(4);
     await waitFor(() =>
       expect(
@@ -1166,6 +1212,177 @@ describe('pipeline sections and addresses', () => {
     );
     expect(system.getByRole('button', { name: /Commit message/ }).textContent).toContain('global');
     expect(system.getByRole('button', { name: /Task split/ }).textContent).toContain('global');
+  });
+
+  it('opens the tab of stages with an empty screen for an unknown stage', async () => {
+    await open('#pipelines/system/other');
+    expect(tabNamed('System stages').getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByText('Pick a system stage.')).toBeTruthy();
+  });
+
+  it('shows the filters only on the tab «Pipelines»', async () => {
+    const filtered = (hash: string) => {
+      cleanup();
+      return open(hash);
+    };
+    await open('#pipelines');
+    expect(screen.getByRole('complementary', { name: 'Filters' })).toBeTruthy();
+    await filtered('#pipelines/actions/commit');
+    expect(screen.queryByRole('complementary', { name: 'Filters' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Filters/ })).toBeNull();
+    await filtered('#pipelines/system/resolve');
+    expect(screen.queryByRole('complementary', { name: 'Filters' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Filters/ })).toBeNull();
+  });
+
+  it('opens the first stage, then the pipeline that was open, from the tabs', async () => {
+    await open('#pipelines/feature');
+    fireEvent.click(tabNamed('System stages'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/split'));
+    fireEvent.click(tabNamed('Pipelines'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/feature'));
+  });
+
+  it('comes back to the last stage and the last action of their tabs', async () => {
+    await open('#pipelines/actions/notify');
+    fireEvent.click(tabNamed('System stages'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/split'));
+    fireEvent.click(
+      within(await screen.findByRole('list', { name: 'System stages' })).getByRole('button', {
+        name: /Commit message/,
+      }),
+    );
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/message'));
+    fireEvent.click(tabNamed('Actions'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/notify'));
+    fireEvent.click(tabNamed('System stages'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/message'));
+  });
+
+  it('falls back to the first action when the remembered one is deleted', async () => {
+    let actions = [
+      actionEntry('commit', { name: 'Commit', run: 'git commit -am x' }),
+      actionEntry('notify', { specialist: 'writer' }, 'global'),
+    ];
+    const changing = api({
+      config: vi.fn(async () =>
+        configView({ specialists, pipelines: [entry('feature')], actions }),
+      ),
+      systemStages: vi.fn(async () => systemStagesView()),
+      deleteAction: vi.fn(async () => {
+        actions = [actions[0]!];
+        return { ok: true as const, revision: null, file: '/f' };
+      }),
+    });
+    await open('#pipelines/actions/notify', changing);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/commit'));
+    expect(tabNamed('Actions').getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(tabNamed('System stages'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/split'));
+    fireEvent.click(tabNamed('Actions'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/commit'));
+  });
+
+  it('opens the form of a new action when the last action is deleted', async () => {
+    let actions = [actionEntry('commit', { name: 'Commit', run: 'git commit -am x' })];
+    const changing = api({
+      config: vi.fn(async () =>
+        configView({ specialists, pipelines: [entry('feature')], actions }),
+      ),
+      systemStages: vi.fn(async () => systemStagesView()),
+      deleteAction: vi.fn(async () => {
+        actions = [];
+        return { ok: true as const, revision: null, file: '/f' };
+      }),
+    });
+    await open('#pipelines/actions/commit', changing);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/new'));
+    expect(tabNamed('Actions').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('stays on the action when the copy of the other level remains after a delete', async () => {
+    let actions = [
+      actionEntry('notify', { specialist: 'writer' }, 'global'),
+      actionEntry('commit', { name: 'Commit', run: 'git commit -am x' }, 'project_over_global'),
+    ];
+    const deleteAction = vi.fn(async () => {
+      actions = [
+        actions[0]!,
+        actionEntry('commit', { name: 'Commit', run: 'git commit -am x' }, 'global'),
+      ];
+      return { ok: true as const, revision: null, file: '/f' };
+    });
+    const changing = api({
+      config: vi.fn(async () =>
+        configView({ specialists, pipelines: [entry('feature')], actions }),
+      ),
+      systemStages: vi.fn(async () => systemStagesView()),
+      deleteAction,
+    });
+    await open('#pipelines/actions/commit', changing);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deleteAction).toHaveBeenCalled());
+    await screen.findByText('/xdg/aip/actions/commit.yaml');
+    expect(window.location.hash).toBe('#pipelines/actions/commit');
+    expect(tabNamed('Actions').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('does not move when the open tab is clicked', async () => {
+    await open('#pipelines/system/resolve/global');
+    fireEvent.click(tabNamed('System stages'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(window.location.hash).toBe('#pipelines/system/resolve/global');
+    expect(tabNamed('System stages').getAttribute('href')).toBe('#pipelines/system/resolve/global');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('stays on the new pipeline when the tab «Pipelines» is clicked there', async () => {
+    await open('#pipelines/new');
+    fireEvent.click(tabNamed('Pipelines'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(window.location.hash).toBe('#pipelines/new');
+  });
+
+  it('opens the form of a new action on the tab «Actions» without actions', async () => {
+    const empty = api({
+      config: vi.fn(async () => configView({ specialists, pipelines: [entry('feature')] })),
+      systemStages: vi.fn(async () => systemStagesView()),
+    });
+    await open('#pipelines', empty);
+    await screen.findByRole('list', { name: 'pipeline' });
+    await waitFor(() => expect(tabNamed('Actions').getAttribute('aria-disabled')).toBeNull());
+    fireEvent.click(tabNamed('Actions'));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/new'));
+  });
+
+  it('does not leave a form with unsaved edits when asked to stay', async () => {
+    await open('#pipelines/actions/commit');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Renamed' } });
+    fireEvent.click(tabNamed('System stages'));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(window.location.hash).toBe('#pipelines/actions/commit');
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Renamed');
+    fireEvent.click(tabNamed('System stages'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Leave' }));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/split'));
+  });
+
+  it('does not open the tab «Actions» before the configuration loads', async () => {
+    const slow = api({ config: vi.fn(() => new Promise<never>(() => undefined)) });
+    await open('#pipelines', slow);
+    expect(tabNamed('Actions').getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(tabNamed('Actions'));
+    expect(window.location.hash).toBe('#pipelines');
   });
 
   it('opens an action and a system stage from the address', async () => {
@@ -1180,18 +1397,35 @@ describe('pipeline sections and addresses', () => {
   });
 
   it('writes the address of the clicked entry', async () => {
-    window.location.hash = '#pipelines';
-    render(<App api={sectioned()} openStream={openFake} />);
+    await open('#pipelines/actions/commit');
     fireEvent.click(await screen.findByRole('button', { name: /notify/ }));
     await waitFor(() => expect(window.location.hash).toBe('#pipelines/actions/notify'));
+    fireEvent.click(tabNamed('System stages'));
     fireEvent.click(
-      within(screen.getByRole('list', { name: 'System stages' })).getByRole('button', {
+      within(await screen.findByRole('list', { name: 'System stages' })).getByRole('button', {
         name: /^Delivery(?! conflict)/,
       }),
     );
     await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/delivery'));
-    fireEvent.click(within(screen.getByRole('list', { name: 'pipeline' })).getByRole('button'));
+    fireEvent.click(tabNamed('Pipelines'));
+    fireEvent.click(
+      within(await screen.findByRole('list', { name: 'pipeline' })).getByRole('button'),
+    );
     await waitFor(() => expect(window.location.hash).toBe('#pipelines/feature'));
+  });
+
+  it('writes the shared level of a stage into the address and keeps it for another stage', async () => {
+    await open('#pipelines/system/resolve');
+    fireEvent.click(await screen.findByRole('tab', { name: 'Shared' }));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/resolve/global'));
+    fireEvent.click(
+      within(screen.getByRole('list', { name: 'System stages' })).getByRole('button', {
+        name: /Commit message/,
+      }),
+    );
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/message/global'));
+    fireEvent.click(screen.getByRole('tab', { name: 'Project' }));
+    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/message'));
   });
 
   it('keeps the four system stages when the list of them does not load', async () => {
@@ -1200,7 +1434,7 @@ describe('pipeline sections and addresses', () => {
         throw new Error('no stages');
       }),
     });
-    render(<Page api={failing} start={null} />);
+    await open('#pipelines/system/split', failing);
     const system = within(await screen.findByRole('list', { name: 'System stages' }));
     expect(system.getAllByRole('button')).toHaveLength(4);
   });

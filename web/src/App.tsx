@@ -83,6 +83,7 @@ function Panel({
   const [route, setRoute] = useState<Route>(readRoute);
   const {
     runs,
+    listedRuns,
     connection,
     loaded,
     home,
@@ -168,6 +169,7 @@ function Panel({
     runs,
     (item) => setRoute({ view: 'runs', run: item.runId, group: item.slug, step: null, tab: null }),
     loaded,
+    listedRuns,
   );
 
   const onDraft = useCallback((key: string, text: string) => {
@@ -415,8 +417,9 @@ function Panel({
               runs={runs}
               selected={route.run}
               section={route.group}
-              onSelect={(id, section = null) =>
-                setRoute({ view: 'pipelines', run: id, group: section, step: null, tab: null })
+              scope={route.step}
+              onSelect={(id, section = null, level = null) =>
+                setRoute({ view: 'pipelines', run: id, group: section, step: level, tab: null })
               }
             />
           </Suspense>

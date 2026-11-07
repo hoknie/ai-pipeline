@@ -36,7 +36,9 @@ The addresses are `#specialists`, `#specialists/<slug>` and `#specialists/new`.
 
 ## Pipeline
 
-The tab edits the `aip/pipelines/<id>.yaml` files of the project. Shared pipelines are edited in [Settings](settings.md#shared-pipelines).
+The page has three tabs: "Pipeline", "Actions" and "System stages". Each tab shows only its own list; the filters belong to the "Pipeline" tab. Choosing a tab opens the entry that was last open on it, or the default one: the first action (the form of a new action when there are none) and the first system stage.
+
+The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Shared pipelines are edited in [Settings](settings.md#shared-pipelines).
 
 - The "Name" field sets the optional `name` of the pipeline; lists, badges, the graph and the palette show it instead of the id.
 - The form lists the steps: id, specialist, the return on rejection with the number of rounds, and the additional prompt. Steps are added, deleted and reordered with buttons.
@@ -50,4 +52,12 @@ The filters are search by id and name, level, "Tags" and "Specialists" (the ones
 
 "Import" copies project pipelines of another repository of the panel, with their tags, in one request. A taken id cannot be chosen. The specialists a pipeline names are not copied: if one is missing in the project, nothing is imported and the dialog shows the error.
 
-The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`.
+### System stages
+
+A system stage (task split, commit message, delivery conflict resolution, delivery) shows its built-in task read only. Under it the stage settings have two tabs, "Shared" and "Project", as on the [Settings](settings.md) page. The line above the form names the file the tab saves to.
+
+Each field shows the value of its tab and where it comes from; on the "Project" tab "Inherit" removes the project key.
+
+The commit message stage has the specialist, the commit message template and the additional prompt. The template and the additional prompts are text areas, so line breaks are kept; a value of only spaces removes the key. "Save" writes all changes of the tab in one request. The split has no settings of its own: it is set in the pipeline.
+
+The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`; `#pipelines/actions/<id>` and `#pipelines/system/<kind>` open the other tabs. `#pipelines/system/<kind>/global` opens the "Shared" tab of a stage; without the suffix the "Project" tab opens.

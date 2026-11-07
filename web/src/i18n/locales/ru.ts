@@ -588,6 +588,7 @@ export const ru: Dictionary = {
       afterItems: 'Ждущие задачи',
       afterRuns: 'Запуски из очереди',
       tags: 'Теги',
+      postpone: 'Отложить',
       autoDeliver: 'Автодоставка',
       autoDeliverBySetting: 'по настройке',
       autoDeliverForTask: 'для этой задачи',
@@ -920,6 +921,7 @@ export const ru: Dictionary = {
   },
   pipeline: {
     sections: { pipelines: 'Pipeline', actions: 'Действия', system: 'Системные этапы' },
+    tabs: 'разделы страницы Pipeline',
     actions: {
       section: 'действие {{id}}',
       newName: 'новое',
@@ -962,18 +964,11 @@ export const ru: Dictionary = {
       },
       section: 'системный этап {{kind}}',
       empty: 'Выберите системный этап.',
-      saved: 'Сохранено в {{file}}. Новые запуски получат изменение.',
       loadFailed: 'Системные этапы не загрузились: {{message}}',
       task: 'Встроенная задача',
       taskLabel: 'встроенная задача: {{name}}',
       noTask: 'У этапа нет задачи: работу делает система.',
       taskHelp: 'Встроенная задача только для чтения; дополнение ниже дописывается к ней.',
-      settings: 'Настройки',
-      prompt: 'Дополнительный промпт',
-      promptHelp: 'Дописывается в конец задачи. Пишется в {{path}}; пустое поле убирает значение.',
-      readOnly: 'Остальные настройки этапа',
-      readOnlyHelp: 'Их меняют в настройках.',
-      source: { default: 'по умолчанию', global: 'общий', project: 'проект' },
       splitSettings: 'У деления нет своих настроек: оно задаётся в pipeline.',
     },
     points: {
@@ -1292,6 +1287,10 @@ export const ru: Dictionary = {
         label: 'Автор сообщения',
         hint: 'Специалист, пишущий сообщение коммита.',
       },
+      delivery_message_prompt: {
+        label: 'Дополнительный промпт',
+        hint: 'Дописывается в конец встроенной задачи сообщения коммита.',
+      },
       delivery_resolver: {
         label: 'Разбор конфликтов',
         hint: 'Специалист, разбирающий конфликты доставки.',
@@ -1299,6 +1298,10 @@ export const ru: Dictionary = {
       delivery_resolver_rounds: {
         label: 'Раундов разбора',
         hint: 'Сколько раз разборщик может попробовать.',
+      },
+      delivery_resolver_prompt: {
+        label: 'Дополнительный промпт',
+        hint: 'Дописывается в конец встроенной задачи разрешения конфликтов.',
       },
       web_autostart: {
         label: 'Запускать вместе с демоном',

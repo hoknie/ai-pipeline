@@ -34,6 +34,7 @@ A task with predecessors shows them on a second line after "Waits for:".
 - **Title, pipeline, text or groups** describe the task.
 - **"Waits for"** chooses the [predecessors](../usage/queue.md#dependencies). A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).
 - **"Parent task"** chooses one run of the repository as the [parent](../usage/tags.md#parent-of-a-task), finished runs included, in three parts: "In progress", "Planned" and "Finished". The chosen parent is shown as `#N title`. "No parent task" removes the linked task tags of the task.
+- **"Postpone"** adds the task [postponed](../usage/queue.md#postponed-tasks). The switch is only in the new task; for an existing task the "Postpone" button in the list changes the flag.
 - **Tags** and **delivery** are the [tags](../usage/tags.md) and [delivery settings](../configuration/delivery.md#settings-for-one-task) of the task.
 - **"Skip steps"** is a row of segments: a pressed segment is a [skipped step](../usage/queue.md#skipping-steps), and the last unpressed one stays disabled.
 

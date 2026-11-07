@@ -512,6 +512,8 @@ const SETTING_SPECS: SettingSpec[] = [
   ['delivery.message_specialist', 'specialist', null],
   ['delivery.resolver', 'specialist', null],
   ['delivery.resolver_rounds', 'integer', 3, { range: [1, 10] }],
+  ['delivery.message_prompt', 'string', null],
+  ['delivery.resolver_prompt', 'string', null],
   ['workspace.base', 'choice', 'working_tree', { options: ['working_tree', 'head'] }],
   ['workspace.include', 'strings', []],
   ['naming.enabled', 'boolean', true],

@@ -112,9 +112,36 @@ describe('notificationItems', () => {
 });
 
 describe('pruneKeys', () => {
-  it('keeps only the keys of current items', () => {
-    const items = notificationItems([runView({ groups: [failed('a')] })]);
-    expect(pruneKeys(['run1/a/failed', 'run1/gone/failed'], items)).toEqual(['run1/a/failed']);
+  it('drops the mark of a group that left its state in the loaded run', () => {
+    const runs = [
+      runView({ groups: [failed('a'), groupRow({ slug: 'gone', status: 'running' })] }),
+    ];
+    expect(pruneKeys(['run1/a/failed', 'run1/gone/failed'], runs)).toEqual(['run1/a/failed']);
+  });
+
+  it('keeps the mark of a run that is not loaded', () => {
+    const runs = [runView({ groups: [failed('a')] })];
+    expect(pruneKeys(['old/a/failed', 'run1/a/failed'], runs)).toEqual([
+      'old/a/failed',
+      'run1/a/failed',
+    ]);
+    expect(pruneKeys(['old/a/failed'], [])).toEqual(['old/a/failed']);
+  });
+
+  it('keeps the mark of a run the observer repairs', () => {
+    const repairing = {
+      ...runView({ groups: [failed('a')] }),
+      repair: { allowed: true, active: true, repairs: 1, incident: null },
+    } as ReturnType<typeof runView>;
+    expect(notificationItems([repairing])).toEqual([]);
+    expect(pruneKeys(['run1/a/failed'], [repairing])).toEqual(['run1/a/failed']);
+  });
+
+  it('keeps at most 1000 marks, dropping the oldest', () => {
+    const keys = Array.from({ length: 1005 }, (_, index) => `old${index}/a/failed`);
+    const kept = pruneKeys(keys, []);
+    expect(kept).toHaveLength(1000);
+    expect(kept[0]).toBe('old5/a/failed');
   });
 });
 
@@ -178,6 +205,21 @@ describe('useNotificationCenter', () => {
     expect(result.current.unread).toBe(1);
   });
 
+  it('keeps a hidden and a read mark while the run is not loaded, and after it returns', () => {
+    const marked = [runView({ id: 'old', groups: [failed('f')] })];
+    const first = mount(marked);
+    act(() => first.result.current.open());
+    act(() => first.result.current.hide('old/f/failed'));
+    first.unmount();
+    // after a reload the snapshot has no such run
+    const second = mount([runView({ id: 'new', groups: [] })]);
+    expect(window.localStorage.getItem('aip.web.notificationsHidden')).toBe('["old/f/failed"]');
+    expect(window.localStorage.getItem('aip.web.notificationsRead')).toBe('["old/f/failed"]');
+    second.rerender({ runs: [runView({ id: 'new', groups: [] }), ...marked] });
+    expect(second.result.current.items).toEqual([]);
+    expect(second.result.current.unread).toBe(0);
+  });
+
   it('hides everything at once', () => {
     const { result } = mount();
     act(() => result.current.hideAll());
@@ -230,6 +272,65 @@ describe('useNotificationCenter', () => {
         title: 'aip: f',
         options: { body: 'Failed · boom', tag: 'run1/f/failed' },
       });
+    });
+
+    it('stays silent about a run loaded after the first state', () => {
+      const live = [runView({ id: 'live', groups: [groupRow({ slug: 'f' })] })];
+      const { rerender } = renderHook(
+        ({ runs, listed }) => useNotificationCenter(runs, open, true, listed),
+        { initialProps: { runs: live, listed: new Set(['live']) as ReadonlySet<string> } },
+      );
+      const history = runView({ id: 'old', groups: [failed('f')] });
+      rerender({ runs: [...live, history], listed: new Set(['live']) });
+      expect(FakeNotification.created).toEqual([]);
+      // the run enters the live list with the same state: its key is known, so still silent
+      rerender({ runs: [...live, history], listed: new Set(['live', 'old']) });
+      expect(FakeNotification.created).toEqual([]);
+      // a new failure of a listed run is announced once
+      const fell = runView({ id: 'live', groups: [failed('f')] });
+      rerender({ runs: [fell, history], listed: new Set(['live', 'old']) });
+      expect(FakeNotification.created).toHaveLength(1);
+      expect(FakeNotification.created[0]!.options.tag).toBe('live/f/failed');
+    });
+
+    it('announces a loaded run once when it fails again', () => {
+      const live = [runView({ id: 'live', groups: [groupRow({ slug: 'f' })] })];
+      const listed = new Set(['live', 'old']) as ReadonlySet<string>;
+      const { rerender } = renderHook(
+        ({ runs, listed }) => useNotificationCenter(runs, open, true, listed),
+        { initialProps: { runs: live, listed: new Set(['live']) as ReadonlySet<string> } },
+      );
+      const failedOld = runView({ id: 'old', groups: [failed('f')] });
+      rerender({ runs: [...live, failedOld], listed: new Set(['live']) });
+      expect(FakeNotification.created).toEqual([]);
+      const rerun = runView({ id: 'old', groups: [groupRow({ slug: 'f', status: 'running' })] });
+      rerender({ runs: [...live, rerun], listed });
+      expect(FakeNotification.created).toEqual([]);
+      rerender({ runs: [...live, runView({ id: 'old', groups: [failed('f')] })], listed });
+      expect(FakeNotification.created).toHaveLength(1);
+      expect(FakeNotification.created[0]!.options.tag).toBe('old/f/failed');
+    });
+
+    it('stays silent about a hidden item after a repair ends', () => {
+      const group = failed('f');
+      const { result, rerender } = renderHook(
+        ({ runs }) => useNotificationCenter(runs, open, true),
+        { initialProps: { runs: [runView({ groups: [group] })] } },
+      );
+      act(() => result.current.hide('run1/f/failed'));
+      const base = runView({ groups: [group] });
+      const repairing = {
+        ...base,
+        repair: { allowed: true, active: true, repairs: 1, incident: null },
+      } as unknown as ReturnType<typeof runView>;
+      rerender({ runs: [repairing] });
+      const finished = {
+        ...repairing,
+        repair: { ...repairing.repair, active: false },
+      } as ReturnType<typeof runView>;
+      rerender({ runs: [finished] });
+      expect(FakeNotification.created).toEqual([]);
+      expect(result.current.items).toEqual([]);
     });
 
     it('shows nothing without the permission', () => {

@@ -577,6 +577,7 @@ export const en = {
       afterItems: 'Waiting tasks',
       afterRuns: 'Runs from the queue',
       tags: 'Tags',
+      postpone: 'Postpone',
       autoDeliver: 'Auto delivery',
       autoDeliverBySetting: 'as in the settings',
       autoDeliverForTask: 'for this task',
@@ -907,6 +908,7 @@ export const en = {
   },
   pipeline: {
     sections: { pipelines: 'Pipelines', actions: 'Actions', system: 'System stages' },
+    tabs: 'Pipeline sections',
     actions: {
       section: 'action {{id}}',
       newName: 'new',
@@ -949,18 +951,11 @@ export const en = {
       },
       section: 'system stage {{kind}}',
       empty: 'Pick a system stage.',
-      saved: 'Saved to {{file}}. New runs get the change.',
       loadFailed: 'The system stages did not load: {{message}}',
       task: 'Built-in task',
       taskLabel: 'built-in task: {{name}}',
       noTask: 'This stage has no task: the system does the work.',
       taskHelp: 'The built-in task is read only; the additional prompt below is appended to it.',
-      settings: 'Settings',
-      prompt: 'Additional prompt',
-      promptHelp: 'Appended to the end of the task. Written to {{path}}; empty removes it.',
-      readOnly: 'Other settings of the stage',
-      readOnlyHelp: 'These are changed in the settings.',
-      source: { default: 'default', global: 'shared', project: 'project' },
       splitSettings: 'The split has no settings of its own: it is set in the pipeline.',
     },
     points: {
@@ -1287,6 +1282,10 @@ export const en = {
         label: 'Message specialist',
         hint: 'Specialist that writes the commit message.',
       },
+      delivery_message_prompt: {
+        label: 'Additional prompt',
+        hint: 'Appended to the end of the built-in task of the commit message.',
+      },
       delivery_resolver: {
         label: 'Conflict resolver',
         hint: 'Specialist that resolves delivery conflicts.',
@@ -1294,6 +1293,10 @@ export const en = {
       delivery_resolver_rounds: {
         label: 'Resolver rounds',
         hint: 'How many times the resolver may try.',
+      },
+      delivery_resolver_prompt: {
+        label: 'Additional prompt',
+        hint: 'Appended to the end of the built-in task of conflict resolution.',
       },
       web_autostart: {
         label: 'Start with the daemon',

@@ -4,11 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.tsx';
 import { RunList } from '../src/components/runs/RunList.tsx';
 import { EMPTY_FILTERS } from '../src/components/runs/runFilter.ts';
+import { useNotificationCenter } from '../src/notifications.ts';
 import { useRuns } from '../src/store.ts';
 import { useNearEnd } from '../src/useNearEnd.ts';
 import { TagsProvider } from '../src/tags.tsx';
 
-import { FakeEventSource, fakeApi, openFake, runView } from './fixtures.ts';
+import { FakeEventSource, fakeApi, groupRow, openFake, runView } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from './render.tsx';
 
 afterEach(() => {
@@ -63,6 +64,104 @@ describe('history of finished runs', () => {
     expect(result.current.runs.find((run) => run.id === 'a')?.title).toBe('новое');
     act(() => stream().send({ event: 'snapshot', seq: 2, runs: [runView()] }));
     expect(result.current.runs.find((run) => run.id === 'a')?.title).toBe('новое');
+  });
+});
+
+describe('first state of the runs', () => {
+  it('is loaded by the snapshot, not by an earlier daemon event', () => {
+    const api = fakeApi();
+    const { result } = renderHook(() => useRuns(api, openFake));
+    act(() => stream().send({ event: 'daemon', daemon: null }));
+    expect(result.current.loaded).toBe(false);
+    act(() => stream().send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    expect(result.current.loaded).toBe(true);
+  });
+
+  it('lists only the runs of the snapshot and of run events as live', async () => {
+    const finishedRuns = vi.fn().mockResolvedValueOnce({ runs: [done('a')], next: null });
+    const api = fakeApi({ finishedRuns });
+    const { result } = renderHook(() => useRuns(api, openFake));
+    act(() => stream().send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    act(() => result.current.history.loadMore());
+    await waitFor(() => expect(result.current.runs.map((run) => run.id)).toContain('a'));
+    expect([...result.current.listedRuns]).toEqual(['run1']);
+  });
+
+  it('keeps a hidden item hidden when a snapshot lacks its run and a page brings it back', async () => {
+    window.localStorage.clear();
+    const old = runView({
+      id: 'old',
+      finished: true,
+      state: 'finished',
+      groups: [groupRow({ slug: 'f', title: 'f', status: 'failed', reason: 'boom' })],
+    });
+    const finishedRuns = vi.fn().mockResolvedValueOnce({ runs: [old], next: null });
+    const api = fakeApi({ finishedRuns });
+    const created: unknown[] = [];
+    vi.stubGlobal(
+      'Notification',
+      class {
+        static permission = 'granted';
+        constructor(...args: unknown[]) {
+          created.push(args);
+        }
+      },
+    );
+    const { result } = renderHook(() => {
+      const state = useRuns(api, openFake);
+      const center = useNotificationCenter(
+        state.runs,
+        () => undefined,
+        state.loaded,
+        state.listedRuns,
+      );
+      return { state, center };
+    });
+    act(() => stream().send({ event: 'snapshot', seq: 1, runs: [old] }));
+    act(() => result.current.center.hide('old/f/failed'));
+    // after a reload the snapshot lacks the old run
+    act(() => stream().send({ event: 'snapshot', seq: 2, runs: [runView()] }));
+    expect(window.localStorage.getItem('aip.web.notificationsHidden')).toBe('["old/f/failed"]');
+    act(() => result.current.state.history.loadMore());
+    await waitFor(() => expect(result.current.state.runs.map((run) => run.id)).toContain('old'));
+    expect(result.current.center.items).toEqual([]);
+    expect(result.current.center.unread).toBe(0);
+    expect(created).toEqual([]);
+  });
+
+  it('keeps the marks and stays silent when a daemon event precedes the snapshot', () => {
+    window.localStorage.clear();
+    window.localStorage.setItem('aip.web.notificationsHidden', '["old/f/failed"]');
+    const created: unknown[] = [];
+    vi.stubGlobal(
+      'Notification',
+      class {
+        static permission = 'granted';
+        constructor(...args: unknown[]) {
+          created.push(args);
+        }
+      },
+    );
+    const api = fakeApi();
+    const { result } = renderHook(() => {
+      const state = useRuns(api, openFake);
+      const center = useNotificationCenter(
+        state.runs,
+        () => undefined,
+        state.loaded,
+        state.listedRuns,
+      );
+      return { state, center };
+    });
+    act(() => stream().send({ event: 'daemon', daemon: null }));
+    const old = runView({
+      id: 'old',
+      groups: [groupRow({ slug: 'f', title: 'f', status: 'failed', reason: 'boom' })],
+    });
+    act(() => stream().send({ event: 'snapshot', seq: 1, runs: [old] }));
+    expect(window.localStorage.getItem('aip.web.notificationsHidden')).toBe('["old/f/failed"]');
+    expect(result.current.center.items).toEqual([]);
+    expect(created).toEqual([]);
   });
 });
 

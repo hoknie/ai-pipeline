@@ -41,6 +41,38 @@ describe('preferences of the panel', () => {
   });
 });
 
+describe('shared preferences', () => {
+  const external = (key: string, value: string) => {
+    window.localStorage.setItem(key, value);
+    window.dispatchEvent(new StorageEvent('storage', { key, newValue: value }));
+  };
+
+  it('follows a change made in another tab', () => {
+    const { result } = renderHook(() => usePreference('flag', false, { shared: true }));
+    act(() => external('aip.web.flag', 'true'));
+    expect(result.current[0]).toBe(true);
+  });
+
+  it('ignores another key', () => {
+    const { result } = renderHook(() => usePreference('flag', false, { shared: true }));
+    act(() => external('aip.web.other', 'true'));
+    expect(result.current[0]).toBe(false);
+  });
+
+  it('stays put without shared', () => {
+    const { result } = renderHook(() => usePreference('flag', false));
+    act(() => external('aip.web.flag', 'true'));
+    expect(result.current[0]).toBe(false);
+  });
+
+  it('stops listening after unmount', () => {
+    const remove = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = renderHook(() => usePreference('flag', false, { shared: true }));
+    unmount();
+    expect(remove).toHaveBeenCalledWith('storage', expect.any(Function));
+  });
+});
+
 describe('answers-only switch of the run screen', () => {
   const transcript = vi.fn(async () => ({
     runId: 'run1',

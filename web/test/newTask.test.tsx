@@ -267,6 +267,24 @@ describe('repository of the new task', () => {
     );
   });
 
+  it('keeps the postpone switch when the repository changes', async () => {
+    const { api } = twoRepositories();
+    const dialog = await openDialog();
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Postpone' }));
+    await pickLib(dialog);
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('docs'),
+    );
+    expect(
+      within(dialog).getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked'),
+    ).toBe('true');
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'later' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
+    expect(api.calls.filter(([name]) => name === 'queueAdd')).toEqual([['queueAdd', LIB]]);
+    expect(api.queueAdd).toHaveBeenCalledWith(expect.objectContaining({ postponed: true }));
+  });
+
   it('keeps the pipeline the chosen repository has', async () => {
     twoRepositories({ libPipelines: ['docs', 'feature'] });
     const dialog = await openDialog();

@@ -55,20 +55,17 @@ export function DeliveryFields({
   onReload,
   effective,
   idPrefix,
-  writeLevel,
 }: {
   api: Api;
   config: ConfigEditorResponse | null;
   onReload: () => Promise<void> | void;
   effective?: { autoDeliver: boolean | null; deliveryMode: string | null };
   idPrefix: string;
-  /** Writes to this level instead of the one each value comes from. */
-  writeLevel?: 'global' | 'project';
 }) {
   const { t } = useTranslation();
   const source = config ?? undefined;
-  const auto = useGeneralSetting(api, 'delivery.auto', source, onReload, writeLevel);
-  const mode = useSetting<string>(api, 'delivery.mode', 'string', source, onReload, writeLevel);
+  const auto = useGeneralSetting(api, 'delivery.auto', source, onReload);
+  const mode = useSetting<string>(api, 'delivery.mode', 'string', source, onReload);
   const invalid = effective
     ? effective.autoDeliver === null || effective.deliveryMode === null
     : config !== null && config.errors.length > 0;
