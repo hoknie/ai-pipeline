@@ -2,13 +2,14 @@ import { existsSync } from 'node:fs';
 
 import { databasePath } from '../platform/paths/index.ts';
 import { Database } from '../platform/sqlite/index.ts';
-import { FinishedRunRepository, RunRepository } from '../feature/runs/repositories/index.ts';
+import { createRunArchive, type RunArchive } from '../feature/runs/services/index.ts';
 import type { RunState } from '../feature/runs/types/index.ts';
 import type {
   Runtime as RuntimeName,
   RuntimeSettings,
 } from '../feature/swarm-config/types/index.ts';
-import { runtimeFor } from '../runtime/index.ts';
+
+import { createAgents } from './agents.ts';
 
 /** The runs of the state directory, read without a daemon. */
 export interface Maintenance {
@@ -20,8 +21,7 @@ export interface Maintenance {
 
 interface Opened {
   database: Database;
-  runs: RunRepository;
-  finished: FinishedRunRepository;
+  archive: RunArchive;
 }
 
 /** Opens the state directory for offline tasks such as cleaning; the database opens on first use. */
@@ -31,13 +31,12 @@ export function openMaintenance(stateDirectory: string): Maintenance {
   const open = (): Opened => {
     if (opened) return opened;
     const database = new Database(path);
-    const runs = new RunRepository(database);
-    opened = { database, runs, finished: new FinishedRunRepository(database, runs) };
+    opened = { database, archive: createRunArchive(database) };
     return opened;
   };
   return {
-    loadRun: (runId) => open().runs.loadRun(runId) ?? undefined,
-    finishedRuns: () => (opened || existsSync(path) ? open().finished.finishedRuns() : []),
+    loadRun: (runId) => open().archive.load(runId),
+    finishedRuns: () => (opened || existsSync(path) ? open().archive.finishedRuns() : []),
     close: () => opened?.database.close(),
   };
 }
@@ -48,5 +47,5 @@ export function agentExecutable(
   environment: NodeJS.ProcessEnv,
   settings: RuntimeSettings,
 ): string {
-  return runtimeFor(name, environment, settings).executable;
+  return createAgents(environment).agents.runtimeFor(name, settings).executable;
 }

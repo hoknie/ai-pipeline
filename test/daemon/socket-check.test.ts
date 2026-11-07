@@ -64,8 +64,8 @@ describe('daemon socket check', () => {
 
   it('stops when its socket file is replaced', async () => {
     const { running } = await daemon();
-    rmSync(running.daemon.socket);
-    writeFileSync(running.daemon.socket, 'another');
+    rmSync(running.application.socket);
+    writeFileSync(running.application.socket, 'another');
     await stoppedWithin(running, 2_000);
   });
 
@@ -75,6 +75,6 @@ describe('daemon socket check', () => {
     writeFileSync(lock, '999999999');
     await stoppedWithin(running, 2_000);
     expect(readFileSync(lock, 'utf8')).toBe('999999999');
-    expect(existsSync(running.daemon.socket)).toBe(false);
+    expect(existsSync(running.application.socket)).toBe(false);
   });
 });

@@ -12,12 +12,7 @@ import {
   isServiceGroup,
   isSplitGroup,
 } from '../../../feature/runs/types/index.ts';
-import type {
-  AttemptDecision,
-  AttemptView,
-  GroupView,
-  SpecCandidate,
-} from '../contract/responses/groups.ts';
+import type { AttemptDecision, AttemptView, GroupView } from '../contract/responses/groups.ts';
 import type { DiffStat, WaitLookup } from '../contract/responses/runs.ts';
 import {
   NO_WAITS,
@@ -171,25 +166,4 @@ export function groupView(
     permissionHints: permissionHints(attempts),
     log,
   };
-}
-
-const SPEC_PATH = /^openspec\/changes\/(archive\/[^/]+|[^/]+)\/(?:proposal|design|tasks)\.md$/;
-
-/** The changes among `paths`, active before archived and then by name. */
-export function pickSpecChange(paths: string[]): SpecCandidate[] {
-  const found = new Map<string, SpecCandidate>();
-  for (const path of paths) {
-    const directory = SPEC_PATH.exec(path)?.[1];
-    if (directory === undefined || found.has(directory)) continue;
-    found.set(directory, {
-      change: directory.slice(directory.lastIndexOf('/') + 1),
-      path: `openspec/changes/${directory}`,
-    });
-  }
-  const archived = (candidate: SpecCandidate) => candidate.path.includes('/changes/archive/');
-  return [...found.values()].sort(
-    (a, b) =>
-      Number(archived(a)) - Number(archived(b)) ||
-      (a.change < b.change ? -1 : a.change > b.change ? 1 : 0),
-  );
 }

@@ -1,6 +1,5 @@
 import type { Database } from '../../../platform/sqlite/index.ts';
-
-export type KnownRepository = { path: string; addedAt: number };
+import type { KnownRepository } from '../types/index.ts';
 
 export class KnownRepositories {
   private readonly database: Database;

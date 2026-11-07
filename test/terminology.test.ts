@@ -16,7 +16,7 @@ const OTHER_MEANING = [/^\.github\//, /^\.claude\//, /^openspec\//, /^docs\/deve
  */
 const COMPATIBILITY = [
   'src/platform/sqlite/migrations.ts',
-  'src/daemon/executor.ts',
+  'src/feature/runs/services/effects/actions.ts',
   'test/daemon/actions.test.ts',
   'src/feature/swarm-config/repositories/config-files.ts',
   'src/feature/swarm-config/services/assemble.ts',

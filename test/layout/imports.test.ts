@@ -25,34 +25,34 @@ const ok = (messages: string[]) => expect(messages).toEqual([]);
 
 describe('importViolations: old layers', () => {
   it('allows listed layers and the same layer', () => {
-    ok(check('runtime/a.ts', 'feature/agents/types/index.ts'));
-    ok(check('runtime/a.ts', 'runtime/b.ts'));
+    ok(check('cli/a.ts', 'presentation/cli/index.ts'));
+    ok(check('cli/a.ts', 'cli/b.ts'));
   });
 
   it('rejects layers outside the table and unknown layers', () => {
-    bad(check('runtime/a.ts', 'daemon/b.ts'));
-    expect(check('weird/a.ts', 'daemon/b.ts')[0]).toContain('unknown layer');
+    bad(check('cli/a.ts', 'platform/b.ts'));
+    expect(check('weird/a.ts', 'cli/b.ts')[0]).toContain('unknown layer');
   });
 
   it('counts type imports like value imports', () => {
     const root = makeTree({
-      'runtime/a.ts': `import type { X } from '../daemon/b.ts';\n`,
-      'daemon/b.ts': 'export type X = 1;\n',
+      'cli/a.ts': `import type { X } from '../platform/b.ts';\n`,
+      'platform/b.ts': 'export type X = 1;\n',
     });
     expect(importViolations(root)).toHaveLength(1);
   });
 
   it('flags import() with a string like a static import', () => {
     const root = makeTree({
-      'runtime/a.ts': `export const f = () => import('../daemon/b.ts');\n`,
-      'daemon/b.ts': stub,
+      'cli/a.ts': `export const f = () => import('../platform/b.ts');\n`,
+      'platform/b.ts': stub,
     });
     expect(importViolations(root)).toHaveLength(1);
   });
 
   it('rejects an import that leaves the tree', () => {
     const root = makeTree({
-      'runtime/a.ts': `import data from '../../x.json';\nexport { data };\n`,
+      'cli/a.ts': `import data from '../../x.json';\nexport { data };\n`,
     });
     expect(importViolations(root)[0]?.message).toContain('leaves the source tree');
   });
@@ -112,18 +112,16 @@ describe('importViolations: platform and app', () => {
     bad(check('app/a.ts', 'presentation/web/index.ts'));
   });
 
-  it('lets app assemble the old layers it builds from, but not cli or mcp', () => {
-    ok(check('app/a.ts', 'daemon/b.ts'));
-    ok(check('app/a.ts', 'runtime/b.ts'));
+  it('keeps app off the old layers', () => {
     bad(check('app/a.ts', 'cli/b.ts'));
     bad(check('app/a.ts', 'protocol/b.ts'));
   });
 
-  it('lets app see services, clients and (for now) repositories, only through index.ts', () => {
+  it('lets app see services and clients only through index.ts, and no repositories', () => {
     ok(check('app/a.ts', 'feature/tags/services/index.ts'));
     ok(check('app/a.ts', 'feature/agents/clients/index.ts'));
     ok(check('app/a.ts', 'feature/agents/clients/claude/index.ts'));
-    ok(check('app/a.ts', 'feature/tags/repositories/index.ts'));
+    bad(check('app/a.ts', 'feature/tags/repositories/index.ts'));
     bad(check('app/a.ts', 'feature/tags/repositories/tags.ts'));
     bad(check('app/a.ts', 'feature/tags/services/inner.ts'));
     bad(check('app/a.ts', 'presentation/cli/a.ts'));

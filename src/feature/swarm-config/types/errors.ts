@@ -46,3 +46,33 @@ export class ConfigLoadError extends AppError {
     this.detail = detail;
   }
 }
+
+/** The file or directory a load error that is not about the fields points at. */
+function configErrorPath(detail: ConfigError): string {
+  switch (detail.kind) {
+    case 'read':
+    case 'syntax':
+      return detail.path;
+    case 'legacy':
+      return detail.found;
+    case 'no_files':
+      return detail.expected[0] ?? '';
+    case 'invalid':
+      return '';
+  }
+}
+
+/** The errors of a configuration that did not load: its fields, or the one file it is about. */
+export function configLoadErrors(error: ConfigLoadError): FieldError[] {
+  const { detail } = error;
+  return detail.kind === 'invalid'
+    ? detail.errors
+    : [{ path: configErrorPath(detail), message: error.message }];
+}
+
+/** The first error of a configuration that did not load, as one line. */
+export function firstConfigError(error: ConfigLoadError): string {
+  const { detail } = error;
+  const first = detail.kind === 'invalid' ? detail.errors[0] : undefined;
+  return first ? `${first.path}: ${first.message}` : error.message;
+}

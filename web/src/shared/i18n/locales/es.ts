@@ -1167,6 +1167,8 @@ export const es: Dictionary = {
   },
   settingsPage: {
     groups: 'grupos de ajustes',
+    beta: 'beta',
+    betaHint: 'aún en desarrollo: el comportamiento y los ajustes pueden cambiar',
     hasErrors: 'el grupo tiene errores de configuración',
     restartNote: 'Los cambios se aplican tras el reinicio: véase el grupo <link>Sistema</link>.',
     tabs: 'nivel de ajustes',

@@ -25,12 +25,12 @@ describe('human review in a queue with auto answer', () => {
     expect(row).toMatchObject({ status: 'needs_human', humanOnly: 'review', step: 'review' });
     expect(row.question).toContain('проверь архитектуру');
     expect((await h.group(runId, row.slug)).humanOnly).toBe('review');
-    expect(h.running.daemon.state(runId).groups[0]?.decisions).toEqual([]);
+    expect(h.running.application.services.runs.states.get(runId).groups[0]?.decisions).toEqual([]);
 
     await h.call('answer', { runId, group: row.slug, answer: 'Принято' });
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(final.groups.map((group) => group.status)).toEqual(['merged']);
-    const decisions = h.running.daemon.state(runId).groups[0]!.decisions;
+    const decisions = h.running.application.services.runs.states.get(runId).groups[0]!.decisions;
     expect(decisions).toHaveLength(1);
     expect(decisions[0]).toMatchObject({ by: 'human', answer: 'Принято' });
   });

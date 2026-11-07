@@ -1230,7 +1230,7 @@ describe('aip web', () => {
       405,
     );
     expect((await fetch(`${listUrl}/nope`, { headers: authed(web) })).status).toBe(404);
-    h.running.daemon.database.prepare("UPDATE artifacts SET uri = 's3://b/x'").run();
+    h.running.application.database.prepare("UPDATE artifacts SET uri = 's3://b/x'").run();
     expect((await fetch(url('out.log'), { headers: authed(web) })).status).toBe(409);
   });
 

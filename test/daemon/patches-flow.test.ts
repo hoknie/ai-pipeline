@@ -57,7 +57,7 @@ describe('patch of a run', () => {
     const before = (await h.call('run_patch', { runId })) as RunPatchView;
     expect(before.fileName).toBe(`${runId}.patch`);
     expect(text(before)).toContain('+export const value = 2;');
-    const record = h.running.daemon.repositories.patches.runPatch(runId);
+    const record = h.running.application.services.delivery.patches.record(runId);
     expect(record?.uri).toMatch(/^file:\/\/\//);
     expect(record?.size).toBe(before.size);
     expect(existsSync(join(h.state, 'patches', runId, `${record?.commit}.patch`))).toBe(true);
@@ -70,7 +70,9 @@ describe('patch of a run', () => {
     expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toBe('');
     const after = (await h.call('run_patch', { runId })) as RunPatchView;
     expect(after.base64).toBe(before.base64);
-    expect(h.running.daemon.repositories.patches.runPatch(runId)?.commit).toBe(record?.commit);
+    expect(h.running.application.services.delivery.patches.record(runId)?.commit).toBe(
+      record?.commit,
+    );
   });
 
   it('is saved before the cleanup although nobody asked for it', async () => {
@@ -88,7 +90,7 @@ describe('patch of a run', () => {
     const h = current;
     const runId = await finishedRun(h);
     await h.call('apply', { runId });
-    h.running.daemon.database.prepare('DELETE FROM run_patches').run();
+    h.running.application.database.prepare('DELETE FROM run_patches').run();
     await expect(h.call('run_patch', { runId })).rejects.toThrow('run refs are removed');
     await expect(h.call('run_patch', { runId: 'unknown' })).rejects.toThrow('unknown run');
   });

@@ -404,7 +404,7 @@ describe('Действия наблюдателя', () => {
     await h.call('run_pause', { runId: asked.id });
     await h.call('observers_set', { settings: { enabled: true } });
     await settle(h);
-    expect(h.running.daemon.state(asked.id).run.hold).toBe('paused');
+    expect(h.running.application.services.runs.states.get(asked.id).run.hold).toBe('paused');
     expect(fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'repair')).toHaveLength(0);
     h.open('second');
     // Only a person lifts a pause: `queue_run_now` takes the paused run back.
@@ -477,7 +477,10 @@ describe('Границы действий наблюдателя', () => {
       h.call('repair_action', { token: 'unknown-token', action: 'cancel', reason: 'x' }),
     ).rejects.toThrow(/token/);
     // the token of the running ordinary group, taken from the executor
-    const tokens = (h.running.daemon as any).executor.tokens as Map<string, { group: string }>;
+    const tokens = (h.running.application.services.runs.effects as any).running.tokens as Map<
+      string,
+      { group: string }
+    >;
     const token = [...tokens].find(([, key]) => key.group !== '_repair')?.[0];
     expect(token).toBeDefined();
     await expect(

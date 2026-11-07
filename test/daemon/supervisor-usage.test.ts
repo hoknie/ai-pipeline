@@ -5,9 +5,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import type { Usage } from '../../src/feature/agents/types/index.ts';
-import { readLines, readTimes, timesPath } from '../../src/daemon/logs.ts';
-import { launchProcess } from '../../src/daemon/supervisor.ts';
-import type { OutputParser } from '../../src/runtime/index.ts';
+import {
+  launchProcess,
+  readLines,
+  readTimes,
+  timesPath,
+} from '../../src/feature/agents/services/index.ts';
+import type { OutputParser } from '../../src/feature/agents/types/index.ts';
 
 /** A parser whose usage is the sum of the numbers on the lines it was given. */
 function summing(): OutputParser {

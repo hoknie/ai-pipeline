@@ -12,7 +12,7 @@ afterEach(async () => {
 describe('serial processing', () => {
   it('runs the jobs one after another in the order of the calls', async () => {
     const h = (current = await harness());
-    const { daemon } = h.running;
+    const daemon = h.running.application.services.runs.engine;
     const log: string[] = [];
     const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const first = daemon.serial(async () => {
@@ -37,7 +37,7 @@ describe('serial processing', () => {
 
   it('goes on after a failed job and hands its error to the caller', async () => {
     const h = (current = await harness());
-    const { daemon } = h.running;
+    const daemon = h.running.application.services.runs.engine;
     const failed = daemon.serial(() => Promise.reject(new Error('boom')));
     const next = daemon.serial(() => Promise.resolve('ok'));
     await expect(failed).rejects.toThrow('boom');
@@ -46,7 +46,7 @@ describe('serial processing', () => {
 
   it('on stop waits for the job under way before it closes the database', async () => {
     const h = (current = await harness());
-    const { daemon } = h.running;
+    const daemon = h.running.application.services.runs.engine;
     const log: string[] = [];
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => (release = resolve));

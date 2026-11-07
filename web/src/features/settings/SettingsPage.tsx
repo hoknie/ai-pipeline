@@ -2,6 +2,7 @@ import { Trans, useTranslation } from 'react-i18next';
 
 import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
 import {
+  BETA_SETTINGS_GROUPS,
   SETTINGS_GROUPS_BY_SCOPE,
   SETTINGS_SCOPES,
   errorsByGroup,
@@ -11,6 +12,7 @@ import {
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { ConfigErrors } from '../../shared/ui/layout/EntryList.tsx';
 import { SettingsTarget } from './SettingsTarget.tsx';
+import { BetaBadge } from './page/BetaBadge.tsx';
 import { GroupBody } from './page/GroupBody.tsx';
 import { GroupNav } from './page/GroupNav.tsx';
 import { hrefOf, SYSTEM_LINK } from './page/hrefOf.ts';
@@ -71,7 +73,10 @@ export default function SettingsPage(props: SettingsPageProps) {
             leave={leave}
           />
           <div className="flex min-w-0 flex-col gap-3" data-group={group} data-scope={scope}>
-            <h2 className="text-lg font-semibold">{t(`settingsPage.group.${group}`)}</h2>
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              {t(`settingsPage.group.${group}`)}
+              {BETA_SETTINGS_GROUPS.has(group) ? <BetaBadge /> : null}
+            </h2>
             <p className="text-sm text-muted-foreground">{t(`settingsPage.about.${group}`)}</p>
             {group === 'runtimes' || group === 'system' ? (
               <p className="text-sm text-muted-foreground">

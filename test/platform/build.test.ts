@@ -31,7 +31,9 @@ describe('current build', () => {
     copies.push(copy);
     cpSync(join(repository, 'src'), copy, { recursive: true });
     expect(fingerprintTree(copy).fingerprint).toBe(currentBuild().fingerprint);
-    writeFileSync(join(copy, 'daemon', 'daemon.ts'), '// changed\n', { flag: 'a' });
+    writeFileSync(join(copy, 'feature', 'runs', 'services', 'engine.ts'), '// changed\n', {
+      flag: 'a',
+    });
     expect(fingerprintTree(copy).fingerprint).not.toBe(currentBuild().fingerprint);
   });
 });

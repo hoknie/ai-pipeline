@@ -20,3 +20,6 @@ export {
   planTagsSet,
   tagFolder,
 } from './specialist-tags.ts';
+export { ConfigEditService } from './config-edits.ts';
+export { createSwarmEditServices, type SwarmEditServices } from './create.ts';
+export { SharedConfigService } from './shared-config.ts';

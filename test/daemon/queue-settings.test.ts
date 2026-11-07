@@ -206,7 +206,7 @@ describe('autopilot answers', () => {
     expect(done.stop).toBeNull();
     const [created] = await allRuns(h);
     await h.waitFor(created!.id, (run) => run.finished);
-    const state = h.running.daemon.state(created!.id);
+    const state = h.running.application.services.runs.states.get(created!.id);
     const decisions = state.groups.flatMap((group) => group.decisions);
     expect(decisions).toHaveLength(1);
     expect(decisions[0]).toMatchObject({ question: 'OAuth или пароль?', by: 'autopilot' });
@@ -231,7 +231,9 @@ describe('autopilot answers', () => {
     await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
     const [created] = await allRuns(h);
     await h.waitFor(created!.id, (run) => run.finished);
-    const decisions = h.running.daemon.state(created!.id).groups.flatMap((g) => g.decisions);
+    const decisions = h.running.application.services.runs.states
+      .get(created!.id)
+      .groups.flatMap((g) => g.decisions);
     expect(decisions[0]?.answer).toBe('Делай как проще');
     await h.call('queue_settings', { repository: h.repo, autopilotAnswer: null });
     expect((await queueOf(h)).autopilotAnswer).toBeNull();
@@ -259,7 +261,9 @@ describe('autopilot answers', () => {
     await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
     const [created] = await allRuns(h);
     await h.waitFor(created!.id, (run) => run.finished);
-    const decisions = h.running.daemon.state(created!.id).groups.flatMap((g) => g.decisions);
+    const decisions = h.running.application.services.runs.states
+      .get(created!.id)
+      .groups.flatMap((g) => g.decisions);
     expect(decisions).toHaveLength(1);
     expect(decisions[0]).toMatchObject({ by: 'autopilot' });
     expect((await queueOf(h)).autopilot).toBe(false);

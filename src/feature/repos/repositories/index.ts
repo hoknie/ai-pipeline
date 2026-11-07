@@ -1,1 +1,1 @@
-export { KnownRepositories, type KnownRepository } from './known.ts';
+export { KnownRepositories } from './known.ts';

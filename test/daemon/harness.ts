@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
-import type { DaemonOptions, DaemonTimings } from '../../src/daemon/index.ts';
+import type { ApplicationOptions as DaemonOptions, DaemonTimings } from '../../src/app/index.ts';
 import { request } from '../../src/presentation/ipc/client/index.ts';
 import type {
   GroupView,
@@ -150,7 +150,7 @@ export async function harness(
       timings: { ...TEST_TIMINGS, ...options.timings },
     });
   let running = await start();
-  const socket = running.daemon.socket;
+  const socket = running.application.socket;
   const call = <M extends Parameters<typeof request>[1]>(method: M, params: ParamsOf<M>) =>
     request(socket, method, params);
   const status = async (runId: string) => (await call('status', { runId })) as RunView;

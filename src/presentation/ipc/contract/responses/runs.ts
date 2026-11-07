@@ -6,6 +6,7 @@ import type {
   HumanOnly,
   HumanQuestion,
   Incident,
+  RunCreated,
   RunHold,
   RunPhase,
   SpecialistUse,
@@ -229,15 +230,7 @@ export interface ResolverRow {
   reason: string | null;
 }
 
-export interface RunCreated {
-  runId: string;
-  /** Number of the task of the run. */
-  number: number;
-  branch: string;
-  groups: { slug: string; title: string }[];
-  split: boolean;
-  warnings: string[];
-}
+export type { RunCreated } from '../../../../feature/runs/types/index.ts';
 
 /** Answer to `run`: the task goes to the queue; the run exists once the queue takes the task. */
 export interface RunQueued {
@@ -246,12 +239,6 @@ export interface RunQueued {
   number: number;
   run: RunCreated | null;
   queue: QueueView;
-}
-
-export interface ApplyResult {
-  runId: string;
-  pending: boolean;
-  groups: { slug: string; delivery: GroupDelivery }[];
 }
 
 export type {
@@ -269,3 +256,5 @@ export type {
   StageSection,
   StageStatus,
 } from '../../../../feature/runs/types/index.ts';
+
+export type { ApplyResult } from '../../../../feature/delivery/types/index.ts';

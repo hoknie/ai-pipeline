@@ -2,9 +2,9 @@ import { linkSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 import { AppError, unavailable } from '../platform/errors/index.ts';
 import { ensureDirectory, lockPath as daemonLockPath } from '../platform/paths/index.ts';
-import { serveDaemon, type Daemon, type DaemonOptions } from '../daemon/index.ts';
+import { serveDaemon } from '../presentation/ipc/server.ts';
 
-import { createApplication } from './application.ts';
+import { createApplication, type Application, type ApplicationOptions } from './application.ts';
 
 export class AlreadyRunning extends AppError {
   constructor(pid: number) {
@@ -50,22 +50,25 @@ export function acquireLock(path: string): void {
 }
 
 export interface RunningDaemon {
-  daemon: Daemon;
+  application: Application;
   close(): Promise<void>;
   closed: Promise<void>;
 }
 
 /** Takes the lock, builds the application and serves it on the daemon socket. */
-export async function startDaemon(options: DaemonOptions): Promise<RunningDaemon> {
+export async function startDaemon(options: ApplicationOptions): Promise<RunningDaemon> {
   ensureDirectory(options.stateDirectory);
   const lockPath = daemonLockPath(options.stateDirectory);
   acquireLock(lockPath);
-  const { daemon } = createApplication(options);
+  const application = createApplication(options);
   try {
-    const served = await serveDaemon(daemon, { lockPath, socketCheckMs: options.socketCheckMs });
-    return { daemon, ...served };
+    const served = await serveDaemon(application, {
+      lockPath,
+      socketCheckMs: options.socketCheckMs,
+    });
+    return { application, ...served };
   } catch (error) {
-    await daemon.stop().catch(() => undefined);
+    await application.stop().catch(() => undefined);
     rmSync(lockPath, { force: true });
     throw error;
   }

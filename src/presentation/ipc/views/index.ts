@@ -1,5 +1,6 @@
 export { catalogView } from './catalog.ts';
-export { attemptView, groupView, pickSpecChange } from './groups.ts';
+export { attemptView, groupView } from './groups.ts';
+export { pickSpecChange } from '../../../feature/delivery/types/index.ts';
 export { observersView } from './observers.ts';
 export { queueView } from './queue.ts';
 export { displayPath, repositoryViews } from './repositories.ts';

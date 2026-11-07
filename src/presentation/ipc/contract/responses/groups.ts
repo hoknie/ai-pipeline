@@ -78,27 +78,8 @@ export interface GroupView {
   log: { seq: number; lines: string[] } | null;
 }
 
-/** The documents of the OpenSpec change a group works on. */
-export interface GroupSpecView {
-  /** The directory name of the change, for example `add-export`. */
-  change: string;
-  /** The directory of the change from the repository root. */
-  path: string;
-  design: string | null;
-  tasks: string | null;
-}
-
-export interface SpecCandidate {
-  change: string;
-  path: string;
-}
-
-/** Answer to `group_file_diff`: the diff of one file of a group, without the file headers. */
-export interface FileDiffView {
-  path: string;
-  previousPath: string | null;
-  binary: boolean;
-  lines: string[];
-  totalLines: number;
-  truncated: boolean;
-}
+export type {
+  FileDiffView,
+  GroupSpecView,
+  SpecCandidate,
+} from '../../../../feature/delivery/types/index.ts';

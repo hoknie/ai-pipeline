@@ -9,38 +9,12 @@
  */
 export const oldLayers: Record<string, string[]> = {
   platform: [],
-  runtime: ['feature/swarm-config/types/index', 'feature/agents/types/index'],
-  daemon: [
-    'feature/swarm-config/types/index',
-    'feature/swarm-config/services/index',
-    'feature/swarm-edit/types/index',
-    'feature/swarm-edit/services/index',
-    'feature/agents/types/index',
-    'feature/artifacts/types/index',
-    'feature/observers/types/index',
-    'feature/queue/types/index',
-    'feature/runs/machine/index',
-    'feature/runs/types/index',
-    'feature/tags/types/index',
-    'feature/artifacts/repositories/index',
-    'feature/delivery/repositories/index',
-    'feature/observers/repositories/index',
-    'feature/queue/repositories/index',
-    'feature/repos/repositories/index',
-    'feature/runs/repositories/index',
-    'feature/runs/services/index',
-    'feature/tags/repositories/index',
-    'platform',
-    'runtime',
-    'presentation/ipc/contract',
-    'presentation/ipc/views',
-  ],
   // `src/cli/main.ts`: the entry point only calls the CLI.
   cli: ['presentation/cli'],
 };
 
 /** Старые слои, которые видит `app`: он собирает приложение из них. */
-export const appOldLayers: readonly string[] = ['runtime', 'daemon'];
+export const appOldLayers: readonly string[] = [];
 
 /** Виды папок фичи (§5). */
 export const featureViews = [
@@ -174,14 +148,7 @@ export const presentationRules: Record<PresentationSub, PresentationRule> = {
 export const entryOnlySubs: readonly string[] = ['mcp', 'web'];
 
 /** Что `app` видит в фичах и в представлении. */
-export const appViews: readonly FeatureView[] = [
-  'types',
-  'ports',
-  'services',
-  'clients',
-  // Временно: пока `Daemon` один, `app` создаёт репозитории фич и передаёт их ему.
-  'repositories',
-];
+export const appViews: readonly FeatureView[] = ['types', 'ports', 'services', 'clients'];
 export const appPresentation: readonly string[] = [
   'ipc',
   'ipc/views',
@@ -194,14 +161,8 @@ export const appPresentation: readonly string[] = [
  * Старые папки стоят рядом с целевыми и уходят вместе со слоем.
  */
 export const packagePlaces: Record<string, readonly string[]> = {
-  zod: ['runtime', 'presentation', 'feature/*/clients'],
-  yaml: [
-    'runtime',
-    'feature/swarm-config',
-    'feature/swarm-edit',
-    'feature/agents',
-    'presentation/cli',
-  ],
+  zod: ['presentation', 'feature/*/clients'],
+  yaml: ['feature/swarm-config', 'feature/swarm-edit', 'feature/agents', 'presentation/cli'],
   commander: ['presentation/cli'],
   '@modelcontextprotocol/sdk': ['presentation/mcp', 'presentation/cli'],
 };

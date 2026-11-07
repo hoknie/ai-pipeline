@@ -174,3 +174,12 @@ export interface Attempt {
 export function attemptVerdict(attempt: Attempt): Verdict | null {
   return attempt.status === 'finished' ? (attempt.report?.verdict ?? null) : null;
 }
+
+/** A running agent (or a process that was one) whose descendants and process group are background. */
+export interface AgentRoot {
+  pid: number;
+  run: string;
+  /** Null for the naming of a run, which belongs to no group. */
+  group: string | null;
+  seq: number | null;
+}

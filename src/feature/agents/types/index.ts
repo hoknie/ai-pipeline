@@ -4,3 +4,7 @@ export * from './step-input.ts';
 export * from './usage.ts';
 export * from './catalog.ts';
 export * from './transcript.ts';
+export * from './message.ts';
+export * from './run-naming.ts';
+export * from './runtime.ts';
+export * from './transcript-parts.ts';

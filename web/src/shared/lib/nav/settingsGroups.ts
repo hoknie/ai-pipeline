@@ -23,6 +23,9 @@ export type SettingsGroup =
   | (typeof SETTINGS_GROUPS_BY_SCOPE)['global'][number]
   | (typeof SETTINGS_GROUPS_BY_SCOPE)['project'][number];
 
+/** Groups still in development, marked «beta» in the column and the heading. */
+export const BETA_SETTINGS_GROUPS: ReadonlySet<SettingsGroup> = new Set(['observers']);
+
 export const DEFAULT_SETTINGS_SCOPE: SettingsScope = 'global';
 export const DEFAULT_SETTINGS_GROUP: SettingsGroup = 'general';
 

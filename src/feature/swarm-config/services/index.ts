@@ -12,3 +12,5 @@ export {
 } from './load.ts';
 export { validateConfig, validateObserverProfile } from './validate.ts';
 export { validateRuntimesSection, validateWebSection } from './validate.ts';
+export { ConfigService, type DeliverySettings } from './settings.ts';
+export { createSwarmConfigServices, type SwarmConfigServices } from './create.ts';

@@ -17,6 +17,41 @@ export interface NewGroup {
   task: string;
 }
 
+/** The task a run is created from: what a queue item stands for. */
+export interface RunRequest {
+  repository: string;
+  pipeline: string;
+  task?: string | undefined;
+  groups?: NewGroup[] | undefined;
+  title?: string | undefined;
+  autoDeliver?: boolean | undefined;
+  deliveryMode?: DeliveryMode | undefined;
+  skip?: string[] | undefined;
+}
+
+/** A run the queue has just created. */
+export interface RunCreated {
+  runId: string;
+  /** Number of the task of the run. */
+  number: number;
+  branch: string;
+  groups: { slug: string; title: string }[];
+  split: boolean;
+  warnings: string[];
+}
+
+/** What a run says about itself right after it was created or taken from the queue again. */
+export function runCreated(state: RunState, warnings: string[] = []): RunCreated {
+  return {
+    runId: state.run.id,
+    number: state.run.number,
+    branch: state.run.branch,
+    groups: state.groups.map((group) => ({ slug: group.slug, title: group.title })),
+    split: state.split !== null,
+    warnings,
+  };
+}
+
 export interface NewRun {
   id: string;
   repository: string;

@@ -5,10 +5,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
-import { DEFAULT_TIMINGS } from '../../src/daemon/index.ts';
-import { KILL_GRACE_MS } from '../../src/daemon/processes.ts';
-import { DRAIN_MS, STOP_GRACE_MS } from '../../src/daemon/supervisor.ts';
-import { NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS } from '../../src/daemon/executor.ts';
+import { DEFAULT_TIMINGS } from '../../src/app/index.ts';
+import { KILL_GRACE_MS } from '../../src/feature/processes/services/index.ts';
+import { DRAIN_MS, STOP_GRACE_MS } from '../../src/feature/agents/services/index.ts';
+import { NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS } from '../../src/feature/runs/services/index.ts';
 import { SHORT_TIMEOUT, run, start } from './control-harness.ts';
 
 let plain: RunningDaemon | null = null;
@@ -22,7 +22,7 @@ describe('daemon timings', () => {
   it('uses the product durations when no timings are given', async () => {
     const state = realpathSync(mkdtempSync(join(tmpdir(), 'aip-timings-')));
     plain = await startDaemon({ stateDirectory: state, entry: [process.execPath, 'unused'] });
-    expect(plain.daemon.timings).toEqual({
+    expect(plain.application.timings).toEqual({
       timeoutUnitMs: 1000,
       drainMs: DRAIN_MS,
       stopGraceMs: STOP_GRACE_MS,
@@ -34,7 +34,7 @@ describe('daemon timings', () => {
       processKillLookMs: 250,
       processCacheMs: 1000,
     });
-    expect(plain.daemon.timings).toEqual(DEFAULT_TIMINGS);
+    expect(plain.application.timings).toEqual(DEFAULT_TIMINGS);
   });
 
   it('overrides only the durations that are given', async () => {
@@ -44,7 +44,7 @@ describe('daemon timings', () => {
       entry: [process.execPath, 'unused'],
       timings: { timeoutUnitMs: 10 },
     });
-    expect(plain.daemon.timings).toEqual({ ...DEFAULT_TIMINGS, timeoutUnitMs: 10 });
+    expect(plain.application.timings).toEqual({ ...DEFAULT_TIMINGS, timeoutUnitMs: 10 });
   });
 
   it('counts the timeout of a step in the unit of the daemon', async () => {

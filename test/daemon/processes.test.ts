@@ -3,7 +3,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { selectBackground, terminateTree, type AgentRoot } from '../../src/daemon/processes.ts';
+import { selectBackground, terminateTree } from '../../src/feature/processes/services/index.ts';
+import type { AgentRoot } from '../../src/feature/runs/types/index.ts';
 import {
   parseClock,
   parsePs,
