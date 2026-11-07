@@ -3,13 +3,8 @@ import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
-import {
-  ConfigLoadError,
-  configPaths,
-  findSpecialist,
-  loadRuntimeSettings,
-  type RuntimeSettings,
-} from '../config/index.ts';
+import { ConfigLoadError, type RuntimeSettings } from '../feature/swarm-config/types/index.ts';
+import { configPaths, loadRuntimeSettings } from '../feature/swarm-config/services/index.ts';
 import {
   REPAIR_GROUP,
   RESOLVE_GROUP,
@@ -58,21 +53,22 @@ import {
   workspaceRoot,
   type GroupChange,
   type Snapshot,
-} from '../git/index.ts';
+} from '../platform/git/index.ts';
 import {
   answerText,
-  findExecutable,
   missingSkills,
   namingPrompt,
   parseNaming,
   runtimeFor,
+  type OutputParser,
 } from '../runtime/index.ts';
+import { findExecutable } from '../platform/process/index.ts';
 
-import type { Daemon, DaemonTimings } from './daemon.ts';
+import type { ExecutorHost } from './ports.ts';
+import type { DaemonTimings } from './timings.ts';
 import type { AgentRoot } from './processes.ts';
 import { timesPath } from './logs.ts';
 import { launchProcess, type SupervisedProcess } from './supervisor.ts';
-import type { OutputParser } from '../runtime/index.ts';
 
 export interface AttemptKey {
   run: string;
@@ -112,7 +108,7 @@ function keyOf(key: AttemptKey): string {
 }
 
 export class Executor {
-  private readonly daemon: Daemon;
+  private readonly host: ExecutorHost;
   private readonly entry: string[];
   private readonly graceMs: number | undefined;
   private readonly timings: DaemonTimings;
@@ -126,12 +122,12 @@ export class Executor {
   private readonly usageBuffers = new Map<string, UsageBuffer>();
 
   constructor(options: {
-    daemon: Daemon;
+    host: ExecutorHost;
     entry: string[];
     graceMs: number | undefined;
     timings: DaemonTimings;
   }) {
-    this.daemon = options.daemon;
+    this.host = options.host;
     this.entry = options.entry;
     this.graceMs = options.graceMs;
     this.timings = options.timings;
@@ -185,7 +181,7 @@ export class Executor {
   }
 
   private reportUsage(state: RunState, key: AttemptKey, usage: Usage): void {
-    if (this.daemon.stopping) return;
+    if (this.host.stopping) return;
     let buffer = this.usageBuffers.get(key.run);
     if (!buffer) {
       buffer = { state, pending: new Map(), timer: null };
@@ -211,10 +207,10 @@ export class Executor {
     buffer.pending.clear();
     buffer.timer = setTimeout(() => this.flushUsage(run), this.timings.usageIntervalMs);
     buffer.timer.unref();
-    void this.daemon
+    void this.host
       .serial(() => {
-        if (this.daemon.stopping) return Promise.resolve();
-        return this.daemon.apply(buffer.state, { kind: 'attempt_usage', updates });
+        if (this.host.stopping) return Promise.resolve();
+        return this.host.apply(buffer.state, { kind: 'attempt_usage', updates });
       })
       .catch(() => undefined);
   }
@@ -364,7 +360,7 @@ export class Executor {
     const key = { run: state.run.id, group: slug, seq };
     const finish = async (outcome: ActionOutcome): Promise<void> => {
       await this.discardChanges(state, group);
-      await this.daemon.apply(state, { kind: 'action_finished', group: slug, seq, outcome });
+      await this.host.apply(state, { kind: 'action_finished', group: slug, seq, outcome });
     };
     let directory: string;
     try {
@@ -397,7 +393,7 @@ export class Executor {
         cwd: directory,
         logPath,
         parser: quiet,
-        environment: this.daemon.environment,
+        environment: this.host.environment,
         graceMs: this.graceMs,
         drainMs: this.timings.drainMs,
         timesPath: timesPath(logPath),
@@ -415,16 +411,16 @@ export class Executor {
       this.running.delete(keyOf(key));
       this.keys.delete(keyOf(key));
       if (process.pid !== undefined) {
-        this.daemon.agentGone({ pid: process.pid, run: key.run, group: key.group, seq: key.seq });
+        this.host.agentGone({ pid: process.pid, run: key.run, group: key.group, seq: key.seq });
       }
       // A stopping daemon leaves the attempt running: the next start marks it interrupted.
-      if (this.daemon.stopping) return undefined;
+      if (this.host.stopping) return undefined;
       const outcome: ActionOutcome = exit.spawnError
         ? { kind: 'spawn', message: exit.spawnError }
         : timedOut
           ? { kind: 'timeout' }
           : { kind: 'exit', code: exit.code ?? 1 };
-      return this.daemon.serial(() => finish(outcome));
+      return this.host.serial(() => finish(outcome));
     });
   }
 
@@ -433,8 +429,8 @@ export class Executor {
     const { naming } = state.run.config;
     const settings = this.runtimeSettings(state);
     if (typeof settings === 'string') return;
-    const runtime = runtimeFor(naming.runtime, this.daemon.environment, settings);
-    if (!findExecutable(runtime.executable, this.daemon.environment.PATH)) return;
+    const runtime = runtimeFor(naming.runtime, this.host.environment, settings);
+    if (!findExecutable(runtime.executable, this.host.environment.PATH)) return;
     const directory = join(this.workspace(state), 'logs', state.run.id, '_naming');
     const logPath = join(directory, 'output.log');
     const task = state.split?.task ?? state.groups.map((group) => group.task).join('\n\n');
@@ -448,7 +444,7 @@ export class Executor {
       cwd: directory,
       logPath,
       parser: runtime.createParser(),
-      environment: this.daemon.environment,
+      environment: this.host.environment,
       graceMs: this.graceMs,
       drainMs: this.timings.drainMs,
     });
@@ -458,9 +454,9 @@ export class Executor {
     clearTimeout(timer);
     this.naming.delete(process);
     if (process.pid !== undefined) {
-      this.daemon.agentGone({ pid: process.pid, run: state.run.id, group: null, seq: null });
+      this.host.agentGone({ pid: process.pid, run: state.run.id, group: null, seq: null });
     }
-    if (this.daemon.stopping) return;
+    if (this.host.stopping) return;
     let lines: string[] = [];
     try {
       lines = readFileSync(logPath, 'utf8').split('\n');
@@ -468,8 +464,8 @@ export class Executor {
       // no output
     }
     const named = exit.code === 0 ? parseNaming(answerText(runtime.transcript(lines))) : null;
-    await this.daemon.serial(() =>
-      this.daemon.apply(state, {
+    await this.host.serial(() =>
+      this.host.apply(state, {
         kind: 'run_named',
         title: named?.title ?? null,
         name: named?.name ?? null,
@@ -503,7 +499,7 @@ export class Executor {
 
   /** Current `runtimes` of the shared settings.yaml, or the text of the error in it. */
   private runtimeSettings(state: RunState): RuntimeSettings | string {
-    const { XDG_CONFIG_HOME, HOME } = this.daemon.environment;
+    const { XDG_CONFIG_HOME, HOME } = this.host.environment;
     try {
       return loadRuntimeSettings(configPaths(state.run.repository, XDG_CONFIG_HOME, HOME));
     } catch (error) {
@@ -522,8 +518,8 @@ export class Executor {
       await this.exit(state, key, { kind: 'spawn', message: settings });
       return;
     }
-    const runtime = runtimeFor(attempt.runtime, this.daemon.environment, settings);
-    if (!findExecutable(runtime.executable, this.daemon.environment.PATH)) {
+    const runtime = runtimeFor(attempt.runtime, this.host.environment, settings);
+    if (!findExecutable(runtime.executable, this.host.environment.PATH)) {
       await this.exit(state, key, { kind: 'runtime_not_found', runtime: attempt.runtime });
       return;
     }
@@ -576,7 +572,7 @@ export class Executor {
         '--worker',
         token,
         '--socket',
-        this.daemon.socket,
+        this.host.socket,
         ...(slug === SPLIT_GROUP ? ['--split'] : []),
         ...(specialist.queue === true ? ['--queue'] : []),
         ...(isRepairGroup(group) ? ['--repair'] : []),
@@ -588,22 +584,20 @@ export class Executor {
       claudeSettings: state.run.config.claude.settings,
     });
     if (launch.sessionId) attempt.sessionId = launch.sessionId;
-    this.daemon.save(state);
+    this.host.save(state);
     const process = launchProcess(launch, {
       cwd: worktree,
       logPath,
       parser: runtime.createParser(),
-      environment: this.daemon.environment,
+      environment: this.host.environment,
       graceMs: this.graceMs,
       drainMs: this.timings.drainMs,
       timesPath: timesPath(logPath),
       onUsage: (usage) => this.reportUsage(state, key, usage),
     });
     const timer = setTimeout(() => {
-      if (this.daemon.stopping) return;
-      void this.daemon.serial(() =>
-        this.daemon.apply(state, { kind: 'timed_out', group: slug, seq }),
-      );
+      if (this.host.stopping) return;
+      void this.host.serial(() => this.host.apply(state, { kind: 'timed_out', group: slug, seq }));
     }, specialist.timeoutSeconds * this.timings.timeoutUnitMs);
     this.running.set(keyOf(key), { process, timer });
     this.keys.set(keyOf(key), key);
@@ -613,11 +607,11 @@ export class Executor {
       this.running.delete(keyOf(key));
       this.keys.delete(keyOf(key));
       if (process.pid !== undefined) {
-        this.daemon.agentGone({ pid: process.pid, run: key.run, group: key.group, seq: key.seq });
+        this.host.agentGone({ pid: process.pid, run: key.run, group: key.group, seq: key.seq });
       }
       this.tokens.delete(token);
-      if (this.daemon.stopping) return undefined;
-      return this.daemon.serial(async () => {
+      if (this.host.stopping) return undefined;
+      return this.host.serial(async () => {
         await this.discardChanges(state, group);
         const baseline = this.baselines.get(keyOf(key));
         this.baselines.delete(keyOf(key));
@@ -635,7 +629,7 @@ export class Executor {
             outsideChanges = [];
           }
         }
-        await this.daemon.apply(state, {
+        await this.host.apply(state, {
           kind: 'attempt_exited',
           group: slug,
           seq,
@@ -649,7 +643,7 @@ export class Executor {
                 : null,
             outsideChanges,
             denials: exit.outcome.denials,
-            onLimit: this.daemon.onLimitOf(state.run.repository),
+            onLimit: this.host.onLimitOf(state.run.repository),
           },
         });
       });
@@ -700,7 +694,7 @@ export class Executor {
     failure: NonNullable<Attempt['reason']>,
   ): Promise<void> {
     this.baselines.delete(keyOf(key));
-    await this.daemon.apply(state, {
+    await this.host.apply(state, {
       kind: 'attempt_exited',
       group: key.group,
       seq: key.seq,
@@ -725,9 +719,9 @@ export class Executor {
         actionPoint === undefined ? groupRef(state.run, slug) : runRef(state.run),
         state.run.config.workspace.include,
       );
-      if (actionPoint === undefined) void this.daemon.refreshDiff(state, slug);
+      if (actionPoint === undefined) void this.host.refreshDiff(state, slug);
     } catch (error) {
-      await this.daemon.apply(state, {
+      await this.host.apply(state, {
         kind: 'commit_failed',
         group: slug,
         message: (error as Error).message,
@@ -757,9 +751,9 @@ export class Executor {
     } catch (error) {
       outcome = { kind: 'failed', message: (error as Error).message };
     }
-    await this.daemon.apply(state, { kind: 'merge_finished', group: slug, outcome });
-    void this.daemon.refreshDiff(state, slug);
-    if (outcome.kind === 'merged') void this.daemon.savePatch(state);
+    await this.host.apply(state, { kind: 'merge_finished', group: slug, outcome });
+    void this.host.refreshDiff(state, slug);
+    if (outcome.kind === 'merged') void this.host.savePatch(state);
   }
 
   async changedFiles(state: RunState, slugs: string[] | null): Promise<string[]> {
@@ -807,10 +801,10 @@ export class Executor {
         include: state.run.config.workspace.include,
         baseRef: this.resolveBaseRef(state),
       });
-      await this.daemon.apply(state, { kind: 'resolve_prepared', conflicts: prepared.conflicts });
+      await this.host.apply(state, { kind: 'resolve_prepared', conflicts: prepared.conflicts });
     } catch (error) {
       const message = `could not prepare the resolver: ${(error as Error).message}`;
-      await this.daemon.apply(state, {
+      await this.host.apply(state, {
         kind: 'delivery_finished',
         result: { kind: 'failed', message },
       });
@@ -848,7 +842,7 @@ export class Executor {
       result = { kind: 'failed', message: (error as Error).message };
     }
     await this.rebaseOutside(state, result);
-    await this.daemon.apply(state, { kind: 'delivery_finished', result });
+    await this.host.apply(state, { kind: 'delivery_finished', result });
   }
 
   private async deliver(
@@ -874,12 +868,12 @@ export class Executor {
       result = { kind: 'failed', message: (error as Error).message };
     }
     await this.rebaseOutside(state, result);
-    await this.daemon.apply(state, { kind: 'delivery_finished', result });
+    await this.host.apply(state, { kind: 'delivery_finished', result });
   }
 
   private async cleanup(state: RunState): Promise<void> {
     // The refs the patch is built from go away with the cleanup.
-    await this.daemon.savePatch(state);
+    await this.host.savePatch(state);
     try {
       await cleanRun({
         repository: state.run.repository,

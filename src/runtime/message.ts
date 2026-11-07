@@ -1,4 +1,4 @@
-import type { Specialist } from '../config/index.ts';
+import type { Specialist } from '../feature/swarm-config/types/index.ts';
 import type { StepInput } from '../core/index.ts';
 
 import { describePermissions } from './types.ts';

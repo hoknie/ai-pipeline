@@ -4,8 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { databasePath } from '../../src/config/index.ts';
-import { startDaemon } from '../../src/daemon/index.ts';
+import { databasePath } from '../../src/platform/paths/index.ts';
+import { startDaemon } from '../../src/app/index.ts';
 import type { RunCreated, Transcript } from '../../src/protocol/index.ts';
 import { Store } from '../../src/store/index.ts';
 import { PIPELINE_CONFIG, startRun, statuses, until } from './harness.ts';

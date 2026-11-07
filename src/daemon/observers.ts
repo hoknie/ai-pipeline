@@ -1,4 +1,5 @@
-import { validateObserverProfile, type FieldError } from '../config/index.ts';
+import { validateObserverProfile } from '../feature/swarm-config/services/index.ts';
+import { type FieldError } from '../feature/swarm-config/types/index.ts';
 import {
   OBSERVER_REPAIRS_MAX,
   OBSERVER_WORKERS_MAX,

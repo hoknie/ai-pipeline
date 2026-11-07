@@ -1,12 +1,12 @@
-import { execFile, execFileSync, type ChildProcess } from 'node:child_process';
+import { execFile, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, afterEach } from 'vitest';
 
-import { socketPath } from '../../src/config/index.ts';
-import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
+import { socketPath } from '../../src/platform/paths/index.ts';
+import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
 import { request } from '../../src/protocol/index.ts';
 import type { CliIo } from '../../src/cli/io.ts';
 import { runCli } from '../../src/cli/program.ts';

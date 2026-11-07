@@ -65,7 +65,7 @@ export type {
   TranscriptEntry,
 } from '../../src/protocol/index.ts';
 
-import type { DeliveryMode } from '../../src/config/index.ts';
+import type { DeliveryMode } from '../../src/feature/swarm-config/types/index.ts';
 import type { DaemonCheck, DependencyView, QueueItemView } from '../../src/protocol/index.ts';
 
 /** State of a predecessor: done, still pending or blocked. */
@@ -131,11 +131,11 @@ export type {
   EntryReference,
   EntrySource,
   EntrySources,
-  FieldError,
   SettingKind,
   SettingValue,
   WriteLevel,
-} from '../../src/config/index.ts';
+} from '../../src/feature/swarm-edit/types/index.ts';
+export type { FieldError } from '../../src/feature/swarm-config/types/index.ts';
 
 /** What `GET /api/system` answers: the daemon, the panel and the daemon log. */
 export interface SystemView {

@@ -1,4 +1,4 @@
-import type { DeliveryMode } from '../../src/config/index.ts';
+import type { DeliveryMode } from '../../src/feature/swarm-config/types/index.ts';
 
 /** Ways the merged result is delivered, in the order the pickers show them. */
 export const DELIVERY_MODES: readonly DeliveryMode[] = ['worktree', 'commit', 'branch'];

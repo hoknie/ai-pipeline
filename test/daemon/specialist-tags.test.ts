@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { ConfigEditorView } from '../../src/config/index.ts';
+import type { ConfigEditorView } from '../../src/feature/swarm-edit/types/index.ts';
 import type {
   SpecialistTagsResult,
   SpecialistTagsView,

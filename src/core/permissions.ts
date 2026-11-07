@@ -4,7 +4,7 @@ import type {
   Permissions,
   ResolvedConfig,
   Specialist,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 
 /** Permissions of one specialist as the current configuration defines them. */
 export interface SpecialistPermissions {

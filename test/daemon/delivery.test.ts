@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { databasePath } from '../../src/config/index.ts';
+import { databasePath } from '../../src/platform/paths/index.ts';
 import type { ApplyResult, RunCreated } from '../../src/protocol/index.ts';
 import { Store } from '../../src/store/index.ts';
 

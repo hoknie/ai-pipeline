@@ -2,7 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
 
-import { OBSERVER_SPECIALIST, findSpecialist } from '../../src/config/index.ts';
+import { OBSERVER_SPECIALIST, findSpecialist } from '../../src/feature/swarm-config/types/index.ts';
 import { createWorkerServer } from '../../src/mcp/worker.ts';
 import { createClaudeRuntime } from '../../src/runtime/index.ts';
 import { config } from '../core/helpers.ts';

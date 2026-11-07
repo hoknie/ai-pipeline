@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
+import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
 
 const root = join(import.meta.dirname, '..', '..');
 const fakes = join(root, 'test', 'fakes');

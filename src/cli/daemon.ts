@@ -1,9 +1,12 @@
 import type { Command } from 'commander';
 
-import { lockPath } from '../config/index.ts';
+import { join } from 'node:path';
+
+import { lockPath } from '../platform/paths/index.ts';
 import {
   checkDaemon,
   daemonMismatchMessage,
+  ensureDaemon,
   pingDaemon,
   stopDaemon,
   type DaemonCheck,
@@ -11,7 +14,7 @@ import {
   type Style,
 } from '../protocol/index.ts';
 
-import { context, daemon } from './commands.ts';
+import { context, type Context } from './commands.ts';
 import { failLine, writeLine, type CliIo } from './io.ts';
 import { examples } from './help.ts';
 import { startPanel } from './web-control.ts';
@@ -59,6 +62,68 @@ export function formatDaemonStatus(status: DaemonStatus, warning: string | null 
   return lines.join('\n');
 }
 
+const warned = new Set<string>();
+
+/**
+ * Starts the daemon when none runs and replaces an older idle one; a daemon of another build
+ * that keeps running is reported on stderr, once per process.
+ */
+export async function daemon(ctx: Context, client = 'aip'): Promise<DaemonCheck> {
+  const check = await ensureDaemon(ctx.socket, ctx.entry, {
+    logPath: join(ctx.stateDirectory, 'daemon.log'),
+    environment: ctx.io.env,
+    lockPath: lockPath(ctx.stateDirectory),
+  });
+  const message = daemonMismatchMessage(check, client);
+  if (message && !warned.has(message)) {
+    warned.add(message);
+    ctx.io.stderr(`aip: warning: ${message}\n`);
+  }
+  return check;
+}
+
+/** `aip daemon`: runs the daemon in the foreground together with the web panel. */
+async function runForeground(io: CliIo, style: Style): Promise<void> {
+  const ctx = context(io, style);
+  const print = (value: string): void => writeLine(io, value);
+  // Imported on demand: the other daemon subcommands and every other command stay light.
+  const [{ AlreadyRunning, startDaemon }, { createDaemonPanel }] = await Promise.all([
+    import('../app/index.ts'),
+    import('./web/daemon-panel.ts'),
+  ]);
+  try {
+    const panel = createDaemonPanel({
+      stateDirectory: ctx.stateDirectory,
+      socket: ctx.socket,
+      entry: ctx.entry,
+      environment: io.env,
+      cwd: io.cwd,
+      pid: io.pid,
+      log: (line) => io.stderr(`${line}\n`),
+    });
+    const running = await startDaemon({
+      stateDirectory: ctx.stateDirectory,
+      entry: ctx.entry,
+      environment: io.env,
+      panel,
+    });
+    const stop = () => void running.close();
+    io.onSignal('SIGTERM', stop);
+    io.onSignal('SIGINT', stop);
+    print(`aip daemon listening on ${ctx.socket} (pid ${io.pid})`);
+    const started = await panel.autostart();
+    if (started !== null) print(`aip web: ${started.url}`);
+    await running.closed;
+    await panel.close();
+  } catch (error) {
+    if (error instanceof AlreadyRunning) {
+      failLine(io, 'aip daemon', error.message);
+      return;
+    }
+    throw error;
+  }
+}
+
 export function registerDaemon(program: Command, style: Style, io: CliIo): void {
   const print = (value: string): void => writeLine(io, value);
   const fail = (message: string): void => failLine(io, 'aip daemon', message);
@@ -78,44 +143,7 @@ export function registerDaemon(program: Command, style: Style, io: CliIo): void 
     .command('daemon')
     .description('Run the aip daemon in the foreground, or control the background one')
     .addHelpText('after', examples(['aip daemon', 'aip daemon status'], style))
-    .action(async () => {
-      const ctx = context(io, style);
-      // Imported on demand: the other daemon subcommands and every other command stay light.
-      const [{ AlreadyRunning, startDaemon }, { createDaemonPanel }] = await Promise.all([
-        import('../daemon/index.ts'),
-        import('./web/daemon-panel.ts'),
-      ]);
-      try {
-        const panel = createDaemonPanel({
-          stateDirectory: ctx.stateDirectory,
-          socket: ctx.socket,
-          entry: ctx.entry,
-          environment: io.env,
-          cwd: io.cwd,
-          pid: io.pid,
-          log: (line) => io.stderr(`${line}\n`),
-        });
-        const running = await startDaemon({
-          stateDirectory: ctx.stateDirectory,
-          entry: ctx.entry,
-          panel,
-        });
-        const stop = () => void running.close();
-        io.onSignal('SIGTERM', stop);
-        io.onSignal('SIGINT', stop);
-        print(`aip daemon listening on ${ctx.socket} (pid ${io.pid})`);
-        const started = await panel.autostart();
-        if (started !== null) print(`aip web: ${started.url}`);
-        await running.closed;
-        await panel.close();
-      } catch (error) {
-        if (error instanceof AlreadyRunning) {
-          fail(error.message);
-          return;
-        }
-        throw error;
-      }
-    });
+    .action(() => runForeground(io, style));
 
   command
     .command('start')

@@ -1,21 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 
 import { Option, type Command } from 'commander';
 import { parse as parseYaml } from 'yaml';
 
+import { DELIVERY_MODES, type DeliveryMode } from '../feature/swarm-config/types/index.ts';
+import { configPaths, loadWebSettings } from '../feature/swarm-config/services/index.ts';
+import { socketPath, stateDirectoryFromEnvironment } from '../platform/paths/index.ts';
 import {
-  DELIVERY_MODES,
-  configPaths,
-  loadWebSettings,
-  lockPath,
-  socketPath,
-  stateDirectoryFromEnvironment,
-  type DeliveryMode,
-} from '../config/index.ts';
-import {
-  daemonMismatchMessage,
-  ensureDaemon,
   formatApply,
   formatGroup,
   formatQueue,
@@ -33,7 +25,6 @@ import {
   request,
   subscribe,
   type ApplyResult,
-  type DaemonCheck,
   type GroupView,
   type Method,
   type ParamsOf,
@@ -50,7 +41,7 @@ import { examples as renderExamples, HELP_GROUPS } from './help.ts';
 import { writeLine, failLine, type CliIo } from './io.ts';
 import { VERSION } from './version.ts';
 import { latestRepository } from './web/default-repository.ts';
-import { registerDaemon } from './daemon.ts';
+import { daemon, registerDaemon } from './daemon.ts';
 import type { WebServer } from './web/server.ts';
 import { openBrowser } from './web/open.ts';
 import { readPanelState } from './web/state.ts';
@@ -83,25 +74,6 @@ export async function call<M extends Method>(
 ): Promise<unknown> {
   await daemon(ctx);
   return request(ctx.socket, method, params);
-}
-
-const warned = new Set<string>();
-
-/**
- * Starts the daemon when none runs and replaces an older idle one; a daemon of another build
- * that keeps running is reported on stderr, once per process.
- */
-export async function daemon(ctx: Context, client = 'aip'): Promise<DaemonCheck> {
-  const check = await ensureDaemon(ctx.socket, ctx.entry, {
-    logPath: join(ctx.stateDirectory, 'daemon.log'),
-    lockPath: lockPath(ctx.stateDirectory),
-  });
-  const message = daemonMismatchMessage(check, client);
-  if (message && !warned.has(message)) {
-    warned.add(message);
-    ctx.io.stderr(`aip: warning: ${message}\n`);
-  }
-  return check;
 }
 
 /** The helpers of the commands, bound to the streams and the style of one call. */

@@ -9,18 +9,18 @@ import {
   defaultRuntimes,
   findSpecialist,
   type Specialist,
-} from '../../src/config/index.ts';
+} from '../../src/feature/swarm-config/types/index.ts';
 import type { StepInput } from '../../src/core/index.ts';
 import {
   createClaudeRuntime,
   createOpencodeRuntime,
-  findExecutable,
   missingSkills,
   runtimeFor,
   systemPrompt,
   userMessage,
   type LaunchContext,
 } from '../../src/runtime/index.ts';
+import { findExecutable } from '../../src/platform/process/index.ts';
 import { config } from '../core/helpers.ts';
 
 const fixtures = join(import.meta.dirname, '..', 'fixtures');

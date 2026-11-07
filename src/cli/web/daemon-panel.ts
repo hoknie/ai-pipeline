@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 
 import type { PanelControl } from '../../daemon/index.ts';
 import type { WebStartResult, WebStatusResult, WebStopResult } from '../../protocol/index.ts';
-import { configPaths, loadWebSettings } from '../../config/index.ts';
+import { configPaths, loadWebSettings } from '../../feature/swarm-config/services/index.ts';
 import { latestRepository } from './default-repository.ts';
 import { previousPanelToken, removePanelState, writePanelState } from './state.ts';
 import { startWebServer, webTokenFromEnv, type WebServer } from './server.ts';

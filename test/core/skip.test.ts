@@ -10,7 +10,7 @@ import {
   stepStates,
   stepsOf,
 } from '../../src/core/index.ts';
-import { findPipeline } from '../../src/config/index.ts';
+import { findPipeline } from '../../src/feature/swarm-config/types/index.ts';
 
 import { CONFIG_TEXT, config, finish, group, run, step } from './helpers.ts';
 

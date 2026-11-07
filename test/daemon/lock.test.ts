@@ -5,9 +5,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { AlreadyRunning, acquireLock } from '../../src/daemon/index.ts';
+import { AlreadyRunning, acquireLock } from '../../src/app/index.ts';
 
-const server = join(import.meta.dirname, '..', '..', 'src', 'daemon', 'server.ts');
+const server = join(import.meta.dirname, '..', '..', 'src', 'app', 'daemon.ts');
 
 function directory(): string {
   return mkdtempSync(join(tmpdir(), 'aip-lock-'));

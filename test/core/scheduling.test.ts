@@ -14,7 +14,7 @@ import {
   transition,
   type RunState,
 } from '../../src/core/index.ts';
-import { isValidSlug } from '../../src/config/index.ts';
+import { isValidSlug } from '../../src/feature/swarm-config/types/index.ts';
 
 import { CONFIG_TEXT, finish, group, run, runningAttempt, step } from './helpers.ts';
 

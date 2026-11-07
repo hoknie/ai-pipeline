@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 
-import { configPaths, loadWebSettings } from '../config/index.ts';
+import { configPaths, loadWebSettings } from '../feature/swarm-config/services/index.ts';
 import {
   IpcError,
   pingDaemon,
@@ -13,9 +13,9 @@ import {
   type WebStatusResult,
 } from '../protocol/index.ts';
 
-import { context, daemon, type Context } from './commands.ts';
+import { context, type Context } from './commands.ts';
+import { daemon, EXIT_NOT_RUNNING } from './daemon.ts';
 import { failLine, writeLine, type CliIo } from './io.ts';
-import { EXIT_NOT_RUNNING } from './daemon.ts';
 import { examples } from './help.ts';
 import { openBrowser } from './web/open.ts';
 import { webTokenFromEnv } from './web/server.ts';

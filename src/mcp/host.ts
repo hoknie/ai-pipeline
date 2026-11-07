@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-import { DELIVERY_MODES } from '../config/index.ts';
+import { DELIVERY_MODES } from '../feature/swarm-config/types/index.ts';
 import {
   formatApply,
   formatGroup,

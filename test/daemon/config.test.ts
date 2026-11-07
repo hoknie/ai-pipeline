@@ -12,7 +12,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { revisionOf, type ConfigEditorView } from '../../src/config/index.ts';
+import { revisionOf } from '../../src/feature/swarm-edit/services/index.ts';
+import { type ConfigEditorView } from '../../src/feature/swarm-edit/types/index.ts';
 import type {
   ConfigCatalogResponse,
   ConfigEditResult,

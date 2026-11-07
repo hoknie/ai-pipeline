@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findSpecialist } from '../../src/config/index.ts';
+import { findSpecialist } from '../../src/feature/swarm-config/types/index.ts';
 import {
   REPAIR_GROUP,
   freezeCandidate,

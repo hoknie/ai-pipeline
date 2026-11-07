@@ -1,4 +1,8 @@
-import { findPipeline, groupPipeline, type ResolvedConfig } from '../config/index.ts';
+import {
+  findPipeline,
+  groupPipeline,
+  type ResolvedConfig,
+} from '../feature/swarm-config/types/index.ts';
 
 import { Rejection } from './errors.ts';
 import { runPipeline, stepsOf, type Group, type Run, type RunState } from './model.ts';

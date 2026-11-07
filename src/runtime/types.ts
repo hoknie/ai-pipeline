@@ -6,7 +6,7 @@ import type {
   Permissions,
   Runtime as RuntimeName,
   Specialist,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 import type { Denial, StepInput, Usage } from '../core/index.ts';
 
 export interface LaunchContext {

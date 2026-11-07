@@ -5,8 +5,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { lockPath, socketPath } from '../../src/config/index.ts';
-import { startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
+import { lockPath, socketPath } from '../../src/platform/paths/index.ts';
+import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
 import {
   currentBuild,
   daemonMismatchMessage,

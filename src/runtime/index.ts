@@ -3,7 +3,7 @@ import {
   defaultRuntimes,
   type Runtime as RuntimeName,
   type RuntimeSettings,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 
 import { createClaudeRuntime } from './claude.ts';
 import { mcpServers, skillCatalog, sortEntries } from './catalog.ts';
@@ -22,11 +22,10 @@ export { missingSkills, skillCandidates } from './skills.ts';
 export { claudeTranscript, opencodeTranscript, toolSummary } from './transcript.ts';
 export { answerText, namingPrompt, parseNaming, type RunNaming } from './naming.ts';
 export * from './types.ts';
-export { findExecutable } from './which.ts';
 
 export function runtimeFor(
   name: RuntimeName,
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: NodeJS.ProcessEnv,
   settings: RuntimeSettings = defaultRuntimes(),
 ): Runtime {
   const { command, args, env } = settings[name];
@@ -41,7 +40,7 @@ export { mcpServers, skillCatalog } from './catalog.ts';
 export function runtimeCatalog(
   repository: string,
   home: string,
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: NodeJS.ProcessEnv,
 ): ConfigCatalogResponse['runtimes'] {
   const build = (name: RuntimeName) => {
     const runtime = runtimeFor(name, environment);

@@ -39,7 +39,7 @@ import {
   attemptDirectory,
   updateFromBranch,
   type GitCall,
-} from '../../src/git/index.ts';
+} from '../../src/platform/git/index.ts';
 
 function sh(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();

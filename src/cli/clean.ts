@@ -1,6 +1,4 @@
-import { existsSync } from 'node:fs';
-
-import { databasePath } from '../config/index.ts';
+import { openMaintenance } from '../app/maintenance.ts';
 import { deliveryBranch, groupRef, isRunFinished, type RunState } from '../core/index.ts';
 import {
   cleanRun as cleanWorkspace,
@@ -8,9 +6,8 @@ import {
   runWorktreeRoot,
   workspaceRoot,
   type CleanPlan,
-} from '../git/index.ts';
+} from '../platform/git/index.ts';
 import { plainStyle, runTitle, table, type Style } from '../protocol/index.ts';
-import { Store } from '../store/index.ts';
 
 import type { Context } from './commands.ts';
 
@@ -39,23 +36,22 @@ function planFor(state: RunState, all: boolean): CleanPlan {
 }
 
 export async function cleanRun(ctx: Context, runId: string, all: boolean): Promise<string[]> {
-  const store = new Store(databasePath(ctx.stateDirectory));
+  const maintenance = openMaintenance(ctx.stateDirectory);
   try {
-    const state = store.loadRun(runId);
+    const state = maintenance.loadRun(runId);
     if (!state) throw new Error(`unknown run \`${runId}\``);
     return await cleanWorkspace(planFor(state, all));
   } finally {
-    store.close();
+    maintenance.close();
   }
 }
 
 /** Finished runs that still have something to clean, the latest finished first. */
 export async function cleanableRuns(ctx: Context): Promise<CleanableRun[]> {
-  if (!existsSync(databasePath(ctx.stateDirectory))) return [];
-  const store = new Store(databasePath(ctx.stateDirectory));
+  const maintenance = openMaintenance(ctx.stateDirectory);
   try {
     const result: CleanableRun[] = [];
-    for (const state of store.finishedRuns()) {
+    for (const state of maintenance.finishedRuns()) {
       if (state.run.finishedAt === null) continue;
       if (!(await hasRunLeftovers(planFor(state, false)))) continue;
       result.push({
@@ -67,7 +63,7 @@ export async function cleanableRuns(ctx: Context): Promise<CleanableRun[]> {
     }
     return result;
   } finally {
-    store.close();
+    maintenance.close();
   }
 }
 

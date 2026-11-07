@@ -7,7 +7,7 @@ import {
   type ActionPoint,
   type ResolvedConfig,
   type Pipeline,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 
 import {
   MESSAGE_GROUP,

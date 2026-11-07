@@ -15,11 +15,10 @@ import { describe, expect, it } from 'vitest';
 import {
   configFromFiles,
   configPaths,
-  findSpecialist,
-  findPipeline,
   loadRuntimeSettings,
   loadWebSettings,
-} from '../src/config/index.ts';
+} from '../src/feature/swarm-config/services/index.ts';
+import { findSpecialist, findPipeline } from '../src/feature/swarm-config/types/index.ts';
 
 const root = join(import.meta.dirname, '..');
 
@@ -402,5 +401,33 @@ describe('documentation structure', () => {
       }
     }
     expect(problems).toEqual([]);
+  });
+});
+
+// Регламент раскладки лежит в git и не ссылается на то, чего в git нет.
+const untracked = /openspec|\bADR\b|CLAUDE\.md|журнал\S* решений|\.aip\//i;
+
+function untrackedMentions(text: string): string[] {
+  return text
+    .split('\n')
+    .flatMap((line, index) => (untracked.test(line) ? [`line ${index + 1}: ${line.trim()}`] : []));
+}
+
+describe('layout document', () => {
+  it('detects mentions of untracked files and the decision log', () => {
+    const text = ['Правило.', 'Причина в ADR 0007.', 'См. openspec/specs.', 'Из CLAUDE.md.'].join(
+      '\n',
+    );
+    expect(untrackedMentions(text)).toEqual([
+      'line 2: Причина в ADR 0007.',
+      'line 3: См. openspec/specs.',
+      'line 4: Из CLAUDE.md.',
+    ]);
+    expect(untrackedMentions('Журнал решений проекта')).toHaveLength(1);
+    expect(untrackedMentions('Причина названа рядом с правилом.')).toEqual([]);
+  });
+
+  it('ARCHITECTURE.md mentions no untracked files and no decision log', () => {
+    expect(untrackedMentions(readFileSync(join(root, 'ARCHITECTURE.md'), 'utf8'))).toEqual([]);
   });
 });

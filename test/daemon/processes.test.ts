@@ -3,15 +3,13 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { selectBackground, terminateTree, type AgentRoot } from '../../src/daemon/processes.ts';
 import {
   parseClock,
   parsePs,
-  selectBackground,
   snapshotProcesses,
-  terminateTree,
-  type AgentRoot,
   type PsRow,
-} from '../../src/daemon/processes.ts';
+} from '../../src/platform/process/index.ts';
 import {
   streamEventSchema,
   subscribe,

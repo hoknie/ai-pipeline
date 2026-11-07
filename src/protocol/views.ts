@@ -1,15 +1,14 @@
-import { z } from 'zod';
-
+import { pipelineNameOf } from '../feature/swarm-config/types/index.ts';
+import type { ActionPoint, DeliveryMode, FieldError } from '../feature/swarm-config/types/index.ts';
 import {
-  pipelineNameOf,
-  type ActionPoint,
-  type DeliveryMode,
   type SharedSpecialistUsage,
   type SharedSpecialistsUsage,
   type SharedPipelineUsage,
   type SharedPipelinesUsage,
   type SpecialistTagFolder,
-} from '../config/index.ts';
+  type ConfigEditorView,
+  type EntryReference,
+} from '../feature/swarm-edit/types/index.ts';
 import {
   DEFAULT_AUTOPILOT_ANSWER,
   defaultObserverSettings,
@@ -78,9 +77,9 @@ import {
   GROUP_STATUSES,
   type GroupWait,
   canReturn,
+  type Incident,
+  type ObserverSettings,
 } from '../core/index.ts';
-import type { Incident, ObserverSettings } from '../core/index.ts';
-import type { ConfigEditorView, EntryReference, FieldError } from '../config/index.ts';
 
 /** A catalog tag as clients see it. */
 export interface TagView {

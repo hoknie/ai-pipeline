@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { request } from '../../src/protocol/index.ts';
-import { socketPath } from '../../src/config/index.ts';
+import { socketPath } from '../../src/platform/paths/index.ts';
 
 const main = join(import.meta.dirname, '..', '..', 'src', 'cli', 'main.ts');
 const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-init-')));

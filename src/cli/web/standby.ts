@@ -1,4 +1,5 @@
-import { configPaths, loadWebSettings, lockPath } from '../../config/index.ts';
+import { configPaths, loadWebSettings } from '../../feature/swarm-config/services/index.ts';
+import { lockPath } from '../../platform/paths/index.ts';
 import {
   checkDaemon,
   ensureDaemon,

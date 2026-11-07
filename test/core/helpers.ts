@@ -1,4 +1,5 @@
-import { parseConfig, type ResolvedConfig } from '../../src/config/index.ts';
+import { parseConfig } from '../../src/feature/swarm-config/services/index.ts';
+import { type ResolvedConfig } from '../../src/feature/swarm-config/types/index.ts';
 import {
   createRun,
   dispatch,

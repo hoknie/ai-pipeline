@@ -1,20 +1,18 @@
-import type {
-  Action,
-  ActionPoint,
-  ResolvedConfig,
-  Runtime,
-  Specialist,
-  Step,
-  Pipeline,
-} from '../config/index.ts';
 import {
+  type Action,
+  type ActionPoint,
+  type ResolvedConfig,
+  type Runtime,
+  type Specialist,
+  type Step,
+  type Pipeline,
   ACTION_POINTS,
   OBSERVER_SPECIALIST,
   findAction,
   findSpecialist,
   findPipeline,
   groupPipeline,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 import type { Denial } from './permissions.ts';
 
 export const SPLIT_GROUP = '_split';

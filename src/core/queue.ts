@@ -1,4 +1,4 @@
-import { DELIVERY_MODES, type DeliveryMode } from '../config/index.ts';
+import { DELIVERY_MODES, type DeliveryMode } from '../feature/swarm-config/types/index.ts';
 
 import type { NewGroup } from './create.ts';
 import { Rejection } from './errors.ts';

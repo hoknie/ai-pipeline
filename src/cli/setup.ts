@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { configPaths, defaultRuntimes, loadRuntimeSettings } from '../config/index.ts';
-import { findExecutable } from '../runtime/index.ts';
+import { configPaths, loadRuntimeSettings } from '../feature/swarm-config/services/index.ts';
+import { findExecutable } from '../platform/process/index.ts';
 import type { Style } from '../protocol/index.ts';
 
 export interface SetupOptions {
@@ -131,7 +131,7 @@ function hostBinary(
       name
     ].command;
   } catch {
-    command = defaultRuntimes()[name].command;
+    // The default command of a runtime is its name.
   }
   return deps.find(command);
 }

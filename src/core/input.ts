@@ -1,4 +1,4 @@
-import { buildPrompt } from '../config/index.ts';
+import { buildPrompt } from '../feature/swarm-config/types/index.ts';
 
 import {
   isSplitGroup,

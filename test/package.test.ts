@@ -3,7 +3,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { configFromFiles, findPipeline } from '../src/config/index.ts';
+import { configFromFiles } from '../src/feature/swarm-config/services/index.ts';
+import { findPipeline } from '../src/feature/swarm-config/types/index.ts';
 
 const root = join(import.meta.dirname, '..');
 

@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
-import { configPaths } from '../config/index.ts';
-import { repositoryRoot } from '../git/index.ts';
+import { configPaths } from '../feature/swarm-config/services/index.ts';
+import { repositoryRoot } from '../platform/git/index.ts';
 
 /** The starter configuration shipped with the package. */
 const TEMPLATE = join(import.meta.dirname, '..', '..', 'templates', 'aip');

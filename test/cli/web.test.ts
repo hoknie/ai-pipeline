@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createDaemonPanel, startDaemonPanel } from '../../src/cli/web/daemon-panel.ts';
 import { readPanelState, writePanelState } from '../../src/cli/web/state.ts';
-import { databasePath } from '../../src/config/index.ts';
+import { databasePath } from '../../src/platform/paths/index.ts';
 import { Store } from '../../src/store/index.ts';
 import { startWebServer, webTokenFromEnv, type WebServer } from '../../src/cli/web/server.ts';
 import type { GroupView, QueueView, RunCreated, RunView } from '../../src/protocol/index.ts';

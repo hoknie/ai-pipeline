@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { DELIVERY_MODES, SLUG_PATTERN_TEXT, isValidSlug, settingFieldOf } from '../config/index.ts';
+import {
+  DELIVERY_MODES,
+  SLUG_PATTERN_TEXT,
+  isValidSlug,
+} from '../feature/swarm-config/types/index.ts';
+import { settingFieldOf } from '../feature/swarm-edit/types/index.ts';
 import {
   ARTIFACT_CONTENT_LIMIT,
   ARTIFACT_FILE_NAME_LIMIT,
@@ -486,11 +491,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   z.object({
     method: z.literal('run_tags'),
     params: z
-      .object({
-        runId: z.string().min(1),
-        add: tagNames.optional(),
-        remove: tagNames.optional(),
-      })
+      .object({ runId: z.string().min(1), add: tagNames.optional(), remove: tagNames.optional() })
       .refine((params) => (params.add?.length ?? 0) + (params.remove?.length ?? 0) > 0, {
         message: 'pass tags to add or remove',
       }),
@@ -643,11 +644,7 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     seq: z.number().int(),
     run: z.looseObject({ id: z.string() }),
   }),
-  z.object({
-    event: z.literal('observers'),
-    seq: z.number().int(),
-    observers: z.looseObject({}),
-  }),
+  z.object({ event: z.literal('observers'), seq: z.number().int(), observers: z.looseObject({}) }),
   z.object({
     event: z.literal('incident'),
     seq: z.number().int(),

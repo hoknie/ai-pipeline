@@ -3,13 +3,16 @@ import { stringify } from 'yaml';
 
 import {
   ConfigLoadError,
-  configPathsFromEnvironment,
   formatDuration,
-  loadConfigSources,
   type ResolvedConfig,
-} from '../config/index.ts';
-import { repositoryRoot } from '../git/index.ts';
-import { findExecutable, runtimeFor } from '../runtime/index.ts';
+} from '../feature/swarm-config/types/index.ts';
+import {
+  configPathsFromEnvironment,
+  loadConfigSources,
+} from '../feature/swarm-config/services/index.ts';
+import { repositoryRoot } from '../platform/git/index.ts';
+import { findExecutable } from '../platform/process/index.ts';
+import { runtimeFor } from '../runtime/index.ts';
 
 import { probeVersion } from './probe.ts';
 
@@ -169,7 +172,11 @@ export async function checkConfig(
   let legacy: string[] = [];
   try {
     const repository = await repositoryRoot(directory);
-    ({ config, files, legacy = [] } = loadConfigSources(configPathsFromEnvironment(repository)));
+    ({
+      config,
+      files,
+      legacy = [],
+    } = loadConfigSources(configPathsFromEnvironment(repository, environment)));
   } catch (error) {
     io.stderr(`${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`);
     return 1;

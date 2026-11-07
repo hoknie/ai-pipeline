@@ -1,4 +1,4 @@
-import { isValidSlug } from '../config/index.ts';
+import { isValidSlug } from '../feature/swarm-config/types/index.ts';
 
 export function queueItemId(nowMillis: number, random: number): string {
   return `q${base36(nowMillis, 8)}${base36(random % 36 ** 3, 3)}`;

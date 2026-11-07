@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
-import { settingFieldOf, SLUG_PATTERN_TEXT, isValidSlug } from '../../config/index.ts';
+import { settingFieldOf } from '../../feature/swarm-edit/types/index.ts';
+import { SLUG_PATTERN_TEXT, isValidSlug } from '../../feature/swarm-config/types/index.ts';
 import {
   IpcError,
   checkDaemon,
@@ -980,10 +981,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       pattern: new RegExp(`^/api/runs/${segment}/delivered$`),
       handle: async ([runId], body) => {
         const { groups } = parseBody(markDeliveredBody, body);
-        return call('run_mark_delivered', {
-          runId: runId ?? '',
-          ...(groups ? { groups } : {}),
-        });
+        return call('run_mark_delivered', { runId: runId ?? '', ...(groups ? { groups } : {}) });
       },
     },
     {

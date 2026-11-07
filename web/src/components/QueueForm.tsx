@@ -18,7 +18,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group.tsx';
 
 import type { Api } from '../api.ts';
-import type { DeliveryMode } from '../../../src/config/index.ts';
+import type { DeliveryMode } from '../../../src/feature/swarm-config/types/index.ts';
 import { DELIVERY_MODES } from '../deliveryModes.ts';
 import { taskNumber } from '../format.ts';
 import { useTags } from '../tags.tsx';

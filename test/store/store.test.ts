@@ -9,7 +9,7 @@ import {
   ensureDirectory,
   socketPath,
   stateDirectory,
-} from '../../src/config/index.ts';
+} from '../../src/platform/paths/index.ts';
 import { SCHEMA_VERSION, Store, migrate, type ArtifactRecord } from '../../src/store/index.ts';
 import { finish, run, step } from '../core/helpers.ts';
 import {

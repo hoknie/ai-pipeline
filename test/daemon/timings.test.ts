@@ -4,7 +4,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { DEFAULT_TIMINGS, startDaemon, type RunningDaemon } from '../../src/daemon/index.ts';
+import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
+import { DEFAULT_TIMINGS } from '../../src/daemon/index.ts';
 import { KILL_GRACE_MS } from '../../src/daemon/processes.ts';
 import { DRAIN_MS, STOP_GRACE_MS } from '../../src/daemon/supervisor.ts';
 import { NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS } from '../../src/daemon/executor.ts';

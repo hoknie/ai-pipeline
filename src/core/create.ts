@@ -1,4 +1,8 @@
-import { findPipeline, type DeliveryMode, type ResolvedConfig } from '../config/index.ts';
+import {
+  findPipeline,
+  type DeliveryMode,
+  type ResolvedConfig,
+} from '../feature/swarm-config/types/index.ts';
 
 import { groupSlugs, runName } from './ids.ts';
 import { applySkip } from './skip.ts';

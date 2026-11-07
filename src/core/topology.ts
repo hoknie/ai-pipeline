@@ -10,7 +10,7 @@ import {
   type Runtime,
   type Step,
   type Pipeline,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 
 import { actionName, pipelineStages, type PipelineStage } from './stages.ts';
 import {

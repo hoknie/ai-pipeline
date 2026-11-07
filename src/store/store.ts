@@ -5,7 +5,7 @@ import {
   withConfigDefaults,
   type ResolvedConfig,
   type Runtime,
-} from '../config/index.ts';
+} from '../feature/swarm-config/types/index.ts';
 import {
   MESSAGE_GROUP,
   ON_LIMIT_MODES,

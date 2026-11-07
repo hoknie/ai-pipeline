@@ -1,4 +1,8 @@
-import { findSpecialist, type SpecialistLevel, type Step } from '../config/index.ts';
+import {
+  findSpecialist,
+  type SpecialistLevel,
+  type Step,
+} from '../feature/swarm-config/types/index.ts';
 
 import { allGroups, isRepairGroup, stepsOf, type RunState } from './model.ts';
 import { attemptStepLabel, specialistName, stepLabel } from './topology.ts';

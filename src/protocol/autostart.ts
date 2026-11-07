@@ -166,7 +166,7 @@ export async function spawnDaemon(
   const child = spawn(executable, [...args, 'daemon'], {
     detached: true,
     stdio: ['ignore', output, output],
-    env: options.environment ?? process.env,
+    env: options.environment,
   });
   child.unref();
   const deadline = Date.now() + (options.timeoutMs ?? 5000);

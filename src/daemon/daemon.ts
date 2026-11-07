@@ -6,10 +6,21 @@ import { isAbsolute, join, resolve, sep } from 'node:path';
 
 import {
   ConfigEditError,
-  ConfigLoadError,
-  type ConfigPaths,
   type EditRequest,
   type EntryReference,
+  type TagPlan,
+} from '../feature/swarm-edit/types/index.ts';
+import {
+  ConfigLoadError,
+  type ConfigPaths,
+  type ConfigError,
+  findSpecialist,
+  findPipeline,
+  type FieldError,
+  pipelineNameOf,
+  type DeliveryMode,
+} from '../feature/swarm-config/types/index.ts';
+import {
   commitEdit,
   commitEdits,
   tagFolder,
@@ -17,25 +28,18 @@ import {
   planTagRemove,
   planTagRename,
   planTagsSet,
-  type TagPlan,
   draftConfig,
   editorView,
   planEdit,
-  type ConfigError,
-  configPaths,
-  databasePath,
-  findSpecialist,
-  findPipeline,
-  loadConfig,
   planSettings,
-  validateObserverProfile,
-  type FieldError,
   sharedSpecialistUsage,
   sharedPipelineUsage,
-  socketPath,
-  pipelineNameOf,
-  type DeliveryMode,
-} from '../config/index.ts';
+} from '../feature/swarm-edit/services/index.ts';
+import {
+  configPaths,
+  loadConfig,
+  validateObserverProfile,
+} from '../feature/swarm-config/services/index.ts';
 import {
   Rejection,
   addItem,
@@ -63,7 +67,6 @@ import {
   itemStarted,
   knownTags,
   mergeTags,
-  moveItem,
   pauseQueue,
   acknowledgeRun,
   adoptRun,
@@ -145,7 +148,7 @@ import {
   refExists,
   repositoryRoot,
   workspaceRoot,
-} from '../git/index.ts';
+} from '../platform/git/index.ts';
 import {
   catalogView,
   currentBuild,
@@ -199,32 +202,21 @@ import {
   type ObserversView,
 } from '../protocol/index.ts';
 import { runtimeCatalog, runtimeFor } from '../runtime/index.ts';
-import { Store, type KnownRepository } from '../store/index.ts';
+import type { KnownRepository, Store } from '../store/index.ts';
 
-import { Executor, NAMING_TIMEOUT_MS, USAGE_INTERVAL_MS, type AttemptKey } from './executor.ts';
+import type { Executor, AttemptKey } from './executor.ts';
+import type { ExecutorHost } from './ports.ts';
+import type { DaemonTimings } from './timings.ts';
 import { readLines, readTail, readTimes, timesPath } from './logs.ts';
 import { checkObserverSettings } from './observers.ts';
-import { FileArtifactStorage, artifactStorageFor, type ArtifactStorage } from './artifacts.ts';
-import { FilePatchStorage, storageFor, type PatchStorage } from './patches.ts';
-import { DRAIN_MS, STOP_GRACE_MS } from './supervisor.ts';
-import {
-  selectBackground,
-  snapshotProcesses,
-  KILL_GRACE_MS,
-  terminateTree,
-  type AgentRoot,
-  type PsRow,
-} from './processes.ts';
+import { artifactStorageFor, type ArtifactStorage } from './artifacts.ts';
+import { storageFor, type PatchStorage } from './patches.ts';
+import { selectBackground, terminateTree, type AgentRoot } from './processes.ts';
+import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
 
 const NO_PANEL = 'this daemon serves no web panel';
-/** A timer fires this long after a usage limit resets, so the reset has surely passed. */
-const WAKE_MARGIN_MS = 1000;
 /** The longest delay `setTimeout` keeps. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
-/** How often the daemon looks at background processes while someone is subscribed. */
-const PROCESS_STREAM_MS = 2000;
-/** Pause between a SIGTERM and the extra look at background processes. */
-const PROCESS_KILL_LOOK_MS = 250;
 
 /** The web panel the daemon serves; implemented outside the daemon layer and passed in. */
 export interface PanelControl {
@@ -232,44 +224,6 @@ export interface PanelControl {
   start(options: { token?: string; restart?: boolean }): Promise<WebStartResult>;
   stop(): Promise<WebStopResult>;
 }
-
-/** Every duration the daemon waits for; tests shorten them. */
-export interface DaemonTimings {
-  /** Length of one second of a step's `timeout`. */
-  timeoutUnitMs: number;
-  /** How long the output of an agent is drained after it exited. */
-  drainMs: number;
-  /** Time between the stop signal and SIGKILL for an agent. */
-  stopGraceMs: number;
-  /** Time between SIGTERM and SIGKILL when a background process is killed. */
-  killGraceMs: number;
-  /** A timer fires this long after a usage limit resets. */
-  wakeMarginMs: number;
-  /** How often the usage of a running step is saved. */
-  usageIntervalMs: number;
-  /** The longest the naming agent may run. */
-  namingTimeoutMs: number;
-  /** How often subscribers get the background processes. */
-  processStreamMs: number;
-  /** Pause between a SIGTERM and the extra look at background processes. */
-  processKillLookMs: number;
-  /** How long a snapshot of the process table answers `processes` requests. */
-  processCacheMs: number;
-}
-
-/** The durations of a daemon without overrides. */
-export const DEFAULT_TIMINGS: DaemonTimings = {
-  timeoutUnitMs: 1000,
-  drainMs: DRAIN_MS,
-  stopGraceMs: STOP_GRACE_MS,
-  killGraceMs: KILL_GRACE_MS,
-  wakeMarginMs: WAKE_MARGIN_MS,
-  usageIntervalMs: USAGE_INTERVAL_MS,
-  namingTimeoutMs: NAMING_TIMEOUT_MS,
-  processStreamMs: PROCESS_STREAM_MS,
-  processKillLookMs: PROCESS_KILL_LOOK_MS,
-  processCacheMs: 1_000,
-};
 
 export interface DaemonOptions {
   stateDirectory: string;
@@ -298,7 +252,20 @@ function deliveryOutcome(delivery: Group['delivery']): Group['delivery'] {
   return rest;
 }
 
-export class Daemon {
+/** What `createApplication` builds and hands to the daemon. */
+export interface DaemonParts {
+  store: Store;
+  socket: string;
+  environment: NodeJS.ProcessEnv;
+  /** Defaults merged with the overrides. */
+  timings: DaemonTimings;
+  patchStorages: PatchStorage[];
+  artifactStorages: ArtifactStorage[];
+  /** Builds the executor that works for this daemon. */
+  createExecutor: (host: ExecutorHost) => Executor;
+}
+
+export class Daemon implements ExecutorHost {
   readonly store: Store;
   readonly socket: string;
   readonly environment: NodeJS.ProcessEnv;
@@ -347,24 +314,19 @@ export class Daemon {
   private sentProcesses: string | null = null;
   private sentProcessesError: string | null = null;
 
-  constructor(options: DaemonOptions) {
-    this.store = new Store(databasePath(options.stateDirectory));
-    this.socket = socketPath(options.stateDirectory);
-    this.patchStorages = [new FilePatchStorage(join(options.stateDirectory, 'patches'))];
-    this.artifactStorages = [new FileArtifactStorage(join(options.stateDirectory, 'artifacts'))];
-    this.environment = options.environment ?? process.env;
+  constructor(options: DaemonOptions, parts: DaemonParts) {
+    this.store = parts.store;
+    this.socket = parts.socket;
+    this.patchStorages = parts.patchStorages;
+    this.artifactStorages = parts.artifactStorages;
+    this.environment = parts.environment;
     this.now = options.now ?? Date.now;
     this.build = options.build ?? currentBuild();
     this.panel = options.panel;
-    this.timings = { ...DEFAULT_TIMINGS, ...options.timings };
+    this.timings = parts.timings;
     this.processesIntervalMs = options.processesIntervalMs ?? this.timings.processStreamMs;
     this.takeProcesses = options.snapshotProcesses ?? (() => snapshotProcesses());
-    this.executor = new Executor({
-      daemon: this,
-      entry: options.entry,
-      graceMs: options.graceMs ?? this.timings.stopGraceMs,
-      timings: this.timings,
-    });
+    this.executor = parts.createExecutor(this);
   }
 
   async start(): Promise<void> {

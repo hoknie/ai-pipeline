@@ -1,4 +1,4 @@
-import { groupPipeline, type Specialist } from '../config/index.ts';
+import { groupPipeline, type Specialist } from '../feature/swarm-config/types/index.ts';
 
 import {
   advanceChecks,
@@ -7,7 +7,6 @@ import {
   finishDelivery,
   finishMessage,
   renderCommitMessage,
-  cleanupIfDelivered,
   markDelivered,
   requestDelivery,
   resolvePrepared,

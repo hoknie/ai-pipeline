@@ -3,12 +3,8 @@ import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  startDaemon,
-  type DaemonOptions,
-  type DaemonTimings,
-  type RunningDaemon,
-} from '../../src/daemon/index.ts';
+import { startDaemon, type RunningDaemon } from '../../src/app/index.ts';
+import type { DaemonOptions, DaemonTimings } from '../../src/daemon/index.ts';
 import {
   request,
   type GroupView,
