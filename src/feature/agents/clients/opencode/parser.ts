@@ -39,10 +39,9 @@ function findStepFinish(value: unknown): Record<string, unknown> | null {
 /** The usage so far plus the tokens and the cost of one finished step. */
 function addStep(usage: Usage | null, step: Record<string, unknown>): Usage {
   const input =
-    (numberAt(step, 'tokens', 'input') ?? 0) +
-    (numberAt(step, 'tokens', 'cache', 'read') ?? 0) +
-    (numberAt(step, 'tokens', 'cache', 'write') ?? 0);
-  const output = numberAt(step, 'tokens', 'output') ?? 0;
+    (numberAt(step, 'tokens', 'input') ?? 0) + (numberAt(step, 'tokens', 'cache', 'write') ?? 0);
+  const output =
+    (numberAt(step, 'tokens', 'output') ?? 0) + (numberAt(step, 'tokens', 'reasoning') ?? 0);
   const cost = numberAt(step, 'cost');
   return {
     inputTokens: (usage?.inputTokens ?? 0) + input,

@@ -245,19 +245,24 @@ describe('actions before delivery', () => {
   });
 
   it('drop a commit of the check: the tree of the run stays on its ref', async () => {
+    // Inspect the reset worktree after delivery without racing automatic cleanup.
     const h = await start(`  actions:
     lint: { run: "echo x > extra.txt && git add -A && git -c user.name=a -c user.email=a@b commit -q -m check" }
   stages:
     before_delivery: [lint]
-  delivery: { auto: false }`);
+  delivery: { auto: false, keep: true }`);
     h.script({ code: [{ write: { 'lib.ts': 'export const value = 2;\n' } }] });
     const runId = await plainRun(h);
     await h.waitFor(runId, (run) => run.finished);
+    const ref = `refs/aip/${runId}/run`;
+    const mergedHead = git(h.repo, 'rev-parse', ref);
     await h.call('apply', { runId });
     await h.waitFor(runId, (run) => run.deliveryStage?.status === 'applied');
     const tree = join(h.repo, '.aip', 'worktrees', runId, '_run');
     expect(existsSync(tree)).toBe(true);
-    expect(git(tree, 'rev-parse', 'HEAD')).toBe(git(h.repo, 'rev-parse', `refs/aip/${runId}/run`));
+    expect(git(tree, 'rev-parse', 'HEAD')).toBe(mergedHead);
+    expect(git(h.repo, 'rev-parse', ref)).toBe(mergedHead);
+    expect(existsSync(join(tree, 'extra.txt'))).toBe(false);
     expect(existsSync(join(h.repo, 'extra.txt'))).toBe(false);
   });
 

@@ -336,7 +336,7 @@ describe('claude adapter', () => {
     parser.push('not json');
     expect(parser.outcome()).toEqual({
       sessionId: 'fa86c288-6f1b-44f7-889b-779235a84990',
-      usage: { inputTokens: 2 + 23287 + 11382, outputTokens: 4, costUsd: 0.00477342 },
+      usage: { inputTokens: 2 + 23287, outputTokens: 4, costUsd: 0.00477342 },
       error: null,
       denials: [],
       usageLimit: null,
@@ -685,23 +685,36 @@ describe('opencode run --format json output', () => {
     for (const line of recorded) parser.push(line);
     expect(parser.outcome()).toEqual({
       sessionId: 'ses_ses1',
-      usage: { inputTokens: 19026 + 19090, outputTokens: 25 + 3, costUsd: 0 },
+      usage: { inputTokens: 19026 + 19090, outputTokens: 25 + 20 + 3 + 1, costUsd: 0 },
       error: null,
       denials: [],
     });
   });
 
-  it('sums the cost of steps', () => {
+  it('sums the cost and reasoning tokens of steps and ignores cache reads', () => {
     const parser = runtime.createParser();
-    const step = (cost: number) =>
+    const step = (cost: number, reasoning = 0, cacheRead = 0, cacheWrite = 0) =>
       JSON.stringify({
         type: 'step_finish',
         sessionID: 'ses_1',
-        part: { type: 'step-finish', tokens: { input: 1, output: 1 }, cost },
+        part: {
+          type: 'step-finish',
+          tokens: {
+            input: 10,
+            output: 5,
+            reasoning,
+            cache: { read: cacheRead, write: cacheWrite },
+          },
+          cost,
+        },
       });
-    parser.push(step(0.25));
-    parser.push(step(0.5));
-    expect(parser.outcome().usage?.costUsd).toBeCloseTo(0.75);
+    parser.push(step(0.25, 20, 500, 4));
+    parser.push(step(0.5, 30, 800, 6));
+    expect(parser.outcome().usage).toEqual({
+      inputTokens: 30,
+      outputTokens: 60,
+      costUsd: 0.75,
+    });
   });
 
   it('reports the message of an error event, not its response headers', () => {
@@ -761,12 +774,12 @@ describe('live usage', () => {
     expect(parser.usage()).toBeNull();
   });
 
-  it('sums the messages of the assistant without a cost', () => {
+  it('sums the messages of the assistant without a cost and ignores cache reads', () => {
     const parser = createClaudeRuntime('/bin/claude').createParser();
     parser.push(assistant('m1', 100, 10, 50, 5));
-    expect(parser.usage()).toEqual({ inputTokens: 155, outputTokens: 10, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 105, outputTokens: 10, costUsd: null });
     parser.push(assistant('m2', 200, 20));
-    expect(parser.usage()).toEqual({ inputTokens: 355, outputTokens: 30, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 305, outputTokens: 30, costUsd: null });
   });
 
   it('counts a message of several events once, by the last event', () => {

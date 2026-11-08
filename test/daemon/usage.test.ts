@@ -74,17 +74,17 @@ describe('live usage', () => {
     const runId = await run(h);
     const live = await h.waitFor(
       runId,
-      (view) => view.groups[0]?.step === 'code' && (view.usage?.inputTokens ?? 0) >= 3500,
+      (view) => view.groups[0]?.step === 'code' && (view.usage?.inputTokens ?? 0) >= 3000,
     );
     expect(live.finished).toBe(false);
     expect(live.groups[0]?.status).toBe('running');
-    expect(live.usage).toEqual({ inputTokens: 3500, outputTokens: 300, costUsd: null });
+    expect(live.usage).toEqual({ inputTokens: 3000, outputTokens: 300, costUsd: null });
     expect(live.groups[0]?.usage).toEqual(live.usage);
     const detail = await h.group(runId, 'login');
     expect(detail.attempts[0]?.usage).toEqual(live.usage);
     const seen = views.filter((view) => view.id === runId && view.usage !== null);
     expect(seen.length).toBeGreaterThan(0);
-    expect(seen.map((view) => view.usage!.inputTokens)).toContain(3500);
+    expect(seen.map((view) => view.usage!.inputTokens)).toContain(3000);
   });
 
   it('ends with the usage of the result, not the sum of the messages', async () => {

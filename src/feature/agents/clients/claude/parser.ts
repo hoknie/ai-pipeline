@@ -82,13 +82,9 @@ function commandOf(input: unknown): string | null {
   return typeof command === 'string' ? command : null;
 }
 
-/** Input tokens of every kind: fresh, written to the cache and read from it. */
+/** Fresh input tokens and tokens written to the cache; cache reads are not counted. */
 function inputTokens(tokens: z.infer<typeof tokenUsage> | undefined): number {
-  return (
-    (tokens?.input_tokens ?? 0) +
-    (tokens?.cache_creation_input_tokens ?? 0) +
-    (tokens?.cache_read_input_tokens ?? 0)
-  );
+  return (tokens?.input_tokens ?? 0) + (tokens?.cache_creation_input_tokens ?? 0);
 }
 
 /** Refused tool calls of a stream, each once: Claude Code reports them as events and in the result. */

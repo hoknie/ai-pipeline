@@ -25,9 +25,11 @@ export function summarize(state: RunState): RunSummary {
     GroupStatus,
     number
   >;
-  let usage: Usage | null = null;
   for (const group of state.groups) {
     counts[group.status] += 1;
+  }
+  let usage: Usage | null = null;
+  for (const group of allGroups(state)) {
     usage = addUsage(usage, groupUsage(group));
   }
   usage = addUsage(usage, state.run.namingUsage ?? null);

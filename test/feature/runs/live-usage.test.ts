@@ -158,4 +158,48 @@ describe('sums with a running attempt', () => {
     expect(summarize(state).usage).toEqual(live);
     expect(topology(state).steps[0]?.usage).toEqual(live);
   });
+
+  it('includes service groups in the summary usage', () => {
+    const state = run(1);
+    step(state);
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq: 1,
+        exit: exitOf({ inputTokens: 1000, outputTokens: 200, costUsd: 0 }),
+      },
+      10,
+    );
+    transition(
+      state,
+      {
+        kind: 'repair_start',
+        incident: { key: 'k', kind: 'failed', group: 'gruppa-1', detail: 'no report' },
+        specialist: state.run.config.specialists[0]!,
+      },
+      20,
+    );
+    step(state, 25);
+    transition(
+      state,
+      {
+        kind: 'attempt_usage',
+        updates: [
+          {
+            group: '_repair',
+            seq: 1,
+            usage: { inputTokens: 500, outputTokens: 50, costUsd: 0.25 },
+          },
+        ],
+      },
+      30,
+    );
+    expect(summarize(state).usage).toEqual({
+      inputTokens: 1500,
+      outputTokens: 250,
+      costUsd: 0.25,
+    });
+  });
 });

@@ -73,7 +73,7 @@ function messageEvent(reading: Reading, event: JsonObject, at: number | null): v
 
 function resultEntry(event: JsonObject, at: number | null): TranscriptEntry {
   const usage = isJsonObject(event.usage) ? event.usage : {};
-  const input = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens']
+  const input = ['input_tokens', 'cache_creation_input_tokens']
     .map((key) => (typeof usage[key] === 'number' ? usage[key] : 0))
     .reduce((sum, value) => sum + value, 0);
   return {

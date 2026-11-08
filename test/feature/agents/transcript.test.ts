@@ -114,7 +114,7 @@ describe('claude transcript', () => {
       text: 'готово',
       error: false,
       verdict: null,
-      inputTokens: 1110,
+      inputTokens: 110,
       outputTokens: 50,
       costUsd: 0.25,
       at: null,
