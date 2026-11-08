@@ -305,6 +305,23 @@ describe('cli', () => {
     expect(reviewer).not.toContain('max:');
   });
 
+  it('shows OpenCode options only for specialists that set them', async () => {
+    const box = sandbox(
+      PIPELINE_CONFIG.replace(
+        'coder: { name: Кодировщик }',
+        'coder: { name: Кодировщик, runtime: opencode, variant: company-deep, reasoning_effort: xhigh }',
+      ),
+    );
+    const result = await aip(box, 'config', 'check');
+    expect(result.code).toBe(0);
+    const coder = result.stdout.split('    coder:')[1]?.split('    reviewer:')[0] ?? '';
+    const reviewer = result.stdout.split('    reviewer:')[1]?.split('pipelines:')[0] ?? '';
+    expect(coder).toContain('variant: company-deep');
+    expect(coder).toContain('reasoning_effort: xhigh');
+    expect(reviewer).not.toContain('variant:');
+    expect(reviewer).not.toContain('reasoning_effort:');
+  });
+
   it('lists the files with old names in config check without changing the exit code', async () => {
     const box = sandbox();
     const old = join(box.repo, 'aip', 'workflows', 'legacy.yaml');

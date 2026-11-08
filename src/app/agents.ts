@@ -7,7 +7,12 @@ import { createAgentsServices, type AgentsServices } from '../feature/agents/ser
 export function createAgents(environment: NodeJS.ProcessEnv): AgentsServices {
   return createAgentsServices({
     environment,
-    factories: { claude: createClaudeRuntime, opencode: createOpencodeRuntime },
+    factories: {
+      claude: createClaudeRuntime,
+      opencode: createOpencodeRuntime,
+      agy: createAgyRuntime,
+    },
     naming: new NamingClient(),
   });
 }
+import { createAgyRuntime } from '../feature/agents/clients/agy/index.ts';

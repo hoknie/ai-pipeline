@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
 import { FEEDBACK_LIMIT } from '../../feature/runs/types/index.ts';
-import { RUN_TITLE_LIMIT } from '../../feature/agents/types/index.ts';
+import { RUN_TITLE_LIMIT, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
 import { attempt } from './tools.ts';
 import type { WorkerKit } from './worker-tools.ts';
@@ -11,7 +11,7 @@ export function registerSplit(kit: WorkerKit): void {
   const { options, server } = kit;
   if (options.split) {
     server.registerTool(
-      'swarm_split',
+      WORKER_TOOLS.split,
       {
         title: 'Propose groups of work',
         description:
@@ -36,7 +36,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
   const { options, server } = kit;
   if (options.queue) {
     server.registerTool(
-      'swarm_queue_add',
+      WORKER_TOOLS.queue,
       {
         title: 'Add a task to the queue',
         description:
@@ -102,7 +102,7 @@ export function registerRepair(kit: WorkerKit): void {
   const { options, server } = kit;
   if (options.repair) {
     server.registerTool(
-      'swarm_repair_answer',
+      WORKER_TOOLS.answer,
       {
         title: 'Answer a question of a group',
         description:
@@ -129,7 +129,7 @@ export function registerRepair(kit: WorkerKit): void {
         }),
     );
     server.registerTool(
-      'swarm_repair_retry',
+      WORKER_TOOLS.retry,
       {
         title: 'Retry a group',
         description:
@@ -151,7 +151,7 @@ export function registerRepair(kit: WorkerKit): void {
         }),
     );
     server.registerTool(
-      'swarm_repair_cancel',
+      WORKER_TOOLS.cancel,
       {
         title: 'Cancel a group or the task',
         description:

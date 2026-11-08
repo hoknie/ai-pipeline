@@ -347,6 +347,8 @@ export function specialistEntry(
       name: slug.toUpperCase(),
       runtime: 'claude',
       model: null,
+      variant: null,
+      reasoning_effort: null,
       permissions: 'edit',
       timeout: '30m',
       allow_commands: [],
@@ -492,7 +494,7 @@ type SettingSpec = [
 ];
 
 const OPTIONS = {
-  runtime: ['claude', 'opencode'],
+  runtime: ['claude', 'opencode', 'agy'],
   permissions: ['read', 'edit', 'full'],
 };
 
@@ -537,6 +539,9 @@ const SETTING_SPECS: SettingSpec[] = [
   ['runtimes.opencode.command', 'string', 'opencode', { globalOnly: true }],
   ['runtimes.opencode.args', 'strings', [], { globalOnly: true }],
   ['runtimes.opencode.env', 'env', [], { globalOnly: true }],
+  ['runtimes.agy.command', 'string', 'agy', { globalOnly: true }],
+  ['runtimes.agy.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.agy.env', 'env', [], { globalOnly: true }],
 ];
 
 /**
@@ -614,6 +619,7 @@ export function catalogView(overrides: Partial<ConfigCatalogResponse> = {}): Con
         ],
       },
       opencode: { tools: [], skills: [] },
+      agy: { tools: [], skills: [] },
     },
     ...overrides,
   };

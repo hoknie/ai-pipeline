@@ -21,12 +21,15 @@ import {
   PERMISSIONS,
   type Runtime,
   RUNTIMES,
+  REASONING_EFFORTS,
   type Specialist,
 } from '../types/specialist.ts';
 
 export const SPECIALIST_KEYS = [
   'name',
   'model',
+  'variant',
+  'reasoning_effort',
   'runtime',
   'permissions',
   'timeout',
@@ -128,8 +131,31 @@ export function checkSpecialist(
     }
   }
   if (!('name' in mapping)) addError(ctx, join(path, 'name'), 'is required');
+  checkOpencodeOptions(ctx, mapping, path, specialist);
   if (specialist.mcp && specialist.runtime !== 'claude') {
     addError(ctx, join(path, 'mcp'), 'is supported by the claude runtime only');
   }
   return specialist;
+}
+
+function checkOpencodeOptions(
+  ctx: ValidateContext,
+  mapping: Record<string, unknown>,
+  path: string,
+  specialist: Specialist,
+): void {
+  for (const key of ['variant', 'reasoning_effort'] as const) {
+    if (!(key in mapping)) continue;
+    const fieldPath = join(path, key);
+    if (specialist.runtime !== 'opencode') {
+      addError(ctx, fieldPath, 'is supported by the opencode runtime only');
+    }
+    if (key === 'variant') {
+      const variant = readString(ctx, mapping[key], fieldPath);
+      if (variant !== null) specialist.variant = variant.trim();
+    } else {
+      const effort = readChoice(ctx, mapping[key], fieldPath, REASONING_EFFORTS);
+      if (effort !== null) specialist.reasoningEffort = effort;
+    }
+  }
 }

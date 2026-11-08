@@ -51,6 +51,44 @@ describe('hold of a run and priority runs', () => {
 });
 
 describe('runs', () => {
+  it('restores a snapshot written before agy without changing its specialists', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    store.runs.saveRun(state);
+    const { agy: _absent, ...runtimes } = state.run.config.runtimes;
+    store.database
+      .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
+      .run(JSON.stringify({ ...state.run.config, runtimes }), state.run.id);
+    const loaded = store.runs.loadRun(state.run.id)!;
+    expect(loaded.run.config.specialists).toEqual(state.run.config.specialists);
+    expect(loaded.run.config.runtimes.agy).toEqual({ command: 'agy', args: [], env: {} });
+    store.database.close();
+  });
+
+  it.each([false, true])(
+    'restores model options, including an old snapshot (explicit: %s)',
+    (explicit) => {
+      const store = temporaryStorage();
+      const state = run(1);
+      const coder = state.run.config.specialists.find((item) => item.slug === 'coder')!;
+      if (explicit) {
+        coder.variant = 'company-deep';
+        coder.reasoningEffort = 'xhigh';
+      }
+      store.runs.saveRun(state);
+      const restored = store.runs
+        .loadRun(state.run.id)!
+        .run.config.specialists.find((item) => item.slug === 'coder')!;
+      expect(restored).toEqual(coder);
+      if (explicit)
+        expect(restored).toMatchObject({ variant: 'company-deep', reasoningEffort: 'xhigh' });
+      else {
+        expect(restored).not.toHaveProperty('variant');
+        expect(restored).not.toHaveProperty('reasoningEffort');
+      }
+    },
+  );
+
   it('reads back exactly what it saved', () => {
     const store = temporaryStorage();
     const state = run(2);

@@ -86,6 +86,9 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
         mode: 'primary',
         prompt: systemPrompt(context.specialist, context.input),
         permission: opencodePermission(context),
+        ...(context.specialist.reasoningEffort
+          ? { options: { reasoningEffort: context.specialist.reasoningEffort } }
+          : {}),
       },
     },
   };
@@ -101,6 +104,7 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
       '--agent',
       agent,
       ...(context.specialist.model ? ['-m', context.specialist.model] : []),
+      ...(context.specialist.variant ? ['--variant', context.specialist.variant] : []),
       ...(context.resumeSession ? ['-s', context.resumeSession] : []),
       ...(context.specialist.permissions === 'full' ? ['--auto'] : []),
       userMessage(context.input),

@@ -1,6 +1,8 @@
 export type FieldName =
   | 'name'
   | 'model'
+  | 'variant'
+  | 'reasoning_effort'
   | 'runtime'
   | 'permissions'
   | 'timeout'
@@ -15,6 +17,8 @@ export const FIELDS: FieldName[] = [
   'name',
   'runtime',
   'model',
+  'variant',
+  'reasoning_effort',
   'permissions',
   'timeout',
   'allow_commands',

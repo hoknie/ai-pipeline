@@ -78,7 +78,9 @@ export default function SettingsPage(props: SettingsPageProps) {
               {BETA_SETTINGS_GROUPS.has(group) ? <BetaBadge /> : null}
             </h2>
             <p className="text-sm text-muted-foreground">{t(`settingsPage.about.${group}`)}</p>
-            {group === 'runtimes' || group === 'system' ? (
+            {group === 'runtimes' ? (
+              <p className="text-sm text-muted-foreground">{t('settingsPage.runtimeNote')}</p>
+            ) : group === 'system' ? (
               <p className="text-sm text-muted-foreground">
                 <Trans
                   i18nKey="settingsPage.restartNote"

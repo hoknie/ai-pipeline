@@ -8,7 +8,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes", ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
+"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
 
 ## Project groups
 
@@ -28,7 +28,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 - Errors of validation are shown at the fields. If the file was changed after it was read, the form offers "Reload".
 - Leaving a group, a tab or a project with unsaved changes asks for confirmation.
 - A group with configuration errors gets a mark, and the errors are shown in the group. Errors of specialists and pipelines are shown in "General".
-- Of the runtime environment only the names of the variables are shown, never their values: a value can be added or replaced, not read. A change of `web.*` takes effect after the restart: see [System](#system).
+- Of the runtime environment only the names of the variables are shown, never their values: a value can be added or replaced, not read. Runtime settings are reread before the next agent starts. A change of `web.*` takes effect after the restart: see [System](#system).
 
 ## Shared specialists
 

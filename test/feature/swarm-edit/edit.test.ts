@@ -934,6 +934,13 @@ describe('web and runtimes in the editor view', () => {
       file: null,
     });
     expect(find(view, 'runtimes.opencode.env')?.value).toEqual([]);
+    expect(find(view, 'runtimes.agy.command')).toMatchObject({
+      path: 'runtimes.agy.command',
+      value: 'agy',
+      globalOnly: true,
+    });
+    expect(find(view, 'runtimes.agy.args')?.value).toEqual([]);
+    expect(find(view, 'runtimes.agy.env')?.value).toEqual([]);
   });
 
   it('takes the values and the file from the global settings.yaml', () => {
@@ -980,6 +987,7 @@ describe('catalog of setting fields', () => {
     for (const path of [
       'specialists.coder.model',
       'runtimes.claude.env.1BAD',
+      'runtimes.agy.env.1BAD',
       'runtimes.nope.env.FOO',
       'runtimes.claude.env.',
       'nothing',
@@ -1117,6 +1125,40 @@ describe('batch write of settings', () => {
       'API_KEY',
     ]);
     expect(JSON.stringify(view)).not.toContain('secret');
+  });
+
+  it('writes agy settings and exposes only environment names', () => {
+    const paths = levels(null);
+    const plan = accepted(
+      planSettings(paths, {
+        values: {
+          'runtimes.agy.command': '/opt/agy',
+          'runtimes.agy.args': ['--effort', 'high'],
+          'runtimes.agy.env.GEMINI_API_KEY': 'secret',
+        },
+        revision: null,
+      }),
+    );
+    commitEdit(plan);
+    const view = editorView(paths);
+    expect(view.settings.find((field) => field.path === 'runtimes.agy.command')?.value).toBe(
+      '/opt/agy',
+    );
+    expect(view.settings.find((field) => field.path === 'runtimes.agy.args')?.value).toEqual([
+      '--effort',
+      'high',
+    ]);
+    expect(view.settings.find((field) => field.path === 'runtimes.agy.env')?.value).toEqual([
+      'GEMINI_API_KEY',
+    ]);
+    expect(JSON.stringify(view)).not.toContain('secret');
+    expect(
+      planSettings(paths, {
+        values: { 'runtimes.agy.command': 'agy' },
+        revision: null,
+        level: 'project',
+      }),
+    ).toMatchObject({ ok: false, reason: 'invalid' });
   });
 
   it('refuses a wrong command and a name that is not a variable', () => {

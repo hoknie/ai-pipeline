@@ -74,6 +74,7 @@ describe('ensureDaemon and the build of the daemon', () => {
       AIP_WEB_AUTOSTART: '0',
       AIP_CLAUDE_BIN: join(root, 'test', 'fakes', 'claude'),
       AIP_OPENCODE_BIN: join(root, 'test', 'fakes', 'opencode'),
+      AIP_AGY_BIN: join(root, 'test', 'fakes', 'agy'),
     };
     const old: RunningDaemon = await startDaemon({
       stateDirectory: state,

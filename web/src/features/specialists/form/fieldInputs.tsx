@@ -2,6 +2,8 @@ import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ReasoningEffort } from '../../../../../src/feature/swarm-config/types/index.ts';
+
 import type { CatalogEntry, ConfigCatalogResponse } from '../../../shared/api/types.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import {
@@ -15,8 +17,17 @@ import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
 import { ValuesPicker } from '../../../shared/ui/forms/ValuesPicker.tsx';
 import { isList, type Draft, type FieldName, type ListField } from './draft.ts';
 
-const RUNTIMES = ['claude', 'opencode'];
+const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
 const PERMISSIONS = ['read', 'edit', 'full'];
+const REASONING_EFFORTS = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+] as const satisfies readonly ReasoningEffort[];
 /** Radix `Select` has no empty value: this one stands for «take it from defaults». */
 const INHERIT = '__inherit';
 
@@ -26,6 +37,7 @@ export function fieldLabel(field: FieldName, t: TFunction): string {
 
 /** What an empty field falls back to, as a hint; empty when there is nothing to say. */
 export function hintOf(field: FieldName, defaults: Record<string, unknown>, t: TFunction): string {
+  if (field === 'variant' || field === 'reasoning_effort') return t('specialists.opencodeDefault');
   if (field === 'runtime' || field === 'permissions' || field === 'timeout') {
     return t('specialists.fromDefaults', { value: String(defaults[`defaults.${field}`] ?? '') });
   }
@@ -68,15 +80,16 @@ function ListInput({
 }: InputProps & { field: ListField }) {
   const { t } = useTranslation();
   const runtime = draft.runtime || String(defaults['defaults.runtime'] ?? 'claude');
+  const runtimeName = RUNTIMES.find((name) => name === runtime) ?? 'claude';
   const known: CatalogEntry[] | null =
     field === 'tools' || field === 'skills'
-      ? (catalog?.runtimes[runtime === 'opencode' ? 'opencode' : 'claude']?.[field] ?? null)
+      ? (catalog?.runtimes[runtimeName]?.[field] ?? null)
       : null;
   const mark = (value: string): string | null => {
     if (!known) return null;
     if (!known.some((entry) => entry.name === value)) return t('picker.notFound');
     return field === 'tools' &&
-      runtime !== 'opencode' &&
+      runtime === 'claude' &&
       value.startsWith('mcp__') &&
       !catalog?.mcpInherited
       ? t('picker.mcpIsolated')
@@ -105,7 +118,9 @@ export function FieldInput(props: InputProps) {
   if (isList(field)) return <ListInput {...props} field={field} />;
   const set = (text: string) => onDraft((current) => ({ ...current, [field]: text }));
   const hint = hintOf(field, defaults, t);
-  if (field === 'runtime' || field === 'permissions') {
+  if (field === 'runtime' || field === 'permissions' || field === 'reasoning_effort') {
+    const options =
+      field === 'runtime' ? RUNTIMES : field === 'permissions' ? PERMISSIONS : REASONING_EFFORTS;
     return (
       <Select
         value={draft[field] === '' ? INHERIT : draft[field]}
@@ -117,7 +132,7 @@ export function FieldInput(props: InputProps) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={INHERIT}>{hint || t('specialists.byDefault')}</SelectItem>
-          {(field === 'runtime' ? RUNTIMES : PERMISSIONS).map((option) => (
+          {options.map((option) => (
             <SelectItem key={option} value={option}>
               {option}
             </SelectItem>

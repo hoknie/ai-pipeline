@@ -958,6 +958,7 @@ describe('runtimes settings', () => {
     expect(runtimes('')).toEqual({
       claude: { command: 'claude', args: [], env: {} },
       opencode: { command: 'opencode', args: [], env: {} },
+      agy: { command: 'agy', args: [], env: {} },
     });
   });
 

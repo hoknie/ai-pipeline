@@ -43,6 +43,7 @@ function machine(extra: NodeJS.ProcessEnv = {}): Machine {
       PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(delimiter),
       AIP_CLAUDE_BIN: join(fakes, 'claude'),
       AIP_OPENCODE_BIN: join(fakes, 'opencode'),
+      AIP_AGY_BIN: join(fakes, 'agy'),
       AIP_FAKE_HOST_STATE: hostState,
       NO_COLOR: '1',
       ...extra,

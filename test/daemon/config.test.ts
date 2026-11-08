@@ -59,6 +59,28 @@ async function write(
 }
 
 describe('config editor', () => {
+  it('round-trips OpenCode options through the existing configuration transport', async () => {
+    const h = await start();
+    const coder = (await view(h)).specialists[0]!;
+    expect(
+      await write(
+        h,
+        'coder',
+        { ...coder.raw, runtime: 'opencode', variant: 'deep', reasoning_effort: 'xhigh' },
+        coder.revision,
+      ),
+    ).toMatchObject({ ok: true });
+    const saved = (await view(h)).specialists[0]!;
+    expect(saved.raw).toMatchObject({ variant: 'deep', reasoning_effort: 'xhigh' });
+    expect(saved.effective).toMatchObject({ variant: 'deep', reasoning_effort: 'xhigh' });
+    const { variant: _variant, reasoning_effort: _effort, ...cleared } = saved.raw;
+    expect(await write(h, 'coder', cleared, saved.revision)).toMatchObject({ ok: true });
+    expect((await view(h)).specialists[0]!.effective).toMatchObject({
+      variant: null,
+      reasoning_effort: null,
+    });
+  });
+
   it('returns the specialists with levels, files and revisions', async () => {
     const h = await start();
     const result = await view(h);

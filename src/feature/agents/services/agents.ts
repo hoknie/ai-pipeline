@@ -9,7 +9,7 @@ import type { RunNaming, Runtime, RuntimeCatalogs } from '../types/index.ts';
 import { mcpServers, skillCatalog, sortEntries } from './catalog.ts';
 
 export interface AgentsDependencies {
-  /** The environment agents start in; `AIP_CLAUDE_BIN` and `AIP_OPENCODE_BIN` replace the executables. */
+  /** The environment agents start in; `AIP_<RUNTIME>_BIN` replaces each executable. */
   environment: NodeJS.ProcessEnv;
   factories: RuntimeFactories;
   naming: NamingPort;
@@ -31,9 +31,7 @@ export class AgentsService {
   runtimeFor(name: RuntimeName, settings: RuntimeSettings = defaultRuntimes()): Runtime {
     const { environment, factories } = this.dependencies;
     const { command, args, env } = settings[name];
-    return name === 'claude'
-      ? factories.claude(environment.AIP_CLAUDE_BIN || command, { args, env })
-      : factories.opencode(environment.AIP_OPENCODE_BIN || command, { args, env });
+    return factories[name](environment[`AIP_${name.toUpperCase()}_BIN`] || command, { args, env });
   }
 
   /** Tools and skills a specialist of each runtime can name, read from disk on every call. */
@@ -49,7 +47,7 @@ export class AgentsService {
         skills: skillCatalog(runtime.skillDirectories(repository, home), repository, home),
       };
     };
-    return { claude: build('claude'), opencode: build('opencode') };
+    return { claude: build('claude'), opencode: build('opencode'), agy: build('agy') };
   }
 
   /** The title and the name of a run from the answer of the naming agent. */

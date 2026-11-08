@@ -831,6 +831,8 @@ export const en = {
     usedBy: 'The specialist is used by:',
     fromDefaults: '{{value}} (from defaults)',
     byDefault: 'default',
+    opencodeDefault: 'OpenCode default',
+    variantOverridesEffort: 'The selected variant takes precedence if it sets reasoningEffort.',
     header: 'specialist actions',
     replacesDefaults: 'The tools of the specialist replace the ones from defaults.',
     catalogError:
@@ -846,6 +848,9 @@ export const en = {
       name: 'How the specialist is shown in the panel and in the log.',
       runtime: 'The agent CLI that runs the step.',
       model: "The model of the agent; empty — the runtime's default.",
+      variant: 'OpenCode only. Model variant name; empty uses OpenCode settings.',
+      reasoning_effort:
+        'OpenCode only. Supported effort levels depend on the model; empty uses OpenCode settings.',
       permissions: 'What the specialist may do: read, edit files or run anything.',
       timeout: 'How long one attempt may take, such as 90s, 30m or 2h.',
       max: 'How many steps of this specialist may run at once.',
@@ -897,6 +902,8 @@ export const en = {
       name: 'Name',
       runtime: 'Runtime',
       model: 'Model',
+      variant: 'Variant',
+      reasoning_effort: 'Reasoning effort',
       permissions: 'Permissions',
       timeout: 'Timeout',
       allow_commands: 'Allowed commands',
@@ -1148,6 +1155,8 @@ export const en = {
     betaHint: 'still in development: behaviour and settings may change',
     hasErrors: 'the group has configuration errors',
     restartNote: 'Changes take effect after the restart: see the <link>System</link> group.',
+    runtimeNote:
+      'Runtime settings are read again before the next agent starts; the daemon does not need a restart.',
     tabs: 'level of settings',
     project: 'Project',
     noProjects: 'No repositories yet: add one in the repository menu.',
@@ -1230,6 +1239,7 @@ export const en = {
       delivery_conflicts: 'Conflicts',
       runtimes_claude: 'Claude',
       runtimes_opencode: 'OpenCode',
+      runtimes_agy: 'Antigravity CLI (agy)',
       system_panel: 'Panel settings',
     },
     field: {

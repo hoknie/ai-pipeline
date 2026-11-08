@@ -130,5 +130,28 @@ describe('runtimeCatalog', () => {
     expect(result.claude.tools).toContainEqual({ name: 'WebFetch', source: 'builtin' });
     expect(result.claude.tools.map((tool) => tool.name)).toContain('mcp__jira');
     expect(result.opencode.tools).toEqual([]);
+    expect(result.agy.tools).toEqual([]);
+  });
+
+  it('lists Antigravity skill directories without inheriting claude MCP state', () => {
+    const { repository, home } = layout();
+    put(join(repository, '.agents/skills/review/SKILL.md'), '---\ndescription: Review\n---\n');
+    put(join(home, '.gemini/config/skills/plan/SKILL.md'), '---\ndescription: Plan\n---\n');
+    put(join(home, '.gemini/antigravity-cli/skills/cli/SKILL.md'), '');
+    const result = runtimeCatalog(repository, home, {});
+    expect(result.agy.tools).toEqual([]);
+    expect(result.agy.skills.map(({ name, source }) => [name, source])).toEqual([
+      ['review', 'project'],
+      ['cli', 'global'],
+      ['plan', 'global'],
+    ]);
+  });
+
+  it('recognizes the project customizations directory as the agy workspace root', () => {
+    const { repository, home } = layout();
+    put(join(repository, '.agents/skills/review/SKILL.md'), '');
+    expect(runtimeCatalog(repository, home, {}).agy.skills).toContainEqual(
+      expect.objectContaining({ name: 'review', source: 'project' }),
+    );
   });
 });

@@ -71,6 +71,30 @@ function anchor(heading: string): string {
 }
 
 describe('documentation examples', () => {
+  it('the OpenCode runtime example keeps the variant and base effort separate', () => {
+    const reviewer = yamlBlocks('docs/configuration/runtimes.md').find((block) =>
+      block.startsWith('name: OpenCode reviewer'),
+    );
+    expect(reviewer).toBeDefined();
+    const config = configFromFiles({ specialists: { reviewer: reviewer! } });
+    expect(config.specialists[0]).toMatchObject({
+      runtime: 'opencode',
+      variant: 'high',
+      reasoningEffort: 'low',
+      permissions: 'read',
+    });
+  });
+
+  it('the OpenCode specialist example sets effort without forcing a variant', () => {
+    const coder = yamlBlocks('docs/configuration/specialists.md').find((block) =>
+      block.startsWith('name: OpenCode coder'),
+    );
+    expect(coder).toBeDefined();
+    const config = configFromFiles({ specialists: { coder: coder! } });
+    expect(config.specialists[0]).toMatchObject({ runtime: 'opencode', reasoningEffort: 'xhigh' });
+    expect(config.specialists[0]).not.toHaveProperty('variant');
+  });
+
   it('README files form a valid configuration', () => {
     const [settings, pipeline] = yamlBlocks('README.md');
     const config = configFromFiles({

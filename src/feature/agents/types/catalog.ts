@@ -13,4 +13,5 @@ export interface RuntimeCatalog {
 export interface RuntimeCatalogs {
   claude: RuntimeCatalog;
   opencode: RuntimeCatalog;
+  agy: RuntimeCatalog;
 }

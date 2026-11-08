@@ -12,6 +12,7 @@ describe('configCatalogResponseSchema', () => {
       runtimes: {
         claude: { tools: [{ name: 'Read', source: 'builtin' }], skills: [] },
         opencode: empty,
+        agy: empty,
       },
     };
     expect(configCatalogResponseSchema.parse(value)).toEqual(value);
@@ -24,6 +25,7 @@ describe('configCatalogResponseSchema', () => {
       runtimes: {
         claude: { tools: [{ name: 'x', source: 'plugin' }], skills: [] },
         opencode: empty,
+        agy: empty,
       },
     };
     expect(configCatalogResponseSchema.safeParse(value).success).toBe(false);

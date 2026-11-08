@@ -102,6 +102,7 @@ export function defaultRuntimes(): RuntimeSettings {
   return {
     claude: { command: 'claude', args: [], env: {} },
     opencode: { command: 'opencode', args: [], env: {} },
+    agy: { command: 'agy', args: [], env: {} },
   };
 }
 
@@ -157,6 +158,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const runtimes: RuntimeSettings = {
     claude: { ...defaults.claude, ...stored.runtimes?.claude },
     opencode: { ...defaults.opencode, ...stored.runtimes?.opencode },
+    agy: { ...defaults.agy, ...stored.runtimes?.agy },
   };
   const specialists = stored.specialists.map((specialist) => ({
     ...specialist,

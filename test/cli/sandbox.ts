@@ -88,6 +88,7 @@ export function sandbox(config = PIPELINE_CONFIG, options: { shared?: boolean } 
     AIP_WEB_AUTOSTART: '0',
     AIP_CLAUDE_BIN: join(fakes, 'claude'),
     AIP_OPENCODE_BIN: join(fakes, 'opencode'),
+    AIP_AGY_BIN: join(fakes, 'agy'),
     AIP_FAKE_STATE: join(base, 'fake'),
     AIP_FAKE_SCRIPT: join(base, 'script.json'),
   };

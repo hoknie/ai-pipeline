@@ -5,6 +5,7 @@ import {
   type FieldError,
   PIPELINES_DIR,
   SPECIALISTS_DIR,
+  type ReasoningEffort,
 } from '../../swarm-config/types/index.ts';
 import { field } from './setting-fields.ts';
 
@@ -140,6 +141,8 @@ export interface EditorSpecialistValues {
   name: string;
   runtime: string;
   model: string | null;
+  variant: string | null;
+  reasoning_effort: ReasoningEffort | null;
   permissions: string;
   timeout: string;
   allow_commands: string[];

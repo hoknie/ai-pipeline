@@ -49,6 +49,8 @@ function valuesOf(specialist: Specialist): EditorSpecialistValues {
     name: specialist.name,
     runtime: specialist.runtime,
     model: specialist.model,
+    variant: specialist.variant ?? null,
+    reasoning_effort: specialist.reasoningEffort ?? null,
     permissions: specialist.permissions,
     timeout: formatDuration(specialist.timeoutSeconds),
     allow_commands: specialist.allowCommands,

@@ -1,15 +1,5 @@
 import { OBSERVER_SPECIALIST } from '../../../swarm-config/types/index.ts';
-import type { LaunchContext } from '../../types/index.ts';
-
-const REPORT_TOOL = 'mcp__aip__swarm_report';
-const ARTIFACT_TOOL = 'mcp__aip__swarm_artifact';
-const SPLIT_TOOL = 'mcp__aip__swarm_split';
-const QUEUE_TOOL = 'mcp__aip__swarm_queue_add';
-const REPAIR_TOOLS = [
-  'mcp__aip__swarm_repair_answer',
-  'mcp__aip__swarm_repair_retry',
-  'mcp__aip__swarm_repair_cancel',
-];
+import { workerToolNames, type LaunchContext } from '../../types/index.ts';
 
 /** Setting sources without the user's level: no personal hooks, plugins or permission rules. */
 export const PROJECT_SETTINGS = ['--setting-sources', 'project,local'];
@@ -21,11 +11,11 @@ const EDIT_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
  * (the worker server offers the split only on the split step), and the queue when allowed.
  */
 function aipTools(context: LaunchContext): string[] {
-  const tools = [REPORT_TOOL, ARTIFACT_TOOL, SPLIT_TOOL];
-  if (context.specialist.queue === true) tools.push(QUEUE_TOOL);
-  // Only the observer of an incident has these tools; its profile has the reserved slug.
-  if (context.specialist.slug === OBSERVER_SPECIALIST) tools.push(...REPAIR_TOOLS);
-  return tools;
+  return workerToolNames({
+    split: true,
+    queue: context.specialist.queue === true,
+    repair: context.specialist.slug === OBSERVER_SPECIALIST,
+  }).map((name) => `mcp__aip__${name}`);
 }
 
 /** Tools allowed without a prompt: those of aip and all of the specialist's own MCP servers. */

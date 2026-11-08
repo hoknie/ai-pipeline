@@ -8,3 +8,4 @@ export * from './message.ts';
 export * from './run-naming.ts';
 export * from './runtime.ts';
 export * from './transcript-parts.ts';
+export * from './worker-tools.ts';

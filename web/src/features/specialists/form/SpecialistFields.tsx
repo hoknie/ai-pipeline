@@ -27,7 +27,7 @@ export {
 
 /** The fields of the form by section; the titles are `specialists.sections.<key>`. */
 const SECTIONS: { key: 'main' | 'limits' | 'tools' | 'prompt'; fields: FieldName[] }[] = [
-  { key: 'main', fields: ['name', 'runtime', 'model', 'tags'] },
+  { key: 'main', fields: ['name', 'runtime', 'model', 'variant', 'reasoning_effort', 'tags'] },
   { key: 'limits', fields: ['permissions', 'timeout', 'max', 'allow_commands'] },
   { key: 'tools', fields: ['tools', 'skills'] },
   { key: 'prompt', fields: ['prompt'] },
@@ -53,6 +53,11 @@ function FieldBlock({
       <p className="text-xs text-muted-foreground">
         {field === 'tags' && tagsHelp !== undefined ? tagsHelp : t(`specialists.help.${field}`)}
       </p>
+      {field === 'reasoning_effort' &&
+      draft.variant.trim() !== '' &&
+      draft.reasoning_effort !== '' ? (
+        <p className="text-xs text-muted-foreground">{t('specialists.variantOverridesEffort')}</p>
+      ) : null}
       {field === 'allow_commands' && draft.allow_commands.length === 0 && hint ? (
         <p className="text-xs text-muted-foreground">{hint}</p>
       ) : null}
@@ -101,8 +106,14 @@ export function SpecialistFields(props: SpecialistFieldsProps) {
   const { t } = useTranslation();
   const errorsOf = (field: FieldName) =>
     errors.filter((error) => fieldOf(error.path, prefix) === field);
+  const showOpencode =
+    (draft.runtime || defaults['defaults.runtime'] || 'claude') === 'opencode' ||
+    draft.variant.trim() !== '' ||
+    draft.reasoning_effort.trim() !== '';
   const shown = (field: FieldName) =>
-    !omit.includes(field) && (field !== 'tags' || tags !== undefined);
+    !omit.includes(field) &&
+    (field !== 'tags' || tags !== undefined) &&
+    (showOpencode || (field !== 'variant' && field !== 'reasoning_effort'));
   return (
     <div className="@container">
       <div className="grid gap-3 @3xl:grid-cols-2">

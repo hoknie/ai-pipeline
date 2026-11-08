@@ -137,6 +137,7 @@ export async function harness(
     XDG_CONFIG_HOME: join(base, 'xdg'),
     AIP_CLAUDE_BIN: join(fakes, 'claude'),
     AIP_OPENCODE_BIN: join(fakes, 'opencode'),
+    AIP_AGY_BIN: join(fakes, 'agy'),
     AIP_FAKE_STATE: fakeState,
     AIP_FAKE_SCRIPT: scriptPath,
     ...environment,

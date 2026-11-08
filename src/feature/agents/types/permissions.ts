@@ -93,6 +93,8 @@ export function specialistsOf(config: ResolvedConfig): SpecialistsRefresh {
 
 const SCALAR_FIELDS = [
   ['model', 'model'],
+  ['variant', 'variant'],
+  ['reasoningEffort', 'reasoning_effort'],
   ['runtime', 'runtime'],
   ['permissions', 'permissions'],
   ['timeoutSeconds', 'timeout'],
@@ -122,8 +124,8 @@ function specialistChanges(before: Specialist, after: Specialist): string[] {
   const changes: string[] = [];
   for (const [field, label] of SCALAR_FIELDS) {
     // Snapshots made before `queue` and `level` existed have no value: not a change.
-    if (before[field] === undefined) continue;
-    if (before[field] !== after[field]) {
+    if (before[field] === undefined && field !== 'variant' && field !== 'reasoningEffort') continue;
+    if ((before[field] ?? null) !== (after[field] ?? null)) {
       changes.push(`${before.slug} ${label} ${shown(before[field])} → ${shown(after[field])}`);
     }
   }

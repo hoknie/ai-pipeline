@@ -426,6 +426,73 @@ describe('claude adapter', () => {
 describe('opencode adapter', () => {
   const runtime = createOpencodeRuntime('/bin/opencode');
 
+  it.each([
+    { variant: 'company-deep' },
+    { reasoningEffort: 'xhigh' as const },
+    { variant: 'high', reasoningEffort: 'low' as const },
+    {},
+  ])('passes model options independently: %j', (options) => {
+    const launch = runtime.buildLaunch(context({ specialist: specialist(options) }));
+    const generated = JSON.parse(launch.files[0]!.content);
+    const agent = generated.agent['aip-coder'];
+    if ('variant' in options) expect(after(launch.args, '--variant')).toBe(options.variant);
+    else expect(launch.args).not.toContain('--variant');
+    if ('reasoningEffort' in options)
+      expect(agent.options).toEqual({ reasoningEffort: options.reasoningEffort });
+    else expect(agent).not.toHaveProperty('options');
+    expect(after(launch.args, '-m')).toBe('anthropic/sonnet');
+    expect(Object.keys(generated)).toEqual(['$schema', 'mcp', 'agent']);
+  });
+
+  it('keeps options with sessions, permissions and extra runtime arguments, without a model', () => {
+    const configured = createOpencodeRuntime('/bin/opencode', {
+      args: ['--pure'],
+      env: { KEEP: 'yes' },
+    });
+    const launch = configured.buildLaunch(
+      context({
+        resumeSession: 'ses_resume',
+        specialist: specialist({
+          model: null,
+          variant: 'deep',
+          reasoningEffort: 'high',
+          permissions: 'full',
+        }),
+      }),
+    );
+    expect(launch.args.slice(0, 2)).toEqual(['--pure', 'run']);
+    expect(launch.args).not.toContain('-m');
+    expect(after(launch.args, '--variant')).toBe('deep');
+    expect(after(launch.args, '-s')).toBe('ses_resume');
+    expect(launch.args).toContain('--auto');
+    const generated = JSON.parse(launch.files[0]!.content);
+    expect(generated.agent['aip-coder']).toMatchObject({
+      options: { reasoningEffort: 'high' },
+      permission: { bash: { 'git push*': 'deny' } },
+    });
+    expect(generated.mcp.aip.command).toEqual(context().workerCommand);
+    expect(launch.env.KEEP).toBe('yes');
+  });
+
+  it('keeps different efforts local to the agents of their attempts', () => {
+    const high = runtime.buildLaunch(
+      context({ specialist: specialist({ reasoningEffort: 'high' }) }),
+    );
+    const xhigh = runtime.buildLaunch(
+      context({
+        attemptDirectory: '/other-attempt',
+        specialist: specialist({ slug: 'reviewer', reasoningEffort: 'xhigh' }),
+      }),
+    );
+    expect(JSON.parse(high.files[0]!.content).agent['aip-coder'].options.reasoningEffort).toBe(
+      'high',
+    );
+    expect(JSON.parse(xhigh.files[0]!.content).agent['aip-reviewer'].options.reasoningEffort).toBe(
+      'xhigh',
+    );
+    expect(high.env.OPENCODE_CONFIG).not.toBe(xhigh.env.OPENCODE_CONFIG);
+  });
+
   it('generates an agent with permissions and the worker MCP server', () => {
     const launch = runtime.buildLaunch(context());
     const generated = JSON.parse(launch.files[0]!.content);

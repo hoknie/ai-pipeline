@@ -25,6 +25,7 @@ function aip(args: string[], cwd: string, name: string) {
     XDG_STATE_HOME: join(base, name, 'state'),
     AIP_CLAUDE_BIN: join(import.meta.dirname, '..', 'fakes', 'claude'),
     AIP_OPENCODE_BIN: join(import.meta.dirname, '..', 'fakes', 'opencode'),
+    AIP_AGY_BIN: join(import.meta.dirname, '..', 'fakes', 'agy'),
     AIP_WEB_AUTOSTART: '0',
   };
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {

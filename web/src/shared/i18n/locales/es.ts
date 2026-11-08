@@ -846,6 +846,8 @@ export const es: Dictionary = {
     usedBy: 'El especialista se usa en:',
     fromDefaults: '{{value}} (de defaults)',
     byDefault: 'por defecto',
+    opencodeDefault: 'Predeterminado de OpenCode',
+    variantOverridesEffort: 'La variante seleccionada tiene prioridad si define reasoningEffort.',
     header: 'acciones del especialista',
     replacesDefaults: 'Las herramientas del especialista sustituyen a las de defaults.',
     catalogError:
@@ -861,6 +863,10 @@ export const es: Dictionary = {
       name: 'Cómo se muestra el especialista en el panel y en el registro.',
       runtime: 'El agente que ejecuta el paso.',
       model: 'El modelo del agente; vacío: el predeterminado del agente.',
+      variant:
+        'Solo OpenCode. Nombre de la variante del modelo; vacío usa los ajustes de OpenCode.',
+      reasoning_effort:
+        'Solo OpenCode. Los niveles admitidos dependen del modelo; vacío usa los ajustes de OpenCode.',
       permissions:
         'Qué puede hacer el especialista: leer, editar archivos o ejecutar cualquier cosa.',
       timeout: 'Cuánto puede durar un intento, por ejemplo 90s, 30m o 2h.',
@@ -914,6 +920,8 @@ export const es: Dictionary = {
       name: 'Nombre',
       runtime: 'Ejecutor',
       model: 'Modelo',
+      variant: 'Variante',
+      reasoning_effort: 'Esfuerzo de razonamiento',
       permissions: 'Permisos',
       timeout: 'Tiempo límite',
       allow_commands: 'Comandos permitidos',
@@ -1171,6 +1179,8 @@ export const es: Dictionary = {
     betaHint: 'aún en desarrollo: el comportamiento y los ajustes pueden cambiar',
     hasErrors: 'el grupo tiene errores de configuración',
     restartNote: 'Los cambios se aplican tras el reinicio: véase el grupo <link>Sistema</link>.',
+    runtimeNote:
+      'Los ajustes del ejecutor se vuelven a leer antes del siguiente agente; no hace falta reiniciar el daemon.',
     tabs: 'nivel de ajustes',
     project: 'Proyecto',
     noProjects: 'Aún no hay repositorios: añada uno en el menú de repositorios.',
@@ -1253,6 +1263,7 @@ export const es: Dictionary = {
       delivery_conflicts: 'Conflictos',
       runtimes_claude: 'Claude',
       runtimes_opencode: 'OpenCode',
+      runtimes_agy: 'Antigravity (CLI)',
       system_panel: 'Ajustes del panel',
     },
     field: {

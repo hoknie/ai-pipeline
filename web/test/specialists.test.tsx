@@ -200,6 +200,8 @@ describe('specialist form', () => {
       name: 'Кодировщик',
       runtime: '',
       model: 'sonnet',
+      variant: '',
+      reasoning_effort: '',
       permissions: '',
       timeout: '',
       allow_commands: [],
@@ -513,6 +515,26 @@ describe('tools and skills', () => {
     ]);
   });
 
+  it('uses the Antigravity skill catalog for a specialist with runtime agy', async () => {
+    const catalog = vi.fn(async () =>
+      catalogView({
+        runtimes: {
+          ...catalogView().runtimes,
+          agy: { tools: [], skills: [{ name: 'antigravity-review', source: 'project' }] },
+        },
+      }),
+    );
+    render(
+      <Page
+        api={fakeApi({ catalog, config: vi.fn(async () => reviewer({ runtime: 'agy' })) })}
+        start="reviewer"
+      />,
+    );
+    const search = await open('Skills');
+    fireEvent.change(search, { target: { value: 'antigravity' } });
+    expect(await screen.findByRole('option', { name: /antigravity-review/ })).toBeTruthy();
+  });
+
   it('offers a skill of two levels in both groups and gives one chip', async () => {
     render(<Page api={fakeApi({ config: vi.fn(async () => reviewer({})) })} start="reviewer" />);
     const search = await open('Skills');
@@ -592,6 +614,21 @@ describe('tools and skills', () => {
     expect(remove.closest('[class*="gap-1.5"]')!.textContent).toMatch(
       /until claude.mcp is inherit/,
     );
+  });
+
+  it('does not apply Claude MCP inheritance hints to agy tools', async () => {
+    const catalog = vi.fn(async () => catalogView());
+    render(
+      <Page
+        api={fakeApi({
+          catalog,
+          config: vi.fn(async () => reviewer({ runtime: 'agy', tools: ['mcp__jira'] })),
+        })}
+        start="reviewer"
+      />,
+    );
+    expect(await screen.findByRole('button', { name: 'Remove mcp__jira' })).toBeTruthy();
+    expect(screen.queryByText(/until claude.mcp is inherit/)).toBeNull();
   });
 
   it('does not mark an MCP tool when the user settings are inherited', async () => {

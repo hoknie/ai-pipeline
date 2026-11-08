@@ -845,6 +845,8 @@ export const ru: Dictionary = {
     usedBy: 'Специалист используется:',
     fromDefaults: '{{value}} (из defaults)',
     byDefault: 'по умолчанию',
+    opencodeDefault: 'По умолчанию OpenCode',
+    variantOverridesEffort: 'Выбранный вариант имеет приоритет, если задаёт reasoningEffort.',
     header: 'действия со специалистом',
     replacesDefaults: 'Инструменты специалиста заменяют инструменты из defaults.',
     catalogError:
@@ -860,6 +862,9 @@ export const ru: Dictionary = {
       name: 'Как специалист называется в панели и в журнале.',
       runtime: 'Агент, который выполняет этап.',
       model: 'Модель агента; пусто — модель исполнителя по умолчанию.',
+      variant: 'Только OpenCode. Имя варианта модели; пусто — настройки OpenCode.',
+      reasoning_effort:
+        'Только OpenCode. Поддерживаемые уровни зависят от модели; пусто — настройки OpenCode.',
       permissions: 'Что разрешено специалисту: читать, править файлы или запускать что угодно.',
       timeout: 'Сколько может длиться одна попытка, например 90s, 30m или 2h.',
       max: 'Сколько этапов этого специалиста могут идти одновременно.',
@@ -910,6 +915,8 @@ export const ru: Dictionary = {
       name: 'Имя',
       runtime: 'Исполнитель',
       model: 'Модель',
+      variant: 'Вариант',
+      reasoning_effort: 'Усилие рассуждения',
       permissions: 'Права',
       timeout: 'Таймаут',
       allow_commands: 'Разрешённые команды',
@@ -1162,6 +1169,8 @@ export const ru: Dictionary = {
     betaHint: 'ещё дорабатывается: поведение и настройки могут измениться',
     hasErrors: 'в группе есть ошибки конфигурации',
     restartNote: 'Изменения вступают в силу после перезапуска: см. группу <link>Система</link>.',
+    runtimeNote:
+      'Настройки исполнителя перечитываются перед следующим запуском агента; перезапуск демона не нужен.',
     tabs: 'уровень настроек',
     project: 'Проект',
     noProjects: 'Репозиториев пока нет: добавьте репозиторий в меню репозиториев.',
@@ -1244,6 +1253,7 @@ export const ru: Dictionary = {
       delivery_conflicts: 'Конфликты',
       runtimes_claude: 'Claude',
       runtimes_opencode: 'OpenCode',
+      runtimes_agy: 'Antigravity (командная строка)',
       system_panel: 'Настройки панели',
     },
     field: {

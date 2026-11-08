@@ -1,6 +1,18 @@
-export const RUNTIMES = ['claude', 'opencode'] as const;
+export const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
 
 export type Runtime = (typeof RUNTIMES)[number];
+
+export const REASONING_EFFORTS = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+] as const;
+
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export const PERMISSIONS = ['read', 'edit', 'full'] as const;
 
@@ -31,6 +43,9 @@ export interface Specialist {
   slug: string;
   name: string;
   model: string | null;
+  /** OpenCode model options; absent in older snapshots and when left to the runtime. */
+  variant?: string;
+  reasoningEffort?: ReasoningEffort;
   runtime: Runtime;
   permissions: Permissions;
   timeoutSeconds: number;

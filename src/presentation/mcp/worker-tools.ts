@@ -16,7 +16,7 @@ import {
   QUESTION_TEXT_LIMIT,
   SUMMARY_LIMIT,
 } from '../../feature/runs/types/index.ts';
-import { VERDICTS } from '../../feature/agents/types/index.ts';
+import { VERDICTS, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { packageVersion } from '../../platform/build/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
 import { attempt, type Send } from './tools.ts';
@@ -41,7 +41,7 @@ export type WorkerKit = ReturnType<typeof workerKit>;
 export function registerReport(kit: WorkerKit): void {
   const { options, server } = kit;
   server.registerTool(
-    'swarm_report',
+    WORKER_TOOLS.report,
     {
       title: 'Report the result of this step',
       description:
@@ -103,7 +103,7 @@ export function registerReport(kit: WorkerKit): void {
 export function registerArtifact(kit: WorkerKit): void {
   const { options, server } = kit;
   server.registerTool(
-    'swarm_artifact',
+    WORKER_TOOLS.artifact,
     {
       title: 'Publish an artifact',
       description:

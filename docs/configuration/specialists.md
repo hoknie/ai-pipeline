@@ -26,8 +26,10 @@ prompt: |
 |---|---|---|
 | `name` | The display name. Required | |
 | `prompt` | The instructions; see [Prompt](#prompt) | Only the task |
-| `runtime` | `claude` or `opencode`; see [configuration/runtimes.md](runtimes.md) | [`defaults`](README.md#defaults) |
-| `model` | `opus`, `sonnet` or a full id for Claude; `provider/model` for OpenCode | The runtime's default model |
+| `runtime` | `claude`, `opencode` or `agy`; see [configuration/runtimes.md](runtimes.md) | [`defaults`](README.md#defaults) |
+| `model` | `opus`, `sonnet` or a full id for Claude; `provider/model` for OpenCode; a model id accepted by Antigravity for agy | The runtime's default model |
+| `variant` | OpenCode model variant name; see [OpenCode model options](#opencode-model-options) | OpenCode's choice |
+| `reasoning_effort` | OpenCode `reasoningEffort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | OpenCode's choice |
 | `permissions` | `read`, `edit` or `full`; see [configuration/permissions.md](permissions.md#permission-levels) | `defaults` |
 | `timeout` | How long a step may run; a step that exceeds it gets `failed` | `defaults` |
 | `allow_commands` | Command patterns allowed at the `edit` level | `defaults` |
@@ -37,6 +39,23 @@ prompt: |
 | `max` | How many may work at once; see [Limits](#limits) | No limit of its own |
 | `queue` | May add tasks to the queue; see [Queueing tasks](#queueing-tasks) | `false` |
 | `tags` | Labels for the panel; see [Tags](#tags) | None |
+
+## OpenCode model options
+
+```yaml
+name: OpenCode coder
+runtime: opencode
+model: openai/gpt-6.1-sol
+reasoning_effort: xhigh
+```
+
+`variant` selects a named variant, including a custom name such as `company-deep`. `reasoning_effort` sets the agent's `reasoningEffort` directly. Both fields are optional, supported only with `runtime: opencode` (also when inherited), and cannot be set in `defaults`. A model is not required: without `model`, OpenCode chooses it.
+
+Only some models support each effort level. `aip config check` validates the fields without contacting the provider; OpenCode and the provider determine whether the selected model supports them.
+
+If both fields are set, OpenCode applies the variant after the agent options. A variant that defines `reasoningEffort` overrides `reasoning_effort`: `variant: high` together with `reasoning_effort: xhigh` can therefore use `high`. If the variant does not define effort, the explicit effort remains. See [runtimes](runtimes.md) for how the options are passed.
+
+Without either field, `aip` sets neither option and leaves the choice to OpenCode and its provider. It does not assume a fixed `medium` or `high`. The fields are part of the run's configuration snapshot.
 
 ## Prompt
 
@@ -53,7 +72,7 @@ The message to a specialist contains:
 - the remarks of the specialist who rejected the work, after a return;
 - the human's answer, after `needs_human`.
 
-If the runtime can continue a session (Claude Code always, OpenCode by session id), the session continues after the human's answer.
+If the runtime can continue a session (Claude Code, OpenCode by session id, Antigravity by `conversation_id`), the session continues after the human's answer.
 
 ## Limits
 
@@ -68,13 +87,13 @@ A group that the scheduler does not start yet has the status `waiting`, with a r
 
 ## Skills
 
-`skills` tells the specialist to use these skills. If a skill is not found in the runtime's directories (`.claude/skills`, `~/.claude/skills`, `~/.config/opencode/skills` and so on), a warning goes to the step log and the step still starts.
+`skills` tells the specialist to use these skills. If a skill is not found in the runtime's directories (`.claude/skills`, `~/.claude/skills`, `~/.config/opencode/skills`, `.agents/skills`, `~/.gemini/config/skills` and so on), a warning goes to the step log and the step still starts.
 
 The panel suggests skills from these directories (`SKILL.md` in subdirectories, and command files `.md`, nested ones as `directory:command`) and marks whether each comes from the repository or the home directory.
 
 ## Tools
 
-`tools` are Claude tools added to the set for the [permission level](permissions.md#tools-of-a-claude-specialist), for example `WebFetch`, `WebSearch` or `Task`. A value on a specialist replaces the value from `defaults`.
+`tools` are Claude tools added to the set for the [permission level](permissions.md#tools-of-a-claude-specialist), for example `WebFetch`, `WebSearch` or `Task`. A value on a specialist replaces the value from `defaults`. Antigravity and OpenCode do not consume this field.
 
 The panel suggests names from the catalog: Claude's built-in tools and the `mcp__<server>` servers from the repository's `.mcp.json` and `~/.claude.json`. A value that is not in the catalog is typed by hand.
 

@@ -27,6 +27,7 @@ Both editors follow these rules:
 The tab edits the `aip/specialists/<slug>.yaml` files of the project and of the shared directory. The form has the [fields of a specialist](../configuration/specialists.md#fields).
 
 - The list shows each specialist with a level badge ("project", "global", "project over global"). "New specialist" creates one.
+- The runtime selector includes Claude Code, OpenCode and Antigravity CLI (`agy`). The tools and skills picker follows the selected runtime.
 - The page filters specialists by tags, search text, level, `runtime`, `model`, `skills`, `tools` and `allow_commands`; values are taken after `defaults`.
 - Delete is refused with a list of references while steps use the specialist.
 - "Override in the project", "Make global" and "Remove the override" move a specialist between the levels. A "Project / Global" switch chooses the level when files exist on both.

@@ -307,7 +307,11 @@ if (mode === 'claude' && (args[0] === 'mcp' || args[0] === 'plugin')) {
 }
 
 // A one-shot question (naming a run): answers with `script.naming`, or fails when it is not set.
-if (args.includes('--no-session-persistence') || args.includes('aip-oneshot')) {
+if (
+  args.includes('--no-session-persistence') ||
+  args.includes('aip-oneshot') ||
+  (mode === 'agy' && args.some((arg) => arg.endsWith('agy-oneshot.json')))
+) {
   const state = process.env.AIP_FAKE_STATE;
   const script = process.env.AIP_FAKE_SCRIPT
     ? JSON.parse(readFileSync(process.env.AIP_FAKE_SCRIPT, 'utf8'))
@@ -339,6 +343,19 @@ if (args.includes('--no-session-persistence') || args.includes('aip-oneshot')) {
         },
       }),
     );
+  } else if (mode === 'agy') {
+    console.log(
+      JSON.stringify({
+        event: 'result',
+        result: {
+          status: 'SUCCESS',
+          response: answer,
+          conversation_id: 'conv_naming',
+          num_turns: 1,
+          usage: { input_tokens: 30, output_tokens: 10 },
+        },
+      }),
+    );
   } else {
     console.log(JSON.stringify({ type: 'text', part: { type: 'text', text: answer } }));
   }
@@ -356,7 +373,21 @@ function workerCommand(): {
   prompt: string;
   message: string;
   cwd: string;
+  server?: string;
 } {
+  if (mode === 'agy') {
+    const config = JSON.parse(
+      readFileSync(join(option('--add-dir')!, '.agents', 'mcp_config.json'), 'utf8'),
+    );
+    const server = Object.values(config.mcpServers)[0] as { command: string; args: string[] };
+    return {
+      ...server,
+      prompt: option('-p') ?? '',
+      message: option('-p') ?? '',
+      cwd: process.cwd(),
+      server: Object.keys(config.mcpServers)[0],
+    };
+  }
   if (mode === 'claude') {
     const config = JSON.parse(readFileSync(option('--mcp-config')!, 'utf8'));
     const server = config.mcpServers.aip;
@@ -382,12 +413,24 @@ function workerCommand(): {
 
 const state = process.env.AIP_FAKE_STATE!;
 const worker = workerCommand();
+if (mode === 'agy')
+  console.log(
+    JSON.stringify({ event: 'init', conversation_id: option('--conversation') ?? 'conv_fake' }),
+  );
 const step = /Step: "([^"]+)"/.exec(worker.prompt)?.[1] ?? 'unknown';
 const group = /Group: "([^"]+)"/.exec(worker.prompt)?.[1] ?? 'unknown';
 mkdirSync(state, { recursive: true });
 appendFileSync(
   join(state, 'calls.jsonl'),
-  `${JSON.stringify({ mode, step, group, args, cwd: worker.cwd })}\n`,
+  `${JSON.stringify({
+    mode,
+    step,
+    group,
+    args,
+    cwd: worker.cwd,
+    ...(mode === 'opencode' ? { configPath: process.env.OPENCODE_CONFIG } : {}),
+    ...(mode === 'agy' ? { workerServer: worker.server } : {}),
+  })}\n`,
 );
 const counterPath = join(state, `count-${group}-${step}`.replace(/[^\w.-]/g, '_'));
 const count = existsSync(counterPath) ? Number(readFileSync(counterPath, 'utf8')) : 0;
@@ -443,6 +486,20 @@ for (const [index, call] of liveUsage.entries()) {
             cache_read_input_tokens: call.cacheRead ?? 0,
             output_tokens: call.output,
           },
+        },
+      }),
+    );
+  } else if (mode === 'agy') {
+    console.log(
+      JSON.stringify({
+        event: 'step_update',
+        step_update: {
+          conversation_id: option('--conversation') ?? 'conv_fake',
+          step_index: index,
+          state: 'DONE',
+          step_type: 'agent_response',
+          text_delta: 'working',
+          usage: { input_tokens: call.input, output_tokens: call.output },
         },
       }),
     );
@@ -629,6 +686,27 @@ if (mode === 'claude') {
       }),
     );
   }
+} else if (mode === 'agy') {
+  if (!action.noResult)
+    console.log(
+      JSON.stringify({
+        event: 'result',
+        result: {
+          conversation_id: option('--conversation') ?? 'conv_fake',
+          status: action.exitCode ? 'ERROR' : 'SUCCESS',
+          response: 'done',
+          num_turns: option('--conversation') ? 2 : 1,
+          usage: {
+            input_tokens: liveUsage.length
+              ? liveUsage.reduce((sum, call) => sum + call.input, 0)
+              : 100,
+            output_tokens: liveUsage.length
+              ? liveUsage.reduce((sum, call) => sum + call.output, 0)
+              : 20,
+          },
+        },
+      }),
+    );
 } else {
   const message = 'msg_fake';
   const timestamp = Date.now();

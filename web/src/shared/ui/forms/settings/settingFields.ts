@@ -40,6 +40,10 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
       key: 'opencode',
       paths: ['runtimes.opencode.command', 'runtimes.opencode.args', 'runtimes.opencode.env'],
     },
+    {
+      key: 'agy',
+      paths: ['runtimes.agy.command', 'runtimes.agy.args', 'runtimes.agy.env'],
+    },
   ],
   system: [{ key: 'panel', paths: ['web.autostart', 'web.auth', 'web.host', 'web.port'] }],
 };

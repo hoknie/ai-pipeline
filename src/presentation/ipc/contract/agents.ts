@@ -81,7 +81,11 @@ export const configCatalogResponseSchema = z.object({
   repository: z.string(),
   /** `claude.mcp: inherit` — the MCP servers of the user are available to specialists. */
   mcpInherited: z.boolean(),
-  runtimes: z.object({ claude: runtimeCatalogSchema, opencode: runtimeCatalogSchema }),
+  runtimes: z.object({
+    claude: runtimeCatalogSchema,
+    opencode: runtimeCatalogSchema,
+    agy: runtimeCatalogSchema,
+  }),
 });
 
 export type ConfigCatalogResponse = z.infer<typeof configCatalogResponseSchema>;

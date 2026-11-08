@@ -204,6 +204,36 @@ describe('settings of the observers', () => {
     }
   });
 
+  it('saves OpenCode variant and effort through the shared specialist form', async () => {
+    const view = observersView({
+      settings: { specialist: { runtime: 'opencode', variant: 'deep', reasoning_effort: 'high' } },
+    });
+    const api = await open('#settings/global/observers/specialist', {
+      observers: vi.fn(async () => view),
+    });
+    fireEvent.change(await screen.findByLabelText('Variant'), {
+      target: { value: 'company-deep' },
+    });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Reasoning effort' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'xhigh' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.setObservers).toHaveBeenCalled());
+    expect(vi.mocked(api.setObservers).mock.calls[0]![0].specialist).toMatchObject({
+      runtime: 'opencode',
+      variant: 'company-deep',
+      reasoning_effort: 'xhigh',
+    });
+  });
+
+  it('saves agy as the observer runtime through the shared specialist form', async () => {
+    const api = await open('#settings/global/observers/specialist');
+    fireEvent.keyDown(await screen.findByRole('combobox', { name: 'Runtime' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'agy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.setObservers).toHaveBeenCalled());
+    expect(vi.mocked(api.setObservers).mock.calls[0]![0].specialist.runtime).toBe('agy');
+  });
+
   it('sends no max, tags or queue and keeps a key the form does not know', async () => {
     const view = observersView({
       settings: { specialist: { max: 3, tags: ['a'], queue: 'q', mcp: { x: 1 }, timeout: '5m' } },

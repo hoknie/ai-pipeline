@@ -641,10 +641,14 @@ describe('settings page', () => {
     expect(screen.queryByTestId('setting-runtimes.claude.command')).toBeNull();
   });
 
-  it('explains Runtimes and System and links to System', async () => {
+  it('explains when runtime and system settings take effect', async () => {
     show(queueOf(), {}, '#settings/global/runtimes');
-    const link = await screen.findByRole('link', { name: 'System' });
-    expect(link.getAttribute('href')).toBe('#settings/global/system');
+    await screen.findByTestId('setting-runtimes.agy.command');
+    expect(screen.getByText(/before the next agent starts/)).toBeTruthy();
+    expect(screen.getByText(/the daemon does not need a restart/)).toBeTruthy();
+    cleanup();
+    show(queueOf(), {}, '#settings/global/system');
+    expect(await screen.findByRole('link', { name: 'System' })).toBeTruthy();
     expect(screen.getByText(/Changes take effect after the restart/)).toBeTruthy();
   });
 
@@ -975,6 +979,45 @@ describe('settings form', () => {
         'Command',
       ).value,
     ).toBe('opencode');
+    expect(
+      within(
+        screen.getByRole('region', { name: 'Antigravity CLI (agy)' }),
+      ).getByLabelText<HTMLInputElement>('Command').value,
+    ).toBe('agy');
+    expect(screen.getByTestId('setting-runtimes.agy.env').textContent).not.toContain(
+      'GEMINI_API_KEY',
+    );
+  });
+
+  it('writes Antigravity command, arguments and a secret without showing the secret', async () => {
+    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.agy.env');
+    const agy = within(screen.getByRole('region', { name: 'Antigravity CLI (agy)' }));
+    fireEvent.change(agy.getByLabelText('Command'), { target: { value: '/opt/agy' } });
+    fireEvent.click(agy.getByRole('combobox', { name: 'Arguments' }));
+    const args = await screen.findByRole('combobox', { name: 'Search in Arguments' });
+    fireEvent.change(args, { target: { value: '--effort' } });
+    fireEvent.keyDown(args, { key: 'Enter' });
+    fireEvent.change(args, { target: { value: 'high' } });
+    fireEvent.keyDown(args, { key: 'Enter' });
+    fireEvent.change(agy.getByLabelText('Variable name of agy'), {
+      target: { value: 'GEMINI_API_KEY' },
+    });
+    fireEvent.change(agy.getByLabelText('Variable value of agy'), { target: { value: 'secret' } });
+    fireEvent.click(agy.getByRole('button', { name: 'Add to agy' }));
+    expect(document.body.innerHTML).not.toContain('secret');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        {
+          'runtimes.agy.command': '/opt/agy',
+          'runtimes.agy.args': ['--effort', 'high'],
+          'runtimes.agy.env.GEMINI_API_KEY': 'secret',
+        },
+        'g1',
+        'global',
+      ),
+    );
   });
 
   it('adds, replaces and deletes variables with values only on write', async () => {

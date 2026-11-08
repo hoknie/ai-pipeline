@@ -1,6 +1,6 @@
 # Runtimes
 
-A runtime is the agent CLI that executes a step: `claude` (Claude Code) or `opencode`. A specialist picks one with [`runtime`](specialists.md#fields). This page covers how `aip` finds and starts it, and what a `claude` specialist inherits from your own setup.
+A runtime is the agent CLI that executes a step: `claude` (Claude Code), `opencode`, or `agy` (Antigravity CLI). A specialist picks one with [`runtime`](specialists.md#fields). This page covers how `aip` finds and starts it, and what a specialist inherits from your own setup.
 
 ## `runtimes`
 
@@ -13,14 +13,17 @@ runtimes:
   opencode:
     command: npx
     args: [-y, opencode-ai]
+  agy:
+    command: agy
+    args: [--effort, high]
 ```
 
 This section is set in the shared `settings.yaml` only. In a project `aip/settings.yaml` it is a validation error (`swarm.runtimes`).
 
-- **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is `claude` and `opencode`.
-  - The order of choice is: `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` from the daemon's environment, then `command`, then `PATH`.
+- **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is the runtime's name: `claude`, `opencode` or `agy`.
+  - The order of choice is: `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN` from the daemon's environment, then `command`, then `PATH`.
 - **`args`** are put right after the command, before the arguments `aip` builds, for every start of the agent: a step, a retry, an answer and the request for a run name. A wrapper such as `npx -y opencode-ai` works this way: `npx -y opencode-ai run --format json …`.
-  - `args` are also added when the command comes from `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN`.
+  - `args` are also added when the command comes from `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN`.
   - `aip` does not filter `args`: a flag such as `--dangerously-skip-permissions` weakens the limits of a specialist.
 - **`env`** is added to the environment of the daemon for the agent process. The variables `aip` sets itself (`ENABLE_TOOL_SEARCH` for Claude Code, `OPENCODE_CONFIG` for OpenCode) win.
 
@@ -28,6 +31,36 @@ The daemon reads the section on every start of an agent, so a change takes effec
 
 - If the section is wrong, the step fails with `spawn error: invalid swarm.runtimes: …`.
 - `aip setup` and `aip config check` use `command` only, not `args` and `env`.
+
+## OpenCode model options
+
+The specialist fields `variant` and `reasoning_effort` apply to every launch of an OpenCode specialist, including retries and answers:
+
+- `variant` is passed as `opencode run --variant <name>` alongside the unchanged `-m <provider/model>` when a model is set.
+- `reasoning_effort` is written as `options.reasoningEffort` of the generated agent in the attempt's `opencode.json`.
+- With neither field set, `aip` leaves both options unset. The effective choice depends on OpenCode's configuration and the provider.
+
+```yaml
+name: OpenCode reviewer
+runtime: opencode
+model: openai/gpt-6.1-sol
+variant: high
+reasoning_effort: low
+permissions: read
+```
+
+OpenCode applies the selected variant after the agent options. A variant that sets `reasoningEffort` overrides the explicit base effort; a variant without an effort leaves it in effect. Support depends on the model and provider.
+
+## Antigravity CLI (`agy`)
+
+`agy` runs headlessly with a machine-readable JSON stream. Its `conversation_id` is resumed for the same specialist after a human answer. The CLI uses your existing Antigravity authentication; `aip` does not sign in or edit your personal Antigravity settings.
+
+- The user-level command is controlled by the normal `runtimes.agy` settings or `AIP_AGY_BIN`.
+- Skills are read from `.agents/skills` and the standard Antigravity folders under `~/.gemini`.
+- Antigravity model names are passed through unchanged. Without `model`, Antigravity selects its default.
+- `agy` does not report a billing cost. Token usage on a resumed conversation is cumulative, so only usage attributable to the current attempt is counted.
+- `aip` applies its own permission check to file writes and commands. A shell command is denied unless it matches `allow_commands`; commands with uninspectable shell syntax are denied.
+- `variant` and `reasoning_effort` are OpenCode-only and cannot be used with agy.
 
 ## `claude.mcp`
 
@@ -51,11 +84,11 @@ How the `claude` runtime gets the `edit` level is described in [configuration/pe
 
 ## What differs between runtimes
 
-| | `claude` | `opencode` |
-|---|---|---|
-| Continuing a session | Always | By session id |
-| Reporting denied commands | Yes | No, see [Denied commands](permissions.md#denied-commands) |
-| Recognizing a [usage limit](../usage/queue.md#usage-limit) | Yes | No |
-| [`tools`](specialists.md#tools), [`mcp`](specialists.md#mcp-servers) of a specialist | Yes | No |
+| | `claude` | `opencode` | `agy` |
+|---|---|---|---|
+| Continuing a session | Always | By session id | By `conversation_id` |
+| Reporting denied commands | Yes | No, see [Denied commands](permissions.md#denied-commands) | Shown in the journal |
+| Recognizing a [usage limit](../usage/queue.md#usage-limit) | Yes | No | No |
+| [`tools`](specialists.md#tools), [`mcp`](specialists.md#mcp-servers) of a specialist | Yes | No | No |
 
 Connecting the hosts themselves is a separate matter: see [hosts/claude-code.md](../hosts/claude-code.md) and [hosts/opencode.md](../hosts/opencode.md).

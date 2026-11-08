@@ -5,6 +5,7 @@ import {
   commandParts,
   matchesPattern,
   permissionsOf,
+  refreshPermissions,
   refreshSpecialists,
   specialistsOf,
   suggestPatterns,
@@ -153,6 +154,42 @@ describe('suggested allow_commands patterns', () => {
 });
 
 describe('specialists refresh', () => {
+  it('reports added, changed and removed model options, including old snapshots', () => {
+    const snapshot = config();
+    const fresh = config();
+    const coder = fresh.specialists.find((item) => item.slug === 'coder')!;
+    coder.variant = 'deep';
+    coder.reasoningEffort = 'high';
+    expect(refreshSpecialists(snapshot, specialistsOf(fresh))).toEqual([
+      'coder variant none → deep',
+      'coder reasoning_effort none → high',
+    ]);
+    coder.variant = 'concise';
+    coder.reasoningEffort = 'xhigh';
+    expect(refreshSpecialists(snapshot, specialistsOf(fresh))).toEqual([
+      'coder variant deep → concise',
+      'coder reasoning_effort high → xhigh',
+    ]);
+    delete coder.variant;
+    delete coder.reasoningEffort;
+    expect(refreshSpecialists(snapshot, specialistsOf(fresh))).toEqual([
+      'coder variant concise → none',
+      'coder reasoning_effort xhigh → none',
+    ]);
+    expect(refreshSpecialists(snapshot, specialistsOf(fresh))).toEqual([]);
+  });
+
+  it('does not change model options when refreshing only permissions', () => {
+    const snapshot = config();
+    const coder = snapshot.specialists.find((item) => item.slug === 'coder')!;
+    coder.variant = 'deep';
+    coder.reasoningEffort = 'high';
+    const fresh = config();
+    fresh.specialists.find((item) => item.slug === 'coder')!.reasoningEffort = 'xhigh';
+    expect(refreshPermissions(snapshot, permissionsOf(fresh))).toBeNull();
+    expect(coder).toMatchObject({ variant: 'deep', reasoningEffort: 'high' });
+  });
+
   const NEW_CONFIG = CONFIG_TEXT.replace(
     'reviewer: { name: Ревьюер, permissions: read }',
     'reviewer: { name: Ревьюер, permissions: read, model: opus, allow_commands: ["ls *"] }',

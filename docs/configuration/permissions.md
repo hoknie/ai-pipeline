@@ -4,11 +4,11 @@ Every [specialist](specialists.md) works at one permission level, set with `perm
 
 ## Permission levels
 
-| Level | `claude` | `opencode` |
-|---|---|---|
-| `read` | tools `Read`, `Grep`, `Glob` | `edit: deny`, `bash: deny` |
-| `edit` | editing files and `Bash(<pattern>)` for each command in `allow_commands` (or see [`claude.edit_mode`](#claudeedit_mode)) | `edit: allow`, `bash`: everything denied except `allow_commands` |
-| `full` | `--dangerously-skip-permissions` | `--auto`, `bash: allow` |
+| Level | `claude` | `opencode` | `agy` |
+|---|---|---|---|
+| `read` | tools `Read`, `Grep`, `Glob` | `edit: deny`, `bash: deny` | Read/search tools only; writes and shell denied |
+| `edit` | editing files and `Bash(<pattern>)` for each command in `allow_commands` (or see [`claude.edit_mode`](#claudeedit_mode)) | `edit: allow`, `bash`: everything denied except `allow_commands` | Worktree edits and commands verified against `allow_commands` |
+| `full` | `--dangerously-skip-permissions` | `--auto`, `bash: allow` | Editing and shell allowed, except protected Git operations |
 
 `git push` is forbidden at every level, and `git checkout` and `git switch` are also forbidden at `read` and `edit`. The `full` level is enabled only explicitly, and `aip config check` warns about every specialist with `full`.
 
@@ -34,6 +34,12 @@ Sets how the `claude` runtime gets the `edit` level. The mode does not affect th
   - Commands from `allow_commands` are allowed in advance.
   - The classifier does not keep the specialist inside the worktree: it lets writes to the home directory through. That is why `auto` is not the default and `aip config check` warns about it.
 
+### Antigravity CLI (`agy`)
+
+Antigravity runs headlessly with a permission hook scoped to the current attempt. Its user-level `permissions` may add restrictions; they do not grant a specialist more access than `aip` assigned.
+
+In `edit`, `allow_commands` is checked against the whole command: `npm test` does not authorize `npm test -- --update`, while `npm test*` does. Shell substitutions, redirections and commands the hook cannot inspect are denied. Writes are limited to the worktree. `agy` does not return permission denials in the same structured form as Claude Code.
+
 ## Denied commands
 
 Commands that Claude Code rejected are shown in `aip group show` under the attempt (`denied: …`) and in the panel, each with a pattern for `allow_commands`. The `Permission hints:` line of a group collects the patterns that the specialists' permissions do not have yet:
@@ -46,6 +52,7 @@ Permission hints: add to allow_commands: 'claude plugin *' (a retry or an answer
 - A compound command (`a && b`, `a | b`, `a; b`) passes only if every part matches a pattern, so a pattern is suggested for every part that is not allowed.
 - Loops and here-documents cannot be allowed by a pattern; for them the output says `no pattern allows it` instead of a pattern.
 - The `opencode` runtime does not report denials.
+- Antigravity permission-hook denials are shown in its journal; the hook refuses unverified actions rather than widening a command prefix.
 
 ## Refreshing permissions
 

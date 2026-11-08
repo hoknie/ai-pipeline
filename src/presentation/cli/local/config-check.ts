@@ -72,6 +72,8 @@ function presentSpecialists(config: Config): unknown {
         name: specialist.name,
         runtime: specialist.runtime,
         model: specialist.model ?? '(runtime default)',
+        ...(specialist.variant ? { variant: specialist.variant } : {}),
+        ...(specialist.reasoningEffort ? { reasoning_effort: specialist.reasoningEffort } : {}),
         permissions: specialist.permissions,
         timeout: formatDuration(specialist.timeoutSeconds),
         allow_commands: specialist.allowCommands,
