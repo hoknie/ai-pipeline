@@ -1,4 +1,5 @@
 export * from './action.ts';
+export * from './chain.ts';
 export * from './duration.ts';
 export * from './errors.ts';
 export * from './levels.ts';

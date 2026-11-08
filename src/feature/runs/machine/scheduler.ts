@@ -5,6 +5,8 @@ import {
   COMMAND_RUNTIME,
   actionOf,
   buildInput,
+  limitHolds,
+  selectAttemptRuntime,
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
@@ -81,14 +83,33 @@ function startAttempt(state: RunState, group: Group, now: number): Attempt {
   if (!specialist) throw new Error(`specialist ${step.specialist} does not exist`);
   const previousOfStep = group.attempts.filter((attempt) => attempt.stepId === step.id);
   const resumeSession = pending.resume ? (previousOfStep.at(-1)?.sessionId ?? null) : null;
+  const holds = limitHolds([state], now);
+  const selected = selectAttemptRuntime({
+    specialist,
+    chains: state.run.config.chains,
+    defaults: state.run.config.defaults,
+    limitHolds: holds,
+    attempts: group.attempts,
+    stepIndex: pending.stepIndex,
+    round: previousOfStep.length + 1,
+    resume: pending.resume,
+    seed: (group.attempts.at(-1)?.seq ?? 0) + now,
+  });
   const attempt: Attempt = {
     seq: (group.attempts.at(-1)?.seq ?? 0) + 1,
     stepId: step.id,
     stepIndex: pending.stepIndex,
     round: previousOfStep.length + 1,
     specialist: specialist.slug,
-    runtime: specialist.runtime,
-    model: specialist.model,
+    runtime: selected.runtime,
+    model: selected.model,
+    ...(selected.variant !== undefined ? { variant: selected.variant } : {}),
+    ...(selected.reasoningEffort !== undefined
+      ? { reasoningEffort: selected.reasoningEffort }
+      : {}),
+    ...(selected.chainIndex !== undefined && selected.chainIndex !== null
+      ? { chainIndex: selected.chainIndex }
+      : {}),
     status: 'running',
     input: buildInput(state.run, group, pending),
     resumeSession,

@@ -30,7 +30,7 @@ async function start(config = CODE_ONLY_CONFIG): Promise<Harness> {
   return current;
 }
 
-type Result = { ok: true; observers: ObserversView } | { ok: false; errors: unknown[] };
+type Result = { ok: true; view: ObserversView } | { ok: false; errors: unknown[] };
 
 /** Saves settings of the observers; `projects` defaults to the repository of the harness. */
 async function configure(h: Harness, settings: Record<string, unknown> = {}): Promise<Result> {
@@ -597,7 +597,7 @@ describe('Настройки наблюдателей', () => {
     const saved = await configure(h, { workers: 2 });
     expect(saved).toMatchObject({
       ok: true,
-      observers: { settings: { enabled: true, workers: 2 } },
+      view: { settings: { enabled: true, workers: 2 } },
     });
     await h.restart();
     const view = (await h.call('observers', {})) as ObserversView;

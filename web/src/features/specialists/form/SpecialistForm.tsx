@@ -187,6 +187,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
         defaults={editor.defaults}
         catalog={catalog}
         catalogError={catalogError}
+        chains={view.chains}
         tags={tags}
         tagsHelp={level === 'global' ? t('specialists.tags.sharedOnly') : undefined}
         mainStart={

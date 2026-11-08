@@ -5,6 +5,7 @@ import { stem } from '../types/levels.ts';
 import { ConfigLoadError, type FieldError } from '../types/errors.ts';
 import {
   ACTIONS_DIR,
+  CHAINS_DIR,
   LEGACY_PIPELINES_DIR,
   type LevelFiles,
   type LevelPaths,
@@ -63,6 +64,7 @@ export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {
   };
   const settings = pick([paths.directory], '', SETTINGS_NAME);
   const specialists = pick([join(paths.directory, SPECIALISTS_DIR)], 'specialists');
+  const chains = pick([join(paths.directory, CHAINS_DIR)], 'chains');
   const legacyDirectory = join(paths.directory, LEGACY_PIPELINES_DIR);
   const pipelines = pick(
     [join(paths.directory, PIPELINES_DIR), legacyDirectory],
@@ -80,6 +82,7 @@ export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {
   return {
     ...(first ? { settings: first } : {}),
     specialists,
+    chains,
     pipelines,
     actions,
     problems,

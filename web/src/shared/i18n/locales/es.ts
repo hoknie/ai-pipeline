@@ -830,6 +830,13 @@ export const es: Dictionary = {
     },
   },
   specialists: {
+    tabs: {
+      label: 'Secciones de especialistas',
+      specialists: 'Especialistas',
+      chains: 'Cadenas',
+    },
+    noChain: 'Ninguna (un solo ejecutor)',
+    chainActiveHint: 'Los parámetros de ejecución están determinados por la cadena seleccionada.',
     new: 'Nuevo especialista',
     list: 'especialistas',
     saved:
@@ -861,6 +868,7 @@ export const es: Dictionary = {
     help: {
       tags: 'Etiquetas del especialista para filtrar e importar. No afectan a las ejecuciones.',
       name: 'Cómo se muestra el especialista en el panel y en el registro.',
+      runtime_chain: 'Una cadena de ejecutores para ejecución y tolerancia a fallos.',
       runtime: 'El agente que ejecuta el paso.',
       model: 'El modelo del agente; vacío: el predeterminado del agente.',
       variant:
@@ -918,6 +926,7 @@ export const es: Dictionary = {
     fields: {
       tags: 'Etiquetas',
       name: 'Nombre',
+      runtime_chain: 'Cadena de ejecutores',
       runtime: 'Ejecutor',
       model: 'Modelo',
       variant: 'Variante',
@@ -929,6 +938,53 @@ export const es: Dictionary = {
       skills: 'Habilidades',
       max: 'Límite simultáneo',
       prompt: 'Prompt del sistema',
+    },
+  },
+  chains: {
+    section: 'cadena {{id}}',
+    help: {
+      name: 'Cómo se muestra la cadena en el panel.',
+      mode: 'Usar el siguiente ejecutor en caso de error, elegir por turnos o elegir al azar.',
+    },
+    sharedReadOnly:
+      'Las cadenas compartidas son de solo lectura aquí. Sustituya esta cadena en el proyecto o edítela en Ajustes para todos los repositorios.',
+    new: 'Nueva cadena',
+    list: 'cadenas',
+    empty: 'Elija una cadena a la izquierda',
+    header: 'acciones de la cadena',
+    savedToast: 'Cadena guardada',
+    deleteTitle: '¿Eliminar cadena «{{slug}}»?',
+    deleteDescription: 'El archivo de la cadena se eliminará permanentemente.',
+    delete: 'Eliminar cadena',
+    deletedToast: 'Cadena «{{slug}}» eliminada',
+    overrideRemovedToast: 'Sustitución del proyecto de la cadena «{{slug}}» eliminada',
+    referencedNotice: 'No se puede eliminar: la cadena está referenciada por {{refs}}',
+    enabled: 'Habilitada',
+    disabled: 'Deshabilitada',
+    runtimesTitle: 'Ejecutores en la cadena',
+    addRuntime: 'Añadir ejecutor',
+    modes: {
+      on_error: 'En caso de error (on_error)',
+      round_robin: 'Por turnos (round_robin)',
+      random: 'Aleatorio (random)',
+    },
+    fields: {
+      slug: 'Slug',
+      name: 'Nombre',
+      mode: 'Modo de ejecución',
+    },
+    item: {
+      enabled: 'Habilitado',
+      disabled: 'Deshabilitado',
+      runtime: 'Ejecutor',
+      model: 'Modelo',
+      modelPlaceholder: 'Modelo predeterminado o específico',
+      variant: 'Variante',
+      variantPlaceholder: 'Variante OpenCode',
+      reasoningEffort: 'Esfuerzo de razonamiento',
+      moveUp: 'Subir',
+      moveDown: 'Bajar',
+      remove: 'Eliminar ejecutor',
     },
   },
   pipeline: {
@@ -1226,6 +1282,7 @@ export const es: Dictionary = {
       delivery: 'Entrega',
       runtimes: 'Ejecutores',
       specialists: 'Especialistas',
+      chains: 'Cadenas',
       pipelines: 'Pipeline',
       observers: 'Observadores',
       system: 'Sistema',
@@ -1244,6 +1301,8 @@ export const es: Dictionary = {
         'Comandos, argumentos y variables de entorno de los CLI de agentes. Los valores de las variables nunca se muestran.',
       specialists:
         'Especialistas compartidos: archivos del directorio compartido, disponibles en todos los repositorios. Aquí se puede cambiar cualquier campo.',
+      chains:
+        'Cadenas de ejecutores compartidas: archivos en ~/.config/aip/chains/, disponibles en todos los proyectos para ejecución y tolerancia a fallos.',
       pipelines:
         'Pipelines compartidos: archivos del directorio compartido, disponibles en cada repositorio. Aquí se puede cambiar cualquier campo y las etiquetas.',
       system:

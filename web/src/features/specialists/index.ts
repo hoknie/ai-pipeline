@@ -8,6 +8,7 @@ export {
 export { SpecialistForm, describeReference } from './form/SpecialistForm.tsx';
 export { SpecialistTagChip } from './SpecialistTagChip.tsx';
 export { LEVEL_KEYS, NEW_ID } from './SpecialistsPage.tsx';
+export { ChainsList, ChainsPane, NEW_CHAIN } from './chains/index.ts';
 export { type LevelFilter, matchesLevel } from './specialistFilters.ts';
 export {
   existingSelection,

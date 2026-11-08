@@ -25,7 +25,7 @@ function targetOf(
   config: ReturnType<typeof useSettingsConfig>['config'],
 ): string | null {
   const { group, scope } = props;
-  if (group === 'specialists' || group === 'pipelines') {
+  if (group === 'specialists' || group === 'pipelines' || group === 'chains') {
     return config ? `${config.directories.global}/${group}` : null;
   }
   const isForm = group !== 'tags' && group !== 'queue' && group !== 'observers';

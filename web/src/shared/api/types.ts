@@ -3,6 +3,9 @@ export type {
   CatalogEntry,
   ConfigCatalogResponse,
   ConfigEditResult,
+  ConfigEditorResponse,
+  ConfigPreview,
+  EditorChain,
   SharedSpecialistView,
   SharedSpecialistsView,
   SharedPipelineView,
@@ -12,8 +15,6 @@ export type {
   SpecialistTagsResult,
   SpecialistTagsView,
   SpecialistsImportResult,
-  ConfigPreview,
-  ConfigEditorResponse,
   DependencyView,
   AttemptView,
   BackgroundOwner,
@@ -64,10 +65,16 @@ export type {
   TranscriptEntry,
 } from '../../../../src/presentation/ipc/contract/index.ts';
 
-import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
+import type {
+  ChainMode,
+  ChainRuntimeItem,
+  DeliveryMode,
+  ReasoningEffort,
+  RuntimeChain,
+} from '../../../../src/feature/swarm-config/types/index.ts';
 import type { TagColor } from '../../../../src/feature/tags/types/index.ts';
 
-export type { TagColor };
+export type { ChainMode, ChainRuntimeItem, DeliveryMode, ReasoningEffort, RuntimeChain, TagColor };
 import type {
   DaemonCheck,
   DependencyView,

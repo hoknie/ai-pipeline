@@ -84,7 +84,7 @@ function configWriteRoutes({ call }: RouteKit): Route[] {
     },
     {
       method: 'DELETE',
-      pattern: new RegExp(`^/api/config/(specialists|pipelines|actions)/${segment}$`),
+      pattern: new RegExp(`^/api/config/(specialists|pipelines|actions|chains)/${segment}$`),
       handle: async ([section, id], body, repository) => {
         const { revision, level } = body as { revision?: string; level?: 'project' | 'global' };
         if (!revision) throw panel('invalid', 'revision is required');
@@ -96,7 +96,9 @@ function configWriteRoutes({ call }: RouteKit): Route[] {
                 ? 'pipeline'
                 : section === 'actions'
                   ? 'action'
-                  : 'specialist',
+                  : section === 'chains'
+                    ? 'chain'
+                    : 'specialist',
             id: entryId(id),
             revision,
             level,
@@ -135,6 +137,23 @@ function configImportRoutes({ call }: RouteKit): Route[] {
           (await call('config_write', {
             repository,
             kind: 'action',
+            id: entryId(id),
+            value,
+            revision,
+            level,
+          })) as ConfigEditResult,
+        );
+      },
+    },
+    {
+      method: 'PUT',
+      pattern: new RegExp(`^/api/config/chains/${segment}$`),
+      handle: async ([id], body, repository) => {
+        const { value, revision, level } = parseBody(writeBody, body);
+        return editReply(
+          (await call('config_write', {
+            repository,
+            kind: 'chain',
             id: entryId(id),
             value,
             revision,

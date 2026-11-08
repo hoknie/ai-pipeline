@@ -15,6 +15,7 @@ import { stemOf } from './references.ts';
 import {
   type ConfigEditorView,
   type EditorAction,
+  type EditorChain,
   type EditorPipeline,
   type EditorSpecialist,
   type EditorSpecialistValues,
@@ -145,6 +146,14 @@ function editorActions(files: Files): EditorAction[] {
   }));
 }
 
+function editorChains(files: Files): EditorChain[] {
+  return entriesOf(files.global.chains, files.project.chains).map((entry) => ({
+    slug: entry.id,
+    level: entry.level,
+    ...entryFields(entry),
+  }));
+}
+
 /** Everything the specialists tab shows, also when the configuration does not pass validation. */
 export function editorView(paths: ConfigPaths): ConfigEditorView {
   const files = readLevels(paths);
@@ -158,6 +167,7 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
     directories: { global: paths.global.directory, project: paths.project.directory },
     settingsFiles: { global: settingsView('global'), project: settingsView('project') },
     specialists: editorSpecialists(files, global, project),
+    chains: editorChains(files),
     pipelines: editorPipelines(files),
     actions: editorActions(files),
     settings: editorSettings(paths, files, global, project),

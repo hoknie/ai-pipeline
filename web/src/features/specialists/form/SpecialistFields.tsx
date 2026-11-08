@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ConfigCatalogResponse, FieldError } from '../../../shared/api/types.ts';
+import type { ConfigCatalogResponse, EditorChain, FieldError } from '../../../shared/api/types.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
@@ -27,7 +27,10 @@ export {
 
 /** The fields of the form by section; the titles are `specialists.sections.<key>`. */
 const SECTIONS: { key: 'main' | 'limits' | 'tools' | 'prompt'; fields: FieldName[] }[] = [
-  { key: 'main', fields: ['name', 'runtime', 'model', 'variant', 'reasoning_effort', 'tags'] },
+  {
+    key: 'main',
+    fields: ['name', 'runtime_chain', 'runtime', 'model', 'variant', 'reasoning_effort', 'tags'],
+  },
   { key: 'limits', fields: ['permissions', 'timeout', 'max', 'allow_commands'] },
   { key: 'tools', fields: ['tools', 'skills'] },
   { key: 'prompt', fields: ['prompt'] },
@@ -53,6 +56,9 @@ function FieldBlock({
       <p className="text-xs text-muted-foreground">
         {field === 'tags' && tagsHelp !== undefined ? tagsHelp : t(`specialists.help.${field}`)}
       </p>
+      {field === 'runtime_chain' && draft.runtime_chain ? (
+        <p className="text-xs text-muted-foreground">{t('specialists.chainActiveHint')}</p>
+      ) : null}
       {field === 'reasoning_effort' &&
       draft.variant.trim() !== '' &&
       draft.reasoning_effort !== '' ? (
@@ -86,6 +92,7 @@ interface SpecialistFieldsProps {
   /** Tools and skills to choose from; null while it is not loaded or failed to load. */
   catalog: ConfigCatalogResponse | null;
   catalogError: string | null;
+  chains?: EditorChain[];
   /** Fields that are not shown. */
   omit?: FieldName[];
   /** The control of the field `tags`; the field is not shown without it. */
@@ -101,19 +108,32 @@ interface SpecialistFieldsProps {
  * observer's specialist both draw them. What differs comes in as props.
  */
 export function SpecialistFields(props: SpecialistFieldsProps) {
-  const { draft, onDraft, disabled, errors, prefix, defaults, catalog, catalogError } = props;
+  const { draft, onDraft, disabled, errors, prefix, defaults, catalog, catalogError, chains } =
+    props;
   const { omit = [], tags, tagsHelp, mainStart } = props;
   const { t } = useTranslation();
   const errorsOf = (field: FieldName) =>
     errors.filter((error) => fieldOf(error.path, prefix) === field);
+  const hasChain = draft.runtime_chain.trim() !== '';
   const showOpencode =
-    (draft.runtime || defaults['defaults.runtime'] || 'claude') === 'opencode' ||
-    draft.variant.trim() !== '' ||
-    draft.reasoning_effort.trim() !== '';
-  const shown = (field: FieldName) =>
-    !omit.includes(field) &&
-    (field !== 'tags' || tags !== undefined) &&
-    (showOpencode || (field !== 'variant' && field !== 'reasoning_effort'));
+    !hasChain &&
+    ((draft.runtime || defaults['defaults.runtime'] || 'claude') === 'opencode' ||
+      draft.variant.trim() !== '' ||
+      draft.reasoning_effort.trim() !== '');
+  const shown = (field: FieldName) => {
+    if (omit.includes(field)) return false;
+    if (field === 'tags' && tags === undefined) return false;
+    if (
+      hasChain &&
+      (field === 'runtime' ||
+        field === 'model' ||
+        field === 'variant' ||
+        field === 'reasoning_effort')
+    ) {
+      return false;
+    }
+    return showOpencode || (field !== 'variant' && field !== 'reasoning_effort');
+  };
   return (
     <div className="@container">
       <div className="grid gap-3 @3xl:grid-cols-2">
@@ -147,6 +167,7 @@ export function SpecialistFields(props: SpecialistFieldsProps) {
                       defaults,
                       catalog,
                       tags,
+                      chains,
                     }}
                     errors={errorsOf(field)}
                     tagsHelp={tagsHelp}

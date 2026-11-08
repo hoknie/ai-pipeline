@@ -64,16 +64,42 @@ function presentActions(config: Config): unknown {
   );
 }
 
+function presentChains(config: Config): unknown {
+  return Object.fromEntries(
+    config.chains.map((chain) => [
+      chain.slug,
+      {
+        name: chain.name,
+        mode: chain.mode,
+        runtimes: chain.runtimes.map((item) => ({
+          runtime: item.runtime,
+          ...(item.model ? { model: item.model } : {}),
+          ...(item.variant ? { variant: item.variant } : {}),
+          ...(item.reasoningEffort ? { reasoning_effort: item.reasoningEffort } : {}),
+          ...(item.enabled ? {} : { enabled: false }),
+        })),
+        ...(chain.enabled ? {} : { enabled: false }),
+      },
+    ]),
+  );
+}
+
 function presentSpecialists(config: Config): unknown {
   return Object.fromEntries(
     config.specialists.map((specialist) => [
       specialist.slug,
       {
         name: specialist.name,
-        runtime: specialist.runtime,
-        model: specialist.model ?? '(runtime default)',
-        ...(specialist.variant ? { variant: specialist.variant } : {}),
-        ...(specialist.reasoningEffort ? { reasoning_effort: specialist.reasoningEffort } : {}),
+        ...(specialist.runtimeChain
+          ? { runtime_chain: specialist.runtimeChain }
+          : {
+              runtime: specialist.runtime,
+              model: specialist.model ?? '(runtime default)',
+              ...(specialist.variant ? { variant: specialist.variant } : {}),
+              ...(specialist.reasoningEffort
+                ? { reasoning_effort: specialist.reasoningEffort }
+                : {}),
+            }),
         permissions: specialist.permissions,
         timeout: formatDuration(specialist.timeoutSeconds),
         allow_commands: specialist.allowCommands,
@@ -144,6 +170,7 @@ export function presentConfig(config: ResolvedConfig): unknown {
     },
     delivery: presentDelivery(config),
     ...(config.actions.length > 0 ? { actions: presentActions(config) } : {}),
+    ...(config.chains.length > 0 ? { chains: presentChains(config) } : {}),
     ...(Object.keys(config.stages).length > 0 ? { stages: config.stages } : {}),
     specialists: presentSpecialists(config),
     pipelines: presentPipelines(config),
@@ -193,7 +220,14 @@ export async function checkConfig(
     return 1;
   }
   io.stdout(stringify({ swarm: presentConfig(config) }));
-  const runtimes = [...new Set(config.specialists.map((specialist) => specialist.runtime))];
+  const specialistRuntimes = config.specialists.flatMap((specialist) => {
+    if (!specialist.runtimeChain) return [specialist.runtime];
+    const chain = config.chains.find((c) => c.slug === specialist.runtimeChain);
+    if (!chain || !chain.enabled) return [config.defaults.runtime];
+    const active = chain.runtimes.filter((r) => r.enabled).map((r) => r.runtime);
+    return active.length > 0 ? active : [config.defaults.runtime];
+  });
+  const runtimes = [...new Set(specialistRuntimes)];
   io.stdout('\nConfig files:\n');
   for (const file of files) io.stdout(`  ${file}\n`);
   if (legacy.length > 0) {

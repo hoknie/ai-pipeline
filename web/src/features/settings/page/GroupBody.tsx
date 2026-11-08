@@ -7,6 +7,7 @@ import { Skeleton } from '../../../shared/ui/feedback/skeleton.tsx';
 import { SettingsForm } from '../../../shared/ui/forms/settings/SettingsForm.tsx';
 import { ObserversGroup } from '../ObserversGroup.tsx';
 import { QueueModes } from '../QueueModes.tsx';
+import { SharedChainsGroup } from '../SharedChainsGroup.tsx';
 import { SharedSpecialistsGroup } from '../SharedSpecialistsGroup.tsx';
 import { SystemGroup } from '../SystemGroup.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
@@ -72,6 +73,18 @@ function SharedBody({ props, settings }: BodyProps) {
       </Suspense>
     );
   }
+  if (group === 'chains') {
+    return (
+      <SharedChainsGroup
+        api={api}
+        config={config}
+        selected={props.chain ?? null}
+        onSelect={props.onSelectChain ?? (() => undefined)}
+        onReload={reload}
+        dirty={dirty}
+      />
+    );
+  }
   return (
     <SharedSpecialistsGroup
       api={api}
@@ -128,7 +141,7 @@ export function GroupBody({ props, settings }: BodyProps) {
       />
     );
   }
-  if (group === 'pipelines' || group === 'specialists') {
+  if (group === 'pipelines' || group === 'specialists' || group === 'chains') {
     return <SharedBody props={props} settings={settings} />;
   }
   return <FormBody props={props} settings={settings} />;

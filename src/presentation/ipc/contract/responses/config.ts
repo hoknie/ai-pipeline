@@ -23,6 +23,7 @@ export type SharedPipelineView = SharedPipelineUsage;
 export type {
   ConfigEditResult,
   ConfigPreview,
+  EditorChain,
   PipelinesImportResult,
   PipelinesView,
   SettingLevel,

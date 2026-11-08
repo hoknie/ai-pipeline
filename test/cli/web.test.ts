@@ -2418,146 +2418,79 @@ describe('aip web shared pipelines and import', () => {
 });
 
 describe('API наблюдателей', () => {
-  const VIEW = {
-    settings: { enabled: false },
-    workers: { running: [], waiting: 0 },
-  };
-  const stubs: { close(): void }[] = [];
-  let stubWeb: WebServer | null = null;
-
-  afterEach(async () => {
-    await stubWeb?.close();
-    stubWeb = null;
-    for (const stub of stubs.splice(0)) stub.close();
-  });
-
-  /** A daemon that answers from a table, records requests and lets the test push stream lines. */
-  async function stubDaemon(answers: Record<string, (params: unknown) => unknown>) {
-    const received: { method: string; params: unknown }[] = [];
-    const subscribers: import('node:net').Socket[] = [];
-    const server = createServer((connection) => {
-      let buffer = '';
-      connection.setEncoding('utf8');
-      connection.on('error', () => undefined);
-      connection.on('data', (chunk: string) => {
-        buffer += chunk;
-        let end = buffer.indexOf('\n');
-        while (end !== -1) {
-          const message = JSON.parse(buffer.slice(0, end)) as {
-            id: number;
-            method: string;
-            params: unknown;
-          };
-          buffer = buffer.slice(end + 1);
-          end = buffer.indexOf('\n');
-          if (message.method === 'subscribe') {
-            subscribers.push(connection);
-            connection.write(
-              `${JSON.stringify({ event: 'snapshot', seq: 1, runs: [], queues: [], repositories: [], tags: [] })}\n`,
-            );
-            continue;
-          }
-          received.push({ method: message.method, params: message.params });
-          const answer = answers[message.method];
-          const reply = answer
-            ? { id: message.id, ok: true, result: answer(message.params) }
-            : { id: message.id, ok: false, error: `unknown run ${message.method}` };
-          connection.write(`${JSON.stringify(reply)}\n`);
-        }
-      });
-    });
-    const socket = join(mkdtempSync(join(tmpdir(), 'aip-stub-')), 's.sock');
-    await new Promise<void>((resolve) => server.listen(socket, resolve));
-    stubs.push({
-      close: () => {
-        for (const subscriber of subscribers) subscriber.destroy();
-        server.close();
-      },
-    });
-    stubWeb = await startWebServer({
-      socket,
+  it('reads, saves and rejects the settings without a repository', async () => {
+    h = await harness(MANUAL_CONFIG);
+    web = await startWebServer({
+      socket: h.socket,
       port: 0,
       auth: 'none',
       defaultRepository: async () => null,
-      ensureDaemon: async () => ({ started: false, restarted: false, mismatch: null }),
     });
-    const base = `http://127.0.0.1:${stubWeb.port}`;
-    return {
-      base,
-      received,
-      push: (event: unknown) => {
-        for (const subscriber of subscribers) subscriber.write(`${JSON.stringify(event)}\n`);
-      },
-    };
-  }
-
-  it('reads, saves and rejects the settings without a repository', async () => {
-    const stub = await stubDaemon({
-      observers: () => VIEW,
-      observers_set: (params) => {
-        const { settings } = params as { settings: { enabled?: unknown } };
-        return settings.enabled === 'maybe'
-          ? {
-              ok: false,
-              reason: 'invalid',
-              errors: [{ path: 'enabled', message: 'not a boolean' }],
-            }
-          : { ok: true, view: { ...VIEW, settings: { enabled: true } } };
-      },
-    });
-    const read = await fetch(`${stub.base}/api/observers`);
+    const base = `http://127.0.0.1:${web.port}`;
+    const read = await fetch(`${base}/api/observers`);
     expect(read.status).toBe(200);
-    expect(await read.json()).toEqual(VIEW);
+    expect(await read.json()).toMatchObject({
+      settings: { enabled: false, workers: 1, maxRepairs: 5 },
+      workers: { running: [], waiting: 0 },
+    });
 
-    const saved = await fetch(`${stub.base}/api/observers`, {
+    const saved = await fetch(`${base}/api/observers`, {
       method: 'PUT',
       headers: JSON_TYPE,
-      body: JSON.stringify({ enabled: true }),
+      body: JSON.stringify({ enabled: true, workers: 2 }),
     });
     expect(saved.status).toBe(200);
-    expect(await saved.json()).toEqual({ ...VIEW, settings: { enabled: true } });
+    expect(await saved.json()).toMatchObject({
+      settings: { enabled: true, workers: 2, maxRepairs: 5 },
+      workers: { running: [], waiting: 0 },
+    });
 
-    const refused = await fetch(`${stub.base}/api/observers`, {
+    const refused = await fetch(`${base}/api/observers`, {
       method: 'PUT',
       headers: JSON_TYPE,
-      body: JSON.stringify({ enabled: 'maybe' }),
+      body: JSON.stringify({ workers: 0 }),
     });
     expect(refused.status).toBe(422);
     expect(await refused.json()).toEqual({
-      errors: [{ path: 'enabled', message: 'not a boolean' }],
+      errors: [expect.objectContaining({ path: 'workers' })],
     });
 
-    const wrongShape = await fetch(`${stub.base}/api/observers`, {
+    const wrongShape = await fetch(`${base}/api/observers`, {
       method: 'PUT',
       headers: JSON_TYPE,
       body: JSON.stringify([1]),
     });
     expect(wrongShape.status).toBe(400);
-    expect(stub.received.filter((item) => item.method === 'observers_set')).toEqual([
-      { method: 'observers_set', params: { settings: { enabled: true } } },
-      { method: 'observers_set', params: { settings: { enabled: 'maybe' } } },
-    ]);
   });
 
   it('forbids or allows the observer in a run', async () => {
-    const stub = await stubDaemon({ run_observer: () => ({ enabled: false }) });
-    const post = (runId: string, body: unknown) =>
-      fetch(`${stub.base}/api/runs/${runId}/observer`, {
+    const { h, web, base } = await setup();
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.finished);
+    const post = (id: string, body: unknown) =>
+      fetch(`${base}/api/runs/${id}/observer`, {
         method: 'POST',
-        headers: JSON_TYPE,
+        headers: authed(web, JSON_TYPE),
         body: JSON.stringify(body),
       });
-    expect((await post('run-1', { enabled: false })).status).toBe(200);
-    expect((await post('run-1', { enabled: 'no' })).status).toBe(400);
-    expect(stub.received).toEqual([
-      { method: 'run_observer', params: { runId: 'run-1', enabled: false } },
-    ]);
+    const forbidden = await post(runId, { enabled: false });
+    expect(forbidden.status).toBe(200);
+    expect(((await forbidden.json()) as RunView).repair?.allowed).toBe(false);
+    expect((await post(runId, { enabled: 'no' })).status).toBe(400);
+    expect((await post('nope', { enabled: false })).status).toBe(404);
   });
 
   it('forwards the observers event to the browser and drops incident', async () => {
-    const stub = await stubDaemon({});
+    const { h, web, base } = await setup();
     const controller = new AbortController();
-    const response = await fetch(`${stub.base}/api/events`, { signal: controller.signal });
+    const response = await fetch(`${base}/api/events`, {
+      headers: authed(web),
+      signal: controller.signal,
+    });
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let text = '';
@@ -2570,14 +2503,14 @@ describe('API наблюдателей', () => {
       }
     };
     await readUntil('"snapshot"');
-    stub.push({
-      event: 'incident',
-      seq: 2,
-      runId: 'run-1',
-      repository: '/r',
-      incident: { key: 'k', kind: 'failed', group: 'g', detail: 'd' },
-    });
-    stub.push({ event: 'observers', seq: 3, observers: VIEW });
+    h.script({ code: [{ exitCode: 1, noReport: true }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.finished);
+    await h.call('observers_set', { settings: { workers: 2 } });
     await readUntil('"observers"');
     controller.abort();
     expect(text).toContain('"event":"observers"');

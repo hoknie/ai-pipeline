@@ -65,6 +65,19 @@ export function actionReferences(tree: unknown, id: string): EntryReference[] {
   return references;
 }
 
+/** Everything in a merged `{ swarm }` tree that names the chain in a specialist's `runtime_chain`. */
+export function chainReferences(tree: unknown, slug: string): EntryReference[] {
+  const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
+  const references: EntryReference[] = [];
+  const specialists = isMapping(swarm.specialists) ? swarm.specialists : {};
+  for (const [name, specialist] of Object.entries(specialists)) {
+    if (isMapping(specialist) && specialist.runtime_chain === slug) {
+      references.push({ specialist: name });
+    }
+  }
+  return references;
+}
+
 export function stemOf(path: string): string {
   return basename(path).replace(/\.ya?ml$/, '');
 }

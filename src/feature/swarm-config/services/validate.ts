@@ -9,16 +9,17 @@ import {
   readString,
 } from './validate-context.ts';
 import { checkPipelines, checkSplitTargets } from './validate-pipelines.ts';
-import { checkRuntimes } from './validate-runtimes.ts';
+import { checkChains, checkRuntimes } from './validate-runtimes.ts';
 import {
+  checkClaude,
   checkDefaults,
   checkDelivery,
   checkNaming,
-  checkClaude,
   checkWeb,
   checkWorkspace,
 } from './validate-settings.ts';
 import { checkSpecialist, checkSpecialists, SPECIALIST_KEYS } from './validate-specialists.ts';
+import { type RuntimeChain } from '../types/chain.ts';
 import { type FieldError } from '../types/errors.ts';
 import { OBSERVER_SPECIALIST } from '../types/lookups.ts';
 import { isMapping } from '../types/merge.ts';
@@ -53,6 +54,7 @@ const SWARM_KEYS = [
   'delivery',
   'defaults',
   'specialists',
+  'chains',
   'pipelines',
   'actions',
   'stages',
@@ -143,6 +145,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     delivery: defaultDelivery(),
     defaults: defaultDefaults(),
     specialists: [],
+    chains: [],
     pipelines: [],
     actions: [],
     stages: {},
@@ -185,8 +188,10 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     checkDelivery(ctx, swarm.delivery, config.delivery, known);
   }
   if ('defaults' in swarm) checkDefaults(ctx, swarm.defaults, config.defaults);
+  if ('chains' in swarm) config.chains = checkChains(ctx, swarm.chains);
   if ('specialists' in swarm)
     config.specialists = checkSpecialists(ctx, swarm.specialists, config.defaults);
+  checkSpecialistChains(ctx, config.specialists, config.chains);
   const knownSpecialists = isMapping(swarm.specialists) ? Object.keys(swarm.specialists) : [];
   if ('actions' in swarm) config.actions = checkActions(ctx, swarm.actions, knownSpecialists);
   const knownActions = isMapping(swarm.actions) ? Object.keys(swarm.actions) : [];
@@ -199,4 +204,26 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     checkSplitTargets(ctx, config.pipelines);
   }
   return config;
+}
+
+function checkSpecialistChains(
+  ctx: ValidateContext,
+  specialists: Specialist[],
+  chains: RuntimeChain[],
+): void {
+  const known = chains.map((chain) => chain.slug);
+  for (const specialist of specialists) {
+    if (!specialist.runtimeChain) continue;
+    const path = `swarm.specialists.${specialist.slug}.runtime_chain`;
+    const chain = chains.find((c) => c.slug === specialist.runtimeChain);
+    if (!chain) {
+      const hint = known.length > 0 ? `; known: ${known.join(', ')}` : '; none defined';
+      addError(ctx, path, `unknown chain \`${specialist.runtimeChain}\`${hint}`);
+      continue;
+    }
+    if (specialist.mcp && !chain.runtimes.some((r) => r.runtime === 'claude')) {
+      const mcpPath = `swarm.specialists.${specialist.slug}.mcp`;
+      addError(ctx, mcpPath, `requires at least one claude runtime in chain \`${chain.slug}\``);
+    }
+  }
 }

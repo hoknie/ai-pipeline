@@ -322,6 +322,33 @@ describe('cli', () => {
     expect(reviewer).not.toContain('reasoning_effort:');
   });
 
+  it('shows chains and runtime_chain in config check', async () => {
+    const box = sandbox(`swarm:
+  chains:
+    fallback:
+      name: Fallback chain
+      mode: on_error
+      runtimes:
+        - runtime: opencode
+          model: openai/gpt-5
+  specialists:
+    coder:
+      name: Кодировщик
+      runtime_chain: fallback
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`);
+    const result = await aip(box, 'config', 'check');
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain('chains:');
+    expect(result.stdout).toContain('fallback:');
+    expect(result.stdout).toContain('mode: on_error');
+    expect(result.stdout).toContain('runtime_chain: fallback');
+    expect(result.stdout).toContain('Agent CLIs:\n  opencode:');
+  });
+
   it('lists the files with old names in config check without changing the exit code', async () => {
     const box = sandbox();
     const old = join(box.repo, 'aip', 'workflows', 'legacy.yaml');

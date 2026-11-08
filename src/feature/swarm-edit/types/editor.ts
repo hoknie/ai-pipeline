@@ -2,6 +2,7 @@ import { AppError } from '../../../platform/errors/index.ts';
 
 import {
   ACTIONS_DIR,
+  CHAINS_DIR,
   type FieldError,
   PIPELINES_DIR,
   SPECIALISTS_DIR,
@@ -9,19 +10,21 @@ import {
 } from '../../swarm-config/types/index.ts';
 import { field } from './setting-fields.ts';
 
-export type EntryKind = 'specialist' | 'pipeline' | 'action';
+export type EntryKind = 'specialist' | 'pipeline' | 'action' | 'chain';
 
 export const KIND_DIRECTORY: Record<EntryKind, string> = {
   specialist: SPECIALISTS_DIR,
   pipeline: PIPELINES_DIR,
   action: ACTIONS_DIR,
+  chain: CHAINS_DIR,
 };
 
 /** Key of the section of the configuration tree (`swarm.<section>.<id>`) that holds the kind. */
-export const KIND_SECTION: Record<EntryKind, 'specialists' | 'pipelines' | 'actions'> = {
+export const KIND_SECTION: Record<EntryKind, 'specialists' | 'pipelines' | 'actions' | 'chains'> = {
   specialist: 'specialists',
   pipeline: 'pipelines',
   action: 'actions',
+  chain: 'chains',
 };
 
 export type EntryLevel = 'project' | 'global' | 'project_over_global';
@@ -43,6 +46,8 @@ export interface EntryReference {
   split?: boolean;
   /** Id of an action (`actions/<id>.yaml`) that runs the specialist. */
   action?: string;
+  /** Specialist that references the chain. */
+  specialist?: string;
   /** `delivery.resolver` or `delivery.message_specialist`. */
   field?: string;
   /** Pipeline point (`swarm.stages.<point>` or `stages.<point>` of the pipeline) that names an action. */
@@ -176,6 +181,16 @@ export interface EditorAction {
   sources: EntrySources;
 }
 
+/** A runtime chain in the editor: where it lives and what its files say. */
+export interface EditorChain {
+  slug: string;
+  level: EntryLevel;
+  file: string;
+  revision: string | null;
+  raw: Record<string, unknown>;
+  sources: EntrySources;
+}
+
 export interface EditorSetting {
   /** Key path in settings.yaml, such as `delivery.mode`. */
   path: string;
@@ -205,6 +220,7 @@ export interface ConfigEditorView {
   directories: { global: string; project: string };
   settingsFiles: { global: SettingsFileView; project: SettingsFileView };
   specialists: EditorSpecialist[];
+  chains: EditorChain[];
   pipelines: EditorPipeline[];
   actions: EditorAction[];
   settings: EditorSetting[];

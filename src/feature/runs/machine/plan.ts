@@ -12,6 +12,7 @@ import {
   repositoryLimits,
   runningByRepository,
   runningBySpecialist,
+  selectAttemptRuntime,
   specialistName,
   specialistOfStep,
   stepsOf,
@@ -93,9 +94,23 @@ export function planDispatch(states: RunState[], now: number): DispatchPlan {
       start.push({ state, group });
       continue;
     }
-    const until = specialist ? holds.get(specialist.runtime) : undefined;
-    if (specialist && until !== undefined) {
-      waits.set(key, { reason: 'limit', runtime: specialist.runtime, until });
+    const stepIndex = group.pending?.stepIndex ?? 0;
+    const round = group.attempts.filter((a) => a.stepIndex === stepIndex).length + 1;
+    const effectiveRuntime = specialist
+      ? selectAttemptRuntime({
+          specialist,
+          chains: state.run.config.chains,
+          defaults: state.run.config.defaults,
+          limitHolds: holds,
+          attempts: group.attempts,
+          stepIndex,
+          round,
+          resume: group.pending?.resume ?? false,
+        }).runtime
+      : undefined;
+    const until = effectiveRuntime ? holds.get(effectiveRuntime) : undefined;
+    if (effectiveRuntime && until !== undefined) {
+      waits.set(key, { reason: 'limit', runtime: effectiveRuntime, until });
       continue;
     }
     const limit = specialist?.max ?? null;

@@ -3,6 +3,7 @@ import type {
   ClaudeSettingsSource,
   Permissions,
   ResolvedConfig,
+  RuntimeChain,
   Specialist,
 } from '../../swarm-config/types/index.ts';
 
@@ -69,6 +70,7 @@ export function refreshPermissions(
 /** Whole definitions of the specialists of the current configuration, for a retry with it. */
 export interface SpecialistsRefresh {
   specialists: Specialist[];
+  chains?: RuntimeChain[];
   claudeEditMode: ClaudeEditMode;
   claudeSettings: ClaudeSettingsSource;
 }
@@ -86,6 +88,10 @@ function copySpecialist(specialist: Specialist): Specialist {
 export function specialistsOf(config: ResolvedConfig): SpecialistsRefresh {
   return {
     specialists: config.specialists.map(copySpecialist),
+    chains: config.chains.map((chain) => ({
+      ...chain,
+      runtimes: chain.runtimes.map((r) => ({ ...r })),
+    })),
     claudeEditMode: config.claude.editMode,
     claudeSettings: config.claude.settings,
   };
@@ -96,6 +102,7 @@ const SCALAR_FIELDS = [
   ['variant', 'variant'],
   ['reasoningEffort', 'reasoning_effort'],
   ['runtime', 'runtime'],
+  ['runtimeChain', 'runtime_chain'],
   ['permissions', 'permissions'],
   ['timeoutSeconds', 'timeout'],
   ['max', 'max'],
@@ -161,6 +168,12 @@ export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsR
   }
   config.claude.editMode = refresh.claudeEditMode;
   config.claude.settings = refresh.claudeSettings;
+  if (refresh.chains) {
+    config.chains = refresh.chains.map((chain) => ({
+      ...chain,
+      runtimes: chain.runtimes.map((r) => ({ ...r })),
+    }));
+  }
   return changes;
 }
 

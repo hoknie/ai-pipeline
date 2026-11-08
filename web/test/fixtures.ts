@@ -653,6 +653,7 @@ export function configView(overrides: Partial<ConfigEditorResponse> = {}): Confi
       project: { file: '/repo/aip/settings.yaml', revision: null },
     },
     specialists: [specialistEntry('coder', { raw: { name: 'Кодировщик', model: 'sonnet' } })],
+    chains: [],
     pipelines: [],
     actions: [],
     settings: settingsOf(),
@@ -772,6 +773,8 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     previewPipeline: vi.fn(async () => ({ topology: pipelineOf(), errors: [] })),
     writeAction: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteAction: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
+    writeChain: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
+    deleteChain: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
     systemStages: vi.fn(async () => ({ repository: '/repo', stages: [], errors: [] })),
     observers: vi.fn(async () => observersView()),
     setObservers: vi.fn(async (settings: ObserverSettings) => ({

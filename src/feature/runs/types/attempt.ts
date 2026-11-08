@@ -1,4 +1,5 @@
 import type { Denial, StepInput, Usage, Verdict } from '../../agents/types/index.ts';
+import type { ReasoningEffort } from '../../swarm-config/types/index.ts';
 import {
   type AttemptRuntime,
   type AttemptStatus,
@@ -155,6 +156,9 @@ export interface Attempt {
   specialist: string;
   runtime: AttemptRuntime;
   model: string | null;
+  variant?: string;
+  reasoningEffort?: ReasoningEffort;
+  chainIndex?: number | null;
   status: AttemptStatus;
   input: StepInput;
   resumeSession: string | null;

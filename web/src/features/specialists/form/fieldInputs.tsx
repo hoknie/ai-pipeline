@@ -4,7 +4,11 @@ import { useTranslation } from 'react-i18next';
 
 import type { ReasoningEffort } from '../../../../../src/feature/swarm-config/types/index.ts';
 
-import type { CatalogEntry, ConfigCatalogResponse } from '../../../shared/api/types.ts';
+import type {
+  CatalogEntry,
+  ConfigCatalogResponse,
+  EditorChain,
+} from '../../../shared/api/types.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import {
   Select,
@@ -66,6 +70,7 @@ export interface InputProps {
   catalog: ConfigCatalogResponse | null;
   /** The control of the field `tags`. */
   tags: ReactNode;
+  chains?: EditorChain[];
 }
 
 /** The tools or skills to choose from, with a note on the ones the runtime does not know. */
@@ -112,12 +117,34 @@ function ListInput({
 
 /** The control of one field of the form. */
 export function FieldInput(props: InputProps) {
-  const { field, draft, onDraft, disabled, invalid, defaults, tags } = props;
+  const { field, draft, onDraft, disabled, invalid, defaults, tags, chains } = props;
   const { t } = useTranslation();
   if (field === 'tags') return tags;
   if (isList(field)) return <ListInput {...props} field={field} />;
   const set = (text: string) => onDraft((current) => ({ ...current, [field]: text }));
   const hint = hintOf(field, defaults, t);
+  if (field === 'runtime_chain') {
+    const available = chains ?? [];
+    return (
+      <Select
+        value={draft.runtime_chain || '__none'}
+        disabled={disabled}
+        onValueChange={(val) => set(val === '__none' ? '' : val)}
+      >
+        <SelectTrigger id="field-runtime_chain" aria-invalid={invalid}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none">{t('specialists.noChain')}</SelectItem>
+          {available.map((c) => (
+            <SelectItem key={c.slug} value={c.slug}>
+              {String(c.raw.name || c.slug)} ({c.slug})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
   if (field === 'runtime' || field === 'permissions' || field === 'reasoning_effort') {
     const options =
       field === 'runtime' ? RUNTIMES : field === 'permissions' ? PERMISSIONS : REASONING_EFFORTS;

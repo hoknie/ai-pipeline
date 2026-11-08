@@ -815,6 +815,13 @@ export const en = {
     },
   },
   specialists: {
+    tabs: {
+      label: 'Specialist sections',
+      specialists: 'Specialists',
+      chains: 'Chains',
+    },
+    noChain: 'None (single runtime)',
+    chainActiveHint: 'Runtime parameters are determined by the selected chain.',
     new: 'New specialist',
     list: 'specialists',
     saved:
@@ -846,6 +853,7 @@ export const en = {
     help: {
       tags: 'Labels of the specialist for filtering and import. They do not affect runs.',
       name: 'How the specialist is shown in the panel and in the log.',
+      runtime_chain: 'A chain of runtimes for execution and failover.',
       runtime: 'The agent CLI that runs the step.',
       model: "The model of the agent; empty — the runtime's default.",
       variant: 'OpenCode only. Model variant name; empty uses OpenCode settings.',
@@ -900,6 +908,7 @@ export const en = {
     fields: {
       tags: 'Tags',
       name: 'Name',
+      runtime_chain: 'Runtime chain',
       runtime: 'Runtime',
       model: 'Model',
       variant: 'Variant',
@@ -911,6 +920,53 @@ export const en = {
       skills: 'Skills',
       max: 'Concurrency limit',
       prompt: 'Prompt',
+    },
+  },
+  chains: {
+    section: 'chain {{id}}',
+    help: {
+      name: 'How the chain is shown in the panel.',
+      mode: 'Use the next runtime on error, cycle through runtimes, or choose one at random.',
+    },
+    sharedReadOnly:
+      'Shared chains are view-only here. Override this chain in the project, or edit it in Settings for all repositories.',
+    new: 'New chain',
+    list: 'chains',
+    empty: 'Choose a chain on the left',
+    header: 'chain actions',
+    savedToast: 'Chain saved',
+    deleteTitle: 'Delete chain «{{slug}}»?',
+    deleteDescription: 'The chain file will be deleted permanently.',
+    delete: 'Delete chain',
+    deletedToast: 'Chain «{{slug}}» deleted',
+    overrideRemovedToast: 'Project override of chain «{{slug}}» removed',
+    referencedNotice: 'Cannot delete: chain is referenced by {{refs}}',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    runtimesTitle: 'Runtimes in chain',
+    addRuntime: 'Add runtime',
+    modes: {
+      on_error: 'On error',
+      round_robin: 'Round-robin',
+      random: 'Random',
+    },
+    fields: {
+      slug: 'Slug',
+      name: 'Name',
+      mode: 'Execution mode',
+    },
+    item: {
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      runtime: 'Runtime',
+      model: 'Model',
+      modelPlaceholder: 'Default model or specific model',
+      variant: 'Variant',
+      variantPlaceholder: 'OpenCode variant',
+      reasoningEffort: 'Reasoning effort',
+      moveUp: 'Move up',
+      moveDown: 'Move down',
+      remove: 'Remove runtime',
     },
   },
   pipeline: {
@@ -1202,6 +1258,7 @@ export const en = {
       delivery: 'Delivery',
       runtimes: 'Runtimes',
       specialists: 'Specialists',
+      chains: 'Chains',
       pipelines: 'Pipeline',
       observers: 'Observers',
       system: 'System',
@@ -1220,6 +1277,8 @@ export const en = {
         'Commands, arguments and environment variables of the agent CLIs. The values of the variables are never shown.',
       specialists:
         'Shared specialists: files of the shared specialists directory, available in every repository. Every field can be changed here.',
+      chains:
+        'Shared runtime chains: files in ~/.config/aip/chains/, available across all projects for execution and failover.',
       pipelines:
         'Shared pipelines: files of the shared pipelines directory, available in every repository. Every field and the tags can be changed here.',
       system:

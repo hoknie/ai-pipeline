@@ -59,12 +59,48 @@ describe('routes', () => {
     });
     expect(parseRoute('#specialists/coder').run).toBe('coder');
     expect(parseRoute('#specialists/new').run).toBe('new');
+    expect(parseRoute('#specialists/chains')).toEqual({
+      view: 'specialists',
+      run: null,
+      group: 'chains',
+      step: null,
+      tab: null,
+    });
+    expect(parseRoute('#specialists/chains/fallback')).toEqual({
+      view: 'specialists',
+      run: 'fallback',
+      group: 'chains',
+      step: null,
+      tab: null,
+    });
+    expect(parseRoute('#specialists/chains/new')).toEqual({
+      view: 'specialists',
+      run: 'new',
+      group: 'chains',
+      step: null,
+      tab: null,
+    });
     expect(
       formatRoute({ view: 'specialists', run: 'coder', group: null, step: null, tab: null }),
     ).toBe('#specialists/coder');
     expect(
       formatRoute({ view: 'specialists', run: null, group: null, step: null, tab: null }),
     ).toBe('#specialists');
+    expect(
+      formatRoute({ view: 'specialists', run: null, group: 'chains', step: null, tab: null }),
+    ).toBe('#specialists/chains');
+    expect(
+      formatRoute({ view: 'specialists', run: 'fallback', group: 'chains', step: null, tab: null }),
+    ).toBe('#specialists/chains/fallback');
+    expect(
+      formatRoute({
+        view: 'settings',
+        group: 'global',
+        run: 'chains',
+        step: 'fallback',
+        tab: null,
+      }),
+    ).toBe('#settings/global/chains/fallback');
   });
 });
 
@@ -198,6 +234,7 @@ describe('specialist form', () => {
     const raw = { name: 'Кодировщик', timeout: '1h', model: 'sonnet', color: 'red' };
     const draft = {
       name: 'Кодировщик',
+      runtime_chain: '',
       runtime: '',
       model: 'sonnet',
       variant: '',
@@ -219,6 +256,30 @@ describe('specialist form', () => {
       max: 2,
     });
     expect(Object.keys(valueOf(draft, raw))).toEqual(['name', 'model', 'color', 'skills', 'max']);
+  });
+
+  it('replaces runtime parameters with runtime_chain when set', () => {
+    const raw = { name: 'Coder', runtime: 'claude', model: 'sonnet' };
+    const draft = {
+      name: 'Coder',
+      runtime_chain: 'fast-to-strong',
+      runtime: 'claude',
+      model: 'sonnet',
+      variant: '',
+      reasoning_effort: '',
+      permissions: '',
+      timeout: '',
+      allow_commands: [],
+      tools: [],
+      skills: [],
+      max: '',
+      prompt: '',
+      tags: [],
+    };
+    expect(valueOf(draft, raw)).toEqual({
+      name: 'Coder',
+      runtime_chain: 'fast-to-strong',
+    });
   });
 });
 

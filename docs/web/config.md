@@ -24,9 +24,12 @@ Both editors follow these rules:
 
 ## Specialists
 
-The tab edits the `aip/specialists/<slug>.yaml` files of the project and of the shared directory. The form has the [fields of a specialist](../configuration/specialists.md#fields).
+The page has two tabs: "Specialists" and "Chains".
+
+The "Specialists" tab edits the `aip/specialists/<slug>.yaml` files of the project and of the shared directory. The form has the [fields of a specialist](../configuration/specialists.md#fields).
 
 - The list shows each specialist with a level badge ("project", "global", "project over global"). "New specialist" creates one.
+- Specialists can bind to an execution chain via the "Runtime chain" selector. When a chain is selected, individual runtime and model fields are hidden.
 - The runtime selector includes Claude Code, OpenCode and Antigravity CLI (`agy`). The tools and skills picker follows the selected runtime.
 - The page filters specialists by tags, search text, level, `runtime`, `model`, `skills`, `tools` and `allow_commands`; values are taken after `defaults`.
 - Delete is refused with a list of references while steps use the specialist.
@@ -34,6 +37,17 @@ The tab edits the `aip/specialists/<slug>.yaml` files of the project and of the 
 - "Import" copies specialists of another repository.
 
 The addresses are `#specialists`, `#specialists/<slug>` and `#specialists/new`.
+
+### Chains
+
+The "Chains" tab edits project runtime chains (`aip/chains/<slug>.yaml`) for failover and multi-model execution. New chains on this tab are always saved to the project.
+
+- Mode: `on_error` (failover on limits or unavailable runtime), `round_robin` (turn-based iteration), or `random`.
+- Ordered list of runtimes with individual model, variant, reasoning effort, and enable toggles.
+- Shared chains are view-only here. "Override in the project" copies a shared chain into the project; "Remove the override" returns to the shared chain.
+- Shared chains (`~/.config/aip/chains/<slug>.yaml`) are created and edited in [Settings](settings.md) under the "Chains" group (`#settings/global/chains`). This form edits the shared source even when the current project overrides it.
+
+The addresses are `#specialists/chains`, `#specialists/chains/<slug>` and `#specialists/chains/new`.
 
 ## Pipeline
 

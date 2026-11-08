@@ -5,6 +5,7 @@ import { validateConfig, validateRuntimesSection, validateWebSection } from './v
 import { ConfigLoadError } from '../types/errors.ts';
 import {
   ACTIONS_DIR,
+  CHAINS_DIR,
   type ConfigPaths,
   type LevelFiles,
   type LevelPaths,
@@ -30,6 +31,7 @@ export function levelIsEmpty(files: LevelFiles): boolean {
   return (
     files.settings === undefined &&
     files.specialists.length === 0 &&
+    files.chains.length === 0 &&
     files.pipelines.length === 0 &&
     files.actions.length === 0 &&
     files.problems.length === 0
@@ -64,6 +66,7 @@ export function loadConfigSources(paths: ConfigPaths): LoadedConfig {
 export function configFromFiles(files: {
   settings?: string;
   specialists?: Record<string, string>;
+  chains?: Record<string, string>;
   pipelines?: Record<string, string>;
   actions?: Record<string, string>;
 }): ResolvedConfig {
@@ -77,6 +80,9 @@ export function configFromFiles(files: {
       : { settings: source(`${SETTINGS_NAME}.yaml`, files.settings) }),
     specialists: Object.entries(files.specialists ?? {}).map(([name, text]) =>
       source(`${SPECIALISTS_DIR}/${name}.yaml`, text),
+    ),
+    chains: Object.entries(files.chains ?? {}).map(([name, text]) =>
+      source(`${CHAINS_DIR}/${name}.yaml`, text),
     ),
     pipelines: Object.entries(files.pipelines ?? {}).map(([name, text]) => {
       const read = source(`${PIPELINES_DIR}/${name}.yaml`, text);

@@ -108,6 +108,8 @@ export function SettingsRoute(props: {
         onSelectSpecialist={select('specialists')}
         pipeline={common.route.step}
         onSelectPipeline={select('pipelines')}
+        chain={common.route.step}
+        onSelectChain={select('chains')}
         observerTab={common.route.step}
         onSelectObserverTab={select('observers')}
         dirty={common.dirty}
@@ -145,7 +147,10 @@ export function ListRoute({ common }: { common: Common }) {
           dirty={common.dirty}
           api={common.api}
           selected={route.run}
-          onSelect={(id) => onRoute(to('specialists', id))}
+          section={route.group}
+          onSelect={(id, section = null) =>
+            common.onRoute({ ...to('specialists', id), group: section })
+          }
         />
       </Suspense>
     );

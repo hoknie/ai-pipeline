@@ -17,7 +17,7 @@ export const entryIdSchema = z
   .string()
   .refine(isValidSlug, { message: `id must match ${SLUG_PATTERN_TEXT}` });
 
-const entryKindSchema = z.enum(['specialist', 'pipeline', 'action']);
+const entryKindSchema = z.enum(['specialist', 'pipeline', 'action', 'chain']);
 
 /** Repository of the project level; null is the shared level. */
 const levelRepository = z.string().min(1).nullable();

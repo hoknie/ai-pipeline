@@ -31,6 +31,7 @@ export const SPECIALIST_KEYS = [
   'variant',
   'reasoning_effort',
   'runtime',
+  'runtime_chain',
   'permissions',
   'timeout',
   'allow_commands',
@@ -42,6 +43,8 @@ export const SPECIALIST_KEYS = [
   'queue',
   'tags',
 ];
+
+const CHAIN_CONFLICTS = ['runtime', 'model', 'variant', 'reasoning_effort'] as const;
 
 export function checkSpecialists(
   ctx: ValidateContext,
@@ -84,58 +87,86 @@ export function checkSpecialist(
     level: 'project',
   };
   for (const [key, field] of readEntries(ctx, mapping, path, [...allowed])) {
-    const fieldPath = join(path, key);
-    switch (key) {
-      case 'name':
-        specialist.name = readString(ctx, field, fieldPath) ?? '';
-        break;
-      case 'model':
-        specialist.model = readString(ctx, field, fieldPath);
-        break;
-      case 'runtime':
-        specialist.runtime =
-          readChoice<Runtime>(ctx, field, fieldPath, RUNTIMES) ?? specialist.runtime;
-        break;
-      case 'permissions':
-        specialist.permissions =
-          readChoice<Permissions>(ctx, field, fieldPath, PERMISSIONS) ?? specialist.permissions;
-        break;
-      case 'timeout':
-        specialist.timeoutSeconds = readTimeout(ctx, field, fieldPath) ?? specialist.timeoutSeconds;
-        break;
-      case 'allow_commands':
-        specialist.allowCommands = readStrings(ctx, field, fieldPath);
-        break;
-      case 'tools':
-        specialist.tools = readStrings(ctx, field, fieldPath);
-        break;
-      case 'mcp':
-        specialist.mcp = checkMcpServers(ctx, field, fieldPath);
-        break;
-      case 'skills':
-        specialist.skills = readStrings(ctx, field, fieldPath);
-        break;
-      case 'prompt':
-        specialist.prompt = readString(ctx, field, fieldPath);
-        break;
-      case 'max':
-        specialist.max = readInteger(ctx, field, fieldPath, MAX_RANGE);
-        break;
-      case 'queue':
-        specialist.queue = readBoolean(ctx, field, fieldPath) ?? false;
-        break;
-      case 'tags':
-        // Tags are metadata for the panel: checked here, never part of the specialist.
-        checkTagNames(ctx, field, fieldPath);
-        break;
-    }
+    checkSpecialistField(ctx, specialist, key, field, join(path, key));
   }
   if (!('name' in mapping)) addError(ctx, join(path, 'name'), 'is required');
+  checkSpecialistConfig(ctx, mapping, path, specialist);
+  return specialist;
+}
+
+function checkSpecialistConfig(
+  ctx: ValidateContext,
+  mapping: Record<string, unknown>,
+  path: string,
+  specialist: Specialist,
+): void {
+  if ('runtime_chain' in mapping) {
+    for (const conflict of CHAIN_CONFLICTS) {
+      if (conflict in mapping) {
+        addError(ctx, join(path, conflict), 'cannot be combined with runtime_chain');
+      }
+    }
+    return;
+  }
   checkOpencodeOptions(ctx, mapping, path, specialist);
   if (specialist.mcp && specialist.runtime !== 'claude') {
     addError(ctx, join(path, 'mcp'), 'is supported by the claude runtime only');
   }
-  return specialist;
+}
+
+function checkSpecialistField(
+  ctx: ValidateContext,
+  specialist: Specialist,
+  key: string,
+  field: unknown,
+  fieldPath: string,
+): void {
+  switch (key) {
+    case 'name':
+      specialist.name = readString(ctx, field, fieldPath) ?? '';
+      break;
+    case 'model':
+      specialist.model = readString(ctx, field, fieldPath);
+      break;
+    case 'runtime':
+      specialist.runtime =
+        readChoice<Runtime>(ctx, field, fieldPath, RUNTIMES) ?? specialist.runtime;
+      break;
+    case 'runtime_chain':
+      specialist.runtimeChain = readString(ctx, field, fieldPath);
+      break;
+    case 'permissions':
+      specialist.permissions =
+        readChoice<Permissions>(ctx, field, fieldPath, PERMISSIONS) ?? specialist.permissions;
+      break;
+    case 'timeout':
+      specialist.timeoutSeconds = readTimeout(ctx, field, fieldPath) ?? specialist.timeoutSeconds;
+      break;
+    case 'allow_commands':
+      specialist.allowCommands = readStrings(ctx, field, fieldPath);
+      break;
+    case 'tools':
+      specialist.tools = readStrings(ctx, field, fieldPath);
+      break;
+    case 'mcp':
+      specialist.mcp = checkMcpServers(ctx, field, fieldPath);
+      break;
+    case 'skills':
+      specialist.skills = readStrings(ctx, field, fieldPath);
+      break;
+    case 'prompt':
+      specialist.prompt = readString(ctx, field, fieldPath);
+      break;
+    case 'max':
+      specialist.max = readInteger(ctx, field, fieldPath, MAX_RANGE);
+      break;
+    case 'queue':
+      specialist.queue = readBoolean(ctx, field, fieldPath) ?? false;
+      break;
+    case 'tags':
+      checkTagNames(ctx, field, fieldPath);
+      break;
+  }
 }
 
 function checkOpencodeOptions(

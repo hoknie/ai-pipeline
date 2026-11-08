@@ -1,5 +1,6 @@
 export type FieldName =
   | 'name'
+  | 'runtime_chain'
   | 'model'
   | 'variant'
   | 'reasoning_effort'
@@ -15,6 +16,7 @@ export type FieldName =
 
 export const FIELDS: FieldName[] = [
   'name',
+  'runtime_chain',
   'runtime',
   'model',
   'variant',
@@ -62,6 +64,7 @@ export function valueOf(draft: Draft, raw: Record<string, unknown>): Record<stri
       continue;
     }
     const text = draft[field];
+    if (text === undefined || text === null) continue;
     if (field === 'prompt') {
       if (text.trim() !== '') filled[field] = text;
     } else if (text.trim() !== '') {
@@ -69,9 +72,25 @@ export function valueOf(draft: Draft, raw: Record<string, unknown>): Record<stri
         field === 'max' && /^\d+$/.test(text.trim()) ? Number(text.trim()) : text.trim();
     }
   }
+  const chain = draft.runtime_chain ? draft.runtime_chain.trim() : '';
+  if (chain !== '') {
+    delete filled.runtime;
+    delete filled.model;
+    delete filled.variant;
+    delete filled.reasoning_effort;
+  }
   // keys of the file keep their place; new ones follow in form order
   const value: Record<string, unknown> = {};
   for (const [key, original] of Object.entries(raw)) {
+    if (
+      chain !== '' &&
+      (key === 'runtime' || key === 'model' || key === 'variant' || key === 'reasoning_effort')
+    ) {
+      continue;
+    }
+    if (chain === '' && key === 'runtime_chain') {
+      continue;
+    }
     if (!(FIELDS as string[]).includes(key)) value[key] = original;
     else if (key in filled) value[key] = filled[key];
   }

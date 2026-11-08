@@ -8,6 +8,8 @@ export const SETTINGS_NAME = 'settings';
 
 export const SPECIALISTS_DIR = 'specialists';
 
+export const CHAINS_DIR = 'chains';
+
 export const PIPELINES_DIR = 'pipelines';
 
 /** The old name of the pipelines directory; still read, never created. */
@@ -39,6 +41,7 @@ export interface LoadedConfig {
 export interface LevelFiles {
   settings?: ConfigSource;
   specialists: ConfigSource[];
+  chains: ConfigSource[];
   pipelines: ConfigSource[];
   actions: ConfigSource[];
   /** Problems found while reading, such as `x.yaml` next to `x.yml`. */

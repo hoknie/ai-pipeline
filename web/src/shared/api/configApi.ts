@@ -75,6 +75,13 @@ export interface ConfigApi {
   ): Promise<ConfigEditResult>;
   /** Refused with the places that name the action when a point still uses it. */
   deleteAction(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
+  writeChain(
+    id: string,
+    value: Record<string, unknown>,
+    revision: string | null,
+    level?: WriteLevel,
+  ): Promise<ConfigEditResult>;
+  deleteChain(id: string, revision: string, level?: WriteLevel): Promise<ConfigEditResult>;
   /** The built-in stages of the pipeline with their tasks and settings. */
   systemStages(): Promise<SystemStagesResponse>;
 }
@@ -138,6 +145,15 @@ export function configApi(repository: string | null): ConfigApi {
       ),
     deleteAction: (id, revision, level) =>
       edit(at(`/api/config/actions/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
+        method: 'DELETE',
+      }),
+    writeChain: (id, value, revision, level) =>
+      edit(
+        at(`/api/config/chains/${enc(id)}`),
+        json('PUT', { value, revision, ...(level ? { level } : {}) }),
+      ),
+    deleteChain: (id, revision, level) =>
+      edit(at(`/api/config/chains/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
         method: 'DELETE',
       }),
     systemStages: () => call(at('/api/system-stages')),

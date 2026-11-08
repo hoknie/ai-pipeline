@@ -7,14 +7,18 @@ import {
   actionPointOf,
   attemptStepLabel,
   enterPoint,
+  freshPending,
   groupSlugs,
+  hasNextChainItem,
   isActionGroup,
   isMessageGroup,
   isRepairGroup,
   isResolveGroup,
   isServiceGroup,
   isSplitGroup,
+  limitHolds,
   newGroup,
+  specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
 import { finishDelivery, resolverDone } from './delivery-flow.ts';
@@ -49,6 +53,15 @@ function exitFailure(attempt: Attempt, exit: AttemptExit): FailReason | null {
   return exit.failure ?? (attempt.report === null ? { kind: 'no_report' } : null);
 }
 
+function isFailoverError(kind: FailReason['kind']): boolean {
+  return (
+    kind === 'usage_limit' ||
+    kind === 'runtime_not_found' ||
+    kind === 'spawn' ||
+    kind === 'no_report'
+  );
+}
+
 function failAttempt(
   m: Ctx,
   group: Group,
@@ -58,7 +71,26 @@ function failAttempt(
 ): void {
   attempt.status = 'failed';
   attempt.reason = failure;
-  if (failure.kind === 'usage_limit' && onLimit === 'wait' && !isRepairGroup(group)) {
+  const specialist = specialistOfStep(m.state.run, group, attempt.specialist);
+  const chain = specialist?.runtimeChain
+    ? m.state.run.config.chains.find((c) => c.slug === specialist.runtimeChain)
+    : undefined;
+  const holds = limitHolds([m.state], m.now);
+  if (
+    isFailoverError(failure.kind) &&
+    hasNextChainItem(chain, group.attempts, attempt.stepIndex, holds)
+  ) {
+    group.status = 'queued';
+    group.pending = freshPending(attempt.stepIndex);
+    return;
+  }
+  const roundHadLimit = group.attempts.some(
+    (a) =>
+      a.stepIndex === attempt.stepIndex &&
+      a.round === attempt.round &&
+      a.reason?.kind === 'usage_limit',
+  );
+  if (roundHadLimit && onLimit === 'wait' && !isRepairGroup(group)) {
     waitForLimit(group, attempt);
     return;
   }

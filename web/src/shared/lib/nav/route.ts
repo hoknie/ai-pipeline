@@ -30,7 +30,7 @@ function settingsRoute(first: string | null, second: string | null, third: strin
   // a shared specialist (or `new`) of the group «Specialists» is the third part; for the
   // observers it is the tab of the group
   const step =
-    scope === 'global' && (group === 'specialists' || group === 'pipelines')
+    scope === 'global' && (group === 'specialists' || group === 'pipelines' || group === 'chains')
       ? third
       : scope === 'global' && group === 'observers' && third !== null
         ? observerTabOf(third)
@@ -73,6 +73,15 @@ export function parseRoute(hash: string): Route {
   if (head === 'specialists') {
     // the former «General settings» entry of the specialists list
     if (decode(rest[0]) === '_settings') return settingsRoute(null, null, null);
+    if (decode(rest[0]) === 'chains') {
+      return {
+        view: 'specialists',
+        run: decode(rest[1]),
+        group: 'chains',
+        step: null,
+        tab: null,
+      };
+    }
     return { view: 'specialists', run: decode(rest[0]), group: null, step: null, tab: null };
   }
   if (head === 'settings') return settingsRoute(decode(rest[0]), decode(rest[1]), decode(rest[2]));
@@ -92,14 +101,18 @@ export function formatRoute(route: Route): string {
   const enc = encodeURIComponent;
   if (route.view === 'queue') return '#queue';
   if (route.view === 'topology') return route.run ? `#topology/${enc(route.run)}` : '#topology';
-  if (route.view === 'specialists')
+  if (route.view === 'specialists') {
+    if (route.group === 'chains') {
+      return route.run ? `#specialists/chains/${enc(route.run)}` : '#specialists/chains';
+    }
     return route.run ? `#specialists/${enc(route.run)}` : '#specialists';
+  }
   if (route.view === 'settings') {
     const place = settingsLocationOf(route.group, route.run);
     // an old route with the group only (`run`) leads to its new place
     const { scope, group } = route.group === null ? settingsLocationOf(route.run, null) : place;
     const slug =
-      scope === 'global' && (group === 'specialists' || group === 'pipelines')
+      scope === 'global' && (group === 'specialists' || group === 'pipelines' || group === 'chains')
         ? route.step
         : scope === 'global' && group === 'observers'
           ? observerTabOf(route.step)

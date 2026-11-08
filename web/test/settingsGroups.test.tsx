@@ -17,6 +17,7 @@ describe('groups of settings', () => {
       'agents',
       'delivery',
       'runtimes',
+      'chains',
       'specialists',
       'pipelines',
       'observers',

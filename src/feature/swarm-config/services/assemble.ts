@@ -30,7 +30,7 @@ export function assembleLevel(files: LevelFiles): Level {
       problems.push({ file: settingsFile, path: 'swarm', message: 'must be a mapping' });
     } else {
       for (const [key, field] of Object.entries(value)) {
-        if (key === 'specialists' || key === 'pipelines' || key === 'actions') {
+        if (key === 'specialists' || key === 'chains' || key === 'pipelines' || key === 'actions') {
           problems.push({
             file: settingsFile,
             path: `swarm.${key}`,
@@ -54,8 +54,8 @@ export function assembleLevel(files: LevelFiles): Level {
       }
     }
   }
-  const entries = (section: string, sources: ConfigSource[]): void => {
-    if (sources.length === 0) return;
+  const entries = (section: string, sources: ConfigSource[] | undefined): void => {
+    if (!sources || sources.length === 0) return;
     const map: Record<string, unknown> = {};
     for (const source of sources) {
       const name = stem(source.path);
@@ -65,17 +65,23 @@ export function assembleLevel(files: LevelFiles): Level {
     swarm[section] = map;
   };
   entries('specialists', files.specialists);
+  entries('chains', files.chains);
   entries('pipelines', files.pipelines);
   entries('actions', files.actions);
   const present =
     files.settings !== undefined ||
-    files.specialists.length + files.pipelines.length + files.actions.length > 0;
+    files.specialists.length +
+      (files.chains?.length ?? 0) +
+      files.pipelines.length +
+      files.actions.length >
+      0;
   return {
     tree: present ? { swarm } : undefined,
     origins,
     files: [
       ...(settingsFile === undefined ? [] : [settingsFile]),
       ...files.specialists.map((source) => source.path),
+      ...files.chains.map((source) => source.path),
       ...files.pipelines.map((source) => source.path),
       ...files.actions.map((source) => source.path),
     ],
@@ -157,6 +163,7 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
   ];
   if (errors.length > 0 || !result.ok) throw new ConfigLoadError({ kind: 'invalid', errors });
   const projectSpecialists = isMapping(projectSwarm) ? projectSwarm.specialists : undefined;
+  const projectChains = isMapping(projectSwarm) ? projectSwarm.chains : undefined;
   const projectActions = isMapping(projectSwarm) ? projectSwarm.actions : undefined;
   const config: ResolvedConfig = {
     ...result.config,
@@ -164,6 +171,11 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
       isMapping(projectSpecialists) && specialist.slug in projectSpecialists
         ? specialist
         : { ...specialist, level: 'global' },
+    ),
+    chains: (result.config.chains ?? []).map((chain) =>
+      isMapping(projectChains) && chain.slug in projectChains
+        ? chain
+        : { ...chain, level: 'global' },
     ),
     actions: result.config.actions.map((action) =>
       isMapping(projectActions) && action.id in projectActions

@@ -1,4 +1,5 @@
 import { type Action, type StagePoints } from './action.ts';
+import { type RuntimeChain } from './chain.ts';
 import { type Pipeline, type Split, type Step } from './pipeline.ts';
 import { type Defaults, type Runtime, type Specialist } from './specialist.ts';
 
@@ -136,8 +137,9 @@ function normalizedSplit(split: Split | null | undefined): Split | null {
 export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const stored = config as Omit<
     ResolvedConfig,
-    'workspace' | 'delivery' | 'actions' | 'stages' | 'pipelines'
+    'workspace' | 'delivery' | 'actions' | 'stages' | 'pipelines' | 'chains'
   > & {
+    chains?: RuntimeChain[];
     pipelines?: Pipeline[];
     /** Name of the pipelines in snapshots stored by older builds. */
     workflows?: Pipeline[];
@@ -180,6 +182,16 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
       humanReview: (step as Partial<Step>).humanReview ?? false,
     })),
   }));
+  const chains = (stored.chains ?? []).map((chain) => ({
+    ...chain,
+    level: chain.level ?? 'project',
+    enabled: chain.enabled ?? true,
+    runtimes: (chain.runtimes ?? []).map((item) => ({
+      ...item,
+      enabled: item.enabled ?? true,
+      model: item.model ?? null,
+    })),
+  }));
   // Runs stored before pipeline actions existed have none.
   const actions = stored.actions ?? [];
   const stages = stored.stages ?? {};
@@ -192,6 +204,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     web,
     runtimes,
     specialists,
+    chains,
     claude,
     pipelines,
     actions,
@@ -213,6 +226,7 @@ export interface ResolvedConfig {
   delivery: DeliverySettings;
   defaults: Defaults;
   specialists: Specialist[];
+  chains: RuntimeChain[];
   pipelines: Pipeline[];
   /** Pipeline actions by id. */
   actions: Action[];

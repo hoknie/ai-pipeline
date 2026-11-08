@@ -33,5 +33,11 @@ export function readLevels(paths: ConfigPaths): { global: LevelFiles; project: L
 }
 
 export function emptyLevel(): Level {
-  return assembleLevel({ specialists: [], pipelines: [], actions: [], problems: [] });
+  return assembleLevel({
+    specialists: [],
+    chains: [],
+    pipelines: [],
+    actions: [],
+    problems: [],
+  });
 }

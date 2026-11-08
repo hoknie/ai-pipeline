@@ -134,8 +134,17 @@ export class AttemptStarter {
   private launch(prepared: Prepared, directory: string, token: string): SupervisedProcess {
     const { state, group, attempt, key, runtime, worktree, specialist } = prepared;
     const { context, entry, socket, environment, graceMs, timings } = this.dependencies;
+    const effectiveSpecialist: Specialist = {
+      ...specialist,
+      runtime: attempt.runtime as Specialist['runtime'],
+      model: attempt.model,
+      ...(attempt.variant !== undefined ? { variant: attempt.variant } : {}),
+      ...(attempt.reasoningEffort !== undefined
+        ? { reasoningEffort: attempt.reasoningEffort }
+        : {}),
+    };
     const launch = runtime.buildLaunch({
-      specialist,
+      specialist: effectiveSpecialist,
       input: attempt.input,
       worktree,
       attemptDirectory: directory,

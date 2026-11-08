@@ -16,9 +16,12 @@ export const LEVEL_KEYS: Record<EntryLevel, EntryLevel> = {
 };
 
 function subtitleOf(entry: EditorSpecialist): string {
-  const runtime = entry.effective
-    ? `${entry.effective.runtime}${entry.effective.model ? ` · ${entry.effective.model}` : ''}`
-    : null;
+  const chain = (entry.raw.runtime_chain as string) ?? null;
+  const runtime = chain
+    ? `chain: ${chain}`
+    : entry.effective
+      ? `${entry.effective.runtime}${entry.effective.model ? ` · ${entry.effective.model}` : ''}`
+      : null;
   return [entry.slug, runtime].filter(Boolean).join(' · ');
 }
 

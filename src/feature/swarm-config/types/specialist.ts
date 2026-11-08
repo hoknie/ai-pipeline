@@ -46,6 +46,8 @@ export interface Specialist {
   /** OpenCode model options; absent in older snapshots and when left to the runtime. */
   variant?: string;
   reasoningEffort?: ReasoningEffort;
+  /** Slug of the runtime chain; absent in older snapshots or when configured directly. */
+  runtimeChain?: string | null;
   runtime: Runtime;
   permissions: Permissions;
   timeoutSeconds: number;

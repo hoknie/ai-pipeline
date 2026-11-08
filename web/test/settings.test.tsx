@@ -449,6 +449,7 @@ const GLOBAL_GROUPS = [
   'Agents',
   'Delivery',
   'Runtimes',
+  'Chains',
   'Specialists',
   'Pipeline',
   'Observers',

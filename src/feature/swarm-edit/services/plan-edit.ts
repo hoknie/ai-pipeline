@@ -23,7 +23,7 @@ import {
   sameValue,
 } from '../repositories/documents.ts';
 import { emptyLevel, readLevels, resolution, type Resolution } from './levels.ts';
-import { actionReferences, specialistReferences, stemOf } from './references.ts';
+import { actionReferences, chainReferences, specialistReferences, stemOf } from './references.ts';
 import {
   ConfigEditError,
   type EditPlan,
@@ -194,12 +194,16 @@ function keepSharedTags(request: EditRequest, file: string, current: string | un
   };
 }
 
-/** Entries that still name a removed specialist or action, or none. */
+/** Entries that still name a removed specialist, chain or action, or none. */
 function referencesOfRemoved(draft: Draft, edit: EditRequest, level: WriteLevel) {
-  const kind = edit.kind === 'specialist' ? 'specialist' : 'action';
-  const referencesTo = kind === 'specialist' ? specialistReferences : actionReferences;
+  const referencesTo =
+    edit.kind === 'specialist'
+      ? specialistReferences
+      : edit.kind === 'chain'
+        ? chainReferences
+        : actionReferences;
   const has = (files: LevelFiles) =>
-    sourcesOf(files, kind).some((source) => stemOf(source.path) === edit.id);
+    sourcesOf(files, edit.kind).some((source) => stemOf(source.path) === edit.id);
   const globalTree = assembleLevel(draft.files.global).tree;
   const projectTree = assembleLevel(draft.files.project).tree;
   const references: EntryReference[] = [];
@@ -253,7 +257,10 @@ export function planEdit(paths: ConfigPaths, request: EditRequest): EditPlan {
     const path = `swarm.${KIND_SECTION[edit.kind]}.${edit.id}`;
     return { ok: false, reason: 'invalid', errors: [{ file, path, message: error.message }] };
   }
-  if (edit.value === null && (edit.kind === 'specialist' || edit.kind === 'action')) {
+  if (
+    edit.value === null &&
+    (edit.kind === 'specialist' || edit.kind === 'action' || edit.kind === 'chain')
+  ) {
     const references = referencesOfRemoved(draft, edit, level);
     if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };
   }

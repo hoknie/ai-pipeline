@@ -5,6 +5,7 @@ export const KEYED_SECTIONS = new Set([
   'workspace',
   'naming',
   'specialists',
+  'chains',
   'pipelines',
   'actions',
   'stages',

@@ -6,6 +6,8 @@ import { useMediaQuery } from '../../shared/lib/browser/media.ts';
 import { notifySuccess } from '../../shared/lib/browser/notify.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { ConfigErrors, SplitPage } from '../../shared/ui/layout/EntryList.tsx';
+import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
+import { ChainsList, ChainsPane, NEW_CHAIN } from './chains/index.ts';
 import { SpecialistImportDialog } from './importing/SpecialistImportDialog.tsx';
 import { NEW_ID, SpecialistPane } from './page/SpecialistPane.tsx';
 import { SpecialistsFilterControl } from './page/SpecialistsFilterControl.tsx';
@@ -14,32 +16,34 @@ import { useLeaveGuard } from './page/useLeaveGuard.ts';
 import { useSpecialistSearch } from './page/useSpecialistSearch.tsx';
 import { useSpecialistsData } from './page/useSpecialistsData.ts';
 
-export { NEW_ID };
+export { NEW_ID, NEW_CHAIN };
 export { LEVEL_KEYS } from './page/SpecialistsList.tsx';
 
-export default function SpecialistsPage({
+function SpecialistsBody({
   api,
+  data,
   selected,
+  dirty,
+  notice,
+  setNotice,
+  go,
   onSelect,
-  dirty: sharedDirty,
 }: {
   api: Api;
+  data: ReturnType<typeof useSpecialistsData>;
   selected: string | null;
-  onSelect: (id: string | null) => void;
-  /** Whether the open form has unsaved edits; the caller owns it to guard other navigation. */
-  dirty?: RefObject<boolean>;
+  dirty: RefObject<boolean>;
+  notice: string | null;
+  setNotice: (n: string | null) => void;
+  go: (id: string | null, extra?: string | null) => Promise<void>;
+  onSelect: (id: string | null, section?: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const data = useSpecialistsData(api);
   const { view, load } = data;
-  const [notice, setNotice] = useState<string | null>(null);
-  const ownDirty = useRef(false);
-  const dirty = sharedDirty ?? ownDirty;
   const [importing, setImporting] = useState(false);
   const columns = useMediaQuery('(min-width: 1280px)');
   const wide = useMediaQuery('(min-width: 768px)');
   const { panel, shown, count, reset } = useSpecialistSearch(view);
-  const go = useLeaveGuard(selected, dirty, onSelect, () => setNotice(null));
 
   return (
     <SplitPage
@@ -59,10 +63,10 @@ export default function SpecialistsPage({
                 <SpecialistsFilterControl count={count} wide={wide} panel={panel} />
               )
             }
-            onNew={() => void go(NEW_ID)}
+            onNew={() => void go(NEW_ID, null)}
             onImport={() => setImporting(true)}
             onReset={reset}
-            onSelect={(id) => void go(id)}
+            onSelect={(id) => void go(id, null)}
           />
         </>
       }
@@ -73,7 +77,7 @@ export default function SpecialistsPage({
         selected={selected}
         notice={notice}
         dirty={dirty}
-        onSelect={onSelect}
+        onSelect={(id) => onSelect(id, null)}
         onNotice={setNotice}
       />
       {view && view.repository ? (
@@ -90,5 +94,118 @@ export default function SpecialistsPage({
         />
       ) : null}
     </SplitPage>
+  );
+}
+
+function ChainsBody({
+  api,
+  data,
+  selected,
+  dirty,
+  go,
+  onSelect,
+}: {
+  api: Api;
+  data: ReturnType<typeof useSpecialistsData>;
+  selected: string | null;
+  dirty: RefObject<boolean>;
+  go: (id: string | null, extra?: string | null) => Promise<void>;
+  onSelect: (id: string | null, section?: string | null) => void;
+}) {
+  const { view, load } = data;
+  return (
+    <SplitPage
+      side={
+        <>
+          {data.failure ? <Alert variant="destructive">{data.failure}</Alert> : null}
+          {view ? <ConfigErrors errors={view.errors} /> : null}
+          <ChainsList
+            chains={view?.chains ?? []}
+            loaded={view !== null}
+            selected={selected}
+            onNew={() => void go(NEW_CHAIN, 'chains')}
+            onSelect={(slug) => void go(slug, 'chains')}
+          />
+        </>
+      }
+    >
+      <ChainsPane
+        api={api}
+        view={view}
+        failure={data.failure}
+        selected={selected}
+        dirty={dirty}
+        load={load}
+        onSelect={(slug) => onSelect(slug, 'chains')}
+      />
+    </SplitPage>
+  );
+}
+
+export default function SpecialistsPage({
+  api,
+  selected,
+  section = null,
+  onSelect,
+  dirty: sharedDirty,
+}: {
+  api: Api;
+  selected: string | null;
+  section?: string | null;
+  onSelect: (id: string | null, section?: string | null) => void;
+  dirty?: RefObject<boolean>;
+}) {
+  const { t } = useTranslation();
+  const data = useSpecialistsData(api);
+  const [notice, setNotice] = useState<string | null>(null);
+  const ownDirty = useRef(false);
+  const dirty = sharedDirty ?? ownDirty;
+  const isChains = section === 'chains';
+  const go = useLeaveGuard(selected, dirty, onSelect, () => setNotice(null));
+
+  const tabs = [
+    {
+      key: 'specialists',
+      label: t('specialists.tabs.specialists'),
+      href: '#specialists',
+      selected: !isChains,
+      onClick: () => (isChains ? go(null, null) : Promise.resolve()),
+    },
+    {
+      key: 'chains',
+      label: t('specialists.tabs.chains'),
+      href: '#specialists/chains',
+      selected: isChains,
+      onClick: () => (!isChains ? go(null, 'chains') : Promise.resolve()),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="px-4 pt-3">
+        <LinkTabs label={t('specialists.tabs.label')} tabs={tabs} />
+      </div>
+      {isChains ? (
+        <ChainsBody
+          api={api}
+          data={data}
+          selected={selected}
+          dirty={dirty}
+          go={go}
+          onSelect={onSelect}
+        />
+      ) : (
+        <SpecialistsBody
+          api={api}
+          data={data}
+          selected={selected}
+          dirty={dirty}
+          notice={notice}
+          setNotice={setNotice}
+          go={go}
+          onSelect={onSelect}
+        />
+      )}
+    </div>
   );
 }

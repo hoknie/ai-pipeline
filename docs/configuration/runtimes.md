@@ -91,4 +91,28 @@ How the `claude` runtime gets the `edit` level is described in [configuration/pe
 | Recognizing a [usage limit](../usage/queue.md#usage-limit) | Yes | No | No |
 | [`tools`](specialists.md#tools), [`mcp`](specialists.md#mcp-servers) of a specialist | Yes | No | No |
 
+## Runtime chains
+
+A runtime chain defines a pool of runtimes and models for a specialist. Every chain is one file in `aip/chains/<slug>.yaml` (project level) or `~/.config/aip/chains/<slug>.yaml` (global level).
+
+```yaml
+name: Fallback chain
+mode: on_error
+runtimes:
+  - runtime: claude
+    model: sonnet
+  - runtime: opencode
+    model: openai/gpt-5
+    reasoning_effort: high
+```
+
+- **`mode`**:
+  - `on_error`: starts with the first enabled runtime and falls back to the next enabled runtime when an attempt hits limits or cannot start (`usage_limit`, `runtime_not_found`, `spawn`, `no_report`).
+  - `random`: picks a random enabled runtime from the pool for each step.
+  - `round_robin`: cycles through the enabled runtimes in order across steps.
+- **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, or `agy`), optional `model`, optional `enabled` (default `true`), and optional `variant` and `reasoning_effort` for OpenCode.
+- **`enabled`**: optional boolean (default `true`). When a chain or all its runtimes are disabled, specialists bound to it use `defaults.runtime` with no explicit model.
+
+A specialist binds to a chain via `runtime_chain: <slug>` in its definition (see [Specialists](specialists.md#fields)). The `runtime_chain` field cannot be used together with explicit `runtime`, `model`, `variant`, or `reasoning_effort`.
+
 Connecting the hosts themselves is a separate matter: see [hosts/claude-code.md](../hosts/claude-code.md) and [hosts/opencode.md](../hosts/opencode.md).
