@@ -31,6 +31,14 @@ function menu(onSelect = vi.fn(), onAdd = vi.fn(async () => undefined)) {
         onSelect,
         onAdd,
         onRemove: () => undefined,
+        browse: async () => ({
+          path: '/Users/me',
+          parent: '/Users',
+          home: '/Users/me',
+          git: false,
+          entries: [],
+          truncated: false,
+        }),
       }}
     />,
   );

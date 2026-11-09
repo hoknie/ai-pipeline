@@ -1,6 +1,5 @@
-import { resolve } from 'node:path';
-
 import { formatApply, formatQueue, formatRun } from '../../format/index.ts';
+import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { ApplyResult, QueueView, RunView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
@@ -14,13 +13,16 @@ export function addPause(kit: RunKit): void {
       'Pause a run: the running agents stop, nothing new starts, and the run goes to the end of the queue; "aip queue run <item>" continues the interrupted step in the same session',
     )
     .argument('<run-id>', 'run id')
-    .option('-r, --repo <path>', 'repository path; defaults to the repository of the run')
+    .option(
+      '-r, --repo <path>',
+      'repository path or project slug; defaults to the repository of the run',
+    )
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip run pause 0mh3k2ab1x9z']))
     .action(async (runId: string, options: { repo?: string; json?: boolean }) => {
       const view = (await call(context(), 'run_pause', {
         runId,
-        ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
+        ...(options.repo !== undefined ? { repository: repositoryArgument(options.repo) } : {}),
       })) as QueueView & { item: string };
       output(options.json, formatQueue(view, activeStyle), view);
     });

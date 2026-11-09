@@ -15,6 +15,7 @@ export const SETTINGS_GROUPS_BY_SCOPE = {
     'specialists',
     'pipelines',
     'observers',
+    'projects',
     'system',
   ],
   project: ['general', 'agents', 'delivery', 'queue', 'tags'],

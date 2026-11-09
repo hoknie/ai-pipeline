@@ -136,12 +136,17 @@ export class ObserverService {
     return { ok: true };
   }
 
-  /** A repository left the registry: the observers no longer work there. */
-  forgetRepository(root: string): void {
+  /** A repository left the registry: the observers no longer work there, or work at `to`. */
+  forgetRepository(root: string, to?: string): void {
     if (!this.current.projects.some((project) => project.repository === root)) return;
     this.current = {
       ...this.current,
-      projects: this.current.projects.filter((project) => project.repository !== root),
+      projects:
+        to === undefined
+          ? this.current.projects.filter((project) => project.repository !== root)
+          : this.current.projects.map((project) =>
+              project.repository === root ? { ...project, repository: to } : project,
+            ),
     };
     this.dependencies.observers.saveObservers(this.current);
     this.dependencies.publish.observersChanged();

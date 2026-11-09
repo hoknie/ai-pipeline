@@ -118,9 +118,12 @@ export function formatRepositories(
   if (repositories.length === 0) return 'No repositories yet.';
   return table(
     [
-      ['REPOSITORY', 'UNFINISHED', 'WAITING', 'QUEUED'],
+      ['SLUG', 'NAME', 'REPOSITORY', 'STATE', 'UNFINISHED', 'WAITING', 'QUEUED'],
       ...repositories.map((entry) => [
+        entry.slug,
+        entry.label,
         entry.path,
+        entry.enabled ? 'on' : 'off',
         String(entry.unfinished),
         String(entry.waiting),
         String(entry.queued),

@@ -45,7 +45,7 @@ export class TaskTags {
     // Three tables, one transaction: the scenario is opened here, each feature changes its own.
     database.transaction(() => {
       tags.deleteStored(repository, id);
-      runs.states.dropStoredTag(repository, id);
+      runs.states.changeStored(repository, { dropTag: id });
       store.dropItemTag(repository, id);
     });
     tags.forget(id);

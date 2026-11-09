@@ -1,8 +1,10 @@
-import { Plus } from 'lucide-react';
+import { Plus, Settings2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { BrowseDirectories } from '../../../features/repositories/index.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
+import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import { repositoryLabel, repositoryMatches } from '../../../shared/lib/catalog/repositories.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import {
@@ -39,7 +41,18 @@ export interface RepositoryChoice {
   onAdd: (path: string) => Promise<void>;
   /** Asks and removes a repository from the list. */
   onRemove: (repository: string) => void;
+  /** The folder browser of the path field. */
+  browse: BrowseDirectories;
 }
+
+/** The group «Projects» of the settings, where every project is managed. */
+const PROJECTS_LINK = formatRoute({
+  view: 'settings',
+  run: 'projects',
+  group: 'global',
+  step: null,
+  tab: null,
+});
 
 /** Picks the repository whose queue, configuration and pipelines the panel shows. */
 export function RepositoryMenu({
@@ -51,7 +64,8 @@ export function RepositoryMenu({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const { repositories, selected, waiting, home, onSelect, onAdd, onRemove } = choice;
+  const { repositories, selected, waiting, home, onSelect, onRemove } = choice;
+  const adder = { onAdd: choice.onAdd, browse: choice.browse };
   const shownPath = (path: string) => choice.paths?.get(path) ?? path;
   const search = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -63,9 +77,8 @@ export function RepositoryMenu({
     const timer = setTimeout(() => search.current?.focus(), 0);
     return () => clearTimeout(timer);
   }, [open]);
-  if (selected === null) return <AddFirstRepository compact={compact} onAdd={onAdd} />;
+  if (selected === null) return <AddFirstRepository compact={compact} {...adder} />;
   const name = repositoryLabel(selected);
-  const label = t('nav.repositoryCurrent', { name });
   const others = repositories
     .filter((path) => path !== selected)
     .reduce((sum, path) => sum + (waiting.get(path) ?? 0), 0);
@@ -73,7 +86,7 @@ export function RepositoryMenu({
   const trigger = (
     <RepositoryTrigger
       name={name}
-      label={label}
+      label={t('nav.repositoryCurrent', { name })}
       title={selected}
       others={others}
       compact={compact}
@@ -112,9 +125,15 @@ export function RepositoryMenu({
             <Plus aria-hidden />
             {t('nav.repositoryAdd')}
           </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href={PROJECTS_LINK} data-projects-link>
+              <Settings2 aria-hidden />
+              {t('nav.repositoryManage')}
+            </a>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <AddRepositoryDialog open={adding} onOpenChange={setAdding} onAdd={onAdd} />
+      <AddRepositoryDialog open={adding} onOpenChange={setAdding} {...adder} />
     </>
   );
 }

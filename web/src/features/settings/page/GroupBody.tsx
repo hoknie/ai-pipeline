@@ -11,6 +11,7 @@ import { SharedChainsGroup } from '../SharedChainsGroup.tsx';
 import { SharedSpecialistsGroup } from '../SharedSpecialistsGroup.tsx';
 import { SystemGroup } from '../SystemGroup.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
+import { ProjectsGroup } from '../projects/ProjectsGroup.tsx';
 import type { SettingsPageProps } from './types.ts';
 import type { SettingsConfig } from './useSettingsConfig.ts';
 
@@ -129,6 +130,21 @@ export function GroupBody({ props, settings }: BodyProps) {
     return repository === null ? null : <TagsSettings api={api} repository={repository} />;
   }
   if (group === 'queue') return <QueueBody props={props} settings={settings} />;
+  if (group === 'projects') {
+    return (
+      <ProjectsGroup
+        api={api}
+        registry={props.registry}
+        selected={props.project}
+        onSelect={props.onSelectProject}
+        dirty={props.dirty}
+        onRegistry={props.onRegistry}
+        onMoved={props.onProjectMoved}
+        onRemove={props.onRemoveProject}
+        onOpen={props.onOpenProject}
+      />
+    );
+  }
   if (group === 'observers') {
     return (
       <ObserversGroup

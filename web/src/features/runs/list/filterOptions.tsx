@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
+import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { statusInfo } from '../../../shared/lib/status.ts';
 import { useTags } from '../../../shared/lib/catalog/tags.tsx';
 import type { RunView } from '../../../shared/api/types.ts';
@@ -71,6 +72,12 @@ export function useFilterOptions(input: FilterOptionsInput) {
       value: path,
       label: repositoryLabel(path),
       hint: repositoryPaths?.get(path) ?? path,
+      render: (
+        <span className="inline-flex items-center gap-1.5">
+          <ProjectDot path={path} />
+          {repositoryLabel(path)}
+        </span>
+      ),
       count: repositoryCounts.get(path) ?? 0,
     }))
     .sort(

@@ -60,8 +60,9 @@ export class QueueControl {
   }
 
   async start(params: { repository: string; parallel?: number | undefined }): Promise<Queue> {
-    const { store, advance, now } = this.dependencies;
+    const { store, advance, registry, now } = this.dependencies;
     const queue = await this.queueOf(params.repository);
+    registry.requireEnabled(queue.repository);
     if (params.parallel !== undefined) setParallel(queue, params.parallel, now());
     startQueue(queue, this.statesOf(queue), now());
     store.save(queue);
@@ -86,7 +87,8 @@ export class QueueControl {
       { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer, onLimit },
       now(),
     );
-    if (enablesAutopilot && queue.status === 'stopped' && queue.stop === null) {
+    const enabled = this.dependencies.registry.entry(queue.repository)?.enabled !== false;
+    if (enablesAutopilot && enabled && queue.status === 'stopped' && queue.stop === null) {
       startQueue(queue, this.statesOf(queue), now());
     }
     store.save(queue);
@@ -96,8 +98,9 @@ export class QueueControl {
 
   /** `queue_run_now`: the item starts at once, taking a place a lower run may give up. */
   async runNow(params: { repository: string; item: string }): Promise<RunCreated> {
-    const { store, advance, runs, now } = this.dependencies;
+    const { store, advance, runs, registry, now } = this.dependencies;
     const queue = await this.queueOf(params.repository);
+    registry.requireEnabled(queue.repository);
     const item = queue.items.find((candidate) => candidate.id === params.item);
     if (!item) throw rejected('unknown queue item');
     if (item.run !== null) {
@@ -120,9 +123,10 @@ export class QueueControl {
 
   /** `queue_return`: the run goes back to the queue as its first item. */
   returnRun(params: RunRef): Promise<QueueChange> {
-    return this.withQueue(params, (queue, state, id, moment) =>
-      returnRun(queue, state, id, moment),
-    );
+    return this.withQueue(params, (queue, state, id, moment) => {
+      this.dependencies.registry.requireEnabled(queue.repository);
+      return returnRun(queue, state, id, moment);
+    });
   }
 
   /**
@@ -157,7 +161,8 @@ export class QueueControl {
     state: RunState,
     params: { group: string; refreshConfig?: boolean | undefined },
   ): Promise<RunState> {
-    const { store, advance, config, runs, now } = this.dependencies;
+    const { store, advance, config, runs, registry, now } = this.dependencies;
+    registry.requireEnabled(state.run.repository);
     const keys = problemKeys(state);
     // Loaded before the event: a broken configuration refuses the retry with nothing changed.
     const refresh =

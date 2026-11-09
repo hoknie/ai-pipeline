@@ -1,4 +1,5 @@
 import type { Queue } from '../../../feature/queue/types/index.ts';
+import { directoryName, slugOf } from '../../../feature/repos/types/index.ts';
 import { type RunState, isRunFinished, runPhase } from '../../../feature/runs/types/index.ts';
 import type { RepositoryEntry, RepositoryView } from '../contract/responses/repositories.ts';
 
@@ -25,6 +26,11 @@ export function repositoryViews(
         path: entry.path,
         displayPath: displayPath(entry.path, home),
         addedAt: entry.addedAt,
+        name: entry.name,
+        label: entry.name ?? directoryName(entry.path),
+        slug: entry.slug ?? slugOf(directoryName(entry.path)),
+        enabled: entry.enabled,
+        color: entry.color,
         unfinished: own.filter((state) => !isRunFinished(state)).length,
         waiting: own.filter((state) => runPhase(state) === 'needs_human').length,
         queued: queue?.items.length ?? 0,

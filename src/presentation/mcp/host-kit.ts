@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { packageVersion } from '../../platform/build/index.ts';
 import { formatQueue, formatRun } from '../format/index.ts';
+import { repositoryArgument } from '../ipc/client/index.ts';
 import type { QueueView, RunView } from '../ipc/contract/index.ts';
 import type { Send } from './tools.ts';
 
@@ -47,14 +48,17 @@ export function hostKit(options: HostOptions) {
     const view = (await options.send(method, params)) as RunView;
     return withData(formatRun(view, now()), view);
   };
-  const repo = z.string().optional().describe('Repository path; defaults to the current directory');
+  const repo = z
+    .string()
+    .optional()
+    .describe('Repository path or project slug; defaults to the current directory');
   const item = z.string().describe('Queue item id from swarm_queue');
   const queueGroups = z
     .array(z.object({ title: z.string(), task: z.string() }))
     .describe('Explicit groups');
   const showQueue = async (method: string, params: Record<string, unknown>, where?: string) => {
     const view = (await options.send(method, {
-      repository: where ?? options.cwd,
+      repository: where === undefined ? options.cwd : repositoryArgument(where, options.cwd),
       ...params,
     })) as QueueView & { item?: string };
     const text = formatQueue(view);

@@ -34,6 +34,7 @@ export const en = {
     repositoryCurrent: 'Repository: {{name}}',
     repositoryWaiting: 'waiting for an answer: {{count}}',
     repositoryAdd: 'Add repository…',
+    repositoryManage: 'Manage projects',
     repositorySearch: 'Search projects…',
     repositoryNone: 'Nothing found',
     repositoryRemove: 'Remove from list',
@@ -796,6 +797,19 @@ export const en = {
       removed: 'Tag deleted',
     },
   },
+  pathPicker: {
+    browse: 'Browse…',
+    title: 'Choose a folder',
+    description: 'Double-click a folder to open it; git marks the root of a repository.',
+    up: 'Up',
+    home: 'Home',
+    go: 'Go',
+    path: 'Path',
+    empty: 'No subfolders',
+    truncated: 'Showing the first {{count}} folders',
+    choose: 'Choose this folder',
+    loading: 'Loading…',
+  },
   picker: {
     add: 'Add',
     remove: 'Remove {{value}}',
@@ -1215,6 +1229,8 @@ export const en = {
       'Runtime settings are read again before the next agent starts; the daemon does not need a restart.',
     tabs: 'level of settings',
     project: 'Project',
+    projectsNote: "Projects are kept in the daemon's database and are shared by every panel.",
+    noEnabledProjects: 'No enabled projects: add or enable one in the group',
     noProjects: 'No repositories yet: add one in the repository menu.',
     writesTo: 'Saved to',
     target: 'Where the settings are saved',
@@ -1253,6 +1269,7 @@ export const en = {
       taken: 'This variable already exists.',
     },
     group: {
+      projects: 'Projects',
       general: 'General',
       agents: 'Agents',
       delivery: 'Delivery',
@@ -1266,6 +1283,8 @@ export const en = {
       tags: 'Tags',
     },
     about: {
+      projects:
+        'Every project of the daemon: its name, slug, color, whether it is enabled, and its path. Disabled projects are listed here too.',
       observers:
         'Observers: agents that take a task after an incident (a question, a failure, a conflict, a refused delivery) and try to repair it.',
       general:
@@ -1430,6 +1449,68 @@ export const en = {
       connect: 'Connect {{name}}',
       maxWorkers: 'Workers in the project',
       maxWorkersOf: 'Workers in {{name}}',
+    },
+  },
+  projects: {
+    add: 'Add project',
+    new: 'New project',
+    search: 'Search projects',
+    list: 'projects',
+    empty: 'No projects yet: add one with «Add project».',
+    nothing: 'Nothing found',
+    choose: 'Choose a project on the left',
+    disabled: 'Disabled',
+    form: 'project {{name}}',
+    noColor: 'No color',
+    colors: {
+      gray: 'Gray',
+      red: 'Red',
+      orange: 'Orange',
+      yellow: 'Yellow',
+      green: 'Green',
+      teal: 'Teal',
+      blue: 'Blue',
+      violet: 'Violet',
+      pink: 'Pink',
+      brown: 'Brown',
+    },
+    fields: {
+      name: 'Name',
+      slug: 'Slug',
+      path: 'Path',
+      enabled: 'Enabled',
+      color: 'Color',
+    },
+    hints: {
+      name: 'Shown in the panel instead of the directory name; leave it empty to show the directory name.',
+      nameAuto: 'the directory name',
+      slug: 'A short address: pass it instead of the path in --repo and in repo of the MCP tools. Lower-case letters, digits and dashes.',
+      slugAuto: 'made from the directory name',
+      enabled:
+        'A disabled project is hidden in the panel and takes no new runs or tasks; its running runs go on.',
+      path: 'The root of the git repository.',
+      newPath:
+        'A path inside a git repository, absolute or from the home folder (~/…); a subdirectory resolves to its root.',
+    },
+    move: {
+      open: 'Change path…',
+      title: 'Change the path of the project',
+      description:
+        'The runs, the queue and the tags of the project move to the new path. Files are not moved.',
+      path: 'New path',
+      submit: 'Change path',
+    },
+    facts: {
+      label: 'About the project',
+      added: 'Added',
+      unfinished: 'Unfinished runs',
+      waiting: 'Waiting for an answer',
+      queued: 'Tasks in the queue',
+    },
+    links: {
+      settings: 'Project settings',
+      queue: 'Queue',
+      disabled: 'The project is disabled: enable it to open its settings and its queue.',
     },
   },
   system: {

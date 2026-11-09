@@ -49,6 +49,21 @@ describe('agy launches', () => {
     expect(second.args.join(' ')).toContain('aip-next-id');
   });
 
+  it('rewrites the same hook policy for every attempt of a group, so a resumed conversation sees the current one', () => {
+    const paths = (seq: number, sessionId: string) =>
+      runtime
+        .buildLaunch(
+          agyContext('/state', {
+            attemptDirectory: `/state/logs/run/login/${seq}`,
+            sessionId,
+            resumeSession: seq > 2 ? 'conv-1' : null,
+          }),
+        )
+        .files.map((file) => file.path);
+    expect(paths(3, 'next-id')).toEqual(paths(2, 'fresh-id'));
+    expect(paths(3, 'next-id')).toContain('/state/logs/run/login/agy/policy.json');
+  });
+
   it('uses the worker flags for queue and observer tools', () => {
     const context = agyContext();
     context.workerCommand.push('--queue', '--repair');

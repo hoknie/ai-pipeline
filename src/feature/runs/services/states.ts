@@ -116,8 +116,18 @@ export class RunStates {
     return this.dependencies.runs.runOfQueueItem(repository, item);
   }
 
-  /** Drops a removed tag from the stored runs; no transaction of its own. */
-  dropStoredTag(repository: string, id: string): void {
-    this.dependencies.runs.dropTag(repository, id);
+  /**
+   * A change of the stored runs of a repository, no transaction of its own: a removed tag leaves
+   * them, or the runs of a project that moved get its new path (in memory too).
+   */
+  changeStored(repository: string, change: { dropTag: string } | { moveTo: string }): void {
+    if ('dropTag' in change) {
+      this.dependencies.runs.dropTag(repository, change.dropTag);
+      return;
+    }
+    this.dependencies.runs.moveRuns(repository, change.moveTo);
+    for (const state of this.states.values()) {
+      if (state.run.repository === repository) state.run.repository = change.moveTo;
+    }
   }
 }

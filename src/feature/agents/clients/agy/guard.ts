@@ -13,7 +13,7 @@ export type AgyPolicy = z.infer<typeof policySchema>;
 const hookSchema = z.object({
   toolCall: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()) }),
 });
-const READ_TOOLS = new Set(['view_file', 'list_dir', 'find_by_name', 'grep_search']);
+const READ_TOOLS = new Set(['view_file', 'read_file', 'list_dir', 'find_by_name', 'grep_search']);
 const WRITE_TOOLS = new Set([
   'write_to_file',
   'replace_file_content',
@@ -21,6 +21,7 @@ const WRITE_TOOLS = new Set([
 ]);
 const READ_PATHS: Record<string, string> = {
   view_file: 'AbsolutePath',
+  read_file: 'Path',
   list_dir: 'DirectoryPath',
   find_by_name: 'SearchDirectory',
   grep_search: 'SearchPath',
@@ -28,6 +29,8 @@ const READ_PATHS: Record<string, string> = {
 
 function mcpAllowed(policy: AgyPolicy, name: string, args: Record<string, unknown>): boolean {
   if (!policy.server) return false;
+  if (name === 'list_resources' || name === 'read_resource')
+    return args.ServerName === policy.server;
   if (name === 'call_mcp_tool')
     return (
       args.ServerName === policy.server &&
@@ -53,7 +56,7 @@ function permit(policy: AgyPolicy, name: string, args: Record<string, unknown>):
   if (name === 'run_command')
     return (
       policy.permissions !== 'read' &&
-      insideWorktree(policy.worktree, args.Cwd) &&
+      insideWorktree(policy.worktree, args.Cwd ?? policy.worktree) &&
       allowedCommand(args.CommandLine, policy.permissions === 'full' ? null : policy.allowCommands)
     );
   // Unchecked background input and delegated agents could bypass the command policy.

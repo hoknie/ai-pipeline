@@ -4,7 +4,7 @@
 
 The server passes requests to the [daemon](../usage/daemon.md) and starts it when it is not running, so every Claude Code and OpenCode window and the terminal see one state.
 
-Without `repo`, a tool works with the repository of the current directory. Every answer has a table for humans and the data as JSON. In OpenCode the tools carry the server prefix: `aip_swarm_status`, `aip_swarm_run`.
+Without `repo`, a tool works with the repository of the current directory. `repo` is a path or a [project slug](../usage/repositories.md#projects); when the current directory has a file or directory of that name, the path wins. Every answer has a table for humans and the data as JSON. In OpenCode the tools carry the server prefix: `aip_swarm_status`, `aip_swarm_run`.
 
 ## Host tools
 

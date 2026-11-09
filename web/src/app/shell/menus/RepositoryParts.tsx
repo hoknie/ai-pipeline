@@ -2,9 +2,11 @@ import { FolderGit2, Plus, X } from 'lucide-react';
 import { useState, type FormEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PathInput, type BrowseDirectories } from '../../../features/repositories/index.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
+import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import {
   Dialog,
@@ -29,10 +31,12 @@ export function AddRepositoryDialog({
   open,
   onOpenChange,
   onAdd,
+  browse,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdd: (path: string) => Promise<void>;
+  browse: BrowseDirectories;
 }) {
   const { t } = useTranslation();
   const [path, setPath] = useState('');
@@ -68,14 +72,15 @@ export function AddRepositoryDialog({
             <DialogDescription>{t('nav.repositoryAddDescription')}</DialogDescription>
           </DialogHeader>
           <Label htmlFor="repository-path">{t('nav.repositoryPath')}</Label>
-          <Input
+          <PathInput
             id="repository-path"
             value={path}
-            onChange={(event) => setPath(event.target.value)}
-            placeholder="/home/me/projects/app"
+            onChange={setPath}
+            browse={browse}
+            placeholder="~/projects/app"
             autoFocus
-            aria-invalid={error !== null}
-            aria-describedby={error ? 'repository-path-error' : undefined}
+            invalid={error !== null}
+            describedBy={error ? 'repository-path-error' : undefined}
           />
           {error ? (
             <p id="repository-path-error" role="alert" className="text-sm text-destructive">
@@ -122,6 +127,7 @@ export function RepositoryTrigger({
         title={title}
       >
         <FolderGit2 aria-hidden />
+        <ProjectDot path={title} />
         <span className="flex-1 truncate text-left">{name}</span>
         {others > 0 ? (
           <Badge variant="warn" aria-label={t('nav.repositoryWaiting', { count: others })}>
@@ -151,7 +157,10 @@ export function RepositoryItem({
   return (
     <DropdownMenuRadioItem value={path} title={path} className="min-h-[3.25rem]">
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">{repositoryLabel(path)}</span>
+        <span className="flex items-center gap-1.5 truncate">
+          <ProjectDot path={path} />
+          <span className="truncate">{repositoryLabel(path)}</span>
+        </span>
         <span className="text-xs break-all whitespace-normal text-muted-foreground">{shown}</span>
       </span>
       {count > 0 ? (
@@ -251,9 +260,11 @@ export function RepositoryList(props: {
 export function AddFirstRepository({
   compact,
   onAdd,
+  browse,
 }: {
   compact: boolean;
   onAdd: (path: string) => Promise<void>;
+  browse: BrowseDirectories;
 }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
@@ -270,7 +281,7 @@ export function AddFirstRepository({
         <Plus aria-hidden />
         <span className="flex-1 truncate text-left">{t('nav.repositoryAdd')}</span>
       </Button>
-      <AddRepositoryDialog open={adding} onOpenChange={setAdding} onAdd={onAdd} />
+      <AddRepositoryDialog open={adding} onOpenChange={setAdding} onAdd={onAdd} browse={browse} />
     </>
   );
 }

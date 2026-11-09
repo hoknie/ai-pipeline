@@ -1,7 +1,4 @@
-import { resolve } from 'node:path';
-
 import { rejected } from '../../../platform/errors/index.ts';
-import { repositoryRoot } from '../../../platform/git/index.ts';
 import type { ObserverService } from '../../observers/services/index.ts';
 import type { QueueStore } from '../../queue/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
@@ -15,6 +12,31 @@ export interface RepositoryRemovalDependencies {
   observers: ObserverService;
 }
 
+/** Refuses a project with an unfinished run: its worktrees and refs belong to the project's root. */
+export function checkNoUnfinishedRuns(root: string, states: RunStates): void {
+  const unfinished = states
+    .all()
+    .filter((state) => state.run.repository === root && !isRunFinished(state))
+    .map((state) => state.run.id);
+  if (unfinished.length > 0) {
+    throw rejected(
+      `repository has unfinished runs: ${unfinished.length} (${unfinished.join(', ')})`,
+    );
+  }
+}
+
+/**
+ * Refuses a project that still works: an unfinished run, or tasks in its queue. A queue left
+ * running without tasks does not hold the project.
+ */
+export function checkIdle(root: string, states: RunStates, queues: QueueStore): void {
+  checkNoUnfinishedRuns(root, states);
+  const queue = queues.get(root);
+  if (queue && queue.items.length > 0) {
+    throw rejected(`repository queue holds tasks: ${queue.items.length}`);
+  }
+}
+
 /** `repository_remove`: a repository leaves the registry when nothing works in it. */
 export class RepositoryRemoval {
   private readonly dependencies: RepositoryRemovalDependencies;
@@ -25,21 +47,8 @@ export class RepositoryRemoval {
 
   async remove(path: string): Promise<void> {
     const { registry, states, queues, observers } = this.dependencies;
-    let root: string;
-    try {
-      root = await repositoryRoot(path);
-    } catch {
-      root = resolve(path);
-    }
-    if (!registry.has(root)) throw rejected(`unknown repository ${root}`);
-    const unfinished = states
-      .all()
-      .filter((state) => state.run.repository === root && !isRunFinished(state)).length;
-    if (unfinished > 0) throw rejected(`repository has unfinished runs: ${unfinished}`);
-    const queue = queues.get(root);
-    if (queue && (queue.status === 'running' || queue.items.length > 0)) {
-      throw rejected('repository queue is not empty or running');
-    }
+    const root = await registry.resolve(path);
+    checkIdle(root, states, queues);
     observers.forgetRepository(root);
     registry.forget(root);
   }

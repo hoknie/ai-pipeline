@@ -46,6 +46,14 @@ function props(extra: Partial<NavProps> = {}): NavProps {
       onSelect: () => {},
       onAdd: async () => {},
       onRemove: () => {},
+      browse: async () => ({
+        path: '/home/me',
+        parent: '/home',
+        home: '/home/me',
+        git: false,
+        entries: [],
+        truncated: false,
+      }),
     },
     ...extra,
   };

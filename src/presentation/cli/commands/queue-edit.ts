@@ -1,7 +1,6 @@
-import { resolve } from 'node:path';
-
 import { Option } from 'commander';
 
+import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { QueueView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
@@ -64,7 +63,7 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
   const pipeline = options.pipeline ?? options.workflow;
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
   return {
-    repository: resolve(options.repo),
+    repository: repositoryArgument(options.repo),
     item,
     ...(pipeline !== undefined ? { pipeline } : {}),
     ...(options.task !== undefined ? { task: options.task } : {}),
@@ -190,7 +189,7 @@ export function addSettings(kit: QueueKit): void {
         showQueue(
           options.json,
           (await call(context(), 'queue_settings', {
-            repository: resolve(options.repo),
+            repository: repositoryArgument(options.repo),
             ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
             ...(autopilot !== undefined ? { autopilot } : {}),
             ...(autoAnswer !== undefined ? { autoAnswer } : {}),

@@ -2,8 +2,9 @@ import { Check, FolderGit2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { repositoryLabel } from '../../shared/lib/catalog/repositories.ts';
+import { repositoryLabel, repositoryMatches } from '../../shared/lib/catalog/repositories.ts';
 import { Badge } from '../../shared/ui/feedback/badge.tsx';
+import { ProjectDot } from '../../shared/ui/feedback/ProjectDot.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import {
   Command,
@@ -15,14 +16,9 @@ import {
 } from '../../shared/ui/overlays/command.tsx';
 import { Popover, PopoverContent, PopoverTrigger } from '../../shared/ui/overlays/popover.tsx';
 
-/** Repositories whose directory name or path contains the text, without regard to case. */
+/** Repositories whose label, slug or path contains the text, without regard to case. */
 export function matchRepositories(repositories: readonly string[], query: string): string[] {
-  const needle = query.trim().toLowerCase();
-  if (needle === '') return [...repositories];
-  return repositories.filter(
-    (path) =>
-      repositoryLabel(path).toLowerCase().includes(needle) || path.toLowerCase().includes(needle),
-  );
+  return repositories.filter((path) => repositoryMatches(path, path, query));
 }
 
 function PickerTrigger({
@@ -56,6 +52,7 @@ function PickerTrigger({
         className="h-9.5 w-full justify-start px-2.5"
       >
         <FolderGit2 aria-hidden />
+        <ProjectDot path={value} />
         <span className="flex-1 truncate text-left">{repositoryLabel(value)}</span>
         {count > 0 ? (
           <Badge variant="warn" aria-label={t('nav.repositoryWaiting', { count })}>
@@ -83,7 +80,10 @@ function RepositoryRow({
     <CommandItem value={path} title={path} onSelect={onSelect}>
       <Check className={chosen ? 'opacity-100' : 'opacity-0'} />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate">{repositoryLabel(path)}</span>
+        <span className="flex items-center gap-1.5 truncate">
+          <ProjectDot path={path} />
+          <span className="truncate">{repositoryLabel(path)}</span>
+        </span>
         <span className="truncate text-xs text-muted-foreground">{path}</span>
       </span>
       {waits > 0 ? (

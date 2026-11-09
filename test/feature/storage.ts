@@ -55,10 +55,21 @@ export function temporaryStorage(): Storage {
 
 /** Gives a database built from the current schema the column names of the builds before the rename. */
 export function renameBack(database: import('node:sqlite').DatabaseSync): void {
+  dropProjectAttributes(database);
   for (const table of ['runs', 'queue_items']) {
     const columns = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
     if (columns.some((column) => column.name === 'pipeline')) {
       database.exec(`ALTER TABLE ${table} RENAME COLUMN pipeline TO workflow`);
     }
+  }
+}
+
+/** Takes away the project attributes of the registry, the last migration, when they are there. */
+export function dropProjectAttributes(database: import('node:sqlite').DatabaseSync): void {
+  const columns = database.prepare('PRAGMA table_info(repositories)').all() as { name: string }[];
+  if (!columns.some((column) => column.name === 'slug')) return;
+  database.exec('DROP INDEX IF EXISTS repositories_by_slug');
+  for (const column of ['name', 'slug', 'enabled', 'color']) {
+    database.exec(`ALTER TABLE repositories DROP COLUMN ${column}`);
   }
 }

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   databasePath,
   ensureDirectory,
+  expandHome,
   socketPath,
   stateDirectory,
 } from '../../src/platform/paths/index.ts';
@@ -36,5 +37,14 @@ describe('socket path', () => {
     const path = socketPath(long, '/tmp');
     expect(path).toMatch(/^\/tmp\/aip-[0-9a-f]{16}\.sock$/);
     expect(socketPath(long, '/tmp')).toBe(path);
+  });
+});
+
+describe('expandHome', () => {
+  it('writes ~ and ~/… under the home directory and keeps any other path', () => {
+    expect(expandHome('~', '/home/me')).toBe('/home/me');
+    expect(expandHome('~/projects/app', '/home/me')).toBe('/home/me/projects/app');
+    expect(expandHome('/srv/app', '/home/me')).toBe('/srv/app');
+    expect(expandHome('~other/app', '/home/me')).toBe('~other/app');
   });
 });

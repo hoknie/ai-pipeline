@@ -28,7 +28,8 @@ function targetOf(
   if (group === 'specialists' || group === 'pipelines' || group === 'chains') {
     return config ? `${config.directories.global}/${group}` : null;
   }
-  const isForm = group !== 'tags' && group !== 'queue' && group !== 'observers';
+  const isForm =
+    group !== 'tags' && group !== 'queue' && group !== 'observers' && group !== 'projects';
   return isForm ? (config?.settingsFiles[scope].file ?? null) : null;
 }
 
@@ -62,6 +63,8 @@ export default function SettingsPage(props: SettingsPageProps) {
         repositories={repositories}
         onSelectRepository={props.onSelectRepository}
         file={targetOf(props, config)}
+        note={group === 'projects' ? t('settingsPage.projectsNote') : null}
+        anyProject={props.registry.length > 0}
       />
       {scope === 'project' && repositories.length === 0 ? null : (
         <div className="grid w-full gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">

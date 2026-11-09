@@ -1,5 +1,3 @@
-import { resolve } from 'node:path';
-
 import type { Command } from 'commander';
 
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
@@ -11,6 +9,7 @@ import {
   formatTagLabels,
   type Style,
 } from '../../format/index.ts';
+import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { RunQueued, RunView } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
@@ -54,7 +53,7 @@ function startParams(pipeline: string, options: StartOptions) {
   const groups = options.groups ? readGroups(options.groups) : undefined;
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
   return {
-    repository: resolve(options.repo),
+    repository: repositoryArgument(options.repo),
     pipeline,
     ...(options.task !== undefined ? { task: options.task } : {}),
     ...(groups ? { groups } : {}),
@@ -78,7 +77,7 @@ function addStart(kit: RunKit): void {
     .argument('<pipeline>', 'pipeline id from the aip/ configuration')
     .option('-t, --task <text>', 'one task; the pipeline may split it into groups')
     .option('-g, --groups <file>', 'YAML or JSON file with a list of { title, task }')
-    .option('-r, --repo <path>', 'repository path', '.')
+    .option('-r, --repo <path>', 'repository path or project slug', '.')
     .option(
       '--title <text>',
       'title of the run (at most 60 characters); otherwise a model names it',

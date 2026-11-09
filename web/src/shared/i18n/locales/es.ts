@@ -37,6 +37,7 @@ export const es: Dictionary = {
     repositoryCurrent: 'Repositorio: {{name}}',
     repositoryWaiting: 'esperan respuesta: {{count}}',
     repositoryAdd: 'Añadir repositorio…',
+    repositoryManage: 'Gestionar proyectos',
     repositorySearch: 'Buscar proyecto…',
     repositoryNone: 'No se encontró nada',
     repositoryRemove: 'Quitar de la lista',
@@ -811,6 +812,19 @@ export const es: Dictionary = {
       removed: 'Etiqueta eliminada',
     },
   },
+  pathPicker: {
+    browse: 'Examinar…',
+    title: 'Elegir carpeta',
+    description: 'Haz doble clic en una carpeta para abrirla; git marca la raíz de un repositorio.',
+    up: 'Subir',
+    home: 'Inicio',
+    go: 'Ir',
+    path: 'Ruta',
+    empty: 'No hay subcarpetas',
+    truncated: 'Se muestran las primeras {{count}} carpetas',
+    choose: 'Elegir esta carpeta',
+    loading: 'Cargando…',
+  },
   picker: {
     add: 'Añadir',
     remove: 'Quitar {{value}}',
@@ -1239,6 +1253,9 @@ export const es: Dictionary = {
       'Los ajustes del ejecutor se vuelven a leer antes del siguiente agente; no hace falta reiniciar el daemon.',
     tabs: 'nivel de ajustes',
     project: 'Proyecto',
+    projectsNote:
+      'Los proyectos se guardan en la base del daemon y son comunes a todos los paneles.',
+    noEnabledProjects: 'No hay proyectos activados: añada o active uno en el grupo',
     noProjects: 'Aún no hay repositorios: añada uno en el menú de repositorios.',
     writesTo: 'Se guarda en',
     target: 'Dónde se guardan los ajustes',
@@ -1277,6 +1294,7 @@ export const es: Dictionary = {
       taken: 'Esta variable ya existe.',
     },
     group: {
+      projects: 'Proyectos',
       general: 'General',
       agents: 'Agentes',
       delivery: 'Entrega',
@@ -1290,6 +1308,8 @@ export const es: Dictionary = {
       tags: 'Etiquetas',
     },
     about: {
+      projects:
+        'Todos los proyectos del daemon: nombre, slug, color, si está activado y su ruta. Los proyectos desactivados también aparecen aquí.',
       observers:
         'Observadores: agentes que toman una tarea tras un incidente (una pregunta, un fallo, un conflicto, una entrega rechazada) e intentan repararla.',
       general:
@@ -1467,6 +1487,68 @@ export const es: Dictionary = {
       connect: 'Conectar {{name}}',
       maxWorkers: 'Trabajadores en el proyecto',
       maxWorkersOf: 'Trabajadores en {{name}}',
+    },
+  },
+  projects: {
+    add: 'Añadir proyecto',
+    new: 'Proyecto nuevo',
+    search: 'Buscar proyectos',
+    list: 'proyectos',
+    empty: 'Aún no hay proyectos: añada uno con «Añadir proyecto».',
+    nothing: 'No se encontró nada',
+    choose: 'Elija un proyecto a la izquierda',
+    disabled: 'Desactivado',
+    form: 'proyecto {{name}}',
+    noColor: 'Sin color',
+    colors: {
+      gray: 'Gris',
+      red: 'Rojo',
+      orange: 'Naranja',
+      yellow: 'Amarillo',
+      green: 'Verde',
+      teal: 'Turquesa',
+      blue: 'Azul',
+      violet: 'Violeta',
+      pink: 'Rosa',
+      brown: 'Marrón',
+    },
+    fields: {
+      name: 'Nombre',
+      slug: 'Slug',
+      path: 'Ruta',
+      enabled: 'Activado',
+      color: 'Color del proyecto',
+    },
+    hints: {
+      name: 'Se muestra en el panel en lugar del nombre del directorio; déjelo vacío para mostrar el nombre del directorio.',
+      nameAuto: 'el nombre del directorio',
+      slug: 'Una dirección corta: pásela en lugar de la ruta en --repo y en repo de las herramientas MCP. Minúsculas, dígitos y guiones.',
+      slugAuto: 'a partir del nombre del directorio',
+      enabled:
+        'Un proyecto desactivado se oculta en el panel y no acepta ejecuciones ni tareas nuevas; las ejecuciones en curso siguen.',
+      path: 'La raíz del repositorio git.',
+      newPath:
+        'Una ruta dentro de un repositorio git, absoluta o desde la carpeta personal (~/…); un subdirectorio se resuelve a su raíz.',
+    },
+    move: {
+      open: 'Cambiar ruta…',
+      title: 'Cambiar la ruta del proyecto',
+      description:
+        'Las ejecuciones, la cola y las etiquetas del proyecto pasan a la nueva ruta. Los archivos no se mueven.',
+      path: 'Nueva ruta',
+      submit: 'Cambiar ruta',
+    },
+    facts: {
+      label: 'Sobre el proyecto',
+      added: 'Añadido',
+      unfinished: 'Ejecuciones sin terminar',
+      waiting: 'Esperan respuesta',
+      queued: 'Tareas en la cola',
+    },
+    links: {
+      settings: 'Ajustes del proyecto',
+      queue: 'Cola',
+      disabled: 'El proyecto está desactivado: actívelo para abrir sus ajustes y su cola.',
     },
   },
   system: {

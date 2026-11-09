@@ -117,6 +117,13 @@ describe('repositories event', () => {
     await h.call('tag_add', { repository: h.repo, name: 'marker' });
     await until('the marker', () => events.some((event) => event.event === 'tags'));
     expect(repositories()).toHaveLength(1);
+    await h.call('repository_update', { path: h.repo, name: 'Shop', color: 'teal' });
+    await until('the renamed project', () =>
+      repositories().some((event) => event.repositories.some((entry) => entry.label === 'Shop')),
+    );
+    expect(repositories().at(-1)?.repositories).toMatchObject([
+      { path: h.repo, name: 'Shop', label: 'Shop', color: 'teal', enabled: true },
+    ]);
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',

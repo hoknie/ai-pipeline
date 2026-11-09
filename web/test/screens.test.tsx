@@ -649,6 +649,43 @@ describe('structured questions', () => {
     expect(within(oauth).getByText('recommended')).toBeTruthy();
   });
 
+  it.each([
+    ['a long sentence with natural word boundaries that needs several lines', 'a different option'],
+    ['https://example.test/a-very-long-unbroken-path-that-must-wrap', 'another option'],
+  ])('keeps and submits the full long option: %s', async (option, otherOption) => {
+    const answer = vi.fn(async () => undefined);
+    const row = askingMany({
+      questions: [
+        { text: 'Choose an option', options: [option, otherOption], recommendation: option },
+      ],
+    });
+    mountAsking({ answer } as never, row);
+
+    await screen.findByRole('group', { name: 'Question 1 of 1' });
+    const optionText = screen.getAllByText(option, { exact: true })[0]!;
+    const recommended = optionText.closest('button')!;
+    const other = screen.getByRole('button', { name: otherOption });
+    expect(recommended).toBeTruthy();
+    expect(optionText.tagName).toBe('SPAN');
+    expect(optionText.className).toContain('[overflow-wrap:anywhere]');
+    expect(within(recommended).getByText('recommended')).toBeTruthy();
+    expect(recommended.getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(optionText);
+    expect(recommended.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(other);
+    expect(other.getAttribute('aria-pressed')).toBe('true');
+    expect(recommended.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(within(recommended).getByText('recommended'));
+    expect(recommended.getAttribute('aria-pressed')).toBe('true');
+    expect((screen.getByLabelText('answer to question 1') as HTMLTextAreaElement).value).toBe(
+      option,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
+    expect(answer).toHaveBeenCalledWith('run1', 'login', 'Q1: Choose an option\nA1: ' + option);
+  });
+
   it('disables the button and counts the unanswered questions', async () => {
     mountAsking();
     const field = await screen.findByLabelText('answer to question 2');

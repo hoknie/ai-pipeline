@@ -21,6 +21,7 @@ describe('groups of settings', () => {
       'specialists',
       'pipelines',
       'observers',
+      'projects',
       'system',
     ]);
     expect(SETTINGS_GROUPS_BY_SCOPE.project).toEqual([
@@ -152,5 +153,26 @@ describe('settings addresses', () => {
   it('sends the former general settings address to the settings page', () => {
     expect(parseRoute('#specialists/_settings')).toEqual(route('general', 'global'));
     expect(parseRoute('#specialists/coder').view).toBe('specialists');
+  });
+});
+
+describe('addresses of the group Projects', () => {
+  it('opens a project by its slug, the new form, and General on the project tab', () => {
+    expect(parseRoute('#settings/global/projects/shop')).toEqual({
+      view: 'settings',
+      run: 'projects',
+      group: 'global',
+      step: 'shop',
+      tab: null,
+    });
+    expect(formatRoute(parseRoute('#settings/global/projects/new'))).toBe(
+      '#settings/global/projects/new',
+    );
+    expect(formatRoute(parseRoute('#settings/global/projects'))).toBe('#settings/global/projects');
+    expect(parseRoute('#settings/project/projects')).toMatchObject({
+      run: 'general',
+      group: 'project',
+      step: null,
+    });
   });
 });

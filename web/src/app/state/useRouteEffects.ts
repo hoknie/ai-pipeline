@@ -10,6 +10,8 @@ export function useRouteEffects(
   selected: string | null,
   setRoute: (update: (current: Route) => Route) => void,
   setChosen: (path: string) => void,
+  /** Whether a repository is a disabled project: a run of one does not select it. */
+  disabled: (repository: string) => boolean,
 ): void {
   const first = runs.find((candidate) => candidate.repository === selected);
   useEffect(() => {
@@ -17,11 +19,13 @@ export function useRouteEffects(
       setRoute((current) => ({ ...current, run: first.id }));
   }, [route.view, route.run, first, setRoute]);
 
-  // An address or a link that opens a run of another repository selects that repository.
-  const routedRepository =
+  // An address or a link that opens a run of another repository selects that repository,
+  // unless the panel does not offer it (a disabled project).
+  const found =
     route.view === 'runs' && route.run
       ? (runs.find((candidate) => candidate.id === route.run)?.repository ?? null)
       : null;
+  const routedRepository = found !== null && !disabled(found) ? found : null;
   useEffect(() => {
     if (routedRepository !== null && routedRepository !== selected) setChosen(routedRepository);
   }, [routedRepository, selected, setChosen]);

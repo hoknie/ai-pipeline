@@ -5,9 +5,19 @@ import type { HandlerTable } from './types.ts';
 /** The registry of repositories and the tag catalogs. */
 export const repositoryHandlers = {
   repositories: async (_params, { snapshots }) => snapshots.repositories(),
-  repository_add: (params, { services, snapshots }) =>
+  repository_add: ({ path, ...attributes }, { services, snapshots }) =>
     services.runs.engine.serial(async () => {
-      await services.registry.rootOf(params.path);
+      await services.projects.add(path, attributes);
+      return snapshots.repositories();
+    }),
+  repository_update: ({ path, ...changes }, { services, snapshots }) =>
+    services.runs.engine.serial(async () => {
+      await services.compose.repositoryEdit.update(path, changes);
+      return snapshots.repositories();
+    }),
+  repository_move: (params, { services, snapshots }) =>
+    services.runs.engine.serial(async () => {
+      await services.compose.repositoryMove.move(params.path, params.to);
       return snapshots.repositories();
     }),
   repository_remove: (params, { services, snapshots }) =>

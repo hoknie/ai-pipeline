@@ -6,8 +6,11 @@ import type { Api } from '../src/shared/api/api.ts';
 import { httpApi, withRepository } from '../src/shared/api/api.ts';
 import type { RepositoryView } from '../src/shared/api/types.ts';
 import {
+  latestEnabled,
+  rememberProjects,
   repositoryLabel,
   repositoryList,
+  repositoryMatches,
   waitingByRepository,
 } from '../src/shared/lib/catalog/repositories.ts';
 
@@ -19,6 +22,7 @@ import {
   openFake,
   queueItem,
   queueOf,
+  repositoryView,
   runView,
   specialistEntry,
   pipelinesView,
@@ -38,8 +42,8 @@ afterEach(() => {
 const APP = '/work/app';
 const LIB = '/work/lib';
 
-function entry(path: string, waiting = 0): RepositoryView {
-  return { path, displayPath: path, addedAt: 1, unfinished: waiting, waiting, queued: 0 };
+function entry(path: string, waiting = 0, overrides: Partial<RepositoryView> = {}): RepositoryView {
+  return repositoryView(path, { unfinished: waiting, waiting, ...overrides });
 }
 
 describe('repositoryList, waitingByRepository, repositoryLabel', () => {
@@ -71,6 +75,33 @@ describe('repositoryList, waitingByRepository, repositoryLabel', () => {
     expect(repositoryLabel(APP)).toBe('app');
     expect(repositoryLabel('/work/app/')).toBe('app');
     expect(repositoryLabel('/')).toBe('/');
+  });
+});
+
+describe('names, colors and disabled projects', () => {
+  afterEach(() => rememberProjects([]));
+
+  it('leaves disabled projects out, sorts by label and falls back to the latest enabled', () => {
+    const registry = [
+      entry('/work/zeta', 0, { name: 'Alpha', label: 'Alpha', addedAt: 3 }),
+      entry(LIB, 0, { enabled: false, addedAt: 4 }),
+      entry(APP, 0, { addedAt: 2 }),
+    ];
+    rememberProjects(registry);
+    expect(repositoryList(null, registry)).toEqual(['/work/zeta', APP]);
+    expect(repositoryList(LIB, registry)).toEqual(['/work/zeta', APP]);
+    expect(latestEnabled(registry)).toBe('/work/zeta');
+    expect(latestEnabled([entry(LIB, 0, { enabled: false })])).toBeNull();
+  });
+
+  it('names a project by its name and finds it by name, slug or path', () => {
+    rememberProjects([entry(APP, 0, { name: 'Магазин', label: 'Магазин', slug: 'shop' })]);
+    expect(repositoryLabel(APP)).toBe('Магазин');
+    expect(repositoryLabel(LIB)).toBe('lib');
+    for (const query of ['магаз', 'SHO', 'app', '/work']) {
+      expect(repositoryMatches(APP, APP, query)).toBe(true);
+    }
+    expect(repositoryMatches(APP, APP, 'zzz')).toBe(false);
   });
 });
 
@@ -312,6 +343,15 @@ describe('repository selector', () => {
     render(<App api={api} openStream={openFake} />);
     snapshot();
     await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: lib'));
+  });
+
+  it('keeps the repository when a run of a disabled project is opened by address', async () => {
+    window.location.hash = '#runs/l1';
+    const { api } = twoRepositories();
+    render(<App api={api} openStream={openFake} />);
+    snapshot(undefined, { repositories: [entry(APP), entry(LIB, 0, { enabled: false })] });
+    await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: app'));
+    expect(window.location.hash).toBe('#runs/l1');
   });
 
   it('opens the topology of a run of another repository in that repository', async () => {

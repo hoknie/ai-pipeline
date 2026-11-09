@@ -1,7 +1,11 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { repositoryLabel } from '../../shared/lib/catalog/repositories.ts';
+import {
+  addedProject,
+  latestEnabled,
+  repositoryLabel,
+} from '../../shared/lib/catalog/repositories.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
 import type { Route } from '../../shared/lib/nav/route.ts';
 import type { PanelData } from './usePanelData.ts';
@@ -23,8 +27,9 @@ export function useRepositoryActions(panel: PanelData) {
     dirty.current = false;
     lastRun.current = null;
   };
-  const selectRepository = async (path: string) => {
-    if (path === selected) return;
+  /** Makes a repository the panel's; false when the user stays with unsaved edits. */
+  const selectRepository = async (path: string): Promise<boolean> => {
+    if (path === selected) return true;
     if (
       dirty.current &&
       !(await confirm({
@@ -35,27 +40,22 @@ export function useRepositoryActions(panel: PanelData) {
         destructive: true,
       }))
     )
-      return;
+      return false;
     reset();
     setChosen(path);
     // A run of the previous repository cannot stay open: the list is about to show another.
     if (route.view === 'runs') setRoute(closedRuns);
+    return true;
   };
 
   const addRepository = async (path: string) => {
     const list = await api.addRepository(path);
     setRegistry(list);
-    // The daemon answers with the list only; the new entry is the root that contains the path.
-    const known = new Set(registry.map((entry) => entry.path));
-    const root =
-      list
-        .filter((entry) => path === entry.path || path.startsWith(`${entry.path}/`))
-        .sort((left, right) => right.path.length - left.path.length)[0]?.path ??
-      list.find((entry) => !known.has(entry.path))?.path;
+    const root = addedProject(path, registry, list)?.path;
     if (root) await selectRepository(root);
   };
 
-  const removeRepository = async (path: string) => {
+  const removeRepository = async (path: string): Promise<boolean> => {
     const name = repositoryLabel(path);
     if (
       !(await confirm({
@@ -65,18 +65,37 @@ export function useRepositoryActions(panel: PanelData) {
         destructive: true,
       }))
     )
-      return;
+      return false;
+    let list;
     try {
-      setRegistry(await api.removeRepository(path));
+      list = await api.removeRepository(path);
     } catch (error) {
       notifyError(error);
-      return;
+      return false;
     }
+    setRegistry(list);
     if (path === latest.current.selected || path === latest.current.chosen) {
       reset();
-      setChosen(null);
+      // without a known home the panel would be left with no repository and no list
+      setChosen(panel.state.home === null ? latestEnabled(list) : null);
       if (route.view === 'runs') setRoute(closedRuns);
     }
+    return true;
   };
-  return { selectRepository, addRepository, removeRepository };
+
+  /** A project moved: the chosen repository follows it to the new path. */
+  const projectMoved = (from: string, to: string) => {
+    if (latest.current.chosen === from || latest.current.selected === from) setChosen(to);
+  };
+
+  /** Makes a project the panel's repository, then opens its settings or its queue. */
+  const openProject = async (path: string, target: 'settings' | 'queue') => {
+    if (!(await selectRepository(path))) return;
+    setRoute(
+      target === 'queue'
+        ? { view: 'queue', run: null, group: null, step: null, tab: null }
+        : { view: 'settings', run: 'general', group: 'project', step: null, tab: null },
+    );
+  };
+  return { selectRepository, addRepository, removeRepository, projectMoved, openProject };
 }

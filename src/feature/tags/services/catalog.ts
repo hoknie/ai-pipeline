@@ -108,6 +108,14 @@ export class TagCatalogService {
     this.catalog = this.catalog.filter((tag) => tag.id !== id);
   }
 
+  /** The catalog of a project that moved, stored and in memory; no transaction of its own. */
+  moveRepository(from: string, to: string): void {
+    this.dependencies.tags.moveTags(from, to);
+    this.catalog = this.catalog.map((tag) =>
+      tag.repository === from ? { ...tag, repository: to } : tag,
+    );
+  }
+
   /** Tells the clients about the catalogs. */
   publish(repository: string): void {
     this.dependencies.publish.tagsChanged(repository);

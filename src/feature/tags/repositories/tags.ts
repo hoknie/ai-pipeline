@@ -52,6 +52,11 @@ export class TagRepository {
       );
   }
 
+  /** One statement, no transaction of its own: the tags of a project that moved. */
+  moveTags(from: string, to: string): void {
+    this.database.prepare('UPDATE tags SET repository = ? WHERE repository = ?').run(to, from);
+  }
+
   /** One statement, no transaction of its own: the scenario of removing a tag opens it. */
   deleteTag(repository: string, id: string): void {
     this.database.prepare('DELETE FROM tags WHERE id = ? AND repository = ?').run(id, repository);

@@ -10,3 +10,4 @@ export {
   type StopResult,
 } from './autostart.ts';
 export { DaemonUnavailable, IpcError, request, subscribe } from './client.ts';
+export { repositoryArgument } from './repository-argument.ts';

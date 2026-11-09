@@ -8,7 +8,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
+"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
 
 ## Project groups
 
@@ -54,6 +54,16 @@ The group "Observers" of "Shared" sets the agents that take a task after an inci
 - "Main": the switch "Enable observers", "Workers" (1 to 20, how many observers work at once), "Repairs per task" (1 to 50) and the switch "Answer questions meant only for a human" (off: such a question waits for a person; on: the agent decides it). Under the fields are the repairs in progress and the number of tasks waiting for a worker; they follow the stream without a reload.
 - "Specialist": the fields of the specialist that works as the observer, as in a specialist form, but without the slug, tags, limit and queue.
 - "Projects": the repositories of the registry, each with a switch "Connect" and the field "Workers in the project", empty by default (no limit of its own).
+
+## Projects
+
+The group "Projects" of "Shared" manages the [projects of the daemon](../usage/repositories.md#projects). On the left is every project, disabled ones too (marked "Disabled"), with its slug, path and runs waiting for an answer, a search by name, slug or path, and "Add project". The address is `#settings/global/projects/<slug>` for a project and `#settings/global/projects/new` for a new one.
+
+- The form of a project has "Name" (empty: the directory name), "Slug", "Path" with "Change path…", the switch "Enabled" and "Color". Below are when it was added and its unfinished runs, runs waiting for an answer and queued tasks.
+- "Save" sends the changed fields; a refusal of the daemon, such as a taken slug, is shown at its field. Leaving a form with unsaved changes asks first.
+- Disabling the selected repository of the panel selects the default one. A disabled project is not in the repository picker, in the picker of a new task or in "Project" of the project tab.
+- "Change path…" moves the project to another root. The field starts with the current path (`~` for the home directory), takes `~/…`, and has "Browse…". The queued tasks move with the project; the dialog keeps the refusal while the project has unfinished runs.
+- "Project settings" and "Queue" make the project the selected repository and open its settings or its queue. "Remove from list" asks first and follows the rules of the repository picker.
 
 ## System
 

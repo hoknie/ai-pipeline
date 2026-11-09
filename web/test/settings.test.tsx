@@ -453,6 +453,7 @@ const GLOBAL_GROUPS = [
   'Specialists',
   'Pipeline',
   'Observers',
+  'Projects',
   'System',
 ];
 const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Tags'];

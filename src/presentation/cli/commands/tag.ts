@@ -1,9 +1,8 @@
-import { resolve } from 'node:path';
-
 import type { Command } from 'commander';
 
 import { TAG_COLORS } from '../../../feature/tags/types/index.ts';
 import { formatTagList, type Style } from '../../format/index.ts';
+import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { TagView } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
@@ -28,13 +27,15 @@ function addList(kit: TagKit): void {
   tag
     .command('list')
     .description('Show the tags of the repository')
-    .option('-r, --repo <path>', 'repository path', '.')
+    .option('-r, --repo <path>', 'repository path or project slug', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag list']))
     .action(async (options: { repo: string; json?: boolean }) => {
       show(
         options.json,
-        (await call(context(), 'tags', { repository: resolve(options.repo) })) as TagView[],
+        (await call(context(), 'tags', {
+          repository: repositoryArgument(options.repo),
+        })) as TagView[],
       );
     });
 }
@@ -46,14 +47,14 @@ function addAdd(kit: TagKit): void {
     .description('Create a tag (name up to 30 characters, unique ignoring case)')
     .argument('<name>', 'tag name')
     .option('--color <color>', `one of: ${TAG_COLORS.join(', ')}`)
-    .option('-r, --repo <path>', 'repository path', '.')
+    .option('-r, --repo <path>', 'repository path or project slug', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag add auth --color blue']))
     .action(async (name: string, options: { color?: string; repo: string; json?: boolean }) => {
       show(
         options.json,
         (await call(context(), 'tag_add', {
-          repository: resolve(options.repo),
+          repository: repositoryArgument(options.repo),
           name,
           ...(options.color !== undefined ? { color: options.color } : {}),
         })) as TagView[],
@@ -69,7 +70,7 @@ function addEdit(kit: TagKit): void {
     .argument('<name>', 'tag name')
     .option('--name <new>', 'new name')
     .option('--color <color>', `one of: ${TAG_COLORS.join(', ')}`)
-    .option('-r, --repo <path>', 'repository path', '.')
+    .option('-r, --repo <path>', 'repository path or project slug', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag edit auth --name login --color teal']))
     .action(
@@ -83,7 +84,7 @@ function addEdit(kit: TagKit): void {
         show(
           options.json,
           (await call(context(), 'tag_edit', {
-            repository: resolve(options.repo),
+            repository: repositoryArgument(options.repo),
             tag: name,
             ...(options.name !== undefined ? { name: options.name } : {}),
             ...(options.color !== undefined ? { color: options.color } : {}),
@@ -99,14 +100,14 @@ function addRemove(kit: TagKit): void {
     .command('remove')
     .description('Delete a tag and take it off every task and run of the repository')
     .argument('<name>', 'tag name')
-    .option('-r, --repo <path>', 'repository path', '.')
+    .option('-r, --repo <path>', 'repository path or project slug', '.')
     .option('--json', 'print JSON')
     .addHelpText('after', examples(['aip tag remove auth']))
     .action(async (name: string, options: { repo: string; json?: boolean }) => {
       show(
         options.json,
         (await call(context(), 'tag_remove', {
-          repository: resolve(options.repo),
+          repository: repositoryArgument(options.repo),
           tag: name,
         })) as TagView[],
       );

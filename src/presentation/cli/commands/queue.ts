@@ -1,9 +1,8 @@
-import { resolve } from 'node:path';
-
 import { Option, type Command } from 'commander';
 
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
 import { formatQueue, formatRunCreated, type Style } from '../../format/index.ts';
+import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { QueueView, RunCreated } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
@@ -43,7 +42,9 @@ function queueKit(program: Command, io: CliIo, style: Style) {
         collect,
       );
   const common = (command: Command): Command =>
-    command.option('-r, --repo <path>', 'repository path', '.').option('--json', 'print JSON');
+    command
+      .option('-r, --repo <path>', 'repository path or project slug', '.')
+      .option('--json', 'print JSON');
   return {
     print,
     output,
@@ -67,7 +68,9 @@ function addList(kit: QueueKit): void {
     .action(async (options: { repo: string; json?: boolean }) => {
       showQueue(
         options.json,
-        (await call(context(), 'queue', { repository: resolve(options.repo) })) as QueueView,
+        (await call(context(), 'queue', {
+          repository: repositoryArgument(options.repo),
+        })) as QueueView,
       );
     });
 }
@@ -100,7 +103,7 @@ function addAdd(kit: QueueKit): void {
       }
       const deliveryMode = parseDeliveryMode(options.deliveryMode);
       const view = (await call(context(), 'queue_add', {
-        repository: resolve(options.repo),
+        repository: repositoryArgument(options.repo),
         pipeline,
         ...(options.task !== undefined ? { task: options.task } : {}),
         ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
@@ -131,7 +134,7 @@ function addRemove(kit: QueueKit): void {
       showQueue(
         options.json,
         (await call(context(), 'queue_remove', {
-          repository: resolve(options.repo),
+          repository: repositoryArgument(options.repo),
           item,
         })) as QueueView,
       );
@@ -152,7 +155,7 @@ function addMove(kit: QueueKit): void {
       showQueue(
         options.json,
         (await call(context(), 'queue_edit', {
-          repository: resolve(options.repo),
+          repository: repositoryArgument(options.repo),
           item,
           position: Number(position),
         })) as QueueView,
@@ -173,7 +176,7 @@ function addStart(kit: QueueKit): void {
       showQueue(
         options.json,
         (await call(context(), 'queue_start', {
-          repository: resolve(options.repo),
+          repository: repositoryArgument(options.repo),
           ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
         })) as QueueView,
       );
@@ -193,7 +196,7 @@ function addParallel(kit: QueueKit): void {
       showQueue(
         options.json,
         (await call(context(), 'queue_settings', {
-          repository: resolve(options.repo),
+          repository: repositoryArgument(options.repo),
           parallel: Number(n),
         })) as QueueView,
       );
@@ -207,7 +210,9 @@ function addPause(kit: QueueKit): void {
     .action(async (options: { repo: string; json?: boolean }) => {
       showQueue(
         options.json,
-        (await call(context(), 'queue_pause', { repository: resolve(options.repo) })) as QueueView,
+        (await call(context(), 'queue_pause', {
+          repository: repositoryArgument(options.repo),
+        })) as QueueView,
       );
     });
 }
@@ -226,7 +231,7 @@ function addReturn(kit: QueueKit): void {
     .action(async (run: string, options: { repo?: string; json?: boolean }) => {
       const view = (await call(context(), 'queue_return', {
         runId: run,
-        ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
+        ...(options.repo !== undefined ? { repository: repositoryArgument(options.repo) } : {}),
       })) as QueueView & { item: string };
       showQueue(options.json, view);
     });
@@ -246,7 +251,7 @@ function addDismiss(kit: QueueKit): void {
     .action(async (run: string, options: { repo?: string; json?: boolean }) => {
       const view = (await call(context(), 'queue_dismiss', {
         runId: run,
-        ...(options.repo !== undefined ? { repository: resolve(options.repo) } : {}),
+        ...(options.repo !== undefined ? { repository: repositoryArgument(options.repo) } : {}),
       })) as QueueView;
       showQueue(options.json, view);
     });
@@ -264,7 +269,7 @@ function addRunNow(kit: QueueKit): void {
   )
     .addHelpText('after', examples(['aip queue run 2']))
     .action(async (item: string, options: { repo: string; json?: boolean }) => {
-      const repository = resolve(options.repo);
+      const repository = repositoryArgument(options.repo);
       const created = (await call(context(), 'queue_run_now', {
         repository,
         item,

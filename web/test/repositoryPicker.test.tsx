@@ -6,6 +6,9 @@ import {
   matchRepositories,
 } from '../src/features/repositories/RepositoryPicker.tsx';
 
+import { rememberProjects } from '../src/shared/lib/catalog/repositories.ts';
+
+import { repositoryView } from './fixtures.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
 afterEach(() => {
@@ -29,6 +32,21 @@ function mount(onChange = vi.fn(), waiting = new Map<string, number>()) {
   );
   return { onChange, trigger: screen.getByRole('combobox', { name: 'Repository' }) };
 }
+
+describe('projects in the picker', () => {
+  afterEach(() => rememberProjects([]));
+
+  it('shows the name and the color of a project and finds it by its slug', () => {
+    rememberProjects([
+      repositoryView(APP, { name: 'Магазин', label: 'Магазин', slug: 'shop', color: 'teal' }),
+    ]);
+    expect(matchRepositories(ALL, 'SHOP')).toEqual([APP]);
+    expect(matchRepositories(ALL, 'магаз')).toEqual([APP]);
+    const { trigger } = mount();
+    expect(trigger.textContent).toContain('Магазин');
+    expect(trigger.querySelector('[data-project-color="teal"]')).toBeTruthy();
+  });
+});
 
 describe('matchRepositories', () => {
   it('matches the directory name or the path without regard to case', () => {

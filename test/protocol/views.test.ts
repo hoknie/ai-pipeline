@@ -41,10 +41,11 @@ function inRepository(path: string, id: string, options: Parameters<typeof run>[
 }
 
 describe('repositoryViews', () => {
+  const project = { name: null, slug: null, enabled: true, color: null };
   const entries = [
-    { path: '/b', addedAt: 2 },
-    { path: '/a', addedAt: 1 },
-    { path: '/c', addedAt: 3 },
+    { path: '/b', addedAt: 2, ...project },
+    { path: '/a', addedAt: 1, ...project },
+    { path: '/c', addedAt: 3, ...project },
   ];
 
   it('counts unfinished and waiting runs and queued tasks, sorted by path', () => {
@@ -64,12 +65,31 @@ describe('repositoryViews', () => {
     expect(views[2]).toMatchObject({ unfinished: 0, waiting: 0, queued: 0 });
   });
 
+  it('carries the attributes of a project and its label', () => {
+    const [named, plain] = repositoryViews(
+      [
+        { path: '/work/app', addedAt: 1, name: 'Shop', slug: 'app', enabled: false, color: 'teal' },
+        { path: '/work/shop-api', addedAt: 2, ...project },
+      ],
+      [],
+      [],
+    );
+    expect(named).toMatchObject({
+      name: 'Shop',
+      label: 'Shop',
+      slug: 'app',
+      enabled: false,
+      color: 'teal',
+    });
+    expect(plain).toMatchObject({ name: null, label: 'shop-api', enabled: true, color: null });
+  });
+
   it('writes the home directory as ~ in displayPath', () => {
     const list = [
-      { path: '/Users/me', addedAt: 1 },
-      { path: '/Users/me/projects/shop', addedAt: 2 },
-      { path: '/Users/me2/shop', addedAt: 3 },
-      { path: '/srv/app', addedAt: 4 },
+      { path: '/Users/me', addedAt: 1, ...project },
+      { path: '/Users/me/projects/shop', addedAt: 2, ...project },
+      { path: '/Users/me2/shop', addedAt: 3, ...project },
+      { path: '/srv/app', addedAt: 4, ...project },
     ];
     const shown = (home: string | null) =>
       repositoryViews(list, [], [], home).map((view) => view.displayPath);
@@ -90,13 +110,35 @@ describe('repositoryViews', () => {
           path: '/repo/app',
           displayPath: '/repo/app',
           addedAt: 1,
+          name: 'Shop',
+          label: 'Shop',
+          slug: 'app',
+          enabled: true,
+          color: null,
           unfinished: 2,
           waiting: 1,
           queued: 0,
         },
+        {
+          path: '/repo/lib',
+          displayPath: '/repo/lib',
+          addedAt: 2,
+          name: null,
+          label: 'lib',
+          slug: 'lib',
+          enabled: false,
+          color: null,
+          unfinished: 0,
+          waiting: 0,
+          queued: 0,
+        },
       ]),
     ).toBe(
-      ['REPOSITORY  UNFINISHED  WAITING  QUEUED', '/repo/app   2           1        0'].join('\n'),
+      [
+        'SLUG  NAME  REPOSITORY  STATE  UNFINISHED  WAITING  QUEUED',
+        'app   Shop  /repo/app   on     2           1        0',
+        'lib   lib   /repo/lib   off    0           0        0',
+      ].join('\n'),
     );
   });
 });

@@ -822,3 +822,23 @@ describe('host MCP swarm_skip_step', () => {
     expect(textOf(result)).toContain('already passed');
   });
 });
+
+describe('host MCP repo as a project slug', () => {
+  it('sends a slug as it is and a path resolved against the working directory', async () => {
+    const calls: { method: string; params: Record<string, unknown> }[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', repo: 'app' },
+    });
+    await client.callTool({ name: 'swarm_queue', arguments: { repo: 'sub/dir' } });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { pipeline: 'feature', task: 'x', repo: 'shop' },
+    });
+    expect(calls.map((call) => call.params.repository)).toEqual(['app', '/repo/sub/dir', 'shop']);
+  });
+});

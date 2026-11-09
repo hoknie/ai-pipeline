@@ -21,6 +21,14 @@ describe('RepositoryMenu without any repository', () => {
           onSelect: () => undefined,
           onAdd,
           onRemove: () => undefined,
+          browse: async () => ({
+            path: '/Users/me',
+            parent: '/Users',
+            home: '/Users/me',
+            git: false,
+            entries: [],
+            truncated: false,
+          }),
         }}
       />,
     );

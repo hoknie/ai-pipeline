@@ -41,6 +41,11 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           repository={selected}
           repositories={state.repositories}
           onSelectRepository={(path) => void actions.selectRepository(path)}
+          registry={state.registry}
+          onRegistry={state.setRegistry}
+          onProjectMoved={actions.projectMoved}
+          onRemoveProject={actions.removeRepository}
+          onOpenProject={(path, target) => void actions.openProject(path, target)}
           queue={queue}
           onQueue={state.setQueue}
           onError={notifyError}

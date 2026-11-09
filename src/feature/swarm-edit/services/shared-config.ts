@@ -105,7 +105,7 @@ export class SharedConfigService {
     const plan = this.importPlan(params.repository, params.source, params.slugs, 'specialist');
     if (!plan.ok) return plan;
     commitEdits(plan.edits);
-    this.dependencies.changed.configChanged(params.repository);
+    this.dependencies.changed.configChanged(this.dependencies.registry.pathOf(params.repository));
     return { ok: true, imported: [...new Set(params.slugs)] };
   }
 
@@ -126,7 +126,7 @@ export class SharedConfigService {
         : plan;
     }
     commitEdits(plan.edits);
-    this.dependencies.changed.configChanged(params.repository);
+    this.dependencies.changed.configChanged(this.dependencies.registry.pathOf(params.repository));
     return { ok: true, imported: [...new Set(params.ids)] };
   }
 
@@ -155,9 +155,10 @@ export class SharedConfigService {
 
   /** Plans and writes without an await between them, so two edits never interleave. */
   private tagEdit(
-    repository: string | null,
+    reference: string | null,
     plan: (paths: ConfigPaths, level: 'global' | 'project') => TagPlan,
   ): SpecialistTagsResult {
+    const repository = reference === null ? null : this.dependencies.registry.pathOf(reference);
     if (repository !== null && !this.dependencies.registry.has(repository)) {
       throw rejected(`unknown repository ${repository}`);
     }
@@ -170,11 +171,13 @@ export class SharedConfigService {
   }
 
   private importPlan(
-    repository: string,
-    source: string,
+    target: string,
+    from: string,
     ids: string[],
     kind: 'specialist' | 'pipeline',
   ): TagPlan {
+    const repository = this.dependencies.registry.pathOf(target);
+    const source = this.dependencies.registry.pathOf(from);
     for (const path of [repository, source]) {
       if (!this.dependencies.registry.has(path)) throw rejected(`unknown repository ${path}`);
     }

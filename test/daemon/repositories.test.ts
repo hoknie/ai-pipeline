@@ -82,6 +82,11 @@ describe('repository registry', () => {
         path: repo,
         displayPath: repo,
         addedAt: expect.any(Number),
+        name: null,
+        label: 'repo',
+        slug: 'repo',
+        enabled: true,
+        color: null,
         unfinished: 0,
         waiting: 0,
         queued: 0,
@@ -128,8 +133,17 @@ describe('repository registry', () => {
     const h = (current = await harness());
     await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'A' });
     await expect(h.call('repository_remove', { path: h.repo })).rejects.toThrow(
-      'repository queue is not empty or running',
+      'repository queue holds tasks: 1',
     );
+  });
+
+  it('removes a project whose empty queue was left running and whose directory is gone', async () => {
+    const h = (current = await harness());
+    const gone = newRepository();
+    await h.call('queue_start', { repository: gone });
+    rmSync(gone, { recursive: true, force: true });
+    await h.call('queue', { repository: gone });
+    expect(await h.call('repository_remove', { path: gone })).toEqual([]);
   });
 
   it('refuses an unknown repository and removes one whose directory is gone', async () => {

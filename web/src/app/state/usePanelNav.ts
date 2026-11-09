@@ -28,6 +28,7 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
       onSelect: (path) => void actions.selectRepository(path),
       onAdd: actions.addRepository,
       onRemove: (path) => void actions.removeRepository(path),
+      browse: panel.api.directories,
     },
     working,
     waiting,

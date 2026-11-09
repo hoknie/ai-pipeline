@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import { databasePath, ensureDirectory } from '../../../src/platform/paths/index.ts';
 import { SCHEMA_VERSION, migrate } from '../../../src/platform/sqlite/index.ts';
-import { openStorage, temporaryStorage, renameBack } from '../../feature/storage.ts';
+import {
+  dropProjectAttributes,
+  openStorage,
+  renameBack,
+  temporaryStorage,
+} from '../../feature/storage.ts';
 import { run } from '../../feature/runs/helpers.ts';
 import { addItem, emptyQueue } from '../../../src/feature/queue/types/index.ts';
 
@@ -69,7 +74,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(28);
+    expect(SCHEMA_VERSION).toBe(29);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -82,8 +87,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -3).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    MIGRATIONS.slice(0, -4).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     prepare(database);
     migrate(database);
     return database;
@@ -202,7 +207,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -220,6 +225,30 @@ describe('pipeline rename', () => {
       id: 'q1',
       pipeline: 'feature',
     });
+    store.database.close();
+  });
+});
+
+describe('project attributes', () => {
+  it('keeps the registry of an older database, every project enabled and without a slug yet', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = openStorage(databasePath(directory));
+    old.known.addRepository('/work/app', 5);
+    old.known.addRepository('/a/app', 9);
+    dropProjectAttributes(old.database.connection);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.close();
+    const store = openStorage(databasePath(directory));
+    expect(
+      store.database
+        .prepare(
+          'SELECT path, added_at, name, slug, enabled, color FROM repositories ORDER BY path',
+        )
+        .all(),
+    ).toEqual([
+      { path: '/a/app', added_at: 9, name: null, slug: null, enabled: 1, color: null },
+      { path: '/work/app', added_at: 5, name: null, slug: null, enabled: 1, color: null },
+    ]);
     store.database.close();
   });
 });

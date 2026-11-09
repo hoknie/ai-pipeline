@@ -556,7 +556,9 @@ describe('colored text', () => {
   it('prints plain text without a style', () => {
     expect(formatRepositories([], style)).toBe('No repositories yet.');
     const text = formatRepositories(
-      [{ path: '/r', unfinished: 1, waiting: 0, queued: 2 }] as never,
+      [
+        { path: '/r', slug: 'r', label: 'r', enabled: true, unfinished: 1, waiting: 0, queued: 2 },
+      ] as never,
       style,
     );
     expect(strip(text)).toContain('REPOSITORY');

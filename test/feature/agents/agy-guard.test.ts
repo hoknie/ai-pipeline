@@ -84,7 +84,7 @@ describe('the generated agy permission hook', () => {
       outside,
       join(editor.context.worktree, 'external', 'new.ts'),
       join(editor.context.worktree, 'dangling'),
-      join(editor.context.attemptDirectory, 'agy', 'policy.json'),
+      join(dirname(editor.context.attemptDirectory), 'agy', 'policy.json'),
     ])
       expect(write(path), path).toBe('deny');
   });
@@ -116,6 +116,24 @@ describe('the generated agy permission hook', () => {
       'ask_permission',
     ])
       expect(reader.decide(name).decision, name).toBe('deny');
+  });
+
+  it('understands the tool names agy actually sends', () => {
+    expect(
+      reader.decide('read_file', { Path: join(reader.context.worktree, 'CLAUDE.md') }).decision,
+    ).toBe('auto_approve');
+    expect(reader.decide('read_file', { Path: join(root, 'outside', 'secret') }).decision).toBe(
+      'deny',
+    );
+    expect(editor.decide('run_command', { CommandLine: 'npm test' }).decision).toBe('auto_approve');
+    expect(editor.decide('run_command', { CommandLine: 'rm -rf target' }).decision).toBe('deny');
+    expect(reader.decide('run_command', { CommandLine: 'npm test' }).decision).toBe('deny');
+    for (const name of ['list_resources', 'read_resource']) {
+      expect(reader.decide(name, { ServerName: 'aip-fresh-id' }).decision, name).toBe(
+        'auto_approve',
+      );
+      expect(reader.decide(name, { ServerName: 'other' }).decision, name).toBe('deny');
+    }
   });
 
   it('does not let broad user grants or an outside Cwd replace the policy', () => {

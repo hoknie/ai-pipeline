@@ -65,4 +65,14 @@ export class QueueStore {
   dropItemTag(repository: string, id: string): void {
     this.dependencies.queues.dropItemTag(repository, id);
   }
+
+  /** The queue of a project that moved, stored and in memory; no transaction of its own. */
+  moveRepository(from: string, to: string): void {
+    this.dependencies.queues.moveQueue(from, to);
+    const queue = this.queues.get(from);
+    this.queues.delete(from);
+    if (queue === undefined) return;
+    queue.repository = to;
+    this.queues.set(to, queue);
+  }
 }

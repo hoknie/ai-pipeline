@@ -4,7 +4,7 @@ import type { DeliveryServices } from '../../feature/delivery/services/index.ts'
 import type { ObserverService } from '../../feature/observers/services/index.ts';
 import type { ProcessService } from '../../feature/processes/services/index.ts';
 import type { QueueServices } from '../../feature/queue/services/index.ts';
-import type { RegistryService } from '../../feature/repos/services/index.ts';
+import type { ProjectService, RegistryService } from '../../feature/repos/services/index.ts';
 import type { RunsServices } from '../../feature/runs/services/index.ts';
 import type { ConfigService } from '../../feature/swarm-config/services/index.ts';
 import type {
@@ -18,6 +18,7 @@ export interface DaemonServices {
   now: () => number;
   config: ConfigService;
   registry: RegistryService;
+  projects: ProjectService;
   tags: TagCatalogService;
   edits: ConfigEditService;
   shared: SharedConfigService;

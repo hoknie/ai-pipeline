@@ -1676,13 +1676,16 @@ describe('aip web repository parameter', () => {
 
   it('rejects relative paths and paths outside git', async () => {
     const { web, base } = await setup();
-    const relative = await fetch(`${base}/api/config?repository=relative`, {
+    const relative = await fetch(`${base}/api/config?repository=work/lib`, {
       headers: authed(web),
     });
     expect(relative.status).toBe(400);
     expect(((await relative.json()) as { error: string }).error).toBe(
-      'repository must be an absolute path',
+      'repository must be an absolute path or a project slug',
     );
+    const unknown = await fetch(`${base}/api/queue?repository=nope`, { headers: authed(web) });
+    expect(unknown.status).toBe(400);
+    expect(await unknown.text()).toContain('unknown project `nope`');
     for (const path of ['/api/queue', '/api/pipelines', '/api/config']) {
       const outside = await fetch(`${base}${path}?repository=${enc(secondRepository(true))}`, {
         headers: authed(web),
@@ -1775,6 +1778,52 @@ describe('aip web repositories', () => {
       headers: authed(web),
     });
     expect(removed.status).toBe(200);
+  });
+
+  it('changes and moves a project, addressed by its slug', async () => {
+    const { web, base } = await setup();
+    const repo = temporaryRepository();
+    await fetch(`${base}/api/repositories`, {
+      method: 'POST',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ path: repo, slug: 'fresh' }),
+    });
+    const queue = await fetch(`${base}/api/queue?repository=fresh`, { headers: authed(web) });
+    expect(queue.status).toBe(200);
+    expect(((await queue.json()) as { repository: string }).repository).toBe(repo);
+    const changed = await fetch(`${base}/api/repositories?repository=fresh`, {
+      method: 'PATCH',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ name: 'New', enabled: false }),
+    });
+    expect(changed.status).toBe(200);
+    expect(await changed.json()).toMatchObject([{ path: repo, name: 'New', enabled: false }]);
+    const unknownField = await fetch(`${base}/api/repositories?repository=fresh`, {
+      method: 'PATCH',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ path: '/elsewhere' }),
+    });
+    expect(unknownField.status).toBe(400);
+    const relative = await fetch(`${base}/api/repositories/move?repository=fresh`, {
+      method: 'POST',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ to: 'projects/new' }),
+    });
+    expect(relative.status).toBe(400);
+    const target = temporaryRepository();
+    const moved = await fetch(`${base}/api/repositories/move?repository=fresh`, {
+      method: 'POST',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ to: target }),
+    });
+    expect(moved.status).toBe(200);
+    expect(await moved.json()).toMatchObject([{ path: target, slug: 'fresh', name: 'New' }]);
+    const anonymous = await fetch(`${base}/api/repositories?repository=fresh`, {
+      method: 'PATCH',
+      headers: JSON_TYPE,
+      body: JSON.stringify({ name: 'X' }),
+    });
+    expect(anonymous.status).toBe(401);
   });
 
   it('relays the repositories event and the list in the snapshot', async () => {
@@ -2024,7 +2073,9 @@ describe('default repository of the panel', () => {
     const headers = authed(web);
     const empty = await fetch(`${base}/api/queue`, { headers });
     expect(empty.status).toBe(409);
-    expect(((await empty.json()) as { error: string }).error).toContain('add one in the panel');
+    expect(((await empty.json()) as { error: string }).error).toContain(
+      'add or enable one in the panel',
+    );
     // runs do not belong to a repository
     expect((await fetch(`${base}/api/runs`, { headers })).status).toBe(200);
 

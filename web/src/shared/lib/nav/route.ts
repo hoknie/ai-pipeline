@@ -24,13 +24,21 @@ export interface Route {
   tab: string | null;
 }
 
+/** Groups of the shared tab whose third address part opens an entry (a slug, an id or `new`). */
+const SLUG_GROUPS: ReadonlySet<string> = new Set([
+  'specialists',
+  'pipelines',
+  'chains',
+  'projects',
+]);
+
 /** The settings route of `#settings/<tab>/<group>`, or of an old `#settings/<group>`. */
 function settingsRoute(first: string | null, second: string | null, third: string | null): Route {
   const { scope, group } = settingsLocationOf(first, second);
   // a shared specialist (or `new`) of the group «Specialists» is the third part; for the
   // observers it is the tab of the group
   const step =
-    scope === 'global' && (group === 'specialists' || group === 'pipelines' || group === 'chains')
+    scope === 'global' && SLUG_GROUPS.has(group)
       ? third
       : scope === 'global' && group === 'observers' && third !== null
         ? observerTabOf(third)
@@ -112,7 +120,7 @@ export function formatRoute(route: Route): string {
     // an old route with the group only (`run`) leads to its new place
     const { scope, group } = route.group === null ? settingsLocationOf(route.run, null) : place;
     const slug =
-      scope === 'global' && (group === 'specialists' || group === 'pipelines' || group === 'chains')
+      scope === 'global' && SLUG_GROUPS.has(group)
         ? route.step
         : scope === 'global' && group === 'observers'
           ? observerTabOf(route.step)

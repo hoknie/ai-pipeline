@@ -47,7 +47,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | Command | What it does |
 |---|---|
 | `aip tag list\|add\|edit\|remove` | The [tag catalog](tags.md) of a repository |
-| `aip repo list\|add <path>\|remove <path> [--json]` | The [repositories](repositories.md) the daemon knows (`REPOSITORY`, `UNFINISHED`, `WAITING`, `QUEUED`) |
+| `aip repo list\|add <path>\|edit <project>\|move <project> <path>\|remove <project> [--json]` | The [projects](repositories.md#projects) the daemon knows (`SLUG`, `NAME`, `REPOSITORY`, `STATE`, `UNFINISHED`, `WAITING`, `QUEUED`); `<project>` is a path or a slug |
 
 ## Panels and streams
 

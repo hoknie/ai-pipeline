@@ -27,7 +27,11 @@ export function usePanelData(api: Api, openStream: EventSourceFactory) {
   );
   const { runs, selected, registry } = state;
   const chrome = useChrome(route.view);
-  useRouteEffects(route, runs, selected, setRoute, setChosen);
+  const disabled = useMemo(() => {
+    const off = new Set(registry.filter((entry) => !entry.enabled).map((entry) => entry.path));
+    return (repository: string) => off.has(repository);
+  }, [registry]);
+  useRouteEffects(route, runs, selected, setRoute, setChosen, disabled);
   const notifications = useNotificationCenter(
     runs,
     (item) => setRoute({ view: 'runs', run: item.runId, group: item.slug, step: null, tab: null }),

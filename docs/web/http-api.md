@@ -4,7 +4,7 @@ The [web panel](README.md) works through this API, served at its address. With `
 
 ## Conventions
 
-- The queue requests, `/api/config…` and `/api/pipelines` accept `repository=<absolute path>`. Without it the most recently added repository is used; while the list is empty, the answer is 409.
+- The queue requests, `/api/config…` and `/api/pipelines` accept `repository=<absolute path>` or `repository=<project slug>`. Without it the most recently added enabled project is used; while there is none, the answer is 409.
 - A relative path and a path outside a git repository are rejected with code 400. A `repository` field in the request body is ignored.
 - Daemon refusals come back with code 400 and the error text, unless a request below says otherwise.
 
@@ -149,11 +149,14 @@ Writing `settings.yaml`:
 
 | Request | What it does |
 |---|---|
-| `GET /api/repositories` | The repositories with counters and `displayPath`, the path with the home directory written as `~` |
-| `POST /api/repositories` | Adds one: `{"path": "<absolute path>"}` |
-| `DELETE /api/repositories?repository=<absolute path>` | Removes one |
+| `GET /api/repositories` | The projects with counters, `displayPath` (the path with the home directory written as `~`), `name`, `label` (the name or the directory name), `slug`, `enabled` and `color` |
+| `POST /api/repositories` | Adds one: `{"path": "<absolute path or ~/…>", "name"?, "slug"?, "color"?}` |
+| `PATCH /api/repositories?repository=<path or slug>` | Changes a project: any of `name` (or `null`), `slug`, `enabled`, `color` (or `null`) |
+| `POST /api/repositories/move?repository=<path or slug>` | Gives a project a new path: `{"to": "<absolute path or ~/…>"}` |
+| `DELETE /api/repositories?repository=<path or slug>` | Removes one |
+| `GET /api/directories?path=<absolute path or ~/…>` | The folder browser of the path fields: `path`, `parent` (null at `/`), `home`, `git` and `entries` (`name`, `path`, `git`: the folder holds `.git`), at most 500 subfolders without hidden ones, `truncated` when there are more; without `path`, the home directory |
 
-A relative path is rejected with code 400 without contacting the daemon.
+Each of them answers with the list. A relative `path` or `to`, and a body with unknown fields, are rejected with code 400 without contacting the daemon. See [Multiple repositories](../usage/repositories.md#projects) for what the attributes do.
 
 ## Processes
 

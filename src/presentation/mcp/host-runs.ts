@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
 import { formatApply, formatGroup, formatRunQueued, formatRunList } from '../format/index.ts';
+import { repositoryArgument } from '../ipc/client/index.ts';
 import type { ApplyResult, GroupView, RunQueued, RunView } from '../ipc/contract/index.ts';
 import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
@@ -21,7 +22,7 @@ export function registerRun(kit: HostKit): void {
           .array(z.object({ title: z.string(), task: z.string() }))
           .optional()
           .describe('Explicit groups'),
-        repo: z.string().optional().describe('Repository path; defaults to the current directory'),
+        repo: kit.repo,
         title: z
           .string()
           .optional()
@@ -59,7 +60,7 @@ export function registerRun(kit: HostKit): void {
     }) =>
       attempt(async () => {
         const queued = (await options.send('run', {
-          repository: repo ?? options.cwd,
+          repository: repo === undefined ? options.cwd : repositoryArgument(repo, options.cwd),
           pipeline,
           ...(task !== undefined ? { task } : {}),
           ...(groups !== undefined ? { groups } : {}),

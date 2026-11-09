@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { ObserversView } from '../../shared/api/observerTypes.ts';
-import type { QueueView, RunView } from '../../shared/api/types.ts';
+import type { QueueView, RepositoryView, RunView } from '../../shared/api/types.ts';
 import type { QueueDraft } from '../../features/queue/index.ts';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import type { Route } from '../../shared/lib/nav/route.ts';
@@ -88,6 +88,11 @@ export function SettingsRoute(props: {
   repository: string | null;
   repositories: string[];
   onSelectRepository: (path: string) => void;
+  registry: RepositoryView[];
+  onRegistry: (registry: RepositoryView[]) => void;
+  onProjectMoved: (from: string, to: string) => void;
+  onRemoveProject: (path: string) => Promise<boolean>;
+  onOpenProject: (path: string, target: 'settings' | 'queue') => void;
   queue: QueueView | null;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
@@ -110,6 +115,8 @@ export function SettingsRoute(props: {
         onSelectPipeline={select('pipelines')}
         chain={common.route.step}
         onSelectChain={select('chains')}
+        project={common.route.step}
+        onSelectProject={select('projects')}
         observerTab={common.route.step}
         onSelectObserverTab={select('observers')}
         dirty={common.dirty}

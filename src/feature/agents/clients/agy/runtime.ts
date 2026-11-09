@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
   systemPrompt,
@@ -18,7 +18,8 @@ import { agyHookFiles } from './hooks.ts';
 function launch(executable: string, extra: RuntimeExtra, context: LaunchContext): Launch {
   // A unique name avoids a user's running `aip` MCP server taking this worker's name.
   const server = `aip-${context.sessionId}`;
-  const directory = join(context.attemptDirectory, 'agy');
+  // A resumed conversation keeps its workspace folders, so every attempt of a group rewrites the same one.
+  const directory = join(dirname(context.attemptDirectory), 'agy');
   const settingsPath = join(directory, 'settings.json');
   const [command, ...args] = context.workerCommand;
   const tools = workerToolNames({

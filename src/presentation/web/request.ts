@@ -1,4 +1,6 @@
 import { isAbsolute } from 'node:path';
+
+import { isProjectSlug } from '../../feature/repos/types/index.ts';
 import type { IncomingMessage } from 'node:http';
 
 import { panel } from './errors.ts';
@@ -85,9 +87,13 @@ export async function requestRepository(
   if (chosen === null || chosen === '') {
     if (options.repository !== undefined) return options.repository;
     const found = (await options.defaultRepository?.()) ?? null;
-    if (found === null) throw panel('conflict', 'no repository yet: add one in the panel');
+    if (found === null) {
+      throw panel('conflict', 'no repository yet: add or enable one in the panel');
+    }
     return found;
   }
-  if (!isAbsolute(chosen)) throw panel('invalid', 'repository must be an absolute path');
+  if (!isAbsolute(chosen) && !isProjectSlug(chosen)) {
+    throw panel('invalid', 'repository must be an absolute path or a project slug');
+  }
   return chosen;
 }

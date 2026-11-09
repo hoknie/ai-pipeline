@@ -47,12 +47,12 @@ describe('repository registry', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1 - (11 + 8 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2 - (11 + 8 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.known.repositories()).toEqual([
-      { path: '/work/app', addedAt: 20 },
-      { path: '/work/lib', addedAt: 7 },
+      { path: '/work/app', addedAt: 20, name: null, slug: null, enabled: true, color: null },
+      { path: '/work/lib', addedAt: 7, name: null, slug: null, enabled: true, color: null },
     ]);
   });
 
@@ -60,7 +60,9 @@ describe('repository registry', () => {
     const store = temporaryStorage();
     expect(store.known.addRepository('/repo', 5)).toBe(true);
     expect(store.known.addRepository('/repo', 9)).toBe(false);
-    expect(store.known.repositories()).toEqual([{ path: '/repo', addedAt: 5 }]);
+    expect(store.known.repositories()).toEqual([
+      { path: '/repo', addedAt: 5, name: null, slug: null, enabled: true, color: null },
+    ]);
   });
 
   it('removes only the registry entry and survives reopening', () => {
@@ -77,5 +79,40 @@ describe('repository registry', () => {
       state.run.repository,
     ]);
     expect(reopened.runs.loadRun(state.run.id)).not.toBeNull();
+  });
+
+  it('writes the attributes of a project and moves it to another path', () => {
+    const store = temporaryStorage();
+    store.known.addRepository('/work/app', 5, { slug: 'app' });
+    store.known.updateRepository({
+      path: '/work/app',
+      addedAt: 99,
+      name: 'Shop',
+      slug: 'shop',
+      enabled: false,
+      color: 'teal',
+    });
+    store.known.moveRepository('/work/app', '/projects/app');
+    expect(store.known.repositories()).toEqual([
+      {
+        path: '/projects/app',
+        addedAt: 5,
+        name: 'Shop',
+        slug: 'shop',
+        enabled: false,
+        color: 'teal',
+      },
+    ]);
+    store.known.addRepository('/work/lib', 6);
+    expect(() =>
+      store.known.updateRepository({
+        path: '/work/lib',
+        addedAt: 6,
+        name: null,
+        slug: 'shop',
+        enabled: true,
+        color: null,
+      }),
+    ).toThrow(/UNIQUE/);
   });
 });

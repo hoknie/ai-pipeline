@@ -31,17 +31,17 @@ function QuestionField({
       </legend>
       <Markdown text={question.text} />
       {options.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap gap-2">
           {options.map((option) => (
             <Button
               key={option}
               variant="outline"
               size="sm"
-              className="h-auto min-h-7 whitespace-normal"
+              className="h-auto min-h-7 min-w-0 max-w-full shrink whitespace-normal flex-wrap justify-start text-left"
               aria-pressed={value === option}
               onClick={() => onChange(option)}
             >
-              {option}
+              <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{option}</span>
               {option === recommendation ? (
                 <Badge variant="warn">
                   <Sparkles aria-hidden="true" />
@@ -94,7 +94,7 @@ export function QuestionsForm({
   return (
     <form
       aria-label={t('runs.questions.label')}
-      className="flex flex-col gap-3 rounded-lg border border-status-warn/40 bg-status-warn-bg p-3"
+      className="flex min-w-0 max-w-full flex-col gap-3 rounded-lg border border-status-warn/40 bg-status-warn-bg p-3"
       onSubmit={(event) => {
         event.preventDefault();
         if (empty > 0) return;

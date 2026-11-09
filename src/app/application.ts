@@ -73,7 +73,7 @@ function createLower(context: Context) {
   const { environment, database, now, ports } = context;
   const { agents } = createAgents(environment);
   const { config } = createSwarmConfigServices({ environment });
-  const { registry } = createReposServices({ database, now, publish: ports.repos.port });
+  const { registry, projects } = createReposServices({ database, now, publish: ports.repos.port });
   const { catalog: tags } = createTagsServices({
     database,
     registry,
@@ -86,7 +86,7 @@ function createLower(context: Context) {
     agents,
     changed: ports.config.port,
   });
-  return { agents, config, registry, tags, edits, shared };
+  return { agents, config, registry, projects, tags, edits, shared };
 }
 
 type Lower = ReturnType<typeof createLower>;
@@ -127,7 +127,7 @@ function createRuns(context: Context, lower: Lower) {
 /** The features above the runs, in the order of the graph. */
 function createUpper(context: Context, lower: Lower, runs: RunsServices) {
   const { options, database, now, ports } = context;
-  const { config, registry, tags } = lower;
+  const { config, registry, projects, tags } = lower;
   const delivery = createDeliveryServices({
     database,
     stateDirectory: options.stateDirectory,
@@ -153,9 +153,13 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     publish: ports.observers.port,
   });
   const compose = createComposeServices({
+    database,
     registry,
+    projects,
+    tags,
     states: runs.states,
     queues: queue.store,
+    control: queue.control,
     observers,
   });
   return { delivery, artifacts, queue, observers, compose };

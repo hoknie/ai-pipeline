@@ -77,6 +77,11 @@ export class RunRepository {
     return row?.id ?? null;
   }
 
+  /** One statement, no transaction of its own: the runs of a project that moved get its new path. */
+  moveRuns(from: string, to: string): void {
+    this.database.prepare('UPDATE runs SET repository = ? WHERE repository = ?').run(to, from);
+  }
+
   /**
    * One statement, no transaction of its own: takes the tag off every run of the repository,
    * finished too. The scenario of removing a tag opens the transaction.

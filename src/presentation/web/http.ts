@@ -1,5 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { isAbsolute } from 'node:path';
+
+import { isProjectSlug } from '../../feature/repos/types/index.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { z } from 'zod';
@@ -125,10 +127,10 @@ export function hostAllowed(incoming: IncomingMessage, port: number): boolean {
   }
 }
 
-/** `?repository=` must be an absolute path. */
+/** `?repository=` must be an absolute path or the slug of a project. */
 export function absoluteRepository(value: string | null): string {
-  if (value === null || !isAbsolute(value)) {
-    throw panel('invalid', 'repository must be an absolute path');
+  if (value === null || (!isAbsolute(value) && !isProjectSlug(value))) {
+    throw panel('invalid', 'repository must be an absolute path or a project slug');
   }
   return value;
 }

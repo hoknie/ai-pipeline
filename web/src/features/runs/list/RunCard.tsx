@@ -17,6 +17,7 @@ import { orderEntries } from '../../../shared/lib/order.ts';
 import { StatusBadge } from '../../../shared/ui/feedback/StatusBadge.tsx';
 import { TagChips } from '../../../shared/ui/feedback/TagChip.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
+import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { undeliveredMark } from '../header/delivery.ts';
 import { RunDecisions } from './RunDecisions.tsx';
 import { RunProgress } from './RunProgress.tsx';
@@ -123,7 +124,8 @@ export function RunCard(props: RunCardProps) {
         <span className="truncate font-mono text-xs text-muted-foreground">{run.name ?? '—'}</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {scope === 'all' ? (
-            <span className="font-medium" title={run.repository}>
+            <span className="inline-flex items-center gap-1 font-medium" title={run.repository}>
+              <ProjectDot path={run.repository} />
               {repositoryLabel(run.repository)}
             </span>
           ) : null}

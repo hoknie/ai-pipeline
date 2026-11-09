@@ -25,7 +25,7 @@ import { artifactRoute, patchRoute } from './routes/downloads.ts';
 import { groupsRoutes } from './routes/groups.ts';
 import { processesRoutes } from './routes/processes.ts';
 import { queueRoutes } from './routes/queue.ts';
-import { repositoriesRoute } from './routes/repositories.ts';
+import { directoriesRoute, repositoriesRoute } from './routes/repositories.ts';
 import { runsRoutes } from './routes/runs.ts';
 import { settingsRoutes } from './routes/settings.ts';
 import { specialistsRoutes } from './routes/specialists.ts';
@@ -55,7 +55,13 @@ export function webTokenFromEnv(env: NodeJS.ProcessEnv): string | undefined {
 /** The routes of the panel in the order they are tried: the raw ones, then the JSON table. */
 function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
   return {
-    raw: [repositoriesRoute(kit), systemRoute(kit), patchRoute(kit), artifactRoute(kit)],
+    raw: [
+      repositoriesRoute(kit),
+      directoriesRoute(),
+      systemRoute(kit),
+      patchRoute(kit),
+      artifactRoute(kit),
+    ],
     table: [
       runsRoutes,
       groupsRoutes,

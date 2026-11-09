@@ -267,6 +267,13 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE runs RENAME COLUMN workflow TO pipeline;
   ALTER TABLE queue_items RENAME COLUMN workflow TO pipeline;
   `,
+  `
+  ALTER TABLE repositories ADD COLUMN name TEXT;
+  ALTER TABLE repositories ADD COLUMN slug TEXT;
+  ALTER TABLE repositories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE repositories ADD COLUMN color TEXT;
+  CREATE UNIQUE INDEX repositories_by_slug ON repositories (slug) WHERE slug IS NOT NULL;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

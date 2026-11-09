@@ -65,6 +65,7 @@ export class QueueItems {
   async enqueue(params: QueueAddRequest): Promise<Enqueued> {
     const { store, advance, registry, tags, taskTags, runs, now } = this.dependencies;
     const repository = await registry.rootOf(params.repository);
+    registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(repository, params.pipeline, params.skip);
@@ -135,6 +136,7 @@ export class QueueItems {
       }
       // Every task carries the linked task tag of its run, then the other tags of the run.
       const repository = state.run.repository;
+      this.dependencies.registry.requireEnabled(repository);
       await this.ensureItem(repository, params.pipeline, params.skip);
       const queue = store.of(repository);
       const after = this.resolveDependencies(queue, params.after ?? []);
@@ -194,6 +196,7 @@ export class QueueItems {
     inherited?: string[],
   ): Promise<QueueChange> {
     const { store, advance, tags, taskTags, now } = this.dependencies;
+    this.dependencies.registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(repository, params.pipeline, params.skip);

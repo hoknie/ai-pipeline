@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
 export function stateDirectoryFromEnvironment(environment: NodeJS.ProcessEnv): string {
@@ -11,6 +11,13 @@ export function stateDirectory(xdgStateHome: string | undefined, home: string | 
   const base =
     xdgStateHome && isAbsolute(xdgStateHome) ? xdgStateHome : join(home ?? '.', '.local', 'state');
   return join(base, 'aip');
+}
+
+/** A path the user typed with the home directory as `~` or `~/…`; any other path stays as it is. */
+export function expandHome(path: string, home: string = homedir()): string {
+  if (path === '~') return home;
+  if (path.startsWith('~/')) return join(home, path.slice(2));
+  return path;
 }
 
 export function ensureDirectory(path: string): string {

@@ -41,6 +41,15 @@ export class QueueRepository {
       .run(id, repository, id);
   }
 
+  /** No transaction of its own: the queue of a project that moved gets its new path. */
+  moveQueue(from: string, to: string): void {
+    this.database.exec('PRAGMA defer_foreign_keys = ON');
+    this.database
+      .prepare('UPDATE queue_items SET repository = ? WHERE repository = ?')
+      .run(to, from);
+    this.database.prepare('UPDATE queues SET repository = ? WHERE repository = ?').run(to, from);
+  }
+
   saveQueue(queue: Queue): void {
     this.database.transaction(() => {
       this.database

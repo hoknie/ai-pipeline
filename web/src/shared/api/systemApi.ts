@@ -27,13 +27,51 @@ async function saveObservers(settings: ObserverSettings): Promise<ObserversResul
   throw new ApiError(response.status, String(body.error ?? response.statusText));
 }
 
+/** The attributes a new project may get; an absent one is chosen by the daemon. */
+export interface NewProject {
+  name?: string;
+  slug?: string;
+  color?: string;
+}
+
+/** The changed attributes of a project; `null` drops the name or the color. */
+export interface ProjectChanges {
+  name?: string | null;
+  slug?: string;
+  enabled?: boolean;
+  color?: string | null;
+}
+
+/** A subdirectory in the path picker; `git` marks the root of a repository. */
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+  git: boolean;
+}
+
+/** The subdirectories of a directory on the panel's machine, hidden ones left out. */
+export interface DirectoryListing {
+  path: string;
+  parent: string | null;
+  home: string;
+  git: boolean;
+  entries: DirectoryEntry[];
+  truncated: boolean;
+}
+
 export interface SystemApi {
   /** The daemon's list of repositories with counters. */
   repositories(): Promise<RepositoryView[]>;
   /** Adds the git repository of a path to the daemon's list; returns the new list. */
-  addRepository(path: string): Promise<RepositoryView[]>;
+  addRepository(path: string, attributes?: NewProject): Promise<RepositoryView[]>;
+  /** Changes the attributes of a project; returns the new list. */
+  updateRepository(path: string, changes: ProjectChanges): Promise<RepositoryView[]>;
+  /** Gives a project a new path; the daemon refuses while it has work. */
+  moveRepository(path: string, to: string): Promise<RepositoryView[]>;
   /** Removes a repository from the list; the daemon refuses while it has work. */
   removeRepository(path: string): Promise<RepositoryView[]>;
+  /** The subdirectories of a path (`~` is the home directory; absent: the home directory). */
+  directories(path?: string): Promise<DirectoryListing>;
   /** Processes started by agents of the daemon (all repositories). */
   processes(): Promise<BackgroundProcessesView>;
   /** Terminates a background process and its children; the daemon refuses any other PID. */
@@ -62,9 +100,14 @@ export interface SystemApi {
 export function systemApi(): SystemApi {
   return {
     repositories: () => call('/api/repositories'),
-    addRepository: (path) => post('/api/repositories', { path }),
+    addRepository: (path, attributes = {}) => post('/api/repositories', { path, ...attributes }),
+    updateRepository: (path, changes) =>
+      call(`/api/repositories?repository=${enc(path)}`, json('PATCH', changes)),
+    moveRepository: (path, to) => post(`/api/repositories/move?repository=${enc(path)}`, { to }),
     removeRepository: (path) =>
       call(`/api/repositories?repository=${enc(path)}`, { method: 'DELETE' }),
+    directories: (path) =>
+      call(path === undefined ? '/api/directories' : `/api/directories?path=${enc(path)}`),
     processes: () => call('/api/processes'),
     killProcess: (pid) => post(`/api/processes/${pid}/kill`),
     system: () => call('/api/system'),
