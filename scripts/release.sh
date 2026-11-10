@@ -33,7 +33,7 @@ pack() {
     local tarball
     tarball="$(npm pack --silent --pack-destination "$RELEASE" | tail -n 1)"
     [ -f "$RELEASE/$tarball" ] || die "npm pack wrote no $tarball"
-    tar -tzf "$RELEASE/$tarball" | grep -qx 'package/dist/cli/main.js' || die "$tarball does not hold dist/cli/main.js"
+    tar -tzf "$RELEASE/$tarball" | grep -x 'package/dist/cli/main.js' >/dev/null || die "$tarball does not hold dist/cli/main.js"
     (cd "$RELEASE" && sum "$tarball" > SHA256SUMS && sum -c SHA256SUMS >/dev/null && cat SHA256SUMS)
 }
 
