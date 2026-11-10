@@ -1458,7 +1458,7 @@ describe('observers in views', () => {
   it('ends the repair view when the incident is cleared', () => {
     const state = failedRun();
     state.run.repair.incident = incident;
-    state.run.repair.taken = repairIncidents(state, observers()).map((found) => found.key);
+    state.run.repair.taken = repairIncidents(state).map((found) => found.key);
     state.run.repair.incident = null;
     const view = runView(state, 1000, undefined, [], undefined, undefined, observers());
     expect(view.state).toBe('failed');

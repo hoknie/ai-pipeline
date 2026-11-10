@@ -12,8 +12,8 @@ import { Label } from '../../../shared/ui/forms/label.tsx';
 import { stepIds } from '../stepIds.ts';
 import { PipelineTagsInput } from './PipelineTagsInput.tsx';
 import { PointsInput } from './points/PointsInput.tsx';
-import type { ActionPoint } from '../../../shared/lib/pipeline/pipelineEntries.ts';
-import { record, type Draft, type SplitDraft } from './steps/draft.ts';
+import { record } from './steps/draft.ts';
+import { withPoint, withSplit } from './steps/draftOps.ts';
 import { SplitFieldset } from './steps/SplitFieldset.tsx';
 import { StepsList } from './steps/StepsList.tsx';
 import type { usePipelineEditor } from './usePipelineEditor.ts';
@@ -25,8 +25,20 @@ export interface Places {
   other: FieldError[];
 }
 
+/** The specialists a step can name. */
+export function specialistSlugs(view: ConfigEditorResponse, sharedOnly: boolean): string[] {
+  return view.specialists
+    .filter((specialist) => !sharedOnly || specialist.sources.global)
+    .map((specialist) => specialist.slug);
+}
+
 /** The pipelines the groups of a split can follow, and how to name them. */
-function splitTargets(view: ConfigEditorResponse, id: string, sharedOnly: boolean, own: string) {
+export function splitTargets(
+  view: ConfigEditorResponse,
+  id: string,
+  sharedOnly: boolean,
+  own: string,
+) {
   const targets = view.pipelines
     .filter((candidate) => !sharedOnly || candidate.sources.global)
     .filter((candidate) => candidate.id !== id && !record(record(candidate.raw).split).pipeline)
@@ -35,21 +47,6 @@ function splitTargets(view: ConfigEditorResponse, id: string, sharedOnly: boolea
   const nameOf = (target: string): string =>
     rawName(record(view.pipelines.find((candidate) => candidate.id === target)?.raw)) ?? target;
   return { targets, nameOf };
-}
-
-/** The draft with the split changed; `null` removes it. */
-function withSplit(current: Draft, patch: Partial<SplitDraft> | null): Draft {
-  if (patch === null) return { ...current, split: null };
-  const empty = { specialist: '', maxGroups: '', pipeline: '', additionalPrompt: '' };
-  return { ...current, split: { ...empty, ...current.split, ...patch } };
-}
-
-/** The draft with the own list of a point changed; `null` gives the point back to the inherited one. */
-function withPoint(current: Draft, point: ActionPoint, list: string[] | null): Draft {
-  const next = { ...current.stages };
-  if (list === null) delete next[point];
-  else next[point] = list;
-  return { ...current, stages: next };
 }
 
 type Editor = ReturnType<typeof usePipelineEditor>;
@@ -148,9 +145,7 @@ export function FormTab({
   disabled: boolean;
 }) {
   const { draft, setDraft, preview } = editor;
-  const slugs = view.specialists
-    .filter((specialist) => !sharedOnly || specialist.sources.global)
-    .map((specialist) => specialist.slug);
+  const slugs = specialistSlugs(view, sharedOnly);
   const { targets, nameOf } = splitTargets(
     view,
     editor.id,

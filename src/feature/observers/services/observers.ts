@@ -18,11 +18,13 @@ import type { ObserversPublishPort } from '../ports/index.ts';
 import type { ObserverRepository } from '../repositories/index.ts';
 import {
   defaultObserverSettings,
+  personQuestions,
   planRepairs,
   repairAdmitted,
   repairIncidents,
   type ObserverSettings,
   type RepairAction,
+  waitsForPerson,
 } from '../types/index.ts';
 
 import { checkObserverSettings } from './settings-check.ts';
@@ -60,7 +62,7 @@ export class ObserverService {
 
   /** Whether an observer takes the incident of the run: then the queue does not stop for it. */
   takesIncident(state: RunState): boolean {
-    return repairAdmitted(state, this.current) && repairIncidents(state, this.current).length > 0;
+    return repairAdmitted(state, this.current) && repairIncidents(state).length > 0;
   }
 
   /** Looks at the incidents of the runs once, however many changes arrive meanwhile. */
@@ -96,7 +98,7 @@ export class ObserverService {
     const all = [...pool.values()];
     const pending = (state: RunState) => queue.advance.pending(state.run.repository);
     for (const state of all.filter((candidate) => !pending(candidate))) {
-      for (const incident of repairIncidents(state, settings)) {
+      for (const incident of repairIncidents(state)) {
         const key = `${state.run.id}:${incident.key}`;
         if (this.sent.has(key)) continue;
         this.sent.add(key);
@@ -173,7 +175,7 @@ export class ObserverService {
     switch (params.action) {
       case 'answer': {
         const group = this.target(state, params.group);
-        if (group.humanOnly !== null && !this.current.answerHumanOnly) {
+        if (group.humanOnly !== null) {
           throw rejected(`the question of group \`${group.slug}\` is for a person only`);
         }
         const permissions = currentPermissions(config, state);
@@ -194,6 +196,19 @@ export class ObserverService {
       }
       case 'cancel': {
         const group = params.group === undefined ? null : this.target(state, params.group);
+        if (group !== null && waitsForPerson(group)) {
+          throw rejected(
+            `group \`${group.slug}\` waits for a person: its question is for a person only`,
+          );
+        }
+        if (group === null) {
+          const [asking] = personQuestions(state);
+          if (asking) {
+            throw rejected(
+              `task ${state.run.id} has a question for a person only in group \`${asking.slug}\`; observers do not cancel it`,
+            );
+          }
+        }
         const reason = params.reason;
         await runs.engine.apply(state, { kind: 'cancel', group: group?.slug ?? null, reason });
         return;

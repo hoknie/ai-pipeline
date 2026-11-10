@@ -6,7 +6,10 @@ import {
   planRepairs,
   repairAdmitted,
   repairIncidents,
+  personQuestions,
+  waitsForPerson,
 } from '../../../src/feature/observers/types/index.ts';
+import { checkObserverSettings } from '../../../src/feature/observers/services/settings-check.ts';
 import { repairTask, transition } from '../../../src/feature/runs/machine/index.ts';
 import type { Incident, RunState } from '../../../src/feature/runs/types/index.ts';
 
@@ -31,7 +34,7 @@ function failedRun(id: string, at = 1000, repository = '/repo'): RunState {
 }
 
 function incidentOf(state: RunState): Incident {
-  const [incident] = repairIncidents(state, settings());
+  const [incident] = repairIncidents(state);
   if (!incident) throw new Error('no incident');
   return incident;
 }
@@ -42,7 +45,6 @@ describe('defaults', () => {
       enabled: false,
       workers: 1,
       maxRepairs: 5,
-      answerHumanOnly: false,
       projects: [],
       specialist: {},
     });
@@ -52,13 +54,13 @@ describe('defaults', () => {
 describe('incidents of a task', () => {
   it('lists failed groups and questions, with their kind', () => {
     const state = failedRun('run000000001');
-    expect(repairIncidents(state, settings())).toEqual([
+    expect(repairIncidents(state)).toEqual([
       expect.objectContaining({ kind: 'failed', group: 'gruppa-1' }),
     ]);
     const asking = run(1);
     step(asking);
     finish(asking, 'needs_human', { questions: [{ text: 'Что делать?' }] });
-    expect(repairIncidents(asking, settings())).toEqual([
+    expect(repairIncidents(asking)).toEqual([
       expect.objectContaining({ kind: 'question', group: 'gruppa-1' }),
     ]);
   });
@@ -67,30 +69,53 @@ describe('incidents of a task', () => {
     const cancelled = run(1);
     step(cancelled);
     transition(cancelled, { kind: 'cancel', group: null }, 3000);
-    expect(repairIncidents(cancelled, settings())).toEqual([]);
+    expect(repairIncidents(cancelled)).toEqual([]);
     const limited = failedRun('run000000002');
     limited.groups[0]!.attempts[0]!.reason = {
       kind: 'usage_limit',
       resetsAt: 9_999_999,
     } as never;
-    expect(repairIncidents(limited, settings())).toEqual([]);
+    expect(repairIncidents(limited)).toEqual([]);
   });
 
-  it('leaves questions for a person to humans unless answerHumanOnly is set', () => {
+  it.each(['request', 'review'] as const)(
+    'never offers a question for a person only (%s)',
+    (humanOnly) => {
+      const state = run(1);
+      step(state);
+      finish(state, 'needs_human', { questions: [{ text: 'Пароль?' }] });
+      state.groups[0]!.humanOnly = humanOnly;
+      expect(repairIncidents(state)).toEqual([]);
+      expect(waitsForPerson(state.groups[0]!)).toBe(true);
+      expect(personQuestions(state)).toHaveLength(1);
+    },
+  );
+
+  it('does not treat a cancelled group with a saved mark as waiting for a person', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', {
-      questions: [{ text: 'Пароль?' }],
-      humanOnly: true,
-    });
-    expect(repairIncidents(state, settings())).toEqual([]);
-    expect(repairIncidents(state, settings({ answerHumanOnly: true }))).toHaveLength(1);
+    finish(state, 'needs_human', { questions: [{ text: 'Пароль?' }] });
+    state.groups[0]!.humanOnly = 'request';
+    transition(state, { kind: 'cancel', group: 'gruppa-1' }, 3000);
+    expect(waitsForPerson(state.groups[0]!)).toBe(false);
+    expect(personQuestions(state)).toEqual([]);
+  });
+
+  it('puts the person-only rule and the mark into the task of the observer', () => {
+    const state = run(2);
+    step(state);
+    finish(state, 'needs_human', { questions: [{ text: 'Принять?' }] });
+    state.groups[0]!.humanOnly = 'review';
+    const text = repairTask(state, { key: 'k', kind: 'failed', group: 'gruppa-2', detail: '' });
+    expect(text).toContain('is never yours');
+    expect(text).toContain('gruppa-1 (');
+    expect(text).toContain('needs_human, question for a person only');
   });
 
   it('skips the keys already taken', () => {
     const state = failedRun('run000000001');
     state.run.repair.taken.push(incidentOf(state).key);
-    expect(repairIncidents(state, settings())).toEqual([]);
+    expect(repairIncidents(state)).toEqual([]);
   });
 });
 
@@ -173,5 +198,13 @@ describe('task of the observer', () => {
     const text = repairTask(state, incident, { conflicts: ['src/a.ts'] });
     expect(text).toContain('<<<<<<<');
     expect(text).toContain('- src/a.ts');
+  });
+});
+
+describe('settings check', () => {
+  it('rejects the removed answerHumanOnly key', () => {
+    const check = checkObserverSettings({ answerHumanOnly: true }, settings(), new Set());
+    expect(check.settings).toBeNull();
+    expect(check.errors).toContainEqual({ path: 'answerHumanOnly', message: 'unknown key' });
   });
 });

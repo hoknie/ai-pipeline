@@ -49,7 +49,7 @@ function failedRun(options: { configText?: string; groups?: number } = {}): RunS
 }
 
 function incidentOf(state: RunState): Incident {
-  const [incident] = repairIncidents(state, SETTINGS);
+  const [incident] = repairIncidents(state);
   if (!incident) throw new Error('no incident');
   return incident;
 }
@@ -131,7 +131,7 @@ describe('end of a repair', () => {
     expect(state.run.repair.taken).toEqual([incident.key]);
     expect(state.run.repair.repairs).toBe(1);
     expect(state.run.finishedAt).not.toBeNull();
-    expect(repairIncidents(state, SETTINGS)).toEqual([]);
+    expect(repairIncidents(state)).toEqual([]);
   });
 
   it.each(['rejected', 'needs_human'] as const)(
@@ -289,17 +289,14 @@ describe('repair of a delivery', () => {
   }
 
   function startDeliveryRepair(state: RunState): Effect[] {
-    const incident = repairIncidents(state, SETTINGS).find((item) => item.kind === 'delivery');
+    const incident = repairIncidents(state).find((item) => item.kind === 'delivery');
     if (!incident) throw new Error('no delivery incident');
     return transition(state, { kind: 'repair_start', incident, specialist: profile(state) }, 7000);
   }
 
   it('takes every group of the refused delivery and prepares the tree', () => {
     const state = refusedDelivery();
-    expect(repairIncidents(state, SETTINGS).map((item) => item.kind)).toEqual([
-      'delivery',
-      'delivery',
-    ]);
+    expect(repairIncidents(state).map((item) => item.kind)).toEqual(['delivery', 'delivery']);
     const effects = startDeliveryRepair(state);
     expect(effects).toEqual([
       { kind: 'prepare_resolve', run: state.run.id, groups: ['gruppa-1', 'gruppa-2'], round: 1 },
@@ -363,7 +360,7 @@ describe('repair of a delivery', () => {
     expect(state.groups.map((g) => g.delivery.state)).toEqual(['apply_failed', 'apply_failed']);
     expect(state.run.pendingDelivery).toBeNull();
     expect(state.run.repair.incident).toBeNull();
-    expect(repairIncidents(state, SETTINGS)).toEqual([]);
+    expect(repairIncidents(state)).toEqual([]);
   });
 
   it('a crash of the agent ends the delivery as apply_failed', () => {
@@ -399,7 +396,7 @@ describe('repair of a delivery', () => {
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
     expect(state.groups[0]?.delivery.state).toBe('apply_failed');
-    expect(repairIncidents(state, SETTINGS)).toHaveLength(2);
+    expect(repairIncidents(state)).toHaveLength(2);
   });
 
   it('cancelling the task during preparation drops the delivery', () => {

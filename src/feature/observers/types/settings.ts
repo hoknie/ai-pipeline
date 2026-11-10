@@ -13,7 +13,6 @@ export interface ObserverSettings {
   enabled: boolean;
   workers: number;
   maxRepairs: number;
-  answerHumanOnly: boolean;
   projects: ObserverProject[];
   /** YAML fields of the specialist: name, model, runtime, permissions, timeout, tools, prompt, … */
   specialist: Record<string, unknown>;
@@ -24,7 +23,6 @@ export function defaultObserverSettings(): ObserverSettings {
     enabled: false,
     workers: 1,
     maxRepairs: 5,
-    answerHumanOnly: false,
     projects: [],
     specialist: {},
   };

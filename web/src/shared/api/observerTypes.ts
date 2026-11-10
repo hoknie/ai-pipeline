@@ -28,7 +28,6 @@ export interface ObserverSettings {
   workers: number;
   /** 1..50 */
   maxRepairs: number;
-  answerHumanOnly: boolean;
   projects: ObserverProject[];
   /** The fields of the observer's specialist, as in a specialist file. */
   specialist: Record<string, unknown>;
@@ -96,7 +95,6 @@ export function parseObserversView(value: unknown): ObserversView | null {
       enabled: settings.enabled === true,
       workers: Number(settings.workers ?? 1),
       maxRepairs: Number(settings.maxRepairs ?? 1),
-      answerHumanOnly: settings.answerHumanOnly === true,
       projects: Array.isArray(settings.projects) ? settings.projects : [],
       specialist:
         typeof settings.specialist === 'object' && settings.specialist !== null

@@ -42,7 +42,6 @@ export function observersView(
       enabled: false,
       workers: 1,
       maxRepairs: 3,
-      answerHumanOnly: false,
       projects: [],
       specialist: {},
       ...overrides.settings,

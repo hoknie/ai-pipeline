@@ -2,7 +2,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { FieldError } from '../../../../shared/api/types.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
-import { movedBy, newStepDraft, stepOfError, type Draft, type StepDraft } from './draft.ts';
+import { stepOfError, type Draft, type StepDraft } from './draft.ts';
+import { insertStep, moveStep, patchStep, removeStep } from './draftOps.ts';
 import { StepCard } from './StepCard.tsx';
 
 /** The steps of the pipeline in order, and the button that adds one. */
@@ -26,21 +27,7 @@ export function StepsList({
   const { t } = useTranslation();
   const hasSplit = draft.split !== null;
   const patch = (key: number, change: Partial<StepDraft>) =>
-    onDraft((current) => ({
-      ...current,
-      steps: current.steps.map((step) => (step.key === key ? { ...step, ...change } : step)),
-    }));
-  const remove = (step: StepDraft, index: number) =>
-    onDraft((c) => ({
-      ...c,
-      steps: c.steps
-        .filter((candidate) => candidate.key !== step.key)
-        .map((candidate) =>
-          candidate.gotoKey === step.key
-            ? { ...candidate, gotoKey: null, gotoRaw: ids[index] ?? '' }
-            : candidate,
-        ),
-    }));
+    onDraft((current) => patchStep(current, key, change));
   return (
     <>
       <ol className="flex flex-col gap-2" aria-label={t('pipelines.steps')}>
@@ -57,8 +44,8 @@ export function StepsList({
               (error) => stepOfError(error.path, pipelineId, hasSplit).step === index,
             )}
             onPatch={(change) => patch(step.key, change)}
-            onMove={(delta) => onDraft((c) => ({ ...c, steps: movedBy(c.steps, index, delta) }))}
-            onRemove={() => remove(step, index)}
+            onMove={(delta) => onDraft((c) => moveStep(c, step.key, index + delta))}
+            onRemove={() => onDraft((c) => removeStep(c, step.key))}
           />
         ))}
       </ol>
@@ -66,7 +53,7 @@ export function StepsList({
         <Button
           variant="outline"
           disabled={disabled}
-          onClick={() => onDraft((c) => ({ ...c, steps: [...c.steps, newStepDraft()] }))}
+          onClick={() => onDraft((c) => insertStep(c, c.steps.length).draft)}
         >
           {t('pipelines.addStep')}
         </Button>

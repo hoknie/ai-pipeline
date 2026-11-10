@@ -13,7 +13,15 @@ import {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
-import { CODE_ONLY_CONFIG, harness, settle, startRun, until, type Harness } from './harness.ts';
+import {
+  CODE_ONLY_CONFIG,
+  PIPELINE_CONFIG,
+  harness,
+  settle,
+  startRun,
+  until,
+  type Harness,
+} from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -532,7 +540,7 @@ describe('Границы действий наблюдателя', () => {
     expect(view.groups.find((group) => group.slug === 'vhod')?.status).toBe('cancelled');
   });
 
-  it('refuses a question for a person only unless the settings allow it', async () => {
+  it('refuses to answer a question for a person only', async () => {
     const h = await start();
     const question = { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Скажи' }] };
     h.script({
@@ -560,34 +568,95 @@ describe('Границы действий наблюдателя', () => {
   });
 });
 
+const REVIEW_CONFIG = PIPELINE_CONFIG.replace(
+  'specialist: reviewer,',
+  'specialist: reviewer, human_review: true,',
+);
+
+const ASKING = { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Скажи' }] };
+const TWO = [
+  { title: 'Вход', task: 'вход' },
+  { title: 'Тихая', task: 'тихо' },
+];
+
+/** Starts a task whose group `tihaya` waits for a person while `vhod` fails and is repaired. */
+async function askingRun(h: Harness, calls: unknown[]): Promise<string> {
+  h.script({
+    'code@Вход': [FAIL, {}],
+    'code@Тихая': [ASKING],
+    repair: [{ toolCalls: calls }],
+  });
+  await configure(h, { maxRepairs: 1 });
+  const runId = await launch(h, TWO);
+  await h.waitFor(runId, (view) => view.repair?.repairs === 1 && view.repair.incident === null);
+  return runId;
+}
+
 describe('Вопрос только для человека', () => {
-  it('answers it with the author observer when the settings allow', async () => {
+  it('refuses to cancel the group that waits for a person', async () => {
+    const h = await start();
+    const runId = await askingRun(h, [
+      { name: 'swarm_repair_cancel', arguments: { group: 'tihaya', reason: 'надоело' } },
+    ]);
+    const [result] = toolResults(h);
+    expect(result?.isError).toBe(true);
+    expect(JSON.stringify(result)).toContain('waits for a person');
+    expect((await h.status(runId)).groups.find((group) => group.slug === 'tihaya')?.status).toBe(
+      'needs_human',
+    );
+  });
+
+  it('refuses to cancel the task while such a question is open', async () => {
+    const h = await start();
+    const runId = await askingRun(h, [
+      { name: 'swarm_repair_cancel', arguments: { reason: 'тупик' } },
+    ]);
+    const [result] = toolResults(h);
+    expect(result?.isError).toBe(true);
+    expect(JSON.stringify(result)).toContain('tihaya');
+    const view = await h.status(runId);
+    expect(view.repair?.cancelReason ?? null).toBeNull();
+    expect(view.groups.find((group) => group.slug === 'tihaya')?.status).toBe('needs_human');
+  });
+
+  it('still cancels a task without such a question', async () => {
     const h = await start();
     h.script({
+      code: [FAIL],
+      repair: [{ toolCalls: [{ name: 'swarm_repair_cancel', arguments: { reason: 'тупик' } }] }],
+    });
+    await configure(h);
+    const runId = await launch(h);
+    const view = await h.waitFor(runId, (run) => run.repair?.cancelReason === 'тупик');
+    expect(view.repair?.cancelReason).toBe('тупик');
+    expect(toolResults(h)[0]?.isError).toBeUndefined();
+  });
+
+  it('refuses to answer a human review of a step', async () => {
+    const h = await start(REVIEW_CONFIG);
+    h.script({
       'code@Вход': [FAIL, {}],
-      'code@Тихая': [
-        { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Скажи' }] },
-        {},
-      ],
+      review: [{ summary: 'проверь' }],
       repair: [
         {
+          waitFor: h.gate('repair'),
           toolCalls: [
-            { name: 'swarm_repair_answer', arguments: { group: 'tihaya', answer: 'да' } },
-            { name: 'swarm_repair_retry', arguments: { group: 'vhod' } },
+            { name: 'swarm_repair_answer', arguments: { group: 'tihaya', answer: 'Принято' } },
           ],
         },
       ],
     });
-    await configure(h, { answerHumanOnly: true });
-    const runId = await launch(h, [
-      { title: 'Вход', task: 'вход' },
-      { title: 'Тихая', task: 'тихо' },
-    ]);
-    const view = await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
-    expect(toolResults(h)[0]?.isError).toBeUndefined();
-    expect(view.decisions.map((decision) => [decision.by, decision.answer])).toEqual([
-      ['observer', 'да'],
-    ]);
+    await configure(h, { maxRepairs: 1 });
+    const runId = await launch(h, TWO);
+    await h.waitFor(runId, (view) =>
+      view.groups.some((group) => group.slug === 'tihaya' && group.status === 'needs_human'),
+    );
+    h.open('repair');
+    await h.waitFor(runId, (view) => view.repair?.repairs === 1 && view.repair.incident === null);
+    const [result] = toolResults(h);
+    expect(result?.isError).toBe(true);
+    const row = (await h.status(runId)).groups.find((group) => group.slug === 'tihaya');
+    expect(row).toMatchObject({ status: 'needs_human', humanOnly: 'review' });
   });
 });
 
@@ -622,6 +691,26 @@ describe('Настройки наблюдателей', () => {
     expect(many.errors.some((error) => error.path.startsWith('specialist'))).toBe(true);
     const view = (await h.call('observers', {})) as ObserversView;
     expect(view.settings).toMatchObject({ enabled: true, workers: 2, maxRepairs: 5 });
+  });
+
+  it('rejects the removed answerHumanOnly key', async () => {
+    const h = await start();
+    const bad = (await h.call('observers_set', {
+      settings: { answerHumanOnly: true },
+    })) as { ok: false; errors: { path: string }[] };
+    expect(bad).toMatchObject({ ok: false, errors: [{ path: 'answerHumanOnly' }] });
+  });
+
+  it('drops answerHumanOnly saved by an older version', async () => {
+    const h = await start();
+    await configure(h, { workers: 2 });
+    h.running.application.database
+      .prepare('UPDATE observers SET settings_json = ? WHERE id = 1')
+      .run(JSON.stringify({ enabled: true, workers: 2, answerHumanOnly: true }));
+    await h.restart();
+    const view = (await h.call('observers', {})) as ObserversView;
+    expect(view.settings).toMatchObject({ enabled: true, workers: 2 });
+    expect(view.settings).not.toHaveProperty('answerHumanOnly');
   });
 
   it('drops a repository from the projects when it leaves the registry', async () => {

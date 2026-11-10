@@ -61,7 +61,9 @@ describe('group screen', () => {
       { group: vi.fn(async () => groupView({ status: 'needs_human' })) },
     );
     expect(await screen.findByText('Human review')).toBeTruthy();
-    expect(screen.getByText('The queue autopilot does not answer this question.')).toBeTruthy();
+    expect(
+      screen.getByText('Neither the queue autopilot nor observers answer this question.'),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
     await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', 'login', 'Принято'));
   });

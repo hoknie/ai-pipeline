@@ -12,7 +12,7 @@ import {
 } from '../src/features/pipelines/form/PipelineForm.tsx';
 import PipelinesPage from '../src/features/pipelines/PipelinesPage.tsx';
 import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
-import type { EditorPipeline } from '../src/shared/api/types.ts';
+import type { EditorPipeline, FieldError } from '../src/shared/api/types.ts';
 
 import {
   actionEntry,
@@ -26,11 +26,7 @@ import {
   systemStagesView,
 } from './fixtures.ts';
 
-vi.mock('../src/features/topology/PipelineGraph.tsx', () => ({
-  PipelineGraph: ({ pipeline }: { pipeline: { id: string; steps: { id: string }[] } }) => (
-    <div data-testid="graph">{pipeline.steps.map((step) => step.id).join(',')}</div>
-  ),
-}));
+vi.mock('@xyflow/react', async () => (await import('./fakeFlow.tsx')).fakeFlow());
 
 beforeEach(() => {
   window.location.hash = '';
@@ -91,7 +87,7 @@ const stepBox = async (index: number) =>
 
 // Fake timers stop `findBy*` from polling, so the preview tests read the DOM directly.
 const openPreview = () =>
-  fireEvent.mouseDown(screen.getByRole('tab', { name: /Preview/ }), { button: 0 });
+  fireEvent.mouseDown(screen.getByRole('tab', { name: /Diagram/ }), { button: 0 });
 const openForm = () =>
   fireEvent.mouseDown(screen.getByRole('tab', { name: /Form/ }), { button: 0 });
 
@@ -301,7 +297,7 @@ describe('steps', () => {
     )[1];
     expect(value).toEqual({
       steps: [
-        { id: 'code', specialist: 'coder', on_reject: { goto: 'plan', max_rounds: 2 } },
+        { id: 'code', specialist: 'coder' },
         { id: 'writer', specialist: 'writer' },
         { id: 'review', specialist: 'reviewer', on_reject: { goto: 'code', max_rounds: 3 } },
       ],
@@ -470,10 +466,11 @@ describe('preview', () => {
     expect(last[0]).toBe('feature');
     expect(last[1].steps[0]?.additional_prompt).toBe('plan2');
     openPreview();
-    expect(screen.getByTestId('graph').textContent).toBe('plan,code,review');
+    expect(screen.getByTestId('pipeline-canvas')).toBeTruthy();
+    expect(document.querySelectorAll('[data-kind="step"]')).toHaveLength(3);
   });
 
-  it('keeps the last graph marked as outdated while the draft is invalid', async () => {
+  it('marks the diagram as outdated while the draft is invalid', async () => {
     vi.useFakeTimers();
     const previewPipeline = vi
       .fn()
@@ -500,19 +497,20 @@ describe('preview', () => {
     expect(screen.getByText('stale')).toBeTruthy();
     expect(within(stepNow(0)).getByRole('alert').textContent).toContain('unknown specialist');
     openPreview();
-    expect(screen.getByTestId('graph')).toBeTruthy();
+    expect(screen.getByTestId('pipeline-canvas')).toBeTruthy();
+    expect(document.querySelector('[data-kind="step"]')?.getAttribute('data-error')).toBe('true');
     expect(screen.getAllByText('stale')).toHaveLength(2);
-    expect(screen.getByText(/errors on the «Form» tab/)).toBeTruthy();
+    expect(screen.getByText(/errors on the nodes/)).toBeTruthy();
     expect(screen.queryAllByRole('listitem', { name: /^step \d+$/ })).toHaveLength(0);
   });
 
   it('drops the answer to an older draft', async () => {
     vi.useFakeTimers();
-    const resolvers: ((value: { topology: ReturnType<typeof pipelineOf>; errors: [] }) => void)[] =
-      [];
+    type Answer = { topology: ReturnType<typeof pipelineOf>; errors: FieldError[] };
+    const resolvers: ((value: Answer) => void)[] = [];
     const previewPipeline = vi.fn(
       () =>
-        new Promise<{ topology: ReturnType<typeof pipelineOf>; errors: [] }>((resolve) => {
+        new Promise<Answer>((resolve) => {
           resolvers.push(resolve);
         }),
     );
@@ -528,35 +526,36 @@ describe('preview', () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
     expect(resolvers).toHaveLength(2);
-    const topology = (id: string) => ({
-      ...pipelineOf(),
-      steps: [{ ...pipelineOf().steps[0]!, id }],
+    const failed = (message: string): Answer => ({
+      topology: pipelineOf(),
+      errors: [{ path: 'swarm.pipelines.feature.steps[0].specialist', message }],
     });
     await act(async () => {
-      resolvers[1]!({ topology: topology('fresh'), errors: [] });
+      resolvers[1]!(failed('fresh'));
     });
     await act(async () => {
-      resolvers[0]!({ topology: topology('old'), errors: [] });
+      resolvers[0]!(failed('old'));
     });
+    expect(within(stepNow(0)).getByRole('alert').textContent).toContain('fresh');
     openPreview();
-    expect(screen.getByTestId('graph').textContent).toBe('fresh');
+    expect(document.querySelector('[data-kind="step"]')?.getAttribute('data-error')).toBe('true');
   });
 });
 
 describe('tabs', () => {
-  it('shows the form first and the graph on the preview tab, keeping the draft', async () => {
+  it('shows the form first and the diagram on its tab, keeping the draft', async () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'n', file: '/f' }));
     const previewPipeline = vi.fn(async () => ({ topology: pipelineOf(), errors: [] }));
     render(<Page api={api({ writePipeline, previewPipeline })} start="feature" />);
     await stepBox(0);
     expect(screen.getByRole('tab', { name: /Form/ }).getAttribute('aria-selected')).toBe('true');
-    expect(screen.queryByTestId('graph')).toBeNull();
+    expect(screen.queryByTestId('pipeline-canvas')).toBeNull();
     await waitFor(() => expect(previewPipeline).toHaveBeenCalled());
     openPreview();
-    expect(screen.getByTestId('graph')).toBeTruthy();
+    expect(screen.getByTestId('pipeline-canvas')).toBeTruthy();
     expect(screen.queryAllByRole('listitem', { name: /^step \d+$/ })).toHaveLength(0);
     openForm();
-    expect(screen.queryByTestId('graph')).toBeNull();
+    expect(screen.queryByTestId('pipeline-canvas')).toBeNull();
     fireEvent.change(screen.getAllByLabelText('additional step prompt')[0]!, {
       target: { value: 'plan2' },
     });
@@ -570,7 +569,7 @@ describe('tabs', () => {
     expect(written[1].steps[0]?.additional_prompt).toBe('plan2');
   });
 
-  it('marks the preview tab as outdated and keeps the errors on the form', async () => {
+  it('marks the diagram tab as outdated and keeps the errors on the form', async () => {
     const previewPipeline = vi.fn(async () => ({
       topology: null,
       errors: [
@@ -581,11 +580,11 @@ describe('tabs', () => {
     await stepBox(0);
     await waitFor(() => expect(previewPipeline).toHaveBeenCalled());
     await waitFor(() =>
-      expect(within(screen.getByRole('tab', { name: /Preview/ })).getByText('stale')).toBeTruthy(),
+      expect(within(screen.getByRole('tab', { name: /Diagram/ })).getByText('stale')).toBeTruthy(),
     );
     expect(within(await stepBox(0)).getByRole('alert').textContent).toContain('unknown specialist');
     openPreview();
-    expect(screen.getByText(/errors on the «Form» tab/)).toBeTruthy();
+    expect(screen.getByText(/errors on the nodes/)).toBeTruthy();
   });
 });
 

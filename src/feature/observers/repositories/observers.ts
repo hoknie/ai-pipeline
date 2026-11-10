@@ -16,7 +16,13 @@ export class ObserverRepository {
     if (!row) return defaults;
     try {
       const saved = JSON.parse(String(row.settings_json)) as Partial<ObserverSettings>;
-      return { ...defaults, ...saved };
+      return {
+        enabled: saved.enabled ?? defaults.enabled,
+        workers: saved.workers ?? defaults.workers,
+        maxRepairs: saved.maxRepairs ?? defaults.maxRepairs,
+        projects: saved.projects ?? defaults.projects,
+        specialist: saved.specialist ?? defaults.specialist,
+      };
     } catch {
       return defaults;
     }

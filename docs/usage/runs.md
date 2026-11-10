@@ -121,7 +121,7 @@ Observers are agents that take a task after an incident and try to repair it wit
 
 An incident is one of these states of a group:
 
-- a question (`needs_human`) that the queue auto-answers did not settle at this queue step. A question marked `human_only` is an incident only when the setting "Answer questions meant only for a human" is on;
+- a question (`needs_human`) that the queue auto-answers did not settle at this queue step. A question for a person only (a `human_review` check or a `human_only` result) is never an incident;
 - a `failed` group, including a group interrupted by a daemon restart;
 - a `conflict` group;
 - a delivery in `apply_failed`. All groups in `apply_failed` are repaired together.
@@ -129,7 +129,7 @@ An incident is one of these states of a group:
 A group cancelled by a person and a [usage limit](queue.md#usage-limit) are not incidents. The same state after a new attempt of the group is a new incident.
 
 An observer works in one task and has tools only for it: answer a question of a group, retry a group, cancel a group or the whole task with a reason.
-The daemon applies the rules a person has: a retry of a group a person cancelled, an answer to a `human_only` question without the setting, and any action on a service group other than split are refused. An answer is saved with the author `observer`, so a summary can read `answers: human 1, observer 2`.
+The daemon applies the rules a person has: a retry of a group a person cancelled, an answer to a question for a person only, a cancel of a group that waits for such a question, a cancel of the whole task while such a question is open, and any action on a service group other than split are refused. An answer is saved with the author `observer`, so a summary can read `answers: human 1, observer 2`.
 
 - While an incident is repaired or waits for a free worker, the run has the state `repair`.
   Only an incident an observer has taken keeps the run unfinished: `finished` is `false`, `finishedAt` is empty, and `aip run show` prints the step `observer` in the `System:` line (in JSON it is `system` with kind `repair` and the service group `_repair`).

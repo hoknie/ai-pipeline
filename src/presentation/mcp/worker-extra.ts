@@ -106,7 +106,7 @@ export function registerRepair(kit: WorkerKit): void {
       {
         title: 'Answer a question of a group',
         description:
-          'Answer the question a group of the task waits for. The group continues with your answer. Call swarm_report afterwards as usual.',
+          'Answer the question a group of the task waits for. The group continues with your answer. A question for a person only (human review or human only) is refused. Call swarm_report afterwards as usual.',
         inputSchema: {
           group: z.string().min(1).describe('Slug of the group that waits for an answer'),
           answer: z
@@ -155,7 +155,7 @@ export function registerRepair(kit: WorkerKit): void {
       {
         title: 'Cancel a group or the task',
         description:
-          'Cancel one group, or the whole task when group is omitted. The reason is shown in the task. Call swarm_report afterwards as usual.',
+          'Cancel one group, or the whole task when group is omitted. The reason is shown in the task. Refused for a group or task waiting for a person. Call swarm_report afterwards as usual.',
         inputSchema: {
           group: z
             .string()

@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { StagedTopology } from '../../shared/lib/pipeline/pipelineStages.ts';
+import type { PipelineTopology } from '../../shared/api/types.ts';
 
 import { cn } from '../../shared/lib/browser/cn.ts';
 import type { MachineLoad } from '../../shared/lib/pipeline/specialistLoad.ts';
@@ -60,7 +60,7 @@ export function PipelineGraph({
   onNodes,
   className,
 }: {
-  pipeline: StagedTopology;
+  pipeline: PipelineTopology;
   live?: Live | null;
   /** Load of the specialists across the machine; without it nodes show no occupancy. */
   load?: MachineLoad | null;

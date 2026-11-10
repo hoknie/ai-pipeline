@@ -618,6 +618,24 @@ describe('the outcome of a delivery started in the panel', () => {
     ).toBeTruthy();
   });
 
+  it('does not show the delivery reason on the step line of _resolve', async () => {
+    window.location.hash = '#runs/run1/_resolve';
+    mount([
+      stuck({
+        system: [systemRow('resolve', { status: 'failed' })],
+        deliveryStage: {
+          status: 'apply_failed',
+          reason: 'the resolver reported rejected: long feedback',
+          groups: ['login'],
+        },
+      }),
+    ]);
+    const status = await screen.findByRole('status', { name: 'Delivery' });
+    expect(within(status).getByText('Delivery failed')).toBeTruthy();
+    expect(status.textContent).not.toContain('the resolver reported rejected');
+    expect(status.querySelector('[title]')).toBeNull();
+  });
+
   it('shows the last attempt on the step line and rereads the reason of a new attempt', async () => {
     const group = vi
       .fn()

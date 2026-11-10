@@ -70,18 +70,9 @@ function LimitsCard({
           <p className="text-xs text-muted-foreground">{t('observers.maxRepairs.hint')}</p>
           <Errors errors={at('maxRepairs')} />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <Switch
-              id="observers-human-only"
-              checked={form.answerHumanOnly}
-              disabled={busy}
-              onCheckedChange={(answerHumanOnly) => update({ answerHumanOnly })}
-            />
-            <Label htmlFor="observers-human-only">{t('observers.humanOnly.label')}</Label>
-          </div>
-          <p className="text-xs text-muted-foreground">{t('observers.humanOnly.hint')}</p>
-        </div>
+        <p className="text-xs text-muted-foreground" data-testid="observers-human-only-note">
+          {t('observers.humanOnly.note')}
+        </p>
       </section>
     </Card>
   );

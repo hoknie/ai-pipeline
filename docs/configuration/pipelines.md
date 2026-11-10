@@ -80,11 +80,11 @@ Answer with [`aip group answer`](../usage/runs.md#answering-a-specialist), in th
 
 - The changes of the step are committed first, so the person sees them in the diff. The group goes to `needs_human` with a question that carries the summary of the step, marked `human review`.
 - The answer of the person resumes the same step. If the specialist reports `done` again, the group goes on without a second review; `rejected` and `needs_human` work as usual.
-- The [queue's auto answer](../usage/queue.md#answering-questions) never answers such a question.
+- The [queue's auto answer](../usage/queue.md#answering-questions) never answers such a question, and neither do the [observers](../usage/runs.md#observers): they cannot answer it or cancel its group or the task.
 
 ### Human only
 
-`human_only: true` in `swarm_report` (only with `needs_human`) asks for a person's own look, for example at the architecture of what was written. The question is marked `human only`, and the queue's auto answer does not answer it.
+`human_only: true` in `swarm_report` (only with `needs_human`) asks for a person's own look, for example at the architecture of what was written. The question is marked `human only`, and the queue's auto answer does not answer it. Observers do not answer it either and cannot cancel its group or the task while it waits.
 
 ## Split
 

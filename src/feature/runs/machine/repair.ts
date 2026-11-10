@@ -18,14 +18,18 @@ const REPAIR_POSITION = 1_000_002;
 const RULES = [
   'You are an observer: you repair one task without a person. Work only on this task.',
   'Tools: swarm_repair_answer { group, answer } answers a question of a group; swarm_repair_retry { group, refresh_config? } restarts a failed or conflicted group; swarm_repair_cancel { group?, reason } cancels a group, or the whole task without `group`, and the reason stays visible in the task.',
-  'You cannot touch other tasks, the queue or the settings. A question marked for a person only is answered by you only when it is part of your incident.',
+  'You cannot touch other tasks, the queue or the settings. A question marked for a person only (human review or human only) is never yours: you cannot answer it, and you cannot cancel its group or the task while it waits; leave it to the person.',
   'Finish with swarm_report: done when the incident is dealt with; rejected or needs_human when a person must take over — the incident then stays with the person.',
 ];
 
 function groupsText(state: RunState): string {
   const lines = state.groups.map((group) => {
     const delivery = group.status === 'merged' ? `, delivery ${group.delivery.state}` : '';
-    return `- ${group.slug} (${group.title}): ${group.status}${delivery}`;
+    const person =
+      group.status === 'needs_human' && group.humanOnly !== null
+        ? ', question for a person only'
+        : '';
+    return `- ${group.slug} (${group.title}): ${group.status}${delivery}${person}`;
   });
   return lines.join('\n') || '- (none)';
 }

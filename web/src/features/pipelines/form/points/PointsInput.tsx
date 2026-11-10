@@ -180,8 +180,11 @@ export function PointsInput({
   previewStages,
   sharedOnly,
   disabled,
+  only,
   onPoint,
 }: {
+  /** Shows this point alone. */
+  only?: ActionPoint;
   view: ConfigEditorResponse;
   hasSplit: boolean;
   /** The own lists of the draft by point. */
@@ -210,24 +213,26 @@ export function PointsInput({
     >
       <legend className="px-1 text-sm font-medium">{t('pipeline.points.title')}</legend>
       <p className="text-xs text-muted-foreground">{t('pipeline.points.help')}</p>
-      {ACTION_POINTS.filter((point) => hasSplit || !SPLIT_POINTS.includes(point)).map((point) => {
-        const own = stages[point] !== undefined;
-        // the inherited list is known only from the preview: until it arrives the point is not editable
-        const unknown = !own && previewStages === null;
-        return (
-          <PointEditor
-            key={point}
-            point={point}
-            list={listOf(point)}
-            own={own}
-            unknown={unknown}
-            options={unknown ? [] : offered(point)}
-            view={view}
-            disabled={disabled}
-            onList={(list) => onPoint(point, list)}
-          />
-        );
-      })}
+      {ACTION_POINTS.filter((point) => only === undefined || point === only)
+        .filter((point) => hasSplit || !SPLIT_POINTS.includes(point))
+        .map((point) => {
+          const own = stages[point] !== undefined;
+          // the inherited list is known only from the preview: until it arrives the point is not editable
+          const unknown = !own && previewStages === null;
+          return (
+            <PointEditor
+              key={point}
+              point={point}
+              list={listOf(point)}
+              own={own}
+              unknown={unknown}
+              options={unknown ? [] : offered(point)}
+              view={view}
+              disabled={disabled}
+              onList={(list) => onPoint(point, list)}
+            />
+          );
+        })}
     </fieldset>
   );
 }

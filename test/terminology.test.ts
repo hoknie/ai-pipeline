@@ -6,8 +6,14 @@ import { describe, expect, it } from 'vitest';
 
 const root = join(import.meta.dirname, '..');
 
-/** Paths where the word is not about the pipelines of aip. */
-const OTHER_MEANING = [/^\.github\//, /^\.claude\//, /^openspec\//, /^docs\/development\.md$/];
+/** Paths where the word is not about the pipelines of aip (the changelog quotes commit subjects). */
+const OTHER_MEANING = [
+  /^\.github\//,
+  /^\.claude\//,
+  /^openspec\//,
+  /^docs\/development\.md$/,
+  /^CHANGELOG\.md$/,
+];
 
 /**
  * The places that keep the old name on purpose: the old directory, keys, placeholders, options and

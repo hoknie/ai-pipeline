@@ -5,7 +5,6 @@ import {
   stageLink,
   stageNodeId,
   type PipelineStage,
-  type StagedTopology,
   type StageSection,
 } from '../../shared/lib/pipeline/pipelineStages.ts';
 import type { PipelineTopology } from '../../shared/api/types.ts';
@@ -19,7 +18,7 @@ export const RESOLVER_GAP = 60;
 
 /** What building a node needs to know about the pipeline and the runs on it. */
 export interface NodeContext {
-  pipeline: StagedTopology;
+  pipeline: PipelineTopology;
   live: Live;
   load: MachineLoad;
   t: TFunction;

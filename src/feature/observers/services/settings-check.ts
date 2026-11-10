@@ -7,7 +7,7 @@ import {
   OBSERVER_WORKERS_MAX,
 } from '../types/index.ts';
 
-const KEYS = ['enabled', 'workers', 'maxRepairs', 'answerHumanOnly', 'projects', 'specialist'];
+const KEYS = ['enabled', 'workers', 'maxRepairs', 'projects', 'specialist'];
 
 function isMapping(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -49,10 +49,6 @@ export function checkObserverSettings(
   if ('enabled' in value) {
     if (typeof value.enabled === 'boolean') next.enabled = value.enabled;
     else errors.push({ path: 'enabled', message: 'must be a boolean' });
-  }
-  if ('answerHumanOnly' in value) {
-    if (typeof value.answerHumanOnly === 'boolean') next.answerHumanOnly = value.answerHumanOnly;
-    else errors.push({ path: 'answerHumanOnly', message: 'must be a boolean' });
   }
   if ('workers' in value) {
     const workers = integerIn(value.workers, 'workers', 1, OBSERVER_WORKERS_MAX, errors);

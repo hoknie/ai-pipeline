@@ -56,10 +56,10 @@ The page has three tabs: "Pipeline", "Actions" and "System stages". Each tab sho
 The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Shared pipelines are edited in [Settings](settings.md#shared-pipelines).
 
 - The "Name" field sets the optional `name` of the pipeline; lists, badges, the graph and the palette show it instead of the id.
-- The form lists the steps: id, specialist, the return on rejection with the number of rounds, and the additional prompt. Steps are added, deleted and reordered with buttons.
+- The form lists the steps: id, specialist, the return on rejection with the number of rounds, and the additional prompt. Steps are added, deleted and reordered with buttons. Deleting a step also clears the return of every step that pointed to it, with its number of rounds.
 - The "Task split" switch turns on the split block. Its "Group steps" choice is "Own steps" or the id of another pipeline, which is [`split.pipeline`](../configuration/pipelines.md#groups-that-follow-another-pipelines-steps). When a target is chosen, the step list is hidden and a link to the target's form takes its place.
 - The field "Tags" holds the labels of the project file; tags of the shared file are shown as chips with a "Shared" mark.
-- "Preview" shows the graph of the draft without writing. While the draft is invalid, the last valid graph stays with a "stale" mark.
+- "Diagram" is a visual editor of the same draft, in the manner of the visual editors of issue trackers.
 - A shared pipeline opens for viewing only. "Override in the project" copies it into the project; "Edit in Settings" leads to `#settings/global/pipelines/<id>`. A new pipeline is always a project one.
 - Running runs continue from their snapshot after the pipeline is deleted. A new run of a deleted pipeline is rejected.
 

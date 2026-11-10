@@ -2,16 +2,14 @@ import type { PipelineStage, StagePerformer, PipelineTopology } from '../../api/
 
 export type { PipelineStage, StageKind, StagePerformer, StageSection } from '../../api/types.ts';
 
-export type StagedTopology = PipelineTopology & { stages?: PipelineStage[] };
-
 const SYSTEM: StagePerformer = { type: 'system' };
 
 /**
  * The stages of a pipeline: the list from the engine, or, while the engine does not send one,
  * the list built from the older fields of the topology in the same order.
  */
-export function pipelineStagesOf(pipeline: StagedTopology): PipelineStage[] {
-  if (pipeline.stages?.length) return pipeline.stages;
+export function pipelineStagesOf(pipeline: PipelineTopology): PipelineStage[] {
+  if (pipeline.stages.length) return pipeline.stages;
   const stages: PipelineStage[] = [];
   const base = { condition: null, status: null, group: null };
   if (pipeline.split) {

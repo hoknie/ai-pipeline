@@ -56,7 +56,7 @@ function failedRun(groups = 1, auto = false): RunState {
 }
 
 function incidentOf(state: RunState): Incident {
-  const [incident] = repairIncidents(state, SETTINGS);
+  const [incident] = repairIncidents(state);
   if (!incident) throw new Error('no incident');
   return incident;
 }
@@ -87,7 +87,7 @@ function refusedDelivery(): RunState {
 }
 
 function startDeliveryRepair(state: RunState): Incident {
-  const incident = repairIncidents(state, SETTINGS).find((item) => item.kind === 'delivery');
+  const incident = repairIncidents(state).find((item) => item.kind === 'delivery');
   if (!incident) throw new Error('no delivery incident');
   transition(state, { kind: 'repair_start', incident, specialist: profile(state) }, 7000);
   return incident;
@@ -115,7 +115,7 @@ describe('pause during the repair of a delivery', () => {
   function expectTakenAgain(state: RunState): void {
     transition(state, { kind: 'hold', hold: null }, 9100);
     expect(repairAdmitted(state, SETTINGS)).toBe(true);
-    expect(repairIncidents(state, SETTINGS)).toHaveLength(2);
+    expect(repairIncidents(state)).toHaveLength(2);
   }
 
   it('keeps the hold while the group works', () => {
@@ -264,7 +264,7 @@ describe('restart during a repair', () => {
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
     expect(state.run.repair.repairs).toBe(1);
-    expect(repairIncidents(state, SETTINGS)).toHaveLength(1);
+    expect(repairIncidents(state)).toHaveLength(1);
   });
 
   it('starts a queued repair after the restart', () => {
@@ -298,7 +298,7 @@ describe('restart during a repair', () => {
     expect(state.run.pendingDelivery).toBeNull();
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
-    expect(repairIncidents(state, SETTINGS)).toHaveLength(2);
+    expect(repairIncidents(state)).toHaveLength(2);
   });
 });
 
@@ -337,7 +337,7 @@ describe('delivery repair outcomes', () => {
     expect(state.run.repair.repairs).toBe(1);
     expect(state.run.repair.taken).toHaveLength(2);
     expect(state.groups.map((g) => g.delivery.state)).toEqual(['applied', 'applied']);
-    expect(repairIncidents(state, SETTINGS)).toEqual([]);
+    expect(repairIncidents(state)).toEqual([]);
   });
 
   it('a timeout of the agent keeps the keys free', () => {
@@ -347,7 +347,7 @@ describe('delivery repair outcomes', () => {
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
     expect(state.groups.map((g) => g.delivery.state)).toEqual(['apply_failed', 'apply_failed']);
-    expect(repairIncidents(state, SETTINGS)).toHaveLength(2);
+    expect(repairIncidents(state)).toHaveLength(2);
   });
 
   it('a delivery that failed without an attempt ends the repair and takes the keys', () => {

@@ -17,7 +17,6 @@ export interface Form {
   enabled: boolean;
   workers: string;
   maxRepairs: string;
-  answerHumanOnly: boolean;
   specialist: Draft;
   projects: Record<string, ProjectDraft>;
 }
@@ -34,7 +33,6 @@ export function formOf(settings: ObserverSettings): Form {
     enabled: settings.enabled,
     workers: String(settings.workers),
     maxRepairs: String(settings.maxRepairs),
-    answerHumanOnly: settings.answerHumanOnly,
     specialist: draftOf(settings.specialist),
     projects,
   };
@@ -73,7 +71,6 @@ export function settingsOf(
     enabled: form.enabled,
     workers: numberOf(form.workers),
     maxRepairs: numberOf(form.maxRepairs),
-    answerHumanOnly: form.answerHumanOnly,
     projects: repositories.flatMap((repository) => {
       const project = form.projects[repository];
       if (!project?.connected) return [];

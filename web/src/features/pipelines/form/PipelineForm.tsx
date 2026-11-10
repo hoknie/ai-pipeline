@@ -11,8 +11,8 @@ import { rawName } from '../../../shared/lib/pipeline/pipelineName.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
-import { FormTab } from './FormTab.tsx';
-import { PreviewTab } from './PreviewTab.tsx';
+import { FormTab, type Places } from './FormTab.tsx';
+import { SchemaTab } from './SchemaTab.tsx';
 import { FilePath } from '../../../shared/ui/layout/FilePath.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../shared/ui/layout/tabs.tsx';
 import { PREVIEW_DELAY_MS } from './editorState.ts';
@@ -98,11 +98,54 @@ function FormHeading({
   );
 }
 
+function EditorTabs({
+  editor,
+  view,
+  pipeline,
+  sharedOnly,
+  places,
+  disabled,
+}: {
+  editor: ReturnType<typeof usePipelineEditor>;
+  view: ConfigEditorResponse;
+  pipeline: EditorPipeline | null;
+  sharedOnly: boolean;
+  places: Places;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  const { preview } = editor;
+  return (
+    <Tabs value={editor.tab} onValueChange={editor.setTab}>
+      <TabsList aria-label={t('pipelines.tabs')}>
+        <TabsTrigger value="form">{t('pipelines.form')}</TabsTrigger>
+        <TabsTrigger value="schema">
+          {t('pipelines.schema')}{' '}
+          {preview.stale ? <Badge variant="warn">{t('pipelines.stale')}</Badge> : null}
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="form" className="flex min-w-0 flex-col gap-3">
+        <FormTab
+          editor={editor}
+          view={view}
+          pipeline={pipeline}
+          sharedOnly={sharedOnly}
+          places={places}
+          disabled={disabled}
+        />
+      </TabsContent>
+      <TabsContent value="schema">
+        <SchemaTab editor={editor} view={view} sharedOnly={sharedOnly} disabled={disabled} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 export function PipelineForm(props: PipelineFormProps) {
   const { view, pipeline, notice, sharedOnly } = props;
   const { t } = useTranslation();
   const editor = usePipelineEditor(props);
-  const { level, draft, id, busy, readOnly, source, sources, preview } = editor;
+  const { level, draft, id, busy, readOnly, source, sources } = editor;
   const disabled = readOnly || busy;
   const places = errorsByPlace(editor.errors, id, draft.split !== null);
   const copyOnly = pipeline !== null && !sharedOnly;
@@ -135,28 +178,14 @@ export function PipelineForm(props: PipelineFormProps) {
         projectFile={Boolean(sources.project)}
         globalFile={sources.global?.file ?? null}
       />
-      <Tabs value={editor.tab} onValueChange={editor.setTab}>
-        <TabsList aria-label={t('pipelines.tabs')}>
-          <TabsTrigger value="form">{t('pipelines.form')}</TabsTrigger>
-          <TabsTrigger value="preview">
-            {t('pipelines.preview')}{' '}
-            {preview.stale ? <Badge variant="warn">{t('pipelines.stale')}</Badge> : null}
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="form" className="flex min-w-0 flex-col gap-3">
-          <FormTab
-            editor={editor}
-            view={view}
-            pipeline={pipeline}
-            sharedOnly={Boolean(sharedOnly)}
-            places={places}
-            disabled={disabled}
-          />
-        </TabsContent>
-        <TabsContent value="preview">
-          <PreviewTab id={id} preview={preview} />
-        </TabsContent>
-      </Tabs>
+      <EditorTabs
+        editor={editor}
+        view={view}
+        pipeline={pipeline}
+        sharedOnly={Boolean(sharedOnly)}
+        places={places}
+        disabled={disabled}
+      />
       <PipelineButtons
         pipeline={pipeline}
         readOnly={readOnly}

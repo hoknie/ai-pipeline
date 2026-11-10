@@ -203,12 +203,3 @@ export function fieldLabel(path: string): string {
   const match = /steps\[\d+\]\.(.+)$|split\.(.+)$|\.(steps)$/.exec(path);
   return match?.[1] ?? match?.[2] ?? match?.[3] ?? '';
 }
-
-export function movedBy(steps: StepDraft[], index: number, delta: number): StepDraft[] {
-  const target = index + delta;
-  if (target < 0 || target >= steps.length) return steps;
-  const copy = [...steps];
-  const [moved] = copy.splice(index, 1);
-  copy.splice(target, 0, moved as StepDraft);
-  return copy;
-}

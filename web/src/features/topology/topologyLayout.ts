@@ -2,7 +2,8 @@ import type { Edge } from '@xyflow/react';
 import type { TFunction } from 'i18next';
 
 import type { MachineLoad } from '../../shared/lib/pipeline/specialistLoad.ts';
-import { pipelineStagesOf, type StagedTopology } from '../../shared/lib/pipeline/pipelineStages.ts';
+import { pipelineStagesOf } from '../../shared/lib/pipeline/pipelineStages.ts';
+import type { PipelineTopology } from '../../shared/api/types.ts';
 import type { Live } from './liveState.ts';
 import {
   commonOf,
@@ -44,7 +45,7 @@ const resolverEdge = (t: TFunction): Edge => ({
 });
 
 /** The back edges of the steps that can send the work to an earlier step. */
-function rejectEdges(pipeline: StagedTopology): Edge[] {
+function rejectEdges(pipeline: PipelineTopology): Edge[] {
   return pipeline.steps.flatMap((step) =>
     step.onReject
       ? [
@@ -65,7 +66,7 @@ function rejectEdges(pipeline: StagedTopology): Edge[] {
 
 /** Nodes left to right by the list of stages; the resolver under the delivery. */
 export function layout(
-  pipeline: StagedTopology,
+  pipeline: PipelineTopology,
   live: Live,
   t: TFunction,
   sizes: ReadonlyMap<string, Size> = new Map(),

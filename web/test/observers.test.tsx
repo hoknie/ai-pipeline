@@ -71,7 +71,6 @@ describe('the observers as the panel reads them', () => {
       enabled: true,
       workers: 4,
       maxRepairs: 2,
-      answerHumanOnly: false,
       projects: [],
       specialist: {},
     });
@@ -150,8 +149,7 @@ describe('settings of the observers', () => {
     ).toBe('true');
     expect(screen.getByLabelText<HTMLInputElement>('Workers').value).toBe('3');
     expect(screen.getByLabelText('Repairs per task')).toBeTruthy();
-    expect(screen.getByText('Answer questions meant only for a human')).toBeTruthy();
-    expect(screen.getByText(/the agent decides it/)).toBeTruthy();
+    expect(screen.getByTestId('observers-human-only-note')).toBeTruthy();
     const running = within(screen.getByTestId('observers-running'));
     expect(running.getByText(/run7/)).toBeTruthy();
     expect(screen.getByTestId('observers-waiting').textContent).toBe(
@@ -198,6 +196,12 @@ describe('settings of the observers', () => {
     expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
   });
 
+  it('explains that questions for a person only are never taken, with no switch', async () => {
+    await open('#settings/global/observers');
+    expect(await screen.findByTestId('observers-human-only-note')).toBeTruthy();
+    expect(document.getElementById('observers-human-only')).toBeNull();
+  });
+
   it('saves the form and shows the answer', async () => {
     const api = await open('#settings/global/observers');
     const workers = await screen.findByLabelText<HTMLInputElement>('Workers');
@@ -207,6 +211,7 @@ describe('settings of the observers', () => {
     await waitFor(() => expect(api.setObservers).toHaveBeenCalled());
     const sent = vi.mocked(api.setObservers).mock.calls[0]![0] as ObserverSettings;
     expect(sent).toMatchObject({ enabled: true, workers: 5, projects: [] });
+    expect(sent).not.toHaveProperty('answerHumanOnly');
     await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>('Workers').value).toBe('5'));
   });
 

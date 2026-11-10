@@ -91,75 +91,80 @@ function ReturnChoice({
 }
 
 /** One step: its specialist, the move and remove buttons, the return, the prompt and the review. */
-export function StepCard(props: StepCardProps) {
+export function StepFields(props: StepCardProps) {
   const { step, index, steps, slugs, disabled, errors, onPatch } = props;
   const { t } = useTranslation();
   return (
-    <li aria-label={t('pipelines.step', { index: index + 1 })}>
-      <Card className="flex flex-col gap-2 p-3">
-        <div className="flex items-center gap-2">
-          <SpecialistSelect
-            current={step.specialist}
-            slugs={slugs}
-            label={t('pipelines.stepSpecialist')}
-            disabled={disabled}
-            onChange={(next) => onPatch({ specialist: next })}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('pipelines.up')}
-            disabled={disabled || index === 0}
-            onClick={() => props.onMove(-1)}
-          >
-            <ArrowUp />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('pipelines.down')}
-            disabled={disabled || index === steps.length - 1}
-            onClick={() => props.onMove(1)}
-          >
-            <ArrowDown />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('pipelines.removeStep')}
-            disabled={disabled}
-            onClick={props.onRemove}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-        <ReturnChoice {...props} />
-        <Textarea
-          aria-label={t('pipelines.stepPrompt')}
-          rows={2}
-          value={step.additionalPrompt}
+    <>
+      <div className="flex items-center gap-2">
+        <SpecialistSelect
+          current={step.specialist}
+          slugs={slugs}
+          label={t('pipelines.stepSpecialist')}
           disabled={disabled}
-          placeholder={t('pipelines.stepPrompt')}
-          onChange={(event) => onPatch({ additionalPrompt: event.target.value })}
+          onChange={(next) => onPatch({ specialist: next })}
         />
-        <div className="flex items-center gap-2">
-          <Switch
-            id={`review-${step.key}`}
-            checked={step.humanReview}
-            disabled={disabled}
-            onCheckedChange={(humanReview) => onPatch({ humanReview })}
-          />
-          <Label htmlFor={`review-${step.key}`}>{t('pipelines.humanReview')}</Label>
-        </div>
-        {errors.map((error) => (
-          <p
-            className="text-sm text-destructive"
-            role="alert"
-            key={`${error.path}:${error.message}`}
-          >
-            {fieldLabel(error.path)}: {error.message}
-          </p>
-        ))}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('pipelines.up')}
+          disabled={disabled || index === 0}
+          onClick={() => props.onMove(-1)}
+        >
+          <ArrowUp />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('pipelines.down')}
+          disabled={disabled || index === steps.length - 1}
+          onClick={() => props.onMove(1)}
+        >
+          <ArrowDown />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('pipelines.removeStep')}
+          disabled={disabled}
+          onClick={props.onRemove}
+        >
+          <Trash2 />
+        </Button>
+      </div>
+      <ReturnChoice {...props} />
+      <Textarea
+        aria-label={t('pipelines.stepPrompt')}
+        rows={2}
+        value={step.additionalPrompt}
+        disabled={disabled}
+        placeholder={t('pipelines.stepPrompt')}
+        onChange={(event) => onPatch({ additionalPrompt: event.target.value })}
+      />
+      <div className="flex items-center gap-2">
+        <Switch
+          id={`review-${step.key}`}
+          checked={step.humanReview}
+          disabled={disabled}
+          onCheckedChange={(humanReview) => onPatch({ humanReview })}
+        />
+        <Label htmlFor={`review-${step.key}`}>{t('pipelines.humanReview')}</Label>
+      </div>
+      {errors.map((error) => (
+        <p className="text-sm text-destructive" role="alert" key={`${error.path}:${error.message}`}>
+          {fieldLabel(error.path)}: {error.message}
+        </p>
+      ))}
+    </>
+  );
+}
+
+export function StepCard(props: StepCardProps) {
+  const { t } = useTranslation();
+  return (
+    <li aria-label={t('pipelines.step', { index: props.index + 1 })}>
+      <Card className="flex flex-col gap-2 p-3">
+        <StepFields {...props} />
       </Card>
     </li>
   );

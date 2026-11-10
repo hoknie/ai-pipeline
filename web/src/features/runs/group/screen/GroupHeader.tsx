@@ -159,11 +159,6 @@ function DeliveryStage({ ctx }: { ctx: GroupCtx }) {
           {attemptAt !== null ? (
             <span>{t('runs.system.lastAttempt', { time: clock(attemptAt) })}</span>
           ) : null}
-          {stage.status === 'apply_failed' && stage.reason ? (
-            <span className="min-w-0 truncate" title={stage.reason}>
-              {stage.reason.split('\n')[0]}
-            </span>
-          ) : null}
         </>
       ) : null}
     </span>

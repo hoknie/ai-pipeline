@@ -178,7 +178,7 @@ export function repairActive(state: RunState, observers: ObserverSettings): bool
   if (state.run.hold !== null) return false;
   return (
     state.run.repair.incident !== null ||
-    (repairAdmitted(state, observers) && repairIncidents(state, observers).length > 0)
+    (repairAdmitted(state, observers) && repairIncidents(state).length > 0)
   );
 }
 
