@@ -1,9 +1,14 @@
+import { History, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Api } from '../../../../shared/api/api.ts';
+import { Alert } from '../../../../shared/ui/feedback/alert.tsx';
+import { Empty } from '../../../../shared/ui/feedback/empty.tsx';
+import { Skeleton } from '../../../../shared/ui/feedback/skeleton.tsx';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
+import { Card } from '../../../../shared/ui/layout/card.tsx';
 import { useHistory } from '../useHistory.ts';
-import { HistoryFilters } from './HistoryFilters.tsx';
+import { HistoryFilters, hasFilter } from './HistoryFilters.tsx';
 import { HistoryList } from './HistoryList.tsx';
 import { HistoryPagination } from './HistoryPagination.tsx';
 
@@ -19,56 +24,57 @@ export function HistoryTab({ api }: { api: Api }) {
     return () => clearInterval(interval);
   }, [page]);
 
-  const hasFilter =
-    history.filters.repository !== undefined ||
-    history.filters.result !== undefined ||
-    history.filters.model !== undefined ||
-    history.filters.runtime !== undefined ||
-    history.filters.from !== undefined ||
-    history.filters.to !== undefined;
+  const filtered = hasFilter(history.filters);
 
   return (
-    <section
-      className="@container flex min-w-0 flex-col gap-3"
-      aria-label={t('observers.history.title')}
-    >
-      <header className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{t('observers.history.title')}</h2>
-        <Button variant="outline" loading={history.busy} onClick={history.refresh}>
-          {t('observers.history.refresh')}
-        </Button>
-      </header>
-      <HistoryFilters history={history} projects={page?.projects ?? []} />
-      {history.error ? (
-        <div
-          role="alert"
-          className="flex items-center justify-between rounded border border-destructive p-3"
-        >
-          <span>{t('observers.history.error')}</span>
-          <Button variant="outline" size="sm" onClick={history.retry}>
-            {t('observers.history.retry')}
+    <section className="@container min-w-0" aria-label={t('observers.history.title')}>
+      <Card className="overflow-hidden">
+        <header className="flex items-center justify-between gap-2 border-b px-3 py-2">
+          <h3 className="text-sm font-semibold">{t('observers.history.title')}</h3>
+          <Button variant="outline" size="sm" loading={history.busy} onClick={history.refresh}>
+            <RefreshCw aria-hidden="true" />
+            {t('observers.history.refresh')}
           </Button>
-        </div>
-      ) : null}
-      {history.busy && !page ? (
-        <div
-          role="status"
-          aria-label={t('observers.history.loading')}
-          className="h-24 animate-pulse rounded bg-muted"
-        />
-      ) : null}
-      {page && !page.items.length ? (
-        <div className="flex flex-col items-start gap-2 py-4">
-          <p>{t(hasFilter ? 'observers.history.noMatches' : 'observers.history.empty')}</p>
-          {hasFilter ? (
-            <Button variant="outline" size="sm" onClick={history.reset}>
-              {t('observers.history.reset')}
+        </header>
+        <HistoryFilters history={history} projects={page?.projects ?? []} />
+        {history.error ? (
+          <Alert variant="destructive" className="m-3 flex w-auto items-center justify-between">
+            <span>{t('observers.history.error')}</span>
+            <Button variant="outline" size="sm" onClick={history.retry}>
+              {t('observers.history.retry')}
             </Button>
-          ) : null}
-        </div>
-      ) : null}
-      {page?.items.length ? <HistoryList page={page} asOf={now} /> : null}
-      <HistoryPagination history={history} />
+          </Alert>
+        ) : null}
+        {history.busy && !page ? (
+          <div
+            role="status"
+            aria-label={t('observers.history.loading')}
+            className="flex flex-col gap-2 p-3"
+          >
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} className="h-12" />
+            ))}
+          </div>
+        ) : null}
+        {page && !page.items.length ? (
+          <Empty
+            icon={<History />}
+            title={t(filtered ? 'observers.history.noMatches' : 'observers.history.empty')}
+          >
+            {filtered ? (
+              <Button variant="outline" size="sm" onClick={history.reset}>
+                {t('observers.history.reset')}
+              </Button>
+            ) : null}
+          </Empty>
+        ) : null}
+        {page?.items.length ? <HistoryList page={page} asOf={now} /> : null}
+        <HistoryPagination
+          history={history}
+          pageSize={history.filters.limit ?? 20}
+          onPageSize={(limit) => history.update({ limit })}
+        />
+      </Card>
     </section>
   );
 }

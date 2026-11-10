@@ -51,10 +51,13 @@ describe('observer history UI components', () => {
     );
 
     expect(screen.getByText('#42')).toBeTruthy();
-    expect(screen.getByText('#2')).toBeTruthy();
+    expect(screen.getByText('attempt #2')).toBeTruthy();
     expect(screen.getByText('Fix Task')).toBeTruthy();
     expect(screen.getByText('(process_aborted)')).toBeTruthy();
-    expect(screen.getAllByText(/2026|1970/).length).toBeGreaterThan(0);
+    // Short clock time in the row, the full date with the year in the tooltip of start and end.
+    const times = Array.from(document.querySelectorAll('time'));
+    expect(times).toHaveLength(2);
+    for (const time of times) expect(time.getAttribute('title')).toMatch(/1970/);
     expect(screen.getByText('Failed')).toBeTruthy();
     expect(screen.getByText(/12.5k \/ 800/)).toBeTruthy();
     const span = screen.getByTitle(/800/);
@@ -65,7 +68,7 @@ describe('observer history UI components', () => {
   it('renders card view with all fields', () => {
     render(<HistoryCard item={item} asOf={6000} />);
     expect(screen.getByText('#42')).toBeTruthy();
-    expect(screen.getByText('#2')).toBeTruthy();
+    expect(screen.getByText('attempt #2')).toBeTruthy();
     expect(screen.getByText('(process_aborted)')).toBeTruthy();
   });
 
@@ -141,10 +144,16 @@ describe('observer history UI components', () => {
     expect(cards?.className).toContain('@min-[64rem]:hidden');
     expect(cards?.className).not.toMatch(/(^| )min-\[64rem\]/);
     expect(container.innerHTML).not.toMatch(/ (sm|lg):grid-cols/);
-    // Long paths and models wrap instead of widening the page.
-    for (const view of [table!, cards!])
-      for (const text of ['/work/app', 'claude-3-7-sonnet'])
-        expect(within(view as HTMLElement).getByText(text).className).toContain('break-all');
+    // The project goes by its name with the full path in the tooltip; long names and models wrap
+    // instead of widening the page.
+    for (const view of [table!, cards!]) {
+      const project = within(view as HTMLElement).getByText('app');
+      expect(project.className).toContain('break-all');
+      expect(project.parentElement?.getAttribute('title')).toBe('/work/app');
+      expect(within(view as HTMLElement).getByText('claude-3-7-sonnet').className).toContain(
+        'break-all',
+      );
+    }
     expect(container.querySelector('table')?.className).toContain('table-fixed');
   });
 

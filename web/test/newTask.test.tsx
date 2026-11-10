@@ -618,10 +618,17 @@ describe('repository of the new task', () => {
     fireEvent.change(within(dialog).getByPlaceholderText('Name (optional)'), {
       target: { value: 'my name' },
     });
-    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Waits for' }));
+    const after = within(dialog).getByRole('combobox', { name: 'Waits for' });
+    fireEvent.click(after);
     fireEvent.click(await screen.findByRole('option', { name: /app task/ }));
     await waitFor(() => expect(within(dialog).getAllByText(/app task/).length).toBeGreaterThan(0));
     fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
+    // the closed popover hands the focus back to its trigger on a timer; a select opened before
+    // that would lose the focus and close
+    await waitFor(() => {
+      expect(after.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(after);
+    });
     await pickLib(dialog);
     await waitFor(() => expect(within(dialog).queryByText(/app task/)).toBeNull());
     expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(

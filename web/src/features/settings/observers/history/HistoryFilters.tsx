@@ -1,3 +1,5 @@
+import { RotateCcw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ObserverHistoryQuery } from '../../../../shared/api/observerHistoryApi.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
 import { HistoryFilterFields } from './HistoryFilterFields.tsx';
@@ -8,6 +10,19 @@ type HistoryControls = {
   reset: () => void;
 };
 
+/** Whether any filter narrows the history; the page size is not a filter. */
+export function hasFilter(filters: ObserverHistoryQuery): boolean {
+  return (
+    filters.repository !== undefined ||
+    filters.result !== undefined ||
+    filters.model !== undefined ||
+    filters.runtime !== undefined ||
+    filters.from !== undefined ||
+    filters.to !== undefined
+  );
+}
+
+/** The filters of the history above the list, with «Reset» once any of them is set. */
 export function HistoryFilters({
   history,
   projects,
@@ -16,26 +31,15 @@ export function HistoryFilters({
   projects: string[];
 }) {
   const { t } = useTranslation();
-  const fieldClass = 'rounded border bg-background p-2';
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-2 border-b p-3">
       <HistoryFilterFields history={history} projects={projects} />
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={history.reset}>
+      {hasFilter(history.filters) ? (
+        <Button variant="ghost" size="sm" className="w-fit" onClick={history.reset}>
+          <RotateCcw aria-hidden="true" />
           {t('observers.history.reset')}
         </Button>
-        <select
-          aria-label={t('observers.history.pageSize')}
-          value={history.filters.limit ?? 20}
-          onChange={(e) => history.update({ limit: Number(e.target.value) as 20 | 50 | 100 })}
-          className={fieldClass}
-        >
-          {[20, 50, 100].map((size) => (
-            <option key={size}>{size}</option>
-          ))}
-        </select>
-      </div>
-    </>
+      ) : null}
+    </div>
   );
 }
-import { useTranslation } from 'react-i18next';
