@@ -5,7 +5,7 @@ import { Input } from '../../shared/ui/forms/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 import type { PipelineFilter, PipelineFilterOptions } from './pipelineFilters.ts';
 
-import { ValuesPicker } from '../../shared/ui/forms/ValuesPicker.tsx';
+import { FilterField } from '../../shared/ui/forms/filters/FilterField.tsx';
 
 const LEVELS: LevelFilter[] = ['all', 'project', 'global'];
 
@@ -48,35 +48,26 @@ export function PipelineFilters({
         ))}
       </ToggleGroup>
       {options.tags.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">{t('pipelines.filters.tags')}</span>
-          <ValuesPicker
-            label={t('pipelines.filters.tags')}
-            values={filter.tags}
-            onChange={(tags) => onFilter({ ...filter, tags })}
-            options={options.tags.map((tag) => ({
-              name: tag.name,
-              source: tag.shared ? 'global' : 'project',
-            }))}
-            creatable={false}
-            headings={{ global: t('specialists.tags.shared'), project: t('specialists.tags.own') }}
-          />
-        </div>
+        <FilterField
+          label={t('pipelines.filters.tags')}
+          selected={filter.tags}
+          onChange={(tags) => onFilter({ ...filter, tags })}
+          options={options.tags.map((tag) => ({
+            value: tag.name,
+            label: tag.name,
+            group: tag.shared ? t('specialists.tags.shared') : t('specialists.tags.own'),
+          }))}
+          clearLabel={t('runs.list.clear')}
+        />
       ) : null}
       {options.specialists.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">
-            {t('pipelines.filters.specialists')}
-          </span>
-          <ValuesPicker
-            label={t('pipelines.filters.specialists')}
-            values={filter.specialists}
-            onChange={(specialists) => onFilter({ ...filter, specialists })}
-            options={options.specialists.map((name) => ({ name, source: 'project' as const }))}
-            creatable={false}
-            headings={{ project: '' }}
-          />
-        </div>
+        <FilterField
+          label={t('pipelines.filters.specialists')}
+          selected={filter.specialists}
+          onChange={(specialists) => onFilter({ ...filter, specialists })}
+          options={options.specialists.map((name) => ({ value: name, label: name }))}
+          clearLabel={t('runs.list.clear')}
+        />
       ) : null}
     </div>
   );

@@ -185,8 +185,6 @@ export const zh: Dictionary = {
       specialists: '专家',
       repositories: '仓库',
       clear: '清除',
-      collapse: '收起筛选',
-      expand: '展开筛选',
       empty: '未找到结果',
       loadingMore: '正在加载更早的运行…',
       moreFailed: '无法加载更早的运行。',
@@ -808,6 +806,10 @@ export const zh: Dictionary = {
     truncated: '仅显示前 {{count}} 个文件夹',
     choose: '选择此文件夹',
     loading: '加载中…',
+  },
+  filters: {
+    collapse: '收起筛选',
+    expand: '展开筛选',
   },
   picker: {
     add: '添加',

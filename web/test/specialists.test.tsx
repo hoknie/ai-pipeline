@@ -970,6 +970,59 @@ describe('specialist filters', () => {
     expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
   });
 
+  it('shows the chosen values as chips under the label and clears them', async () => {
+    render(<Page api={api()} />);
+    await pick('Runtimes', 'claude');
+    const column = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(within(column).getByText('Runtimes')).toBeTruthy();
+    fireEvent.click(within(column).getByRole('button', { name: 'Remove claude' }));
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    expect(within(column).queryByRole('button', { name: 'Remove claude' })).toBeNull();
+  });
+
+  it('clears all the values of a field with «Clear»', async () => {
+    render(<Page api={api()} />);
+    await pick('Runtimes', 'claude');
+    await openPanel();
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Runtimes' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'opencode' }));
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    fireEvent.click(screen.getByRole('option', { name: 'Clear' }));
+    const column = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(within(column).queryByRole('button', { name: /^Remove / })).toBeNull();
+    expect(rows()).toHaveLength(3);
+  });
+
+  it('collapses the column into a strip with the count, keeps the list and remembers it', async () => {
+    render(<Page api={api()} />);
+    await pick('Runtimes', 'claude');
+    await pick('Commands', 'npm test*');
+    const column = await screen.findByRole('complementary', { name: 'Filters' });
+    const list = screen.getByRole('list', { name: 'specialists', hidden: true }).closest('aside')!;
+    const width = list.className;
+    fireEvent.click(within(column).getByRole('button', { name: 'Collapse filters' }));
+    const strip = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(strip.style.width).toBe('40px');
+    expect(within(strip).getByText('2')).toBeTruthy();
+    expect(within(strip).queryByRole('searchbox')).toBeNull();
+    expect(rows()).toHaveLength(1);
+    // the freed width goes to the form: the list column keeps its width
+    expect(list.className).toBe(width);
+    expect(window.localStorage.getItem('aip.web.specialistFiltersCollapsed')).toBe('true');
+    expect(window.localStorage.getItem('aip.web.runFiltersCollapsed')).toBeNull();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Expand filters' }));
+    expect((await screen.findByRole('complementary', { name: 'Filters' })).style.width).toBe(
+      '256px',
+    );
+  });
+
+  it('opens collapsed when it was left so', async () => {
+    window.localStorage.setItem('aip.web.specialistFiltersCollapsed', 'true');
+    render(<Page api={api()} />);
+    const strip = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(strip.style.width).toBe('40px');
+  });
+
   describe.each([
     ['popover', 1100],
     ['sheet', 600],
@@ -997,6 +1050,13 @@ describe('specialist filters', () => {
       });
       expect(rows()).toHaveLength(1);
       expect(screen.getByRole('button', { name: 'Filters (1)', hidden: true })).toBeTruthy();
+    });
+
+    it('keeps the button, not a strip, when the column was collapsed', async () => {
+      window.localStorage.setItem('aip.web.specialistFiltersCollapsed', 'true');
+      render(<Page api={api()} />);
+      expect(await screen.findByRole('button', { name: 'Filters' })).toBeTruthy();
+      expect(screen.queryByRole('complementary', { name: 'Filters' })).toBeNull();
     });
 
     it('counts the saved filters on the button', async () => {

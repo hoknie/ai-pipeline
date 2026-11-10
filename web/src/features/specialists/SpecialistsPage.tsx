@@ -10,7 +10,6 @@ import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
 import { ChainsList, ChainsPane, NEW_CHAIN } from './chains/index.ts';
 import { SpecialistImportDialog } from './importing/SpecialistImportDialog.tsx';
 import { NEW_ID, SpecialistPane } from './page/SpecialistPane.tsx';
-import { SpecialistsFilterControl } from './page/SpecialistsFilterControl.tsx';
 import { SpecialistsList } from './page/SpecialistsList.tsx';
 import { useLeaveGuard } from './page/useLeaveGuard.ts';
 import { useSpecialistSearch } from './page/useSpecialistSearch.tsx';
@@ -43,12 +42,11 @@ function SpecialistsBody({
   const [importing, setImporting] = useState(false);
   const columns = useMediaQuery('(min-width: 1280px)');
   const wide = useMediaQuery('(min-width: 768px)');
-  const { panel, shown, count, reset } = useSpecialistSearch(view);
+  const { column, button, shown, count, reset } = useSpecialistSearch(view, columns);
 
   return (
     <SplitPage
-      filters={columns ? panel : null}
-      filtersLabel={t('specialists.filters.button')}
+      {...column}
       side={
         <>
           {data.failure ? <Alert variant="destructive">{data.failure}</Alert> : null}
@@ -58,11 +56,7 @@ function SpecialistsBody({
             loaded={view !== null}
             selected={selected}
             narrowed={count > 0}
-            filtersControl={
-              !view || columns ? null : (
-                <SpecialistsFilterControl count={count} wide={wide} panel={panel} />
-              )
-            }
+            filtersControl={button(wide)}
             onNew={() => void go(NEW_ID, null)}
             onImport={() => setImporting(true)}
             onReset={reset}

@@ -62,6 +62,10 @@ export default function PipelinesPage({
       <SplitPage
         filters={columns && section === null && view ? <FiltersPanel filters={filters} /> : null}
         filtersLabel={t('pipelines.filters.button')}
+        filtersCount={filters.count}
+        filtersCountLabel={t('pipelines.filters.buttonCount', { count: filters.count })}
+        filtersCollapsed={filters.collapsed}
+        onFiltersCollapsed={filters.setCollapsed}
         side={
           <PipelinesSide
             section={section}

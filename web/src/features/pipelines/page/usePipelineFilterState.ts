@@ -4,6 +4,7 @@ import { usePreference } from '../../../shared/lib/browser/preferences.ts';
 import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
 import {
   EMPTY_PIPELINE_FILTER,
+  activePipelineFilterCount,
   existingPipelineFilter,
   pipelineFilterOptions,
   savedPipelineFilter,
@@ -17,6 +18,7 @@ export function usePipelineFilterState(view: ConfigEditorResponse | null) {
     {},
   );
   const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = usePreference<boolean>('pipelineFiltersCollapsed', false);
   const repository = view?.repository ?? null;
   const options = useMemo(() => pipelineFilterOptions(view?.pipelines ?? []), [view]);
   const stored = useMemo<PipelineFilter>(
@@ -37,7 +39,18 @@ export function usePipelineFilterState(view: ConfigEditorResponse | null) {
       setSavedByRepository({ ...savedByRepository, [repository]: filter });
     }
   }, [view, repository, filter, stored, savedByRepository, setSavedByRepository]);
-  return { repository, options, filter, setFilter, search, setSearch };
+  const count = activePipelineFilterCount(filter, search);
+  return {
+    repository,
+    options,
+    filter,
+    setFilter,
+    search,
+    setSearch,
+    collapsed,
+    setCollapsed,
+    count,
+  };
 }
 
 export type PipelineFilterState = ReturnType<typeof usePipelineFilterState>;

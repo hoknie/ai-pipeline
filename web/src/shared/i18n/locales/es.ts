@@ -191,8 +191,6 @@ export const es: Dictionary = {
       specialists: 'Especialistas',
       repositories: 'Repositorio',
       clear: 'Borrar',
-      collapse: 'Contraer filtros',
-      expand: 'Expandir filtros',
       empty: 'No se encontró nada',
       loadingMore: 'Cargando ejecuciones anteriores…',
       moreFailed: 'No se pudieron cargar las ejecuciones anteriores.',
@@ -828,6 +826,10 @@ export const es: Dictionary = {
     truncated: 'Se muestran las primeras {{count}} carpetas',
     choose: 'Elegir esta carpeta',
     loading: 'Cargando…',
+  },
+  filters: {
+    collapse: 'Contraer filtros',
+    expand: 'Expandir filtros',
   },
   picker: {
     add: 'Añadir',

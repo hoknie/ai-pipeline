@@ -1084,8 +1084,8 @@ describe('tag catalog and filter', () => {
     expect(within(list).getByText('С тегом')).toBeTruthy();
     expect(within(list).queryByText('Без тега')).toBeNull();
     expect(within(list).getByText('login')).toBeTruthy();
-    // the removed tag drops out; the chosen one is a number on the button, not a chip
-    expect(within(screen.getByRole('combobox', { name: 'Tags' })).getByText('1')).toBeTruthy();
+    // the removed tag drops out; the chosen one is a chip under the label
+    expect(screen.getByRole('button', { name: 'Remove login' })).toBeTruthy();
   });
 
   it('ignores the status filter of the old versions and keeps the filters after a reload', async () => {

@@ -5,7 +5,7 @@ import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { statusInfo } from '../../../shared/lib/status.ts';
 import { useTags } from '../../../shared/lib/catalog/tags.tsx';
 import type { RunView } from '../../../shared/api/types.ts';
-import type { FilterOption } from '../../../shared/ui/forms/FilterSelect.tsx';
+import type { FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { TagLabel } from '../../../shared/ui/feedback/TagChip.tsx';
 import {
   RUN_STATES,

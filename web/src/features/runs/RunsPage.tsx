@@ -4,8 +4,7 @@ import { useMediaQuery } from '../../shared/lib/browser/media.ts';
 import { defaultEntry, orderEntries } from '../../shared/lib/order.ts';
 import { activeFilters, filterRuns } from './list/runFilter.ts';
 import { NarrowDetail } from './page/NarrowDetail.tsx';
-import { FilterColumn } from './page/FilterColumn.tsx';
-import { FiltersControl } from './page/FiltersControl.tsx';
+import { RunFilterColumn, RunFiltersButton } from './page/RunFilterSlots.tsx';
 import { NoRuns } from './page/NoRuns.tsx';
 import { RunDetail } from './page/RunDetail.tsx';
 import { RunListPane } from './page/RunListPane.tsx';
@@ -48,7 +47,7 @@ export function RunsPage(props: RunsPageProps) {
     : null;
   const detail = <RunDetail {...props} run={run} onSelect={select} />;
   const control = loaded ? (
-    <FiltersControl filterProps={filterProps} count={count} wide={wide} />
+    <RunFiltersButton filterProps={filterProps} count={count} wide={wide} />
   ) : null;
   const list = (
     <RunListPane
@@ -75,7 +74,7 @@ export function RunsPage(props: RunsPageProps) {
   return (
     <div className="flex min-h-0 flex-1">
       {columns && loaded ? (
-        <FilterColumn
+        <RunFilterColumn
           filterProps={filterProps}
           count={count}
           collapsed={collapsed}

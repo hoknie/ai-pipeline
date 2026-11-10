@@ -191,8 +191,6 @@ export const ru: Dictionary = {
       specialists: 'Специалисты',
       repositories: 'Репозиторий',
       clear: 'Очистить',
-      collapse: 'Свернуть фильтры',
-      expand: 'Развернуть фильтры',
       empty: 'Ничего не найдено',
       loadingMore: 'Загрузка прошлых запусков…',
       moreFailed: 'Не удалось загрузить прошлые запуски.',
@@ -827,6 +825,10 @@ export const ru: Dictionary = {
     truncated: 'Показаны первые {{count}} папок',
     choose: 'Выбрать эту папку',
     loading: 'Загрузка…',
+  },
+  filters: {
+    collapse: 'Свернуть фильтры',
+    expand: 'Развернуть фильтры',
   },
   picker: {
     add: 'Добавить',

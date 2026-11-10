@@ -7,6 +7,7 @@ import { Alert } from '../feedback/alert.tsx';
 import { Badge } from '../feedback/badge.tsx';
 
 import { FilePath } from './FilePath.tsx';
+import { FilterColumn } from './FilterColumn.tsx';
 import type { FieldError } from '../../api/types.ts';
 
 export interface Entry {
@@ -63,29 +64,50 @@ export function EntryList({
 
 /**
  * List on the left, content on the right; one under the other in a narrow window.
- * With `filters`, a column of them stands before the list from 1280 px.
+ * With `filters`, a column of them stands before the list from 1280 px; with `onFiltersCollapsed`
+ * it folds into a strip with the count of the active filters.
  */
 export function SplitPage({
   side,
   filters,
   filtersLabel,
+  filtersCount = 0,
+  filtersCountLabel = '',
+  filtersCollapsed = false,
+  onFiltersCollapsed,
   children,
 }: {
   side: ReactNode;
   filters?: ReactNode;
   filtersLabel?: string;
+  filtersCount?: number;
+  filtersCountLabel?: string;
+  filtersCollapsed?: boolean;
+  onFiltersCollapsed?: (collapsed: boolean) => void;
   children: ReactNode;
 }) {
   const columns = useMediaQuery('(min-width: 1280px)');
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       {filters && columns ? (
-        <aside
-          aria-label={filtersLabel}
-          className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto border-r p-3"
-        >
-          {filters}
-        </aside>
+        onFiltersCollapsed ? (
+          <FilterColumn
+            label={filtersLabel ?? ''}
+            count={filtersCount}
+            countLabel={filtersCountLabel}
+            collapsed={filtersCollapsed}
+            onCollapsed={onFiltersCollapsed}
+          >
+            {filters}
+          </FilterColumn>
+        ) : (
+          <aside
+            aria-label={filtersLabel}
+            className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto border-r p-3"
+          >
+            {filters}
+          </aside>
+        )
       ) : null}
       <aside className="flex shrink-0 flex-col gap-2 border-b p-3 md:w-80 md:overflow-y-auto md:border-r md:border-b-0">
         {side}

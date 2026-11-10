@@ -249,15 +249,27 @@ describe('run list', () => {
     expect(screen.getByText('Готовый')).toBeTruthy();
   });
 
-  it('shows only the runs waiting for an answer, with the choice kept on the button', async () => {
+  it('shows only the runs waiting for an answer, with the choice shown as a chip', async () => {
     render(<Harness />);
     await choose('State', /Needs answer/);
-    expect(screen.getAllByRole('button', { expanded: false, name: /./ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove Needs answer' })).toBeTruthy();
     expect(screen.getByText('Ждущий Запуск')).toBeTruthy();
     expect(screen.queryByText('Активный')).toBeNull();
     // the list stays open: another state can be added
     fireEvent.click(screen.getByRole('option', { name: /Cancelled/ }));
     expect(screen.getByText('Отменённый')).toBeTruthy();
+  });
+
+  it('clears both chosen values of a filter with «Clear» and leaves the others alone', async () => {
+    render(<Harness initial={only({ pipelines: ['feature'] })} />);
+    await choose('State', /Needs answer/);
+    fireEvent.click(screen.getByRole('option', { name: /Cancelled/ }));
+    expect(screen.getByRole('button', { name: 'Remove Needs answer' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove Cancelled' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('option', { name: 'Clear' }));
+    expect(screen.queryByRole('button', { name: 'Remove Needs answer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove Cancelled' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove feature' })).toBeTruthy();
   });
 
   it('says that nothing is found and resets the search and every filter', async () => {
@@ -409,16 +421,16 @@ describe('filter by the tag of a linked task', () => {
     );
   }
 
-  it('offers, applies and removes it like an ordinary tag, without chips in the column', async () => {
+  it('offers, applies and removes it like an ordinary tag, shown as a chip', async () => {
     render(<Filtered />);
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
     fireEvent.click(screen.getByRole('combobox', { name: 'Tags' }));
     fireEvent.click(await screen.findByRole('option', { name: /cards-half-width/ }));
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
-    // the choice is a number on the button, not a chip with a remove button
-    expect(screen.queryByRole('button', { name: 'Remove tag cards-half-width' })).toBeNull();
-    expect(within(screen.getByRole('combobox', { name: 'Tags' })).getByText('1')).toBeTruthy();
-    fireEvent.click(screen.getByRole('option', { name: /cards-half-width/ }));
+    // the choice is a chip under the label, removable without opening the list
+    expect(screen.getByRole('button', { name: 'Remove cards-half-width' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove cards-half-width' }));
+    expect(screen.queryByRole('button', { name: 'Remove cards-half-width' })).toBeNull();
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(2);
   });
 });

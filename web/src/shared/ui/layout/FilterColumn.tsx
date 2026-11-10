@@ -1,27 +1,33 @@
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button } from '../../../shared/ui/forms/button.tsx';
-import { RunFilters } from '../list/RunFilters.tsx';
-import type { FilterProps } from './types.ts';
-import { FILTERS_WIDTH, STRIP_WIDTH } from './widths.ts';
+import { Button } from '../forms/button.tsx';
+import { FILTERS_WIDTH, STRIP_WIDTH } from './filterWidths.ts';
 
 /** The column of the filters: expanded, or a strip with the count of the active ones. */
 export function FilterColumn({
-  filterProps,
+  children,
+  label,
   count,
+  countLabel,
   collapsed,
   onCollapsed,
 }: {
-  filterProps: FilterProps;
+  children: ReactNode;
+  /** The name of the column. */
+  label: string;
+  /** How many filters are active. */
   count: number;
+  /** The name of the number on the strip, such as «Filters (2)». */
+  countLabel: string;
   collapsed: boolean;
   onCollapsed: (collapsed: boolean) => void;
 }) {
   const { t } = useTranslation();
   return collapsed ? (
     <aside
-      aria-label={t('runs.list.filters')}
+      aria-label={label}
       data-filters="collapsed"
       style={{ width: STRIP_WIDTH }}
       className="flex shrink-0 flex-col items-center gap-2 border-r py-3"
@@ -29,15 +35,15 @@ export function FilterColumn({
       <Button
         variant="ghost"
         size="icon"
-        aria-label={t('runs.list.expand')}
-        title={t('runs.list.expand')}
+        aria-label={t('filters.expand')}
+        title={t('filters.expand')}
         onClick={() => onCollapsed(false)}
       >
         <PanelLeftOpen />
       </Button>
       {count > 0 ? (
         <span
-          aria-label={t('runs.list.filtersCount', { count })}
+          aria-label={countLabel}
           className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
         >
           {count}
@@ -46,7 +52,7 @@ export function FilterColumn({
     </aside>
   ) : (
     <aside
-      aria-label={t('runs.list.filters')}
+      aria-label={label}
       data-filters="expanded"
       style={{ width: FILTERS_WIDTH }}
       className="flex shrink-0 flex-col gap-2 overflow-y-auto border-r p-3"
@@ -55,13 +61,13 @@ export function FilterColumn({
         variant="ghost"
         size="sm"
         className="w-fit"
-        aria-label={t('runs.list.collapse')}
+        aria-label={t('filters.collapse')}
         onClick={() => onCollapsed(true)}
       >
         <PanelLeftClose />
-        {t('runs.list.collapse')}
+        {t('filters.collapse')}
       </Button>
-      <RunFilters {...filterProps} />
+      {children}
     </aside>
   );
 }

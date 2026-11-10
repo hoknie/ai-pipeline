@@ -185,8 +185,6 @@ export const en = {
       specialists: 'Specialists',
       repositories: 'Repository',
       clear: 'Clear',
-      collapse: 'Collapse filters',
-      expand: 'Expand filters',
       empty: 'Nothing found',
       loadingMore: 'Loading older runs…',
       moreFailed: 'Could not load older runs.',
@@ -813,6 +811,10 @@ export const en = {
     truncated: 'Showing the first {{count}} folders',
     choose: 'Choose this folder',
     loading: 'Loading…',
+  },
+  filters: {
+    collapse: 'Collapse filters',
+    expand: 'Expand filters',
   },
   picker: {
     add: 'Add',

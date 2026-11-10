@@ -935,6 +935,26 @@ describe('pipeline tags and filters', () => {
     expect(screen.queryByRole('button', { name: 'Filters' })).toBeNull();
   });
 
+  it('collapses the column of the filters on its own, apart from the runs', async () => {
+    render(<Page api={fakeApi({ config: configOf() })} />);
+    await screen.findByTestId('tags-feature');
+    await pick('fast', 'Tags');
+    const column = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(within(column).getByRole('button', { name: 'Remove fast' })).toBeTruthy();
+    fireEvent.click(within(column).getByRole('button', { name: 'Collapse filters' }));
+    const strip = await screen.findByRole('complementary', { name: 'Filters' });
+    expect(strip.style.width).toBe('40px');
+    expect(within(strip).getByText('1')).toBeTruthy();
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    expect(window.localStorage.getItem('aip.web.pipelineFiltersCollapsed')).toBe('true');
+    expect(window.localStorage.getItem('aip.web.runFiltersCollapsed')).toBeNull();
+    expect(window.localStorage.getItem('aip.web.specialistFiltersCollapsed')).toBeNull();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Expand filters' }));
+    expect((await screen.findByRole('complementary', { name: 'Filters' })).style.width).toBe(
+      '256px',
+    );
+  });
+
   it('keeps pipelines with any chosen tag and remembers the choice per repository', async () => {
     const api = fakeApi({ config: configOf() });
     const view = render(<Page api={api} />);

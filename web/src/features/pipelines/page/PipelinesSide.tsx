@@ -6,6 +6,7 @@ import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { ConfigErrors, EntryList } from '../../../shared/ui/layout/EntryList.tsx';
+import { FiltersButton } from '../../../shared/ui/layout/FiltersButton.tsx';
 import { rawName } from '../../../shared/lib/pipeline/pipelineName.ts';
 import {
   SYSTEM_KINDS,
@@ -24,7 +25,7 @@ import {
   applyPipelineFilter,
 } from '../pipelineFilters.ts';
 import { stageLevel } from '../SystemStagePage.tsx';
-import { FiltersControl } from './FiltersControl.tsx';
+import { FiltersPanel } from './FiltersControl.tsx';
 import type { PipelinesData } from './usePipelinesData.ts';
 import type { PipelineFilterState } from './usePipelineFilterState.ts';
 import type { Level } from './usePipelineNavigation.ts';
@@ -65,7 +66,13 @@ function PipelineList(props: {
         </Button>
       </div>
       {props.filtersControl ? (
-        <FiltersControl filters={filters} count={count} wide={props.wide} />
+        <FiltersButton
+          label={t('pipelines.filters.button')}
+          countLabel={count > 0 ? t('pipelines.filters.buttonCount', { count }) : null}
+          wide={props.wide}
+        >
+          <FiltersPanel filters={filters} />
+        </FiltersButton>
       ) : null}
       {view && shown.length === 0 && count > 0 ? (
         <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">

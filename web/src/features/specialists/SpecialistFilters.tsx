@@ -9,7 +9,7 @@ import {
 import { Input } from '../../shared/ui/forms/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 
-import { ValuesPicker, type PickerOption } from '../../shared/ui/forms/ValuesPicker.tsx';
+import { FilterField, type FilterOption } from '../../shared/ui/forms/filters/FilterField.tsx';
 
 const LEVELS: LevelFilter[] = ['all', 'project', 'global'];
 
@@ -28,8 +28,9 @@ export function SpecialistFilters({
   onSearch: (search: string) => void;
 }) {
   const { t } = useTranslation();
-  const plain = (names: string[]): PickerOption[] =>
-    names.map((name) => ({ name, source: 'project' }));
+  const clear = t('runs.list.clear');
+  const plain = (names: string[]): FilterOption[] =>
+    names.map((name) => ({ value: name, label: name }));
   return (
     <div className="flex flex-col gap-2">
       <Input
@@ -56,36 +57,27 @@ export function SpecialistFilters({
         </ToggleGroup>
       </div>
       {options.tags.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">{t('specialists.filters.tags')}</span>
-          <ValuesPicker
-            label={t('specialists.filters.tags')}
-            values={filter.tags}
-            onChange={(tags) => onFilter({ ...filter, tags })}
-            options={options.tags.map((tag) => ({
-              name: tag.name,
-              source: tag.shared ? 'global' : 'project',
-            }))}
-            creatable={false}
-            headings={{
-              global: t('specialists.tags.shared'),
-              project: t('specialists.tags.own'),
-            }}
-          />
-        </div>
+        <FilterField
+          label={t('specialists.filters.tags')}
+          selected={filter.tags}
+          onChange={(tags) => onFilter({ ...filter, tags })}
+          options={options.tags.map((tag) => ({
+            value: tag.name,
+            label: tag.name,
+            group: tag.shared ? t('specialists.tags.shared') : t('specialists.tags.own'),
+          }))}
+          clearLabel={clear}
+        />
       ) : null}
       {LIST_FIELDS.filter((field) => options[field].length > 0).map((field) => (
-        <div key={field} className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">{t(`specialists.filters.${field}`)}</span>
-          <ValuesPicker
-            label={t(`specialists.filters.${field}`)}
-            values={filter[field]}
-            onChange={(values) => onFilter({ ...filter, [field]: values })}
-            options={plain(options[field])}
-            creatable={false}
-            headings={{ project: '' }}
-          />
-        </div>
+        <FilterField
+          key={field}
+          label={t(`specialists.filters.${field}`)}
+          selected={filter[field]}
+          onChange={(values) => onFilter({ ...filter, [field]: values })}
+          options={plain(options[field])}
+          clearLabel={clear}
+        />
       ))}
     </div>
   );

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { RunView } from '../../../shared/api/types.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
-import { FilterSelect, type FilterOption } from '../../../shared/ui/forms/FilterSelect.tsx';
+import { FilterField, type FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { useFilterOptions } from './filterOptions.tsx';
 import type { RunFilterKey, RunFilterState, RunScope } from './runFilter.ts';
 
@@ -65,7 +65,7 @@ export function RunFilters({
         <ToggleGroupItem value="all">{t('runs.list.scopeAll')}</ToggleGroupItem>
       </ToggleGroup>
       {fields.map(([label, key, list]) => (
-        <FilterSelect
+        <FilterField
           key={key}
           label={label}
           options={list}
