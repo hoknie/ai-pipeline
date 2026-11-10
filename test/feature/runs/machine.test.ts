@@ -111,6 +111,37 @@ describe('rejections', () => {
     expect(step(state)).toEqual([]);
   });
 
+  it('sends the answer on the exceeded limit to the goto step with the last feedback', () => {
+    const state = toReview();
+    for (let round = 1; round <= 3; round += 1) {
+      finish(state, 'rejected');
+      step(state);
+      finish(state, 'done');
+      step(state);
+    }
+    finish(state, 'rejected', { feedback: 'нет теста X' });
+    const reviewSeq = group(state).attempts.at(-1)!.seq;
+    expect(group(state).pending).toMatchObject({ stepIndex: 1, feedback: 'нет теста X' });
+    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'добавь тест X' }, 2500);
+    expect(group(state).pending).not.toHaveProperty('askedBy');
+    step(state);
+    const attempt = runningAttempt(state);
+    expect(attempt.stepId).toBe('code');
+    expect(attempt.input.feedback).toBe('нет теста X');
+    expect(attempt.input.humanAnswer).toBe('добавь тест X');
+    expect(group(state).decisions.at(-1)).toMatchObject({
+      stepId: 'review',
+      attemptSeq: reviewSeq,
+      answer: 'добавь тест X',
+    });
+    // The rejecting step asks again on the next rejection: every extra round needs a person.
+    finish(state, 'done');
+    step(state);
+    finish(state, 'rejected', { feedback: 'всё ещё нет' });
+    expect(group(state).status).toBe('needs_human');
+    expect(group(state).question).toMatch(/rejected the work 5 times \(limit 3\)/);
+  });
+
   it('asks a human when a step without on_reject rejects', () => {
     const state = run(1);
     step(state);

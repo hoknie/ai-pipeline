@@ -2,6 +2,7 @@ export * from './attempt.ts';
 export * from './constants.ts';
 export * from './create.ts';
 export * from './group.ts';
+export * from './history/attempt-history.ts';
 export * from './input.ts';
 export * from './limits.ts';
 export * from './problems.ts';

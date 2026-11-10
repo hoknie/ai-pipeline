@@ -34,9 +34,28 @@ The daemon reads the section on every start of an agent, so a change takes effec
 
 ## OpenCode model options
 
+An explicitly configured OpenCode model must use `provider/model` (for example `openai/gpt-6.1-sol`). Any provider and additional `/` characters in the model suffix are allowed; the ID is passed unchanged. Short aliases such as `luna-6.1` are invalid and are not automatically completed. Omitting the model remains valid and lets OpenCode choose its default.
+
+If a previous run contains a short model ID, update the specialist or chain with the full ID
+you intend to use, then explicitly retry with the current configuration (`refresh_config`).
+A normal retry deliberately uses the original snapshot and will reject the old ID. Existing
+attempts remain in history; no automatic migration or provider guess is performed. An invalid
+model on the optional naming generator is skipped and the run keeps its fallback name.
+For example, `model: gpt-5` on an OpenCode specialist is reported at
+`swarm.specialists.<slug>.model` with `OpenCode model "gpt-5" must use provider/model format`;
+the equivalent chain error points to `swarm.chains.<slug>.runtimes[<index>].model`.
+
+```yaml
+name: Fallback
+mode: on_error
+runtimes:
+  - runtime: opencode
+    model: openai/gpt-6.1-sol
+```
+
 The specialist fields `variant` and `reasoning_effort` apply to every launch of an OpenCode specialist, including retries and answers:
 
-- `variant` is passed as `opencode run --variant <name>` alongside the unchanged `-m <provider/model>` when a model is set.
+- `variant` is passed together with the unchanged model as `-m <provider/model>#<variant>`. OpenCode 2 names a variant only together with a model, so `variant` requires `model`; without one the configuration is rejected at the `variant` field.
 - `reasoning_effort` is written as `options.reasoningEffort` of the generated agent in the attempt's `opencode.json`.
 - With neither field set, `aip` leaves both options unset. The effective choice depends on OpenCode's configuration and the provider.
 

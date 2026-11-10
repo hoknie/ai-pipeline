@@ -787,6 +787,13 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     deleteChain: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
     systemStages: vi.fn(async () => ({ repository: '/repo', stages: [], errors: [] })),
     observers: vi.fn(async () => observersView()),
+    observerHistory: vi.fn(async () => ({
+      items: [],
+      nextCursor: null,
+      limit: 20,
+      projects: [],
+      asOf: Date.now(),
+    })),
     setObservers: vi.fn(async (settings: ObserverSettings) => ({
       ok: true as const,
       view: observersView({ settings }),

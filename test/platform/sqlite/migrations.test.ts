@@ -12,7 +12,7 @@ import {
   renameBack,
   temporaryStorage,
 } from '../../feature/storage.ts';
-import { run } from '../../feature/runs/helpers.ts';
+import { finish, run, step } from '../../feature/runs/helpers.ts';
 import { addItem, emptyQueue } from '../../../src/feature/queue/types/index.ts';
 
 describe('migrations', () => {
@@ -32,6 +32,47 @@ describe('migrations', () => {
     expect(tables()).toEqual(before);
     const mode = store.database.prepare('PRAGMA journal_mode').get() as { journal_mode: string };
     expect(mode.journal_mode).toBe('wal');
+  });
+
+  it('adds history indexes to an older database without changing saved attempts and usage', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-history-')), 'aip'));
+    const path = databasePath(directory);
+    const previous = openStorage(path);
+    const state = run(1, { id: 'old-history-run' });
+    step(state);
+    finish(state, 'done');
+    state.groups[0]!.attempts[0]!.usage = { inputTokens: 12, outputTokens: 4, costUsd: 0.001 };
+    previous.runs.saveRun(state);
+    previous.database.exec(
+      'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
+    );
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    previous.database.close();
+
+    const migrated = openStorage(path);
+    expect(migrated.runs.loadRun(state.run.id)?.groups[0]?.attempts[0]?.usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 4,
+      costUsd: 0.001,
+    });
+    const indexes = migrated.database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('attempts_history_order', 'runs_history_repository') ORDER BY name",
+      )
+      .all() as { name: string }[];
+    expect(indexes.map((index) => index.name)).toEqual([
+      'attempts_history_order',
+      'runs_history_repository',
+    ]);
+    migrated.database.close();
+
+    const reopened = openStorage(path);
+    expect(reopened.runs.loadRun(state.run.id)?.groups[0]?.attempts[0]?.usage).toEqual({
+      inputTokens: 12,
+      outputTokens: 4,
+      costUsd: 0.001,
+    });
+    reopened.database.close();
   });
 });
 
@@ -74,7 +115,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(29);
+    expect(SCHEMA_VERSION).toBe(30);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -87,8 +128,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -4).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    MIGRATIONS.slice(0, -5).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     prepare(database);
     migrate(database);
     return database;
@@ -207,7 +248,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -236,7 +277,7 @@ describe('project attributes', () => {
     old.known.addRepository('/work/app', 5);
     old.known.addRepository('/a/app', 9);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(

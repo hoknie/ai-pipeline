@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { observerHistoryRequests } from './observers/history.ts';
 
 export const observersRequests = [
+  ...observerHistoryRequests,
   z.object({ method: z.literal('observers'), params: z.object({}).default({}) }),
   z.object({
     // The shape only: the daemon checks the values, so a mistake comes back as field errors.

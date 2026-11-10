@@ -148,7 +148,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     observe: ports.observe.port,
     publish: ports.queuePublish.port,
   });
-  const { observers } = createObserversServices({
+  const observersServices = createObserversServices({
     ...{ database, runs, queue, registry, config, now },
     publish: ports.observers.port,
   });
@@ -160,9 +160,16 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     states: runs.states,
     queues: queue.store,
     control: queue.control,
-    observers,
+    observers: observersServices.observers,
   });
-  return { delivery, artifacts, queue, observers, compose };
+  return {
+    delivery,
+    artifacts,
+    queue,
+    observers: observersServices.observers,
+    history: observersServices.history,
+    compose,
+  };
 }
 
 /** The one place that creates the database, the services of the features and the transport. */

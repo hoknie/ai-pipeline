@@ -7,7 +7,7 @@ export function systemPrompt(specialist: Specialist, input: StepInput): string {
   const lines = [
     `You are "${specialist.name}", a specialist in an aip swarm. Group: "${input.groupTitle}". Step: "${input.stepId}".`,
     'You work in an isolated git worktree: the current directory. Change files only inside it. Never run git push, git checkout or git switch, and never touch other directories.',
-    describePermissions(specialist.permissions),
+    describePermissions(specialist.permissions, specialist.allowCommands),
     'If a tool call is refused for lack of permission, look for another way to do it within your permissions. Report "needs_human" only when the step cannot be done without the refused action, and name the refused command in the question.',
     'When you are finished you MUST call the tool `swarm_report` exactly as the last action:',
     '- verdict "done" when the step is complete;',

@@ -18,7 +18,14 @@ import {
 } from '../types/chain.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
 import { type RuntimeSettings } from '../types/settings.ts';
-import { type McpServer, REASONING_EFFORTS, RUNTIMES, type Runtime } from '../types/specialist.ts';
+import {
+  type McpServer,
+  REASONING_EFFORTS,
+  RUNTIMES,
+  type Runtime,
+  modelIdProblem,
+  variantProblem,
+} from '../types/specialist.ts';
 
 const RUNTIME_COMMAND_KEYS = ['command', 'args', 'env'];
 
@@ -104,6 +111,8 @@ function checkChainRuntimes(
       else if (key === 'enabled') runtimeItem.enabled = readBoolean(ctx, field, fieldPath) ?? true;
     }
     if (!('runtime' in mapping)) addError(ctx, join(itemPath, 'runtime'), 'is required');
+    const modelProblem = modelIdProblem(runtimeItem.runtime, runtimeItem.model);
+    if (modelProblem) addError(ctx, join(itemPath, 'model'), modelProblem);
     checkChainRuntimeOpencode(ctx, mapping, itemPath, runtimeItem);
     items.push(runtimeItem);
   }
@@ -125,6 +134,8 @@ function checkChainRuntimeOpencode(
     if (key === 'variant') {
       const variant = readString(ctx, mapping[key], fieldPath);
       if (variant !== null) item.variant = variant.trim();
+      const problem = variantProblem(item.runtime, item.model, item.variant);
+      if (problem) addError(ctx, fieldPath, problem);
     } else {
       const effort = readChoice(ctx, mapping[key], fieldPath, REASONING_EFFORTS);
       if (effort !== null) item.reasoningEffort = effort;

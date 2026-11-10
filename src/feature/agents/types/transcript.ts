@@ -3,7 +3,13 @@ export const TRANSCRIPT_TEXT_LIMIT = 20_000;
 
 /** `at` is the moment (ms since epoch) the daemon received the log line the entry came from. */
 export type TranscriptEntry =
-  | { kind: 'text'; text: string; at?: number | null | undefined }
+  | {
+      kind: 'text';
+      text: string;
+      /** Additive fragment identity, stable within one attempt; absent means a complete message. */
+      streamId?: string | undefined;
+      at?: number | null | undefined;
+    }
   | {
       kind: 'tool_call';
       id: string | null;

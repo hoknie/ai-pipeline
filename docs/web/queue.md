@@ -32,6 +32,8 @@ A task with predecessors shows them on a second line after "Waits for:".
 
 - **"Repository"** defaults to the repository selected in the top bar. Choosing another one adds the task to its queue and does not switch the panel. The pipelines, "Waits for", the parent task and the delivery defaults come from that repository; the links are cleared on a switch, the text and tags stay.
 - **Title, pipeline, text or groups** describe the task.
+- In task mode, either the title or the description is enough. If the description is empty, the title is sent as the task text.
+- In groups mode, each group needs a title, a description or both; an entirely empty group is not allowed. For example, a group with only the description `Fix login\nCheck errors` gets the title `Fix login` and keeps the full description. When editing a saved task, these canonical values appear in their fields.
 - **"Waits for"** chooses the [predecessors](../usage/queue.md#dependencies). A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).
 - **"Parent task"** chooses one run of the repository as the [parent](../usage/tags.md#parent-of-a-task), finished runs included, in three parts: "In progress", "Planned" and "Finished". The chosen parent is shown as `#N title`. "No parent task" removes the linked task tags of the task.
 - **"Postpone"** adds the task [postponed](../usage/queue.md#postponed-tasks). The switch is only in the new task; for an existing task the "Postpone" button in the list changes the flag.

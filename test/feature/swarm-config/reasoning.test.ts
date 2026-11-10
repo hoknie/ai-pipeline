@@ -22,15 +22,19 @@ describe('OpenCode model options', () => {
   );
 
   it('keeps a custom variant independent of effort and trims its edges', () => {
-    const coder = configOf('runtime: opencode\nvariant: " company-deep "').specialists[0]!;
+    const coder = configOf(
+      'runtime: opencode\nmodel: openai/gpt-6.1-sol\nvariant: " company-deep "',
+    ).specialists[0]!;
     expect(coder.variant).toBe('company-deep');
     expect(coder).not.toHaveProperty('reasoningEffort');
   });
 
   it('accepts both fields with an inherited runtime', () => {
     expect(
-      configOf('variant: concise\nreasoning_effort: high', 'defaults: { runtime: opencode }')
-        .specialists[0],
+      configOf(
+        'variant: concise\nreasoning_effort: high\nmodel: openai/gpt-6.1-sol',
+        'defaults: { runtime: opencode }',
+      ).specialists[0],
     ).toMatchObject({ runtime: 'opencode', variant: 'concise', reasoningEffort: 'high' });
   });
 
@@ -61,6 +65,28 @@ describe('OpenCode model options', () => {
         );
     }
   });
+
+  it.each([['runtime: opencode\nvariant: high'], ['variant: high\nruntime: opencode']])(
+    'rejects a variant without a model, which OpenCode cannot take: %j',
+    (fields) => {
+      const result = validateConfig({
+        swarm: {
+          specialists: {
+            coder: {
+              name: 'C',
+              ...Object.fromEntries(fields.split('\n').map((line) => line.split(': '))),
+            },
+          },
+        },
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(result.errors).toContainEqual({
+          path: 'swarm.specialists.coder.variant',
+          message: 'needs a model: OpenCode takes a variant only as provider/model#variant',
+        });
+    },
+  );
 
   it.each([
     { runtime: 'claude', variant: 'high', reasoning_effort: 'high' },
@@ -93,6 +119,7 @@ describe('OpenCode options compatibility', () => {
   it('accepts the same explicit options for the observer profile', () => {
     const result = validateObserverProfile({
       runtime: 'opencode',
+      model: 'openai/gpt-6.1-sol',
       variant: 'deep',
       reasoning_effort: 'xhigh',
     });
@@ -120,7 +147,13 @@ describe('OpenCode options compatibility', () => {
       {
         swarm: {
           specialists: {
-            coder: { name: 'C', runtime: 'opencode', variant: 'deep', reasoning_effort: 'high' },
+            coder: {
+              name: 'C',
+              runtime: 'opencode',
+              model: 'openai/gpt-6.1-sol',
+              variant: 'deep',
+              reasoning_effort: 'high',
+            },
           },
         },
       },

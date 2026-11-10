@@ -36,6 +36,8 @@ export interface Pending {
   resume: boolean;
   message?: HumanMessage | null;
   reviewed?: boolean;
+  /** Seq of the attempt that asked the question, when the answer goes to another step. */
+  askedBy?: number;
 }
 
 export function freshPending(stepIndex: number): Pending {

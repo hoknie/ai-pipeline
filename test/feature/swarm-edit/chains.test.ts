@@ -113,6 +113,72 @@ describe('chains in editor', () => {
     expect(del.ok).toBe(true);
   });
 
+  it('preserves provider-qualified model IDs when updating a chain', () => {
+    const paths = temporaryPaths();
+    const initial =
+      'name: Main\nmode: on_error\nruntimes:\n  - runtime: opencode\n    model: openai/gpt-custom\n';
+    const file = join(paths.project.directory, 'chains', 'main.yaml');
+    write(file, initial);
+    const plan = planEdit(paths, {
+      kind: 'chain',
+      id: 'main',
+      value: {
+        name: 'Main updated',
+        mode: 'on_error',
+        runtimes: [{ runtime: 'opencode', model: 'other/gpt-custom' }],
+      },
+      revision: revisionOf(initial),
+      level: 'project',
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.text).toContain('model: other/gpt-custom');
+  });
+
+  it('keeps model and variant attached to runtime elements when reordered', () => {
+    const paths = temporaryPaths();
+    const initial =
+      'name: Main\nmode: on_error\nruntimes:\n  - runtime: opencode\n    model: alpha/gpt\n    variant: fast\n  - runtime: opencode\n    model: beta/gpt\n    variant: deep\n';
+    const file = join(paths.project.directory, 'chains', 'main.yaml');
+    write(file, initial);
+    const plan = planEdit(paths, {
+      kind: 'chain',
+      id: 'main',
+      value: {
+        name: 'Main',
+        mode: 'on_error',
+        runtimes: [
+          { runtime: 'opencode', model: 'beta/gpt', variant: 'deep' },
+          { runtime: 'opencode', model: 'alpha/gpt', variant: 'fast' },
+        ],
+      },
+      revision: revisionOf(initial),
+      level: 'project',
+    });
+    if (!plan.ok) throw new Error('expected valid reordered chain');
+    write(plan.file, plan.text!);
+    const reopened = planEdit(paths, {
+      kind: 'chain',
+      id: 'main',
+      value: {
+        name: 'Main',
+        mode: 'on_error',
+        runtimes: [
+          { runtime: 'opencode', model: 'beta/gpt', variant: 'deep' },
+          { runtime: 'opencode', model: 'alpha/gpt', variant: 'fast' },
+        ],
+      },
+      revision: revisionOf(plan.text!),
+      level: 'project',
+    });
+    if (!reopened.ok) throw new Error('expected reordered chain to reopen');
+    expect(reopened.text).toContain('model: beta/gpt');
+    expect(reopened.text).toContain('variant: deep');
+    expect(reopened.text!.indexOf('model: beta/gpt')).toBeLessThan(
+      reopened.text!.indexOf('model: alpha/gpt'),
+    );
+  });
+
   it('refuses to delete a chain that a specialist references', () => {
     const paths = temporaryPaths();
     write(
@@ -151,5 +217,72 @@ describe('chains in editor', () => {
     };
     expect(chainReferences(tree, 'fallback')).toEqual([{ specialist: 'coder' }]);
     expect(chainReferences(tree, 'missing')).toEqual([]);
+  });
+
+  it('rejects a new short OpenCode model in chain runtime and saves full IDs across levels', () => {
+    const paths = temporaryPaths();
+    write(join(paths.project.directory, 'settings.yaml'), 'max: 3\n');
+
+    // Rejecting a new short model in a chain element
+    const invalid = planEdit(paths, {
+      kind: 'chain',
+      id: 'main',
+      value: {
+        name: 'Main',
+        mode: 'on_error',
+        runtimes: [{ runtime: 'opencode', model: 'short-model' }],
+      },
+      revision: null,
+      level: 'project',
+    });
+    expect(invalid).toMatchObject({ ok: false, reason: 'invalid' });
+    if (invalid.ok || invalid.reason !== 'invalid') throw new Error('expected invalid chain');
+    expect(invalid.errors).toContainEqual({
+      file: join(paths.project.directory, 'chains', 'main.yaml'),
+      path: 'swarm.chains.main.runtimes[0].model',
+      message: expect.stringContaining('short-model'),
+    });
+
+    // Valid chain at global level
+    const globalChain = planEdit(paths, {
+      kind: 'chain',
+      id: 'shared-chain',
+      value: {
+        name: 'Shared Chain',
+        mode: 'on_error',
+        runtimes: [{ runtime: 'opencode', model: 'provider/gpt-shared' }],
+      },
+      revision: null,
+      level: 'global',
+    });
+    expect(globalChain.ok).toBe(true);
+    if (!globalChain.ok) throw new Error('expected valid global chain');
+    write(globalChain.file, globalChain.text!);
+
+    // Valid chain at project level
+    const projectChain = planEdit(paths, {
+      kind: 'chain',
+      id: 'project-chain',
+      value: {
+        name: 'Project Chain',
+        mode: 'on_error',
+        runtimes: [{ runtime: 'opencode', model: 'provider/gpt-project' }],
+      },
+      revision: null,
+      level: 'project',
+    });
+    expect(projectChain.ok).toBe(true);
+    if (!projectChain.ok) throw new Error('expected valid project chain');
+    write(projectChain.file, projectChain.text!);
+
+    const view = editorView(paths);
+    const shared = view.chains.find((c) => c.slug === 'shared-chain');
+    const project = view.chains.find((c) => c.slug === 'project-chain');
+    expect(shared?.raw).toMatchObject({
+      runtimes: [{ model: 'provider/gpt-shared' }],
+    });
+    expect(project?.raw).toMatchObject({
+      runtimes: [{ model: 'provider/gpt-project' }],
+    });
   });
 });

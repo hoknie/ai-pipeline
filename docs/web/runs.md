@@ -45,7 +45,7 @@ The "Steps" block lists each step of the pipeline with its state (done, running,
 
 The tabs:
 
-- **"Log"** shows the attempts of the group: specialist, runtime, verdict, tokens and cost. The log of a running attempt keeps loading by itself, and every entry carries the time it was received.
+- **"Log"** shows the attempts of the group: specialist, runtime, verdict, tokens and cost. Consecutive fragments of one answer grow in a single block, timestamped with the first fragment's time. The log of a running attempt keeps loading by itself; the raw-log view retains the original events.
 - **"Changes"** is a file tree with `+N −M`.
 - **"Task"** shows the task text.
 - **"Artifacts · N"** lists the [artifacts](../usage/runs.md#artifacts) of the group, newest first, with the step, title, file name, time and size. "Open" previews `.md` and `.log` files up to 1 MB, and "Download" saves any file. While the group has no artifacts the tab is dimmed, and `?tab=artifacts` falls back to the log.

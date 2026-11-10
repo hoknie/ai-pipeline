@@ -20,9 +20,10 @@ To check, run `opencode mcp list`. It shows `aip` as `connected`.
 
 - In OpenCode the tools are named with the server prefix: `aip_swarm_status`, `aip_swarm_run`, and for a specialist `aip_swarm_report`.
 - A specialist with `runtime: opencode` runs under an agent that `aip` generates: `bash` outside `allow_commands` is refused, and `-s <session>` continues a session. See [Permission levels](../configuration/permissions.md#permission-levels).
+- A specialist runs as `opencode run --standalone` in its worktree: a private OpenCode server reads the generated agent from `OPENCODE_CONFIG`, which the background OpenCode service does not.
 - `aip group show` prints the OpenCode log of a step with its tokens.
 
-`aip` has been checked against OpenCode 1.18.35.
+`aip` has been checked against OpenCode 2.2.6.
 
 ## Troubleshooting
 

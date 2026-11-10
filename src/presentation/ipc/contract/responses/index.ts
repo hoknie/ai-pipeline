@@ -2,6 +2,7 @@ export * from './artifacts.ts';
 export * from './config.ts';
 export * from './groups.ts';
 export * from './observers.ts';
+export * from './observer-history.ts';
 export * from './processes.ts';
 export * from './queue.ts';
 export * from './repositories.ts';

@@ -37,8 +37,13 @@ export function agyTranscript(lines: string[], times?: (number | null)[]): Trans
       continue;
     }
     const step = event.step_update;
-    if (step.step_type === 'agent_response' && step.text_delta) {
-      entries.push({ kind: 'text', text: clip(step.text_delta), at });
+    if (step.step_type === 'agent_response' && step.text_delta !== undefined) {
+      entries.push({
+        kind: 'text',
+        text: clip(step.text_delta),
+        streamId: `agy:agent-response:${step.step_index}`,
+        at,
+      });
     }
     if (step.step_type !== 'tool' || !step.tool_info) continue;
     const info = step.tool_info;

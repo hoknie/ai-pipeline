@@ -284,6 +284,37 @@ describe('specialist form', () => {
 });
 
 describe('creating, copying and deleting', () => {
+  it('keeps the full OpenCode model ID in an edited form and save request', async () => {
+    const model = 'OpenAI/team/GPT-Custom';
+    const writeSpecialist = vi.fn(async () => ({
+      ok: true as const,
+      revision: 'rev2',
+      file: '/f',
+    }));
+    const entry = specialistEntry(
+      'coder',
+      { raw: { name: 'Кодировщик', runtime: 'opencode', model } },
+      { name: 'Кодировщик', runtime: 'opencode', model },
+    );
+    const api = fakeApi({
+      writeSpecialist,
+      config: vi.fn(async () => configView({ specialists: [entry] })),
+    });
+    render(<Page api={api} start="coder" />);
+    const modelInput = await screen.findByLabelText<HTMLInputElement>('Model');
+    expect(modelInput.value).toBe(model);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coder renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(writeSpecialist).toHaveBeenCalledWith(
+        'coder',
+        { name: 'Coder renamed', runtime: 'opencode', model },
+        'rev-coder',
+        'project',
+      ),
+    );
+  });
+
   it('creates a specialist from an empty form with a slug', async () => {
     const writeSpecialist = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={fakeApi({ writeSpecialist })} />);

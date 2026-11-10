@@ -27,7 +27,7 @@ describe('OpenCode options in the configuration editor', () => {
     (level) => {
       const paths = setup();
       const file = join(paths[level].directory, 'specialists/coder.yaml');
-      write(file, '# keep this comment\nname: C\nruntime: opencode\n');
+      write(file, '# keep this comment\nname: C\nruntime: opencode\nmodel: openai/gpt-6.1-sol\n');
       const before = editorView(paths).specialists[0]!;
       const value = { ...before.raw, variant: 'company-deep', reasoning_effort: 'high' };
       const plan = planEdit(paths, {
@@ -54,7 +54,9 @@ describe('OpenCode options in the configuration editor', () => {
       });
       if (!clear.ok) throw new Error(JSON.stringify(clear));
       commitEdit(clear);
-      expect(readFileSync(file, 'utf8')).toBe('# keep this comment\nname: C\nruntime: opencode\n');
+      expect(readFileSync(file, 'utf8')).toBe(
+        '# keep this comment\nname: C\nruntime: opencode\nmodel: openai/gpt-6.1-sol\n',
+      );
       expect(editorView(paths).specialists[0]!.effective).toMatchObject({
         variant: null,
         reasoning_effort: null,
@@ -68,7 +70,8 @@ describe('OpenCode options in the configuration editor', () => {
       const paths = setup();
       const target = source === 'project' ? 'global' : 'project';
       const file = join(paths[source].directory, 'specialists/coder.yaml');
-      const text = 'name: C\nruntime: opencode\nvariant: deep\nreasoning_effort: xhigh\n';
+      const text =
+        'name: C\nruntime: opencode\nmodel: openai/gpt-6.1-sol\nvariant: deep\nreasoning_effort: xhigh\n';
       write(file, text);
       const value = editorView(paths).specialists[0]!.raw;
       for (const id of ['coder', 'copy']) {
@@ -122,7 +125,7 @@ describe('OpenCode options in the configuration editor', () => {
     const paths = setup();
     write(
       join(paths.global.directory, 'specialists/coder.yaml'),
-      'name: Shared\nruntime: opencode\nvariant: deep\nreasoning_effort: low\n',
+      'name: Shared\nruntime: opencode\nmodel: openai/gpt-6.1-sol\nvariant: deep\nreasoning_effort: low\n',
     );
     write(
       join(paths.project.directory, 'specialists/coder.yaml'),

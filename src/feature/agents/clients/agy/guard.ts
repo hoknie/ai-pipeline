@@ -14,11 +14,13 @@ const hookSchema = z.object({
   toolCall: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()) }),
 });
 const READ_TOOLS = new Set(['view_file', 'read_file', 'list_dir', 'find_by_name', 'grep_search']);
-const WRITE_TOOLS = new Set([
-  'write_to_file',
-  'replace_file_content',
-  'multi_replace_file_content',
-]);
+const WRITE_PATHS: Record<string, string> = {
+  write_to_file: 'TargetFile',
+  replace_file_content: 'TargetFile',
+  multi_replace_file_content: 'TargetFile',
+  write_file: 'Path',
+  edit_file: 'Path',
+};
 const READ_PATHS: Record<string, string> = {
   view_file: 'AbsolutePath',
   read_file: 'Path',
@@ -48,10 +50,11 @@ function permit(policy: AgyPolicy, name: string, args: Record<string, unknown>):
     return (
       policy.permissions === 'full' || insideWorktree(policy.worktree, args[READ_PATHS[name] ?? ''])
     );
-  if (WRITE_TOOLS.has(name))
+  const writePath = WRITE_PATHS[name];
+  if (writePath)
     return (
       policy.permissions !== 'read' &&
-      (policy.permissions === 'full' || insideWorktree(policy.worktree, args.TargetFile))
+      (policy.permissions === 'full' || insideWorktree(policy.worktree, args[writePath]))
     );
   if (name === 'run_command')
     return (

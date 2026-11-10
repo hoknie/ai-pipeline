@@ -132,7 +132,7 @@ describe('failures and control', () => {
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged']);
     const code = calls(h).find((call) => call.step === 'code');
-    expect(code?.args.slice(0, 3)).toEqual(['run', '--format', 'json']);
+    expect(code?.args.slice(0, 4)).toEqual(['run', '--standalone', '--format', 'json']);
     expect((await h.group(runId, 'g1')).attempts[0]?.usage).toEqual({
       inputTokens: 50,
       outputTokens: 10,

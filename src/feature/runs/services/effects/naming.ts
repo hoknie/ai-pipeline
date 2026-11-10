@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { launchProcess } from '../../../agents/services/index.ts';
 import { answerText, namingPrompt } from '../../../agents/types/index.ts';
 import { findExecutable } from '../../../../platform/process/index.ts';
+import { modelIdProblem } from '../../../swarm-config/types/index.ts';
 import type { RunState } from '../../types/index.ts';
 
 import type { EffectDependencies } from './context.ts';
@@ -18,6 +19,7 @@ export async function nameRun(
 ): Promise<void> {
   const { naming } = state.run.config;
   const { config, agents, environment, graceMs, timings, context, agentExit } = dependencies;
+  if (modelIdProblem(naming.runtime, naming.model)) return;
   const settings = config.runtimeSettings(state.run.repository);
   if (typeof settings === 'string') return;
   const runtime = agents.runtimeFor(naming.runtime, settings);

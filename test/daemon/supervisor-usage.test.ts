@@ -55,6 +55,30 @@ describe('launchProcess onUsage', () => {
   });
 });
 
+describe('launchProcess environment', () => {
+  it('sets PWD to the working directory of the agent, not to the directory of the daemon', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aip-supervisor-'));
+    const lines: string[] = [];
+    const process = launchProcess(
+      {
+        command: globalThis.process.execPath,
+        args: ['-e', 'console.log(process.env.PWD)'],
+        env: {},
+        files: [],
+        sessionId: null,
+      },
+      {
+        cwd: directory,
+        logPath: join(directory, 'output.log'),
+        parser: { ...summing(), push: (line) => lines.push(line) },
+        environment: { ...globalThis.process.env, PWD: tmpdir() },
+      },
+    );
+    await process.exited;
+    expect(lines).toContain(directory);
+  });
+});
+
 describe('launchProcess timesPath', () => {
   // The pause starts once `one` reached the log: a busy supervisor reads it late, and a pause
   // counted from the write would shrink between the two times.

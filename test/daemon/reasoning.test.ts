@@ -10,7 +10,7 @@ import { run, start } from './control-harness.ts';
 function configuration(effort: string, variant: string): string {
   return CODE_ONLY_CONFIG.replace(
     'coder: { name: Кодировщик }',
-    `coder: { name: Кодировщик, runtime: opencode, reasoning_effort: ${effort}, variant: ${variant} }`,
+    `coder: { name: Кодировщик, runtime: opencode, model: openai/gpt-6.1-sol, reasoning_effort: ${effort}, variant: ${variant} }`,
   );
 }
 
@@ -24,7 +24,7 @@ function launches(h: Harness) {
       args: call.args,
       effort: JSON.parse(readFileSync(call.configPath, 'utf8')).agent['aip-coder'].options
         .reasoningEffort,
-      variant: call.args[call.args.indexOf('--variant') + 1],
+      variant: call.args[call.args.indexOf('-m') + 1]?.split('#')[1],
     }));
 }
 

@@ -66,7 +66,13 @@ describe('config editor', () => {
       await write(
         h,
         'coder',
-        { ...coder.raw, runtime: 'opencode', variant: 'deep', reasoning_effort: 'xhigh' },
+        {
+          ...coder.raw,
+          runtime: 'opencode',
+          model: 'openai/gpt-6.1-sol',
+          variant: 'deep',
+          reasoning_effort: 'xhigh',
+        },
         coder.revision,
       ),
     ).toMatchObject({ ok: true });

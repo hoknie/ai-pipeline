@@ -17,6 +17,7 @@ export {
   type RunsServices,
 } from './create.ts';
 export { RunArchive } from './archive.ts';
+export { RunAttemptHistoryService } from './attempt-history.ts';
 export { RunStates, type FinishedPage } from './states.ts';
 export { RunReads, type GroupDetails } from './reads.ts';
 export { currentPermissions, currentSpecialists } from './refresh.ts';

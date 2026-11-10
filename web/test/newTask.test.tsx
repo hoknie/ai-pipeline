@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
+import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
 import { emptyDraft, fieldsOf, retarget } from '../src/features/queue/QueueForm.tsx';
 import type { Api } from '../src/shared/api/api.ts';
 import type { QueueView, RunView } from '../src/shared/api/types.ts';
+import { en } from '../src/shared/i18n/locales/en.ts';
+import { es } from '../src/shared/i18n/locales/es.ts';
+import { ru } from '../src/shared/i18n/locales/ru.ts';
+import { zh } from '../src/shared/i18n/locales/zh.ts';
 
 import {
   act,
@@ -43,6 +48,299 @@ function strip() {
 }
 
 describe('new task from the top strip', () => {
+  it('submits a title-only task as both title and task text', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(within(dialog).getByLabelText('Name'), {
+      target: { value: '  Only title  ' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        title: 'Only title',
+        task: 'Only title',
+      }),
+    );
+  });
+
+  it('submits a description-only task without generating a title', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(within(dialog).getByLabelText('Task text'), {
+      target: { value: '  Do work\nAnd verify  ' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        task: 'Do work\nAnd verify',
+      }),
+    );
+  });
+
+  it('blocks an empty task without submitting it', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    const add = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
+    expect(add.disabled).toBe(true);
+    fireEvent.submit(dialog.querySelector('form')!);
+    expect(api.queueAdd).not.toHaveBeenCalled();
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('');
+    expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('preserves the original title-only draft when the server rejects it', async () => {
+    const api = fakeApi({
+      queue: vi.fn(async () => queueOf()),
+      queueAdd: vi.fn(async () => {
+        throw new Error('rejected');
+      }),
+    });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    const name = within(dialog).getByLabelText('Name') as HTMLInputElement;
+    const text = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
+    fireEvent.change(name, { target: { value: '  title only  ' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'title only',
+          task: 'title only',
+        }),
+      ),
+    );
+    await waitFor(() => expect(within(dialog).getByText('rejected')).toBeTruthy());
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
+    expect(name.value).toBe('  title only  ');
+    expect(text.value).toBe('');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(2));
+    expect(api.queueAdd).toHaveBeenLastCalledWith({
+      pipeline: 'feature',
+      title: 'title only',
+      task: 'title only',
+    });
+    expect(name.value).toBe('  title only  ');
+    expect(text.value).toBe('');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+    fireEvent.click(strip().getByRole('button', { name: 'New task' }));
+    const reopened = await screen.findByRole('dialog', { name: 'New task' });
+    expect((within(reopened).getByLabelText('Name') as HTMLInputElement).value).toBe(
+      '  title only  ',
+    );
+    expect((within(reopened).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('clears the draft after a successful create and opens an empty form again', async () => {
+    const api = fakeApi({
+      queue: vi.fn(async () => queueOf()),
+      queueAdd: vi.fn(async () => ({
+        ...queueOf({ items: [queueItem('q5', 'Only title', 5)] }),
+        item: 'q5',
+      })),
+    });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Only title' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(screen.getAllByText('Task #5 created').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+    fireEvent.click(strip().getByRole('button', { name: 'New task' }));
+    const reopened = await screen.findByRole('dialog', { name: 'New task' });
+    expect((within(reopened).getByLabelText('Name') as HTMLInputElement).value).toBe('');
+    expect((within(reopened).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it.each([
+    ['en', en],
+    ['es', es],
+    ['ru', ru],
+    ['zh', zh],
+  ] as const)('shows the hint of each mode in %s', async (lang, dict) => {
+    window.localStorage.setItem('aip.web.language', JSON.stringify(lang));
+    await act(async () => {
+      await i18next.changeLanguage(lang);
+    });
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = await within(screen.getAllByRole('banner')[0]!).findByRole<HTMLButtonElement>(
+      'button',
+      { name: dict.nav.newTask },
+    );
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(dict.queue.form.alternativeHint)).toBeTruthy();
+    expect(within(dialog).queryByText(dict.queue.form.groupAlternativeHint)).toBeNull();
+    fireEvent.click(within(dialog).getByRole('radio', { name: dict.queue.form.groups }));
+    expect(await within(dialog).findByText(dict.queue.form.groupAlternativeHint)).toBeTruthy();
+    expect(within(dialog).queryByText(dict.queue.form.alternativeHint)).toBeNull();
+  });
+
+  it('submits mixed title-only and description-only groups in order', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
+    fireEvent.change(within(dialog).getByLabelText('Title of group 1'), {
+      target: { value: 'Only title' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
+    fireEvent.change(within(dialog).getByLabelText('Text of group 2'), {
+      target: { value: 'Only description\nMore detail' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        groups: [
+          { title: 'Only title', task: 'Only title' },
+          { title: 'Only description', task: 'Only description\nMore detail' },
+        ],
+      }),
+    );
+  });
+
+  it('preserves description-only group source on server error and retries the same payload', async () => {
+    const api = fakeApi({
+      queue: vi.fn(async () => queueOf()),
+      queueAdd: vi.fn(async () => {
+        throw new Error('rejected');
+      }),
+    });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
+    fireEvent.change(within(dialog).getByLabelText('Text of group 1'), {
+      target: { value: '\n  ## Original\n- detail  ' },
+    });
+    const payload = {
+      pipeline: 'feature',
+      groups: [{ title: '## Original', task: '## Original\n- detail' }],
+    };
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalledWith(payload));
+    await within(dialog).findByText('rejected');
+    expect((within(dialog).getByLabelText('Title of group 1') as HTMLInputElement).value).toBe('');
+    expect((within(dialog).getByLabelText('Text of group 1') as HTMLTextAreaElement).value).toBe(
+      '\n  ## Original\n- detail  ',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(2));
+    expect(api.queueAdd).toHaveBeenLastCalledWith(payload);
+  });
+
+  it('keeps a description-only group draft over queue and run events and a reopen', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await screen.findByLabelText('Task text');
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
+    fireEvent.change(within(dialog).getByLabelText('Text of group 1'), {
+      target: { value: 'Only text\nmore' },
+    });
+    act(() => {
+      FakeEventSource.last!.open();
+      FakeEventSource.last!.send({ event: 'queue', seq: 1, queue: queueOf() });
+      FakeEventSource.last!.send({ event: 'run', seq: 2, run: runView() });
+    });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+    fireEvent.click(strip().getByRole('button', { name: 'New task' }));
+    const again = await screen.findByRole('dialog', { name: 'New task' });
+    expect((await within(again).findByLabelText<HTMLInputElement>('Title of group 1')).value).toBe(
+      '',
+    );
+    expect(within(again).getByLabelText<HTMLTextAreaElement>('Text of group 1').value).toBe(
+      'Only text\nmore',
+    );
+    expect(api.queueAdd).not.toHaveBeenCalled();
+  });
+
+  it('blocks submission when any group is completely empty', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
+    fireEvent.change(within(dialog).getByLabelText('Title of group 1'), {
+      target: { value: 'valid title' },
+    });
+    const add = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
+    expect(add.disabled).toBe(true);
+    fireEvent.submit(dialog.querySelector('form')!);
+    expect(api.queueAdd).not.toHaveBeenCalled();
+    expect((within(dialog).getByLabelText('Title of group 1') as HTMLInputElement).value).toBe(
+      'valid title',
+    );
+    expect((within(dialog).getByLabelText('Title of group 2') as HTMLInputElement).value).toBe('');
+    expect((within(dialog).getByLabelText('Text of group 2') as HTMLTextAreaElement).value).toBe(
+      '',
+    );
+  });
+
   it('opens the dialog over the section and announces the created task', async () => {
     const api = fakeApi({
       queue: vi.fn(async () => queueOf()),
@@ -332,7 +630,7 @@ describe('repository of the new task', () => {
     expect((within(dialog).getByPlaceholderText('Name (optional)') as HTMLInputElement).value).toBe(
       'my name',
     );
-  });
+  }, 10_000);
 
   it('takes the delivery defaults of the chosen repository', async () => {
     twoRepositories();

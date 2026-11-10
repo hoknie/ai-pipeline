@@ -64,6 +64,7 @@ function GroupsEditor({ idPrefix, effective, change, locked }: FormState) {
           </Button>
         </fieldset>
       ))}
+      <p className="text-xs text-muted-foreground">{t('queue.form.groupAlternativeHint')}</p>
       <Button
         variant="outline"
         size="sm"
@@ -162,15 +163,18 @@ export function TaskFields(props: {
         <PipelineSelect state={state} pipelines={props.pipelines} options={props.options} />
       </fieldset>
       {effective.mode === 'task' ? (
-        <MarkdownField
-          id={`${idPrefix}-task`}
-          aria-label={t('queue.form.taskText')}
-          rows={9}
-          value={effective.task}
-          placeholder={t('queue.form.taskPlaceholder')}
-          disabled={locked}
-          onChange={(task) => change({ task })}
-        />
+        <>
+          <p className="text-xs text-muted-foreground">{t('queue.form.alternativeHint')}</p>
+          <MarkdownField
+            id={`${idPrefix}-task`}
+            aria-label={t('queue.form.taskText')}
+            rows={9}
+            value={effective.task}
+            placeholder={t('queue.form.taskPlaceholder')}
+            disabled={locked}
+            onChange={(task) => change({ task })}
+          />
+        </>
       ) : (
         <GroupsEditor {...state} />
       )}

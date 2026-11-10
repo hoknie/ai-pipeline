@@ -51,7 +51,7 @@ export const LEGACY_SETTINGS_GROUPS: Record<
 };
 
 /** The tabs of the group «Observers»; the third part of its address. */
-export const OBSERVER_TABS = ['general', 'specialist', 'projects'] as const;
+export const OBSERVER_TABS = ['general', 'specialist', 'projects', 'history'] as const;
 export type ObserverTab = (typeof OBSERVER_TABS)[number];
 
 /** The tab of the group «Observers» for the part of an address; an unknown one is the first. */

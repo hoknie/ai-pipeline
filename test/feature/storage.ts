@@ -55,6 +55,9 @@ export function temporaryStorage(): Storage {
 
 /** Gives a database built from the current schema the column names of the builds before the rename. */
 export function renameBack(database: import('node:sqlite').DatabaseSync): void {
+  database.exec(
+    'DROP INDEX IF EXISTS attempts_history_order; DROP INDEX IF EXISTS runs_history_repository;',
+  );
   dropProjectAttributes(database);
   for (const table of ['runs', 'queue_items']) {
     const columns = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];

@@ -274,6 +274,10 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE repositories ADD COLUMN color TEXT;
   CREATE UNIQUE INDEX repositories_by_slug ON repositories (slug) WHERE slug IS NOT NULL;
   `,
+  `
+  CREATE INDEX IF NOT EXISTS attempts_history_order ON attempts (group_slug, started_at DESC, run_id DESC, seq DESC);
+  CREATE INDEX IF NOT EXISTS runs_history_repository ON runs (repository, id);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

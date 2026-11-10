@@ -1,4 +1,4 @@
-import { describe, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { z } from 'zod';
 
 import type {
@@ -30,5 +30,33 @@ describe('contract of the agents types', () => {
     expectTypeOf<
       z.infer<typeof configCatalogResponseSchema>['runtimes']
     >().toEqualTypeOf<RuntimeCatalogs>();
+  });
+
+  it('accepts additive stream fragments and legacy text entries', () => {
+    expect(transcriptEntrySchema.parse({ kind: 'text', text: 'a', streamId: 's' })).toMatchObject({
+      streamId: 's',
+    });
+    expect(
+      transcriptSchema.parse({
+        runId: 'r',
+        group: 'g',
+        seq: null,
+        cursor: 1,
+        running: false,
+        entries: [
+          { kind: 'text', text: 'a', streamId: 's' },
+          { kind: 'text', text: 'legacy' },
+        ],
+      }).entries,
+    ).toEqual([
+      { kind: 'text', text: 'a', streamId: 's' },
+      { kind: 'text', text: 'legacy' },
+    ]);
+    expect(transcriptEntrySchema.safeParse({ kind: 'text', text: '', streamId: '' }).success).toBe(
+      false,
+    );
+    expect(transcriptEntrySchema.safeParse({ kind: 'text', text: '', streamId: 2 }).success).toBe(
+      false,
+    );
   });
 });

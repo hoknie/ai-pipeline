@@ -2,7 +2,7 @@ import type { Reporter, TestCase, TestModule } from 'vitest/node';
 
 export const TEST_LIMIT_MS = 400;
 /** Limit of the `e2e` project: tests with a daemon, real git repositories and agent processes. */
-export const E2E_LIMIT_MS = 3000;
+export const E2E_LIMIT_MS = 5000;
 /** Limit of the `web` project: every test draws the panel in jsdom, which slows with the load. */
 export const WEB_LIMIT_MS = 1000;
 

@@ -40,6 +40,7 @@ import {
   PERMISSIONS,
   type Runtime,
   RUNTIMES,
+  modelIdProblem,
 } from '../types/specialist.ts';
 
 const CLAUDE_KEYS = ['edit_mode', 'mcp', 'settings'];
@@ -140,12 +141,22 @@ export function checkWeb(ctx: ValidateContext, value: unknown, web: WebSettings)
 export function checkNaming(ctx: ValidateContext, value: unknown, naming: NamingSettings): void {
   const mapping = readMapping(ctx, value, 'swarm.naming');
   if (!mapping) return;
+  let modelWasValid = true;
   for (const [key, field] of readEntries(ctx, mapping, 'swarm.naming', NAMING_KEYS)) {
     const path = join('swarm.naming', key);
     if (key === 'enabled') naming.enabled = readBoolean(ctx, field, path) ?? naming.enabled;
     if (key === 'runtime')
       naming.runtime = readChoice<Runtime>(ctx, field, path, RUNTIMES) ?? naming.runtime;
-    if (key === 'model') naming.model = readString(ctx, field, path) ?? naming.model;
+    if (key === 'model') {
+      const errorsBeforeRead = ctx.errors.length;
+      const model = readString(ctx, field, path);
+      modelWasValid = ctx.errors.length === errorsBeforeRead;
+      if (model !== null) naming.model = model;
+    }
+  }
+  if (naming.enabled && modelWasValid) {
+    const modelProblem = modelIdProblem(naming.runtime, naming.model);
+    if (modelProblem) addError(ctx, 'swarm.naming.model', modelProblem);
   }
 }
 

@@ -14,30 +14,10 @@ import { isJsonSummary, parseJson, readableJson, readableSummary } from './jsonT
 import { Markdown } from '../../../shared/ui/layout/Markdown.tsx';
 import { StatusBadge } from '../../../shared/ui/feedback/StatusBadge.tsx';
 
+import { blocks } from './blocks.ts';
+
 type ToolCall = Extract<TranscriptEntry, { kind: 'tool_call' }>;
 type ToolResult = Extract<TranscriptEntry, { kind: 'tool_result' }>;
-
-type Block =
-  | { kind: 'call'; call: ToolCall; results: ToolResult[] }
-  | { kind: 'entry'; entry: TranscriptEntry };
-
-/** Puts every tool result under the call it answers. */
-export function blocks(entries: TranscriptEntry[]): Block[] {
-  const result: Block[] = [];
-  const calls = new Map<string, Block & { kind: 'call' }>();
-  for (const entry of entries) {
-    if (entry.kind === 'tool_call') {
-      const block = { kind: 'call' as const, call: entry, results: [] as ToolResult[] };
-      if (entry.id) calls.set(entry.id, block);
-      result.push(block);
-    } else if (entry.kind === 'tool_result' && entry.id && calls.has(entry.id)) {
-      calls.get(entry.id)?.results.push(entry);
-    } else {
-      result.push({ kind: 'entry', entry });
-    }
-  }
-  return result;
-}
 
 /** The moment of a log entry; nothing when the daemon did not send it. */
 export function EntryTime({ at }: { at: number | null | undefined }) {
@@ -222,12 +202,15 @@ export function Transcript({
   const { t } = useTranslation();
   if (entries.length === 0)
     return <p className="text-sm text-muted-foreground">{t('runs.transcript.empty')}</p>;
-  const shown = onlyText ? entries.filter((entry) => entry.kind === 'text') : entries;
+  const allBlocks = blocks(entries);
+  const shown = onlyText
+    ? allBlocks.filter((block) => block.kind === 'entry' && block.entry.kind === 'text')
+    : allBlocks;
   if (shown.length === 0)
     return <p className="text-sm text-muted-foreground">{t('runs.transcript.noReplies')}</p>;
   return (
     <div className="flex flex-col gap-2">
-      {blocks(shown).map((block, index) =>
+      {shown.map((block, index) =>
         block.kind === 'call' ? (
           <Call key={index} call={block.call} results={block.results} showJson={showJson} />
         ) : (

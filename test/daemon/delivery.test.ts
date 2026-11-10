@@ -372,7 +372,11 @@ describe('diff statistics', () => {
       code: [{ write: { 'lib.ts': 'export const value = 2;\n', 'extra.ts': 'a\nb\n' } }],
     });
     const runId = await finishedRun(h);
-    const view = await h.waitFor(runId, (run) => run.diff !== null);
+    // The run view starts with an empty diff while the asynchronous statistics job is pending.
+    const view = await h.waitFor(
+      runId,
+      (run) => run.diff?.files === 2 && run.diff.added === 3 && run.diff.removed === 1,
+    );
     expect(view.diff).toEqual({ files: 2, added: 3, removed: 1 });
     expect(view.groups[0]?.diff).toEqual({ files: 2, added: 3, removed: 1 });
     expect(view.title).toBe('вход');

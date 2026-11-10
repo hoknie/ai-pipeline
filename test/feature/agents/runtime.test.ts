@@ -117,8 +117,32 @@ describe('message to the specialist', () => {
     expect(text).toContain('Never run git push');
     expect(text).toContain('Use these skills for this step: grill-me, opsx:propose.');
     expect(text).toContain('run only the allowed shell commands');
+    expect(text).toContain('Allowed shell commands');
+    expect(text).toContain('one refused command refuses the whole call');
     expect(text).toContain('look for another way to do it within your permissions');
     expect(text).toContain('name the refused command in the question');
+  });
+});
+
+describe('the allowed commands in the system prompt', () => {
+  it('lists the allowed command patterns of an editing specialist', () => {
+    const text = systemPrompt(
+      specialist({ allowCommands: ['npm run check*', 'git status*'] }),
+      input,
+    );
+    expect(text).toContain(
+      'Allowed shell commands (`*` stands for the rest of the line): `npm run check*`, `git status*`.',
+    );
+  });
+
+  it('says that no command is allowed when the list is empty, and lists nothing for read and full', () => {
+    expect(systemPrompt(specialist({ allowCommands: [] }), input)).toContain(
+      'No shell command is allowed.',
+    );
+    for (const permissions of ['read', 'full'] as const)
+      expect(
+        systemPrompt(specialist({ permissions, allowCommands: ['npm test'] }), input),
+      ).not.toContain('Allowed shell commands');
   });
 });
 
@@ -435,12 +459,13 @@ describe('opencode adapter', () => {
     const launch = runtime.buildLaunch(context({ specialist: specialist(options) }));
     const generated = JSON.parse(launch.files[0]!.content);
     const agent = generated.agent['aip-coder'];
-    if ('variant' in options) expect(after(launch.args, '--variant')).toBe(options.variant);
-    else expect(launch.args).not.toContain('--variant');
+    expect(launch.args).not.toContain('--variant');
     if ('reasoningEffort' in options)
       expect(agent.options).toEqual({ reasoningEffort: options.reasoningEffort });
     else expect(agent).not.toHaveProperty('options');
-    expect(after(launch.args, '-m')).toBe('anthropic/sonnet');
+    expect(after(launch.args, '-m')).toBe(
+      'variant' in options ? `anthropic/sonnet#${options.variant}` : 'anthropic/sonnet',
+    );
     expect(Object.keys(generated)).toEqual(['$schema', 'mcp', 'agent']);
   });
 
@@ -460,9 +485,10 @@ describe('opencode adapter', () => {
         }),
       }),
     );
-    expect(launch.args.slice(0, 2)).toEqual(['--pure', 'run']);
+    expect(launch.args.slice(0, 3)).toEqual(['--pure', 'run', '--standalone']);
     expect(launch.args).not.toContain('-m');
-    expect(after(launch.args, '--variant')).toBe('deep');
+    expect(launch.args).not.toContain('--variant');
+    expect(launch.args.join(' ')).not.toContain('deep');
     expect(after(launch.args, '-s')).toBe('ses_resume');
     expect(launch.args).toContain('--auto');
     const generated = JSON.parse(launch.files[0]!.content);
@@ -515,17 +541,17 @@ describe('opencode adapter', () => {
     });
   });
 
-  it('passes directory, agent, model and session and enables --auto only for full', () => {
+  it('runs standalone in the worktree, passes agent, model and session, --auto only for full', () => {
     const launch = runtime.buildLaunch(context({ resumeSession: 'ses_1' }));
-    expect(launch.args.slice(0, 7)).toEqual([
+    expect(launch.args.slice(0, 6)).toEqual([
       'run',
+      '--standalone',
       '--format',
       'json',
-      '--dir',
-      '/state/worktrees/x/run/login',
       '--agent',
       'aip-coder',
     ]);
+    expect(launch.args).not.toContain('--dir');
     expect(after(launch.args, '-m')).toBe('anthropic/sonnet');
     expect(after(launch.args, '-s')).toBe('ses_1');
     expect(launch.args).not.toContain('--auto');
@@ -622,7 +648,14 @@ describe('extra arguments and variables of the settings', () => {
     });
     const launch = runtime.buildLaunch(context());
     expect(launch.command).toBe('npx');
-    expect(launch.args.slice(0, 5)).toEqual(['-y', 'opencode-ai', 'run', '--format', 'json']);
+    expect(launch.args.slice(0, 6)).toEqual([
+      '-y',
+      'opencode-ai',
+      'run',
+      '--standalone',
+      '--format',
+      'json',
+    ]);
     expect(launch.env.OPENCODE_CONFIG).toBe('/state/logs/run/login/3/opencode.json');
     expect(launch.env.KEEP).toBe('yes');
     const oneShot = runtime.buildOneShot({ prompt: 'q', model: 'm', directory: '/tmp/x' });

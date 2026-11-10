@@ -42,6 +42,20 @@ export function opencodeAgentName(slug: string): string {
   return `aip-${slug}`;
 }
 
+/**
+ * `-m provider/model#variant`: OpenCode 2 has no `--variant` flag and names a variant only
+ * together with a model, so a variant without a model is not passed (the configuration rejects it).
+ */
+function modelArgs(model: string | null | undefined, variant: string | undefined): string[] {
+  if (!model) return [];
+  return ['-m', variant ? `${model}#${variant}` : model];
+}
+
+/**
+ * The launches run with `--standalone`: the background service of OpenCode 2 ignores
+ * `OPENCODE_CONFIG` of the caller, so the generated agent and the worker MCP server would be
+ * missing. The process runs in the worktree; OpenCode 2 takes it as the project directory.
+ */
 function oneShot(executable: string, extra: RuntimeExtra, request: OneShotRequest): Launch {
   const configPath = join(request.directory, 'opencode.json');
   const agent = 'aip-oneshot';
@@ -60,6 +74,7 @@ function oneShot(executable: string, extra: RuntimeExtra, request: OneShotReques
     args: [
       ...extra.args,
       'run',
+      '--standalone',
       '--format',
       'json',
       '--agent',
@@ -97,14 +112,12 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
     args: [
       ...extra.args,
       'run',
+      '--standalone',
       '--format',
       'json',
-      '--dir',
-      context.worktree,
       '--agent',
       agent,
-      ...(context.specialist.model ? ['-m', context.specialist.model] : []),
-      ...(context.specialist.variant ? ['--variant', context.specialist.variant] : []),
+      ...modelArgs(context.specialist.model, context.specialist.variant),
       ...(context.resumeSession ? ['-s', context.resumeSession] : []),
       ...(context.specialist.permissions === 'full' ? ['--auto'] : []),
       userMessage(context.input),

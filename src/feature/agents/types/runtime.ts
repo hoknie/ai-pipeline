@@ -78,12 +78,21 @@ export interface Runtime {
 
 export const PROTECTED_GIT_COMMANDS = ['git push', 'git checkout', 'git switch'];
 
-export function describePermissions(permissions: Permissions): string {
+export function describePermissions(
+  permissions: Permissions,
+  allowCommands: string[] = [],
+): string {
   switch (permissions) {
     case 'read':
       return 'You may only read and search files. Do not try to edit files or run shell commands.';
     case 'edit':
-      return 'You may edit files inside the current directory and run only the allowed shell commands.';
+      return [
+        'You may edit files inside the current directory and run only the allowed shell commands.',
+        allowCommands.length > 0
+          ? `Allowed shell commands (\`*\` stands for the rest of the line): ${allowCommands.map((command) => `\`${command}\``).join(', ')}.`
+          : 'No shell command is allowed.',
+        'A chain (`&&`, `;`, `|`) runs only when every command in it is allowed, and one refused command refuses the whole call: run commands one at a time, and read files with the file tools instead of `echo` or `printf`.',
+      ].join(' ');
     case 'full':
       return 'You may edit files inside the current directory and run shell commands.';
   }

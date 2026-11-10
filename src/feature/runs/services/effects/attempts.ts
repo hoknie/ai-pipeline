@@ -10,7 +10,7 @@ import {
   type SupervisedProcess,
 } from '../../../agents/services/index.ts';
 import type { Runtime } from '../../../agents/types/index.ts';
-import type { Specialist } from '../../../swarm-config/types/index.ts';
+import { modelIdProblem, type Specialist } from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
 import { findExecutable } from '../../../../platform/process/index.ts';
 import {
@@ -100,6 +100,14 @@ export class AttemptStarter {
     const attempt = group?.attempts.find((candidate) => candidate.seq === seq);
     if (!group || !attempt || attempt.runtime === 'command') return null;
     const key = { run: state.run.id, group: slug, seq };
+    const modelProblem = modelIdProblem(attempt.runtime, attempt.model);
+    if (modelProblem) {
+      await this.fail(state, key, {
+        kind: 'spawn',
+        message: `attempt ${seq} for ${attempt.specialist}: ${modelProblem}`,
+      });
+      return null;
+    }
     const { config, agents, environment } = this.dependencies;
     const settings = config.runtimeSettings(state.run.repository);
     if (typeof settings === 'string') {

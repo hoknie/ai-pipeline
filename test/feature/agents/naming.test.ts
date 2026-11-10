@@ -30,6 +30,7 @@ describe('one-shot calls', () => {
     });
     expect(launch.args).toEqual([
       'run',
+      '--standalone',
       '--format',
       'json',
       '--agent',

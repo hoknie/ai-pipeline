@@ -23,6 +23,35 @@ function transcriptQuery(search: URLSearchParams): { seq?: number; after?: numbe
   return query;
 }
 
+function historyQuery(search: URLSearchParams): object {
+  const result: Record<string, unknown> = {};
+  for (const key of ['repository', 'runtime', 'model', 'result', 'cursor']) {
+    const value = search.get(key);
+    if (value !== null) result[key] = value;
+  }
+  for (const key of ['from', 'to', 'limit']) {
+    const value = search.get(key);
+    if (value === null) continue;
+    if (!/^(0|[1-9]\d*)$/.test(value))
+      throw panel('invalid', `${key} must be a non-negative integer`);
+    const number = Number(value);
+    if (!Number.isSafeInteger(number)) throw panel('invalid', `${key} must be a safe integer`);
+    result[key] = number;
+  }
+  if (
+    result.limit !== undefined &&
+    result.limit !== 20 &&
+    result.limit !== 50 &&
+    result.limit !== 100
+  )
+    throw panel('invalid', 'limit must be 20, 50 or 100');
+  const from = result.from as number | undefined;
+  const to = result.to as number | undefined;
+  if (from !== undefined && to !== undefined && from >= to)
+    throw panel('invalid', 'from must be less than to');
+  return result;
+}
+
 function deleteQuery(search: URLSearchParams): object {
   const revision = search.get('revision');
   const level = search.get('level');
@@ -52,6 +81,7 @@ export async function requestBody(incoming: IncomingMessage, url: URL): Promise<
     const before = searchParams.get('before');
     return { limit, ...(before ? { before } : {}) };
   }
+  if (pathname === '/api/observers/history') return historyQuery(searchParams);
   if (pathname.endsWith('/transcript')) return transcriptQuery(searchParams);
   if (pathname.endsWith('/diff')) {
     const path = searchParams.get('path');
@@ -73,6 +103,7 @@ function repositoryFree(pathname: string, search: URLSearchParams): boolean {
     pathname.startsWith('/api/processes') ||
     pathname.startsWith('/api/specialist-tags') ||
     pathname === '/api/observers' ||
+    pathname === '/api/observers/history' ||
     own
   );
 }

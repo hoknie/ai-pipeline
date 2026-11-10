@@ -309,7 +309,7 @@ describe('cli', () => {
     const box = sandbox(
       PIPELINE_CONFIG.replace(
         'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, runtime: opencode, variant: company-deep, reasoning_effort: xhigh }',
+        'coder: { name: Кодировщик, runtime: opencode, model: openai/gpt-6.1-sol, variant: company-deep, reasoning_effort: xhigh }',
       ),
     );
     const result = await aip(box, 'config', 'check');

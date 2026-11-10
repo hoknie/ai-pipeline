@@ -159,6 +159,45 @@ describe('settings of the observers', () => {
     );
   });
 
+  it('loads history without depending on settings and links to the repair group', async () => {
+    const api = await open('#settings/global/observers/history', {
+      observers: vi.fn(async () => {
+        throw new Error('settings unavailable');
+      }),
+      observerHistory: vi.fn(async () => ({
+        items: [
+          {
+            id: 'r1:_repair:2',
+            runId: 'r1',
+            runNumber: 1,
+            runTitle: 'Old task',
+            repository: '/gone/app',
+            attemptSeq: 2,
+            runtime: 'agy',
+            model: null,
+            startedAt: 1_000,
+            finishedAt: 2_000,
+            status: 'finished',
+            verdict: 'done',
+            result: 'done' as const,
+            failureKind: null,
+            usage: { inputTokens: 0, outputTokens: 10, costUsd: 0 },
+          },
+        ],
+        nextCursor: null,
+        limit: 20 as const,
+        projects: ['/gone/app'],
+        asOf: 2_000,
+      })),
+    });
+    const [link] = await screen.findAllByRole('link', { name: 'Old task' });
+    expect(link).toBeDefined();
+    expect(link!.getAttribute('href')).toBe('#runs/r1/_repair');
+    expect(api.observerHistory).toHaveBeenCalledWith({ limit: 20 });
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+
   it('saves the form and shows the answer', async () => {
     const api = await open('#settings/global/observers');
     const workers = await screen.findByLabelText<HTMLInputElement>('Workers');
@@ -328,6 +367,35 @@ describe('settings of the observers', () => {
     await waitFor(() => expect(api.setObservers).toHaveBeenCalled());
     const sent = vi.mocked(api.setObservers).mock.calls[0]![0] as ObserverSettings;
     expect(sent.projects).toEqual([{ repository: '/work/app', maxWorkers: 2 }]);
+  });
+
+  it('asks for confirmation when leaving dirty form for history tab', async () => {
+    await open('#settings/global/observers');
+    const workers = await screen.findByLabelText<HTMLInputElement>('Workers');
+    fireEvent.change(workers, { target: { value: '99' } });
+    const tabs = screen.getByRole('tablist', { name: 'observer settings' });
+    const historyTab = within(tabs).getByRole('tab', { name: 'History' });
+    fireEvent.mouseDown(historyTab);
+    fireEvent.click(historyTab);
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(screen.getByLabelText<HTMLInputElement>('Workers').value).toBe('99');
+
+    fireEvent.mouseDown(historyTab);
+    fireEvent.click(historyTab);
+    const dialog2 = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog2).getByRole('button', { name: 'Leave' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('falls back to general when tab is unknown', async () => {
+    await open('#settings/global/observers/unknown-tab');
+    expect(
+      await screen.findByRole<HTMLInputElement>('switch', { name: 'Enable observers' }),
+    ).toBeTruthy();
   });
 });
 

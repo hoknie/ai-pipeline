@@ -2,6 +2,26 @@ export const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
 
 export type Runtime = (typeof RUNTIMES)[number];
 
+/** Returns a diagnostic for an explicitly configured OpenCode model without modifying it. */
+export function modelIdProblem(runtime: Runtime | string, model: string | null): string | null {
+  if (runtime !== 'opencode' || model === null) return null;
+  const separator = model.indexOf('/');
+  if (separator <= 0 || separator === model.length - 1 || /\s/.test(model)) {
+    return `OpenCode model "${model}" must use provider/model format, for example openai/gpt-6.1-sol`;
+  }
+  return null;
+}
+
+/** OpenCode names a variant only together with a model (`provider/model#variant`). */
+export function variantProblem(
+  runtime: Runtime | string,
+  model: string | null,
+  variant: string | undefined,
+): string | null {
+  if (runtime !== 'opencode' || !variant || model) return null;
+  return 'needs a model: OpenCode takes a variant only as provider/model#variant';
+}
+
 export const REASONING_EFFORTS = [
   'none',
   'minimal',

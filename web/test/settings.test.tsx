@@ -579,7 +579,9 @@ describe('settings page', () => {
 
   it('changes the address when an observers tab is chosen', async () => {
     show(queueOf(), {}, '#settings/global/observers/general');
-    const tabs = await screen.findByRole('tablist', { name: 'observer settings' });
+    // The tabs show before the settings load; take them once the form is there.
+    await screen.findByLabelText('Workers');
+    const tabs = screen.getByRole('tablist', { name: 'observer settings' });
     fireEvent.mouseDown(within(tabs).getByRole('tab', { name: 'Specialist' }));
     fireEvent.click(within(tabs).getByRole('tab', { name: 'Specialist' }));
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/observers/specialist'));

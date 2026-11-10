@@ -60,7 +60,7 @@ A step that ends without `swarm_report`, or on `timeout`, gets the `failed` stat
 
 ## Returns
 
-`on_reject.goto` must point to an earlier step. After `max_rounds` returns the group goes to `needs_human`. A `rejected` verdict on a step without `on_reject` also leads to `needs_human`.
+`on_reject.goto` must point to an earlier step. After `max_rounds` returns the group goes to `needs_human` with the last feedback. Your answer goes to the `goto` step together with that feedback, as one more round; a further rejection asks you again. A `rejected` verdict on a step without `on_reject` also leads to `needs_human`.
 
 ## Asking a person
 

@@ -134,6 +134,40 @@ describe('Antigravity transcript', () => {
       'hello',
       ' world',
     ]);
+    expect(entries.filter((entry) => entry.kind === 'text').map((entry) => entry.streamId)).toEqual(
+      ['agy:agent-response:2', 'agy:agent-response:2'],
+    );
+    const firstPage = agyTranscript(lines.slice(1, 2), [2]);
+    const secondPage = agyTranscript(lines.slice(2, 3), [3]);
+    const paged = [...firstPage, ...secondPage];
+    expect(paged.filter((entry) => entry.kind === 'text')).toEqual(
+      entries.filter((entry) => entry.kind === 'text'),
+    );
+    expect(paged.map((entry) => entry.at)).toEqual([2, 3]);
+    expect(
+      agyTranscript([
+        JSON.stringify({
+          event: 'step_update',
+          step_update: {
+            step_index: 3,
+            state: 'ACTIVE',
+            step_type: 'agent_response',
+            text_delta: 'x',
+          },
+        }),
+        JSON.stringify({
+          event: 'step_update',
+          step_update: {
+            step_index: 4,
+            state: 'ACTIVE',
+            step_type: 'agent_response',
+            text_delta: 'y',
+          },
+        }),
+      ])
+        .filter((entry) => entry.kind === 'text')
+        .map((entry) => entry.streamId),
+    ).toEqual(['agy:agent-response:3', 'agy:agent-response:4']);
     expect(entries.filter((entry) => entry.kind === 'tool_call')).toHaveLength(1);
     expect(entries).toContainEqual({
       kind: 'tool_result',
@@ -144,5 +178,29 @@ describe('Antigravity transcript', () => {
     });
     expect(entries).toContainEqual({ kind: 'raw', text: 'diagnostic', at: 6 });
     expect(entries.at(-1)).toMatchObject({ kind: 'result', text: 'failed', error: true, at: 7 });
+  });
+
+  it('preserves exact fragment text, timestamps and source lines including whitespace and empty deltas', () => {
+    const deltas = ['Привет', ' ', 'мир', '\n\n', ''];
+    const lines = deltas.map((text_delta) =>
+      JSON.stringify({
+        event: 'step_update',
+        step_update: { step_index: 9, state: 'ACTIVE', step_type: 'agent_response', text_delta },
+      }),
+    );
+    const original = [...lines];
+    const entries = agyTranscript(lines, [10, 11, 12, 13, 14]);
+    expect(entries.map((entry) => entry.kind === 'text' && entry.text)).toEqual(deltas);
+    expect(entries.map((entry) => entry.at)).toEqual([10, 11, 12, 13, 14]);
+    expect(
+      entries.every((entry) => entry.kind === 'text' && entry.streamId === 'agy:agent-response:9'),
+    ).toBe(true);
+    expect(
+      entries
+        .filter((entry) => entry.kind === 'text')
+        .map((entry) => entry.text)
+        .join(''),
+    ).toBe('Привет мир\n\n');
+    expect(lines).toEqual(original);
   });
 });

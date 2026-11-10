@@ -128,6 +128,15 @@ describe('the generated agy permission hook', () => {
     expect(editor.decide('run_command', { CommandLine: 'npm test' }).decision).toBe('auto_approve');
     expect(editor.decide('run_command', { CommandLine: 'rm -rf target' }).decision).toBe('deny');
     expect(reader.decide('run_command', { CommandLine: 'npm test' }).decision).toBe('deny');
+    for (const name of ['write_file', 'edit_file']) {
+      const inside = { Path: join(editor.context.worktree, 'src', 'a.ts') };
+      expect(editor.decide(name, inside).decision, name).toBe('auto_approve');
+      expect(editor.decide(name, { Path: join(root, 'outside', 'b.ts') }).decision, name).toBe(
+        'deny',
+      );
+      expect(editor.decide(name, { TargetFile: inside.Path }).decision, name).toBe('deny');
+      expect(reader.decide(name, inside).decision, name).toBe('deny');
+    }
     for (const name of ['list_resources', 'read_resource']) {
       expect(reader.decide(name, { ServerName: 'aip-fresh-id' }).decision, name).toBe(
         'auto_approve',

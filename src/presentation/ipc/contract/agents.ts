@@ -18,7 +18,12 @@ export const agentsRequests = [
 const at = z.number().nullable().optional();
 
 export const transcriptEntrySchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('text'), text: z.string(), at }),
+  z.object({
+    kind: z.literal('text'),
+    text: z.string(),
+    streamId: z.string().min(1).optional(),
+    at,
+  }),
   z.object({
     kind: z.literal('tool_call'),
     id: z.string().nullable(),

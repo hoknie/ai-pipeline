@@ -43,7 +43,13 @@ export function answerQuestion(
   if (group.status !== 'needs_human') throw wrongStatus(group, 'answer', 'needs_human');
   refreshPermissionsOf(m, group, permissions);
   const last = group.attempts.at(-1);
-  const asking = last && last.stepIndex === group.pending?.stepIndex ? last : undefined;
+  const askedBy = group.pending?.askedBy;
+  const asking =
+    askedBy !== undefined
+      ? group.attempts.find((candidate) => candidate.seq === askedBy)
+      : last && last.stepIndex === group.pending?.stepIndex
+        ? last
+        : undefined;
   const stepId =
     asking?.stepId ??
     group.attempts.find((candidate) => candidate.stepIndex === group.pending?.stepIndex)?.stepId ??
@@ -61,6 +67,7 @@ export function answerQuestion(
   group.questions = null;
   if (group.pending) {
     group.pending.humanAnswer = answer;
+    delete group.pending.askedBy;
     if (group.humanOnly === 'review') group.pending.reviewed = true;
   }
   group.humanOnly = null;

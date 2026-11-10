@@ -117,6 +117,51 @@ describe('ChainsList UI', () => {
 });
 
 describe('ChainForm UI', () => {
+  it('keeps each full model ID with its runtime when rows are reordered and saved', async () => {
+    const full = {
+      name: 'Qualified models',
+      mode: 'on_error',
+      enabled: true,
+      runtimes: [
+        { runtime: 'opencode', model: 'openai/gpt-custom', enabled: true },
+        { runtime: 'opencode', model: 'OtherProvider/team/GPT-Custom', enabled: true },
+      ],
+    };
+    const chain = {
+      ...chainFixture,
+      raw: full,
+      sources: {
+        ...chainFixture.sources,
+        project: { ...chainFixture.sources.project!, raw: full },
+      },
+    };
+    const writeChain = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 'c2',
+      file: '/f',
+    }));
+    render(
+      <ChainForm
+        api={fakeApi({ writeChain })}
+        chain={chain}
+        onDirty={vi.fn()}
+        onSaved={vi.fn(async () => undefined)}
+        onDeleted={vi.fn(async () => undefined)}
+      />,
+    );
+    expect(screen.getAllByDisplayValue('openai/gpt-custom')).toHaveLength(1);
+    expect(screen.getAllByDisplayValue('OtherProvider/team/GPT-Custom')).toHaveLength(1);
+    const moveUp = screen.getAllByRole('button', { name: 'Move up' });
+    fireEvent.click(moveUp[1]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeChain).toHaveBeenCalled());
+    const saved = writeChain.mock.calls[0]?.[1] as typeof full;
+    expect(saved.runtimes.map((item) => item.model)).toEqual([
+      'OtherProvider/team/GPT-Custom',
+      'openai/gpt-custom',
+    ]);
+  });
+
   it('allows saving an existing project chain without changing its fields', async () => {
     const api = fakeApi();
     render(

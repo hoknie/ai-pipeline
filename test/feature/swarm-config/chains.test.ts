@@ -147,6 +147,24 @@ swarm:
     );
   });
 
+  it('rejects unqualified OpenCode model IDs, including disabled chain items', () => {
+    const errors = errorsOf(
+      `\nswarm:\n  chains:\n    fallback:\n      name: Fallback\n      mode: on_error\n      enabled: false\n      runtimes:\n        - runtime: opencode\n          model: luna-6.1\n          enabled: false\n`,
+    );
+    expectError(errors, 'swarm.chains.fallback.runtimes[0].model', 'provider/model');
+  });
+
+  it('keeps qualified IDs distinct and permits an omitted model', () => {
+    const config = parseConfig(
+      `\nswarm:\n  chains:\n    fallback:\n      name: Fallback\n      mode: on_error\n      runtimes:\n        - runtime: opencode\n          model: openai/gpt-custom\n        - runtime: opencode\n          model: other/gpt-custom\n        - runtime: opencode\n`,
+    );
+    expect(config.chains[0]?.runtimes.map((item) => item.model)).toEqual([
+      'openai/gpt-custom',
+      'other/gpt-custom',
+      null,
+    ]);
+  });
+
   it('validates specialist referencing a chain and mutual exclusions', () => {
     const errors = errorsOf(`
 swarm:

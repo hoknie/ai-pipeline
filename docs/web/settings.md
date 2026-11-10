@@ -49,11 +49,17 @@ The addresses are `#settings/global/pipelines`, `#settings/global/pipelines/<id>
 
 ## Observers
 
-The group "Observers" of "Shared" sets the agents that take a task after an incident (a question, a failed step, a conflict or a refused delivery) and try to repair it. The address is `#settings/global/observers/<tab>`; an unknown tab opens "Main", and choosing a tab changes the address. The three tabs are one form: "Save" writes them together, and the errors of validation are shown at the fields.
+The group "Observers" of "Shared" sets the agents that take a task after an incident
+(a question, a failed step, a conflict or a refused delivery) and try to repair it.
+The address is `#settings/global/observers/<tab>`; an unknown tab opens "Main", and
+choosing a tab changes the address. The three settings tabs are one form: "Save"
+writes them together, and the errors of validation are shown at the fields.
+"History" is a separate read-only tab and does not depend on whether observers are enabled.
 
 - "Main": the switch "Enable observers", "Workers" (1 to 20, how many observers work at once), "Repairs per task" (1 to 50) and the switch "Answer questions meant only for a human" (off: such a question waits for a person; on: the agent decides it). Under the fields are the repairs in progress and the number of tasks waiting for a worker; they follow the stream without a reload.
 - "Specialist": the fields of the specialist that works as the observer, as in a specialist form, but without the slug, tags, limit and queue.
 - "Projects": the repositories of the registry, each with a switch "Connect" and the field "Workers in the project", empty by default (no limit of its own).
+- "History": saved attempts by the observer across all projects, newest first.
 
 ## Projects
 

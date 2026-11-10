@@ -104,19 +104,22 @@ export function rejectedStep(m: Ctx, group: Group, attempt: Attempt, feedback: s
     return;
   }
   const rounds = (group.rejections[attempt.stepId] ?? 0) + 1;
+  const gotoIndex = steps.findIndex((step) => step.id === onReject.goto);
+  group.rejections[attempt.stepId] = rounds;
   if (rounds > onReject.maxRounds) {
+    // The answer goes to the goto step with the feedback: the rejecting step would only reject.
     askHuman(
       group,
-      attempt.stepIndex,
+      gotoIndex,
       `Step \`${attemptStepLabel(m.state, group, attempt)}\` rejected the work ${rounds} times (limit ${onReject.maxRounds}). Last feedback:\n${feedback}`,
       null,
     );
+    group.pending = { ...freshPending(gotoIndex), feedback, askedBy: attempt.seq };
     return;
   }
-  group.rejections[attempt.stepId] = rounds;
   group.status = 'queued';
   group.pending = {
-    stepIndex: steps.findIndex((step) => step.id === onReject.goto),
+    stepIndex: gotoIndex,
     feedback,
     humanAnswer: null,
     resume: false,

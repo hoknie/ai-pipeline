@@ -407,7 +407,7 @@ function workerCommand(): {
     args: rest,
     prompt: agent.prompt,
     message: args.at(-1) ?? '',
-    cwd: option('--dir')!,
+    cwd: process.cwd(),
   };
 }
 

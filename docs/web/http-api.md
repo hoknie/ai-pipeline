@@ -104,13 +104,9 @@ All paths start with `/api/runs/<id>/groups/<group>`.
 | Request | What it does |
 |---|---|
 | `GET /api/observers` | The settings of the observers and the repairs in progress and waiting |
+| `GET /api/observers/history` | A page of saved observer repair attempts across all projects |
 | `PUT /api/observers` | Saves the settings |
 
-- These requests do not read `repository` and work while the list of repositories is empty.
-- Both answer with `{"settings": {...}, "workers": {...}}`. `settings` has the fields of [Observers](settings.md#observers): `enabled`, `workers` (a number), `maxRepairs`, `answerHumanOnly`, `projects`, `specialist`. The outer `workers` is `{"running": [{runId, repository, incident}], "waiting": <number>}`.
-- `PUT /api/observers` takes the settings without a wrapper, not the answer of `GET`.
-  - The body may be partial: only the keys that are sent change, and an unknown key comes back with code 422.
-  - Code 200 returns the object above. Invalid values come back with code 422 and `{"errors": [...]}` with the path of each field, and the settings stay as they were. A body that is not an object comes back with code 400.
 
 ## Configuration
 

@@ -9,7 +9,11 @@ import type {
   QueueAdvancePort,
   RunsPublishPort,
 } from '../ports/index.ts';
-import { FinishedRunRepository, RunRepository } from '../repositories/index.ts';
+import {
+  AttemptHistoryRepository,
+  FinishedRunRepository,
+  RunRepository,
+} from '../repositories/index.ts';
 
 import { RunArchive } from './archive.ts';
 import type { EffectTimings } from './effects/context.ts';
@@ -18,6 +22,7 @@ import { RunEngine } from './engine.ts';
 import { RunReads } from './reads.ts';
 import { RunRequests } from './requests.ts';
 import { RunStates } from './states.ts';
+import { RunAttemptHistoryService } from './attempt-history.ts';
 
 export interface RunsDependencies {
   database: Database;
@@ -38,6 +43,7 @@ export interface RunsDependencies {
 }
 
 export interface RunsServices {
+  attemptHistory: RunAttemptHistoryService;
   states: RunStates;
   engine: RunEngine;
   effects: RunEffects;
@@ -66,6 +72,7 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
   engine.attach(effects);
   const { registry, config, agents } = dependencies;
   return {
+    attemptHistory: new RunAttemptHistoryService(new AttemptHistoryRepository(database)),
     states,
     engine,
     effects,

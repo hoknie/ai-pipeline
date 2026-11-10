@@ -50,7 +50,14 @@ model: openai/gpt-6.1-sol
 reasoning_effort: xhigh
 ```
 
-`variant` selects a named variant, including a custom name such as `company-deep`. `reasoning_effort` sets the agent's `reasoningEffort` directly. Both fields are optional, supported only with `runtime: opencode` (also when inherited), and cannot be set in `defaults`. A model is not required: without `model`, OpenCode chooses it.
+`variant` selects a named variant, including a custom name such as `company-deep`. `reasoning_effort` sets the agent's `reasoningEffort` directly. Both fields are optional, supported only with `runtime: opencode` (also when inherited), and cannot be set in `defaults`.
+
+A model is not required for `reasoning_effort`: without `model`, OpenCode chooses it. `variant` needs `model`, because OpenCode takes a variant only as `provider/model#variant`.
+
+When a model is explicitly set for OpenCode, it must be a full `provider/model` ID, such as `openai/gpt-6.1-sol`. Any provider is accepted, and additional `/` characters and case in the model suffix are preserved. Short aliases such as `gpt-6.1-sol` are rejected; choose the full ID explicitly rather than relying on automatic provider completion.
+
+For example, `runtime: opencode` with `model: gpt-6.1-sol` reports an error at
+`swarm.specialists.<slug>.model`; `model` may be omitted to use OpenCode's default.
 
 Only some models support each effort level. `aip config check` validates the fields without contacting the provider; OpenCode and the provider determine whether the selected model supports them.
 

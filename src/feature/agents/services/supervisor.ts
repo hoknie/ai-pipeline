@@ -184,7 +184,8 @@ export function launchProcess(launch: Launch, options: LaunchOptions): Supervise
   try {
     child = spawn(launch.command, launch.args, {
       cwd: options.cwd,
-      env: { ...options.environment, ...launch.env },
+      // PWD of the daemon names another directory; OpenCode 2 takes its project from PWD.
+      env: { ...options.environment, ...launch.env, PWD: options.cwd },
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

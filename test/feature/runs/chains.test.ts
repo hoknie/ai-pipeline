@@ -207,6 +207,7 @@ describe('selectAttemptRuntime', () => {
       resume: false,
     });
     expect(second.runtime).toBe('opencode');
+    expect(second.model).toBe('openai/gpt-4o');
     expect(second.chainIndex).toBe(1);
     attempts.push(makeAttempt(2, 'opencode', 1));
 
@@ -281,6 +282,7 @@ describe('execution with on_error runtime chains', () => {
 
     // Group should be queued on the same step and round with resume: false
     expect(g.status).toBe('queued');
+    expect(g.attempts[0]?.reason).toEqual({ kind: 'usage_limit', resetsAt: 60_000 });
     expect(g.pending).toEqual({
       stepIndex: 0,
       feedback: null,
@@ -326,6 +328,7 @@ describe('execution with on_error runtime chains', () => {
 
     const g = group(state);
     expect(g.status).toBe('queued');
+    expect(g.attempts[0]?.reason).toEqual({ kind: 'runtime_not_found', runtime: 'claude' });
 
     // Next dispatch selects opencode (agy is disabled)
     dispatch([state], 2100);
@@ -379,5 +382,151 @@ describe('execution with on_error runtime chains', () => {
     expect(g.status).toBe('failed');
     expect(g.reason).toBe('spawn error: exec error');
     expect(g.attempts[1]?.reason).toEqual({ kind: 'spawn', message: 'exec error' });
+  });
+});
+
+describe('qualified model preservation across chain modes and attempt creation', () => {
+  const MULTI_PROVIDER_CONFIG = `swarm:
+  max: 5
+  chains:
+    random-chain:
+      name: Random Qualified
+      mode: random
+      runtimes:
+        - runtime: opencode
+          model: openai/gpt-custom
+        - runtime: opencode
+          model: other/gpt-custom
+    error-chain:
+      name: Error Qualified
+      mode: on_error
+      runtimes:
+        - runtime: opencode
+          model: alpha/gpt-common
+        - runtime: opencode
+          model: beta/gpt-common
+    no-model-chain:
+      name: No Model
+      mode: on_error
+      runtimes:
+        - runtime: opencode
+  specialists:
+    random-spec:
+      name: Random Specialist
+      runtime_chain: random-chain
+    error-spec:
+      name: Error Specialist
+      runtime_chain: error-chain
+    no-model-spec:
+      name: No Model Specialist
+      runtime_chain: no-model-chain
+  pipelines:
+    feature:
+      steps:
+        - { id: work, specialist: random-spec }
+    error-pipe:
+      steps:
+        - { id: work, specialist: error-spec }
+`;
+
+  it('preserves distinct full IDs with identical suffixes in random mode with deterministic seeds', () => {
+    const state = run(1, { configText: MULTI_PROVIDER_CONFIG });
+    const spec = state.run.config.specialists.find((s) => s.slug === 'random-spec')!;
+    const first = selectAttemptRuntime({
+      specialist: spec,
+      chains: state.run.config.chains,
+      defaults: state.run.config.defaults,
+      limitHolds: new Map(),
+      attempts: [],
+      stepIndex: 0,
+      round: 1,
+      resume: false,
+      seed: 0,
+    });
+    expect(first.model).toBe('openai/gpt-custom');
+    expect(first.chainIndex).toBe(0);
+
+    const second = selectAttemptRuntime({
+      specialist: spec,
+      chains: state.run.config.chains,
+      defaults: state.run.config.defaults,
+      limitHolds: new Map(),
+      attempts: [],
+      stepIndex: 0,
+      round: 1,
+      resume: false,
+      seed: 1,
+    });
+    expect(second.model).toBe('other/gpt-custom');
+    expect(second.chainIndex).toBe(1);
+    expect(first.model).not.toBe(second.model);
+  });
+
+  it('keeps distinct full IDs in on_error failover and attempt creation', () => {
+    const errorConfig = `swarm:
+  max: 5
+  chains:
+    error-chain:
+      name: Error Qualified
+      mode: on_error
+      runtimes:
+        - runtime: opencode
+          model: alpha/gpt-common
+        - runtime: opencode
+          model: beta/gpt-common
+  specialists:
+    error-spec:
+      name: Error Specialist
+      runtime_chain: error-chain
+  pipelines:
+    feature:
+      steps:
+        - { id: work, specialist: error-spec }
+`;
+    const state = run(1, { configText: errorConfig });
+    const g = group(state);
+
+    dispatch([state], 1000);
+    expect(g.attempts[0]?.model).toBe('alpha/gpt-common');
+    expect(g.attempts[0]?.chainIndex).toBe(0);
+
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: g.slug,
+        seq: 1,
+        exit: {
+          sessionId: null,
+          usage: null,
+          failure: { kind: 'spawn', message: 'failed on alpha' },
+          outsideChanges: [],
+        },
+      },
+      2000,
+    );
+
+    dispatch([state], 2100);
+    expect(g.attempts[1]?.model).toBe('beta/gpt-common');
+    expect(g.attempts[1]?.chainIndex).toBe(1);
+    expect(g.attempts[0]?.model).not.toBe(g.attempts[1]?.model);
+  });
+
+  it('preserves null model when a chain runtime omits model', () => {
+    const state = run(1, { configText: MULTI_PROVIDER_CONFIG });
+    const spec = state.run.config.specialists.find((s) => s.slug === 'no-model-spec')!;
+    const selected = selectAttemptRuntime({
+      specialist: spec,
+      chains: state.run.config.chains,
+      defaults: state.run.config.defaults,
+      limitHolds: new Map(),
+      attempts: [],
+      stepIndex: 0,
+      round: 1,
+      resume: false,
+    });
+    expect(selected.model).toBeNull();
+    expect(selected.runtime).toBe('opencode');
+    expect(selected.chainIndex).toBe(0);
   });
 });

@@ -23,6 +23,8 @@ import {
   RUNTIMES,
   REASONING_EFFORTS,
   type Specialist,
+  modelIdProblem,
+  variantProblem,
 } from '../types/specialist.ts';
 
 export const SPECIALIST_KEYS = [
@@ -108,6 +110,8 @@ function checkSpecialistConfig(
     }
     return;
   }
+  const modelProblem = modelIdProblem(specialist.runtime, specialist.model);
+  if (modelProblem) addError(ctx, join(path, 'model'), modelProblem);
   checkOpencodeOptions(ctx, mapping, path, specialist);
   if (specialist.mcp && specialist.runtime !== 'claude') {
     addError(ctx, join(path, 'mcp'), 'is supported by the claude runtime only');
@@ -184,6 +188,8 @@ function checkOpencodeOptions(
     if (key === 'variant') {
       const variant = readString(ctx, mapping[key], fieldPath);
       if (variant !== null) specialist.variant = variant.trim();
+      const problem = variantProblem(specialist.runtime, specialist.model, specialist.variant);
+      if (problem) addError(ctx, fieldPath, problem);
     } else {
       const effort = readChoice(ctx, mapping[key], fieldPath, REASONING_EFFORTS);
       if (effort !== null) specialist.reasoningEffort = effort;

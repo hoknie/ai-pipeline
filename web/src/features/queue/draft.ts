@@ -116,11 +116,20 @@ export function retarget(
 export function draftValid(draft: QueueDraft): boolean {
   if (draft.pipeline === '') return false;
   if ([...draft.title.trim()].length > TITLE_LIMIT) return false;
-  if (draft.mode === 'task') return draft.task.trim() !== '';
+  if (draft.mode === 'task') return draft.task.trim() !== '' || draft.title.trim() !== '';
   return (
     draft.groups.length > 0 &&
-    draft.groups.every((group) => group.title.trim() !== '' && group.task.trim() !== '')
+    draft.groups.every((group) => group.title.trim() !== '' || group.task.trim() !== '')
   );
+}
+
+function groupTitleFromTask(task: string): string {
+  const firstLine =
+    task
+      .split(/\r\n|\r|\n/)
+      .find((line) => line.trim() !== '')
+      ?.trim() ?? '';
+  return Array.from(firstLine).slice(0, TITLE_LIMIT).join('');
 }
 
 /**
@@ -137,11 +146,11 @@ export function fieldsOf(
   return {
     pipeline: draft.pipeline,
     ...(draft.mode === 'task'
-      ? { task: draft.task.trim() }
+      ? { task: draft.task.trim() || title }
       : {
           groups: draft.groups.map((group) => ({
-            title: group.title.trim(),
-            task: group.task.trim(),
+            title: group.title.trim() || groupTitleFromTask(group.task),
+            task: group.task.trim() || group.title.trim(),
           })),
         }),
     ...(title !== '' ? { title } : {}),

@@ -1,7 +1,10 @@
 import type { ArtifactService } from '../../feature/artifacts/services/index.ts';
 import type { ComposeServices } from '../../feature/compose/services/index.ts';
 import type { DeliveryServices } from '../../feature/delivery/services/index.ts';
-import type { ObserverService } from '../../feature/observers/services/index.ts';
+import type {
+  ObserverHistoryService,
+  ObserverService,
+} from '../../feature/observers/services/index.ts';
 import type { ProcessService } from '../../feature/processes/services/index.ts';
 import type { QueueServices } from '../../feature/queue/services/index.ts';
 import type { ProjectService, RegistryService } from '../../feature/repos/services/index.ts';
@@ -28,5 +31,6 @@ export interface DaemonServices {
   artifacts: ArtifactService;
   queue: QueueServices;
   observers: ObserverService;
+  history: ObserverHistoryService;
   compose: ComposeServices;
 }

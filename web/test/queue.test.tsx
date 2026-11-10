@@ -608,7 +608,7 @@ describe('new task form', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
     fireEvent.change(screen.getByLabelText('Title of group 1'), { target: { value: 'Вход' } });
-    expect(add.disabled).toBe(true);
+    expect(add.disabled).toBe(false);
     fireEvent.change(screen.getByLabelText('Text of group 1'), { target: { value: 'форма' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
     expect(add.disabled).toBe(true);
@@ -658,6 +658,42 @@ describe('new task form', () => {
     await screen.findByText(/unknown pipeline/);
     expect(api.queueAdd).toHaveBeenCalled();
     expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('Сделать вход');
+  });
+
+  it('accepts a title without task text and sends the title as task text', async () => {
+    const api = show(queueOf());
+    await openNewTask();
+    await screen.findByLabelText('Task text');
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Search  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        title: 'Search',
+        task: 'Search',
+      }),
+    );
+  });
+
+  it('accepts group descriptions without titles and preserves blank titles on server error', async () => {
+    const api = show(queueOf(), {
+      queueAdd: vi.fn(async () => {
+        throw new ApiError(400, 'unknown pipeline');
+      }),
+    });
+    await openNewTask();
+    await screen.findByLabelText('Task text');
+    fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
+    fireEvent.change(screen.getByLabelText('Text of group 1'), {
+      target: { value: '\n  First line\n- Markdown body  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/unknown pipeline/);
+    expect(api.queueAdd).toHaveBeenCalledWith({
+      pipeline: 'feature',
+      groups: [{ title: 'First line', task: 'First line\n- Markdown body' }],
+    });
+    expect((screen.getByLabelText('Title of group 1') as HTMLInputElement).value).toBe('');
   });
 
   it('keeps the typed text when a queue or run event arrives and when the tab changes', async () => {
@@ -805,6 +841,190 @@ describe('automatic delivery switch', () => {
 });
 
 describe('items', () => {
+  it.each([
+    {
+      label: 'a title-only group',
+      edited: { title: 'Only title', task: '' },
+      expected: { title: 'Only title', task: 'Only title' },
+    },
+    {
+      label: 'a description-only group',
+      edited: { title: '', task: 'Only description\nMore detail' },
+      expected: { title: 'Only description', task: 'Only description\nMore detail' },
+    },
+  ])('saves $label without losing its independent input', async ({ edited, expected }) => {
+    const api = show(
+      queueOf({
+        items: [
+          queueItem('q1', '', 1, {
+            task: null,
+            groups: [{ title: 'Initial', task: 'Initial' }],
+          }),
+        ],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    const title = await screen.findByLabelText<HTMLInputElement>('Title of group 1');
+    const task = screen.getByLabelText<HTMLTextAreaElement>('Text of group 1');
+    fireEvent.change(title, { target: { value: edited.title } });
+    fireEvent.change(task, { target: { value: edited.task } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith(
+        'q1',
+        expect.objectContaining({ groups: [expected], title: null }),
+      ),
+    );
+  });
+
+  it('clears a non-empty shared title of a task with null', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'Body', 1, { title: 'Old title' })] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    const name = await screen.findByLabelText<HTMLInputElement>('Name');
+    expect(name.value).toBe('Old title');
+    fireEvent.change(name, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith(
+        'q1',
+        expect.objectContaining({ task: 'Body', title: null }),
+      ),
+    );
+  });
+
+  it('edits only the title of a task and keeps its text', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'Body', 1, { title: 'Old title' })] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'New title' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith(
+        'q1',
+        expect.objectContaining({ task: 'Body', title: 'New title' }),
+      ),
+    );
+  });
+
+  it('clears the text of a task with a title and sends the title as text', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'Body', 1, { title: 'X' })] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    const fields = await screen.findAllByLabelText('Task text');
+    const editor = fields.find((node) => (node as HTMLTextAreaElement).value === 'Body')!;
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.queueEdit).toHaveBeenCalledWith('q1', {
+        pipeline: 'feature',
+        task: 'X',
+        title: 'X',
+        autoDeliver: null,
+        deliveryMode: null,
+        tags: [],
+        skip: [],
+      }),
+    );
+  });
+
+  it('reopens the edit form with the canonical data after saving', async () => {
+    const api = show(
+      queueOf({
+        items: [
+          queueItem('q1', '', 1, {
+            task: null,
+            groups: [{ title: 'Old', task: 'Old\nrest' }],
+          }),
+        ],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const edit = () =>
+      fireEvent.click(
+        within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+      );
+    edit();
+    fireEvent.change(await screen.findByLabelText('Title of group 1'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Text of group 1'), {
+      target: { value: 'Saved first line\nmore' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByLabelText('Title of group 1')).toBeNull());
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'queue',
+        seq: 5,
+        queue: queueOf({
+          items: [
+            queueItem('q1', '', 1, {
+              task: null,
+              groups: [{ title: 'Saved first line', task: 'Saved first line\nmore' }],
+            }),
+          ],
+        }),
+      });
+    });
+    await waitFor(() =>
+      expect(
+        within(screen.getAllByRole('listitem')[0]!).queryByRole('button', { name: 'Edit' }),
+      ).not.toBeNull(),
+    );
+    edit();
+    expect((await screen.findByLabelText<HTMLInputElement>('Title of group 1')).value).toBe(
+      'Saved first line',
+    );
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Text of group 1').value).toBe(
+      'Saved first line\nmore',
+    );
+  });
+
+  it('saves a group with only a description: its title comes from the first line', async () => {
+    const api = show(
+      queueOf({
+        items: [
+          queueItem('q1', '', 1, {
+            task: null,
+            groups: [
+              { title: 'Only title', task: 'Only title' },
+              { title: 'Old title', task: 'Исправить вход\nПроверить ошибку' },
+            ],
+          }),
+        ],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    fireEvent.change(await screen.findByLabelText('Title of group 2'), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalledTimes(1));
+    expect(api.queueEdit).toHaveBeenCalledWith(
+      'q1',
+      expect.objectContaining({
+        groups: [
+          { title: 'Only title', task: 'Only title' },
+          { title: 'Исправить вход', task: 'Исправить вход\nПроверить ошибку' },
+        ],
+        title: null,
+      }),
+    );
+  });
+
   it('has no repository field in the form of an item', async () => {
     show();
     await screen.findByRole('list', { name: 'tasks in the queue' });

@@ -101,20 +101,20 @@ describe('slow test reporter', () => {
       return lines.join('\n');
     };
 
-    it('gives e2e 3000 ms, web 1000 ms and every other project 400 ms', () => {
-      expect(E2E_LIMIT_MS).toBe(3000);
-      expect(projectLimit('e2e', {})).toBe(3000);
+    it('gives e2e 5000 ms, web 1000 ms and every other project 400 ms', () => {
+      expect(E2E_LIMIT_MS).toBe(5000);
+      expect(projectLimit('e2e', {})).toBe(5000);
       expect(projectLimit('unit', {})).toBe(400);
       expect(WEB_LIMIT_MS).toBe(1000);
       expect(projectLimit('web', {})).toBe(1000);
       expect(projectLimit(undefined, {})).toBe(400);
     });
 
-    it('lets an end-to-end test of 2000 ms pass and stops one of 3001 ms', () => {
+    it('lets an end-to-end test of 4000 ms pass and stops one of 5001 ms', () => {
       expect(run([fakeCase('e2e fast', 2000, 'passed', 'e2e')])).toBe('');
       expect(process.exitCode).toBe(exitCode);
-      const out = run([fakeCase('e2e slow', 3001, 'passed', 'e2e')]);
-      expect(out).toContain('test/a.test.ts > e2e slow: 3001 ms (limit 3000 ms)');
+      const out = run([fakeCase('e2e slow', 5001, 'passed', 'e2e')]);
+      expect(out).toContain('test/a.test.ts > e2e slow: 5001 ms (limit 5000 ms)');
       expect(process.exitCode).toBe(1);
     });
 
@@ -129,11 +129,11 @@ describe('slow test reporter', () => {
     });
 
     it('lets the variable raise the limit of a project and never lower it', () => {
-      expect(projectLimit('e2e', { AIP_TEST_LIMIT_MS: '500' })).toBe(3000);
-      expect(projectLimit('e2e', { AIP_TEST_LIMIT_MS: '4000' })).toBe(4000);
+      expect(projectLimit('e2e', { AIP_TEST_LIMIT_MS: '500' })).toBe(5000);
+      expect(projectLimit('e2e', { AIP_TEST_LIMIT_MS: '6000' })).toBe(6000);
       expect(projectLimit('unit', { AIP_TEST_LIMIT_MS: '1000' })).toBe(1000);
-      const out = run([fakeCase('e2e', 3500, 'passed', 'e2e')], { AIP_TEST_LIMIT_MS: '100' });
-      expect(out).toContain('(limit 3000 ms)');
+      const out = run([fakeCase('e2e', 5500, 'passed', 'e2e')], { AIP_TEST_LIMIT_MS: '100' });
+      expect(out).toContain('(limit 5000 ms)');
     });
   });
 });

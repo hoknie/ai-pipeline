@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { OBSERVER_TABS, type ObserverTab } from '../../../shared/lib/nav/settingsGroups.ts';
 import { Tabs, TabsList, TabsTrigger } from '../../../shared/ui/layout/tabs.tsx';
 
-/** The three tabs of the group; a tab with an error of the server is marked. */
+/** The observer settings tabs; history is read-only and has no form errors. */
 export function ObserverTabs({
   tab,
   onTab,
