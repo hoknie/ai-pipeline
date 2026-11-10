@@ -2,7 +2,7 @@
 # What a release needs besides the gate.
 #   scripts/release.sh version            the version in package.json
 #   scripts/release.sh check-tag vX.Y.Z   the tag names that version, and the plugin manifest agrees
-#   scripts/release.sh pack               the npm tarball and SHA256SUMS in dist/release
+#   scripts/release.sh pack               the npm tarball aip-X.Y.Z.tgz and SHA256SUMS in dist/release
 #   scripts/release.sh notes              the CHANGELOG.md section of this version, else one written from git
 
 set -euo pipefail
@@ -30,9 +30,11 @@ check_tag() {
 pack() {
     rm -rf "$RELEASE"
     mkdir -p "$RELEASE"
-    local tarball
-    tarball="$(npm pack --silent --pack-destination "$RELEASE" | tail -n 1)"
-    [ -f "$RELEASE/$tarball" ] || die "npm pack wrote no $tarball"
+    local packed tarball="aip-$VERSION.tgz"
+    packed="$(npm pack --silent --pack-destination "$RELEASE" | tail -n 1)"
+    [ -f "$RELEASE/$packed" ] || die "npm pack wrote no $packed"
+    # npm names a scoped package's tarball after its scope too (hoknie-aip-X.Y.Z.tgz); the asset is aip-X.Y.Z.tgz
+    [ "$packed" = "$tarball" ] || mv "$RELEASE/$packed" "$RELEASE/$tarball"
     tar -tzf "$RELEASE/$tarball" | grep -x 'package/dist/cli/main.js' >/dev/null || die "$tarball does not hold dist/cli/main.js"
     (cd "$RELEASE" && sum "$tarball" > SHA256SUMS && sum -c SHA256SUMS >/dev/null && cat SHA256SUMS)
 }
