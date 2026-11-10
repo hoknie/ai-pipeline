@@ -76,7 +76,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
-      version: ${{ steps.tag.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - id: tag
         env:
@@ -86,6 +86,7 @@ jobs:
         with:
           ref: refs/tags/${{ steps.tag.outputs.tag }}
       - name: The tag names the version in package.json and the plugin manifest
+        id: version
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: echo "version=$(scripts/release.sh check-tag "$TAG")" >> "$GITHUB_OUTPUT"
