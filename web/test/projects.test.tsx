@@ -323,6 +323,66 @@ describe('the group Projects', () => {
     await remove();
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/projects'));
   });
+
+  const headerLabel = () =>
+    document.querySelector('[data-repository-trigger]')?.getAttribute('aria-label');
+  const selectLib = async () => {
+    const trigger = document.querySelector<HTMLElement>('[data-repository-trigger]')!;
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /lib/ }));
+    await waitFor(() => expect(headerLabel()).toBe('Repository: lib'));
+  };
+  const confirmRemoval = async () => {
+    const form = within(await projectForm('lib'));
+    fireEvent.click(form.getByRole('button', { name: 'Remove from list' }));
+    return within(await screen.findByRole('alertdialog'));
+  };
+
+  it('removing the selected project selects the first one and forgets the choice', async () => {
+    const removeRepository = vi.fn<Api['removeRepository']>(async () => [repositoryView(APP)]);
+    await show([repositoryView(APP), repositoryView(LIB)], '#settings/global/projects/lib', {
+      removeRepository,
+    });
+    await selectLib();
+    const dialog = await confirmRemoval();
+    fireEvent.click(dialog.getByRole('button', { name: 'Remove from list' }));
+    await waitFor(() => expect(removeRepository).toHaveBeenCalledWith(LIB));
+    await waitFor(() => expect(headerLabel()).toBe('Repository: app'));
+    expect(window.localStorage.getItem('aip.web.repository')).toBe('null');
+  });
+
+  it('cancelling the removal sends nothing and keeps the selection', async () => {
+    const removeRepository = vi.fn<Api['removeRepository']>(async () => [repositoryView(APP)]);
+    await show([repositoryView(APP), repositoryView(LIB)], '#settings/global/projects/lib', {
+      removeRepository,
+    });
+    await selectLib();
+    const dialog = await confirmRemoval();
+    fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(removeRepository).not.toHaveBeenCalled();
+    expect(headerLabel()).toBe('Repository: lib');
+  });
+
+  it('a removed project that returns to the registry is not selected again', async () => {
+    const removeRepository = vi.fn<Api['removeRepository']>(async () => [repositoryView(APP)]);
+    await show([repositoryView(APP), repositoryView(LIB)], '#settings/global/projects/lib', {
+      removeRepository,
+    });
+    await selectLib();
+    const dialog = await confirmRemoval();
+    fireEvent.click(dialog.getByRole('button', { name: 'Remove from list' }));
+    await waitFor(() => expect(headerLabel()).toBe('Repository: app'));
+    act(() =>
+      FakeEventSource.last?.send({
+        event: 'repositories',
+        seq: 9,
+        repositories: [repositoryView(APP), repositoryView(LIB)],
+      }),
+    );
+    expect(headerLabel()).toBe('Repository: app');
+    expect(window.localStorage.getItem('aip.web.repository')).toBe('null');
+  });
 });
 
 describe('disabled projects in the panel', () => {

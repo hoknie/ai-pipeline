@@ -27,10 +27,8 @@ function menu(onSelect = vi.fn(), onAdd = vi.fn(async () => undefined)) {
         paths,
         selected: '/Users/me/projects/shop',
         waiting: new Map(),
-        home: '/Users/me/projects/shop',
         onSelect,
         onAdd,
-        onRemove: () => undefined,
         browse: async () => ({
           path: '/Users/me',
           parent: '/Users',

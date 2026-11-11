@@ -1,4 +1,4 @@
-import { FolderGit2, Plus, X } from 'lucide-react';
+import { FolderGit2, Plus } from 'lucide-react';
 import { useState, type FormEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -139,19 +139,15 @@ export function RepositoryTrigger({
   );
 }
 
-/** A repository in the list: its name and path, the waiting runs and the remove button. */
+/** A repository in the list: its name and path and the waiting runs. */
 export function RepositoryItem({
   path,
   shown,
   count,
-  removable,
-  onRemove,
 }: {
   path: string;
   shown: string;
   count: number;
-  removable: boolean;
-  onRemove: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -168,25 +164,6 @@ export function RepositoryItem({
           {count}
         </Badge>
       ) : null}
-      {!removable ? null : (
-        <button
-          type="button"
-          className="ml-2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-          aria-label={t('nav.repositoryRemove')}
-          title={t('nav.repositoryRemove')}
-          data-repository-remove={path}
-          onPointerDown={(event) => event.stopPropagation()}
-          onPointerUp={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onRemove();
-          }}
-        >
-          <X className="size-3.5" aria-hidden />
-        </button>
-      )}
     </DropdownMenuRadioItem>
   );
 }
@@ -227,9 +204,7 @@ export function RepositoryList(props: {
   selected: string;
   shownPath: (path: string) => string;
   waiting: ReadonlyMap<string, number>;
-  home: string | null;
   onSelect: (repository: string) => void;
-  onRemove: (repository: string) => void;
 }) {
   const { t } = useTranslation();
   const { matching, waiting } = props;
@@ -242,8 +217,6 @@ export function RepositoryList(props: {
             path={path}
             shown={props.shownPath(path)}
             count={waiting.get(path) ?? 0}
-            removable={path !== props.home}
-            onRemove={() => props.onRemove(path)}
           />
         ))}
       </DropdownMenuRadioGroup>

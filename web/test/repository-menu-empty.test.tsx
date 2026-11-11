@@ -17,10 +17,8 @@ describe('RepositoryMenu without any repository', () => {
           repositories: [],
           selected: null,
           waiting: new Map(),
-          home: null,
           onSelect: () => undefined,
           onAdd,
-          onRemove: () => undefined,
           browse: async () => ({
             path: '/Users/me',
             parent: '/Users',

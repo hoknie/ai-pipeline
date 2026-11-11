@@ -34,13 +34,9 @@ export interface RepositoryChoice {
   selected: string | null;
   /** Runs waiting for an answer, by repository. */
   waiting: ReadonlyMap<string, number>;
-  /** The repository `aip web` runs in; it cannot be removed from the list. */
-  home: string | null;
   onSelect: (repository: string) => void;
   /** Adds the repository of a path; rejects with the daemon's message when it refuses. */
   onAdd: (path: string) => Promise<void>;
-  /** Asks and removes a repository from the list. */
-  onRemove: (repository: string) => void;
   /** The folder browser of the path field. */
   browse: BrowseDirectories;
 }
@@ -64,7 +60,7 @@ export function RepositoryMenu({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const { repositories, selected, waiting, home, onSelect, onRemove } = choice;
+  const { repositories, selected, waiting, onSelect } = choice;
   const adder = { onAdd: choice.onAdd, browse: choice.browse };
   const shownPath = (path: string) => choice.paths?.get(path) ?? path;
   const search = useRef<HTMLInputElement>(null);
@@ -113,12 +109,7 @@ export function RepositoryMenu({
             selected={selected}
             shownPath={shownPath}
             waiting={waiting}
-            home={home}
             onSelect={onSelect}
-            onRemove={(path) => {
-              setOpen(false);
-              onRemove(path);
-            }}
           />
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setAdding(true)}>

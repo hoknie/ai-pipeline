@@ -42,10 +42,8 @@ function props(extra: Partial<NavProps> = {}): NavProps {
       repositories: [],
       selected: null,
       waiting: new Map(),
-      home: null,
       onSelect: () => {},
       onAdd: async () => {},
-      onRemove: () => {},
       browse: async () => ({
         path: '/home/me',
         parent: '/home',

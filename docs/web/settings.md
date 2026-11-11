@@ -69,7 +69,7 @@ The group "Projects" of "Shared" manages the [projects of the daemon](../usage/r
 - "Save" sends the changed fields; a refusal of the daemon, such as a taken slug, is shown at its field. Leaving a form with unsaved changes asks first.
 - Disabling the selected repository of the panel selects the default one. A disabled project is not in the repository picker, in the picker of a new task or in "Project" of the project tab.
 - "Change path…" moves the project to another root. The field starts with the current path (`~` for the home directory), takes `~/…`, and has "Browse…". The queued tasks move with the project; the dialog keeps the refusal while the project has unfinished runs.
-- "Project settings" and "Queue" make the project the selected repository and open its settings or its queue. "Remove from list" asks first and follows the rules of the repository picker.
+- "Project settings" and "Queue" make the project the selected repository and open its settings or its queue. "Remove from list" asks first. The daemon refuses while the repository has unfinished runs or queued tasks; a queue left running without tasks does not hold it. Removing the selected project selects the default one and the browser forgets the choice.
 
 ## System
 

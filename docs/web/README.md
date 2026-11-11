@@ -57,7 +57,7 @@ The panel can outlive a stopped daemon: see [The panel and the daemon](../usage/
 The repository picker lists the enabled [projects of the daemon](../usage/repositories.md#projects) by name, with the color of each project. "Manage projects" opens the group ["Projects"](settings.md#projects) of the settings.
 
 - "Add repository…" takes a path inside a git repository, absolute or from the home directory (`~/…`), adds its root and selects it. "Browse…" next to the field opens a folder browser of the machine the panel runs on; git roots are marked.
-- "Remove from list" is in every item except the default repository, the most recently added one. The daemon refuses to remove a repository with unfinished runs or queued tasks; a queue left running without tasks does not hold it. After the answer the list opens again; removing the selected repository selects the default one.
+- The picker does not remove repositories: remove one in the group ["Projects"](settings.md#projects) of the settings or with `aip repo remove`.
 - The choice is remembered in the browser. "Queue", "Specialists", "Pipeline" and the command palette work with the selected repository.
 - Other repositories with runs waiting for an answer get a counter in the list.
 
