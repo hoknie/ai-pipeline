@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { App } from '../src/app/App.tsx';
+
 import type { NotificationCenterState } from '../src/app/notifications.ts';
 import { NavSidebar, type NavProps } from '../src/app/shell/nav/NavSidebar.tsx';
 import { MobileNav } from '../src/app/shell/nav/MobileNav.tsx';
@@ -8,7 +10,8 @@ import { AppShell } from '../src/app/shell/AppShell.tsx';
 import { TopNav } from '../src/app/shell/nav/TopNav.tsx';
 import { TooltipProvider } from '../src/shared/ui/feedback/tooltip.tsx';
 
-import { cleanup, fireEvent, render, screen, within } from './render.tsx';
+import { FakeEventSource, fakeApi, openFake, runView } from './fixtures.ts';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
 afterEach(() => cleanup());
 
@@ -76,7 +79,7 @@ describe('top navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Runs', 'Queue', 'Specialists', 'Pipeline', 'Settings']);
+    ).toEqual(['Runs', 'Queue', 'Specialists', 'Pipeline', 'Statistics', 'Settings']);
     expect(within(bar!).getByText('web')).toBeTruthy();
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])
@@ -341,5 +344,33 @@ describe('scrolling of the shell', () => {
     expect(area.classList.contains('relative')).toBe(true);
     expect(area.classList.contains('overflow-y-auto')).toBe(true);
     expect(area.classList.contains('overscroll-contain')).toBe(true);
+  });
+});
+
+describe('statistics section', () => {
+  it('opens after a reload with the period of the address and is marked in the navigation', async () => {
+    window.location.hash = '#stats?period=7d';
+    const api = fakeApi();
+    render(<App api={api} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    const nav = screen.getByRole('navigation', { name: 'sections' });
+    expect(within(nav).getByRole('link', { name: 'Statistics' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    const radio = await screen.findByRole('radio', { name: '7 days' });
+    expect(radio.getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(api.statsReport).toHaveBeenCalled());
+    expect(window.location.hash).toBe('#stats?period=7d');
+    window.location.hash = '';
+  });
+
+  it('writes the chosen period into the address', async () => {
+    window.location.hash = '#stats';
+    const api = fakeApi();
+    render(<App api={api} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    fireEvent.click(await screen.findByRole('radio', { name: '90 days' }));
+    await waitFor(() => expect(window.location.hash).toBe('#stats?period=90d'));
+    window.location.hash = '';
   });
 });

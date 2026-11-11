@@ -3,6 +3,7 @@ import { configApi, type ConfigApi } from './configApi.ts';
 import { queueApi, type QueueApi, type QueueSettingsPatch } from './queueApi.ts';
 import { runActionsApi, type RunActionsApi } from './runActionsApi.ts';
 import { runsApi, type RunsApi } from './runsApi.ts';
+import { statsApi, type StatsApi } from './statsApi.ts';
 import { systemApi, type SystemApi } from './systemApi.ts';
 import {
   observerHistory,
@@ -12,8 +13,9 @@ import {
 
 export { ApiError, withRepository };
 export type { QueueSettingsPatch };
+export type { StatsQuery } from './statsApi.ts';
 
-export interface Api extends RunsApi, RunActionsApi, QueueApi, SystemApi, ConfigApi {
+export interface Api extends RunsApi, RunActionsApi, QueueApi, SystemApi, ConfigApi, StatsApi {
   observerHistory(query?: ObserverHistoryQuery): Promise<ObserverHistoryPage>;
   /**
    * The same API bound to a repository: queue, configuration and pipeline requests carry
@@ -30,6 +32,7 @@ function bound(repository: string | null): Api {
     ...queueApi((path) => withRepository(path, repository)),
     ...systemApi(),
     ...configApi(repository),
+    ...statsApi(),
     observerHistory,
   };
   return api;

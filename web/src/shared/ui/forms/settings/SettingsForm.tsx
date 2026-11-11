@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../api/api.ts';
-import type { ConfigEditorResponse, EditorSetting } from '../../../api/types.ts';
+import type { ConfigEditorResponse, EditorSetting, RepositoryView } from '../../../api/types.ts';
 import type { SettingsGroup, SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 
 import { Alert } from '../../feedback/alert.tsx';
@@ -42,6 +42,21 @@ function FormAlerts({ draft, onReload }: { draft: Draft; onReload: () => void })
   );
 }
 
+/** What the «Statistics» card does, and the way to the page. */
+function StatsNote() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+      <p>{t('settingsPage.statsNote.exclude')}</p>
+      <p>{t('settingsPage.statsNote.disabled')}</p>
+      <p>{t('settingsPage.statsNote.live')}</p>
+      <a href="#stats" className="w-fit text-primary underline underline-offset-2">
+        {t('settingsPage.statsNote.open')}
+      </a>
+    </div>
+  );
+}
+
 function SectionCard({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <Card>
@@ -55,16 +70,49 @@ function SectionCard({ id, title, children }: { id: string; title: string; child
   );
 }
 
+/** One card of a group, or nothing when none of its fields is known. */
+function SectionCards({
+  section,
+  group,
+  byPath,
+  fields: shared,
+}: {
+  section: SettingsSection;
+  group: SettingsGroup;
+  byPath: Map<string, EditorSetting>;
+  fields: {
+    scope: SettingsScope;
+    specialists: string[];
+    projects: readonly RepositoryView[];
+    draft: Draft;
+  };
+}) {
+  const { t } = useTranslation();
+  const fields = section.paths.flatMap((path) => byPath.get(path) ?? []);
+  if (fields.length === 0) return null;
+  return (
+    <SectionCard
+      id={`section-${group}-${section.key}`}
+      title={t(`settingsPage.section.${group}_${section.key}` as never)}
+    >
+      {group === 'system' && section.key === 'stats' ? <StatsNote /> : null}
+      <SectionFields fields={fields} {...shared} />
+    </SectionCard>
+  );
+}
+
 /** The fields of one card. */
 function SectionFields({
   fields,
   scope,
   specialists,
+  projects,
   draft,
 }: {
   fields: EditorSetting[];
   scope: SettingsScope;
   specialists: string[];
+  projects: readonly RepositoryView[];
   draft: Draft;
 }) {
   return fields.map((field) =>
@@ -85,6 +133,7 @@ function SectionFields({
         scope={scope}
         draft={draft.drafts[field.path]}
         specialists={specialists}
+        projects={projects}
         error={draft.errorOf(field.path)}
         disabled={draft.busy}
         onChange={(value) => {
@@ -112,6 +161,7 @@ export function SettingsForm({
   scope,
   group,
   sections: shownSections,
+  projects = [],
   onSaved,
   onDirty,
 }: {
@@ -121,6 +171,8 @@ export function SettingsForm({
   group: SettingsGroup;
   /** The cards to show instead of those of the group (the settings of a built-in stage). */
   sections?: SettingsSection[];
+  /** The projects of the registry: the choices of `stats.exclude`. */
+  projects?: readonly RepositoryView[];
   /** Called after a write, and by «Reload»: the page reads the configuration again. */
   onSaved: () => Promise<void> | void;
   onDirty: (dirty: boolean) => void;
@@ -154,24 +206,15 @@ export function SettingsForm({
     >
       <div className="@container">
         <div className="grid gap-3 @3xl:grid-cols-2" data-testid="settings-sections">
-          {sections.map((section) => {
-            const fields = section.paths.flatMap((path) => byPath.get(path) ?? []);
-            if (fields.length === 0) return null;
-            return (
-              <SectionCard
-                key={section.key}
-                id={`section-${group}-${section.key}`}
-                title={t(`settingsPage.section.${group}_${section.key}` as never)}
-              >
-                <SectionFields
-                  fields={fields}
-                  scope={scope}
-                  specialists={specialists}
-                  draft={draft}
-                />
-              </SectionCard>
-            );
-          })}
+          {sections.map((section) => (
+            <SectionCards
+              key={section.key}
+              section={section}
+              group={group}
+              byPath={byPath}
+              fields={{ scope, specialists, projects, draft }}
+            />
+          ))}
         </div>
       </div>
       <FormAlerts draft={draft} onReload={reload} />

@@ -1,6 +1,6 @@
 import { observerTabOf, settingsLocationOf } from './settingsGroups.ts';
 
-export type View = 'runs' | 'queue' | 'specialists' | 'pipelines' | 'settings';
+export type View = 'runs' | 'queue' | 'specialists' | 'pipelines' | 'stats' | 'settings';
 
 export interface Route {
   view: View;
@@ -53,15 +53,31 @@ export type PipelineSection = (typeof PIPELINE_SECTIONS)[number];
 export const isPipelineSection = (value: string | null): value is PipelineSection =>
   PIPELINE_SECTIONS.some((section) => section === value);
 
+/** Periods of the statistics page; the first is the default. */
+export const STATS_PERIODS = ['30d', '7d', '90d', 'all'] as const;
+export type StatsPeriodId = (typeof STATS_PERIODS)[number];
+
+export const statsPeriodOf = (value: string | null): StatsPeriodId =>
+  STATS_PERIODS.find((period) => period === value) ?? '30d';
+
 const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : null);
 
 /** `#runs/<run>/<group>/<step>`, the older `#topology/<pipeline>` opens the topology section; the older `#<run>/<group>` still works. */
 export function parseRoute(hash: string): Route {
   const [path = '', query = ''] = hash.split('?', 2) as [string, string?];
-  const tab = new URLSearchParams(query).get('tab') || null;
+  const params = new URLSearchParams(query);
+  const tab = params.get('tab') || null;
   const parts = path.replace(/^#\/?/, '').split('/');
   const [head, ...rest] = parts;
   if (head === 'queue') return { view: 'queue', run: null, group: null, step: null, tab: null };
+  if (head === 'stats')
+    return {
+      view: 'stats',
+      run: params.get('project') || null,
+      group: statsPeriodOf(params.get('period')),
+      step: null,
+      tab: null,
+    };
   if (head === 'topology')
     return { view: 'pipelines', run: decode(rest[0]), group: 'topology', step: null, tab: null };
   if (head === 'pipelines' || head === 'workflows') {
@@ -108,6 +124,10 @@ export function parseRoute(hash: string): Route {
 export function formatRoute(route: Route): string {
   const enc = encodeURIComponent;
   if (route.view === 'queue') return '#queue';
+  if (route.view === 'stats') {
+    const project = route.run ? `&project=${enc(route.run)}` : '';
+    return `#stats?period=${statsPeriodOf(route.group)}${project}`;
+  }
   if (route.view === 'specialists') {
     if (route.group === 'chains') {
       return route.run ? `#specialists/chains/${enc(route.run)}` : '#specialists/chains';

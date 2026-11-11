@@ -8,6 +8,7 @@ The web panel is a page in your browser. In it you follow runs, answer specialis
 | "Queue" | Add, order and run tasks | [web/queue.md](queue.md) |
 | "Specialists" | Edit specialist files | [web/config.md](config.md#specialists) |
 | "Pipeline" | Edit pipeline files; the "Topology" tab shows the graph of a pipeline with live groups | [web/config.md](config.md#pipeline) |
+| "Statistics" | Tokens, cost and time by day, project, specialist and model | [web/stats.md](stats.md) |
 | "Settings" | Edit `settings.yaml`, shared specialists and pipelines; the system state | [web/settings.md](settings.md) |
 
 The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. The panel talks to the daemon through its [HTTP API](http-api.md).

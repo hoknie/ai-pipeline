@@ -1,6 +1,6 @@
 import { RunsPage } from '../../features/runs/index.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
-import { ListRoute, QueueRoute, SettingsRoute } from './pages.tsx';
+import { ListRoute, QueueRoute, SettingsRoute, StatsRoute } from './pages.tsx';
 import type { PanelData } from '../state/usePanelData.ts';
 import type { useRepositoryActions } from '../state/useRepositoryActions.ts';
 
@@ -52,6 +52,8 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           onError={notifyError}
         />
       );
+    case 'stats':
+      return <StatsRoute common={common} registry={state.registry} />;
     case 'pipelines':
     case 'specialists':
       return <ListRoute common={common} />;

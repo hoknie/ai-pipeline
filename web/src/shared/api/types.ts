@@ -54,6 +54,8 @@ export type {
   ResolverRow,
   RunView,
   RuntimeCatalog,
+  StatsClearView,
+  StatsReportView,
   StepGroup,
   StepState,
   StepTopology,

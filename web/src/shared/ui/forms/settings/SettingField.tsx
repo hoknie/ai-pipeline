@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '../button.tsx';
@@ -5,9 +6,10 @@ import { Input } from '../input.tsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select.tsx';
 import { Textarea } from '../textarea.tsx';
 import { Switch } from '../switch.tsx';
-import type { EditorSetting, SettingValue } from '../../../api/types.ts';
+import type { EditorSetting, RepositoryView, SettingValue } from '../../../api/types.ts';
 import type { SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 import { ValuesPicker } from '../ValuesPicker.tsx';
+import { ProjectsField } from './ProjectsField.tsx';
 
 import { MULTILINE_FIELDS, fieldKey } from './settingFields.ts';
 
@@ -41,6 +43,7 @@ interface ControlProps {
   locked: boolean;
   invalid: boolean;
   specialists: string[];
+  projects: readonly RepositoryView[];
   onChange: (value: SettingValue) => void;
 }
 
@@ -142,6 +145,19 @@ function SettingControl(props: ControlProps) {
         />
       );
     case 'strings':
+      if (setting.path === 'stats.exclude') {
+        return (
+          <ProjectsField
+            id={id}
+            label={label}
+            values={Array.isArray(shown) ? (shown as string[]) : []}
+            projects={props.projects}
+            onChange={(items) => onChange(items)}
+            disabled={locked}
+            invalid={invalid}
+          />
+        );
+      }
       return (
         <ValuesPicker
           id={id}
@@ -188,12 +204,47 @@ function SourceLine({
   );
 }
 
+/** The label and the control: a switch stands before its label, other controls below it. */
+function ControlRow({
+  kind,
+  id,
+  label,
+  control,
+}: {
+  kind: EditorSetting['kind'];
+  id: string;
+  label: string;
+  control: ReactNode;
+}) {
+  if (kind === 'boolean') {
+    return (
+      <div className="flex items-center gap-2">
+        {control}
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </label>
+      </div>
+    );
+  }
+  return (
+    <>
+      {kind === 'strings' ? null : (
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </label>
+      )}
+      {control}
+    </>
+  );
+}
+
 /** One field of a form: the label, the control by its kind, the hint, the source and the error. */
 export function SettingField({
   setting,
   scope,
   draft,
   specialists,
+  projects,
   error,
   disabled,
   onChange,
@@ -204,6 +255,7 @@ export function SettingField({
   scope: SettingsScope;
   draft: DraftValue | undefined;
   specialists: string[];
+  projects: readonly RepositoryView[];
   error: string | null;
   disabled: boolean;
   onChange: (value: SettingValue) => void;
@@ -228,29 +280,14 @@ export function SettingField({
       locked={locked}
       invalid={error !== null}
       specialists={specialists}
+      projects={projects}
       onChange={onChange}
     />
   );
 
   return (
     <div className="flex flex-col gap-1" data-testid={`setting-${setting.path}`}>
-      {setting.kind === 'boolean' ? (
-        <div className="flex items-center gap-2">
-          {control}
-          <label htmlFor={id} className="text-sm font-medium">
-            {label}
-          </label>
-        </div>
-      ) : (
-        <>
-          {setting.kind === 'strings' ? null : (
-            <label htmlFor={id} className="text-sm font-medium">
-              {label}
-            </label>
-          )}
-          {control}
-        </>
-      )}
+      <ControlRow kind={setting.kind} id={id} label={label} control={control} />
       <p id={`${id}-hint`} className="text-xs text-muted-foreground">
         {t(`settingsPage.field.${key}.hint` as never)}{' '}
         <code className="text-xs">{setting.path}</code>

@@ -31,6 +31,7 @@ import type {
   PipelinesView,
   SystemView,
   SpecialistTagFolderView,
+  StatsReportView,
 } from '../src/shared/api/types.ts';
 
 /** The observers as the daemon sends them: off, one worker, nothing running. */
@@ -538,6 +539,9 @@ const SETTING_SPECS: SettingSpec[] = [
   ['network.proxy', 'string', null, { globalOnly: true }],
   ['network.interval', 'integer', 30, { range: [5, 3600], globalOnly: true }],
   ['network.timeout', 'integer', 5, { range: [1, 60], globalOnly: true }],
+  ['stats.enabled', 'boolean', true, { globalOnly: true }],
+  ['stats.show_cost', 'boolean', true, { globalOnly: true }],
+  ['stats.exclude', 'strings', [], { globalOnly: true }],
   ['runtimes.claude.command', 'string', 'claude', { globalOnly: true }],
   ['runtimes.claude.args', 'strings', [], { globalOnly: true }],
   ['runtimes.claude.env', 'env', ['ANTHROPIC_API_KEY'], { globalOnly: true }],
@@ -664,6 +668,44 @@ export function configView(overrides: Partial<ConfigEditorResponse> = {}): Confi
     actions: [],
     settings: settingsOf(),
     errors: [],
+    ...overrides,
+  };
+}
+
+const NO_PER_TASK = {
+  tokens: { mean: 0, median: 0 },
+  costUsd: { mean: 0, median: 0 },
+  agentMs: { mean: 0, median: 0 },
+  wallMs: { mean: 0, median: 0 },
+};
+
+/** An empty report of the statistics: nothing in the period, collection on. */
+export function statsReportView(overrides: Partial<StatsReportView> = {}): StatsReportView {
+  return {
+    settings: { enabled: true, exclude: [], showCost: true, backfilledAt: null },
+    since: null,
+    until: null,
+    repository: null,
+    totals: {
+      tasks: 0,
+      attempts: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      tokens: 0,
+      costUsd: 0,
+      attemptsWithoutCost: 0,
+      agentMs: 0,
+      commandMs: 0,
+      wallMs: 0,
+    },
+    perTask: NO_PER_TASK,
+    outcomes: { finished: 0, failed: 0, cancelled: 0 },
+    projects: [],
+    bySpecialist: [],
+    byModel: [],
+    byPipeline: [],
+    byRuntime: [],
+    series: [],
     ...overrides,
   };
 }
@@ -805,6 +847,8 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
       view: observersView({ settings }),
     })),
     setRunObserver: vi.fn(async () => ({})),
+    statsReport: vi.fn(async () => statsReportView()),
+    statsClear: vi.fn(async () => ({ removed: 0 })),
     ...overrides,
   };
   /** Methods that record the repository they were bound to, then call the shared mock. */

@@ -11,6 +11,7 @@ import {
   fakeApi,
   openFake,
   queueOf,
+  repositoryView,
   settingsOf,
   systemView,
   tagFolder,
@@ -1533,5 +1534,79 @@ describe('system group', () => {
     expect(card('Daemon').getByRole('button', { name: 'Restart daemon' })).toBeTruthy();
     expect(card('Daemon').getByRole('button', { name: 'Stop daemon' })).toBeTruthy();
     expect(screen.getAllByText('The daemon started').length).toBeGreaterThan(0);
+  });
+});
+
+describe('statistics settings', () => {
+  const registry = [
+    repositoryView('/work/app', { label: 'app', displayPath: '~/work/app' }),
+    repositoryView('/work/lib', { label: 'lib', displayPath: '~/work/lib', color: 'teal' }),
+  ];
+
+  const showStats = (overrides: object = {}, level = 'global') => {
+    const api = show(queueOf(), overrides, `#settings/${level}/system`);
+    act(() => {
+      stream().open();
+      stream().send({ event: 'snapshot', seq: 1, runs: [], repositories: registry });
+    });
+    return api;
+  };
+
+  it('shows the form with collection and cost on and no excluded projects by default', async () => {
+    showStats();
+    const enabled = await screen.findByTestId('setting-stats.enabled');
+    expect(
+      within(enabled)
+        .getByRole('switch', { name: 'Collect statistics' })
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+    const cost = screen.getByTestId('setting-stats.show_cost');
+    expect(
+      within(cost).getByRole('switch', { name: 'Show cost' }).getAttribute('aria-checked'),
+    ).toBe('true');
+    const exclude = screen.getByTestId('setting-stats.exclude');
+    expect(exclude.textContent).toContain('default');
+    expect(within(exclude).queryAllByRole('button', { name: /^Remove/ })).toHaveLength(0);
+    const card = screen.getByRole('region', { name: 'Statistics' });
+    expect(card.textContent).toContain('without restarting the daemon');
+    expect(card.textContent).toContain('its records stay');
+    expect(within(card).getByRole('link', { name: 'Open Statistics' }).getAttribute('href')).toBe(
+      '#stats',
+    );
+  });
+
+  it('has no statistics form on the project tab', async () => {
+    showStats({}, 'project');
+    await screen.findByRole('region', { name: /General|Runs|Delivery/ }).catch(() => null);
+    expect(screen.queryByTestId('setting-stats.exclude')).toBeNull();
+  });
+
+  it('excludes a project of the registry by name and writes its path', async () => {
+    const api = showStats();
+    const exclude = await screen.findByTestId('setting-stats.exclude');
+    fireEvent.click(within(exclude).getByRole('combobox', { name: 'Excluded projects' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'lib' }));
+    expect((await within(exclude).findByText('lib')).getAttribute('title')).toBe('~/work/lib');
+    expect(exclude.querySelector('[data-project-color="teal"]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'stats.exclude': ['/work/lib'] },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('marks a path outside the registry and lets it go', async () => {
+    const config = configView({
+      settings: settingsOf({ 'stats.exclude': { path: 'stats.exclude', value: ['/old/app'] } }),
+    });
+    showStats({ config: vi.fn(async () => config) });
+    const exclude = await screen.findByTestId('setting-stats.exclude');
+    expect(within(exclude).getByText('/old/app')).toBeTruthy();
+    expect(within(exclude).getByText('not in the registry')).toBeTruthy();
+    fireEvent.click(within(exclude).getByRole('button', { name: 'Remove /old/app' }));
+    expect(within(exclude).queryByText('/old/app')).toBeNull();
   });
 });

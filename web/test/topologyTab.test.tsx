@@ -190,7 +190,7 @@ describe('the sections of the panel', () => {
   it('have no section «Topology» in the navigation and the palette', async () => {
     render(<App api={api()} openStream={openFake} />);
     const nav = screen.getByRole('navigation', { name: 'sections' });
-    expect(within(nav).getAllByRole('link')).toHaveLength(5);
+    expect(within(nav).getAllByRole('link')).toHaveLength(6);
     expect(within(nav).queryByRole('link', { name: 'Topology' })).toBeNull();
     act(() => {
       fireEvent.keyDown(document, { key: 'k', ctrlKey: true });

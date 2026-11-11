@@ -34,6 +34,15 @@
   --color-status-ok-bg: oklch(0.95 0.04 150);
   --color-status-mute: oklch(0.45 0.015 255);
   --color-status-mute-bg: oklch(0.94 0.005 250);
+
+  --color-chart-1: oklch(0.56 0.15 262);
+  --color-chart-2: oklch(0.56 0.15 150);
+  --color-chart-3: oklch(0.56 0.15 70);
+  --color-chart-4: oklch(0.56 0.15 25);
+  --color-chart-5: oklch(0.56 0.15 310);
+  --color-chart-6: oklch(0.56 0.15 200);
+  --color-chart-7: oklch(0.56 0.15 350);
+  --color-chart-8: oklch(0.56 0.15 110);
 }
 
 .dark {
@@ -64,6 +73,15 @@
   --color-status-ok-bg: oklch(0.28 0.05 150);
   --color-status-mute: oklch(0.74 0.012 255);
   --color-status-mute-bg: oklch(0.27 0.01 258);
+
+  --color-chart-1: oklch(0.74 0.13 262);
+  --color-chart-2: oklch(0.74 0.13 150);
+  --color-chart-3: oklch(0.74 0.13 70);
+  --color-chart-4: oklch(0.74 0.13 25);
+  --color-chart-5: oklch(0.74 0.13 310);
+  --color-chart-6: oklch(0.74 0.13 200);
+  --color-chart-7: oklch(0.74 0.13 350);
+  --color-chart-8: oklch(0.74 0.13 110);
 }
 
 @layer base {

@@ -190,11 +190,12 @@ export const sizeExempt: readonly string[] = ['shared/i18n/locales'];
 export const webSharedAreas: readonly string[] = ['api', 'ui', 'lib', 'i18n'];
 
 /** Группы дизайн-системы: файл `shared/ui` лежит в одной из них. */
-export const webUiGroups: readonly string[] = ['forms', 'feedback', 'layout', 'overlays'];
+export const webUiGroups: readonly string[] = ['forms', 'feedback', 'layout', 'overlays', 'charts'];
 
 /** Граф областей панели: ключ видит перечисленные области (только через их `index.ts`). Ацикличен. */
 export const webGraph: Record<string, readonly string[]> = {
   topology: [],
+  stats: [],
   tags: [],
   repositories: [],
   specialists: ['tags', 'repositories'],

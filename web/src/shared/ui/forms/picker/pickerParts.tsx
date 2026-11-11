@@ -1,4 +1,5 @@
 import { Check, Plus, X } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '../../feedback/badge.tsx';
@@ -13,16 +14,26 @@ export interface PickerOption {
   description?: string;
 }
 
+/** Extra look of a value: a mark before the text and a tooltip instead of the text. */
+export interface ValueLook {
+  icon?: (value: string) => ReactNode;
+  hint?: (value: string) => string | undefined;
+}
+
 export const GROUPS: OptionSource[] = ['builtin', 'project', 'global'];
 export const CREATE = '__create';
 
 function ValueChip({
   text,
+  icon,
+  hint,
   note,
   disabled,
   onRemove,
 }: {
   text: string;
+  icon: ReactNode;
+  hint: string | undefined;
   note: string | null;
   disabled: boolean;
   onRemove: () => void;
@@ -30,7 +41,8 @@ function ValueChip({
   const { t } = useTranslation();
   return (
     <Badge variant="outline" className="min-w-0 max-w-full gap-1.5 pr-1">
-      <span className="min-w-0 truncate" title={text}>
+      {icon}
+      <span className="min-w-0 truncate" title={hint ?? text}>
         {text}
       </span>
       {note ? <span className="font-normal text-status-warn">{note}</span> : null}
@@ -54,6 +66,7 @@ function OptionGroup({
   values,
   mark,
   display,
+  look,
   onAdd,
 }: {
   source: OptionSource;
@@ -62,6 +75,7 @@ function OptionGroup({
   values: string[];
   mark: ((value: string) => string | null) | undefined;
   display: ((value: string) => string) | undefined;
+  look: ValueLook;
   onAdd: (name: string) => void;
 }) {
   const { t } = useTranslation();
@@ -78,8 +92,12 @@ function OptionGroup({
             onSelect={() => onAdd(option.name)}
           >
             <Check className={values.includes(option.name) ? 'opacity-100' : 'opacity-0'} />
+            {look.icon?.(option.name)}
             <span className="flex min-w-0 flex-col">
-              <span className="line-clamp-3 whitespace-normal break-words" title={text}>
+              <span
+                className="line-clamp-3 whitespace-normal break-words"
+                title={look.hint?.(option.name) ?? text}
+              >
                 {text}
                 {note ? <span className="ml-2 text-xs text-status-warn">{note}</span> : null}
               </span>
@@ -109,6 +127,7 @@ export function PickerChips({
   inherited,
   values,
   display,
+  look,
   mark,
   disabled,
   onRemove,
@@ -116,6 +135,7 @@ export function PickerChips({
   inherited: string[];
   values: string[];
   display: ((value: string) => string) | undefined;
+  look?: ValueLook;
   mark: ((value: string) => string | null) | undefined;
   disabled: boolean;
   onRemove: (value: string) => void;
@@ -133,6 +153,8 @@ export function PickerChips({
         <ValueChip
           key={value}
           text={display?.(value) ?? value}
+          icon={look?.icon?.(value)}
+          hint={look?.hint?.(value)}
           note={mark?.(value) ?? null}
           disabled={disabled}
           onRemove={() => onRemove(value)}
@@ -186,6 +208,7 @@ export function PickerList({
   headings,
   mark,
   display,
+  look,
   onAdd,
 }: {
   listId: string;
@@ -197,6 +220,7 @@ export function PickerList({
   headings: Partial<Record<OptionSource, string>> | undefined;
   mark: ((value: string) => string | null) | undefined;
   display: ((value: string) => string) | undefined;
+  look: ValueLook;
   onAdd: (added: string[]) => void;
 }) {
   const { t } = useTranslation();
@@ -216,6 +240,7 @@ export function PickerList({
           values={values}
           mark={mark}
           display={display}
+          look={look}
           onAdd={(name) => onAdd([name])}
         />
       ))}

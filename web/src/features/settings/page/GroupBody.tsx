@@ -110,6 +110,7 @@ function FormBody({ props, settings }: BodyProps) {
           config={config}
           scope={scope}
           group={group}
+          projects={props.registry}
           onSaved={reload}
           onDirty={setDirty}
         />

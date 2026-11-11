@@ -6,7 +6,7 @@ import type { ObserversView } from '../../shared/api/observerTypes.ts';
 import type { NetworkStatus, QueueView, RepositoryView, RunView } from '../../shared/api/types.ts';
 import type { QueueDraft } from '../../features/queue/index.ts';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
-import type { Route } from '../../shared/lib/nav/route.ts';
+import { statsPeriodOf, type Route } from '../../shared/lib/nav/route.ts';
 import { settingsLocationOf } from '../../shared/lib/nav/settingsGroups.ts';
 
 export const NewTaskDialog = lazy(() =>
@@ -22,6 +22,9 @@ const SpecialistsPage = lazy(() =>
 );
 const PipelinesPage = lazy(() =>
   import('../../features/pipelines/index.ts').then((module) => ({ default: module.PipelinesPage })),
+);
+const StatsPage = lazy(() =>
+  import('../../features/stats/index.ts').then((module) => ({ default: module.StatsPage })),
 );
 const SettingsPage = lazy(() =>
   import('../../features/settings/index.ts').then((module) => ({ default: module.SettingsPage })),
@@ -74,6 +77,25 @@ export function QueueRoute(props: {
         onError={props.onError}
         onNewTask={props.onNewTask}
         runs={common.runs}
+      />
+    </Suspense>
+  );
+}
+
+export function StatsRoute({ common, registry }: { common: Common; registry: RepositoryView[] }) {
+  const { t } = useTranslation();
+  const { route, onRoute } = common;
+  return (
+    <Suspense fallback={<Loading what={t('app.loadingStats')} />}>
+      <StatsPage
+        api={common.api}
+        registry={registry}
+        runs={common.runs}
+        period={statsPeriodOf(route.group)}
+        project={route.run}
+        onFilter={(period, project) =>
+          onRoute({ view: 'stats', run: project, group: period, step: null, tab: null })
+        }
       />
     </Suspense>
   );

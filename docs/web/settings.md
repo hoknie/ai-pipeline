@@ -8,7 +8,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system). Fields of `web.*` and `runtimes.*` exist only here.
+"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system). Fields of `web.*`, `runtimes.*`, `network.*` and `stats.*` exist only here.
 
 ## Project groups
 
@@ -77,6 +77,10 @@ The group "Projects" of "Shared" manages the [projects of the daemon](../usage/r
 
 - The card "Network" shows the [state of the network](../configuration/network.md): "Check is off", "Available" or "Unavailable" with the reason, when the state changed, when it was last checked and the proxy of the check (from the settings or the daemon environment) without its login and password. It updates on the `network` event and with the poll.
 - The form "Network" sets the `network` section of the shared settings. Changes apply from the next check, without restarting the daemon; while the network is down, agents do not start.
+- The form "Statistics" sets the `stats` section of the shared settings: "Collect statistics", "Show cost" and the excluded projects. See [Statistics](stats.md).
+  - Excluded projects are chosen from the list of projects, with the path. A path that is not in the list is marked "not in the registry" and can be removed.
+  - An excluded project is no longer collected and is hidden from the reports; its records stay.
+  - Changes apply without restarting the daemon.
 - "Restart panel" restarts the panel on its address with its token; the page comes back by itself. The daemon and its agents keep running.
 - "Restart daemon" runs `aip daemon restart --web` as a separate process. While agents work the panel asks again, and "Restart, stopping the agents" runs it with `--force`.
 - "Stop daemon" asks for confirmation and runs `aip daemon stop --web` as a separate process. While agents work the panel asks again, and "Stop, stopping the agents" runs it with `--force`. The page stays open: a [stand-in process](../usage/daemon.md#the-panel-and-the-daemon) serves it while the daemon is stopped.

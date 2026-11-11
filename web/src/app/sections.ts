@@ -1,4 +1,12 @@
-import { Activity, GitBranch, ListOrdered, Settings, Users, type LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  BarChart3,
+  GitBranch,
+  ListOrdered,
+  Settings,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 
 import type { TFunction } from 'i18next';
 
@@ -6,7 +14,7 @@ import type { View } from '../shared/lib/nav/route.ts';
 
 export interface Section {
   view: View;
-  labelKey: 'runs' | 'queue' | 'specialists' | 'pipelines' | 'settings';
+  labelKey: 'runs' | 'queue' | 'specialists' | 'pipelines' | 'stats' | 'settings';
   icon: LucideIcon;
 }
 
@@ -16,6 +24,7 @@ export const SECTIONS: Section[] = [
   { view: 'queue', labelKey: 'queue', icon: ListOrdered },
   { view: 'specialists', labelKey: 'specialists', icon: Users },
   { view: 'pipelines', labelKey: 'pipelines', icon: GitBranch },
+  { view: 'stats', labelKey: 'stats', icon: BarChart3 },
   { view: 'settings', labelKey: 'settings', icon: Settings },
 ];
 

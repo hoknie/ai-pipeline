@@ -9,6 +9,7 @@ import {
   PickerList,
   withValues,
   type OptionSource,
+  type ValueLook,
   type PickerOption,
 } from './picker/pickerParts.tsx';
 import { usePickerState } from './picker/usePickerState.ts';
@@ -28,6 +29,10 @@ interface ValuesPickerProps {
   mark?: (value: string) => string | null;
   /** The text of a chosen value in its chip and in the remove button; default: the value itself. */
   display?: (value: string) => string;
+  /** A mark before a value, such as a color dot; null for none. */
+  icon?: ValueLook['icon'];
+  /** The tooltip of a value instead of its text, such as a path. */
+  hint?: ValueLook['hint'];
   /** Group headings instead of the names of the sources; an empty string shows no heading. */
   headings?: Partial<Record<OptionSource, string>>;
   creatable?: boolean;
@@ -43,6 +48,7 @@ interface ValuesPickerProps {
  */
 export function ValuesPicker(props: ValuesPickerProps) {
   const { id, label, values, onChange, options = [], inherited = [], mark, display } = props;
+  const look: ValueLook = { icon: props.icon, hint: props.hint };
   const { headings, creatable = true, disabled = false, invalid = false } = props;
   const { t } = useTranslation();
   const picker = usePickerState({ values, onChange, options, creatable });
@@ -56,6 +62,7 @@ export function ValuesPicker(props: ValuesPickerProps) {
           inherited={inherited}
           values={values}
           display={display}
+          look={look}
           mark={mark}
           disabled={disabled}
           onRemove={(value) => onChange(values.filter((candidate) => candidate !== value))}
@@ -87,6 +94,7 @@ export function ValuesPicker(props: ValuesPickerProps) {
             headings={headings}
             mark={mark}
             display={display}
+            look={look}
             onAdd={picker.add}
           />
         </Command>
