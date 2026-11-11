@@ -7,13 +7,14 @@ import {
   groupProcessesByTask,
   useBackgroundProcesses,
 } from '../src/app/shell/status/backgroundProcesses.ts';
+import { BackgroundProcesses } from '../src/app/shell/status/BackgroundProcesses.tsx';
 import { formatCpu, formatMemory, formatUptime } from '../src/shared/lib/format.ts';
 import type { StreamedProcesses } from '../src/shared/api/runs/runsState.ts';
 import { en } from '../src/shared/i18n/locales/en.ts';
 import { ru } from '../src/shared/i18n/locales/ru.ts';
 
 import { fakeApi, processView } from './fixtures.ts';
-import { act, cleanup, renderHook } from './render.tsx';
+import { act, cleanup, render, renderHook, screen } from './render.tsx';
 
 afterEach(() => {
   cleanup();
@@ -180,5 +181,30 @@ describe('groupProcessesByTask', () => {
   it('makes a task of a run for a process without a group', () => {
     const tasks = groupProcessesByTask([p(1, null), p(2, 'a'), p(3, null)]);
     expect(tasks.map((t) => t.processes.length)).toEqual([2, 1]);
+  });
+});
+
+describe('BackgroundProcesses table', () => {
+  it('keeps the header cells sticky over separate borders', () => {
+    const polled = { processes: [processView()], error: null, refresh: async () => {} };
+    const { container } = render(
+      <BackgroundProcesses api={fakeApi()} polled={polled} onOpenGroup={() => {}} />,
+    );
+    const table = container.querySelector('table')!;
+    expect(table.className).toContain('border-separate');
+    expect(table.className).toContain('border-spacing-0');
+    expect(table.querySelector('thead')!.className).not.toContain('sticky');
+    const heads = screen.getAllByRole('columnheader');
+    expect(heads.length).toBeGreaterThan(0);
+    for (const head of heads) {
+      for (const name of ['sticky', 'top-0', 'bg-card', 'border-b']) {
+        expect(head.classList.contains(name)).toBe(true);
+      }
+    }
+    const row = screen.getByText('4242').closest('tr')!;
+    expect(row.classList.contains('border-b')).toBe(false);
+    for (const cell of Array.from(row.querySelectorAll('td'))) {
+      expect(cell.classList.contains('border-b')).toBe(true);
+    }
   });
 });

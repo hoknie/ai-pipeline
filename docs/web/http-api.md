@@ -108,6 +108,15 @@ All paths start with `/api/runs/<id>/groups/<group>`.
 | `PUT /api/observers` | Saves the settings |
 
 
+## Statistics
+
+| Request | What it does |
+|---|---|
+| `GET /api/stats` | The [usage report](../configuration/stats.md#report) of the daemon |
+| `DELETE /api/stats?repository=<path>` | Deletes the records of a project and returns `{"removed": <count>}` |
+
+- `GET /api/stats` takes `since` and `until` (moments in milliseconds; without them all time) and `repository` (an absolute path or a slug; without it all projects). A wrong value comes back with code 400.
+
 ## Configuration
 
 | Request | What it does |

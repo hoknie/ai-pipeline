@@ -31,6 +31,8 @@ export interface DaemonTimings {
   processKillLookMs: number;
   /** How long a snapshot of the process table answers `processes` requests. */
   processCacheMs: number;
+  /** How long the usage journal keeps a read of the `stats` settings. */
+  statsSettingsMs: number;
 }
 
 /** The durations of a daemon without overrides. */
@@ -45,4 +47,5 @@ export const DEFAULT_TIMINGS: DaemonTimings = {
   processStreamMs: PROCESS_STREAM_MS,
   processKillLookMs: PROCESS_KILL_LOOK_MS,
   processCacheMs: 1_000,
+  statsSettingsMs: 2_000,
 };

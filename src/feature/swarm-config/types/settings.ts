@@ -254,6 +254,20 @@ export interface NetworkSettings {
   timeout: number;
 }
 
+/** The usage statistics of the daemon; read from the global settings.yaml only. */
+export interface StatsSettings {
+  /** The daemon keeps the usage journal. */
+  enabled: boolean;
+  /** Project paths whose usage is not recorded and not reported. */
+  exclude: string[];
+  /** Reports show the cost of attempts. */
+  showCost: boolean;
+}
+
+export function defaultStats(): StatsSettings {
+  return { enabled: true, exclude: [], showCost: true };
+}
+
 export const DEFAULT_NETWORK_TARGET = 'https://api.anthropic.com';
 
 export function defaultNetwork(): NetworkSettings {

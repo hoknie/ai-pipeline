@@ -19,6 +19,7 @@ import {
   checkWeb,
   checkWorkspace,
 } from './validate-settings.ts';
+import { checkStats } from './sections/stats.ts';
 import { checkSpecialist, checkSpecialists, SPECIALIST_KEYS } from './validate-specialists.ts';
 import { type RuntimeChain } from '../types/chain.ts';
 import { type FieldError } from '../types/errors.ts';
@@ -31,6 +32,7 @@ import {
   defaultNaming,
   defaultNetwork,
   defaultRuntimes,
+  defaultStats,
   defaultWeb,
   defaultWorkspace,
   MAX_RANGE,
@@ -53,6 +55,7 @@ const SWARM_KEYS = [
   'web',
   'runtimes',
   'network',
+  'stats',
   'outside_changes',
   'claude',
   'delivery',
@@ -189,6 +192,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   if ('web' in swarm) checkWeb(ctx, swarm.web, config.web);
   if ('runtimes' in swarm) checkRuntimes(ctx, swarm.runtimes, config.runtimes);
   if ('network' in swarm) checkNetwork(ctx, swarm.network, defaultNetwork());
+  if ('stats' in swarm) checkStats(ctx, swarm.stats, defaultStats());
   if ('outside_changes' in swarm) {
     config.outsideChanges =
       readChoice<OutsideChanges>(

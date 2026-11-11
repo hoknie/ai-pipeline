@@ -11,7 +11,7 @@ export interface HelpGroup {
 export const HELP_GROUPS: HelpGroup[] = [
   { heading: 'Runs:', commands: ['run', 'group'] },
   { heading: 'Queue & repositories:', commands: ['queue', 'repo', 'tag'] },
-  { heading: 'Dashboards & streams:', commands: ['web', 'events'] },
+  { heading: 'Dashboards & streams:', commands: ['web', 'events', 'stats'] },
   { heading: 'Setup & maintenance:', commands: ['setup', 'init', 'config', 'version', 'help'] },
   { heading: 'Plumbing (started by hosts and aip itself):', commands: ['daemon', 'mcp'] },
 ];

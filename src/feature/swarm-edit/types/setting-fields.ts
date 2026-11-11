@@ -73,6 +73,9 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('network.proxy', 'string', { globalOnly: true }),
   field('network.interval', 'integer', { range: NETWORK_INTERVAL_RANGE, globalOnly: true }),
   field('network.timeout', 'integer', { range: NETWORK_TIMEOUT_RANGE, globalOnly: true }),
+  field('stats.enabled', 'boolean', { globalOnly: true }),
+  field('stats.exclude', 'strings', { globalOnly: true }),
+  field('stats.show_cost', 'boolean', { globalOnly: true }),
   ...RUNTIMES.flatMap((runtime) => [
     field(`runtimes.${runtime}.command`, 'string', { globalOnly: true }),
     field(`runtimes.${runtime}.args`, 'strings', { globalOnly: true }),

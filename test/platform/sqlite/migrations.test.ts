@@ -46,7 +46,7 @@ describe('migrations', () => {
     previous.database.exec(
       'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
     );
-    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     previous.database.close();
 
     const migrated = openStorage(path);
@@ -115,7 +115,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(30);
+    expect(SCHEMA_VERSION).toBe(31);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -128,8 +128,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -5).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    MIGRATIONS.slice(0, -6).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     prepare(database);
     migrate(database);
     return database;
@@ -248,7 +248,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -277,7 +277,7 @@ describe('project attributes', () => {
     old.known.addRepository('/work/app', 5);
     old.known.addRepository('/a/app', 9);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(
@@ -290,6 +290,38 @@ describe('project attributes', () => {
       { path: '/a/app', added_at: 9, name: null, slug: null, enabled: 1, color: null },
       { path: '/work/app', added_at: 5, name: null, slug: null, enabled: 1, color: null },
     ]);
+    store.database.close();
+  });
+});
+
+describe('migration to the usage journal', () => {
+  it('adds the stats tables to an older database and keeps its runs', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = openStorage(databasePath(directory));
+    const state = run(1, { id: 'stats-run' });
+    step(state);
+    old.runs.saveRun(state);
+    old.database.exec('DROP TABLE stats_attempts; DROP TABLE stats_runs; DROP TABLE stats_meta;');
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old.database.close();
+    const store = openStorage(databasePath(directory));
+    const names = (type: string) =>
+      (
+        store.database
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = ? AND name LIKE 'stats_%' ORDER BY name",
+          )
+          .all(type) as { name: string }[]
+      ).map((row) => row.name);
+    expect(names('table')).toEqual(['stats_attempts', 'stats_meta', 'stats_runs']);
+    expect(names('index')).toEqual(
+      expect.arrayContaining([
+        'stats_attempts_by_finished',
+        'stats_attempts_by_repository',
+        'stats_runs_by_repository',
+      ]),
+    );
+    expect(store.runs.loadRun(state.run.id)?.run.id).toBe(state.run.id);
     store.database.close();
   });
 });

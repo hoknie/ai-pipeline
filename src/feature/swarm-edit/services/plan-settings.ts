@@ -5,6 +5,7 @@ import {
   parseYaml,
   validateNetworkSection,
   validateRuntimesSection,
+  validateStatsSection,
   validateWebSection,
 } from '../../swarm-config/services/index.ts';
 import {
@@ -197,6 +198,7 @@ export function planSettings(paths: ConfigPaths, request: SettingsRequest): Edit
       const root = isMapping(source?.value) ? source.value : {};
       return [
         ...validateNetworkSection(root.network).errors,
+        ...validateStatsSection(root.stats).errors,
         ...validateWebSection(root.web).errors,
         ...validateRuntimesSection(root.runtimes).errors,
       ];

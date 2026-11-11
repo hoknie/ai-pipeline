@@ -70,6 +70,7 @@ export const featureGraph: Record<string, readonly string[]> = {
   processes: ['runs'],
   queue: ['runs', 'tags', 'repos', 'swarm-config'],
   observers: ['queue', 'runs', 'repos', 'swarm-config'],
+  stats: ['runs', 'repos', 'swarm-config'],
   compose: ['observers', 'queue', 'runs', 'tags', 'repos'],
 };
 

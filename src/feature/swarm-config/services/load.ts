@@ -7,6 +7,7 @@ import {
   validateRuntimesSection,
   validateWebSection,
 } from './validate.ts';
+import { validateStatsSection } from './sections/stats.ts';
 import { ConfigLoadError } from '../types/errors.ts';
 import {
   ACTIONS_DIR,
@@ -23,7 +24,9 @@ import { type ConfigSource } from '../types/merge.ts';
 import {
   defaultNetwork,
   defaultRuntimes,
+  defaultStats,
   type NetworkSettings,
+  type StatsSettings,
   defaultWeb,
   type ResolvedConfig,
   type RuntimeSettings,
@@ -131,5 +134,13 @@ export function loadNetworkSettings(paths: ConfigPaths): NetworkSettings {
   return loadGlobalSection(paths, 'network', defaultNetwork, (value) => {
     const { network, errors } = validateNetworkSection(value);
     return { value: network, errors };
+  });
+}
+
+/** The usage statistics settings from the global settings.yaml only. */
+export function loadStatsSettings(paths: ConfigPaths): StatsSettings {
+  return loadGlobalSection(paths, 'stats', defaultStats, (value) => {
+    const { stats, errors } = validateStatsSection(value);
+    return { value: stats, errors };
   });
 }

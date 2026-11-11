@@ -1,5 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import { STATS_MIGRATION } from './stats-migration.ts';
+
 export const MIGRATIONS: string[] = [
   `
   CREATE TABLE runs (
@@ -278,6 +280,7 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS attempts_history_order ON attempts (group_slug, started_at DESC, run_id DESC, seq DESC);
   CREATE INDEX IF NOT EXISTS runs_history_repository ON runs (repository, id);
   `,
+  STATS_MIGRATION,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

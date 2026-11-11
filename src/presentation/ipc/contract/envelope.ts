@@ -9,6 +9,7 @@ import { processesRequests } from './processes.ts';
 import { queueRequests } from './queue.ts';
 import { repositoriesRequests } from './repositories.ts';
 import { runsRequests } from './runs.ts';
+import { statsRequests } from './stats/stats.ts';
 import { tagsRequests } from './tags.ts';
 import { z } from 'zod';
 
@@ -19,6 +20,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...queueRequests,
   ...repositoriesRequests,
   ...tagsRequests,
+  ...statsRequests,
   ...observersRequests,
   ...configRequests,
   ...processesRequests,

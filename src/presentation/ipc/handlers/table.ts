@@ -6,6 +6,7 @@ import { observerHandlers } from './observers.ts';
 import { queueHandlers } from './queue.ts';
 import { repositoryHandlers } from './repositories.ts';
 import { runHandlers } from './runs.ts';
+import { statsHandlers } from './stats.ts';
 import { systemHandlers } from './system.ts';
 import type { Handler, HandlerTable, IpcContext } from './types.ts';
 
@@ -18,6 +19,7 @@ export const handlers: HandlerTable = {
   ...runHandlers,
   ...groupHandlers,
   ...queueHandlers,
+  ...statsHandlers,
 };
 
 /** Answers a request with the handler of its method. */

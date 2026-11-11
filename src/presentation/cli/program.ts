@@ -11,6 +11,7 @@ import { registerQueue } from './commands/queue.ts';
 import { registerRepositories } from './commands/repositories.ts';
 import { registerRun } from './commands/run.ts';
 import { registerSetup } from './commands/setup.ts';
+import { registerStats } from './commands/stats.ts';
 import { registerTag } from './commands/tag.ts';
 import { registerWeb } from './commands/web.ts';
 import { HELP_GROUPS, addFooter, bareHelpTarget, configureHelpStyle } from './help.ts';
@@ -72,6 +73,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
   program.commandsGroup(dashboards!.heading);
   registerWeb(program, io, style);
   registerEvents(program, io, style);
+  registerStats(program, io, style);
   program.commandsGroup(setup!.heading);
   registerSetup(program, io, style);
   program.helpCommand('help [command]', 'Show help for a command');

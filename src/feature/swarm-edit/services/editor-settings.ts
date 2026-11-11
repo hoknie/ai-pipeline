@@ -2,6 +2,7 @@ import { key } from '../types/editor.ts';
 import {
   loadNetworkSettings,
   loadRuntimeSettings,
+  loadStatsSettings,
   loadWebSettings,
   mergeOrigins,
   validateConfig,
@@ -12,6 +13,7 @@ import {
   type ConfigSource,
   defaultNetwork,
   defaultRuntimes,
+  defaultStats,
   defaultWeb,
   formatDuration,
   isMapping,
@@ -22,6 +24,7 @@ import {
   type ResolvedConfig,
   RUNTIMES,
   type RuntimeSettings,
+  type StatsSettings,
   type WebSettings,
 } from '../../swarm-config/types/index.ts';
 import { emptyLevel, resolution } from './levels.ts';
@@ -90,7 +93,8 @@ function globalSectionSettings(
   const web = safe(() => loadWebSettings(paths), defaultWeb);
   const runtimes = safe(() => loadRuntimeSettings(paths), defaultRuntimes);
   const network = safe(() => loadNetworkSettings(paths), defaultNetwork);
-  return sectionValues(web, runtimes, network).map(([path, value]) => ({
+  const stats = safe(() => loadStatsSettings(paths), defaultStats);
+  return sectionValues(web, runtimes, network, stats).map(([path, value]) => ({
     path,
     value,
     file: originOf(...(path.split('.') as [string, ...string[]])),
@@ -102,6 +106,7 @@ function sectionValues(
   web: WebSettings,
   runtimes: RuntimeSettings,
   network: NetworkSettings,
+  stats: StatsSettings,
 ): [string, unknown][] {
   const result: [string, unknown][] = [
     ['web.autostart', web.autostart],
@@ -114,6 +119,9 @@ function sectionValues(
     ['network.proxy', network.proxy === null ? null : redactProxy(network.proxy)],
     ['network.interval', network.interval],
     ['network.timeout', network.timeout],
+    ['stats.enabled', stats.enabled],
+    ['stats.exclude', stats.exclude],
+    ['stats.show_cost', stats.showCost],
   ];
   for (const runtime of RUNTIMES) {
     const command = runtimes[runtime];
@@ -176,7 +184,7 @@ export function editorSettings(
   ];
   const defaultValues = new Map<string, unknown>([
     ...settingsOf(configOrDefaults(null)),
-    ...sectionValues(defaultWeb(), defaultRuntimes(), defaultNetwork()),
+    ...sectionValues(defaultWeb(), defaultRuntimes(), defaultNetwork(), defaultStats()),
   ]);
   const proxyCredentials = hasCredentials(globalNetwork(paths));
   const aloneConfig = resolution(global, emptyLevel()).config;

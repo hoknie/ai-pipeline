@@ -8,7 +8,7 @@ export interface Lifecycle {
 }
 
 export function createLifecycle(services: DaemonServices, database: Database): Lifecycle {
-  const { network, runs, queue, tags, registry, observers, delivery, artifacts, processes } =
+  const { network, runs, queue, tags, registry, observers, delivery, artifacts, processes, stats } =
     services;
   return {
     async start() {
@@ -21,6 +21,8 @@ export function createLifecycle(services: DaemonServices, database: Database): L
         tags.load();
         registry.load();
         observers.load();
+        // The history moves into the usage journal once, before the first new record.
+        await stats.ledger.backfill();
         // A delivery cut off by the restart starts again.
         for (const { state, effects } of recovered) await runs.effects.perform(state, effects);
         await runs.engine.schedule();

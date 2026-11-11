@@ -21,6 +21,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | [configuration/delivery.md](configuration/delivery.md) | how a result reaches you: modes, safety, conflicts and the resolver, commit messages |
 | [configuration/runtimes.md](configuration/runtimes.md) | which agent CLI starts and how: `runtimes`, `claude.mcp`, `claude.settings` |
 | [configuration/network.md](configuration/network.md) | the network check and the proxy for agents: `network` |
+| [configuration/stats.md](configuration/stats.md) | usage statistics: what is recorded, exclusions, the report: `stats` |
 
 ## Running work
 

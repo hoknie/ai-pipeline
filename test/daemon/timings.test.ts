@@ -33,6 +33,7 @@ describe('daemon timings', () => {
       processStreamMs: 2000,
       processKillLookMs: 250,
       processCacheMs: 1000,
+      statsSettingsMs: 2000,
     });
     expect(plain.application.timings).toEqual(DEFAULT_TIMINGS);
   });

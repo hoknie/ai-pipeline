@@ -11,6 +11,7 @@ import { createProcessesServices } from '../feature/processes/services/index.ts'
 import { createQueueServices } from '../feature/queue/services/index.ts';
 import { createReposServices } from '../feature/repos/services/index.ts';
 import { createRunsServices, type RunsServices } from '../feature/runs/services/index.ts';
+import { createStatsServices } from '../feature/stats/services/index.ts';
 import { createSwarmConfigServices } from '../feature/swarm-config/services/index.ts';
 import { createSwarmEditServices } from '../feature/swarm-edit/services/index.ts';
 import { createTagsServices } from '../feature/tags/services/index.ts';
@@ -159,6 +160,14 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     ...{ database, runs, queue, registry, config, now },
     publish: ports.observers.port,
   });
+  const { ledger, report } = createStatsServices({
+    database,
+    config,
+    registry,
+    states: runs.states,
+    now,
+    settingsCacheMs: context.timings.statsSettingsMs,
+  });
   const compose = createComposeServices({
     database,
     registry,
@@ -175,6 +184,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     queue,
     observers: observersServices.observers,
     history: observersServices.history,
+    stats: { ledger, report },
     compose,
   };
 }
@@ -217,7 +227,14 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
   ports.tags.set(publications.tags);
   ports.config.set(publications.config);
   ports.processes.set(publications.processes);
-  ports.runs.set(publications.runs);
+  // Every saved run reaches the clients first, then the usage journal.
+  ports.runs.set({
+    ...publications.runs,
+    runSaved: (state) => {
+      publications.runs.runSaved(state);
+      void services.stats.ledger.capture(state);
+    },
+  });
   ports.queuePublish.set(publications.queue);
   ports.observers.set(publications.observers);
   ports.delivery.set(publications.delivery);

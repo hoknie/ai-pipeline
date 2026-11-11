@@ -52,6 +52,31 @@ function historyQuery(search: URLSearchParams): object {
   return result;
 }
 
+/** `since`, `until` and `repository` of `/api/stats`; the moments are whole milliseconds. */
+function statsQuery(search: URLSearchParams): {
+  since?: number;
+  until?: number;
+  repository?: string;
+} {
+  const result: { since?: number; until?: number; repository?: string } = {};
+  for (const key of ['since', 'until'] as const) {
+    const value = search.get(key);
+    if (value === null) continue;
+    if (!/^(0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(Number(value)))
+      throw panel('invalid', `${key} must be a non-negative integer (ms)`);
+    result[key] = Number(value);
+  }
+  if (result.since !== undefined && result.until !== undefined && result.since >= result.until)
+    throw panel('invalid', 'since must be less than until');
+  const repository = search.get('repository');
+  if (repository !== null && repository !== '') {
+    if (!isAbsolute(repository) && !isProjectSlug(repository))
+      throw panel('invalid', 'repository must be an absolute path or a project slug');
+    result.repository = repository;
+  }
+  return result;
+}
+
 function deleteQuery(search: URLSearchParams): object {
   const revision = search.get('revision');
   const level = search.get('level');
@@ -73,6 +98,8 @@ export async function requestBody(incoming: IncomingMessage, url: URL): Promise<
   const verb = incoming.method ?? 'GET';
   const { pathname, searchParams } = url;
   if (verb === 'POST' || verb === 'PUT') return readJson(incoming);
+  if (pathname === '/api/stats' && (verb === 'GET' || verb === 'DELETE'))
+    return statsQuery(searchParams);
   if (verb === 'DELETE') return deleteQuery(searchParams);
   if (/\/groups\/[^/]+$/.test(pathname))
     return { tail: boundedInteger(searchParams, 'tail', 40, 500) };
@@ -104,6 +131,7 @@ function repositoryFree(pathname: string, search: URLSearchParams): boolean {
     pathname.startsWith('/api/specialist-tags') ||
     pathname === '/api/observers' ||
     pathname === '/api/observers/history' ||
+    pathname === '/api/stats' ||
     own
   );
 }

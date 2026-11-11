@@ -33,6 +33,7 @@ export const TEST_TIMINGS: DaemonTimings = {
   processStreamMs: 2000,
   processKillLookMs: 20,
   processCacheMs: 20,
+  statsSettingsMs: 20,
 };
 
 export const PIPELINE_CONFIG = `swarm:

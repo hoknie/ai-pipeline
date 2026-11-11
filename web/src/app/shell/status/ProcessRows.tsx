@@ -8,7 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../shared/ui/feed
 import { FILE_PATH_CLASS } from '../../../shared/ui/layout/FilePath.tsx';
 import type { groupProcessesByTask } from './backgroundProcesses.ts';
 
-const numeric = 'px-2 py-1.5 text-right align-middle whitespace-nowrap tabular-nums';
+const line = 'border-b group-last/row:border-0';
+const numeric = `${line} px-2 py-1.5 text-right align-middle whitespace-nowrap tabular-nums`;
 
 type Task = ReturnType<typeof groupProcessesByTask>[number];
 
@@ -24,8 +25,8 @@ export function TaskRow({
   const { owner } = task;
   const last = task.processes[task.processes.length - 1]!;
   return (
-    <tr className="border-b bg-muted/40">
-      <th scope="rowgroup" colSpan={6} className="px-2 py-1.5 text-left font-medium">
+    <tr className="bg-muted/40">
+      <th scope="rowgroup" colSpan={6} className="border-b px-2 py-1.5 text-left font-medium">
         {owner.group !== null ? (
           <Button
             variant="link"
@@ -53,7 +54,7 @@ export function TaskRow({
 function CommandCell({ command, onCopy }: { command: string; onCopy: (text: string) => void }) {
   const { t } = useTranslation();
   return (
-    <td className="min-w-0 px-2 py-1.5 align-middle">
+    <td className={`${line} min-w-0 px-2 py-1.5 align-middle`}>
       <div className="flex min-w-0 items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -99,13 +100,13 @@ export function ProcessRow({
   const { t, i18n } = useTranslation();
   const command = process.command === '' ? process.name : process.command;
   return (
-    <tr className="border-b last:border-0 hover:bg-muted/50">
+    <tr className="group/row hover:bg-muted/50">
       <td className={numeric}>{process.pid}</td>
       <CommandCell command={command} onCopy={onCopy} />
       <td className={numeric}>{formatUptime(process.uptimeSeconds, t)}</td>
       <td className={numeric}>{formatCpu(process.cpuPercent, i18n.language)}</td>
       <td className={numeric}>{formatMemory(process.memoryBytes, t, i18n.language)}</td>
-      <td className="px-2 py-1.5 text-right align-middle">
+      <td className={`${line} px-2 py-1.5 text-right align-middle`}>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

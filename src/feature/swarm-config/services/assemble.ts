@@ -135,7 +135,7 @@ function fileOf(origins: Map<string, string>, path: string): string | undefined 
 }
 
 /** Sections that only the global level may set. */
-const GLOBAL_ONLY_SECTIONS = ['web', 'runtimes', 'network'];
+const GLOBAL_ONLY_SECTIONS = ['web', 'runtimes', 'network', 'stats'];
 
 /** Merges the global level with the project one and validates the result. */
 export function resolveLevels(global: Level, project: Level): LoadedConfig {

@@ -10,6 +10,7 @@ import type { ProcessService } from '../../feature/processes/services/index.ts';
 import type { QueueServices } from '../../feature/queue/services/index.ts';
 import type { ProjectService, RegistryService } from '../../feature/repos/services/index.ts';
 import type { RunsServices } from '../../feature/runs/services/index.ts';
+import type { StatsServices } from '../../feature/stats/services/index.ts';
 import type { ConfigService } from '../../feature/swarm-config/services/index.ts';
 import type {
   ConfigEditService,
@@ -34,5 +35,6 @@ export interface DaemonServices {
   queue: QueueServices;
   observers: ObserverService;
   history: ObserverHistoryService;
+  stats: StatsServices;
   compose: ComposeServices;
 }

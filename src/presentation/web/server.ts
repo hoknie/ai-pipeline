@@ -30,6 +30,7 @@ import { runsRoutes } from './routes/runs.ts';
 import { settingsRoutes } from './routes/settings.ts';
 import { observerHistoryRoutes } from './routes/observers/history.ts';
 import { specialistsRoutes } from './routes/specialists.ts';
+import { statsRoutes } from './routes/stats/stats.ts';
 import { systemRoute } from './routes/system.ts';
 import { tagsRoutes } from './routes/tags.ts';
 import type { RawRoute, Route, RouteKit } from './routes/types.ts';
@@ -73,6 +74,7 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       specialistsRoutes,
       tagsRoutes,
       processesRoutes,
+      statsRoutes,
     ].flatMap((routes) => routes(kit)),
   };
 }

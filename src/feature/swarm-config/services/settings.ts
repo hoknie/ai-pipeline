@@ -8,10 +8,11 @@ import {
   type NetworkSettings,
   type ResolvedConfig,
   type RuntimeSettings,
+  type StatsSettings,
 } from '../types/index.ts';
 
 import { configPaths } from './discover.ts';
-import { loadConfig, loadNetworkSettings, loadRuntimeSettings } from './load.ts';
+import { loadConfig, loadNetworkSettings, loadRuntimeSettings, loadStatsSettings } from './load.ts';
 
 /** What the queue view shows from the configuration of a repository; nulls when it does not load. */
 export interface DeliverySettings {
@@ -74,6 +75,16 @@ export class ConfigService {
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
       return `invalid swarm.network: ${error.message}`;
+    }
+  }
+
+  /** Current `stats` of the shared settings.yaml, or the text of the error in it. */
+  statsSettings(): StatsSettings | string {
+    try {
+      return loadStatsSettings(this.pathsOf('.'));
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw error;
+      return `invalid swarm.stats: ${error.message}`;
     }
   }
 }

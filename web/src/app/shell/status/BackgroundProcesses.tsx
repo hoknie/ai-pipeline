@@ -69,9 +69,9 @@ export function BackgroundProcesses({
     return <p className="text-muted-foreground">{t('statusBar.noProcesses')}</p>;
   }
   const tasks = groupProcessesByTask(rows);
-  const head = 'bg-card px-2 py-1.5 font-medium';
+  const head = 'sticky top-0 z-10 border-b bg-card px-2 py-1.5 font-medium text-muted-foreground';
   return (
-    <table className="w-full table-fixed text-left">
+    <table className="w-full table-fixed border-separate border-spacing-0 text-left">
       <colgroup>
         <col className="w-16" />
         <col />
@@ -80,7 +80,7 @@ export function BackgroundProcesses({
         <col className="w-24" />
         <col className="w-20" />
       </colgroup>
-      <thead className="sticky top-0 z-10 border-b text-muted-foreground">
+      <thead>
         <tr>
           <th className={`${head} text-right`}>{t('statusBar.pid')}</th>
           <th className={head}>{t('statusBar.command')}</th>

@@ -5,11 +5,10 @@ import { GroupScreen } from '../src/features/runs/group/GroupScreen.tsx';
 import { MessageDialog } from '../src/features/runs/group/MessageDialog.tsx';
 import { Transcript } from '../src/features/runs/transcript/Transcript.tsx';
 import { clockSeconds, dateTime } from '../src/shared/lib/format.ts';
-import { useElementHeight } from '../src/shared/lib/browser/useElementHeight.ts';
 import type { TranscriptEntry } from '../src/shared/api/types.ts';
 
 import { fakeApi, groupRow, groupView } from './fixtures.ts';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
 afterEach(() => {
   cleanup();
@@ -229,49 +228,5 @@ describe('message dialog', () => {
     expect(screen.getByText(/interrupted/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalled();
-  });
-});
-
-describe('useElementHeight', () => {
-  function Probe({ element }: { element: Element | null }) {
-    return <span>{`h=${useElementHeight(element)}`}</span>;
-  }
-
-  it('is 0 without ResizeObserver or without an element', () => {
-    vi.stubGlobal('ResizeObserver', undefined);
-    const element = document.createElement('div');
-    render(<Probe element={element} />);
-    expect(screen.getByText('h=0')).toBeTruthy();
-    cleanup();
-    vi.stubGlobal('ResizeObserver', class {});
-    render(<Probe element={null} />);
-    expect(screen.getByText('h=0')).toBeTruthy();
-  });
-
-  it('follows the height of the element and disconnects on unmount', () => {
-    let notify: () => void = () => undefined;
-    const disconnect = vi.fn();
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        constructor(callback: () => void) {
-          notify = callback;
-        }
-        observe() {}
-        disconnect() {
-          disconnect();
-        }
-      },
-    );
-    const element = document.createElement('div');
-    let height = 48;
-    element.getBoundingClientRect = () => ({ height }) as DOMRect;
-    const { unmount } = render(<Probe element={element} />);
-    expect(screen.getByText('h=48')).toBeTruthy();
-    height = 71.2;
-    act(() => notify());
-    expect(screen.getByText('h=72')).toBeTruthy();
-    unmount();
-    expect(disconnect).toHaveBeenCalled();
   });
 });

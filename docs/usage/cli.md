@@ -54,6 +54,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | Command | What it does |
 |---|---|
 | `aip web`, `aip web start\|stop\|restart\|status` | The [web panel](../web/README.md) |
+| `aip stats [--project <path>] [--since 30d] [--json]`, `aip stats clear --project <path>` | [Usage statistics](../configuration/stats.md): tokens, cost and time per task, project, specialist, model, pipeline and runtime; `--since` is `<n>h`, `<n>d`, `<n>w` or `all`; `clear` deletes the records of a project |
 | `aip events --json` | Streams changes as JSON lines: a snapshot first, then one line per change |
 
 ## Setup and maintenance
