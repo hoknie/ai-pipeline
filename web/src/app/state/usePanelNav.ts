@@ -7,17 +7,14 @@ import { tabRoute } from './tabRoute.ts';
 
 /** The properties of the navigation strip: tabs, counters and the repository menu. */
 export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavProps {
-  const { route, setRoute, scope, chrome, setChosen } = panel;
+  const { route, setRoute, scope, chrome } = panel;
   const { runs, selected, queue } = panel.state;
-  const run =
-    route.view === 'runs' ? (runs.find((candidate) => candidate.id === route.run) ?? null) : null;
   const { working, waiting } = navRunCounts(runsOf(runs, scope === 'repository' ? selected : null));
   return {
     view: route.view,
-    hrefFor: (view: View) => formatRoute(tabRoute(view, route, run, panel.lastRun.current)),
+    hrefFor: (view: View) => formatRoute(tabRoute(view, route, panel.lastRun.current)),
     onNavigate: (view: View) => {
-      if (view === 'topology' && run && run.repository !== selected) setChosen(run.repository);
-      setRoute(tabRoute(view, route, run, panel.lastRun.current));
+      setRoute(tabRoute(view, route, panel.lastRun.current));
     },
     repository: {
       repositories: panel.state.repositories,

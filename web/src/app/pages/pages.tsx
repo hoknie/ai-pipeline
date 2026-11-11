@@ -9,9 +9,6 @@ import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import type { Route } from '../../shared/lib/nav/route.ts';
 import { settingsLocationOf } from '../../shared/lib/nav/settingsGroups.ts';
 
-const TopologyPage = lazy(() =>
-  import('../../features/topology/index.ts').then((module) => ({ default: module.TopologyPage })),
-);
 export const NewTaskDialog = lazy(() =>
   import('../../features/queue/index.ts').then((module) => ({ default: module.NewTaskDialog })),
 );
@@ -144,34 +141,23 @@ export function ListRoute({ common }: { common: Common }) {
           onSelect={(id, section = null, level = null) =>
             onRoute({ ...to('pipelines', id, section), step: level })
           }
-        />
-      </Suspense>
-    );
-  if (route.view === 'specialists')
-    return (
-      <Suspense fallback={<Loading what={t('app.loadingSpecialists')} />}>
-        <SpecialistsPage
-          key={common.pageKey}
-          dirty={common.dirty}
-          api={common.api}
-          selected={route.run}
-          section={route.group}
-          onSelect={(id, section = null) =>
-            common.onRoute({ ...to('specialists', id), group: section })
+          onOpenGroup={(target, step) =>
+            onRoute({ ...to('runs', target.runId, target.slug), step })
           }
         />
       </Suspense>
     );
   return (
-    <Suspense fallback={<Loading what={t('app.loadingGraph')} />}>
-      <TopologyPage
+    <Suspense fallback={<Loading what={t('app.loadingSpecialists')} />}>
+      <SpecialistsPage
         key={common.pageKey}
+        dirty={common.dirty}
         api={common.api}
-        runs={common.runs}
-        pipeline={route.run}
-        onSelectPipeline={(id) => onRoute(to('topology', id))}
-        onEditPipeline={(id) => onRoute(to('pipelines', id))}
-        onOpenGroup={(target, step) => onRoute({ ...to('runs', target.runId, target.slug), step })}
+        selected={route.run}
+        section={route.group}
+        onSelect={(id, section = null) =>
+          common.onRoute({ ...to('specialists', id), group: section })
+        }
       />
     </Suspense>
   );

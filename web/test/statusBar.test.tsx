@@ -534,8 +534,8 @@ describe('status bar in the panel', () => {
     );
   }
 
-  it('stays under the Topology and Queue tabs and follows the events', async () => {
-    window.location.hash = '#topology/feature';
+  it('stays under the Pipeline topology tab and the Queue section and follows the events', async () => {
+    window.location.hash = '#pipelines/topology/feature';
     mount();
     expect(await screen.findByText(summary(1, 2, 0))).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: 'Queue' }));

@@ -18,7 +18,6 @@ export const en = {
   nav: {
     runs: 'Runs',
     queue: 'Queue',
-    topology: 'Topology',
     specialists: 'Specialists',
     pipelines: 'Pipeline',
     settings: 'Settings',
@@ -993,7 +992,12 @@ export const en = {
     },
   },
   pipeline: {
-    sections: { pipelines: 'Pipelines', actions: 'Actions', system: 'System stages' },
+    sections: {
+      pipelines: 'Pipelines',
+      actions: 'Actions',
+      system: 'System stages',
+      topology: 'Topology',
+    },
     tabs: 'Pipeline sections',
     actions: {
       section: 'action {{id}}',

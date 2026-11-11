@@ -314,7 +314,7 @@ describe('repository selector', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
     await waitFor(() => expect(calls).toContainEqual(['config', LIB]));
-    fireEvent.click(screen.getByRole('link', { name: 'Topology' }));
+    window.location.hash = '#pipelines/topology/feature';
     await waitFor(() => expect(calls).toContainEqual(['pipelines', LIB]));
   });
 
@@ -354,21 +354,18 @@ describe('repository selector', () => {
     expect(window.location.hash).toBe('#runs/l1');
   });
 
-  it('opens the topology of a run of another repository in that repository', async () => {
+  it('shows the topology tab of the selected repository and follows its change', async () => {
+    window.location.hash = '#pipelines/topology/feature';
     const { api, base } = twoRepositories();
     render(<App api={api} openStream={openFake} />);
     snapshot();
-    await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: app'));
-    fireEvent.click(screen.getByRole('radio', { name: 'All repositories' }));
-    fireEvent.click(await screen.findByText('lib run'));
-    fireEvent.click(screen.getByRole('link', { name: 'Topology' }));
+    const calls = (base as Api & { calls: [string, string | null][] }).calls;
+    await waitFor(() => expect(calls).toContainEqual(['pipelines', APP]));
+    await openMenu();
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /lib/ }));
     await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: lib'));
-    await waitFor(() =>
-      expect((base as Api & { calls: [string, string | null][] }).calls).toContainEqual([
-        'pipelines',
-        LIB,
-      ]),
-    );
+    await waitFor(() => expect(calls).toContainEqual(['pipelines', LIB]));
+    expect(window.location.hash).toBe('#pipelines/topology/feature');
   });
 });
 

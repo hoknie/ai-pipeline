@@ -1,18 +1,18 @@
 import { observerTabOf, settingsLocationOf } from './settingsGroups.ts';
 
-export type View = 'runs' | 'topology' | 'queue' | 'specialists' | 'pipelines' | 'settings';
+export type View = 'runs' | 'queue' | 'specialists' | 'pipelines' | 'settings';
 
 export interface Route {
   view: View;
   /**
-   * Run on the runs tab, pipeline on the topology tab, specialist (or `new`) on the specialists
+   * Run on the runs tab, specialist (or `new`) on the specialists
    * tab, group of settings on the settings tab; on the pipeline tab the id of a pipeline, of an
    * action or of a system stage.
    */
   run: string | null;
   /**
    * On the runs tab the group of a run; on the settings tab the tab of the page (`global`,
-   * `project`); on the pipeline tab the section (`actions`, `system`), null for the pipelines.
+   * `project`); on the pipeline tab the section (`actions`, `system`, `topology`), null for the pipelines.
    */
   group: string | null;
   /**
@@ -47,7 +47,7 @@ function settingsRoute(first: string | null, second: string | null, third: strin
 }
 
 /** Sections of the pipeline list other than the pipelines. */
-export const PIPELINE_SECTIONS = ['actions', 'system'] as const;
+export const PIPELINE_SECTIONS = ['actions', 'system', 'topology'] as const;
 export type PipelineSection = (typeof PIPELINE_SECTIONS)[number];
 
 export const isPipelineSection = (value: string | null): value is PipelineSection =>
@@ -55,7 +55,7 @@ export const isPipelineSection = (value: string | null): value is PipelineSectio
 
 const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : null);
 
-/** `#runs/<run>/<group>/<step>`, `#topology/<run>`; the older `#<run>/<group>` still works. */
+/** `#runs/<run>/<group>/<step>`, the older `#topology/<pipeline>` opens the topology section; the older `#<run>/<group>` still works. */
 export function parseRoute(hash: string): Route {
   const [path = '', query = ''] = hash.split('?', 2) as [string, string?];
   const tab = new URLSearchParams(query).get('tab') || null;
@@ -63,7 +63,7 @@ export function parseRoute(hash: string): Route {
   const [head, ...rest] = parts;
   if (head === 'queue') return { view: 'queue', run: null, group: null, step: null, tab: null };
   if (head === 'topology')
-    return { view: 'topology', run: decode(rest[0]), group: null, step: null, tab: null };
+    return { view: 'pipelines', run: decode(rest[0]), group: 'topology', step: null, tab: null };
   if (head === 'pipelines' || head === 'workflows') {
     // `#pipelines/actions/<id>` and `#pipelines/system/<kind>`; one part is always a pipeline
     const section = decode(rest[0]);
@@ -108,7 +108,6 @@ export function parseRoute(hash: string): Route {
 export function formatRoute(route: Route): string {
   const enc = encodeURIComponent;
   if (route.view === 'queue') return '#queue';
-  if (route.view === 'topology') return route.run ? `#topology/${enc(route.run)}` : '#topology';
   if (route.view === 'specialists') {
     if (route.group === 'chains') {
       return route.run ? `#specialists/chains/${enc(route.run)}` : '#specialists/chains';

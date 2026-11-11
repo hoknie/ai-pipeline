@@ -6,7 +6,7 @@ import type { PipelineSection } from '../../../shared/lib/nav/route.ts';
 import { NEW_ID } from '../../specialists/index.ts';
 
 export type Level = 'global' | null;
-type Tab = 'pipelines' | 'actions' | 'system';
+type Tab = 'pipelines' | 'actions' | 'system' | 'topology';
 
 /** Moves between entries, asking first when the open form has unsaved edits. */
 export function usePipelineNavigation(props: {
@@ -25,6 +25,7 @@ export function usePipelineNavigation(props: {
     pipelines: undefined,
     actions: undefined,
     system: undefined,
+    topology: undefined,
   });
   useEffect(() => {
     if (selected !== null && selected !== NEW_ID)

@@ -11,8 +11,6 @@ The list shows the pipelines of the repository with the number of active runs. T
 - A node whose specialist has a limit shows "busy N of M · in other runs: K". It is highlighted when the limit is reached.
 - A step node shows "attempts N" and the tokens and cost of the active runs: `in/out · $cost`.
 
-The address `#topology/<pipeline>` opens a pipeline.
-
 ## How editing works
 
 Both editors follow these rules:

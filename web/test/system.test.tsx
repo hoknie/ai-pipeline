@@ -278,7 +278,7 @@ describe('opening a split from the topology', () => {
       pipelines: vi.fn(async () => pipelinesView({ pipelines: [pipeline] })),
       group: vi.fn(async () => groupView({ slug: '_split' })),
     });
-    window.location.hash = '#topology/feature';
+    window.location.hash = '#pipelines/topology/feature';
     render(<App api={api} openStream={openFake} />);
     act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [run] }));
     fireEvent.click(await screen.findByTestId('stage-split'));

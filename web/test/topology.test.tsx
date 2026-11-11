@@ -69,10 +69,10 @@ describe('routes', () => {
       step: 'review',
       tab: null,
     });
-    expect(parseRoute('#topology/feature')).toEqual({
-      view: 'topology',
+    expect(parseRoute('#pipelines/topology/feature')).toEqual({
+      view: 'pipelines',
       run: 'feature',
-      group: null,
+      group: 'topology',
       step: null,
       tab: null,
     });
@@ -88,8 +88,20 @@ describe('routes', () => {
       '#runs/r1/login/code',
     );
     expect(
-      formatRoute({ view: 'topology', run: 'feature', group: null, step: null, tab: null }),
-    ).toBe('#topology/feature');
+      formatRoute({ view: 'pipelines', run: 'feature', group: 'topology', step: null, tab: null }),
+    ).toBe('#pipelines/topology/feature');
+    // one part after pipelines is always a pipeline
+    expect(parseRoute('#pipelines/topology')).toEqual({
+      view: 'pipelines',
+      run: 'topology',
+      group: null,
+      step: null,
+      tab: null,
+    });
+    // the former addresses lead to the tab
+    const tab = { view: 'pipelines', group: 'topology', step: null, tab: null };
+    expect(parseRoute('#topology/feature')).toEqual({ ...tab, run: 'feature' });
+    expect(parseRoute('#topology')).toEqual({ ...tab, run: null });
   });
 });
 
@@ -287,12 +299,15 @@ describe('topology page', () => {
 
 describe('edit link', () => {
   it('opens the pipeline editor from the topology', async () => {
-    window.location.hash = '#topology/feature';
+    window.location.hash = '#pipelines/topology/feature';
     render(<App api={fakeApi()} openStream={openFake} />);
     fireEvent.click(await screen.findByRole('link', { name: 'Edit' }));
     expect(window.location.hash).toBe('#pipelines/feature');
     expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
       'page',
+    );
+    expect(screen.getByRole('tab', { name: 'Pipelines' }).getAttribute('aria-selected')).toBe(
+      'true',
     );
   });
 });
@@ -304,7 +319,7 @@ const expanded = () =>
     .map((button) => button.getAttribute('aria-expanded') === 'true');
 
 describe('tabs', () => {
-  it('opens the pipeline of the selected run and returns to the group with the step opened', async () => {
+  it('opens the topology tab and returns to the group with the step opened', async () => {
     const api = fakeApi({
       group: vi.fn(async () =>
         groupView({
@@ -347,10 +362,9 @@ describe('tabs', () => {
     );
     // the first run opens once the panel knows its repository
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1'));
-    fireEvent.click(screen.getByRole('link', { name: 'Topology' }));
+    window.location.hash = '#pipelines/topology/feature';
     await screen.findByTestId('stage-review');
-    expect(window.location.hash).toBe('#topology/feature');
-    expect(screen.getByRole('link', { name: 'Topology' }).getAttribute('aria-current')).toBe(
+    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
       'page',
     );
     fireEvent.click(screen.getByTestId('stage-code'));

@@ -21,7 +21,6 @@ export const ru: Dictionary = {
   nav: {
     runs: 'Запуски',
     queue: 'Очередь',
-    topology: 'Топология',
     specialists: 'Специалисты',
     pipelines: 'Pipeline',
     settings: 'Настройки',
@@ -1006,7 +1005,12 @@ export const ru: Dictionary = {
     },
   },
   pipeline: {
-    sections: { pipelines: 'Pipeline', actions: 'Действия', system: 'Системные этапы' },
+    sections: {
+      pipelines: 'Pipeline',
+      actions: 'Действия',
+      system: 'Системные этапы',
+      topology: 'Топология',
+    },
     tabs: 'разделы страницы Pipeline',
     actions: {
       section: 'действие {{id}}',

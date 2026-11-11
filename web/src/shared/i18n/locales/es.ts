@@ -21,7 +21,6 @@ export const es: Dictionary = {
   nav: {
     runs: 'Ejecuciones',
     queue: 'Cola',
-    topology: 'Topología',
     specialists: 'Especialistas',
     pipelines: 'Pipeline',
     settings: 'Ajustes',
@@ -1011,7 +1010,12 @@ export const es: Dictionary = {
     },
   },
   pipeline: {
-    sections: { pipelines: 'Pipelines', actions: 'Acciones', system: 'Etapas del sistema' },
+    sections: {
+      pipelines: 'Pipelines',
+      actions: 'Acciones',
+      system: 'Etapas del sistema',
+      topology: 'Topología',
+    },
     tabs: 'secciones de Pipeline',
     actions: {
       section: 'acción {{id}}',

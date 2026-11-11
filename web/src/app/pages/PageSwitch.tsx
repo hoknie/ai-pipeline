@@ -54,7 +54,6 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
       );
     case 'pipelines':
     case 'specialists':
-    case 'topology':
       return <ListRoute common={common} />;
     default:
       return (

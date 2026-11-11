@@ -21,7 +21,6 @@ export const zh: Dictionary = {
   nav: {
     runs: '运行',
     queue: '队列',
-    topology: '拓扑',
     specialists: '专员',
     pipelines: 'Pipeline',
     settings: '设置',
@@ -980,7 +979,7 @@ export const zh: Dictionary = {
     },
   },
   pipeline: {
-    sections: { pipelines: 'Pipelines', actions: '动作', system: '系统阶段' },
+    sections: { pipelines: 'Pipelines', actions: '动作', system: '系统阶段', topology: '拓扑' },
     tabs: 'Pipeline 页面的分区',
     actions: {
       section: '动作 {{id}}',
