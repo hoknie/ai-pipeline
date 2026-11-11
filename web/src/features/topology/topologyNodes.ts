@@ -14,6 +14,8 @@ import type { Busy, Size, StageData } from './topologyTypes.ts';
 
 /** Height assumed for a node that has not been measured yet. */
 export const FALLBACK_HEIGHT = 90;
+/** Width of a stage card, assumed for a node that has not been measured yet. */
+export const FALLBACK_WIDTH = 170;
 /** Vertical gap between the delivery and the resolver. */
 export const RESOLVER_GAP = 60;
 

@@ -13,8 +13,8 @@ function Handles() {
     <>
       <Handle type="target" position={Position.Left} id="in" />
       <Handle type="source" position={Position.Right} id="out" />
-      <Handle type="target" position={Position.Top} id="back-in" />
-      <Handle type="source" position={Position.Top} id="back-out" />
+      <Handle type="target" position={Position.Bottom} id="back-in" />
+      <Handle type="source" position={Position.Bottom} id="back-out" />
       <Handle type="source" position={Position.Bottom} id="down" />
       <Handle type="target" position={Position.Top} id="up" />
     </>

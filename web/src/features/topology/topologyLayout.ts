@@ -1,11 +1,14 @@
 import type { Edge } from '@xyflow/react';
 import type { TFunction } from 'i18next';
 
+import { routeEdges, type RouteEdge } from '../../shared/lib/graph/edgeRoutes.ts';
 import type { MachineLoad } from '../../shared/lib/pipeline/specialistLoad.ts';
 import { pipelineStagesOf } from '../../shared/lib/pipeline/pipelineStages.ts';
 import type { PipelineTopology } from '../../shared/api/types.ts';
 import type { Live } from './liveState.ts';
 import {
+  FALLBACK_HEIGHT,
+  FALLBACK_WIDTH,
   commonOf,
   mainNode,
   resolverNode,
@@ -30,6 +33,7 @@ function forward(from: StageNode, spec: NodeSpec): Edge {
     sourceHandle: 'out',
     targetHandle: 'in',
     animated: spec.data.active,
+    type: 'orthogonal',
     className: 'edge-forward',
   };
 }
@@ -40,6 +44,7 @@ const resolverEdge = (t: TFunction): Edge => ({
   target: 'resolver',
   sourceHandle: 'down',
   targetHandle: 'up',
+  type: 'orthogonal',
   label: t('topology.conflict'),
   className: 'edge-resolver',
 });
@@ -55,7 +60,7 @@ function rejectEdges(pipeline: PipelineTopology): Edge[] {
             target: `step:${step.onReject.goto}`,
             sourceHandle: 'back-out',
             targetHandle: 'back-in',
-            type: 'smoothstep',
+            type: 'orthogonal',
             label: `≤ ${step.onReject.maxRounds}`,
             className: 'edge-reject',
           },
@@ -105,5 +110,32 @@ export function layout(
     if (last) edges.push(forward(last, spec));
     last = node;
   }
-  return { nodes, edges: [...edges, ...rejectEdges(pipeline)] };
+  const all = [...edges, ...rejectEdges(pipeline)];
+  return { nodes, edges: routed(nodes, all, sizes) };
+}
+
+/** The edges with the routes along which they are drawn; the nodes stand by their middle left. */
+function routed(nodes: StageNode[], edges: Edge[], sizes: ReadonlyMap<string, Size>): Edge[] {
+  const routes = routeEdges(
+    nodes.map((node) => {
+      const size = sizes.get(node.id);
+      const height = size?.height ?? FALLBACK_HEIGHT;
+      return {
+        id: node.id,
+        x: node.position.x,
+        y: node.position.y - height / 2,
+        width: size?.width ?? FALLBACK_WIDTH,
+        height,
+      };
+    }),
+    edges.map((edge): RouteEdge => {
+      const kind = edge.id.startsWith('reject:')
+        ? 'return'
+        : edge.id === 'delivery->resolver'
+          ? 'down'
+          : 'next';
+      return { id: edge.id, source: edge.source, target: edge.target, kind };
+    }),
+  );
+  return edges.map((edge) => ({ ...edge, data: { route: routes.get(edge.id) } }));
 }

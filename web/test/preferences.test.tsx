@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-li
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
-import { usePreference } from '../src/shared/lib/browser/preferences.ts';
+import { forgetPreference, usePreference } from '../src/shared/lib/browser/preferences.ts';
 
 import { FakeEventSource, fakeApi, groupView, openFake, runView } from './fixtures.ts';
 
@@ -38,6 +38,37 @@ describe('preferences of the panel', () => {
     expect(result.current[0]).toBe(false);
     act(() => result.current[1](true));
     expect(result.current[0]).toBe(true);
+  });
+});
+
+describe('the key of a preference', () => {
+  it('gives the value of the new key when the key changes', () => {
+    window.localStorage.setItem('aip.web.a', '1');
+    window.localStorage.setItem('aip.web.b', '2');
+    const { result, rerender } = renderHook(({ key }) => usePreference(key, 0), {
+      initialProps: { key: 'a' },
+    });
+    expect(result.current[0]).toBe(1);
+    rerender({ key: 'b' });
+    expect(result.current[0]).toBe(2);
+    rerender({ key: 'c' });
+    expect(result.current[0]).toBe(0);
+  });
+
+  it('is forgotten: the stored value is gone and the next read gives the initial one', () => {
+    const first = renderHook(() => usePreference('flag', false));
+    act(() => first.result.current[1](true));
+    forgetPreference('flag');
+    expect(window.localStorage.getItem('aip.web.flag')).toBeNull();
+    first.unmount();
+    expect(renderHook(() => usePreference('flag', false)).result.current[0]).toBe(false);
+  });
+
+  it('is forgotten without a usable storage too', () => {
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    expect(() => forgetPreference('flag')).not.toThrow();
   });
 });
 

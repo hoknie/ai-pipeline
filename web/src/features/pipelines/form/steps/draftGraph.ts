@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react';
 
 import type { FieldError } from '../../../../shared/api/types.ts';
+import type { Route } from '../../../../shared/lib/graph/edgeRoutes.ts';
 import type { ActionPoint } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
 import type {
   PipelineStage,
@@ -56,6 +57,8 @@ export interface CanvasNodeData extends Record<string, unknown> {
   sectionStart: boolean;
   /** The address of the entry of the stage in the Pipeline tab. */
   link: string | null;
+  /** The node is an end of the chosen connection: its side handles are shown. */
+  anchoring?: boolean;
 }
 
 export type CanvasNode = Node<CanvasNodeData, 'canvas'>;
@@ -63,6 +66,8 @@ export type CanvasNode = Node<CanvasNodeData, 'canvas'>;
 export interface AddEdgeData extends Record<string, unknown> {
   /** The place in the list of steps where a click on the plus inserts one. */
   index: number;
+  /** The route along which the edge is drawn; set by the canvas from the nodes it shows. */
+  route?: Route | undefined;
 }
 
 export type CanvasEdge = Edge<AddEdgeData>;
@@ -165,7 +170,6 @@ function chainOf(draft: Draft, context: GraphContext, marked: Set<string>): Canv
         }),
       );
       const last = nodes[nodes.length - 1] as CanvasNode;
-      last.draggable = context.editable;
       last.connectable = context.editable;
     }
   }
@@ -198,8 +202,7 @@ function orderEdges(nodes: CanvasNode[], draft: Draft, context: GraphContext): C
       id: `next:${from.id}->${to.id}`,
       source: from.id,
       target: to.id,
-      type: withAdd && insertAt !== null ? 'add' : 'default',
-      selectable: false,
+      type: withAdd && insertAt !== null ? 'add' : 'orthogonal',
       data: { index: insertAt ?? 0 },
     });
   }
@@ -214,7 +217,7 @@ function conflictEdge(): CanvasEdge {
     target: 'resolver',
     sourceHandle: 'down',
     targetHandle: 'up',
-    selectable: false,
+    type: 'orthogonal',
     data: { index: 0 },
   };
 }
@@ -231,7 +234,7 @@ function returnEdges(draft: Draft, context: GraphContext): CanvasEdge[] {
               target: `follow:${step.gotoIndex}`,
               sourceHandle: 'back-out',
               targetHandle: 'back-in',
-              selectable: false,
+              type: 'orthogonal',
               ...(step.maxRounds ? { label: `≤ ${step.maxRounds}` } : {}),
               data: { index: 0 },
             },
@@ -248,6 +251,7 @@ function returnEdges(draft: Draft, context: GraphContext): CanvasEdge[] {
         target: stepNodeId(target.key),
         sourceHandle: 'back-out',
         targetHandle: 'back-in',
+        type: 'orthogonal',
         ...(step.maxRounds.trim() ? { label: `≤ ${step.maxRounds.trim()}` } : {}),
         data: { index: 0 },
       },

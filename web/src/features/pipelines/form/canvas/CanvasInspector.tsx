@@ -8,6 +8,7 @@ import { formatRoute } from '../../../../shared/lib/nav/route.ts';
 import { splitTargets, specialistSlugs } from '../FormTab.tsx';
 import { PointsInput } from '../points/PointsInput.tsx';
 import { stepOfError, type Draft } from '../steps/draft.ts';
+import type { CanvasEdge, CanvasNode } from '../steps/draftGraph.ts';
 import {
   moveStep,
   patchStep,
@@ -19,6 +20,7 @@ import {
 import { SplitFieldset } from '../steps/SplitFieldset.tsx';
 import { StepFields } from '../steps/StepCard.tsx';
 import { errorsOfStep, type Selection } from './canvasModel.ts';
+import { NodeName } from './CanvasNode.tsx';
 import { StageInspector } from './StageInspector.tsx';
 
 export interface InspectorProps {
@@ -32,6 +34,10 @@ export interface InspectorProps {
   sharedOnly: boolean;
   disabled: boolean;
   previewStages: readonly PipelineStage[] | null | undefined;
+  /** The nodes and the connections of the canvas, for the inspector of a connection. */
+  nodes: readonly CanvasNode[];
+  edges: readonly CanvasEdge[];
+  onResetAnchors: (edge: CanvasEdge) => void;
 }
 
 function StepInspector({
@@ -96,16 +102,63 @@ function SplitInspector({
   );
 }
 
+/** A connection: where it goes from and to, the buttons that give its ends back and remove a return. */
+function EdgeInspector({
+  edgeId,
+  returnKey,
+  nodes,
+  edges,
+  disabled,
+  onDraft,
+  onResetAnchors,
+}: InspectorProps & { edgeId: string; returnKey: number | null }) {
+  const { t } = useTranslation();
+  const edge = edges.find((candidate) => candidate.id === edgeId);
+  if (!edge) return null;
+  const dataOf = (id: string) => nodes.find((node) => node.id === id)?.data;
+  const from = dataOf(edge.source);
+  const to = dataOf(edge.target);
+  return (
+    <div className="flex flex-col gap-2" data-testid="inspector-edge">
+      <p className="text-sm font-medium">{t('pipelines.canvasEdge')}</p>
+      <p className="flex flex-wrap items-center gap-1 text-sm">
+        {from ? <NodeName data={from} /> : edge.source}
+        <span aria-hidden>→</span>
+        {to ? <NodeName data={to} /> : edge.target}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => onResetAnchors(edge)}>
+          {t('pipelines.canvasResetAnchors')}
+        </Button>
+        {returnKey !== null ? (
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => onDraft((current) => setReturn(current, returnKey, null))}
+          >
+            {t('pipelines.canvasRemoveReturn')}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /** The properties of the chosen node: the same fields the form has. */
 export function CanvasInspector(props: InspectorProps) {
   const { t } = useTranslation();
   const { selection, draft, onDraft, view, sharedOnly, disabled } = props;
+  // the split and the points have a frame of their own; the others stand on a card
+  let framed = false;
   let body;
   if (!selection)
     body = <p className="text-sm text-muted-foreground">{t('pipelines.canvasHint')}</p>;
   else if (selection.kind === 'step') body = <StepInspector {...props} selection={selection} />;
-  else if (selection.kind === 'split') body = <SplitInspector {...props} />;
-  else if (selection.kind === 'point') {
+  else if (selection.kind === 'split') {
+    framed = true;
+    body = <SplitInspector {...props} />;
+  } else if (selection.kind === 'point') {
+    framed = true;
     const point: ActionPoint = selection.point;
     body = (
       <PointsInput
@@ -122,16 +175,11 @@ export function CanvasInspector(props: InspectorProps) {
   } else if (selection.kind === 'stage') {
     body = <StageInspector id={selection.id} stages={props.previewStages ?? null} />;
   } else if (selection.kind === 'return') {
-    const key = selection.key;
     body = (
-      <Button
-        variant="outline"
-        disabled={disabled}
-        onClick={() => onDraft((current) => setReturn(current, key, null))}
-      >
-        {t('pipelines.canvasRemoveReturn')}
-      </Button>
+      <EdgeInspector {...props} edgeId={`return:${selection.key}`} returnKey={selection.key} />
     );
+  } else if (selection.kind === 'edge') {
+    body = <EdgeInspector {...props} edgeId={selection.id} returnKey={null} />;
   } else {
     const pipeline = draft.split?.pipeline ?? '';
     body = (
@@ -158,7 +206,7 @@ export function CanvasInspector(props: InspectorProps) {
       aria-label={t('pipelines.canvasInspector')}
       data-canvas-inspector=""
     >
-      {body}
+      {framed ? body : <div className="rounded-lg border bg-card p-3">{body}</div>}
     </aside>
   );
 }

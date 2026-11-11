@@ -97,11 +97,6 @@ export function connectReturn(
   return setReturn(draft, source, target);
 }
 
-/** The place for a dragged step among the others, by the x-centres of the others in order. */
-export function dropIndex(centers: readonly number[], x: number): number {
-  return centers.filter((center) => center < x).length;
-}
-
 /** The draft with the split changed; `null` removes it. */
 export function withSplit(current: Draft, patch: Partial<SplitDraft> | null): Draft {
   if (patch === null) return { ...current, split: null };

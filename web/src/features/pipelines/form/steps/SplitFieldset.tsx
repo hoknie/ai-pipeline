@@ -113,7 +113,7 @@ export function SplitFieldset({
 }) {
   const { t } = useTranslation();
   return (
-    <fieldset className="flex flex-col gap-2 rounded-lg border p-3" disabled={disabled}>
+    <fieldset className="flex flex-col gap-2 rounded-lg border bg-card p-3" disabled={disabled}>
       <legend className="px-1 text-sm font-medium">{t('pipelines.split')}</legend>
       <div className="flex items-center gap-2">
         <Switch

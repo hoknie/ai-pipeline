@@ -1,12 +1,14 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '../../../../shared/lib/browser/cn.ts';
 import { conditionText, performerText } from '../../../../shared/lib/pipeline/stageText.ts';
+import { SIDES, type Side } from '../../../../shared/lib/graph/sideRoutes.ts';
 import type { CanvasNode as CanvasNodeType } from '../steps/draftGraph.ts';
 
 /** The caption of a node by its kind. */
-function useCaption(data: CanvasNodeType['data']): { title: string; subtitle: string } {
+export function useCaption(data: CanvasNodeType['data']): { title: string; subtitle: string } {
   const { t } = useTranslation();
   switch (data.kind) {
     case 'start':
@@ -45,6 +47,11 @@ function useCaption(data: CanvasNodeType['data']): { title: string; subtitle: st
   }
 }
 
+/** The caption of a node as text, for the inspector of a connection. */
+export function NodeName({ data }: { data: CanvasNodeType['data'] }) {
+  return <code>{useCaption(data).title}</code>;
+}
+
 /** The lines under the caption: who performs a stage of the daemon and when it runs. */
 function StageLines({ id, data }: { id: string; data: CanvasNodeType['data'] }) {
   const { t } = useTranslation();
@@ -68,6 +75,41 @@ function StageLines({ id, data }: { id: string; data: CanvasNodeType['data'] }) 
   );
 }
 
+const POSITION: Record<Side, Position> = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+};
+
+/** The handles of the four sides: the places a connection can be moved to; seen on hover or at the ends of the chosen connection. */
+function SideHandles() {
+  const className =
+    'size-2.5 !border-primary !bg-card opacity-0 group-hover:opacity-100 group-data-[anchoring=true]:opacity-100';
+  return (
+    <>
+      {SIDES.map((side) => (
+        <Fragment key={side}>
+          <Handle
+            type="source"
+            position={POSITION[side]}
+            id={side}
+            className={className}
+            isConnectable
+          />
+          <Handle
+            type="target"
+            position={POSITION[side]}
+            id={side}
+            className={className}
+            isConnectable
+          />
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 /** One node of the diagram: a step, the split, a point of actions or a stage of the system. */
 export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<CanvasNodeType>) {
   const { t } = useTranslation();
@@ -77,12 +119,13 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
     <div
       data-testid={`canvas-node-${id}`}
       data-kind={data.kind}
+      data-anchoring={data.anchoring ? 'true' : undefined}
       data-error={data.error ? 'true' : undefined}
       data-locked={data.locked ? 'true' : undefined}
       data-conditional={data.condition !== null ? 'true' : undefined}
       aria-invalid={data.error ? true : undefined}
       className={cn(
-        'relative min-w-36 max-w-52 rounded-lg border px-3 py-2 text-sm shadow-sm',
+        'group relative min-w-36 max-w-52 rounded-lg border px-3 py-2 text-sm shadow-sm',
         step ? 'bg-card' : 'bg-muted',
         selected && 'ring-2 ring-primary',
         data.error && 'border-destructive',
@@ -98,6 +141,7 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
           {t(`topology.stages.section.${data.section}`)}
         </div>
       ) : null}
+      <SideHandles />
       <Handle type="target" position={Position.Left} id="in" isConnectable={false} />
       <div className="truncate font-medium">{caption.title}</div>
       {caption.subtitle ? (
@@ -117,14 +161,14 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
             type="source"
             position={Position.Bottom}
             id="back-out"
-            style={{ left: '35%' }}
+            style={{ left: '75%' }}
             isConnectable={isConnectable}
           />
           <Handle
             type="target"
             position={Position.Bottom}
             id="back-in"
-            style={{ left: '65%' }}
+            style={{ left: '25%' }}
             isConnectable={isConnectable}
           />
         </>

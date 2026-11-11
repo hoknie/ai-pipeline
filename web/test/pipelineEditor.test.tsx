@@ -95,7 +95,7 @@ describe('the inspector', () => {
     const writePipeline = saved();
     render(<Page api={api({ writePipeline })} />);
     await openDiagram();
-    expect(inspector().getByText('Choose a node to edit it.')).toBeTruthy();
+    expect(inspector().getByText(/^Choose a node to edit it\./)).toBeTruthy();
     fireEvent.click(node('code'));
     expect(inspector().getByTestId('inspector-step-id').textContent).toBe('code');
     fireEvent.change(inspector().getByLabelText('additional step prompt'), {
@@ -130,6 +130,12 @@ describe('the inspector', () => {
     await openDiagram();
     const edge = screen.getByTestId(`edge-return:${keyOf('review')}`);
     expect(edge.textContent).toBe('≤ 3');
+    const shown = flow.props!.edges.find((item) => item.id === `return:${keyOf('review')}`) as {
+      type?: string;
+      data?: { route?: { points: unknown[] } };
+    };
+    expect(shown.type).toBe('orthogonal');
+    expect(shown.data?.route?.points.length).toBeGreaterThan(1);
     fireEvent.click(edge);
     fireEvent.click(inspector().getByRole('button', { name: 'Remove the return' }));
     expect(screen.queryByTestId(`edge-return:${keyOf('review')}`)).toBeNull();
@@ -199,20 +205,31 @@ describe('adding, removing and moving', () => {
     expect(isRemoveKey({ key: 'a', target: canvas() })).toBe(false);
   });
 
-  it('moves a step with the buttons and by dragging', async () => {
+  it('moves a step with the buttons of the inspector', async () => {
     const writePipeline = saved();
     render(<Page api={api({ writePipeline })} />);
     await openDiagram();
-    fireEvent.click(node('code'));
+    fireEvent.click(node('review'));
     fireEvent.click(inspector().getByRole('button', { name: 'up' }));
-    expect(stepNodes().map(titleOf)).toEqual(['code', 'plan', 'review']);
-    const drag = flow.props!.onNodeDragStop!;
-    act(() => drag({}, { id: `step:${keyOf('review')}`, position: { x: -10 } }));
-    expect(stepNodes().map(titleOf)).toEqual(['review', 'code', 'plan']);
+    expect(stepNodes().map(titleOf)).toEqual(['plan', 'review', 'code']);
     expect((await save(writePipeline)).steps.map((step) => step.id)).toEqual([
+      'plan',
       'review',
       'code',
+    ]);
+  });
+
+  it('does not change the order of the steps when a node is dragged', async () => {
+    const writePipeline = saved();
+    render(<Page api={api({ writePipeline })} />);
+    await openDiagram();
+    const review = flow.props!.nodes.find((item) => item.id === `step:${keyOf('review')}`)!;
+    act(() => flow.props!.onNodeDragStop!({}, { ...review, position: { x: -10, y: 300 } }));
+    expect(stepNodes().map(titleOf)).toEqual(['plan', 'code', 'review']);
+    expect((await save(writePipeline)).steps.map((step) => step.id)).toEqual([
       'plan',
+      'code',
+      'review',
     ]);
   });
 });
@@ -222,6 +239,7 @@ describe('returns by connecting', () => {
     const writePipeline = saved();
     render(<Page api={api({ writePipeline })} />);
     await openDiagram();
+    expect((flow.props as { connectionLineType?: unknown }).connectionLineType).toBe('smoothstep');
     const connect = flow.props!.onConnect!;
     const [plan, review] = ['plan', 'review'].map((title) => `step:${keyOf(title)}`);
     const valid = flow.props!.isValidConnection!;
@@ -325,7 +343,7 @@ describe('a split that follows another pipeline', () => {
     expect(follow.every((item) => item.dataset.locked === 'true')).toBe(true);
     expect(stepNodes()).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Add a step here' })).toBeNull();
-    expect(flow.props!.nodesDraggable).toBe(false);
+    expect(flow.props!.nodesDraggable).toBe(true);
     expect(flow.props!.nodesConnectable).toBe(false);
     fireEvent.click(follow[0]!);
     expect(inspector().getByText(/edit them there/)).toBeTruthy();
@@ -395,7 +413,7 @@ describe('view only', () => {
     const { onDirty } = form();
     openTab(/Diagram/);
     expect(screen.queryByRole('button', { name: 'Add a step here' })).toBeNull();
-    expect(flow.props!.nodesDraggable).toBe(false);
+    expect(flow.props!.nodesDraggable).toBe(true);
     expect(flow.props!.nodesConnectable).toBe(false);
     fireEvent.click(node('code'));
     expect(inspector().getByLabelText('additional step prompt')).toHaveProperty('disabled', true);

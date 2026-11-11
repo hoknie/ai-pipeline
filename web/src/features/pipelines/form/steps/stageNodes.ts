@@ -7,7 +7,7 @@ import {
 import type { CanvasKind, CanvasNode, CanvasNodeData } from './draftGraph.ts';
 
 /** How far below the delivery the resolver stands. */
-export const RESOLVER_OFFSET_Y = 130;
+export const RESOLVER_OFFSET_Y = 140;
 
 /** The stages of a canvas that the daemon, not the draft, decides on. */
 export type SystemKind = 'message' | 'resolver' | 'cleanup';
@@ -26,7 +26,7 @@ export function canvasNode(id: string, x: number, data: Partial<CanvasNodeData>)
     id,
     type: 'canvas',
     position: { x, y: 0 },
-    draggable: false,
+    draggable: true,
     connectable: false,
     data: {
       kind: 'step',

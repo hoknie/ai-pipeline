@@ -663,6 +663,22 @@ describe('saving and deleting', () => {
     expect((await screen.findAllByText('Pipeline «feature» deleted')).length).toBeGreaterThan(0);
   });
 
+  it('forgets the layout of the diagram of a deleted pipeline and keeps the others', async () => {
+    window.localStorage.setItem('aip.web.canvasLayout./repo.feature', '{"plan":{"x":1,"y":2}}');
+    window.localStorage.setItem('aip.web.canvasLayout./repo.other', '{"plan":{"x":1,"y":2}}');
+    window.localStorage.setItem('aip.web.canvasAnchors./repo.feature', '{"a->b":{"source":"top"}}');
+    window.localStorage.setItem('aip.web.canvasAnchors./repo.other', '{"a->b":{"source":"top"}}');
+    render(<Page api={api()} start="feature" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await screen.findAllByText('Pipeline «feature» deleted');
+    expect(window.localStorage.getItem('aip.web.canvasLayout./repo.feature')).toBeNull();
+    expect(window.localStorage.getItem('aip.web.canvasLayout./repo.other')).not.toBeNull();
+    expect(window.localStorage.getItem('aip.web.canvasAnchors./repo.feature')).toBeNull();
+    expect(window.localStorage.getItem('aip.web.canvasAnchors./repo.other')).not.toBeNull();
+  });
+
   it('saves a copy under a new id and creates a pipeline from an empty form', async () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={api({ writePipeline })} start="feature" />);

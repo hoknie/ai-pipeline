@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { WriteLevel } from '../../../shared/api/types.ts';
+import { forgetPreference } from '../../../shared/lib/browser/preferences.ts';
 import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import type {
   EditorInput,
@@ -9,6 +10,8 @@ import type {
   useEditorFeedback,
   useEditorFields,
 } from './editorState.ts';
+import { anchorsKey } from './canvas/canvasAnchors.ts';
+import { layoutKey } from './canvas/useCanvasLayout.ts';
 import { draftOf } from './steps/draft.ts';
 
 export interface EditorCallbacks {
@@ -128,7 +131,12 @@ export function useGuardedActions(
       if (!yes) return;
       feedback.setReferences([]);
       const result = await api.deletePipeline(pipeline.id, source.revision, level);
-      if (write.report(result)) await onDeleted();
+      if (write.report(result)) {
+        const repository = sharedOnly ? 'global' : input.view.repository;
+        forgetPreference(layoutKey(repository, pipeline.id));
+        forgetPreference(anchorsKey(repository, pipeline.id));
+        await onDeleted();
+      }
     });
   const reread = async () => {
     if (!(await discardsEdits(t('pipelines.rereadTitle'), t('settings.editor.reread')))) return;

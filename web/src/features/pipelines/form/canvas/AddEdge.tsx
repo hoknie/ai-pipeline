@@ -1,8 +1,9 @@
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { createContext, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { edgeLook, pathOf } from '../../../../shared/lib/graph/OrthogonalEdge.tsx';
 import type { CanvasEdge } from '../steps/draftGraph.ts';
 
 /** Inserts a step at a place of the list; set by the canvas. */
@@ -15,24 +16,25 @@ export function AddEdge({
   sourceY,
   targetX,
   targetY,
-  sourcePosition,
-  targetPosition,
   data,
   markerEnd,
+  selected,
+  selectable,
 }: EdgeProps<CanvasEdge>) {
   const { t } = useTranslation();
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-  });
+  const route = data?.route;
+  const path = pathOf(route, { x: sourceX, y: sourceY }, { x: targetX, y: targetY });
+  const labelX = route?.label.x ?? (sourceX + targetX) / 2;
+  const labelY = route?.label.y ?? (sourceY + targetY) / 2;
   const onAdd = useContext(AddStepContext);
   return (
     <>
-      <BaseEdge id={id} path={path} {...(markerEnd ? { markerEnd } : {})} />
+      <BaseEdge
+        id={id}
+        path={path}
+        {...(markerEnd ? { markerEnd } : {})}
+        {...edgeLook(selected, selectable)}
+      />
       <EdgeLabelRenderer>
         <button
           type="button"

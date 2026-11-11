@@ -5,7 +5,6 @@ import { draftGraph, type GraphContext } from '../src/features/pipelines/form/st
 import {
   canReturn,
   connectReturn,
-  dropIndex,
   insertStep,
   moveStep,
   removeStep,
@@ -155,15 +154,6 @@ describe('returns', () => {
     expect(gotos(connected)).toEqual([null, null, 'plan']);
     expect(connectReturn(draft, { source: `step:${a}`, target: `step:${c}` })).toBe(draft);
     expect(connectReturn(draft, { source: 'split', target: `step:${c}` })).toBe(draft);
-  });
-});
-
-describe('dropIndex', () => {
-  it('counts the steps left of the drop', () => {
-    expect(dropIndex([0, 240, 480], -50)).toBe(0);
-    expect(dropIndex([0, 240, 480], 300)).toBe(2);
-    expect(dropIndex([0, 240, 480], 900)).toBe(3);
-    expect(dropIndex([], 10)).toBe(0);
   });
 });
 
@@ -322,13 +312,13 @@ describe('draftGraph', () => {
     });
     const plus = graph.edges.filter((edge) => edge.type === 'add');
     expect(plus.map((edge) => edge.data?.index)).toEqual([0, 1, 2, 3]);
-    expect(graph.nodes.filter((node) => node.draggable)).toHaveLength(3);
+    expect(graph.nodes.every((node) => node.draggable)).toBe(true);
   });
 
-  it('has no plus and no dragging when only shown', () => {
+  it('has no plus and no linking when only shown, and still lets the nodes be moved', () => {
     const graph = draftGraph(draftOf(RAW), base({ editable: false }));
     expect(graph.edges.filter((edge) => edge.type === 'add')).toHaveLength(0);
-    expect(graph.nodes.some((node) => node.draggable)).toBe(false);
+    expect(graph.nodes.every((node) => node.draggable)).toBe(true);
     expect(graph.nodes.some((node) => node.connectable)).toBe(false);
   });
 
@@ -384,7 +374,7 @@ describe('draftGraph', () => {
     );
     const follow = graph.nodes.filter((node) => node.data.kind === 'follow');
     expect(follow.map((node) => node.id)).toEqual(['follow:0', 'follow:1']);
-    expect(follow.every((node) => node.data.locked && !node.draggable)).toBe(true);
+    expect(follow.every((node) => node.data.locked && node.draggable)).toBe(true);
     expect(graph.nodes.some((node) => node.data.kind === 'step')).toBe(false);
     expect(graph.edges.some((edge) => edge.type === 'add')).toBe(false);
     expect(graph.edges.find((edge) => edge.id === 'return:follow:1')?.label).toBe('≤ 2');

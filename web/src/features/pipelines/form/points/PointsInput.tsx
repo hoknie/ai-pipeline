@@ -151,7 +151,7 @@ export function PointsInput({
       .filter((candidate) => !listOf(point).includes(candidate));
   return (
     <fieldset
-      className="flex flex-col gap-3 rounded-lg border p-3"
+      className="flex flex-col gap-3 rounded-lg border bg-card p-3"
       disabled={disabled}
       data-testid="pipeline-points"
     >

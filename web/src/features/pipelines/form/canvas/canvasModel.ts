@@ -18,6 +18,7 @@ export type Selection =
   | { kind: 'point'; point: ActionPoint }
   | { kind: 'return'; key: number }
   | { kind: 'follow' }
+  | { kind: 'edge'; id: string }
   | { kind: 'stage'; id: StageNodeId };
 
 /** The nodes of the stages the system performs: shown only, described in the inspector. */
@@ -36,13 +37,21 @@ export function selectionOfNode(id: string): Selection | null {
   return point ? { kind: 'point', point } : null;
 }
 
-/** The selection that is still there after the draft changed, or none. */
+/** The selection a click on an edge stands for: an own return, or any other connection. */
+export function selectionOfEdge(id: string): Selection {
+  const key = id.startsWith('return:') ? Number(id.slice(7)) : NaN;
+  return Number.isInteger(key) ? { kind: 'return', key } : { kind: 'edge', id };
+}
+
+/** The selection that is still there after the draft changed, or none; `edgeIds` are the connections shown, when known. */
 export function liveSelection(
   selection: Selection | null,
   draft: Draft,
   stages: readonly PipelineStage[] | null = null,
+  edgeIds: ReadonlySet<string> | null = null,
 ): Selection | null {
   if (!selection) return null;
+  if (selection.kind === 'edge') return !edgeIds || edgeIds.has(selection.id) ? selection : null;
   if (selection.kind === 'stage') {
     if (selection.id === 'delivery') return selection;
     if (selection.id === 'merge') return draft.split ? selection : null;

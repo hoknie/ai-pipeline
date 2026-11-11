@@ -11,6 +11,15 @@ function read<T>(key: string, initial: T): T {
   }
 }
 
+/** Forgets a stored setting; the next read gives the initial value. */
+export function forgetPreference(key: string): void {
+  try {
+    window.localStorage.removeItem(PREFIX + key);
+  } catch {
+    // Private mode: nothing was stored.
+  }
+}
+
 /**
  * A setting of the person using the panel, kept in the browser between runs and page loads.
  * Without a usable localStorage it lives for the page only.
@@ -25,6 +34,13 @@ export function usePreference<T>(
   const shared = options.shared === true;
   const initialRef = useRef(initial);
   initialRef.current = initial;
+  const shownKey = useRef(key);
+  useEffect(() => {
+    // another key is another setting: its value replaces the one of the previous key
+    if (shownKey.current === key) return;
+    shownKey.current = key;
+    setValue(read(key, initialRef.current));
+  }, [key]);
   useEffect(() => {
     if (!shared) return;
     const onStorage = (event: StorageEvent) => {

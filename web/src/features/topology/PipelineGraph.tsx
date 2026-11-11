@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { PipelineTopology } from '../../shared/api/types.ts';
 
+import { OrthogonalEdge } from '../../shared/lib/graph/OrthogonalEdge.tsx';
 import { cn } from '../../shared/lib/browser/cn.ts';
 import type { MachineLoad } from '../../shared/lib/pipeline/specialistLoad.ts';
 import { useTheme } from '../../shared/lib/browser/theme.ts';
@@ -46,6 +47,7 @@ function FitOnSwitch({ pipeline }: { pipeline: string }) {
 }
 
 const NODE_TYPES = { stage: Stage };
+const EDGE_TYPES = { orthogonal: OrthogonalEdge };
 
 /**
  * The graph of a pipeline. With `live` the nodes carry the groups of active runs; without it
@@ -108,6 +110,7 @@ export function PipelineGraph({
           nodes={graph.nodes}
           edges={graph.edges}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
           nodeOrigin={NODE_ORIGIN}
           fitView
           colorMode={resolved}

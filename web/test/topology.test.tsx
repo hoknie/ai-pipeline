@@ -121,6 +121,28 @@ describe('layout', () => {
     ).toEqual(['b']);
     expect(edges.find((edge) => edge.id === 'reject:review->code')).toMatchObject({ label: '≤ 3' });
     expect(edges.map((edge) => edge.id)).toContain('delivery->resolver');
+    for (const edge of edges) expect(edge.type).toBe('orthogonal');
+    const route = (
+      edges.find((edge) => edge.id === 'reject:review->code')?.data as {
+        route: { points: { y: number }[] };
+      }
+    ).route;
+    const lane = route.points[1]!.y;
+    const bottom = Math.max(
+      ...nodes
+        .filter((node) => node.id.startsWith('step:'))
+        .map((node) => node.position.y + FALLBACK_HEIGHT / 2),
+    );
+    expect(lane).toBeGreaterThanOrEqual(bottom + 24);
+  });
+
+  it('draws an order edge as one straight segment before the nodes are measured', () => {
+    const pipeline = pipelineOf({ delivery: { mode: 'worktree', resolver: 'coder' } });
+    const { edges } = layout(pipeline, liveState(pipeline, [], '/repo'), i18next.t);
+    const order = edges.find((edge) => edge.id.startsWith('plan->') || edge.source === 'step:plan');
+    const points = (order?.data as { route: { points: { x: number; y: number }[] } }).route.points;
+    expect(points).toHaveLength(2);
+    expect(points[0]!.y).toBe(points[1]!.y);
   });
 });
 
@@ -432,6 +454,15 @@ describe('stable layout', () => {
     for (const node of nodes) {
       expect(node.data.attempts).toBe(node.data.kind === 'step' ? 0 : null);
     }
+  });
+
+  it('keeps the edge of a return when only the data of a node changes', () => {
+    const sizes = new Map<string, Size>([['step:code', { width: 150, height: 80 }]]);
+    const firstEdges = stabilizeEdges([], build(undefined, sizes).edges);
+    const changed = build([runView({ id: 'a', topology: onReview() })], sizes);
+    const nextEdges = stabilizeEdges(firstEdges, changed.edges);
+    const at = firstEdges.findIndex((edge) => edge.id === 'reject:review->code');
+    expect(nextEdges[at]).toBe(firstEdges[at]);
   });
 
   it('keeps unchanged nodes and edges, replaces only the changed ones with the cached size', () => {
