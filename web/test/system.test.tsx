@@ -109,7 +109,7 @@ describe('system steps in the runs section', () => {
     const api = mount([
       runView({ groups: [groupRow({ status: 'merged' })], system: [systemRow('resolve')] }),
     ]);
-    fireEvent.click(await screen.findByRole('button', { name: /Delivery conflict resolution/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Delivery conflict resolution/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     fireEvent.click(
       within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel group' }),

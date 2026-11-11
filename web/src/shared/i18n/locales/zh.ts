@@ -172,6 +172,8 @@ export const zh: Dictionary = {
   },
   runs: {
     list: {
+      stageLabel: '{{status}} · {{stage}}{{more}}',
+      stageMore: ' +{{n}}',
       undeliveredTip: '结果未交付到工作树：已交付 {{applied}}/{{merged}} 个分组',
       answers: '回答',
       answersCount: '{{who}} {{n}}',

@@ -171,6 +171,8 @@ export const en = {
   },
   runs: {
     list: {
+      stageLabel: '{{status}} · {{stage}}{{more}}',
+      stageMore: ' +{{n}}',
       undeliveredTip:
         'The result is not delivered to the working tree: {{applied}} of {{merged}} groups delivered',
       answers: 'Answers',

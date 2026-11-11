@@ -177,6 +177,8 @@ export const ru: Dictionary = {
   },
   runs: {
     list: {
+      stageLabel: '{{status}} · {{stage}}{{more}}',
+      stageMore: ' +{{n}}',
       undeliveredTip:
         'Результат не доставлен в рабочее дерево: доставлено групп {{applied}} из {{merged}}',
       answers: 'Ответы',

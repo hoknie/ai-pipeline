@@ -328,3 +328,57 @@ describe('undelivered result in the list', () => {
     expect(row().textContent).not.toContain('Not delivered');
   });
 });
+
+describe('stage in the status badge', () => {
+  const props = {
+    selectedRun: null,
+    selectedGroup: null,
+    now: 2_000,
+    query: '',
+    onQuery: () => undefined,
+    filters: EMPTY_FILTERS,
+    onFilters: () => undefined,
+    onSelect: () => undefined,
+    scope: 'repository' as const,
+    onScope: () => undefined,
+    repository: '/repo',
+  };
+
+  it('shows the step after the state of a running run', () => {
+    const row = show(runView({ groups: [groupRow()] }));
+    expect(within(row).getByLabelText(/^Active · Кодер \(active\)$/)).toBeTruthy();
+  });
+
+  it('adds the number of other stages', () => {
+    const row = show(
+      runView({
+        state: 'needs_human' as never,
+        groups: [
+          groupRow({ slug: 'ui' }),
+          groupRow({ slug: 'api', status: 'needs_human', stepName: 'Ревьюер' }),
+        ],
+      }),
+    );
+    const badge = within(row).getByLabelText(/Ревьюер \+1 \(needs_human\)$/);
+    expect(badge.textContent).toContain('Ревьюер +1');
+  });
+
+  it('has no stage for a finished run', () => {
+    const row = show(
+      runView({ state: 'finished', finished: true, groups: [groupRow({ status: 'merged' })] }),
+    );
+    expect(within(row).getByLabelText(/^[^·]*\(finished\)$/)).toBeTruthy();
+  });
+
+  it('follows the step without remounting the row', () => {
+    const run = runView({ groups: [groupRow()] });
+    const view = render(<RunList runs={[run]} {...props} />);
+    const element = view.container.querySelector('[data-run]');
+    expect(screen.getByLabelText(/Кодер \(active\)$/)).toBeTruthy();
+    view.rerender(
+      <RunList runs={[{ ...run, groups: [groupRow({ stepName: 'Ревьюер' })] }]} {...props} />,
+    );
+    expect(screen.getByLabelText(/Ревьюер \(active\)$/)).toBeTruthy();
+    expect(view.container.querySelector('[data-run]')).toBe(element);
+  });
+});

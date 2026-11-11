@@ -177,6 +177,8 @@ export const es: Dictionary = {
   },
   runs: {
     list: {
+      stageLabel: '{{status}} · {{stage}}{{more}}',
+      stageMore: ' +{{n}}',
       undeliveredTip:
         'El resultado no se entregó al árbol de trabajo: {{applied}} de {{merged}} grupos entregados',
       answers: 'Respuestas',

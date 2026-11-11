@@ -24,6 +24,7 @@ import { RunProgress } from './RunProgress.tsx';
 import { entryBadge } from './RunStatuses.tsx';
 import { RunWarningsBadge } from './RunWarningsBadge.tsx';
 import type { RunScope } from './runFilter.ts';
+import { runStage } from './runStage.ts';
 
 interface RunCardProps {
   run: RunView;
@@ -103,6 +104,15 @@ export function RunCard(props: RunCardProps) {
   const locale = useLocale();
   const times = runTimes(run, now, locale);
   const mark = undeliveredMark(run);
+  const stage = runStage(run, (kind) => t(`runs.system.${kind}`));
+  const status = runStatusLabel(run, t);
+  const stageLabel = stage
+    ? t('runs.list.stageLabel', {
+        status,
+        stage: stage.first,
+        more: stage.rest > 0 ? t('runs.list.stageMore', { n: stage.rest }) : '',
+      })
+    : status;
   return (
     <li data-run={run.id}>
       <button
@@ -134,7 +144,7 @@ export function RunCard(props: RunCardProps) {
         </span>
         <span className="grid grid-cols-2 items-center gap-2 text-xs text-muted-foreground">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <StatusBadge status={run.state} label={runStatusLabel(run, t)} />
+            <StatusBadge status={run.state} label={stageLabel} tip={stage?.all.join(', ')} />
             <RunWarningsBadge run={run} />
             <UndeliveredBadge run={run} />
           </span>

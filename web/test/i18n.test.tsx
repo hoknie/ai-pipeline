@@ -172,7 +172,7 @@ describe('language menu', () => {
   it('shows data as it is on any language', () => {
     mount([runView({ title: 'Флаг --json для aip version', state: 'needs_human', waiting: 1 })]);
     expect(screen.getAllByText('Флаг --json для aip version').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText('Needs answer (needs_human)').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText(/^Needs answer.* \(needs_human\)$/).length).toBeGreaterThan(0);
   });
 });
 
@@ -241,6 +241,8 @@ const DICTIONARIES = { es, ru, zh } as Record<string, Tree>;
 // Words that read the same in the language: names of languages, product and protocol terms.
 const SAME_AS_ENGLISH = new Set([
   'Script {{n}}',
+  '{{status}} · {{stage}}{{more}}',
+  ' +{{n}}',
   'B',
   'beta',
   'Plain',

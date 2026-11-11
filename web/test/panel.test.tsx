@@ -227,10 +227,10 @@ describe('needs_human runs', () => {
 
   it('shows needs_human ×N in the list and header, and active after the answer', () => {
     const { rerender } = render(list([waiting()], { now: 1000 }));
-    expect(screen.getByText('Needs answer ×3')).toBeTruthy();
+    expect(screen.getByText(/^Needs answer ×3/)).toBeTruthy();
     rerender(list([{ ...waiting(), state: 'active', waiting: 0 }], { now: 1000 }));
     expect(screen.queryByText(/Needs answer/)).toBeNull();
-    expect(screen.getByText('Active')).toBeTruthy();
+    expect(screen.getByText(/^Active/)).toBeTruthy();
   });
 
   it('shows a plain needs_human badge for a single waiting group', () => {
