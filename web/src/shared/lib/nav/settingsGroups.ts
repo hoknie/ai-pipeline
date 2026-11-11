@@ -45,6 +45,7 @@ export const LEGACY_SETTINGS_GROUPS: Record<
   runtimes: { scope: 'global', group: 'runtimes' },
   chains: { scope: 'global', group: 'chains' },
   web: { scope: 'global', group: 'system' },
+  network: { scope: 'global', group: 'system' },
   queue: { scope: 'project', group: 'queue' },
   tags: { scope: 'project', group: 'tags' },
   system: { scope: 'global', group: 'system' },
@@ -88,7 +89,7 @@ export function groupOf(path: string): SettingsGroup {
   if (section === 'defaults' || section === 'claude') return 'agents';
   if (section === 'delivery') return 'delivery';
   if (section === 'runtimes') return 'runtimes';
-  if (section === 'web') return 'system';
+  if (section === 'web' || section === 'network') return 'system';
   return DEFAULT_SETTINGS_GROUP;
 }
 

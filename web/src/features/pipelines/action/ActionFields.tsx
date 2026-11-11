@@ -14,6 +14,7 @@ import {
 import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
 import type { ActionDraft, Field } from './actionDraft.ts';
+import { ScriptsInput } from './ScriptsInput.tsx';
 
 /** Radix `Select` has no empty value: this one stands for «nothing chosen». */
 const NONE = '__none';
@@ -32,14 +33,10 @@ function CommandFields({ draft, disabled, update, errorsOf }: FieldsProps) {
     <>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="field-action-run">{t('pipeline.actions.run')}</Label>
-        <Textarea
-          id="field-action-run"
-          rows={3}
-          className="font-mono"
-          value={draft.run}
+        <ScriptsInput
+          scripts={draft.scripts}
           disabled={disabled}
-          placeholder='git commit -am "$AIP_COMMIT_MESSAGE"'
-          onChange={(event) => update({ run: event.target.value })}
+          onScripts={(scripts) => update({ scripts })}
         />
         <p className="text-xs text-muted-foreground">{t('pipeline.actions.runHelp')}</p>
         {errorsOf('run')}

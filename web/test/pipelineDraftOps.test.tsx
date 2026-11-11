@@ -15,6 +15,11 @@ import {
   withSplit,
 } from '../src/features/pipelines/form/steps/draftOps.ts';
 import { stepIds } from '../src/features/pipelines/stepIds.ts';
+import { findPipeline } from '../../src/feature/swarm-config/types/index.ts';
+import { parseConfig } from '../../src/feature/swarm-config/services/index.ts';
+import { pipelineStages } from '../../src/feature/runs/types/index.ts';
+import type { PipelineStage } from '../src/shared/lib/pipeline/pipelineStages.ts';
+import { ACTION_POINTS, POINT_SECTION } from '../src/shared/lib/pipeline/pipelineEntries.ts';
 
 const RAW = {
   steps: [
@@ -189,6 +194,7 @@ describe('draftGraph', () => {
     ids: stepIds(draft.steps),
     follow: null,
     points: { before_split: [], after_split: [], before_delivery: ['lint'], after_delivery: null },
+    stages: null,
     errors: [],
     editable: true,
     ...over,
@@ -209,6 +215,85 @@ describe('draftGraph', () => {
     expect(graph.nodes[1]?.data).toMatchObject({ title: 'plan', subtitle: 'plan', kind: 'step' });
     expect(graph.nodes.find((n) => n.id === 'point:before_delivery')?.data.count).toBe(1);
     expect(graph.nodes.find((n) => n.id === 'point:after_delivery')?.data.count).toBeNull();
+  });
+
+  const stage = (
+    id: string,
+    kind: PipelineStage['kind'],
+    over: Partial<PipelineStage> = {},
+  ): PipelineStage => ({
+    id,
+    kind,
+    section: 'delivery',
+    name: id,
+    performer: { type: 'system' },
+    condition: null,
+    status: null,
+    group: null,
+    ...over,
+  });
+  const scribe = { type: 'specialist', slug: 'scribe', name: 'scribe' } as const;
+  const SYSTEM_STAGES = [
+    stage('message', 'message', { performer: scribe, condition: 'delivery_commit' }),
+    stage('delivery', 'delivery'),
+    stage('resolve', 'resolve', { performer: scribe, condition: 'conflict' }),
+    stage('cleanup', 'cleanup', { section: 'finish', condition: 'not_keep' }),
+  ];
+
+  it('adds the message, the resolver and the cleanup from the stages of the daemon', () => {
+    const graph = draftGraph(draftOf(RAW), base({ stages: SYSTEM_STAGES }));
+    expect(idsOf(graph).filter((id) => !id.startsWith('step:'))).toEqual([
+      'start',
+      'point:before_delivery',
+      'message',
+      'delivery',
+      'point:after_delivery',
+      'cleanup',
+      'resolver',
+    ]);
+    const data = (id: string) => graph.nodes.find((n) => n.id === id)?.data;
+    expect(data('message')).toMatchObject({ performer: scribe, condition: 'delivery_commit' });
+    expect(data('message')?.link).toBe('#pipelines/system/message');
+    expect(data('delivery')).toMatchObject({ performer: { type: 'system' }, condition: null });
+    expect(data('cleanup')).toMatchObject({ section: 'finish', sectionStart: false });
+    const conflict = graph.edges.find((edge) => edge.target === 'resolver');
+    expect(conflict).toMatchObject({
+      source: 'delivery',
+      sourceHandle: 'down',
+      targetHandle: 'up',
+    });
+    const below = graph.nodes.find((n) => n.id === 'resolver')?.position;
+    expect(below?.x).toBe(graph.nodes.find((n) => n.id === 'delivery')?.position.x);
+    expect(below?.y).toBeGreaterThan(0);
+    expect(data('resolver')?.sectionStart).toBe(false);
+    expect(graph.edges.some((edge) => edge.target === 'message')).toBe(true);
+  });
+
+  it('keeps only the merge and the delivery without stages of the daemon', () => {
+    const graph = draftGraph(draftOf(RAW), base());
+    expect(idsOf(graph)).not.toContain('message');
+    expect(idsOf(graph)).not.toContain('resolver');
+    expect(idsOf(graph)).not.toContain('cleanup');
+    const delivery = graph.nodes.find((n) => n.id === 'delivery')?.data;
+    expect(delivery).toMatchObject({
+      performer: { type: 'system' },
+      link: '#pipelines/system/delivery',
+    });
+  });
+
+  it('marks the first node of each section', () => {
+    const draft = withSplit(draftOf(RAW), { specialist: 'plan' });
+    const graph = draftGraph(draft, base({}, draft));
+    const starts = graph.nodes
+      .filter((n) => n.data.sectionStart)
+      .map((n) => [n.id.startsWith('step:') ? 'step' : n.id, n.data.section]);
+    expect(starts).toEqual([
+      ['point:before_split', 'prepare'],
+      ['step', 'work'],
+      ['merge', 'merge'],
+      ['point:before_delivery', 'delivery'],
+      ['point:after_delivery', 'finish'],
+    ]);
   });
 
   it('puts the split, its points and the merge around the steps', () => {
@@ -313,5 +398,35 @@ describe('draftGraph', () => {
       locked: true,
       title: 'gone',
     });
+  });
+});
+
+describe('POINT_SECTION', () => {
+  it('matches the sections the engine gives the stages of each point', () => {
+    const resolved = parseConfig(`swarm:
+  max: 2
+  specialists:
+    coder: { name: Coder }
+  actions:
+    one: { run: "a" }
+  stages:
+    before_split: [one]
+    after_split: [one]
+    before_delivery: [one]
+    after_delivery: [one]
+  pipelines:
+    feature:
+      split: { specialist: coder, max_groups: 2 }
+      steps:
+        - { id: code, specialist: coder }
+`);
+    const pipeline = findPipeline(resolved, 'feature');
+    if (!pipeline) throw new Error('no pipeline');
+    const stages = pipelineStages(resolved, pipeline);
+    for (const point of ACTION_POINTS) {
+      const own = stages.filter((stage) => stage.id.startsWith(`action:${point}:`));
+      expect(own).toHaveLength(1);
+      expect(own[0]?.section).toBe(POINT_SECTION[point]);
+    }
   });
 });

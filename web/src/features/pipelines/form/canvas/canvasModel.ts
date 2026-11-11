@@ -4,10 +4,12 @@ import {
   pointsOfStages,
   type ActionPoint,
 } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
+import type { PipelineStage } from '../../../../shared/lib/pipeline/pipelineStages.ts';
 import { stepIds } from '../../stepIds.ts';
 import { draftOf, record, stepOfError, type Draft } from '../steps/draft.ts';
 import { pointNodeId, stepNodeId, type GraphContext } from '../steps/draftGraph.ts';
 import { stepKeyOfNode } from '../steps/draftOps.ts';
+import { stageOfKind } from '../steps/stageNodes.ts';
 
 /** What the person chose on the canvas. */
 export type Selection =
@@ -15,7 +17,12 @@ export type Selection =
   | { kind: 'split' }
   | { kind: 'point'; point: ActionPoint }
   | { kind: 'return'; key: number }
-  | { kind: 'follow' };
+  | { kind: 'follow' }
+  | { kind: 'stage'; id: StageNodeId };
+
+/** The nodes of the stages the system performs: shown only, described in the inspector. */
+export type StageNodeId = 'merge' | 'delivery' | 'message' | 'resolver' | 'cleanup';
+const STAGE_NODES: readonly StageNodeId[] = ['merge', 'delivery', 'message', 'resolver', 'cleanup'];
 
 /** The selection a click on a node stands for. */
 export function selectionOfNode(id: string): Selection | null {
@@ -23,13 +30,24 @@ export function selectionOfNode(id: string): Selection | null {
   if (key !== null) return { kind: 'step', key };
   if (id === 'split' || id === 'start') return { kind: 'split' };
   if (id.startsWith('follow:')) return { kind: 'follow' };
+  const stage = STAGE_NODES.find((candidate) => candidate === id);
+  if (stage) return { kind: 'stage', id: stage };
   const point = ACTION_POINTS.find((candidate) => pointNodeId(candidate) === id);
   return point ? { kind: 'point', point } : null;
 }
 
 /** The selection that is still there after the draft changed, or none. */
-export function liveSelection(selection: Selection | null, draft: Draft): Selection | null {
+export function liveSelection(
+  selection: Selection | null,
+  draft: Draft,
+  stages: readonly PipelineStage[] | null = null,
+): Selection | null {
   if (!selection) return null;
+  if (selection.kind === 'stage') {
+    if (selection.id === 'delivery') return selection;
+    if (selection.id === 'merge') return draft.split ? selection : null;
+    return stageOfKind(stages, selection.id) ? selection : null;
+  }
   if (selection.kind === 'step' || selection.kind === 'return') {
     const step = draft.steps.find((candidate) => candidate.key === selection.key);
     if (!step || draft.split?.pipeline) return null;
@@ -46,6 +64,7 @@ export function selectedNodeId(selection: Selection | null): string | null {
   if (selection.kind === 'step') return stepNodeId(selection.key);
   if (selection.kind === 'split') return 'split';
   if (selection.kind === 'point') return pointNodeId(selection.point);
+  if (selection.kind === 'stage') return selection.id;
   return null;
 }
 
@@ -73,7 +92,7 @@ export function followOf(view: ConfigEditorResponse, draft: Draft): GraphContext
 /** The lists of the points: the own one, or the one the daemon computed; `null` while unknown. */
 export function pointLists(
   draft: Draft,
-  previewStages: { id: string; kind: string }[] | null | undefined,
+  previewStages: readonly PipelineStage[] | null | undefined,
 ): GraphContext['points'] {
   const inherited = pointsOfStages(previewStages ?? undefined);
   return Object.fromEntries(

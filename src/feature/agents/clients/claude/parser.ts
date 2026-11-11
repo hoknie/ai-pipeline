@@ -76,6 +76,12 @@ function exhaustedLimit(value: unknown): { resetsAt: number | null } | null {
   return { resetsAt: info?.resetsAt === undefined ? null : info.resetsAt * 1000 };
 }
 
+/** Texts of the result of a request that never got an answer from the API. */
+const NETWORK_ERROR =
+  /Connection error|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|Request timed out|unsupported_country_region_territory/i;
+
+const NETWORK_ERROR_LIMIT = 200;
+
 function commandOf(input: unknown): string | null {
   if (typeof input !== 'object' || input === null) return null;
   const command = (input as { command?: unknown }).command;
@@ -132,6 +138,7 @@ class ClaudeParser implements OutputParser {
   private readonly anonymous: Usage[] = [];
   private error: string | null = null;
   private usageLimit: { resetsAt: number | null } | null = null;
+  private networkError: string | null = null;
   private readonly denials = new Denials();
 
   push(line: string): void {
@@ -179,6 +186,7 @@ class ClaudeParser implements OutputParser {
       error: this.error,
       denials: this.denials.values(),
       usageLimit: this.usageLimit,
+      networkError: this.networkError,
     };
   }
 
@@ -225,6 +233,9 @@ class ClaudeParser implements OutputParser {
     }
     if (event.is_error) {
       this.error = typeof event.result === 'string' ? event.result : 'claude reported an error';
+      if (typeof event.result === 'string' && NETWORK_ERROR.test(event.result)) {
+        this.networkError = event.result.slice(0, NETWORK_ERROR_LIMIT);
+      }
     }
   }
 }

@@ -42,6 +42,8 @@ export type FailReason =
   | { kind: 'skipped' }
   /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
   | { kind: 'usage_limit'; resetsAt: number | null }
+  /** The network was down or the API of the agent was unreachable; the step goes on after a pause. */
+  | { kind: 'network'; problem: string }
   /** A human message interrupted the attempt; the step continues in the same session. */
   | { kind: 'message'; text: string; at: number }
   /** A pause of the run stopped the attempt; the step continues in the same session. */
@@ -77,6 +79,8 @@ export function describeFailReason(reason: FailReason): string {
       return 'interrupted by a message';
     case 'paused':
       return 'interrupted by a pause';
+    case 'network':
+      return `network: ${reason.problem}`;
     case 'usage_limit':
       return reason.resetsAt === null
         ? 'usage limit'

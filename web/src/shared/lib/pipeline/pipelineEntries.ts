@@ -2,7 +2,7 @@
  * Pipeline entries of the list: actions and built-in (system) stages. The shapes are declared
  * here, structurally, so the panel compiles whatever the protocol types look like.
  */
-import type { EntryLevel } from '../../api/types.ts';
+import type { EntryLevel, StageSection } from '../../api/types.ts';
 
 /** Points of the pipeline where a pipeline (or `swarm.stages`) runs actions. */
 export const ACTION_POINTS = [
@@ -12,6 +12,14 @@ export const ACTION_POINTS = [
   'after_delivery',
 ] as const;
 export type ActionPoint = (typeof ACTION_POINTS)[number];
+
+/** The section of the stages of each point; the same table the engine uses for its stages. */
+export const POINT_SECTION: Record<ActionPoint, StageSection> = {
+  before_split: 'prepare',
+  after_split: 'prepare',
+  before_delivery: 'delivery',
+  after_delivery: 'finish',
+};
 
 /** Points that only exist in a pipeline with a split. */
 export const SPLIT_POINTS: readonly ActionPoint[] = ['before_split', 'after_split'];

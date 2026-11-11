@@ -1,5 +1,6 @@
 import type {
   BackgroundProcessView,
+  NetworkStatus,
   DaemonMismatch,
   QueueView,
   RepositoryView,
@@ -34,7 +35,8 @@ export type StreamEvent =
   | { event: 'tags'; repository?: string; tags: TagView[] }
   | { event: 'run'; run: RunView }
   | { event: 'queue'; queue: QueueView }
-  | { event: 'processes'; processes?: BackgroundProcessView[]; error?: string };
+  | { event: 'processes'; processes?: BackgroundProcessView[]; error?: string }
+  | { event: 'network'; network: NetworkStatus };
 
 /**
  * An event of the stream as it is read: the ones above, `observers` (the settings changed in
@@ -51,6 +53,7 @@ const STREAM_EVENTS = new Set([
   'run',
   'queue',
   'processes',
+  'network',
 ]);
 
 export function isStreamEvent(event: ReadEvent): event is StreamEvent {

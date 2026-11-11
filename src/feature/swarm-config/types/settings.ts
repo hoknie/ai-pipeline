@@ -193,7 +193,11 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     })),
   }));
   // Runs stored before pipeline actions existed have none.
-  const actions = stored.actions ?? [];
+  // Runs stored before script lists keep `run` as one string.
+  const actions = (stored.actions ?? []).map((action) => ({
+    ...action,
+    run: typeof action.run === 'string' ? [action.run] : action.run,
+  }));
   const stages = stored.stages ?? {};
   const { workflows: _old, ...current } = stored;
   return {
@@ -232,4 +236,45 @@ export interface ResolvedConfig {
   actions: Action[];
   /** Actions of the pipeline points shared by the pipelines. */
   stages: StagePoints;
+}
+
+/** The network check of the daemon; read from the global settings.yaml only. */
+export interface NetworkSettings {
+  /** The daemon checks the network and holds agents while it is down. */
+  enabled: boolean;
+  /** `host:port` (a TCP connection) or an `http(s)://` URL (a GET request). */
+  targets: string[];
+  /** Interfaces that must exist and have a non-loopback address, such as `wt0` of NetBird. */
+  interfaces: string[];
+  /** An `http(s)://` proxy: probes go through it and agents get it as `HTTPS_PROXY`. */
+  proxy: string | null;
+  /** Seconds between two checks. */
+  interval: number;
+  /** Seconds a probe may take. */
+  timeout: number;
+}
+
+export const DEFAULT_NETWORK_TARGET = 'https://api.anthropic.com';
+
+export function defaultNetwork(): NetworkSettings {
+  return {
+    enabled: false,
+    targets: [DEFAULT_NETWORK_TARGET],
+    interfaces: [],
+    proxy: null,
+    interval: 30,
+    timeout: 5,
+  };
+}
+
+/** The proxy URL without login and password; text that is not a URL is returned as it is. */
+export function redactProxy(proxy: string): string {
+  try {
+    const url = new URL(proxy);
+    url.username = '';
+    url.password = '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return proxy;
+  }
 }

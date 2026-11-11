@@ -12,10 +12,23 @@ on_failure: stop          # stop | continue
 
 Exactly one of `run` and `specialist` is required.
 
-- **`run`** is a command run by the daemon through the shell. No agent is started.
+- **`run`** is a command run by the daemon through the shell. No agent is started. It is a string or a list of scripts; see [several scripts](#several-scripts).
 - **`specialist`** is a specialist that works as a step of the run. `additional_prompt` is appended to its prompt; it is allowed only with `specialist`.
-- **`timeout`** stops a command that works too long; the step fails with the reason `timeout`.
+- **`timeout`** stops a command that works too long (all its scripts together); the step fails with the reason `timeout`.
 - **`on_failure: stop`** (the default) stops the pipeline at this point; `continue` lets it go on, and the step stays failed.
+
+## Several scripts
+
+`run` may be a list. The scripts run one after another in the listed order, each by its own `sh -c`, with the same environment and directory:
+
+```yaml
+# aip/actions/check.yaml
+run:
+  - npm run lint
+  - npm test
+```
+
+The first script that exits with a non-zero code stops the action with that code, and the scripts after it do not start. The log of the step has a line `[aip] $ <script>` before each script.
 
 ## Points
 

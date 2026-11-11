@@ -75,6 +75,8 @@ The group "Projects" of "Shared" manages the [projects of the daemon](../usage/r
 
 "System" shows the state of the [daemon](../usage/daemon.md) (pid, version, build, whether agents work) and of the panel (pid, address without the token, access, build), refreshed every 3 seconds, and the path of the daemon log.
 
+- The card "Network" shows the [state of the network](../configuration/network.md): "Check is off", "Available" or "Unavailable" with the reason, when the state changed, when it was last checked and the proxy of the check (from the settings or the daemon environment) without its login and password. It updates on the `network` event and with the poll.
+- The form "Network" sets the `network` section of the shared settings. Changes apply from the next check, without restarting the daemon; while the network is down, agents do not start.
 - "Restart panel" restarts the panel on its address with its token; the page comes back by itself. The daemon and its agents keep running.
 - "Restart daemon" runs `aip daemon restart --web` as a separate process. While agents work the panel asks again, and "Restart, stopping the agents" runs it with `--force`.
 - "Stop daemon" asks for confirmation and runs `aip daemon stop --web` as a separate process. While agents work the panel asks again, and "Stop, stopping the agents" runs it with `--force`. The page stays open: a [stand-in process](../usage/daemon.md#the-panel-and-the-daemon) serves it while the daemon is stopped.

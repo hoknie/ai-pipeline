@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { ObserversView } from '../../shared/api/observerTypes.ts';
-import type { QueueView, RepositoryView, RunView } from '../../shared/api/types.ts';
+import type { NetworkStatus, QueueView, RepositoryView, RunView } from '../../shared/api/types.ts';
 import type { QueueDraft } from '../../features/queue/index.ts';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import type { Route } from '../../shared/lib/nav/route.ts';
@@ -85,6 +85,7 @@ export function QueueRoute(props: {
 export function SettingsRoute(props: {
   common: Common;
   streamedObservers: ObserversView | null;
+  streamedNetwork: NetworkStatus | null;
   repository: string | null;
   repositories: string[];
   onSelectRepository: (path: string) => void;

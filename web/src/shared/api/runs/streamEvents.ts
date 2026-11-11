@@ -5,6 +5,7 @@ import { isStreamEvent, type ReadEvent, type StreamEvent } from '../stream.ts';
 import type {
   BackgroundProcessView,
   DaemonMismatch,
+  NetworkStatus,
   QueueView,
   RepositoryView,
   RunView,
@@ -35,6 +36,7 @@ export interface RunsSetters {
   setHistory: Setter<Map<string, RunView>>;
   setStreamedObservers: Setter<ObserversView | null>;
   setStreamedProcesses: Setter<StreamedProcesses | null>;
+  setStreamedNetwork: Setter<NetworkStatus | null>;
   setConnection: Setter<'live' | 'reconnecting' | 'polling'>;
 }
 
@@ -91,6 +93,9 @@ function applyKnown(
       set.setStreamedProcesses({ processes, error: event.error ?? null });
       return;
     }
+    case 'network':
+      set.setStreamedNetwork(event.network);
+      return;
     case 'queue': {
       const view = event.queue;
       set.setQueues((current) => putQueue(current, view));

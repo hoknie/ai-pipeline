@@ -64,7 +64,10 @@ const HANDLERS: Handlers = {
   action_finished: (m, e) => actionFinished(m, e.group, e.seq, e.outcome),
   message: (m, e) => messageAttempt(m, e.group, e.seq, e.text),
   cancel: (m, e) => cancelGroups(m, e.group, e.reason),
-  retry: (m, e) => retryGroup(m, e.group, e.permissions, e.specialists),
+  retry: (m, e) => {
+    retryGroup(m, e.group, e.permissions, e.specialists);
+    if (e.hold !== undefined) m.state.run.hold = e.hold;
+  },
   answer: (m, e) => answerQuestion(m, e.group, e.answer, e.by ?? 'human', e.permissions),
   merge_finished: (m, e) => mergeFinished(m, e.group, e.outcome),
   commit_failed: (m, e) => commitFailed(m, e.group, e.message),

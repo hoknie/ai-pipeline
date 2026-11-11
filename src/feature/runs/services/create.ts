@@ -1,5 +1,6 @@
 import type { Database } from '../../../platform/sqlite/index.ts';
 import type { AgentsService } from '../../agents/services/index.ts';
+import type { NetworkMonitor } from '../../network/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
 import type {
@@ -29,6 +30,7 @@ export interface RunsDependencies {
   now: () => number;
   agents: AgentsService;
   config: ConfigService;
+  network: NetworkMonitor;
   registry: RegistryService;
   socket: string;
   environment: NodeJS.ProcessEnv;
@@ -67,6 +69,7 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     queue: dependencies.queue,
     observe: dependencies.observe,
     publish: dependencies.publish,
+    network: () => dependencies.network.snapshot(),
   });
   const effects = new RunEffects({ ...dependencies, context: engine });
   engine.attach(effects);

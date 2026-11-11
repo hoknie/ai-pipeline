@@ -45,7 +45,20 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
       paths: ['runtimes.agy.command', 'runtimes.agy.args', 'runtimes.agy.env'],
     },
   ],
-  system: [{ key: 'panel', paths: ['web.autostart', 'web.auth', 'web.host', 'web.port'] }],
+  system: [
+    { key: 'panel', paths: ['web.autostart', 'web.auth', 'web.host', 'web.port'] },
+    {
+      key: 'network',
+      paths: [
+        'network.enabled',
+        'network.targets',
+        'network.interfaces',
+        'network.proxy',
+        'network.interval',
+        'network.timeout',
+      ],
+    },
+  ],
 };
 
 /** The cards of the settings of a built-in stage; the group of the titles is `delivery`. */

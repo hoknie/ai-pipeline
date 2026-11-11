@@ -18,6 +18,10 @@ const WEB_PORT_RANGE = [1, 65535] as const;
 
 const RESOLVER_ROUNDS_RANGE = MAX_ROUNDS_RANGE;
 
+const NETWORK_INTERVAL_RANGE = [5, 3600] as const;
+
+const NETWORK_TIMEOUT_RANGE = [1, 60] as const;
+
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export function field(
@@ -63,6 +67,12 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('web.auth', 'choice', { options: WEB_AUTH_MODES, globalOnly: true }),
   field('web.host', 'choice', { options: WEB_HOSTS, globalOnly: true }),
   field('web.port', 'integer', { range: WEB_PORT_RANGE, globalOnly: true }),
+  field('network.enabled', 'boolean', { globalOnly: true }),
+  field('network.targets', 'strings', { globalOnly: true }),
+  field('network.interfaces', 'strings', { globalOnly: true }),
+  field('network.proxy', 'string', { globalOnly: true }),
+  field('network.interval', 'integer', { range: NETWORK_INTERVAL_RANGE, globalOnly: true }),
+  field('network.timeout', 'integer', { range: NETWORK_TIMEOUT_RANGE, globalOnly: true }),
   ...RUNTIMES.flatMap((runtime) => [
     field(`runtimes.${runtime}.command`, 'string', { globalOnly: true }),
     field(`runtimes.${runtime}.args`, 'strings', { globalOnly: true }),

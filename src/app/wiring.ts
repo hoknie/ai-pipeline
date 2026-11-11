@@ -1,5 +1,6 @@
 import type { ArtifactsPublishPort } from '../feature/artifacts/ports/index.ts';
 import type { DeliveryPublishPort } from '../feature/delivery/ports/index.ts';
+import type { NetworkChangedPort } from '../feature/network/ports/index.ts';
 import type { ObserversPublishPort } from '../feature/observers/ports/index.ts';
 import type { ProcessesPublishPort } from '../feature/processes/ports/index.ts';
 import type { QueuePublishPort, RepairPolicyPort } from '../feature/queue/ports/index.ts';
@@ -72,6 +73,7 @@ export function declarePorts() {
     queuePublish: wiring.port<QueuePublishPort>('queue.publish'),
     repair: wiring.port<RepairPolicyPort>('queue.repair'),
     observers: wiring.port<ObserversPublishPort>('observers.publish'),
+    network: wiring.port<NetworkChangedPort>('network.changed'),
   };
   return { wiring, ports };
 }

@@ -59,9 +59,12 @@ The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Sha
 - The form lists the steps: id, specialist, the return on rejection with the number of rounds, and the additional prompt. Steps are added, deleted and reordered with buttons. Deleting a step also clears the return of every step that pointed to it, with its number of rounds.
 - The "Task split" switch turns on the split block. Its "Group steps" choice is "Own steps" or the id of another pipeline, which is [`split.pipeline`](../configuration/pipelines.md#groups-that-follow-another-pipelines-steps). When a target is chosen, the step list is hidden and a link to the target's form takes its place.
 - The field "Tags" holds the labels of the project file; tags of the shared file are shown as chips with a "Shared" mark.
-- "Diagram" is a visual editor of the same draft, in the manner of the visual editors of issue trackers.
+- "Diagram" is a visual editor of the same draft, in the manner of the visual editors of issue trackers. It shows all the stages that "Topology" does, with sections, performers and conditions; a click on a system stage (merge, delivery, commit message, resolver, cleanup) opens its description.
+- The block "Actions at the points of the pipeline" lists the actions that run at each point. A point without a list of its own shows the inherited one with an "inherited" mark; an empty list turns the point off.
 - A shared pipeline opens for viewing only. "Override in the project" copies it into the project; "Edit in Settings" leads to `#settings/global/pipelines/<id>`. A new pipeline is always a project one.
 - Running runs continue from their snapshot after the pipeline is deleted. A new run of a deleted pipeline is rejected.
+
+The "Actions" tab edits a command action as a list of scripts. "Add script" appends a row, the trash button removes a row (the last one stays), and the order is changed by dragging a row by its handle or with `Alt+↑`/`Alt+↓` on a focused row. One script is saved as a string, several as a list; an empty row is dropped.
 
 The filters are search by id and name, level, "Tags" and "Specialists" (the ones in the steps and in `split`). Any of the chosen values fits inside one list, and all lists together narrow the result. The choice is remembered per repository.
 

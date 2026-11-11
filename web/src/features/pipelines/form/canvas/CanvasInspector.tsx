@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ConfigEditorResponse, FieldError } from '../../../../shared/api/types.ts';
 import type { ActionPoint } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
+import type { PipelineStage } from '../../../../shared/lib/pipeline/pipelineStages.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
 import { formatRoute } from '../../../../shared/lib/nav/route.ts';
 import { splitTargets, specialistSlugs } from '../FormTab.tsx';
@@ -18,6 +19,7 @@ import {
 import { SplitFieldset } from '../steps/SplitFieldset.tsx';
 import { StepFields } from '../steps/StepCard.tsx';
 import { errorsOfStep, type Selection } from './canvasModel.ts';
+import { StageInspector } from './StageInspector.tsx';
 
 export interface InspectorProps {
   selection: Selection | null;
@@ -29,7 +31,7 @@ export interface InspectorProps {
   errors: FieldError[];
   sharedOnly: boolean;
   disabled: boolean;
-  previewStages: { id: string; kind: string }[] | null | undefined;
+  previewStages: readonly PipelineStage[] | null | undefined;
 }
 
 function StepInspector({
@@ -117,6 +119,8 @@ export function CanvasInspector(props: InspectorProps) {
         onPoint={(next, list) => onDraft((current) => withPoint(current, next, list))}
       />
     );
+  } else if (selection.kind === 'stage') {
+    body = <StageInspector id={selection.id} stages={props.previewStages ?? null} />;
   } else if (selection.kind === 'return') {
     const key = selection.key;
     body = (

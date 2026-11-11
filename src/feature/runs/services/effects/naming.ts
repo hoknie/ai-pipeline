@@ -8,6 +8,7 @@ import { modelIdProblem } from '../../../swarm-config/types/index.ts';
 import type { RunState } from '../../types/index.ts';
 
 import type { EffectDependencies } from './context.ts';
+import { withProxy } from './proxy.ts';
 import type { RunningAgents } from './running.ts';
 import { workspaceOf } from './worktrees.ts';
 
@@ -37,7 +38,7 @@ export async function nameRun(
     cwd: directory,
     logPath,
     parser: runtime.createParser(),
-    environment,
+    environment: withProxy(environment, dependencies.network.proxy()),
     graceMs,
     drainMs: timings.drainMs,
   });

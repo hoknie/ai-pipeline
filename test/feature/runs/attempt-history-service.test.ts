@@ -53,6 +53,7 @@ describe('RunAttemptHistoryService', () => {
       now: () => 1,
       agents: {} as never,
       config: {} as never,
+      network: {} as never,
       registry: {} as never,
       socket: '/tmp/aip-test.sock',
       environment: {},

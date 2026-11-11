@@ -3,7 +3,14 @@ import { useCallback, useEffect, useMemo } from 'react';
 import type { Api } from '../api.ts';
 import type { ObserversView } from '../observerTypes.ts';
 import { browserEventSource, type Connection, type EventSourceFactory } from '../stream.ts';
-import type { DaemonMismatch, QueueView, RepositoryView, RunView, TagView } from '../types.ts';
+import type {
+  DaemonMismatch,
+  NetworkStatus,
+  QueueView,
+  RepositoryView,
+  RunView,
+  TagView,
+} from '../types.ts';
 import { connectRuns } from './connectRuns.ts';
 import {
   putQueue,
@@ -51,6 +58,8 @@ export interface RunsResult {
   daemon: DaemonMismatch;
   /** The last `processes` event of the stream; null until one arrives. */
   streamedProcesses: StreamedProcesses | null;
+  /** The last `network` event of the stream; null until one arrives. */
+  streamedNetwork: NetworkStatus | null;
   /** Older finished runs, loaded page by page on demand. */
   history: HistoryState;
   /** The last `observers` event of the stream; null until one arrives. */

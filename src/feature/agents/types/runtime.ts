@@ -52,6 +52,8 @@ export interface RunOutcome {
   denials: Denial[];
   /** The agent CLI stopped because its usage limit ran out; `resetsAt` in ms or null. */
   usageLimit?: { resetsAt: number | null } | null;
+  /** The CLI failed on a network error of the API (at most 200 characters); null otherwise. */
+  networkError?: string | null;
 }
 
 export interface OutputParser {

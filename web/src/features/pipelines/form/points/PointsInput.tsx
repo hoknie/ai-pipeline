@@ -1,4 +1,3 @@
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { ConfigEditorResponse } from '../../../../shared/api/types.ts';
@@ -10,6 +9,8 @@ import {
   pointsOfStages,
   type ActionPoint,
 } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
+import { useListDrag } from '../../../../shared/lib/browser/useListDrag.ts';
+import { moveId } from '../../../../shared/lib/listOrder.ts';
 import { Badge } from '../../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
 import {
@@ -19,72 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../../shared/ui/forms/select.tsx';
+import { ActionRow } from './ActionRow.tsx';
 import { NONE } from '../steps/SpecialistSelect.tsx';
-
-/** Moves the element at `index` by `delta` places. */
-function swapped(list: string[], index: number, delta: number): string[] {
-  const copy = [...list];
-  const other = index + delta;
-  [copy[other], copy[index]] = [copy[index] as string, copy[other] as string];
-  return copy;
-}
-
-function ActionRow({
-  actionId,
-  name,
-  known,
-  index,
-  list,
-  disabled,
-  onList,
-}: {
-  actionId: string;
-  name: string;
-  known: boolean;
-  index: number;
-  list: string[];
-  disabled: boolean;
-  onList: (list: string[]) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <li className="flex items-center gap-2 text-sm">
-      <span className="min-w-0 flex-1 truncate" title={actionId}>
-        {name}
-        {!known ? (
-          <span className="text-destructive"> ({t('pipeline.points.missing')})</span>
-        ) : null}
-      </span>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={t('pipeline.points.up', { id: actionId })}
-        disabled={disabled || index === 0}
-        onClick={() => onList(swapped(list, index, -1))}
-      >
-        <ArrowUp />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={t('pipeline.points.down', { id: actionId })}
-        disabled={disabled || index === list.length - 1}
-        onClick={() => onList(swapped(list, index, 1))}
-      >
-        <ArrowDown />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={t('pipeline.points.remove', { id: actionId })}
-        disabled={disabled}
-        onClick={() => onList(list.filter((_, at) => at !== index))}
-      >
-        <Trash2 />
-      </Button>
-    </li>
-  );
-}
 
 interface PointProps {
   point: ActionPoint;
@@ -104,6 +41,12 @@ interface PointProps {
 function PointEditor({ point, list, own, unknown, options, view, disabled, onList }: PointProps) {
   const { t } = useTranslation();
   const label = t(`pipeline.points.names.${point}`);
+  const drag = useListDrag(list, (key, position) => {
+    const from = list.indexOf(key);
+    // the edges of the list and the row's own place change nothing
+    if (from === -1 || position < 1 || position > list.length || position - 1 === from) return;
+    onList(moveId(list, from, position));
+  });
   const actions = actionsOf(view);
   const nameOfAction = (actionId: string): string => {
     const raw = actions.find((entry) => entry.id === actionId)?.raw;
@@ -142,6 +85,7 @@ function PointEditor({ point, list, own, unknown, options, view, disabled, onLis
               index={index}
               list={list}
               disabled={disabled}
+              drag={drag}
               onList={onList}
             />
           ))}
@@ -190,7 +134,7 @@ export function PointsInput({
   /** The own lists of the draft by point. */
   stages: Partial<Record<ActionPoint, string[]>>;
   /** The stages of the preview, where the inherited lists come from; `null` until it arrives. */
-  previewStages: { id: string; kind: string }[] | null | undefined;
+  previewStages: readonly { id: string; kind: string }[] | null | undefined;
   sharedOnly: boolean;
   disabled: boolean;
   onPoint: (point: ActionPoint, list: string[] | null) => void;

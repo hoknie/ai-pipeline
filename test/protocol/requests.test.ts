@@ -17,6 +17,7 @@ const SAMPLES: Record<Method, unknown> = {
   shutdown: {},
   shutdown_idle: {},
   subscribe: {},
+  network_status: {},
   run: { ...repository, pipeline: 'feature', task: 'do it' },
   status: {},
   finished_runs: {},
@@ -92,9 +93,9 @@ const SAMPLES: Record<Method, unknown> = {
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 74 methods, each in the request schema once', () => {
+  it('has 75 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(74);
+    expect(methods).toHaveLength(75);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

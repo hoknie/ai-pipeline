@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   configFromFiles,
   configPaths,
+  loadNetworkSettings,
   loadRuntimeSettings,
   loadWebSettings,
 } from '../src/feature/swarm-config/services/index.ts';
@@ -186,6 +187,19 @@ describe('documentation examples', () => {
     );
     expect(runtimes.opencode).toEqual({ command: 'npx', args: ['-y', 'opencode-ai'], env: {} });
     expect(runtimes.claude.args).toEqual(['--debug']);
+  });
+
+  it('the network example of docs/configuration/network.md is valid in the global settings', () => {
+    const block =
+      yamlBlocks('docs/configuration/network.md').find((b) => b.startsWith('network:')) ?? '';
+    const root = mkdtempSync(join(tmpdir(), 'aip-docs-network-'));
+    mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
+    writeFileSync(join(root, 'xdg', 'aip', 'settings.yaml'), block);
+    const network = loadNetworkSettings(
+      configPaths(join(root, 'repo'), join(root, 'xdg'), undefined),
+    );
+    expect(network).toMatchObject({ enabled: true, interfaces: ['wt0'], interval: 30, timeout: 5 });
+    expect(network.targets).toEqual(['https://api.anthropic.com', '10.0.0.5:443']);
   });
 
   it('the web example of docs/configuration/README.md is valid in the global settings', () => {

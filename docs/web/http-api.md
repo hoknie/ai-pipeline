@@ -160,7 +160,7 @@ Each of them answers with the list. A relative `path` or `to`, and a body with u
 
 ## System
 
-- `GET /api/system` returns the state of the daemon and of the panel (the address has no token).
+- `GET /api/system` returns the state of the daemon and of the panel (the address has no token) and `network`: `state`, `problem`, `checkedAt`, `since` and the `proxy` of the check (from the settings or the daemon environment) without login and password.
 - `POST /api/system/web/restart` and `POST /api/system/daemon/restart` (body `{"force": true}` optional) answer 202 `{"state": "restarting"}` and restart after the answer is sent.
 - `POST /api/system/daemon/stop` and `POST /api/system/daemon/start` stop and start the daemon.
 - The answer is 409 with `code` `daemon_busy` for a busy daemon without `force`, and `web_standalone` for a panel started by `aip web`.

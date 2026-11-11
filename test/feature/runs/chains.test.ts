@@ -530,3 +530,87 @@ describe('qualified model preservation across chain modes and attempt creation',
     expect(selected.chainIndex).toBe(0);
   });
 });
+
+describe('chains and failures of the network', () => {
+  function exit(state: RunState, failure: unknown, now: number): void {
+    const attempt = runningAttempt(state);
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq: attempt.seq,
+        exit: { sessionId: null, usage: null, failure: failure as never, outsideChanges: [] },
+      },
+      now,
+    );
+  }
+
+  const NETWORK = { kind: 'network', problem: 'Connection error' };
+
+  it('does not burn the chain: on_error repeats claude and switches on the next no_report', () => {
+    const state = run(1, { configText: CHAIN_CONFIG });
+    dispatch([state], 1000);
+    exit(state, NETWORK, 2000);
+    expect(group(state).pending).toMatchObject({ keepRuntime: true });
+    expect(planDispatch([state], 40_000).start).toHaveLength(1);
+    dispatch([state], 40_000);
+    expect(group(state).attempts[1]).toMatchObject({ runtime: 'claude', chainIndex: 0 });
+
+    exit(state, { kind: 'no_report' }, 41_000);
+    dispatch([state], 41_100);
+    expect(group(state).attempts[2]).toMatchObject({ runtime: 'opencode', chainIndex: 1 });
+  });
+
+  it('does not exclude the item of a network failure from the next choice', () => {
+    const state = run(1, { configText: CHAIN_CONFIG });
+    dispatch([state], 1000);
+    exit(state, NETWORK, 2000);
+    dispatch([state], 40_000);
+    exit(state, NETWORK, 41_000);
+    dispatch([state], 80_000);
+    expect(group(state).attempts.map((a) => a.runtime)).toEqual(['claude', 'claude', 'claude']);
+  });
+
+  it('keeps the element B of a round_robin chain after a network failure', () => {
+    const state = run(1, { configText: CHAIN_CONFIG });
+    state.run.pipeline = 'cycle-pipe';
+    dispatch([state], 1000);
+    expect(group(state).attempts[0]).toMatchObject({ runtime: 'claude', chainIndex: 0 });
+    transition(
+      state,
+      {
+        kind: 'report',
+        group: 'gruppa-1',
+        seq: 1,
+        report: { verdict: 'done', summary: 'ok', feedback: null },
+      },
+      1900,
+    );
+    exit(state, null, 2000);
+    dispatch([state], 2100);
+    expect(group(state).attempts.at(-1)).toMatchObject({ runtime: 'opencode', chainIndex: 1 });
+    exit(state, NETWORK, 3000);
+    dispatch([state], 40_000);
+    expect(group(state).attempts.at(-1)).toMatchObject({ runtime: 'opencode', chainIndex: 1 });
+  });
+
+  it('keeps the runtime of the failed attempt without a session', () => {
+    const state = run(1, { configText: CHAIN_CONFIG });
+    dispatch([state], 1000);
+    const spec = state.run.config.specialists.find((s) => s.slug === 'cycler')!;
+    const attempts = group(state).attempts;
+    const chosen = selectAttemptRuntime({
+      specialist: spec,
+      chains: state.run.config.chains,
+      defaults: state.run.config.defaults,
+      limitHolds: new Map(),
+      attempts: attempts.map((a) => ({ ...a, specialist: 'cycler', chainIndex: 1 })),
+      stepIndex: 0,
+      round: 2,
+      resume: false,
+      keepRuntime: true,
+    });
+    expect(chosen.runtime).toBe(attempts[0]?.runtime);
+  });
+});

@@ -1,7 +1,12 @@
 import { existsSync } from 'node:fs';
 import { canonicalPipeline, parseYaml, readLevel } from '../repositories/config-files.ts';
 import { assembleLevel, emptyLevel, loadGlobalSection, resolveLevels } from './assemble.ts';
-import { validateConfig, validateRuntimesSection, validateWebSection } from './validate.ts';
+import {
+  validateConfig,
+  validateNetworkSection,
+  validateRuntimesSection,
+  validateWebSection,
+} from './validate.ts';
 import { ConfigLoadError } from '../types/errors.ts';
 import {
   ACTIONS_DIR,
@@ -16,7 +21,9 @@ import {
 } from '../types/levels.ts';
 import { type ConfigSource } from '../types/merge.ts';
 import {
+  defaultNetwork,
   defaultRuntimes,
+  type NetworkSettings,
   defaultWeb,
   type ResolvedConfig,
   type RuntimeSettings,
@@ -116,5 +123,13 @@ export function loadRuntimeSettings(paths: ConfigPaths): RuntimeSettings {
   return loadGlobalSection(paths, 'runtimes', defaultRuntimes, (value) => {
     const { runtimes, errors } = validateRuntimesSection(value);
     return { value: runtimes, errors };
+  });
+}
+
+/** The network check from the global settings.yaml only. */
+export function loadNetworkSettings(paths: ConfigPaths): NetworkSettings {
+  return loadGlobalSection(paths, 'network', defaultNetwork, (value) => {
+    const { network, errors } = validateNetworkSection(value);
+    return { value: network, errors };
   });
 }

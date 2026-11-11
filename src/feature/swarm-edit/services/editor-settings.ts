@@ -1,5 +1,6 @@
 import { key } from '../types/editor.ts';
 import {
+  loadNetworkSettings,
   loadRuntimeSettings,
   loadWebSettings,
   mergeOrigins,
@@ -9,12 +10,15 @@ import {
   ConfigLoadError,
   type ConfigPaths,
   type ConfigSource,
+  defaultNetwork,
   defaultRuntimes,
   defaultWeb,
   formatDuration,
   isMapping,
   type Level,
   type LevelFiles,
+  type NetworkSettings,
+  redactProxy,
   type ResolvedConfig,
   RUNTIMES,
   type RuntimeSettings,
@@ -57,7 +61,7 @@ function settingsOf(config: ResolvedConfig): [string, unknown][] {
 }
 
 /**
- * `web.*` and `runtimes.*` as the daemon reads them: from the global settings.yaml only. The value
+ * `web.*`, `network.*` and `runtimes.*` as the daemon reads them: from the global settings.yaml only. The value
  * of `env` never leaves the config layer: only the sorted names of the variables do.
  */
 function globalSectionSettings(
@@ -85,7 +89,8 @@ function globalSectionSettings(
   };
   const web = safe(() => loadWebSettings(paths), defaultWeb);
   const runtimes = safe(() => loadRuntimeSettings(paths), defaultRuntimes);
-  return sectionValues(web, runtimes).map(([path, value]) => ({
+  const network = safe(() => loadNetworkSettings(paths), defaultNetwork);
+  return sectionValues(web, runtimes, network).map(([path, value]) => ({
     path,
     value,
     file: originOf(...(path.split('.') as [string, ...string[]])),
@@ -93,12 +98,22 @@ function globalSectionSettings(
 }
 
 /** `web.*` and `runtimes.*` values as pairs; the value of `env` is reduced to the sorted names. */
-function sectionValues(web: WebSettings, runtimes: RuntimeSettings): [string, unknown][] {
+function sectionValues(
+  web: WebSettings,
+  runtimes: RuntimeSettings,
+  network: NetworkSettings,
+): [string, unknown][] {
   const result: [string, unknown][] = [
     ['web.autostart', web.autostart],
     ['web.auth', web.auth],
     ['web.host', web.host],
     ['web.port', web.port],
+    ['network.enabled', network.enabled],
+    ['network.targets', network.targets],
+    ['network.interfaces', network.interfaces],
+    ['network.proxy', network.proxy === null ? null : redactProxy(network.proxy)],
+    ['network.interval', network.interval],
+    ['network.timeout', network.timeout],
   ];
   for (const runtime of RUNTIMES) {
     const command = runtimes[runtime];
@@ -125,7 +140,22 @@ function writtenOf(source: ConfigSource | undefined, path: string, kind: Setting
     if (!isMapping(node) || !(part in node)) return undefined;
     node = node[part];
   }
+  if (path === 'network.proxy' && typeof node === 'string') return redactProxy(node);
   return kind === 'env' && isMapping(node) ? Object.keys(node).sort() : node;
+}
+
+function globalNetwork(paths: ConfigPaths): NetworkSettings {
+  try {
+    return loadNetworkSettings(paths);
+  } catch (error) {
+    if (error instanceof ConfigLoadError) return defaultNetwork();
+    throw error;
+  }
+}
+
+/** Whether the proxy URL carries a login or a password. */
+function hasCredentials(network: NetworkSettings): boolean {
+  return network.proxy !== null && redactProxy(network.proxy) !== network.proxy.replace(/\/$/, '');
 }
 
 export function editorSettings(
@@ -146,8 +176,9 @@ export function editorSettings(
   ];
   const defaultValues = new Map<string, unknown>([
     ...settingsOf(configOrDefaults(null)),
-    ...sectionValues(defaultWeb(), defaultRuntimes()),
+    ...sectionValues(defaultWeb(), defaultRuntimes(), defaultNetwork()),
   ]);
+  const proxyCredentials = hasCredentials(globalNetwork(paths));
   const aloneConfig = resolution(global, emptyLevel()).config;
   const globalValues = new Map<string, unknown>(settingsOf(configOrDefaults(aloneConfig)));
   return base.map((entry) => {
@@ -168,6 +199,7 @@ export function editorSettings(
       defaultValue: defaultValues.get(entry.path),
       globalValue: setting.globalOnly ? entry.value : globalValues.get(entry.path),
       written,
+      ...(entry.path === 'network.proxy' && proxyCredentials ? { credentials: true } : {}),
     };
   });
 }

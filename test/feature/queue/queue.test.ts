@@ -1295,23 +1295,70 @@ describe('answers of the autopilot', () => {
 });
 
 describe('fixed runs go first', () => {
-  it('returns a skipped run that works again to the end of the places, over the parallel limit', () => {
+  /** `a` was skipped for a failure and works again; `b` runs; `parallel` as given. */
+  function revivedSetup(parallel: number) {
     const queue = queueOf('A', 'B', 'C');
     queue.skipFailed = true;
+    queue.parallel = parallel;
     startQueue(queue, [], 3);
     itemStarted(queue, 'q1', 'a', 4);
     const failed = failedRun('a');
-    expect(advance(queue, [failed], lookupOf(failed), 5).take.map((item) => item.id)).toEqual([
-      'q2',
-    ]);
+    advance(queue, [failed], lookupOf(failed), 5);
     itemStarted(queue, 'q2', 'b', 6);
-    expect(queue).toMatchObject({ runs: ['b'], skipped: ['a'] });
-    group(failed).status = 'running';
     const other = run(1, { id: 'b' });
     step(other);
-    const take = advance(queue, [other], lookupOf(failed, other), 7).take;
-    expect(take).toEqual([]);
+    group(failed).status = 'running';
+    return { queue, failed, other };
+  }
+
+  it('freezes a skipped run that works again when every place is taken, first in the queue', () => {
+    const { queue, failed, other } = revivedSetup(1);
+    expect(queue).toMatchObject({ runs: ['b'], skipped: ['a'] });
+    const result = advance(queue, [other], lookupOf(failed, other), 7);
+    expect(result.take).toEqual([]);
+    expect(result.freeze).toEqual(['a']);
+    expect(queue).toMatchObject({ runs: ['b'], skipped: [] });
+    expect(queue.items[0]).toMatchObject({ run: 'a' });
+    expect(queue.priority).toEqual([]);
+  });
+
+  it('puts a skipped run that works again into a free place', () => {
+    const { queue, failed, other } = revivedSetup(2);
+    const result = advance(queue, [other], lookupOf(failed, other), 7);
+    expect(result.freeze).toEqual([]);
     expect(queue).toMatchObject({ runs: ['b', 'a'], skipped: [] });
+  });
+
+  it('keeps a revived run that only waits for auto delivery in a place', () => {
+    const queue = queueOf('A');
+    queue.skipFailed = true;
+    startQueue(queue, [], 3);
+    itemStarted(queue, 'q1', 'b', 4);
+    const other = run(1, { id: 'b' });
+    step(other);
+    const waiting = mergedRun('a', false);
+    waiting.run.config.delivery.auto = true;
+    queue.skipped = ['a'];
+    const result = advance(queue, [other], lookupOf(waiting, other), 7);
+    expect(result.freeze).toEqual([]);
+    expect(queue.runs).toEqual(['b', 'a']);
+  });
+
+  it('continues a frozen revived run before the waiting tasks, and holds the place for it', () => {
+    const { queue, failed, other } = revivedSetup(1);
+    advance(queue, [other], lookupOf(failed, other), 7);
+    failed.run.hold = 'frozen';
+    other.run.finishedAt = 10;
+    other.run.config.delivery.auto = false;
+    group(other).status = 'merged';
+    group(other).delivery.state = 'applied';
+    const next = advance(queue, [other], lookupOf(failed, other), 8);
+    expect(next.take.map((item) => item.run)).toEqual(['a']);
+    expect(next.take).toHaveLength(1);
+    failed.run.hold = null;
+    itemStarted(queue, next.take[0]!.id, 'a', 9);
+    expect(queue.runs).toEqual(['a']);
+    expect(advance(queue, [failed], lookupOf(failed), 10).take).toEqual([]);
   });
 
   it('only forgets a skipped run that no longer holds a place', () => {

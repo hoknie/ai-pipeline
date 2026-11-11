@@ -1551,7 +1551,26 @@ describe('actions at the points of a pipeline', () => {
     expect(valueOfCall(writePipeline).stages).toBeUndefined();
   });
 
-  it('adds actions in order and moves them', async () => {
+  const ids = (scope: ReturnType<typeof within>) =>
+    scope.getAllByRole('listitem').map((item: HTMLElement) => item.getAttribute('data-id'));
+  const dragRow = (from: HTMLElement, to: HTMLElement, clientY: number, data = '') => {
+    const dataTransfer = { setData: vi.fn(), getData: vi.fn(() => data), effectAllowed: '' };
+    fireEvent.dragStart(from, { dataTransfer });
+    fireEvent.dragOver(to, { dataTransfer, clientY });
+    fireEvent.drop(to, { dataTransfer, clientY });
+  };
+  const addTwo = async () => {
+    const before = await point('Before delivery');
+    choose(
+      await before.findByRole('combobox', { name: 'add an action: Before delivery' }),
+      'commit',
+    );
+    choose(before.getByRole('combobox', { name: 'add an action: Before delivery' }), 'lint');
+    choose(before.getByRole('combobox', { name: 'add an action: Before delivery' }), 'review');
+    return before;
+  };
+
+  it('adds actions in order and moves them with Alt+ArrowUp', async () => {
     const writePipeline = saved();
     render(<Page api={withActions({ writePipeline })} start="feature" />);
     const before = await point('Before delivery');
@@ -1560,14 +1579,130 @@ describe('actions at the points of a pipeline', () => {
       'commit',
     );
     choose(before.getByRole('combobox', { name: 'add an action: Before delivery' }), 'lint');
-    fireEvent.click(before.getByRole('button', { name: 'move lint up' }));
-    expect(before.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'lint',
-      'commit',
-    ]);
+    expect(before.queryByRole('button', { name: /^move /i })).toBeNull();
+    expect(before.getByRole('button', { name: 'remove lint' })).toBeTruthy();
+    fireEvent.keyDown(before.getByRole('listitem', { name: '2. lint' }), {
+      key: 'ArrowUp',
+      altKey: true,
+    });
+    expect(ids(before)).toEqual(['lint', 'commit']);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writePipeline).toHaveBeenCalled());
     expect(valueOfCall(writePipeline).stages).toEqual({ before_delivery: ['lint', 'commit'] });
+  });
+
+  it('reorders the actions of a point by dragging', async () => {
+    const writePipeline = saved();
+    render(<Page api={withActions({ writePipeline })} start="feature" />);
+    const before = await addTwo();
+    expect(ids(before)).toEqual(['commit', 'lint', 'review']);
+    dragRow(
+      before.getByRole('listitem', { name: '2. lint' }),
+      before.getByRole('listitem', { name: '1. commit' }),
+      -1,
+    );
+    expect(ids(before)).toEqual(['lint', 'commit', 'review']);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(valueOfCall(writePipeline).stages).toEqual({
+      before_delivery: ['lint', 'commit', 'review'],
+    });
+  });
+
+  it('does not change the list when a row is dropped on its own place', async () => {
+    const writePipeline = saved();
+    render(<Page api={withActions({ writePipeline })} start="feature" />);
+    const before = await addTwo();
+    dragRow(
+      before.getByRole('listitem', { name: '2. lint' }),
+      before.getByRole('listitem', { name: '2. lint' }),
+      1,
+    );
+    expect(ids(before)).toEqual(['commit', 'lint', 'review']);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(valueOfCall(writePipeline).stages).toEqual({
+      before_delivery: ['commit', 'lint', 'review'],
+    });
+  });
+
+  it('ignores Alt+ArrowUp on the first row and Alt+ArrowDown on the last', async () => {
+    render(<Page api={withActions()} start="feature" />);
+    const before = await addTwo();
+    fireEvent.keyDown(before.getByRole('listitem', { name: '1. commit' }), {
+      key: 'ArrowUp',
+      altKey: true,
+    });
+    fireEvent.keyDown(before.getByRole('listitem', { name: '3. review' }), {
+      key: 'ArrowDown',
+      altKey: true,
+    });
+    expect(ids(before)).toEqual(['commit', 'lint', 'review']);
+  });
+
+  it('keeps an inherited point inherited when a move at the edge does nothing', async () => {
+    const stages = [stage('after_delivery', 'commit'), stage('after_delivery', 'lint')];
+    render(<Page api={withActions({}, RAW, stages)} start="feature" />);
+    const after = await point('After delivery');
+    await waitFor(() => expect(after.getAllByRole('listitem').length).toBe(2));
+    fireEvent.keyDown(after.getByRole('listitem', { name: '1. commit' }), {
+      key: 'ArrowUp',
+      altKey: true,
+    });
+    fireEvent.keyDown(after.getByRole('listitem', { name: '2. lint' }), {
+      key: 'ArrowDown',
+      altKey: true,
+    });
+    expect(ids(after)).toEqual(['commit', 'lint']);
+    expect(after.getByText('inherited')).toBeTruthy();
+  });
+
+  it('does not drag or move rows while the form is being saved', async () => {
+    const writePipeline = vi.fn(() => new Promise<never>(() => {}));
+    render(<Page api={withActions({ writePipeline })} start="feature" />);
+    const before = await addTwo();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const row = before.getByRole('listitem', { name: '2. lint' });
+    await waitFor(() => expect(row.getAttribute('draggable')).toBe('false'));
+    fireEvent.keyDown(row, { key: 'ArrowUp', altKey: true });
+    expect(ids(before)).toEqual(['commit', 'lint', 'review']);
+  });
+
+  it('reorders an inherited point and makes it its own', async () => {
+    const writePipeline = saved();
+    const stages = [stage('after_delivery', 'commit'), stage('after_delivery', 'lint')];
+    render(<Page api={withActions({ writePipeline }, RAW, stages)} start="feature" />);
+    const after = await point('After delivery');
+    await waitFor(() => expect(after.getByText('inherited')).toBeTruthy());
+    await waitFor(() => expect(after.getAllByRole('listitem').length).toBe(2));
+    dragRow(
+      after.getByRole('listitem', { name: '2. lint' }),
+      after.getByRole('listitem', { name: '1. commit' }),
+      -1,
+    );
+    expect(ids(after)).toEqual(['lint', 'commit']);
+    expect(after.queryByText('inherited')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    expect(valueOfCall(writePipeline).stages).toEqual({ after_delivery: ['lint', 'commit'] });
+  });
+
+  it('ignores a row dropped over another point', async () => {
+    const stages = [stage('after_delivery', 'commit'), stage('after_delivery', 'lint')];
+    render(<Page api={withActions({}, RAW, stages)} start="feature" />);
+    const before = await addTwo();
+    const after = await point('After delivery');
+    await waitFor(() => expect(after.getAllByRole('listitem').length).toBe(2));
+    dragRow(
+      before.getByRole('listitem', { name: '2. lint' }),
+      after.getByRole('listitem', { name: '1. commit' }),
+      -1,
+      'lint',
+    );
+    expect(ids(before)).toEqual(['commit', 'lint', 'review']);
+    expect(ids(after)).toEqual(['commit', 'lint']);
+    expect(after.getByText('inherited')).toBeTruthy();
   });
 
   it('offers only commands after the delivery', async () => {

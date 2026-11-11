@@ -8,9 +8,11 @@ export interface Lifecycle {
 }
 
 export function createLifecycle(services: DaemonServices, database: Database): Lifecycle {
-  const { runs, queue, tags, registry, observers, delivery, artifacts, processes } = services;
+  const { network, runs, queue, tags, registry, observers, delivery, artifacts, processes } =
+    services;
   return {
     async start() {
+      network.start();
       await delivery.patches.sweep();
       await artifacts.sweep();
       await runs.engine.serial(async () => {
@@ -29,6 +31,7 @@ export function createLifecycle(services: DaemonServices, database: Database): L
     },
     async stop() {
       runs.engine.halt();
+      network.stop();
       processes.stop();
       await runs.engine.drain();
       database.close();

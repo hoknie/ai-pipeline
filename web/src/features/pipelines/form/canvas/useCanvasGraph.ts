@@ -1,9 +1,13 @@
 import { applyNodeChanges, type NodeChange } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useTranslation } from 'react-i18next';
+
 import type { ConfigEditorResponse } from '../../../../shared/api/types.ts';
+import type { PipelineStage } from '../../../../shared/lib/pipeline/pipelineStages.ts';
 import { stepIds } from '../../stepIds.ts';
 import {
+  CONFLICT_EDGE,
   draftGraph,
   type CanvasEdge,
   type CanvasNode as CanvasNodeType,
@@ -20,9 +24,7 @@ export function useCanvasGraph(
 ) {
   const { draft, errors, id } = editor;
   const topology = editor.preview.topology;
-  const previewStages = topology
-    ? ((topology as { stages?: { id: string; kind: string }[] }).stages ?? [])
-    : null;
+  const previewStages: PipelineStage[] | null = topology ? (topology.stages ?? []) : null;
   const ids = useMemo(() => stepIds(draft.steps), [draft.steps]);
   const graph = useMemo(
     () =>
@@ -31,6 +33,7 @@ export function useCanvasGraph(
         ids,
         follow: followOf(view, draft),
         points: pointLists(draft, previewStages),
+        stages: previewStages,
         errors,
         editable,
       }),
@@ -52,13 +55,15 @@ export function useCanvasGraph(
       }),
     );
   }, [graph.nodes, markedId]);
+  const { t } = useTranslation();
   const edges: CanvasEdge[] = useMemo(
     () =>
       graph.edges.map((edge) => ({
         ...edge,
+        ...(edge.id === CONFLICT_EDGE ? { label: t('topology.conflict') } : {}),
         selected: selection?.kind === 'return' && edge.id === `return:${selection.key}`,
       })),
-    [graph.edges, selection],
+    [graph.edges, selection, t],
   );
   const onNodesChange = useCallback(
     (changes: NodeChange<CanvasNodeType>[]) =>

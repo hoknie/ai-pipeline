@@ -7,6 +7,7 @@ import {
   type PipelineStage,
   type StageSection,
 } from '../../shared/lib/pipeline/pipelineStages.ts';
+import { conditionText, performerText } from '../../shared/lib/pipeline/stageText.ts';
 import type { PipelineTopology } from '../../shared/api/types.ts';
 import type { Live, LiveGroup } from './liveState.ts';
 import type { Busy, Size, StageData } from './topologyTypes.ts';
@@ -69,24 +70,6 @@ function active(groups: LiveGroup[]): boolean {
   return groups.some((group) => group.status === 'running' || group.status === 'merging');
 }
 
-function performerText(stage: PipelineStage, t: TFunction): string {
-  switch (stage.performer.type) {
-    case 'specialist':
-      return stage.performer.name || stage.performer.slug;
-    case 'command':
-      return stage.performer.command;
-    default:
-      return t('topology.stages.system');
-  }
-}
-
-const CONDITIONS = new Set(['delivery_commit', 'conflict', 'not_keep']);
-
-function conditionText(key: string | null, t: TFunction): string | null {
-  if (key === null) return null;
-  return CONDITIONS.has(key) ? t(`topology.stages.condition.${key as 'conflict'}`) : key;
-}
-
 const EMPTY = {
   attempts: null,
   costUsd: null,
@@ -112,7 +95,7 @@ export function commonOf(
     stageId: stage.id,
     section: stage.section,
     sectionStart: stage.section !== previous,
-    performer: performerText(stage, t),
+    performer: performerText(stage.performer, t),
     condition: conditionText(stage.condition, t),
     link: stageLink(stage),
   };
@@ -182,7 +165,7 @@ function otherNode(ctx: NodeContext, stage: PipelineStage, common: Common): Node
     data: {
       kind,
       title,
-      subtitle: performerText(stage, t),
+      subtitle: performerText(stage.performer, t),
       detail: null,
       groups: [],
       active: false,

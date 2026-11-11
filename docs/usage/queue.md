@@ -112,7 +112,7 @@ A running queue with `auto answer` on answers the questions of specialists (a st
 
 - A run with a `failed`, `conflict` or `apply_failed` problem leaves its place at once. The queue does not stop and takes the next task. The run itself keeps working.
 - Such runs are listed under `Skipped with a problem:` (at most 10, the earliest is dropped first). A run leaves the list when the problem is gone.
-- A skipped run whose problem is fixed (a retry, an answer, a resolved conflict) goes back to the front of the queue's places, even over the `parallel` limit. New tasks wait until a place frees.
+- A skipped run whose problem is fixed (a retry, an answer, a resolved conflict) takes a free place again. When every place is taken it waits [frozen](#freezing), first in the queue, and continues before new tasks as soon as a place frees. A run that only waits for auto-delivery keeps its place.
 - A task that waits for a skipped run is blocked.
 - A task that cannot start (for example, its pipeline was removed) stays in the queue with the error. It is not taken again until it is edited or the queue is started, and the queue goes on with the other tasks. After an edit it goes to position 1.
 - `aip queue dismiss <run-id>` removes a skipped run from the list; `--repo` defaults to the repository of the run. The run keeps its status, stays in the run list and can still be delivered. A run that is not in the list is refused. A task that waits for the removed run stays blocked.
@@ -131,6 +131,8 @@ A running queue with `auto answer` on answers the questions of specialists (a st
 An incident of a task that an [observer](runs.md#observers) can take does not stop the queue.
 
 - The task gets the state `repair` and the queue goes on. A task with unfinished work (a question) keeps its place. A failed task does not hold a place during the repair and gets it back only when its group is retried.
+- A retry by an observer is not a priority action: it takes a free place, and with every place taken the task waits frozen, first in the queue, and no agent starts for it.
+- Only a direct action of a person (retry, return, "Run now") may go beyond `parallel`.
 - A new incident that no observer can take (observers are off, the project is not connected, the task is forbidden, or its repairs are used up) stops the queue by the rules above. An incident the queue already passed to observers does not stop it later, and the task waits for a person. A task with a `hold` is not watched and does not stop the queue.
 - Auto-answers of the queue come first: a question reaches an observer only when the queue did not settle it.
 - A repair is not counted in `max` or in the place limit of the queue. A failed task stays in the skipped list during a repair.
@@ -145,6 +147,8 @@ When an agent (`claude`) runs out of its subscription limit, the step stops with
 - With `--on-limit wait` (the default) the group waits, and `aip run show` notes `waiting for claude usage limit, until 20:50`. It continues the same step and session after the reset, and the queue starts by itself (`, resumes automatically`). `aip queue pause` cancels the automatic start.
 - With `--on-limit stop` the group fails (retry it with `aip group retry`) and the queue waits for `aip queue start`.
 - A reset that passed while the daemon was down is picked up when it starts.
+
+A [down network](../configuration/network.md) does not stop the queue: its runs start and their groups wait, shown as `(waiting for network)` in `aip queue list`.
 
 ## Skipping steps
 

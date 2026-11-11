@@ -4,7 +4,7 @@ import { artifactsRequests } from './artifacts.ts';
 import { configRequests } from './config.ts';
 import { groupsRequests } from './groups.ts';
 import { observersRequests } from './observers.ts';
-import { panelRequests } from './panel.ts';
+import { networkStatusSchema, panelRequests } from './panel.ts';
 import { processesRequests } from './processes.ts';
 import { queueRequests } from './queue.ts';
 import { repositoriesRequests } from './repositories.ts';
@@ -101,6 +101,7 @@ export const streamEventSchema = z.discriminatedUnion('event', [
       detail: z.string(),
     }),
   }),
+  z.object({ event: z.literal('network'), seq: z.number().int(), network: networkStatusSchema }),
   z.object({
     event: z.literal('processes'),
     seq: z.number().int(),

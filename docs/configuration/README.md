@@ -7,7 +7,8 @@ The configuration is an `aip/` directory with settings, specialists and pipeline
 - [configuration/permissions.md](permissions.md): `claude.edit_mode` and permission levels;
 - [configuration/actions.md](actions.md): the files in `actions/` and the pipeline points where they run;
 - [configuration/delivery.md](delivery.md): the `delivery` section;
-- [configuration/runtimes.md](runtimes.md): the `runtimes` section, `claude.mcp` and `claude.settings`.
+- [configuration/runtimes.md](runtimes.md): the `runtimes` section, `claude.mcp` and `claude.settings`;
+- [configuration/network.md](network.md): the `network` section: the network check and the proxy for agents.
 
 Every file can also be edited in the [web panel](../web/settings.md).
 
@@ -55,7 +56,7 @@ The project level overrides the shared one:
 |---|---|
 | `max`, `workspace_dir`, `outside_changes` | As a whole |
 | `defaults`, `claude`, `delivery`, `workspace`, `naming` | Field by field |
-| `web`, `runtimes` | Read from the shared level only; in a project file they are a validation error |
+| `web`, `runtimes`, `network` | Read from the shared level only; in a project file they are a validation error |
 | Specialists, pipelines and actions | As a whole, by name: a project file `coder.yaml` replaces the shared one |
 | `stages` | By point: a point of the project level replaces the shared one |
 
@@ -79,6 +80,7 @@ workspace: { ... }
 naming: { ... }
 web: { ... }              # shared directory only
 runtimes: { ... }         # shared directory only
+network: { ... }          # shared directory only
 claude:
   edit_mode: allowlist    # allowlist | accept_edits | auto
   mcp: isolated           # isolated | inherit
@@ -97,6 +99,7 @@ defaults: { ... }
 | `naming` | [`naming`](#naming) |
 | `web` | [`web`](#web) |
 | `runtimes` | [configuration/runtimes.md](runtimes.md#runtimes) |
+| `network` | [configuration/network.md](network.md) |
 | `claude.edit_mode` | [configuration/permissions.md](permissions.md#claudeedit_mode) |
 | `claude.mcp` | [configuration/runtimes.md](runtimes.md#claudemcp) |
 | `claude.settings` | [configuration/runtimes.md](runtimes.md#claudesettings) |
@@ -198,7 +201,7 @@ The fields are described in [configuration/specialists.md](specialists.md#fields
 
 | In `swarm.yaml` | In `aip/` |
 |---|---|
-| `swarm.max`, `workspace_dir`, `outside_changes`, `workspace`, `naming`, `web`, `runtimes`, `claude`, `delivery`, `defaults` | `aip/settings.yaml`, without the `swarm:` root |
+| `swarm.max`, `workspace_dir`, `outside_changes`, `workspace`, `naming`, `web`, `runtimes`, `network`, `claude`, `delivery`, `defaults` | `aip/settings.yaml`, without the `swarm:` root |
 | `swarm.specialists.<slug>` | `aip/specialists/<slug>.yaml` |
 | `swarm.pipelines.<id>` | `aip/pipelines/<id>.yaml` |
 | shared `~/.config/aip/swarm.yaml` | these files in `~/.config/aip/` |

@@ -5,12 +5,13 @@ import {
   pipelineNameOf,
   type ConfigPaths,
   type DeliveryMode,
+  type NetworkSettings,
   type ResolvedConfig,
   type RuntimeSettings,
 } from '../types/index.ts';
 
 import { configPaths } from './discover.ts';
-import { loadConfig, loadRuntimeSettings } from './load.ts';
+import { loadConfig, loadNetworkSettings, loadRuntimeSettings } from './load.ts';
 
 /** What the queue view shows from the configuration of a repository; nulls when it does not load. */
 export interface DeliverySettings {
@@ -63,6 +64,16 @@ export class ConfigService {
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
       return `invalid swarm.runtimes: ${error.message}`;
+    }
+  }
+
+  /** Current `network` of the shared settings.yaml, or the text of the error in it. */
+  networkSettings(): NetworkSettings | string {
+    try {
+      return loadNetworkSettings(this.pathsOf('.'));
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw error;
+      return `invalid swarm.network: ${error.message}`;
     }
   }
 }

@@ -191,6 +191,7 @@ export class ObserverService {
         await queue.control.retryNow(state, {
           group: group.slug,
           refreshConfig: params.refreshConfig,
+          by: 'observer',
         });
         return;
       }

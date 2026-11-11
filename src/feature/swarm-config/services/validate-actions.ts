@@ -41,6 +41,24 @@ export function checkActions(ctx: ValidateContext, value: unknown, known: string
   });
 }
 
+/** `run`: one script as a string, or a non-empty list of scripts. */
+function readScripts(ctx: ValidateContext, value: unknown, path: string): string[] | null {
+  if (!Array.isArray(value)) {
+    if (typeof value !== 'string') {
+      addError(ctx, path, 'must be a string or a list of strings');
+      return null;
+    }
+    const script = readString(ctx, value, path);
+    return script === null ? null : [script];
+  }
+  if (value.length === 0) {
+    addError(ctx, path, 'must not be empty');
+    return null;
+  }
+  const scripts = value.map((item, index) => readString(ctx, item, `${path}[${index}]`));
+  return scripts.every((script) => script !== null) ? (scripts as string[]) : null;
+}
+
 export function checkAction(
   ctx: ValidateContext,
   id: string,
@@ -67,7 +85,7 @@ export function checkAction(
         action.name = readString(ctx, field, fieldPath)?.trim() ?? null;
         break;
       case 'run':
-        action.run = readString(ctx, field, fieldPath);
+        action.run = readScripts(ctx, field, fieldPath);
         break;
       case 'specialist': {
         const slug = readString(ctx, field, fieldPath);

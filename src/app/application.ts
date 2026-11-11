@@ -5,6 +5,7 @@ import { Database } from '../platform/sqlite/index.ts';
 import { createArtifactsServices } from '../feature/artifacts/services/index.ts';
 import { createComposeServices } from '../feature/compose/services/index.ts';
 import { createDeliveryServices } from '../feature/delivery/services/index.ts';
+import { createNetworkServices } from '../feature/network/services/index.ts';
 import { createObserversServices } from '../feature/observers/services/index.ts';
 import { createProcessesServices } from '../feature/processes/services/index.ts';
 import { createQueueServices } from '../feature/queue/services/index.ts';
@@ -73,6 +74,12 @@ function createLower(context: Context) {
   const { environment, database, now, ports } = context;
   const { agents } = createAgents(environment);
   const { config } = createSwarmConfigServices({ environment });
+  const { monitor: network } = createNetworkServices({
+    config,
+    now,
+    changed: ports.network.port,
+    environment,
+  });
   const { registry, projects } = createReposServices({ database, now, publish: ports.repos.port });
   const { catalog: tags } = createTagsServices({
     database,
@@ -86,7 +93,7 @@ function createLower(context: Context) {
     agents,
     changed: ports.config.port,
   });
-  return { agents, config, registry, projects, tags, edits, shared };
+  return { agents, config, network, registry, projects, tags, edits, shared };
 }
 
 type Lower = ReturnType<typeof createLower>;
@@ -215,6 +222,14 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
   ports.observers.set(publications.observers);
   ports.delivery.set(publications.delivery);
   ports.artifacts.set(publications.artifacts);
+  // Agents held for the network start, and the clients hear about it, as soon as it changes.
+  ports.network.set({
+    changed: (state) => {
+      publications.network.changed(state);
+      const { engine } = services.runs;
+      void engine.serial(() => engine.wake()).catch(() => undefined);
+    },
+  });
   ports.queue.set(services.queue.advance);
   ports.observe.set(services.observers);
   ports.repair.set(services.observers);

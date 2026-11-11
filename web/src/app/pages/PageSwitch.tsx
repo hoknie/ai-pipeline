@@ -38,6 +38,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
         <SettingsRoute
           common={common}
           streamedObservers={state.streamedObservers}
+          streamedNetwork={state.streamedNetwork}
           repository={selected}
           repositories={state.repositories}
           onSelectRepository={(path) => void actions.selectRepository(path)}

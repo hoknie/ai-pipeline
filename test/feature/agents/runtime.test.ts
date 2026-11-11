@@ -364,6 +364,7 @@ describe('claude adapter', () => {
       error: null,
       denials: [],
       usageLimit: null,
+      networkError: null,
     });
   });
 
@@ -398,6 +399,57 @@ describe('claude adapter', () => {
       );
       parser.push(JSON.stringify({ type: 'result', is_error: false }));
       expect(parser.outcome().usageLimit).toBeNull();
+    });
+  });
+
+  describe('network error', () => {
+    const failed = (result: string, extra: Record<string, unknown> = {}) =>
+      JSON.stringify({ type: 'result', is_error: true, result, ...extra });
+
+    it('reads a connection error of the result', () => {
+      const parser = runtime.createParser();
+      parser.push(failed('API Error: Connection error.'));
+      expect(parser.outcome().networkError).toBe('API Error: Connection error.');
+      expect(parser.outcome().usageLimit).toBeNull();
+    });
+
+    it('knows the other texts of the list, whatever the case', () => {
+      for (const text of [
+        'read ECONNRESET',
+        'connect ETIMEDOUT 1.2.3.4:443',
+        'getaddrinfo ENOTFOUND api.anthropic.com',
+        'getaddrinfo EAI_AGAIN x',
+        'TypeError: fetch failed',
+        'socket hang up',
+        'request timed out',
+        'unsupported_country_region_territory',
+      ]) {
+        const parser = runtime.createParser();
+        parser.push(failed(text));
+        expect(parser.outcome().networkError).toBe(text);
+      }
+    });
+
+    it('cuts the text to 200 characters', () => {
+      const parser = runtime.createParser();
+      parser.push(failed(`Connection error ${'x'.repeat(500)}`));
+      expect(parser.outcome().networkError).toHaveLength(200);
+    });
+
+    it('does not take other errors, or a result without is_error', () => {
+      const parser = runtime.createParser();
+      parser.push(failed('Invalid model name'));
+      expect(parser.outcome().networkError).toBeNull();
+      const fine = runtime.createParser();
+      fine.push(JSON.stringify({ type: 'result', is_error: false, result: 'Connection error' }));
+      expect(fine.outcome().networkError).toBeNull();
+    });
+
+    it('reports both a limit and a network error, the limit decides in the daemon', () => {
+      const parser = runtime.createParser();
+      parser.push(failed('Connection error', { api_error: 'usage_limit_reached' }));
+      expect(parser.outcome().usageLimit).toEqual({ resetsAt: null });
+      expect(parser.outcome().networkError).toBe('Connection error');
     });
   });
 

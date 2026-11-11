@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../src/shared/api/api.ts';
 import { draftOfAction, valueOfAction } from '../src/features/pipelines/ActionForm.tsx';
+import { newScript } from '../src/features/pipelines/action/actionDraft.ts';
 import PipelinesPage from '../src/features/pipelines/PipelinesPage.tsx';
 
 import { choose, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
@@ -59,11 +60,42 @@ describe('the draft of an action', () => {
     });
     const draft = draftOfAction({ specialist: 'coder', additional_prompt: 'x' });
     expect(draft.kind).toBe('specialist');
-    expect(valueOfAction({ ...draft, kind: 'command', run: 'make' })).toEqual({ run: 'make' });
+    expect(valueOfAction({ ...draft, kind: 'command', scripts: [newScript('make')] })).toEqual({
+      run: 'make',
+    });
     expect(valueOfAction({ ...draft, kind: 'specialist' })).toEqual({
       specialist: 'coder',
       additional_prompt: 'x',
     });
+  });
+});
+
+describe('the scripts of an action draft', () => {
+  const texts = (raw: Record<string, unknown>) =>
+    draftOfAction(raw).scripts.map((script) => script.text);
+
+  it('reads a string as one script and a list as scripts in order', () => {
+    expect(texts({ run: 'make' })).toEqual(['make']);
+    expect(texts({ run: ['npm run lint', 'npm test'] })).toEqual(['npm run lint', 'npm test']);
+    expect(texts({})).toEqual(['']);
+  });
+
+  it('gives equal texts keys of their own', () => {
+    const keys = draftOfAction({ run: ['a', 'a'] }).scripts.map((script) => script.key);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  it('writes one script as a string and several as a list', () => {
+    expect(valueOfAction(draftOfAction({ run: ['make'] }))).toEqual({ run: 'make' });
+    expect(valueOfAction(draftOfAction({ run: ['a', 'b'] }))).toEqual({ run: ['a', 'b'] });
+  });
+
+  it('drops an empty row', () => {
+    const draft = draftOfAction({ run: 'make' });
+    expect(valueOfAction({ ...draft, scripts: [...draft.scripts, newScript('  ')] })).toEqual({
+      run: 'make',
+    });
+    expect(valueOfAction({ ...draft, scripts: [newScript('')] })).toEqual({ run: '' });
   });
 });
 
@@ -169,5 +201,100 @@ describe('the form of an action', () => {
     await waitFor(() =>
       expect(deleteAction).toHaveBeenCalledWith('review', 'rev-review', 'project'),
     );
+  });
+
+  describe('with several scripts', () => {
+    const lint = actionEntry('lint', { run: ['a', 'b'] });
+    const scriptApi = (writeAction: ReturnType<typeof saved>, extra: Partial<Api> = {}) =>
+      api({
+        writeAction,
+        config: vi.fn(async () =>
+          configView({ specialists, actions: [commit, review, lint], pipelines: [] }),
+        ),
+        ...extra,
+      });
+    const rows = () =>
+      screen.getAllByLabelText(/^Script \d+$/).map((field) => (field as HTMLTextAreaElement).value);
+
+    it('adds a script and saves the scripts as a list', async () => {
+      const writeAction = saved();
+      render(<Page api={scriptApi(writeAction)} start="commit" />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Add script' }));
+      fireEvent.change(screen.getByLabelText('Script 2'), { target: { value: 'echo done' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(writeAction).toHaveBeenCalled());
+      expect(lastValue(writeAction)[1]).toMatchObject({
+        run: ['git commit -am x', 'echo done'],
+      });
+    });
+
+    it('moves a script by Alt+arrow and saves the new order', async () => {
+      const writeAction = saved();
+      render(<Page api={scriptApi(writeAction)} start="lint" />);
+      await screen.findByLabelText('Script 1');
+      const second = screen.getByLabelText('Script 2').closest('li')!;
+      fireEvent.keyDown(second, { key: 'ArrowUp', altKey: true });
+      expect(rows()).toEqual(['b', 'a']);
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(writeAction).toHaveBeenCalled());
+      expect(lastValue(writeAction)[1]).toMatchObject({ run: ['b', 'a'] });
+    });
+
+    it('moves a script by dragging its grip above the first one', async () => {
+      render(<Page api={scriptApi(saved())} start="lint" />);
+      await screen.findByLabelText('Script 1');
+      const items = within(screen.getByLabelText('Script 1').closest('ol')!).getAllByRole(
+        'listitem',
+      );
+      const grip = items[1]!.querySelector('[draggable="true"]')!;
+      const rect = { top: 0, height: 10, bottom: 10, left: 0, right: 0, width: 0 } as DOMRect;
+      for (const item of items) item.getBoundingClientRect = () => rect;
+      fireEvent.dragStart(grip, { dataTransfer: { setData: () => {}, effectAllowed: '' } });
+      fireEvent.dragOver(items[0]!, { clientY: 1 });
+      fireEvent.drop(items[0]!, { clientY: 1 });
+      await waitFor(() => expect(rows()).toEqual(['b', 'a']));
+    });
+
+    it('removes a script down to one and saves it as a string', async () => {
+      const writeAction = saved();
+      render(<Page api={scriptApi(writeAction)} start="lint" />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Remove script 1' }));
+      expect(rows()).toEqual(['b']);
+      expect(screen.getByRole('button', { name: 'Remove script 1' })).toHaveProperty(
+        'disabled',
+        true,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(writeAction).toHaveBeenCalled());
+      expect(lastValue(writeAction)[1]).toEqual({ run: 'b' });
+    });
+
+    it('does not write an empty added row', async () => {
+      const writeAction = saved();
+      render(<Page api={scriptApi(writeAction)} start="commit" />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Add script' }));
+      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Commit!' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(writeAction).toHaveBeenCalled());
+      expect(lastValue(writeAction)[1]).toMatchObject({ run: 'git commit -am x' });
+    });
+
+    it('shows the error of a script under the list', async () => {
+      const writeAction = vi.fn(async () => ({
+        ok: false as const,
+        reason: 'invalid' as const,
+        errors: [{ path: 'swarm.actions.lint.run[1]', message: 'must not be empty' }],
+      }));
+      render(<Page api={scriptApi(writeAction as never)} start="lint" />);
+      fireEvent.change(await screen.findByLabelText('Script 2'), { target: { value: ' ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      const alert = await screen.findByText('must not be empty');
+      expect(
+        screen
+          .getByLabelText('Script 1')
+          .closest('ol')!
+          .parentElement!.parentElement!.contains(alert),
+      ).toBe(true);
+    });
   });
 });

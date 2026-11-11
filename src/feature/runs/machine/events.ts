@@ -92,6 +92,8 @@ export type Event =
       permissions?: PermissionsRefresh;
       /** The whole specialists of the current configuration; replaces `permissions` when set. */
       specialists?: SpecialistsRefresh;
+      /** The run is held in the same transition, so no agent starts (a retry with no free place). */
+      hold?: 'frozen';
     }
   | {
       kind: 'answer';

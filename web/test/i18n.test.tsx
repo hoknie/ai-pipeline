@@ -240,6 +240,7 @@ const DICTIONARIES = { es, ru, zh } as Record<string, Tree>;
 
 // Words that read the same in the language: names of languages, product and protocol terms.
 const SAME_AS_ENGLISH = new Set([
+  'Script {{n}}',
   'B',
   'beta',
   'Plain',
@@ -263,6 +264,8 @@ const SAME_AS_ENGLISH = new Set([
   'Global',
   'global',
   'General',
+  'Interfaces',
+  'Proxy',
   // Units and abbreviations written the same way in several languages.
   'PID',
   's',

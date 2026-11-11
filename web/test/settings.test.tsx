@@ -1302,6 +1302,50 @@ describe('system group', () => {
     expect(document.body.innerHTML).not.toContain('token=');
   });
 
+  it('shows the network card with the problem, and updates it on the network event', async () => {
+    current = systemView({
+      network: {
+        state: 'down',
+        problem: 'interface wt0 is down',
+        checkedAt: new Date(2026, 0, 1, 10, 5).getTime(),
+        since: new Date(2026, 0, 1, 10, 0).getTime(),
+        proxy: 'http://proxy.local:3128',
+      },
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    show(queueOf(), { system: vi.fn(async () => current) }, '#settings/system');
+    await screen.findByRole('region', { name: 'Daemon' });
+    const network = card('Network state');
+    expect(network.getByText('Unavailable')).toBeTruthy();
+    expect(network.getByText('interface wt0 is down')).toBeTruthy();
+    expect(network.getByText('10:00')).toBeTruthy();
+    expect(network.getByText('http://proxy.local:3128')).toBeTruthy();
+    act(() =>
+      stream().send({
+        event: 'network',
+        seq: 5,
+        network: { state: 'up', problem: null, checkedAt: 1, since: 2, proxy: null },
+      }),
+    );
+    await waitFor(() => expect(card('Network state').getByText('Available')).toBeTruthy());
+    expect(card('Network state').queryByText('interface wt0 is down')).toBeNull();
+  });
+
+  it('shows the network form with the defaults and the note on when it applies', async () => {
+    show(queueOf(), {}, '#settings/global/system');
+    const enabled = await screen.findByTestId('setting-network.enabled');
+    expect(enabled.textContent).toContain('without restarting the daemon');
+    expect(enabled.textContent).toContain('agents do not start');
+    const interval = await screen.findByTestId('setting-network.interval');
+    expect(within(interval).getByLabelText<HTMLInputElement>('Interval').value).toBe('30');
+    expect(interval.textContent).toContain('default');
+    expect(
+      within(await screen.findByTestId('setting-network.targets')).getByText(
+        'https://api.anthropic.com',
+      ),
+    ).toBeTruthy();
+  });
+
   it('reads the state again every 3 seconds and shows the daemon as busy', async () => {
     await mountSystem();
     current = systemView({ daemon: daemonOf({ busy: true }) });

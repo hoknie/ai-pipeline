@@ -21,6 +21,7 @@ import {
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
+import { NETWORK_FAILURE_LIMIT } from '../../network/types/index.ts';
 import { finishDelivery, resolverDone } from './delivery-flow.ts';
 import type { AttemptExit, Ctx } from './events.ts';
 import { closeRepair } from './repair.ts';
@@ -48,7 +49,9 @@ function lateUsage(group: Group, seq: number, exit: AttemptExit): void {
 
 /** The failure of an exited attempt; a report sent before the limit ran out counts as usual. */
 function exitFailure(attempt: Attempt, exit: AttemptExit): FailReason | null {
-  const limited = exit.failure?.kind === 'usage_limit' && attempt.report !== null;
+  const limited =
+    (exit.failure?.kind === 'usage_limit' || exit.failure?.kind === 'network') &&
+    attempt.report !== null;
   if (limited) return null;
   return exit.failure ?? (attempt.report === null ? { kind: 'no_report' } : null);
 }
@@ -60,6 +63,16 @@ function isFailoverError(kind: FailReason['kind']): boolean {
     kind === 'spawn' ||
     kind === 'no_report'
   );
+}
+
+/** Network failures at the end of the attempts of the step, the last attempt included. */
+function networkFailuresInRow(group: Group, stepIndex: number): number {
+  let count = 0;
+  for (const attempt of [...group.attempts].reverse()) {
+    if (attempt.stepIndex !== stepIndex || attempt.reason?.kind !== 'network') break;
+    count += 1;
+  }
+  return count;
 }
 
 function failAttempt(
@@ -75,6 +88,15 @@ function failAttempt(
   const chain = specialist?.runtimeChain
     ? m.state.run.config.chains.find((c) => c.slug === specialist.runtimeChain)
     : undefined;
+  if (failure.kind === 'network' && !isRepairGroup(group)) {
+    // The network is to blame, not the runtime: the same item of the chain tries again.
+    if (networkFailuresInRow(group, attempt.stepIndex) >= NETWORK_FAILURE_LIMIT) {
+      failGroup(m, group, failure);
+      return;
+    }
+    waitForLimit(group, attempt, true);
+    return;
+  }
   const holds = limitHolds([m.state], m.now);
   if (
     isFailoverError(failure.kind) &&

@@ -2,12 +2,36 @@ import type { Edge, Node } from '@xyflow/react';
 
 import type { FieldError } from '../../../../shared/api/types.ts';
 import type { ActionPoint } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
+import type {
+  PipelineStage,
+  StageCondition,
+  StagePerformer,
+  StageSection,
+} from '../../../../shared/lib/pipeline/pipelineStages.ts';
 import { stepOfError, type Draft } from './draft.ts';
 import { STEP_NODE_PREFIX } from './draftOps.ts';
+import {
+  RESOLVER_OFFSET_Y,
+  canvasNode as node,
+  stageFields,
+  systemNode,
+  withSections,
+} from './stageNodes.ts';
 
 export const GAP_X = 240;
+export const CONFLICT_EDGE = 'conflict:delivery->resolver';
 
-export type CanvasKind = 'start' | 'point' | 'split' | 'step' | 'follow' | 'merge' | 'delivery';
+export type CanvasKind =
+  | 'start'
+  | 'point'
+  | 'split'
+  | 'step'
+  | 'follow'
+  | 'merge'
+  | 'delivery'
+  | 'message'
+  | 'resolver'
+  | 'cleanup';
 
 export interface CanvasNodeData extends Record<string, unknown> {
   kind: CanvasKind;
@@ -23,6 +47,15 @@ export interface CanvasNodeData extends Record<string, unknown> {
   point: ActionPoint | null;
   /** The number of actions of a point; `null` while the inherited list is unknown. */
   count: number | null;
+  /** Who performs a stage the daemon lists (merge, delivery, message, resolver, cleanup). */
+  performer: StagePerformer | null;
+  /** Why the stage does not always run. */
+  condition: StageCondition | null;
+  section: StageSection | null;
+  /** The node is the first of its section and carries the caption of the section. */
+  sectionStart: boolean;
+  /** The address of the entry of the stage in the Pipeline tab. */
+  link: string | null;
 }
 
 export type CanvasNode = Node<CanvasNodeData, 'canvas'>;
@@ -49,6 +82,8 @@ export interface GraphContext {
   follow: { pipeline: string; steps: FollowStep[] | null } | null;
   /** The lists of the points, own or inherited; `null` while unknown. */
   points: Record<ActionPoint, string[] | null>;
+  /** The stages of the last answer of the daemon to the check of the draft; `null`: none yet. */
+  stages: readonly PipelineStage[] | null;
   errors: FieldError[];
   /** Whether steps can be added, moved and linked. */
   editable: boolean;
@@ -56,27 +91,6 @@ export interface GraphContext {
 
 export const stepNodeId = (key: number): string => `${STEP_NODE_PREFIX}${key}`;
 export const pointNodeId = (point: ActionPoint): string => `point:${point}`;
-
-function node(id: string, x: number, data: Partial<CanvasNodeData>): CanvasNode {
-  return {
-    id,
-    type: 'canvas',
-    position: { x, y: 0 },
-    draggable: false,
-    connectable: false,
-    data: {
-      kind: 'step',
-      title: '',
-      subtitle: '',
-      error: false,
-      locked: false,
-      key: null,
-      point: null,
-      count: null,
-      ...data,
-    },
-  };
-}
 
 /** The ids of the nodes marked by the errors: a step of the draft or the split. */
 function markedNodes(draft: Draft, context: GraphContext): Set<string> {
@@ -120,7 +134,7 @@ function followNodes(context: GraphContext, start: number) {
   );
 }
 
-/** The nodes in the order of the stages: start, points, split, steps, merge and delivery. */
+/** The nodes in the order of the stages: start, points, split, steps, merge, delivery, cleanup. */
 function chainOf(draft: Draft, context: GraphContext, marked: Set<string>): CanvasNode[] {
   const nodes: CanvasNode[] = [node('start', 0, { kind: 'start' })];
   const add = (item: (x: number) => CanvasNode) => nodes.push(item(nodes.length * GAP_X));
@@ -155,10 +169,15 @@ function chainOf(draft: Draft, context: GraphContext, marked: Set<string>): Canv
       last.connectable = context.editable;
     }
   }
-  if (hasSplit) add((x) => node('merge', x, { kind: 'merge' }));
+  if (hasSplit)
+    add((x) => node('merge', x, { kind: 'merge', ...stageFields(context.stages, 'merge') }));
   add((x) => pointNode('before_delivery', x, context));
-  add((x) => node('delivery', x, { kind: 'delivery' }));
+  const message = systemNode(context.stages, 'message', nodes.length * GAP_X);
+  if (message) nodes.push(message);
+  add((x) => node('delivery', x, { kind: 'delivery', ...stageFields(context.stages, 'delivery') }));
   add((x) => pointNode('after_delivery', x, context));
+  const cleanup = systemNode(context.stages, 'cleanup', nodes.length * GAP_X);
+  if (cleanup) nodes.push(cleanup);
   return nodes;
 }
 
@@ -185,6 +204,19 @@ function orderEdges(nodes: CanvasNode[], draft: Draft, context: GraphContext): C
     });
   }
   return edges;
+}
+
+/** The edge from the delivery down to the resolver; the canvas gives it its caption. */
+function conflictEdge(): CanvasEdge {
+  return {
+    id: CONFLICT_EDGE,
+    source: 'delivery',
+    target: 'resolver',
+    sourceHandle: 'down',
+    targetHandle: 'up',
+    selectable: false,
+    data: { index: 0 },
+  };
 }
 
 function returnEdges(draft: Draft, context: GraphContext): CanvasEdge[] {
@@ -229,6 +261,15 @@ export function draftGraph(
   context: GraphContext,
 ): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
   const marked = markedNodes(draft, context);
-  const nodes = chainOf(draft, context, marked);
-  return { nodes, edges: [...orderEdges(nodes, draft, context), ...returnEdges(draft, context)] };
+  const chain = withSections(chainOf(draft, context, marked));
+  const delivery = chain.find((item) => item.id === 'delivery') as CanvasNode;
+  const resolver = systemNode(context.stages, 'resolver', delivery.position.x, RESOLVER_OFFSET_Y);
+  return {
+    nodes: resolver ? [...chain, ...withSections([resolver])] : chain,
+    edges: [
+      ...orderEdges(chain, draft, context),
+      ...(resolver ? [conflictEdge()] : []),
+      ...returnEdges(draft, context),
+    ],
+  };
 }

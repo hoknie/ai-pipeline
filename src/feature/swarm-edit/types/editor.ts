@@ -208,6 +208,8 @@ export interface EditorSetting {
   globalValue: unknown;
   /** What each settings.yaml says itself; a key that is not there is absent. For `env`, only names. */
   written: { global?: unknown; project?: unknown };
+  /** For `network.proxy`: the URL has a login or a password, which are never shown. */
+  credentials?: boolean;
 }
 
 export interface SettingsFileView {

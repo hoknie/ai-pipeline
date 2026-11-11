@@ -112,6 +112,9 @@ export class Hub {
       // Not kept: the snapshot has no observers, a new tab reads GET /api/observers.
       this.seq = event.seq;
       this.broadcast(event);
+    } else if (event.event === 'network') {
+      this.seq = event.seq;
+      this.broadcast(event);
     } else if (event.event === 'processes') {
       const { seq, ...rest } = event;
       this.processes = rest;

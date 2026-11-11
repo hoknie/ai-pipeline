@@ -1,5 +1,6 @@
 import type { ArtifactsPublishPort } from '../../feature/artifacts/ports/index.ts';
 import type { DeliveryPublishPort } from '../../feature/delivery/ports/index.ts';
+import type { NetworkChangedPort } from '../../feature/network/ports/index.ts';
 import type { ObserversPublishPort } from '../../feature/observers/ports/index.ts';
 import type { ProcessesPublishPort } from '../../feature/processes/ports/index.ts';
 import type { QueuePublishPort } from '../../feature/queue/ports/index.ts';
@@ -36,6 +37,7 @@ export interface PublicationPorts {
   observers: ObserversPublishPort;
   delivery: DeliveryPublishPort;
   artifacts: ArtifactsPublishPort;
+  network: NetworkChangedPort;
 }
 
 /** The subscribers of the daemon and the one counter of the events they get. */
@@ -102,6 +104,7 @@ export class Publisher {
       },
       delivery: { runChanged },
       artifacts: { runChanged },
+      network: { changed: () => this.send('network', { network: this.services.network.status() }) },
     };
   }
 

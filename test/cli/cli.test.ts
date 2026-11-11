@@ -235,6 +235,22 @@ describe('cli', () => {
     expect(result.stdout).toMatch(/stages:\n\s+before_delivery:\n\s+- lint/);
   });
 
+  it('prints the scripts of an action as a list in aip config check', async () => {
+    const box = sandbox(
+      PIPELINE_CONFIG.replace(
+        '  pipelines:',
+        `  actions:
+    lint: { run: ["npm run lint", "npm test"] }
+  stages:
+    before_delivery: [lint]
+  pipelines:`,
+      ),
+    );
+    const result = await aip(box, 'config', 'check');
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(/lint:\n\s+run:\n\s+- npm run lint\n\s+- npm test\n\s+timeout/);
+  });
+
   it('shows the action of a run in aip run show', async () => {
     const box = sandbox(
       PIPELINE_CONFIG.replace(

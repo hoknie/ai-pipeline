@@ -37,7 +37,7 @@ aip group show <run-id> <group> # attempts, verdicts, remarks, tokens, changed f
 - `aip run list` shows each run with its task number (`#` column), the first line of its task and a summary of changes (`2 files +367 −0`). With a run id, it prints the table of that run's groups.
 - A pipeline with a `name` is printed as `<name> (<id>)`; without a `name`, as the id.
 - `aip run show` prints a `System:` line with the system stages in the order split, commit message, resolver, observer and delivery, for example `System: split done · message running · delivery pending`. A failed delivery shows its first reason there, even when no resolver ran.
-- A waiting group has a `NOTE` saying what it waits for, for example `waiting for coder`. The `Groups:` line counts them as `waiting N`.
+- A waiting group has a `NOTE` saying what it waits for, for example `waiting for coder` or `waiting for network: interface wt0 is down`. The `Groups:` line counts them as `waiting N`.
 
 For a live stream of changes, `aip events --json` prints a snapshot and then one JSON line per change.
 
@@ -197,4 +197,11 @@ The `wait` object of a `waiting` group has `reason` and the details of the reaso
 
 - `specialist`: the [`max` of its specialist](../configuration/specialists.md#limits) is reached;
 - `capacity`: the [`max` of the repository](../configuration/README.md#max) is reached;
-- `limit`: the runtime waits for its [usage limit](queue.md#usage-limit) to reset.
+- `limit`: the runtime waits for its [usage limit](queue.md#usage-limit) to reset;
+- `network`: the [network check](../configuration/network.md) says the network is down (`until` is `null`), or the last attempt failed because of the network and the group pauses (`until`).
+
+### Network
+
+While the network is `down`, no agent starts in any run and the groups wait with `waiting for network: <problem>`. Agents that already run are not stopped, and command actions are not held. When the network is back the groups start by themselves.
+
+An attempt that ends without a report on a network error gets the reason `network: <problem>`. The group waits 30 seconds, then repeats the same step in the same session. The failure does not switch the runtime of a [chain](../configuration/runtimes.md#runtime-chains) and is not a rejection. After 5 such failures of a step in a row the group fails.

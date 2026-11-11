@@ -10,11 +10,17 @@ import {
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
+import { scriptText } from '../../swarm-config/types/index.ts';
+import { OFF_NETWORK, type NetworkSnapshot } from '../../network/types/index.ts';
 import type { Effect } from './events.ts';
 import { isCommandAction, planDispatch } from './plan.ts';
 
-export function dispatch(states: RunState[], now: number): Effect[] {
-  return planDispatch(states, now).start.map(({ state, group }) => {
+export function dispatch(
+  states: RunState[],
+  now: number,
+  network: NetworkSnapshot = OFF_NETWORK,
+): Effect[] {
+  return planDispatch(states, now, network).start.map(({ state, group }) => {
     const attempt = isCommandAction(state, group)
       ? startCommand(state, group, now)
       : startAttempt(state, group, now);
@@ -47,7 +53,7 @@ function startCommand(state: RunState, group: Group, now: number): Attempt {
     model: null,
     status: 'running',
     input: {
-      prompt: action.run,
+      prompt: scriptText(action.run),
       groupTitle: group.title,
       stepId,
       specialistName: action.name ?? action.id,
@@ -82,7 +88,12 @@ function startAttempt(state: RunState, group: Group, now: number): Attempt {
   const specialist = specialistOfStep(state.run, group, step.specialist);
   if (!specialist) throw new Error(`specialist ${step.specialist} does not exist`);
   const previousOfStep = group.attempts.filter((attempt) => attempt.stepId === step.id);
-  const resumeSession = pending.resume ? (previousOfStep.at(-1)?.sessionId ?? null) : null;
+  const resumeSession = pending.resume
+    ? (previousOfStep.findLast((attempt) => (attempt.sessionId ?? attempt.resumeSession) !== null)
+        ?.sessionId ??
+      previousOfStep.findLast((attempt) => attempt.resumeSession !== null)?.resumeSession ??
+      null)
+    : null;
   const holds = limitHolds([state], now);
   const selected = selectAttemptRuntime({
     specialist,
@@ -93,6 +104,7 @@ function startAttempt(state: RunState, group: Group, now: number): Attempt {
     stepIndex: pending.stepIndex,
     round: previousOfStep.length + 1,
     resume: pending.resume,
+    keepRuntime: pending.keepRuntime ?? false,
     seed: (group.attempts.at(-1)?.seq ?? 0) + now,
   });
   const attempt: Attempt = {

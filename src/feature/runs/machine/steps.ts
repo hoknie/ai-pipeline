@@ -47,30 +47,30 @@ export function askHuman(
   group.question = question;
   group.questions = questions;
   group.humanOnly = humanOnly;
-  group.pending = { stepIndex: step, feedback: null, humanAnswer: null, resume: true };
+  group.pending = { ...freshPending(step), resume: true };
 }
 
 export function restorePending(group: Group): void {
   const last = group.attempts.at(-1);
   if (group.pending === null && last) {
     group.pending = {
-      stepIndex: last.stepIndex,
+      ...freshPending(last.stepIndex),
       feedback: last.input.feedback,
       humanAnswer: last.input.humanAnswer,
-      resume: false,
       ...(last.input.reviewed ? { reviewed: true } : {}),
     };
   }
 }
 
-/** The group waits in `queued` for the same step; the scheduler holds it until the limit resets. */
-export function waitForLimit(group: Group, attempt: Attempt): void {
+/** The group waits in `queued` for the same step until the limit resets or the network is back. */
+export function waitForLimit(group: Group, attempt: Attempt, keepRuntime = false): void {
   if (isTerminal(group.status)) return;
   group.pending = {
-    stepIndex: attempt.stepIndex,
+    ...freshPending(attempt.stepIndex),
     feedback: attempt.input.feedback,
     humanAnswer: attempt.input.humanAnswer,
-    resume: attempt.sessionId !== null,
+    resume: (attempt.sessionId ?? (keepRuntime ? attempt.resumeSession : null)) !== null,
+    ...(keepRuntime ? { keepRuntime: true, message: attempt.input.message } : {}),
     ...(attempt.input.reviewed ? { reviewed: true } : {}),
   };
   group.status = 'queued';

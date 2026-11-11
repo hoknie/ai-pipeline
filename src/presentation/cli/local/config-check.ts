@@ -55,7 +55,10 @@ function presentActions(config: Config): unknown {
       {
         ...(action.name ? { name: action.name } : {}),
         ...(action.run !== null
-          ? { run: action.run, timeout: action.timeoutSeconds }
+          ? {
+              run: action.run.length === 1 ? action.run[0] : action.run,
+              timeout: action.timeoutSeconds,
+            }
           : { specialist: action.specialist }),
         ...(action.additionalPrompt ? { additional_prompt: action.additionalPrompt } : {}),
         on_failure: action.onFailure,

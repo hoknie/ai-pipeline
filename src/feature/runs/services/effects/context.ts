@@ -1,4 +1,5 @@
 import type { AgentsService } from '../../../agents/services/index.ts';
+import type { NetworkMonitor } from '../../../network/services/index.ts';
 import type { ConfigService } from '../../../swarm-config/services/index.ts';
 import type { Event } from '../../machine/index.ts';
 import type { AgentExitPort, DiffPort, QueueAdvancePort } from '../../ports/index.ts';
@@ -33,6 +34,8 @@ export interface EffectDependencies {
   context: EffectContext;
   agents: AgentsService;
   config: ConfigService;
+  /** The check of the network: agents start after it and learn about a failed network from it. */
+  network: NetworkMonitor;
   /** Path of the daemon socket the worker MCP servers connect to. */
   socket: string;
   environment: NodeJS.ProcessEnv;

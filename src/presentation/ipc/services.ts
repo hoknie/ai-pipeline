@@ -5,6 +5,7 @@ import type {
   ObserverHistoryService,
   ObserverService,
 } from '../../feature/observers/services/index.ts';
+import type { NetworkMonitor } from '../../feature/network/services/index.ts';
 import type { ProcessService } from '../../feature/processes/services/index.ts';
 import type { QueueServices } from '../../feature/queue/services/index.ts';
 import type { ProjectService, RegistryService } from '../../feature/repos/services/index.ts';
@@ -20,6 +21,7 @@ import type { TagCatalogService } from '../../feature/tags/services/index.ts';
 export interface DaemonServices {
   now: () => number;
   config: ConfigService;
+  network: NetworkMonitor;
   registry: RegistryService;
   projects: ProjectService;
   tags: TagCatalogService;

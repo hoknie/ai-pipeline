@@ -61,6 +61,8 @@ interface Action {
    * `resetsAt` in seconds of the epoch, absent: no reset time.
    */
   usageLimit?: { resetsAt?: number };
+  /** The fake claude stops without a report with this error result, as on a lost connection. */
+  networkError?: string;
   /**
    * Usage the agent reports as it works, before `delayMs`: `claude` prints `assistant` events with
    * `message.usage` (the same `id` repeats a message), `opencode` prints `step-finish` events.
@@ -553,6 +555,21 @@ if (action.usageLimit && mode === 'claude') {
       api_error_status: 429,
       api_error: 'usage_limit_reached',
       result: text,
+      session_id: session,
+      total_cost_usd: 0,
+    }),
+  );
+  process.exit(1);
+}
+
+if (action.networkError && mode === 'claude') {
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: session }));
+  console.log(
+    JSON.stringify({
+      type: 'result',
+      subtype: 'error_during_execution',
+      is_error: true,
+      result: action.networkError,
       session_id: session,
       total_cost_usd: 0,
     }),

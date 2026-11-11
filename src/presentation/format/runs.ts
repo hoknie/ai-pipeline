@@ -166,8 +166,14 @@ function decisionLines(run: RunView, style: Style): string[] {
 }
 
 /** What a waiting group waits for, for the NOTE column. */
-export function waitNote(wait: GroupWait | null | undefined): string {
+export function waitNote(wait: GroupWait | null | undefined, withProblem = true): string {
   if (!wait) return '';
+  if (wait.reason === 'network') {
+    if (wait.until !== null) return `waiting for network, until ${clockTime(wait.until)}`;
+    return withProblem && wait.problem
+      ? `waiting for network: ${wait.problem}`
+      : 'waiting for network';
+  }
   if (wait.reason === 'limit')
     return `waiting for ${wait.runtime} usage limit, until ${clockTime(wait.until)}`;
   if (wait.reason === 'specialist') return `waiting for ${wait.specialist}`;

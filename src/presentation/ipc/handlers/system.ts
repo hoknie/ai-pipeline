@@ -13,7 +13,9 @@ export const systemHandlers = {
       pid: process.pid,
       build,
       busy: services.runs.engine.busy(),
+      network: services.network.status(),
     }) satisfies PingResult,
+  network_status: async (_params, { services }) => services.network.status(),
   shutdown: async () => ({ stopping: true }),
   // After the work already queued, so the check and the stop are one step.
   shutdown_idle: (_params, { services }) => {

@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
 import { ApiError } from '../src/shared/api/api.ts';
-import { dropPosition, dropSlot, moveId } from '../src/features/queue/queueOrder.ts';
+import { dropPosition, dropSlot, moveId } from '../src/shared/lib/listOrder.ts';
 import {
   afterOptions,
   dependents,

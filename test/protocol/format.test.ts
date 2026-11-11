@@ -827,6 +827,44 @@ describe('system stages and waiting in text', () => {
     expect(waitNote(null)).toBe('');
   });
 
+  it('names the problem of the network, or the end of the pause', () => {
+    expect(waitNote({ reason: 'network', problem: 'interface wt0 is down', until: null })).toBe(
+      'waiting for network: interface wt0 is down',
+    );
+    expect(waitNote({ reason: 'network', problem: 'x', until: 0 })).toMatch(
+      /^waiting for network, until \d\d:\d\d$/,
+    );
+  });
+
+  it('lists a group that waits for the network without the problem in the queue', () => {
+    const state = run(1);
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    const text = formatQueue(
+      queueView(
+        queue,
+        () => state,
+        null,
+        [],
+        null,
+        () => ({ reason: 'network', problem: 'interface wt0 is down', until: null }),
+      ),
+    );
+    expect(text).toContain('gruppa-1: Планировщик (waiting for network)');
+    expect(text).not.toContain('wt0');
+    const shown = formatRun(
+      runView(
+        state,
+        3000,
+        () => null,
+        [],
+        () => ({ reason: 'network', problem: 'interface wt0 is down', until: null }),
+      ),
+      3000,
+    );
+    expect(shown).toContain('waiting for network: interface wt0 is down');
+  });
+
   it('lists the waiting groups on the line of the run of the queue', () => {
     const state = run(1);
     const queue = emptyQueue('/repo', 1);

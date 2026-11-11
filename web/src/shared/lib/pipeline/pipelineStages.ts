@@ -1,6 +1,12 @@
 import type { PipelineStage, StagePerformer, PipelineTopology } from '../../api/types.ts';
 
-export type { PipelineStage, StageKind, StagePerformer, StageSection } from '../../api/types.ts';
+export type {
+  PipelineStage,
+  StageCondition,
+  StageKind,
+  StagePerformer,
+  StageSection,
+} from '../../api/types.ts';
 
 const SYSTEM: StagePerformer = { type: 'system' };
 

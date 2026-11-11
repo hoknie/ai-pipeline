@@ -2,7 +2,19 @@ import { z } from 'zod';
 
 import type { BuildInfo } from '../../../platform/build/index.ts';
 
+/** The state of the network the daemon holds; `proxy` has no login and password. */
+export const networkStatusSchema = z.object({
+  state: z.enum(['off', 'up', 'down']),
+  problem: z.string().nullable(),
+  checkedAt: z.number().nullable(),
+  since: z.number(),
+  proxy: z.string().nullable(),
+});
+
+export type NetworkStatusView = z.infer<typeof networkStatusSchema>;
+
 export const panelRequests = [
+  z.object({ method: z.literal('network_status'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('ping'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('shutdown'), params: z.object({}).default({}) }),
   z.object({ method: z.literal('shutdown_idle'), params: z.object({}).default({}) }),
@@ -35,6 +47,8 @@ export const pingResultSchema = z.object({
   pid: z.number().int().optional(),
   build: buildInfoSchema.optional(),
   busy: z.boolean().optional(),
+  /** The state of the network; absent in a daemon older than the network check. */
+  network: networkStatusSchema.optional(),
 });
 
 export type PingResult = z.infer<typeof pingResultSchema>;

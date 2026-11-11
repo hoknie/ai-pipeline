@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 import { createDaemonPanel } from '../../src/presentation/web/panel/daemon-panel.ts';
 import { withSettings } from './settings.ts';
 import { startWebServer, type WebServer } from '../../src/presentation/web/server.ts';
@@ -386,5 +387,62 @@ describe('restart from the panel of the daemon', () => {
     } finally {
       await controller.close();
     }
+  });
+});
+
+describe('the network in the system view', () => {
+  const NETWORK = {
+    state: 'down' as const,
+    problem: 'interface wt0 is down',
+    checkedAt: 2000,
+    since: 1000,
+    proxy: 'http://proxy.local:3128',
+  };
+
+  it('comes from the ping of the daemon, and is null without a daemon', () => {
+    const input = {
+      check: null,
+      panelBuild: BUILD,
+      servedBy: 'daemon' as const,
+      panel: { pid: 7, host: '127.0.0.1', port: 7341, auth: 'token' as const },
+      logPath: null,
+    };
+    expect(
+      systemView({ ...input, ping: { pong: true, pid: 5, build: BUILD, network: NETWORK } })
+        .network,
+    ).toEqual(NETWORK);
+    expect(systemView({ ...input, ping: null }).network).toBeNull();
+  });
+
+  it('is answered by GET /api/system without the password of the proxy, and sent as an event', async () => {
+    h = await harness(MANUAL_CONFIG);
+    const directory = join(h.environment.XDG_CONFIG_HOME!, 'aip');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      join(directory, 'settings.yaml'),
+      'network: { enabled: true, interfaces: [aip-no-such-interface], proxy: "http://user:secret@127.0.0.1:9" }\n',
+    );
+    const events: string[] = [];
+    const ended = subscribe(h.socket, (line) => events.push(line));
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    await until('the snapshot', () => events.length > 0);
+    await h.running.application.services.network.checkNow();
+    await until('the network event', () => events.some((line) => line.includes('"network"')));
+    const base = `http://127.0.0.1:${web.port}`;
+    const response = await fetch(`${base}/api/system`, { headers: { 'x-aip-token': web.token! } });
+    const text = await response.text();
+    const view = JSON.parse(text) as ReturnType<typeof systemView>;
+    expect(view.network).toMatchObject({
+      state: 'down',
+      problem: 'interface aip-no-such-interface is down',
+      proxy: 'http://127.0.0.1:9',
+    });
+    expect(text).not.toContain('secret');
+    const event = events.map((line) => JSON.parse(line)).find((item) => item.event === 'network');
+    expect(event).toMatchObject({ network: { state: 'down', proxy: 'http://127.0.0.1:9' } });
+    expect(JSON.stringify(event)).not.toContain('secret');
+    await h.close();
+    h = null;
+    await ended;
   });
 });

@@ -3,6 +3,7 @@ import { Document, isMap, isScalar, parseDocument } from 'yaml';
 import {
   assembleLevel,
   parseYaml,
+  validateNetworkSection,
   validateRuntimesSection,
   validateWebSection,
 } from '../../swarm-config/services/index.ts';
@@ -195,6 +196,7 @@ export function planSettings(paths: ConfigPaths, request: SettingsRequest): Edit
     const sectionErrors = (source: ConfigSource | undefined): FieldError[] => {
       const root = isMapping(source?.value) ? source.value : {};
       return [
+        ...validateNetworkSection(root.network).errors,
         ...validateWebSection(root.web).errors,
         ...validateRuntimesSection(root.runtimes).errors,
       ];

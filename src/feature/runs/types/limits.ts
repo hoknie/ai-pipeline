@@ -6,7 +6,8 @@ import type {
 } from '../../swarm-config/types/index.ts';
 import type { Attempt } from './attempt.ts';
 import { COMMAND_RUNTIME, USAGE_LIMIT_FALLBACK_MS, type AttemptRuntime } from './constants.ts';
-import { isRepairGroup } from './group.ts';
+import { NETWORK_RETRY_MS } from '../../network/types/index.ts';
+import { type Group, isRepairGroup } from './group.ts';
 import { type RunState, allGroups } from './run.ts';
 
 /** When the usage limit of an attempt that ran out of it resets; null for other attempts. */
@@ -15,6 +16,13 @@ export function limitResetsAt(attempt: Attempt): number | null {
   return (
     attempt.reason.resetsAt ?? (attempt.finishedAt ?? attempt.startedAt) + USAGE_LIMIT_FALLBACK_MS
   );
+}
+
+/** When the group may retry after a network failure of its last attempt; null otherwise. */
+export function networkRetryAt(group: Group): number | null {
+  const last = group.attempts.at(-1);
+  if (last?.reason?.kind !== 'network' || last.status !== 'failed') return null;
+  return (last.finishedAt ?? last.startedAt) + NETWORK_RETRY_MS;
 }
 
 /** Runtimes held by a usage limit that has not reset at `now`, with the moment it resets. */
@@ -83,7 +91,9 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
 export type GroupWait =
   | { reason: 'limit'; runtime: string; until: number }
   | { reason: 'specialist'; specialist: string; name: string; max: number }
-  | { reason: 'capacity'; max: number };
+  | { reason: 'capacity'; max: number }
+  /** The network is down (`until` null) or the last attempt failed because of it (`until`: retry). */
+  | { reason: 'network'; problem: string; until: number | null };
 
 export interface SelectedRuntime {
   runtime: AttemptRuntime;
@@ -102,11 +112,14 @@ export interface SelectAttemptOptions {
   stepIndex: number;
   round: number;
   resume: boolean;
+  /** The attempt before it failed because of the network: keep its runtime even without a session. */
+  keepRuntime?: boolean;
   seed?: number;
 }
 
 export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRuntime {
   const { specialist, chains, defaults, limitHolds, attempts, stepIndex, resume, seed } = options;
+  const keepRuntime = options.keepRuntime ?? false;
   if (!specialist.runtimeChain) {
     return {
       runtime: specialist.runtime,
@@ -127,7 +140,7 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
   if (enabledItems.length === 0) {
     return { runtime: defaults.runtime, model: null };
   }
-  if (resume) {
+  if (resume || keepRuntime) {
     const prev = [...attempts].reverse().find((a) => a.stepIndex === stepIndex);
     if (prev) {
       return {
@@ -157,6 +170,8 @@ function currentStepFailedIndices(attempts: Attempt[], stepIndex: number): Set<n
   for (let i = attempts.length - 1; i >= 0; i--) {
     const a = attempts[i]!;
     if (a.stepIndex !== stepIndex || a.status !== 'failed') break;
+    // The network, not the runtime, failed: the item stays a candidate.
+    if (a.reason?.kind === 'network') continue;
     if (a.chainIndex !== undefined && a.chainIndex !== null) {
       failed.add(a.chainIndex);
     }

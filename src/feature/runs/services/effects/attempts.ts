@@ -22,9 +22,11 @@ import {
   type Group,
   type RunState,
 } from '../../types/index.ts';
+import { NETWORK_FRESH_MS } from '../../../network/types/index.ts';
 
 import type { ActionRunner } from './actions.ts';
 import type { AttemptKey, EffectDependencies } from './context.ts';
+import { withProxy } from './proxy.ts';
 import type { OutsideChanges } from './outside.ts';
 import type { RunningAgents } from './running.ts';
 import type { UsageBuffers } from './usage.ts';
@@ -90,7 +92,9 @@ export class AttemptStarter {
       }
       this.parts.running.dropToken(token);
       if (this.dependencies.context.stopping) return undefined;
-      return this.dependencies.context.serial(() => this.exited(state, group, key, exit));
+      return this.networkFailure(state, key, exit).then((network) =>
+        this.dependencies.context.serial(() => this.exited(state, group, key, exit, network)),
+      );
     });
   }
 
@@ -124,6 +128,15 @@ export class AttemptStarter {
       worktree = await ensureGroupWorktree(state, group);
     } catch (error) {
       await this.fail(state, key, { kind: 'git', message: (error as Error).message });
+      return null;
+    }
+    // Not into a network that is known to be down: the attempt waits and starts again later.
+    const network = await this.dependencies.network.ensureFresh(NETWORK_FRESH_MS);
+    if (network.state === 'down') {
+      await this.fail(state, key, {
+        kind: 'network',
+        problem: network.problem ?? 'network is down',
+      });
       return null;
     }
     // Leftovers of an interrupted check must not reach this one.
@@ -180,12 +193,35 @@ export class AttemptStarter {
       cwd: worktree,
       logPath: log,
       parser: runtime.createParser(),
-      environment,
+      environment: withProxy(environment, this.dependencies.network.proxy()),
       graceMs,
       drainMs: timings.drainMs,
       timesPath: timesPath(log),
       onUsage: (usage) => this.parts.usage.report(state, key, usage),
     });
+  }
+
+  /**
+   * Why an agent that ended without a report may have ended because of the network: the problem,
+   * or null. The check runs after the exit and outside the queue, so a slow probe holds nothing.
+   */
+  private async networkFailure(
+    state: RunState,
+    key: AttemptKey,
+    exit: ProcessExit,
+  ): Promise<string | null> {
+    if (exit.spawnError || exit.outcome.usageLimit) return null;
+    const attempt = findGroup(state, key.group)?.attempts.find((item) => item.seq === key.seq);
+    if (!attempt || attempt.status !== 'running' || attempt.reason !== null) return null;
+    if (attempt.report !== null) return null;
+    if (exit.outcome.networkError) return exit.outcome.networkError;
+    let snapshot;
+    try {
+      snapshot = await this.dependencies.network.checkNow();
+    } catch {
+      return null;
+    }
+    return snapshot.state === 'down' ? (snapshot.problem ?? 'network is down') : null;
   }
 
   /** The exit of the agent as an event: its session, usage, failure and changes outside. */
@@ -194,6 +230,7 @@ export class AttemptStarter {
     group: Group,
     key: AttemptKey,
     exit: ProcessExit,
+    network: string | null,
   ): Promise<void> {
     await this.parts.actions.discardChanges(state, group);
     const outsideChanges = await this.parts.outside.finish(state, key);
@@ -208,7 +245,9 @@ export class AttemptStarter {
           ? { kind: 'spawn', message: exit.spawnError }
           : exit.outcome.usageLimit
             ? { kind: 'usage_limit', resetsAt: exit.outcome.usageLimit.resetsAt }
-            : null,
+            : network !== null
+              ? { kind: 'network', problem: network }
+              : null,
         outsideChanges,
         denials: exit.outcome.denials,
         onLimit: this.dependencies.queue.onLimitOf(state.run.repository),

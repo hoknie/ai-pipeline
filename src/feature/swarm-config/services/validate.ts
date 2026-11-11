@@ -15,6 +15,7 @@ import {
   checkDefaults,
   checkDelivery,
   checkNaming,
+  checkNetwork,
   checkWeb,
   checkWorkspace,
 } from './validate-settings.ts';
@@ -28,11 +29,13 @@ import {
   DEFAULT_WORKSPACE_DIR,
   defaultDelivery,
   defaultNaming,
+  defaultNetwork,
   defaultRuntimes,
   defaultWeb,
   defaultWorkspace,
   MAX_RANGE,
   OUTSIDE_CHANGES,
+  type NetworkSettings,
   type OutsideChanges,
   type ResolvedConfig,
   type RuntimeSettings,
@@ -49,6 +52,7 @@ const SWARM_KEYS = [
   'naming',
   'web',
   'runtimes',
+  'network',
   'outside_changes',
   'claude',
   'delivery',
@@ -80,6 +84,17 @@ export function validateRuntimesSection(value: unknown): {
   const runtimes = defaultRuntimes();
   if (value !== undefined) checkRuntimes(ctx, value, runtimes);
   return { runtimes, errors: ctx.errors };
+}
+
+/** Checks the `network` section alone; `value` is the content of `swarm.network`. */
+export function validateNetworkSection(value: unknown): {
+  network: NetworkSettings;
+  errors: FieldError[];
+} {
+  const ctx: ValidateContext = { errors: [] };
+  const network = defaultNetwork();
+  if (value !== undefined) checkNetwork(ctx, value, network);
+  return { network, errors: ctx.errors };
 }
 
 export function validateConfig(root: unknown): ValidationResult {
@@ -173,6 +188,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   if ('naming' in swarm) checkNaming(ctx, swarm.naming, config.naming);
   if ('web' in swarm) checkWeb(ctx, swarm.web, config.web);
   if ('runtimes' in swarm) checkRuntimes(ctx, swarm.runtimes, config.runtimes);
+  if ('network' in swarm) checkNetwork(ctx, swarm.network, defaultNetwork());
   if ('outside_changes' in swarm) {
     config.outsideChanges =
       readChoice<OutsideChanges>(

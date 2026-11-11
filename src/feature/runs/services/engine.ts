@@ -7,7 +7,14 @@ import {
   type Event,
 } from '../machine/index.ts';
 import type { ObservePort, QueueAdvancePort, RunsPublishPort } from '../ports/index.ts';
-import { allGroups, limitHolds, type GroupWait, type RunState } from '../types/index.ts';
+import type { NetworkSnapshot } from '../../network/types/index.ts';
+import {
+  allGroups,
+  limitHolds,
+  networkRetryAt,
+  type GroupWait,
+  type RunState,
+} from '../types/index.ts';
 
 import type { RunStates } from './states.ts';
 
@@ -31,6 +38,8 @@ export interface RunEngineDependencies {
   queue: QueueAdvancePort;
   observe: ObservePort;
   publish: RunsPublishPort;
+  /** The state of the network now: agents do not start while it is down. */
+  network: () => NetworkSnapshot;
 }
 
 /**
@@ -93,7 +102,7 @@ export class RunEngine {
       const all = states.all();
       const active = all.filter((state) => state.run.finishedAt === null);
       // Finished runs too: a usage limit of a failed run still holds its runtime.
-      const effects = dispatch(all, now());
+      const effects = dispatch(all, now(), this.dependencies.network());
       this.armWake();
       if (effects.length === 0) return;
       for (const state of active) this.save(state);
@@ -111,7 +120,7 @@ export class RunEngine {
     this.waits.get(waitKey(run, slug)) ?? null;
 
   /**
-   * Sets the timer to the nearest moment a usage limit resets: a held runtime may start its
+   * Sets the timer to the nearest moment a usage limit resets or a pause after a network failure ends: a held runtime may start its
    * steps again, a queue stopped by the limit may start by itself.
    */
   armWake(): void {
@@ -120,7 +129,16 @@ export class RunEngine {
     if (this.halted) return;
     const { states, now, wakeMarginMs, queue } = this.dependencies;
     const moment = now();
-    const moments = [...limitHolds(states.all(), moment).values(), ...queue.wakeMoments()];
+    const retries = states
+      .all()
+      .filter((state) => state.run.finishedAt === null)
+      .flatMap((state) => allGroups(state).map((group) => networkRetryAt(group)))
+      .filter((at): at is number => at !== null && at > moment);
+    const moments = [
+      ...limitHolds(states.all(), moment).values(),
+      ...retries,
+      ...queue.wakeMoments(),
+    ];
     if (moments.length === 0) return;
     const delay = Math.min(Math.max(Math.min(...moments) - moment, 0) + wakeMarginMs, MAX_TIMER_MS);
     this.wakeTimer = setTimeout(() => {
@@ -166,7 +184,7 @@ export class RunEngine {
   /** Recomputes which queued groups wait, and tells subscribers about runs whose waits changed. */
   private refreshWaits(): void {
     const states = this.dependencies.states.all();
-    this.waits = planDispatch(states, this.dependencies.now()).waits;
+    this.waits = planDispatch(states, this.dependencies.now(), this.dependencies.network()).waits;
     const changed: RunState[] = [];
     const repositories = new Set<string>();
     for (const state of states) {

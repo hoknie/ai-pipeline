@@ -117,7 +117,11 @@ function FormBody({ props, settings }: BodyProps) {
         <Loading />
       )}
       {group === 'system' ? (
-        <SystemGroup api={api} onRestarted={() => void reload().catch(() => undefined)} />
+        <SystemGroup
+          api={api}
+          streamedNetwork={props.streamedNetwork}
+          onRestarted={() => void reload().catch(() => undefined)}
+        />
       ) : null}
     </>
   );

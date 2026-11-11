@@ -139,7 +139,7 @@ export function freezeCandidate(
  * Gives `run` a place as a priority run. When every place is taken and a run can be frozen, that
  * run leaves the places and its return item `itemId` goes first in the queue; its id is returned
  * and the caller sets `hold: frozen` on it. Without a candidate the run takes a place over
- * `parallel`.
+ * `parallel`. `reserved`: places already given away in the same step (continuing frozen runs).
  */
 export function claimPlace(
   queue: Queue,
@@ -147,10 +147,11 @@ export function claimPlace(
   run: string,
   itemId: string,
   now: number,
+  reserved = 0,
 ): string | null {
   let frozen: string | null = null;
   const list = [...states];
-  const others = queue.runs.filter((id) => id !== run).length;
+  const others = queue.runs.filter((id) => id !== run).length + reserved;
   if (others >= queue.parallel) {
     const candidate = freezeCandidate(queue, list, run);
     const state = candidate === null ? undefined : list.find((s) => s.run.id === candidate);
@@ -167,6 +168,28 @@ export function claimPlace(
   if (!queue.priority.includes(run)) queue.priority.push(run);
   queue.updatedAt = now;
   return frozen;
+}
+
+/**
+ * A revived run without a priority action waits for a place: it leaves the skipped list and the
+ * old items, and its return item goes first. The places, priority and the run itself stay as they
+ * are; the problems known before and the current ones do not stop the queue.
+ */
+export function deferRun(
+  queue: Queue,
+  state: RunState,
+  known: readonly string[],
+  itemId: string,
+  now: number,
+): QueueItem {
+  const run = state.run.id;
+  queue.skipped = queue.skipped.filter((id) => id !== run);
+  queue.items = queue.items.filter((item) => item.run !== run);
+  const item = returnItem(state, itemId, now);
+  queue.items.unshift(item);
+  queue.acknowledged = [...new Set([...queue.acknowledged, ...known, ...problemKeys(state)])];
+  queue.updatedAt = now;
+  return item;
 }
 
 /** Makes the current problems and usage limits of a run known to the queue. */

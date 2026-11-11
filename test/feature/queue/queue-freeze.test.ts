@@ -5,10 +5,12 @@ import {
   addItem,
   advance,
   claimPlace,
+  deferRun,
   emptyQueue,
   freezeCandidate,
   pauseRun,
   removeItem,
+  returnItem,
   returnRun,
 } from '../../../src/feature/queue/types/index.ts';
 import { transition } from '../../../src/feature/runs/machine/index.ts';
@@ -218,6 +220,40 @@ describe('advance takes returned runs by freezing', () => {
     expect(take).toEqual([]);
     expect(freeze).toEqual([]);
     expect(queue.runs).toEqual(['b']);
+  });
+});
+
+describe('a frozen and a returned run in one step', () => {
+  it('counts the continuing frozen run as taken, so the returned run freezes another', () => {
+    const queue = queueWith(2, 'a', 'b');
+    const [a, b] = [working('a'), working('b')];
+    const f = working('f');
+    const r = failed('r');
+    queue.items.push(returnItem(f, 'rf', 4), returnItem(r, 'rr', 4));
+    freezeIt(f);
+    a.run.finishedAt = 9;
+    group(a).status = 'merged';
+    group(a).delivery.state = 'applied';
+    const { take, freeze } = advance(queue, [a, b], lookupOf(a, b, f, r), 10);
+    expect(take.map((item) => item.run)).toEqual(['f', 'r']);
+    expect(freeze).toEqual(['b']);
+    expect(queue.items[0]).toMatchObject({ run: 'b' });
+    expect(queue.runs).toEqual(['r']);
+  });
+});
+
+describe('deferring a run', () => {
+  it('puts the return item first and changes neither places nor priority', () => {
+    const queue = queueWith(1, 'b');
+    queue.priority = ['b'];
+    queue.skipped = ['a'];
+    addItem(queue, { pipeline: 'feature', task: 'W' }, 'q1', 2);
+    const a = working('a');
+    const item = deferRun(queue, a, ['a/gruppa-1/x'], 'ra', 5);
+    expect(item.run).toBe('a');
+    expect(queue.items.map((entry) => entry.id)).toEqual(['ra', 'q1']);
+    expect(queue).toMatchObject({ runs: ['b'], priority: ['b'], skipped: [] });
+    expect(queue.acknowledged).toContain('a/gruppa-1/x');
   });
 });
 

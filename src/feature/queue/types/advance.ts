@@ -1,8 +1,13 @@
-import { type RunState, retryableGroups, runProblems } from '../../runs/types/index.ts';
+import {
+  type RunState,
+  finishedApartFromRepair,
+  retryableGroups,
+  runProblems,
+} from '../../runs/types/index.ts';
 import { itemReadiness } from './dependencies.ts';
 import { type Queue, type QueueItem, QUEUE_SKIPPED_MAX, newItemId, queueStates } from './items.ts';
 import { BLOCKING_REASONS, SKIPPED_REASONS, STOPPING_REASONS, limitHits } from './limit-hits.ts';
-import { claimPlace, occupiesSlot } from './returns.ts';
+import { claimPlace, deferRun, occupiesSlot } from './returns.ts';
 import { queueWakeAt, startQueue } from './settings.ts';
 
 /** A new usage limit of a run of the queue stops it; every such attempt counts once. */
@@ -46,14 +51,27 @@ function skipFailedRuns(queue: Queue, own: RunState[]): RunState[] {
 }
 
 /** Skipped runs that no longer have a problem and occupy a place go back to the places. */
-function returnSkippedRuns(queue: Queue, lookup: (id: string) => RunState | undefined): RunState[] {
+function returnSkippedRuns(
+  queue: Queue,
+  lookup: (id: string) => RunState | undefined,
+  now: number,
+  free: number,
+): { returned: RunState[]; frozen: RunState[] } {
   const returned: RunState[] = [];
+  const frozen: RunState[] = [];
+  let room = free;
   queue.skipped = queue.skipped
     .filter((id) => {
       const state = lookup(id);
       if (state === undefined) return false;
       if (runProblems(state).some((problem) => BLOCKING_REASONS.has(problem.reason))) return true;
-      if (occupiesSlot(state) && !queue.runs.includes(id)) returned.push(state);
+      if (!occupiesSlot(state) || queue.runs.includes(id)) return false;
+      if (room > 0 || finishedApartFromRepair(state)) {
+        room -= 1;
+        returned.push(state);
+      } else {
+        frozen.push(state);
+      }
       return false;
     })
     .slice(0, QUEUE_SKIPPED_MAX);
@@ -63,7 +81,9 @@ function returnSkippedRuns(queue: Queue, lookup: (id: string) => RunState | unde
       for (const hit of limitHits(state)) queue.acknowledged.push(hit.key);
     }
   }
-  return returned;
+  // No place for it: the run waits frozen, first in the queue, and continues as a place frees up.
+  for (const state of frozen) deferRun(queue, state, [], newItemId(queue, now), now);
+  return { returned, frozen };
 }
 
 /** A new stopping problem of a watched run stops the queue. */
@@ -131,15 +151,16 @@ function takeReturned(
   lookup: (id: string) => RunState | undefined,
   now: number,
   result: { take: QueueItem[]; freeze: string[] },
+  reserved: number,
 ): void {
   const live = (): RunState[] => own.filter((state) => queue.runs.includes(state.run.id));
   for (const item of [...queue.items]) {
-    if (item.run === null || item.postponed) continue;
+    if (item.run === null || item.postponed || result.freeze.includes(item.run)) continue;
     if (queue.skipFailed && item.error !== null) continue;
     const state = lookup(item.run);
     if (!state || state.run.hold !== null || retryableGroups(state).length === 0) continue;
     if (itemReadiness(queue, item, lookup) !== 'ready') continue;
-    const frozen = claimPlace(queue, live(), item.run, newItemId(queue, now), now);
+    const frozen = claimPlace(queue, live(), item.run, newItemId(queue, now), now, reserved);
     if (frozen !== null) result.freeze.push(frozen);
     result.take.push(item);
   }
@@ -179,16 +200,19 @@ export function advance(
   const wake = queueWakeAt(queue);
   if (wake !== null && now >= wake) startQueue(queue, own, now);
   if (queue.skipFailed) own = skipFailedRuns(queue, own);
-  own = [...own, ...returnSkippedRuns(queue, lookup)];
+  const free = Math.max(0, queue.parallel - own.filter(occupiesSlot).length);
+  const revived = returnSkippedRuns(queue, lookup, now, free);
+  const result = { take: [] as QueueItem[], freeze: revived.frozen.map((state) => state.run.id) };
+  own = [...own, ...revived.returned];
   const watched = own.filter((state) => state.run.hold === null);
   stopOnLimit(queue, watched);
   stopOnProblem(queue, watched);
   dropFinishedReturns(queue, lookup);
   releasePlaces(queue, own);
-  const result = { take: takeFrozen(queue, lookup), freeze: [] as string[] };
+  result.take = takeFrozen(queue, lookup);
   const frozenTaken = result.take.length;
   if (queue.status === 'running') {
-    takeReturned(queue, own, lookup, now, result);
+    takeReturned(queue, own, lookup, now, result, frozenTaken);
     result.take.push(...takeReady(queue, lookup, result.take, frozenTaken));
     if (
       !queue.autopilot &&

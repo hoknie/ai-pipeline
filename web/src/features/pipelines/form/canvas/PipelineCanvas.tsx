@@ -64,7 +64,7 @@ export function PipelineCanvas({
   const { resolved } = useTheme();
   const { draft, setDraft } = editor;
   const [chosen, setChosen] = useState<Selection | null>(null);
-  const selection = liveSelection(chosen, draft);
+  const selection = liveSelection(chosen, draft, editor.preview.topology?.stages ?? null);
   const editable = !disabled && followOf(view, draft) === null;
   const flow = useCanvasGraph(editor, view, editable, selection);
   const { onAdd, onDragStop, onKeyDown } = useCanvasHandlers(

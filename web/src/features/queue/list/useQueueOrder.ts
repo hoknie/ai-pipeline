@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { QueueItemView, QueueView } from '../../../shared/api/types.ts';
-import { moveId } from '../queueOrder.ts';
+import { moveId } from '../../../shared/lib/listOrder.ts';
 
 export type QueueNotice = {
   message: string | null;

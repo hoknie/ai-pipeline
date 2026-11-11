@@ -130,9 +130,11 @@ export function clock(timestamp: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-/** A group failure reason for people; a usage limit is translated, other reasons stay as they are. */
+/** A group failure reason for people; a usage limit and a network failure are translated, other reasons stay as they are. */
 export function reasonLabel(reason: string, t: TFunction): string {
   if (reason === 'step skipped') return t('runs.group.skippedReason');
+  const network = /^network: (.*)$/s.exec(reason);
+  if (network) return t('runs.group.networkReason', { problem: network[1] ?? '' });
   const limit = /^usage limit(?:, resets (\d\d:\d\d))?$/.exec(reason);
   if (!limit) return reason;
   return limit[1] ? t('runs.group.limitReasonAt', { time: limit[1] }) : t('runs.group.limitReason');

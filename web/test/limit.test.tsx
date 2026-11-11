@@ -198,3 +198,15 @@ describe('a group waiting for a usage limit', () => {
     expect(await screen.findByText('The usage limit ran out, resets at 20:50')).toBeTruthy();
   });
 });
+
+describe('a group that failed on the network', () => {
+  it('translates the reason with the problem', async () => {
+    window.location.hash = '#runs/run1/login';
+    showRun(
+      runView({
+        groups: [groupRow({ status: 'failed', reason: 'network: API Error: Connection error.' })],
+      }),
+    );
+    expect(await screen.findByText('No network: API Error: Connection error.')).toBeTruthy();
+  });
+});

@@ -36,6 +36,8 @@ export interface Pending {
   resume: boolean;
   message?: HumanMessage | null;
   reviewed?: boolean;
+  /** The next attempt keeps the runtime of the last one of the step, as after a network failure. */
+  keepRuntime?: boolean;
   /** Seq of the attempt that asked the question, when the answer goes to another step. */
   askedBy?: number;
 }

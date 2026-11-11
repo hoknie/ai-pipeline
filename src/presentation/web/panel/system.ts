@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { unavailable } from '../../../platform/errors/index.ts';
 import type { BuildInfo } from '../../../platform/build/index.ts';
-import type { DaemonCheck, PingResult } from '../../ipc/contract/index.ts';
+import type { DaemonCheck, NetworkStatusView, PingResult } from '../../ipc/contract/index.ts';
 
 /**
  * Who serves the panel: the daemon (it can restart the panel), a standalone `aip web`, or the
@@ -34,6 +34,8 @@ export interface SystemView {
     build: string;
     servedBy: ServedBy;
   };
+  /** The network the daemon holds, proxy without credentials; null when the daemon is not running. */
+  network: NetworkStatusView | null;
   /** The daemon log, where the restart helper writes; null when the panel does not know it. */
   logPath: string | null;
 }
@@ -82,6 +84,7 @@ export function systemView(input: SystemInput): SystemView {
       build: panelBuild.fingerprint,
       servedBy: input.servedBy,
     },
+    network: ping?.network ?? null,
     logPath: input.logPath,
   };
 }

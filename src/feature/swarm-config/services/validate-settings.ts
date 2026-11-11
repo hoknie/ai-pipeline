@@ -25,6 +25,7 @@ import {
   type DeliveryMode,
   type DeliverySettings,
   type NamingSettings,
+  type NetworkSettings,
   WEB_AUTH_MODES,
   WEB_HOSTS,
   type WebAuth,
@@ -62,6 +63,12 @@ const WORKSPACE_KEYS = ['base', 'include'];
 const WEB_KEYS = ['autostart', 'auth', 'port', 'host'];
 
 const WEB_PORT_RANGE: Range = [1, 65535];
+
+const NETWORK_KEYS = ['enabled', 'targets', 'interfaces', 'proxy', 'interval', 'timeout'];
+
+const NETWORK_INTERVAL_RANGE: Range = [5, 3600];
+
+const NETWORK_TIMEOUT_RANGE: Range = [1, 60];
 
 const NAMING_KEYS = ['enabled', 'runtime', 'model'];
 
@@ -228,5 +235,61 @@ export function checkClaude(ctx: ValidateContext, value: unknown, claude: Claude
         'swarm.claude.settings',
         CLAUDE_SETTINGS_SOURCES,
       ) ?? claude.settings;
+  }
+}
+
+/** Why `target` is not `host:port` or an `http(s)://` URL, or null when it is. */
+export function networkTargetProblem(target: string): string | null {
+  if (/^https?:\/\//i.test(target)) {
+    try {
+      return new URL(target).hostname === '' ? 'must be host:port or an http(s):// URL' : null;
+    } catch {
+      return 'must be host:port or an http(s):// URL';
+    }
+  }
+  const match = /^(\[[^\]\s]+\]|[^\s:/\[\]]+):(\d+)$/.exec(target);
+  const port = match?.[2] === undefined ? 0 : Number(match[2]);
+  return port >= 1 && port <= 65535 ? null : 'must be host:port or an http(s):// URL';
+}
+
+function proxyProblem(proxy: string): string | null {
+  try {
+    const url = new URL(proxy);
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '') return null;
+  } catch {
+    // reported below
+  }
+  return 'must be an http:// or https:// URL';
+}
+
+export function checkNetwork(ctx: ValidateContext, value: unknown, network: NetworkSettings): void {
+  const mapping = readMapping(ctx, value, 'swarm.network');
+  if (!mapping) return;
+  for (const [key, field] of readEntries(ctx, mapping, 'swarm.network', NETWORK_KEYS)) {
+    const path = join('swarm.network', key);
+    if (key === 'enabled') network.enabled = readBoolean(ctx, field, path) ?? network.enabled;
+    if (key === 'targets') {
+      const targets = readStrings(ctx, field, path);
+      targets.forEach((target, index) => {
+        const problem = networkTargetProblem(target);
+        if (problem) addError(ctx, `${path}[${index}]`, problem);
+      });
+      network.targets = targets;
+    }
+    if (key === 'interfaces') network.interfaces = readStrings(ctx, field, path);
+    if (key === 'proxy') {
+      const proxy = readString(ctx, field, path);
+      if (proxy !== null) {
+        const problem = proxyProblem(proxy);
+        if (problem) addError(ctx, path, problem);
+        else network.proxy = proxy;
+      }
+    }
+    if (key === 'interval') {
+      network.interval = readInteger(ctx, field, path, NETWORK_INTERVAL_RANGE) ?? network.interval;
+    }
+    if (key === 'timeout') {
+      network.timeout = readInteger(ctx, field, path, NETWORK_TIMEOUT_RANGE) ?? network.timeout;
+    }
   }
 }

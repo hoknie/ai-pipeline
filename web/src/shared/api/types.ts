@@ -150,7 +150,16 @@ export type {
 } from '../../../../src/feature/swarm-edit/types/index.ts';
 export type { FieldError } from '../../../../src/feature/swarm-config/types/index.ts';
 
-/** What `GET /api/system` answers: the daemon, the panel and the daemon log. */
+/** The network the daemon holds; the proxy has no login and password. */
+export interface NetworkStatus {
+  state: 'off' | 'up' | 'down';
+  problem: string | null;
+  checkedAt: number | null;
+  since: number;
+  proxy: string | null;
+}
+
+/** What `GET /api/system` answers: the daemon, the panel, the network and the daemon log. */
 export interface SystemView {
   daemon: {
     running: boolean;
@@ -177,5 +186,7 @@ export interface SystemView {
      */
     servedBy: 'daemon' | 'standalone' | 'standby';
   };
+  /** The network the daemon holds; null while the daemon is not running. */
+  network: NetworkStatus | null;
   logPath: string | null;
 }

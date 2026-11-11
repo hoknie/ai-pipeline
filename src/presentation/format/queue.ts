@@ -35,7 +35,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
     }
     for (const held of run.waiting ?? []) {
       lines.push(
-        `    ${held.group}${(held.stepName ?? held.step) ? `: ${held.stepName ?? held.step}` : ''} (${waitNote(held.wait)})`,
+        `    ${held.group}${(held.stepName ?? held.step) ? `: ${held.stepName ?? held.step}` : ''} (${waitNote(held.wait, false)})`,
       );
     }
     if (run.problem) {

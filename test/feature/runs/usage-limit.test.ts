@@ -79,6 +79,19 @@ describe('a group that ran out of the usage limit', () => {
     expect(group(state).status).toBe('queued');
   });
 
+  it('holds the run in the same transition as a retry with hold, so no agent starts', () => {
+    const state = run(1);
+    step(state);
+    hitLimit(state, { onLimit: 'stop' });
+    expect(state.run.finishedAt).not.toBeNull();
+    const effects = transition(state, { kind: 'retry', group: 'gruppa-1', hold: 'frozen' }, 3000);
+    expect(group(state).status).toBe('queued');
+    expect(state.run.hold).toBe('frozen');
+    expect(state.run.finishedAt).toBeNull();
+    expect(effects.some((effect) => effect.kind === 'start_attempt')).toBe(false);
+    expect(dispatch([state], 3000)).toEqual([]);
+  });
+
   it('ignores the limit when the specialist reported before it', () => {
     const state = run(1);
     step(state);

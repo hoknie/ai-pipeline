@@ -16,7 +16,9 @@ import {
 import type { ConfigService } from '../../swarm-config/services/index.ts';
 import {
   adoptRun,
+  deferRun,
   dismissRun,
+  occupiesSlot,
   itemStarted,
   pauseQueue,
   pauseRun,
@@ -159,7 +161,12 @@ export class QueueControl {
   /** The retry itself, for callers that already run inside `serial`. */
   async retryNow(
     state: RunState,
-    params: { group: string; refreshConfig?: boolean | undefined },
+    params: {
+      group: string;
+      refreshConfig?: boolean | undefined;
+      /** `observer`: not a priority action; with no free place the run waits frozen. */
+      by?: 'user' | 'observer';
+    },
   ): Promise<RunState> {
     const { store, advance, config, runs, registry, now } = this.dependencies;
     registry.requireEnabled(state.run.repository);
@@ -170,14 +177,36 @@ export class QueueControl {
         ? { specialists: currentSpecialists(config, state) }
         : { permissions: currentPermissions(config, state) };
     // A rejected retry leaves the hold in place; the hold is released only after it succeeds.
-    await runs.engine.apply(state, { kind: 'retry', group: params.group, ...refresh });
-    if (state.run.hold !== null) await runs.engine.apply(state, { kind: 'hold', hold: null });
     const queue = store.of(state.run.repository);
     const moment = now();
-    const adopted = adoptRun(queue, state, keys, moment, {
-      states: this.statesOf(queue),
-      itemId: queueItemId(moment, randomInt(36 ** 3)),
-    });
+    const itemId = queueItemId(moment, randomInt(36 ** 3));
+    if (params.by === 'observer') {
+      const taken = this.statesOf(queue).filter(occupiesSlot).length;
+      const wait = !queue.runs.includes(state.run.id) && taken >= queue.parallel;
+      if (wait) {
+        // Held in the same transition: no agent starts for a step over the limit.
+        await runs.engine.apply(state, {
+          kind: 'retry',
+          group: params.group,
+          ...refresh,
+          hold: 'frozen',
+        });
+        deferRun(queue, state, keys, itemId, moment);
+        store.save(queue);
+        advance.request(state.run.repository);
+        return state;
+      }
+    }
+    await runs.engine.apply(state, { kind: 'retry', group: params.group, ...refresh });
+    if (state.run.hold !== null) await runs.engine.apply(state, { kind: 'hold', hold: null });
+    const claim = { states: this.statesOf(queue), itemId };
+    const adopted = adoptRun(
+      queue,
+      state,
+      keys,
+      moment,
+      params.by === 'observer' ? undefined : claim,
+    );
     if (adopted) {
       if (adopted.frozen !== null) await advance.freeze(adopted.frozen);
       store.save(queue);

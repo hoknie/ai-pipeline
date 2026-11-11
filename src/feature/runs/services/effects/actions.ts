@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 
 import { launchProcess } from '../../../agents/services/index.ts';
 import type { OutputParser } from '../../../agents/types/index.ts';
@@ -26,6 +26,14 @@ const QUIET: OutputParser = {
   usage: () => null,
   outcome: () => ({ sessionId: null, usage: null, error: null, denials: [] }),
 };
+
+/**
+ * The scripts of a command run one after another in one shell process, each in its own `sh -c`:
+ * the first failure stops the action with its code. The scripts are arguments, never part of this
+ * text, so quotes and `$` in them need no escaping.
+ */
+const SCRIPT_LOOP =
+  'for script in "$@"; do printf \'[aip] $ %s\\n\' "$script"; /bin/sh -c "$script" || exit $?; done';
 
 /** The environment of a command action. */
 function actionEnvironment(state: RunState, group: Group): Record<string, string> {
@@ -123,14 +131,21 @@ export class ActionRunner {
       await finish({ kind: 'spawn', message: (error as Error).message });
       return;
     }
-    this.launch(state, group, seq, action, directory, finish);
+    this.launch(
+      state,
+      group,
+      seq,
+      { run: action.run, timeoutSeconds: action.timeoutSeconds },
+      directory,
+      finish,
+    );
   }
 
   private launch(
     state: RunState,
     group: Group,
     seq: number,
-    action: { run: string | null; timeoutSeconds: number },
+    action: { run: string[]; timeoutSeconds: number },
     directory: string,
     finish: (outcome: ActionOutcome) => Promise<void>,
   ): void {
@@ -140,11 +155,10 @@ export class ActionRunner {
     mkdirSync(attemptDirectory(workspaceOf(state), state.run.id, group.slug, seq), {
       recursive: true,
     });
-    appendFileSync(log, `[aip] $ ${action.run}\n`);
     const process = launchProcess(
       {
         command: '/bin/sh',
-        args: ['-c', action.run ?? ''],
+        args: ['-c', SCRIPT_LOOP, 'aip-action', ...action.run],
         env: actionEnvironment(state, group),
         files: [],
         sessionId: null,

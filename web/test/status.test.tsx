@@ -120,4 +120,13 @@ describe('waiting', () => {
       /^Waiting for the claude usage limit to reset, until \d\d:\d\d$/,
     );
   });
+
+  it('explains a wait for the network, with the problem or the end of the pause', () => {
+    expect(waitText({ reason: 'network', problem: 'interface wt0 is down', until: null }, t)).toBe(
+      'Waiting for the network: interface wt0 is down',
+    );
+    expect(waitText({ reason: 'network', problem: 'x', until: 0 }, t)).toMatch(
+      /^Waiting for the network, until \d\d:\d\d$/,
+    );
+  });
 });

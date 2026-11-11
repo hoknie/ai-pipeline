@@ -351,8 +351,54 @@ describe('Действия наблюдателя', () => {
     const back = (await h.call('queue', { repository: h.repo })) as QueueView;
     expect(back.runs.map((run) => run.id)).toContain(runId);
     expect(back.skipped.map((run) => run.id)).not.toContain(runId);
+    expect(back.runs.find((run) => run.id === runId)?.priority).toBe(false);
     h.open('second');
     await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
+  });
+
+  it('waits frozen, first in the queue, when an observer retries with every place taken', async () => {
+    const h = await start();
+    h.script({
+      code: [FAIL, { waitFor: h.gate('b') }, {}],
+      repair: [{ waitFor: h.gate('repair'), ...retry() }],
+    });
+    await configure(h);
+    for (const title of ['один', 'два']) {
+      await h.call('queue_add', { repository: h.repo, pipeline: 'feature', groups: GROUPS, title });
+    }
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    const placed = async (done: (queue: QueueView) => boolean): Promise<QueueView> => {
+      let last = (await h.call('queue', { repository: h.repo })) as QueueView;
+      await until('the queue', async () => {
+        last = (await h.call('queue', { repository: h.repo })) as QueueView;
+        return done(last);
+      });
+      return last;
+    };
+    const busy = await placed((queue) => queue.skipped.length === 1 && queue.runs.length === 1);
+    const a = busy.skipped[0]!.id;
+    const b = busy.runs[0]!.id;
+    await h.waitFor(
+      a,
+      (run) => run.repair?.incident !== null && run.repair?.incident !== undefined,
+    );
+    const agentCalls = () => fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'code');
+    await until('both tasks started', () => agentCalls().length === 2);
+    h.open('repair');
+    const frozen = await h.waitFor(a, (run) => run.hold === 'frozen');
+    expect(frozen.finished).toBe(false);
+    const queue = await placed((view) => view.items[0]?.run === a);
+    expect(queue.runs.map((run) => run.id)).toEqual([b]);
+    expect(queue.runs[0]!.priority).toBe(false);
+    expect(queue.skipped).toEqual([]);
+    expect(queue.items[0]).toMatchObject({ run: a, hold: 'frozen' });
+    expect((await h.status(b)).hold).toBeNull();
+    await settle(h);
+    expect(agentCalls()).toHaveLength(2);
+    h.open('b');
+    const done = await h.waitFor(a, (run) => run.finished && run.state === 'finished');
+    expect(done.hold).toBeNull();
   });
 
   it('lets the autopilot answer before an observer sees the question', async () => {

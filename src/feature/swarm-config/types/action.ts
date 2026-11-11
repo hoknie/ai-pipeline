@@ -21,7 +21,8 @@ export interface Action {
   id: string;
   /** Display name; null: the id is shown. */
   name: string | null;
-  run: string | null;
+  /** Scripts of a command, in the order they run; null: not a command. */
+  run: string[] | null;
   specialist: string | null;
   /** Text appended to the prompt of the specialist; only with `specialist`. */
   additionalPrompt: string | null;
@@ -30,6 +31,11 @@ export interface Action {
   onFailure: ActionFailure;
   /** Level of the definition. */
   level: SpecialistLevel;
+}
+
+/** The scripts of a command as one text, for showing. */
+export function scriptText(run: readonly string[]): string {
+  return run.join('\n');
 }
 
 /** Ids of actions by pipeline point; a point that is absent has no value of its own. */
