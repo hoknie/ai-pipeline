@@ -10,7 +10,6 @@ import {
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
-import { scriptText } from '../../swarm-config/types/index.ts';
 import { OFF_NETWORK, type NetworkSnapshot } from '../../network/types/index.ts';
 import type { Effect } from './events.ts';
 import { isCommandAction, planDispatch } from './plan.ts';
@@ -53,7 +52,7 @@ function startCommand(state: RunState, group: Group, now: number): Attempt {
     model: null,
     status: 'running',
     input: {
-      prompt: scriptText(action.run),
+      prompt: action.run,
       groupTitle: group.title,
       stepId,
       specialistName: action.name ?? action.id,

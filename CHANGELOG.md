@@ -8,6 +8,21 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ### Features
 
+- Updated pipeline scheme ([4241cbb](https://github.com/hoknie/ai-pipeline/commit/4241cbb58dfe4d942c3f9ad9339d7b246e1dcbe2))
+- Added network settings and cmd multi support ([eac433b](https://github.com/hoknie/ai-pipeline/commit/eac433bc22c5160f740a39f82ca45075acf27cb5))
+- Updated filters ([5052c23](https://github.com/hoknie/ai-pipeline/commit/5052c2377737f34212462e0ee4b0b05a9707ef0f))
+- Disallow human auto answers for direct mode ([6a1616b](https://github.com/hoknie/ai-pipeline/commit/6a1616b6e51f6b6c31ef54d204fc9fa6e70ed4ea))
+
+### Other
+
+- Updated changelog and release arch name ([a498b66](https://github.com/hoknie/ai-pipeline/commit/a498b668d7e4d9fc3f46837a8ed9765b7ee3ddd8))
+
+[Full diff](https://github.com/hoknie/ai-pipeline/compare/v0.1.0...HEAD)
+
+## [0.1.0] - 2026-11-10
+
+### Features
+
 - History updated ([92f41e2](https://github.com/hoknie/ai-pipeline/commit/92f41e2a9ba3cec651ca0565bc4d05e8392bb04d))
 - Added observer history ([25b4b32](https://github.com/hoknie/ai-pipeline/commit/25b4b32485a32d3a092df473e0ff7e213ed3fb00))
 - Added project controls ([f936259](https://github.com/hoknie/ai-pipeline/commit/f9362591207ed73ccd1b6237568835a182d30887))

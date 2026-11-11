@@ -12,23 +12,24 @@ on_failure: stop          # stop | continue
 
 Exactly one of `run` and `specialist` is required.
 
-- **`run`** is a command run by the daemon through the shell. No agent is started. It is a string or a list of scripts; see [several scripts](#several-scripts).
+- **`run`** is a command run by the daemon through the shell. No agent is started. It is one script, a string; see [a script of several lines](#a-script-of-several-lines).
 - **`specialist`** is a specialist that works as a step of the run. `additional_prompt` is appended to its prompt; it is allowed only with `specialist`.
-- **`timeout`** stops a command that works too long (all its scripts together); the step fails with the reason `timeout`.
+- **`timeout`** stops a command that works too long; the step fails with the reason `timeout`.
 - **`on_failure: stop`** (the default) stops the pipeline at this point; `continue` lets it go on, and the step stays failed.
 
-## Several scripts
+## A script of several lines
 
-`run` may be a list. The scripts run one after another in the listed order, each by its own `sh -c`, with the same environment and directory:
+`run` is one script, run by one `sh -c` with the log line `[aip] $ <script>` before it. Write several commands as lines of a block string:
 
 ```yaml
 # aip/actions/check.yaml
-run:
-  - npm run lint
-  - npm test
+run: |
+  set -e
+  npm run lint
+  npm test
 ```
 
-The first script that exits with a non-zero code stops the action with that code, and the scripts after it do not start. The log of the step has a line `[aip] $ <script>` before each script.
+The script ends with the code of its last command, and a non-zero code fails the action. Use `set -e` or `&&` to stop at the first failing command. A list in `run` is an error.
 
 ## Points
 

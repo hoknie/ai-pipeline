@@ -1,12 +1,11 @@
 import { useTranslation } from 'react-i18next';
 
 import type { ConfigEditorResponse } from '../../shared/api/types.ts';
-import type { ActionEntry } from '../../shared/lib/pipeline/pipelineEntries.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
-import { FilePath } from '../../shared/ui/layout/FilePath.tsx';
 import { ActionFields } from './action/ActionFields.tsx';
+import { ActionHeader } from './action/ActionHeader.tsx';
 import { describeActionReference, type ActionDraft, type Field } from './action/actionDraft.ts';
 import { useActionEditor, type ActionEditorInput } from './action/useActionEditor.ts';
 
@@ -73,7 +72,7 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null })
   const { view, action, notice } = props;
   const { t } = useTranslation();
   const editor = useActionEditor(props);
-  const { level, draft, busy, source } = editor;
+  const { level, draft, busy } = editor;
   const update = (patch: Partial<ActionDraft>) =>
     editor.setDraft((current) => ({ ...current, ...patch }));
   const errorsOf = (field: Field) =>
@@ -89,16 +88,7 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null })
         id: editor.id || t('pipeline.actions.newName'),
       })}
     >
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">
-          {action
-            ? typeof action.raw.name === 'string' && action.raw.name !== ''
-              ? action.raw.name
-              : action.id
-            : t('pipeline.actions.new')}
-        </h2>
-        {action ? <FilePath variant="line" path={source?.file ?? action.file} /> : null}
-      </div>
+      <ActionHeader action={action} editor={editor} />
       <ActionNotices editor={editor} view={view} notice={notice} />
       <ToggleGroup
         type="single"
@@ -114,24 +104,18 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null })
       <p className="text-sm text-muted-foreground">
         {level === 'global' ? t('settings.editor.globalHint') : t('pipeline.actions.projectHint')}
       </p>
-      <ActionFields
-        draft={draft}
-        disabled={busy}
-        update={update}
-        errorsOf={errorsOf}
-        slugs={editor.slugs}
-        newId={action ? null : editor.newId}
-        onNewId={editor.setNewId}
-      />
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={busy || (!action && !editor.newId)} onClick={() => void editor.save()}>
-          {t('settings.editor.save')}
-        </Button>
-        {action && source ? (
-          <Button variant="destructive" disabled={busy} onClick={() => void editor.remove()}>
-            {t('settings.editor.remove')}
-          </Button>
-        ) : null}
+      <div className="@container">
+        <div className="grid items-start gap-3 @3xl:grid-cols-2">
+          <ActionFields
+            draft={draft}
+            disabled={busy}
+            update={update}
+            errorsOf={errorsOf}
+            slugs={editor.slugs}
+            newId={action ? null : editor.newId}
+            onNewId={editor.setNewId}
+          />
+        </div>
       </div>
     </section>
   );

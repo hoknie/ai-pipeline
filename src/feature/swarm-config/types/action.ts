@@ -21,8 +21,8 @@ export interface Action {
   id: string;
   /** Display name; null: the id is shown. */
   name: string | null;
-  /** Scripts of a command, in the order they run; null: not a command. */
-  run: string[] | null;
+  /** The script of a command (may span lines); null: not a command. */
+  run: string | null;
   specialist: string | null;
   /** Text appended to the prompt of the specialist; only with `specialist`. */
   additionalPrompt: string | null;
@@ -33,9 +33,13 @@ export interface Action {
   level: SpecialistLevel;
 }
 
-/** The scripts of a command as one text, for showing. */
-export function scriptText(run: readonly string[]): string {
-  return run.join('\n');
+/**
+ * One script for a list of scripts stored by older builds: each of several runs in its own
+ * subshell, one after another, and the first failure stops the rest with its code.
+ */
+export function legacyScript(scripts: readonly string[]): string {
+  if (scripts.length === 1) return scripts[0]!;
+  return scripts.map((script) => `(\n${script}\n)`).join(' &&\n');
 }
 
 /** Ids of actions by pipeline point; a point that is absent has no value of its own. */

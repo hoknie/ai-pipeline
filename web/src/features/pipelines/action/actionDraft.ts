@@ -16,30 +16,16 @@ export const FIELDS = [
 ] as const;
 export type Field = (typeof FIELDS)[number];
 
-export interface ScriptDraft {
-  key: string;
-  text: string;
-}
-
-let scriptCounter = 0;
-
-/** A script row with a key of its own. */
-export function newScript(text = ''): ScriptDraft {
-  scriptCounter += 1;
-  return { key: `s${scriptCounter}`, text };
-}
-
-/** The scripts of `run`: a string is one script, a list is several; nothing is one empty row. */
-function scriptsOf(run: unknown): ScriptDraft[] {
-  const texts = Array.isArray(run) ? run.map(text) : [text(run)];
-  return (texts.length > 0 ? texts : ['']).map((value) => newScript(value));
+/** The script of `run`: a string as it is, a list (an older file) as lines, nothing as empty. */
+function scriptOf(run: unknown): string {
+  return Array.isArray(run) ? run.map(text).join('\n') : text(run);
 }
 
 export interface ActionDraft {
   name: string;
   kind: ActionKind;
-  /** The scripts of a command in order; the key of a row is local, the texts may repeat. */
-  scripts: ScriptDraft[];
+  /** The script of a command; may span lines. */
+  script: string;
   /** Seconds as typed; empty: the default. */
   timeout: string;
   specialist: string;
@@ -56,7 +42,7 @@ export function draftOfAction(raw: Record<string, unknown>): ActionDraft {
   return {
     name: text(raw.name),
     kind: isCommandAction(raw) ? 'command' : 'specialist',
-    scripts: scriptsOf(raw.run),
+    script: scriptOf(raw.run),
     timeout: text(raw.timeout),
     specialist: text(raw.specialist),
     additionalPrompt: text(raw.additional_prompt),
@@ -72,9 +58,7 @@ export function valueOfAction(draft: ActionDraft): Record<string, unknown> {
   const value: Record<string, unknown> = {};
   if (draft.name.trim() !== '') value.name = draft.name.trim();
   if (draft.kind === 'command') {
-    // empty rows are dropped; one script is a string, several are a list
-    const scripts = draft.scripts.map((script) => script.text).filter((line) => line.trim() !== '');
-    value.run = scripts.length === 0 ? '' : scripts.length === 1 ? scripts[0] : scripts;
+    value.run = draft.script;
     if (draft.timeout.trim() !== '') value.timeout = asNumber(draft.timeout);
   } else {
     value.specialist = draft.specialist;

@@ -64,7 +64,11 @@ The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Sha
 - A shared pipeline opens for viewing only. "Override in the project" copies it into the project; "Edit in Settings" leads to `#settings/global/pipelines/<id>`. A new pipeline is always a project one.
 - Running runs continue from their snapshot after the pipeline is deleted. A new run of a deleted pipeline is rejected.
 
-The "Actions" tab edits a command action as a list of scripts. "Add script" appends a row, the trash button removes a row (the last one stays), and the order is changed by dragging a row by its handle or with `Alt+↑`/`Alt+↓` on a focused row. One script is saved as a string, several as a list; an empty row is dropped.
+The "Actions" tab edits one action. A sticky header shows its name, the level, the file and the buttons "Save", "Discard changes" (after an edit) and "Delete".
+
+Below, the card "Main" holds the id of a new action, the name, the type and "On failure"; next to it (two columns on a wide window, one on a narrow one) is the card "Command" with a single script field that grows with the text, and the timeout, or the card "Specialist".
+
+The script is one text: several commands are its lines.
 
 The filters are search by id and name, level, "Tags" and "Specialists" (the ones in the steps and in `split`). Any of the chosen values fits inside one list, and all lists together narrow the result. The choice is remembered per repository.
 

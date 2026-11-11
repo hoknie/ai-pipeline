@@ -1,8 +1,10 @@
+import { Bot, Terminal } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ActionKind } from '../../../shared/lib/pipeline/pipelineEntries.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
+import { Card } from '../../../shared/ui/layout/card.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import {
   Select,
@@ -14,7 +16,6 @@ import {
 import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
 import type { ActionDraft, Field } from './actionDraft.ts';
-import { ScriptsInput } from './ScriptsInput.tsx';
 
 /** Radix `Select` has no empty value: this one stands for «nothing chosen». */
 const NONE = '__none';
@@ -27,16 +28,34 @@ export interface FieldsProps {
   errorsOf: (field: Field) => ReactNode;
 }
 
-function CommandFields({ draft, disabled, update, errorsOf }: FieldsProps) {
+function SectionCard({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <Card>
+      <section aria-labelledby={id} className="flex flex-col gap-3 p-4">
+        <h3 id={id} className="text-sm font-semibold">
+          {title}
+        </h3>
+        {children}
+      </section>
+    </Card>
+  );
+}
+
+function CommandCard({ draft, disabled, update, errorsOf }: FieldsProps) {
   const { t } = useTranslation();
   return (
-    <>
+    <SectionCard id="action-section-command" title={t('pipeline.actions.sectionCommand')}>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="field-action-run">{t('pipeline.actions.run')}</Label>
-        <ScriptsInput
-          scripts={draft.scripts}
+        <Label htmlFor="field-action-run">{t('pipeline.actions.script')}</Label>
+        <Textarea
+          id="field-action-run"
+          className="field-sizing-content font-mono"
+          rows={6}
+          spellCheck={false}
+          value={draft.script}
           disabled={disabled}
-          onScripts={(scripts) => update({ scripts })}
+          placeholder={'npm run lint\nnpm test'}
+          onChange={(event) => update({ script: event.target.value })}
         />
         <p className="text-xs text-muted-foreground">{t('pipeline.actions.runHelp')}</p>
         {errorsOf('run')}
@@ -54,11 +73,11 @@ function CommandFields({ draft, disabled, update, errorsOf }: FieldsProps) {
         />
         {errorsOf('timeout')}
       </div>
-    </>
+    </SectionCard>
   );
 }
 
-function SpecialistFields({
+function SpecialistCard({
   draft,
   disabled,
   update,
@@ -67,7 +86,7 @@ function SpecialistFields({
 }: FieldsProps & { slugs: string[] }) {
   const { t } = useTranslation();
   return (
-    <>
+    <SectionCard id="action-section-specialist" title={t('pipeline.actions.sectionSpecialist')}>
       <div className="flex flex-col gap-1.5">
         <Label>{t('pipeline.actions.specialistField')}</Label>
         <Select
@@ -100,7 +119,7 @@ function SpecialistFields({
         />
         {errorsOf('additional_prompt')}
       </div>
-    </>
+    </SectionCard>
   );
 }
 
@@ -116,7 +135,7 @@ function FailureField({ draft, disabled, update, errorsOf }: FieldsProps) {
           update({ onFailure: next === NONE ? '' : (next as 'stop' | 'continue') })
         }
       >
-        <SelectTrigger aria-label={t('pipeline.actions.onFailureLabel')} className="w-64">
+        <SelectTrigger aria-label={t('pipeline.actions.onFailureLabel')} className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -130,7 +149,7 @@ function FailureField({ draft, disabled, update, errorsOf }: FieldsProps) {
   );
 }
 
-/** The fields of an action: the id of a new one, the name, the kind and what the kind needs. */
+/** The cards of an action: the main one and the one of its type; the form lays them out. */
 export function ActionFields(
   props: FieldsProps & { slugs: string[]; newId: string | null; onNewId: (id: string) => void },
 ) {
@@ -138,50 +157,55 @@ export function ActionFields(
   const { draft, disabled, update, errorsOf } = props;
   return (
     <>
-      {props.newId !== null ? (
+      <SectionCard id="action-section-main" title={t('pipeline.actions.sectionMain')}>
+        {props.newId !== null ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="field-action-id">Id</Label>
+            <Input
+              id="field-action-id"
+              type="text"
+              value={props.newId}
+              disabled={disabled}
+              placeholder="commit"
+              onChange={(event) => props.onNewId(event.target.value)}
+            />
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="field-action-id">Id</Label>
+          <Label htmlFor="field-action-name">{t('pipeline.actions.name')}</Label>
           <Input
-            id="field-action-id"
+            id="field-action-name"
             type="text"
-            value={props.newId}
+            value={draft.name}
             disabled={disabled}
-            placeholder="commit"
-            onChange={(event) => props.onNewId(event.target.value)}
+            onChange={(event) => update({ name: event.target.value })}
           />
+          {errorsOf('name')}
         </div>
-      ) : null}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="field-action-name">{t('pipeline.actions.name')}</Label>
-        <Input
-          id="field-action-name"
-          type="text"
-          value={draft.name}
-          disabled={disabled}
-          onChange={(event) => update({ name: event.target.value })}
-        />
-        {errorsOf('name')}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label id="action-kind-label">{t('pipeline.actions.kind')}</Label>
-        <ToggleGroup
-          type="single"
-          value={draft.kind}
-          aria-labelledby="action-kind-label"
-          onValueChange={(next) => {
-            if (next) update({ kind: next as ActionKind });
-          }}
-        >
-          <ToggleGroupItem value="command" disabled={disabled}>
-            {t('pipeline.actions.command')}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="specialist" disabled={disabled}>
-            {t('pipeline.actions.specialist')}
-          </ToggleGroupItem>
-        </ToggleGroup>
-      </div>
-      {draft.kind === 'command' ? <CommandFields {...props} /> : <SpecialistFields {...props} />}
-      <FailureField {...props} />
+        <div className="flex flex-col gap-1.5">
+          <Label id="action-kind-label">{t('pipeline.actions.kind')}</Label>
+          <ToggleGroup
+            type="single"
+            className="self-start"
+            value={draft.kind}
+            aria-labelledby="action-kind-label"
+            onValueChange={(next) => {
+              if (next) update({ kind: next as ActionKind });
+            }}
+          >
+            <ToggleGroupItem value="command" disabled={disabled}>
+              <Terminal />
+              {t('pipeline.actions.command')}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="specialist" disabled={disabled}>
+              <Bot />
+              {t('pipeline.actions.specialist')}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        <FailureField {...props} />
+      </SectionCard>
+      {draft.kind === 'command' ? <CommandCard {...props} /> : <SpecialistCard {...props} />}
     </>
   );
 }

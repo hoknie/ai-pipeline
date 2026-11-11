@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { databasePath } from '../../src/platform/paths/index.ts';
 import type { RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 
 import { harness, startRun, type Harness } from './harness.ts';
@@ -52,46 +54,74 @@ async function logOf(h: Harness, runId: string): Promise<string[]> {
   return (await h.group(runId, SLUG)).log?.lines ?? [];
 }
 
-describe('actions with several scripts', () => {
-  it('run the scripts in order and log each one', async () => {
-    const h = await start('{ run: ["echo one", "echo two"] }');
+describe('an action with one script', () => {
+  it('runs the lines in order and logs the script once', async () => {
+    const h = await start('{ run: "echo one\\necho two" }');
     const runId = await runCheck(h);
-    const view = await h.status(runId);
-    expect(view.system[0]?.status).toBe('done');
-    const lines = (await logOf(h, runId)).filter((line) => /one|two/.test(line));
-    expect(lines).toEqual(['[aip] $ echo one', 'one', '[aip] $ echo two', 'two']);
+    expect((await h.status(runId)).system[0]?.status).toBe('done');
+    const lines = await logOf(h, runId);
+    expect(lines[0]).toBe('[aip] $ echo one');
+    expect(lines.filter((line) => /^(one|two)$/.test(line))).toEqual(['one', 'two']);
   });
 
-  it('stop at the first failed script with its code', async () => {
-    const h = await start('{ run: ["exit 2", "touch $AIP_REPOSITORY/../marker"] }');
+  it('fails with the exit code of the script', async () => {
+    const h = await start('{ run: "exit 2\\ntouch $AIP_REPOSITORY/../marker" }');
     const runId = await runCheck(h);
-    const view = await h.status(runId);
-    expect(view.system[0]).toMatchObject({ status: 'failed', reason: 'exit code 2' });
+    expect((await h.status(runId)).system[0]).toMatchObject({
+      status: 'failed',
+      reason: 'exit code 2',
+    });
     expect(existsSync(join(h.repo, '..', 'marker'))).toBe(false);
   });
 
-  it('go on after a script that exits with 0', async () => {
-    const h = await start('{ run: ["exit 0", "echo after"] }');
-    const runId = await runCheck(h);
-    const view = await h.status(runId);
-    expect(view.system[0]?.status).toBe('done');
-    expect((await logOf(h, runId)).join('\n')).toContain('after');
-  });
-
-  it('pass quotes and variables to a script as they are written', async () => {
+  it('passes quotes and variables to the script as they are written', async () => {
     const h = await start(
-      `{ run: ["echo first", "printf '%s|%s' \\"$AIP_ACTION\\" 'it is' > $AIP_REPOSITORY/../out"] }`,
+      `{ run: "printf '%s|%s' \\"$AIP_ACTION\\" 'it is' > $AIP_REPOSITORY/../out" }`,
     );
     const runId = await runCheck(h);
     expect((await h.status(runId)).system[0]?.status).toBe('done');
     expect(readFileSync(join(h.repo, '..', 'out'), 'utf8')).toBe('check|it is');
   });
 
-  it('share one timeout between the scripts', async () => {
-    // 10 s last 500 ms here: each script fits, the two together do not.
-    const h = await start('{ run: ["sleep 0.3", "sleep 0.3"], timeout: 10 }');
+  it('joins a list stored in an old run snapshot and stops at the first failure', async () => {
+    const h = await start('{ run: "true" }');
+    const created = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'plain',
+      groups: [{ title: 'Вход', task: 'вход' }],
+    })) as RunCreated;
+    await h.waitFor(created.runId, (run) => run.finished);
+    await h.restart(() => {
+      const database = new DatabaseSync(databasePath(h.state));
+      const row = database
+        .prepare('SELECT config_json FROM runs WHERE id = ?')
+        .get(created.runId) as { config_json: string };
+      const config = JSON.parse(row.config_json) as {
+        actions: { id: string; run: unknown }[];
+      };
+      const action = config.actions.find((item) => item.id === 'check')!;
+      action.run = ['exit 2', `touch ${join(h.repo, '..', 'marker')}`];
+      database
+        .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
+        .run(JSON.stringify(config), created.runId);
+      database.close();
+    });
+    await h.call('apply', { runId: created.runId });
+    await h.waitFor(created.runId, (run) => run.system[0]?.status !== 'running' && run.finished);
+    expect((await h.status(created.runId)).system[0]).toMatchObject({
+      status: 'failed',
+      reason: 'exit code 2',
+    });
+    expect(existsSync(join(h.repo, '..', 'marker'))).toBe(false);
+  });
+
+  it('times out over all its lines', async () => {
+    // 10 s last 500 ms here: each line fits, the two together do not.
+    const h = await start('{ run: "sleep 0.3\\nsleep 0.3", timeout: 10 }');
     const runId = await runCheck(h);
-    const view = await h.status(runId);
-    expect(view.system[0]).toMatchObject({ status: 'failed', reason: 'timeout' });
+    expect((await h.status(runId)).system[0]).toMatchObject({
+      status: 'failed',
+      reason: 'timeout',
+    });
   });
 });

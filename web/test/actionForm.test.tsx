@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Api } from '../src/shared/api/api.ts';
 import { draftOfAction, valueOfAction } from '../src/features/pipelines/ActionForm.tsx';
-import { newScript } from '../src/features/pipelines/action/actionDraft.ts';
 import PipelinesPage from '../src/features/pipelines/PipelinesPage.tsx';
 
 import { choose, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
@@ -60,7 +59,7 @@ describe('the draft of an action', () => {
     });
     const draft = draftOfAction({ specialist: 'coder', additional_prompt: 'x' });
     expect(draft.kind).toBe('specialist');
-    expect(valueOfAction({ ...draft, kind: 'command', scripts: [newScript('make')] })).toEqual({
+    expect(valueOfAction({ ...draft, kind: 'command', script: 'make' })).toEqual({
       run: 'make',
     });
     expect(valueOfAction({ ...draft, kind: 'specialist' })).toEqual({
@@ -70,32 +69,23 @@ describe('the draft of an action', () => {
   });
 });
 
-describe('the scripts of an action draft', () => {
-  const texts = (raw: Record<string, unknown>) =>
-    draftOfAction(raw).scripts.map((script) => script.text);
-
-  it('reads a string as one script and a list as scripts in order', () => {
-    expect(texts({ run: 'make' })).toEqual(['make']);
-    expect(texts({ run: ['npm run lint', 'npm test'] })).toEqual(['npm run lint', 'npm test']);
-    expect(texts({})).toEqual(['']);
+describe('the script of an action draft', () => {
+  it('reads a string as it is and a list of an older file as lines', () => {
+    expect(draftOfAction({ run: 'make' }).script).toBe('make');
+    expect(draftOfAction({ run: 'a\nb' }).script).toBe('a\nb');
+    expect(draftOfAction({ run: ['npm run lint', 'npm test'] }).script).toBe(
+      'npm run lint\nnpm test',
+    );
+    expect(draftOfAction({}).script).toBe('');
   });
 
-  it('gives equal texts keys of their own', () => {
-    const keys = draftOfAction({ run: ['a', 'a'] }).scripts.map((script) => script.key);
-    expect(new Set(keys).size).toBe(2);
+  it('writes the script as a string with its line breaks', () => {
+    expect(valueOfAction(draftOfAction({ run: 'a\nb\n' }))).toEqual({ run: 'a\nb\n' });
+    expect(valueOfAction(draftOfAction({ run: ['a', 'b'] }))).toEqual({ run: 'a\nb' });
   });
 
-  it('writes one script as a string and several as a list', () => {
-    expect(valueOfAction(draftOfAction({ run: ['make'] }))).toEqual({ run: 'make' });
-    expect(valueOfAction(draftOfAction({ run: ['a', 'b'] }))).toEqual({ run: ['a', 'b'] });
-  });
-
-  it('drops an empty row', () => {
-    const draft = draftOfAction({ run: 'make' });
-    expect(valueOfAction({ ...draft, scripts: [...draft.scripts, newScript('  ')] })).toEqual({
-      run: 'make',
-    });
-    expect(valueOfAction({ ...draft, scripts: [newScript('')] })).toEqual({ run: '' });
+  it('writes an empty script as an empty string', () => {
+    expect(valueOfAction({ ...draftOfAction({ run: 'make' }), script: '' })).toEqual({ run: '' });
   });
 });
 
@@ -106,7 +96,7 @@ describe('the form of an action', () => {
     fireEvent.click(await screen.findByRole('radio', { name: 'Global' }));
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'lint' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lint' } });
-    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'npm run lint' } });
+    fireEvent.change(screen.getByLabelText('Script'), { target: { value: 'npm run lint' } });
     fireEvent.change(screen.getByLabelText('Timeout, seconds'), { target: { value: '120' } });
     choose(screen.getByRole('combobox', { name: 'on failure' }), 'Continue');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -124,7 +114,7 @@ describe('the form of an action', () => {
     render(<Page api={api({ writeAction })} start="new" />);
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'notify' } });
     fireEvent.click(screen.getByRole('radio', { name: 'Specialist' }));
-    expect(screen.queryByLabelText('Command')).toBeNull();
+    expect(screen.queryByLabelText('Script')).toBeNull();
     choose(screen.getByRole('combobox', { name: 'action specialist' }), 'writer');
     fireEvent.change(screen.getByLabelText('Additional prompt'), { target: { value: 'Short' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -203,98 +193,82 @@ describe('the form of an action', () => {
     );
   });
 
-  describe('with several scripts', () => {
+  it('shows the name, the level and the buttons in the header', async () => {
+    render(<Page api={api()} start="commit" />);
+    const header = await screen.findByRole('toolbar');
+    expect(within(header).getByRole('heading', { name: 'Commit' })).toBeTruthy();
+    expect(within(header).getByText('project')).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Save' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Delete' })).toBeTruthy();
+    expect(within(header).queryByRole('button', { name: 'Discard changes' })).toBeNull();
+  });
+
+  it('discards the edits without writing', async () => {
+    const writeAction = saved();
+    render(<Page api={api({ writeAction })} start="commit" />);
+    const field = await screen.findByLabelText('Script');
+    fireEvent.change(field, { target: { value: 'make' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect((screen.getByLabelText('Script') as HTMLTextAreaElement).value).toBe('git commit -am x');
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).toBeNull();
+    expect(writeAction).not.toHaveBeenCalled();
+  });
+
+  it('has no Delete and has the Id in the main card for a new action', async () => {
+    render(<Page api={api()} start="new" />);
+    const main = (await screen.findByRole('heading', { name: 'Main' })).closest('section')!;
+    expect(within(main).getByLabelText('Id')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+  });
+
+  it('swaps the Command card for the Specialist one with the type', async () => {
+    render(<Page api={api()} start="commit" />);
+    expect(await screen.findByRole('heading', { name: 'Command' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Specialist' }));
+    expect(screen.queryByRole('heading', { name: 'Command' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Specialist' })).toBeTruthy();
+  });
+
+  it('saves a multi-line script as one string', async () => {
+    const writeAction = saved();
+    render(<Page api={api({ writeAction })} start="commit" />);
+    fireEvent.change(await screen.findByLabelText('Script'), {
+      target: { value: 'npm run lint\nnpm test' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeAction).toHaveBeenCalled());
+    expect(lastValue(writeAction)[1]).toMatchObject({ run: 'npm run lint\nnpm test' });
+  });
+
+  it('opens a file with a list as one script and saves it as a string', async () => {
+    const writeAction = saved();
     const lint = actionEntry('lint', { run: ['a', 'b'] });
-    const scriptApi = (writeAction: ReturnType<typeof saved>, extra: Partial<Api> = {}) =>
-      api({
-        writeAction,
-        config: vi.fn(async () =>
-          configView({ specialists, actions: [commit, review, lint], pipelines: [] }),
-        ),
-        ...extra,
-      });
-    const rows = () =>
-      screen.getAllByLabelText(/^Script \d+$/).map((field) => (field as HTMLTextAreaElement).value);
+    render(
+      <Page
+        api={api({
+          writeAction,
+          config: vi.fn(async () => configView({ specialists, actions: [lint], pipelines: [] })),
+        })}
+        start="lint"
+      />,
+    );
+    const field = (await screen.findByLabelText('Script')) as HTMLTextAreaElement;
+    expect(field.value).toBe('a\nb');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeAction).toHaveBeenCalled());
+    expect(lastValue(writeAction)[1]).toEqual({ run: 'a\nb' });
+  });
 
-    it('adds a script and saves the scripts as a list', async () => {
-      const writeAction = saved();
-      render(<Page api={scriptApi(writeAction)} start="commit" />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Add script' }));
-      fireEvent.change(screen.getByLabelText('Script 2'), { target: { value: 'echo done' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(writeAction).toHaveBeenCalled());
-      expect(lastValue(writeAction)[1]).toMatchObject({
-        run: ['git commit -am x', 'echo done'],
-      });
-    });
-
-    it('moves a script by Alt+arrow and saves the new order', async () => {
-      const writeAction = saved();
-      render(<Page api={scriptApi(writeAction)} start="lint" />);
-      await screen.findByLabelText('Script 1');
-      const second = screen.getByLabelText('Script 2').closest('li')!;
-      fireEvent.keyDown(second, { key: 'ArrowUp', altKey: true });
-      expect(rows()).toEqual(['b', 'a']);
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(writeAction).toHaveBeenCalled());
-      expect(lastValue(writeAction)[1]).toMatchObject({ run: ['b', 'a'] });
-    });
-
-    it('moves a script by dragging its grip above the first one', async () => {
-      render(<Page api={scriptApi(saved())} start="lint" />);
-      await screen.findByLabelText('Script 1');
-      const items = within(screen.getByLabelText('Script 1').closest('ol')!).getAllByRole(
-        'listitem',
-      );
-      const grip = items[1]!.querySelector('[draggable="true"]')!;
-      const rect = { top: 0, height: 10, bottom: 10, left: 0, right: 0, width: 0 } as DOMRect;
-      for (const item of items) item.getBoundingClientRect = () => rect;
-      fireEvent.dragStart(grip, { dataTransfer: { setData: () => {}, effectAllowed: '' } });
-      fireEvent.dragOver(items[0]!, { clientY: 1 });
-      fireEvent.drop(items[0]!, { clientY: 1 });
-      await waitFor(() => expect(rows()).toEqual(['b', 'a']));
-    });
-
-    it('removes a script down to one and saves it as a string', async () => {
-      const writeAction = saved();
-      render(<Page api={scriptApi(writeAction)} start="lint" />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Remove script 1' }));
-      expect(rows()).toEqual(['b']);
-      expect(screen.getByRole('button', { name: 'Remove script 1' })).toHaveProperty(
-        'disabled',
-        true,
-      );
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(writeAction).toHaveBeenCalled());
-      expect(lastValue(writeAction)[1]).toEqual({ run: 'b' });
-    });
-
-    it('does not write an empty added row', async () => {
-      const writeAction = saved();
-      render(<Page api={scriptApi(writeAction)} start="commit" />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Add script' }));
-      fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Commit!' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      await waitFor(() => expect(writeAction).toHaveBeenCalled());
-      expect(lastValue(writeAction)[1]).toMatchObject({ run: 'git commit -am x' });
-    });
-
-    it('shows the error of a script under the list', async () => {
-      const writeAction = vi.fn(async () => ({
-        ok: false as const,
-        reason: 'invalid' as const,
-        errors: [{ path: 'swarm.actions.lint.run[1]', message: 'must not be empty' }],
-      }));
-      render(<Page api={scriptApi(writeAction as never)} start="lint" />);
-      fireEvent.change(await screen.findByLabelText('Script 2'), { target: { value: ' ' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-      const alert = await screen.findByText('must not be empty');
-      expect(
-        screen
-          .getByLabelText('Script 1')
-          .closest('ol')!
-          .parentElement!.parentElement!.contains(alert),
-      ).toBe(true);
-    });
+  it('shows the error of the script under its field', async () => {
+    const writeAction = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'invalid' as const,
+      errors: [{ path: 'swarm.actions.commit.run', message: 'must not be empty' }],
+    }));
+    render(<Page api={api({ writeAction })} start="commit" />);
+    fireEvent.change(await screen.findByLabelText('Script'), { target: { value: ' ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const alert = await screen.findByText('must not be empty');
+    expect(screen.getByLabelText('Script').parentElement!.contains(alert)).toBe(true);
   });
 });

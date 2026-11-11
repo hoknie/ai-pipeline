@@ -1,4 +1,4 @@
-import { type Action, type StagePoints } from './action.ts';
+import { type Action, legacyScript, type StagePoints } from './action.ts';
 import { type RuntimeChain } from './chain.ts';
 import { type Pipeline, type Split, type Step } from './pipeline.ts';
 import { type Defaults, type Runtime, type Specialist } from './specialist.ts';
@@ -143,7 +143,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     pipelines?: Pipeline[];
     /** Name of the pipelines in snapshots stored by older builds. */
     workflows?: Pipeline[];
-    actions?: Action[];
+    actions?: (Omit<Action, 'run'> & { run: string | readonly string[] | null })[];
     stages?: StagePoints;
     workspace?: Partial<WorkspaceSettings>;
     delivery: Partial<DeliverySettings>;
@@ -193,10 +193,10 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     })),
   }));
   // Runs stored before pipeline actions existed have none.
-  // Runs stored before script lists keep `run` as one string.
-  const actions = (stored.actions ?? []).map((action) => ({
+  // Runs stored while `run` could be a list keep the list: it becomes one script.
+  const actions: Action[] = (stored.actions ?? []).map((action) => ({
     ...action,
-    run: typeof action.run === 'string' ? [action.run] : action.run,
+    run: Array.isArray(action.run) ? legacyScript(action.run) : (action.run as string | null),
   }));
   const stages = stored.stages ?? {};
   const { workflows: _old, ...current } = stored;

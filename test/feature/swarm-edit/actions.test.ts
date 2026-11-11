@@ -79,7 +79,7 @@ describe('the description of an action', () => {
     expect(findAction(config, 'commit')).toEqual({
       id: 'commit',
       name: null,
-      run: ['git commit -am "$AIP_COMMIT_MESSAGE"'],
+      run: 'git commit -am "$AIP_COMMIT_MESSAGE"',
       specialist: null,
       additionalPrompt: null,
       timeoutSeconds: 600,
@@ -293,8 +293,8 @@ describe('levels', () => {
     write(join(paths.project.directory, 'actions', 'commit.yaml'), 'run: project\ntimeout: 5\n');
     const config = loadConfig(paths);
     expect(config.actions.map((action) => [action.id, action.run, action.level])).toEqual([
-      ['commit', ['project'], 'project'],
-      ['lint', ['lint'], 'global'],
+      ['commit', 'project', 'project'],
+      ['lint', 'lint', 'global'],
     ]);
     expect(findAction(config, 'commit')?.timeoutSeconds).toBe(5);
   });
@@ -356,14 +356,14 @@ describe('a stored configuration', () => {
     expect(read.delivery.messagePrompt).toBeUndefined();
   });
 
-  it('turns a string run of an older snapshot into a list of one script', () => {
+  it('keeps a string run of an older snapshot', () => {
     const config = parseConfig(
       withSwarm('  actions:\n    a: { run: x }\n  stages:\n    after_delivery: [a]\n'),
     );
     const stored = structuredClone(config) as unknown as { actions: { run: unknown }[] };
     stored.actions[0]!.run = 'echo x';
     const read = withConfigDefaults(stored as never);
-    expect(read.actions[0]?.run).toEqual(['echo x']);
+    expect(read.actions[0]?.run).toBe('echo x');
   });
 
   it('keeps the actions of a newer snapshot', () => {

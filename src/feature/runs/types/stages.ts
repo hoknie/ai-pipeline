@@ -6,7 +6,6 @@ import {
   findAction,
   groupPipeline,
   pipelineActionIds,
-  scriptText,
 } from '../../swarm-config/types/index.ts';
 import { MESSAGE_GROUP, RESOLVE_GROUP, SPLIT_GROUP } from './constants.ts';
 import { actionSlug } from './group.ts';
@@ -59,7 +58,7 @@ const POINT_SECTION: Record<ActionPoint, StageSection> = {
 };
 
 function performerOf(config: ResolvedConfig, action: Action): StagePerformer {
-  if (action.run !== null) return { type: 'command', command: scriptText(action.run) };
+  if (action.run !== null) return { type: 'command', command: action.run };
   const slug = action.specialist ?? '';
   return { type: 'specialist', slug, name: specialistName(config, slug) };
 }

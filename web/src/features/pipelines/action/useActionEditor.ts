@@ -74,6 +74,12 @@ function useActionState(action: ActionEntry | null) {
     setBusy,
     attempt,
     clearAnswer,
+    /** Back to what the file holds. */
+    reset: () => {
+      clearAnswer();
+      setDraft(draftOfAction(raw));
+      setNewId('');
+    },
   };
 }
 
@@ -94,6 +100,26 @@ function useDirty(
   return { value, dirty };
 }
 
+type WriteResult = Awaited<ReturnType<Api['writeAction']>>;
+
+/** Keeps what a refused write said; true when the write went through. */
+function reportWrite(state: ReturnType<typeof useActionState>, result: WriteResult): boolean {
+  if (result.ok) return true;
+  if (result.reason === 'conflict') state.setConflict(result.message);
+  else {
+    state.setErrors(result.errors);
+    state.setReferences((result.references ?? []) as ActionReference[]);
+  }
+  return false;
+}
+
+/** The specialists to choose from, with the one of the draft even when it is gone. */
+function slugsOf(view: ConfigEditorResponse, draft: ActionDraft): string[] {
+  const slugs = view.specialists.map((specialist) => specialist.slug);
+  if (draft.specialist !== '' && !slugs.includes(draft.specialist)) slugs.push(draft.specialist);
+  return slugs;
+}
+
 /** The state and the actions (save, delete, switch the level, read again) of the action form. */
 export function useActionEditor(input: ActionEditorInput) {
   const { api, view, action, onDirty, onReload, onSaved, onDeleted } = input;
@@ -104,15 +130,7 @@ export function useActionEditor(input: ActionEditorInput) {
   const id = action?.id ?? newId;
   const { value, dirty } = useDirty(raw, draft, action === null && newId !== '', onDirty);
 
-  const report = (result: Awaited<ReturnType<Api['writeAction']>>): boolean => {
-    if (result.ok) return true;
-    if (result.reason === 'conflict') state.setConflict(result.message);
-    else {
-      state.setErrors(result.errors);
-      state.setReferences((result.references ?? []) as ActionReference[]);
-    }
-    return false;
-  };
+  const report = (result: WriteResult): boolean => reportWrite(state, result);
   const save = () =>
     attempt(async () => {
       state.clearAnswer();
@@ -162,9 +180,19 @@ export function useActionEditor(input: ActionEditorInput) {
     state.setDraft(draftOfAction(action?.sources[next]?.raw ?? action?.raw ?? {}));
     state.setLevel(next);
   };
-  const slugs = view.specialists.map((specialist) => specialist.slug);
-  if (draft.specialist !== '' && !slugs.includes(draft.specialist)) slugs.push(draft.specialist);
+  const slugs = slugsOf(view, draft);
   const fieldErrors = (field: Field) => errors.filter((error) => fieldOf(error.path, id) === field);
   const otherErrors = errors.filter((error) => fieldOf(error.path, id) === null);
-  return { ...state, id, slugs, fieldErrors, otherErrors, save, remove, reread, switchLevel };
+  return {
+    ...state,
+    id,
+    slugs,
+    dirty,
+    fieldErrors,
+    otherErrors,
+    save,
+    remove,
+    reread,
+    switchLevel,
+  };
 }
