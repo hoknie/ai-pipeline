@@ -117,12 +117,25 @@ describe('the inspector', () => {
     await openDiagram();
     const before = keyOf('plan');
     fireEvent.click(node('plan'));
-    choose(inspector().getByRole('combobox', { name: 'step specialist' }), 'writer');
+    choose(inspector().getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
     expect(titleOf(node('writer'))).toBe('writer');
     expect(keyOf('writer')).toBe(before);
     const value = await save(writePipeline);
     expect(value.steps[0]).toMatchObject({ id: 'writer', specialist: 'writer' });
     expect(value.steps[1]).toMatchObject({ on_reject: { goto: 'writer', max_rounds: 2 } });
+  });
+
+  it('offers the specialists as «Name (slug)» and keeps an unknown one as its slug', async () => {
+    const raw = { steps: [{ id: 'ghost', specialist: 'ghost' }, ...RAW.steps.slice(1)] };
+    render(<Page api={api({}, [entry('feature', { raw })])} />);
+    await openDiagram();
+    fireEvent.click(node('ghost'));
+    const select = inspector().getByRole('combobox', { name: 'step specialist' });
+    expect(select.textContent).toBe('ghost');
+    fireEvent.keyDown(select, { key: 'Enter' });
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toContain('REVIEWER (reviewer)');
+    expect(options).toContain('ghost');
   });
 
   it('shows the edge of a return with its rounds', async () => {
@@ -150,7 +163,7 @@ describe('adding, removing and moving', () => {
     expect(screen.getAllByRole('button', { name: 'Add a step here' })).toHaveLength(4);
     fireEvent.click(screen.getAllByRole('button', { name: 'Add a step here' })[1]!);
     expect(stepNodes()).toHaveLength(4);
-    choose(inspector().getByRole('combobox', { name: 'step specialist' }), 'writer');
+    choose(inspector().getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
     const value = await save(writePipeline);
     expect(value.steps.map((step) => step.id)).toEqual(['plan', 'writer', 'code', 'review']);
   });
@@ -160,7 +173,7 @@ describe('adding, removing and moving', () => {
     render(<Page api={api({ writePipeline })} />);
     await openDiagram();
     fireEvent.click(screen.getAllByRole('button', { name: 'Add a step here' })[3]!);
-    choose(inspector().getByRole('combobox', { name: 'step specialist' }), 'writer');
+    choose(inspector().getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
     expect((await save(writePipeline)).steps.map((step) => step.id)).toEqual([
       'plan',
       'code',
@@ -263,7 +276,7 @@ describe('split and points', () => {
     fireEvent.click(inspector().getByRole('switch', { name: 'Task split' }));
     expect(screen.getByTestId('canvas-node-split')).toBeTruthy();
     expect(screen.getByTestId('canvas-node-point:before_split')).toBeTruthy();
-    choose(inspector().getByRole('combobox', { name: 'split specialist' }), 'plan');
+    choose(inspector().getByRole('combobox', { name: 'split specialist' }), /\(plan\)/);
     const value = await save(writePipeline);
     expect((value as { split?: unknown }).split).toEqual({ specialist: 'plan' });
   });

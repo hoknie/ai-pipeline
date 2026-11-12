@@ -145,7 +145,12 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
       <Handle type="target" position={Position.Left} id="in" isConnectable={false} />
       <div className="truncate font-medium">{caption.title}</div>
       {caption.subtitle ? (
-        <div className="truncate text-xs text-muted-foreground">{caption.subtitle}</div>
+        <div
+          className="truncate text-xs text-muted-foreground"
+          title={data.subtitleHint || undefined}
+        >
+          {caption.subtitle}
+        </div>
       ) : null}
       <StageLines id={id} data={data} />
       <Handle type="source" position={Position.Right} id="out" isConnectable={false} />

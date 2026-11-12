@@ -1,3 +1,5 @@
+import { specialistOption } from '../../../../shared/lib/catalog/specialists.ts';
+import { useSpecialistNames } from './SpecialistNames.ts';
 import {
   Select,
   SelectContent,
@@ -23,6 +25,7 @@ export function SpecialistSelect({
   disabled: boolean;
   onChange: (next: string) => void;
 }) {
+  const names = useSpecialistNames();
   return (
     <Select
       value={current === '' ? NONE : current}
@@ -37,7 +40,7 @@ export function SpecialistSelect({
         {[...new Set([...slugs, ...(current && !slugs.includes(current) ? [current] : [])])].map(
           (slug) => (
             <SelectItem key={slug} value={slug}>
-              {slug}
+              {specialistOption(names, slug)}
             </SelectItem>
           ),
         )}

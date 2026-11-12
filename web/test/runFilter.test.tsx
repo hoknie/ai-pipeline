@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
+import { renderHook } from '@testing-library/react';
+import { useFilterOptions } from '../src/features/runs/list/filterOptions.tsx';
 import { RunList } from '../src/features/runs/list/RunList.tsx';
 import {
   activeFilters,
@@ -473,5 +475,49 @@ describe('repository filter', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Repository' }));
     expect(await screen.findByText('~/lib')).toBeTruthy();
     expect(screen.getByText('/work/app')).toBeTruthy();
+  });
+});
+
+describe('the specialists filter of the run list', () => {
+  const stage = (slug: string, name: string) => ({
+    id: `step:${slug}`,
+    kind: 'step',
+    section: 'work',
+    name,
+    performer: { type: 'specialist', slug, name },
+    condition: null,
+    status: null,
+  });
+  const steps = (...slugs: string[]) =>
+    slugs.map((specialist, index) => ({
+      id: `s${index}`,
+      specialist,
+      name: specialist,
+      skipped: false,
+      state: 'upcoming' as const,
+    }));
+
+  it('labels the choices with the names of the run snapshot, sorted by label, and keeps the slug', () => {
+    const run = runView({
+      id: 'r',
+      steps: steps('coder', 'plan', 'ghost'),
+      topology: {
+        stages: [stage('coder', 'Кодировщик'), stage('plan', 'Аналитик')],
+      } as unknown as RunView['topology'],
+    });
+    const { result } = renderHook(() =>
+      useFilterOptions({
+        runs: [run],
+        query: '',
+        filters: EMPTY_FILTERS,
+        scope: 'all',
+        repository: null,
+      }),
+    );
+    expect(result.current.specialists.map(({ value, label }) => ({ value, label }))).toEqual([
+      { value: 'plan', label: 'Аналитик' },
+      { value: 'coder', label: 'Кодировщик' },
+      { value: 'ghost', label: 'ghost' },
+    ]);
   });
 });

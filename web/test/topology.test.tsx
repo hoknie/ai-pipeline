@@ -878,6 +878,25 @@ describe('pipeline stages', () => {
     expect(summary({ ...splitBase, stages: engineStages(splitBase) })).toEqual(summary(splitBase));
   });
 
+  it('labels the split node with the name of its specialist and keeps the slug in the hint', () => {
+    const stagesWithName = engineStages(splitBase).map((stage) =>
+      stage.id === 'split'
+        ? {
+            ...stage,
+            performer: { type: 'specialist' as const, slug: 'planner', name: 'Планировщик' },
+          }
+        : stage,
+    );
+    const split = nodesOf({ ...splitBase, stages: stagesWithName }).nodes.find(
+      (node) => node.id === 'split',
+    )!.data;
+    expect(split.subtitle).toBe('Планировщик');
+    expect(split.subtitleHint).toBe('planner');
+    const fallback = nodesOf(splitBase).nodes.find((node) => node.id === 'split')!.data;
+    expect(fallback.subtitle).toBe('planner');
+    expect(fallback.subtitleHint).toBeUndefined();
+  });
+
   it('carries the section, performer, condition and link on the older path too', () => {
     const data = (id: string) => nodesOf(splitBase).nodes.find((node) => node.id === id)!.data;
     expect(data('resolver').condition).toBe(i18next.t('topology.stages.condition.conflict'));

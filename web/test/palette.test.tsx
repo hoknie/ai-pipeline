@@ -11,6 +11,7 @@ import {
   groupView,
   openFake,
   runView,
+  specialistEntry,
 } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
@@ -224,3 +225,23 @@ describe('section counters', () => {
 });
 
 void groupRow;
+
+describe('specialists in the palette', () => {
+  it('shows the name and finds the specialist by the name and by the slug', async () => {
+    mount([runView()], {
+      config: vi.fn(async () =>
+        configView({ specialists: [specialistEntry('reviewer', {}, { name: 'Ревьюер' })] }),
+      ),
+    });
+    openPalette();
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByRole('option', { name: 'Ревьюер' })).toBeTruthy();
+    const box = within(dialog).getByRole('combobox');
+    fireEvent.change(box, { target: { value: 'ревью' } });
+    expect(within(dialog).queryByRole('option', { name: 'Ревьюер' })).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'reviewer' } });
+    const item = await within(dialog).findByRole('option', { name: 'Ревьюер' });
+    fireEvent.click(item);
+    await waitFor(() => expect(window.location.hash).toBe('#specialists/reviewer'));
+  });
+});

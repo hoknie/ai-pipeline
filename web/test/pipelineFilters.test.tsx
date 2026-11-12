@@ -103,7 +103,19 @@ describe('pipeline filters', () => {
 
   it('offers the tags and specialists of the pipelines and drops vanished values', () => {
     const options = pipelineFilterOptions(all);
-    expect(options.specialists).toEqual(['coder', 'plan', 'splitter']);
+    expect(options.specialists.map((item) => item.value)).toEqual(['coder', 'plan', 'splitter']);
+    const named = pipelineFilterOptions(
+      all,
+      new Map([
+        ['coder', 'Кодировщик'],
+        ['plan', 'Аналитик'],
+      ]),
+    ).specialists;
+    expect(named).toEqual([
+      { value: 'plan', label: 'Аналитик' },
+      { value: 'coder', label: 'Кодировщик' },
+      { value: 'splitter', label: 'splitter' },
+    ]);
     expect(options.tags.map((tag) => tag.name).sort()).toEqual(['Backend', 'fast']);
     expect(
       existingPipelineFilter(

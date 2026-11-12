@@ -1,4 +1,5 @@
 import { Bot, Terminal } from 'lucide-react';
+import { specialistOption } from '../../../shared/lib/catalog/specialists.ts';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -83,7 +84,8 @@ function SpecialistCard({
   update,
   errorsOf,
   slugs,
-}: FieldsProps & { slugs: string[] }) {
+  names,
+}: FieldsProps & { slugs: string[]; names: ReadonlyMap<string, string> }) {
   const { t } = useTranslation();
   return (
     <SectionCard id="action-section-specialist" title={t('pipeline.actions.sectionSpecialist')}>
@@ -101,7 +103,7 @@ function SpecialistCard({
             <SelectItem value={NONE}>—</SelectItem>
             {slugs.map((slug) => (
               <SelectItem key={slug} value={slug}>
-                {slug}
+                {specialistOption(names, slug)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -151,7 +153,12 @@ function FailureField({ draft, disabled, update, errorsOf }: FieldsProps) {
 
 /** The cards of an action: the main one and the one of its type; the form lays them out. */
 export function ActionFields(
-  props: FieldsProps & { slugs: string[]; newId: string | null; onNewId: (id: string) => void },
+  props: FieldsProps & {
+    slugs: string[];
+    names: ReadonlyMap<string, string>;
+    newId: string | null;
+    onNewId: (id: string) => void;
+  },
 ) {
   const { t } = useTranslation();
   const { draft, disabled, update, errorsOf } = props;

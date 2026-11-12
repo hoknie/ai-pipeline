@@ -1,5 +1,6 @@
 import { matchesLevel, type LevelFilter } from '../specialists/index.ts';
 import { existingSelection, filterSpecialists, repositoryTags } from '../specialists/index.ts';
+import { nameOf } from '../../shared/lib/catalog/specialists.ts';
 import type { EditorPipeline } from '../../shared/api/types.ts';
 
 /** What the pipelines list is narrowed by; the search text lives apart from it. */
@@ -15,7 +16,8 @@ type Entry = Pick<EditorPipeline, 'id' | 'level' | 'raw' | 'shared_tags' | 'own_
 
 export interface PipelineFilterOptions {
   tags: { name: string; shared: boolean }[];
-  specialists: string[];
+  /** The slug is the value of a choice, the name its label. */
+  specialists: { value: string; label: string }[];
 }
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -37,10 +39,13 @@ export function specialistsOfPipeline(entry: Pick<EditorPipeline, 'raw'>): strin
 }
 
 /** The choices of every filter: tags and specialists of the pipelines, sorted by name. */
-export function pipelineFilterOptions(entries: readonly Entry[]): PipelineFilterOptions {
-  const specialists = [...new Set(entries.flatMap(specialistsOfPipeline))].sort((a, b) =>
-    a.localeCompare(b),
-  );
+export function pipelineFilterOptions(
+  entries: readonly Entry[],
+  names: ReadonlyMap<string, string> = new Map(),
+): PipelineFilterOptions {
+  const specialists = [...new Set(entries.flatMap(specialistsOfPipeline))]
+    .map((value) => ({ value, label: nameOf(names, value) }))
+    .sort((a, b) => a.label.localeCompare(b.label) || a.value.localeCompare(b.value));
   return { tags: repositoryTags(entries), specialists };
 }
 
@@ -76,7 +81,9 @@ export function existingPipelineFilter(
   return {
     ...filter,
     tags: existingSelection(filter.tags, options.tags),
-    specialists: filter.specialists.filter((name) => options.specialists.includes(name)),
+    specialists: filter.specialists.filter((slug) =>
+      options.specialists.some((item) => item.value === slug),
+    ),
   };
 }
 

@@ -437,7 +437,7 @@ describe('free layout of the diagram', () => {
     const id = keyOf('code');
     drag(id, at(340, 220));
     fireEvent.click(stepNodes().find((item) => titleOf(item) === 'code')!);
-    choose(inspector().getByRole('combobox', { name: 'step specialist' }), 'writer');
+    choose(inspector().getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
     expect(place(id)).toEqual(at(340, 220));
   });
 

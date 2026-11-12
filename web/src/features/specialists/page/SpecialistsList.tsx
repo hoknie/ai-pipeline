@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { EditorSpecialist, EntryLevel } from '../../../shared/api/types.ts';
+import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { EntryList } from '../../../shared/ui/layout/EntryList.tsx';
 import { SpecialistTagChip } from '../SpecialistTagChip.tsx';
@@ -75,7 +76,7 @@ export function SpecialistsList({
         onSelect={onSelect}
         entries={specialists.map((entry) => ({
           id: entry.slug,
-          title: entry.effective?.name ?? entry.raw.name?.toString() ?? entry.slug,
+          title: specialistName(entry),
           subtitle: subtitleOf(entry),
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
           extra:

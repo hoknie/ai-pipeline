@@ -91,14 +91,15 @@ const SAMPLES: Record<Method, unknown> = {
   worker_queue_add: { token: 't', pipeline: 'feature', task: 'do it' },
   artifact_publish: { token: 't', fileName: 'a.md', content: 'text' },
   split: { token: 't', groups: [{ title: 'a', task: 'b' }] },
+  worker_run_show: { token: 't', run: '#1' },
 };
 
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 78 methods, each in the request schema once', () => {
+  it('has 79 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(78);
+    expect(methods).toHaveLength(79);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

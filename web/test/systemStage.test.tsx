@@ -7,7 +7,7 @@ import PipelinesPage from '../src/features/pipelines/PipelinesPage.tsx';
 import type { SystemStagesResponse } from '../src/shared/lib/pipeline/pipelineEntries.ts';
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
-import { configView, fakeApi, systemStagesView } from './fixtures.ts';
+import { configView, fakeApi, specialistEntry, systemStagesView } from './fixtures.ts';
 
 beforeEach(() => {
   window.location.hash = '';
@@ -109,6 +109,21 @@ describe('the screen of a system stage', () => {
     await value('delivery.message_specialist');
     await value('delivery.commit_message');
     expect((await value('delivery.message_prompt')).textContent).toContain('not set');
+  });
+
+  it('shows the specialists of the stages by «Name (slug)»', async () => {
+    const config = vi.fn(async () =>
+      configView({ specialists: [specialistEntry('coder', {}, { name: 'Кодер' })] }),
+    );
+    const systemStages = vi.fn(async () =>
+      withStage('resolve', [{ path: 'delivery.resolver', value: 'coder', level: 'project' }])(),
+    );
+    render(<Page api={api({ config, systemStages })} start="resolve" />);
+    await waitFor(async () =>
+      expect(within(await value('delivery.resolver')).getByTestId('stage-shown').textContent).toBe(
+        'Кодер (coder)',
+      ),
+    );
   });
 
   it('shows the delivery mode by its name and a flag as yes or no', async () => {

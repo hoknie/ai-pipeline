@@ -115,7 +115,7 @@ describe('the form of an action', () => {
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'notify' } });
     fireEvent.click(screen.getByRole('radio', { name: 'Specialist' }));
     expect(screen.queryByLabelText('Script')).toBeNull();
-    choose(screen.getByRole('combobox', { name: 'action specialist' }), 'writer');
+    choose(screen.getByRole('combobox', { name: 'action specialist' }), 'WRITER (writer)');
     fireEvent.change(screen.getByLabelText('Additional prompt'), { target: { value: 'Short' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeAction).toHaveBeenCalled());

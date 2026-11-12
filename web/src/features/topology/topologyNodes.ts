@@ -106,6 +106,11 @@ export function commonOf(
 function splitNode({ pipeline, live, load, t }: NodeContext, common: Common): NodeSpec | null {
   const split = pipeline.split;
   if (!split) return null;
+  const splitStage = pipeline.stages.find((stage) => stage.id === 'split');
+  const splitName =
+    splitStage?.performer.type === 'specialist' && splitStage.performer.name
+      ? splitStage.performer.name
+      : split.specialist;
   const pipelineText = split.pipeline
     ? [t('topology.splitPipeline', { id: split.pipelineName ?? split.pipeline })]
     : [];
@@ -114,7 +119,8 @@ function splitNode({ pipeline, live, load, t }: NodeContext, common: Common): No
     data: {
       kind: 'split',
       title: t('topology.split'),
-      subtitle: split.specialist,
+      subtitle: splitName,
+      ...(splitName === split.specialist ? {} : { subtitleHint: split.specialist }),
       detail: [t('topology.splitDetail', { n: split.maxGroups }), ...pipelineText].join(' · '),
       groups: live.splitting,
       active: live.splitting.some((group) => group.status === 'running'),

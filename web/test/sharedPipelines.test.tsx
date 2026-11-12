@@ -162,7 +162,7 @@ describe('shared pipelines group', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     const triggers = screen.getAllByRole('combobox', { name: /specialist/i });
     fireEvent.keyDown(triggers[triggers.length - 1]!, { key: 'ArrowDown' });
-    await screen.findByRole('option', { name: 'coder' });
+    await screen.findByRole('option', { name: 'CODER (coder)' });
     expect(screen.queryByRole('option', { name: 'local' })).toBeNull();
   });
 

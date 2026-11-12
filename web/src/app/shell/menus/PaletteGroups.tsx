@@ -6,6 +6,7 @@ import { SECTIONS } from '../../sections.ts';
 import type { Route } from '../../../shared/lib/nav/route.ts';
 import { runStatusLabel } from '../../../shared/lib/status.ts';
 import type { EditorSpecialist, EditorPipeline, RunView } from '../../../shared/api/types.ts';
+import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { CommandGroup, CommandItem } from '../../../shared/ui/overlays/command.tsx';
 import { orderGroups } from '../../../shared/lib/order.ts';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
@@ -108,15 +109,18 @@ export function ConfigGroups({ go, to, entries }: { go: Go; to: To; entries: Ent
       ) : null}
       {entries.specialists.length > 0 ? (
         <CommandGroup heading={t('palette.specialists')}>
-          {entries.specialists.map((specialist) => (
-            <CommandItem
-              key={specialist.slug}
-              value={`${t('palette.specialist')} ${specialist.slug}`}
-              onSelect={() => go(to('specialists', specialist.slug))}
-            >
-              {specialist.slug}
-            </CommandItem>
-          ))}
+          {entries.specialists.map((specialist) => {
+            const name = specialistName(specialist);
+            return (
+              <CommandItem
+                key={specialist.slug}
+                value={`${t('palette.specialist')} ${name} ${specialist.slug}`}
+                onSelect={() => go(to('specialists', specialist.slug))}
+              >
+                {name}
+              </CommandItem>
+            );
+          })}
         </CommandGroup>
       ) : null}
     </>

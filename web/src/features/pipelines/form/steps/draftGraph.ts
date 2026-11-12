@@ -40,6 +40,8 @@ export interface CanvasNodeData extends Record<string, unknown> {
   title: string;
   /** The specialist of a step or of the split. */
   subtitle: string;
+  /** The tooltip of the subtitle: the slug of the specialist whose name it shows. */
+  subtitleHint?: string;
   error: boolean;
   /** The node is shown only: the step belongs to another pipeline. */
   locked: boolean;
@@ -90,6 +92,8 @@ export interface GraphContext {
   /** The stages of the last answer of the daemon to the check of the draft; `null`: none yet. */
   stages: readonly PipelineStage[] | null;
   errors: FieldError[];
+  /** The name of a specialist by slug; the slug itself when it has none. */
+  specialistName?: (slug: string) => string;
   /** Whether steps can be added, moved and linked. */
   editable: boolean;
 }
@@ -117,6 +121,12 @@ function pointNode(point: ActionPoint, x: number, context: GraphContext): Canvas
   });
 }
 
+/** The subtitle of a node that names a specialist: the name, with the slug as the hint. */
+function whoOf(context: GraphContext, slug: string) {
+  const subtitle = context.specialistName?.(slug) ?? slug;
+  return subtitle === slug ? { subtitle } : { subtitle, subtitleHint: slug };
+}
+
 function followNodes(context: GraphContext, start: number) {
   const follow = context.follow as NonNullable<GraphContext['follow']>;
   if (follow.steps === null) {
@@ -133,7 +143,7 @@ function followNodes(context: GraphContext, start: number) {
     node(`follow:${index}`, start + index * GAP_X, {
       kind: 'follow',
       title: step.id,
-      subtitle: step.specialist,
+      ...whoOf(context, step.specialist),
       locked: true,
     }),
   );
@@ -146,10 +156,13 @@ function chainOf(draft: Draft, context: GraphContext, marked: Set<string>): Canv
   const hasSplit = draft.split !== null;
   if (hasSplit) {
     add((x) => pointNode('before_split', x, context));
+    // a split that follows a pipeline shows «follows pipeline X»: the slug hint would not fit it
+    const { subtitleHint, ...who } = whoOf(context, draft.split?.specialist ?? '');
+    const splitWho = draft.split?.pipeline ? who : { ...who, subtitleHint };
     add((x) =>
       node('split', x, {
         kind: 'split',
-        subtitle: draft.split?.specialist ?? '',
+        ...splitWho,
         title: draft.split?.pipeline ?? '',
         error: marked.has('split'),
       }),
@@ -165,7 +178,7 @@ function chainOf(draft: Draft, context: GraphContext, marked: Set<string>): Canv
           kind: 'step',
           key: step.key,
           title: context.ids[index] ?? '',
-          subtitle: step.specialist,
+          ...whoOf(context, step.specialist),
           error: marked.has(stepNodeId(step.key)),
         }),
       );

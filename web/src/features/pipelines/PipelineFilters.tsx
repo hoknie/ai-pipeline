@@ -65,7 +65,7 @@ export function PipelineFilters({
           label={t('pipelines.filters.specialists')}
           selected={filter.specialists}
           onChange={(specialists) => onFilter({ ...filter, specialists })}
-          options={options.specialists.map((name) => ({ value: name, label: name }))}
+          options={options.specialists}
           clearLabel={t('runs.list.clear')}
         />
       ) : null}

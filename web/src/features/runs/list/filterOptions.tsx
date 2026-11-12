@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { nameOf } from '../../../shared/lib/catalog/specialists.ts';
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
 import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { statusInfo } from '../../../shared/lib/status.ts';
@@ -53,9 +54,18 @@ export function useFilterOptions(input: FilterOptionsInput) {
   const specialistCounts = counts('specialists');
   const specialists = new Set<string>(filters.specialists);
   for (const run of scoped) runSpecialists(run).forEach((slug) => specialists.add(slug));
+  const names = new Map<string, string>();
+  for (const run of scoped)
+    for (const stage of run.topology?.stages ?? [])
+      if (stage.performer.type === 'specialist' && stage.performer.name)
+        names.set(stage.performer.slug, stage.performer.name);
   const specialistOptions: FilterOption[] = [...specialists]
-    .sort((left, right) => left.localeCompare(right))
-    .map((value) => ({ value, label: value, count: specialistCounts.get(value) ?? 0 }));
+    .map((value) => ({
+      value,
+      label: nameOf(names, value),
+      count: specialistCounts.get(value) ?? 0,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
 
   const tagCounts = counts('tagIds');
   const tagOptions: FilterOption[] = of(repository).map((tag) => ({

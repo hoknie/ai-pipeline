@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { usePreference } from '../../../shared/lib/browser/preferences.ts';
+import { specialistNames } from '../../../shared/lib/catalog/specialists.ts';
 import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
 import {
   EMPTY_PIPELINE_FILTER,
@@ -20,7 +21,10 @@ export function usePipelineFilterState(view: ConfigEditorResponse | null) {
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = usePreference<boolean>('pipelineFiltersCollapsed', false);
   const repository = view?.repository ?? null;
-  const options = useMemo(() => pipelineFilterOptions(view?.pipelines ?? []), [view]);
+  const options = useMemo(
+    () => pipelineFilterOptions(view?.pipelines ?? [], specialistNames(view?.specialists ?? [])),
+    [view],
+  );
   const stored = useMemo<PipelineFilter>(
     () =>
       repository === null

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { specialistNames } from '../../../shared/lib/catalog/specialists.ts';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
@@ -187,6 +188,7 @@ export function useActionEditor(input: ActionEditorInput) {
     ...state,
     id,
     slugs,
+    names: specialistNames(view.specialists),
     dirty,
     fieldErrors,
     otherErrors,

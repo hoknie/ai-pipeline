@@ -1,8 +1,10 @@
 import { GitBranch } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, RunView } from '../../../shared/api/types.ts';
+import { specialistNames } from '../../../shared/lib/catalog/specialists.ts';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import { Empty } from '../../../shared/ui/feedback/empty.tsx';
 import { Skeleton } from '../../../shared/ui/feedback/skeleton.tsx';
@@ -35,6 +37,8 @@ const revisions = (entry: {
 
 function SystemBody({ data, selected }: BodyProps) {
   const { t } = useTranslation();
+  const specialists = data.view?.specialists;
+  const names = useMemo(() => specialistNames(specialists ?? []), [specialists]);
   if (!isSystemKind(selected))
     return <Empty icon={<GitBranch />} title={t('pipeline.system.empty')} />;
   return (
@@ -43,6 +47,7 @@ function SystemBody({ data, selected }: BodyProps) {
       kind={selected}
       stages={data.stages}
       failure={data.stagesFailure}
+      names={names}
     />
   );
 }

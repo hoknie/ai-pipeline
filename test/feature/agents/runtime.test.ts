@@ -120,6 +120,7 @@ describe('message to the specialist', () => {
     expect(text).toContain('Allowed shell commands');
     expect(text).toContain('one refused command refuses the whole call');
     expect(text).toContain('look for another way to do it within your permissions');
+    expect(text).toContain('read them with the tool `swarm_run_show` instead of asking a person');
     expect(text).toContain('name the refused command in the question');
   });
 });
@@ -175,6 +176,7 @@ describe('claude adapter', () => {
       'Glob',
       'mcp__aip__swarm_report',
       'mcp__aip__swarm_artifact',
+      'mcp__aip__swarm_run_show',
       'mcp__aip__swarm_split',
     ]);
   });
@@ -239,6 +241,7 @@ describe('claude adapter', () => {
           runtime.buildLaunch(context({ claudeEditMode, specialist: specialist({ permissions }) }))
             .args,
         );
+        expect(allowed).toContain('mcp__aip__swarm_run_show');
         expect(allowed).toContain('mcp__aip__swarm_artifact');
         expect(allowed).not.toContain('mcp__aip__swarm_queue_add');
       }
@@ -268,6 +271,7 @@ describe('claude adapter', () => {
       'Bash(npm test*)',
       'mcp__aip__swarm_report',
       'mcp__aip__swarm_artifact',
+      'mcp__aip__swarm_run_show',
       'mcp__aip__swarm_split',
     ]);
     expect(launch.args).toContain('Bash(git push:*)');
@@ -288,6 +292,7 @@ describe('claude adapter', () => {
       'Bash(npm test*)',
       'mcp__aip__swarm_report',
       'mcp__aip__swarm_artifact',
+      'mcp__aip__swarm_run_show',
       'mcp__aip__swarm_split',
     ]);
     expect(launch.args).toEqual(

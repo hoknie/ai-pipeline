@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
+import { nameOf, specialistNames } from '../../../../shared/lib/catalog/specialists.ts';
 import { routeEdges, type RouteEdge } from '../../../../shared/lib/graph/edgeRoutes.ts';
 import type { ConfigEditorResponse } from '../../../../shared/api/types.ts';
 import type { PipelineStage } from '../../../../shared/lib/pipeline/pipelineStages.ts';
@@ -88,9 +89,11 @@ function useDraftGraph(
   const topology = editor.preview.topology;
   const previewStages: PipelineStage[] | null = topology ? (topology.stages ?? []) : null;
   const ids = useMemo(() => stepIds(draft.steps), [draft.steps]);
+  const names = useMemo(() => specialistNames(view.specialists), [view.specialists]);
   const graph = useMemo(
     () =>
       draftGraph(draft, {
+        specialistName: (slug) => nameOf(names, slug),
         pipelineId: id,
         ids,
         follow: followOf(view, draft),
@@ -101,7 +104,7 @@ function useDraftGraph(
       }),
     // the preview stages come from the topology, the follow steps from the view
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, ids, id, errors, editable, view, topology],
+    [draft, ids, id, errors, editable, view, topology, names],
   );
   return { ids, previewStages, graph };
 }

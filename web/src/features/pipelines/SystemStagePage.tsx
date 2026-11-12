@@ -5,6 +5,7 @@ import type {
   SystemStageEntry,
   SystemStagesResponse,
 } from '../../shared/lib/pipeline/pipelineEntries.ts';
+import { specialistOption } from '../../shared/lib/catalog/specialists.ts';
 import { formatRoute } from '../../shared/lib/nav/route.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Label } from '../../shared/ui/forms/label.tsx';
@@ -13,6 +14,8 @@ import type { WriteLevel } from '../../shared/api/types.ts';
 
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { STAGE_SECTIONS, fieldKey } from '../../shared/ui/forms/settings/settingFields.ts';
+
+const NO_NAMES: ReadonlyMap<string, string> = new Map();
 
 /** The level a stage is shown at: the project when it sets any of its settings, else the shared. */
 export function stageLevel(stage: SystemStageEntry | undefined): WriteLevel {
@@ -57,7 +60,15 @@ const SOURCE_KEY = {
   default: 'settingsPage.source.default',
 } as const;
 
-function StageValue({ stage, path }: { stage: SystemStageEntry | undefined; path: string }) {
+function StageValue({
+  stage,
+  path,
+  names,
+}: {
+  stage: SystemStageEntry | undefined;
+  path: string;
+  names: ReadonlyMap<string, string>;
+}) {
   const { t } = useTranslation();
   const setting = stage?.settings.find((candidate) => candidate.path === path);
   const value = setting?.value;
@@ -67,6 +78,8 @@ function StageValue({ stage, path }: { stage: SystemStageEntry | undefined; path
   else if (typeof value === 'boolean')
     shown = t(value ? 'pipeline.system.yes' : 'pipeline.system.no');
   else if (path === 'delivery.mode') shown = t(`deliveryMode.${String(value)}` as never);
+  else if (path === 'delivery.message_specialist' || path === 'delivery.resolver')
+    shown = specialistOption(names, String(value));
   else shown = String(value);
   return (
     <div className="flex flex-col gap-0.5" data-testid={`stage-value-${path}`}>
@@ -85,9 +98,11 @@ function StageValue({ stage, path }: { stage: SystemStageEntry | undefined; path
 function StageSettings({
   kind,
   stage,
+  names,
 }: {
   kind: Exclude<SystemKind, 'split'>;
   stage: SystemStageEntry | undefined;
+  names: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
   return (
@@ -96,7 +111,7 @@ function StageSettings({
       {STAGE_SECTIONS[kind]
         .flatMap((section) => section.paths)
         .map((path) => (
-          <StageValue key={path} stage={stage} path={path} />
+          <StageValue key={path} stage={stage} path={path} names={names} />
         ))}
       <p className="text-xs text-muted-foreground">{t('pipeline.system.settingsHelp')}</p>
       <div>
@@ -122,8 +137,11 @@ export function SystemStagePage({
   kind,
   stages,
   failure,
+  names = NO_NAMES,
 }: {
   kind: SystemKind;
+  /** slug → name of the specialists, to show the chosen one by its name. */
+  names?: ReadonlyMap<string, string>;
   /** null while the stages are not loaded or could not be. */
   stages: SystemStagesResponse | null;
   failure: string | null;
@@ -156,7 +174,7 @@ export function SystemStagePage({
       <StageTask stage={stage} performer={performer} />
 
       {kind !== 'split' ? (
-        <StageSettings kind={kind} stage={stage} />
+        <StageSettings kind={kind} stage={stage} names={names} />
       ) : (
         <p className="text-sm text-muted-foreground">{t('pipeline.system.splitSettings')}</p>
       )}

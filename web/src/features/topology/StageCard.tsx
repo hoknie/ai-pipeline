@@ -25,7 +25,7 @@ function Handles() {
 function StageLines({ data, testId }: { data: StageData; testId: string }) {
   return (
     <>
-      <div className="truncate text-muted-foreground" title={data.subtitle}>
+      <div className="truncate text-muted-foreground" title={data.subtitleHint ?? data.subtitle}>
         {data.subtitle}
       </div>
       {data.performer && data.performer !== data.subtitle ? (

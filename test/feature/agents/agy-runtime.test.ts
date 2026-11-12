@@ -43,7 +43,12 @@ describe('agy launches', () => {
         enabledTools: string[];
         tools: unknown;
       }[];
-      expect(server?.enabledTools).toEqual(['swarm_report', 'swarm_artifact', 'swarm_split']);
+      expect(server?.enabledTools).toEqual([
+        'swarm_report',
+        'swarm_artifact',
+        'swarm_run_show',
+        'swarm_split',
+      ]);
     }
     expect(first.files.map((file) => file.path)).not.toEqual(second.files.map((file) => file.path));
     expect(second.args.join(' ')).toContain('aip-next-id');

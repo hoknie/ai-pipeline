@@ -18,6 +18,8 @@ export interface StageData extends Record<string, unknown> {
   kind: 'split' | 'step' | 'merge' | 'delivery' | 'resolver' | 'action' | 'message' | 'cleanup';
   title: string;
   subtitle: string;
+  /** The tooltip of the subtitle, when it is a name and the slug stands behind it. */
+  subtitleHint?: string;
   detail: string | null;
   groups: LiveGroup[];
   attempts: number | null;

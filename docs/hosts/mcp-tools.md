@@ -43,8 +43,11 @@ Specialists inside a run get their own MCP server (`aip mcp --worker`) with othe
 |---|---|---|
 | `swarm_report` | Every step | Ends a step with a [verdict](../configuration/pipelines.md#verdicts): `done`, `rejected` or `needs_human`, with `feedback`, `questions` and `human_only` |
 | `swarm_artifact` | Every step | Publishes a file of the step as an [artifact](../usage/runs.md#artifacts): `file_name`, `title?`, and `content` or `path` |
+| `swarm_run_show` | Every step | Reads a run of the same repository without changing it: `run` (id, task number `#333` or a panel link `…#runs/<id>[/<group>]`), `group?`, `tail_lines?` |
 | `swarm_split` | The split step | Proposes the [groups](../configuration/pipelines.md#split) of a task |
 | `swarm_queue_add` | A specialist with [`queue: true`](../configuration/specialists.md#queueing-tasks) | Puts a task in the queue of the run's repository: `pipeline`, `task` or `groups`, `title?`, `deliveryMode?`, `skip?`, `after?` |
+
+`swarm_run_show` shows only runs of the repository the specialist's run belongs to; any other run is refused. Without a group it returns the run overview and the full task of every group, with a group (from the parameter or from the link) every attempt of the group and the tail of its latest log.
 
 `swarm_queue_add` of a specialist works with the repository of the run, not with the directory where the specialist works. The task always gets the [linked task tag](../usage/tags.md#tags-of-tasks-a-specialist-queues) of its run. A predecessor id from an earlier answer keeps working after that item has started, because it then points to its run.
 

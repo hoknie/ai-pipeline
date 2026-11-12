@@ -132,6 +132,16 @@ describe('the system stages on the diagram', () => {
     );
   });
 
+  it('names the specialist of a step node and keeps its slug as the hint', async () => {
+    render(<Page api={api([DELIVERY])} />);
+    await openDiagram();
+    const code = (await screen.findAllByTestId(/^canvas-node-step:/)).find((item) =>
+      item.textContent?.includes('CODER'),
+    )!;
+    const line = within(code).getByText('CODER');
+    expect(line.getAttribute('title')).toBe('coder');
+  });
+
   it('has none of them when the daemon lists no such stage', async () => {
     render(<Page api={api([DELIVERY])} />);
     await openDiagram();

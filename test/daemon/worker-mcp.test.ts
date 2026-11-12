@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { QueueView, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
 
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
+
 import { PIPELINE_CONFIG, startRun, type Harness } from './harness.ts';
 import { queueOf, start } from './queue-harness.ts';
 
@@ -195,5 +197,93 @@ describe('the worker MCP server through a real agent', () => {
     expect(first?.title).toBe('Первая');
     expect(second?.title).toBe('Вторая');
     expect(second?.after.map((dependency) => dependency.id)).toEqual([first?.id]);
+  });
+
+  it('swarm_run_show: reads a run of the repository by id, number and link', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    h.script({ code: [{}], review: [{}] });
+    const first = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Логин', task: 'Починить вход по паролю' }],
+    })) as RunCreated;
+    const done = await h.waitFor(first.runId, (view) => view.finished);
+    const slug = done.groups[0]?.slug ?? '';
+    h.script({
+      'code@Чтение': [
+        {
+          realWorker: true,
+          toolCalls: [
+            { name: 'swarm_run_show', arguments: { run: first.runId } },
+            { name: 'swarm_run_show', arguments: { run: `#${done.number}`, group: slug } },
+            {
+              name: 'swarm_run_show',
+              arguments: { run: `http://127.0.0.1:1/#runs/${first.runId}/${slug}/code?tab=log` },
+            },
+            { name: 'swarm_run_show', arguments: { run: '#9999' } },
+          ],
+        },
+      ],
+      review: [{}],
+    });
+    const second = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Чтение', task: `Сделать как в ${first.runId}` }],
+    })) as RunCreated;
+    await h.waitFor(second.runId, (view) => view.finished);
+    const results = toolResults(h);
+    expect(results.map((entry) => entry.result.isError)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      true,
+    ]);
+    const [overview, byNumber, byLink, unknown] = results.map(textOf);
+    expect(overview).toContain(first.runId);
+    expect(overview).toContain(`- ${slug} (Логин): Починить вход по паролю`);
+    expect(byNumber).toContain(`Group ${slug} (Логин)`);
+    expect(byNumber).toContain('Task: Починить вход по паролю');
+    expect(byLink).toContain(`Group ${slug} (Логин)`);
+    expect(unknown).toBe('unknown task #9999 in this repository');
+  });
+
+  it('swarm_run_show: refuses a run of another repository without showing it', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    const other = join(h.repo, '..', 'other');
+    copyTemplateRepo(other, PIPELINE_CONFIG);
+    h.script({ code: [{}], review: [{}] });
+    const foreign = (await startRun(h, {
+      repository: other,
+      pipeline: 'feature',
+      groups: [{ title: 'Секрет', task: 'Секретная задача' }],
+    })) as RunCreated;
+    await h.waitFor(foreign.runId, (view) => view.finished);
+    h.script({
+      'code@Чтение': [
+        {
+          realWorker: true,
+          toolCalls: [{ name: 'swarm_run_show', arguments: { run: foreign.runId } }],
+        },
+      ],
+      review: [{}],
+    });
+    const own = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Чтение', task: 'читать' }],
+    })) as RunCreated;
+    await h.waitFor(own.runId, (view) => view.finished);
+    const [refused] = toolResults(h);
+    expect(refused?.result.isError).toBe(true);
+    expect(textOf(refused)).toBe(`run ${foreign.runId} belongs to another repository`);
+    expect(textOf(refused)).not.toContain('Секрет');
+  });
+
+  it('swarm_run_show: refuses a token of no running attempt', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    await expect(h.call('worker_run_show', { token: 'nope', run: '#1' })).rejects.toThrow(
+      'unknown or expired report token',
+    );
   });
 });

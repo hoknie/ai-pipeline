@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
@@ -7,6 +8,7 @@ import type {
   FieldError,
   WriteLevel,
 } from '../../../shared/api/types.ts';
+import { specialistNames } from '../../../shared/lib/catalog/specialists.ts';
 import { rawName } from '../../../shared/lib/pipeline/pipelineName.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
@@ -20,6 +22,7 @@ import { PipelineButtons } from './PipelineButtons.tsx';
 import { LevelHint, PipelineNotices } from './PipelineNotices.tsx';
 import { UsageBlock, type SharedPipelineOnly } from './PipelineUsage.tsx';
 import { draftOf, isNameError, isTagsError, stepOfError, valueOf } from './steps/draft.ts';
+import { SpecialistNames } from './steps/SpecialistNames.ts';
 import { usePipelineEditor } from './usePipelineEditor.ts';
 
 export { PREVIEW_DELAY_MS, draftOf, valueOf };
@@ -149,61 +152,64 @@ export function PipelineForm(props: PipelineFormProps) {
   const disabled = readOnly || busy;
   const places = errorsByPlace(editor.errors, id, draft.split !== null);
   const copyOnly = pipeline !== null && !sharedOnly;
+  const names = useMemo(() => specialistNames(view.specialists), [view.specialists]);
   return (
-    <section
-      className="flex flex-col gap-3"
-      aria-label={t('pipelines.section', { id: id || t('pipelines.newName') })}
-    >
-      <FormHeading pipeline={pipeline} file={source?.file} />
-      {readOnly ? <Alert role="status">{t('pipelines.sharedReadOnly')}</Alert> : null}
-      <PipelineNotices
-        view={view}
-        notice={notice}
-        problem={editor.problem}
-        conflict={editor.conflict}
-        otherErrors={places.other}
-        references={editor.references}
-        onReread={() => void editor.reread()}
-      />
-      {sharedOnly ? (
-        <p className="text-sm text-muted-foreground">{t('pipelines.sharedOnlyHint')}</p>
-      ) : null}
-      {sharedOnly && pipeline ? <UsageBlock shared={sharedOnly} view={view} /> : null}
-      {copyOnly && editor.bothLevels ? (
-        <LevelToggle level={level} onChange={(next) => void editor.switchLevel(next)} />
-      ) : null}
-      <LevelHint
-        global={level === 'global'}
-        sharedOnly={Boolean(sharedOnly)}
-        projectFile={Boolean(sources.project)}
-        globalFile={sources.global?.file ?? null}
-      />
-      <EditorTabs
-        editor={editor}
-        view={view}
-        pipeline={pipeline}
-        sharedOnly={Boolean(sharedOnly)}
-        places={places}
-        disabled={disabled}
-      />
-      <PipelineButtons
-        pipeline={pipeline}
-        readOnly={readOnly}
-        busy={busy}
-        canSave={Boolean(pipeline) || editor.newId !== ''}
-        overrideInProject={copyOnly && Boolean(sources.global) && !sources.project}
-        makeGlobal={pipeline !== null && Boolean(sources.project) && !sources.global && !readOnly}
-        canRemove={Boolean(pipeline && source) && !readOnly}
-        removeBlocked={editor.removeBlocked}
-        removeBlockedReason={editor.removeBlockedReason}
-        removeLabel={editor.removeLabel}
-        saveAs={editor.saveAs}
-        onSave={() => void editor.save()}
-        onCopyTo={(target) => void editor.copyTo(target)}
-        onSaveAs={editor.setSaveAs}
-        onSaveCopy={() => void editor.saveCopy()}
-        onRemove={() => void editor.remove()}
-      />
-    </section>
+    <SpecialistNames.Provider value={names}>
+      <section
+        className="flex flex-col gap-3"
+        aria-label={t('pipelines.section', { id: id || t('pipelines.newName') })}
+      >
+        <FormHeading pipeline={pipeline} file={source?.file} />
+        {readOnly ? <Alert role="status">{t('pipelines.sharedReadOnly')}</Alert> : null}
+        <PipelineNotices
+          view={view}
+          notice={notice}
+          problem={editor.problem}
+          conflict={editor.conflict}
+          otherErrors={places.other}
+          references={editor.references}
+          onReread={() => void editor.reread()}
+        />
+        {sharedOnly ? (
+          <p className="text-sm text-muted-foreground">{t('pipelines.sharedOnlyHint')}</p>
+        ) : null}
+        {sharedOnly && pipeline ? <UsageBlock shared={sharedOnly} view={view} /> : null}
+        {copyOnly && editor.bothLevels ? (
+          <LevelToggle level={level} onChange={(next) => void editor.switchLevel(next)} />
+        ) : null}
+        <LevelHint
+          global={level === 'global'}
+          sharedOnly={Boolean(sharedOnly)}
+          projectFile={Boolean(sources.project)}
+          globalFile={sources.global?.file ?? null}
+        />
+        <EditorTabs
+          editor={editor}
+          view={view}
+          pipeline={pipeline}
+          sharedOnly={Boolean(sharedOnly)}
+          places={places}
+          disabled={disabled}
+        />
+        <PipelineButtons
+          pipeline={pipeline}
+          readOnly={readOnly}
+          busy={busy}
+          canSave={Boolean(pipeline) || editor.newId !== ''}
+          overrideInProject={copyOnly && Boolean(sources.global) && !sources.project}
+          makeGlobal={pipeline !== null && Boolean(sources.project) && !sources.global && !readOnly}
+          canRemove={Boolean(pipeline && source) && !readOnly}
+          removeBlocked={editor.removeBlocked}
+          removeBlockedReason={editor.removeBlockedReason}
+          removeLabel={editor.removeLabel}
+          saveAs={editor.saveAs}
+          onSave={() => void editor.save()}
+          onCopyTo={(target) => void editor.copyTo(target)}
+          onSaveAs={editor.setSaveAs}
+          onSaveCopy={() => void editor.saveCopy()}
+          onRemove={() => void editor.remove()}
+        />
+      </section>
+    </SpecialistNames.Provider>
   );
 }

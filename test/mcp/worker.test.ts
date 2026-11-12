@@ -135,6 +135,7 @@ describe('worker MCP server', () => {
     expect((await plain.listTools()).tools.map((tool) => tool.name)).toEqual([
       'swarm_report',
       'swarm_artifact',
+      'swarm_run_show',
     ]);
     const calls: unknown[] = [];
     const splitting = await connect(true, async (method, params) => {
@@ -144,6 +145,7 @@ describe('worker MCP server', () => {
     expect((await splitting.listTools()).tools.map((tool) => tool.name)).toEqual([
       'swarm_report',
       'swarm_artifact',
+      'swarm_run_show',
       'swarm_split',
     ]);
     const result = await splitting.callTool({
@@ -154,6 +156,39 @@ describe('worker MCP server', () => {
     expect(calls).toEqual([
       { method: 'split', params: { token: 'token-1', groups: [{ title: 'A', task: 'a' }] } },
     ]);
+  });
+
+  it('swarm_run_show passes the reference with the attempt token and shows the daemon error', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(false, async (method, params) => {
+      calls.push({ method, params });
+      throw new Error('run abc belongs to another repository');
+    });
+    const result = await client.callTool({
+      name: 'swarm_run_show',
+      arguments: { run: 'http://127.0.0.1:7341/#runs/abc/fix', group: 'login', tail_lines: 5 },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toBe('run abc belongs to another repository');
+    await client.callTool({ name: 'swarm_run_show', arguments: { run: '#333' } });
+    expect(calls).toEqual([
+      {
+        method: 'worker_run_show',
+        params: {
+          token: 'token-1',
+          run: 'http://127.0.0.1:7341/#runs/abc/fix',
+          group: 'login',
+          tailLines: 5,
+        },
+      },
+      { method: 'worker_run_show', params: { token: 'token-1', run: '#333' } },
+    ]);
+    const refused = await client.callTool({
+      name: 'swarm_run_show',
+      arguments: { run: 'abc', tail_lines: 0 },
+    });
+    expect(refused.isError).toBe(true);
+    expect(calls).toHaveLength(2);
   });
 
   it('swarm_artifact sends content or a path and answers with the id', async () => {
@@ -401,13 +436,14 @@ describe('worker MCP server', () => {
       (await (await connect(false, async () => null, false, repair)).listTools()).tools
         .map((tool) => tool.name)
         .sort();
-    expect(await names(false)).toEqual(['swarm_artifact', 'swarm_report']);
+    expect(await names(false)).toEqual(['swarm_artifact', 'swarm_report', 'swarm_run_show']);
     expect(await names(true)).toEqual([
       'swarm_artifact',
       'swarm_repair_answer',
       'swarm_repair_cancel',
       'swarm_repair_retry',
       'swarm_report',
+      'swarm_run_show',
     ]);
   });
 
