@@ -13,6 +13,7 @@ import {
   queueOf,
   repositoryView,
   settingsOf,
+  specialistEntry,
   systemView,
   tagFolder,
 } from './fixtures.ts';
@@ -749,13 +750,102 @@ describe('settings form', () => {
     fireEvent.keyDown(resolver, { key: 'Enter' });
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
       'not set',
-      'coder',
+      'CODER',
     ]);
-    fireEvent.click(screen.getByRole('option', { name: 'coder' }));
+    fireEvent.click(screen.getByRole('option', { name: 'CODER' }));
     fireEvent.click(saveButton());
     await waitFor(() =>
       expect(api.writeSettings).toHaveBeenCalledWith(
         { 'delivery.mode': 'branch', 'delivery.resolver': 'coder' },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('shows the name of a specialist in the choice and writes its slug', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        specialists: [
+          specialistEntry('coder', {}, { name: 'Кодировщик' }),
+          specialistEntry('resolver', {}, { name: 'Разрешатель конфликтов' }),
+        ],
+        settings: settingsOf({
+          'delivery.resolver': { path: 'delivery.resolver', value: 'resolver', written: {} },
+        }),
+      }),
+    );
+    const api = show(queueOf(), { config }, '#settings/global/delivery');
+    const resolver = await screen.findByRole('combobox', { name: 'Conflict resolver' });
+    expect(resolver.textContent).toContain('Разрешатель конфликтов');
+    expect(resolver.textContent).not.toContain('resolver');
+    fireEvent.keyDown(resolver, { key: 'Enter' });
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'not set',
+      'Кодировщик',
+      'Разрешатель конфликтов',
+    ]);
+    fireEvent.click(screen.getByRole('option', { name: 'Кодировщик' }));
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'delivery.resolver': 'coder' },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('marks the specialists of the same name with their slugs', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        specialists: [
+          specialistEntry('a', {}, { name: 'Ревью' }),
+          specialistEntry('b', {}, { name: 'Ревью' }),
+        ],
+      }),
+    );
+    show(queueOf(), { config }, '#settings/global/delivery');
+    const resolver = await screen.findByRole('combobox', { name: 'Conflict resolver' });
+    fireEvent.keyDown(resolver, { key: 'Enter' });
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'not set',
+      'Ревью (a)',
+      'Ревью (b)',
+    ]);
+  });
+
+  it('shows the name of a specialist in the commit message choice and writes its slug', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        specialists: [
+          specialistEntry('coder', {}, { name: 'Кодировщик' }),
+          specialistEntry('writer', {}, { name: 'Автор коммитов' }),
+        ],
+        settings: settingsOf({
+          'delivery.message_specialist': {
+            path: 'delivery.message_specialist',
+            value: 'writer',
+            written: {},
+          },
+        }),
+      }),
+    );
+    const api = show(queueOf(), { config }, '#settings/global/delivery');
+    const message = await screen.findByRole('combobox', { name: 'Message specialist' });
+    expect(message.textContent).toContain('Автор коммитов');
+    expect(message.textContent).not.toContain('writer');
+    fireEvent.keyDown(message, { key: 'Enter' });
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'not set',
+      'Кодировщик',
+      'Автор коммитов',
+    ]);
+    fireEvent.click(screen.getByRole('option', { name: 'Кодировщик' }));
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'delivery.message_specialist': 'coder' },
         'g1',
         'global',
       ),

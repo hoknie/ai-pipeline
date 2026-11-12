@@ -12,6 +12,7 @@ import { Card } from '../../layout/card.tsx';
 import { EnvField } from './EnvField.tsx';
 import { INHERIT, SettingField, savedValue, type DraftValue } from './SettingField.tsx';
 import { SETTINGS_SECTIONS, envPath, type SettingsSection } from './settingFields.ts';
+import { specialistOptions, type SpecialistOption } from './specialistLabels.ts';
 import { useSettingsDraft, type Drafts } from './useSettingsDraft.ts';
 
 type Draft = ReturnType<typeof useSettingsDraft>;
@@ -95,7 +96,7 @@ function SectionCards({
   byPath: Map<string, EditorSetting>;
   fields: {
     scope: SettingsScope;
-    specialists: string[];
+    specialists: SpecialistOption[];
     projects: readonly RepositoryView[];
     draft: Draft;
   };
@@ -131,7 +132,7 @@ function SectionFields({
 }: {
   fields: EditorSetting[];
   scope: SettingsScope;
-  specialists: string[];
+  specialists: SpecialistOption[];
   projects: readonly RepositoryView[];
   draft: Draft;
 }) {
@@ -204,10 +205,7 @@ export function SettingsForm({
     [config.settings],
   );
   const known = useMemo(() => new Set(byPath.keys()), [byPath]);
-  const specialists = useMemo(
-    () => config.specialists.map((specialist) => specialist.slug),
-    [config.specialists],
-  );
+  const specialists = useMemo(() => specialistOptions(config.specialists), [config.specialists]);
   const draft = useSettingsDraft({ api, config, scope, known, onSaved, onDirty });
   const { dirty, busy } = draft;
   const reload = () => {

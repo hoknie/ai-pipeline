@@ -364,6 +364,27 @@ describe('statistics section', () => {
     window.location.hash = '';
   });
 
+  it('opens from an open run without a project filter', async () => {
+    window.location.hash = '#runs/run1';
+    const api = fakeApi();
+    render(<App api={api} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    const nav = screen.getByRole('navigation', { name: 'sections' });
+    const link = within(nav).getByRole('link', { name: 'Statistics' });
+    expect(link.getAttribute('href')).toBe('#stats?period=30d');
+    fireEvent.click(link);
+    await waitFor(() => expect(window.location.hash).toBe('#stats?period=30d'));
+    const select = (await screen.findByRole('combobox', { name: 'Project' })) as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(Array.from(select.options).some((option) => option.value === 'run1')).toBe(false);
+    expect(select.options[0]?.textContent).toBe('All projects');
+    await waitFor(() => expect(api.statsReport).toHaveBeenCalled());
+    for (const call of vi.mocked(api.statsReport).mock.calls) {
+      expect(JSON.stringify(call)).not.toContain('run1');
+    }
+    window.location.hash = '';
+  });
+
   it('writes the chosen period into the address', async () => {
     window.location.hash = '#stats';
     const api = fakeApi();

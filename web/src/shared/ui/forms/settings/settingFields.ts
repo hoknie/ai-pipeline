@@ -1,4 +1,27 @@
+import type { EditorSetting } from '../../../api/types.ts';
 import type { SettingsGroup } from '../../../lib/nav/settingsGroups.ts';
+import type { SpecialistOption } from './specialistLabels.ts';
+
+/** Radix `Select` has no empty value: this one stands for «not set». */
+export const NONE = '__none';
+
+/** The items of a choice: the value is written to the file, the label is shown. */
+export function choiceItems(
+  setting: EditorSetting,
+  specialists: SpecialistOption[],
+  t: (key: string) => string,
+): { value: string; label: string }[] {
+  if (setting.kind === 'specialist') {
+    return [
+      { value: NONE, label: t('settingsPage.notSet') },
+      ...specialists.map((specialist) => ({ value: specialist.slug, label: specialist.label })),
+    ];
+  }
+  return (setting.options ?? []).map((option) => ({
+    value: option,
+    label: setting.path === 'delivery.mode' ? t(`deliveryMode.${option}`) : option,
+  }));
+}
 
 /** A card of a group: its key names the title, `paths` are the fields in the order shown. */
 export interface SettingsSection {

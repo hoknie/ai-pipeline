@@ -10,7 +10,7 @@ export function tabRoute(view: View, route: Route, lastRun: string | null): Rout
     step: null,
     tab: null,
   });
-  if (view === 'queue' || view === 'specialists' || view === 'pipelines') return open(null);
   if (view === 'settings') return open('general', 'global');
-  return open(lastRun);
+  if (view === 'runs') return open(lastRun);
+  return open(null);
 }

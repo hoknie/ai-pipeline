@@ -11,14 +11,12 @@ import type { SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 import { ValuesPicker } from '../ValuesPicker.tsx';
 import { ProjectsField } from './ProjectsField.tsx';
 
-import { MULTILINE_FIELDS, fieldKey } from './settingFields.ts';
+import { MULTILINE_FIELDS, NONE, choiceItems, fieldKey } from './settingFields.ts';
+import type { SpecialistOption } from './specialistLabels.ts';
 
 /** The draft value that returns a field of the project to the shared value (the key is removed). */
 export const INHERIT = Symbol('inherit');
 export type DraftValue = SettingValue | typeof INHERIT;
-
-/** Radix `Select` has no empty value: this one stands for «not set». */
-const NONE = '__none';
 
 /** The value of the field on the tab, without the draft: the shared level or the project result. */
 export function savedValue(setting: EditorSetting, scope: SettingsScope): unknown {
@@ -42,7 +40,7 @@ interface ControlProps {
   shown: unknown;
   locked: boolean;
   invalid: boolean;
-  specialists: string[];
+  specialists: SpecialistOption[];
   projects: readonly RepositoryView[];
   onChange: (value: SettingValue) => void;
 }
@@ -57,7 +55,7 @@ function ChoiceControl({
   onChange,
 }: ControlProps) {
   const { t } = useTranslation();
-  const options = setting.kind === 'choice' ? [...(setting.options ?? [])] : [NONE, ...specialists];
+  const items = choiceItems(setting, specialists, (key) => t(key as never));
   const value = typeof shown === 'string' ? shown : setting.kind === 'specialist' ? NONE : '';
   return (
     <Select
@@ -69,13 +67,9 @@ function ChoiceControl({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option} value={option}>
-            {option === NONE
-              ? t('settingsPage.notSet')
-              : setting.path === 'delivery.mode'
-                ? t(`deliveryMode.${option}` as never)
-                : option}
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
           </SelectItem>
         ))}
       </SelectContent>
@@ -254,7 +248,7 @@ export function SettingField({
   setting: EditorSetting;
   scope: SettingsScope;
   draft: DraftValue | undefined;
-  specialists: string[];
+  specialists: SpecialistOption[];
   projects: readonly RepositoryView[];
   error: string | null;
   disabled: boolean;
