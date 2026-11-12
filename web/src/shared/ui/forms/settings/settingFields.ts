@@ -1,6 +1,6 @@
 import type { EditorSetting } from '../../../api/types.ts';
 import type { SettingsGroup } from '../../../lib/nav/settingsGroups.ts';
-import type { SpecialistOption } from './specialistLabels.ts';
+import type { SpecialistOption } from '../../../lib/specialistLabels.ts';
 
 /** Radix `Select` has no empty value: this one stands for «not set». */
 export const NONE = '__none';

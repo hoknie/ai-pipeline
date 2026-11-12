@@ -5,6 +5,7 @@ import type { Api } from '../../../api/api.ts';
 import type { ConfigEditorResponse, EditorSetting, RepositoryView } from '../../../api/types.ts';
 import type { SettingsGroup, SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 
+import { ModelCatalogProvider } from '../../../lib/catalog/models.tsx';
 import { Alert } from '../../feedback/alert.tsx';
 import { Button } from '../button.tsx';
 import { Card } from '../../layout/card.tsx';
@@ -12,7 +13,7 @@ import { Card } from '../../layout/card.tsx';
 import { EnvField } from './EnvField.tsx';
 import { INHERIT, SettingField, savedValue, type DraftValue } from './SettingField.tsx';
 import { SETTINGS_SECTIONS, envPath, type SettingsSection } from './settingFields.ts';
-import { specialistOptions, type SpecialistOption } from './specialistLabels.ts';
+import { specialistOptions, type SpecialistOption } from '../../../lib/specialistLabels.ts';
 import { useSettingsDraft, type Drafts } from './useSettingsDraft.ts';
 
 type Draft = ReturnType<typeof useSettingsDraft>;
@@ -98,6 +99,7 @@ function SectionCards({
     scope: SettingsScope;
     specialists: SpecialistOption[];
     projects: readonly RepositoryView[];
+    runtime: string;
     draft: Draft;
   };
 }) {
@@ -128,12 +130,14 @@ function SectionFields({
   scope,
   specialists,
   projects,
+  runtime,
   draft,
 }: {
   fields: EditorSetting[];
   scope: SettingsScope;
   specialists: SpecialistOption[];
   projects: readonly RepositoryView[];
+  runtime: string;
   draft: Draft;
 }) {
   return fields.map((field) =>
@@ -155,6 +159,7 @@ function SectionFields({
         draft={draft.drafts[field.path]}
         specialists={specialists}
         projects={projects}
+        runtime={runtime}
         error={draft.errorOf(field.path)}
         disabled={draft.busy}
         onChange={(value) => {
@@ -206,7 +211,16 @@ export function SettingsForm({
   );
   const known = useMemo(() => new Set(byPath.keys()), [byPath]);
   const specialists = useMemo(() => specialistOptions(config.specialists), [config.specialists]);
+  const namingRuntime = byPath.get('naming.runtime');
   const draft = useSettingsDraft({ api, config, scope, known, onSaved, onDirty });
+  const runtimeDraft = draft.drafts['naming.runtime'];
+  const runtimeValue =
+    typeof runtimeDraft === 'string'
+      ? runtimeDraft
+      : namingRuntime
+        ? savedValue(namingRuntime, scope)
+        : undefined;
+  const runtime = typeof runtimeValue === 'string' ? runtimeValue : '';
   const { dirty, busy } = draft;
   const reload = () => {
     draft.discard();
@@ -214,37 +228,39 @@ export function SettingsForm({
   };
 
   return (
-    <form
-      noValidate
-      className="flex flex-col gap-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (dirty && !busy) void draft.save();
-      }}
-    >
-      <div className="@container">
-        <div className="grid gap-3 @3xl:grid-cols-2" data-testid="settings-sections">
-          {sections.map((section) => (
-            <SectionCards
-              key={section.key}
-              section={section}
-              group={group}
-              byPath={byPath}
-              fields={{ scope, specialists, projects, draft }}
-            />
-          ))}
+    <ModelCatalogProvider api={api}>
+      <form
+        noValidate
+        className="flex flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (dirty && !busy) void draft.save();
+        }}
+      >
+        <div className="@container">
+          <div className="grid gap-3 @3xl:grid-cols-2" data-testid="settings-sections">
+            {sections.map((section) => (
+              <SectionCards
+                key={section.key}
+                section={section}
+                group={group}
+                byPath={byPath}
+                fields={{ scope, specialists, projects, runtime, draft }}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-      <FormAlerts draft={draft} onReload={reload} />
-      <div className="flex gap-2">
-        <Button type="submit" disabled={!dirty || busy} loading={busy}>
-          {t('settingsPage.save')}
-        </Button>
-        <Button type="button" variant="outline" disabled={!dirty || busy} onClick={draft.discard}>
-          {t('settingsPage.discard')}
-        </Button>
-      </div>
-    </form>
+        <FormAlerts draft={draft} onReload={reload} />
+        <div className="flex gap-2">
+          <Button type="submit" disabled={!dirty || busy} loading={busy}>
+            {t('settingsPage.save')}
+          </Button>
+          <Button type="button" variant="outline" disabled={!dirty || busy} onClick={draft.discard}>
+            {t('settingsPage.discard')}
+          </Button>
+        </div>
+      </form>
+    </ModelCatalogProvider>
   );
 }
 

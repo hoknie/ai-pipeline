@@ -111,8 +111,7 @@ export function ActionForm(props: ActionEditorInput & { notice: string | null })
             disabled={busy}
             update={update}
             errorsOf={errorsOf}
-            slugs={editor.slugs}
-            names={editor.names}
+            options={editor.options}
             newId={action ? null : editor.newId}
             onNewId={editor.setNewId}
           />

@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { ReasoningEffort } from '../../../shared/api/types.ts';
-import { ModelField } from '../form/ModelField.tsx';
+import { ModelField } from '../../../shared/ui/forms/picker/ModelField.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';

@@ -63,7 +63,10 @@ const usageOf = (id: string, overrides: Partial<SharedPipelineView> = {}): Share
 
 const view = () =>
   configView({
-    specialists: [specialistEntry('coder', { level: 'global' }), specialistEntry('local')],
+    specialists: [
+      specialistEntry('coder', { level: 'global' }, { name: 'coder' }),
+      specialistEntry('local', {}, { name: 'local' }),
+    ],
     pipelines: [
       project('feature'),
       shared('quick', { name: 'Quick', tags: ['fast'], steps: STEPS }),
@@ -162,7 +165,7 @@ describe('shared pipelines group', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     const triggers = screen.getAllByRole('combobox', { name: /specialist/i });
     fireEvent.keyDown(triggers[triggers.length - 1]!, { key: 'ArrowDown' });
-    await screen.findByRole('option', { name: 'CODER (coder)' });
+    await screen.findByRole('option', { name: 'coder' });
     expect(screen.queryByRole('option', { name: 'local' })).toBeNull();
   });
 

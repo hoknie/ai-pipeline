@@ -1,4 +1,4 @@
-import type { EditorSpecialist } from '../../../api/types.ts';
+import type { EditorSpecialist } from '../api/types.ts';
 
 /** A specialist choice of a form: the slug is the value written to the file, the label is shown. */
 export interface SpecialistOption {

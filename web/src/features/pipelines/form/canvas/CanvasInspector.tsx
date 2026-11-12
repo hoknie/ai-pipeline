@@ -5,7 +5,7 @@ import type { ActionPoint } from '../../../../shared/lib/pipeline/pipelineEntrie
 import type { PipelineStage } from '../../../../shared/lib/pipeline/pipelineStages.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
 import { formatRoute } from '../../../../shared/lib/nav/route.ts';
-import { splitTargets, specialistSlugs } from '../FormTab.tsx';
+import { splitTargets, specialistChoices } from '../FormTab.tsx';
 import { PointsInput } from '../points/PointsInput.tsx';
 import { stepOfError, type Draft } from '../steps/draft.ts';
 import type { CanvasEdge, CanvasNode } from '../steps/draftGraph.ts';
@@ -61,7 +61,7 @@ function StepInspector({
         index={index}
         steps={draft.steps}
         ids={rest.ids}
-        slugs={specialistSlugs(rest.view, rest.sharedOnly)}
+        options={specialistChoices(rest.view, rest.sharedOnly)}
         disabled={rest.disabled}
         errors={errorsOfStep(rest.errors, rest.pipelineId, draft, index)}
         onPatch={(patch) => onDraft((current) => patchStep(current, step.key, patch))}
@@ -90,7 +90,7 @@ function SplitInspector({
   return (
     <SplitFieldset
       split={draft.split}
-      slugs={specialistSlugs(view, sharedOnly)}
+      options={specialistChoices(view, sharedOnly)}
       targets={targets}
       nameOf={nameOf}
       disabled={disabled}

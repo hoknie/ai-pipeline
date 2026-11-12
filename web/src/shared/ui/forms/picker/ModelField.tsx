@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { modelsOf, useModelCatalog } from '../../../shared/lib/catalog/models.tsx';
-import { ModelPicker } from '../../../shared/ui/forms/ModelPicker.tsx';
+import { modelsOf, useModelCatalog } from '../../../lib/catalog/models.tsx';
+import { ModelPicker } from '../ModelPicker.tsx';
 
 /** The field `model` of a runtime: its models come from the catalog the page provides. */
 export function ModelField({

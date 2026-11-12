@@ -7,6 +7,7 @@ import type {
 } from '../../../shared/api/types.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import { rawName } from '../../../shared/lib/pipeline/pipelineName.ts';
+import { specialistOptions, type SpecialistOption } from '../../../shared/lib/specialistLabels.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { stepIds } from '../stepIds.ts';
@@ -26,10 +27,13 @@ export interface Places {
 }
 
 /** The specialists a step can name. */
-export function specialistSlugs(view: ConfigEditorResponse, sharedOnly: boolean): string[] {
-  return view.specialists
-    .filter((specialist) => !sharedOnly || specialist.sources.global)
-    .map((specialist) => specialist.slug);
+export function specialistChoices(
+  view: ConfigEditorResponse,
+  sharedOnly: boolean,
+): SpecialistOption[] {
+  return specialistOptions(
+    view.specialists.filter((specialist) => !sharedOnly || specialist.sources.global),
+  );
 }
 
 /** The pipelines the groups of a split can follow, and how to name them. */
@@ -86,12 +90,12 @@ function NameField({
 function StepsOrFollow({
   editor,
   nameOf,
-  slugs,
+  options,
   disabled,
 }: {
   editor: Editor;
   nameOf: (pipeline: string) => string;
-  slugs: string[];
+  options: SpecialistOption[];
   disabled: boolean;
 }) {
   const { t } = useTranslation();
@@ -120,7 +124,7 @@ function StepsOrFollow({
       draft={draft}
       ids={stepIds(draft.steps)}
       pipelineId={editor.id}
-      slugs={slugs}
+      options={options}
       disabled={disabled}
       errors={editor.errors}
       onDraft={editor.setDraft}
@@ -145,7 +149,7 @@ export function FormTab({
   disabled: boolean;
 }) {
   const { draft, setDraft, preview } = editor;
-  const slugs = specialistSlugs(view, sharedOnly);
+  const options = specialistChoices(view, sharedOnly);
   const { targets, nameOf } = splitTargets(
     view,
     editor.id,
@@ -179,14 +183,14 @@ export function FormTab({
       ) : null}
       <SplitFieldset
         split={draft.split}
-        slugs={slugs}
+        options={options}
         targets={targets}
         nameOf={nameOf}
         disabled={disabled}
         errors={places.split}
         onSplit={(patch) => setDraft((current) => withSplit(current, patch))}
       />
-      <StepsOrFollow editor={editor} nameOf={nameOf} slugs={slugs} disabled={disabled} />
+      <StepsOrFollow editor={editor} nameOf={nameOf} options={options} disabled={disabled} />
       <PointsInput
         view={view}
         hasSplit={draft.split !== null}

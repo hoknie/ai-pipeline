@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { specialistNames } from '../../../shared/lib/catalog/specialists.ts';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, FieldError, WriteLevel } from '../../../shared/api/types.ts';
 import type { ActionEntry, ActionReference } from '../../../shared/lib/pipeline/pipelineEntries.ts';
+import { specialistOptions, type SpecialistOption } from '../../../shared/lib/specialistLabels.ts';
 import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import {
   draftOfAction,
@@ -114,11 +114,9 @@ function reportWrite(state: ReturnType<typeof useActionState>, result: WriteResu
   return false;
 }
 
-/** The specialists to choose from, with the one of the draft even when it is gone. */
-function slugsOf(view: ConfigEditorResponse, draft: ActionDraft): string[] {
-  const slugs = view.specialists.map((specialist) => specialist.slug);
-  if (draft.specialist !== '' && !slugs.includes(draft.specialist)) slugs.push(draft.specialist);
-  return slugs;
+/** The specialists to choose from, shown by name; the select keeps the one of the draft when it is gone. */
+function optionsOf(view: ConfigEditorResponse): SpecialistOption[] {
+  return specialistOptions(view.specialists);
 }
 
 /** The state and the actions (save, delete, switch the level, read again) of the action form. */
@@ -181,14 +179,13 @@ export function useActionEditor(input: ActionEditorInput) {
     state.setDraft(draftOfAction(action?.sources[next]?.raw ?? action?.raw ?? {}));
     state.setLevel(next);
   };
-  const slugs = slugsOf(view, draft);
+  const options = optionsOf(view);
   const fieldErrors = (field: Field) => errors.filter((error) => fieldOf(error.path, id) === field);
   const otherErrors = errors.filter((error) => fieldOf(error.path, id) === null);
   return {
     ...state,
     id,
-    slugs,
-    names: specialistNames(view.specialists),
+    options,
     dirty,
     fieldErrors,
     otherErrors,

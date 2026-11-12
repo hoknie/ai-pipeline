@@ -309,7 +309,7 @@ function entry(id: string, overrides: Partial<EditorPipeline> = {}): EditorPipel
 }
 
 const specialists = ['plan', 'coder', 'reviewer', 'writer', 'scan', 'report'].map((slug) =>
-  specialistEntry(slug),
+  specialistEntry(slug, {}, { name: slug }),
 );
 
 const EXPLORE = {
@@ -437,7 +437,7 @@ describe('free layout of the diagram', () => {
     const id = keyOf('code');
     drag(id, at(340, 220));
     fireEvent.click(stepNodes().find((item) => titleOf(item) === 'code')!);
-    choose(inspector().getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
+    choose(inspector().getByRole('combobox', { name: 'step specialist' }), /^writer$/);
     expect(place(id)).toEqual(at(340, 220));
   });
 

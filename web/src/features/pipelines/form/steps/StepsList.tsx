@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import type { FieldError } from '../../../../shared/api/types.ts';
+import type { SpecialistOption } from '../../../../shared/lib/specialistLabels.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
 import { stepOfError, type Draft, type StepDraft } from './draft.ts';
 import { insertStep, moveStep, patchStep, removeStep } from './draftOps.ts';
@@ -11,7 +12,7 @@ export function StepsList({
   draft,
   ids,
   pipelineId,
-  slugs,
+  options,
   disabled,
   errors,
   onDraft,
@@ -19,7 +20,7 @@ export function StepsList({
   draft: Draft;
   ids: string[];
   pipelineId: string;
-  slugs: string[];
+  options: SpecialistOption[];
   disabled: boolean;
   errors: FieldError[];
   onDraft: (change: (current: Draft) => Draft) => void;
@@ -38,7 +39,7 @@ export function StepsList({
             index={index}
             steps={draft.steps}
             ids={ids}
-            slugs={slugs}
+            options={options}
             disabled={disabled}
             errors={errors.filter(
               (error) => stepOfError(error.path, pipelineId, hasSplit).step === index,

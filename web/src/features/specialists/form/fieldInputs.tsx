@@ -19,7 +19,7 @@ import {
 } from '../../../shared/ui/forms/select.tsx';
 import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
 import { ValuesPicker } from '../../../shared/ui/forms/ValuesPicker.tsx';
-import { ModelField } from './ModelField.tsx';
+import { ModelField } from '../../../shared/ui/forms/picker/ModelField.tsx';
 import { isList, type Draft, type FieldName, type ListField } from './draft.ts';
 
 const RUNTIMES = ['claude', 'opencode', 'agy'] as const;

@@ -18,7 +18,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const specialists = ['coder', 'writer'].map((slug) => specialistEntry(slug));
+const specialists = ['coder', 'writer'].map((slug) => specialistEntry(slug, {}, { name: slug }));
 const commit = actionEntry('commit', { name: 'Commit', run: 'git commit -am x', timeout: 60 });
 const review = actionEntry('review', { specialist: 'writer', additional_prompt: 'Be brief' });
 
@@ -115,7 +115,7 @@ describe('the form of an action', () => {
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'notify' } });
     fireEvent.click(screen.getByRole('radio', { name: 'Specialist' }));
     expect(screen.queryByLabelText('Script')).toBeNull();
-    choose(screen.getByRole('combobox', { name: 'action specialist' }), 'WRITER (writer)');
+    choose(screen.getByRole('combobox', { name: 'action specialist' }), 'writer');
     fireEvent.change(screen.getByLabelText('Additional prompt'), { target: { value: 'Short' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeAction).toHaveBeenCalled());

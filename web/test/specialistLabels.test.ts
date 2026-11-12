@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { specialistOptions } from '../src/shared/ui/forms/settings/specialistLabels.ts';
+import { specialistOptions } from '../src/shared/lib/specialistLabels.ts';
 
 import { specialistEntry } from './fixtures.ts';
 

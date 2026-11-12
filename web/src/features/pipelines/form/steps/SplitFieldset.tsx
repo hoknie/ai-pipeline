@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import type { FieldError } from '../../../../shared/api/types.ts';
+import type { SpecialistOption } from '../../../../shared/lib/specialistLabels.ts';
 import { Input } from '../../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../../shared/ui/forms/label.tsx';
 import {
@@ -17,7 +18,7 @@ import { NONE, SpecialistSelect } from './SpecialistSelect.tsx';
 
 function SplitDetails({
   split,
-  slugs,
+  options,
   targets,
   nameOf,
   disabled,
@@ -25,7 +26,7 @@ function SplitDetails({
   onSplit,
 }: {
   split: SplitDraft;
-  slugs: string[];
+  options: SpecialistOption[];
   targets: string[];
   nameOf: (pipeline: string) => string;
   disabled: boolean;
@@ -39,7 +40,7 @@ function SplitDetails({
         <Label>{t('pipelines.splitSpecialist')}</Label>
         <SpecialistSelect
           current={split.specialist}
-          slugs={slugs}
+          options={options}
           label={t('pipelines.splitSpecialistLabel')}
           disabled={disabled}
           onChange={(next) => onSplit({ specialist: next })}
@@ -95,7 +96,7 @@ function SplitDetails({
 /** The settings of a split: the specialist, the groups limit, whose steps the groups follow. */
 export function SplitFieldset({
   split,
-  slugs,
+  options,
   targets,
   nameOf,
   disabled,
@@ -103,7 +104,7 @@ export function SplitFieldset({
   onSplit,
 }: {
   split: SplitDraft | null;
-  slugs: string[];
+  options: SpecialistOption[];
   /** Pipelines whose steps the groups can follow. */
   targets: string[];
   nameOf: (pipeline: string) => string;
@@ -130,7 +131,7 @@ export function SplitFieldset({
       {split ? (
         <SplitDetails
           split={split}
-          slugs={slugs}
+          options={options}
           targets={targets}
           nameOf={nameOf}
           disabled={disabled}

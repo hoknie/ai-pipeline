@@ -9,10 +9,11 @@ import { Switch } from '../switch.tsx';
 import type { EditorSetting, RepositoryView, SettingValue } from '../../../api/types.ts';
 import type { SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 import { ValuesPicker } from '../ValuesPicker.tsx';
+import { ModelSettingControl } from './ModelSettingControl.tsx';
 import { ProjectsField } from './ProjectsField.tsx';
 
 import { MULTILINE_FIELDS, NONE, choiceItems, fieldKey } from './settingFields.ts';
-import type { SpecialistOption } from './specialistLabels.ts';
+import type { SpecialistOption } from '../../../lib/specialistLabels.ts';
 
 /** The draft value that returns a field of the project to the shared value (the key is removed). */
 export const INHERIT = Symbol('inherit');
@@ -42,6 +43,8 @@ interface ControlProps {
   invalid: boolean;
   specialists: SpecialistOption[];
   projects: readonly RepositoryView[];
+  /** The runtime whose models the field `naming.model` offers. */
+  runtime: string;
   onChange: (value: SettingValue) => void;
 }
 
@@ -77,8 +80,10 @@ function ChoiceControl({
   );
 }
 
-function TextControl({ setting, id, shown, locked, invalid, onChange }: ControlProps) {
+function TextControl({ setting, id, shown, locked, invalid, runtime, onChange }: ControlProps) {
   const { t } = useTranslation();
+  if (setting.path === 'naming.model')
+    return <ModelSettingControl {...{ id, runtime, shown, locked, invalid, onChange }} />;
   const common = {
     id,
     value: typeof shown === 'string' ? shown : '',
@@ -239,6 +244,7 @@ export function SettingField({
   draft,
   specialists,
   projects,
+  runtime,
   error,
   disabled,
   onChange,
@@ -250,6 +256,7 @@ export function SettingField({
   draft: DraftValue | undefined;
   specialists: SpecialistOption[];
   projects: readonly RepositoryView[];
+  runtime: string;
   error: string | null;
   disabled: boolean;
   onChange: (value: SettingValue) => void;
@@ -275,6 +282,7 @@ export function SettingField({
       invalid={error !== null}
       specialists={specialists}
       projects={projects}
+      runtime={runtime}
       onChange={onChange}
     />
   );

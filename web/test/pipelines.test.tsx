@@ -60,7 +60,9 @@ function entry(id: string, overrides: Partial<EditorPipeline> = {}): EditorPipel
   return { ...base, sources: overrides.sources ?? sourcesFor('pipelines', base) };
 }
 
-const specialists = ['plan', 'coder', 'reviewer', 'writer'].map((slug) => specialistEntry(slug));
+const specialists = ['plan', 'coder', 'reviewer', 'writer'].map((slug) =>
+  specialistEntry(slug, {}, { name: slug }),
+);
 
 function api(overrides: Partial<Api> = {}, pipelines = [entry('feature')]): Api {
   return fakeApi({
@@ -118,7 +120,7 @@ describe('the name of a pipeline', () => {
     fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'mine' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     const added = await stepBox(0);
-    choose(within(added).getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
+    choose(within(added).getByRole('combobox', { name: 'step specialist' }), /^writer$/);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writePipeline).toHaveBeenCalled());
     const [id, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
@@ -269,7 +271,7 @@ describe('steps', () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={api({ writePipeline })} start="feature" />);
     const plan = await stepBox(0);
-    choose(within(plan).getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
+    choose(within(plan).getByRole('combobox', { name: 'step specialist' }), /^writer$/);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writePipeline).toHaveBeenCalled());
     const [, value, revision] = writePipeline.mock.calls[0] as unknown as [
@@ -287,7 +289,7 @@ describe('steps', () => {
     render(<Page api={api({ writePipeline })} start="feature" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Add step' }));
     const added = await stepBox(3);
-    choose(within(added).getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
+    choose(within(added).getByRole('combobox', { name: 'step specialist' }), /^writer$/);
     fireEvent.click(within(added).getByRole('button', { name: 'up' }));
     fireEvent.click(within(await stepBox(0)).getByRole('button', { name: 'delete step' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -490,7 +492,7 @@ describe('preview', () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
     expect(screen.queryByText('stale')).toBeNull();
-    choose(within(stepNow(0)).getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
+    choose(within(stepNow(0)).getByRole('combobox', { name: 'step specialist' }), /^writer$/);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
@@ -694,10 +696,7 @@ describe('saving and deleting', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'New pipeline' }));
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'quick' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
-    choose(
-      within(await stepBox(0)).getByRole('combobox', { name: 'step specialist' }),
-      /\(coder\)/,
-    );
+    choose(within(await stepBox(0)).getByRole('combobox', { name: 'step specialist' }), /^coder$/);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(writePipeline).toHaveBeenCalledWith(
@@ -847,7 +846,7 @@ describe('step ids follow the specialist', () => {
       const index = screen.getAllByRole('listitem', { name: /^step \d+$/ }).length - 1;
       choose(
         within(stepNow(index)).getByRole('combobox', { name: 'step specialist' }),
-        new RegExp(`\\(${slug}\\)`),
+        new RegExp(`^${slug}$`),
       );
     }
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -891,12 +890,12 @@ describe('step ids follow the specialist', () => {
     render(<Page api={api({ previewPipeline })} start="feature" />);
     await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
-    choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), /\(writer\)/);
+    choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), /^writer$/);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
     expect(lastPreviewId()).toBe('writer');
-    choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), /\(reviewer\)/);
+    choose(within(stepNow(3)).getByRole('combobox', { name: 'step specialist' }), /^reviewer$/);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PREVIEW_DELAY_MS);
     });
@@ -997,7 +996,7 @@ describe('pipeline tags and filters', () => {
   it('filters by a specialist of the steps or of the split', async () => {
     render(<Page api={fakeApi({ config: configOf() })} />);
     await screen.findByTestId('tags-feature');
-    await pick('WRITER', 'Specialists');
+    await pick('writer', 'Specialists');
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(rows()[0]).toContain('epic');
   });

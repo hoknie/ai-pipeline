@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ActionKind } from '../../../shared/lib/pipeline/pipelineEntries.ts';
+import type { SpecialistOption } from '../../../shared/lib/specialistLabels.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
@@ -16,6 +17,7 @@ import {
 } from '../../../shared/ui/forms/select.tsx';
 import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
+import { SpecialistSelect } from '../form/steps/SpecialistSelect.tsx';
 import type { ActionDraft, Field } from './actionDraft.ts';
 
 /** Radix `Select` has no empty value: this one stands for «nothing chosen». */
@@ -83,31 +85,20 @@ function SpecialistCard({
   disabled,
   update,
   errorsOf,
-  slugs,
-  names,
-}: FieldsProps & { slugs: string[]; names: ReadonlyMap<string, string> }) {
+  options,
+}: FieldsProps & { options: SpecialistOption[] }) {
   const { t } = useTranslation();
   return (
     <SectionCard id="action-section-specialist" title={t('pipeline.actions.sectionSpecialist')}>
       <div className="flex flex-col gap-1.5">
         <Label>{t('pipeline.actions.specialistField')}</Label>
-        <Select
-          value={draft.specialist === '' ? NONE : draft.specialist}
+        <SpecialistSelect
+          current={draft.specialist}
+          options={options}
+          label={t('pipeline.actions.specialistLabel')}
           disabled={disabled}
-          onValueChange={(next) => update({ specialist: next === NONE ? '' : next })}
-        >
-          <SelectTrigger aria-label={t('pipeline.actions.specialistLabel')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>—</SelectItem>
-            {slugs.map((slug) => (
-              <SelectItem key={slug} value={slug}>
-                {specialistOption(names, slug)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(next) => update({ specialist: next })}
+        />
         {errorsOf('specialist')}
       </div>
       <div className="flex flex-col gap-1.5">
@@ -154,8 +145,7 @@ function FailureField({ draft, disabled, update, errorsOf }: FieldsProps) {
 /** The cards of an action: the main one and the one of its type; the form lays them out. */
 export function ActionFields(
   props: FieldsProps & {
-    slugs: string[];
-    names: ReadonlyMap<string, string>;
+    options: SpecialistOption[];
     newId: string | null;
     onNewId: (id: string) => void;
   },

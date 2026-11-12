@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { FieldError } from '../../../../shared/api/types.ts';
+import type { SpecialistOption } from '../../../../shared/lib/specialistLabels.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../../shared/ui/forms/label.tsx';
@@ -25,7 +26,7 @@ export interface StepCardProps {
   steps: StepDraft[];
   /** The ids the steps get on save. */
   ids: string[];
-  slugs: string[];
+  options: SpecialistOption[];
   disabled: boolean;
   errors: FieldError[];
   onPatch: (patch: Partial<StepDraft>) => void;
@@ -92,14 +93,14 @@ function ReturnChoice({
 
 /** One step: its specialist, the move and remove buttons, the return, the prompt and the review. */
 export function StepFields(props: StepCardProps) {
-  const { step, index, steps, slugs, disabled, errors, onPatch } = props;
+  const { step, index, steps, options, disabled, errors, onPatch } = props;
   const { t } = useTranslation();
   return (
     <>
       <div className="flex items-center gap-2">
         <SpecialistSelect
           current={step.specialist}
-          slugs={slugs}
+          options={options}
           label={t('pipelines.stepSpecialist')}
           disabled={disabled}
           onChange={(next) => onPatch({ specialist: next })}

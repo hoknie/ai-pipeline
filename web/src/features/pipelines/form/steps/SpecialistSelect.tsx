@@ -1,5 +1,3 @@
-import { specialistOption } from '../../../../shared/lib/catalog/specialists.ts';
-import { useSpecialistNames } from './SpecialistNames.ts';
 import {
   Select,
   SelectContent,
@@ -8,24 +6,31 @@ import {
   SelectValue,
 } from '../../../../shared/ui/forms/select.tsx';
 
+import { type SpecialistOption } from '../../../../shared/lib/specialistLabels.ts';
+
 /** Radix `Select` has no empty value: this one stands for «nothing chosen». */
 export const NONE = '__none';
 
-/** A choice of a specialist by slug; the current one stays in the list even if unknown. */
+/** The options with the current slug added (labelled by itself) when the file names an unknown one. */
+export function withCurrent(options: SpecialistOption[], current: string): SpecialistOption[] {
+  if (current === '' || options.some((option) => option.slug === current)) return options;
+  return [...options, { slug: current, label: current }];
+}
+
+/** A choice of a specialist shown by name, stored by slug; an unknown current one stays in the list. */
 export function SpecialistSelect({
   current,
-  slugs,
+  options,
   label,
   disabled,
   onChange,
 }: {
   current: string;
-  slugs: string[];
+  options: SpecialistOption[];
   label: string;
   disabled: boolean;
   onChange: (next: string) => void;
 }) {
-  const names = useSpecialistNames();
   return (
     <Select
       value={current === '' ? NONE : current}
@@ -37,13 +42,11 @@ export function SpecialistSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>—</SelectItem>
-        {[...new Set([...slugs, ...(current && !slugs.includes(current) ? [current] : [])])].map(
-          (slug) => (
-            <SelectItem key={slug} value={slug}>
-              {specialistOption(names, slug)}
-            </SelectItem>
-          ),
-        )}
+        {withCurrent(options, current).map((option) => (
+          <SelectItem key={option.slug} value={option.slug}>
+            {option.label}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

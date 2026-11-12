@@ -935,16 +935,16 @@ describe('settings form', () => {
       }),
     );
     const api = show(queueOf(), { config }, '#settings/project/general');
-    const model = await screen.findByLabelText('Naming model');
-    fireEvent.change(model, { target: { value: '' } });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Naming model' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Default' }));
     expect(saveButton().disabled).toBe(true);
     expect(api.writeSettings).not.toHaveBeenCalled();
   });
 
   it('removes the key of a cleared field', async () => {
     const api = show(queueOf(), {}, '#settings/global/general');
-    const model = await screen.findByLabelText('Naming model');
-    fireEvent.change(model, { target: { value: '' } });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Naming model' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Default' }));
     fireEvent.click(saveButton());
     await waitFor(() =>
       expect(api.writeSettings).toHaveBeenCalledWith({ 'naming.model': null }, 'g1', 'global'),
