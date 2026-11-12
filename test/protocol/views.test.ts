@@ -253,6 +253,22 @@ describe('queueView', () => {
     expect(view.status).toBe('running');
   });
 
+  it('does not show a failed observer step on a run that still works', () => {
+    const state = run(1);
+    step(state);
+    state.repair = { ...group(state), slug: '_repair', status: 'failed' };
+    const queue = emptyQueue('/repo', 1);
+    queue.runs.push(state.run.id);
+    const card = queueView(queue, lookup(state)).runs[0]!;
+    expect(card.state).toBe('active');
+    expect(card.system).toEqual([]);
+    expect(card.active.length).toBeGreaterThan(0);
+    state.repair = { ...group(state), slug: '_repair', status: 'running' };
+    expect(queueView(queue, lookup(state)).runs[0]!.system).toEqual([
+      { kind: 'repair', status: 'running' },
+    ]);
+  });
+
   it('reports 0/0 groups while the task is split', () => {
     const state = run(1, { split: true, configText: SPLIT_CONFIG });
     const queue = emptyQueue('/repo', 1);

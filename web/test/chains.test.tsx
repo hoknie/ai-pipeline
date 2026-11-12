@@ -319,6 +319,24 @@ describe('SpecialistsPage with Chains tab', () => {
 });
 
 describe('shared chains in Settings', () => {
+  it('loads the model catalog and offers models in the chain elements', async () => {
+    const api = fakeApi();
+    render(
+      <SharedChainsGroup
+        api={api}
+        config={configView({ chains: [sharedChain] })}
+        selected={sharedChain.slug}
+        dirty={{ current: false }}
+        onSelect={vi.fn()}
+        onReload={vi.fn(async () => undefined)}
+      />,
+    );
+    await waitFor(() => expect(api.models).toHaveBeenCalled());
+    const pickers = await screen.findAllByRole('combobox', { name: 'Model' });
+    fireEvent.click(pickers[0]!);
+    expect(await screen.findByRole('option', { name: 'sonnet' })).toBeTruthy();
+  });
+
   it('saves an existing shared chain with its own revision, including the next save', async () => {
     const api = fakeApi();
     const props = {

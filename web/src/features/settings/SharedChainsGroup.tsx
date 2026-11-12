@@ -2,8 +2,9 @@ import { useMemo, type RefObject } from 'react';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { ConfigEditorResponse, EditorChain } from '../../shared/api/types.ts';
+import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
 import { SplitPage } from '../../shared/ui/layout/EntryList.tsx';
-import { ChainsList, ChainsPane, NEW_CHAIN } from '../specialists/index.ts';
+import { ChainsList, ChainsPane, NEW_CHAIN } from '../specialists';
 
 export { NEW_CHAIN as NEW_SHARED_CHAIN };
 
@@ -25,27 +26,29 @@ export function SharedChainsGroup(props: {
   }, [config]);
 
   return (
-    <SplitPage
-      side={
-        <ChainsList
-          chains={sharedConfig.chains}
-          loaded={true}
+    <ModelCatalogProvider api={api}>
+      <SplitPage
+        side={
+          <ChainsList
+            chains={sharedConfig.chains}
+            loaded={true}
+            selected={selected}
+            onNew={() => onSelect(NEW_CHAIN)}
+            onSelect={onSelect}
+          />
+        }
+      >
+        <ChainsPane
+          api={api}
+          view={sharedConfig}
+          failure={null}
           selected={selected}
-          onNew={() => onSelect(NEW_CHAIN)}
+          dirty={dirty}
+          scope="global"
+          load={onReload}
           onSelect={onSelect}
         />
-      }
-    >
-      <ChainsPane
-        api={api}
-        view={sharedConfig}
-        failure={null}
-        selected={selected}
-        dirty={dirty}
-        scope="global"
-        load={onReload}
-        onSelect={onSelect}
-      />
-    </SplitPage>
+      </SplitPage>
+    </ModelCatalogProvider>
   );
 }

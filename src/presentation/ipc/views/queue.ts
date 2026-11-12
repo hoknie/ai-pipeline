@@ -71,11 +71,17 @@ function queueRunView(
       total: state.groups.length,
     },
     steps: stepProgress(state),
-    system: systemGroups(state).map(({ kind, group }) => ({
-      kind,
-      status: displayStatus(serviceStatus(group), waitOf(group), groupHold(state, group)),
-      ...(kind === 'action' ? { title: group.title } : {}),
-    })),
+    // A settled observer step (failed, cancelled) of a run that still works is not the state of
+    // the run: the card shows what the run does, not the observer's old failure.
+    system: systemGroups(state)
+      .filter(
+        ({ kind, group }) => kind !== 'repair' || !isTerminal(group.status) || isRunFinished(state),
+      )
+      .map(({ kind, group }) => ({
+        kind,
+        status: displayStatus(serviceStatus(group), waitOf(group), groupHold(state, group)),
+        ...(kind === 'action' ? { title: group.title } : {}),
+      })),
     delivery: deliveryStage(state)?.status ?? null,
     waiting: allGroups(state).flatMap((group) => {
       const wait = waitOf(group);
