@@ -22,7 +22,8 @@ export function runsRoutes({ call }: RouteKit): Route[] {
     {
       method: 'GET',
       pattern: /^\/api\/finished-runs$/,
-      handle: (_match, body) => call('finished_runs', body as { limit: number; before?: string }),
+      handle: (_match, body) =>
+        call('finished_runs', body as { limit: number; before?: string; repository?: string }),
     },
     {
       method: 'GET',

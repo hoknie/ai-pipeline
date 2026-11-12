@@ -398,6 +398,37 @@ describe('finishedRunsPage', () => {
     expect(second.more).toBe(false);
     store.database.close();
   });
+
+  it('pages the finished runs of one repository only', () => {
+    const store = temporaryStorage();
+    for (const [id, now, repository] of [
+      ['run000000001', 10, '/repo'],
+      ['run000000002', 20, '/other'],
+      ['run000000003', 30, '/repo'],
+      ['run000000004', 40, '/other'],
+      ['run000000005', 50, '/repo'],
+    ] as const) {
+      const state = finished(id, now, true);
+      state.run.repository = repository;
+      store.runs.saveRun(state);
+    }
+    const first = store.finished.finishedRunsPage(2, undefined, '/repo');
+    expect(first.runs.map((state) => state.run.id)).toEqual(['run000000005', 'run000000003']);
+    expect(first.more).toBe(true);
+    const last = first.runs.at(-1)!.run;
+    const second = store.finished.finishedRunsPage(
+      2,
+      { createdAt: last.createdAt, id: last.id },
+      '/repo',
+    );
+    expect(second.runs.map((state) => state.run.id)).toEqual(['run000000001']);
+    expect(second.more).toBe(false);
+    expect(store.finished.finishedRunsPage(2, undefined, '/none')).toEqual({
+      runs: [],
+      more: false,
+    });
+    store.database.close();
+  });
 });
 
 describe('runs with pipeline actions', () => {

@@ -20,7 +20,7 @@ export const runHandlers = {
   },
   finished_runs: async (params, { services, snapshots }) => {
     const now = services.now();
-    const page = services.runs.states.page(params.limit, params.before);
+    const page = services.runs.states.page(params.limit, params.before, params.repository);
     return { runs: page.runs.map((state) => snapshots.run(state, now)), next: page.next };
   },
   cancel: (params, context) =>

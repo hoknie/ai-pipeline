@@ -83,14 +83,14 @@ export class RunStates {
   }
 
   /** A page of finished runs after the cursor `<created_at>.<id>`; `next` is null at the end. */
-  page(limit: number, before?: string): FinishedPage {
+  page(limit: number, before?: string, repository?: string): FinishedPage {
     let cursor: { createdAt: number; id: string } | undefined;
     if (before !== undefined) {
       const match = /^(\d+)\.(.+)$/.exec(before);
       if (!match) throw rejected('before is not a valid cursor');
       cursor = { createdAt: Number(match[1]), id: match[2] ?? '' };
     }
-    const page = this.dependencies.finished.finishedRunsPage(limit, cursor);
+    const page = this.dependencies.finished.finishedRunsPage(limit, cursor, repository);
     const runs = page.runs.map((stored) => this.states.get(stored.run.id) ?? stored);
     const last = page.runs.at(-1);
     return { runs, next: page.more && last ? `${last.run.createdAt}.${last.run.id}` : null };

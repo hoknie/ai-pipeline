@@ -76,12 +76,19 @@ export function useRuns(
   opened: string | null = null,
   /** Receives the message of a failed fetch of the opened run. */
   onError: (message: string) => void = () => undefined,
+  /** Older runs come per selected repository (true) or of all repositories (false). */
+  historyByRepository = false,
 ): RunsResult {
   const { state, set, refs } = useRunsStore(opened, wanted);
   useEffect(() => connectRuns(api, openStream, set, refs), [api, openStream]);
-  const history = useHistoryPages(api, set.setHistory);
   const openedState = useOpenedRun(api, state, set.setExtra, opened, onError);
   const selection = useSelection(api, state, set.setQueues, wanted);
+  // Until the repository is known nothing is loaded: the list would be the wrong one.
+  const history = useHistoryPages(
+    api,
+    set.setHistory,
+    historyByRepository ? (selection.selected ?? undefined) : null,
+  );
   const { runs, extra, history: pages } = state;
   const sorted = useMemo(() => {
     const all = new Map(extra);

@@ -1,3 +1,5 @@
+import { isAbsolute } from 'node:path';
+
 import { RUN_TITLE_LIMIT } from '../../../feature/agents/types/index.ts';
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
 import { TAG_NAME_LIMIT } from '../../../feature/tags/types/index.ts';
@@ -76,6 +78,11 @@ export const runsRequests = [
       .object({
         limit: z.number().int().min(1).max(100).default(15),
         before: z.string().min(1).optional(),
+        repository: z
+          .string()
+          .min(1)
+          .refine((value) => isAbsolute(value), { message: 'repository must be an absolute path' })
+          .optional(),
       })
       .default({ limit: 15 }),
   }),

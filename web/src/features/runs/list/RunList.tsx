@@ -87,7 +87,8 @@ export function RunList({
   const shown = filterRuns(runs, query, filterState, scope, repository, byId);
   const filtered = activeFilters(query, filterState, scope) > 0;
   const [marker, setMarker] = useState<HTMLElement | null>(null);
-  useNearEnd(more === 'idle' ? marker : null, onMore, runs.length);
+  const listKey = `${scope}|${repository}|${runs.length}`;
+  useNearEnd(more === 'idle' ? marker : null, onMore, listKey);
   return (
     <div className="flex flex-col gap-2">
       {showFilters ? (

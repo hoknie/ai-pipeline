@@ -40,22 +40,23 @@ export class FinishedRunRepository {
   finishedRunsPage(
     limit: number,
     before?: { createdAt: number; id: string },
+    repository?: string,
   ): { runs: RunState[]; more: boolean } {
-    const rows = (
-      before
-        ? this.database
-            .prepare(
-              `SELECT * FROM runs WHERE finished_at IS NOT NULL
-                 AND (created_at < ? OR (created_at = ? AND id < ?))
-               ORDER BY created_at DESC, id DESC LIMIT ?`,
-            )
-            .all(before.createdAt, before.createdAt, before.id, limit + 1)
-        : this.database
-            .prepare(
-              'SELECT * FROM runs WHERE finished_at IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT ?',
-            )
-            .all(limit + 1)
-    ) as Row[];
+    const conditions = ['finished_at IS NOT NULL'];
+    const params: (string | number)[] = [];
+    if (repository !== undefined) {
+      conditions.push('repository = ?');
+      params.push(repository);
+    }
+    if (before) {
+      conditions.push('(created_at < ? OR (created_at = ? AND id < ?))');
+      params.push(before.createdAt, before.createdAt, before.id);
+    }
+    const rows = this.database
+      .prepare(
+        `SELECT * FROM runs WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT ?`,
+      )
+      .all(...params, limit + 1) as Row[];
     return {
       runs: rows.slice(0, limit).map((row) => hydrateRun(this.database, row)),
       more: rows.length > limit,

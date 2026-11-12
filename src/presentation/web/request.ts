@@ -106,7 +106,10 @@ export async function requestBody(incoming: IncomingMessage, url: URL): Promise<
   if (pathname === '/api/finished-runs') {
     const limit = boundedInteger(searchParams, 'limit', 15, 100);
     const before = searchParams.get('before');
-    return { limit, ...(before ? { before } : {}) };
+    const repository = searchParams.get('repository');
+    if (repository && !isAbsolute(repository))
+      throw panel('invalid', 'repository must be an absolute path');
+    return { limit, ...(before ? { before } : {}), ...(repository ? { repository } : {}) };
   }
   if (pathname === '/api/observers/history') return historyQuery(searchParams);
   if (pathname.endsWith('/transcript')) return transcriptQuery(searchParams);

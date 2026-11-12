@@ -179,6 +179,19 @@ describe('aip web', () => {
         (await fetch(`${base}/api/finished-runs?${query}`, { headers: authed(web) })).status,
       ).toBe(400);
     }
+    const own = (await (
+      await fetch(`${base}/api/finished-runs?repository=${encodeURIComponent(h.repo)}`, {
+        headers: authed(web),
+      })
+    ).json()) as { runs: RunView[] };
+    expect(own.runs.map((run) => run.id)).toContain(runId);
+    const foreign = await fetch(`${base}/api/finished-runs?repository=%2Fno%2Fsuch%2Frepo`, {
+      headers: authed(web),
+    });
+    expect(((await foreign.json()) as { runs: RunView[] }).runs).toEqual([]);
+    expect(
+      (await fetch(`${base}/api/finished-runs?repository=work`, { headers: authed(web) })).status,
+    ).toBe(400);
     expect((await fetch(`${base}/api/finished-runs`)).status).toBe(401);
     expect((await fetch(`${base}/api/runs/nope`, { headers: authed(web) })).status).toBe(404);
     // The old addresses of the pipelines are gone.

@@ -9,12 +9,18 @@ import type {
 import { ApiError, call, enc } from './http.ts';
 
 /** How many finished runs one page of the run list loads. */
-const FINISHED_PAGE = 15;
+const FINISHED_PAGE = 50;
 
 export interface RunsApi {
   runs(): Promise<RunView[]>;
-  /** A page of finished runs after the cursor `before` (none: the newest); `next` is null at the end. */
-  finishedRuns(before?: string): Promise<{ runs: RunView[]; next: string | null }>;
+  /**
+   * A page of finished runs after the cursor `before` (none: the newest), of one repository (its
+   * absolute path) or of all; `next` is null at the end.
+   */
+  finishedRuns(
+    before?: string,
+    repository?: string,
+  ): Promise<{ runs: RunView[]; next: string | null }>;
   /** One run by id, also one the list no longer carries; 404 when the daemon does not know it. */
   run(runId: string): Promise<RunView>;
   group(runId: string, group: string): Promise<GroupView>;
@@ -35,8 +41,12 @@ export interface RunsApi {
 export function runsApi(): RunsApi {
   const api: RunsApi = {
     runs: () => call('/api/runs'),
-    finishedRuns: (before) =>
-      call(`/api/finished-runs?limit=${FINISHED_PAGE}${before ? `&before=${enc(before)}` : ''}`),
+    finishedRuns: (before, repository) =>
+      call(
+        `/api/finished-runs?limit=${FINISHED_PAGE}${before ? `&before=${enc(before)}` : ''}${
+          repository ? `&repository=${enc(repository)}` : ''
+        }`,
+      ),
     run: (runId) => call(`/api/runs/${enc(runId)}`),
     group: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}?tail=200`),
     groupSpec: (runId, group) => call(`/api/runs/${enc(runId)}/groups/${enc(group)}/spec`),

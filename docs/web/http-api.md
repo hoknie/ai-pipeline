@@ -23,7 +23,7 @@ The panel asks `GET /api/processes` once on opening and then every 3 seconds onl
 | Request | What it does |
 |---|---|
 | `GET /api/runs` | Active and recent runs |
-| `GET /api/finished-runs?limit=<n>&before=<cursor>` | A page of finished runs |
+| `GET /api/finished-runs?limit=<n>&before=<cursor>&repository=<path>` | A page of finished runs |
 | `GET /api/runs/<id>` | One run |
 | `POST /api/runs/<id>/title` | Changes the title |
 | `POST /api/runs/<id>/tags` | Changes the tags |
@@ -36,7 +36,7 @@ The panel asks `GET /api/processes` once on opening and then every 3 seconds onl
 
 - `GET /api/finished-runs` returns `{runs, next}`, newest created first.
   - `limit` is an integer from 1 to 100 (15 by default). `before` is the `next` of the previous page; leave it out for the first page. `next` is `null` on the last page.
-  - A `limit` out of range or a `before` that is not a cursor is answered with 400.
+  - A `limit` out of range, a `before` that is not a cursor or a `repository` that is not an absolute path is answered with 400.
 - `POST /api/runs/<id>/title` takes `{"title": "<new title>"}` (trimmed, 1 to 60 characters) and returns the run. The short `name` stays, and a later answer of the naming model does not replace the title. An empty or too long title comes back with code 400, an unknown run with code 404.
 - `POST /api/runs/<id>/skip` takes `{"step": "<step id>", "skip": true}` (`false` brings it back) and returns the run. A refusal (unknown step, a step every group has passed) comes back with code 400.
 - `POST /api/runs/<id>/observer` takes `{"enabled": <boolean>}` and returns the run. `false` stops the repair in progress and forbids observers in this task; `true` gives it back and resets the repair count. A wrong body comes back with code 400, an unknown run with code 404.

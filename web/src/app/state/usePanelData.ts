@@ -24,6 +24,7 @@ export function usePanelData(api: Api, openStream: EventSourceFactory) {
     chosen,
     route.view === 'runs' ? route.run : null,
     notifyError,
+    scope === 'repository',
   );
   const { runs, selected, registry } = state;
   const chrome = useChrome(route.view);
