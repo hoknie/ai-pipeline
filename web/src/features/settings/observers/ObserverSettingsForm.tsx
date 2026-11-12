@@ -78,6 +78,7 @@ export function ObserverSettingsForm({
             defaults={state.defaults}
             catalog={state.catalog}
             catalogError={state.catalogError}
+            chains={state.chains}
           />
         ) : null}
         {tab === 'projects' ? (

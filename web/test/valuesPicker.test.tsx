@@ -164,4 +164,28 @@ describe('ValuesPicker', () => {
       'min-w-80',
     );
   });
+
+  it('keeps options aligned with a long description', async () => {
+    const description = 'очень длинное описание навыка '.repeat(7);
+    render(
+      <Harness
+        start={['tdd']}
+        options={[
+          { name: 'tdd', source: 'project' },
+          { name: 'review', source: 'project', description },
+        ]}
+      />,
+    );
+    await search();
+    const options = screen.getAllByRole('option').filter((o) => o.querySelector('svg'));
+    expect(options).toHaveLength(2);
+    for (const option of options) {
+      expect(option.className).toContain('items-start');
+      expect(option.querySelector('svg')!.getAttribute('class')).toContain('shrink-0');
+      const column = option.querySelector('span.flex-col')!;
+      expect(column.className).toContain('flex-1');
+      expect(column.className).toContain('min-w-0');
+    }
+    expect(screen.getByText(description.trim()).className).toContain('truncate');
+  });
 });

@@ -89,11 +89,16 @@ function OptionGroup({
           <CommandItem
             key={`${source}:${option.name}`}
             value={`${source}:${option.name}`}
+            className="items-start"
             onSelect={() => onAdd(option.name)}
           >
-            <Check className={values.includes(option.name) ? 'opacity-100' : 'opacity-0'} />
-            {look.icon?.(option.name)}
-            <span className="flex min-w-0 flex-col">
+            <Check
+              className={`mt-0.5 shrink-0 ${values.includes(option.name) ? 'opacity-100' : 'opacity-0'}`}
+            />
+            {look.icon ? (
+              <span className="flex h-5 shrink-0 items-center">{look.icon(option.name)}</span>
+            ) : null}
+            <span className="flex min-w-0 flex-1 flex-col">
               <span
                 className="line-clamp-3 whitespace-normal break-words"
                 title={look.hint?.(option.name) ?? text}

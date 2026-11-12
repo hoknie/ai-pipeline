@@ -7,6 +7,7 @@ import type { ObserverSettings, ObserversView } from '../../../shared/api/observ
 import type {
   ConfigCatalogResponse,
   ConfigEditorResponse,
+  EditorChain,
   FieldError,
 } from '../../../shared/api/types.ts';
 import { formOf, keyOf, settingsOf, type Form } from './form.ts';
@@ -46,7 +47,16 @@ function useObserverSources(api: Api) {
       ),
     [config],
   );
-  return { defaults, catalog, catalogError };
+  /** The observer's specialist is global: only the chains of the global level can be chosen. */
+  const chains = useMemo(
+    () =>
+      (config?.chains ?? []).flatMap((chain): EditorChain[] => {
+        const source = chain.sources.global;
+        return source ? [{ ...chain, ...source, level: 'global' }] : [];
+      }),
+    [config],
+  );
+  return { defaults, catalog, catalogError, chains };
 }
 
 /** Saving the form: the server's errors stay with the form, a failure of the request goes up. */
@@ -138,7 +148,7 @@ export function useObservers(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamed]);
 
-  const { defaults, catalog, catalogError } = useObserverSources(api);
+  const { defaults, catalog, catalogError, chains } = useObserverSources(api);
 
   const order = useMemo(() => [...new Set(repositories)], [repositories]);
   const submitted = form ? settingsOf(form, order, rawSpecialist.current) : null;
@@ -162,6 +172,7 @@ export function useObservers(
     discard,
     catalog,
     catalogError,
+    chains,
     defaults,
     order,
     submitted,

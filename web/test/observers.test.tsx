@@ -202,6 +202,25 @@ describe('settings of the observers', () => {
     expect(document.getElementById('observers-human-only')).toBeNull();
   });
 
+  it('offers the shared chains in the runtime chain of the observer specialist', async () => {
+    const raw = { name: 'Fast to strong', runtimes: [] };
+    const chain = {
+      slug: 'fast-to-strong',
+      level: 'global' as const,
+      file: '/xdg/aip/chains/fast-to-strong.yaml',
+      revision: 'g1',
+      raw,
+      sources: { global: { file: '/xdg/aip/chains/fast-to-strong.yaml', revision: 'g1', raw } },
+    };
+    await open('#settings/global/observers/specialist', {
+      config: vi.fn(async () => configView({ chains: [chain] })),
+    });
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Runtime chain' }));
+    expect(
+      await screen.findByRole('option', { name: 'Fast to strong (fast-to-strong)' }),
+    ).toBeTruthy();
+  });
+
   it('saves the form and shows the answer', async () => {
     const api = await open('#settings/global/observers');
     const workers = await screen.findByLabelText<HTMLInputElement>('Workers');

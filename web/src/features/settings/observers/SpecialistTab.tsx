@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import type { ConfigCatalogResponse, FieldError } from '../../../shared/api/types.ts';
+import type { ConfigCatalogResponse, EditorChain, FieldError } from '../../../shared/api/types.ts';
 import { SpecialistFields, type Draft } from '../../specialists/index.ts';
 import { SPECIALIST_PREFIX, type Form } from './form.ts';
 
@@ -13,6 +13,7 @@ export function SpecialistTab({
   defaults,
   catalog,
   catalogError,
+  chains,
 }: {
   form: Form;
   setForm: (change: (current: Form | null) => Form | null) => void;
@@ -21,6 +22,7 @@ export function SpecialistTab({
   defaults: Record<string, unknown>;
   catalog: ConfigCatalogResponse | null;
   catalogError: string | null;
+  chains: EditorChain[];
 }) {
   const { t } = useTranslation();
   return (
@@ -37,6 +39,7 @@ export function SpecialistTab({
         defaults={defaults}
         catalog={catalog}
         catalogError={catalogError}
+        chains={chains}
         omit={['max', 'tags']}
       />
     </>
