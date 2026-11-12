@@ -85,13 +85,13 @@ export function StatusBar({
         <Tabs
           value={tab}
           onValueChange={(value) => setTab(value as StatusTab)}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col gap-0"
         >
           <TabsList className="shrink-0">
             <TabsTrigger value="specialists">{t('statusBar.tabSpecialists')}</TabsTrigger>
             <TabsTrigger value="processes">{t('statusBar.tabProcesses')}</TabsTrigger>
           </TabsList>
-          <TabsContent value="specialists" className="min-h-0 flex-1 overflow-y-auto">
+          <TabsContent value="specialists" className="min-h-0 flex-1 overflow-y-auto pt-3">
             <SpecialistLoadPanel runs={runs} selected={selected} onOpenGroup={onOpenGroup} />
           </TabsContent>
           <TabsContent value="processes" className="min-h-0 flex-1 overflow-y-auto">
