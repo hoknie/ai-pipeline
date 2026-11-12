@@ -2,6 +2,7 @@
 export const WORKER_TOOLS = {
   report: 'swarm_report',
   artifact: 'swarm_artifact',
+  runShow: 'swarm_run_show',
   split: 'swarm_split',
   queue: 'swarm_queue_add',
   answer: 'swarm_repair_answer',
@@ -17,6 +18,7 @@ export function workerToolNames(options: {
   return [
     WORKER_TOOLS.report,
     WORKER_TOOLS.artifact,
+    WORKER_TOOLS.runShow,
     ...(options.split ? [WORKER_TOOLS.split] : []),
     ...(options.queue ? [WORKER_TOOLS.queue] : []),
     ...(options.repair ? [WORKER_TOOLS.answer, WORKER_TOOLS.retry, WORKER_TOOLS.cancel] : []),

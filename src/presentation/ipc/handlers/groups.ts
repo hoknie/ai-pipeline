@@ -4,6 +4,14 @@ import type { HandlerTable } from './types.ts';
 export const groupHandlers = {
   group: async (params, { services, snapshots }) =>
     snapshots.group(services.runs.reads.group(params.runId, params.group, params.tailLines)),
+  worker_run_show: async (params, { services, snapshots }) => {
+    const read = services.runs.reads.forWorker(params);
+    return {
+      run: snapshots.run(read.state),
+      tasks: read.tasks,
+      group: read.group ? snapshots.group(read.group) : null,
+    };
+  },
   transcript: async (params, { services }) => services.runs.reads.transcript(params),
   group_spec: (params, { services }) => services.delivery.diffs.spec(params.runId, params.group),
   group_file_diff: (params, { services }) => services.delivery.diffs.fileDiff(params),

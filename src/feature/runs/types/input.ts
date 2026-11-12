@@ -60,3 +60,38 @@ export const RESOLVE_INSTRUCTIONS = (run: string): string[] => [
   'Resolve every conflict so that both the edits of the user and the intent of the run are kept. Remove every conflict marker, run the checks of the project if you can, and report done. Report rejected if the conflicts cannot be resolved safely.',
   'Run the checks in the foreground and wait for their result in the same shell command, with a timeout long enough for the whole check (up to 10 minutes). Never start them in the background and never wait for them with `pgrep`, `pkill` or `sleep` loops: the name of the check command also appears in the command lines of other agents and of your own shell, so such a wait never ends.',
 ];
+
+/** A run named in a task: by id (with a group from a panel link) or by its task number. */
+export type RunReference =
+  { kind: 'id'; id: string; group: string | null } | { kind: 'number'; number: number };
+
+const RUN_ID = /^[a-z0-9]+$/;
+const PANEL_LINK = /#runs\/([^/?#\s]+)(?:\/([^/?#\s]+))?/;
+
+function decode(part: string): string | null {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reads a run reference: a panel link with `#runs/<run>[/<group>…]` (host and port do not matter),
+ * a task number `333` or `#333`, or a run id. Anything else gives null.
+ */
+export function parseRunReference(text: string): RunReference | null {
+  const value = text.trim();
+  const link = PANEL_LINK.exec(value);
+  if (link) {
+    const id = decode(link[1] ?? '');
+    if (id === null || !RUN_ID.test(id)) return null;
+    const group = link[2] === undefined ? null : decode(link[2]);
+    if (link[2] !== undefined && (group === null || group === '')) return null;
+    return { kind: 'id', id, group };
+  }
+  const number = /^#?(\d+)$/.exec(value);
+  if (number) return { kind: 'number', number: Number(number[1]) };
+  if (RUN_ID.test(value)) return { kind: 'id', id: value, group: null };
+  return null;
+}

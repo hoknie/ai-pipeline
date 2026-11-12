@@ -53,6 +53,15 @@ export const groupsRequests = [
   }),
   z.object({ method: z.literal('report'), params: reportParamsSchema }),
   z.object({
+    method: z.literal('worker_run_show'),
+    params: z.object({
+      token: z.string().min(1),
+      run: z.string().trim().min(1),
+      group: z.string().min(1).optional(),
+      tailLines: z.number().int().min(1).max(500).optional(),
+    }),
+  }),
+  z.object({
     method: z.literal('split'),
     params: z.object({ token: z.string().min(1), groups: z.array(proposedGroupSchema) }),
   }),

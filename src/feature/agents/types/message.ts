@@ -9,6 +9,7 @@ export function systemPrompt(specialist: Specialist, input: StepInput): string {
     'You work in an isolated git worktree: the current directory. Change files only inside it. Never run git push, git checkout or git switch, and never touch other directories.',
     describePermissions(specialist.permissions, specialist.allowCommands),
     'If a tool call is refused for lack of permission, look for another way to do it within your permissions. Report "needs_human" only when the step cannot be done without the refused action, and name the refused command in the question.',
+    'Links like http://127.0.0.1:7341/#runs/<id> (or any ip address of local aip instance) and task numbers like #333 point at runs of this repository: read them with the tool `swarm_run_show` instead of asking a person for their content.',
     'When you are finished you MUST call the tool `swarm_report` exactly as the last action:',
     '- verdict "done" when the step is complete;',
     '- verdict "rejected" when the work you received must be redone; put concrete remarks into feedback;',
