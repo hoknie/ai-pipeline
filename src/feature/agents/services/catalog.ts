@@ -10,7 +10,7 @@ const SOURCE_ORDER = { builtin: 0, project: 1, global: 2 } as const;
 
 export function sortEntries(entries: CatalogEntry[]): CatalogEntry[] {
   return [...entries].sort(
-    (a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source] || a.name.localeCompare(b.name),
+    (a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source] || a.name.localeCompare(b.name, 'en'),
   );
 }
 

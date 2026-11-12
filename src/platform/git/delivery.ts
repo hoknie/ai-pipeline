@@ -376,7 +376,7 @@ export async function diffStat(repository: string, from: string, to: string): Pr
       ...(previousPath ? { previousPath } : {}),
     });
   }
-  files.sort((left, right) => left.path.localeCompare(right.path));
+  files.sort((left, right) => left.path.localeCompare(right.path, 'en'));
   return {
     files,
     added: files.reduce((sum, file) => sum + (file.added ?? 0), 0),

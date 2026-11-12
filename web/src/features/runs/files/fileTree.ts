@@ -38,7 +38,11 @@ function finish(draft: Draft): FileNode {
   const children = [...current.children.values()]
     .map(finish)
     .sort((left, right) =>
-      left.kind === right.kind ? left.name.localeCompare(right.name) : left.kind === 'dir' ? -1 : 1,
+      left.kind === right.kind
+        ? left.name.localeCompare(right.name, 'en')
+        : left.kind === 'dir'
+          ? -1
+          : 1,
     );
   return {
     name: current.name,
@@ -76,7 +80,11 @@ export function buildFileTree(files: FileStat[]): FileNode[] {
   return [...root.children.values()]
     .map(finish)
     .sort((left, right) =>
-      left.kind === right.kind ? left.name.localeCompare(right.name) : left.kind === 'dir' ? -1 : 1,
+      left.kind === right.kind
+        ? left.name.localeCompare(right.name, 'en')
+        : left.kind === 'dir'
+          ? -1
+          : 1,
     );
 }
 

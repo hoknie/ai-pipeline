@@ -32,7 +32,7 @@ export function repositoryTags(
       else if (tag.shared) known.shared = true;
     }
   }
-  return result.sort((left, right) => left.name.localeCompare(right.name));
+  return result.sort((left, right) => left.name.localeCompare(right.name, 'en'));
 }
 
 /** The specialists that have at least one of the selected tags; all of them when none is selected. */

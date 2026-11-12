@@ -6,9 +6,9 @@ export function catalogView(catalog: readonly Tag[]): TagView[] {
   return [...catalog]
     .sort(
       (a, b) =>
-        a.repository.localeCompare(b.repository) ||
-        a.name.toLocaleLowerCase('und').localeCompare(b.name.toLocaleLowerCase('und')) ||
-        a.id.localeCompare(b.id),
+        a.repository.localeCompare(b.repository, 'en') ||
+        a.name.toLocaleLowerCase('und').localeCompare(b.name.toLocaleLowerCase('und'), 'en') ||
+        a.id.localeCompare(b.id, 'en'),
     )
     .map(({ id, repository, name, color, task }) => ({ id, repository, name, color, task }));
 }

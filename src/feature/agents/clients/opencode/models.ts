@@ -12,7 +12,9 @@ export function parseOpencodeModels(text: string): ModelEntry[] {
     const id = `${match[1]}/${match[2]}`;
     if (!seen.has(id)) seen.set(id, { id, name: match[2]!, group: match[1]! });
   }
-  return [...seen.values()].sort((a, b) => a.id.toLowerCase().localeCompare(b.id.toLowerCase()));
+  return [...seen.values()].sort((a, b) =>
+    a.id.toLowerCase().localeCompare(b.id.toLowerCase(), 'en'),
+  );
 }
 
 function failureText(error: unknown, executable: string): string {

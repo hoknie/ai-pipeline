@@ -60,8 +60,8 @@ export function fieldOfError(message: string): ProjectField | null {
 export function sortedProjects(registry: readonly RepositoryView[]): RepositoryView[] {
   return [...registry].sort(
     (left, right) =>
-      left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }) ||
-      left.path.localeCompare(right.path),
+      left.label.localeCompare(right.label, 'en', { sensitivity: 'base' }) ||
+      left.path.localeCompare(right.path, 'en'),
   );
 }
 

@@ -49,7 +49,7 @@ export function useFilterOptions(input: FilterOptionsInput) {
   for (const id of filters.pipelines) if (!pipelines.has(id)) pipelines.set(id, id);
   const pipelineOptions: FilterOption[] = [...pipelines]
     .map(([value, label]) => ({ value, label, count: pipelineCounts.get(value) ?? 0 }))
-    .sort((left, right) => left.label.localeCompare(right.label));
+    .sort((left, right) => left.label.localeCompare(right.label, 'en'));
 
   const specialistCounts = counts('specialists');
   const specialists = new Set<string>(filters.specialists);
@@ -65,7 +65,7 @@ export function useFilterOptions(input: FilterOptionsInput) {
       label: nameOf(names, value),
       count: specialistCounts.get(value) ?? 0,
     }))
-    .sort((left, right) => left.label.localeCompare(right.label));
+    .sort((left, right) => left.label.localeCompare(right.label, 'en'));
 
   const tagCounts = counts('tagIds');
   const tagOptions: FilterOption[] = of(repository).map((tag) => ({
@@ -91,7 +91,8 @@ export function useFilterOptions(input: FilterOptionsInput) {
       count: repositoryCounts.get(path) ?? 0,
     }))
     .sort(
-      (left, right) => left.label.localeCompare(right.label) || left.hint.localeCompare(right.hint),
+      (left, right) =>
+        left.label.localeCompare(right.label, 'en') || left.hint.localeCompare(right.hint, 'en'),
     );
 
   return {

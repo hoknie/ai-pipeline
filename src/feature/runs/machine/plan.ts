@@ -108,7 +108,7 @@ export function planDispatch(
     .filter((state) => state.run.finishedAt === null)
     .sort(
       (left, right) =>
-        left.run.createdAt - right.run.createdAt || left.run.id.localeCompare(right.run.id),
+        left.run.createdAt - right.run.createdAt || left.run.id.localeCompare(right.run.id, 'en'),
     )
     .flatMap((state) =>
       [...allGroups(state)]

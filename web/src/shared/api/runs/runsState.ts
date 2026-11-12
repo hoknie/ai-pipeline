@@ -112,7 +112,7 @@ export function replaceTags(
   const rest = current.filter((tag) => tag.repository !== repository);
   const merged = [...rest, ...next.filter((tag) => tag.repository === repository)];
   // the order of the daemon: by repository, then the order inside the repository
-  merged.sort((a, b) => a.repository.localeCompare(b.repository));
+  merged.sort((a, b) => a.repository.localeCompare(b.repository, 'en'));
   return sameTags(current, merged);
 }
 

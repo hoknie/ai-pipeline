@@ -137,7 +137,7 @@ export function breakdownRows(
     };
   });
   return rows.sort(
-    (left, right) => right.tokens - left.tokens || left.key.localeCompare(right.key),
+    (left, right) => right.tokens - left.tokens || left.key.localeCompare(right.key, 'en'),
   );
 }
 

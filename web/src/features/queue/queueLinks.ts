@@ -129,7 +129,7 @@ export function parentChoices(runs: readonly RunView[], repository: string): Par
       SECTION_ORDER[a.section] - SECTION_ORDER[b.section] ||
       b.key - a.key ||
       b.run.createdAt - a.run.createdAt ||
-      a.run.id.localeCompare(b.run.id),
+      a.run.id.localeCompare(b.run.id, 'en'),
   );
   return keyed.map(({ run, section }) => ({
     id: run.id,

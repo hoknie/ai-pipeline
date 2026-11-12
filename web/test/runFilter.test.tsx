@@ -515,9 +515,9 @@ describe('the specialists filter of the run list', () => {
       }),
     );
     expect(result.current.specialists.map(({ value, label }) => ({ value, label }))).toEqual([
+      { value: 'ghost', label: 'ghost' },
       { value: 'plan', label: 'Аналитик' },
       { value: 'coder', label: 'Кодировщик' },
-      { value: 'ghost', label: 'ghost' },
     ]);
   });
 });

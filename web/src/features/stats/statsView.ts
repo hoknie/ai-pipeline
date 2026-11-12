@@ -119,7 +119,7 @@ export function sortRows<T>(
     if (a === null) return 1;
     if (b === null) return -1;
     if (typeof a === 'string' || typeof b === 'string') {
-      return sign * String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
+      return sign * String(a).localeCompare(String(b), 'en', { sensitivity: 'base' });
     }
     return sign * (a - b);
   });

@@ -55,7 +55,7 @@ export function listDirectory(
           entry.isDirectory() || (entry.isSymbolicLink() && isDirectory(join(path, entry.name))),
       )
       .map((entry) => entry.name)
-      .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+      .sort((left, right) => left.localeCompare(right, 'en', { sensitivity: 'base' }));
   } catch {
     throw panel('forbidden', `cannot read ${path}`);
   }

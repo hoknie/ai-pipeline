@@ -123,7 +123,7 @@ export function planRepairs(
   }
   candidates.sort(
     (left, right) =>
-      left.since - right.since || left.state.run.id.localeCompare(right.state.run.id),
+      left.since - right.since || left.state.run.id.localeCompare(right.state.run.id, 'en'),
   );
   const starts: RepairStart[] = [];
   for (const { state, incident } of candidates) {

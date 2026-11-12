@@ -38,14 +38,14 @@ export function specialistsOfPipeline(entry: Pick<EditorPipeline, 'raw'>): strin
   return [...new Set(names)];
 }
 
-/** The choices of every filter: tags and specialists of the pipelines, sorted by name. */
+/** The choices of every filter: tags and specialists of the pipelines, sorted by name in English. */
 export function pipelineFilterOptions(
   entries: readonly Entry[],
   names: ReadonlyMap<string, string> = new Map(),
 ): PipelineFilterOptions {
   const specialists = [...new Set(entries.flatMap(specialistsOfPipeline))]
     .map((value) => ({ value, label: nameOf(names, value) }))
-    .sort((a, b) => a.label.localeCompare(b.label) || a.value.localeCompare(b.value));
+    .sort((a, b) => a.label.localeCompare(b.label, 'en') || a.value.localeCompare(b.value, 'en'));
   return { tags: repositoryTags(entries), specialists };
 }
 

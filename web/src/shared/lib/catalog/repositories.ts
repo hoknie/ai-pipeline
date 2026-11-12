@@ -31,9 +31,9 @@ export function repositoryColor(path: string): string | null {
 const enabledOf = (entry: RepositoryView) => entry.enabled !== false;
 
 const byLabel = (left: string, right: string) =>
-  repositoryLabel(left).localeCompare(repositoryLabel(right), undefined, {
+  repositoryLabel(left).localeCompare(repositoryLabel(right), 'en', {
     sensitivity: 'base',
-  }) || left.localeCompare(right);
+  }) || left.localeCompare(right, 'en');
 
 /**
  * Repositories the panel can switch between: the home one first, then the enabled projects of

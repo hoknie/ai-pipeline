@@ -112,9 +112,9 @@ describe('pipeline filters', () => {
       ]),
     ).specialists;
     expect(named).toEqual([
+      { value: 'splitter', label: 'splitter' },
       { value: 'plan', label: 'Аналитик' },
       { value: 'coder', label: 'Кодировщик' },
-      { value: 'splitter', label: 'splitter' },
     ]);
     expect(options.tags.map((tag) => tag.name).sort()).toEqual(['Backend', 'fast']);
     expect(

@@ -78,7 +78,7 @@ export interface FilterOptions {
 }
 
 const unique = (values: string[]): string[] =>
-  [...new Set(values)].sort((left, right) => left.localeCompare(right));
+  [...new Set(values)].sort((left, right) => left.localeCompare(right, 'en'));
 
 /** The choices of every filter: distinct values of the specialists, sorted by name. */
 export function filterOptions(entries: readonly Entry[]): FilterOptions {
