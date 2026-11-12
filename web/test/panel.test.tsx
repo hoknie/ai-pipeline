@@ -480,12 +480,13 @@ function panel(
   api: ReturnType<typeof fakeApi>,
   onlyReplies = false,
   onOnlyReplies?: (value: boolean) => void,
+  row: ReturnType<typeof groupRow> = groupRow(),
 ) {
   return render(
     <GroupScreen
       api={api}
       runId="run1"
-      row={groupRow()}
+      row={row}
       draftKey="run1/login"
       drafts={{}}
       onDraft={() => undefined}
@@ -938,6 +939,15 @@ describe('attempts and transcript', () => {
       fireEvent.wheel(window, { deltaY: -40 });
       expect(await screen.findByRole('button', { name: 'Watch' })).toBeTruthy();
     });
+
+    it.each(['merged', 'failed', 'cancelled'] as const)(
+      'is absent for a group with status %s',
+      async (status) => {
+        panel(logApi(), false, vi.fn(), groupRow({ status }));
+        await screen.findByText('ответ специалиста');
+        expect(screen.queryByRole('button', { name: 'Watch' })).toBeNull();
+      },
+    );
 
     it('is absent on other tabs and turns the mode off when leaving the log', async () => {
       panel(logApi());

@@ -6,16 +6,34 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Breaking changes
-
-- Runtimes are off until switched on: set `runtimes.<name>.enabled: true` in the shared `settings.yaml` or use the panel. A non-empty `AIP_<NAME>_BIN` switches a runtime on while `enabled` is not set.
-
 ### Features
 
+- Labeled slugs ([3c28553](https://github.com/hoknie/ai-pipeline/commit/3c285530a6a02a842c21a61d9001060852a039e0))
+- Added follow button ([7683fca](https://github.com/hoknie/ai-pipeline/commit/7683fca47abde870f7973ca6d37b1e434073fa10))
+- Updated query for runs load ([ae89d51](https://github.com/hoknie/ai-pipeline/commit/ae89d512a497d2a39f89b58709a7ca4b10e4d935))
+- Added spec name everywhere ([73047f4](https://github.com/hoknie/ai-pipeline/commit/73047f4605c3acc533d80cf73f073e309fbea263))
+- Added mcp run show tool ([34c4d48](https://github.com/hoknie/ai-pipeline/commit/34c4d48e428135474e3cebd1d039d5335653d8de))
+- Added enable flag for runtimes ([591998d](https://github.com/hoknie/ai-pipeline/commit/591998dac8dd5f8f3fd68266fe0f4083c551f405))
+- Added model list load in select ([f4dfd6e](https://github.com/hoknie/ai-pipeline/commit/f4dfd6e5db22d075deecf41094539b6c51269edb))
+- Added stage status and deny edit system stage from project ([aae0636](https://github.com/hoknie/ai-pipeline/commit/aae06367c79c9d5440ab69646895644cee42c06f))
+- Added stats dashboard (alpha) ([5615162](https://github.com/hoknie/ai-pipeline/commit/561516280ae9def2548b1c2976776cab7cfdf5fc))
+- Added stage on run uncompleted status ([a7ce99e](https://github.com/hoknie/ai-pipeline/commit/a7ce99e3a6d1985abc91b5d86a537687b961f1c1))
+- Removed prj delete button ([7cc7233](https://github.com/hoknie/ai-pipeline/commit/7cc7233613374bbef458df5320765376ed6042b6))
+- Init stats ([1c12997](https://github.com/hoknie/ai-pipeline/commit/1c129973ef628ee98ee9f40b9f4876e63dd07509))
+- Moved topology to pipeline ([7a80945](https://github.com/hoknie/ai-pipeline/commit/7a8094569f6cdfbf74dcf764a570fe8b7d7b91eb))
+- Updated header menu ([190f78f](https://github.com/hoknie/ai-pipeline/commit/190f78fee5d4881352a907111f7da59ccff20581))
+- Updated actions view ([b5c8bc5](https://github.com/hoknie/ai-pipeline/commit/b5c8bc57e57d8bf7615b09b0667139dfded2f8fd))
 - Updated pipeline scheme ([4241cbb](https://github.com/hoknie/ai-pipeline/commit/4241cbb58dfe4d942c3f9ad9339d7b246e1dcbe2))
 - Added network settings and cmd multi support ([eac433b](https://github.com/hoknie/ai-pipeline/commit/eac433bc22c5160f740a39f82ca45075acf27cb5))
 - Updated filters ([5052c23](https://github.com/hoknie/ai-pipeline/commit/5052c2377737f34212462e0ee4b0b05a9707ef0f))
 - Disallow human auto answers for direct mode ([6a1616b](https://github.com/hoknie/ai-pipeline/commit/6a1616b6e51f6b6c31ef54d204fc9fa6e70ed4ea))
+
+### Fixes
+
+- Updated status display in queue ([5138400](https://github.com/hoknie/ai-pipeline/commit/513840060d238d06cc9538cf6fda6ecda423143b))
+- Removed space between headers in background procs ([310d1d3](https://github.com/hoknie/ai-pipeline/commit/310d1d35d9ac6504a53159d5f5c298d4e0655d8a))
+- Updated stats link ([a8cd347](https://github.com/hoknie/ai-pipeline/commit/a8cd347af3bc63669fd7aad1a1d9f2fd46342624))
+- Updated chain select in observer ([12196a2](https://github.com/hoknie/ai-pipeline/commit/12196a2cf9ca6f6a0732ca0cc7d92a1ec8227535))
 
 ### Other
 
