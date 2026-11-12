@@ -74,10 +74,8 @@ The filters are search by id and name, level, "Tags" and "Specialists" (the ones
 
 ### System stages
 
-A system stage (task split, commit message, delivery conflict resolution, delivery) shows its built-in task read only. Under it the stage settings have two tabs, "Shared" and "Project", as on the [Settings](settings.md) page. The line above the form names the file the tab saves to.
+A system stage (task split, commit message, delivery conflict resolution, delivery) shows its built-in task read only. Under it the screen lists the effective values of the stage settings, each with where it comes from: the project, the shared settings or the default.
 
-Each field shows the value of its tab and where it comes from; on the "Project" tab "Inherit" removes the project key.
+The screen is view only: "Edit in Settings" opens the "Delivery" group of [Settings](settings.md), on the "Project" tab when the project sets a field of the stage, else on the "Shared" tab. The split has no settings of its own: it is set in the pipeline.
 
-The commit message stage has the specialist, the commit message template and the additional prompt. The template and the additional prompts are text areas, so line breaks are kept; a value of only spaces removes the key. "Save" writes all changes of the tab in one request. The split has no settings of its own: it is set in the pipeline.
-
-The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`; `#pipelines/actions/<id>` and `#pipelines/system/<kind>` open the other tabs. `#pipelines/system/<kind>/global` opens the "Shared" tab of a stage; without the suffix the "Project" tab opens.
+The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`; `#pipelines/actions/<id>` and `#pipelines/system/<kind>` open the other tabs.

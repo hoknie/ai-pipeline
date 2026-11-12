@@ -16,7 +16,7 @@ import { ActionForm } from '../ActionForm.tsx';
 import { PipelineForm } from '../form/PipelineForm.tsx';
 import { SystemStagePage } from '../SystemStagePage.tsx';
 import type { PipelinesData } from './usePipelinesData.ts';
-import type { Level, PipelineNavigation } from './usePipelineNavigation.ts';
+import type { PipelineNavigation } from './usePipelineNavigation.ts';
 
 export type BodyProps = {
   api: Api;
@@ -25,44 +25,24 @@ export type BodyProps = {
   navigation: PipelineNavigation;
   selected: string | null;
   section: 'actions' | 'system' | null;
-  level: Level;
   dirty: { current: boolean };
-  onSelect: (
-    id: string | null,
-    section?: 'actions' | 'system' | null,
-    level?: 'global' | null,
-  ) => void;
+  onSelect: (id: string | null, section?: 'actions' | 'system' | null) => void;
 };
 
 const revisions = (entry: {
   sources: { project?: { revision?: string } | null; global?: { revision?: string } | null };
 }) => `${entry.sources.project?.revision ?? ''}:${entry.sources.global?.revision ?? ''}`;
 
-function SystemBody({
-  api,
-  data,
-  navigation,
-  selected,
-  level,
-  view,
-}: BodyProps & { view: ConfigEditorResponse }) {
+function SystemBody({ data, selected }: BodyProps) {
   const { t } = useTranslation();
   if (!isSystemKind(selected))
     return <Empty icon={<GitBranch />} title={t('pipeline.system.empty')} />;
   return (
     <SystemStagePage
       key={selected}
-      api={api}
       kind={selected}
-      view={view}
       stages={data.stages}
       failure={data.stagesFailure}
-      scope={level === 'global' ? 'global' : 'project'}
-      onScope={(next) =>
-        void navigation.go(selected, 'system', next === 'global' ? 'global' : null)
-      }
-      onDirty={navigation.onDirty}
-      onReload={data.reloadAll}
     />
   );
 }
@@ -155,7 +135,7 @@ export function PipelinesBody(props: BodyProps) {
       </div>
     );
   }
-  if (props.section === 'system') return <SystemBody {...props} view={view} />;
+  if (props.section === 'system') return <SystemBody {...props} />;
   if (props.section === 'actions') return <ActionsBody {...props} view={view} />;
   return <PipelineBody {...props} view={view} />;
 }

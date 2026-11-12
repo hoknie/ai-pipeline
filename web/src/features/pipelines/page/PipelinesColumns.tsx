@@ -10,7 +10,7 @@ import { ImportHost } from './ImportHost.tsx';
 import { PipelinesBody, type BodyProps } from './PipelinesBody.tsx';
 import { PipelinesSide } from './PipelinesSide.tsx';
 import { usePipelineFilterState } from './usePipelineFilterState.ts';
-import type { Level, PipelineNavigation } from './usePipelineNavigation.ts';
+import type { PipelineNavigation } from './usePipelineNavigation.ts';
 import type { PipelinesData } from './usePipelinesData.ts';
 
 /** The list of the open tab (pipelines, actions, system stages) and its form. */
@@ -21,12 +21,11 @@ export function PipelinesColumns(props: {
   navigation: PipelineNavigation;
   selected: string | null;
   section: BodyProps['section'];
-  level: Level;
   dirty: RefObject<boolean>;
   onSelect: BodyProps['onSelect'];
 }) {
   const { t } = useTranslation();
-  const { data, navigation, selected, section, level } = props;
+  const { data, navigation, selected, section } = props;
   const { view } = data;
   const [importing, setImporting] = useState(false);
   const wide = useMediaQuery('(min-width: 768px)');
@@ -46,7 +45,6 @@ export function PipelinesColumns(props: {
           section={section}
           selected={selected}
           data={data}
-          level={level}
           filters={filters}
           filtersControl={!!view && !columns && section === null}
           wide={wide}
@@ -62,7 +60,6 @@ export function PipelinesColumns(props: {
         navigation={navigation}
         selected={selected}
         section={section}
-        level={level}
         dirty={props.dirty}
         onSelect={props.onSelect}
       />

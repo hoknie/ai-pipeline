@@ -15,10 +15,7 @@ export interface Route {
    * `project`); on the pipeline tab the section (`actions`, `system`, `topology`), null for the pipelines.
    */
   group: string | null;
-  /**
-   * Step whose last attempt is opened in the group; on the pipeline tab, for a system stage,
-   * `global` is the level tab of the stage.
-   */
+  /** Step whose last attempt is opened in the group. */
   step: string | null;
   /** Tab of the group screen; null for the default log tab. */
   tab: string | null;
@@ -89,7 +86,7 @@ export function parseRoute(hash: string): Route {
         view: 'pipelines',
         run: id,
         group: section,
-        step: section === 'system' && decode(rest[2]) === 'global' ? 'global' : null,
+        step: null,
         tab: null,
       };
     return { view: 'pipelines', run: section, group: null, step: null, tab: null };
@@ -149,9 +146,7 @@ export function formatRoute(route: Route): string {
   if (route.view === 'pipelines') {
     if (!route.run) return '#pipelines';
     return isPipelineSection(route.group)
-      ? `#pipelines/${route.group}/${enc(route.run)}${
-          route.group === 'system' && route.step === 'global' ? '/global' : ''
-        }`
+      ? `#pipelines/${route.group}/${enc(route.run)}`
       : `#pipelines/${enc(route.run)}`;
   }
   if (!route.run) return '#runs';

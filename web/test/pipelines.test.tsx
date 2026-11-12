@@ -1144,7 +1144,7 @@ describe('pipeline sections and addresses', () => {
     expect(formatRoute(route(null, 'actions'))).toBe('#pipelines');
   });
 
-  it('reads and writes the shared level of a system stage', () => {
+  it('ignores a level part of the address of a system stage', () => {
     const route = (run: string, group: string, step: string | null) => ({
       view: 'pipelines' as const,
       run,
@@ -1153,15 +1153,13 @@ describe('pipeline sections and addresses', () => {
       tab: null,
     });
     expect(parseRoute('#pipelines/system/resolve/global')).toEqual(
-      route('resolve', 'system', 'global'),
+      route('resolve', 'system', null),
     );
     expect(parseRoute('#pipelines/system/resolve/other')).toEqual(route('resolve', 'system', null));
     expect(parseRoute('#pipelines/actions/commit/global')).toEqual(
       route('commit', 'actions', null),
     );
-    expect(formatRoute(route('resolve', 'system', 'global'))).toBe(
-      '#pipelines/system/resolve/global',
-    );
+    expect(formatRoute(route('resolve', 'system', 'global'))).toBe('#pipelines/system/resolve');
     expect(formatRoute(route('resolve', 'system', null))).toBe('#pipelines/system/resolve');
     expect(formatRoute(route('commit', 'actions', 'global'))).toBe('#pipelines/actions/commit');
     expect(formatRoute(route('feature', null as unknown as string, 'global'))).toBe(
@@ -1376,10 +1374,13 @@ describe('pipeline sections and addresses', () => {
 
   it('does not move when the open tab is clicked', async () => {
     await open('#pipelines/system/resolve/global');
+    expect(
+      await screen.findByRole('heading', { name: 'Delivery conflict resolution' }),
+    ).toBeTruthy();
     fireEvent.click(tabNamed('System stages'));
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(window.location.hash).toBe('#pipelines/system/resolve/global');
-    expect(tabNamed('System stages').getAttribute('href')).toBe('#pipelines/system/resolve/global');
+    expect(window.location.hash).toBe('#pipelines/system/resolve');
+    expect(tabNamed('System stages').getAttribute('href')).toBe('#pipelines/system/resolve');
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
@@ -1453,18 +1454,73 @@ describe('pipeline sections and addresses', () => {
     await waitFor(() => expect(window.location.hash).toBe('#pipelines/feature'));
   });
 
-  it('writes the shared level of a stage into the address and keeps it for another stage', async () => {
-    await open('#pipelines/system/resolve');
-    fireEvent.click(await screen.findByRole('tab', { name: 'Shared' }));
-    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/resolve/global'));
+  it('moves between stages without a level in the address', async () => {
+    await open('#pipelines/system/resolve/global');
     fireEvent.click(
-      within(screen.getByRole('list', { name: 'System stages' })).getByRole('button', {
+      within(await screen.findByRole('list', { name: 'System stages' })).getByRole('button', {
         name: /Commit message/,
       }),
     );
-    await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/message/global'));
-    fireEvent.click(screen.getByRole('tab', { name: 'Project' }));
     await waitFor(() => expect(window.location.hash).toBe('#pipelines/system/message'));
+  });
+
+  it('shows a system stage as view only with values and their sources', async () => {
+    await open('#pipelines/system/resolve');
+    await screen.findByRole('heading', { name: 'Delivery conflict resolution' });
+    expect(screen.queryByRole('tab', { name: 'Shared' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Project' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Additional prompt' })).toBeNull();
+    const prompt = await screen.findByTestId('stage-value-delivery.resolver_prompt');
+    await waitFor(() => expect(prompt.textContent).toContain('Be careful'));
+    expect(prompt.textContent).toContain('set in the project');
+    expect(screen.getByTestId('stage-value-delivery.resolver_rounds').textContent).toContain(
+      'default',
+    );
+  });
+
+  it('leads the button of a stage to the project or the shared delivery settings', async () => {
+    await open('#pipelines/system/resolve');
+    const project = await screen.findByRole('link', { name: 'Edit in Settings' });
+    await waitFor(() => expect(project.getAttribute('href')).toBe('#settings/project/delivery'));
+    cleanup();
+    await open('#pipelines/system/message');
+    const shared = await screen.findByRole('link', { name: 'Edit in Settings' });
+    expect(shared.getAttribute('href')).toBe('#settings/global/delivery');
+  });
+
+  it('shows the delivery mode of a stage by its name', async () => {
+    const stagesApi = api(
+      {
+        config: vi.fn(async () => configView({ specialists, pipelines: [entry('feature')] })),
+        systemStages: vi.fn(async () =>
+          systemStagesView({
+            stages: systemStagesView().stages.map((stage) =>
+              stage.kind === 'delivery'
+                ? {
+                    ...stage,
+                    settings: [{ path: 'delivery.mode', value: 'branch', level: 'project' }],
+                  }
+                : stage,
+            ),
+          }),
+        ),
+      },
+      [entry('feature')],
+    );
+    await open('#pipelines/system/delivery', stagesApi);
+    await waitFor(() =>
+      expect(screen.getByTestId('stage-value-delivery.mode').textContent).toContain('Branch'),
+    );
+    expect(screen.getByTestId('stage-value-delivery.mode').textContent).toContain(
+      'set in the project',
+    );
+  });
+
+  it('has no settings block and no button for the split', async () => {
+    await open('#pipelines/system/split');
+    expect(await screen.findByText(/has no settings of its own/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Edit in Settings' })).toBeNull();
   });
 
   it('keeps the four system stages when the list of them does not load', async () => {

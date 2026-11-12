@@ -1,22 +1,18 @@
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../shared/api/api.ts';
 import type {
   SystemKind,
   SystemStageEntry,
   SystemStagesResponse,
 } from '../../shared/lib/pipeline/pipelineEntries.ts';
 import { formatRoute } from '../../shared/lib/nav/route.ts';
-import { SETTINGS_SCOPES, type SettingsScope } from '../../shared/lib/nav/settingsGroups.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Label } from '../../shared/ui/forms/label.tsx';
 import { Textarea } from '../../shared/ui/forms/textarea.tsx';
-import type { ConfigEditorResponse, WriteLevel } from '../../shared/api/types.ts';
+import type { WriteLevel } from '../../shared/api/types.ts';
 
-import { FilePath } from '../../shared/ui/layout/FilePath.tsx';
-import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
-import { SettingsForm } from '../../shared/ui/forms/settings/SettingsForm.tsx';
-import { STAGE_SECTIONS } from '../../shared/ui/forms/settings/settingFields.ts';
+import { Button } from '../../shared/ui/forms/button.tsx';
+import { STAGE_SECTIONS, fieldKey } from '../../shared/ui/forms/settings/settingFields.ts';
 
 /** The level a stage is shown at: the project when it sets any of its settings, else the shared. */
 export function stageLevel(stage: SystemStageEntry | undefined): WriteLevel {
@@ -55,88 +51,82 @@ function StageTask({
   );
 }
 
+const SOURCE_KEY = {
+  project: 'settingsPage.source.project',
+  global: 'pipeline.system.sourceGlobal',
+  default: 'settingsPage.source.default',
+} as const;
+
+function StageValue({ stage, path }: { stage: SystemStageEntry | undefined; path: string }) {
+  const { t } = useTranslation();
+  const setting = stage?.settings.find((candidate) => candidate.path === path);
+  const value = setting?.value;
+  const key = fieldKey(path);
+  let shown: string;
+  if (value === undefined || value === null || value === '') shown = t('settingsPage.notSet');
+  else if (typeof value === 'boolean')
+    shown = t(value ? 'pipeline.system.yes' : 'pipeline.system.no');
+  else if (path === 'delivery.mode') shown = t(`deliveryMode.${String(value)}` as never);
+  else shown = String(value);
+  return (
+    <div className="flex flex-col gap-0.5" data-testid={`stage-value-${path}`}>
+      <span className="text-sm font-medium">{t(`settingsPage.field.${key}.label` as never)}</span>
+      <span data-testid="stage-shown" className="whitespace-pre-wrap break-words text-sm">
+        {shown}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        <span data-testid="stage-source">{t(SOURCE_KEY[setting?.level ?? 'default'])}</span>{' '}
+        <code className="text-xs">{path}</code>
+      </span>
+    </div>
+  );
+}
+
 function StageSettings({
-  api,
   kind,
-  view,
-  scope,
-  onScope,
-  onDirty,
-  onReload,
+  stage,
 }: {
-  api: Api;
   kind: Exclude<SystemKind, 'split'>;
-  view: ConfigEditorResponse;
-  scope: SettingsScope;
-  onScope: (scope: SettingsScope) => void;
-  onDirty: (dirty: boolean) => void;
-  onReload: () => Promise<void>;
+  stage: SystemStageEntry | undefined;
 }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-3">
-      <LinkTabs
-        label={t('settingsPage.tabs')}
-        tabs={SETTINGS_SCOPES.map((tab) => ({
-          key: tab,
-          label: t(`settingsPage.scope.${tab}`),
-          href: formatRoute({
-            view: 'pipelines',
-            run: kind,
-            group: 'system',
-            step: tab === 'global' ? 'global' : null,
-            tab: null,
-          }),
-          selected: tab === scope,
-          onClick: (event) => {
-            event.preventDefault();
-            onScope(tab);
-          },
-        }))}
-      />
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm font-medium">{t('settingsPage.writesTo')}</span>
-        <FilePath path={view.settingsFiles[scope].file} variant="line" />
-        {scope === 'global' ? (
-          <span className="text-xs text-muted-foreground">{t('settingsPage.globalNote')}</span>
-        ) : null}
+      <h3 className="text-sm font-semibold">{t('pipeline.system.settings')}</h3>
+      {STAGE_SECTIONS[kind]
+        .flatMap((section) => section.paths)
+        .map((path) => (
+          <StageValue key={path} stage={stage} path={path} />
+        ))}
+      <p className="text-xs text-muted-foreground">{t('pipeline.system.settingsHelp')}</p>
+      <div>
+        <Button variant="outline" asChild>
+          <a
+            href={formatRoute({
+              view: 'settings',
+              run: 'delivery',
+              group: stageLevel(stage),
+              step: null,
+              tab: null,
+            })}
+          >
+            {t('pipelines.editInSettings')}
+          </a>
+        </Button>
       </div>
-      <SettingsForm
-        key={`${kind}:${scope}`}
-        api={api}
-        config={view}
-        scope={scope}
-        group="delivery"
-        sections={STAGE_SECTIONS[kind]}
-        onSaved={onReload}
-        onDirty={onDirty}
-      />
     </div>
   );
 }
 
 export function SystemStagePage({
-  api,
   kind,
-  view,
   stages,
   failure,
-  scope,
-  onScope,
-  onDirty,
-  onReload,
 }: {
-  api: Api;
   kind: SystemKind;
-  view: ConfigEditorResponse;
   /** null while the stages are not loaded or could not be. */
   stages: SystemStagesResponse | null;
   failure: string | null;
-  /** The open level tab: «Shared» (`global`) or «Project». */
-  scope: SettingsScope;
-  onScope: (scope: SettingsScope) => void;
-  onDirty: (dirty: boolean) => void;
-  onReload: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const stage = stages?.stages.find((candidate) => candidate.kind === kind);
@@ -166,15 +156,7 @@ export function SystemStagePage({
       <StageTask stage={stage} performer={performer} />
 
       {kind !== 'split' ? (
-        <StageSettings
-          api={api}
-          kind={kind}
-          view={view}
-          scope={scope}
-          onScope={onScope}
-          onDirty={onDirty}
-          onReload={onReload}
-        />
+        <StageSettings kind={kind} stage={stage} />
       ) : (
         <p className="text-sm text-muted-foreground">{t('pipeline.system.splitSettings')}</p>
       )}

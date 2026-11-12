@@ -8,7 +8,7 @@ import type { RunView } from '../../shared/api/types.ts';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
 import { PipelinesColumns } from './page/PipelinesColumns.tsx';
-import { usePipelineNavigation, type Level } from './page/usePipelineNavigation.ts';
+import { usePipelineNavigation } from './page/usePipelineNavigation.ts';
 import { usePipelinesData } from './page/usePipelinesData.ts';
 import { usePipelineTabs } from './page/usePipelineTabs.ts';
 import type { LiveGroup } from '../topology/index.ts';
@@ -23,7 +23,6 @@ export default function PipelinesPage({
   runs,
   selected,
   section: shownSection = null,
-  scope: shownScope = null,
   onSelect,
   onOpenGroup,
   dirty: sharedDirty,
@@ -34,9 +33,7 @@ export default function PipelinesPage({
   selected: string | null;
   /** Section of `selected`: `actions`, `system`, `topology`; null for the pipelines. */
   section?: PipelineSection | string | null;
-  /** Level tab of a system stage: `global`; null for the project. */
-  scope?: string | null;
-  onSelect: (id: string | null, section?: PipelineSection | null, level?: 'global' | null) => void;
+  onSelect: (id: string | null, section?: PipelineSection | null) => void;
   /** Opens a group of a run (a click on a live group of the topology). */
   onOpenGroup?: (group: LiveGroup, step: string | null) => void;
   /** Whether the open form has unsaved edits; the caller owns it to guard other navigation. */
@@ -51,10 +48,9 @@ export default function PipelinesPage({
       : null;
   const data = usePipelinesData(api);
   const { view } = data;
-  const level: Level = section === 'system' && shownScope === 'global' ? 'global' : null;
-  const navigation = usePipelineNavigation({ selected, section, level, dirty, onSelect });
+  const navigation = usePipelineNavigation({ selected, section, dirty, onSelect });
   const actions = view ? actionsOf(view) : [];
-  const tabs = usePipelineTabs({ view, actions, section, selected, level, navigation });
+  const tabs = usePipelineTabs({ view, actions, section, selected, navigation });
   const firstPipeline = view?.pipelines[0]?.id ?? null;
 
   // the former address `#topology` has no pipeline: open the first one
@@ -93,7 +89,6 @@ export default function PipelinesPage({
           navigation={navigation}
           selected={selected}
           section={section}
-          level={level}
           dirty={dirty}
           onSelect={onSelect}
         />

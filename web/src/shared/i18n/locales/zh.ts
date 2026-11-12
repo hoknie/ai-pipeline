@@ -1139,6 +1139,11 @@ export const zh: Dictionary = {
       noTask: '此阶段没有任务：由系统完成。',
       taskHelp: '内置任务只读；下面的附加提示词会追加到它后面。',
       splitSettings: '拆分没有自己的设置：在 Pipeline 中设置。',
+      settings: '设置',
+      settingsHelp: '系统阶段的设置只能在“设置”页面中修改。',
+      yes: '是',
+      no: '否',
+      sourceGlobal: '在共享设置中设置',
     },
     points: {
       title: 'Pipeline 各点的动作',

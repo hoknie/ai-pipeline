@@ -28,8 +28,14 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
   ],
   delivery: [
     { key: 'delivery', paths: ['delivery.mode', 'delivery.auto', 'delivery.keep'] },
-    { key: 'message', paths: ['delivery.commit_message', 'delivery.message_specialist'] },
-    { key: 'conflicts', paths: ['delivery.resolver', 'delivery.resolver_rounds'] },
+    {
+      key: 'message',
+      paths: ['delivery.commit_message', 'delivery.message_specialist', 'delivery.message_prompt'],
+    },
+    {
+      key: 'conflicts',
+      paths: ['delivery.resolver', 'delivery.resolver_rounds', 'delivery.resolver_prompt'],
+    },
   ],
   runtimes: [
     {

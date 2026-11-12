@@ -1157,6 +1157,11 @@ export const en = {
       noTask: 'This stage has no task: the system does the work.',
       taskHelp: 'The built-in task is read only; the additional prompt below is appended to it.',
       splitSettings: 'The split has no settings of its own: it is set in the pipeline.',
+      settings: 'Settings',
+      settingsHelp: 'Settings of a system stage are edited in the Settings page only.',
+      yes: 'yes',
+      no: 'no',
+      sourceGlobal: 'set in the shared settings',
     },
     points: {
       title: 'Actions at the points of the pipeline',

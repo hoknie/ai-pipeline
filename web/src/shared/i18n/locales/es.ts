@@ -1179,6 +1179,11 @@ export const es: Dictionary = {
       taskHelp:
         'La tarea integrada es de solo lectura; el prompt adicional de abajo se añade a ella.',
       splitSettings: 'La división no tiene ajustes propios: se fija en el pipeline.',
+      settings: 'Ajustes',
+      settingsHelp: 'Los ajustes de una etapa del sistema se editan solo en la página de Ajustes.',
+      yes: 'Sí',
+      no: 'No',
+      sourceGlobal: 'definido en los ajustes compartidos',
     },
     points: {
       title: 'Acciones en los puntos del pipeline',

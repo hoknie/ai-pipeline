@@ -28,13 +28,8 @@ import { stageLevel } from '../SystemStagePage.tsx';
 import { FiltersPanel } from './FiltersControl.tsx';
 import type { PipelinesData } from './usePipelinesData.ts';
 import type { PipelineFilterState } from './usePipelineFilterState.ts';
-import type { Level } from './usePipelineNavigation.ts';
 
-type Go = (
-  id: string | null,
-  section?: 'actions' | 'system' | null,
-  level?: Level,
-) => Promise<void>;
+type Go = (id: string | null, section?: 'actions' | 'system' | null) => Promise<void>;
 type Section = 'actions' | 'system' | null;
 
 const levelTag = (t: TFunction) => (level: 'project' | 'global' | 'project_over_global') =>
@@ -153,7 +148,6 @@ export function PipelinesSide(props: {
   section: Section;
   selected: string | null;
   data: PipelinesData;
-  level: Level;
   filters: PipelineFilterState;
   filtersControl: boolean;
   wide: boolean;
@@ -180,7 +174,7 @@ export function PipelinesSide(props: {
         <EntryList
           label={t('pipeline.sections.system')}
           selected={selected}
-          onSelect={(id) => void go(id, 'system', props.level)}
+          onSelect={(id) => void go(id, 'system')}
           entries={SYSTEM_KINDS.map((kind) => ({
             id: kind,
             title: t(`pipeline.system.kinds.${kind}`),

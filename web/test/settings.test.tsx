@@ -861,6 +861,87 @@ describe('settings form', () => {
     );
   });
 
+  it('shows nine fields of delivery with the additional prompts in their sections', async () => {
+    show(queueOf(), {}, '#settings/global/delivery');
+    await screen.findByTestId('setting-delivery.mode');
+    expect(screen.getAllByTestId(/^setting-delivery\./)).toHaveLength(9);
+    const sections = {
+      'delivery.message_prompt': ['section-delivery-message', 'delivery.commit_message'],
+      'delivery.resolver_prompt': ['section-delivery-conflicts', 'delivery.resolver'],
+    } as const;
+    for (const [path, [id, neighbour]] of Object.entries(sections)) {
+      const field = screen.getByTestId(`setting-${path}`);
+      expect(within(field).getByRole('textbox').tagName).toBe('TEXTAREA');
+      const section = document.getElementById(id)?.closest('section');
+      expect(section).toBeTruthy();
+      expect(section?.contains(field)).toBe(true);
+      expect(section?.contains(screen.getByTestId(`setting-${neighbour}`))).toBe(true);
+    }
+  });
+
+  it('writes a two-line additional prompt of the resolver to the project file', async () => {
+    const config = vi.fn(async () => configView({ settingsFiles: FILES }));
+    const api = show(queueOf(), { config }, '#settings/project/delivery');
+    const field = await screen.findByTestId('setting-delivery.resolver_prompt');
+    fireEvent.change(within(field).getByRole('textbox'), { target: { value: 'Line 1\nLine 2' } });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'delivery.resolver_prompt': 'Line 1\nLine 2' },
+        'p1',
+        'project',
+      ),
+    );
+  });
+
+  it('removes the key of an additional prompt made of whitespace only', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settingsFiles: FILES,
+        settings: settingsOf({
+          'delivery.message_prompt': {
+            path: 'delivery.message_prompt',
+            value: 'Be brief',
+            file: PROJECT_FILE,
+            written: { project: 'Be brief' },
+          },
+        }),
+      }),
+    );
+    const api = show(queueOf(), { config }, '#settings/project/delivery');
+    const field = await screen.findByTestId('setting-delivery.message_prompt');
+    fireEvent.change(within(field).getByRole('textbox'), { target: { value: '  \n ' } });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'delivery.message_prompt': null },
+        'p1',
+        'project',
+      ),
+    );
+  });
+
+  it('shows the shared additional prompt as inherited on the project tab', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        settingsFiles: FILES,
+        settings: settingsOf({
+          'delivery.resolver_prompt': {
+            path: 'delivery.resolver_prompt',
+            value: 'Shared text',
+            globalValue: 'Shared text',
+            written: { global: 'Shared text' },
+          },
+        }),
+      }),
+    );
+    show(queueOf(), { config }, '#settings/project/delivery');
+    const field = await screen.findByTestId('setting-delivery.resolver_prompt');
+    expect((within(field).getByRole('textbox') as HTMLTextAreaElement).value).toBe('Shared text');
+    expect(within(field).getByText('inherited from the shared settings')).toBeTruthy();
+    expect(within(field).queryByRole('button', { name: 'Inherit' })).toBeNull();
+  });
+
   it('returns a field of the project to the shared value with Inherit', async () => {
     const config = vi.fn(async () =>
       configView({

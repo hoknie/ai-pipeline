@@ -4,7 +4,7 @@ import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
 import { SYSTEM_KINDS, isSystemKind } from '../../../shared/lib/pipeline/pipelineEntries.ts';
 import { formatRoute, type PipelineSection } from '../../../shared/lib/nav/route.ts';
 import { NEW_ID } from '../../specialists/index.ts';
-import type { Level, PipelineNavigation } from './usePipelineNavigation.ts';
+import type { PipelineNavigation } from './usePipelineNavigation.ts';
 
 type Tab = 'pipelines' | 'actions' | 'system' | 'topology';
 
@@ -28,10 +28,9 @@ export function usePipelineTabs(props: {
   actions: { id: string }[];
   section: PipelineSection | null;
   selected: string | null;
-  level: Level;
   navigation: PipelineNavigation;
 }) {
-  const { view, actions, section, selected, level, navigation } = props;
+  const { view, actions, section, selected, navigation } = props;
   const { t } = useTranslation();
   /** Where a tab leads: the entry last open on it, else the default one. */
   const targetOf = (tab: Tab): string | null => {
@@ -52,12 +51,12 @@ export function usePipelineTabs(props: {
     return {
       key: tab,
       label: t(`pipeline.sections.${tab}`),
-      // the open tab keeps its own address, including the level of a system stage
+      // the open tab keeps its own address
       href: formatRoute({
         view: 'pipelines',
         run: isSelected ? selected : target,
         group: nextSection,
-        step: isSelected && level !== null ? 'global' : null,
+        step: null,
         tab: null,
       }),
       selected: isSelected,
