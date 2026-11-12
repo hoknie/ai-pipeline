@@ -126,6 +126,7 @@ function sectionValues(
   for (const runtime of RUNTIMES) {
     const command = runtimes[runtime];
     result.push(
+      [`runtimes.${runtime}.enabled`, command.enabled ?? false],
       [`runtimes.${runtime}.command`, command.command],
       [`runtimes.${runtime}.args`, command.args],
       [`runtimes.${runtime}.env`, Object.keys(command.env).sort()],

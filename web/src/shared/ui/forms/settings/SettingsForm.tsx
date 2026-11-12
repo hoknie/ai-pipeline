@@ -57,13 +57,26 @@ function StatsNote() {
   );
 }
 
-function SectionCard({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function SectionCard({
+  id,
+  title,
+  mark,
+  children,
+}: {
+  id: string;
+  title: string;
+  mark?: string | undefined;
+  children: ReactNode;
+}) {
   return (
     <Card>
       <section aria-labelledby={id} className="flex flex-col gap-3 p-4">
-        <h3 id={id} className="text-sm font-semibold">
-          {title}
-        </h3>
+        <div className="flex items-baseline gap-2">
+          <h3 id={id} className="text-sm font-semibold">
+            {title}
+          </h3>
+          {mark ? <span className="text-xs text-muted-foreground">({mark})</span> : null}
+        </div>
         {children}
       </section>
     </Card>
@@ -90,10 +103,17 @@ function SectionCards({
   const { t } = useTranslation();
   const fields = section.paths.flatMap((path) => byPath.get(path) ?? []);
   if (fields.length === 0) return null;
+  const switchPath = `runtimes.${section.key}.enabled`;
+  const switchDraft = shared.draft.drafts[switchPath];
+  const off =
+    group === 'runtimes' && byPath.has(switchPath)
+      ? !(typeof switchDraft === 'boolean' ? switchDraft : byPath.get(switchPath)?.value)
+      : false;
   return (
     <SectionCard
       id={`section-${group}-${section.key}`}
       title={t(`settingsPage.section.${group}_${section.key}` as never)}
+      mark={off ? t('settingsPage.runtimeOff') : undefined}
     >
       {group === 'system' && section.key === 'stats' ? <StatsNote /> : null}
       <SectionFields fields={fields} {...shared} />

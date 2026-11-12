@@ -663,7 +663,7 @@ describe('installation checks', () => {
 
   it('takes the command in the order: variable, settings, default name', () => {
     const settings = defaultRuntimes();
-    settings.claude = { command: '/opt/claude', args: ['--debug'], env: { A: '1' } };
+    settings.claude = { command: '/opt/claude', enabled: null, args: ['--debug'], env: { A: '1' } };
     expect(runtimeFor('claude', {}, settings).executable).toBe('/opt/claude');
     expect(runtimeFor('claude', { AIP_CLAUDE_BIN: '/fake/claude' }, settings).executable).toBe(
       '/fake/claude',

@@ -114,6 +114,7 @@ describe('AgentsService.models', () => {
   }
   const ok = () => Promise.resolve({ stdout: 'openai/gpt-5\n' });
   const settings = defaultRuntimes();
+  for (const runtime of Object.values(settings)) runtime.enabled = true;
 
   it('serves a repeat from the cache, also for parallel requests, and refreshes on demand', async () => {
     const { agents, calls } = service([ok]);
@@ -128,6 +129,45 @@ describe('AgentsService.models', () => {
     expect(calls()).toBe(2);
     await agents.models('/other', settings);
     expect(calls()).toBe(3);
+  });
+
+  it('does not ask a disabled runtime and asks again once it is switched on', async () => {
+    const { agents, calls } = service([ok]);
+    const off = defaultRuntimes();
+    const catalogs = await agents.models('/r', off);
+    expect(catalogs.opencode).toEqual({ models: [], error: null });
+    expect(catalogs.claude).toEqual({ models: [], error: null });
+    expect(calls()).toBe(0);
+    const on = defaultRuntimes();
+    on.opencode.enabled = true;
+    const next = await agents.models('/r', on);
+    expect(next.opencode.models.map((model) => model.id)).toEqual(['openai/gpt-5']);
+    expect(calls()).toBe(1);
+  });
+
+  it('is enabled by the field, then by a non-empty AIP_<NAME>_BIN, otherwise off', () => {
+    const build = (environment: NodeJS.ProcessEnv) =>
+      createAgentsServices({
+        environment,
+        factories: {
+          claude: createClaudeRuntime,
+          opencode: createOpencodeRuntime,
+          agy: createAgyRuntime,
+        },
+        naming: { parse: () => null },
+        commands: () => Promise.resolve({ stdout: '' }),
+      }).agents;
+    const withField = (enabled: boolean | null) => {
+      const settings = defaultRuntimes();
+      settings.claude.enabled = enabled;
+      return settings;
+    };
+    expect(build({}).isEnabled('claude', withField(null))).toBe(false);
+    expect(build({}).isEnabled('claude', withField(true))).toBe(true);
+    expect(build({ AIP_CLAUDE_BIN: '/fake' }).isEnabled('claude', withField(null))).toBe(true);
+    expect(build({ AIP_CLAUDE_BIN: '' }).isEnabled('claude', withField(null))).toBe(false);
+    expect(build({ AIP_CLAUDE_BIN: '/fake' }).isEnabled('claude', withField(false))).toBe(false);
+    expect(build({ AIP_CLAUDE_BIN: '/fake' }).isEnabled('opencode', withField(null))).toBe(false);
   });
 
   it('does not keep a failure and leaves the other runtimes alone', async () => {

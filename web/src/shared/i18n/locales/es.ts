@@ -1426,6 +1426,7 @@ export const es: Dictionary = {
     save: 'Guardar',
     discard: 'Descartar cambios',
     saved: 'Ajustes guardados',
+    runtimeOff: 'desactivado',
     reload: 'Recargar',
     conflict: 'No guardado: {{message}}. El archivo cambió tras leerlo.',
     inherit: 'Heredar',
@@ -1459,7 +1460,11 @@ export const es: Dictionary = {
       undo: 'Deshacer',
       name: 'Nombre de variable de {{runtime}}',
       value: 'Valor de variable de {{runtime}}',
-      add: 'Añadir a {{runtime}}',
+      add: 'Añadir variable',
+      nameLabel: 'Nombre',
+      valueLabel: 'Valor',
+      multiple:
+        'Puede añadir varias variables seguidas (Intro añade una variable) y luego pulsar Guardar.',
       newValueOf: 'Nuevo valor de {{name}}',
       invalid: 'Nombre de variable no válido.',
       taken: 'Esta variable ya existe.',
@@ -1634,6 +1639,10 @@ export const es: Dictionary = {
       stats_exclude: {
         label: 'Proyectos excluidos',
         hint: 'Proyectos que no se recopilan ni aparecen en los informes.',
+      },
+      runtimes_enabled: {
+        label: 'Activado',
+        hint: 'Desactivado por defecto: aip no inicia este agente hasta que lo active.',
       },
       runtimes_command: { label: 'Comando', hint: 'Nombre o ruta absoluta del CLI del agente.' },
       runtimes_args: { label: 'Argumentos', hint: 'Argumentos añadidos a cada inicio.' },

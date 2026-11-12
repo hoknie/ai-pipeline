@@ -87,13 +87,24 @@ describe('run names', () => {
     expect(existsSync(join(off.fakeState, 'oneshots.jsonl'))).toBe(false);
   });
 
+  it('does not ask a disabled runtime for a name', async () => {
+    const h = await start({ naming: { answer: '{"title": "x", "name": "x"}' } });
+    const directory = join(h.environment.XDG_CONFIG_HOME!, 'aip');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, 'settings.yaml'), 'runtimes:\n  claude:\n    enabled: false\n');
+    const runId = await create(h);
+    await h.waitFor(runId, (run) => run.finished);
+    await settle(h);
+    expect(existsSync(join(h.fakeState, 'oneshots.jsonl'))).toBe(false);
+  });
+
   it('passes the arguments of the runtime settings to the naming request', async () => {
     const h = await start({ naming: { answer: '{"title": "x", "name": "x"}' } });
     const directory = join(h.environment.XDG_CONFIG_HOME!, 'aip');
     mkdirSync(directory, { recursive: true });
     writeFileSync(
       join(directory, 'settings.yaml'),
-      `runtimes:\n  claude:\n    command: ${join(import.meta.dirname, '..', 'fakes', 'claude')}\n    args: [--add-dir, /data]\n`,
+      `runtimes:\n  claude:\n    enabled: true\n    command: ${join(import.meta.dirname, '..', 'fakes', 'claude')}\n    args: [--add-dir, /data]\n`,
     );
     h.environment.AIP_CLAUDE_BIN = '';
     await h.waitFor(await create(h), (run) => run.name !== null);

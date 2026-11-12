@@ -60,6 +60,7 @@ function isFailoverError(kind: FailReason['kind']): boolean {
   return (
     kind === 'usage_limit' ||
     kind === 'runtime_not_found' ||
+    kind === 'runtime_disabled' ||
     kind === 'spawn' ||
     kind === 'no_report'
   );

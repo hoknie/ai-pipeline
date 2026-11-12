@@ -28,7 +28,8 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 - Errors of validation are shown at the fields. If the file was changed after it was read, the form offers "Reload".
 - Leaving a group, a tab or a project with unsaved changes asks for confirmation.
 - A group with configuration errors gets a mark, and the errors are shown in the group. Errors of specialists and pipelines are shown in "General".
-- Of the runtime environment only the names of the variables are shown, never their values: a value can be added or replaced, not read. Runtime settings are reread before the next agent starts. A change of `web.*` takes effect after the restart: see [System](#system).
+- Every card of "Runtimes" starts with the switch "Enabled": all runtimes are off until you switch them on, and a card of an off runtime is marked "(off)". See [Runtimes](../configuration/runtimes.md).
+- Environment variables of a runtime are added one by one: fill "Name" and "Value", then press Enter or "Add variable" and repeat for the next one.
 
 ## Shared specialists
 

@@ -77,7 +77,12 @@ describe('agy launches', () => {
 
   it('takes the environment executable over the settings and preserves args for naming too', () => {
     const settings = defaultRuntimes();
-    settings.agy = { command: '/configured/agy', args: ['--effort', 'high'], env: { A: '1' } };
+    settings.agy = {
+      command: '/configured/agy',
+      enabled: null,
+      args: ['--effort', 'high'],
+      env: { A: '1' },
+    };
     expect(runtimeFor('agy', {}, settings).executable).toBe('/configured/agy');
     const adapter = runtimeFor('agy', { AIP_AGY_BIN: '/override/agy' }, settings);
     const launch = adapter.buildOneShot({

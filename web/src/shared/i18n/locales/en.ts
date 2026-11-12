@@ -1399,6 +1399,7 @@ export const en = {
     save: 'Save',
     discard: 'Discard changes',
     saved: 'Settings saved',
+    runtimeOff: 'off',
     reload: 'Reload',
     conflict: 'Not saved: {{message}}. The file was changed after it was read.',
     inherit: 'Inherit',
@@ -1432,7 +1433,11 @@ export const en = {
       undo: 'Undo',
       name: 'Variable name of {{runtime}}',
       value: 'Variable value of {{runtime}}',
-      add: 'Add to {{runtime}}',
+      add: 'Add variable',
+      nameLabel: 'Name',
+      valueLabel: 'Value',
+      multiple:
+        'You can add several variables one after another (Enter adds a variable), then press Save.',
       newValueOf: 'New value of {{name}}',
       invalid: 'Not a valid variable name.',
       taken: 'This variable already exists.',
@@ -1595,6 +1600,10 @@ export const en = {
       stats_exclude: {
         label: 'Excluded projects',
         hint: 'Projects that are not collected and not shown in the reports.',
+      },
+      runtimes_enabled: {
+        label: 'Enabled',
+        hint: 'Off by default: aip does not start this agent until you switch it on.',
       },
       runtimes_command: { label: 'Command', hint: 'Name or absolute path of the agent CLI.' },
       runtimes_args: { label: 'Arguments', hint: 'Arguments added to every start.' },

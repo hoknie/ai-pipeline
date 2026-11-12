@@ -61,7 +61,12 @@ describe('runs', () => {
       .run(JSON.stringify({ ...state.run.config, runtimes }), state.run.id);
     const loaded = store.runs.loadRun(state.run.id)!;
     expect(loaded.run.config.specialists).toEqual(state.run.config.specialists);
-    expect(loaded.run.config.runtimes.agy).toEqual({ command: 'agy', args: [], env: {} });
+    expect(loaded.run.config.runtimes.agy).toEqual({
+      command: 'agy',
+      enabled: null,
+      args: [],
+      env: {},
+    });
     store.database.close();
   });
 

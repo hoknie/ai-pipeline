@@ -27,7 +27,7 @@ import {
   variantProblem,
 } from '../types/specialist.ts';
 
-const RUNTIME_COMMAND_KEYS = ['command', 'args', 'env'];
+const RUNTIME_COMMAND_KEYS = ['command', 'enabled', 'args', 'env'];
 
 const MCP_SERVER_KEYS = ['command', 'args', 'env'];
 
@@ -164,6 +164,7 @@ export function checkRuntimes(
           addError(ctx, path, 'must be a command name or an absolute path');
         } else target.command = command;
       }
+      if (key === 'enabled') target.enabled = readBoolean(ctx, field, path);
       if (key === 'args') target.args = readStrings(ctx, field, path);
       if (key === 'env') target.env = checkEnvironment(ctx, field, path);
     }

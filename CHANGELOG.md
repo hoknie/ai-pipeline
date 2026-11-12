@@ -6,6 +6,10 @@ The versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- Runtimes are off until switched on: set `runtimes.<name>.enabled: true` in the shared `settings.yaml` or use the panel. A non-empty `AIP_<NAME>_BIN` switches a runtime on while `enabled` is not set.
+
 ### Features
 
 - Updated pipeline scheme ([4241cbb](https://github.com/hoknie/ai-pipeline/commit/4241cbb58dfe4d942c3f9ad9339d7b246e1dcbe2))

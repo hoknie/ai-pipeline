@@ -18,11 +18,18 @@ import { probeVersion } from '../probe.ts';
 
 type Config = ResolvedConfig;
 
-function presentRuntimes(config: Config): unknown {
+/** Whether a runtime may start: the field, then a non-empty AIP_<NAME>_BIN of the environment. */
+function runtimeEnabled(config: Config, name: string, environment: NodeJS.ProcessEnv): boolean {
+  const setting = config.runtimes[name as keyof Config['runtimes']].enabled;
+  return setting ?? Boolean(environment[`AIP_${name.toUpperCase()}_BIN`]);
+}
+
+function presentRuntimes(config: Config, environment: NodeJS.ProcessEnv): unknown {
   return Object.fromEntries(
     Object.entries(config.runtimes).map(([name, runtime]) => [
       name,
       {
+        enabled: runtimeEnabled(config, name, environment),
         command: runtime.command,
         ...(runtime.args.length > 0 ? { args: runtime.args } : {}),
         ...(Object.keys(runtime.env).length > 0 ? { env: runtime.env } : {}),
@@ -154,7 +161,10 @@ function presentPipelines(config: Config): unknown {
   );
 }
 
-export function presentConfig(config: ResolvedConfig): unknown {
+export function presentConfig(
+  config: ResolvedConfig,
+  environment: NodeJS.ProcessEnv = {},
+): unknown {
   return {
     max: config.max,
     workspace_dir: config.workspaceDir,
@@ -164,7 +174,7 @@ export function presentConfig(config: ResolvedConfig): unknown {
       runtime: config.naming.runtime,
       model: config.naming.model,
     },
-    runtimes: presentRuntimes(config),
+    runtimes: presentRuntimes(config, environment),
     outside_changes: config.outsideChanges,
     claude: {
       edit_mode: config.claude.editMode,
@@ -222,7 +232,7 @@ export async function checkConfig(
     io.stderr(`${error instanceof ConfigLoadError ? error.message : (error as Error).message}\n`);
     return 1;
   }
-  io.stdout(stringify({ swarm: presentConfig(config) }));
+  io.stdout(stringify({ swarm: presentConfig(config, environment) }));
   const specialistRuntimes = config.specialists.flatMap((specialist) => {
     if (!specialist.runtimeChain) return [specialist.runtime];
     const chain = config.chains.find((c) => c.slug === specialist.runtimeChain);
@@ -241,13 +251,24 @@ export async function checkConfig(
     );
   }
   io.stdout('\nAgent CLIs:\n');
+  const disabled: string[] = [];
   for (const name of runtimes) {
+    if (!runtimeEnabled(config, name, environment)) {
+      disabled.push(name);
+      io.stdout(`  ${name}: disabled\n`);
+      continue;
+    }
     const path = findExecutable(
       agentExecutable(name, environment, config.runtimes),
       environment.PATH,
     );
     io.stdout(
       `  ${name}: ${path ? `${await probeVersion(path)} (${path})` : 'not found in PATH'}\n`,
+    );
+  }
+  for (const name of disabled) {
+    io.stdout(
+      `Warning: runtime \`${name}\` is disabled and specialists on it fail; set runtimes.${name}.enabled: true in the shared settings.yaml\n`,
     );
   }
   for (const warning of configWarnings(config)) io.stdout(`Warning: ${warning}\n`);

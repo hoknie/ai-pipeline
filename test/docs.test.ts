@@ -185,7 +185,12 @@ describe('documentation examples', () => {
     const runtimes = loadRuntimeSettings(
       configPaths(join(root, 'repo'), join(root, 'xdg'), undefined),
     );
-    expect(runtimes.opencode).toEqual({ command: 'npx', args: ['-y', 'opencode-ai'], env: {} });
+    expect(runtimes.opencode).toEqual({
+      command: 'npx',
+      enabled: true,
+      args: ['-y', 'opencode-ai'],
+      env: {},
+    });
     expect(runtimes.claude.args).toEqual(['--debug']);
   });
 

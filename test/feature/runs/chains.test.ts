@@ -335,6 +335,31 @@ describe('execution with on_error runtime chains', () => {
     expect(g.attempts[1]?.runtime).toBe('opencode');
   });
 
+  it('fails over on runtime_disabled like on runtime_not_found', () => {
+    const state = run(1, { configText: CHAIN_CONFIG });
+    dispatch([state], 1000);
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq: 1,
+        exit: {
+          sessionId: null,
+          usage: null,
+          failure: { kind: 'runtime_disabled', runtime: 'claude' },
+          outsideChanges: [],
+        },
+      },
+      2000,
+    );
+    const g = group(state);
+    expect(g.status).toBe('queued');
+    expect(g.attempts[0]?.reason).toEqual({ kind: 'runtime_disabled', runtime: 'claude' });
+    dispatch([state], 2100);
+    expect(g.attempts[1]?.runtime).toBe('opencode');
+  });
+
   it('fails group when all enabled elements have failed', () => {
     const state = run(1, { configText: CHAIN_CONFIG });
     dispatch([state], 1000);

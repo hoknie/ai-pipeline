@@ -21,7 +21,10 @@ describe('agy config check', () => {
     const directory = join(box.env.XDG_CONFIG_HOME!, 'aip');
     mkdirSync(directory, { recursive: true });
     const command = exists ? box.env.AIP_AGY_BIN! : '/missing/agy';
-    writeFileSync(join(directory, 'settings.yaml'), `runtimes:\n  agy:\n    command: ${command}\n`);
+    writeFileSync(
+      join(directory, 'settings.yaml'),
+      `runtimes:\n  agy:\n    enabled: true\n    command: ${command}\n`,
+    );
     box.env.AIP_AGY_BIN = '';
     const checked = await aip(box, 'config', 'check');
     expect(checked.code).toBe(0);

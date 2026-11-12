@@ -46,7 +46,7 @@ describe('runtimes in the shared settings.yaml', () => {
   it('start the command with the arguments and variables of the settings', async () => {
     const { h, log, settings } = await start();
     settings(
-      `runtimes:\n  claude:\n    command: ${fakeClaude}\n    args: [--add-dir, /data]\n    env: { MY_FLAG: on }\n`,
+      `runtimes:\n  claude:\n    enabled: true\n    command: ${fakeClaude}\n    args: [--add-dir, /data]\n    env: { MY_FLAG: on }\n`,
     );
     const final = await h.waitFor(await run(h), (view) => view.finished);
     expect(final.groups[0]?.status).toBe('merged');
@@ -57,9 +57,13 @@ describe('runtimes in the shared settings.yaml', () => {
 
   it('take a change made while the daemon runs', async () => {
     const { h, log, settings } = await start();
-    settings(`runtimes:\n  claude:\n    command: ${fakeClaude}\n    args: [--one]\n`);
+    settings(
+      `runtimes:\n  claude:\n    enabled: true\n    command: ${fakeClaude}\n    args: [--one]\n`,
+    );
     await h.waitFor(await run(h), (view) => view.finished);
-    settings(`runtimes:\n  claude:\n    command: ${fakeClaude}\n    args: [--two]\n`);
+    settings(
+      `runtimes:\n  claude:\n    enabled: true\n    command: ${fakeClaude}\n    args: [--two]\n`,
+    );
     await h.waitFor(await run(h), (view) => view.finished);
     const firsts = calls(log)
       .filter((call) => call.argv.includes('--session-id'))
@@ -70,12 +74,12 @@ describe('runtimes in the shared settings.yaml', () => {
 
   it('fail the step with spawn error when the section is wrong', async () => {
     const { h, settings } = await start();
-    settings(`runtimes:\n  claude:\n    command: ${fakeClaude}\n`);
+    settings(`runtimes:\n  claude:\n    enabled: true\n    command: ${fakeClaude}\n`);
     h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     // the section is broken while the run is under way: the next step cannot start
-    settings(`runtimes:\n  claude:\n    command: ${fakeClaude}\n    args: 1\n`);
+    settings(`runtimes:\n  claude:\n    enabled: true\n    command: ${fakeClaude}\n    args: 1\n`);
     h.open('code');
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(final.groups[0]?.status).toBe('failed');
@@ -85,11 +89,44 @@ describe('runtimes in the shared settings.yaml', () => {
 
   it('fail the step when the command does not exist', async () => {
     const { h, settings } = await start();
-    settings('runtimes:\n  claude:\n    command: /nonexistent/claude\n');
+    settings('runtimes:\n  claude:\n    enabled: true\n    command: /nonexistent/claude\n');
     const final = await h.waitFor(await run(h), (view) => view.finished);
     expect(final.groups[0]).toMatchObject({
       status: 'failed',
       reason: 'runtime not found: claude',
     });
+  });
+
+  it('fail the step with runtime disabled until the runtime is switched on', async () => {
+    const { h, settings } = await start();
+    // no `enabled` and no AIP_CLAUDE_BIN: the runtime is off
+    settings(`runtimes:\n  claude:\n    command: ${fakeClaude}\n`);
+    const first = await h.waitFor(await run(h), (view) => view.finished);
+    expect(first.groups[0]).toMatchObject({
+      status: 'failed',
+      reason: 'runtime disabled: claude',
+    });
+    // switched on while the daemon runs
+    settings(`runtimes:\n  claude:\n    enabled: true\n    command: ${fakeClaude}\n`);
+    const second = await h.waitFor(await run(h), (view) => view.finished);
+    expect(second.groups[0]?.status).toBe('merged');
+  });
+
+  it('let an explicit enabled: false win over AIP_CLAUDE_BIN', async () => {
+    const { h, settings } = await start();
+    h.environment.AIP_CLAUDE_BIN = fakeClaude;
+    settings('runtimes:\n  claude:\n    enabled: false\n');
+    const final = await h.waitFor(await run(h), (view) => view.finished);
+    expect(final.groups[0]).toMatchObject({
+      status: 'failed',
+      reason: 'runtime disabled: claude',
+    });
+  });
+
+  it('start the runtime of AIP_CLAUDE_BIN when enabled is not set', async () => {
+    const { h } = await start();
+    h.environment.AIP_CLAUDE_BIN = fakeClaude;
+    const final = await h.waitFor(await run(h), (view) => view.finished);
+    expect(final.groups[0]?.status).toBe('merged');
   });
 });

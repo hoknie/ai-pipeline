@@ -40,15 +40,30 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
   runtimes: [
     {
       key: 'claude',
-      paths: ['runtimes.claude.command', 'runtimes.claude.args', 'runtimes.claude.env'],
+      paths: [
+        'runtimes.claude.enabled',
+        'runtimes.claude.command',
+        'runtimes.claude.args',
+        'runtimes.claude.env',
+      ],
     },
     {
       key: 'opencode',
-      paths: ['runtimes.opencode.command', 'runtimes.opencode.args', 'runtimes.opencode.env'],
+      paths: [
+        'runtimes.opencode.enabled',
+        'runtimes.opencode.command',
+        'runtimes.opencode.args',
+        'runtimes.opencode.env',
+      ],
     },
     {
       key: 'agy',
-      paths: ['runtimes.agy.command', 'runtimes.agy.args', 'runtimes.agy.env'],
+      paths: [
+        'runtimes.agy.enabled',
+        'runtimes.agy.command',
+        'runtimes.agy.args',
+        'runtimes.agy.env',
+      ],
     },
   ],
   system: [

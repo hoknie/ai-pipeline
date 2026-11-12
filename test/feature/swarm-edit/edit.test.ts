@@ -31,7 +31,11 @@ import {
   settingsFile,
   specialistReferences,
 } from '../../../src/feature/swarm-edit/services/index.ts';
-import { configPaths, loadConfig } from '../../../src/feature/swarm-config/services/index.ts';
+import {
+  configPaths,
+  loadConfig,
+  loadRuntimeSettings,
+} from '../../../src/feature/swarm-config/services/index.ts';
 import { type ConfigPaths } from '../../../src/feature/swarm-config/types/index.ts';
 
 function setup(): ConfigPaths {
@@ -934,6 +938,11 @@ describe('web and runtimes in the editor view', () => {
       file: null,
     });
     expect(find(view, 'runtimes.opencode.env')?.value).toEqual([]);
+    expect(find(view, 'runtimes.claude.enabled')).toMatchObject({
+      value: false,
+      file: null,
+      globalOnly: true,
+    });
     expect(find(view, 'runtimes.agy.command')).toMatchObject({
       path: 'runtimes.agy.command',
       value: 'agy',
@@ -1102,6 +1111,26 @@ describe('batch write of settings', () => {
       accepted(planSettings(paths, { values: { 'web.port': 8100 }, revision: revisionOf(GLOBAL) })),
     );
     expect(readFileSync(settingsFile(paths, 'global'), 'utf8')).toContain('port: 8100');
+  });
+
+  it('writes the switch of a runtime only to the global level', () => {
+    const paths = levels(GLOBAL);
+    const plan = planSettings(paths, {
+      values: { 'runtimes.opencode.enabled': true },
+      revision: null,
+      level: 'project',
+    });
+    expect(plan).toMatchObject({ ok: false, reason: 'invalid' });
+    commitEdit(
+      accepted(
+        planSettings(paths, {
+          values: { 'runtimes.opencode.enabled': true },
+          revision: revisionOf(GLOBAL),
+        }),
+      ),
+    );
+    expect(readFileSync(settingsFile(paths, 'global'), 'utf8')).toContain('enabled: true');
+    expect(loadRuntimeSettings(paths).opencode.enabled).toBe(true);
   });
 
   it('writes the command, the arguments and a new variable of a runtime', () => {

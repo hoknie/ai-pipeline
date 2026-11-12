@@ -154,13 +154,13 @@ describe('agy execution', () => {
     const fakeCommand = join(import.meta.dirname, '..', 'fakes', 'agy');
     writeFileSync(
       join(shared, 'settings.yaml'),
-      `runtimes:\n  agy:\n    command: ${fakeCommand}\n    args: [--effort, low]\n`,
+      `runtimes:\n  agy:\n    enabled: true\n    command: ${fakeCommand}\n    args: [--effort, low]\n`,
     );
     const first = await run(h);
     await h.waitFor(first, (value) => value.finished);
     writeFileSync(
       join(shared, 'settings.yaml'),
-      'runtimes:\n  agy:\n    command: /missing/agy\n    args: [--effort, high]\n',
+      'runtimes:\n  agy:\n    enabled: true\n    command: /missing/agy\n    args: [--effort, high]\n',
     );
     const second = await run(h);
     await h.waitFor(second, (value) => value.finished);

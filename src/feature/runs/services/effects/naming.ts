@@ -23,6 +23,7 @@ export async function nameRun(
   if (modelIdProblem(naming.runtime, naming.model)) return;
   const settings = config.runtimeSettings(state.run.repository);
   if (typeof settings === 'string') return;
+  if (!agents.isEnabled(naming.runtime, settings)) return;
   const runtime = agents.runtimeFor(naming.runtime, settings);
   if (!findExecutable(runtime.executable, environment.PATH)) return;
   const directory = join(workspaceOf(state), 'logs', state.run.id, '_naming');

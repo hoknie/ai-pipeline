@@ -7,10 +7,12 @@ A runtime is the agent CLI that executes a step: `claude` (Claude Code), `openco
 ```yaml
 runtimes:
   claude:
+    enabled: true                     # off until you switch it on
     command: /opt/claude/bin/claude   # a name from PATH or an absolute path
     args: [--debug]                   # put right after the command, before the arguments of aip
     env: { HTTPS_PROXY: "http://127.0.0.1:3128" }
   opencode:
+    enabled: true
     command: npx
     args: [-y, opencode-ai]
   agy:
@@ -20,6 +22,9 @@ runtimes:
 
 This section is set in the shared `settings.yaml` only. In a project `aip/settings.yaml` it is a validation error (`swarm.runtimes`).
 
+- **`enabled`** switches the runtime on or off. Every runtime is off until you switch it on: without the field, `aip` does not start it. A step of a specialist on a runtime that is off fails with `runtime disabled: <name>` (a chain with `on_error` moves on to its next item), the request for a run name is skipped and the list of its models stays empty.
+  - A non-empty `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN` in the daemon's environment switches the runtime on while `enabled` is not set. An explicit `enabled: false` wins over the variable.
+  - Switch it in the panel (Settings → Runtimes → Enabled) or set `runtimes.<name>.enabled: true` in the shared `settings.yaml`. To go back to an older `aip`, remove `enabled` from the file first.
 - **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is the runtime's name: `claude`, `opencode` or `agy`.
   - The order of choice is: `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN` from the daemon's environment, then `command`, then `PATH`.
 - **`args`** are put right after the command, before the arguments `aip` builds, for every start of the agent: a step, a retry, an answer and the request for a run name. A wrapper such as `npx -y opencode-ai` works this way: `npx -y opencode-ai run --format json …`.
@@ -126,7 +131,7 @@ runtimes:
 ```
 
 - **`mode`**:
-  - `on_error`: starts with the first enabled runtime and falls back to the next enabled runtime when an attempt hits limits or cannot start (`usage_limit`, `runtime_not_found`, `spawn`, `no_report`).
+  - `on_error`: starts with the first enabled runtime and falls back to the next enabled runtime when an attempt hits limits or cannot start (`usage_limit`, `runtime_not_found`, `runtime_disabled`, `spawn`, `no_report`).
   - `random`: picks a random enabled runtime from the pool for each step.
   - `round_robin`: cycles through the enabled runtimes in order across steps.
 - **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, or `agy`), optional `model`, optional `enabled` (default `true`), and optional `variant` and `reasoning_effort` for OpenCode.

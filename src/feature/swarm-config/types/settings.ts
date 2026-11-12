@@ -93,6 +93,8 @@ export function defaultWeb(): WebSettings {
 /** How an agent CLI is started: the command, extra leading arguments and extra environment. */
 export interface RuntimeCommand {
   command: string;
+  /** The value from the file; `null` when not set: the runtime is then off unless `AIP_<NAME>_BIN` is set. */
+  enabled: boolean | null;
   args: string[];
   env: Record<string, string>;
 }
@@ -101,9 +103,9 @@ export type RuntimeSettings = Record<Runtime, RuntimeCommand>;
 
 export function defaultRuntimes(): RuntimeSettings {
   return {
-    claude: { command: 'claude', args: [], env: {} },
-    opencode: { command: 'opencode', args: [], env: {} },
-    agy: { command: 'agy', args: [], env: {} },
+    claude: { command: 'claude', enabled: null, args: [], env: {} },
+    opencode: { command: 'opencode', enabled: null, args: [], env: {} },
+    agy: { command: 'agy', enabled: null, args: [], env: {} },
   };
 }
 

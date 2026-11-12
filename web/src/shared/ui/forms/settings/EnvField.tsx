@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '../button.tsx';
@@ -101,6 +101,7 @@ function NewVariable({
   nameProblem,
   name,
   value,
+  nameRef,
   onName,
   onValue,
   onAdd,
@@ -110,42 +111,123 @@ function NewVariable({
   nameProblem: string | null;
   name: string;
   value: string;
+  nameRef: RefObject<HTMLInputElement | null>;
   onName: (name: string) => void;
   onValue: (value: string) => void;
   onAdd: () => void;
 }) {
   const { t } = useTranslation();
+  const canAdd = !disabled && name !== '' && nameProblem === null;
+  // Enter adds the variable; it never sends the whole form.
+  const onEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (canAdd) onAdd();
+  };
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        className="w-40"
-        aria-label={t('settingsPage.env.name', { runtime })}
-        placeholder="NAME"
-        value={name}
-        disabled={disabled}
-        aria-invalid={nameProblem !== null}
-        onChange={(event) => onName(event.target.value)}
-      />
-      <Input
-        type="password"
-        autoComplete="off"
-        className="w-48"
-        aria-label={t('settingsPage.env.value', { runtime })}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onValue(event.target.value)}
-      />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={disabled || name === '' || nameProblem !== null}
-        onClick={onAdd}
-      >
-        {t('settingsPage.env.add', { runtime })}
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <span aria-hidden className="text-xs text-muted-foreground">
+          {t('settingsPage.env.nameLabel')}
+        </span>
+        <Input
+          ref={nameRef}
+          className="w-40"
+          aria-label={t('settingsPage.env.name', { runtime })}
+          placeholder="NAME"
+          value={name}
+          disabled={disabled}
+          aria-invalid={nameProblem !== null}
+          onChange={(event) => onName(event.target.value)}
+          onKeyDown={onEnter}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span aria-hidden className="text-xs text-muted-foreground">
+          {t('settingsPage.env.valueLabel')}
+        </span>
+        <Input
+          type="password"
+          autoComplete="off"
+          className="w-48"
+          aria-label={t('settingsPage.env.value', { runtime })}
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onValue(event.target.value)}
+          onKeyDown={onEnter}
+        />
+      </div>
+      <Button type="button" variant="outline" size="sm" disabled={!canAdd} onClick={onAdd}>
+        {t('settingsPage.env.add')}
       </Button>
     </div>
   );
+}
+
+/**
+ * The row for a new variable. A valid free name is a draft of its own at once, so «Save» keeps
+ * a pair that was typed but not added; renaming drops the old draft. `added` are the names of
+ * the drafts of new variables, `names` the saved ones.
+ */
+function useNewVariableRow({
+  names,
+  drafts,
+  onSet,
+  onUndo,
+}: {
+  names: string[];
+  drafts: Record<string, string | null>;
+  onSet: (name: string, value: string | null) => void;
+  onUndo: (name: string) => void;
+}) {
+  const [name, setName] = useState('');
+  const [value, setValue] = useState('');
+  // The name of the variable the row has already put into the draft while it is being typed.
+  const [typing, setTyping] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const added = Object.keys(drafts).filter((candidate) => !names.includes(candidate));
+  const listed = added.filter((candidate) => candidate !== typing);
+  const all = [...names, ...listed];
+  const problemOf = (candidate: string): 'invalid' | 'taken' | null =>
+    candidate === ''
+      ? null
+      : !ENV_NAME.test(candidate)
+        ? 'invalid'
+        : all.includes(candidate)
+          ? 'taken'
+          : null;
+  const nameProblem = problemOf(name);
+
+  // «Discard» or a write took the draft of the row away: the row starts empty again.
+  useEffect(() => {
+    if (typing !== null && !(typing in drafts)) {
+      setTyping(null);
+      setName('');
+      setValue('');
+    }
+  }, [drafts, typing]);
+
+  const changeName = (next: string) => {
+    if (typing !== null && typing !== next) onUndo(typing);
+    setName(next);
+    if (problemOf(next) === null && next !== '') {
+      onSet(next, value);
+      setTyping(next);
+    } else setTyping(null);
+  };
+  const changeValue = (next: string) => {
+    setValue(next);
+    if (typing !== null) onSet(typing, next);
+  };
+  const add = () => {
+    // the draft is already there: the variable moves from the row to the list
+    setTyping(null);
+    setName('');
+    setValue('');
+    nameRef.current?.focus();
+  };
+
+  return { name, value, nameRef, nameProblem, all, changeName, changeValue, add };
 }
 
 /**
@@ -170,12 +252,8 @@ export function EnvField({
   onUndo: (name: string) => void;
 }) {
   const { t } = useTranslation();
-  const [name, setName] = useState('');
-  const [value, setValue] = useState('');
-  const added = Object.keys(drafts).filter((candidate) => !names.includes(candidate));
-  const all = [...names, ...added];
-  const nameProblem =
-    name === '' ? null : !ENV_NAME.test(name) ? 'invalid' : all.includes(name) ? 'taken' : null;
+  const { name, value, nameRef, nameProblem, all, changeName, changeValue, add } =
+    useNewVariableRow({ names, drafts, onSet, onUndo });
 
   return (
     <div
@@ -206,14 +284,12 @@ export function EnvField({
         nameProblem={nameProblem}
         name={name}
         value={value}
-        onName={setName}
-        onValue={setValue}
-        onAdd={() => {
-          onSet(name, value);
-          setName('');
-          setValue('');
-        }}
+        nameRef={nameRef}
+        onName={changeName}
+        onValue={changeValue}
+        onAdd={add}
       />
+      <p className="text-xs text-muted-foreground">{t('settingsPage.env.multiple')}</p>
       {nameProblem ? (
         <p className="text-xs text-destructive">{t(`settingsPage.env.${nameProblem}`)}</p>
       ) : null}

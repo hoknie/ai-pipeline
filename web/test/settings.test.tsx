@@ -1090,7 +1090,7 @@ describe('settings form', () => {
       target: { value: 'GEMINI_API_KEY' },
     });
     fireEvent.change(agy.getByLabelText('Variable value of agy'), { target: { value: 'secret' } });
-    fireEvent.click(agy.getByRole('button', { name: 'Add to agy' }));
+    fireEvent.click(agy.getByRole('button', { name: 'Add variable' }));
     expect(document.body.innerHTML).not.toContain('secret');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
@@ -1116,7 +1116,7 @@ describe('settings form', () => {
     fireEvent.change(claude.getByLabelText('Variable value of claude'), {
       target: { value: 's3cret' },
     });
-    fireEvent.click(claude.getByRole('button', { name: 'Add to claude' }));
+    fireEvent.click(claude.getByRole('button', { name: 'Add variable' }));
     expect(claude.getByText('will be added')).toBeTruthy();
     fireEvent.click(claude.getByRole('button', { name: /^Replace value ANTHROPIC_API_KEY/ }));
     fireEvent.change(claude.getByLabelText('New value of ANTHROPIC_API_KEY'), {
@@ -1163,9 +1163,101 @@ describe('settings form', () => {
       target: { value: '1BAD' },
     });
     expect(claude.getByText('Not a valid variable name.')).toBeTruthy();
-    expect(claude.getByRole<HTMLButtonElement>('button', { name: 'Add to claude' }).disabled).toBe(
+    expect(claude.getByRole<HTMLButtonElement>('button', { name: 'Add variable' }).disabled).toBe(
       true,
     );
+  });
+
+  it('shows every runtime off with a mark on the first run and writes the switch', async () => {
+    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.enabled');
+    for (const name of ['Claude', 'OpenCode', 'Antigravity CLI (agy)']) {
+      const region = within(screen.getByRole('region', { name }));
+      expect(region.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe(
+        'false',
+      );
+      expect(region.getByText('(off)')).toBeTruthy();
+    }
+    // the switch is the first field of the card
+    const opencode = within(screen.getByRole('region', { name: 'OpenCode' }));
+    expect(opencode.getAllByTestId(/^setting-/)[0]?.dataset.testid).toBe(
+      'setting-runtimes.opencode.enabled',
+    );
+    fireEvent.click(opencode.getByRole('switch', { name: 'Enabled' }));
+    expect(opencode.queryByText('(off)')).toBeNull();
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'runtimes.opencode.enabled': true },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('adds two variables in a row, one by Enter and one by the button', async () => {
+    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.env');
+    const claude = within(screen.getByRole('region', { name: 'Claude' }));
+    expect(claude.getByText('Name')).toBeTruthy();
+    expect(claude.getByText('Value')).toBeTruthy();
+    expect(claude.getByText(/several variables/)).toBeTruthy();
+    const nameField = () => claude.getByLabelText<HTMLInputElement>('Variable name of claude');
+    fireEvent.change(nameField(), { target: { value: 'A_ONE' } });
+    fireEvent.change(claude.getByLabelText('Variable value of claude'), { target: { value: '1' } });
+    // the pair is a draft already
+    expect(saveButton().disabled).toBe(false);
+    expect(fireEvent.keyDown(nameField(), { key: 'Enter' })).toBe(false);
+    expect(claude.getByText('A_ONE')).toBeTruthy();
+    expect(nameField().value).toBe('');
+    expect(document.activeElement).toBe(nameField());
+    fireEvent.change(nameField(), { target: { value: 'B_TWO' } });
+    fireEvent.change(claude.getByLabelText('Variable value of claude'), { target: { value: '2' } });
+    fireEvent.click(claude.getByRole('button', { name: 'Add variable' }));
+    expect(claude.getByText('B_TWO')).toBeTruthy();
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'runtimes.claude.env.A_ONE': '1', 'runtimes.claude.env.B_TWO': '2' },
+        'g1',
+        'global',
+      ),
+    );
+    expect(document.body.innerHTML).not.toContain('>2<');
+  });
+
+  it('saves a pair that was typed but not added, and drops the old name on a rename', async () => {
+    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.env');
+    const claude = within(screen.getByRole('region', { name: 'Claude' }));
+    const name = claude.getByLabelText('Variable name of claude');
+    fireEvent.change(name, { target: { value: 'TOK' } });
+    fireEvent.change(name, { target: { value: 'TOKEN' } });
+    fireEvent.change(claude.getByLabelText('Variable value of claude'), {
+      target: { value: 'x' },
+    });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'runtimes.claude.env.TOKEN': 'x' },
+        'g1',
+        'global',
+      ),
+    );
+  });
+
+  it('clears the row of a variable on «Discard»', async () => {
+    show(queueOf(), {}, '#settings/global/runtimes');
+    await screen.findByTestId('setting-runtimes.claude.env');
+    const claude = within(screen.getByRole('region', { name: 'Claude' }));
+    fireEvent.change(claude.getByLabelText('Variable name of claude'), {
+      target: { value: 'TMP' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    await waitFor(() =>
+      expect(claude.getByLabelText<HTMLInputElement>('Variable name of claude').value).toBe(''),
+    );
+    expect(saveButton().disabled).toBe(true);
   });
 
   it('asks before leaving a group with unsaved changes', async () => {

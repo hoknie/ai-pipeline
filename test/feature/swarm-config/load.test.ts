@@ -956,9 +956,9 @@ describe('runtimes settings', () => {
 
   it('default to the names of the CLIs without arguments', () => {
     expect(runtimes('')).toEqual({
-      claude: { command: 'claude', args: [], env: {} },
-      opencode: { command: 'opencode', args: [], env: {} },
-      agy: { command: 'agy', args: [], env: {} },
+      claude: { command: 'claude', enabled: null, args: [], env: {} },
+      opencode: { command: 'opencode', enabled: null, args: [], env: {} },
+      agy: { command: 'agy', enabled: null, args: [], env: {} },
     });
   });
 
@@ -968,10 +968,30 @@ describe('runtimes settings', () => {
     );
     expect(result.opencode).toEqual({
       command: 'npx',
+      enabled: null,
       args: ['-y', 'opencode-ai'],
       env: { A_B: '1' },
     });
-    expect(result.claude).toEqual({ command: '/opt/claude', args: [], env: {} });
+    expect(result.claude).toEqual({
+      command: '/opt/claude',
+      enabled: null,
+      args: [],
+      env: {},
+    });
+  });
+
+  it('read enabled as a boolean and keep null while it is not set', () => {
+    const result = runtimes(
+      '  runtimes:\n    opencode: { enabled: true }\n    claude: { enabled: false }\n',
+    );
+    expect(result.opencode.enabled).toBe(true);
+    expect(result.claude.enabled).toBe(false);
+    expect(result.agy.enabled).toBeNull();
+    expectError(
+      errorsOf(`${BASE}  runtimes: { opencode: { enabled: "yes" } }\n`),
+      'swarm.runtimes.opencode.enabled',
+      'true or false',
+    );
   });
 
   it('reject an unknown runtime, wrong types, a relative path and a bad variable name', () => {
@@ -1012,7 +1032,7 @@ describe('runtimes settings', () => {
     delete stored.runtimes;
     expect(
       withConfigDefaults(stored as Parameters<typeof withConfigDefaults>[0]).runtimes.claude,
-    ).toEqual({ command: 'claude', args: [], env: {} });
+    ).toEqual({ command: 'claude', enabled: null, args: [], env: {} });
   });
 
   it('are an error in the project settings, naming the project file', () => {
@@ -1042,7 +1062,12 @@ describe('runtimes settings', () => {
     const paths = temporaryPaths();
     expect(loadRuntimeSettings(paths).opencode.command).toBe('opencode');
     write(join(paths.global.directory, 'settings.yaml'), 'max: 2\n');
-    expect(loadRuntimeSettings(paths).claude).toEqual({ command: 'claude', args: [], env: {} });
+    expect(loadRuntimeSettings(paths).claude).toEqual({
+      command: 'claude',
+      enabled: null,
+      args: [],
+      env: {},
+    });
   });
 
   it('fail to load with the global file and the field path when wrong', () => {

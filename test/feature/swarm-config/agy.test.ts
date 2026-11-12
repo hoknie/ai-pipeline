@@ -12,7 +12,7 @@ describe('agy configuration', () => {
     });
     expect(config.specialists[0]).toMatchObject({ runtime: 'agy', model: 'custom' });
     expect(config.naming).toMatchObject({ runtime: 'agy', model: 'custom' });
-    expect(config.runtimes.agy).toEqual({ command: 'agy', args: [], env: {} });
+    expect(config.runtimes.agy).toEqual({ command: 'agy', enabled: null, args: [], env: {} });
     expect(validateObserverProfile({ runtime: 'agy' }).errors).toEqual([]);
     expect(validateObserverProfile({ runtime: 'agy' }).specialist.runtime).toBe('agy');
   });

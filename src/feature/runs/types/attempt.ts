@@ -36,6 +36,8 @@ export type FailReason =
   | { kind: 'exit_code'; code: number }
   | { kind: 'no_groups' }
   | { kind: 'runtime_not_found'; runtime: string }
+  /** The runtime is switched off in the settings. */
+  | { kind: 'runtime_disabled'; runtime: string }
   | { kind: 'spawn'; message: string }
   | { kind: 'git'; message: string }
   /** The step was skipped while its attempt ran. */
@@ -69,6 +71,8 @@ export function describeFailReason(reason: FailReason): string {
       return 'no groups';
     case 'runtime_not_found':
       return `runtime not found: ${reason.runtime}`;
+    case 'runtime_disabled':
+      return `runtime disabled: ${reason.runtime}`;
     case 'spawn':
       return `spawn error: ${reason.message}`;
     case 'git':

@@ -77,6 +77,7 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('stats.exclude', 'strings', { globalOnly: true }),
   field('stats.show_cost', 'boolean', { globalOnly: true }),
   ...RUNTIMES.flatMap((runtime) => [
+    field(`runtimes.${runtime}.enabled`, 'boolean', { globalOnly: true }),
     field(`runtimes.${runtime}.command`, 'string', { globalOnly: true }),
     field(`runtimes.${runtime}.args`, 'strings', { globalOnly: true }),
     field(`runtimes.${runtime}.env`, 'env', { globalOnly: true }),

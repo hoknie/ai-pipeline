@@ -118,6 +118,10 @@ export class AttemptStarter {
       await this.fail(state, key, { kind: 'spawn', message: settings });
       return null;
     }
+    if (!agents.isEnabled(attempt.runtime, settings)) {
+      await this.fail(state, key, { kind: 'runtime_disabled', runtime: attempt.runtime });
+      return null;
+    }
     const runtime = agents.runtimeFor(attempt.runtime, settings);
     if (!findExecutable(runtime.executable, environment.PATH)) {
       await this.fail(state, key, { kind: 'runtime_not_found', runtime: attempt.runtime });

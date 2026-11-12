@@ -230,13 +230,26 @@ describe('cli', () => {
     const command = join(fakes, 'claude');
     writeFileSync(
       join(directory, 'settings.yaml'),
-      `runtimes:\n  claude:\n    command: ${command}\n    args: [--debug]\n`,
+      `runtimes:\n  claude:\n    enabled: true\n    command: ${command}\n    args: [--debug]\n`,
     );
     const result = await aip(box, 'config', 'check');
     expect(result.code, result.stderr).toBe(0);
     expect(result.stdout).toContain(`command: ${command}`);
     expect(result.stdout).toContain('- --debug');
     expect(result.stdout).toContain(`claude: fake claude 0.0.0 (${command})`);
+  });
+
+  it('says a runtime is disabled in config check and tells how to enable it', async () => {
+    const box = sandbox();
+    box.env.AIP_CLAUDE_BIN = '';
+    const off = await aip(box, 'config', 'check');
+    expect(off.code, off.stderr).toBe(0);
+    expect(off.stdout).toContain('claude: disabled');
+    expect(off.stdout).not.toContain('claude: fake claude');
+    expect(off.stdout).toContain('runtimes.claude.enabled: true');
+    const on = await aip(sandbox(), 'config', 'check');
+    expect(on.stdout).not.toContain('claude: disabled');
+    expect(on.stdout).toContain('claude: fake claude 0.0.0');
   });
 
   it('shows split.pipeline and no steps for such a pipeline in config check', async () => {
