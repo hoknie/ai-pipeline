@@ -11,6 +11,7 @@ import {
   type RuntimeExtra,
 } from '../../types/index.ts';
 
+import { listOpencodeModels } from './models.ts';
 import { createOpencodeParser } from './parser.ts';
 import { opencodeTranscript } from './transcript.ts';
 
@@ -136,6 +137,7 @@ export function createOpencodeRuntime(
     name: 'opencode',
     executable,
     builtinTools: [],
+    listModels: (directory, run) => listOpencodeModels(executable, extra, directory, run),
     buildOneShot: (request) => oneShot(executable, extra, request),
     buildLaunch: (context) => launch(executable, extra, context),
     transcript: opencodeTranscript,

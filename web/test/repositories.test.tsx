@@ -28,6 +28,7 @@ import {
   pipelinesView,
 } from './fixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { chooseModel, modelValue } from './modelField.ts';
 
 beforeEach(() => {
   window.location.hash = '';
@@ -323,13 +324,13 @@ describe('repository selector', () => {
     const { api } = twoRepositories();
     render(<App api={api} openStream={openFake} />);
     snapshot();
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     await openMenu();
     fireEvent.click(screen.getByRole('menuitemradio', { name: /lib/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Stay' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(trigger().getAttribute('aria-label')).toBe('Repository: app');
-    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('opus');
+    expect(modelValue()).toBe('opus');
 
     await openMenu();
     fireEvent.click(screen.getByRole('menuitemradio', { name: /lib/ }));

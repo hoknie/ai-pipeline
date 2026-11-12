@@ -1,3 +1,4 @@
+import { ModelCatalogProvider } from '../../../shared/lib/catalog/models.tsx';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -51,44 +52,46 @@ export function ObserverSettingsForm({
   }
   const update = (patch: Partial<Form>) => setForm({ ...form, ...patch });
   return (
-    <div className="flex flex-col gap-3">
-      {problem ? <Alert variant="destructive">{problem}</Alert> : null}
-      {errors.other.length > 0 ? (
-        <Alert variant="destructive">
-          <ul>
-            {errors.other.map((error) => (
-              <li key={`${error.path}:${error.message}`}>
-                <code>{error.path}</code>: {error.message}
-              </li>
-            ))}
-          </ul>
-        </Alert>
-      ) : null}
-      {tab === 'general' ? (
-        <GeneralTab form={form} update={update} busy={busy} errors={errors} view={view} />
-      ) : null}
-      {tab === 'specialist' ? (
-        <SpecialistTab
-          form={form}
-          setForm={setForm}
-          busy={busy}
-          errors={errors.specialist}
-          defaults={state.defaults}
-          catalog={state.catalog}
-          catalogError={state.catalogError}
-        />
-      ) : null}
-      {tab === 'projects' ? (
-        <ProjectsTab form={form} update={update} busy={busy} order={order} errors={errors} />
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button loading={busy} disabled={!state.dirty} onClick={() => void state.save()}>
-          {t('settingsPage.save')}
-        </Button>
-        <Button variant="outline" disabled={busy || !state.dirty} onClick={state.discard}>
-          {t('settingsPage.discard')}
-        </Button>
+    <ModelCatalogProvider api={api}>
+      <div className="flex flex-col gap-3">
+        {problem ? <Alert variant="destructive">{problem}</Alert> : null}
+        {errors.other.length > 0 ? (
+          <Alert variant="destructive">
+            <ul>
+              {errors.other.map((error) => (
+                <li key={`${error.path}:${error.message}`}>
+                  <code>{error.path}</code>: {error.message}
+                </li>
+              ))}
+            </ul>
+          </Alert>
+        ) : null}
+        {tab === 'general' ? (
+          <GeneralTab form={form} update={update} busy={busy} errors={errors} view={view} />
+        ) : null}
+        {tab === 'specialist' ? (
+          <SpecialistTab
+            form={form}
+            setForm={setForm}
+            busy={busy}
+            errors={errors.specialist}
+            defaults={state.defaults}
+            catalog={state.catalog}
+            catalogError={state.catalogError}
+          />
+        ) : null}
+        {tab === 'projects' ? (
+          <ProjectsTab form={form} update={update} busy={busy} order={order} errors={errors} />
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button loading={busy} disabled={!state.dirty} onClick={() => void state.save()}>
+            {t('settingsPage.save')}
+          </Button>
+          <Button variant="outline" disabled={busy || !state.dirty} onClick={state.discard}>
+            {t('settingsPage.discard')}
+          </Button>
+        </div>
       </div>
-    </div>
+    </ModelCatalogProvider>
   );
 }

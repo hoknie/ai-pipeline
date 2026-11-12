@@ -11,6 +11,7 @@ import {
   type RuntimeExtra,
 } from '../../types/index.ts';
 
+import { CLAUDE_MODELS } from './models.ts';
 import { createClaudeParser } from './parser.ts';
 import {
   claudePermissionArgs,
@@ -129,6 +130,7 @@ export function createClaudeRuntime(
     transcript: claudeTranscript,
     createParser: createClaudeParser,
     builtinTools: [...CLAUDE_BUILTIN_TOOLS],
+    listModels: () => Promise.resolve({ models: [...CLAUDE_MODELS], error: null }),
     skillDirectories(worktree: string, home: string): string[] {
       return [
         join(worktree, '.claude', 'skills'),

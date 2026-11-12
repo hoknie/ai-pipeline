@@ -19,6 +19,7 @@ import {
 } from '../../../shared/ui/forms/select.tsx';
 import { Textarea } from '../../../shared/ui/forms/textarea.tsx';
 import { ValuesPicker } from '../../../shared/ui/forms/ValuesPicker.tsx';
+import { ModelField } from './ModelField.tsx';
 import { isList, type Draft, type FieldName, type ListField } from './draft.ts';
 
 const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
@@ -115,6 +116,42 @@ function ListInput({
   );
 }
 
+/** The choice of the runtime chain; «none» keeps the single runtime of the specialist. */
+function ChainSelect({
+  value,
+  chains,
+  disabled,
+  invalid,
+  onChange,
+}: {
+  value: string;
+  chains: EditorChain[];
+  disabled: boolean;
+  invalid: boolean;
+  onChange: (slug: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Select
+      value={value || '__none'}
+      disabled={disabled}
+      onValueChange={(val) => onChange(val === '__none' ? '' : val)}
+    >
+      <SelectTrigger id="field-runtime_chain" aria-invalid={invalid}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none">{t('specialists.noChain')}</SelectItem>
+        {chains.map((c) => (
+          <SelectItem key={c.slug} value={c.slug}>
+            {String(c.raw.name || c.slug)} ({c.slug})
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 /** The control of one field of the form. */
 export function FieldInput(props: InputProps) {
   const { field, draft, onDraft, disabled, invalid, defaults, tags, chains } = props;
@@ -124,25 +161,14 @@ export function FieldInput(props: InputProps) {
   const set = (text: string) => onDraft((current) => ({ ...current, [field]: text }));
   const hint = hintOf(field, defaults, t);
   if (field === 'runtime_chain') {
-    const available = chains ?? [];
     return (
-      <Select
-        value={draft.runtime_chain || '__none'}
+      <ChainSelect
+        value={draft.runtime_chain}
+        chains={chains ?? []}
         disabled={disabled}
-        onValueChange={(val) => set(val === '__none' ? '' : val)}
-      >
-        <SelectTrigger id="field-runtime_chain" aria-invalid={invalid}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none">{t('specialists.noChain')}</SelectItem>
-          {available.map((c) => (
-            <SelectItem key={c.slug} value={c.slug}>
-              {String(c.raw.name || c.slug)} ({c.slug})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        invalid={invalid}
+        onChange={set}
+      />
     );
   }
   if (field === 'runtime' || field === 'permissions' || field === 'reasoning_effort') {
@@ -166,6 +192,19 @@ export function FieldInput(props: InputProps) {
           ))}
         </SelectContent>
       </Select>
+    );
+  }
+  if (field === 'model') {
+    return (
+      <ModelField
+        id="field-model"
+        runtime={draft.runtime || String(defaults['defaults.runtime'] ?? 'claude')}
+        value={draft.model}
+        disabled={disabled}
+        invalid={invalid}
+        placeholder={hint}
+        onChange={set}
+      />
     );
   }
   const common = {

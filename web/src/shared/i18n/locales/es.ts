@@ -940,6 +940,16 @@ export const es: Dictionary = {
     collapse: 'Contraer filtros',
     expand: 'Expandir filtros',
   },
+  models: {
+    default: 'Por defecto',
+    notInList: 'no está en la lista',
+    refresh: 'Actualizar lista',
+    loading: 'Cargando modelos…',
+    useTyped: 'Usar «{{value}}»',
+    groups: {
+      aliases: 'Alias',
+    },
+  },
   picker: {
     add: 'Añadir',
     remove: 'Quitar {{value}}',

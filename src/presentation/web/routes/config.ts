@@ -45,6 +45,12 @@ function configReadRoutes({ call }: RouteKit): Route[] {
       pattern: /^\/api\/config\/catalog$/,
       handle: (_match, _body, repository) => call('config_catalog', { repository }),
     },
+    {
+      method: 'GET',
+      pattern: /^\/api\/config\/models$/,
+      handle: (_match, _body, repository, query) =>
+        call('config_models', { repository, refresh: query.get('refresh') === '1' }),
+    },
   ];
 }
 

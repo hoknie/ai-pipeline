@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { chooseModel, modelValue } from './modelField.ts';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -153,7 +154,7 @@ describe('specialist form', () => {
       file: '/f',
     }));
     render(<Page api={fakeApi({ writeSpecialist })} start="coder" />);
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist).toHaveBeenCalledWith(
@@ -182,7 +183,7 @@ describe('specialist form', () => {
     }));
     render(<Page api={fakeApi({ writeSpecialist })} start="coder" />);
     fireEvent.change(await screen.findByLabelText('Timeout'), { target: { value: 'полчаса' } });
-    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const field = (await screen.findByLabelText('Timeout')).closest('div')!;
     expect(await within(field as HTMLElement).findByRole('alert')).toHaveProperty(
@@ -190,7 +191,7 @@ describe('specialist form', () => {
       expect.stringContaining('positive duration'),
     );
     expect((screen.getByLabelText('Timeout') as HTMLInputElement).value).toBe('полчаса');
-    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('opus');
+    expect(modelValue()).toBe('opus');
   });
 
   it('offers to reread after a conflict and asks before dropping the typed values', async () => {
@@ -201,7 +202,7 @@ describe('specialist form', () => {
     }));
     const config = vi.fn(async () => configView());
     render(<Page api={fakeApi({ writeSpecialist, config })} start="coder" />);
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const reread = await screen.findByRole('button', { name: 'Reread the specialist' });
     expect(config).toHaveBeenCalledTimes(1);
@@ -219,7 +220,7 @@ describe('specialist form', () => {
   it('asks before leaving a specialist with unsaved edits', async () => {
     const view = configView({ specialists: [specialistEntry('coder'), specialistEntry('plan')] });
     render(<Page api={fakeApi({ config: vi.fn(async () => view) })} start="coder" />);
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     const list = screen.getByRole('list', { name: 'specialists' });
     fireEvent.click(within(list).getByText('PLAN'));
     fireEvent.click(await screen.findByRole('button', { name: 'Stay' }));
@@ -301,8 +302,8 @@ describe('creating, copying and deleting', () => {
       config: vi.fn(async () => configView({ specialists: [entry] })),
     });
     render(<Page api={api} start="coder" />);
-    const modelInput = await screen.findByLabelText<HTMLInputElement>('Model');
-    expect(modelInput.value).toBe(model);
+    await screen.findByRole('combobox', { name: 'Model' });
+    expect(modelValue()).toBe(model);
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Coder renamed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
@@ -332,7 +333,7 @@ describe('creating, copying and deleting', () => {
   it('saves the form as a new specialist without touching the original', async () => {
     const writeSpecialist = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={fakeApi({ writeSpecialist })} start="coder" />);
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'haiku' } });
+    await chooseModel('haiku');
     fireEvent.click(screen.getByRole('button', { name: 'Save as…' }));
     fireEvent.change(screen.getByLabelText('New slug'), { target: { value: 'coder-fast' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create a copy' }));
@@ -578,7 +579,7 @@ describe('tools and skills', () => {
     render(<Page api={fakeApi({ catalog, writeSpecialist })} start="coder" />);
     await screen.findByLabelText('Model');
     expect(catalog).toHaveBeenCalledTimes(1);
-    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'x' } });
+    await chooseModel('x');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Reread the specialist' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Reread' }));
@@ -690,7 +691,7 @@ describe('tools and skills', () => {
     render(
       <Page api={fakeApi({ writeSpecialist, config: vi.fn(async () => view) })} start="coder" />,
     );
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist.mock.calls[0]![1]).not.toHaveProperty('tools');

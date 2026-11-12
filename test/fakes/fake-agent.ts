@@ -243,6 +243,18 @@ if (process.env.AIP_FAKE_ARGV_LOG) {
   appendFileSync(process.env.AIP_FAKE_ARGV_LOG, `${JSON.stringify({ mode, argv: args, env })}\n`);
 }
 
+// `opencode models`: AIP_FAKE_MODELS (comma-separated ids) is the list, AIP_FAKE_MODELS_FAIL an exit code.
+if (mode === 'opencode' && args.at(-1) === 'models') {
+  const failure = process.env.AIP_FAKE_MODELS_FAIL;
+  if (failure) {
+    console.error('opencode: cannot list models');
+    process.exit(Number(failure));
+  }
+  console.log('Loading providers…');
+  for (const id of (process.env.AIP_FAKE_MODELS ?? '').split(',').filter(Boolean)) console.log(id);
+  process.exit(0);
+}
+
 if (args[0] === '--version') {
   console.log(`fake ${mode} 0.0.0`);
   process.exit(0);

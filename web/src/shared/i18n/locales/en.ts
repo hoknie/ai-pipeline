@@ -923,6 +923,16 @@ export const en = {
     collapse: 'Collapse filters',
     expand: 'Expand filters',
   },
+  models: {
+    default: 'Default',
+    notInList: 'not in the list',
+    refresh: 'Refresh list',
+    loading: 'Loading models…',
+    useTyped: 'Use «{{value}}»',
+    groups: {
+      aliases: 'Aliases',
+    },
+  },
   picker: {
     add: 'Add',
     remove: 'Remove {{value}}',

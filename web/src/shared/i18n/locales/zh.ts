@@ -918,6 +918,16 @@ export const zh: Dictionary = {
     collapse: '收起筛选',
     expand: '展开筛选',
   },
+  models: {
+    default: '默认',
+    notInList: '不在列表中',
+    refresh: '刷新列表',
+    loading: '正在加载模型…',
+    useTyped: '使用「{{value}}」',
+    groups: {
+      aliases: '别名',
+    },
+  },
   picker: {
     add: '添加',
     remove: '移除 {{value}}',

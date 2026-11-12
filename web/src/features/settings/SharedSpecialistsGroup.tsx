@@ -1,3 +1,4 @@
+import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
 import type { RefObject } from 'react';
 
 import type { Api } from '../../shared/api/api.ts';
@@ -24,8 +25,10 @@ export function SharedSpecialistsGroup(props: {
 }) {
   const state = useSharedSpecialists(props);
   return (
-    <SplitPage side={<SharedSpecialistsSide state={state} selected={props.selected} />}>
-      <SharedSpecialistEditor {...props} state={state} />
-    </SplitPage>
+    <ModelCatalogProvider api={props.api}>
+      <SplitPage side={<SharedSpecialistsSide state={state} selected={props.selected} />}>
+        <SharedSpecialistEditor {...props} state={state} />
+      </SplitPage>
+    </ModelCatalogProvider>
   );
 }

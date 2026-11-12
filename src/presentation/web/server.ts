@@ -107,7 +107,7 @@ async function runTable(
     const parts = decodeParts(match.slice(1));
     const body = await requestBody(incoming, url);
     const repository = await requestRepository(url, d.kit.options);
-    const result = await route.handle(parts, body, repository);
+    const result = await route.handle(parts, body, repository, url.searchParams);
     if (result instanceof Reply) json(response, result.status, result.value);
     else json(response, 200, result);
     return;

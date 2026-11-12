@@ -10,6 +10,7 @@ import type { EventSourceLike } from '../src/shared/api/stream.ts';
 import type {
   BackgroundProcessView,
   ConfigCatalogResponse,
+  ConfigModelsResponse,
   ConfigEditorResponse,
   EditorSetting,
   EditorSpecialist,
@@ -611,6 +612,36 @@ export function systemView(overrides: Partial<SystemView> = {}): SystemView {
   };
 }
 
+/** The models per runtime: Claude's built-in list, OpenCode by providers and an empty agy. */
+export function modelsView(overrides: Partial<ConfigModelsResponse> = {}): ConfigModelsResponse {
+  return {
+    repository: '/repo',
+    runtimes: {
+      claude: {
+        models: [
+          { id: 'opus', name: 'opus', group: 'aliases' },
+          { id: 'sonnet', name: 'sonnet', group: 'aliases' },
+          { id: 'claude-opus-5-5', name: 'claude-opus-5-5', group: 'anthropic' },
+        ],
+        error: null,
+      },
+      opencode: {
+        models: [
+          { id: 'openai/gpt-5', name: 'gpt-5', group: 'openai' },
+          {
+            id: 'openrouter/anthropic/claude-opus-5-5',
+            name: 'anthropic/claude-opus-5-5',
+            group: 'openrouter',
+          },
+        ],
+        error: null,
+      },
+      agy: { models: [], error: null },
+    },
+    ...overrides,
+  };
+}
+
 export function catalogView(overrides: Partial<ConfigCatalogResponse> = {}): ConfigCatalogResponse {
   return {
     repository: '/repo',
@@ -803,6 +834,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     startDaemon: vi.fn(async () => undefined),
     config: vi.fn(async () => configView()),
     catalog: vi.fn(async () => catalogView()),
+    models: vi.fn(async () => modelsView()),
     writeSpecialist: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteSpecialist: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
     sharedSpecialists: vi.fn(async () => ({ directory: '/xdg/aip/specialists', specialists: [] })),

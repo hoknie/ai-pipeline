@@ -2,6 +2,7 @@ import type { SystemStagesResponse } from '../lib/pipeline/pipelineEntries.ts';
 import type {
   ConfigCatalogResponse,
   ConfigEditResult,
+  ConfigModelsResponse,
   ConfigEditorResponse,
   ConfigPreview,
   PipelinesImportResult,
@@ -22,6 +23,8 @@ export interface ConfigApi {
   config(): Promise<ConfigEditorResponse>;
   /** Tools and skills a specialist can name, per runtime. */
   catalog(): Promise<ConfigCatalogResponse>;
+  /** Models a specialist can name, per runtime; `refresh` asks the runtimes again. */
+  models(refresh?: boolean): Promise<ConfigModelsResponse>;
   /** Writes a specialist file; problems with the edit come back as a result, not an error. */
   writeSpecialist(
     id: string,
@@ -92,6 +95,7 @@ export function configApi(repository: string | null): ConfigApi {
     pipelines: (other) => call(withRepository('/api/pipelines', other ?? repository)),
     config: () => call(at('/api/config')),
     catalog: () => call(at('/api/config/catalog')),
+    models: (refresh) => call(at(`/api/config/models${refresh ? '?refresh=1' : ''}`)),
     writeSpecialist: (id, value, revision, level) =>
       edit(
         at(`/api/config/specialists/${enc(id)}`),

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { modelValues } from './modelField.ts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { EditorChain } from '../src/shared/api/types.ts';
@@ -149,8 +150,10 @@ describe('ChainForm UI', () => {
         onDeleted={vi.fn(async () => undefined)}
       />,
     );
-    expect(screen.getAllByDisplayValue('openai/gpt-custom')).toHaveLength(1);
-    expect(screen.getAllByDisplayValue('OtherProvider/team/GPT-Custom')).toHaveLength(1);
+    expect(modelValues().filter((value) => value === 'openai/gpt-custom')).toHaveLength(1);
+    expect(modelValues().filter((value) => value === 'OtherProvider/team/GPT-Custom')).toHaveLength(
+      1,
+    );
     const moveUp = screen.getAllByRole('button', { name: 'Move up' });
     fireEvent.click(moveUp[1]!);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));

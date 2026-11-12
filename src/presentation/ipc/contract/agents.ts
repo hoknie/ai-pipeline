@@ -94,3 +94,30 @@ export const configCatalogResponseSchema = z.object({
 });
 
 export type ConfigCatalogResponse = z.infer<typeof configCatalogResponseSchema>;
+
+export const modelEntrySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  group: z.string(),
+});
+
+export type ModelEntry = z.infer<typeof modelEntrySchema>;
+
+export const runtimeModelsSchema = z.object({
+  models: z.array(modelEntrySchema),
+  /** Why listing failed; the list is empty then. */
+  error: z.string().nullable(),
+});
+
+export type RuntimeModels = z.infer<typeof runtimeModelsSchema>;
+
+export const configModelsResponseSchema = z.object({
+  repository: z.string(),
+  runtimes: z.object({
+    claude: runtimeModelsSchema,
+    opencode: runtimeModelsSchema,
+    agy: runtimeModelsSchema,
+  }),
+});
+
+export type ConfigModelsResponse = z.infer<typeof configModelsResponseSchema>;

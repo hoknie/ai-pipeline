@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { ReasoningEffort } from '../../../shared/api/types.ts';
+import { ModelField } from '../form/ModelField.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
@@ -141,12 +142,14 @@ function ItemFields({
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`chain-item-${index}-model`}>{t('chains.item.model')}</Label>
-        <Input
+        <ModelField
           id={`chain-item-${index}-model`}
+          runtime={item.runtime}
+          label={t('chains.item.model')}
           value={item.model}
           disabled={disabled}
           placeholder={t('chains.item.modelPlaceholder')}
-          onChange={(e) => onModel(e.target.value)}
+          onChange={onModel}
         />
       </div>
     </div>

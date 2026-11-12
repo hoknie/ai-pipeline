@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { chooseModel } from './modelField.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
@@ -157,9 +158,9 @@ describe('shared specialists group', () => {
       },
       '#settings/global/specialists/qa',
     );
-    const model = await screen.findByLabelText('Model');
-    expect((model as HTMLInputElement).disabled).toBe(false);
-    fireEvent.change(model, { target: { value: 'opus' } });
+    const model = await screen.findByRole('combobox', { name: 'Model' });
+    expect((model as HTMLButtonElement).disabled).toBe(false);
+    await chooseModel('opus');
     expect(screen.queryByRole('group', { name: 'Level' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Override in the project' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Make shared' })).toBeNull();
@@ -175,7 +176,7 @@ describe('shared specialists group', () => {
 
   it('asks before leaving a specialist with unsaved edits', async () => {
     show({}, '#settings/global/specialists/qa');
-    fireEvent.change(await screen.findByLabelText('Model'), { target: { value: 'opus' } });
+    await chooseModel('opus');
     fireEvent.click((await (await list()).findByText('WRITER')).closest('button') as HTMLElement);
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));

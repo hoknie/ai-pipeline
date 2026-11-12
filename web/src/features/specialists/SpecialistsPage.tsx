@@ -1,6 +1,7 @@
 import { useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
 import type { Api } from '../../shared/api/api.ts';
 import { useMediaQuery } from '../../shared/lib/browser/media.ts';
 import { notifySuccess } from '../../shared/lib/browser/notify.ts';
@@ -175,31 +176,33 @@ export default function SpecialistsPage({
   ];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="px-4 pt-3">
-        <LinkTabs label={t('specialists.tabs.label')} tabs={tabs} />
+    <ModelCatalogProvider api={api}>
+      <div className="flex flex-col gap-3">
+        <div className="px-4 pt-3">
+          <LinkTabs label={t('specialists.tabs.label')} tabs={tabs} />
+        </div>
+        {isChains ? (
+          <ChainsBody
+            api={api}
+            data={data}
+            selected={selected}
+            dirty={dirty}
+            go={go}
+            onSelect={onSelect}
+          />
+        ) : (
+          <SpecialistsBody
+            api={api}
+            data={data}
+            selected={selected}
+            dirty={dirty}
+            notice={notice}
+            setNotice={setNotice}
+            go={go}
+            onSelect={onSelect}
+          />
+        )}
       </div>
-      {isChains ? (
-        <ChainsBody
-          api={api}
-          data={data}
-          selected={selected}
-          dirty={dirty}
-          go={go}
-          onSelect={onSelect}
-        />
-      ) : (
-        <SpecialistsBody
-          api={api}
-          data={data}
-          selected={selected}
-          dirty={dirty}
-          notice={notice}
-          setNotice={setNotice}
-          go={go}
-          onSelect={onSelect}
-        />
-      )}
-    </div>
+    </ModelCatalogProvider>
   );
 }

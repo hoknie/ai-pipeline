@@ -31,6 +31,7 @@ const SAMPLES: Record<Method, unknown> = {
   system_stages: repository,
   config: repository,
   config_catalog: repository,
+  config_models: { ...repository, refresh: true },
   config_write: written,
   config_setting: { ...repository, path: 'web.port', value: 7341, revision: null },
   config_settings: { ...repository, values: { 'web.port': 7341 }, revision: null },
@@ -95,9 +96,9 @@ const SAMPLES: Record<Method, unknown> = {
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 77 methods, each in the request schema once', () => {
+  it('has 78 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(77);
+    expect(methods).toHaveLength(78);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

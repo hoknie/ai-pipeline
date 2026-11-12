@@ -1,3 +1,4 @@
+import type { CommandRunner, RuntimeModels } from './models.ts';
 import type { Denial } from './permissions.ts';
 import type { StepInput } from './step-input.ts';
 import type { TranscriptEntry } from './transcript.ts';
@@ -74,6 +75,8 @@ export interface Runtime {
   /** `times[i]` is the moment (ms) the daemon received `lines[i]`, when known. */
   transcript(lines: string[], times?: (number | null)[]): TranscriptEntry[];
   skillDirectories(worktree: string, home: string): string[];
+  /** The models a specialist of this runtime can name; never rejects, a failure goes to `error`. */
+  listModels(directory: string, run: CommandRunner): Promise<RuntimeModels>;
   /** Tools the agent CLI has without any configuration. */
   readonly builtinTools: string[];
 }

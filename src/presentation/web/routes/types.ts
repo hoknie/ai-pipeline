@@ -5,7 +5,12 @@ import type { WebOptions } from '../options.ts';
 
 export const segment = '([^/]+)';
 
-export type Handler = (match: string[], body: unknown, repository: string) => Promise<unknown>;
+export type Handler = (
+  match: string[],
+  body: unknown,
+  repository: string,
+  query: URLSearchParams,
+) => Promise<unknown>;
 
 /** A JSON route: the server checks the host and the token, reads the body and the repository. */
 export interface Route {

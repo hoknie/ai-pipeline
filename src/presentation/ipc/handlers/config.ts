@@ -5,6 +5,8 @@ export const configHandlers = {
   pipelines: (params, { services }) => services.edits.pipelines(params.repository),
   system_stages: (params, { services }) => services.edits.systemStages(params.repository),
   config: (params, { services }) => services.edits.view(params.repository),
+  config_models: (params, { services }) =>
+    services.edits.models(params.repository, params.refresh ?? false),
   config_catalog: (params, { services }) => services.edits.catalog(params.repository),
   config_write: (params, { services }) =>
     services.edits.edit(params.repository, {

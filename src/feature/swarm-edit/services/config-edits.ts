@@ -1,10 +1,14 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import type { AgentsService } from '../../agents/services/index.ts';
-import type { RuntimeCatalogs } from '../../agents/types/index.ts';
+import type { ModelCatalogs, RuntimeCatalogs } from '../../agents/types/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import { pipelineTopologies, pipelineTopology } from '../../runs/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
-import { ConfigLoadError, configLoadErrors } from '../../swarm-config/types/index.ts';
+import {
+  ConfigLoadError,
+  configLoadErrors,
+  defaultRuntimes,
+} from '../../swarm-config/types/index.ts';
 import type { ConfigChangedPort } from '../ports/index.ts';
 import {
   ConfigEditError,
@@ -69,6 +73,22 @@ export class ConfigEditService {
       mcpInherited = false;
     }
     return { repository, mcpInherited, runtimes: agents.catalog(repository, config.home()) };
+  }
+
+  /** The models of every runtime for the repository; cached by the daemon until `refresh`. */
+  async models(
+    path: string,
+    refresh: boolean,
+  ): Promise<{ repository: string; runtimes: ModelCatalogs }> {
+    const { config, registry, agents } = this.dependencies;
+    const repository = await registry.rootOf(path);
+    let settings = defaultRuntimes();
+    try {
+      settings = config.load(repository).runtimes;
+    } catch {
+      settings = defaultRuntimes();
+    }
+    return { repository, runtimes: await agents.models(repository, settings, refresh) };
   }
 
   /** Check and write run without an await between them, so two edits never interleave. */

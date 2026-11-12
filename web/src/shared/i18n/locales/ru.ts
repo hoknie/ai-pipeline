@@ -941,6 +941,16 @@ export const ru: Dictionary = {
     collapse: 'Свернуть фильтры',
     expand: 'Развернуть фильтры',
   },
+  models: {
+    default: 'По умолчанию',
+    notInList: 'нет в списке',
+    refresh: 'Обновить список',
+    loading: 'Загрузка моделей…',
+    useTyped: 'Использовать «{{value}}»',
+    groups: {
+      aliases: 'Псевдонимы',
+    },
+  },
   picker: {
     add: 'Добавить',
     remove: 'Убрать {{value}}',

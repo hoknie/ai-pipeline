@@ -117,6 +117,7 @@ export function createAgyRuntime(
     name: 'agy',
     executable,
     builtinTools: [],
+    listModels: () => Promise.resolve({ models: [], error: null }),
     buildLaunch: (context) => launch(executable, extra, context),
     buildOneShot: (request) => oneShot(executable, extra, request),
     createParser: createAgyParser,

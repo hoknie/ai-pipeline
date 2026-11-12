@@ -42,6 +42,10 @@ export const configRequests = [
     params: z.object({ repository: z.string().min(1) }),
   }),
   z.object({
+    method: z.literal('config_models'),
+    params: z.object({ repository: z.string().min(1), refresh: z.boolean().optional() }),
+  }),
+  z.object({
     method: z.literal('config_write'),
     params: z.object({
       repository: z.string().min(1),

@@ -515,6 +515,17 @@ describe('repository registry requests', () => {
   });
 });
 
+describe('config_models request', () => {
+  it('takes a repository and an optional refresh flag', () => {
+    const parse = (params: unknown) =>
+      requestSchema.safeParse({ method: 'config_models', params }).success;
+    expect(parse({ repository: '/r' })).toBe(true);
+    expect(parse({ repository: '/r', refresh: true })).toBe(true);
+    expect(parse({ repository: '/r', refresh: 'yes' })).toBe(false);
+    expect(parse({})).toBe(false);
+  });
+});
+
 describe('config_catalog request', () => {
   it('needs a repository', () => {
     expect(

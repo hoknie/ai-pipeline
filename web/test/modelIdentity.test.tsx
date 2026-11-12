@@ -9,6 +9,7 @@ import { ChainForm } from '../src/features/specialists/chains/ChainForm.tsx';
 import type { Api } from '../src/shared/api/api.ts';
 import { configView, fakeApi, specialistEntry } from './fixtures.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
+import { chooseModel, modelValue, modelValues } from './modelField.ts';
 
 afterEach(() => {
   cleanup();
@@ -87,11 +88,11 @@ describe('specialist form model identity', () => {
     });
 
     const { unmount } = render(<Page api={api} start="coder" />);
-    const modelInput = await screen.findByLabelText<HTMLInputElement>('Model');
-    expect(modelInput.value).toBe('openai/gpt-6.1-sol');
+    await screen.findByRole('combobox', { name: 'Model' });
+    expect(modelValue()).toBe('openai/gpt-6.1-sol');
 
     // Attempt invalid short model
-    fireEvent.change(modelInput, { target: { value: 'gpt-short' } });
+    await chooseModel('gpt-short');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalledTimes(1));
 
@@ -100,7 +101,7 @@ describe('specialist form model identity', () => {
     expect(errorAlert).toBeTruthy();
 
     // Fix error with valid full model
-    fireEvent.change(modelInput, { target: { value: 'openai/gpt-6.1-fixed' } });
+    await chooseModel('openai/gpt-6.1-fixed');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalledTimes(2));
     expect(writeSpecialist).toHaveBeenLastCalledWith(
@@ -113,8 +114,8 @@ describe('specialist form model identity', () => {
     // Reopen form and verify model persists
     unmount();
     render(<Page api={api} start="coder" />);
-    const reopenedInput = await screen.findByLabelText<HTMLInputElement>('Model');
-    expect(reopenedInput.value).toBe('openai/gpt-6.1-fixed');
+    await screen.findByRole('combobox', { name: 'Model' });
+    expect(modelValue()).toBe('openai/gpt-6.1-fixed');
   });
 });
 
@@ -159,8 +160,10 @@ describe('chain form model identity', () => {
       />,
     );
 
-    expect(screen.getAllByDisplayValue('openai/gpt-alpha')).toHaveLength(1);
-    expect(screen.getAllByDisplayValue('OtherProvider/team/GPT-beta')).toHaveLength(1);
+    expect(modelValues().filter((value) => value === 'openai/gpt-alpha')).toHaveLength(1);
+    expect(modelValues().filter((value) => value === 'OtherProvider/team/GPT-beta')).toHaveLength(
+      1,
+    );
 
     const moveUp = screen.getAllByRole('button', { name: 'Move up' });
     fireEvent.click(moveUp[1]!);

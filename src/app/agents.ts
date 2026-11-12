@@ -1,6 +1,7 @@
 import { createClaudeRuntime } from '../feature/agents/clients/claude/index.ts';
 import { NamingClient } from '../feature/agents/clients/naming/index.ts';
 import { createOpencodeRuntime } from '../feature/agents/clients/opencode/index.ts';
+import { runCommand } from '../platform/process/index.ts';
 import { createAgentsServices, type AgentsServices } from '../feature/agents/services/index.ts';
 
 /** The services of `agents` with the adapters of both agent CLIs. */
@@ -13,6 +14,7 @@ export function createAgents(environment: NodeJS.ProcessEnv): AgentsServices {
       agy: createAgyRuntime,
     },
     naming: new NamingClient(),
+    commands: runCommand,
   });
 }
 import { createAgyRuntime } from '../feature/agents/clients/agy/index.ts';
