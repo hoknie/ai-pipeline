@@ -478,6 +478,9 @@ export const es: Dictionary = {
       tasks: 'Tareas',
       specChange: 'Cambio: {{name}}',
       onlyReplies: 'Respuestas del especialista',
+      watch: 'Seguir',
+      watchTitle:
+        'Desplazar suavemente hasta los datos nuevos; desplazarse hacia arriba lo detiene',
       noChanges: 'Aún no hay cambios',
       noChangesText: 'El grupo aún no ha cambiado archivos.',
     },

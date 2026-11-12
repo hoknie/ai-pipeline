@@ -478,6 +478,8 @@ export const ru: Dictionary = {
       tasks: 'Задачи',
       specChange: 'Изменение: {{name}}',
       onlyReplies: 'Ответы специалиста',
+      watch: 'Следить',
+      watchTitle: 'Плавно прокручивать к новым данным; прокрутка вверх выключает',
       noChanges: 'Изменений пока нет',
       noChangesText: 'Группа пока не изменила файлы.',
     },

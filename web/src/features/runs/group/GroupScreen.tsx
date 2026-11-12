@@ -14,11 +14,13 @@ import { useGroupCtx } from './screen/useGroupCtx.ts';
 /** The screen of a group or a system step: header, what waits for a person, and the tabs. */
 export function GroupScreen(props: GroupScreenProps) {
   const { t } = useTranslation();
-  const ctx = useGroupCtx(props);
+  const [section, setSection] = useState<HTMLElement | null>(null);
+  const ctx = useGroupCtx(props, section);
   const [header, setHeader] = useState<HTMLElement | null>(null);
   const headerHeight = useElementHeight(header);
   return (
     <section
+      ref={setSection}
       aria-label={t('runs.group.label', { title: ctx.title })}
       className="flex flex-col gap-3 p-4"
       style={{ '--group-header-height': `${headerHeight}px` } as CSSProperties}

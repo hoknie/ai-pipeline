@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /** The nearest ancestor that scrolls vertically; null when the page itself scrolls. */
-function scrollParent(element: Element): Element | null {
+export function scrollParent(element: Element): Element | null {
   for (let node = element.parentElement; node; node = node.parentElement) {
     const overflow = getComputedStyle(node).overflowY;
     if (overflow === 'auto' || overflow === 'scroll') return node;

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useFollowEnd } from '../../../../shared/lib/browser/useFollowEnd.ts';
 
 import { capabilities } from './capabilities.ts';
 import type { GroupScreenProps } from './types.ts';
@@ -13,7 +15,7 @@ import {
 } from './useGroupParts.ts';
 
 /** Everything the parts of the screen of a group read: the props, the loaded group, the commands. */
-export function useGroupCtx(props: GroupScreenProps) {
+export function useGroupCtx(props: GroupScreenProps, section: HTMLElement | null = null) {
   const { api, runId, row, run, onError } = props;
   const { showUsage = false, deliverable = false } = props;
   const { t } = useTranslation();
@@ -35,6 +37,11 @@ export function useGroupCtx(props: GroupScreenProps) {
   });
   const title = 'kind' in row && row.kind !== 'action' ? t(`runs.system.${row.kind}`) : row.title;
   const commands = useGroupCommands({ api, runId, row, run, title, act });
+  const watch = useFollowEnd(section);
+  const stopWatch = watch.stop;
+  useEffect(() => {
+    if (tabs.tab !== 'log') stopWatch();
+  }, [tabs.tab, stopWatch]);
   const [forcing, setForcing] = useState(false);
   const [messaging, setMessaging] = useState<number | null>(null);
   return {
@@ -49,6 +56,7 @@ export function useGroupCtx(props: GroupScreenProps) {
     delivering,
     title,
     tabs,
+    watch,
     ...commands,
     skip: useGroupSkip(run, api, row, onError),
     statusesMounted: useStatusesMounted(showUsage),

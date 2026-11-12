@@ -23,6 +23,7 @@ import {
 import { StatusBadge } from '../../../../shared/ui/feedback/StatusBadge.tsx';
 import { RunStatuses, entryBadge } from '../../list/RunStatuses.tsx';
 import type { GroupCtx } from './useGroupCtx.ts';
+import { WatchButton } from './WatchButton.tsx';
 
 function Heading({ ctx }: { ctx: GroupCtx }) {
   const { run, title, showUsage } = ctx;
@@ -90,6 +91,7 @@ function Actions({ ctx }: { ctx: GroupCtx }) {
   const { row, run, busy, act, caps, delivering, skip } = ctx;
   return (
     <>
+      <WatchButton ctx={ctx} />
       {ctx.onOnlyReplies ? (
         <div className="flex items-center gap-2 whitespace-nowrap">
           <Switch id="only-replies" checked={ctx.onlyReplies} onCheckedChange={ctx.onOnlyReplies} />

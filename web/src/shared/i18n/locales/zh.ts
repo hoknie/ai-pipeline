@@ -466,6 +466,8 @@ export const zh: Dictionary = {
       tasks: '任务清单',
       specChange: '变更：{{name}}',
       onlyReplies: '专员回复',
+      watch: '跟随',
+      watchTitle: '平滑滚动到新数据；向上滚动即停止',
       noChanges: '暂无变更',
       noChangesText: '该分组尚未修改任何文件。',
     },

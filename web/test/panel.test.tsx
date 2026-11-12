@@ -911,6 +911,46 @@ describe('attempts and transcript', () => {
     expect(onOnlyReplies).toHaveBeenCalledWith(true);
   });
 
+  describe('watch button', () => {
+    const scrollTo = vi.fn();
+    beforeEach(() => {
+      scrollTo.mockClear();
+      Object.defineProperty(Element.prototype, 'scrollTo', {
+        configurable: true,
+        value: scrollTo,
+      });
+      vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    });
+    afterEach(() => {
+      Reflect.deleteProperty(Element.prototype, 'scrollTo');
+      vi.unstubAllGlobals();
+    });
+
+    it('stands before the switch, hides after a click and returns after scrolling up', async () => {
+      panel(logApi(), false, vi.fn());
+      await screen.findByText('ответ специалиста');
+      const watch = screen.getByRole('button', { name: 'Watch' });
+      const toggle = screen.getByRole('switch', { name: 'Specialist replies' });
+      expect(watch.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      fireEvent.click(watch);
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
+      expect(screen.queryByRole('button', { name: 'Watch' })).toBeNull();
+      fireEvent.wheel(window, { deltaY: -40 });
+      expect(await screen.findByRole('button', { name: 'Watch' })).toBeTruthy();
+    });
+
+    it('is absent on other tabs and turns the mode off when leaving the log', async () => {
+      panel(logApi());
+      await screen.findByText('ответ специалиста');
+      fireEvent.click(screen.getByRole('button', { name: 'Watch' }));
+      await screen.findByRole('tab', { name: 'Changes' });
+      openTab('Changes');
+      expect(screen.queryByRole('button', { name: 'Watch' })).toBeNull();
+      openTab('Log');
+      expect(await screen.findByRole('button', { name: 'Watch' })).toBeTruthy();
+    });
+  });
+
   it('has no switch of JSON', async () => {
     panel(logApi());
     await screen.findByText('ответ специалиста');

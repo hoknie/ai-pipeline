@@ -469,6 +469,8 @@ export const en = {
       tasks: 'Tasks',
       specChange: 'Change: {{name}}',
       onlyReplies: 'Specialist replies',
+      watch: 'Watch',
+      watchTitle: 'Scroll smoothly to new data; scrolling up stops it',
       noChanges: 'No changes yet',
       noChangesText: 'The group has not changed any files yet.',
     },
