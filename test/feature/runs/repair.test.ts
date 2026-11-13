@@ -252,6 +252,24 @@ describe('queue view of a task under repair', () => {
     expect(problemKeys(state).filter((key) => key.includes('usage_limit'))).toEqual([]);
     expect(state.run.repair.repairs).toBe(0);
   });
+
+  it.each(['runtime_disabled', 'runtime_not_found'] as const)(
+    'gives the repair back when its runtime is unavailable (%s)',
+    (kind) => {
+      const { state, incident } = repairing();
+      expect(state.run.repair.repairs).toBe(1);
+      repairExit(state, { kind, runtime: 'claude' });
+      expect(state.run.repair.repairs).toBe(0);
+      expect(state.run.repair.incident).toBeNull();
+      expect(state.run.repair.taken).not.toContain(incident.key);
+    },
+  );
+
+  it('does not give the repair back for a spawn failure', () => {
+    const { state } = repairing();
+    repairExit(state, { kind: 'spawn', message: 'boom' });
+    expect(state.run.repair.repairs).toBe(1);
+  });
 });
 
 describe('repair of a delivery', () => {

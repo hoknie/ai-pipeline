@@ -1,5 +1,5 @@
 import type { Effect } from '../../machine/index.ts';
-import type { AgentRoot, Group, RunState } from '../../types/index.ts';
+import type { AgentRoot, FailReason, Group, RunState } from '../../types/index.ts';
 import type { EffectRunner } from '../engine.ts';
 
 import { ActionRunner } from './actions.ts';
@@ -9,6 +9,7 @@ import { GitEffects } from './git.ts';
 import { nameRun } from './naming.ts';
 import { OutsideChanges } from './outside.ts';
 import { RunningAgents } from './running.ts';
+import { runtimeProblem } from './runtime-check.ts';
 import { UsageBuffers } from './usage.ts';
 import { logPath, worktreePath } from './worktrees.ts';
 
@@ -56,6 +57,11 @@ export class RunEffects implements EffectRunner {
   /** The attempt a worker MCP server reports for, while it runs. */
   attemptFor(token: string): AttemptKey | undefined {
     return this.running.attemptFor(token);
+  }
+
+  /** Why the runtime cannot start an agent in the repository by its current settings, or null. */
+  runtimeProblem(repository: string, runtime: string): FailReason | null {
+    return runtimeProblem(this.dependencies, repository, runtime);
   }
 
   worktreePath(state: RunState, group: Group): string {

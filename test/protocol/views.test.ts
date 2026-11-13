@@ -10,6 +10,9 @@ import {
 } from '../../src/feature/queue/types/index.ts';
 import {
   type ObserverSettings,
+  type RepairPolicy,
+  type RuntimeUnavailable,
+  repairPolicy,
   defaultObserverSettings,
   repairIncidents,
 } from '../../src/feature/observers/types/index.ts';
@@ -1418,12 +1421,16 @@ describe('pipeline actions in the views', () => {
 });
 
 describe('observers in views', () => {
-  const observers = (patch: Partial<ObserverSettings> = {}): ObserverSettings => ({
+  const observerSettings = (patch: Partial<ObserverSettings> = {}): ObserverSettings => ({
     ...defaultObserverSettings(),
     enabled: true,
     projects: [{ repository: '/repo', maxWorkers: null }],
     ...patch,
   });
+  const observers = (
+    patch: Partial<ObserverSettings> = {},
+    unavailable?: RuntimeUnavailable,
+  ): RepairPolicy => repairPolicy(observerSettings(patch), unavailable);
   const failedRun = (id = 'run00000000a') => {
     const state = inRepository('/repo', id);
     step(state);
@@ -1460,6 +1467,25 @@ describe('observers in views', () => {
     expect(
       runView(state, 1000, undefined, [], undefined, undefined, observers({ projects: [] })).state,
     ).toBe('failed');
+  });
+
+  it('does not show repair for a group whose runtime is still unavailable', () => {
+    const state = failedRun();
+    const attempt = group(state).attempts.at(-1);
+    if (attempt) attempt.reason = { kind: 'runtime_disabled', runtime: attempt.runtime };
+    const view = runView(
+      state,
+      1000,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      observers({}, () => true),
+    );
+    expect(view.state).toBe('failed');
+    expect(view.repair?.active).toBe(false);
+    const enabled = runView(state, 1000, undefined, [], undefined, undefined, observers());
+    expect(enabled.repair?.active).toBe(true);
   });
 
   it('shows a task with an incident being repaired as repair, even with observers off', () => {
@@ -1534,13 +1560,16 @@ describe('observers in views', () => {
     repairing.run.repair.incident = incident;
     const waiting = failedRun('run00000000b');
     const idle = inRepository('/repo', 'run00000000c');
-    const settings = observers();
-    const view = observersView(settings, [repairing, waiting, idle]);
+    const settings = observerSettings();
+    const view = observersView(settings, [repairing, waiting, idle], observers());
     expect(view.settings).toBe(settings);
     expect(view.workers).toEqual({
       running: [{ runId: 'run00000000a', repository: '/repo', incident }],
       waiting: 1,
     });
-    expect(observersView(defaultObserverSettings(), [waiting]).workers.waiting).toBe(0);
+    expect(
+      observersView(defaultObserverSettings(), [waiting], repairPolicy(defaultObserverSettings()))
+        .workers.waiting,
+    ).toBe(0);
   });
 });

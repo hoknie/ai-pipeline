@@ -139,6 +139,10 @@ The daemon applies the rules a person has: a retry of a group a person cancelled
 - `done` ends the repair. `rejected` and `needs_human` end it as unsuccessful: the incident stays for a person, and the text of the report is shown in the task. An incident the observer reported on is not taken again.
 - A crash or a timeout of the observer agent uses up one repair, and the incident can be taken again. A task has at most `maxRepairs` repairs; after that it waits for a person. An incident a person resolves while it waits for a worker is not repaired.
 - A usage limit of the observer agent ends the attempt without waiting, does not use up a repair and does not stop the queue. The incident is taken again after the reset.
+- A runtime that is off or whose command is not found (`runtime disabled`, `runtime not found`) is unavailable.
+  An incident of a group that failed for this reason is not taken while that runtime stays unavailable, and the task is not in `repair`.
+  While the runtime of the observer is unavailable, no repair starts and none is used up: a repair that fails this way is given back.
+  Switch the runtime on in the settings, and the observers take the incident at once.
 - A task with a `hold` (`paused`, `frozen`) is not taken. Pausing a task during a repair stops the agent without using up a repair.
 - A task the observer cancelled shows the reason as `Observer cancelled: <reason>`. A cancelled group shows the reason as its `reason`, without the prefix.
 - `aip run cancel <run-id>` also stops a repair that is in progress.

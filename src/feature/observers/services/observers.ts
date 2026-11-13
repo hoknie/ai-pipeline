@@ -20,10 +20,12 @@ import {
   defaultObserverSettings,
   personQuestions,
   planRepairs,
-  repairAdmitted,
   repairIncidents,
+  repairPolicy,
   type ObserverSettings,
   type RepairAction,
+  type RepairPolicy,
+  type RuntimeUnavailable,
   waitsForPerson,
 } from '../types/index.ts';
 
@@ -62,7 +64,27 @@ export class ObserverService {
 
   /** Whether an observer takes the incident of the run: then the queue does not stop for it. */
   takesIncident(state: RunState): boolean {
-    return repairAdmitted(state, this.current) && repairIncidents(state).length > 0;
+    return this.policy().takesIncident(state);
+  }
+
+  /** The decisions about incidents by the current settings and the runtimes available now. */
+  policy(): RepairPolicy {
+    return repairPolicy(this.current, this.unavailability());
+  }
+
+  /** Whether a runtime is off or not found in a repository; looked up once per pair. */
+  private unavailability(): RuntimeUnavailable {
+    const known = new Map<string, boolean>();
+    return (repository, runtime) => {
+      const key = `${repository}\0${runtime}`;
+      let value = known.get(key);
+      if (value === undefined) {
+        const kind = this.dependencies.runs.effects.runtimeProblem(repository, runtime)?.kind;
+        value = kind === 'runtime_disabled' || kind === 'runtime_not_found';
+        known.set(key, value);
+      }
+      return value;
+    };
   }
 
   /** Looks at the incidents of the runs once, however many changes arrive meanwhile. */
@@ -110,7 +132,7 @@ export class ObserverService {
     if (specialist) {
       // Over all runs, so the repairs of the waiting repositories count against the workers.
       const holds = limitHolds(all, now());
-      for (const { state, incident } of planRepairs(settings, all, holds)) {
+      for (const { state, incident } of planRepairs(settings, all, holds, this.unavailability())) {
         if (pending(state)) continue;
         try {
           await runs.engine.apply(state, { kind: 'repair_start', incident, specialist });

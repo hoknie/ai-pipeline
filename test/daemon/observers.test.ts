@@ -23,6 +23,8 @@ import {
   type Harness,
 } from './harness.ts';
 
+const fakeClaude = join(import.meta.dirname, '..', 'fakes', 'claude');
+
 let current: Harness | null = null;
 
 afterEach(async () => {
@@ -152,6 +154,65 @@ describe('Статус Repair', () => {
     const runId = await launch(h);
     const view = await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
     expect(view.repair?.repairs).toBe(2);
+  });
+});
+
+describe('Недоступный исполнитель', () => {
+  const callsOf = (h: Harness, step: string) =>
+    fakeLines(h, 'calls.jsonl').filter((call) => call.step === step);
+
+  it('does not spend repairs while claude is off, and takes the incident once it is on', async () => {
+    current = await harness(CODE_ONLY_CONFIG, { AIP_CLAUDE_BIN: undefined });
+    const h = current;
+    // no `enabled` and no AIP_CLAUDE_BIN: claude is off, for the group and for the observer
+    h.script({ code: [{}], repair: [retry()] });
+    await configure(h, { maxRepairs: 2 });
+    const runId = await launch(h);
+    const failed = await h.waitFor(runId, (view) => view.finished);
+    await settle(h);
+    expect(failed.groups[0]).toMatchObject({
+      status: 'failed',
+      reason: 'runtime disabled: claude',
+    });
+    const waiting = await h.status(runId);
+    expect(waiting.state).toBe('failed');
+    expect(waiting.repair).toMatchObject({ active: false, repairs: 0, incident: null });
+    expect((await h.group(runId, 'vhod')).attempts).toHaveLength(1);
+    expect(callsOf(h, 'repair')).toHaveLength(0);
+    expect(((await h.call('observers', {})) as ObserversView).workers.waiting).toBe(0);
+
+    await h.call('config_settings', {
+      repository: h.repo,
+      values: { 'runtimes.claude.enabled': true, 'runtimes.claude.command': fakeClaude },
+      revision: null,
+      level: 'global',
+    });
+    const done = await h.waitFor(runId, (view) => view.finished && view.state === 'finished');
+    expect(done.repair?.repairs).toBe(1);
+    expect(callsOf(h, 'repair')).toHaveLength(1);
+  });
+
+  it('does not repair a group whose command is not found', async () => {
+    current = await harness(
+      CODE_ONLY_CONFIG.replace(
+        'coder: { name: Кодировщик }',
+        'coder: { name: Кодировщик, runtime: opencode }',
+      ),
+      { AIP_OPENCODE_BIN: '/nonexistent/opencode' },
+    );
+    const h = current;
+    h.script({ repair: [retry()] });
+    await configure(h);
+    const runId = await launch(h);
+    const failed = await h.waitFor(runId, (view) => view.finished);
+    await settle(h);
+    expect(failed.groups[0]).toMatchObject({
+      status: 'failed',
+      reason: 'runtime not found: opencode',
+    });
+    const view = await h.status(runId);
+    expect(view.repair).toMatchObject({ active: false, repairs: 0 });
+    expect(callsOf(h, 'repair')).toHaveLength(0);
   });
 });
 

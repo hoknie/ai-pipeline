@@ -225,7 +225,13 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
   const publications = publisher.ports();
   ports.repos.set(publications.repos);
   ports.tags.set(publications.tags);
-  ports.config.set(publications.config);
+  // Settings of a runtime may have changed: observers look at the incidents again.
+  ports.config.set({
+    configChanged: (repository) => {
+      publications.config.configChanged(repository);
+      services.observers.request();
+    },
+  });
   ports.processes.set(publications.processes);
   // Every saved run reaches the clients first, then the usage journal.
   ports.runs.set({

@@ -57,6 +57,11 @@ export function clockTime(ms: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/** A failure of the observer's attempt that gives the repair back: nobody's fault, the incident waits. */
+export function refundsRepair(reason: FailReason): boolean {
+  return ['usage_limit', 'runtime_disabled', 'runtime_not_found'].includes(reason.kind);
+}
+
 export function describeFailReason(reason: FailReason): string {
   switch (reason.kind) {
     case 'timeout':

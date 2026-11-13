@@ -12,7 +12,6 @@ import {
 import type { Runtime } from '../../../agents/types/index.ts';
 import { modelIdProblem, type Specialist } from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
-import { findExecutable } from '../../../../platform/process/index.ts';
 import {
   SPLIT_GROUP,
   findGroup,
@@ -27,6 +26,7 @@ import { NETWORK_FRESH_MS } from '../../../network/types/index.ts';
 import type { ActionRunner } from './actions.ts';
 import type { AttemptKey, EffectDependencies } from './context.ts';
 import { withProxy } from './proxy.ts';
+import { runtimeProblem } from './runtime-check.ts';
 import type { OutsideChanges } from './outside.ts';
 import type { RunningAgents } from './running.ts';
 import type { UsageBuffers } from './usage.ts';
@@ -112,21 +112,15 @@ export class AttemptStarter {
       });
       return null;
     }
-    const { config, agents, environment } = this.dependencies;
+    const problem = runtimeProblem(this.dependencies, state.run.repository, attempt.runtime);
+    if (problem) {
+      await this.fail(state, key, problem);
+      return null;
+    }
+    const { config, agents } = this.dependencies;
     const settings = config.runtimeSettings(state.run.repository);
-    if (typeof settings === 'string') {
-      await this.fail(state, key, { kind: 'spawn', message: settings });
-      return null;
-    }
-    if (!agents.isEnabled(attempt.runtime, settings)) {
-      await this.fail(state, key, { kind: 'runtime_disabled', runtime: attempt.runtime });
-      return null;
-    }
+    if (typeof settings === 'string') return null;
     const runtime = agents.runtimeFor(attempt.runtime, settings);
-    if (!findExecutable(runtime.executable, environment.PATH)) {
-      await this.fail(state, key, { kind: 'runtime_not_found', runtime: attempt.runtime });
-      return null;
-    }
     let worktree: string;
     try {
       worktree = await ensureGroupWorktree(state, group);

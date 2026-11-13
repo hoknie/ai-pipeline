@@ -23,6 +23,7 @@ runtimes:
 This section is set in the shared `settings.yaml` only. In a project `aip/settings.yaml` it is a validation error (`swarm.runtimes`).
 
 - **`enabled`** switches the runtime on or off. Every runtime is off until you switch it on: without the field, `aip` does not start it. A step of a specialist on a runtime that is off fails with `runtime disabled: <name>` (a chain with `on_error` moves on to its next item), the request for a run name is skipped and the list of its models stays empty.
+  - [Observers](../usage/runs.md#observers) do not repair such a failure and do not start a repair on a runtime that is off.
   - A non-empty `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN` in the daemon's environment switches the runtime on while `enabled` is not set. An explicit `enabled: false` wins over the variable.
   - Switch it in the panel (Settings → Runtimes → Enabled) or set `runtimes.<name>.enabled: true` in the shared `settings.yaml`. To go back to an older `aip`, remove `enabled` from the file first.
 - **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is the runtime's name: `claude`, `opencode` or `agy`.

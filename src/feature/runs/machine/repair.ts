@@ -1,12 +1,14 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import type { Specialist } from '../../swarm-config/types/index.ts';
 import {
+  type FailReason,
   type Incident,
   type RunState,
   REPAIR_GROUP,
   freshPending,
   isTerminal,
   newGroup,
+  refundsRepair,
   runProblems,
 } from '../types/index.ts';
 import type { Ctx } from './events.ts';
@@ -82,6 +84,11 @@ export function deliveryKeys(state: RunState, groups: readonly string[]): string
         groups.includes(problem.group),
     )
     .map((problem) => problem.key);
+}
+
+/** The repair group failed: the incident is taken again; nobody's fault gives the repair back. */
+export function failRepair(m: Ctx, reason: FailReason): void {
+  closeRepair(m.state, { taken: [], refund: refundsRepair(reason) });
 }
 
 /**

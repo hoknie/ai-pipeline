@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -291,7 +292,11 @@ describe('история попыток наблюдателя через дем
 
   it('records a repair spawn failure through the real history endpoint', async () => {
     const h = await start();
-    h.environment.AIP_OPENCODE_BIN = '/missing/observer-opencode';
+    // The command exists, but the system cannot start it: the repair starts and fails to spawn.
+    const broken = join(mkdtempSync(join(tmpdir(), 'aip-broken-')), 'opencode');
+    writeFileSync(broken, '#!/nonexistent/interpreter\n');
+    chmodSync(broken, 0o755);
+    h.environment.AIP_OPENCODE_BIN = broken;
     h.script({ code: [failed] });
     await h.call('repository_add', { path: h.repo });
     await h.call('observers_set', {
@@ -324,7 +329,7 @@ describe('история попыток наблюдателя через дем
       runtime: 'opencode',
       model: 'test/spawn-test-model',
       result: 'failed',
-      failureKind: 'runtime_not_found',
+      failureKind: 'spawn',
     });
     expect(page.items[0]!.finishedAt).not.toBeNull();
   });

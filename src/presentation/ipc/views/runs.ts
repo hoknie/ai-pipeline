@@ -1,8 +1,7 @@
 import {
-  type ObserverSettings,
+  type RepairPolicy,
   defaultObserverSettings,
-  repairAdmitted,
-  repairIncidents,
+  repairPolicy,
 } from '../../../feature/observers/types/index.ts';
 import {
   runStartedAt,
@@ -174,15 +173,12 @@ function runProgress(state: RunState): { done: number; total: number } {
 }
 
 /** The incident being repaired, or a waiting one an observer may take; the run has no hold. */
-export function repairActive(state: RunState, observers: ObserverSettings): boolean {
+export function repairActive(state: RunState, observers: RepairPolicy): boolean {
   if (state.run.hold !== null) return false;
-  return (
-    state.run.repair.incident !== null ||
-    (repairAdmitted(state, observers) && repairIncidents(state).length > 0)
-  );
+  return state.run.repair.incident !== null || observers.takesIncident(state);
 }
 
-function repairView(state: RunState, observers: ObserverSettings): RunRepairView {
+function repairView(state: RunState, observers: RepairPolicy): RunRepairView {
   const { repair } = state.run;
   return {
     allowed: repair.allowed,
@@ -194,7 +190,7 @@ function repairView(state: RunState, observers: ObserverSettings): RunRepairView
 }
 
 /** The identity, state and timing of the run. */
-function runHead(state: RunState, observers: ObserverSettings) {
+function runHead(state: RunState, observers: RepairPolicy) {
   const summary = summarize(state);
   return {
     id: state.run.id,
@@ -234,7 +230,7 @@ export function runView(
   catalog: readonly Tag[] = [],
   waits: WaitLookup = NO_WAITS,
   artifacts: ArtifactCounts = NO_ARTIFACTS,
-  observers: ObserverSettings = defaultObserverSettings(),
+  observers: RepairPolicy = repairPolicy(defaultObserverSettings()),
 ): RunView {
   const summary = summarize(state);
   const waitOf: WaitOf = (group) =>

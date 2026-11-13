@@ -38,7 +38,7 @@ export class Snapshots {
       tags.of(state.run.repository),
       runs.engine.waitOf,
       artifacts.counts(state.run.id),
-      observers.settings(),
+      observers.policy(),
     );
     const own = queue.store.get(state.run.repository);
     const item = own ? returnItemOf(own, state.run.id) : null;
@@ -80,7 +80,11 @@ export class Snapshots {
 
   /** The observers as the settings page shows them. */
   observers(): ObserversView {
-    return observersView(this.services.observers.settings(), this.services.runs.states.all());
+    return observersView(
+      this.services.observers.settings(),
+      this.services.runs.states.all(),
+      this.services.observers.policy(),
+    );
   }
 
   repositories(): RepositoryView[] {

@@ -24,7 +24,7 @@ import {
 } from '../types/index.ts';
 import { finishDelivery, finishMessage } from './delivery-flow.ts';
 import type { ActionOutcome, Ctx, Effect } from './events.ts';
-import { closeRepair } from './repair.ts';
+import { failRepair } from './repair.ts';
 
 export function groupOf(m: Ctx, slug: string): Group {
   const group = findGroup(m.state, slug);
@@ -141,10 +141,10 @@ export function failGroup(m: Ctx, group: Group, reason: FailReason): void {
   group.reason = describeFailReason(reason);
   if (isMessageGroup(group)) finishMessageGroup(m, group, null);
   if (isRepairGroup(group)) {
-    // A crash, a timeout or an interruption: the incident is taken again; a usage limit gives
-    // the repair back and does not wait.
+    // A crash or a timeout: the incident is taken again. A usage limit or an unavailable
+    // runtime gives the repair back and does not wait.
     group.pending = null;
-    closeRepair(m.state, { taken: [], refund: reason.kind === 'usage_limit' });
+    failRepair(m, reason);
   }
   if (isResolveGroup(group)) {
     group.pending = null;

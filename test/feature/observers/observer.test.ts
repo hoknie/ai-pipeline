@@ -7,6 +7,8 @@ import {
   repairAdmitted,
   repairIncidents,
   personQuestions,
+  observerRuntime,
+  repairPolicy,
   waitsForPerson,
 } from '../../../src/feature/observers/types/index.ts';
 import { checkObserverSettings } from '../../../src/feature/observers/services/settings-check.ts';
@@ -206,5 +208,72 @@ describe('settings check', () => {
     const check = checkObserverSettings({ answerHumanOnly: true }, settings(), new Set());
     expect(check.settings).toBeNull();
     expect(check.errors).toContainEqual({ path: 'answerHumanOnly', message: 'unknown key' });
+  });
+});
+
+describe('unavailable runtimes', () => {
+  /** A run whose first group failed because its runtime is off. */
+  function disabledRun(
+    id: string,
+    kind: 'runtime_disabled' | 'runtime_not_found' = 'runtime_disabled',
+  ) {
+    const state = run(1, { id, now: 1000 });
+    state.run.repository = '/repo';
+    step(state);
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'gruppa-1',
+        seq: 1,
+        exit: {
+          sessionId: null,
+          usage: null,
+          failure: { kind, runtime: 'claude' },
+          outsideChanges: [],
+        },
+      },
+      1100,
+    );
+    return state;
+  }
+  const off = (_repository: string, runtime: string) => runtime === 'claude';
+  const none = new Map<string, number>();
+
+  it.each(['runtime_disabled', 'runtime_not_found'] as const)(
+    'hides a group that failed with %s while its runtime is unavailable',
+    (kind) => {
+      const state = disabledRun('run000000001', kind);
+      expect(state.groups[0]?.status).toBe('failed');
+      expect(repairIncidents(state)).toHaveLength(1);
+      expect(repairIncidents(state, off)).toEqual([]);
+      expect(repairIncidents(state, () => false)).toHaveLength(1);
+      expect(planRepairs(settings(), [state], none, off)).toEqual([]);
+      expect(planRepairs(settings(), [state], none)).toHaveLength(1);
+    },
+  );
+
+  it('keeps a timeout an incident when the runtime is off', () => {
+    const state = failedRun('run000000001');
+    expect(repairIncidents(state, off)).toHaveLength(1);
+  });
+
+  it('does not admit a task while the runtime of the observer is unavailable', () => {
+    const state = failedRun('run000000001');
+    expect(observerRuntime(settings())).toBe('claude');
+    expect(observerRuntime(settings({ specialist: { runtime: 'opencode' } }))).toBe('opencode');
+    expect(repairAdmitted(state, settings(), off)).toBe(false);
+    expect(planRepairs(settings(), [state], none, off)).toEqual([]);
+    expect(repairAdmitted(state, settings({ specialist: { runtime: 'opencode' } }), off)).toBe(
+      true,
+    );
+  });
+
+  it('gives the policy of the settings under the availability', () => {
+    const state = disabledRun('run000000001');
+    expect(repairPolicy(settings(), off).takesIncident(state)).toBe(false);
+    expect(repairPolicy(settings(), off).admitted(state)).toBe(false);
+    expect(repairPolicy(settings()).takesIncident(state)).toBe(true);
+    expect(repairPolicy(settings(), () => false).admitted(state)).toBe(true);
   });
 });
