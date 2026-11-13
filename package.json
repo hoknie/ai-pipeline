@@ -1,6 +1,6 @@
 {
   "name": "@hoknie/aip",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "aip: local orchestrator for a swarm of AI agents (Claude Code, OpenCode)",
   "type": "module",
   "license": "MIT",
