@@ -22,14 +22,30 @@ describe('cancelling the auto delivery in the run header', () => {
     await waitFor(() => expect(api.cancelAutoDelivery).toHaveBeenCalledWith('run1'));
   });
 
-  it('shows Deliver without the cancel button when auto delivery is off or the run is finished', () => {
+  it('shows Deliver without the cancel button when auto delivery is off or the run is finished with a pending delivery', () => {
     show(runView({ autoDeliver: false, finished: false }));
     expect(button('Deliver')).not.toBeNull();
     expect(button('Cancel auto delivery')).toBeNull();
     cleanup();
-    show(runView({ autoDeliver: true, finished: true }));
+    show(
+      runView({
+        autoDeliver: true,
+        finished: true,
+        delivery: { applied: 0, merged: 1, failed: 0, inProgress: false, finishedAt: null },
+      }),
+    );
     expect(button('Deliver')).not.toBeNull();
     expect(button('Cancel auto delivery')).toBeNull();
+  });
+
+  it('hides Deliver and the steps button for a finished run with nothing to deliver', () => {
+    show(runView({ finished: true }));
+    expect(button('Deliver')).toBeNull();
+    expect(screen.queryByRole('button', { name: /steps/i })).toBeNull();
+    cleanup();
+    show(runView({ finished: false }));
+    expect(button('Deliver')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /steps/i })).not.toBeNull();
   });
 
   it('passes an API error to onError', async () => {

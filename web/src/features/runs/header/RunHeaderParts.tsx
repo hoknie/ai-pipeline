@@ -98,7 +98,7 @@ export function RunButtons({
         >
           {t('runs.header.cancelAutoDelivery')}
         </Button>
-      ) : (
+      ) : run.finished && !delivery.deliverable ? null : (
         <Button
           loading={delivery.applying}
           disabled={!delivery.deliverable}

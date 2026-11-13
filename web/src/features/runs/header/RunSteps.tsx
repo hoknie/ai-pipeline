@@ -32,7 +32,7 @@ export function RunSteps({
       setConfirming(false);
     }
   };
-  if (!run.steps || run.steps.length === 0) return null;
+  if (run.finished || !run.steps || run.steps.length === 0) return null;
   const active = run.steps.filter((step) => !step.skipped);
   const last = active.length === 1 ? active[0] : undefined;
   return (
