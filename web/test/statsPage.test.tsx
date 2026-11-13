@@ -417,4 +417,21 @@ describe('states', () => {
     expect(await screen.findByText('Tokens per task')).toBeTruthy();
     expect(screen.queryByText(/daemon is down/)).toBeNull();
   });
+
+  it('has no scroll area of its own: the shell scrolls the page', async () => {
+    const api = fakeApi({ statsReport: vi.fn().mockResolvedValue(twoProjects()) });
+    render(
+      <StatsPage
+        api={api}
+        registry={registry}
+        runs={[]}
+        period="30d"
+        project={null}
+        onFilter={() => {}}
+      />,
+    );
+    await screen.findByText('Tokens per task');
+    const page = screen.getByTestId('stats-page');
+    expect(page.className).not.toMatch(/overflow-y-(auto|scroll)/);
+  });
 });

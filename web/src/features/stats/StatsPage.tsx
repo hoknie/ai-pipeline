@@ -66,7 +66,7 @@ export default function StatsPage({
   const { t } = useTranslation();
   const { report, error, loading, reload } = useStatsReport(api, period, project, runs);
   return (
-    <div className="flex min-w-0 flex-col gap-4 overflow-y-auto p-4" data-testid="stats-page">
+    <div className="flex min-w-0 flex-col gap-4 p-4" data-testid="stats-page">
       <StatsFilters period={period} project={project} registry={registry} onChange={onFilter} />
       {report !== null && !report.settings.enabled ? (
         <Alert variant="warn" className="flex flex-wrap items-center gap-2">
