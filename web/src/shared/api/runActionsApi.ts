@@ -15,6 +15,8 @@ export interface RunActionsApi {
   markDelivered(runId: string, groups?: string[]): Promise<ApplyResult>;
   /** Replaces the title of a run in any state; the name stays. */
   setRunTitle(runId: string, title: string): Promise<RunView>;
+  /** Turns the automatic delivery of an unfinished run off; returns the run. */
+  cancelAutoDelivery(runId: string): Promise<RunView>;
   /** Adds and removes tags (by name) of a run in any state. */
   setRunTags(runId: string, change: { add?: string[]; remove?: string[] }): Promise<RunView>;
   /** Pauses an unfinished run: its running step stops (it continues in the same session) and the run goes to the end of the queue. */
@@ -41,6 +43,7 @@ export function runActionsApi(): RunActionsApi {
     markDelivered: (runId, groups) =>
       post(`/api/runs/${enc(runId)}/delivered`, groups ? { groups } : {}),
     setRunTitle: (runId, title) => post(`/api/runs/${enc(runId)}/title`, { title }),
+    cancelAutoDelivery: (runId) => post(`/api/runs/${enc(runId)}/auto-delivery/cancel`, {}),
     setRunTags: (runId, change) => post(`/api/runs/${enc(runId)}/tags`, change),
     pauseRun: (run, runRepository) =>
       post(withRepository(`/api/runs/${enc(run)}/pause`, runRepository)),

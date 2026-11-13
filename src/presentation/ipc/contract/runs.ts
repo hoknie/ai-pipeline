@@ -125,5 +125,9 @@ export const runsRequests = [
     method: z.literal('run_title'),
     params: z.object({ runId: z.string().min(1), title: titleSchema }),
   }),
+  z.object({
+    method: z.literal('run_auto_deliver_cancel'),
+    params: z.object({ runId: z.string().min(1) }),
+  }),
   z.object({ method: z.literal('repair_action'), params: repairActionParams }),
 ] as const;

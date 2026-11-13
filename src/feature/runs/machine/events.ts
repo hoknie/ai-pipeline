@@ -111,6 +111,8 @@ export type Event =
   | { kind: 'run_named'; title: string | null; name: string | null; usage: Usage | null }
   | { kind: 'tags_set'; tags: string[] }
   | { kind: 'title_set'; title: string }
+  /** The user turns the automatic delivery of an unfinished run off. */
+  | { kind: 'auto_delivery_cancelled' }
   | { kind: 'step_skip'; step: string; skip: boolean }
   | { kind: 'hold'; hold: RunHold | null }
   /** An observer takes the incident; `specialist` is its profile at this moment. */

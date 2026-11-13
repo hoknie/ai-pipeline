@@ -67,7 +67,14 @@ export class RunRequests {
     return state;
   }
 
-  /** Creates the run of a queue item: the branch, the run itself, the naming in the background. */
+  /** `run_auto_deliver_cancel`: turns the automatic delivery of an unfinished run off. */
+  async cancelAutoDelivery(runId: string): Promise<RunState> {
+    const state = this.dependencies.states.get(runId);
+    await this.dependencies.engine.apply(state, { kind: 'auto_delivery_cancelled' });
+    return state;
+  }
+
+  /** Creates the run of a queue item:the branch, the run itself, the naming in the background. */
   async create(
     params: RunRequest,
     tagIds: string[],

@@ -385,6 +385,41 @@ describe('automatic delivery', () => {
     expect(request(state)).toEqual([expect.objectContaining({ kind: 'deliver', auto: false })]);
   });
 
+  it('turns off with auto_delivery_cancelled: no effects, and the finish delivers nothing', () => {
+    const state = run(1);
+    state.run.config.delivery.auto = true;
+    expect(transition(state, { kind: 'auto_delivery_cancelled' }, 100)).toEqual([]);
+    expect(state.run.config.delivery.auto).toBe(false);
+    for (const _ of ['plan', 'code', 'review', 'qa']) {
+      step(state);
+      finish(state, 'done');
+    }
+    expect(
+      transition(
+        state,
+        { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+        5000,
+      ),
+    ).toEqual([]);
+    expect(state.run.finishedAt).toBe(5000);
+    expect(state.groups[0]?.delivery.state).toBe('pending');
+  });
+
+  it('rejects the cancellation for a finished run and when auto is already off', () => {
+    const off = run(1);
+    off.run.config.delivery.auto = false;
+    expect(() => transition(off, { kind: 'auto_delivery_cancelled' }, 100)).toThrow(/is off/);
+
+    const finished = run(1);
+    finished.run.config.delivery.auto = true;
+    transition(finished, { kind: 'cancel', group: null }, 10);
+    expect(finished.run.finishedAt).not.toBeNull();
+    expect(() => transition(finished, { kind: 'auto_delivery_cancelled' }, 100)).toThrow(
+      /is finished/,
+    );
+    expect(finished.run.config.delivery.auto).toBe(true);
+  });
+
   it('does nothing when delivery.auto is off', () => {
     const state = run(1);
     state.run.config.delivery.auto = false;

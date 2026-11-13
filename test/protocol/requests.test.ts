@@ -75,6 +75,7 @@ const SAMPLES: Record<Method, unknown> = {
   tag_remove: { ...repository, tag: 'auth' },
   run_tags: { ...run, add: ['auth'] },
   run_title: { ...run, title: 'Title' },
+  run_auto_deliver_cancel: run,
   observers: {},
   observers_history: {},
   stats_report: {},
@@ -97,9 +98,9 @@ const SAMPLES: Record<Method, unknown> = {
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 79 methods, each in the request schema once', () => {
+  it('has 80 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(79);
+    expect(methods).toHaveLength(80);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

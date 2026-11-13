@@ -6,7 +6,7 @@ import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import { useTags } from '../../../shared/lib/catalog/tags.tsx';
 import type { RunView, TagView } from '../../../shared/api/types.ts';
-import { canDeliver } from './delivery.ts';
+import { autoDeliveryCancellable, canDeliver } from './delivery.ts';
 
 type OnError = (message: string) => void;
 
@@ -150,6 +150,7 @@ export function useRunDelivery(
   const confirm = useConfirm();
   const [forcing, setForcing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [cancellingAuto, setCancellingAuto] = useState(false);
   const markDelivered = async () => {
     const yes = await confirm({
       title: t('runs.header.markDeliveredTitle'),
@@ -176,5 +177,26 @@ export function useRunDelivery(
       setApplying(false);
     }
   };
-  return { forcing, setForcing, applying, apply, markDelivered, deliverable: canDeliver(run) };
+  const cancelAuto = async () => {
+    setCancellingAuto(true);
+    try {
+      await api.cancelAutoDelivery(run.id);
+      notifySuccess(t('runs.header.autoDeliveryCancelled'));
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setCancellingAuto(false);
+    }
+  };
+  return {
+    forcing,
+    setForcing,
+    applying,
+    apply,
+    markDelivered,
+    deliverable: canDeliver(run),
+    cancellingAuto,
+    cancelAuto,
+    autoCancellable: autoDeliveryCancellable(run),
+  };
 }

@@ -382,6 +382,8 @@ export const ru: Dictionary = {
       markDeliveredAction: 'Отметить доставленным',
       markDeliveredKeep: 'Не отмечать',
       markedDelivered: 'Отмечено доставленным',
+      cancelAutoDelivery: 'Отменить автодоставку',
+      autoDeliveryCancelled: 'Автодоставка отменена',
       deliveredManually: 'Доставлено вручную',
       copied: 'Id запуска скопирован',
       copyId: 'Скопировать id запуска',

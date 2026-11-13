@@ -7,7 +7,7 @@ function writeRunRow(database: Database, { run }: RunState): void {
     .prepare(
       `INSERT INTO runs (id, repository, pipeline, base_commit, branch, ref_style, created_at, finished_at, config_json, dirty_warning, next_merge_seq, pending_delivery_json, title, name, naming_usage_json, from_queue, tags_json, queue_item, skipped_steps_json, number, hold, repair_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json, hold = excluded.hold, repair_json = excluded.repair_json`,
+       ON CONFLICT (id) DO UPDATE SET finished_at = excluded.finished_at, next_merge_seq = excluded.next_merge_seq, pending_delivery_json = excluded.pending_delivery_json, title = excluded.title, name = excluded.name, naming_usage_json = excluded.naming_usage_json, tags_json = excluded.tags_json, skipped_steps_json = excluded.skipped_steps_json, hold = excluded.hold, repair_json = excluded.repair_json, config_json = excluded.config_json`,
     )
     .run(
       run.id,

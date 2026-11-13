@@ -80,5 +80,10 @@ export function runsRoutes({ call }: RouteKit): Route[] {
       handle: async ([runId], body) =>
         call('run_title', { runId: runId ?? '', ...parseBody(runTitleBody, body) }),
     },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/auto-delivery/cancel$`),
+      handle: async ([runId]) => call('run_auto_deliver_cancel', { runId: runId ?? '' }),
+    },
   ];
 }

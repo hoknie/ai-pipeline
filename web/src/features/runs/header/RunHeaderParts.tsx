@@ -90,13 +90,23 @@ export function RunButtons({
           {t('runs.header.returnRun')}
         </Button>
       ) : null}
-      <Button
-        loading={delivery.applying}
-        disabled={!delivery.deliverable}
-        onClick={() => void delivery.apply(false)}
-      >
-        {t('runs.header.deliver')}
-      </Button>
+      {delivery.autoCancellable ? (
+        <Button
+          variant="outline"
+          loading={delivery.cancellingAuto}
+          onClick={() => void delivery.cancelAuto()}
+        >
+          {t('runs.header.cancelAutoDelivery')}
+        </Button>
+      ) : (
+        <Button
+          loading={delivery.applying}
+          disabled={!delivery.deliverable}
+          onClick={() => void delivery.apply(false)}
+        >
+          {t('runs.header.deliver')}
+        </Button>
+      )}
     </>
   );
 }

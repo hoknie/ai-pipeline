@@ -380,6 +380,8 @@ export const es: Dictionary = {
       markDeliveredAction: 'Marcar como entregado',
       markDeliveredKeep: 'No marcar',
       markedDelivered: 'Marcado como entregado',
+      cancelAutoDelivery: 'Cancelar la entrega automática',
+      autoDeliveryCancelled: 'Entrega automática cancelada',
       deliveredManually: 'Entregado manualmente',
       copied: 'Id de la ejecución copiado',
       copyId: 'Copiar el id de la ejecución',

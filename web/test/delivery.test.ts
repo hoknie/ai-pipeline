@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyOutcome,
+  autoDeliveryCancellable,
   deliveryBadge,
   settledOutcome,
   undeliveredMark,
@@ -29,6 +30,14 @@ const withDelivery = (
     },
     ...extra,
   });
+
+describe('autoDeliveryCancellable', () => {
+  it('is true only for an unfinished run with auto delivery', () => {
+    expect(autoDeliveryCancellable(runView({ autoDeliver: true, finished: false }))).toBe(true);
+    expect(autoDeliveryCancellable(runView({ autoDeliver: false, finished: false }))).toBe(false);
+    expect(autoDeliveryCancellable(runView({ autoDeliver: true, finished: true }))).toBe(false);
+  });
+});
 
 describe('deliveryBadge', () => {
   it('prefers a running delivery over failures', () => {

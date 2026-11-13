@@ -68,6 +68,10 @@ export const runHandlers = {
     services.runs.engine.serial(async () =>
       snapshots.run(await services.runs.requests.setTitle(params.runId, params.title)),
     ),
+  run_auto_deliver_cancel: (params, { services, snapshots }) =>
+    services.runs.engine.serial(async () =>
+      snapshots.run(await services.runs.requests.cancelAutoDelivery(params.runId)),
+    ),
   run_tags: (params, { services, snapshots }) =>
     services.runs.engine.serial(async () =>
       snapshots.run(await services.queue.taskTags.runTags(params)),

@@ -181,6 +181,37 @@ describe('delivery through the daemon', () => {
     expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 1;\n');
   });
 
+  it('cancels the auto delivery of a running run, survives a restart and leaves apply', async () => {
+    const h = await start('  delivery: { auto: true }\n');
+    h.script({
+      code: [{ waitFor: h.gate('code'), write: { 'lib.ts': 'export const value = 2;\n' } }],
+    });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'Вход', task: 'вход' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
+    const view = (await h.call('run_auto_deliver_cancel', { runId })) as { autoDeliver: boolean };
+    expect(view.autoDeliver).toBe(false);
+    h.open('code');
+    const done = await h.waitFor(runId, (run) => run.finished);
+    expect(done.groups.map((group) => group.delivery)).toEqual(['pending']);
+    await h.restart();
+    expect((await h.status(runId)).autoDeliver).toBe(false);
+    expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 1;\n');
+    await expect(h.call('run_auto_deliver_cancel', { runId })).rejects.toThrow();
+    await h.call('apply', { runId });
+    expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 2;\n');
+  });
+
+  it('refuses to cancel the auto delivery of an unknown run', async () => {
+    const h = await start();
+    await expect(h.call('run_auto_deliver_cancel', { runId: 'nope' })).rejects.toThrow(
+      'unknown run',
+    );
+  });
+
   it('delivers automatically with delivery.auto', async () => {
     const h = await start('  delivery: { auto: true, keep: true }\n');
     h.script(WRITE_LIB);

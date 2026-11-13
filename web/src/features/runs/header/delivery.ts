@@ -5,6 +5,11 @@ export function canDeliver(run: RunView): boolean {
   return run.delivery.merged > run.delivery.applied && !run.delivery.inProgress;
 }
 
+/** Whether the automatic delivery of the run is on and can still be cancelled. */
+export function autoDeliveryCancellable(run: RunView): boolean {
+  return run.autoDeliver && !run.finished;
+}
+
 export type DeliveryBadge = {
   status: 'running' | 'apply_failed' | 'pending' | 'applied';
   /** Which dictionary label to use; `null` takes the label of the status. */

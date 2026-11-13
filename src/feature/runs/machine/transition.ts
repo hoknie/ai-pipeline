@@ -1,4 +1,4 @@
-import { isRejected } from '../../../platform/errors/index.ts';
+import { isRejected, rejected } from '../../../platform/errors/index.ts';
 import { addUsage } from '../../agents/types/index.ts';
 import { type RunState, isRunFinished, pointStalled, retryableGroups } from '../types/index.ts';
 import {
@@ -54,6 +54,15 @@ function runNamed(m: Ctx, event: Extract<Event, { kind: 'run_named' }>): void {
   m.state.run.namingUsage = addUsage(m.state.run.namingUsage, event.usage);
 }
 
+function autoDeliveryCancelled(m: Ctx): void {
+  const run = m.state.run;
+  if (run.finishedAt !== null) {
+    throw rejected(`run ${run.id} is finished; its auto delivery already ran`);
+  }
+  if (!run.config.delivery.auto) throw rejected(`auto delivery of run ${run.id} is off`);
+  run.config.delivery.auto = false;
+}
+
 /** The table of the events: one handler for each kind. */
 const HANDLERS: Handlers = {
   report: (m, e) => reportAttempt(m, e.group, e.seq, e.report),
@@ -78,6 +87,7 @@ const HANDLERS: Handlers = {
   run_named: runNamed,
   tags_set: (m, e) => void (m.state.run.tags = [...e.tags]),
   title_set: (m, e) => void (m.state.run.title = e.title),
+  auto_delivery_cancelled: autoDeliveryCancelled,
   step_skip: (m, e) => stepSkip(m, e.step, e.skip),
   hold: (m, e) => holdRun(m, e.hold),
   repair_start: (m, e) => repairStart(m, e.incident, e.specialist),

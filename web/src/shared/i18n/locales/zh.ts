@@ -371,6 +371,8 @@ export const zh: Dictionary = {
       markDeliveredAction: '标记为已交付',
       markDeliveredKeep: '不标记',
       markedDelivered: '已标记为已交付',
+      cancelAutoDelivery: '取消自动交付',
+      autoDeliveryCancelled: '已取消自动交付',
       deliveredManually: '已手动交付',
       copied: '已复制运行 id',
       copyId: '复制运行 id',

@@ -372,6 +372,8 @@ export const en = {
       markDeliveredAction: 'Mark as delivered',
       markDeliveredKeep: 'Do not mark',
       markedDelivered: 'Marked as delivered',
+      cancelAutoDelivery: 'Cancel auto delivery',
+      autoDeliveryCancelled: 'Auto delivery cancelled',
       deliveredManually: 'Delivered manually',
       copied: 'Run id copied',
       copyId: 'Copy run id',

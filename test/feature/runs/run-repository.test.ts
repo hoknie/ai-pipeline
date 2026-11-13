@@ -12,6 +12,19 @@ import { finish, run, step } from '../../feature/runs/helpers.ts';
 import { addItem, emptyQueue } from '../../../src/feature/queue/types/index.ts';
 import { dispatch, transition } from '../../../src/feature/runs/machine/index.ts';
 
+describe('configuration snapshot of a run', () => {
+  it('keeps a changed delivery.auto after a repeated save', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    state.run.config.delivery.auto = true;
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.config.delivery.auto).toBe(true);
+    transition(state, { kind: 'auto_delivery_cancelled' }, 10);
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.config.delivery.auto).toBe(false);
+  });
+});
+
 describe('hold of a run and priority runs', () => {
   it('keeps the hold of a run and the priority list of a queue', () => {
     const store = temporaryStorage();

@@ -580,6 +580,28 @@ describe('aip web', () => {
     expect((await post('/api/runs/unknown/title', { title: 'x' })).status).toBe(404);
   });
 
+  it('cancels the auto delivery of a running run through the API', async () => {
+    const { h, web, base } = await setup();
+    const post = (path: string) =>
+      fetch(`${base}${path}`, { method: 'POST', headers: authed(web, JSON_TYPE), body: '{}' });
+    h.script({ code: [{ waitFor: h.gate('code') }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+      autoDeliver: true,
+    })) as RunCreated;
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
+    const cancelled = await post(`/api/runs/${runId}/auto-delivery/cancel`);
+    expect(cancelled.status).toBe(200);
+    expect(((await cancelled.json()) as { autoDeliver: boolean }).autoDeliver).toBe(false);
+    expect((await post(`/api/runs/${runId}/auto-delivery/cancel`)).status).toBeGreaterThanOrEqual(
+      400,
+    );
+    expect((await post('/api/runs/unknown/auto-delivery/cancel')).status).toBe(404);
+    h.open('code');
+  });
+
   it('serves the catalog of the chosen repository', async () => {
     const { h, web, base } = await setup();
     const second = realpathSync(mkdtempSync(join(tmpdir(), 'aip-second-')));

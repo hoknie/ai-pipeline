@@ -572,6 +572,12 @@ describe('tag requests', () => {
     bad('run_skip', { runId: 'r', step: 'qa' });
   });
 
+  it('takes a run id in run_auto_deliver_cancel', () => {
+    ok('run_auto_deliver_cancel', { runId: 'r' });
+    bad('run_auto_deliver_cancel', {});
+    bad('run_auto_deliver_cancel', { runId: '' });
+  });
+
   it('takes a trimmed title of 1 to 60 characters in run_title', () => {
     ok('run_title', { runId: 'r', title: ' Вход ' });
     ok('run_title', { runId: 'r', title: 'x'.repeat(60) });

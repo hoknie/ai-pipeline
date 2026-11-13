@@ -35,6 +35,8 @@ aip run apply <run-id>            # all ready groups
 aip run apply <run-id> login      # only these groups
 ```
 
+While a run is still going, the panel's run header can switch its automatic delivery off with «Cancel auto delivery»; the result then waits for manual delivery.
+
 Ready groups can be delivered in parts, and a group cannot be delivered twice. If delivery is refused, the group gets `apply_failed` with the reason, and you can repeat `aip run apply`. After you merged a result by hand, `aip run mark-delivered` marks the groups as delivered and applies nothing.
 
 ## Settings for one task

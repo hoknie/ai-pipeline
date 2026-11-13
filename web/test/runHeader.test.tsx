@@ -9,6 +9,41 @@ afterEach(cleanup);
 
 const button = (name: string) => screen.queryByRole('button', { name });
 
+describe('cancelling the auto delivery in the run header', () => {
+  const show = (run: ReturnType<typeof runView>, api = fakeApi(), onError = vi.fn()) => {
+    render(<RunHeader run={run} api={api} now={0} onError={onError} />);
+    return { api, onError };
+  };
+
+  it('replaces Deliver with Cancel auto delivery for an unfinished run', async () => {
+    const { api } = show(runView({ autoDeliver: true, finished: false }));
+    expect(button('Deliver')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto delivery' }));
+    await waitFor(() => expect(api.cancelAutoDelivery).toHaveBeenCalledWith('run1'));
+  });
+
+  it('shows Deliver without the cancel button when auto delivery is off or the run is finished', () => {
+    show(runView({ autoDeliver: false, finished: false }));
+    expect(button('Deliver')).not.toBeNull();
+    expect(button('Cancel auto delivery')).toBeNull();
+    cleanup();
+    show(runView({ autoDeliver: true, finished: true }));
+    expect(button('Deliver')).not.toBeNull();
+    expect(button('Cancel auto delivery')).toBeNull();
+  });
+
+  it('passes an API error to onError', async () => {
+    const api = fakeApi({
+      cancelAutoDelivery: vi.fn(async () => {
+        throw new Error('run is finished');
+      }),
+    });
+    const { onError } = show(runView({ autoDeliver: true, finished: false }), api);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel auto delivery' }));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('run is finished'));
+  });
+});
+
 describe('pause and continue in the run header', () => {
   it('shows Continue right after the answer to a pause, without an event of the stream', async () => {
     const api = fakeApi();
