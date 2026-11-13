@@ -27,6 +27,7 @@ import { processesRoutes } from './routes/processes.ts';
 import { queueRoutes } from './routes/queue.ts';
 import { directoriesRoute, repositoriesRoute } from './routes/repositories.ts';
 import { runsRoutes } from './routes/runs.ts';
+import { mcpServerRoutes } from './routes/catalog/mcp-servers.ts';
 import { settingsRoutes } from './routes/settings.ts';
 import { observerHistoryRoutes } from './routes/observers/history.ts';
 import { specialistsRoutes } from './routes/specialists.ts';
@@ -70,6 +71,7 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       queueRoutes,
       configRoutes,
       settingsRoutes,
+      mcpServerRoutes,
       observerHistoryRoutes,
       specialistsRoutes,
       tagsRoutes,

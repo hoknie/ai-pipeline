@@ -8,6 +8,8 @@ const policySchema = z.object({
   allowCommands: z.array(z.string()),
   server: z.string(),
   tools: z.array(z.string()),
+  /** Names of the attempt of the MCP servers of the specialist; absent in older policies. */
+  servers: z.array(z.string()).default([]),
 });
 export type AgyPolicy = z.infer<typeof policySchema>;
 const hookSchema = z.object({
@@ -29,17 +31,30 @@ const READ_PATHS: Record<string, string> = {
   grep_search: 'SearchPath',
 };
 
+/** The server a tool name `mcp_<server>_<tool>` belongs to: the longest name that fits. */
+function ownerOf(policy: AgyPolicy, name: string): string | null {
+  if (!name.startsWith('mcp_')) return null;
+  const rest = name.slice(4);
+  const owners = [policy.server, ...policy.servers].filter(
+    (server) => server !== '' && rest.startsWith(`${server}_`),
+  );
+  return owners.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 function mcpAllowed(policy: AgyPolicy, name: string, args: Record<string, unknown>): boolean {
-  if (!policy.server) return false;
-  if (name === 'list_resources' || name === 'read_resource')
-    return args.ServerName === policy.server;
-  if (name === 'call_mcp_tool')
-    return (
-      args.ServerName === policy.server &&
-      typeof args.ToolName === 'string' &&
-      policy.tools.includes(args.ToolName)
-    );
-  return policy.tools.some((tool) => name === `mcp_${policy.server}_${tool}`);
+  const worker = policy.server;
+  const own = (server: unknown): boolean =>
+    typeof server === 'string' && (server === worker || policy.servers.includes(server));
+  if (name === 'list_resources' || name === 'read_resource') return own(args.ServerName);
+  if (name === 'call_mcp_tool') {
+    if (!own(args.ServerName)) return false;
+    if (args.ServerName !== worker) return true;
+    return typeof args.ToolName === 'string' && policy.tools.includes(args.ToolName);
+  }
+  const owner = ownerOf(policy, name);
+  if (owner === null) return false;
+  if (owner !== worker) return true;
+  return policy.tools.includes(name.slice(`mcp_${worker}_`.length));
 }
 
 function permit(policy: AgyPolicy, name: string, args: Record<string, unknown>): boolean {

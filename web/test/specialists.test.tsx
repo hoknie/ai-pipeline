@@ -245,6 +245,7 @@ describe('specialist form', () => {
       allow_commands: [],
       tools: [],
       skills: ['a', '', ' b '],
+      mcp_servers: [],
       max: '2',
       prompt: '',
       tags: [],
@@ -273,6 +274,7 @@ describe('specialist form', () => {
       allow_commands: [],
       tools: [],
       skills: [],
+      mcp_servers: [],
       max: '',
       prompt: '',
       tags: [],
@@ -554,6 +556,85 @@ describe('the tab', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Specialists' }));
     expect(await screen.findByRole('button', { name: 'New specialist' })).toBeTruthy();
     expect(window.location.hash).toBe('#specialists');
+  });
+});
+
+describe('MCP servers of the catalog in the form', () => {
+  const catalogServer = (name: string, allSpecialists = false) => ({
+    name,
+    command: `/bin/${name}`,
+    args: [],
+    envNames: [],
+    allSpecialists,
+    level: 'global' as const,
+    file: '/xdg/aip/settings.yaml',
+    specialists: [],
+    shared: null,
+  });
+  const view = (raw: Record<string, unknown>) =>
+    configView({
+      specialists: [
+        specialistEntry('plan', { raw: { name: 'План', runtime: 'opencode', ...raw } }),
+      ],
+      mcpServers: [catalogServer('github'), catalogServer('graph', true)],
+    });
+  const okWrite = () =>
+    vi.fn(async (..._args: unknown[]) => ({ ok: true as const, revision: 'n', file: '/f' }));
+
+  it('picks a server of the catalog for a specialist of any runtime and saves mcp_servers', async () => {
+    const writeSpecialist = okWrite();
+    render(
+      <Page api={fakeApi({ writeSpecialist, config: vi.fn(async () => view({})) })} start="plan" />,
+    );
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Catalog MCP servers' }));
+    fireEvent.click(await screen.findByRole('option', { name: /github/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
+    expect(writeSpecialist.mock.calls[0]![1]).toEqual({
+      name: 'План',
+      runtime: 'opencode',
+      mcp_servers: ['github'],
+    });
+  });
+
+  it('removes the key when the choice is emptied', async () => {
+    const writeSpecialist = okWrite();
+    render(
+      <Page
+        api={fakeApi({
+          writeSpecialist,
+          config: vi.fn(async () => view({ mcp_servers: ['github'] })),
+        })}
+        start="plan"
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove github' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
+    expect(writeSpecialist.mock.calls[0]![1]).toEqual({ name: 'План', runtime: 'opencode' });
+  });
+
+  it('lists the servers for all specialists with a link to the tab', async () => {
+    render(<Page api={fakeApi({ config: vi.fn(async () => view({})) })} start="plan" />);
+    expect(
+      await screen.findByText(/Servers for all specialists, no choice needed: graph/),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'MCP servers tab' }).getAttribute('href')).toBe(
+      '#settings/global/agents/mcp',
+    );
+  });
+
+  it('marks a name that is not in the catalog and lets it be removed', async () => {
+    render(
+      <Page
+        api={fakeApi({ config: vi.fn(async () => view({ mcp_servers: ['jira'] })) })}
+        start="plan"
+      />,
+    );
+    expect(await screen.findByText('jira')).toBeTruthy();
+    expect(screen.getByText('not in the catalog')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove jira' }));
+    expect(screen.queryByText('jira')).toBeNull();
   });
 });
 

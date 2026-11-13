@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ConfigCatalogResponse, EditorChain, FieldError } from '../../../shared/api/types.ts';
+import type {
+  ConfigCatalogResponse,
+  EditorChain,
+  EditorMcpServer,
+  FieldError,
+} from '../../../shared/api/types.ts';
+import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
@@ -32,9 +38,18 @@ const SECTIONS: { key: 'main' | 'limits' | 'tools' | 'prompt'; fields: FieldName
     fields: ['name', 'runtime_chain', 'runtime', 'model', 'variant', 'reasoning_effort', 'tags'],
   },
   { key: 'limits', fields: ['permissions', 'timeout', 'max', 'allow_commands'] },
-  { key: 'tools', fields: ['tools', 'skills'] },
+  { key: 'tools', fields: ['tools', 'skills', 'mcp_servers'] },
   { key: 'prompt', fields: ['prompt'] },
 ];
+
+/** The tab «MCP servers» of the group «Agents» of the shared settings. */
+const MCP_TAB_LINK = formatRoute({
+  view: 'settings',
+  run: 'agents',
+  group: 'global',
+  step: 'mcp',
+  tab: null,
+});
 
 /** A field with its label, help, hints and errors. */
 function FieldBlock({
@@ -48,6 +63,9 @@ function FieldBlock({
 }) {
   const { t } = useTranslation();
   const { field, draft, defaults } = input;
+  const everyone = (input.mcpServers ?? [])
+    .filter((server) => server.allSpecialists)
+    .map((server) => server.name);
   const hint = hintOf(field, defaults, t);
   return (
     <div className="flex flex-col gap-1.5">
@@ -66,6 +84,14 @@ function FieldBlock({
       ) : null}
       {field === 'allow_commands' && draft.allow_commands.length === 0 && hint ? (
         <p className="text-xs text-muted-foreground">{hint}</p>
+      ) : null}
+      {field === 'mcp_servers' && everyone.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {t('specialists.mcpForAll', { names: everyone.join(', ') })}{' '}
+          <a className="underline" href={MCP_TAB_LINK}>
+            {t('specialists.mcpTab')}
+          </a>
+        </p>
       ) : null}
       {field === 'tools' && draft.tools.length > 0 && inheritedToolsOf(defaults).length > 0 ? (
         <p className="text-xs text-muted-foreground">{t('specialists.replacesDefaults')}</p>
@@ -93,6 +119,8 @@ interface SpecialistFieldsProps {
   catalog: ConfigCatalogResponse | null;
   catalogError: string | null;
   chains?: EditorChain[];
+  /** The servers of the MCP catalog; the field `mcp_servers` is not shown without them. */
+  mcpServers?: EditorMcpServer[];
   /** Fields that are not shown. */
   omit?: FieldName[];
   /** The control of the field `tags`; the field is not shown without it. */
@@ -123,6 +151,7 @@ export function SpecialistFields(props: SpecialistFieldsProps) {
   const shown = (field: FieldName) => {
     if (omit.includes(field)) return false;
     if (field === 'tags' && tags === undefined) return false;
+    if (field === 'mcp_servers' && props.mcpServers === undefined) return false;
     if (
       hasChain &&
       (field === 'runtime' ||
@@ -168,6 +197,7 @@ export function SpecialistFields(props: SpecialistFieldsProps) {
                       catalog,
                       tags,
                       chains,
+                      ...(props.mcpServers ? { mcpServers: props.mcpServers } : {}),
                     }}
                     errors={errorsOf(field)}
                     tagsHelp={tagsHelp}

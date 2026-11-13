@@ -137,6 +137,7 @@ export function SettingsRoute(props: {
         onSelectChain={select('chains')}
         project={common.route.step}
         onSelectProject={select('projects')}
+        agentTab={common.route.step}
         observerTab={common.route.step}
         onSelectObserverTab={select('observers')}
         dirty={common.dirty}

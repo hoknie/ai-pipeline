@@ -1,4 +1,4 @@
-import { observerTabOf, settingsLocationOf } from './settingsGroups.ts';
+import { agentTabOf, observerTabOf, settingsLocationOf } from './settingsGroups.ts';
 
 export type View = 'runs' | 'queue' | 'specialists' | 'pipelines' | 'stats' | 'settings';
 
@@ -39,7 +39,9 @@ function settingsRoute(first: string | null, second: string | null, third: strin
       ? third
       : scope === 'global' && group === 'observers' && third !== null
         ? observerTabOf(third)
-        : null;
+        : group === 'agents' && third !== null
+          ? agentTabOf(third)
+          : null;
   return { view: 'settings', run: group, group: scope, step, tab: null };
 }
 
@@ -140,7 +142,9 @@ export function formatRoute(route: Route): string {
         ? route.step
         : scope === 'global' && group === 'observers'
           ? observerTabOf(route.step)
-          : null;
+          : group === 'agents' && agentTabOf(route.step) !== 'general'
+            ? agentTabOf(route.step)
+            : null;
     return `#settings/${scope}/${group}${slug === null ? '' : `/${enc(slug)}`}`;
   }
   if (route.view === 'pipelines') {

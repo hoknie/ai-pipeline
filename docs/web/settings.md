@@ -8,7 +8,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults and Claude), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system). Fields of `web.*`, `runtimes.*`, `network.*` and `stats.*` exist only here.
+"General" (runs, working copy, naming), "Agents" (defaults and Claude, and the tab ["MCP servers"](#mcp-servers)), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system). Fields of `web.*`, `runtimes.*`, `network.*` and `stats.*` exist only here.
 
 ## Project groups
 
@@ -30,6 +30,20 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 - A group with configuration errors gets a mark, and the errors are shown in the group. Errors of specialists and pipelines are shown in "General".
 - Every card of "Runtimes" starts with the switch "Enabled": all runtimes are off until you switch them on, and a card of an off runtime is marked "(off)". See [Runtimes](../configuration/runtimes.md).
 - Environment variables of a runtime are added one by one: fill "Name" and "Value", then press Enter or "Add variable" and repeat for the next one.
+
+## MCP servers
+
+The group "Agents" has two tabs, "Main" (defaults and Claude) and "MCP servers", on both "Shared" and "Project". The address is `#settings/<tab>/agents/mcp`; an unknown tab opens "Main".
+
+The tab lists the servers of the [`mcp_servers` catalog](../configuration/specialists.md#mcp-servers), each with its command, a mark of where it is defined ("Shared", "In project" or "Project over shared") and the number of specialists that get it. Without servers the tab explains what the catalog is and offers "New server".
+
+A server marked "All specialists" goes to every specialist; the others are chosen in the specialist form, in the field "Catalog MCP servers".
+
+- "New server" and "Edit" open the form: name (a new server only), command, arguments (one per line), variables and the switch "All specialists". A variable is a name and a value, which may be a reference such as `${GITHUB_TOKEN}`.
+- The panel never receives the values of the variables. A saved variable is shown as set, and an empty value keeps it; fill the value to replace it. A reference `${NAME}` is shown as it is written.
+- On "Project", a shared server is read only and has "Override in project": the form opens with its values, and the project server replaces the shared one as a whole (the values of its variables are not copied). "Restore shared" removes the project server. "Delete" removes the server from the file of the level of the tab only.
+- The daemon refuses to delete a server that a specialist names in `mcp_servers` and shows the reference.
+- Leaving the form with unsaved changes asks for confirmation.
 
 ## Shared specialists
 

@@ -22,6 +22,29 @@ describe('agy launches', () => {
     expect(launch.sessionId).toBeNull();
   });
 
+  it('writes the MCP servers of the specialist under the names of the attempt and allows them', () => {
+    const context = agyContext();
+    context.specialist.mcp = { graph: { command: '/bin/graph', args: ['--x'], env: { A: 'b' } } };
+    const launch = runtime.buildLaunch(context);
+    const mcp = JSON.parse(
+      launch.files.find((file) => file.path.endsWith('mcp_config.json'))!.content,
+    );
+    expect(Object.keys(mcp.mcpServers).sort()).toEqual(['aip-fresh-id', 'aip-fresh-id-graph']);
+    expect(mcp.mcpServers['aip-fresh-id-graph']).toEqual({
+      command: '/bin/graph',
+      args: ['--x'],
+      env: { A: 'b' },
+    });
+    const settings = JSON.parse(
+      launch.files.find((file) => file.path.endsWith('settings.json'))!.content,
+    );
+    expect(settings.permissions.allow).toContain('mcp(aip-fresh-id-graph/*)');
+    const policy = JSON.parse(
+      launch.files.find((file) => file.path.endsWith('policy.json'))!.content,
+    );
+    expect(policy.servers).toEqual(['aip-fresh-id-graph']);
+  });
+
   it('resumes only the saved conversation and leaves an unspecified model to agy', () => {
     const launch = runtime.buildLaunch(agyContext('/state', { resumeSession: 'conv-1' }));
     expect(launch.args.slice(-2)).toEqual(['--conversation', 'conv-1']);

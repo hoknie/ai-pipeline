@@ -1001,6 +1001,9 @@ export const es: Dictionary = {
     variantOverridesEffort: 'La variante seleccionada tiene prioridad si define reasoningEffort.',
     header: 'acciones del especialista',
     replacesDefaults: 'Las herramientas del especialista sustituyen a las de defaults.',
+    notInCatalog: 'no está en el catálogo',
+    mcpForAll: 'Servidores para todos los especialistas, sin elegir: {{names}}.',
+    mcpTab: 'Pestaña Servidores MCP',
     catalogError:
       'No se cargó el catálogo de herramientas y habilidades ({{message}}); escriba los valores a mano.',
     sections: {
@@ -1027,6 +1030,8 @@ export const es: Dictionary = {
         'Comandos de shell que puede ejecutar en el nivel «edit»; patrones como «npm test*».',
       tools: 'Herramientas del agente además del conjunto del nivel de permisos.',
       skills: 'Habilidades que el especialista debe usar.',
+      mcp_servers:
+        'Servidores del catálogo MCP que recibe este especialista, en cualquier runtime. Los propios van en «mcp» del archivo.',
       prompt: 'Instrucciones del especialista; se añaden a cada tarea.',
     },
     filters: {
@@ -1080,6 +1085,7 @@ export const es: Dictionary = {
       allow_commands: 'Comandos permitidos',
       tools: 'Herramientas',
       skills: 'Habilidades',
+      mcp_servers: 'Servidores MCP del catálogo',
       max: 'Límite simultáneo',
       prompt: 'Prompt del sistema',
     },
@@ -1473,6 +1479,47 @@ export const es: Dictionary = {
       newValueOf: 'Nuevo valor de {{name}}',
       invalid: 'Nombre de variable no válido.',
       taken: 'Esta variable ya existe.',
+    },
+    agentTabs: {
+      label: 'Pestañas de Agentes',
+      general: 'Principal',
+      mcp: 'Servidores MCP',
+    },
+    mcp: {
+      list: 'Servidores MCP',
+      empty:
+        'Aún no hay servidores MCP. Los servidores del catálogo van a los especialistas de todos los runtimes: Claude, OpenCode y Antigravity (agy).',
+      newServer: 'Nuevo servidor',
+      formLabel: 'Servidor MCP',
+      name: 'Nombre',
+      taken: 'Ya existe un servidor con este nombre.',
+      command: 'Comando',
+      args: 'Argumentos (uno por línea)',
+      env: 'Variables de entorno',
+      envNote:
+        'Los valores nunca se muestran. Una variable guardada conserva su valor hasta que la reemplaces o la borres; ${NAME} lee una variable del demonio al iniciar el agente.',
+      allSpecialists: 'Todos los especialistas',
+      save: 'Guardar',
+      cancel: 'Cancelar',
+      delete: 'Borrar',
+      edit: 'Editar',
+      override: 'Sobrescribir en el proyecto',
+      restore: 'Restaurar el compartido',
+      overrideNote:
+        'El servidor del proyecto sustituye al compartido por completo. Los valores de sus variables no se copian: introdúcelos de nuevo.',
+      deleteTitle: '¿Borrar el servidor {{name}}?',
+      deleteDescription:
+        'El servidor se quita del archivo de este nivel. No se puede borrar un servidor que nombra un especialista.',
+      restoreTitle: '¿Restaurar el servidor compartido {{name}}?',
+      restoreDescription: 'Se quita el servidor del proyecto y vuelve a aplicarse el compartido.',
+      specialists_one: '{{count}} especialista',
+      specialists_many: '{{count}} especialistas',
+      specialists_other: '{{count}} especialistas',
+      source: {
+        global: 'Compartido',
+        project: 'En el proyecto',
+        project_over_global: 'Proyecto sobre compartido',
+      },
     },
     group: {
       projects: 'Proyectos',

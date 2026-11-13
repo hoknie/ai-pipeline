@@ -19,6 +19,7 @@ import {
   checkWeb,
   checkWorkspace,
 } from './validate-settings.ts';
+import { checkMcpCatalog, resolveMcpServers } from './sections/mcp-servers.ts';
 import { checkStats } from './sections/stats.ts';
 import { checkSpecialist, checkSpecialists, SPECIALIST_KEYS } from './validate-specialists.ts';
 import { type RuntimeChain } from '../types/chain.ts';
@@ -60,6 +61,7 @@ const SWARM_KEYS = [
   'claude',
   'delivery',
   'defaults',
+  'mcp_servers',
   'specialists',
   'chains',
   'pipelines',
@@ -107,7 +109,9 @@ export function validateConfig(root: unknown): ValidationResult {
 }
 
 /** Keys of the profile of the observer: a specialist that is never queued, limited or tagged. */
-const OBSERVER_KEYS = SPECIALIST_KEYS.filter((key) => !['max', 'queue', 'tags'].includes(key));
+const OBSERVER_KEYS = SPECIALIST_KEYS.filter(
+  (key) => !['max', 'queue', 'tags', 'mcp_servers'].includes(key),
+);
 
 const OBSERVER_DEFAULT_NAME = 'Observer';
 
@@ -162,6 +166,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     claude: { editMode: 'allowlist', mcp: 'isolated', settings: 'isolated' },
     delivery: defaultDelivery(),
     defaults: defaultDefaults(),
+    mcpServers: {},
     specialists: [],
     chains: [],
     pipelines: [],
@@ -208,9 +213,11 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     checkDelivery(ctx, swarm.delivery, config.delivery, known);
   }
   if ('defaults' in swarm) checkDefaults(ctx, swarm.defaults, config.defaults);
+  if ('mcp_servers' in swarm) config.mcpServers = checkMcpCatalog(ctx, swarm.mcp_servers);
   if ('chains' in swarm) config.chains = checkChains(ctx, swarm.chains);
   if ('specialists' in swarm)
     config.specialists = checkSpecialists(ctx, swarm.specialists, config.defaults);
+  resolveMcpServers(ctx, config.specialists, config.mcpServers);
   checkSpecialistChains(ctx, config.specialists, config.chains);
   const knownSpecialists = isMapping(swarm.specialists) ? Object.keys(swarm.specialists) : [];
   if ('actions' in swarm) config.actions = checkActions(ctx, swarm.actions, knownSpecialists);
@@ -239,11 +246,6 @@ function checkSpecialistChains(
     if (!chain) {
       const hint = known.length > 0 ? `; known: ${known.join(', ')}` : '; none defined';
       addError(ctx, path, `unknown chain \`${specialist.runtimeChain}\`${hint}`);
-      continue;
-    }
-    if (specialist.mcp && !chain.runtimes.some((r) => r.runtime === 'claude')) {
-      const mcpPath = `swarm.specialists.${specialist.slug}.mcp`;
-      addError(ctx, mcpPath, `requires at least one claude runtime in chain \`${chain.slug}\``);
     }
   }
 }

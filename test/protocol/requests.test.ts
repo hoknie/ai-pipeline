@@ -35,6 +35,12 @@ const SAMPLES: Record<Method, unknown> = {
   config_write: written,
   config_setting: { ...repository, path: 'web.port', value: 7341, revision: null },
   config_settings: { ...repository, values: { 'web.port': 7341 }, revision: null },
+  config_mcp_server: {
+    ...repository,
+    name: 'graph',
+    value: { command: '/bin/graph', args: [], env: { TOKEN: null }, allSpecialists: false },
+    revision: null,
+  },
   config_preview: { ...repository, kind: 'pipeline', id: 'feature', value: {} },
   specialist_tags: {},
   shared_specialists: {},
@@ -98,9 +104,9 @@ const SAMPLES: Record<Method, unknown> = {
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 80 methods, each in the request schema once', () => {
+  it('has 81 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(80);
+    expect(methods).toHaveLength(81);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -29,7 +29,11 @@ import {
 import { isEnvVariable, SETTING_FIELDS, settingFieldOf } from '../types/setting-fields.ts';
 
 /** Text of settings.yaml with one field set (or removed); comments and other keys survive. */
-export function editSetting(text: string | undefined, path: string, value: SettingValue): string {
+export function editSetting(
+  text: string | undefined,
+  path: string,
+  value: SettingValue | Record<string, unknown>,
+): string {
   const keys = path.split('.');
   if (text === undefined || text.trim() === '') {
     if (value === null) return text ?? '';

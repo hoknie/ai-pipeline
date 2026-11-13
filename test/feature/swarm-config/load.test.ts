@@ -242,11 +242,11 @@ describe('validation', () => {
     expectError(errors, 'swarm.specialists.a.mcp.f.url', 'unknown key');
   });
 
-  it('allows MCP servers of a specialist only on the claude runtime', () => {
-    const errors = errorsOf(
+  it('allows MCP servers of a specialist on any runtime', () => {
+    const config = parseConfig(
       'swarm:\n  specialists:\n    a: { name: A, runtime: opencode, mcp: { g: { command: x } } }\n',
     );
-    expectError(errors, 'swarm.specialists.a.mcp', 'claude runtime');
+    expect(findSpecialist(config, 'a')?.mcp).toEqual({ g: { command: 'x', args: [], env: {} } });
   });
 
   it('requires the swarm root', () => {

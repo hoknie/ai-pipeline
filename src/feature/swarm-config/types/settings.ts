@@ -1,6 +1,7 @@
 import { type Action, legacyScript, type StagePoints } from './action.ts';
 import { type RuntimeChain } from './chain.ts';
 import { type Pipeline, type Split, type Step } from './pipeline.ts';
+import { type CatalogMcpServer } from './specialist.ts';
 import { type Defaults, type Runtime, type Specialist } from './specialist.ts';
 
 export const OUTSIDE_CHANGES = ['warn', 'stop', 'off'] as const;
@@ -204,6 +205,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const { workflows: _old, ...current } = stored;
   return {
     ...current,
+    mcpServers: stored.mcpServers ?? {},
     workspace,
     delivery,
     naming,
@@ -231,6 +233,8 @@ export interface ResolvedConfig {
   claude: ClaudeSettings;
   delivery: DeliverySettings;
   defaults: Defaults;
+  /** Catalog of MCP servers by name. */
+  mcpServers: Record<string, CatalogMcpServer>;
   specialists: Specialist[];
   chains: RuntimeChain[];
   pipelines: Pipeline[];

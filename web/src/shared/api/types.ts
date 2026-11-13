@@ -140,6 +140,9 @@ export interface QueuePatch {
   position?: number;
 }
 export type {
+  EditorMcpServer,
+  EditorMcpServerValues,
+  McpServerValue,
   EditorSetting,
   EditorSpecialist,
   EditorSpecialistValues,

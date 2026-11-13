@@ -4,6 +4,7 @@ export const KEYED_SECTIONS = new Set([
   'delivery',
   'workspace',
   'naming',
+  'mcp_servers',
   'specialists',
   'chains',
   'pipelines',

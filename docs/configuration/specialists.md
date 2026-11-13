@@ -37,6 +37,7 @@ prompt: |
 | `tools` | Claude tools on top of the permission level; see [Tools](#tools) | `defaults` |
 | `skills` | Skills to use; see [Skills](#skills) | None |
 | `mcp` | MCP servers of this specialist; see [MCP servers](#mcp-servers) | `defaults` |
+| `mcp_servers` | Names of servers from the `mcp_servers` catalog; see [MCP servers](#mcp-servers) | None |
 | `max` | How many may work at once; see [Limits](#limits) | No limit of its own |
 | `queue` | May add tasks to the queue; see [Queueing tasks](#queueing-tasks) | `false` |
 | `tags` | Labels for the panel; see [Tags](#tags) | None |
@@ -107,19 +108,40 @@ The panel suggests names from the catalog: Claude's built-in tools and the `mcp_
 
 ## MCP servers
 
-`mcp` starts MCP servers for this specialist only, next to the `aip` server, on the `claude` runtime. Other specialists do not get them; to give a specialist all your own servers, see [`claude.mcp`](runtimes.md#claudemcp).
+MCP servers start for the specialist next to the `aip` server, on every runtime. Two places define them:
+
+- **The catalog** `mcp_servers` in `settings.yaml`, shared by all specialists. A project server replaces the shared one with the same name as a whole.
+- **The field `mcp`** of one specialist, for a server only this specialist needs.
 
 ```yaml
-mcp:
+# settings.yaml
+mcp_servers:
+  github:
+    command: github-mcp
+    env:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
   code-graph:
     command: /usr/local/bin/code-graph
     args: [--read-only]
+    all_specialists: true   # every specialist gets it
 ```
 
-- Each key is a server name: letters, digits, `-` and `_`; `aip` is reserved.
-- `command` is required (a command name or an absolute path), `args` and `env` are optional.
-- All tools of these servers run without a permission request.
-- The values, `env` included, are stored in the run snapshot and in the `mcp.json` of the attempt, so pass secrets some other way.
+```yaml
+# specialists/coder.yaml
+name: Coder
+mcp_servers: [github]       # a catalog server by name
+mcp:
+  scratch:
+    command: /usr/local/bin/scratch
+```
+
+- A specialist gets the catalog servers with `all_specialists: true`, the ones it names in `mcp_servers`, and its own `mcp`. On a name clash `mcp` wins. A name that is not in the catalog is a validation error.
+- Each key is a server name: letters, digits, `-` and `_`; `aip` is reserved. `command` is required (a command name or an absolute path), `args` and `env` are optional.
+- Values in `env` and items of `args` may refer to the environment of the daemon with `${NAME}`; `$${NAME}` is the literal text. The configuration and the run snapshot keep the reference; the value is substituted when the agent starts, from the environment of the daemon and then `runtimes.<runtime>.env`. A missing variable fails the attempt before the agent starts.
+- The substituted value lies in the files of the attempt (readable by you only) and is available to the agent process. Set secrets with `${NAME}`, not as text.
+- The panel shows the catalog without the values of `env`. The field `mcp` of a specialist is part of its file and is shown as written, so give secrets there as `${NAME}` as well, or move the server to the catalog.
+- All tools of these servers run without a permission request. Antigravity sees a server under the name `aip-<session>-<name>`: see [runtimes](runtimes.md#mcp-servers-of-a-specialist).
+- To give a `claude` specialist all your own servers, see [`claude.mcp`](runtimes.md#claudemcp).
 
 ## Queueing tasks
 

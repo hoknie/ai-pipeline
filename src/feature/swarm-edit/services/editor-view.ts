@@ -25,6 +25,7 @@ import {
   type SettingsFileView,
   type WriteLevel,
 } from '../types/editor.ts';
+import { editorMcpServers } from './mcp/editor-mcp.ts';
 import { editorSettings, type Files } from './editor-settings.ts';
 
 function sourceOf(source: ConfigSource | undefined): EntrySource | undefined {
@@ -171,6 +172,7 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
     pipelines: editorPipelines(files),
     actions: editorActions(files),
     settings: editorSettings(paths, files, global, project),
+    mcpServers: editorMcpServers(paths, global, project),
     errors: resolution(global, project).errors,
   };
 }

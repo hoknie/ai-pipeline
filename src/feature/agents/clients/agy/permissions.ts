@@ -1,5 +1,10 @@
 import { PROTECTED_GIT_COMMANDS, type LaunchContext } from '../../types/index.ts';
 
+/** Names of the attempt of the MCP servers of the specialist: `<worker>-<name>`. */
+export function agyServerNames(context: LaunchContext, worker: string): string[] {
+  return Object.keys(context.specialist.mcp ?? {}).map((name) => `${worker}-${name}`);
+}
+
 /** Precise command checks belong to PreToolUse, not agy's broader native prefix rules. */
 export function agySettings(context: LaunchContext, server: string): Record<string, unknown> {
   const { permissions } = context.specialist;
@@ -10,7 +15,11 @@ export function agySettings(context: LaunchContext, server: string): Record<stri
     allowNonWorkspaceAccess: permissions === 'full',
     artifactReviewPolicy: 'always-proceed',
     permissions: {
-      allow: [`read_file(${context.worktree})`, `mcp(${server}/*)`],
+      allow: [
+        `read_file(${context.worktree})`,
+        `mcp(${server}/*)`,
+        ...agyServerNames(context, server).map((name) => `mcp(${name}/*)`),
+      ],
       ask: [],
       deny: [
         ...(permissions === 'read' ? ['write_file(*)', 'command(*)'] : []),

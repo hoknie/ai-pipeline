@@ -218,6 +218,47 @@ export interface SettingsFileView {
   revision: string | null;
 }
 
+/** A server of the `mcp_servers` catalog in the editor; the values of `env` are never here. */
+export interface EditorMcpServer {
+  name: string;
+  command: string;
+  args: string[];
+  /** Sorted names of the variables of `env`. */
+  envNames: string[];
+  allSpecialists: boolean;
+  level: EntryLevel;
+  /** The settings.yaml that applies: the project one when it defines the server. */
+  file: string;
+  /** Slugs of the specialists that get the server. */
+  specialists: string[];
+  /** The definition of the shared level when it has one, also under a project server. */
+  shared: EditorMcpServerValues | null;
+}
+
+export interface EditorMcpServerValues {
+  command: string;
+  args: string[];
+  envNames: string[];
+  allSpecialists: boolean;
+}
+
+/** A server of the catalog as the editor sends it; `null` in `env` keeps the value in the file. */
+export interface McpServerValue {
+  command: string;
+  args: string[];
+  env: Record<string, string | null>;
+  allSpecialists: boolean;
+}
+
+export interface McpServerRequest {
+  name: string;
+  /** The server to write; null removes it. */
+  value: McpServerValue | null;
+  /** Revision of settings.yaml the caller saw; null when it did not exist. */
+  revision: string | null;
+  level: WriteLevel;
+}
+
 export interface ConfigEditorView {
   directories: { global: string; project: string };
   settingsFiles: { global: SettingsFileView; project: SettingsFileView };
@@ -226,6 +267,7 @@ export interface ConfigEditorView {
   pipelines: EditorPipeline[];
   actions: EditorAction[];
   settings: EditorSetting[];
+  mcpServers: EditorMcpServer[];
   errors: FieldError[];
 }
 

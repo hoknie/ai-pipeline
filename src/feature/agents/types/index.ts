@@ -1,3 +1,4 @@
+export * from './mcp/env.ts';
 export * from './naming.ts';
 export * from './permissions.ts';
 export * from './step-input.ts';

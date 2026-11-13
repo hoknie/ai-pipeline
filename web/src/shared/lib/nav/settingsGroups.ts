@@ -60,6 +60,15 @@ export function observerTabOf(part: string | null): ObserverTab {
   return OBSERVER_TABS.find((tab) => tab === part) ?? 'general';
 }
 
+/** The tabs of the group «Agents»; the third part of its address. */
+export const AGENT_TABS = ['general', 'mcp'] as const;
+export type AgentTab = (typeof AGENT_TABS)[number];
+
+/** The tab of the group «Agents» for the part of an address; an unknown one is the first. */
+export function agentTabOf(part: string | null): AgentTab {
+  return AGENT_TABS.find((tab) => tab === part) ?? 'general';
+}
+
 const isScope = (key: string | null): key is SettingsScope =>
   SETTINGS_SCOPES.some((scope) => scope === key);
 

@@ -4,6 +4,7 @@ export * from './duration.ts';
 export * from './errors.ts';
 export * from './levels.ts';
 export * from './lookups.ts';
+export * from './mcp/reference.ts';
 export * from './merge.ts';
 export * from './pipeline.ts';
 export * from './prompt.ts';

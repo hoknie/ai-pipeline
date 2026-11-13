@@ -9,8 +9,17 @@ import { agyContext } from './agy-context.ts';
 
 const root = mkdtempSync(join(tmpdir(), 'aip-agy-guard-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
-function guard(permissions: 'read' | 'edit' | 'full', allowCommands = ['npm test']) {
-  const context = agyContext(join(root, permissions));
+function guard(
+  permissions: 'read' | 'edit' | 'full',
+  allowCommands = ['npm test'],
+  servers: string[] = [],
+) {
+  const context = agyContext(join(root, [permissions, ...servers].join('-')));
+  if (servers.length > 0) {
+    context.specialist.mcp = Object.fromEntries(
+      servers.map((name) => [name, { command: '/bin/' + name, args: [], env: {} }]),
+    );
+  }
   context.specialist.permissions = permissions;
   context.specialist.allowCommands = allowCommands;
   mkdirSync(context.worktree, { recursive: true });
@@ -33,6 +42,66 @@ function guard(permissions: 'read' | 'edit' | 'full', allowCommands = ['npm test
     },
   };
 }
+
+describe('MCP servers of the specialist in the agy hook', () => {
+  const worker = 'aip-fresh-id';
+  const single = guard('read', [], ['graph']);
+  const pair = guard('read', [], ['graph', 'graph_admin']);
+
+  it('allows a tool of an own server in both forms, also on read', () => {
+    expect(single.decide(`mcp_${worker}-graph_find`).decision).toBe('auto_approve');
+    expect(
+      single.decide('call_mcp_tool', { ServerName: `${worker}-graph`, ToolName: 'find' }).decision,
+    ).toBe('auto_approve');
+    expect(single.decide('list_resources', { ServerName: `${worker}-graph` }).decision).toBe(
+      'auto_approve',
+    );
+    expect(single.decide(`mcp_${worker}_swarm_report`).decision).toBe('auto_approve');
+  });
+
+  it('denies a server that the specialist does not have', () => {
+    expect(single.decide('mcp_jira_find').decision).toBe('deny');
+    expect(single.decide('call_mcp_tool', { ServerName: 'jira', ToolName: 'find' }).decision).toBe(
+      'deny',
+    );
+    expect(single.decide('read_resource', { ServerName: 'jira' }).decision).toBe('deny');
+    expect(single.decide(`mcp_${worker}_find`).decision).toBe('deny');
+  });
+
+  it('keeps graph apart from a similar graph_admin of the user', () => {
+    for (const [name, args] of [
+      ['mcp_graph_admin_x', {}],
+      ['mcp_graph_x', {}],
+      ['call_mcp_tool', { ServerName: 'graph_admin', ToolName: 'x' }],
+      ['call_mcp_tool', { ServerName: 'graph', ToolName: 'x' }],
+    ] as const) {
+      expect(single.decide(name, { ...args }).decision, name).toBe('deny');
+    }
+    // The name of the attempt makes the match exact: the tool is admin_x of the own graph.
+    expect(single.decide(`mcp_${worker}-graph_admin_x`).decision).toBe('auto_approve');
+  });
+
+  it('attributes every call to its own server when both names are allowed', () => {
+    expect(pair.decide(`mcp_${worker}-graph_admin_x`).decision).toBe('auto_approve');
+    expect(pair.decide(`mcp_${worker}-graph_admin_x`).decision).toBe('auto_approve');
+    expect(
+      pair.decide('call_mcp_tool', { ServerName: `${worker}-graph_admin`, ToolName: 'x' }).decision,
+    ).toBe('auto_approve');
+    expect(pair.decide(`mcp_${worker}-graph_x`).decision).toBe('auto_approve');
+    expect(pair.decide(`mcp_${worker}-other_x`).decision).toBe('deny');
+  });
+
+  it('treats an older policy without servers as an empty list', () => {
+    const { servers: _servers, ...older } = single.policy;
+    expect(
+      agyToolDecision(older, { toolCall: { name: `mcp_${worker}-graph_find`, args: {} } }).decision,
+    ).toBe('deny');
+    expect(
+      agyToolDecision(older, { toolCall: { name: `mcp_${worker}_swarm_report`, args: {} } })
+        .decision,
+    ).toBe('auto_approve');
+  });
+});
 
 describe('the generated agy permission hook', () => {
   const editor = guard('edit');

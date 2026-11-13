@@ -19,7 +19,6 @@ import {
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
 import { type RuntimeSettings } from '../types/settings.ts';
 import {
-  type McpServer,
   REASONING_EFFORTS,
   RUNTIMES,
   type Runtime,
@@ -28,12 +27,6 @@ import {
 } from '../types/specialist.ts';
 
 const RUNTIME_COMMAND_KEYS = ['command', 'enabled', 'args', 'env'];
-
-const MCP_SERVER_KEYS = ['command', 'args', 'env'];
-
-const MCP_SERVER_NAME = /^[A-Za-z0-9_-]+$/;
-
-const RESERVED_MCP_SERVER = 'aip';
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -189,50 +182,4 @@ export function checkEnvironment(
     else result[name] = field;
   }
   return result;
-}
-
-export function checkMcpServers(
-  ctx: ValidateContext,
-  value: unknown,
-  path: string,
-): Record<string, McpServer> {
-  const servers: Record<string, McpServer> = {};
-  const mapping = readMapping(ctx, value, path);
-  if (!mapping) return servers;
-  for (const [name, field] of Object.entries(mapping)) {
-    const serverPath = join(path, name);
-    if (!MCP_SERVER_NAME.test(name)) {
-      addError(ctx, serverPath, 'name may contain only letters, digits, "-" and "_"');
-    } else if (name === RESERVED_MCP_SERVER) {
-      addError(ctx, serverPath, 'this name is reserved for the server of aip');
-    } else {
-      const server = checkMcpServer(ctx, field, serverPath);
-      if (server) servers[name] = server;
-    }
-  }
-  return servers;
-}
-
-export function checkMcpServer(
-  ctx: ValidateContext,
-  value: unknown,
-  path: string,
-): McpServer | null {
-  const mapping = readMapping(ctx, value, path);
-  if (!mapping) return null;
-  const server: McpServer = { command: '', args: [], env: {} };
-  for (const [key, field] of readEntries(ctx, mapping, path, MCP_SERVER_KEYS)) {
-    const fieldPath = join(path, key);
-    if (key === 'command') {
-      const command = readString(ctx, field, fieldPath);
-      if (command === null) continue;
-      if (command.includes('/') && !isAbsolute(command)) {
-        addError(ctx, fieldPath, 'must be a command name or an absolute path');
-      } else server.command = command;
-    }
-    if (key === 'args') server.args = readStrings(ctx, field, fieldPath);
-    if (key === 'env') server.env = checkEnvironment(ctx, field, fieldPath);
-  }
-  if (!('command' in mapping)) addError(ctx, join(path, 'command'), 'is required');
-  return server;
 }

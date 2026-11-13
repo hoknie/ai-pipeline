@@ -557,6 +557,22 @@ describe('opencode adapter', () => {
     expect(launch.env.KEEP).toBe('yes');
   });
 
+  it('adds the MCP servers of the specialist to the generated opencode.json', () => {
+    const mcp = { graph: { command: '/bin/graph', args: ['--scout'], env: { A: 'b' } } };
+    const generated = JSON.parse(
+      runtime.buildLaunch(context({ specialist: specialist({ mcp }) })).files[0]!.content,
+    );
+    expect(generated.mcp.graph).toEqual({
+      type: 'local',
+      command: ['/bin/graph', '--scout'],
+      environment: { A: 'b' },
+      enabled: true,
+    });
+    expect(Object.keys(generated.mcp).sort()).toEqual(['aip', 'graph']);
+    const plain = JSON.parse(runtime.buildLaunch(context()).files[0]!.content);
+    expect(Object.keys(plain.mcp)).toEqual(['aip']);
+  });
+
   it('keeps different efforts local to the agents of their attempts', () => {
     const high = runtime.buildLaunch(
       context({ specialist: specialist({ reasoningEffort: 'high' }) }),

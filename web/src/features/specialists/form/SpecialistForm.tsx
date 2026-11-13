@@ -188,6 +188,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
         catalog={catalog}
         catalogError={catalogError}
         chains={view.chains}
+        mcpServers={view.mcpServers}
         tags={tags}
         tagsHelp={level === 'global' ? t('specialists.tags.sharedOnly') : undefined}
         mainStart={

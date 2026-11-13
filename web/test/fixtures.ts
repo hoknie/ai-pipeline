@@ -701,6 +701,7 @@ export function configView(overrides: Partial<ConfigEditorResponse> = {}): Confi
     pipelines: [],
     actions: [],
     settings: settingsOf(),
+    mcpServers: [],
     errors: [],
     ...overrides,
   };
@@ -867,6 +868,8 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     previewPipeline: vi.fn(async () => ({ topology: pipelineOf(), errors: [] })),
     writeAction: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteAction: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
+    writeMcpServer: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
+    deleteMcpServer: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
     writeChain: vi.fn(async () => ({ ok: true as const, revision: 'new', file: '/f' })),
     deleteChain: vi.fn(async () => ({ ok: true as const, revision: null, file: '/f' })),
     systemStages: vi.fn(async () => ({ repository: '/repo', stages: [], errors: [] })),

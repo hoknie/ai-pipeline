@@ -57,6 +57,7 @@ The project level overrides the shared one:
 |---|---|
 | `max`, `workspace_dir`, `outside_changes` | As a whole |
 | `defaults`, `claude`, `delivery`, `workspace`, `naming` | Field by field |
+| `mcp_servers` | By server name: a project server replaces the shared one with the same name as a whole |
 | `web`, `runtimes`, `network`, `stats` | Read from the shared level only; in a project file they are a validation error |
 | Specialists, pipelines and actions | As a whole, by name: a project file `coder.yaml` replaces the shared one |
 | `stages` | By point: a point of the project level replaces the shared one |
@@ -88,6 +89,7 @@ claude:
   mcp: isolated           # isolated | inherit
   settings: isolated      # isolated | inherit
 delivery: { ... }
+mcp_servers: { ... }      # MCP servers for specialists, see specialists.md
 stages: { ... }           # actions shared by the pipelines, see actions.md
 defaults: { ... }
 ```
@@ -107,6 +109,7 @@ defaults: { ... }
 | `claude.mcp` | [configuration/runtimes.md](runtimes.md#claudemcp) |
 | `claude.settings` | [configuration/runtimes.md](runtimes.md#claudesettings) |
 | `delivery` | [configuration/delivery.md](delivery.md) |
+| `mcp_servers` | [configuration/specialists.md](specialists.md#mcp-servers) |
 | `stages` | [configuration/actions.md](actions.md#points) |
 | `defaults` | [`defaults`](#defaults) |
 
@@ -194,7 +197,7 @@ Values for every specialist that does not set its own.
 | `timeout` | a duration: `90s`, `30m`, `2h` | `30m` |
 | `allow_commands` | a list of command patterns | `[]` |
 | `tools` | a list of runtime tools on top of the set for the permission level | `[]` |
-| `mcp` | MCP servers of this specialist, `claude` runtime only | none |
+| `mcp` | MCP servers of this specialist | none |
 
 The fields are described in [configuration/specialists.md](specialists.md#fields) and [configuration/permissions.md](permissions.md).
 

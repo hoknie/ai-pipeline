@@ -6,6 +6,7 @@ export {
   settingsFile,
 } from '../repositories/documents.ts';
 export { editorView } from './editor-view.ts';
+export { planMcpServer } from './mcp/plan-mcp-server.ts';
 export { draftConfig, planEdit } from './plan-edit.ts';
 export { editSetting, planSetting, planSettings } from './plan-settings.ts';
 export { actionReferences, chainReferences, specialistReferences } from './references.ts';

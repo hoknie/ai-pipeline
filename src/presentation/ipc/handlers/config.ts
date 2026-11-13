@@ -32,6 +32,13 @@ export const configHandlers = {
       level: params.level,
     }),
   config_settings: (params, { services }) => services.edits.settings(params),
+  config_mcp_server: (params, { services }) =>
+    services.edits.mcpServer(params.repository, {
+      name: params.name,
+      value: params.value,
+      revision: params.revision,
+      level: params.level,
+    }),
   config_preview: (params, { services }) => services.edits.preview(params),
   specialist_tags: async (_params, { services }) => services.shared.specialistTags(),
   shared_specialists: async (_params, { services }) => services.shared.specialists(),

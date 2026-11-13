@@ -12,7 +12,7 @@ import {
   readStrings,
   readTimeout,
 } from './validate-context.ts';
-import { checkMcpServers } from './validate-runtimes.ts';
+import { checkMcpServers } from './sections/mcp-servers.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
 import { MAX_RANGE } from '../types/settings.ts';
 import {
@@ -39,6 +39,7 @@ export const SPECIALIST_KEYS = [
   'allow_commands',
   'tools',
   'mcp',
+  'mcp_servers',
   'skills',
   'prompt',
   'max',
@@ -113,9 +114,6 @@ function checkSpecialistConfig(
   const modelProblem = modelIdProblem(specialist.runtime, specialist.model);
   if (modelProblem) addError(ctx, join(path, 'model'), modelProblem);
   checkOpencodeOptions(ctx, mapping, path, specialist);
-  if (specialist.mcp && specialist.runtime !== 'claude') {
-    addError(ctx, join(path, 'mcp'), 'is supported by the claude runtime only');
-  }
 }
 
 function checkSpecialistField(
@@ -154,6 +152,9 @@ function checkSpecialistField(
       break;
     case 'mcp':
       specialist.mcp = checkMcpServers(ctx, field, fieldPath);
+      break;
+    case 'mcp_servers':
+      specialist.mcpServers = readStrings(ctx, field, fieldPath);
       break;
     case 'skills':
       specialist.skills = readStrings(ctx, field, fieldPath);

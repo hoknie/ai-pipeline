@@ -10,6 +10,7 @@ export type FieldName =
   | 'allow_commands'
   | 'tools'
   | 'skills'
+  | 'mcp_servers'
   | 'max'
   | 'prompt'
   | 'tags';
@@ -26,12 +27,19 @@ export const FIELDS: FieldName[] = [
   'allow_commands',
   'tools',
   'skills',
+  'mcp_servers',
   'max',
   'prompt',
   'tags',
 ];
-export type ListField = 'allow_commands' | 'tools' | 'skills' | 'tags';
-const LIST_FIELDS = new Set<FieldName>(['allow_commands', 'tools', 'skills', 'tags']);
+export type ListField = 'allow_commands' | 'tools' | 'skills' | 'mcp_servers' | 'tags';
+const LIST_FIELDS = new Set<FieldName>([
+  'allow_commands',
+  'tools',
+  'skills',
+  'mcp_servers',
+  'tags',
+]);
 
 export const isList = (field: FieldName): field is ListField => LIST_FIELDS.has(field);
 

@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
-import { observerTabOf } from '../../../shared/lib/nav/settingsGroups.ts';
+import { agentTabOf, observerTabOf } from '../../../shared/lib/nav/settingsGroups.ts';
 import { Skeleton } from '../../../shared/ui/feedback/skeleton.tsx';
 import { SettingsForm } from '../../../shared/ui/forms/settings/SettingsForm.tsx';
 import { ObserversGroup } from '../ObserversGroup.tsx';
@@ -11,6 +11,7 @@ import { SharedChainsGroup } from '../SharedChainsGroup.tsx';
 import { SharedSpecialistsGroup } from '../SharedSpecialistsGroup.tsx';
 import { SystemGroup } from '../SystemGroup.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
+import { AgentsGroup } from '../agents/AgentsGroup.tsx';
 import { ProjectsGroup } from '../projects/ProjectsGroup.tsx';
 import type { SettingsPageProps } from './types.ts';
 import type { SettingsConfig } from './useSettingsConfig.ts';
@@ -148,6 +149,21 @@ export function GroupBody({ props, settings }: BodyProps) {
         onRemove={props.onRemoveProject}
         onOpen={props.onOpenProject}
       />
+    );
+  }
+  if (group === 'agents') {
+    return (
+      <AgentsGroup
+        api={api}
+        scope={props.scope}
+        tab={agentTabOf(props.agentTab)}
+        config={settings.config}
+        reload={settings.reload}
+        leave={settings.leave}
+        onDirty={settings.setDirty}
+      >
+        <FormBody props={props} settings={settings} />
+      </AgentsGroup>
     );
   }
   if (group === 'observers') {

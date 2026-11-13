@@ -384,6 +384,21 @@ describe('queue requests', () => {
     bad('config_settings', { repository: '/r', values: { max: 1 } });
   });
 
+  it('parses config_mcp_server and refuses a name that is not a server name', () => {
+    const value = { command: '/bin/graph', args: [], env: { TOKEN: null }, allSpecialists: true };
+    ok('config_mcp_server', { repository: '/r', name: 'code-graph', value, revision: null });
+    ok('config_mcp_server', { repository: '/r', name: 'graph', value: null, revision: 'x' });
+    for (const name of ['../x', 'a/b', 'a b', 'aip', '']) {
+      bad('config_mcp_server', { repository: '/r', name, value, revision: null });
+    }
+    bad('config_mcp_server', {
+      repository: '/r',
+      name: 'graph',
+      value: { ...value, env: { '1BAD': 'x' } },
+      revision: null,
+    });
+  });
+
   it('rejects both a task and groups, neither, an empty task and a long title', () => {
     bad('queue_add', {
       repository: '/r',

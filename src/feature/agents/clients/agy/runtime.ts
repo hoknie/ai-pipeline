@@ -11,7 +11,7 @@ import {
   type RuntimeExtra,
 } from '../../types/index.ts';
 import { createAgyParser } from './parser.ts';
-import { agySettings, AGY_ONE_SHOT_SETTINGS } from './permissions.ts';
+import { agyServerNames, agySettings, AGY_ONE_SHOT_SETTINGS } from './permissions.ts';
 import { agyTranscript } from './transcript.ts';
 import { agyHookFiles } from './hooks.ts';
 
@@ -33,6 +33,7 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
     allowCommands: context.specialist.allowCommands,
     server,
     tools,
+    servers: agyServerNames(context, server),
   };
   return {
     command: executable,
@@ -59,6 +60,12 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
         content: JSON.stringify(
           {
             mcpServers: {
+              ...Object.fromEntries(
+                Object.entries(context.specialist.mcp ?? {}).map(([name, own]) => [
+                  `${server}-${name}`,
+                  { command: own.command, args: own.args, env: own.env },
+                ]),
+              ),
               [server]: {
                 command,
                 args,
@@ -103,6 +110,7 @@ function oneShot(executable: string, extra: RuntimeExtra, request: OneShotReques
         allowCommands: [],
         server: '',
         tools: [],
+        servers: [],
       }),
     ],
     sessionId: null,

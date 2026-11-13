@@ -22,6 +22,8 @@ export interface SettingsPageProps {
   /** The open shared chain of the group «Chains» (a slug or `new`); null for none. */
   chain?: string | null;
   onSelectChain?: (slug: string | null) => void;
+  /** The open tab of the group «Agents» (`general` or `mcp`); null for the first. */
+  agentTab: string | null;
   /** The open tab of the group «Observers»; null for the first. */
   observerTab: string | null;
   onSelectObserverTab: (tab: ObserverTab) => void;

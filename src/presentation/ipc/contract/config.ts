@@ -13,6 +13,20 @@ const settingPathSchema = z
   .min(1)
   .refine((path) => settingFieldOf(path) !== undefined, { message: 'unknown setting' });
 
+/** The name of a server of the catalog: letters, digits, `-` and `_`; `aip` is the worker of aip. */
+export const mcpServerNameSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]+$/, { message: 'name may contain only letters, digits, "-" and "_"' })
+  .refine((name) => name !== 'aip', { message: 'this name is reserved for the server of aip' });
+
+/** A server of the catalog; a variable of `env` with `null` keeps the value of the file. */
+export const mcpServerValueSchema = z.object({
+  command: z.string().min(1),
+  args: z.array(z.string()),
+  env: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string().nullable()),
+  allSpecialists: z.boolean(),
+});
+
 export const entryIdSchema = z
   .string()
   .refine(isValidSlug, { message: `id must match ${SLUG_PATTERN_TEXT}` });
@@ -75,6 +89,16 @@ export const configRequests = [
         .refine((values) => Object.keys(values).length > 0, {
           message: 'values must not be empty',
         }),
+      revision: z.string().min(1).nullable(),
+      level: writeLevelSchema.default('global'),
+    }),
+  }),
+  z.object({
+    method: z.literal('config_mcp_server'),
+    params: z.object({
+      repository: z.string().min(1),
+      name: mcpServerNameSchema,
+      value: mcpServerValueSchema.nullable(),
       revision: z.string().min(1).nullable(),
       level: writeLevelSchema.default('global'),
     }),

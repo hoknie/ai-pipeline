@@ -9,7 +9,7 @@ import {
   type ProcessExit,
   type SupervisedProcess,
 } from '../../../agents/services/index.ts';
-import type { Runtime } from '../../../agents/types/index.ts';
+import { expandMcpServers, type Runtime } from '../../../agents/types/index.ts';
 import { modelIdProblem, type Specialist } from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
 import {
@@ -117,7 +117,7 @@ export class AttemptStarter {
       await this.fail(state, key, problem);
       return null;
     }
-    const { config, agents } = this.dependencies;
+    const { config, agents, environment } = this.dependencies;
     const settings = config.runtimeSettings(state.run.repository);
     if (typeof settings === 'string') return null;
     const runtime = agents.runtimeFor(attempt.runtime, settings);
@@ -147,7 +147,19 @@ export class AttemptStarter {
       }
       return null;
     }
-    return { state, group, attempt, key, runtime, worktree, specialist };
+    // `${NAME}` of the MCP servers is replaced only here: the snapshot of the run keeps the text.
+    if (specialist.mcp === undefined)
+      return { state, group, attempt, key, runtime, worktree, specialist };
+    const expanded = expandMcpServers(specialist.mcp, {
+      ...environment,
+      ...settings[attempt.runtime as Specialist['runtime']].env,
+    });
+    if (!expanded.ok) {
+      await this.fail(state, key, { kind: 'spawn', message: expanded.error });
+      return null;
+    }
+    const resolved = { ...specialist, mcp: expanded.servers };
+    return { state, group, attempt, key, runtime, worktree, specialist: resolved };
   }
 
   private launch(prepared: Prepared, directory: string, token: string): SupervisedProcess {

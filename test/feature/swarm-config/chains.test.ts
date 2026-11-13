@@ -194,11 +194,6 @@ swarm:
     unknown-chain:
       name: Unknown
       runtime_chain: missing
-    mcp-without-claude:
-      name: MCP Without Claude
-      runtime_chain: main
-      mcp:
-        tools: { command: tools }
 `);
 
     expectError(
@@ -222,30 +217,25 @@ swarm:
       'cannot be combined with runtime_chain',
     );
     expectError(errors, 'swarm.specialists.unknown-chain.runtime_chain', 'unknown chain `missing`');
-    expectError(
-      errors,
-      'swarm.specialists.mcp-without-claude.mcp',
-      'requires at least one claude runtime in chain `main`',
-    );
   });
 
-  it('allows mcp when chain has at least one claude runtime', () => {
+  it('allows mcp in a chain without a claude runtime', () => {
     const config = parseConfig(`
 swarm:
   chains:
-    with-claude:
+    no-claude:
       name: With Claude
       mode: on_error
       runtimes:
         - runtime: opencode
-        - runtime: claude
+        - runtime: agy
   specialists:
     worker:
       name: Worker
-      runtime_chain: with-claude
+      runtime_chain: no-claude
       mcp:
         tools: { command: tools }
 `);
-    expect(config.specialists[0]?.runtimeChain).toBe('with-claude');
+    expect(config.specialists[0]?.runtimeChain).toBe('no-claude');
   });
 });

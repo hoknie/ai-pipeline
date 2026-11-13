@@ -983,6 +983,9 @@ export const en = {
     variantOverridesEffort: 'The selected variant takes precedence if it sets reasoningEffort.',
     header: 'specialist actions',
     replacesDefaults: 'The tools of the specialist replace the ones from defaults.',
+    notInCatalog: 'not in the catalog',
+    mcpForAll: 'Servers for all specialists, no choice needed: {{names}}.',
+    mcpTab: 'MCP servers tab',
     catalogError:
       'The catalog of tools and skills did not load ({{message}}); type values by hand.',
     sections: {
@@ -1007,6 +1010,8 @@ export const en = {
         'Shell commands the specialist may run on the «edit» level; patterns such as «npm test*».',
       tools: 'Tools of the runtime added to the set of the permissions level.',
       skills: 'Skills the specialist is told to use.',
+      mcp_servers:
+        'Servers of the MCP catalog this specialist gets, on any runtime. Own servers go to «mcp» in the file.',
       prompt: 'Instructions of the specialist; added to every task.',
     },
     filters: {
@@ -1059,6 +1064,7 @@ export const en = {
       allow_commands: 'Allowed commands',
       tools: 'Tools',
       skills: 'Skills',
+      mcp_servers: 'Catalog MCP servers',
       max: 'Concurrency limit',
       prompt: 'Prompt',
     },
@@ -1445,6 +1451,46 @@ export const en = {
       newValueOf: 'New value of {{name}}',
       invalid: 'Not a valid variable name.',
       taken: 'This variable already exists.',
+    },
+    agentTabs: {
+      label: 'Agents tabs',
+      general: 'Main',
+      mcp: 'MCP servers',
+    },
+    mcp: {
+      list: 'MCP servers',
+      empty:
+        'No MCP servers yet. Servers of the catalog go to the specialists of every runtime: Claude, OpenCode and Antigravity (agy).',
+      newServer: 'New server',
+      formLabel: 'MCP server',
+      name: 'Name',
+      taken: 'A server with this name already exists.',
+      command: 'Command',
+      args: 'Arguments (one per line)',
+      env: 'Variables',
+      envNote:
+        'The values are never shown. A saved variable keeps its value until you replace or delete it; ${NAME} reads a variable of the daemon when the agent starts.',
+      allSpecialists: 'All specialists',
+      save: 'Save',
+      cancel: 'Cancel',
+      delete: 'Delete',
+      edit: 'Edit',
+      override: 'Override in project',
+      restore: 'Restore shared',
+      overrideNote:
+        'The project server replaces the shared one as a whole. The values of its variables are not copied: enter them again.',
+      deleteTitle: 'Delete the server {{name}}?',
+      deleteDescription:
+        'The server is removed from the file of this level. A server that a specialist names cannot be deleted.',
+      restoreTitle: 'Restore the shared server {{name}}?',
+      restoreDescription: 'The project server is removed, and the shared one applies again.',
+      specialists_one: '{{count}} specialist',
+      specialists_other: '{{count}} specialists',
+      source: {
+        global: 'Shared',
+        project: 'In project',
+        project_over_global: 'Project over shared',
+      },
     },
     group: {
       projects: 'Projects',

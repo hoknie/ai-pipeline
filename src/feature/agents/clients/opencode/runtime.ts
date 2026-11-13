@@ -95,7 +95,20 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
   const agent = opencodeAgentName(context.specialist.slug);
   const config = {
     $schema: 'https://opencode.ai/config.json',
-    mcp: { aip: { type: 'local', command: context.workerCommand, enabled: true } },
+    mcp: {
+      ...Object.fromEntries(
+        Object.entries(context.specialist.mcp ?? {}).map(([name, server]) => [
+          name,
+          {
+            type: 'local',
+            command: [server.command, ...server.args],
+            environment: server.env,
+            enabled: true,
+          },
+        ]),
+      ),
+      aip: { type: 'local', command: context.workerCommand, enabled: true },
+    },
     agent: {
       [agent]: {
         description: `aip specialist ${context.specialist.name}`,

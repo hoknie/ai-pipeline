@@ -8,6 +8,7 @@ import type {
   CatalogEntry,
   ConfigCatalogResponse,
   EditorChain,
+  EditorMcpServer,
 } from '../../../shared/api/types.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import {
@@ -72,6 +73,31 @@ export interface InputProps {
   /** The control of the field `tags`. */
   tags: ReactNode;
   chains?: EditorChain[];
+  /** The servers of the MCP catalog; the field `mcp_servers` offers them. */
+  mcpServers?: EditorMcpServer[];
+}
+
+/** The choice of the servers of the MCP catalog; a name the catalog lacks stays with a note. */
+function McpServersInput({ draft, onDraft, disabled, invalid, mcpServers = [] }: InputProps) {
+  const { t } = useTranslation();
+  return (
+    <ValuesPicker
+      id="field-mcp_servers"
+      label={fieldLabel('mcp_servers', t)}
+      values={draft.mcp_servers}
+      onChange={(items) => onDraft((current) => ({ ...current, mcp_servers: items }))}
+      options={mcpServers
+        .filter((server) => !server.allSpecialists)
+        .map((server) => ({ name: server.name, source: 'project', description: server.command }))}
+      mark={(value) =>
+        mcpServers.some((server) => server.name === value) ? null : t('specialists.notInCatalog')
+      }
+      headings={{ project: '' }}
+      creatable={false}
+      disabled={disabled}
+      invalid={invalid}
+    />
+  );
 }
 
 /** The tools or skills to choose from, with a note on the ones the runtime does not know. */
@@ -157,6 +183,7 @@ export function FieldInput(props: InputProps) {
   const { field, draft, onDraft, disabled, invalid, defaults, tags, chains } = props;
   const { t } = useTranslation();
   if (field === 'tags') return tags;
+  if (field === 'mcp_servers') return <McpServersInput {...props} />;
   if (isList(field)) return <ListInput {...props} field={field} />;
   const set = (text: string) => onDraft((current) => ({ ...current, [field]: text }));
   const hint = hintOf(field, defaults, t);

@@ -14,9 +14,10 @@ import type {
   SpecialistsImportResult,
   WriteLevel,
 } from './types.ts';
+import { mcpServerApi, type McpServerApi } from './catalog/mcpApi.ts';
 import { call, edit, enc, json, levelQuery, post, withRepository } from './http.ts';
 
-export interface ConfigApi {
+export interface ConfigApi extends McpServerApi {
   /** Pipelines of the bound repository, or of the one given. */
   pipelines(repository?: string): Promise<PipelinesView>;
   /** The configuration of the bound repository, for the editors. */
@@ -128,6 +129,7 @@ export function configApi(repository: string | null): ConfigApi {
         at('/api/config/settings'),
         json('PUT', { values, revision, ...(level ? { level } : {}) }),
       ),
+    ...mcpServerApi(at),
     writePipeline: (id, value, revision, level) =>
       edit(
         at(`/api/config/pipelines/${enc(id)}`),

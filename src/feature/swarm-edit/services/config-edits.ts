@@ -17,6 +17,7 @@ import {
   type ConfigEditorView,
   type ConfigPreview,
   type EditRequest,
+  type McpServerRequest,
   type PipelinesView,
   type SettingValue,
   type SystemStagesView,
@@ -26,6 +27,7 @@ import {
 import { commitEdit } from '../repositories/documents.ts';
 import { editorView } from './editor-view.ts';
 import { draftConfig, planEdit } from './plan-edit.ts';
+import { planMcpServer } from './mcp/plan-mcp-server.ts';
 import { planSettings } from './plan-settings.ts';
 import type { SharedConfigService } from './shared-config.ts';
 
@@ -128,6 +130,17 @@ export class ConfigEditService {
         level: params.level,
       }),
     );
+    if (!plan.ok) return plan;
+    const result = { ok: true as const, ...commitEdit(plan) };
+    changed.configChanged(repository);
+    return result;
+  }
+
+  /** Writes or removes one server of the `mcp_servers` catalog of a level. */
+  async mcpServer(repositoryPath: string, request: McpServerRequest): Promise<ConfigEditResult> {
+    const { config, registry, changed } = this.dependencies;
+    const repository = await registry.rootOf(repositoryPath);
+    const plan = planned(() => planMcpServer(config.pathsOf(repository), request));
     if (!plan.ok) return plan;
     const result = { ok: true as const, ...commitEdit(plan) };
     changed.configChanged(repository);

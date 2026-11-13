@@ -59,6 +59,11 @@ export interface McpServer {
   env: Record<string, string>;
 }
 
+/** A server of the `mcp_servers` catalog; `allSpecialists` connects it to every specialist. */
+export interface CatalogMcpServer extends McpServer {
+  allSpecialists: boolean;
+}
+
 export interface Specialist {
   slug: string;
   name: string;
@@ -75,6 +80,8 @@ export interface Specialist {
   tools: string[];
   /** MCP servers of this specialist by name; absent when there are none. */
   mcp?: Record<string, McpServer>;
+  /** Names of the catalog servers the specialist asks for; absent when there are none. */
+  mcpServers?: string[];
   skills: string[];
   prompt: string | null;
   /** Limit of simultaneously running specialists with this slug; null means no limit. */

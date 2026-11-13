@@ -92,7 +92,17 @@ OpenCode applies the selected variant after the agent options. A variant that se
 - `isolated` (the default): the `claude` specialist sees only the `aip` server, with none of the MCP servers from your Claude Code settings.
 - `inherit`: the specialist can use your servers too.
 
-To give servers to one specialist only, use [`mcp`](specialists.md#mcp-servers).
+To give servers to specialists without your whole Claude Code setup, use the [`mcp_servers` catalog and `mcp`](specialists.md#mcp-servers).
+
+## MCP servers of a specialist
+
+The servers of a specialist (the [catalog](specialists.md#mcp-servers) and `mcp`) work on all runtimes:
+
+- `claude`: they go into the `mcp.json` of the attempt next to `aip`.
+- `opencode`: they go into the generated `opencode.json` under `mcp`, as local servers.
+- `agy`: they go into `.agents/mcp_config.json` of the attempt. The specialist sees a server under the name `aip-<session>-<name>` (for example `aip-3f9c-graph`), which changes from attempt to attempt; its tools and their descriptions are the same. Only the servers of this attempt are allowed, not other servers you have.
+
+`${NAME}` in `env` and `args` is replaced when the attempt starts, and the files of the attempt are readable by you only.
 
 ## `claude.settings`
 
@@ -114,7 +124,8 @@ How the `claude` runtime gets the `edit` level is described in [configuration/pe
 | Continuing a session | Always | By session id | By `conversation_id` |
 | Reporting denied commands | Yes | No, see [Denied commands](permissions.md#denied-commands) | Shown in the journal |
 | Recognizing a [usage limit](../usage/queue.md#usage-limit) | Yes | No | No |
-| [`tools`](specialists.md#tools), [`mcp`](specialists.md#mcp-servers) of a specialist | Yes | No | No |
+| [`tools`](specialists.md#tools) of a specialist | Yes | No | No |
+| [MCP servers](specialists.md#mcp-servers) of a specialist | Yes | Yes | Yes, under other names: see [MCP servers of a specialist](#mcp-servers-of-a-specialist) |
 
 ## Runtime chains
 

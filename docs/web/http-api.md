@@ -125,6 +125,7 @@ All paths start with `/api/runs/<id>/groups/<group>`.
 | `GET /api/config/catalog` | The catalog of skills and tools for suggestions |
 | `GET /api/pipelines` | The pipelines of a repository |
 | `PUT /api/config/settings`, `PUT /api/config/settings/<path>` | Writes several fields or one field of `settings.yaml` |
+| `PUT /api/config/mcp-servers/<name>`, `DELETE /api/config/mcp-servers/<name>?revision=…&level=…` | Writes or removes one server of the `mcp_servers` catalog of a level; a variable of `env` sent as `null` keeps its value in the file, and the values of `env` are never returned |
 | `PUT /api/config/specialists/<slug>`, `PUT /api/config/pipelines/<id>` | Writes a file |
 | `DELETE /api/config/specialists/<slug>`, `DELETE /api/config/pipelines/<id>` | Deletes a file |
 | `POST /api/config/pipelines/<id>/preview` | The graph of a draft |
