@@ -8,6 +8,7 @@ import { databasePath, ensureDirectory } from '../../../src/platform/paths/index
 import { SCHEMA_VERSION, migrate } from '../../../src/platform/sqlite/index.ts';
 import {
   dropProjectAttributes,
+  dropQueueFilter,
   openStorage,
   renameBack,
   temporaryStorage,
@@ -46,7 +47,8 @@ describe('migrations', () => {
     previous.database.exec(
       'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
     );
-    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    dropQueueFilter(previous.database.connection);
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     previous.database.close();
 
     const migrated = openStorage(path);
@@ -115,7 +117,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(31);
+    expect(SCHEMA_VERSION).toBe(32);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -128,8 +130,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -6).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    MIGRATIONS.slice(0, -7).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     prepare(database);
     migrate(database);
     return database;
@@ -248,7 +250,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -276,8 +278,9 @@ describe('project attributes', () => {
     const old = openStorage(databasePath(directory));
     old.known.addRepository('/work/app', 5);
     old.known.addRepository('/a/app', 9);
+    dropQueueFilter(old.database.connection);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(
@@ -302,7 +305,8 @@ describe('migration to the usage journal', () => {
     step(state);
     old.runs.saveRun(state);
     old.database.exec('DROP TABLE stats_attempts; DROP TABLE stats_runs; DROP TABLE stats_meta;');
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    dropQueueFilter(old.database.connection);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const names = (type: string) =>

@@ -17,7 +17,7 @@ import { QueueList } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
 import { related } from './queueLinks.ts';
 import { parseParallel } from './ParallelStepper.tsx';
-import { QueueControls } from './QueueControls.tsx';
+import { QueueSide } from './QueueSide.tsx';
 import { StopReason } from './cards/StopReason.tsx';
 
 export { parseParallel };
@@ -81,14 +81,14 @@ export default function QueuePage({
   return (
     <div className="flex w-full flex-col gap-4 p-4">
       <div className="grid w-full gap-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-        <QueueControls
+        <QueueSide
           api={api}
           queue={queue}
+          pipelines={pipelines}
           parallel={parallel}
           onParallel={setParallel}
           onQueue={onQueue}
           onError={onError}
-          onDone={() => setParallel(null)}
           onNewTask={onNewTask}
         />
         <div className="flex min-w-0 flex-col gap-4">

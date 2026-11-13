@@ -281,6 +281,7 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS runs_history_repository ON runs (repository, id);
   `,
   STATS_MIGRATION,
+  `ALTER TABLE queues ADD COLUMN filter_json TEXT NOT NULL DEFAULT '{"pipelines":[],"tags":[]}'`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -929,8 +929,17 @@ describe('aip web', () => {
     const empty = await post('/api/queue/settings', {});
     expect(empty.status).toBe(400);
     expect(((await empty.json()) as { error: string }).error).toContain(
-      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
     );
+    const filtered = await post('/api/queue/settings', { filter: { pipelines: ['feature'] } });
+    expect(filtered.status).toBe(200);
+    expect(await filtered.json()).toMatchObject({ filter: { pipelines: ['feature'], tags: [] } });
+    expect((await read()).filter.pipelines).toEqual(['feature']);
+    expect((await post('/api/queue/settings', { filter: { pipelines: ['nope'] } })).status).toBe(
+      400,
+    );
+    expect((await post('/api/queue/settings', { filter: { bad: [] } })).status).toBe(400);
+    await post('/api/queue/settings', { filter: { pipelines: [] } });
     const onLimit = await post('/api/queue/settings', { onLimit: 'stop' });
     expect(onLimit.status).toBe(200);
     expect(await onLimit.json()).toMatchObject({ onLimit: 'stop' });

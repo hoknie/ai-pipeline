@@ -17,6 +17,16 @@ function stopReason(view: QueueView): string | null {
   return `${where}: ${stop.reason}`;
 }
 
+function filterLine(view: QueueView): string | null {
+  const names = new Map(view.filterTags.map((tag) => [tag.id, tag.name]));
+  const parts: string[] = [];
+  if (view.filter.pipelines.length > 0) parts.push(`pipelines ${view.filter.pipelines.join(', ')}`);
+  if (view.filter.tags.length > 0) {
+    parts.push(`tags ${view.filter.tags.map((id) => names.get(id) ?? id).join(', ')}`);
+  }
+  return parts.length === 0 ? null : parts.join('; ');
+}
+
 function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
   const lines: string[] = [];
   for (const run of runs) {
@@ -56,6 +66,8 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
   if (view.autopilotAnswer !== null) {
     lines.push(`${style.muted('Autopilot answer:')} ${firstLine(view.autopilotAnswer)}`);
   }
+  const filter = filterLine(view);
+  if (filter !== null) lines.push(`${style.muted('Filter:')} ${filter}`);
   const reason = stopReason(view);
   if (reason) lines.push(style.danger(`Stopped: ${reason}`));
   if (view.runs.length > 0) {
@@ -100,7 +112,8 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
                 : `${taskNumber(dependency.number)} ${dependency.id}`,
             )
             .join(', ')}${mark}`;
-    const postponed = item.postponed ? ' · postponed' : '';
+    const postponed =
+      (item.postponed ? ' · postponed' : '') + (item.filtered ? ' · filtered out' : '');
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;

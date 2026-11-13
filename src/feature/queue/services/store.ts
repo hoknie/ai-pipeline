@@ -66,6 +66,11 @@ export class QueueStore {
     this.dependencies.queues.dropItemTag(repository, id);
   }
 
+  /** Drops a removed tag from the stored filters; no transaction of its own. */
+  dropFilterTag(repository: string, id: string): void {
+    this.dependencies.queues.dropFilterTag(repository, id);
+  }
+
   /** The queue of a project that moved, stored and in memory; no transaction of its own. */
   moveRepository(from: string, to: string): void {
     this.dependencies.queues.moveQueue(from, to);

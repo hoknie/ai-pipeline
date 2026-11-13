@@ -13,6 +13,9 @@ import {
   type RunCreated,
   type RunState,
 } from '../../runs/types/index.ts';
+import { findPipeline } from '../../swarm-config/types/index.ts';
+import type { TagCatalogService } from '../../tags/services/index.ts';
+import { resolveTags } from '../../tags/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
 import {
   adoptRun,
@@ -30,6 +33,7 @@ import {
   startQueue,
   type Queue,
   type QueueChange,
+  type QueueSettingsPatch,
   type QueueSettingsRequest,
 } from '../types/index.ts';
 
@@ -41,6 +45,7 @@ export interface QueueControlDependencies {
   advance: QueueAdvance;
   registry: RegistryService;
   config: ConfigService;
+  tags: TagCatalogService;
   runs: Pick<RunsServices, 'states' | 'engine'>;
   now: () => number;
 }
@@ -84,9 +89,10 @@ export class QueueControl {
     const { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer } = params;
     const onLimit = params.onLimit as OnLimit | undefined;
     const enablesAutopilot = autopilot === true && !queue.autopilot;
+    const filter = this.resolveFilter(queue.repository, params.filter);
     setQueueSettings(
       queue,
-      { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer, onLimit },
+      { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer, onLimit, filter },
       now(),
     );
     const enabled = this.dependencies.registry.entry(queue.repository)?.enabled !== false;
@@ -96,6 +102,27 @@ export class QueueControl {
     store.save(queue);
     await advance.advance(queue.repository);
     return queue;
+  }
+
+  /** Checks the pipelines against the configuration and turns tag names into ids. */
+  private resolveFilter(
+    repository: string,
+    filter: QueueSettingsRequest['filter'],
+  ): QueueSettingsPatch['filter'] {
+    if (filter === undefined) return undefined;
+    const { config, tags } = this.dependencies;
+    if (filter.pipelines !== undefined && filter.pipelines.length > 0) {
+      const loaded = config.load(repository);
+      for (const pipeline of filter.pipelines) {
+        if (findPipeline(loaded, pipeline)) continue;
+        const known = loaded.pipelines.map((candidate) => candidate.id).join(', ') || 'none';
+        throw rejected(`unknown pipeline \`${pipeline}\`; known: ${known}`);
+      }
+    }
+    return {
+      pipelines: filter.pipelines,
+      tags: filter.tags === undefined ? undefined : resolveTags(tags.of(repository), filter.tags),
+    };
   }
 
   /** `queue_run_now`: the item starts at once, taking a place a lower run may give up. */

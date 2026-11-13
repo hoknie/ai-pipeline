@@ -81,6 +81,8 @@ Only when nothing can be frozen does the run take a place beyond the limit (for 
 | `--autopilot-answer <text>` | The text the queue answers questions with when auto answer is on |
 | `--default-autopilot-answer` | Restores the default text |
 | `--on-limit wait\|stop` | What happens on a usage limit (see [Usage limit](#usage-limit)) |
+| `--filter-pipelines <ids>` | Take only tasks of these pipelines (comma-separated; an empty string means any) |
+| `--filter-tags <names>` | Take only tasks with at least one of these tags (comma-separated; an empty string means any) |
 
 ```
 aip queue settings --autopilot on
@@ -88,9 +90,19 @@ aip queue settings --auto-answer on
 aip queue settings --skip-failed on --parallel 2
 aip queue settings --autopilot-answer "Agree, pick the simplest option"
 aip queue settings --on-limit stop
+aip queue settings --filter-pipelines feature --filter-tags auth
 ```
 
-A call without settings is refused with `pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit`. The first line of `aip queue list` shows the modes (`autopilot on, auto answer off, skip failed off`, and `, on limit stop` when set).
+A call without settings is refused with `pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter`. The first line of `aip queue list` shows the modes (`autopilot on, auto answer off, skip failed off`, and `, on limit stop` when set).
+
+### Take filter
+
+The take filter tells a running queue which new tasks to take: the pipeline must be one of `--filter-pipelines` (when set) and the task must have at least one of `--filter-tags` (when set). A task that does not fit waits in its place, marked `filtered out` in `aip queue list` and in the panel. It does not stop the queue. A queue without autopilot stops when nothing that fits is left.
+
+- The filter changes only while the queue is stopped; a running queue refuses it with `queue filter can be changed only while the queue is stopped`.
+- Returned and frozen runs are taken regardless of the filter; "Run now" ignores it.
+- Removing a tag from the catalog removes it from the filter.
+- In the panel the filter is a collapsible block above the queue controls. `aip queue list` shows it on the `Filter:` line.
 
 ### Autopilot
 

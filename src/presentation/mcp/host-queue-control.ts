@@ -30,7 +30,7 @@ export function registerQueueSettings(kit: HostKit): void {
     {
       title: 'Change queue settings',
       description:
-        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once (it does not answer questions); turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting or undelivered group leaves its place and goes to the skipped list, the queue keeps going; a cancelled run and a usage limit still stop the queue. `on_limit`: what a usage limit of an agent does: `wait` (default) keeps the group waiting for the reset and starts the queue again after it, `stop` fails the group and keeps the queue stopped until started. `auto_answer`: a running queue answers the questions of specialists with the `autopilot_answer` text; turning it on does not start a stopped queue. `autopilot_answer`: with `auto_answer` on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. Takes effect at once.',
+        'Change the queue settings; only the passed fields change, at least one is required. `parallel`: runs at the same time. `autopilot`: a running queue does not stop when it becomes empty and takes added tasks at once (it does not answer questions); turning it on starts a stopped queue that has no stop reason. `skip_failed`: a run with a failed, conflicting or undelivered group leaves its place and goes to the skipped list, the queue keeps going; a cancelled run and a usage limit still stop the queue. `on_limit`: what a usage limit of an agent does: `wait` (default) keeps the group waiting for the reset and starts the queue again after it, `stop` fails the group and keeps the queue stopped until started. `auto_answer`: a running queue answers the questions of specialists with the `autopilot_answer` text; turning it on does not start a stopped queue. `autopilot_answer`: with `auto_answer` on, a specialist that asks a question (not more than 3 times in a row per group) gets this text as the answer; null restores the default text. `filter`: which new tasks a running queue takes, `{ pipelines?, tags? }` (pipeline ids, tag names; an empty list means any; a task needs the pipeline and at least one of the tags); changed only while the queue is stopped, queued and returned tasks that do not fit wait. Takes effect at once.',
       inputSchema: {
         parallel: z.number().int().min(1).max(20).optional().describe('Runs at the same time'),
         autopilot: z.boolean().optional().describe('Keep the running queue going when it is empty'),
@@ -53,10 +53,27 @@ export function registerQueueSettings(kit: HostKit): void {
           .enum(['wait', 'stop'])
           .optional()
           .describe('On a usage limit: wait for the reset and go on, or stop'),
+        filter: z
+          .object({
+            pipelines: z.array(z.string().min(1)).max(50).optional(),
+            tags: z.array(z.string().min(1)).max(50).optional(),
+          })
+          .strict()
+          .optional()
+          .describe('Take filter: pipeline ids and tag names; only while the queue is stopped'),
         repo,
       },
     },
-    ({ parallel, autopilot, auto_answer, skip_failed, autopilot_answer, on_limit, repo: where }) =>
+    ({
+      parallel,
+      autopilot,
+      auto_answer,
+      skip_failed,
+      autopilot_answer,
+      on_limit,
+      filter,
+      repo: where,
+    }) =>
       attempt(() =>
         showQueue(
           'queue_settings',
@@ -67,6 +84,7 @@ export function registerQueueSettings(kit: HostKit): void {
             ...(skip_failed !== undefined ? { skipFailed: skip_failed } : {}),
             ...(autopilot_answer !== undefined ? { autopilotAnswer: autopilot_answer } : {}),
             ...(on_limit !== undefined ? { onLimit: on_limit } : {}),
+            ...(filter !== undefined ? { filter } : {}),
           },
           where,
         ),

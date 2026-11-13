@@ -5,6 +5,7 @@ import {
   ON_LIMIT_MODES,
   RECOMMENDATION_LIMIT,
 } from '../../runs/types/index.ts';
+import { type QueueFilterPatch, checkQueueFilter, setQueueFilter } from './filter.ts';
 import { type Queue, QUEUE_PARALLEL_MAX, queueStates } from './items.ts';
 import { problemKeys } from './limit-hits.ts';
 
@@ -15,10 +16,14 @@ export const AUTOPILOT_ANSWERS_MAX = 3;
 export const DEFAULT_AUTOPILOT_ANSWER =
   'I agree with your recommendations; go ahead with them. Where you gave no recommendation, choose the option you consider best and continue without asking again.';
 
-export function setParallel(queue: Queue, parallel: number, now: number): void {
+function checkParallel(parallel: number): void {
   if (!Number.isInteger(parallel) || parallel < 1 || parallel > QUEUE_PARALLEL_MAX) {
     throw rejected(`parallel must be an integer from 1 to ${QUEUE_PARALLEL_MAX}`);
   }
+}
+
+export function setParallel(queue: Queue, parallel: number, now: number): void {
+  checkParallel(parallel);
   queue.parallel = parallel;
   queue.updatedAt = now;
 }
@@ -31,6 +36,8 @@ export interface QueueSettingsPatch {
   /** `null`: the default text. */
   autopilotAnswer?: string | null | undefined;
   onLimit?: OnLimit | undefined;
+  /** Replaces the passed lists of the take filter; only while the queue is stopped. */
+  filter?: QueueFilterPatch | undefined;
 }
 
 function cleanAnswer(answer: string | null): string | null {
@@ -51,21 +58,27 @@ export function setQueueSettings(queue: Queue, patch: QueueSettingsPatch, now: n
     patch.autoAnswer === undefined &&
     patch.skipFailed === undefined &&
     patch.autopilotAnswer === undefined &&
-    patch.onLimit === undefined
+    patch.onLimit === undefined &&
+    patch.filter === undefined
   ) {
-    throw rejected('pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit');
+    throw rejected(
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
+    );
   }
   if (patch.onLimit !== undefined && !ON_LIMIT_MODES.includes(patch.onLimit)) {
     throw rejected(`onLimit must be one of: ${ON_LIMIT_MODES.join(', ')}`);
   }
   const answer =
     patch.autopilotAnswer === undefined ? undefined : cleanAnswer(patch.autopilotAnswer);
+  if (patch.filter !== undefined) checkQueueFilter(queue, patch.filter);
+  if (patch.parallel !== undefined) checkParallel(patch.parallel);
   if (patch.parallel !== undefined) setParallel(queue, patch.parallel, now);
   if (patch.autopilot !== undefined) queue.autopilot = patch.autopilot;
   if (patch.autoAnswer !== undefined) queue.autoAnswer = patch.autoAnswer;
   if (patch.skipFailed !== undefined) queue.skipFailed = patch.skipFailed;
   if (answer !== undefined) queue.autopilotAnswer = answer;
   if (patch.onLimit !== undefined) queue.onLimit = patch.onLimit;
+  if (patch.filter !== undefined) setQueueFilter(queue, patch.filter, now);
   queue.updatedAt = now;
 }
 

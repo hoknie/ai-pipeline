@@ -19,6 +19,8 @@ const VIEW: QueueView & { item: string } = {
   autopilotAnswer: null,
   autopilotAnswerDefault: 'default',
   onLimit: 'wait',
+  filter: { pipelines: [], tags: [] },
+  filterTags: [],
   stop: null,
   freezeCandidate: null,
   items: [
@@ -38,6 +40,7 @@ const VIEW: QueueView & { item: string } = {
       readiness: 'ready',
       after: [],
       postponed: false,
+      filtered: false,
       createdAt: 1,
       error: null,
       run: null,
@@ -354,6 +357,37 @@ describe('host MCP queue tools', () => {
     ]);
   });
 
+  it('passes the filter of the queue settings and shows it', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return { ...VIEW, filter: { pipelines: ['feature'], tags: [] } };
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_settings',
+      arguments: { filter: { pipelines: ['feature'] } },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_settings',
+        params: { repository: '/repo', filter: { pipelines: ['feature'] } },
+      },
+    ]);
+    expect(textOf(result)).toContain('Filter: pipelines feature');
+  });
+
+  it('returns the daemon error of a filter change in a running queue', async () => {
+    const client = await connect(async () => {
+      throw new Error('queue filter can be changed only while the queue is stopped');
+    });
+    const result = await client.callTool({
+      name: 'swarm_queue_settings',
+      arguments: { filter: { tags: ['auth'] } },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('queue filter can be changed only while the queue is stopped');
+  });
+
   it('passes the autopilot answer of the queue settings', async () => {
     const calls: unknown[] = [];
     const client = await connect(async (method, params) => {
@@ -644,13 +678,13 @@ describe('host MCP queue tools', () => {
     const client = await connect(async (method, params) => {
       calls.push({ method, params });
       throw new Error(
-        'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
+        'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
       );
     });
     const result = await client.callTool({ name: 'swarm_queue_settings', arguments: {} });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain(
-      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
     );
     expect(calls).toEqual([{ method: 'queue_settings', params: { repository: '/repo' } }]);
   });

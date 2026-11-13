@@ -6,6 +6,7 @@ import {
   dependencyState,
   freezeCandidate,
   itemReadiness,
+  matchesFilter,
   occupiesSlot,
 } from '../../../feature/queue/types/index.ts';
 import { stepProgress, summarize } from '../../../feature/runs/services/index.ts';
@@ -184,6 +185,8 @@ export function queueView(
     autopilotAnswer: queue.autopilotAnswer,
     autopilotAnswerDefault: DEFAULT_AUTOPILOT_ANSWER,
     onLimit: queue.onLimit,
+    filter: { pipelines: [...queue.filter.pipelines], tags: [...queue.filter.tags] },
+    filterTags: tagViews(catalog, queue.filter.tags),
     stop: queue.stop,
     freezeCandidate:
       queue.runs.length >= queue.parallel
@@ -208,6 +211,7 @@ export function queueView(
       readiness: itemReadiness(queue, item, lookup),
       after: item.after.map((ref) => dependencyView(queue, ref, lookup)),
       postponed: item.postponed,
+      filtered: !matchesFilter(queue.filter, item),
       createdAt: item.createdAt,
       error: item.error,
       run: item.run,

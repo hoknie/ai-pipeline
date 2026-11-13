@@ -17,6 +17,7 @@ export function FilterField({
   selected,
   onChange,
   clearLabel,
+  disabled = false,
 }: {
   id?: string;
   label: string;
@@ -24,6 +25,7 @@ export function FilterField({
   selected: string[];
   onChange: (values: string[]) => void;
   clearLabel: string;
+  disabled?: boolean;
 }) {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -45,10 +47,10 @@ export function FilterField({
             values={selected}
             display={display}
             mark={undefined}
-            disabled={false}
+            disabled={disabled}
             onRemove={(value) => onChange(selected.filter((v) => v !== value))}
           />
-          <AddTrigger id={id} label={label} open={open} listId={listId} disabled={false} />
+          <AddTrigger id={id} label={label} open={open} listId={listId} disabled={disabled} />
         </div>
         <PopoverContent className="p-0">
           <FilterList

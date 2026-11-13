@@ -2,7 +2,7 @@ import { DELIVERY_MODES } from '../../swarm-config/types/index.ts';
 import { ON_LIMIT_MODES } from '../../runs/types/index.ts';
 import type { Database, Row } from '../../../platform/sqlite/index.ts';
 import { json, nullable, parse, text } from '../../../platform/sqlite/index.ts';
-import type { Queue, QueueItem } from '../types/index.ts';
+import type { Queue, QueueFilter, QueueItem } from '../types/index.ts';
 
 export class QueueRepository {
   private readonly database: Database;
@@ -41,6 +41,16 @@ export class QueueRepository {
       .run(id, repository, id);
   }
 
+  /** One statement, no transaction of its own: the scenario of removing a tag opens it. */
+  dropFilterTag(repository: string, id: string): void {
+    this.database
+      .prepare(
+        `UPDATE queues SET filter_json = json_set(filter_json, '$.tags', (SELECT json_group_array(value) FROM json_each(filter_json, '$.tags') WHERE value <> ?))
+         WHERE repository = ? AND EXISTS (SELECT 1 FROM json_each(filter_json, '$.tags') WHERE value = ?)`,
+      )
+      .run(id, repository, id);
+  }
+
   /** No transaction of its own: the queue of a project that moved gets its new path. */
   moveQueue(from: string, to: string): void {
     this.database.exec('PRAGMA defer_foreign_keys = ON');
@@ -54,9 +64,9 @@ export class QueueRepository {
     this.database.transaction(() => {
       this.database
         .prepare(
-          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number, priority_json, auto_answer)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number, priority_json = excluded.priority_json, auto_answer = excluded.auto_answer`,
+          `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number, priority_json, auto_answer, filter_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (repository) DO UPDATE SET status = excluded.status, parallel = excluded.parallel, runs_json = excluded.runs_json, acknowledged_json = excluded.acknowledged_json, stop_json = excluded.stop_json, updated_at = excluded.updated_at, autopilot = excluded.autopilot, skip_failed = excluded.skip_failed, skipped_json = excluded.skipped_json, autopilot_answer = excluded.autopilot_answer, on_limit = excluded.on_limit, next_number = excluded.next_number, priority_json = excluded.priority_json, auto_answer = excluded.auto_answer, filter_json = excluded.filter_json`,
         )
         .run(
           queue.repository,
@@ -74,6 +84,7 @@ export class QueueRepository {
           queue.nextNumber,
           JSON.stringify(queue.priority),
           queue.autoAnswer ? 1 : 0,
+          JSON.stringify(queue.filter),
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
@@ -121,6 +132,7 @@ export class QueueRepository {
       onLimit: ON_LIMIT_MODES.find((mode) => mode === row.on_limit) ?? 'wait',
       nextNumber: Number(row.next_number ?? 1),
       priority: row.priority_json ? parse(row.priority_json) : [],
+      filter: hydrateFilter(row.filter_json),
       items: items.map(hydrateItem),
       runs: parse(row.runs_json ?? null),
       acknowledged: parse(row.acknowledged_json ?? null),
@@ -128,6 +140,24 @@ export class QueueRepository {
       updatedAt: Number(row.updated_at),
     };
   }
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+}
+
+function hydrateFilter(value: unknown): QueueFilter {
+  let parsed: unknown = null;
+  try {
+    parsed = typeof value === 'string' ? JSON.parse(value) : null;
+  } catch {
+    parsed = null;
+  }
+  const filter =
+    typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  return { pipelines: strings(filter.pipelines), tags: strings(filter.tags) };
 }
 
 function hydrateItem(item: Row): QueueItem {

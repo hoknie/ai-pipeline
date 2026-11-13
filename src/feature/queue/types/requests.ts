@@ -50,6 +50,8 @@ export interface QueueSettingsRequest {
   skipFailed?: boolean | undefined;
   autopilotAnswer?: string | null | undefined;
   onLimit?: string | undefined;
+  /** Pipeline ids and tag names; the service resolves them. */
+  filter?: { pipelines?: string[] | undefined; tags?: string[] | undefined } | undefined;
 }
 
 /** A queue after a change, with the item the change concerns. */

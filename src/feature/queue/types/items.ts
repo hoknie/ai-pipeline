@@ -48,6 +48,14 @@ export type QueueStop =
       autoResume: boolean;
     };
 
+/** What a running queue takes; an empty list means any. */
+export interface QueueFilter {
+  /** Ids of pipelines. */
+  pipelines: string[];
+  /** Ids of catalog tags; a task needs at least one of them. */
+  tags: string[];
+}
+
 export interface Queue {
   repository: string;
   status: 'stopped' | 'running';
@@ -62,6 +70,8 @@ export interface Queue {
   autopilotAnswer: string | null;
   /** What a usage limit does: the group waits for the reset, or fails. */
   onLimit: OnLimit;
+  /** Which new items a running queue takes; changed only while the queue is stopped. */
+  filter: QueueFilter;
   items: QueueItem[];
   /** The number the next added task gets. */
   nextNumber: number;
@@ -100,6 +110,7 @@ export function emptyQueue(repository: string, now: number, nextNumber = 1): Que
     skipFailed: false,
     autopilotAnswer: null,
     onLimit: 'wait',
+    filter: { pipelines: [], tags: [] },
     items: [],
     nextNumber,
     runs: [],

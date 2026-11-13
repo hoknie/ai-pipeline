@@ -7,6 +7,7 @@ import {
 import { itemReadiness } from './dependencies.ts';
 import { type Queue, type QueueItem, QUEUE_SKIPPED_MAX, newItemId, queueStates } from './items.ts';
 import { BLOCKING_REASONS, SKIPPED_REASONS, STOPPING_REASONS, limitHits } from './limit-hits.ts';
+import { matchesFilter } from './filter.ts';
 import { claimPlace, deferRun, occupiesSlot } from './returns.ts';
 import { queueWakeAt, startQueue } from './settings.ts';
 
@@ -179,6 +180,7 @@ function takeReady(
       (item) =>
         !take.includes(item) &&
         !item.postponed &&
+        matchesFilter(queue.filter, item) &&
         !(item.run !== null && lookup(item.run)?.run.hold === 'paused') &&
         !(queue.skipFailed && item.error !== null) &&
         itemReadiness(queue, item, lookup) === 'ready',
@@ -216,7 +218,7 @@ export function advance(
     result.take.push(...takeReady(queue, lookup, result.take, frozenTaken));
     if (
       !queue.autopilot &&
-      !queue.items.some((item) => !item.postponed) &&
+      !queue.items.some((item) => !item.postponed && matchesFilter(queue.filter, item)) &&
       queue.runs.length === 0
     ) {
       queue.status = 'stopped';

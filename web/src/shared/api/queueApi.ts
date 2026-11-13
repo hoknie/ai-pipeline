@@ -10,6 +10,8 @@ export interface QueueSettingsPatch {
   autopilotAnswer?: string | null;
   /** On a usage limit: wait for the reset, or stop. */
   onLimit?: 'wait' | 'stop';
+  /** Replaces the passed lists (pipeline ids, tag ids); only while the queue is stopped. */
+  filter?: { pipelines?: string[]; tags?: string[] };
 }
 
 export interface QueueApi {

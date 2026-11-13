@@ -47,6 +47,7 @@ export class TaskTags {
       tags.deleteStored(repository, id);
       runs.states.changeStored(repository, { dropTag: id });
       store.dropItemTag(repository, id);
+      store.dropFilterTag(repository, id);
     });
     tags.forget(id);
     for (const state of runs.states.all()) {
@@ -57,8 +58,10 @@ export class TaskTags {
     }
     for (const queue of store.all()) {
       if (queue.repository !== repository) continue;
-      if (!queue.items.some((item) => item.tags.includes(id))) continue;
+      const inFilter = queue.filter.tags.includes(id);
+      if (!inFilter && !queue.items.some((item) => item.tags.includes(id))) continue;
       for (const item of queue.items) item.tags = item.tags.filter((tag) => tag !== id);
+      queue.filter = { ...queue.filter, tags: queue.filter.tags.filter((tag) => tag !== id) };
       queue.updatedAt = now();
       store.save(queue);
     }

@@ -39,6 +39,8 @@ export interface QueueItemView {
   after: DependencyView[];
   /** A running queue does not take the task; "run now" still starts it. */
   postponed: boolean;
+  /** The item does not fit the take filter: a running queue does not take it. */
+  filtered: boolean;
   createdAt: number;
   error: string | null;
   /** A returned run: taking the item retries it; null for a new task. */
@@ -108,6 +110,10 @@ export interface QueueView {
   autopilotAnswerDefault: string;
   /** What a usage limit does: the group waits for the reset, or fails. */
   onLimit: OnLimit;
+  /** The take filter: ids of pipelines and of catalog tags; an empty list means any. */
+  filter: { pipelines: string[]; tags: string[] };
+  /** The tags of the filter that are still in the catalog. */
+  filterTags: TagView[];
   stop: QueueStop | null;
   /** The run a priority action would freeze now; null when a place is free or there is none. */
   freezeCandidate: string | null;

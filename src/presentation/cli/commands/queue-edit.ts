@@ -7,6 +7,24 @@ import { usage } from '../io.ts';
 import { parseDeliveryMode, parseSwitch, readGroups, type QueueTaskOptions } from '../options.ts';
 import type { QueueKit } from './queue.ts';
 
+/** The `filter` of the request from the flags; empty when no flag is passed. */
+function filterOf(options: { filterPipelines?: string; filterTags?: string }) {
+  return {
+    ...(options.filterPipelines !== undefined
+      ? { pipelines: splitList(options.filterPipelines) }
+      : {}),
+    ...(options.filterTags !== undefined ? { tags: splitList(options.filterTags) } : {}),
+  };
+}
+
+/** A comma-separated list; an empty string is an empty list. */
+function splitList(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+}
+
 interface EditOptions extends QueueTaskOptions {
   pipeline?: string;
   workflow?: string;
@@ -153,7 +171,9 @@ export function addSettings(kit: QueueKit): void {
         '--autopilot-answer <text>',
         'text the queue answers specialists questions with when auto answer is on',
       )
-      .option('--default-autopilot-answer', 'answer with the default text again'),
+      .option('--default-autopilot-answer', 'answer with the default text again')
+      .option('--filter-pipelines <ids>', 'take only these pipelines (comma-separated)')
+      .option('--filter-tags <names>', 'take only tasks with one of these tags'),
   )
     .addHelpText(
       'after',
@@ -162,6 +182,8 @@ export function addSettings(kit: QueueKit): void {
         'aip queue settings --auto-answer on',
         'aip queue settings --skip-failed on --parallel 2',
         'aip queue settings --on-limit stop',
+        'aip queue settings --filter-pipelines feature --filter-tags auth',
+        'aip queue settings --filter-tags ""',
         'aip queue settings --autopilot-answer "Agree; pick the simplest option"',
       ]),
     )
@@ -175,6 +197,8 @@ export function addSettings(kit: QueueKit): void {
         onLimit?: string;
         autopilotAnswer?: string;
         defaultAutopilotAnswer?: boolean;
+        filterPipelines?: string;
+        filterTags?: string;
         json?: boolean;
       }) => {
         if (options.onLimit !== undefined && !['wait', 'stop'].includes(options.onLimit)) {
@@ -186,6 +210,7 @@ export function addSettings(kit: QueueKit): void {
         const autopilot = parseSwitch('--autopilot', options.autopilot);
         const autoAnswer = parseSwitch('--auto-answer', options.autoAnswer);
         const skipFailed = parseSwitch('--skip-failed', options.skipFailed);
+        const filter = filterOf(options);
         showQueue(
           options.json,
           (await call(context(), 'queue_settings', {
@@ -194,6 +219,7 @@ export function addSettings(kit: QueueKit): void {
             ...(autopilot !== undefined ? { autopilot } : {}),
             ...(autoAnswer !== undefined ? { autoAnswer } : {}),
             ...(skipFailed !== undefined ? { skipFailed } : {}),
+            ...(Object.keys(filter).length > 0 ? { filter } : {}),
             ...(options.onLimit !== undefined ? { onLimit: options.onLimit } : {}),
             ...(options.defaultAutopilotAnswer
               ? { autopilotAnswer: null }

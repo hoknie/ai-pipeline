@@ -102,6 +102,13 @@ export const queueRequests = [
         autopilotAnswer: z.string().trim().min(1).max(RECOMMENDATION_LIMIT).nullable().optional(),
         // Checked by the queue, so an unknown value gets its own error.
         onLimit: z.string().optional(),
+        filter: z
+          .object({
+            pipelines: z.array(z.string().min(1)).max(50).optional(),
+            tags: z.array(z.string().min(1)).max(50).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .refine(
         (params) =>
@@ -110,8 +117,12 @@ export const queueRequests = [
           params.autoAnswer !== undefined ||
           params.skipFailed !== undefined ||
           params.autopilotAnswer !== undefined ||
-          params.onLimit !== undefined,
-        { message: 'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit' },
+          params.onLimit !== undefined ||
+          params.filter !== undefined,
+        {
+          message:
+            'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
+        },
       ),
   }),
   z.object({

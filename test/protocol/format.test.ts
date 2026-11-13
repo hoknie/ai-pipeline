@@ -499,11 +499,29 @@ describe('colored text', () => {
       autopilotAnswer: null,
       autopilotAnswerDefault: 'default',
       onLimit: 'wait' as const,
+      filter: { pipelines: [], tags: [] },
+      filterTags: [],
       freezeCandidate: null,
       updatedAt: 1,
     };
     expect(ansi(formatQueue(queue, style)).split('\n')[0]).toContain('◦ stopped');
     expect(strip(formatQueue(queue, style))).toBe(strip(formatQueue(queue)));
+  });
+
+  it('shows the take filter with tag names and marks the items that do not fit', () => {
+    const queue = emptyQueue('/repo', 1);
+    queue.filter = { pipelines: ['feature', 'explore'], tags: ['t1', 't9'] };
+    addItem(queue, { pipeline: 'feature', task: 'A', tags: ['t1'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'other', task: 'B' }, 'q2', 3);
+    const catalog = [{ id: 't1', repository: '/repo', name: 'auth', color: 'blue', task: null }];
+    const text = formatQueue(queueView(queue, () => undefined, null, catalog as never));
+    expect(text).toContain('Filter: pipelines feature, explore; tags auth, t9');
+    const lines = text.split('\n').filter((line) => line.includes('added'));
+    expect(lines[0]).not.toContain('filtered out');
+    expect(lines[1]).toContain(' · filtered out');
+    expect(formatQueue(queueView(emptyQueue('/repo', 1), () => undefined))).not.toContain(
+      'Filter:',
+    );
   });
 
   it('shows auto answer on separately from autopilot', () => {

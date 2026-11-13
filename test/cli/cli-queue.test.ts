@@ -176,10 +176,38 @@ describe('cli', () => {
     const empty = await aip(box, 'queue', 'settings');
     expect(empty.code).not.toBe(0);
     expect(`${empty.stdout}${empty.stderr}`).toContain(
-      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed or onLimit',
+      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
     );
     const view = await aip(box, 'queue', 'list', '--json');
     expect(JSON.parse(view.stdout)).toMatchObject({ autopilot: false, skipFailed: false });
+  });
+
+  it('sets the take filter from the terminal and clears one list', async () => {
+    const box = sandbox();
+    await aip(box, 'tag', 'add', 'auth');
+    const set = await aip(
+      box,
+      'queue',
+      'settings',
+      '--filter-pipelines',
+      'feature',
+      '--filter-tags',
+      'auth',
+      '--json',
+    );
+    expect(set.code).toBe(0);
+    const view = JSON.parse(set.stdout) as { filter: { pipelines: string[]; tags: string[] } };
+    expect(view.filter.pipelines).toEqual(['feature']);
+    expect(view.filter.tags).toHaveLength(1);
+    const text = await aip(box, 'queue', 'list');
+    expect(text.stdout).toContain('Filter: pipelines feature; tags auth');
+    const cleared = await aip(box, 'queue', 'settings', '--filter-tags', '', '--json');
+    expect(JSON.parse(cleared.stdout)).toMatchObject({
+      filter: { pipelines: ['feature'], tags: [] },
+    });
+    const wrong = await aip(box, 'queue', 'settings', '--filter-pipelines', 'nope');
+    expect(wrong.code).not.toBe(0);
+    expect(`${wrong.stdout}${wrong.stderr}`).toContain('unknown pipeline `nope`');
   });
 
   it('sets the behaviour on a usage limit and refuses a wrong value', async () => {

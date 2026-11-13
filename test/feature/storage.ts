@@ -58,6 +58,7 @@ export function renameBack(database: import('node:sqlite').DatabaseSync): void {
   database.exec(
     'DROP INDEX IF EXISTS attempts_history_order; DROP INDEX IF EXISTS runs_history_repository;',
   );
+  dropQueueFilter(database);
   dropProjectAttributes(database);
   for (const table of ['runs', 'queue_items']) {
     const columns = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
@@ -74,5 +75,13 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
   database.exec('DROP INDEX IF EXISTS repositories_by_slug');
   for (const column of ['name', 'slug', 'enabled', 'color']) {
     database.exec(`ALTER TABLE repositories DROP COLUMN ${column}`);
+  }
+}
+
+/** Takes away the take filter of the queues, the newest migration, when it is there. */
+export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
+  const columns = database.prepare('PRAGMA table_info(queues)').all() as { name: string }[];
+  if (columns.some((column) => column.name === 'filter_json')) {
+    database.exec('ALTER TABLE queues DROP COLUMN filter_json');
   }
 }

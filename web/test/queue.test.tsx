@@ -2056,8 +2056,10 @@ describe('queue layout', () => {
     restore = setWindowWidth(1600);
     show(running());
     const controls = await screen.findByRole('region', { name: 'queue controls' });
-    expect(controls.parentElement?.className).toContain('lg:grid-cols-[18rem_minmax(0,1fr)]');
-    expect(controls.parentElement?.previousElementSibling).toBeNull();
+    expect(controls.parentElement?.parentElement?.className).toContain(
+      'lg:grid-cols-[18rem_minmax(0,1fr)]',
+    );
+    expect(controls.parentElement?.parentElement?.previousElementSibling).toBeNull();
     expect(within(controls).getByRole('button', { name: 'Start' })).toBeTruthy();
     expect(within(controls).getByRole('button', { name: 'Pause' })).toBeTruthy();
     expect(within(controls).getByLabelText('Parallelism')).toBeTruthy();

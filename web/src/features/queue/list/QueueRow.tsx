@@ -47,7 +47,7 @@ export function QueueRow(props: RowProps) {
         item.readiness === 'blocked' && 'border-destructive',
         linked && 'ring-2 ring-primary',
         drag.dragging === item.id && 'opacity-50',
-        postponed && 'opacity-60',
+        (postponed || item.filtered) && 'opacity-60',
         drag.drop?.index === index &&
           (drag.drop.after ? 'border-b-2 border-b-primary' : 'border-t-2 border-t-primary'),
       )}

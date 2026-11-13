@@ -40,6 +40,11 @@ export function RowStatus({
           {t('queue.list.postponed')}
         </Badge>
       ) : null}
+      {item.filtered ? (
+        <Badge variant="mute" title={t('queue.filter.filteredHint')}>
+          {t('queue.filter.filtered')}
+        </Badge>
+      ) : null}
       <ReadinessBadge item={item} />
       {linked ? <span className="sr-only">{t('queue.list.linked')}</span> : null}
     </>
