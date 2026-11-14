@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { ActionKind } from '../../../shared/lib/pipeline/pipelineEntries.ts';
 import type { SpecialistOption } from '../../../shared/lib/specialistLabels.ts';
+import { CodeEditor } from '../../../shared/ui/forms/code/CodeEditor.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
@@ -50,10 +51,9 @@ function CommandCard({ draft, disabled, update, errorsOf }: FieldsProps) {
     <SectionCard id="action-section-command" title={t('pipeline.actions.sectionCommand')}>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="field-action-run">{t('pipeline.actions.script')}</Label>
-        <Textarea
+        <CodeEditor
           id="field-action-run"
-          className="field-sizing-content font-mono"
-          rows={6}
+          rows={16}
           spellCheck={false}
           value={draft.script}
           disabled={disabled}

@@ -269,6 +269,7 @@ describe('the form of an action', () => {
     fireEvent.change(await screen.findByLabelText('Script'), { target: { value: ' ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const alert = await screen.findByText('must not be empty');
-    expect(screen.getByLabelText('Script').parentElement!.contains(alert)).toBe(true);
+    const editor = screen.getByLabelText('Script').closest('[data-testid="code-editor"]')!;
+    expect(editor.parentElement!.contains(alert)).toBe(true);
   });
 });
