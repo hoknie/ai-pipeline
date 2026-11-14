@@ -1,6 +1,7 @@
 import { clockTime } from '../../feature/runs/types/index.ts';
 import { type Style, plainStyle, statusBadge } from './style.ts';
-import { formatUsage, humanMark, oneLine, seconds } from './table.ts';
+import { formatUsage } from './numbers.ts';
+import { humanMark, oneLine, seconds } from './table.ts';
 import type {
   ApplyResult,
   DenialView,
@@ -31,7 +32,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     `Group ${style.accent(group.slug)} (${group.title}) · ${statusBadge(group.status, style)}${limitNote(group.limitUntil)} · run ${style.accent(group.runId)}`,
     `${style.muted('Ref:')} ${group.branch}`,
     `${style.muted('Worktree:')} ${group.worktree}`,
-    `${style.muted('Usage:')} ${formatUsage(group.usage)}`,
+    `${style.muted('Usage:')} ${formatUsage(group.usage, style)}`,
     `${style.muted('Task:')} ${group.task}`,
   ];
   if (group.question) {
@@ -71,7 +72,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
   lines.push('', style.muted('Attempts:'));
   for (const attempt of group.attempts) {
     lines.push(
-      `  #${attempt.seq} ${attempt.stepName} r${attempt.round} · ${attempt.specialist} (${attempt.runtime}${attempt.model ? ` ${attempt.model}` : ''}) · ${statusBadge(attempt.status, style)}${attempt.verdict ? ` ${attempt.verdict}` : ''} · ${seconds(attempt.durationMs)} · ${formatUsage(attempt.usage)}`,
+      `  #${attempt.seq} ${attempt.stepName} r${attempt.round} · ${attempt.specialist} (${attempt.runtime}${attempt.model ? ` ${attempt.model}` : ''}) · ${statusBadge(attempt.status, style)}${attempt.verdict ? ` ${attempt.verdict}` : ''} · ${seconds(attempt.durationMs)} · ${formatUsage(attempt.usage, style)}`,
     );
     if (attempt.summary) lines.push(`     summary: ${attempt.summary}`);
     if (attempt.feedback) lines.push(`     feedback: ${attempt.feedback}`);

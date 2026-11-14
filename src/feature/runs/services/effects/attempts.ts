@@ -17,6 +17,7 @@ import {
   findGroup,
   isRepairGroup,
   specialistOfStep,
+  stepsOf,
   type Attempt,
   type Group,
   type RunState,
@@ -140,7 +141,12 @@ export class AttemptStarter {
     // Leftovers of an interrupted check must not reach this one.
     await this.parts.actions.discardChanges(state, group);
     // The observer works from the snapshot of its profile, which is not in the configuration.
-    const specialist = specialistOfStep(state.run, group, attempt.specialist);
+    const step = stepsOf(state.run, group)[attempt.stepIndex];
+    const specialist = specialistOfStep(
+      state.run,
+      group,
+      step ?? { specialist: attempt.specialist },
+    );
     if (!specialist) {
       if (isRepairGroup(group)) {
         await this.fail(state, key, { kind: 'spawn', message: 'the observer has no profile' });

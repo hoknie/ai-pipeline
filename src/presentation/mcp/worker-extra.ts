@@ -64,6 +64,10 @@ export function registerQueueAdd(kit: WorkerKit): void {
             .enum(DELIVERY_MODES)
             .optional()
             .describe('worktree, commit or branch; omit to follow delivery.mode'),
+          variant: z
+            .string()
+            .optional()
+            .describe('Id of a variant of the pipeline; omit for `default`, the pipeline as it is'),
           skip: z
             .array(z.string())
             .optional()
@@ -76,7 +80,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
             ),
         },
       },
-      ({ pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
+      ({ pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
         attempt(async () => {
           if ((task === undefined) === (groups === undefined)) {
             throw invalid('mcp.invalid_arguments', 'pass either task or groups');
@@ -84,6 +88,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
           const result = (await options.send('worker_queue_add', {
             token: options.token,
             pipeline,
+            ...(variant !== undefined ? { variant } : {}),
             ...(task !== undefined ? { task } : {}),
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),

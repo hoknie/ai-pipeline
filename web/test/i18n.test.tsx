@@ -245,6 +245,7 @@ const SAME_AS_ENGLISH = new Set([
   ' +{{n}}',
   'B',
   'beta',
+  'default',
   'Plain',
   'MD',
   'Pipeline',

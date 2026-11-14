@@ -11,6 +11,7 @@ import { reasonText } from './reasonText.ts';
 import { StatusBadge } from '../../../shared/ui/feedback/StatusBadge.tsx';
 import { TagChips } from '../../../shared/ui/feedback/TagChip.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
+import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 
 /** A group slug; the slug of a system step (`_split`, `_message`, `_resolve`) becomes its name. */
 function groupLabel(slug: string, t: TFunction) {
@@ -28,6 +29,7 @@ export function CardBadges({ run }: { run: QueueRunView }) {
     <div className="flex flex-wrap items-center gap-2">
       <StatusBadge status={run.state} />
       <PipelineBadge id={run.pipeline} name={run.pipelineName} />
+      <VariantBadge id={run.variant} name={run.variantName} />
       <TagChips tags={run.tags ?? []} />
       {run.priority ? (
         <Badge variant="run" title={t('queue.priorityHint')}>

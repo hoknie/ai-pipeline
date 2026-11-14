@@ -245,6 +245,7 @@ export function stepsOf(run: Run, group: Group): Step[] {
       // Runs saved before the field existed have no value.
       additionalPrompt: pipeline.split.additionalPrompt ?? null,
       humanReview: false,
+      ...(pipeline.split.agent ? { agent: pipeline.split.agent } : {}),
     },
   ];
 }

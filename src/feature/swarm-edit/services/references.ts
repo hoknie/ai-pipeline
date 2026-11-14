@@ -3,6 +3,28 @@ import { isMapping } from '../../swarm-config/types/index.ts';
 import { type EntryReference } from '../types/editor.ts';
 import { field } from '../types/setting-fields.ts';
 
+/** Overrides of the variants of a pipeline that `matches`: of its split, then of its steps. */
+function variantReferences(
+  id: string,
+  pipeline: Record<string, unknown>,
+  matches: (override: Record<string, unknown>) => boolean,
+): EntryReference[] {
+  const references: EntryReference[] = [];
+  const variants = isMapping(pipeline.variants) ? pipeline.variants : {};
+  for (const [variant, body] of Object.entries(variants)) {
+    if (!isMapping(body)) continue;
+    if (isMapping(body.split) && matches(body.split)) {
+      references.push({ pipeline: id, variant, split: true });
+    }
+    const steps = isMapping(body.steps) ? body.steps : {};
+    for (const [step, override] of Object.entries(steps)) {
+      if (isMapping(override) && matches(override))
+        references.push({ pipeline: id, variant, step });
+    }
+  }
+  return references;
+}
+
 /** Everything in a merged `{ swarm }` tree that names the specialist. */
 export function specialistReferences(tree: unknown, slug: string): EntryReference[] {
   const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
@@ -13,6 +35,7 @@ export function specialistReferences(tree: unknown, slug: string): EntryReferenc
     if (isMapping(pipeline.split) && pipeline.split.specialist === slug) {
       references.push({ pipeline: id, split: true });
     }
+    references.push(...variantReferences(id, pipeline, (override) => override.specialist === slug));
     const steps = Array.isArray(pipeline.steps) ? pipeline.steps : [];
     for (const [index, step] of steps.entries()) {
       if (isMapping(step) && step.specialist === slug) {
@@ -74,6 +97,13 @@ export function chainReferences(tree: unknown, slug: string): EntryReference[] {
     if (isMapping(specialist) && specialist.runtime_chain === slug) {
       references.push({ specialist: name });
     }
+  }
+  const pipelines = isMapping(swarm.pipelines) ? swarm.pipelines : {};
+  for (const [id, pipeline] of Object.entries(pipelines)) {
+    if (!isMapping(pipeline)) continue;
+    references.push(
+      ...variantReferences(id, pipeline, (override) => override.runtime_chain === slug),
+    );
   }
   return references;
 }

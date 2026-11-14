@@ -19,7 +19,7 @@ export function registerQueue(kit: HostKit): void {
 }
 
 export function registerQueueAdd(kit: HostKit): void {
-  const { server, tags, parent, skip, after, repo, queueGroups, showQueue } = kit;
+  const { server, tags, parent, variant, skip, after, repo, queueGroups, showQueue } = kit;
   server.registerTool(
     'swarm_queue_add',
     {
@@ -45,6 +45,7 @@ export function registerQueueAdd(kit: HostKit): void {
           ),
         tags,
         parent,
+        variant,
         skip,
         after,
         postponed: z
@@ -56,6 +57,7 @@ export function registerQueueAdd(kit: HostKit): void {
     },
     ({
       pipeline,
+      variant: variantId,
       task,
       groups,
       title,
@@ -73,6 +75,7 @@ export function registerQueueAdd(kit: HostKit): void {
           'queue_add',
           {
             pipeline,
+            ...(variantId !== undefined ? { variant: variantId } : {}),
             ...(task !== undefined ? { task } : {}),
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),

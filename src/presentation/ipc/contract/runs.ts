@@ -46,12 +46,16 @@ export const afterIds = z.array(z.string().min(1)).max(50);
 
 export const deliveryModeSchema = z.enum(DELIVERY_MODES);
 
+/** Id of a variant of a pipeline. */
+export const variantId = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
+
 export const parentRef = z.union([z.string().trim().min(1), z.number().int().positive()]);
 
 const runParams = z
   .object({
     repository: z.string().min(1),
     pipeline: z.string().min(1),
+    variant: variantId.optional(),
     task: z.string().trim().min(1).optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),

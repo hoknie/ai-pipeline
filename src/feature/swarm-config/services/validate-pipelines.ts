@@ -10,6 +10,7 @@ import {
   readMapping,
   readString,
 } from './validate-context.ts';
+import { checkVariants } from './sections/variants.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
 import {
   DEFAULT_MAX_GROUPS,
@@ -23,7 +24,7 @@ import {
 
 const SPLIT_KEYS = ['specialist', 'max_groups', 'additional_prompt', 'pipeline', 'workflow'];
 
-const PIPELINE_KEYS = ['name', 'split', 'steps', 'tags', 'stages'];
+const PIPELINE_KEYS = ['name', 'split', 'steps', 'tags', 'stages', 'variants'];
 
 const STEP_KEYS = ['id', 'specialist', 'on_reject', 'additional_prompt', 'human_review'];
 
@@ -91,8 +92,17 @@ export function checkPipeline(
           split: 'split' in mapping,
         })
       : undefined;
-  const withStages = <T extends Pipeline>(pipeline: T): Pipeline =>
-    stages === undefined ? pipeline : { ...pipeline, stages };
+  const withStages = (pipeline: Pipeline): Pipeline => {
+    const variants =
+      'variants' in mapping
+        ? checkVariants(ctx, mapping.variants, join(path, 'variants'), pipeline, known)
+        : [];
+    return {
+      ...pipeline,
+      ...(stages === undefined ? {} : { stages }),
+      ...(variants.length > 0 ? { variants } : {}),
+    };
+  };
   const stepsPath = join(path, 'steps');
   if (split?.pipeline) {
     if ('steps' in mapping) {

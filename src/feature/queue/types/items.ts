@@ -13,6 +13,8 @@ export interface QueueItem {
   /** Integer number of the task within the repository; never reused. */
   number: number;
   pipeline: string;
+  /** Id of a variant of the pipeline; `default` is the pipeline as it is. */
+  variant: string;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -89,6 +91,7 @@ export interface Queue {
 
 export interface ItemFields {
   pipeline: string;
+  variant?: string | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;

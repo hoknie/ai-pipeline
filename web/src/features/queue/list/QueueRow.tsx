@@ -7,6 +7,7 @@ import { taskNumber } from '../../../shared/lib/format.ts';
 import type { PipelinesView, QueueItemView, QueueView } from '../../../shared/api/types.ts';
 import { TagChips } from '../../../shared/ui/feedback/TagChip.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
+import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import type { QueueDraft } from '../QueueForm.tsx';
 import { depth, type ParentChoice } from '../queueLinks.ts';
 import { itemLabel } from './itemText.ts';
@@ -82,6 +83,7 @@ export function QueueRow(props: RowProps) {
         <span className="w-5 text-muted-foreground tabular-nums">{index + 1}</span>
         <span className="font-mono text-xs text-muted-foreground">{taskNumber(item.number)}</span>
         <PipelineBadge id={item.pipeline} name={item.pipelineName} />
+        <VariantBadge id={item.variant} name={item.variantName} />
         <span className="min-w-0 flex-1 truncate" title={itemLabel(item, t)}>
           {itemLabel(item, t)}
         </span>

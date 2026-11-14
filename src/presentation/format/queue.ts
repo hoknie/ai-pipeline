@@ -1,11 +1,18 @@
 import { clockTime } from '../../feature/runs/types/index.ts';
 import { waitNote, withTags } from './runs.ts';
-import { type Style, plainStyle, statusBadge } from './style.ts';
-import { addedAt, firstLine, pipelineLabel, table, taskNumber } from './table.ts';
+import {
+  type Style,
+  isTerminal,
+  plainStyle,
+  statusBadge,
+  truncateVisible,
+  visibleWidth,
+} from './style.ts';
+import { addedAt, firstLine, pipelineLabel, runPipelineLabel, table, taskNumber } from './table.ts';
 import { formatTagLabels } from './tags.ts';
 import type { QueueView, RepositoryView } from '../ipc/contract/index.ts';
 
-function stopReason(view: QueueView): string | null {
+export function stopReason(view: QueueView): string | null {
   const stop = view.stop;
   if (!stop) return null;
   if (stop.kind === 'item') return `item ${stop.item}: ${stop.error}`;
@@ -36,7 +43,7 @@ function queueRunLines(runs: QueueView['runs'], style: Style): string[] {
         : `${run.groups.done}/${run.groups.total} groups · steps ${run.steps.done}/${run.steps.total}`;
     const delivering = `${run.delivering ? ' · delivering' : ''}${run.priority ? ' · priority' : ''}`;
     lines.push(
-      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${pipelineLabel(run.pipeline, run.pipelineName)}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
+      `  ${taskNumber(run.number)} ${style.accent(run.id)}  ${statusBadge(run.state, style)}  ${runPipelineLabel(run)}  ${withTags(run.title, run.tags, style)}  ${progress}${delivering}`,
     );
     for (const active of run.active) {
       lines.push(
@@ -97,6 +104,7 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
           ? ' · auto delivery'
           : ' · manual delivery') +
       (item.deliveryMode === null ? '' : ` · delivery: ${item.deliveryMode}`);
+    const variant = item.variant === 'default' ? '' : ` · variant: ${item.variant}`;
     const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
     const mark =
       item.readiness === 'ready'
@@ -117,9 +125,12 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
-    lines.push(
-      `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${pipelineLabel(item.pipeline, item.pipelineName)}  ${body}${title}${tagText}${delivery}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`,
-    );
+    const head = `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${pipelineLabel(item.pipeline, item.pipelineName)}  `;
+    const tail = `${title}${tagText}${delivery}${variant}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
+    const room = isTerminal(style)
+      ? Math.max(10, style.columns - visibleWidth(head) - visibleWidth(tail))
+      : Infinity;
+    lines.push(`${head}${truncateVisible(body, room)}${tail}`);
   }
   return lines.join('\n');
 }

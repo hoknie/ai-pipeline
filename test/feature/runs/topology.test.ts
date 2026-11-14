@@ -393,3 +393,47 @@ describe('stages in the topology', () => {
     expect(status('cleanup')).toBe('done');
   });
 });
+
+describe('topology of the variants of a pipeline', () => {
+  const text = `swarm:
+  specialists:
+    plan: { name: Plan }
+    coder: { name: Coder, runtime: claude, model: sonnet }
+    reviewer: { name: Reviewer, permissions: read }
+  pipelines:
+    feature:
+      steps:
+        - { id: plan, specialist: plan }
+        - { id: code, specialist: coder }
+        - { id: review, specialist: reviewer }
+      variants:
+        light:
+          name: Light
+          skip: [review]
+        strong:
+          steps:
+            code: { model: opus }
+`;
+
+  it('shows the model of the variant on its step', () => {
+    const state = run(1, { configText: text });
+    const feature = pipelineTopology(state.run.config, 'feature')!;
+    const strong = feature.variants.find((variant) => variant.id === 'strong')!;
+    expect(strong.steps.find((entry) => entry.id === 'code')?.model).toBe('opus');
+    const base = feature.variants.find((variant) => variant.id === 'default')!;
+    expect(base.steps.find((entry) => entry.id === 'code')?.model).toBe('sonnet');
+  });
+
+  it('keeps a skipped step in place with the flag', () => {
+    const state = run(1, { configText: text });
+    const light = pipelineTopology(state.run.config, 'feature')!.variants.find(
+      (variant) => variant.id === 'light',
+    )!;
+    expect(light.steps.map((entry) => [entry.id, entry.skipped])).toEqual([
+      ['plan', false],
+      ['code', false],
+      ['review', true],
+    ]);
+    expect(light.split).toBeNull();
+  });
+});

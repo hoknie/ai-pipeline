@@ -23,6 +23,8 @@ export interface RunFilterState {
   states: PanelRunState[];
   /** Pipeline slugs. */
   pipelines: string[];
+  /** Ids of pipeline variants, `default` among them. */
+  variants: string[];
   /** Specialist slugs. */
   specialists: string[];
   tagIds: string[];
@@ -33,6 +35,7 @@ export interface RunFilterState {
 export const EMPTY_FILTERS: RunFilterState = {
   states: [],
   pipelines: [],
+  variants: [],
   specialists: [],
   tagIds: [],
   repositories: [],
@@ -44,6 +47,7 @@ export type RunFilterKey = keyof RunFilterState;
 const FILTER_KEYS: RunFilterKey[] = [
   'states',
   'pipelines',
+  'variants',
   'specialists',
   'tagIds',
   'repositories',
@@ -81,6 +85,8 @@ function haystack(run: RunView, catalog: ReadonlyMap<string, TagView>): string {
     run.name,
     run.pipeline,
     run.pipelineName,
+    run.variant,
+    run.variantName,
     run.id,
     taskNumber(run.number),
     ...run.groups.map((group) => group.title),
@@ -118,6 +124,8 @@ function passes(
       return state.states.length === 0 || state.states.includes(run.state);
     case 'pipelines':
       return state.pipelines.length === 0 || state.pipelines.includes(run.pipeline);
+    case 'variants':
+      return state.variants.length === 0 || state.variants.includes(run.variant);
     case 'specialists':
       return (
         state.specialists.length === 0 ||
@@ -193,6 +201,9 @@ export function optionCounts(
         break;
       case 'pipelines':
         add(run.pipeline);
+        break;
+      case 'variants':
+        add(run.variant);
         break;
       case 'specialists':
         runSpecialists(run).forEach(add);

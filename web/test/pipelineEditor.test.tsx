@@ -485,3 +485,97 @@ describe('view only', () => {
     await act(async () => finish({ ok: true, revision: 'r', file: '/f' }));
   });
 });
+
+describe('the variants of a pipeline', () => {
+  const withVariants = {
+    ...RAW,
+    variants: { light: { name: 'Лёгкая', skip: ['review'] }, strong: {} },
+  };
+  const variantsWritten = (writePipeline: ReturnType<typeof saved>) =>
+    (writePipeline.mock.calls.at(-1) as unknown as [string, Record<string, unknown>])[1]
+      .variants as Record<string, unknown> | undefined;
+  const switcher = () => within(screen.getByRole('radiogroup', { name: 'Pipeline variants' }));
+  const pressSave = async (writePipeline: ReturnType<typeof saved>) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+  };
+
+  it('opens on default with the steps below the switcher', async () => {
+    render(<Page api={api({}, [entry('feature', { raw: withVariants })])} />);
+    await screen.findAllByRole('listitem', { name: /^step \d+$/ });
+    expect(
+      switcher()
+        .getAllByRole('radio')
+        .map((item) => item.textContent),
+    ).toEqual(['default', 'Лёгкая', 'strong']);
+    expect(switcher().getByRole('radio', { name: 'default' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+  });
+
+  it('has only default and the button for a pipeline without variants', async () => {
+    render(<Page api={api()} />);
+    await screen.findAllByRole('listitem', { name: /^step \d+$/ });
+    expect(switcher().getAllByRole('radio')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Add variant' })).toBeTruthy();
+  });
+
+  it('does not change the draft when the variant is switched', async () => {
+    const writePipeline = saved();
+    render(<Page api={api({ writePipeline }, [entry('feature', { raw: withVariants })])} />);
+    await screen.findAllByRole('listitem', { name: /^step \d+$/ });
+    fireEvent.click(switcher().getByRole('radio', { name: 'strong' }));
+    fireEvent.click(switcher().getByRole('radio', { name: 'default' }));
+    await pressSave(writePipeline);
+    expect(variantsWritten(writePipeline)).toEqual(withVariants.variants);
+  });
+
+  it('adds a variant with an id and a name and writes only them', async () => {
+    const writePipeline = saved();
+    render(<Page api={api({ writePipeline })} />);
+    await screen.findAllByRole('listitem', { name: /^step \d+$/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
+    const id = screen.getByLabelText('Id') as HTMLInputElement;
+    expect(id.value).toBe('variant');
+    fireEvent.change(id, { target: { value: 'light' } });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Лёгкая' } });
+    await pressSave(writePipeline);
+    expect(variantsWritten(writePipeline)).toEqual({ light: { name: 'Лёгкая' } });
+  });
+
+  it('shows the error of the check at the id field', async () => {
+    const errors: FieldError[] = [
+      { path: 'swarm.pipelines.feature.variants.default', message: '`default` is reserved' },
+    ];
+    const writePipeline = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'invalid' as const,
+      errors,
+    }));
+    render(<Page api={api({ writePipeline })} />);
+    await screen.findAllByRole('listitem', { name: /^step \d+$/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
+    fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'default' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('`default` is reserved')).toBeTruthy();
+  });
+
+  it('writes the skip of the steps of a variant and deletes a variant', async () => {
+    const writePipeline = saved();
+    render(<Page api={api({ writePipeline }, [entry('feature', { raw: withVariants })])} />);
+    await screen.findAllByRole('listitem', { name: /^step \d+$/ });
+    fireEvent.click(switcher().getByRole('radio', { name: 'strong' }));
+    fireEvent.click(screen.getByRole('button', { name: 'plan' }));
+    await pressSave(writePipeline);
+    expect(variantsWritten(writePipeline)).toEqual({
+      light: { name: 'Лёгкая', skip: ['review'] },
+      strong: { skip: ['plan'] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete variant' }));
+    expect(switcher().getByRole('radio', { name: 'default' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    await pressSave(writePipeline);
+    expect(variantsWritten(writePipeline)).toEqual({ light: { name: 'Лёгкая', skip: ['review'] } });
+  });
+});

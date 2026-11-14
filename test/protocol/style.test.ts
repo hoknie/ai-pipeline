@@ -42,17 +42,26 @@ describe('colorEnabled', () => {
 describe('styles', () => {
   it('returns text unchanged when colors are off', () => {
     for (const style of [plainStyle, createStyle(false)]) {
-      for (const role of Object.values(style)) expect(role('text')).toBe('text');
+      for (const role of Object.values(style).filter((value) => typeof value === 'function'))
+        expect(role('text')).toBe('text');
     }
   });
 
   it('wraps text in ANSI codes when colors are on', () => {
     const style = createStyle(true);
-    for (const role of Object.values(style)) {
+    for (const role of Object.values(style).filter((value) => typeof value === 'function')) {
       const painted = role('text');
       expect(painted).toContain('\x1b[');
       expect(painted).toContain('text');
     }
+  });
+});
+
+describe('rich', () => {
+  it('is true only for the colored style', () => {
+    expect(plainStyle.rich).toBe(false);
+    expect(createStyle(false).rich).toBe(false);
+    expect(createStyle(true).rich).toBe(true);
   });
 });
 

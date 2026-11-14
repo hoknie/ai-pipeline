@@ -89,6 +89,16 @@ describe('grouped help', () => {
     expect(setup?.commands).toContain('help');
   });
 
+  it('lists overview first under Dashboards & streams, before web', async () => {
+    const { stdout } = await aip(['--help']);
+    const dashboards = stdout.slice(
+      stdout.indexOf('Dashboards & streams:'),
+      stdout.indexOf('Setup & maintenance:'),
+    );
+    expect(dashboards.indexOf('overview')).toBeGreaterThan(-1);
+    expect(dashboards.indexOf('overview')).toBeLessThan(dashboards.indexOf('web'));
+  });
+
   it('lists help below Setup & maintenance', async () => {
     const { stdout } = await aip(['--help']);
     const setup = stdout.slice(stdout.indexOf('Setup & maintenance:'), stdout.indexOf('Plumbing'));

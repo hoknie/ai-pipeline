@@ -88,7 +88,8 @@ export function parseRoute(hash: string): Route {
         view: 'pipelines',
         run: id,
         group: section,
-        step: null,
+        // `#pipelines/topology/<id>/<variant>`: the variant of the topology
+        step: section === 'topology' ? decode(rest[2]) : null,
         tab: null,
       };
     return { view: 'pipelines', run: section, group: null, step: null, tab: null };
@@ -149,6 +150,8 @@ export function formatRoute(route: Route): string {
   }
   if (route.view === 'pipelines') {
     if (!route.run) return '#pipelines';
+    if (route.group === 'topology' && route.step)
+      return `#pipelines/topology/${enc(route.run)}/${enc(route.step)}`;
     return isPipelineSection(route.group)
       ? `#pipelines/${route.group}/${enc(route.run)}`
       : `#pipelines/${enc(route.run)}`;

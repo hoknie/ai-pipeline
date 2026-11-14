@@ -113,6 +113,35 @@ describe('the name of a pipeline', () => {
     expect('name' in valueOf({ ...draft, name: '  ' })).toBe(false);
   });
 
+  it('keeps the variants block of the file when the name is edited', async () => {
+    const variants = {
+      light: { name: 'Лёгкий', skip: ['review'] },
+      strong: { steps: { code: { model: 'opus', additional_prompt: null } } },
+    };
+    const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
+    render(
+      <Page
+        api={api({ writePipeline }, [entry('feature', { raw: { ...RAW, variants } })])}
+        start="feature"
+      />,
+    );
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Новое' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writePipeline).toHaveBeenCalled());
+    const [, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(value.name).toBe('Новое');
+    expect(value.variants).toEqual(variants);
+  });
+
+  it('keeps the variants of a pipeline that splits into another one, and writes none for a new one', () => {
+    const variants = { light: { split: { model: 'haiku' } } };
+    const raw = { split: { specialist: 'plan', pipeline: 'epic' }, variants };
+    const value = valueOf(draftOf(raw));
+    expect(value.variants).toEqual(variants);
+    expect(value).not.toHaveProperty('steps');
+    expect(valueOf(draftOf(RAW))).not.toHaveProperty('variants');
+  });
+
   it('saves a new pipeline with the name from the field', async () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={api({ writePipeline })} start="new" />);
@@ -246,6 +275,27 @@ describe('the list', () => {
       (screen.getAllByLabelText('additional step prompt')[0] as HTMLTextAreaElement).disabled,
     ).toBe(false);
     expect(screen.getByRole('button', { name: 'Remove the override' })).toBeTruthy();
+  });
+});
+
+describe('the variants in the list', () => {
+  it('shows the names of the variants under the pipeline, none for a pipeline without them', async () => {
+    const config = vi.fn(async () =>
+      configView({
+        specialists,
+        pipelines: [
+          entry('feature'),
+          entry('task', {
+            raw: { ...RAW, variants: { light: { name: 'Лёгкая' }, strong: {} } },
+          }),
+        ],
+      }),
+    );
+    render(<Page api={fakeApi({ config })} start="feature" />);
+    const list = await screen.findByRole('list', { name: 'pipeline' });
+    const badges = await within(list).findByTestId('variants-task');
+    expect([...badges.children].map((badge) => badge.textContent)).toEqual(['Лёгкая', 'strong']);
+    expect(within(list).queryByTestId('variants-feature')).toBeNull();
   });
 });
 

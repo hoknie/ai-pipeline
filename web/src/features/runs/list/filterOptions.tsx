@@ -51,6 +51,14 @@ export function useFilterOptions(input: FilterOptionsInput) {
     .map(([value, label]) => ({ value, label, count: pipelineCounts.get(value) ?? 0 }))
     .sort((left, right) => left.label.localeCompare(right.label, 'en'));
 
+  const variantCounts = counts('variants');
+  const variants = new Map<string, string>();
+  for (const run of scoped) variants.set(run.variant, run.variantName || run.variant);
+  for (const id of filters.variants) if (!variants.has(id)) variants.set(id, id);
+  const variantOptions: FilterOption[] = [...variants]
+    .map(([value, label]) => ({ value, label, count: variantCounts.get(value) ?? 0 }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'en'));
+
   const specialistCounts = counts('specialists');
   const specialists = new Set<string>(filters.specialists);
   for (const run of scoped) runSpecialists(run).forEach((slug) => specialists.add(slug));
@@ -98,6 +106,7 @@ export function useFilterOptions(input: FilterOptionsInput) {
   return {
     states,
     pipelines: pipelineOptions,
+    variants: variantOptions,
     specialists: specialistOptions,
     tags: tagOptions,
     repositories: repositoryOptions,

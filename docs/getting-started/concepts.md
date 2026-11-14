@@ -24,7 +24,7 @@
 2. **Start.** When a place is free, the queue turns the task into a run. The run takes a snapshot of the configuration and of your working tree (see [`workspace`](../configuration/README.md#workspace)).
 3. **Split.** If the pipeline has a [`split`](../configuration/pipelines.md#split), a specialist divides the task into groups. Otherwise the task is one group.
 4. **Steps.** Each group goes through the steps in order, in its own worktree. Groups of a run work in parallel, within [`max`](../configuration/README.md#max). Every step ends with `swarm_report`, and its changes are committed inside the run.
-5. **Returns and questions.** A rejection returns the group to an earlier step with the remarks. A question stops the group until [you answer](../usage/runs.md#answering-a-specialist).
+5. **Returns and questions.** A rejection returns the group to an earlier step with the remarks. A question stops the group until [you answer](../usage/runs.md#answering-a-specialist); `aip overview` lists everything that waits for you across all projects.
 6. **Merge.** A group that passed its last step is merged inside the run.
 7. **Delivery.** The merged result reaches your repository as uncommitted changes, one commit or a branch. See [configuration/delivery.md](../configuration/delivery.md).
 8. **Cleanup.** The worktrees and internal refs are removed; logs and history stay.

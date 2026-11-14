@@ -7,7 +7,7 @@ import {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
-import { POLL_MS, harness, startRun, until, type Harness } from './harness.ts';
+import { POLL_MS, PIPELINE_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 // Each test needs a fresh daemon: the snapshot, the registry of repositories and the seq of the
 // events are those of one daemon from its start.
@@ -54,6 +54,36 @@ describe('event stream', () => {
     await h.close();
     current = null;
     expect(await ended).toBe('closed');
+  });
+
+  it('carries the variant and its name in the run event', async () => {
+    const h = (current = await harness(`${PIPELINE_CONFIG}      variants:
+        light:
+          name: Лёгкий
+          skip: [review]
+`));
+    const events: StreamEvent[] = [];
+    subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
+    await until('the snapshot', () => events.length > 0);
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      variant: 'light',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await until('the event of the run', () =>
+      events.some(
+        (event) =>
+          event.event === 'run' &&
+          (event.run as unknown as { id: string }).id === runId &&
+          (event.run as unknown as { variant: string }).variant === 'light',
+      ),
+    );
+    const event = events.find((entry) => entry.event === 'run');
+    expect(event?.event === 'run' ? event.run : null).toMatchObject({
+      variant: 'light',
+      variantName: 'Лёгкий',
+    });
   });
 
   it('sends a queue event on every change and the queues in the snapshot', async () => {

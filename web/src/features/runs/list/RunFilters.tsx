@@ -39,6 +39,7 @@ export function RunFilters({
   const fields: [string, RunFilterKey, FilterOption[]][] = [
     [t('runs.list.state'), 'states', options.states],
     [t('runs.list.pipeline'), 'pipelines', options.pipelines],
+    [t('runs.list.variant'), 'variants', options.variants],
     [t('runs.list.specialists'), 'specialists', options.specialists],
     [t('runs.list.tags'), 'tagIds', options.tags],
   ];

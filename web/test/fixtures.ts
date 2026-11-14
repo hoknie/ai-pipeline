@@ -156,6 +156,8 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     repository: '/repo',
     pipeline: 'feature',
     pipelineName: overrides.pipeline ?? 'feature',
+    variant: 'default',
+    variantName: overrides.variant ?? 'default',
     branch: 'refs/aip/run1/run',
     createdAt: 1_000,
     startedAt: 1_000,
@@ -256,17 +258,37 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
   };
 }
 
+/** A variant of a pipeline with these steps: skipped ones marked, nothing else changed. */
+export function variantOf(
+  steps: PipelineTopology['steps'],
+  id: string,
+  name: string = id,
+  skip: string[] = [],
+): PipelineTopology['variants'][number] {
+  return {
+    id,
+    name,
+    skip,
+    steps: steps.map((step) => ({ ...step, skipped: skip.includes(step.id) })),
+    split: null,
+  };
+}
+
 export function pipelineOf(overrides: Partial<PipelineTopology> = {}): PipelineTopology {
+  const steps =
+    overrides.steps ??
+    topologyOf().steps.map(
+      ({ groups: _g, attempts: _a, rejections: _r, usage: _u, skipped: _s, ...step }) => step,
+    );
   return {
     id: 'feature',
     name: overrides.id ?? 'feature',
     split: null,
-    steps: topologyOf().steps.map(
-      ({ groups: _g, attempts: _a, rejections: _r, usage: _u, skipped: _s, ...step }) => step,
-    ),
+    steps,
     delivery: { mode: 'worktree', resolver: null },
     limits: {},
     stages: [],
+    variants: [variantOf(steps, 'default')],
     ...overrides,
   };
 }
@@ -294,6 +316,8 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     state: 'active',
     pipeline: 'feature',
     pipelineName: overrides.pipeline ?? 'feature',
+    variant: 'default',
+    variantName: overrides.variant ?? 'default',
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
@@ -461,6 +485,8 @@ export function queueItem(
     position,
     pipeline: 'feature',
     pipelineName: extra.pipeline ?? 'feature',
+    variant: 'default',
+    variantName: extra.variant ?? 'default',
     task,
     groups: null,
     title: null,

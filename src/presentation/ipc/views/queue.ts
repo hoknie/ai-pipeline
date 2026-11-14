@@ -23,7 +23,11 @@ import {
   stepLabel,
   stepsOf,
 } from '../../../feature/runs/types/index.ts';
-import { type DeliveryMode, pipelineNameOf } from '../../../feature/swarm-config/types/index.ts';
+import {
+  type DeliveryMode,
+  pipelineNameOf,
+  variantNameOf,
+} from '../../../feature/swarm-config/types/index.ts';
 import type { Tag } from '../../../feature/tags/types/index.ts';
 import type {
   DependencyView,
@@ -65,6 +69,8 @@ function queueRunView(
     state: summarize(state).state,
     pipeline: state.run.pipeline,
     pipelineName: pipelineNameOf(state.run.config, state.run.pipeline),
+    variant: state.run.variant,
+    variantName: variantNameOf(state.run.config, state.run.pipeline, state.run.variant),
     tags: tagViews(catalog, state.run.tags),
     createdAt: state.run.createdAt,
     groups: {
@@ -165,6 +171,7 @@ export function queueView(
   deliveryMode: DeliveryMode | null = null,
   waits: WaitLookup = NO_WAITS,
   names: (id: string) => string = (id) => id,
+  variantNames: (pipeline: string, variant: string) => string = (_pipeline, variant) => variant,
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -202,6 +209,8 @@ export function queueView(
       position: index + 1,
       pipeline: item.pipeline,
       pipelineName: names(item.pipeline),
+      variant: item.variant,
+      variantName: variantNames(item.pipeline, item.variant),
       ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,

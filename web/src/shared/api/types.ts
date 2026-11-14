@@ -98,6 +98,8 @@ export type DaemonMismatch = DaemonCheck['mismatch'];
 /** Fields of a task in the queue: either `task` or `groups`. */
 export interface QueueFields {
   pipeline: string;
+  /** Id of a variant of the pipeline; absent: `default`. */
+  variant?: string;
   task?: string;
   groups?: { title: string; task: string }[];
   title?: string;
@@ -120,6 +122,8 @@ export interface QueueFields {
 /** Changes of a queued task; `title: null` removes the title. */
 export interface QueuePatch {
   pipeline?: string;
+  /** Id of a variant of the pipeline. */
+  variant?: string;
   task?: string;
   groups?: { title: string; task: string }[];
   title?: string | null;

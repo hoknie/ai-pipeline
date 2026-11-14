@@ -84,7 +84,7 @@ function startAttempt(state: RunState, group: Group, now: number): Attempt {
   if (pending === null) throw new Error(`group ${group.slug} has nothing to start`);
   const step = stepsOf(state.run, group)[pending.stepIndex];
   if (!step) throw new Error(`step ${pending.stepIndex} does not exist`);
-  const specialist = specialistOfStep(state.run, group, step.specialist);
+  const specialist = specialistOfStep(state.run, group, step);
   if (!specialist) throw new Error(`specialist ${step.specialist} does not exist`);
   const previousOfStep = group.attempts.filter((attempt) => attempt.stepId === step.id);
   const resumeSession = pending.resume

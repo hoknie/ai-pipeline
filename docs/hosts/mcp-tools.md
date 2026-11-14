@@ -10,7 +10,7 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 
 | Tool | Parameters | What it does |
 |---|---|---|
-| `swarm_run` | `pipeline`, `task` or `groups[{title, task}]`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `repo?` | Puts a task at the end of the repository's queue and starts a stopped queue. The answer is `{item, run, queue}`. `run` is the created run, or `null` if the task waits |
+| `swarm_run` | `pipeline`, `task` or `groups[{title, task}]`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `repo?` | Puts a task at the end of the repository's queue and starts a stopped queue. The answer is `{item, run, queue}`. `run` is the created run, or `null` if the task waits |
 | `swarm_status` | `run_id?` | Without `run_id`, the active runs and the 10 latest; with `run_id`, the table of groups |
 | `swarm_group` | `run_id`, `group`, `tail_lines?` | Step attempts, verdicts, remarks, tokens and the tail of the log |
 | `swarm_cancel` | `run_id`, `group?` | Stops a group or a whole run |
@@ -20,7 +20,7 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 | `swarm_apply` | `run_id`, `groups?`, `force?` | Delivers ready groups (the command is `aip run apply`) |
 | `swarm_mark_delivered` | `run_id`, `groups?` | Marks merged groups as delivered when you merged them by hand (the command is `aip run mark-delivered`) |
 | `swarm_queue` | `repo?` | The queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order with their readiness and predecessors, and the runs that hold a place |
-| `swarm_queue_add` | `pipeline`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
+| `swarm_queue_add` | `pipeline`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
 | `swarm_queue_edit` | `item`, `pipeline?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes a waiting task or moves it (1 is first). `deliveryMode: null` follows the config again. `after` and `skip` replace the list, `[]` clears it. A returned run's task takes only `skip` (applied to it), `after`, `position` |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
@@ -45,7 +45,7 @@ Specialists inside a run get their own MCP server (`aip mcp --worker`) with othe
 | `swarm_artifact` | Every step | Publishes a file of the step as an [artifact](../usage/runs.md#artifacts): `file_name`, `title?`, and `content` or `path` |
 | `swarm_run_show` | Every step | Reads a run of the same repository without changing it: `run` (id, task number `#333` or a panel link `…#runs/<id>[/<group>]`), `group?`, `tail_lines?` |
 | `swarm_split` | The split step | Proposes the [groups](../configuration/pipelines.md#split) of a task |
-| `swarm_queue_add` | A specialist with [`queue: true`](../configuration/specialists.md#queueing-tasks) | Puts a task in the queue of the run's repository: `pipeline`, `task` or `groups`, `title?`, `deliveryMode?`, `skip?`, `after?` |
+| `swarm_queue_add` | A specialist with [`queue: true`](../configuration/specialists.md#queueing-tasks) | Puts a task in the queue of the run's repository: `pipeline`, `task` or `groups`, `title?`, `deliveryMode?`, `variant?`, `skip?`, `after?` |
 
 `swarm_run_show` shows only runs of the repository the specialist's run belongs to; any other run is refused. Without a group it returns the run overview and the full task of every group, with a group (from the parameter or from the link) every attempt of the group and the tail of its latest log.
 

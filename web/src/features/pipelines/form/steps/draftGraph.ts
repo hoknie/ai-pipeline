@@ -47,6 +47,8 @@ export interface CanvasNodeData extends Record<string, unknown> {
   locked: boolean;
   /** The key of a step node. */
   key: number | null;
+  /** The variant shown skips the step. */
+  skipped?: boolean;
   point: ActionPoint | null;
   /** The number of actions of a point; `null` while the inherited list is unknown. */
   count: number | null;
@@ -96,6 +98,8 @@ export interface GraphContext {
   specialistName?: (slug: string) => string;
   /** Whether steps can be added, moved and linked. */
   editable: boolean;
+  /** Keys of the steps the shown variant skips. */
+  skipped?: ReadonlySet<number>;
 }
 
 export const stepNodeId = (key: number): string => `${STEP_NODE_PREFIX}${key}`;
@@ -180,6 +184,7 @@ function chainOf(draft: Draft, context: GraphContext, marked: Set<string>): Canv
           title: context.ids[index] ?? '',
           ...whoOf(context, step.specialist),
           error: marked.has(stepNodeId(step.key)),
+          ...(context.skipped?.has(step.key) ? { skipped: true } : {}),
         }),
       );
       const last = nodes[nodes.length - 1] as CanvasNode;

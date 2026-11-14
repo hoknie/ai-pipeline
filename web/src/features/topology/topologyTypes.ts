@@ -29,6 +29,8 @@ export interface StageData extends Record<string, unknown> {
   active: boolean;
   /** Step id, for steps. */
   step: string | null;
+  /** The variant shown skips the step. */
+  skipped?: boolean;
   /** Slug of the specialist of the node; null for nodes without one. */
   specialist: string | null;
   busy: Busy | null;

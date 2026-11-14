@@ -591,3 +591,67 @@ describe('cli', () => {
     await client.close();
   });
 });
+
+describe('cli variants', () => {
+  const VARIANT_CONFIG = `${MANUAL_CONFIG.trimEnd()}
+`.replace(
+    '        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }\n',
+    `        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }
+      variants:
+        light: { skip: [review] }
+`,
+  );
+
+  it('adds a task with a variant and marks it in the queue list', async () => {
+    const box = sandbox(VARIANT_CONFIG);
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'Поправить опечатку',
+      '--variant',
+      'light',
+    );
+    expect(added.code).toBe(0);
+    const list = await aip(box, 'queue', 'list');
+    expect(list.stdout).toContain('variant: light');
+    const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      items: { variant: string; variantName: string }[];
+    };
+    expect(json.items[0]).toMatchObject({ variant: 'light', variantName: 'light' });
+    const item = (json.items[0] as unknown as { id: string }).id;
+    const edited = await aip(box, 'queue', 'edit', item, '--variant', 'default');
+    expect(edited.code).toBe(0);
+    expect((await aip(box, 'queue', 'list')).stdout).not.toContain('variant:');
+  });
+
+  it('fails with code 1 naming an unknown variant', async () => {
+    const box = sandbox(VARIANT_CONFIG);
+    const result = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--variant', 'nope');
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('unknown variant `nope` of pipeline `feature`');
+    expect(result.stderr).toContain('known: default, light');
+  });
+
+  it('shows pipeline:variant in the run table', async () => {
+    const box = sandbox(VARIANT_CONFIG);
+    const started = await aip(
+      box,
+      'run',
+      'start',
+      'feature',
+      '--task',
+      'легко',
+      '--variant',
+      'light',
+    );
+    expect(started.code).toBe(0);
+    const list = await waitValue('the run in the table', async () => {
+      const result = await aip(box, 'run', 'list');
+      return result.stdout.includes('feature:light') ? result : null;
+    });
+    expect(list.stdout).toContain('feature:light');
+  });
+});

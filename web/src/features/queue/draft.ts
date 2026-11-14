@@ -1,10 +1,12 @@
 import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
 import type { QueueFields } from '../../shared/api/types.ts';
-import { pruneSkip } from './SkipSteps.tsx';
+import { pruneSkip } from '../../shared/ui/forms/picker/SkipSteps.tsx';
 
 /** What the user has typed into a task form; kept outside the form so updates do not erase it. */
 export interface QueueDraft {
   pipeline: string;
+  /** Id of the chosen variant of the pipeline; `default` is the pipeline as it is. */
+  variant: string;
   mode: 'task' | 'groups';
   task: string;
   groups: { title: string; task: string }[];
@@ -43,6 +45,7 @@ export function stepsOf(pipeline: { steps: { id: string; name?: string }[] } | u
 export function emptyDraft(pipeline = ''): QueueDraft {
   return {
     pipeline,
+    variant: 'default',
     mode: 'task',
     task: '',
     groups: [{ title: '', task: '' }],
@@ -61,6 +64,7 @@ export function emptyDraft(pipeline = ''): QueueDraft {
 /** The draft of an existing item, for editing. */
 export function draftOf(item: {
   pipeline: string;
+  variant?: string;
   task: string | null;
   groups: { title: string; task: string }[] | null;
   title: string | null;
@@ -72,6 +76,7 @@ export function draftOf(item: {
 }): QueueDraft {
   return {
     pipeline: item.pipeline,
+    variant: item.variant ?? 'default',
     mode: item.groups ? 'groups' : 'task',
     task: item.task ?? '',
     groups: item.groups ? item.groups.map((group) => ({ ...group })) : [{ title: '', task: '' }],
@@ -97,13 +102,16 @@ export function retarget(
   draft: QueueDraft,
   pipelineIds: readonly string[],
   stepIdsOf: (pipeline: string) => string[],
+  variantIdsOf: (pipeline: string) => string[] = () => [],
 ): QueueDraft {
   const pipeline = pipelineIds.includes(draft.pipeline)
     ? draft.pipeline
     : (pipelineIds[0] ?? draft.pipeline);
+  const variants = variantIdsOf(pipeline);
   return {
     ...draft,
     pipeline,
+    variant: variants.includes(draft.variant) ? draft.variant : 'default',
     after: [],
     afterTouched: false,
     parent: null,
@@ -145,6 +153,7 @@ export function fieldsOf(
   const tags = draft.tags.flatMap((id) => tagName(id) ?? []);
   return {
     pipeline: draft.pipeline,
+    ...(allTags || draft.variant !== 'default' ? { variant: draft.variant } : {}),
     ...(draft.mode === 'task'
       ? { task: draft.task.trim() || title }
       : {

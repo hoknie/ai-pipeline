@@ -235,6 +235,24 @@ describe('cli', () => {
     expect(result.stdout).toMatch(/stages:\n\s+before_delivery:\n\s+- lint/);
   });
 
+  it('prints the variants of a pipeline in aip config check, and nothing for a pipeline without', async () => {
+    const plain = await aip(sandbox(), 'config', 'check');
+    expect(plain.stdout).not.toContain('variants:');
+    const box = sandbox(
+      `${PIPELINE_CONFIG}      variants:
+        light:
+          skip: [review]
+          steps:
+            code: { model: haiku }
+`,
+    );
+    const result = await aip(box, 'config', 'check');
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(
+      /variants:\n\s+light:\n\s+skip:\n\s+- review\n\s+steps:\n\s+code:\n\s+model: haiku/,
+    );
+  });
+
   it('prints a multi-line script of an action as a string in aip config check', async () => {
     const box = sandbox(
       PIPELINE_CONFIG.replace(

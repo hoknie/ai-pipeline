@@ -25,6 +25,10 @@ export interface QueueItemView {
   pipeline: string;
   /** Display name of the pipeline in the current configuration. */
   pipelineName: string;
+  /** Id of the pipeline variant; `default` for the pipeline as it is. */
+  variant: string;
+  /** Name of the variant in the current configuration; the id without a name. */
+  variantName: string;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -70,6 +74,8 @@ export interface QueueRunView {
   state: RunPhase;
   pipeline: string;
   pipelineName: string;
+  variant: string;
+  variantName: string;
   tags: TagView[];
   createdAt: number;
   /** Work groups in a final status out of all work groups; `total` is 0 while the task is split. */

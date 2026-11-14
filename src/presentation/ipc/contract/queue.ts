@@ -7,6 +7,7 @@ import {
   proposedGroupSchema,
   skipSteps,
   tagNames,
+  variantId,
 } from './runs.ts';
 import { z } from 'zod';
 
@@ -22,6 +23,7 @@ const queueAddParams = z
   .object({
     repository: queueRepository,
     pipeline: z.string().min(1),
+    variant: variantId.optional(),
     task: queueTask.optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
@@ -42,6 +44,7 @@ export const workerQueueAddParams = z
   .object({
     token: z.string().min(1),
     pipeline: z.string().min(1),
+    variant: variantId.optional(),
     task: queueTask.optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.optional(),
@@ -59,6 +62,7 @@ const queueEditParams = z
     repository: queueRepository,
     item: queueItem,
     pipeline: z.string().min(1).optional(),
+    variant: variantId.optional(),
     task: queueTask.optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: queueTitle.nullable().optional(),

@@ -162,6 +162,20 @@ When an agent (`claude`) runs out of its subscription limit, the step stops with
 
 A [down network](../configuration/network.md) does not stop the queue: its runs start and their groups wait, shown as `(waiting for network)` in `aip queue list`.
 
+## Variants
+
+```
+aip queue add feature --task "Fix a typo" --variant light   # the variant light of the pipeline feature
+aip queue edit <item> --variant strong
+```
+
+`--variant <id>` (also on `aip run start`, MCP `variant`) picks a [variant of the pipeline](../configuration/pipelines.md#variants). Without it the task gets `default`, the pipeline as it is. `aip queue list` shows `variant: light`.
+
+- An unknown variant is refused with the list of the known ones, `default` first. Changing the pipeline of a task without `--variant` checks the task's variant against the new pipeline.
+- The steps the variant skips and the `--skip` of the task are added together. The task keeps its own `skip` apart, and the result is checked like any [skip](#skipping-steps): it cannot leave no steps.
+- A variant removed before the task starts gives the task an error; the queue stops and the run is not created.
+- The variant of a returned run cannot be changed.
+
 ## Skipping steps
 
 ```

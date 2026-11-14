@@ -24,6 +24,7 @@ export interface QueueTaskOptions {
   parent?: string | false;
   after?: string[];
   skip?: string[];
+  variant?: string;
   task?: string;
   groups?: string;
   title?: string;

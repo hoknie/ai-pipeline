@@ -7,6 +7,7 @@ import {
   connectReturn,
   insertStep,
   moveStep,
+  patchStep,
   removeStep,
   setReturn,
   stepKeyOfNode,
@@ -418,5 +419,55 @@ describe('POINT_SECTION', () => {
       expect(own).toHaveLength(1);
       expect(own[0]?.section).toBe(POINT_SECTION[point]);
     }
+  });
+});
+
+describe('variants follow the steps', () => {
+  const variantsOf = (draft: Draft) => valueOf(draft).variants;
+  const twoCoders = {
+    steps: [
+      { id: 'coder', specialist: 'coder' },
+      { id: 'coder-2', specialist: 'coder' },
+    ],
+    variants: { strong: { steps: { 'coder-2': { model: 'opus' } } } },
+  };
+
+  it('writes the override under the new id after the specialist of the step changes', () => {
+    const draft = draftOf({
+      steps: [{ id: 'coder', specialist: 'coder' }],
+      variants: { strong: { steps: { coder: { model: 'opus' } } } },
+    });
+    const next = patchStep(draft, draft.steps[0]!.key, { specialist: 'writer' });
+    expect(variantsOf(next)).toEqual({ strong: { steps: { writer: { model: 'opus' } } } });
+  });
+
+  it('keeps the override on the same step when two steps of a specialist swap', () => {
+    const draft = draftOf(twoCoders);
+    const next = moveStep(draft, draft.steps[1]!.key, 0);
+    expect(variantsOf(next)).toEqual({ strong: { steps: { coder: { model: 'opus' } } } });
+  });
+
+  it('keeps the override of the second step when the first of two coders is removed', () => {
+    const draft = draftOf(twoCoders);
+    const next = removeStep(draft, draft.steps[0]!.key);
+    expect(variantsOf(next)).toEqual({ strong: { steps: { coder: { model: 'opus' } } } });
+  });
+
+  it('drops the skip and the override of a removed step from every variant', () => {
+    const draft = draftOf({
+      steps: [
+        { id: 'code', specialist: 'coder' },
+        { id: 'review', specialist: 'reviewer' },
+      ],
+      variants: {
+        light: { skip: ['review'] },
+        deep: { steps: { review: { model: 'opus' }, code: { model: 'sonnet' } } },
+      },
+    });
+    const next = removeStep(draft, draft.steps[1]!.key);
+    expect(variantsOf(next)).toEqual({
+      light: {},
+      deep: { steps: { code: { model: 'sonnet' } } },
+    });
   });
 });

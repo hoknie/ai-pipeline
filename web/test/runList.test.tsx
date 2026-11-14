@@ -36,6 +36,16 @@ function show(run: ReturnType<typeof runView>, props: Props = {}) {
   return screen.getAllByRole('button', { name: /./ })[0]!;
 }
 
+describe('the variant badge', () => {
+  it('is on a run with a variant and absent on default', () => {
+    show(runView({ variant: 'light', variantName: 'Лёгкий' }));
+    expect(screen.getByLabelText('Variant: Лёгкий (light)')).toBeTruthy();
+    cleanup();
+    show(runView());
+    expect(screen.queryByLabelText(/^Variant:/)).toBeNull();
+  });
+});
+
 const full = () =>
   runView({
     number: 7,

@@ -6,6 +6,7 @@ These sections show and edit the [specialists](../configuration/specialists.md) 
 
 The list shows the pipelines of the repository with the number of active runs. The graph shows the steps with specialist, runtime, model and permissions, the split, the merge, the delivery and the resolver.
 
+- A pipeline with [variants](../configuration/pipelines.md) has a choice of the variant above the graph, with the number of active runs of each. The graph then shows the steps of that variant (skipped ones marked) and only the groups of its runs. The address is `#pipelines/topology/<id>/<variant>`; an unknown variant falls back to `default`.
 - Dashed arcs are `on_reject` returns with their round limit.
 - The groups of active runs sit at their current step. A click on a group opens it in "Runs".
 - A node whose specialist has a limit shows "busy N of M · in other runs: K". It is highlighted when the limit is reached.
@@ -58,6 +59,10 @@ The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Sha
 - The "Task split" switch turns on the split block. Its "Group steps" choice is "Own steps" or the id of another pipeline, which is [`split.pipeline`](../configuration/pipelines.md#groups-that-follow-another-pipelines-steps). When a target is chosen, the step list is hidden and a link to the target's form takes its place.
 - The field "Tags" holds the labels of the project file; tags of the shared file are shown as chips with a "Shared" mark.
 - "Diagram" is a visual editor of the same draft, in the manner of the visual editors of issue trackers. It shows all the stages that "Topology" does, with sections, performers and conditions; a click on a system stage (merge, delivery, commit message, resolver, cleanup) opens its description.
+- Above the form is a switcher: `default`, the variants of the pipeline and "Add variant".
+- A variant has an id (not `default`), a name, the steps it skips and, per step and for the split, only what it changes: specialist, runtime, model, reasoning effort, model variant, runtime chain, the additional prompt (as in the pipeline, own text or removed). Fields left alone are not written.
+- A variant follows its steps, not their ids: reordering steps or changing a specialist keeps the overrides on the same steps; deleting a step removes its overrides. With `split.pipeline` a variant has no steps or skip.
+- "Diagram" for a chosen variant is read only: it shows the specialists the variant applies and marks the skipped steps. The list shows the variants other than `default` as badges under the name. A shared pipeline is edited with its variants in Settings; the project page only shows them.
 - The block "Actions at the points of the pipeline" lists the actions that run at each point. A point without a list of its own shows the inherited one with an "inherited" mark; an empty list turns the point off.
 - A shared pipeline opens for viewing only. "Override in the project" copies it into the project; "Edit in Settings" leads to `#settings/global/pipelines/<id>`. A new pipeline is always a project one.
 - Running runs continue from their snapshot after the pipeline is deleted. A new run of a deleted pipeline is rejected.

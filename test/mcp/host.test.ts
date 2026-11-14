@@ -29,6 +29,8 @@ const VIEW: QueueView & { item: string } = {
       number: 1,
       position: 1,
       pipeline: 'feature',
+      variant: 'default',
+      variantName: 'default',
       pipelineName: 'feature',
       task: 'Сделать вход',
       groups: null,
@@ -124,6 +126,32 @@ describe('host MCP parent of a task', () => {
     const text = textOf(await client.callTool({ name: 'swarm_status', arguments: {} }));
     expect(text).toContain('#cards-half-width→#115');
     expect(text).toContain('"number": 115');
+  });
+
+  it('passes variant of swarm_run and swarm_queue_add', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', variant: 'light' },
+    });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { pipeline: 'feature', task: 'x', variant: 'light' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', pipeline: 'feature', variant: 'light', task: 'x' },
+      },
+      {
+        method: 'run',
+        params: { repository: '/repo', pipeline: 'feature', variant: 'light', task: 'x' },
+      },
+    ]);
   });
 
   it('reports an unknown parent as a tool error', async () => {
@@ -778,7 +806,13 @@ describe('host MCP texts', () => {
       expect(text, name).toContain('failed');
       expect(text, name).not.toContain('\x1b[');
       expect(text, name).not.toMatch(/[✓✗?▸◦⊘] /);
+      expect(text, name).not.toMatch(/^→ /m);
     }
+    const detail = textOf(
+      await client.callTool({ name: 'swarm_status', arguments: { run_id: runs.id } }),
+    );
+    expect(detail).toMatch(/^Steps: .*\[active\]/m);
+    expect(detail).toMatch(/^Progress: \d+\/\d+ steps/m);
   });
 });
 

@@ -10,6 +10,7 @@ import {
 } from './validate-context.ts';
 import { checkPipelines, checkSplitTargets } from './validate-pipelines.ts';
 import { checkChains, checkRuntimes } from './validate-runtimes.ts';
+import { checkVariantTargets } from './sections/variants.ts';
 import {
   checkClaude,
   checkDefaults,
@@ -229,6 +230,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   if ('pipelines' in swarm) {
     config.pipelines = checkPipelines(ctx, swarm.pipelines, knownSpecialists, actionPoints);
     checkSplitTargets(ctx, config.pipelines);
+    checkVariantTargets(ctx, config);
   }
   return config;
 }

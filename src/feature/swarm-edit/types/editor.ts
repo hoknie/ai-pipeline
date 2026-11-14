@@ -44,6 +44,8 @@ export interface EntryReference {
   pipeline?: string;
   step?: string;
   split?: boolean;
+  /** Id of the variant of the pipeline whose override of the step or split is the reference. */
+  variant?: string;
   /** Id of an action (`actions/<id>.yaml`) that runs the specialist. */
   action?: string;
   /** Specialist that references the chain. */

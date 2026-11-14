@@ -3,6 +3,7 @@ import {
   type ResolvedConfig,
   findPipeline,
   groupPipeline,
+  skipProblem,
 } from '../../swarm-config/types/index.ts';
 import { type Group, stepsOf } from './group.ts';
 import { type Run, type RunState, runPipeline } from './run.ts';
@@ -24,21 +25,7 @@ export function checkSkip(
   const pipeline = findPipeline(config, pipelineId);
   if (!pipeline) return `unknown pipeline \`${pipelineId}\``;
   const steps = groupPipeline(config, pipeline).steps;
-  const ids = steps.map((step) => step.id);
-  for (const id of wanted) {
-    if (!ids.includes(id)) {
-      return `unknown step \`${id}\` in skip; steps: ${ids.join(', ')}`;
-    }
-  }
-  const left = steps.filter((step) => !wanted.includes(step.id));
-  if (left.length === 0) return 'skip leaves no steps';
-  for (const step of left) {
-    const goto = step.onReject?.goto;
-    if (goto !== undefined && wanted.includes(goto)) {
-      return `step \`${step.id}\` returns to skipped step \`${goto}\``;
-    }
-  }
-  return null;
+  return skipProblem(steps, wanted);
 }
 
 /** A copy of the configuration without the skipped steps in the pipeline the groups follow. */

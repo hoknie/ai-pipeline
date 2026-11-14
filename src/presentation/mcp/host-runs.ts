@@ -8,7 +8,7 @@ import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
 
 export function registerRun(kit: HostKit): void {
-  const { options, server, tags, parent, skip, after, repo } = kit;
+  const { options, server, tags, parent, variant, skip, after, repo } = kit;
   server.registerTool(
     'swarm_run',
     {
@@ -41,12 +41,14 @@ export function registerRun(kit: HostKit): void {
           ),
         tags,
         parent,
+        variant,
         skip,
         after,
       },
     },
     ({
       pipeline,
+      variant: variantId,
       task,
       groups,
       repo,
@@ -62,6 +64,7 @@ export function registerRun(kit: HostKit): void {
         const queued = (await options.send('run', {
           repository: repo === undefined ? options.cwd : repositoryArgument(repo, options.cwd),
           pipeline,
+          ...(variantId !== undefined ? { variant: variantId } : {}),
           ...(task !== undefined ? { task } : {}),
           ...(groups !== undefined ? { groups } : {}),
           ...(title !== undefined ? { title } : {}),

@@ -21,6 +21,7 @@ import { PREVIEW_DELAY_MS } from './editorState.ts';
 import { PipelineButtons } from './PipelineButtons.tsx';
 import { LevelHint, PipelineNotices } from './PipelineNotices.tsx';
 import { UsageBlock, type SharedPipelineOnly } from './PipelineUsage.tsx';
+import { hasDuplicateIds } from './variants/variantDraft.ts';
 import { draftOf, isNameError, isTagsError, stepOfError, valueOf } from './steps/draft.ts';
 import { SpecialistNames } from './steps/SpecialistNames.ts';
 import { usePipelineEditor } from './usePipelineEditor.ts';
@@ -44,7 +45,16 @@ interface PipelineFormProps {
 }
 
 /** The errors of the preview or of a write, by the part of the form they belong to. */
-function errorsByPlace(errors: FieldError[], id: string, hasSplit: boolean) {
+function errorsByPlace(
+  errors: FieldError[],
+  id: string,
+  hasSplit: boolean,
+  variantId: string | null,
+) {
+  const inVariant = (error: FieldError) =>
+    variantId !== null &&
+    (error.path === `swarm.pipelines.${id}.variants.${variantId}` ||
+      error.path.startsWith(`swarm.pipelines.${id}.variants.${variantId}.`));
   const place = (error: FieldError) => stepOfError(error.path, id, hasSplit);
   return {
     split: errors.filter((error) => place(error).split),
@@ -56,7 +66,8 @@ function errorsByPlace(errors: FieldError[], id: string, hasSplit: boolean) {
         at.step === null &&
         !at.split &&
         !isNameError(error.path, id) &&
-        !isTagsError(error.path, id)
+        !isTagsError(error.path, id) &&
+        !inVariant(error)
       );
     }),
   };
@@ -150,7 +161,8 @@ export function PipelineForm(props: PipelineFormProps) {
   const editor = usePipelineEditor(props);
   const { level, draft, id, busy, readOnly, source, sources } = editor;
   const disabled = readOnly || busy;
-  const places = errorsByPlace(editor.errors, id, draft.split !== null);
+  const shown = draft.variants.find((variant) => variant.key === editor.variant) ?? null;
+  const places = errorsByPlace(editor.errors, id, draft.split !== null, shown?.id ?? null);
   const copyOnly = pipeline !== null && !sharedOnly;
   const names = useMemo(() => specialistNames(view.specialists), [view.specialists]);
   return (
@@ -195,7 +207,7 @@ export function PipelineForm(props: PipelineFormProps) {
           pipeline={pipeline}
           readOnly={readOnly}
           busy={busy}
-          canSave={Boolean(pipeline) || editor.newId !== ''}
+          canSave={(Boolean(pipeline) || editor.newId !== '') && !hasDuplicateIds(draft.variants)}
           overrideInProject={copyOnly && Boolean(sources.global) && !sources.project}
           makeGlobal={pipeline !== null && Boolean(sources.project) && !sources.global && !readOnly}
           canRemove={Boolean(pipeline && source) && !readOnly}

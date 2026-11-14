@@ -10,6 +10,7 @@ import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { CommandGroup, CommandItem } from '../../../shared/ui/overlays/command.tsx';
 import { orderGroups } from '../../../shared/lib/order.ts';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
+import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import { rawName } from '../../../shared/lib/pipeline/pipelineName.ts';
 
 export interface Entries {
@@ -59,6 +60,7 @@ export function RunsGroup({ go, runs }: { go: Go; runs: RunView[] }) {
           </span>
           <span className="ml-auto flex items-center gap-2">
             <PipelineBadge id={run.pipeline} name={run.pipelineName} focusable={false} />
+            <VariantBadge id={run.variant} name={run.variantName} focusable={false} />
             <span className="text-xs text-muted-foreground">{runStatusLabel(run, t)}</span>
           </span>
         </CommandItem>

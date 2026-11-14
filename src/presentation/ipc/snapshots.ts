@@ -61,6 +61,7 @@ export class Snapshots {
       delivery.mode,
       runs.engine.waitOf,
       delivery.names,
+      delivery.variantNames,
     );
   }
 

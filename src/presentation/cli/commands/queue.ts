@@ -35,6 +35,10 @@ function queueKit(program: Command, io: CliIo, style: Style) {
         '--parent <run>',
         'run id or task number (161 or #161) whose linked task tag the task gets',
       )
+      .option(
+        '--variant <id>',
+        'variant of the pipeline (other models, specialists or skipped steps); default: the pipeline as it is',
+      )
       .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
       .option(
         '--after <id>',
@@ -112,6 +116,7 @@ function addAdd(kit: QueueKit): void {
         ...(deliveryMode !== undefined ? { deliveryMode } : {}),
         ...(options.tag !== undefined ? { tags: options.tag } : {}),
         ...(typeof options.parent === 'string' ? { parent: options.parent } : {}),
+        ...(options.variant !== undefined ? { variant: options.variant } : {}),
         ...(options.skip !== undefined ? { skip: options.skip } : {}),
         ...(options.after !== undefined ? { after: options.after } : {}),
         ...(options.postpone ? { postponed: true } : {}),

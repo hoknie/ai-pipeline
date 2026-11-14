@@ -84,6 +84,7 @@ function useDraftGraph(
   editor: ReturnType<typeof usePipelineEditor>,
   view: ConfigEditorResponse,
   editable: boolean,
+  skipped: ReadonlySet<number> | undefined,
 ) {
   const { draft, errors, id } = editor;
   const topology = editor.preview.topology;
@@ -101,10 +102,11 @@ function useDraftGraph(
         stages: previewStages,
         errors,
         editable,
+        ...(skipped ? { skipped } : {}),
       }),
     // the preview stages come from the topology, the follow steps from the view
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, ids, id, errors, editable, view, topology, names],
+    [draft, ids, id, errors, editable, view, topology, names, skipped],
   );
   return { ids, previewStages, graph };
 }
@@ -169,8 +171,9 @@ export function useCanvasGraph(
   repository: string,
   editable: boolean,
   selection: Selection | null,
+  skipped?: ReadonlySet<number>,
 ) {
-  const { ids, previewStages, graph } = useDraftGraph(editor, view, editable);
+  const { ids, previewStages, graph } = useDraftGraph(editor, view, editable, skipped);
   const layout = useCanvasLayout(repository, editor.id, graph.nodes);
   const ends = useMemo(() => endsOf(selection, graph.edges), [selection, graph.edges]);
   const { nodes, onNodesChange } = useCanvasNodes(

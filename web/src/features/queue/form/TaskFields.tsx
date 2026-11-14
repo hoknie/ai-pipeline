@@ -15,7 +15,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
 import type { PipelinesView } from '../../../shared/api/types.ts';
 import { TITLE_LIMIT, stepsOf, type QueueDraft } from '../draft.ts';
-import { pruneSkip } from '../SkipSteps.tsx';
+import { pruneSkip } from '../../../shared/ui/forms/picker/SkipSteps.tsx';
 
 export type FormState = {
   idPrefix: string;
@@ -97,6 +97,7 @@ function PipelineSelect({
         onValueChange={(pipeline) =>
           change({
             pipeline,
+            variant: 'default',
             skip: pruneSkip(
               effective.skip,
               stepsOf(pipelines?.pipelines.find((candidate) => candidate.id === pipeline)).map(
@@ -131,6 +132,38 @@ function PipelineSelect({
   );
 }
 
+function VariantSelect({
+  state,
+  pipelines,
+}: {
+  state: FormState;
+  pipelines: PipelinesView | null;
+}) {
+  const { t } = useTranslation();
+  const { idPrefix, effective, change } = state;
+  const variants =
+    pipelines?.pipelines.find((candidate) => candidate.id === effective.pipeline)?.variants ?? [];
+  // A pipeline with only `default` has nothing to choose.
+  if (variants.length <= 1) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Label htmlFor={`${idPrefix}-variant`}>{t('queue.form.variant')}</Label>
+      <Select value={effective.variant} onValueChange={(variant) => change({ variant })}>
+        <SelectTrigger id={`${idPrefix}-variant`} className="w-48">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {variants.map((variant) => (
+            <SelectItem key={variant.id} value={variant.id}>
+              {variant.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 /** The left half of the form: repository, name, pipeline, and the text or the groups. */
 export function TaskFields(props: {
   state: FormState;
@@ -161,6 +194,7 @@ export function TaskFields(props: {
           />
         </div>
         <PipelineSelect state={state} pipelines={props.pipelines} options={props.options} />
+        <VariantSelect state={state} pipelines={props.pipelines} />
       </fieldset>
       {effective.mode === 'task' ? (
         <>

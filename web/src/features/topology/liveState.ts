@@ -30,6 +30,8 @@ export function liveState(
   pipeline: PipelineTopology,
   runs: RunView[],
   repository: string | null,
+  /** Only the runs of this variant; null: the runs of every variant. */
+  variant: string | null = null,
 ): Live {
   const live: Live = {
     steps: new Map(),
@@ -48,6 +50,7 @@ export function liveState(
   for (const run of runs) {
     if (run.finished || run.pipeline !== pipeline.id) continue;
     if (repository !== null && run.repository !== repository) continue;
+    if (variant !== null && (run.variant ?? 'default') !== variant) continue;
     live.runs += 1;
     live.runIds.push(run.id);
     const place = (group: { slug: string; title: string; status: string }): LiveGroup => ({

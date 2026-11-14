@@ -44,6 +44,7 @@ function itemRequest(queue: Queue, item: QueueItem): RunRequest {
   return {
     repository: queue.repository,
     pipeline: item.pipeline,
+    variant: item.variant,
     ...(item.task !== null ? { task: item.task } : {}),
     ...(item.groups !== null ? { groups: item.groups } : {}),
     ...(item.title !== null ? { title: item.title } : {}),

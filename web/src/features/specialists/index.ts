@@ -5,6 +5,7 @@ export {
   fieldOf,
   valueOf,
 } from './form/SpecialistFields.tsx';
+export { REASONING_EFFORTS, RUNTIMES } from './form/fieldInputs.tsx';
 export { SpecialistForm, describeReference } from './form/SpecialistForm.tsx';
 export { SpecialistTagChip } from './SpecialistTagChip.tsx';
 export { LEVEL_KEYS, NEW_ID } from './SpecialistsPage.tsx';

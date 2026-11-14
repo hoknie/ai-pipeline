@@ -36,7 +36,7 @@ describe('patch of a run', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5 - (4 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6 - (4 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.patches.runPatchIds()).toEqual([]);

@@ -26,7 +26,7 @@ import {
 } from '../src/features/queue/queueLinks.ts';
 import { parseParallel } from '../src/features/queue/QueuePage.tsx';
 import { draftOf, emptyDraft, fieldsOf } from '../src/features/queue/QueueForm.tsx';
-import { pruneSkip } from '../src/features/queue/SkipSteps.tsx';
+import { pruneSkip } from '../src/shared/ui/forms/picker/SkipSteps.tsx';
 import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
@@ -43,6 +43,7 @@ import {
   configView,
   settingsOf,
   pipelineOf,
+  variantOf,
   pipelinesView,
 } from './fixtures.ts';
 
@@ -1726,10 +1727,10 @@ describe('task form layout', () => {
     await openNewTask();
     fireEvent.click(screen.getByRole('combobox', { name: 'Waits for' }));
     const option = await screen.findByRole('option', { name: new RegExp(long) });
-    expect(option.querySelector(`[title="${long}"]`)).toBeTruthy();
+    expect(option.querySelector(`[title="#1 ${long}"]`)).toBeTruthy();
     fireEvent.click(option);
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
-    const chip = document.querySelector(`span.truncate[title="${long}"]`);
+    const chip = document.querySelector(`span.truncate[title="#1 ${long}"]`);
     expect(chip).toBeTruthy();
   });
 });
@@ -1754,7 +1755,7 @@ describe('dependencies in the form', () => {
     const api = show(queueOf({ items: [model(), apiItem()] }));
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
-    const chip = await screen.findByRole('button', { name: 'Remove Модель' });
+    const chip = await screen.findByRole('button', { name: 'Remove #1 Модель' });
     fireEvent.click(chip);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
@@ -1824,7 +1825,7 @@ describe('dependencies in the form', () => {
     const api = show(queueOf({ items: [failed] }));
     await screen.findByRole('list', { name: 'tasks in the queue' });
     await editRow('API');
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove Модель' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Remove (#\d+ )?Модель$/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
     expect((api.queueEdit as ReturnType<typeof vi.fn>).mock.calls[0]![1]).toMatchObject({
@@ -1838,7 +1839,7 @@ describe('dependencies in the form', () => {
     await editRow('API');
     const picker = await screen.findByRole('combobox', { name: 'Waits for' });
     await pick(picker, 'Модель');
-    expect(screen.getAllByRole('button', { name: 'Remove Модель' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Remove #1 Модель' })).toHaveLength(1);
     act(() => {
       stream().open();
       stream().send({
@@ -1847,7 +1848,7 @@ describe('dependencies in the form', () => {
         queue: queueOf({ items: [model(), queueItem('q2', 'api', 2, { title: 'API' })] }),
       });
     });
-    expect(screen.getAllByRole('button', { name: 'Remove Модель' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Remove #1 Модель' })).toHaveLength(1);
   });
 
   it('shows a cycle error at the form and keeps the choice', async () => {
@@ -1863,7 +1864,7 @@ describe('dependencies in the form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('dependency cycle: q1 -> q2 -> q1');
     expect(api.queueEdit).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Remove API' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove #2 API' })).toBeTruthy();
   });
 });
 
@@ -2698,6 +2699,61 @@ describe('two halves of the task form', () => {
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'small', task: 'T' }),
     );
+  });
+
+  describe('variants of the pipeline', () => {
+    const withVariants = pipelinesView({
+      pipelines: [
+        pipelineOf({
+          steps: ['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf),
+          variants: [
+            variantOf(['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf), 'default'),
+            variantOf(['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf), 'light', 'Лёгкий', [
+              'review',
+              'qa',
+            ]),
+          ],
+        }),
+        pipelineOf({ id: 'small', steps: ['code', 'review'].map(stepOf) }),
+      ],
+    });
+
+    it('chooses a variant, sends it and shows its steps pressed and locked', async () => {
+      const api = show(queueOf(), { pipelines: vi.fn(async () => withVariants) });
+      await openNewTask();
+      await skipStepAsync('plan');
+      fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Лёгкий' }));
+      await waitFor(() => expect(skipStep('review').disabled).toBe(true));
+      expect(skipStep('review').getAttribute('aria-pressed')).toBe('true');
+      expect(skipStep('qa').getAttribute('aria-pressed')).toBe('true');
+      expect(skipStep('plan').getAttribute('aria-pressed')).toBe('false');
+      fireEvent.click(skipStep('plan'));
+      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      // the task keeps only its own skip: the steps of the variant are not in it
+      await waitFor(() =>
+        expect(api.queueAdd).toHaveBeenCalledWith({
+          pipeline: 'feature',
+          variant: 'light',
+          task: 'T',
+          skip: ['plan'],
+        }),
+      );
+    });
+
+    it('resets the variant when the pipeline changes and has no field without variants', async () => {
+      show(queueOf(), { pipelines: vi.fn(async () => withVariants) });
+      await openNewTask();
+      await skipStepAsync('plan');
+      fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Лёгкий' }));
+      fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'small' }));
+      await waitFor(() => expect(within(skipGroup()).getAllByRole('button')).toHaveLength(2));
+      expect(screen.queryByRole('combobox', { name: 'Variant' })).toBeNull();
+      expect(skipStep('review').disabled).toBe(false);
+    });
   });
 
   it('shows the skipped steps of an item and edits them', async () => {

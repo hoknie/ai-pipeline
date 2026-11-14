@@ -88,8 +88,8 @@ export class QueueRepository {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number, variant)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -110,6 +110,7 @@ export class QueueRepository {
           item.run,
           item.postponed ? 1 : 0,
           item.number,
+          item.variant,
         ),
       );
     });
@@ -165,6 +166,7 @@ function hydrateItem(item: Row): QueueItem {
     id: String(item.id),
     number: Number(item.number),
     pipeline: String(item.pipeline),
+    variant: item.variant === null || item.variant === undefined ? 'default' : String(item.variant),
     task: text(item.task ?? null),
     groups: nullable(item.groups_json ?? null),
     title: text(item.title ?? null),

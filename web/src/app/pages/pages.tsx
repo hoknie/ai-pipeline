@@ -160,7 +160,10 @@ export function ListRoute({ common }: { common: Common }) {
           runs={common.runs}
           selected={route.run}
           section={route.group}
-          onSelect={(id, section = null) => onRoute(to('pipelines', id, section))}
+          variant={route.step}
+          onSelect={(id, section = null, variant = null) =>
+            onRoute({ ...to('pipelines', id, section), step: variant })
+          }
           onOpenGroup={(target, step) =>
             onRoute({ ...to('runs', target.runId, target.slug), step })
           }

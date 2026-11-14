@@ -162,6 +162,18 @@ describe('freezing for a priority run', () => {
     expect(await h.call('tags', { repository: h.repo })).toEqual(catalog);
   });
 
+  it('refuses to change the variant of a returned run, even an unknown one', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
+    await h.call('queue_return', { runId: a });
+    const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
+    for (const variant of ['light', 'fast', 'default']) {
+      await expect(
+        h.call('queue_edit', { repository: h.repo, item: item.id, variant }),
+      ).rejects.toThrow('a returned run keeps its own task');
+    }
+  });
+
   it('skips a step of a returned run through its queue item and keeps its task', async () => {
     const h = await start(PIPELINE_CONFIG);
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });

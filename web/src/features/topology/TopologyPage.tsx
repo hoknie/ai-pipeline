@@ -8,6 +8,7 @@ import type { RunView, PipelinesView } from '../../shared/api/types.ts';
 
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
+import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 
 import { ConfigErrors, EntryList, SplitPage } from '../../shared/ui/layout/EntryList.tsx';
@@ -15,6 +16,7 @@ import { StatusBadge } from '../../shared/ui/feedback/StatusBadge.tsx';
 import { PipelineGraph } from './PipelineGraph.tsx';
 import { machineLoad } from '../../shared/lib/pipeline/specialistLoad.ts';
 import { liveState, type LiveGroup, type StageNode } from './topologyLayout.ts';
+import { useChosen, VariantChoice } from './VariantChoice.tsx';
 import { TopologyAside } from './TopologyAside.tsx';
 
 function liveCounts(
@@ -116,10 +118,73 @@ function usePipelinesView(api: Api): { view: PipelinesView | null; failure: stri
   return { view, failure };
 }
 
+/** The chosen pipeline: its header, the choice of the variant, the graph and the aside. */
+function PipelineSection({
+  pipeline,
+  base,
+  live,
+  runs,
+  view,
+  variantId,
+  selected,
+  onSelectNode,
+  onEdit,
+  onSelectVariant,
+  onOpenGroup,
+}: {
+  pipeline: PipelinesView['pipelines'][number];
+  base: PipelinesView['pipelines'][number] | null;
+  live: ReturnType<typeof liveState>;
+  runs: RunView[];
+  view: PipelinesView | null;
+  variantId: string;
+  selected: string | null;
+  onSelectNode: (id: string | null) => void;
+  onEdit: ((id: string) => void) | undefined;
+  onSelectVariant: ((variant: string | null) => void) | undefined;
+  onOpenGroup: (group: LiveGroup, step: string | null) => void;
+}) {
+  const load = useMemo(() => machineLoad(runs), [runs]);
+  const [nodes, setNodes] = useState<StageNode[]>([]);
+  const node = nodes.find((candidate) => candidate.id === selected) ?? null;
+  return (
+    <section aria-label={`pipeline ${pipeline.id}`} className="flex flex-col gap-3">
+      <PipelineHeader
+        pipeline={pipeline}
+        repository={view?.repository}
+        runs={live.runs}
+        onEdit={onEdit}
+      />
+      {base ? (
+        <VariantChoice
+          pipeline={base}
+          runs={runs}
+          repository={view?.repository ?? null}
+          selected={variantId}
+          onSelect={(next) => onSelectVariant?.(next === 'default' ? null : next)}
+        />
+      ) : null}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <PipelineGraph
+          pipeline={pipeline}
+          live={live}
+          load={load}
+          selected={selected}
+          onSelect={onSelectNode}
+          onNodes={setNodes}
+        />
+        <TopologyAside node={node} live={live} load={load} onOpenGroup={onOpenGroup} />
+      </div>
+    </section>
+  );
+}
+
 export default function TopologyPage({
   api,
   runs,
   pipeline: selectedId,
+  variant: variantInAddress = null,
+  onSelectVariant,
   onSelectPipeline,
   onEditPipeline,
   onOpenGroup,
@@ -127,6 +192,10 @@ export default function TopologyPage({
   api: Api;
   runs: RunView[];
   pipeline: string | null;
+  /** The variant of the address; null: `default`. */
+  variant?: string | null;
+  /** Chooses a variant; `null` for `default` and for a variant the pipeline does not have. */
+  onSelectVariant?: (variant: string | null) => void;
   onSelectPipeline: (id: string) => void;
   onEditPipeline?: (id: string) => void;
   onOpenGroup: (group: LiveGroup, step: string | null) => void;
@@ -135,19 +204,17 @@ export default function TopologyPage({
   const { view, failure } = usePipelinesView(api);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const pipeline =
-    view?.pipelines.find((candidate) => candidate.id === selectedId) ?? view?.pipelines[0] ?? null;
+  const { base, pipeline, variantId, live } = useChosen(
+    view,
+    runs,
+    selectedId,
+    variantInAddress,
+    onSelectVariant,
+  );
   const counts = useMemo(
     () => liveCounts(view?.pipelines ?? [], runs, view?.repository ?? null),
     [view, runs],
   );
-  const live = useMemo(
-    () => (pipeline ? liveState(pipeline, runs, view?.repository ?? null) : null),
-    [pipeline, runs, view],
-  );
-  const load = useMemo(() => machineLoad(runs), [runs]);
-  const [nodes, setNodes] = useState<StageNode[]>([]);
-  const node = nodes.find((candidate) => candidate.id === selected) ?? null;
 
   return (
     <SplitPage
@@ -174,25 +241,19 @@ export default function TopologyPage({
         {failure ? <Alert variant="destructive">{failure}</Alert> : null}
         {view ? <ConfigErrors errors={view.errors} /> : null}
         {pipeline && live ? (
-          <section aria-label={`pipeline ${pipeline.id}`} className="flex flex-col gap-3">
-            <PipelineHeader
-              pipeline={pipeline}
-              repository={view?.repository}
-              runs={live.runs}
-              onEdit={onEditPipeline}
-            />
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-              <PipelineGraph
-                pipeline={pipeline}
-                live={live}
-                load={load}
-                selected={selected}
-                onSelect={setSelected}
-                onNodes={setNodes}
-              />
-              <TopologyAside node={node} live={live} load={load} onOpenGroup={onOpenGroup} />
-            </div>
-          </section>
+          <PipelineSection
+            pipeline={pipeline}
+            base={base}
+            live={live}
+            runs={runs}
+            view={view}
+            variantId={variantId}
+            selected={selected}
+            onSelectNode={setSelected}
+            onEdit={onEditPipeline}
+            onSelectVariant={onSelectVariant}
+            onOpenGroup={onOpenGroup}
+          />
         ) : null}
       </div>
     </SplitPage>

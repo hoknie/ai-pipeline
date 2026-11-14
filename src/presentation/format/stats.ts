@@ -1,17 +1,9 @@
 import type { StatsReportView } from '../ipc/contract/index.ts';
 import { type Style, plainStyle } from './style.ts';
+import { formatCost, formatTokens } from './numbers.ts';
 import { addedAt, table } from './table.ts';
 
 type Breakdown = StatsReportView['bySpecialist'][number];
-
-/** `950`, `12.5k`, `3.2M`. */
-export function formatTokens(value: number): string {
-  const short = (amount: number, suffix: string): string =>
-    `${amount.toFixed(1).replace(/\.0$/, '')}${suffix}`;
-  if (value >= 1_000_000) return short(value / 1_000_000, 'M');
-  if (value >= 1000) return short(value / 1000, 'k');
-  return String(Math.round(value));
-}
 
 /** `1h 30m`, `45m`, `30s`. */
 export function formatSpan(milliseconds: number): string {
@@ -21,11 +13,6 @@ export function formatSpan(milliseconds: number): string {
   if (minutes < 60) return `${minutes}m`;
   const rest = minutes % 60;
   return rest === 0 ? `${Math.floor(minutes / 60)}h` : `${Math.floor(minutes / 60)}h ${rest}m`;
-}
-
-/** `$0.42`, or `—` when the cost is unknown or hidden. */
-export function formatCost(value: number | null): string {
-  return value === null ? '—' : `$${value.toFixed(2)}`;
 }
 
 function period(report: StatsReportView): string {

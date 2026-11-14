@@ -15,6 +15,7 @@ import { PipelineTagsInput } from './PipelineTagsInput.tsx';
 import { PointsInput } from './points/PointsInput.tsx';
 import { record } from './steps/draft.ts';
 import { withPoint, withSplit } from './steps/draftOps.ts';
+import { VariantPane } from './variants/VariantPane.tsx';
 import { SplitFieldset } from './steps/SplitFieldset.tsx';
 import { StepsList } from './steps/StepsList.tsx';
 import type { usePipelineEditor } from './usePipelineEditor.ts';
@@ -157,7 +158,7 @@ export function FormTab({
     draft.split?.pipeline ?? '',
   );
   return (
-    <>
+    <VariantPane editor={editor} view={view} options={options} disabled={disabled}>
       <NameField editor={editor} errors={places.name} disabled={disabled} />
       <PipelineTagsInput
         view={view}
@@ -204,6 +205,6 @@ export function FormTab({
         disabled={disabled}
         onPoint={(point, list) => setDraft((current) => withPoint(current, point, list))}
       />
-    </>
+    </VariantPane>
   );
 }

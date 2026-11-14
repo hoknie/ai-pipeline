@@ -8,6 +8,7 @@ const io: CliIo = {
   cwd: process.cwd(),
   env: process.env,
   isTTY: process.stdout.isTTY === true,
+  columns: process.stdout.isTTY === true ? process.stdout.columns : undefined,
   entry: [process.execPath, process.argv[1] ?? ''],
   pid: process.pid,
   stdout: (text) => void process.stdout.write(text),

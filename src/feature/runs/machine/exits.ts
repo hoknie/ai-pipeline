@@ -85,7 +85,12 @@ function failAttempt(
 ): void {
   attempt.status = 'failed';
   attempt.reason = failure;
-  const specialist = specialistOfStep(m.state.run, group, attempt.specialist);
+  const step = stepsOf(m.state.run, group)[attempt.stepIndex];
+  const specialist = specialistOfStep(
+    m.state.run,
+    group,
+    step ?? { specialist: attempt.specialist },
+  );
   const chain = specialist?.runtimeChain
     ? m.state.run.config.chains.find((c) => c.slug === specialist.runtimeChain)
     : undefined;

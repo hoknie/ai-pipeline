@@ -5,7 +5,11 @@ import {
   RUN_TITLE_LIMIT,
   cleanSkip,
 } from '../../runs/types/index.ts';
-import { type DeliveryMode, DELIVERY_MODES } from '../../swarm-config/types/index.ts';
+import {
+  type DeliveryMode,
+  DELIVERY_MODES,
+  DEFAULT_VARIANT,
+} from '../../swarm-config/types/index.ts';
 import { checkDependencies } from './dependencies.ts';
 import { type ItemFields, type Queue, type QueueItem, findItem } from './items.ts';
 
@@ -66,6 +70,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
     id,
     number: queue.nextNumber,
     pipeline: cleanPipeline(fields.pipeline),
+    variant: fields.variant ?? DEFAULT_VARIANT,
     ...cleanBody(fields),
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,
@@ -86,6 +91,7 @@ export function addItem(queue: Queue, fields: ItemFields, id: string, now: numbe
 
 export interface ItemPatch {
   pipeline?: string | undefined;
+  variant?: string | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;
@@ -124,6 +130,7 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
   if (after !== undefined) checkDependencies(queue, id, after);
   const deliveryMode = cleanDeliveryMode(patch.deliveryMode);
   if (pipeline !== null) item.pipeline = pipeline;
+  if (patch.variant !== undefined) item.variant = patch.variant;
   if (body) Object.assign(item, body);
   if (title !== undefined) item.title = title;
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;

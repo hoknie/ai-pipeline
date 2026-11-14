@@ -78,8 +78,16 @@ function FlowParts({ onArrange }: { onArrange: () => void }) {
 }
 
 /** The props of the flow that do not depend on the person's actions. */
-function flowProps(draft: Draft, setDraft: Editor['setDraft'], flow: Flow, editable: boolean) {
+function flowProps(
+  draft: Draft,
+  setDraft: Editor['setDraft'],
+  flow: Flow,
+  editable: boolean,
+  draggable: boolean,
+) {
   return {
+    nodesDraggable: draggable,
+    nodesConnectable: editable,
     nodes: flow.nodes,
     edges: flow.edges,
     nodeTypes: NODE_TYPES,
@@ -113,11 +121,14 @@ export function PipelineCanvas({
   view,
   sharedOnly,
   disabled,
+  skipped,
 }: {
   editor: Editor;
   view: ConfigEditorResponse;
   sharedOnly: boolean;
   disabled: boolean;
+  /** A variant is shown: its skipped steps are marked and nothing can be dragged or changed. */
+  skipped?: ReadonlySet<number>;
 }) {
   const { t } = useTranslation();
   const { resolved } = useTheme();
@@ -131,6 +142,7 @@ export function PipelineCanvas({
     sharedOnly ? 'global' : view.repository,
     editable,
     liveSelection(chosen, draft, stages),
+    skipped,
   );
   const selection = liveSelection(chosen, draft, stages, new Set(flow.edges.map((e) => e.id)));
   const { onAdd, onDragStop, onKeyDown, onReconnect } = useCanvasHandlers(
@@ -153,15 +165,13 @@ export function PipelineCanvas({
         <AddStepContext.Provider value={onAdd}>
           <ReactFlowProvider>
             <ReactFlow
-              {...flowProps(draft, setDraft, flow, editable)}
+              {...flowProps(draft, setDraft, flow, editable, skipped === undefined)}
               onNodeDragStop={onDragStop}
               onNodeClick={(_, clicked) => setChosen(selectionOfNode(clicked.id))}
               onReconnect={onReconnect}
               onEdgeClick={(_, clicked) => setChosen(selectionOfEdge(clicked.id))}
               onPaneClick={() => setChosen(null)}
               colorMode={resolved}
-              nodesDraggable
-              nodesConnectable={editable}
             >
               <FlowParts onArrange={flow.arrange} />
             </ReactFlow>

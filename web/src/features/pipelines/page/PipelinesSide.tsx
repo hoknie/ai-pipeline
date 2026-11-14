@@ -24,6 +24,7 @@ import {
   activePipelineFilterCount,
   applyPipelineFilter,
 } from '../pipelineFilters.ts';
+import { VariantBadges } from './VariantBadges.tsx';
 import { stageLevel } from '../SystemStagePage.tsx';
 import { FiltersPanel } from './FiltersControl.tsx';
 import type { PipelinesData } from './usePipelinesData.ts';
@@ -93,19 +94,23 @@ function PipelineList(props: {
           title: rawName(entry.raw) ?? entry.id,
           hint: entry.id,
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
-          extra:
-            tagsOfSpecialist(entry).length > 0 ? (
-              <span data-testid={`tags-${entry.id}`} className="flex flex-wrap gap-1">
-                {tagsOfSpecialist(entry).map((tag) => (
-                  <SpecialistTagChip
-                    key={tag.name}
-                    name={tag.name}
-                    shared={tag.shared}
-                    hint={t('pipelines.tagsSharedHint')}
-                  />
-                ))}
-              </span>
-            ) : undefined,
+          extra: (
+            <>
+              <VariantBadges id={entry.id} raw={entry.raw} />
+              {tagsOfSpecialist(entry).length > 0 ? (
+                <span data-testid={`tags-${entry.id}`} className="flex flex-wrap gap-1">
+                  {tagsOfSpecialist(entry).map((tag) => (
+                    <SpecialistTagChip
+                      key={tag.name}
+                      name={tag.name}
+                      shared={tag.shared}
+                      hint={t('pipelines.tagsSharedHint')}
+                    />
+                  ))}
+                </span>
+              ) : null}
+            </>
+          ),
         }))}
       />
     </>

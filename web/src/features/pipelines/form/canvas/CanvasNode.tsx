@@ -122,6 +122,7 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
       data-anchoring={data.anchoring ? 'true' : undefined}
       data-error={data.error ? 'true' : undefined}
       data-locked={data.locked ? 'true' : undefined}
+      data-skipped={data.skipped ? 'true' : undefined}
       data-conditional={data.condition !== null ? 'true' : undefined}
       aria-invalid={data.error ? true : undefined}
       className={cn(
@@ -129,7 +130,7 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
         step ? 'bg-card' : 'bg-muted',
         selected && 'ring-2 ring-primary',
         data.error && 'border-destructive',
-        data.locked && 'opacity-70',
+        (data.locked || data.skipped) && 'opacity-70',
         data.condition !== null && 'border-dashed',
       )}
     >
@@ -143,7 +144,12 @@ export function CanvasNode({ id, data, selected, isConnectable }: NodeProps<Canv
       ) : null}
       <SideHandles />
       <Handle type="target" position={Position.Left} id="in" isConnectable={false} />
-      <div className="truncate font-medium">{caption.title}</div>
+      <div className={cn('truncate font-medium', data.skipped && 'line-through')}>
+        {caption.title}
+      </div>
+      {data.skipped ? (
+        <div className="text-xs text-muted-foreground">{t('variants.schemaSkipped')}</div>
+      ) : null}
       {caption.subtitle ? (
         <div
           className="truncate text-xs text-muted-foreground"

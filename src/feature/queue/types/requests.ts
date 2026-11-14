@@ -7,6 +7,8 @@ import type { Queue } from './items.ts';
 /** The task of a queue item as a client or a specialist describes it. */
 export interface TaskFields {
   pipeline: string;
+  /** Id of a variant of the pipeline; absent: `default`. */
+  variant?: string | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | undefined;

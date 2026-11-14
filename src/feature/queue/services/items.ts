@@ -5,7 +5,13 @@ import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
 import { checkSkip, type RunState } from '../../runs/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
-import { findPipeline, findSpecialist } from '../../swarm-config/types/index.ts';
+import {
+  DEFAULT_VARIANT,
+  checkVariant,
+  findPipeline,
+  findSpecialist,
+  variantSkip,
+} from '../../swarm-config/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
 import { knownTags, mergeTags, parseParentRef, resolveManualTags } from '../../tags/types/index.ts';
 import {
@@ -39,9 +45,11 @@ export interface QueueItemsDependencies {
 
 /** The fields of a new item without the tags, which are resolved separately. */
 function fields(request: TaskFields & { postponed?: boolean | undefined }): ItemFields {
-  const { pipeline, task, groups, title, autoDeliver, deliveryMode, skip, after } = request;
+  const { pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after } =
+    request;
   return {
     pipeline,
+    variant,
     task,
     groups,
     title,
@@ -68,7 +76,7 @@ export class QueueItems {
     registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
-    await this.ensureItem(repository, params.pipeline, params.skip);
+    await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
     const manual = resolveManualTags(tags.of(repository), params.tags ?? []);
     const parent =
@@ -137,7 +145,7 @@ export class QueueItems {
       // Every task carries the linked task tag of its run, then the other tags of the run.
       const repository = state.run.repository;
       this.dependencies.registry.requireEnabled(repository);
-      await this.ensureItem(repository, params.pipeline, params.skip);
+      await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
       const queue = store.of(repository);
       const after = this.resolveDependencies(queue, params.after ?? []);
       this.checkNewItem(queue, fields({ ...params, after }), now());
@@ -147,14 +155,21 @@ export class QueueItems {
     });
   }
 
-  /** Rejects an unknown pipeline or a `skip` that does not fit it. */
-  async ensureItem(repository: string, pipeline: string, skip: readonly string[] = []) {
+  /** Rejects an unknown pipeline or variant, or a `skip` that does not fit the pipeline with it. */
+  async ensureItem(
+    repository: string,
+    pipeline: string,
+    variant: string = DEFAULT_VARIANT,
+    skip: readonly string[] = [],
+  ) {
     const config = this.dependencies.config.load(repository);
     if (!findPipeline(config, pipeline)) {
       const known = config.pipelines.map((candidate) => candidate.id).join(', ') || 'none';
       throw rejected(`unknown pipeline \`${pipeline}\`; known: ${known}`);
     }
-    const error = checkSkip(config, pipeline, skip);
+    const variantError = checkVariant(config, pipeline, variant);
+    if (variantError !== null) throw rejected(variantError);
+    const error = checkSkip(config, pipeline, [...variantSkip(config, pipeline, variant), ...skip]);
     if (error !== null) throw rejected(error);
   }
 
@@ -199,7 +214,7 @@ export class QueueItems {
     this.dependencies.registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
-    await this.ensureItem(repository, params.pipeline, params.skip);
+    await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
     const after = this.resolveDependencies(queue, params.after ?? []);
     let own = inherited ?? resolveManualTags(tags.of(repository), params.tags ?? []);
     const task = fields({ ...params, after });

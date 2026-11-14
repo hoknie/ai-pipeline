@@ -49,7 +49,7 @@ export function parsePs(text: string): PsRow[] {
 export type PsRunner = (
   file: string,
   args: string[],
-  options: { timeout: number },
+  options: { timeout: number; maxBuffer: number },
   callback: (error: Error | null, stdout: string) => void,
 ) => unknown;
 
@@ -59,7 +59,7 @@ export function snapshotProcesses(run: PsRunner = execFile as PsRunner): Promise
     run(
       'ps',
       ['-A', '-o', 'pid=,ppid=,pgid=,etime=,time=,rss=,args='],
-      { timeout: PS_TIMEOUT_MS },
+      { timeout: PS_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
       (error, stdout) => {
         if (error) reject(error);
         else resolve(parsePs(String(stdout)));

@@ -455,3 +455,71 @@ describe('cli', () => {
     expect((await aip(box, 'run', 'list')).stdout).toContain('Вход');
   });
 });
+
+describe('cli run view', () => {
+  const ansi = /\x1b/;
+
+  it('shows steps, progress and hints of a run that waits for an answer', async () => {
+    const box = sandbox();
+    writeFileSync(
+      box.env.AIP_FAKE_SCRIPT!,
+      JSON.stringify({ code: [{ verdict: 'needs_human', feedback: 'Continue?' }, {}] }),
+    );
+    const forced = { ...box, env: { ...box.env, FORCE_COLOR: '1' } };
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'вопрос', '--json')).stdout,
+    );
+    await waitUntil('the group asks', async () => {
+      const view = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
+        groups: { status: string }[];
+      };
+      return view.groups[0]?.status === 'needs_human';
+    });
+    const group = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout).groups[0]
+      .slug as string;
+    const colored = await aip(forced, 'run', 'show', runId);
+    expect(colored.stdout).toContain(`→ aip group answer ${runId} ${group} "<answer>"`);
+    expect(colored.stdout.replace(/\x1b\[[0-9;]*m/g, '')).toContain(
+      'Progress: ░░░░░░░░░░ 0/2 steps · working changes',
+    );
+    const plain = await aip(box, 'run', 'show', runId);
+    expect(plain.stdout).not.toMatch(/^→ /m);
+    expect(plain.stdout).toContain('Steps: Кодировщик [active] → Ревьюер');
+    expect(plain.stdout).toContain('Progress: 0/2 steps');
+    expect(plain.stdout).not.toMatch(ansi);
+    const piped = await aip(forced, 'run', 'show', runId, '--no-color');
+    expect(piped.stdout).not.toMatch(/^→ /m);
+  });
+
+  it('watches a run to its end without terminal sequences outside a terminal', async () => {
+    const box = sandbox();
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'труба', '--json')).stdout,
+    );
+    const watched = await aip(box, 'run', 'watch', runId);
+    expect(watched.code).toBe(0);
+    expect(watched.stdout).not.toMatch(ansi);
+    expect(watched.stdout).toContain('Progress: 2/2 steps');
+    expect(watched.stdout).not.toMatch(/^→ /m);
+  });
+
+  it('shows the last log line of a running group in run watch only', async () => {
+    const box = sandbox();
+    writeFileSync(
+      box.env.AIP_FAKE_SCRIPT!,
+      JSON.stringify({ code: [{ usage: [{ input: 10, output: 5 }], delayMs: 2600 }, {}] }),
+    );
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'активность', '--json')).stdout,
+    );
+    const watched = await aip(box, 'run', 'watch', runId);
+    expect(watched.stdout).toMatch(/^aktivnost: \S/m);
+    await waitUntil('the run ends', async () => {
+      const view = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
+        finished: boolean;
+      };
+      return view.finished;
+    });
+    expect((await aip(box, 'run', 'show', runId)).stdout).not.toMatch(/^aktivnost: /m);
+  });
+});

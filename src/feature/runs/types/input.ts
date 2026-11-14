@@ -6,7 +6,7 @@ import { type Run, runPipeline, specialistOfStep } from './run.ts';
 export function buildInput(run: Run, group: Group, pending: Pending): StepInput {
   const step = stepsOf(run, group)[pending.stepIndex];
   if (!step) throw new Error(`step ${pending.stepIndex} does not exist`);
-  const specialist = specialistOfStep(run, group, step.specialist);
+  const specialist = specialistOfStep(run, group, step);
   if (!specialist) throw new Error(`specialist ${step.specialist} does not exist`);
   const previous: PreviousStep[] = group.attempts.flatMap((attempt) =>
     attempt.status === 'finished' && attempt.report

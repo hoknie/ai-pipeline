@@ -1,6 +1,48 @@
 import { describe, expect, it } from 'vitest';
 
-import { draftValid, emptyDraft, fieldsOf } from '../src/features/queue/draft.ts';
+import {
+  draftOf,
+  draftValid,
+  emptyDraft,
+  fieldsOf,
+  retarget,
+} from '../src/features/queue/draft.ts';
+
+describe('variant of the queue draft', () => {
+  it('starts as default and is sent only when it is not the default, always on edit', () => {
+    const draft = emptyDraft('feature');
+    expect(draft.variant).toBe('default');
+    expect(fieldsOf({ ...draft, task: 'x' })).not.toHaveProperty('variant');
+    expect(fieldsOf({ ...draft, task: 'x', variant: 'light' }).variant).toBe('light');
+    expect(fieldsOf({ ...draft, task: 'x' }, () => undefined, true).variant).toBe('default');
+  });
+
+  it('is read from an item and dropped when the new repository has no such variant', () => {
+    const draft = draftOf({
+      pipeline: 'feature',
+      variant: 'light',
+      task: 'x',
+      groups: null,
+      title: null,
+      autoDeliver: null,
+    });
+    expect(draft.variant).toBe('light');
+    const keep = retarget(
+      draft,
+      ['feature'],
+      () => [],
+      () => ['default', 'light'],
+    );
+    expect(keep.variant).toBe('light');
+    const drop = retarget(
+      draft,
+      ['feature'],
+      () => [],
+      () => ['default'],
+    );
+    expect(drop.variant).toBe('default');
+  });
+});
 
 describe('queue draft task/title normalization', () => {
   it.each([

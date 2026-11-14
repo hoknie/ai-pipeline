@@ -19,6 +19,7 @@ Options of one task:
 | Option | Read more |
 |---|---|
 | `--auto-deliver`, `--no-auto-deliver`, `--delivery-mode` | [Settings for one task](../configuration/delivery.md#settings-for-one-task) |
+| `--variant <id>` | [Variants](queue.md#variants) |
 | `--skip <step>` | [Skipping steps](queue.md#skipping-steps) |
 | `--after <id>` | [Dependencies](queue.md#dependencies) |
 | `--tag <name>`, `--parent <run>` | [usage/tags.md](tags.md) |
@@ -29,15 +30,18 @@ A run starts from a snapshot of your working tree, so specialists also see your 
 
 ```sh
 aip run list                    # active and recent runs
-aip run watch [run-id]          # refresh until it finishes
+aip run watch [run-id]          # redraw until it finishes
 aip run show <run-id>           # the groups of one run
 aip group show <run-id> <group> # attempts, verdicts, remarks, tokens, changed files, the tail of the log
 ```
 
+- A run that has a variant other than `default` shows `<pipeline>:<variant>` in the `PIPELINE` column; in `--json` every run has `variant` and `variantName` (`default` for runs made before variants).
 - `aip run list` shows each run with its task number (`#` column), the first line of its task and a summary of changes (`2 files +367 −0`). With a run id, it prints the table of that run's groups.
 - A pipeline with a `name` is printed as `<name> (<id>)`; without a `name`, as the id.
 - `aip run show` prints a `System:` line with the system stages in the order split, commit message, resolver, observer and delivery, for example `System: split done · message running · delivery pending`. A failed delivery shows its first reason there, even when no resolver ran.
 - A waiting group has a `NOTE` saying what it waits for, for example `waiting for coder` or `waiting for network: interface wt0 is down`. The `Groups:` line counts them as `waiting N`.
+- `Steps:` lists the steps of the group pipeline. Without color a mark follows a step: `[done]` (every group passed it), `[active]` (a group is on it) or `[skipped]`; a step ahead has none. `Progress:` counts the steps the groups passed, for example `3/7 steps`, and while the run is not finished adds `working changes 4 files +120 −8`. Neither line is printed while the task is being split.
+- In a terminal `aip run watch` draws on the alternate screen, in place, and shows the last log line of each running group (`login: Editing src/login.ts`, asked at most every 2 seconds). Ctrl+C restores the screen and prints the last view once. In a pipe it prints each view whole, separated by an empty line.
 
 For a live stream of changes, `aip events --json` prints a snapshot and then one JSON line per change.
 

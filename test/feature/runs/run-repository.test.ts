@@ -55,7 +55,7 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5 - (7 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6 - (7 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -64,6 +64,18 @@ describe('hold of a run and priority runs', () => {
 });
 
 describe('runs', () => {
+  it('keeps the variant of a run after a restart', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const first = openStorage(databasePath(directory));
+    const state = run(1);
+    state.run.variant = 'light';
+    first.runs.saveRun(state);
+    first.database.close();
+    const second = openStorage(databasePath(directory));
+    expect(second.runs.loadRun(state.run.id)?.run.variant).toBe('light');
+    second.database.close();
+  });
+
   it('restores a snapshot written before agy without changing its specialists', () => {
     const store = temporaryStorage();
     const state = run(1);
@@ -321,7 +333,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-29)).toContain('denials_json');
+    expect(MIGRATIONS.at(-30)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -345,7 +357,7 @@ describe('refused tool calls', () => {
     const reopened = openStorage(databasePath(directory));
     expect(reopened.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-28)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-29)).toContain('outside_changes_json');
   });
 });
 

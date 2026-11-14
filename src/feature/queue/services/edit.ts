@@ -66,20 +66,45 @@ export class QueueEdit {
       await this.skipInRun(queue, existing, params);
       skip = undefined;
     }
-    if (params.pipeline !== undefined || skip !== undefined) {
+    if (existing?.run) {
+      // before any check of the new values: a returned run answers with its own error
+      checkReturnedPatch({
+        pipeline: params.pipeline,
+        variant: params.variant,
+        task: params.task,
+        groups: params.groups,
+        title: params.title,
+        tags: params.tags,
+        autoDeliver: params.autoDeliver,
+        deliveryMode: params.deliveryMode,
+        postponed: params.postponed,
+        skip,
+      });
+    }
+    if (params.pipeline !== undefined || params.variant !== undefined || skip !== undefined) {
       if (existing) {
         await items.ensureItem(
           repository,
           params.pipeline ?? existing.pipeline,
+          params.variant ?? existing.variant,
           skip ?? existing.skip,
         );
       }
     }
     const after =
       params.after === undefined ? undefined : items.resolveDependencies(queue, params.after);
-    const { pipeline, task, groups, title, position, autoDeliver, deliveryMode, postponed } =
-      params;
-    const patch = { pipeline, task, groups, title, position, autoDeliver, deliveryMode };
+    const {
+      pipeline,
+      variant,
+      task,
+      groups,
+      title,
+      position,
+      autoDeliver,
+      deliveryMode,
+      postponed,
+    } = params;
+    const patch = { pipeline, variant, task, groups, title, position, autoDeliver, deliveryMode };
     const fields = { ...patch, skip, after, postponed };
     const tags = await this.tagsOf(queue, existing, params, parentState, fields, moment);
     editItem(queue, params.item, { ...fields, tags }, moment);
@@ -96,10 +121,12 @@ export class QueueEdit {
   /** A returned run has no item-level skip: the steps are skipped in the run itself. */
   private async skipInRun(queue: Queue, item: QueueItem, params: QueueEditRequest): Promise<void> {
     const { runs, items } = this.dependencies;
-    const { pipeline, task, groups, title, autoDeliver, deliveryMode, postponed, skip } = params;
+    const { pipeline, variant, task, groups, title, autoDeliver, deliveryMode, postponed, skip } =
+      params;
     checkReturnedPatch(
       {
         pipeline,
+        variant,
         task,
         groups,
         title,

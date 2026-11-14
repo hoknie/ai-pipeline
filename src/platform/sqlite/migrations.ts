@@ -282,6 +282,7 @@ export const MIGRATIONS: string[] = [
   `,
   STATS_MIGRATION,
   `ALTER TABLE queues ADD COLUMN filter_json TEXT NOT NULL DEFAULT '{"pipelines":[],"tags":[]}'`,
+  `ALTER TABLE runs ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'; ALTER TABLE queue_items ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

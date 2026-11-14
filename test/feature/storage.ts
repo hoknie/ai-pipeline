@@ -78,8 +78,14 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
   }
 }
 
-/** Takes away the take filter of the queues, the newest migration, when it is there. */
+/** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
+  for (const table of ['runs', 'queue_items']) {
+    const have = database.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (have.some((column) => column.name === 'variant')) {
+      database.exec(`ALTER TABLE ${table} DROP COLUMN variant`);
+    }
+  }
   const columns = database.prepare('PRAGMA table_info(queues)').all() as { name: string }[];
   if (columns.some((column) => column.name === 'filter_json')) {
     database.exec('ALTER TABLE queues DROP COLUMN filter_json');

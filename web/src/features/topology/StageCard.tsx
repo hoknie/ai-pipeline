@@ -112,12 +112,14 @@ export function Stage({ data, selected }: NodeProps<StageNode>) {
         'relative grid w-[170px] grid-cols-[minmax(0,1fr)] gap-1 px-3 py-2.5 text-xs',
         data.kind !== 'step' && 'bg-muted',
         data.condition !== null && 'border-dashed',
+        data.skipped && 'opacity-60',
         data.active && 'border-status-run ring-4 ring-status-run-bg',
         data.busy?.full && 'border-status-warn bg-status-warn-bg',
         selected && 'border-primary',
       )}
       data-testid={`stage-${testId}`}
       data-conditional={data.condition !== null ? 'true' : undefined}
+      data-skipped={data.skipped ? 'true' : undefined}
     >
       {data.sectionStart ? (
         <div
@@ -128,9 +130,15 @@ export function Stage({ data, selected }: NodeProps<StageNode>) {
         </div>
       ) : null}
       <Handles />
-      <div className="truncate text-sm font-bold" title={data.title}>
+      <div
+        className={cn('truncate text-sm font-bold', data.skipped && 'line-through')}
+        title={data.title}
+      >
         {data.title}
       </div>
+      {data.skipped ? (
+        <div className="text-muted-foreground">{t('variants.schemaSkipped')}</div>
+      ) : null}
       <StageLines data={data} testId={testId} />
       <StageLoad data={data} testId={testId} />
     </Card>

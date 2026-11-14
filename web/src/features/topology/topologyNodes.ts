@@ -151,6 +151,7 @@ function stepNode(ctx: NodeContext, stage: PipelineStage, common: Common): NodeS
       outputTokens: live.outputTokens.get(step.id) ?? 0,
       active: active(groups),
       step: step.id,
+      ...((step as { skipped?: boolean }).skipped ? { skipped: true } : {}),
       specialist: step.specialist,
       busy: busyOf(pipeline, live, load, step.specialist),
       ...common,

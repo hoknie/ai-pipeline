@@ -31,6 +31,12 @@ export function hostKit(options: HostOptions) {
     .describe(
       'Run id or task number of this repository (161 or #161): the task gets the linked task tag of that run, first',
     );
+  const variant = z
+    .string()
+    .optional()
+    .describe(
+      'Id of a variant of the pipeline (steps with other models or specialists, some steps skipped); omit for `default`, the pipeline as it is',
+    );
   const skip = z
     .array(z.string())
     .optional()
@@ -71,6 +77,7 @@ export function hostKit(options: HostOptions) {
     runId,
     tags,
     parent,
+    variant,
     skip,
     after,
     group,

@@ -298,6 +298,36 @@ describe('planEdit and commitEdit', () => {
     expect(existsSync(specialistFile(paths, 'reviewer'))).toBe(true);
   });
 
+  it('refuses to delete a specialist that only a variant of a pipeline uses', () => {
+    const paths = setup();
+    project(paths);
+    write(specialistFile(paths, 'lite'), 'name: Lite\n');
+    write(
+      join(paths.project.directory, 'pipelines', 'feature.yaml'),
+      [
+        'steps:',
+        '  - { id: code, specialist: coder }',
+        '  - { id: review, specialist: reviewer }',
+        'variants:',
+        '  light:',
+        '    steps: { review: { specialist: lite } }',
+        '',
+      ].join('\n'),
+    );
+    const plan = planEdit(paths, {
+      kind: 'specialist',
+      id: 'lite',
+      value: null,
+      revision: revisionOf('name: Lite\n'),
+    });
+    expect(plan).toMatchObject({
+      ok: false,
+      reason: 'invalid',
+      references: [{ pipeline: 'feature', variant: 'light', step: 'review' }],
+    });
+    expect(existsSync(specialistFile(paths, 'lite'))).toBe(true);
+  });
+
   it('deletes an unused specialist, and an override that has a global one below', () => {
     const paths = setup();
     project(paths);

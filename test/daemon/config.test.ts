@@ -18,6 +18,7 @@ import type {
   ConfigCatalogResponse,
   ConfigEditResult,
   ConfigPreview,
+  PipelinesView,
   RunCreated,
 } from '../../src/presentation/ipc/contract/index.ts';
 
@@ -260,6 +261,14 @@ describe('pipeline editing', () => {
     const listed = await view(h);
     const feature = listed.pipelines.find((pipeline) => pipeline.id === 'feature')!;
     expect(feature.level).toBe('project');
+    const topology = (
+      (await h.call('pipelines', { repository: h.repo })) as PipelinesView
+    ).pipelines.find((pipeline) => pipeline.id === 'feature')!;
+    expect(topology.variants).toHaveLength(1);
+    expect(topology.variants[0]).toMatchObject({ id: 'default', skip: [], split: null });
+    expect(topology.variants[0]!.steps.map((entry) => entry.skipped)).toEqual(
+      topology.steps.map(() => false),
+    );
     const result = (await h.call('config_write', {
       repository: h.repo,
       kind: 'pipeline',

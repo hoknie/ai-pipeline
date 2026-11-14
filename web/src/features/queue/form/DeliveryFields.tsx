@@ -14,7 +14,7 @@ import {
 import { DELIVERY_MODES } from '../../../shared/lib/pipeline/deliveryModes.ts';
 import type { PipelinesView } from '../../../shared/api/types.ts';
 import { stepsOf } from '../draft.ts';
-import { SkipSteps } from '../SkipSteps.tsx';
+import { SkipSteps } from '../../../shared/ui/forms/picker/SkipSteps.tsx';
 import type { FormState } from './TaskFields.tsx';
 
 function AutoDeliver({ state, fallback }: { state: FormState; fallback: boolean | null }) {
@@ -108,6 +108,11 @@ export function DeliveryFields(props: {
           props.pipelines?.pipelines.find((candidate) => candidate.id === effective.pipeline),
         )}
         skip={effective.skip}
+        variantSkip={
+          props.pipelines?.pipelines
+            .find((candidate) => candidate.id === effective.pipeline)
+            ?.variants.find((variant) => variant.id === effective.variant)?.skip ?? []
+        }
         onChange={(skip) => change({ skip })}
       />
     </fieldset>

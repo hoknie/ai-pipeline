@@ -6,6 +6,7 @@ import type { PipelineSection } from '../../shared/lib/nav/route.ts';
 import type { Api } from '../../shared/api/api.ts';
 import type { RunView } from '../../shared/api/types.ts';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
+import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
 import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
 import { PipelinesColumns } from './page/PipelinesColumns.tsx';
 import { usePipelineNavigation } from './page/usePipelineNavigation.ts';
@@ -23,6 +24,7 @@ export default function PipelinesPage({
   runs,
   selected,
   section: shownSection = null,
+  variant = null,
   onSelect,
   onOpenGroup,
   dirty: sharedDirty,
@@ -33,7 +35,9 @@ export default function PipelinesPage({
   selected: string | null;
   /** Section of `selected`: `actions`, `system`, `topology`; null for the pipelines. */
   section?: PipelineSection | string | null;
-  onSelect: (id: string | null, section?: PipelineSection | null) => void;
+  /** The variant of the topology (`#pipelines/topology/<id>/<variant>`); null: `default`. */
+  variant?: string | null;
+  onSelect: (id: string | null, section?: PipelineSection | null, variant?: string | null) => void;
   /** Opens a group of a run (a click on a live group of the topology). */
   onOpenGroup?: (group: LiveGroup, step: string | null) => void;
   /** Whether the open form has unsaved edits; the caller owns it to guard other navigation. */
@@ -60,7 +64,7 @@ export default function PipelinesPage({
   }, [section, selected, firstPipeline, onSelect]);
 
   return (
-    <>
+    <ModelCatalogProvider api={api}>
       <div className="px-4 pt-3">
         <LinkTabs label={t('pipeline.tabs')} tabs={tabs} />
       </div>
@@ -76,6 +80,8 @@ export default function PipelinesPage({
             api={api}
             runs={runs}
             pipeline={selected}
+            variant={variant}
+            onSelectVariant={(next) => selected && onSelect(selected, 'topology', next)}
             onSelectPipeline={(id) => void navigation.go(id, 'topology')}
             onEditPipeline={(id) => void navigation.go(id, null)}
             onOpenGroup={onOpenGroup ?? noop}
@@ -93,6 +99,6 @@ export default function PipelinesPage({
           onSelect={onSelect}
         />
       )}
-    </>
+    </ModelCatalogProvider>
   );
 }

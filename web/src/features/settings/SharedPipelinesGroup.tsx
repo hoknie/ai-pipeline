@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { ConfigEditorResponse } from '../../shared/api/types.ts';
+import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
 import { SplitPage } from '../../shared/ui/layout/EntryList.tsx';
 import { SharedPipelineEditor } from './sharedFiles/SharedPipelineEditor.tsx';
 import { SharedPipelinesSide } from './sharedFiles/SharedPipelinesSide.tsx';
@@ -24,8 +25,10 @@ export function SharedPipelinesGroup(props: {
 }) {
   const state = useSharedPipelines(props);
   return (
-    <SplitPage side={<SharedPipelinesSide state={state} selected={props.selected} />}>
-      <SharedPipelineEditor {...props} state={state} />
-    </SplitPage>
+    <ModelCatalogProvider api={props.api}>
+      <SplitPage side={<SharedPipelinesSide state={state} selected={props.selected} />}>
+        <SharedPipelineEditor {...props} state={state} />
+      </SplitPage>
+    </ModelCatalogProvider>
   );
 }

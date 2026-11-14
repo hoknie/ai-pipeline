@@ -111,6 +111,7 @@ export class RunRequests {
       autoDeliver: params.autoDeliver,
       deliveryMode: params.deliveryMode,
       skip: params.skip,
+      variant: params.variant,
       tags: tagIds,
       now: now(),
       ...(params.title ? { title: params.title } : {}),

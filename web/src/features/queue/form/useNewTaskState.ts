@@ -32,6 +32,31 @@ function useTargetPipelines(api: Api, target: string): PipelinesView | null {
   return pipelinesOf.get(target) ?? null;
 }
 
+/** A draft typed for another repository moves to the chosen one once its pipelines are known. */
+function useRetargetedDraft(input: {
+  open: boolean;
+  draft: QueueDraft | undefined;
+  draftTarget: string | null;
+  target: string;
+  pipelines: PipelinesView | null;
+  onDraft: (draft: QueueDraft | null) => void;
+}): void {
+  const { open, draft, draftTarget, target, pipelines, onDraft } = input;
+  useEffect(() => {
+    if (!open || !draft || !pipelines || draftTarget === target) return;
+    const found = (id: string) => pipelines.pipelines.find((pipeline) => pipeline.id === id);
+    onDraft({
+      ...retarget(
+        draft,
+        pipelines.pipelines.map((pipeline) => pipeline.id),
+        (id) => stepIds(found(id)),
+        (id) => found(id)?.variants.map((variant) => variant.id) ?? [],
+      ),
+      repository: target,
+    });
+  }, [open, draft, pipelines, draftTarget, target, onDraft]);
+}
+
 /** A repository without a queue in the snapshot: load it once. */
 function useTargetQueue(
   scoped: Api,
@@ -93,18 +118,8 @@ export function useNewTaskState(props: {
   const queueKnown = queue !== undefined;
   useTargetQueue(scoped, queueKnown, onQueue);
 
-  // a draft typed for another repository moves to the chosen one once its pipelines are known
   const draftTarget = draft ? (draft.repository ?? selected) : null;
-  useEffect(() => {
-    if (!open || !draft || !pipelines || draftTarget === target) return;
-    const ids = pipelines.pipelines.map((pipeline) => pipeline.id);
-    onDraft({
-      ...retarget(draft, ids, (id) =>
-        stepIds(pipelines.pipelines.find((pipeline) => pipeline.id === id)),
-      ),
-      repository: target,
-    });
-  }, [open, draft, pipelines, draftTarget, target, onDraft]);
+  useRetargetedDraft({ open, draft, draftTarget, target, pipelines, onDraft });
 
   // the preset parent goes into the draft once, when the draft belongs to the target repository
   const parents = useMemo(() => parentChoices(runs, target), [runs, target]);

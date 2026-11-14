@@ -10,6 +10,8 @@ export interface CliIo {
   env: NodeJS.ProcessEnv;
   /** Whether stdout is a terminal. */
   isTTY: boolean;
+  /** Width of the terminal in columns, read once at the start; unset when unknown. */
+  columns?: number;
   /** Command that runs `aip` again: the node executable and the script. */
   entry: string[];
   /** Process id printed by `aip daemon`. */

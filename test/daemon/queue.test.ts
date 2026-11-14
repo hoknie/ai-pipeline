@@ -332,3 +332,94 @@ describe('running the queue', () => {
     expect(await allRuns(h)).toHaveLength(2);
   });
 });
+
+describe('pipeline variants in the queue', () => {
+  const VARIANT_CONFIG = `${PIPELINE_CONFIG}      variants:
+        light:
+          name: Лёгкий
+          skip: [review]
+`;
+
+  it('adds a task with a variant, defaults to default and names the variant', async () => {
+    const h = await start(VARIANT_CONFIG);
+    await add(h, 'A', { variant: 'light' });
+    await add(h, 'B');
+    const items = (await queueOf(h)).items;
+    expect(items.map((item) => [item.variant, item.variantName])).toEqual([
+      ['light', 'Лёгкий'],
+      ['default', 'default'],
+    ]);
+  });
+
+  it('rejects an unknown variant without changing the queue, on add and on edit', async () => {
+    const h = await start(VARIANT_CONFIG);
+    await expect(add(h, 'A', { variant: 'fast' })).rejects.toThrow(
+      'unknown variant `fast` of pipeline `feature`; known: default, light',
+    );
+    const { item } = await add(h, 'B');
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item, variant: 'fast' }),
+    ).rejects.toThrow('unknown variant `fast`');
+    expect((await queueOf(h)).items.map((entry) => entry.variant)).toEqual(['default']);
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      variant: 'light',
+    })) as QueueView;
+    expect(edited.items[0]?.variant).toBe('light');
+  });
+
+  it('rejects a change of pipeline that keeps a variant the new pipeline lacks', async () => {
+    const h = await start(`${VARIANT_CONFIG}    plain:
+      steps:
+        - { id: code, specialist: coder }
+`);
+    const { item } = await add(h, 'A', { variant: 'light' });
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item, pipeline: 'plain' }),
+    ).rejects.toThrow('unknown variant `light` of pipeline `plain`');
+    expect((await queueOf(h)).items[0]).toMatchObject({ pipeline: 'feature', variant: 'light' });
+    const fixed = (await h.call('queue_edit', {
+      repository: h.repo,
+      item,
+      pipeline: 'plain',
+      variant: 'default',
+    })) as QueueView;
+    expect(fixed.items[0]).toMatchObject({ pipeline: 'plain', variant: 'default' });
+  });
+
+  it('refuses a skip that together with the variant leaves no steps', async () => {
+    const h = await start(VARIANT_CONFIG);
+    await expect(add(h, 'A', { variant: 'light', skip: ['code'] })).rejects.toThrow(
+      'skip leaves no steps',
+    );
+  });
+
+  it('creates the run with the variant and the steps of the variant only', async () => {
+    const h = await start(VARIANT_CONFIG);
+    await add(h, 'A', { variant: 'light' });
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.items.length === 0);
+    const [created] = await allRuns(h);
+    expect(created).toMatchObject({ variant: 'light', variantName: 'Лёгкий' });
+    const pipelines = (await h.call('pipelines', { repository: h.repo })) as {
+      pipelines: { id: string; variants: unknown }[];
+    };
+    expect(pipelines.pipelines.find((entry) => entry.id === 'feature')?.variants).toMatchObject([
+      { id: 'default', name: 'default', skip: [] },
+      { id: 'light', name: 'Лёгкий', skip: ['review'] },
+    ]);
+  });
+
+  it('keeps an item first with an error when its variant was removed before the start', async () => {
+    const h = await start(VARIANT_CONFIG);
+    await add(h, 'A', { variant: 'light' });
+    writeConfigDirectory(h.repo, PIPELINE_CONFIG);
+    await h.call('queue_start', { repository: h.repo });
+    const queue = await queueOf(h);
+    expect(queue.status).toBe('stopped');
+    expect(queue.stop).toMatchObject({ kind: 'item' });
+    expect(queue.items[0]?.error).toContain('unknown variant `light` of pipeline `feature`');
+    expect(await allRuns(h)).toEqual([]);
+  });
+});

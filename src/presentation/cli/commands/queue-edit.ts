@@ -84,6 +84,7 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
     repository: repositoryArgument(options.repo),
     item,
     ...(pipeline !== undefined ? { pipeline } : {}),
+    ...(options.variant !== undefined ? { variant: options.variant } : {}),
     ...(options.task !== undefined ? { task: options.task } : {}),
     ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
     ...(options.title !== undefined ? { title: options.title } : {}),

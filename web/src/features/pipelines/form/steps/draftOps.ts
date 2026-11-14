@@ -1,4 +1,5 @@
 import type { ActionPoint } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
+import { withoutStep } from '../variants/variantDraft.ts';
 import { newStepDraft, type Draft, type SplitDraft, type StepDraft } from './draft.ts';
 
 const clamp = (value: number, low: number, high: number): number =>
@@ -29,6 +30,7 @@ export function removeStep(draft: Draft, key: number): Draft {
       .map((step) =>
         step.gotoKey === key ? { ...step, gotoKey: null, gotoRaw: '', maxRounds: '' } : step,
       ),
+    variants: withoutStep(draft.variants, key),
   };
 }
 

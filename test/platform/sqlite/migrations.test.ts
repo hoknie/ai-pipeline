@@ -48,7 +48,7 @@ describe('migrations', () => {
       'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
     );
     dropQueueFilter(previous.database.connection);
-    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     previous.database.close();
 
     const migrated = openStorage(path);
@@ -117,7 +117,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(32);
+    expect(SCHEMA_VERSION).toBe(33);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -130,8 +130,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -7).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    MIGRATIONS.slice(0, -8).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
     prepare(database);
     migrate(database);
     return database;
@@ -250,7 +250,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -280,7 +280,7 @@ describe('project attributes', () => {
     old.known.addRepository('/a/app', 9);
     dropQueueFilter(old.database.connection);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(
@@ -306,7 +306,7 @@ describe('migration to the usage journal', () => {
     old.runs.saveRun(state);
     old.database.exec('DROP TABLE stats_attempts; DROP TABLE stats_runs; DROP TABLE stats_meta;');
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const names = (type: string) =>
@@ -326,6 +326,26 @@ describe('migration to the usage journal', () => {
       ]),
     );
     expect(store.runs.loadRun(state.run.id)?.run.id).toBe(state.run.id);
+    store.database.close();
+  });
+});
+
+describe('migration to pipeline variants', () => {
+  it('gives the runs and the queued tasks of an older database the variant default', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const old = openStorage(databasePath(directory));
+    const state = run(1, { id: 'variant-run' });
+    old.runs.saveRun(state);
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'задача', variant: 'light' }, 'q1', 2);
+    old.queues.saveQueue(queue);
+    // a database written before the variants: the column is not there, the rows are
+    dropQueueFilter(old.database.connection);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 2}`);
+    old.database.close();
+    const store = openStorage(databasePath(directory));
+    expect(store.runs.loadRun('variant-run')?.run.variant).toBe('default');
+    expect(store.queues.loadQueue('/repo')?.items[0]?.variant).toBe('default');
     store.database.close();
   });
 });

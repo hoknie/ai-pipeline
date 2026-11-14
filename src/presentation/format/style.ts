@@ -20,6 +20,10 @@ export function colorEnabled({ noColorFlag, env, isTTY }: ColorInput): boolean {
 }
 
 export interface Style {
+  /** Colored output: badges, bars and hints are drawn only when true. */
+  readonly rich: boolean;
+  /** Terminal width fixed at the start of the command; null outside a terminal or when unknown. */
+  readonly columns: number | null;
   title(text: string): string;
   command(text: string): string;
   option(text: string): string;
@@ -34,6 +38,8 @@ export interface Style {
 const identity = (text: string): string => text;
 
 export const plainStyle: Style = {
+  rich: false,
+  columns: null,
   title: identity,
   command: identity,
   option: identity,
@@ -45,13 +51,15 @@ export const plainStyle: Style = {
   danger: identity,
 };
 
-export function createStyle(enabled: boolean): Style {
+export function createStyle(enabled: boolean, columns?: number): Style {
   if (!enabled) return plainStyle;
   const paint =
     (format: Parameters<typeof styleText>[0]) =>
     (text: string): string =>
       styleText(format, text, { validateStream: false });
   return {
+    rich: true,
+    columns: columns !== undefined && columns > 0 ? columns : null,
     title: paint('bold'),
     command: paint('cyan'),
     option: paint('green'),
@@ -92,7 +100,7 @@ export const STATUS_BADGES: Readonly<Record<string, { badge: string; role: Style
 
 /** A state word with its badge and color; unchanged without color or for an unknown state. */
 export function statusBadge(status: string, style: Style): string {
-  if (style === plainStyle) return status;
+  if (!style.rich) return status;
   const entry = Object.hasOwn(STATUS_BADGES, status) ? STATUS_BADGES[status] : undefined;
   if (!entry) return status;
   return style[entry.role](`${entry.badge} ${status}`);
@@ -102,4 +110,38 @@ export function statusBadge(status: string, style: Style): string {
 export function visibleWidth(text: string): number {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*m/g, '').length;
+}
+
+/** Color and a known width: the output is shaped for a terminal window. */
+export function isTerminal(style: Style): style is Style & { columns: number } {
+  return style.rich && style.columns !== null;
+}
+
+/**
+ * Cuts the text to `width` visible columns, ending with `…`. SGR sequences take no columns; the
+ * style is reset after `…` when the cut part left one open.
+ */
+export function truncateVisible(text: string, width: number): string {
+  if (visibleWidth(text) <= width) return text;
+  const keep = Math.max(0, width - 1);
+  let out = '';
+  let shown = 0;
+  let open = false;
+  // eslint-disable-next-line no-control-regex
+  for (const part of text.split(/(\x1b\[[0-9;]*m)/)) {
+    // eslint-disable-next-line no-control-regex
+    if (/^\x1b\[[0-9;]*m$/.test(part)) {
+      const reset = part === '\x1b[0m' || part === '\x1b[m';
+      if (reset || shown < keep) {
+        out += part;
+        open = !reset;
+      }
+      continue;
+    }
+    if (shown >= keep) continue;
+    const take = part.slice(0, keep - shown);
+    out += take;
+    shown += take.length;
+  }
+  return `${out}…${open ? '\x1b[0m' : ''}`;
 }

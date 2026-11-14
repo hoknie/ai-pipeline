@@ -31,7 +31,7 @@ const labelOf = (choice: { number: number | null; title: string }) =>
 export function AfterField({ state, choices }: { state: FormState; choices: AfterOption[] }) {
   const { t } = useTranslation();
   const { idPrefix, effective, change } = state;
-  const titles = new Map(choices.map((choice) => [choice.id, choice.title]));
+  const titles = new Map(choices.map((choice) => [choice.id, labelOf(choice)]));
   const options: PickerOption[] = choices.map((choice) => ({
     name: choice.id,
     source: SOURCE_OF[choice.kind],

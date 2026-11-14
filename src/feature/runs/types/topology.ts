@@ -11,6 +11,10 @@ import {
   groupPipeline,
   pipelineName,
   pipelineNameOf,
+  pipelineVariants,
+  stepSpecialist,
+  type VariantInfo,
+  applyVariant,
 } from '../../swarm-config/types/index.ts';
 import type { Attempt } from './attempt.ts';
 import type { GroupStatus, RunHold } from './constants.ts';
@@ -83,6 +87,18 @@ function brief(group: Group): StepGroup {
   return { slug: group.slug, title: group.title, status: group.status };
 }
 
+/** A step of a variant: as the variant applies it; skipped steps stay in place. */
+export interface VariantStepInfo extends StepInfo {
+  skipped: boolean;
+}
+
+export interface VariantTopology extends VariantInfo {
+  /** The steps of the groups with the overrides of the variant applied. */
+  steps: VariantStepInfo[];
+  /** The split with the override of the variant applied; null without a split. */
+  split: PipelineTopology['split'];
+}
+
 export interface PipelineTopology {
   id: string;
   /** Display name: `name` of the pipeline, else the id. */
@@ -99,6 +115,8 @@ export interface PipelineTopology {
   limits: Record<string, number | null>;
   /** The stages of the pipeline in order; their status is null outside a run. */
   stages: PipelineStage[];
+  /** `default` first, then the variants in the order of the file. */
+  variants: VariantTopology[];
 }
 
 /** The human name of a step: the name of its specialist, or the specialist slug without one. */
@@ -140,7 +158,7 @@ export function attemptStepLabel(state: RunState, group: Group, attempt: Attempt
 }
 
 function stepInfo(config: ResolvedConfig, steps: readonly Step[], step: Step): StepInfo {
-  const specialist = findSpecialist(config, step.specialist);
+  const specialist = stepSpecialist(config, step);
   return {
     id: step.id,
     specialist: step.specialist,
@@ -152,6 +170,15 @@ function stepInfo(config: ResolvedConfig, steps: readonly Step[], step: Step): S
   };
 }
 
+/** Specialists the variants of a pipeline replace steps with. */
+function variantSpecialists(pipeline: Pipeline): string[] {
+  return (pipeline.variants ?? []).flatMap((variant) =>
+    [variant.split, ...Object.values(variant.steps)].flatMap((override) =>
+      override?.specialist ? [override.specialist] : [],
+    ),
+  );
+}
+
 function limitsOf(
   config: ResolvedConfig,
   pipeline: Pipeline,
@@ -160,6 +187,7 @@ function limitsOf(
   const slugs = [
     ...(pipeline.split ? [pipeline.split.specialist] : []),
     ...steps.map((step) => step.specialist),
+    ...variantSpecialists(pipeline),
     ...(config.delivery.resolver ? [config.delivery.resolver] : []),
   ];
   const limits: Record<string, number | null> = {};
@@ -170,6 +198,35 @@ function limitsOf(
 function splitTargetName(config: ResolvedConfig, pipeline: Pipeline): string | null {
   const target = pipeline.split?.pipeline ?? null;
   return target === null ? null : pipelineNameOf(config, target);
+}
+
+function splitInfo(config: ResolvedConfig, pipeline: Pipeline): PipelineTopology['split'] {
+  return pipeline.split
+    ? {
+        specialist: pipeline.split.specialist,
+        maxGroups: pipeline.split.maxGroups,
+        pipeline: pipeline.split.pipeline ?? null,
+        pipelineName: splitTargetName(config, pipeline),
+      }
+    : null;
+}
+
+function variantTopology(
+  config: ResolvedConfig,
+  pipeline: Pipeline,
+  info: VariantInfo,
+): VariantTopology {
+  const applied = applyVariant(config, pipeline.id, info.id);
+  const own = findPipeline(applied, pipeline.id) ?? pipeline;
+  const steps = groupPipeline(applied, own).steps;
+  return {
+    ...info,
+    steps: steps.map((step) => ({
+      ...stepInfo(applied, steps, step),
+      skipped: info.skip.includes(step.id),
+    })),
+    split: splitInfo(applied, own),
+  };
 }
 
 function shape(config: ResolvedConfig, pipeline: Pipeline): PipelineTopology {
@@ -189,6 +246,9 @@ function shape(config: ResolvedConfig, pipeline: Pipeline): PipelineTopology {
     delivery: { mode: config.delivery.mode, resolver: config.delivery.resolver },
     limits: limitsOf(config, pipeline, steps),
     stages: pipelineStages(config, pipeline),
+    variants: pipelineVariants(config, pipeline.id).map((info) =>
+      variantTopology(config, pipeline, info),
+    ),
   };
 }
 

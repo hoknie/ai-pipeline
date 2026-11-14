@@ -23,9 +23,9 @@ import { ValuesPicker } from '../../../shared/ui/forms/ValuesPicker.tsx';
 import { ModelField } from '../../../shared/ui/forms/picker/ModelField.tsx';
 import { isList, type Draft, type FieldName, type ListField } from './draft.ts';
 
-const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
+export const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
 const PERMISSIONS = ['read', 'edit', 'full'];
-const REASONING_EFFORTS = [
+export const REASONING_EFFORTS = [
   'none',
   'minimal',
   'low',

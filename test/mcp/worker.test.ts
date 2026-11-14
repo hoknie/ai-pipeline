@@ -282,6 +282,28 @@ describe('worker MCP server', () => {
     ]);
   });
 
+  it('passes variant of a queued task from a specialist', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q-abc' };
+      },
+      true,
+    );
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', variant: 'light' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', pipeline: 'feature', variant: 'light', task: 'x' },
+      },
+    ]);
+  });
+
   it('passes autoDeliver of a queued task from a specialist', async () => {
     const calls: unknown[] = [];
     const client = await connect(

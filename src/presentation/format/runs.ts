@@ -1,7 +1,10 @@
 import { type GroupWait, clockTime } from '../../feature/runs/types/index.ts';
 import { formatDiff, limitNote } from './groups.ts';
-import { type Style, plainStyle, statusBadge } from './style.ts';
-import { formatUsage, humanMark, pipelineLabel, seconds, table, taskNumber } from './table.ts';
+import { runHints } from './hints.ts';
+import { progressLine, stepsLine } from './run-steps.ts';
+import { formatUsage } from './numbers.ts';
+import { type Style, isTerminal, plainStyle, statusBadge } from './style.ts';
+import { humanMark, runPipelineLabel, seconds, table, taskNumber } from './table.ts';
 import { formatTagLabels } from './tags.ts';
 import type { RunCreated, RunQueued, RunView, TagView } from '../ipc/contract/index.ts';
 
@@ -37,36 +40,38 @@ function shortTitle(title: string | undefined): string {
 
 export function formatRunList(runs: RunView[], style: Style = plainStyle): string {
   if (runs.length === 0) return 'No runs yet.';
-  return table(
-    [
-      ['#', 'RUN', 'STATE', 'PIPELINE', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
-      ...runs.map((run) => [
-        taskNumber(run.number),
-        style.accent(run.id),
-        statusBadge(run.state, style),
-        pipelineLabel(run.pipeline, run.pipelineName),
-        withTags(shortTitle(run.title), run.tags, style),
-        [
-          run.split && run.split.status !== 'done'
-            ? `split ${run.split.status}`
-            : run.counts || '—',
-          deliveryText(run),
-          answersText(run),
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        formatDiff(run.diff, style),
-        formatUsage(run.usage),
-        run.repository,
-      ]),
-    ],
-    style,
-  );
+  const withRepository = !isTerminal(style) || new Set(runs.map((run) => run.repository)).size > 1;
+  const rows = [
+    ['#', 'RUN', 'STATE', 'PIPELINE', 'TITLE', 'GROUPS', 'CHANGES', 'USAGE', 'REPOSITORY'],
+    ...runs.map((run) => [
+      taskNumber(run.number),
+      style.accent(run.id),
+      statusBadge(run.state, style),
+      runPipelineLabel(run),
+      withTags(shortTitle(run.title), run.tags, style),
+      [
+        run.split && run.split.status !== 'done' ? `split ${run.split.status}` : run.counts || '—',
+        deliveryText(run),
+        answersText(run),
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      formatDiff(run.diff, style),
+      formatUsage(run.usage, style),
+      run.repository,
+    ]),
+  ];
+  return table(withRepository ? rows : rows.map((row) => row.slice(0, -1)), style, { flex: 4 });
 }
 
-export function formatRun(run: RunView, now: number, style: Style = plainStyle): string {
+export function formatRun(
+  run: RunView,
+  now: number,
+  style: Style = plainStyle,
+  activity: readonly string[] = [],
+): string {
   const header = [
-    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${pipelineLabel(run.pipeline, run.pipelineName)} · ${statusBadge(run.state, style)} · ${run.branch}`,
+    `Run ${taskNumber(run.number)} ${style.accent(run.id)} · ${runPipelineLabel(run)} · ${statusBadge(run.state, style)} · ${run.branch}`,
     ...(run.title
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
       : []),
@@ -84,8 +89,11 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
             .join(', ')}`,
         ]
       : []),
-    `${style.muted('Groups:')} ${run.counts || '—'} (${run.total}) · usage ${formatUsage(run.usage)} · started ${seconds(now - run.createdAt)} ago`,
+    `${style.muted('Groups:')} ${run.counts || '—'} (${run.total}) · usage ${formatUsage(run.usage, style)} · started ${seconds(now - run.createdAt)} ago`,
   ];
+  for (const line of [stepsLine(run, style), progressLine(run, style)]) {
+    if (line) header.push(line);
+  }
   const delivery = deliveryText(run);
   if (delivery) header.push(`${style.muted('Delivery:')} ${delivery}`);
   if (run.diff) header.push(`${style.muted('Changes:')} ${formatDiff(run.diff, style)}`);
@@ -111,7 +119,18 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
   if (asked?.question) header.push(style.warning(`  question: ${asked.question}`));
   const answers = decisionLines(run, style);
   if (run.groups.length === 0) return [...header, ...answers].join('\n');
-  const rows = table(
+  const hints = runHints(run, style);
+  const rows = groupTable(run, style);
+  const blocks = [header, [rows], answers, [...activity], hints];
+  return blocks
+    .filter((block) => block.length > 0)
+    .map((block) => block.join('\n'))
+    .join('\n\n');
+}
+
+/** The table of the groups of a run. */
+function groupTable(run: RunView, style: Style): string {
+  return table(
     [
       ['GROUP', 'STATUS', 'STEP', 'ROUND', 'TIME', 'CHANGES', 'DELIVERY', 'NOTE'],
       ...run.groups.map((group) => [
@@ -138,8 +157,8 @@ export function formatRun(run: RunView, now: number, style: Style = plainStyle):
       ]),
     ],
     style,
+    { flex: 7 },
   );
-  return `${header.join('\n')}\n\n${rows}${answers.length > 0 ? `\n\n${answers.join('\n')}` : ''}`;
 }
 
 /** `answers: human N, autopilot M, observer K` for the list of runs; empty without answers. */

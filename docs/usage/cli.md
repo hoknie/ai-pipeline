@@ -9,7 +9,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | `aip run start <pipeline>` | [Queues a task](runs.md#starting-a-task) and starts a stopped queue |
 | `aip run list [run-id] [--tag <name>]` | Active and recent runs; with a run id, the table of that run's groups |
 | `aip run show <run-id>` | The groups of one run and the `System:` line |
-| `aip run watch [run-id]` | Refreshes the state of a run until it finishes |
+| `aip run watch [run-id]` | Redraws the state of a run in place until it finishes |
 | `aip run cancel <run-id>` | Stops a whole run |
 | `aip run pause <run-id>` | [Pauses a run](queue.md#pausing-a-run) |
 | `aip run skip <run-id> <step> [--off] [--json]` | [Skips a step](runs.md#skipping-a-step) for the whole run, or brings it back |
@@ -53,6 +53,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 
 | Command | What it does |
 |---|---|
+| `aip overview [--json] [--watch]` | One summary of all projects: the daemon, what [needs you](runs.md#answering-a-specialist) (questions, failed or conflicting groups, failed or manual deliveries, stopped queues), the busy projects and the unfinished runs; `--watch` redraws it every second and cannot be combined with `--json` |
 | `aip web`, `aip web start\|stop\|restart\|status` | The [web panel](../web/README.md) |
 | `aip stats [--project <path>] [--since 30d] [--json]`, `aip stats clear --project <path>` | [Usage statistics](../configuration/stats.md): tokens, cost and time per task, project, specialist, model, pipeline and runtime; `--since` is `<n>h`, `<n>d`, `<n>w` or `all`; `clear` deletes the records of a project |
 | `aip events --json` | Streams changes as JSON lines: a snapshot first, then one line per change |
@@ -73,6 +74,9 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 In a terminal the output is colored.
 
 - A status icon comes before each state: `✓` done, `✗` error, `?` waiting for an answer, `▸` running, `◦` pending, `⊘` cancelled.
+- `Steps:` of a run shows `✓ ▸ ◦ ⊘` after each step, and `Progress:` a bar of 10 cells (`█████░░░░░ 5/10 steps`). Without color the steps carry `[done]`, `[active]` and `[skipped]` marks and the bar is left out.
+- `aip run show` and `aip run watch` end with dimmed `→` lines holding the next command: `aip group answer`, `aip group retry` or `aip run apply`. Without color there are none.
 - Table headers are dimmed, `+N` is green and `−M` is red.
+- In a colored terminal the tables fit the window width: long titles and notes are cut with `…` (the full text is in `aip run show` and `--json`), usage is short (`92.5k in / 77 out · $0.01`), and `aip run list` hides the `REPOSITORY` column when all runs belong to one project. The width is read when the command starts; restart `aip run watch` after resizing the window.
 - `--no-color` or the `NO_COLOR` variable turn colors off. `FORCE_COLOR=1` turns them on.
-- In a pipe or a file the output has no colors and no icons. MCP tool texts and `--json` output are never colored.
+- In a pipe or a file the output has no colors, no icons, and nothing is cut or shortened. MCP tool texts and `--json` output are never colored.

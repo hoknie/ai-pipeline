@@ -5,6 +5,7 @@ import {
   type ActionPoint,
 } from '../../../../shared/lib/pipeline/pipelineEntries.ts';
 import { stepIds } from '../../stepIds.ts';
+import { variantsOf, variantsValue, type VariantDraft } from '../variants/variantDraft.ts';
 
 export interface StepDraft {
   /** Stable while the step is renamed or moved, so React keeps the focus. */
@@ -40,6 +41,8 @@ export interface Draft {
   split: SplitDraft | null;
   /** Own action lists by point; a point that is absent follows `swarm.stages`. */
   stages: Partial<Record<ActionPoint, string[]>>;
+  /** The variants of the file, in its order; what they change, by the key of the step. */
+  variants: VariantDraft[];
 }
 
 let nextKey = 1;
@@ -121,6 +124,7 @@ export function draftOf(raw: Record<string, unknown>): Draft {
       : [],
     steps,
     stages: ownPointsOf(raw.stages),
+    variants: variantsOf(raw.variants, steps),
     split: split
       ? {
           specialist: text(split.specialist),
@@ -156,6 +160,9 @@ export function valueOf(draft: Draft): Record<string, unknown> {
     stages[point] = list;
   }
   if (Object.keys(stages).length > 0) value.stages = stages;
+  // Before the early return: a pipeline that splits into another one keeps its variants too.
+  const variants = variantsValue(draft.variants, draft.steps, Boolean(draft.split?.pipeline));
+  if (variants !== undefined) value.variants = variants;
   if (draft.split?.pipeline) return value;
   const ids = stepIds(draft.steps);
   value.steps = draft.steps.map((step, index) => {

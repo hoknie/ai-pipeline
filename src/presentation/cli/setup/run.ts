@@ -50,7 +50,10 @@ export async function runSetup(
   return outcomes;
 }
 
-const BADGES: Record<OutcomeStatus, { badge: string; role: keyof Style }> = {
+const BADGES: Record<
+  OutcomeStatus,
+  { badge: string; role: Exclude<keyof Style, 'rich' | 'columns'> }
+> = {
   done: { badge: '✓', role: 'success' },
   configured: { badge: '✓', role: 'success' },
   planned: { badge: '·', role: 'command' },

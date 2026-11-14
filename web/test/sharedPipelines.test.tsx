@@ -195,6 +195,65 @@ describe('shared pipelines group', () => {
   });
 });
 
+describe('variants of a shared pipeline', () => {
+  it('adds a variant in the settings and writes it to the shared file', async () => {
+    const api = show({}, '#settings/global/pipelines/quick');
+    await screen.findByRole('heading', { name: 'Quick' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
+    fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'light' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.writePipeline).toHaveBeenCalled());
+    expect(api.writePipeline).toHaveBeenCalledWith(
+      'quick',
+      expect.objectContaining({ variants: { light: {} } }),
+      'g-quick',
+      'global',
+    );
+  });
+
+  it('loads the models for the variant editor in the settings', async () => {
+    const raw = { steps: STEPS, variants: { light: { name: 'Lite' } } };
+    const api = show(
+      { config: vi.fn(async () => configView({ pipelines: [shared('quick', raw)] })) },
+      '#settings/global/pipelines/quick',
+    );
+    const switcher = await screen.findByRole('radiogroup', { name: 'Pipeline variants' });
+    fireEvent.click(within(switcher).getByRole('radio', { name: 'Lite' }));
+    const region = within(screen.getByRole('region', { name: 'variant light' }));
+    fireEvent.click(await region.findByRole('combobox', { name: 'Model' }));
+    expect(await screen.findByRole('option', { name: 'sonnet' })).toBeTruthy();
+    expect(api.models).toHaveBeenCalled();
+  });
+
+  it('shows the variants of a shared pipeline on the project page without edits', async () => {
+    const raw = {
+      steps: [...STEPS, { id: 'review', specialist: 'reviewer' }],
+      variants: { light: { name: 'Lite', skip: [] } },
+    };
+    show(
+      { config: vi.fn(async () => configView({ pipelines: [shared('quick', raw)] })) },
+      '#pipelines/quick',
+    );
+    const switcher = await screen.findByRole('radiogroup', { name: 'Pipeline variants' });
+    fireEvent.click(within(switcher).getByRole('radio', { name: 'Lite' }));
+    expect((screen.getByLabelText('Name') as HTMLInputElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Add variant' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Delete variant' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    const skips = document.querySelectorAll<HTMLButtonElement>('[id*="-skip-"]');
+    expect(skips.length).toBe(2);
+    for (const skip of skips) expect(skip.disabled).toBe(true);
+    const combos = within(screen.getByRole('region', { name: 'variant light' })).getAllByRole(
+      'combobox',
+    );
+    expect(combos.length).toBeGreaterThan(0);
+    for (const combo of combos) expect((combo as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
 describe('usage of a shared pipeline', () => {
   it('shows the number of projects, their references and the shared level', async () => {
     show({}, '#settings/global/pipelines/quick');

@@ -130,10 +130,9 @@ export function planDispatch(
       waits.set(key, networkWait);
       continue;
     }
-    const slug = group.pending
-      ? stepsOf(state.run, group)[group.pending.stepIndex]?.specialist
-      : undefined;
-    const specialist = slug ? specialistOfStep(state.run, group, slug) : undefined;
+    const step = group.pending ? stepsOf(state.run, group)[group.pending.stepIndex] : undefined;
+    const slug = step?.specialist;
+    const specialist = step ? specialistOfStep(state.run, group, step) : undefined;
     // The repair waits for no limit here: an agent that hits one ends the repair.
     if (isRepairGroup(group)) {
       start.push({ state, group });

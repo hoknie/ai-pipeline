@@ -31,6 +31,8 @@ describe('text for people', () => {
         'Title: Группа 1, Группа 2',
         'Repository: /repo',
         'Groups: running 1 · needs_human 1 (2) · usage — · started 2m00s ago',
+        'Steps: Планировщик [active] → Кодировщик → Ревьюер → Тестировщик',
+        'Progress: 0/8 steps',
         '',
         'GROUP     STATUS       STEP         ROUND  TIME   CHANGES  DELIVERY  NOTE',
         'gruppa-1  needs_human  Планировщик  1      1m00s  —        —         question: OAuth или пароль?',

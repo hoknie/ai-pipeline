@@ -15,6 +15,7 @@ import { findExecutable } from '../../../platform/process/index.ts';
 import { agentExecutable } from '../../../app/maintenance.ts';
 
 import { probeVersion } from '../probe.ts';
+import { presentVariants } from './present-variants.ts';
 
 type Config = ResolvedConfig;
 
@@ -156,6 +157,9 @@ function presentPipelines(config: Config): unknown {
           : {}),
         ...(pipeline.split ? { split: presentSplit(pipeline.split) } : {}),
         ...(pipeline.split?.pipeline ? {} : { steps: presentSteps(pipeline) }),
+        ...(pipeline.variants && pipeline.variants.length > 0
+          ? { variants: presentVariants(pipeline) }
+          : {}),
       },
     ]),
   );

@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import {
   ConfigLoadError,
   pipelineNameOf,
+  variantNameOf,
   type ConfigPaths,
   type DeliveryMode,
   type NetworkSettings,
@@ -19,6 +20,8 @@ export interface DeliverySettings {
   auto: boolean | null;
   mode: DeliveryMode | null;
   names: (id: string) => string;
+  /** Name of a variant of a pipeline; the id without such a variant. */
+  variantNames: (pipeline: string, variant: string) => string;
 }
 
 /** The configuration files of the repositories, read from disk on every call. */
@@ -51,9 +54,16 @@ export class ConfigService {
         auto: config.delivery.auto,
         mode: config.delivery.mode,
         names: (id) => pipelineNameOf(config, id),
+        variantNames: (pipeline, variant) => variantNameOf(config, pipeline, variant),
       };
     } catch (error) {
-      if (error instanceof ConfigLoadError) return { auto: null, mode: null, names: (id) => id };
+      if (error instanceof ConfigLoadError)
+        return {
+          auto: null,
+          mode: null,
+          names: (id) => id,
+          variantNames: (_pipeline, variant) => variant,
+        };
       throw error;
     }
   }

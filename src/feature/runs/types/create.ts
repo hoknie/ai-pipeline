@@ -1,10 +1,14 @@
-import { invalid } from '../../../platform/errors/index.ts';
+import { invalid, rejected } from '../../../platform/errors/index.ts';
 import { RUN_NAME_LIMIT } from '../../agents/types/index.ts';
 import {
   type DeliveryMode,
+  DEFAULT_VARIANT,
   type ResolvedConfig,
+  applyVariant,
+  checkVariant,
   findPipeline,
   isValidSlug,
+  variantSkip,
 } from '../../swarm-config/types/index.ts';
 import { SPLIT_GROUP } from './constants.ts';
 import { newGroup } from './group.ts';
@@ -27,6 +31,8 @@ export interface RunRequest {
   autoDeliver?: boolean | undefined;
   deliveryMode?: DeliveryMode | undefined;
   skip?: string[] | undefined;
+  /** Id of a variant of the pipeline; absent: `default`. */
+  variant?: string | undefined;
 }
 
 /** A run the queue has just created. */
@@ -78,6 +84,8 @@ export interface NewRun {
   tags?: string[] | undefined;
   /** Ids of pipeline steps this run skips. */
   skip?: string[] | undefined;
+  /** Id of a variant of the pipeline; absent: `default`. */
+  variant?: string | undefined;
 }
 
 export function createRun(input: NewRun): RunState {
@@ -95,7 +103,13 @@ export function createRun(input: NewRun): RunState {
     if (group.task.trim() === '')
       throw invalid('core.invalid_run', `group \`${group.title}\` has an empty task`);
   }
-  const skipped = applySkip(input.config, input.pipeline, input.skip ?? []);
+  const variant = input.variant ?? DEFAULT_VARIANT;
+  const variantError = checkVariant(input.config, input.pipeline, variant);
+  if (variantError !== null) throw rejected(variantError);
+  const skipped = applySkip(applyVariant(input.config, input.pipeline, variant), input.pipeline, [
+    ...variantSkip(input.config, input.pipeline, variant),
+    ...(input.skip ?? []),
+  ]);
   const config =
     input.autoDeliver === undefined && input.deliveryMode === undefined
       ? skipped
@@ -115,6 +129,7 @@ export function createRun(input: NewRun): RunState {
       id: input.id,
       repository: input.repository,
       pipeline: input.pipeline,
+      variant,
       baseCommit: input.baseCommit,
       branch: `refs/aip/${input.id}/run`,
       refStyle: 'refs',

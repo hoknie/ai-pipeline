@@ -44,6 +44,8 @@ export function useEditorFields(pipeline: EditorPipeline | null, sharedOnly?: Sh
   const [saveAs, setSaveAs] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('form');
+  /** The key of the variant the form shows; null: `default`, the pipeline itself. */
+  const [variant, setVariant] = useState<number | null>(null);
   return {
     level,
     setLevel,
@@ -57,6 +59,8 @@ export function useEditorFields(pipeline: EditorPipeline | null, sharedOnly?: Sh
     setBusy,
     tab,
     setTab,
+    variant,
+    setVariant,
   };
 }
 

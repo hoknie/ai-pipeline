@@ -5,8 +5,9 @@ import {
   type ResolvedConfig,
   type Specialist,
   type SpecialistLevel,
+  type StepAgent,
   findPipeline,
-  findSpecialist,
+  stepSpecialist,
 } from '../../swarm-config/types/index.ts';
 import {
   type IncidentKind,
@@ -25,6 +26,8 @@ export interface Run {
   id: string;
   repository: string;
   pipeline: string;
+  /** Id of the pipeline variant the run follows; `default` for the pipeline as it is. */
+  variant: string;
   baseCommit: string;
   branch: string;
   refStyle: RefStyle;
@@ -253,9 +256,13 @@ export function finishedApartFromRepair(state: RunState): boolean {
 }
 
 /** The specialist of a step: the snapshot of the observer for the repair group, else the config. */
-export function specialistOfStep(run: Run, group: Group, slug: string): Specialist | undefined {
+export function specialistOfStep(
+  run: Run,
+  group: Group,
+  step: { specialist: string; agent?: StepAgent },
+): Specialist | undefined {
   if (isRepairGroup(group)) return run.repair.specialist ?? undefined;
-  return findSpecialist(run.config, slug);
+  return stepSpecialist(run.config, step);
 }
 
 /** Work groups and the split step of a run that a retry can continue. */

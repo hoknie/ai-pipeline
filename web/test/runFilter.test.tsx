@@ -63,6 +63,27 @@ describe('search by task number', () => {
   });
 });
 
+describe('filter by the variant', () => {
+  const mixed = [
+    runView({ id: 'l1', variant: 'light', variantName: 'Лёгкий' }),
+    runView({ id: 'l2', variant: 'light', variantName: 'Лёгкий' }),
+    runView({ id: 'd1' }),
+  ];
+
+  it('shows only the light runs and counts the variants', () => {
+    expect(ids(find(mixed, '', only({ variants: ['light'] })))).toEqual(['l1', 'l2']);
+    expect(ids(find(mixed, '', only({ variants: ['default'] })))).toEqual(['d1']);
+    expect(ids(find(mixed, '', only({ variants: ['light', 'default'] })))).toHaveLength(3);
+    const counts = optionCounts(mixed, '', EMPTY_FILTERS, 'all', null, new Map(), 'variants');
+    expect(counts.get('light')).toBe(2);
+    expect(counts.get('default')).toBe(1);
+  });
+
+  it('finds a run by the name of its variant', () => {
+    expect(ids(find(mixed, 'лёгк'))).toEqual(['l1', 'l2']);
+  });
+});
+
 describe('navRunCounts', () => {
   it('counts the unfinished runs and those waiting for an answer', () => {
     expect(navRunCounts(runs)).toEqual({ working: 3, waiting: 1 });

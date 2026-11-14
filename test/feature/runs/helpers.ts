@@ -41,6 +41,8 @@ export function run(
     autoDeliver?: boolean;
     deliveryMode?: 'worktree' | 'commit' | 'branch';
     skip?: string[];
+    pipeline?: string;
+    variant?: string;
   } = {},
 ): RunState {
   const resolved = config(options.configText);
@@ -49,7 +51,7 @@ export function run(
     id: options.id ?? 'run000000001',
     number: 1,
     repository: '/repo',
-    pipeline: 'feature',
+    pipeline: options.pipeline ?? 'feature',
     baseCommit: 'abc',
     config: resolved,
     dirtyWarning: false,
@@ -62,6 +64,7 @@ export function run(
     autoDeliver: options.autoDeliver,
     deliveryMode: options.deliveryMode,
     skip: options.skip,
+    variant: options.variant,
   });
 }
 
