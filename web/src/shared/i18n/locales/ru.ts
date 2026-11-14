@@ -1494,6 +1494,7 @@ export const ru: Dictionary = {
     },
   },
   settingsPage: {
+    invalidJson: 'Введите корректный JSON-объект.',
     groups: 'группы настроек',
     beta: 'beta',
     betaHint: 'ещё дорабатывается: поведение и настройки могут измениться',
@@ -1641,6 +1642,8 @@ export const ru: Dictionary = {
       general_naming: 'Именование',
       agents_defaults: 'Значения специалистов по умолчанию',
       agents_claude: 'Claude',
+      agents_opencode: 'OpenCode',
+      agents_agy: 'Antigravity CLI (agy) — агент',
       delivery_delivery: 'Доставка',
       delivery_message: 'Сообщение',
       delivery_conflicts: 'Конфликты',
@@ -1687,6 +1690,26 @@ export const ru: Dictionary = {
       claude_edit_mode: { label: 'Режим правок', hint: 'Как Claude разрешено править файлы.' },
       claude_mcp: { label: 'MCP-серверы', hint: 'Берёт ли Claude ваши MCP-серверы.' },
       claude_settings: { label: 'Настройки Claude', hint: 'Берёт ли Claude ваши настройки.' },
+      claude_overrides: {
+        label: 'Дополнительные настройки',
+        hint: 'JSON в файле --settings Claude; права и MCP задаёт aip.',
+      },
+      opencode_mcp: {
+        label: 'MCP-серверы',
+        hint: 'Наследует ли OpenCode пользовательские MCP-серверы.',
+      },
+      opencode_overrides: {
+        label: 'Дополнительные настройки',
+        hint: 'JSON в opencode.json попытки; права и MCP задаёт aip.',
+      },
+      agy_mcp: {
+        label: 'MCP-серверы',
+        hint: 'Наследует ли Antigravity пользовательские MCP-серверы.',
+      },
+      agy_overrides: {
+        label: 'Дополнительные настройки',
+        hint: 'JSON в settings.json попытки; права и MCP задаёт aip.',
+      },
       delivery_mode: { label: 'Способ доставки', hint: 'Куда попадает результат запуска.' },
       delivery_auto: { label: 'Автодоставка', hint: 'Доставлять сразу после завершения запуска.' },
       delivery_keep: { label: 'Хранить результат', hint: 'Хранить скрытые ссылки доставленного.' },

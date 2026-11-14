@@ -52,7 +52,12 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
         'defaults.tools',
       ],
     },
-    { key: 'claude', paths: ['claude.edit_mode', 'claude.mcp', 'claude.settings'] },
+    {
+      key: 'claude',
+      paths: ['claude.edit_mode', 'claude.mcp', 'claude.settings', 'claude.overrides'],
+    },
+    { key: 'opencode', paths: ['opencode.mcp', 'opencode.overrides'] },
+    { key: 'agy', paths: ['agy.mcp', 'agy.overrides'] },
   ],
   delivery: [
     { key: 'delivery', paths: ['delivery.mode', 'delivery.auto', 'delivery.keep'] },

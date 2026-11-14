@@ -1446,6 +1446,7 @@ export const zh: Dictionary = {
     },
   },
   settingsPage: {
+    invalidJson: '请输入有效的 JSON 对象。',
     groups: '设置分组',
     beta: 'beta',
     betaHint: '仍在开发中：行为和设置可能会变化',
@@ -1577,6 +1578,8 @@ export const zh: Dictionary = {
       general_naming: '命名',
       agents_defaults: '专家默认值',
       agents_claude: 'Claude',
+      agents_opencode: 'OpenCode',
+      agents_agy: 'Antigravity CLI (agy) 代理',
       delivery_delivery: '交付',
       delivery_message: '信息',
       delivery_conflicts: '冲突',
@@ -1605,6 +1608,20 @@ export const zh: Dictionary = {
       claude_edit_mode: { label: '编辑模式', hint: '允许 Claude 如何编辑文件。' },
       claude_mcp: { label: 'MCP 服务器', hint: 'Claude 是否使用您的 MCP 服务器。' },
       claude_settings: { label: 'Claude 设置', hint: 'Claude 是否使用您自己的设置。' },
+      claude_overrides: {
+        label: '附加设置',
+        hint: 'Claude --settings 文件中的 JSON；权限和 MCP 由 aip 控制。',
+      },
+      opencode_mcp: { label: 'MCP 服务器', hint: 'OpenCode 是否继承用户的 MCP 服务器。' },
+      opencode_overrides: {
+        label: '附加设置',
+        hint: 'opencode.json 中的 JSON；权限和 MCP 由 aip 控制。',
+      },
+      agy_mcp: { label: 'MCP 服务器', hint: 'Antigravity 是否继承用户的 MCP 服务器。' },
+      agy_overrides: {
+        label: '附加设置',
+        hint: 'settings.json 中的 JSON；权限和 MCP 由 aip 控制。',
+      },
       delivery_mode: { label: '交付方式', hint: '运行结果的去向。' },
       delivery_auto: { label: '自动交付', hint: '运行结束后立即交付。' },
       delivery_keep: { label: '保留结果', hint: '保留已交付的隐藏引用。' },

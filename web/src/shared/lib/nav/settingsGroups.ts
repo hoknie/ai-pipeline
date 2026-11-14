@@ -95,7 +95,7 @@ export function settingsLocationOf(
 /** The group of a settings field: `swarm.web.port` and `web.port` are «system». */
 export function groupOf(path: string): SettingsGroup {
   const section = path.replace(/^swarm\./, '').split('.')[0] ?? '';
-  if (section === 'defaults' || section === 'claude') return 'agents';
+  if (['defaults', 'claude', 'opencode', 'agy'].includes(section)) return 'agents';
   if (section === 'delivery') return 'delivery';
   if (section === 'runtimes') return 'runtimes';
   if (section === 'web' || section === 'network') return 'system';

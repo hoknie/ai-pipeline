@@ -1500,6 +1500,7 @@ export const es: Dictionary = {
     },
   },
   settingsPage: {
+    invalidJson: 'Introduzca un objeto JSON válido.',
     groups: 'grupos de ajustes',
     beta: 'beta',
     betaHint: 'aún en desarrollo: el comportamiento y los ajustes pueden cambiar',
@@ -1647,6 +1648,8 @@ export const es: Dictionary = {
       general_naming: 'Nombres',
       agents_defaults: 'Valores por defecto de especialistas',
       agents_claude: 'Claude',
+      agents_opencode: 'OpenCode',
+      agents_agy: 'Antigravity CLI (agy) — agente',
       delivery_delivery: 'Entrega',
       delivery_message: 'Mensaje',
       delivery_conflicts: 'Conflictos',
@@ -1708,6 +1711,26 @@ export const es: Dictionary = {
       claude_edit_mode: { label: 'Modo de edición', hint: 'Cómo puede Claude editar archivos.' },
       claude_mcp: { label: 'Servidores MCP', hint: 'Si Claude usa sus servidores MCP.' },
       claude_settings: { label: 'Ajustes de Claude', hint: 'Si Claude usa sus propios ajustes.' },
+      claude_overrides: {
+        label: 'Ajustes adicionales',
+        hint: 'JSON en --settings de Claude; aip controla permisos y MCP.',
+      },
+      opencode_mcp: {
+        label: 'Servidores MCP',
+        hint: 'Si OpenCode hereda servidores MCP del usuario.',
+      },
+      opencode_overrides: {
+        label: 'Ajustes adicionales',
+        hint: 'JSON en opencode.json; aip controla permisos y MCP.',
+      },
+      agy_mcp: {
+        label: 'Servidores MCP',
+        hint: 'Si Antigravity hereda servidores MCP del usuario.',
+      },
+      agy_overrides: {
+        label: 'Ajustes adicionales',
+        hint: 'JSON en settings.json; aip controla permisos y MCP.',
+      },
       delivery_mode: { label: 'Modo de entrega', hint: 'Adónde va el resultado de una ejecución.' },
       delivery_auto: { label: 'Entrega automática', hint: 'Entregar al terminar la ejecución.' },
       delivery_keep: {

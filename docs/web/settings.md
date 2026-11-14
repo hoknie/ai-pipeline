@@ -8,7 +8,7 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults and Claude, and the tab ["MCP servers"](#mcp-servers)), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system).
+"General" (runs, working copy, naming), "Agents" (defaults, Claude, OpenCode and Antigravity, and the tab ["MCP servers"](#mcp-servers)), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system).
 Fields of `web.*`, `runtimes.*`, `network.*`, `attachments.*` and `stats.*` exist only here.
 
 ## Project groups
@@ -34,7 +34,10 @@ Fields of `web.*`, `runtimes.*`, `network.*`, `attachments.*` and `stats.*` exis
 
 ## MCP servers
 
-The group "Agents" has two tabs, "Main" (defaults and Claude) and "MCP servers", on both "Shared" and "Project". The address is `#settings/<tab>/agents/mcp`; an unknown tab opens "Main".
+The group "Agents" has two tabs, "Main" (defaults and the three agents) and "MCP servers", on both "Shared" and "Project". The address is `#settings/<tab>/agents/mcp`; an unknown tab opens "Main".
+The agent cards set the MCP inheritance mode and additional settings as JSON objects.
+An invalid object is reported at the field and is not saved. The project can inherit the shared value.
+See [runtime settings](../configuration/runtimes.md#runtime-overrides) for where each object goes and which keys aip reserves.
 
 The tab lists the servers of the [`mcp_servers` catalog](../configuration/specialists.md#mcp-servers), each with its command, a mark of where it is defined ("Shared", "In project" or "Project over shared") and the number of specialists that get it. Without servers the tab explains what the catalog is and offers "New server".
 

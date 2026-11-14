@@ -4,7 +4,13 @@ import { z } from 'zod';
 
 /** A value of a field of settings.yaml; null removes the field. */
 export const settingValueSchema = z
-  .union([z.boolean(), z.number(), z.string(), z.array(z.string())])
+  .union([
+    z.boolean(),
+    z.number(),
+    z.string(),
+    z.array(z.string()),
+    z.record(z.string(), z.unknown()),
+  ])
   .nullable();
 
 /** A path of the catalog of writable fields, also `runtimes.<runtime>.env.<NAME>`. */
@@ -12,6 +18,12 @@ const settingPathSchema = z
   .string()
   .min(1)
   .refine((path) => settingFieldOf(path) !== undefined, { message: 'unknown setting' });
+
+function settingValueFits(path: string, value: unknown): boolean {
+  if (value === null) return true;
+  const object = typeof value === 'object' && !Array.isArray(value);
+  return (settingFieldOf(path)?.kind === 'json') === object;
+}
 
 /** The name of a server of the catalog: letters, digits, `-` and `_`; `aip` is the worker of aip. */
 export const mcpServerNameSchema = z
@@ -72,26 +84,36 @@ export const configRequests = [
   }),
   z.object({
     method: z.literal('config_setting'),
-    params: z.object({
-      repository: z.string().min(1),
-      path: settingPathSchema,
-      value: settingValueSchema,
-      revision: z.string().min(1).nullable(),
-      level: writeLevelSchema.default('global'),
-    }),
+    params: z
+      .object({
+        repository: z.string().min(1),
+        path: settingPathSchema,
+        value: settingValueSchema,
+        revision: z.string().min(1).nullable(),
+        level: writeLevelSchema.default('global'),
+      })
+      .refine(({ path, value }) => settingValueFits(path, value), {
+        message: 'invalid setting value',
+      }),
   }),
   z.object({
     method: z.literal('config_settings'),
-    params: z.object({
-      repository: z.string().min(1),
-      values: z
-        .record(settingPathSchema, settingValueSchema)
-        .refine((values) => Object.keys(values).length > 0, {
-          message: 'values must not be empty',
-        }),
-      revision: z.string().min(1).nullable(),
-      level: writeLevelSchema.default('global'),
-    }),
+    params: z
+      .object({
+        repository: z.string().min(1),
+        values: z
+          .record(settingPathSchema, settingValueSchema)
+          .refine((values) => Object.keys(values).length > 0, {
+            message: 'values must not be empty',
+          }),
+        revision: z.string().min(1).nullable(),
+        level: writeLevelSchema.default('global'),
+      })
+      .refine(
+        ({ values }) =>
+          Object.entries(values).every(([path, value]) => settingValueFits(path, value)),
+        { message: 'invalid setting value' },
+      ),
   }),
   z.object({
     method: z.literal('config_mcp_server'),

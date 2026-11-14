@@ -1,6 +1,8 @@
 export const KEYED_SECTIONS = new Set([
   'defaults',
   'claude',
+  'opencode',
+  'agy',
   'delivery',
   'workspace',
   'naming',

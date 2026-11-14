@@ -1472,6 +1472,7 @@ export const en = {
     },
   },
   settingsPage: {
+    invalidJson: 'Enter a valid JSON object.',
     groups: 'groups of settings',
     beta: 'beta',
     betaHint: 'still in development: behaviour and settings may change',
@@ -1617,6 +1618,8 @@ export const en = {
       general_naming: 'Naming',
       agents_defaults: 'Defaults of specialists',
       agents_claude: 'Claude',
+      agents_opencode: 'OpenCode',
+      agents_agy: 'Antigravity CLI (agy)',
       delivery_delivery: 'Delivery',
       delivery_message: 'Message',
       delivery_conflicts: 'Conflicts',
@@ -1668,6 +1671,20 @@ export const en = {
       defaults_tools: { label: 'Tools', hint: 'Tools a specialist may use.' },
       claude_edit_mode: { label: 'Edit mode', hint: 'How Claude is allowed to edit files.' },
       claude_mcp: { label: 'MCP servers', hint: 'Whether Claude takes your MCP servers.' },
+      claude_overrides: {
+        label: 'Additional settings',
+        hint: 'JSON in the Claude --settings file; aip controls permissions and MCP.',
+      },
+      opencode_mcp: { label: 'MCP servers', hint: 'Whether OpenCode inherits user MCP servers.' },
+      opencode_overrides: {
+        label: 'Additional settings',
+        hint: 'JSON in the attempt opencode.json; aip controls permissions and MCP.',
+      },
+      agy_mcp: { label: 'MCP servers', hint: 'Whether Antigravity inherits user MCP servers.' },
+      agy_overrides: {
+        label: 'Additional settings',
+        hint: 'JSON in the attempt settings.json; aip controls permissions and MCP.',
+      },
       claude_settings: {
         label: 'Claude settings',
         hint: 'Whether Claude takes your own settings.',

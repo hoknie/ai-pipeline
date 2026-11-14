@@ -15,16 +15,22 @@ export interface SpecialistPermissions {
   queue: boolean;
 }
 
+interface RuntimeRefresh {
+  opencode?: ResolvedConfig['opencode'];
+  agy?: ResolvedConfig['agy'];
+  claudeOverrides?: Record<string, unknown>;
+}
+
 /**
  * Permissions read from the current configuration before a retry or an answer, or the reason they
  * could not be read.
  */
 export type PermissionsRefresh =
-  | {
+  | (RuntimeRefresh & {
       specialists: Record<string, SpecialistPermissions>;
       claudeEditMode: ClaudeEditMode;
       claudeSettings: ClaudeSettingsSource;
-    }
+    })
   | { error: string };
 
 /** Permissions of every specialist of a configuration, for a refresh. */
@@ -42,6 +48,9 @@ export function permissionsOf(config: ResolvedConfig): PermissionsRefresh {
     specialists,
     claudeEditMode: config.claude.editMode,
     claudeSettings: config.claude.settings,
+    opencode: structuredClone(config.opencode),
+    agy: structuredClone(config.agy),
+    claudeOverrides: structuredClone(config.claude.overrides),
   };
 }
 
@@ -64,11 +73,12 @@ export function refreshPermissions(
   }
   config.claude.editMode = refresh.claudeEditMode;
   config.claude.settings = refresh.claudeSettings;
+  applyRuntimeRefresh(config, refresh);
   return null;
 }
 
 /** Whole definitions of the specialists of the current configuration, for a retry with it. */
-export interface SpecialistsRefresh {
+export interface SpecialistsRefresh extends RuntimeRefresh {
   specialists: Specialist[];
   chains?: RuntimeChain[];
   claudeEditMode: ClaudeEditMode;
@@ -94,6 +104,9 @@ export function specialistsOf(config: ResolvedConfig): SpecialistsRefresh {
     })),
     claudeEditMode: config.claude.editMode,
     claudeSettings: config.claude.settings,
+    opencode: structuredClone(config.opencode),
+    agy: structuredClone(config.agy),
+    claudeOverrides: structuredClone(config.claude.overrides),
   };
 }
 
@@ -168,6 +181,7 @@ export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsR
   }
   config.claude.editMode = refresh.claudeEditMode;
   config.claude.settings = refresh.claudeSettings;
+  applyRuntimeRefresh(config, refresh);
   if (refresh.chains) {
     config.chains = refresh.chains.map((chain) => ({
       ...chain,
@@ -175,6 +189,12 @@ export function refreshSpecialists(config: ResolvedConfig, refresh: SpecialistsR
     }));
   }
   return changes;
+}
+
+function applyRuntimeRefresh(config: ResolvedConfig, refresh: RuntimeRefresh): void {
+  if (refresh.opencode) config.opencode = structuredClone(refresh.opencode);
+  if (refresh.agy) config.agy = structuredClone(refresh.agy);
+  if (refresh.claudeOverrides) config.claude.overrides = structuredClone(refresh.claudeOverrides);
 }
 
 /** A tool call refused by the agent CLI; `command` is set for shell commands. */

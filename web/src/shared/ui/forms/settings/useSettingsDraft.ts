@@ -13,6 +13,8 @@ export type Drafts = Record<string, DraftValue>;
 function fieldPathOf(path: string, known: ReadonlySet<string>): string | null {
   const bare = path.replace(/^swarm\./, '').replace(/\[\d+\]$/, '');
   if (known.has(bare)) return bare;
+  const overrides = /^(claude|opencode|agy)\.overrides\./.exec(bare);
+  if (overrides && known.has(`${overrides[1]}.overrides`)) return `${overrides[1]}.overrides`;
   const env = /^(runtimes\.[a-z]+\.env)\./.exec(bare);
   return env && known.has(env[1] as string) ? (env[1] as string) : null;
 }
@@ -52,6 +54,23 @@ interface Outcome {
   others: string[];
 }
 const NO_OUTCOME: Outcome = { conflict: null, failure: null, fields: new Map(), others: [] };
+
+function parseJsonDrafts(drafts: Drafts, config: ConfigEditorResponse, message: string) {
+  const fields = new Map<string, string>();
+  const parsed = { ...drafts };
+  for (const [path, value] of Object.entries(drafts)) {
+    if (config.settings.find((field) => field.path === path)?.kind !== 'json' || value === INHERIT)
+      continue;
+    try {
+      const object: unknown = typeof value === 'string' ? JSON.parse(value) : value;
+      if (object === null || typeof object !== 'object' || Array.isArray(object)) throw new Error();
+      parsed[path] = object as Record<string, unknown>;
+    } catch {
+      fields.set(path, message);
+    }
+  }
+  return { parsed, fields };
+}
 
 /** The draft of a form, the errors of the file and of the last write, and the write itself. */
 export function useSettingsDraft({
@@ -102,11 +121,16 @@ export function useSettingsDraft({
     setOutcome(NO_OUTCOME);
   };
   const save = async () => {
+    const { parsed, fields } = parseJsonDrafts(drafts, config, t('settingsPage.invalidJson'));
+    if (fields.size > 0) {
+      setOutcome({ ...NO_OUTCOME, fields });
+      return;
+    }
     setBusy(true);
     setOutcome((current) => ({ ...current, conflict: null, failure: null }));
     try {
       const result = await api.writeSettings(
-        valuesOf(drafts),
+        valuesOf(parsed),
         config.settingsFiles[scope].revision,
         scope,
       );

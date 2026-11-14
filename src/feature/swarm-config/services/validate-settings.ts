@@ -14,13 +14,6 @@ import {
   readTimeout,
 } from './validate-context.ts';
 import {
-  CLAUDE_EDIT_MODES,
-  CLAUDE_MCP_MODES,
-  CLAUDE_SETTINGS_SOURCES,
-  type ClaudeEditMode,
-  type ClaudeMcpMode,
-  type ClaudeSettings,
-  type ClaudeSettingsSource,
   DELIVERY_MODES,
   type DeliveryMode,
   type DeliverySettings,
@@ -43,8 +36,6 @@ import {
   RUNTIMES,
   modelIdProblem,
 } from '../types/specialist.ts';
-
-const CLAUDE_KEYS = ['edit_mode', 'mcp', 'settings'];
 
 const DELIVERY_KEYS = [
   'mode',
@@ -206,35 +197,6 @@ export function checkDefaults(ctx: ValidateContext, value: unknown, defaults: De
       defaults.timeoutSeconds = readTimeout(ctx, field, path) ?? defaults.timeoutSeconds;
     if (key === 'allow_commands') defaults.allowCommands = readStrings(ctx, field, path);
     if (key === 'tools') defaults.tools = readStrings(ctx, field, path);
-  }
-}
-
-export function checkClaude(ctx: ValidateContext, value: unknown, claude: ClaudeSettings): void {
-  const mapping = readMapping(ctx, value, 'swarm.claude');
-  if (!mapping) return;
-  readEntries(ctx, mapping, 'swarm.claude', CLAUDE_KEYS);
-  if ('edit_mode' in mapping) {
-    claude.editMode =
-      readChoice<ClaudeEditMode>(
-        ctx,
-        mapping.edit_mode,
-        'swarm.claude.edit_mode',
-        CLAUDE_EDIT_MODES,
-      ) ?? claude.editMode;
-  }
-  if ('mcp' in mapping) {
-    claude.mcp =
-      readChoice<ClaudeMcpMode>(ctx, mapping.mcp, 'swarm.claude.mcp', CLAUDE_MCP_MODES) ??
-      claude.mcp;
-  }
-  if ('settings' in mapping) {
-    claude.settings =
-      readChoice<ClaudeSettingsSource>(
-        ctx,
-        mapping.settings,
-        'swarm.claude.settings',
-        CLAUDE_SETTINGS_SOURCES,
-      ) ?? claude.settings;
   }
 }
 

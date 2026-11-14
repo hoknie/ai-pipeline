@@ -11,6 +11,7 @@ import type { SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 import { ValuesPicker } from '../ValuesPicker.tsx';
 import { ModelSettingControl } from './ModelSettingControl.tsx';
 import { ProjectsField } from './ProjectsField.tsx';
+import { JsonField } from './JsonField.tsx';
 
 import { MULTILINE_FIELDS, NONE, choiceItems, fieldKey } from './settingFields.ts';
 import type { SpecialistOption } from '../../../lib/specialistLabels.ts';
@@ -114,6 +115,8 @@ function TextControl({ setting, id, shown, locked, invalid, runtime, onChange }:
 function SettingControl(props: ControlProps) {
   const { setting, id, label, shown, locked, invalid, onChange } = props;
   switch (setting.kind) {
+    case 'json':
+      return <JsonField {...{ id, shown, locked, invalid, onChange }} />;
     case 'boolean':
       return (
         <Switch

@@ -1,4 +1,5 @@
 import { dirname, join } from 'node:path';
+import { overlay } from '../../types/overlay.ts';
 
 import {
   systemPrompt,
@@ -14,6 +15,17 @@ import { createAgyParser } from './parser.ts';
 import { agyServerNames, agySettings, AGY_ONE_SHOT_SETTINGS } from './permissions.ts';
 import { agyTranscript } from './transcript.ts';
 import { agyHookFiles } from './hooks.ts';
+
+function settings(context: LaunchContext, server: string): Record<string, unknown> {
+  return overlay(context.overrides?.agy ?? {}, agySettings(context, server), [
+    ['agentMode'],
+    ['toolPermission'],
+    ['enableTerminalSandbox'],
+    ['allowNonWorkspaceAccess'],
+    ['artifactReviewPolicy'],
+    ['permissions'],
+  ]);
+}
 
 function launch(executable: string, extra: RuntimeExtra, context: LaunchContext): Launch {
   // A unique name avoids a user's running `aip` MCP server taking this worker's name.
@@ -34,6 +46,7 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
     server,
     tools,
     servers: agyServerNames(context, server),
+    inheritMcp: context.agyMcp === 'inherit',
     readDirectories: !context.attachmentsDirectory ? [] : [context.attachmentsDirectory],
   };
   return {
@@ -56,7 +69,10 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
     env: { ...extra.env },
     files: [
       ...agyHookFiles(directory, policy),
-      { path: settingsPath, content: JSON.stringify(agySettings(context, server), null, 2) },
+      {
+        path: settingsPath,
+        content: JSON.stringify(settings(context, server), null, 2),
+      },
       {
         path: join(directory, '.agents', 'mcp_config.json'),
         content: JSON.stringify(
@@ -113,6 +129,7 @@ function oneShot(executable: string, extra: RuntimeExtra, request: OneShotReques
         server: '',
         tools: [],
         servers: [],
+        inheritMcp: false,
         readDirectories: [],
       }),
     ],

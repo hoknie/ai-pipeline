@@ -871,6 +871,27 @@ describe('settings form', () => {
     expect(saveButton().disabled).toBe(true);
   });
 
+  it('validates JSON locally and writes a JSON object', async () => {
+    const api = show(queueOf(), {}, '#settings/project/agents');
+    const field = await screen.findByTestId('setting-opencode.overrides');
+    const input = within(field).getByRole('textbox');
+    fireEvent.change(input, { target: { value: '{ provider: }' } });
+    fireEvent.click(saveButton());
+    expect((await within(field).findByRole('alert')).textContent).toContain(
+      'Enter a valid JSON object.',
+    );
+    expect(api.writeSettings).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: '{"provider":{"local":{}}}' } });
+    fireEvent.click(saveButton());
+    await waitFor(() =>
+      expect(api.writeSettings).toHaveBeenCalledWith(
+        { 'opencode.overrides': { provider: { local: {} } } },
+        null,
+        'project',
+      ),
+    );
+  });
+
   it('writes a list of strings without the removed item', async () => {
     const config = vi.fn(async () =>
       configView({

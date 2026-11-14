@@ -30,9 +30,15 @@ export async function run(h: Harness, count = 1): Promise<string> {
     .runId;
 }
 
-export function calls(
-  h: Harness,
-): { step: string; group: string; args: string[]; mode?: string; workerServer?: string }[] {
+export function calls(h: Harness): {
+  step: string;
+  group: string;
+  args: string[];
+  mode?: string;
+  workerServer?: string;
+  configContent?: string;
+  settings?: Record<string, unknown>;
+}[] {
   return readFileSync(join(h.fakeState, 'calls.jsonl'), 'utf8')
     .trim()
     .split('\n')

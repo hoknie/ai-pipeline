@@ -94,6 +94,31 @@ OpenCode applies the selected variant after the agent options. A variant that se
 
 To give servers to specialists without your whole Claude Code setup, use the [`mcp_servers` catalog and `mcp`](specialists.md#mcp-servers).
 
+## `opencode.mcp`
+
+`inherit` (the default) retains the user's and project's OpenCode MCP servers.
+`isolated` disables servers found in global `opencode.json`/`opencode.jsonc` and project
+`opencode.json`/`opencode.jsonc` and `.opencode/opencode.json`/`opencode.jsonc`, while retaining the worker and specialist servers.
+Sources outside these files, such as organization configuration, are not covered.
+An unreadable or invalid file makes the attempt fail rather than silently losing isolation.
+
+## `agy.mcp`
+
+`isolated` (the default) allows only the attempt's worker and specialist MCP servers. `inherit` also allows user MCP servers, but never the worker of another attempt.
+
+## Runtime `overrides`
+
+`claude.overrides`, `opencode.overrides` and `agy.overrides` accept a JSON-compatible object at either settings level. The project object replaces the global object. Values are stored in the run snapshot; `${VAR}` is not expanded here, so put secrets in `runtimes.<runtime>.env`. The one-off run-title request does not receive overrides.
+
+Claude overrides go to the attempt's `--settings` file, OpenCode overrides to its generated `opencode.json`, and agy overrides to its `settings.json`.
+aip's generated settings win, and its permission and worker MCP nodes replace user nodes entirely.
+Claude rejects `permissions`, `hooks`, `enableAllProjectMcpServers`, `enabledMcpjsonServers`, and `disabledMcpjsonServers`;
+OpenCode rejects `agent.aip-*` and `mcp.aip`.
+agy allows keys in the object but aip replaces its own permission and mode settings and the guard still checks every call.
+OpenCode's other permission keys can be inherited from user configuration; overrides have the same limitation.
+
+There is no `opencode.settings` or `agy.settings`: OpenCode has no reliable switch for personal settings without losing authentication and providers, while agy already uses an attempt settings file and aip's guard.
+
 ## MCP servers of a specialist
 
 The servers of a specialist (the [catalog](specialists.md#mcp-servers) and `mcp`) work on all runtimes:

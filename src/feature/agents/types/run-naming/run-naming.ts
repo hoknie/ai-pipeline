@@ -1,5 +1,5 @@
-import { RUN_NAME_LIMIT, RUN_NAME_PATTERN, RUN_TITLE_LIMIT } from './naming.ts';
-import type { TranscriptEntry } from './transcript.ts';
+import { RUN_NAME_LIMIT, RUN_NAME_PATTERN, RUN_TITLE_LIMIT } from '../naming.ts';
+import type { TranscriptEntry } from '../transcript.ts';
 
 /** The title and the name a cheap model gave a run. */
 export interface RunNaming {

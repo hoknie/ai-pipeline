@@ -161,6 +161,31 @@ describe('skills lookup', () => {
 describe('claude adapter', () => {
   const runtime = createClaudeRuntime('/bin/claude');
 
+  it('passes safe overrides but strips permissions and hooks from old snapshots', () => {
+    const launch = runtime.buildLaunch(
+      context({
+        overrides: {
+          claude: { env: { A: '1' }, permissions: { allow: ['Bash(rm:*)'] }, hooks: {} },
+          opencode: {},
+          agy: {},
+        },
+      }),
+    );
+    const path = after(launch.args, '--settings');
+    expect(path).toContain('claude-settings.json');
+    expect(JSON.parse(launch.files.find((file) => file.path === path)!.content)).toEqual({
+      env: { A: '1' },
+    });
+    expect(launch.args).not.toContain('Bash(rm:*)');
+    expect(launch.args).toContain('Bash(git push:*)');
+    const onlyReserved = runtime.buildLaunch(
+      context({
+        overrides: { claude: { permissions: {} }, opencode: {}, agy: {} },
+      }),
+    );
+    expect(onlyReserved.args).not.toContain('--settings');
+  });
+
   it('allows only reading and the report tool for read', () => {
     const launch = runtime.buildLaunch(
       context({ specialist: specialist({ permissions: 'read' }) }),
@@ -506,6 +531,53 @@ describe('claude adapter', () => {
 
 describe('opencode adapter', () => {
   const runtime = createOpencodeRuntime('/bin/opencode');
+
+  it('replaces owned agent and worker nodes while keeping other overrides', () => {
+    const input = context({
+      overrides: {
+        claude: {},
+        agy: {},
+        opencode: {
+          agent: {
+            'aip-coder': { permission: { bash: { 'rm *': 'allow' } } },
+            other: { model: 'x' },
+          },
+          mcp: { aip: { enabled: false } },
+          provider: { local: { npm: 'example' } },
+        },
+      },
+    });
+    const generated = JSON.parse(runtime.buildLaunch(input).files[0]!.content);
+    const baseline = JSON.parse(runtime.buildLaunch(context()).files[0]!.content);
+    expect(generated.agent['aip-coder']).toEqual(baseline.agent['aip-coder']);
+    expect(generated.agent.other).toEqual({ model: 'x' });
+    expect(generated.mcp.aip).toEqual(baseline.mcp.aip);
+    expect(generated.provider.local.npm).toBe('example');
+  });
+
+  it('disables global and project JSONC servers and fails on invalid files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aip-opencode-'));
+    const home = join(root, 'config');
+    mkdirSync(join(home, 'opencode'), { recursive: true });
+    mkdirSync(join(root, 'worktree', '.opencode'), { recursive: true });
+    writeFileSync(
+      join(home, 'opencode', 'opencode.jsonc'),
+      '{ // global\n "mcp": { "jira": {}, }, }',
+    );
+    const file = join(root, 'worktree', '.opencode', 'opencode.json');
+    writeFileSync(file, '{"mcp":{"other":{},"aip":{}}}');
+    const isolated = createOpencodeRuntime('opencode', {
+      args: [],
+      env: { XDG_CONFIG_HOME: home },
+    });
+    const ctx = context({ opencodeMcp: 'isolated', worktree: join(root, 'worktree') });
+    const launch = isolated.buildLaunch(ctx);
+    expect(JSON.parse(launch.env.OPENCODE_CONFIG_CONTENT!)).toEqual({
+      mcp: { jira: { enabled: false }, other: { enabled: false } },
+    });
+    writeFileSync(file, '{bad');
+    expect(() => isolated.buildLaunch(ctx)).toThrow(file);
+  });
 
   it.each([
     { variant: 'company-deep' },

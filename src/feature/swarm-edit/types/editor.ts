@@ -75,10 +75,18 @@ export type EditPlan =
   | { ok: false; reason: 'conflict'; message: string };
 
 export type SettingKind =
-  'boolean' | 'choice' | 'integer' | 'string' | 'duration' | 'strings' | 'specialist' | 'env';
+  | 'boolean'
+  | 'choice'
+  | 'integer'
+  | 'string'
+  | 'duration'
+  | 'strings'
+  | 'specialist'
+  | 'env'
+  | 'json';
 
 /** A value the editor writes into settings.yaml; null removes the field. */
-export type SettingValue = boolean | number | string | string[] | null;
+export type SettingValue = boolean | number | string | string[] | Record<string, unknown> | null;
 
 /** One field of settings.yaml the editor may write. */
 export interface SettingField {

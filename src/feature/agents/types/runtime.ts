@@ -7,6 +7,8 @@ import type {
   ClaudeEditMode,
   ClaudeMcpMode,
   ClaudeSettingsSource,
+  OpencodeMcpMode,
+  AgyMcpMode,
   Permissions,
   Runtime as RuntimeName,
   Specialist,
@@ -16,6 +18,7 @@ export interface LaunchContext {
   specialist: Specialist;
   input: StepInput;
   worktree: string;
+  environment?: NodeJS.ProcessEnv;
   attemptDirectory: string;
   /** Where the attachments of the run are laid out; null for a run without attachments. */
   attachmentsDirectory?: string | null;
@@ -26,6 +29,13 @@ export interface LaunchContext {
   claudeMcp: ClaudeMcpMode;
   /** `isolated` keeps the user's own Claude Code settings (hooks, plugins, rules) away. */
   claudeSettings: ClaudeSettingsSource;
+  opencodeMcp?: OpencodeMcpMode;
+  agyMcp?: AgyMcpMode;
+  overrides?: {
+    claude: Record<string, unknown>;
+    opencode: Record<string, unknown>;
+    agy: Record<string, unknown>;
+  };
 }
 
 export interface GeneratedFile {

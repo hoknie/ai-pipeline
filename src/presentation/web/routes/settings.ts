@@ -21,6 +21,13 @@ const settingsBody = z.object({
   level: levelParam.optional(),
 });
 
+function checkValue(path: string, value: unknown): void {
+  if (value === null) return;
+  const object = typeof value === 'object' && !Array.isArray(value);
+  if ((settingFieldOf(path)?.kind === 'json') !== object)
+    throw panel('invalid', `invalid value for ${path}`);
+}
+
 export function settingsRoutes({ call }: RouteKit): Route[] {
   return [
     {
@@ -48,6 +55,7 @@ export function settingsRoutes({ call }: RouteKit): Route[] {
           throw panel('not_found', `setting \`${unknown.join('`, `')}\` cannot be written`);
         }
         if (Object.keys(values).length === 0) throw panel('invalid', 'values must not be empty');
+        for (const [path, value] of Object.entries(values)) checkValue(path, value);
         return editReply(
           (await call('config_settings', {
             repository,
@@ -67,6 +75,7 @@ export function settingsRoutes({ call }: RouteKit): Route[] {
           throw panel('not_found', `setting \`${path ?? ''}\` cannot be written`);
         }
         const { value, revision, level } = parseBody(settingBody, body);
+        checkValue(known, value);
         return editReply(
           (await call('config_setting', {
             repository,

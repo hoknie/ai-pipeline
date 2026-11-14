@@ -111,6 +111,9 @@ defaults: { ... }
 | `claude.edit_mode` | [configuration/permissions.md](permissions.md#claudeedit_mode) |
 | `claude.mcp` | [configuration/runtimes.md](runtimes.md#claudemcp) |
 | `claude.settings` | [configuration/runtimes.md](runtimes.md#claudesettings) |
+| `opencode.mcp` | [configuration/runtimes.md](runtimes.md#opencodemcp) |
+| `agy.mcp` | [configuration/runtimes.md](runtimes.md#agymcp) |
+| `claude.overrides`, `opencode.overrides`, `agy.overrides` | [configuration/runtimes.md](runtimes.md#runtime-overrides) |
 | `delivery` | [configuration/delivery.md](delivery.md) |
 | `mcp_servers` | [configuration/specialists.md](specialists.md#mcp-servers) |
 | `stages` | [configuration/actions.md](actions.md#points) |

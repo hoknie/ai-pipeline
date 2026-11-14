@@ -1,4 +1,6 @@
 import { join } from 'node:path';
+import { overlay } from '../../types/overlay.ts';
+import { userServerNames } from './user-servers.ts';
 
 import {
   PROTECTED_GIT_COMMANDS,
@@ -129,6 +131,16 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
       },
     },
   };
+  const owned = [['agent', agent], ...Object.keys(config.mcp).map((name) => ['mcp', name])];
+  const merged = overlay(context.overrides?.opencode ?? {}, config, owned);
+  const isolated = context.opencodeMcp === 'isolated';
+  const disabled = isolated
+    ? Object.fromEntries(
+        userServerNames(context.worktree, { ...context.environment, ...extra.env })
+          .filter((name) => !Object.hasOwn(config.mcp, name))
+          .map((name) => [name, { enabled: false }]),
+      )
+    : {};
   return {
     command: executable,
     args: [
@@ -144,8 +156,12 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
       ...(context.specialist.permissions === 'full' ? ['--auto'] : []),
       userMessage(context.input, context.attachmentsDirectory),
     ],
-    env: { ...extra.env, OPENCODE_CONFIG: configPath },
-    files: [{ path: configPath, content: JSON.stringify(config, null, 2) }],
+    env: {
+      ...extra.env,
+      OPENCODE_CONFIG: configPath,
+      ...(isolated ? { OPENCODE_CONFIG_CONTENT: JSON.stringify({ mcp: disabled }) } : {}),
+    },
+    files: [{ path: configPath, content: JSON.stringify(merged, null, 2) }],
     sessionId: context.resumeSession,
   };
 }

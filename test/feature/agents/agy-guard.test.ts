@@ -48,6 +48,18 @@ describe('MCP servers of the specialist in the agy hook', () => {
   const single = guard('read', [], ['graph']);
   const pair = guard('read', [], ['graph', 'graph_admin']);
 
+  it('inherits user servers but still denies other aip sessions', () => {
+    const policy = { ...single.policy, inheritMcp: true };
+    const decide = (name: string, args: Record<string, unknown> = {}) =>
+      agyToolDecision(policy, { toolCall: { name, args } }).decision;
+    expect(decide('mcp_jira_find')).toBe('auto_approve');
+    expect(decide('call_mcp_tool', { ServerName: 'jira', ToolName: 'find' })).toBe('auto_approve');
+    expect(decide('mcp_aip-other_swarm_report')).toBe('deny');
+    expect(decide('call_mcp_tool', { ServerName: 'aip-other', ToolName: 'swarm_report' })).toBe(
+      'deny',
+    );
+  });
+
   it('allows a tool of an own server in both forms, also on read', () => {
     expect(single.decide(`mcp_${worker}-graph_find`).decision).toBe('auto_approve');
     expect(

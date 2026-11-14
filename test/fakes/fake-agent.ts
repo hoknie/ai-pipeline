@@ -443,7 +443,11 @@ appendFileSync(
     args,
     cwd: worker.cwd,
     ...(mode === 'opencode' ? { configPath: process.env.OPENCODE_CONFIG } : {}),
+    ...(mode === 'opencode' ? { configContent: process.env.OPENCODE_CONFIG_CONTENT } : {}),
     ...(mode === 'agy' ? { workerServer: worker.server } : {}),
+    ...(mode === 'agy'
+      ? { settings: JSON.parse(readFileSync(option('--settings')!, 'utf8')) }
+      : {}),
   })}\n`,
 );
 const counterPath = join(state, `count-${group}-${step}`.replace(/[^\w.-]/g, '_'));

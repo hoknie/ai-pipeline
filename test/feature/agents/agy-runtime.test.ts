@@ -6,6 +6,31 @@ import { runtimeFor } from './helpers.ts';
 
 describe('agy launches', () => {
   const runtime = createAgyRuntime('/bin/agy', { args: ['--effort', 'high'], env: { A: 'b' } });
+  it('keeps user settings below owned permissions and enables inherited MCP', () => {
+    const context = agyContext();
+    context.agyMcp = 'inherit';
+    context.overrides = {
+      claude: {},
+      opencode: {},
+      agy: {
+        theme: 'dark',
+        toolPermission: 'always-proceed',
+        permissions: { allow: ['command(*)'] },
+      },
+    };
+    const launch = runtime.buildLaunch(context);
+    const settings = JSON.parse(
+      launch.files.find((file) => file.path.endsWith('settings.json'))!.content,
+    );
+    expect(settings.theme).toBe('dark');
+    expect(settings.toolPermission).toBe('request-review');
+    expect(settings.permissions.allow).toContain('mcp(*)');
+    expect(settings.permissions.allow).not.toContain('command(*)');
+    expect(
+      JSON.parse(launch.files.find((file) => file.path.endsWith('policy.json'))!.content)
+        .inheritMcp,
+    ).toBe(true);
+  });
   it('passes model, input, leading arguments and environment without continuing a random conversation', () => {
     const context = agyContext();
     context.specialist.model = 'custom/model';

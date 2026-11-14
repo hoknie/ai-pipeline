@@ -16,6 +16,11 @@ export const CLAUDE_MCP_MODES = ['isolated', 'inherit'] as const;
 
 export type ClaudeMcpMode = (typeof CLAUDE_MCP_MODES)[number];
 
+export const OPENCODE_MCP_MODES = ['inherit', 'isolated'] as const;
+export const AGY_MCP_MODES = ['isolated', 'inherit'] as const;
+export type OpencodeMcpMode = (typeof OPENCODE_MCP_MODES)[number];
+export type AgyMcpMode = (typeof AGY_MCP_MODES)[number];
+
 /** Whether a specialist reads the user's own Claude Code settings (hooks, plugins, rules). */
 export const CLAUDE_SETTINGS_SOURCES = ['isolated', 'inherit'] as const;
 
@@ -37,6 +42,17 @@ export interface ClaudeSettings {
   editMode: ClaudeEditMode;
   mcp: ClaudeMcpMode;
   settings: ClaudeSettingsSource;
+  overrides: Record<string, unknown>;
+}
+
+export interface OpencodeSettings {
+  mcp: OpencodeMcpMode;
+  overrides: Record<string, unknown>;
+}
+
+export interface AgySettings {
+  mcp: AgyMcpMode;
+  overrides: Record<string, unknown>;
 }
 
 export interface DeliverySettings {
@@ -140,7 +156,7 @@ function normalizedSplit(split: Split | null | undefined): Split | null {
 export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const stored = config as Omit<
     ResolvedConfig,
-    'workspace' | 'delivery' | 'actions' | 'stages' | 'pipelines' | 'chains'
+    'workspace' | 'delivery' | 'actions' | 'stages' | 'pipelines' | 'chains' | 'opencode' | 'agy'
   > & {
     chains?: RuntimeChain[];
     pipelines?: Pipeline[];
@@ -153,6 +169,8 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     naming?: Partial<NamingSettings>;
     web?: Partial<WebSettings>;
     runtimes?: Partial<RuntimeSettings>;
+    opencode?: Partial<OpencodeSettings>;
+    agy?: Partial<AgySettings>;
   };
   // Runs stored before these settings existed started from HEAD and were delivered by hand.
   const workspace: WorkspaceSettings = { base: 'head', include: [], ...stored.workspace };
@@ -174,6 +192,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const claude: ClaudeSettings = {
     ...stored.claude,
     settings: (stored.claude as Partial<ClaudeSettings>).settings ?? 'isolated',
+    overrides: (stored.claude as Partial<ClaudeSettings>).overrides ?? {},
   };
   // Runs stored before `human_review` existed have no such steps.
   const pipelines = (stored.pipelines ?? stored.workflows ?? []).map((pipeline) => ({
@@ -214,6 +233,8 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     specialists,
     chains,
     claude,
+    opencode: { mcp: 'inherit', overrides: {}, ...stored.opencode },
+    agy: { mcp: 'isolated', overrides: {}, ...stored.agy },
     pipelines,
     actions,
     stages,
@@ -231,6 +252,8 @@ export interface ResolvedConfig {
   runtimes: RuntimeSettings;
   outsideChanges: OutsideChanges;
   claude: ClaudeSettings;
+  opencode: OpencodeSettings;
+  agy: AgySettings;
   delivery: DeliverySettings;
   defaults: Defaults;
   /** Catalog of MCP servers by name. */

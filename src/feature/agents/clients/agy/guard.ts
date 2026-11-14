@@ -10,6 +10,7 @@ const policySchema = z.object({
   tools: z.array(z.string()),
   /** Names of the attempt of the MCP servers of the specialist; absent in older policies. */
   servers: z.array(z.string()).default([]),
+  inheritMcp: z.boolean().default(false),
   /** Folders outside the worktree the specialist may read; absent in older policies. */
   readDirectories: z.array(z.string()).default([]),
 });
@@ -47,14 +48,21 @@ function mcpAllowed(policy: AgyPolicy, name: string, args: Record<string, unknow
   const worker = policy.server;
   const own = (server: unknown): boolean =>
     typeof server === 'string' && (server === worker || policy.servers.includes(server));
-  if (name === 'list_resources' || name === 'read_resource') return own(args.ServerName);
+  const allowed = (server: unknown): boolean =>
+    own(server) ||
+    (policy.inheritMcp &&
+      typeof server === 'string' &&
+      server !== '' &&
+      !server.startsWith('aip-'));
+  if (name === 'list_resources' || name === 'read_resource') return allowed(args.ServerName);
   if (name === 'call_mcp_tool') {
-    if (!own(args.ServerName)) return false;
+    if (!allowed(args.ServerName)) return false;
     if (args.ServerName !== worker) return true;
     return typeof args.ToolName === 'string' && policy.tools.includes(args.ToolName);
   }
   const owner = ownerOf(policy, name);
-  if (owner === null) return false;
+  if (owner === null)
+    return policy.inheritMcp && name.startsWith('mcp_') && !name.slice(4).startsWith('aip-');
   if (owner !== worker) return true;
   return policy.tools.includes(name.slice(`mcp_${worker}_`.length));
 }
@@ -62,7 +70,13 @@ function mcpAllowed(policy: AgyPolicy, name: string, args: Record<string, unknow
 function permit(policy: AgyPolicy, name: string, args: Record<string, unknown>): boolean {
   if (policy.permissions === 'none') return false;
   if (mcpAllowed(policy, name, args)) return true;
-  if (name === 'call_mcp_tool' || name.startsWith('mcp_')) return false;
+  if (
+    name === 'call_mcp_tool' ||
+    name === 'list_resources' ||
+    name === 'read_resource' ||
+    name.startsWith('mcp_')
+  )
+    return false;
   if (READ_TOOLS.has(name))
     return (
       policy.permissions === 'full' ||

@@ -11,8 +11,8 @@ import {
 import { checkPipelines, checkSplitTargets } from './validate-pipelines.ts';
 import { checkChains, checkRuntimes } from './validate-runtimes.ts';
 import { checkVariantTargets } from './sections/variants.ts';
+import { checkClaude, checkOpencode, checkAgy } from './sections/runtime-sections.ts';
 import {
-  checkClaude,
   checkDefaults,
   checkDelivery,
   checkNaming,
@@ -62,6 +62,8 @@ const SWARM_KEYS = [
   'stats',
   'outside_changes',
   'claude',
+  'opencode',
+  'agy',
   'delivery',
   'defaults',
   'mcp_servers',
@@ -166,7 +168,9 @@ function defaultConfig(): ResolvedConfig {
     web: defaultWeb(),
     runtimes: defaultRuntimes(),
     outsideChanges: 'warn',
-    claude: { editMode: 'allowlist', mcp: 'isolated', settings: 'isolated' },
+    claude: { editMode: 'allowlist', mcp: 'isolated', settings: 'isolated', overrides: {} },
+    opencode: { mcp: 'inherit', overrides: {} },
+    agy: { mcp: 'isolated', overrides: {} },
     delivery: defaultDelivery(),
     defaults: defaultDefaults(),
     mcpServers: {},
@@ -218,6 +222,8 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
       ) ?? config.outsideChanges;
   }
   if ('claude' in swarm) checkClaude(ctx, swarm.claude, config.claude);
+  if ('opencode' in swarm) checkOpencode(ctx, swarm.opencode, config.opencode);
+  if ('agy' in swarm) checkAgy(ctx, swarm.agy, config.agy);
   if ('delivery' in swarm) {
     const known = isMapping(swarm.specialists) ? Object.keys(swarm.specialists) : [];
     checkDelivery(ctx, swarm.delivery, config.delivery, known);

@@ -80,6 +80,8 @@ function settingTypeError(
   if (value === null) return null;
   const fail = (message: string, suffix = '') => ({ message, suffix });
   switch (setting.kind) {
+    case 'json':
+      return isMapping(value) ? null : fail('must be an object');
     case 'boolean':
       return typeof value === 'boolean' ? null : fail('must be true or false');
     case 'choice': {
@@ -178,7 +180,13 @@ export function planSettings(paths: ConfigPaths, request: SettingsRequest): Edit
   }
   let text = current;
   try {
-    for (const [path, value] of entries) text = editSetting(text, path, value);
+    for (const [path, value] of entries) {
+      const next =
+        settingFieldOf(path)?.kind === 'json' && isMapping(value) && Object.keys(value).length === 0
+          ? null
+          : value;
+      text = editSetting(text, path, next);
+    }
   } catch (error) {
     if (!(error instanceof ConfigEditError)) throw error;
     return {

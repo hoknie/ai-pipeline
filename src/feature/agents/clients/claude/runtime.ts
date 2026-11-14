@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { CLAUDE_RESERVED_KEYS } from '../../types/overlay.ts';
 
 import {
   PROTECTED_GIT_COMMANDS,
@@ -94,6 +95,10 @@ function launchOptions(context: LaunchContext, mcpConfigPath: string): string[] 
 
 function launch(executable: string, extra: RuntimeExtra, context: LaunchContext): Launch {
   const mcpConfigPath = join(context.attemptDirectory, 'mcp.json');
+  const settingsPath = join(context.attemptDirectory, 'claude-settings.json');
+  const settings = { ...context.overrides?.claude };
+  for (const key of CLAUDE_RESERVED_KEYS) delete settings[key];
+  const hasSettings = Object.keys(settings).length > 0;
   const [workerCommand, ...workerArgs] = context.workerCommand;
   const mcpConfig = {
     mcpServers: {
@@ -111,10 +116,14 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
       'stream-json',
       '--verbose',
       ...launchOptions(context, mcpConfigPath),
+      ...(hasSettings ? ['--settings', settingsPath] : []),
     ],
     // The report tool is loaded at once instead of through a tool search.
     env: { ...extra.env, ENABLE_TOOL_SEARCH: 'false' },
-    files: [{ path: mcpConfigPath, content: JSON.stringify(mcpConfig, null, 2) }],
+    files: [
+      { path: mcpConfigPath, content: JSON.stringify(mcpConfig, null, 2) },
+      ...(hasSettings ? [{ path: settingsPath, content: JSON.stringify(settings, null, 2) }] : []),
+    ],
     sessionId: context.resumeSession ?? context.sessionId,
   };
 }

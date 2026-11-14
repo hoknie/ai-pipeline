@@ -79,7 +79,14 @@ export class AttemptStarter {
     }
     const token = this.parts.running.issueToken(key);
     await this.parts.outside.begin(state, key);
-    const process = this.launch(prepared, directory, token);
+    let process: SupervisedProcess;
+    try {
+      process = this.launch(prepared, directory, token);
+    } catch (error) {
+      this.parts.running.dropToken(token);
+      await this.fail(state, key, { kind: 'spawn', message: (error as Error).message });
+      return;
+    }
     const timer = setTimeout(() => {
       if (this.dependencies.context.stopping) return;
       const { context } = this.dependencies;
@@ -195,6 +202,7 @@ export class AttemptStarter {
       specialist: effectiveSpecialist,
       input: attempt.input,
       worktree,
+      environment,
       attemptDirectory: directory,
       attachmentsDirectory: prepared.attachments,
       workerCommand: [
@@ -213,6 +221,13 @@ export class AttemptStarter {
       claudeEditMode: state.run.config.claude.editMode,
       claudeMcp: state.run.config.claude.mcp,
       claudeSettings: state.run.config.claude.settings,
+      opencodeMcp: state.run.config.opencode?.mcp ?? 'inherit',
+      agyMcp: state.run.config.agy?.mcp ?? 'isolated',
+      overrides: {
+        claude: state.run.config.claude.overrides ?? {},
+        opencode: state.run.config.opencode?.overrides ?? {},
+        agy: state.run.config.agy?.overrides ?? {},
+      },
     });
     if (launch.sessionId) attempt.sessionId = launch.sessionId;
     context.save(state);
