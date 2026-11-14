@@ -1,4 +1,5 @@
 import { navRunCounts, runsOf } from '../../features/runs/index.ts';
+import { requestFocus } from '../../shared/lib/browser/hotkeys.ts';
 import { formatRoute, type Route, type View } from '../../shared/lib/nav/route.ts';
 import type { NavProps } from '../shell/nav/NavSidebar.tsx';
 import type { PanelData } from './usePanelData.ts';
@@ -29,7 +30,12 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
     waiting,
     queued: queue?.items.length ?? 0,
     onPalette: () => chrome.setPalette(true),
-    onNewTask: queue ? chrome.newTask.openNewTask : undefined,
+    // on the page of a new task the button moves the focus to its form instead of opening the dialog
+    onNewTask: queue
+      ? route.view === 'queue' && route.run === 'new'
+        ? () => requestFocus('new-task-page')
+        : chrome.newTask.openNewTask
+      : undefined,
     notifications: panel.notifications,
   };
 }

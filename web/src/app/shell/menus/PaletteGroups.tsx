@@ -131,9 +131,11 @@ export function ConfigGroups({ go, to, entries }: { go: Go; to: To; entries: Ent
 
 export function ActionsGroup({
   onNewTask,
+  onNewTaskPage,
   onShortcuts,
 }: {
   onNewTask: () => void;
+  onNewTaskPage: () => void;
   onShortcuts: () => void;
 }) {
   const { t } = useTranslation();
@@ -141,6 +143,12 @@ export function ActionsGroup({
     <CommandGroup heading={t('palette.actions')}>
       <CommandItem value={`${t('palette.action')} ${t('palette.newTask')}`} onSelect={onNewTask}>
         {t('palette.newTask')}
+      </CommandItem>
+      <CommandItem
+        value={`${t('palette.action')} ${t('palette.newTaskPage')}`}
+        onSelect={onNewTaskPage}
+      >
+        {t('palette.newTaskPage')}
       </CommandItem>
       <CommandItem
         value={`${t('palette.action')} ${t('palette.shortcuts')}`}

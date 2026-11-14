@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
+import { cn } from '../../shared/lib/browser/cn.ts';
 import { Label } from '../../shared/ui/forms/label.tsx';
 
 import type { Api } from '../../shared/api/api.ts';
@@ -12,6 +13,7 @@ import type { QueueFields, PipelinesView } from '../../shared/api/types.ts';
 import type { AfterOption, ParentChoice } from './queueLinks.ts';
 import { continueDraft, draftValid, fieldsOf, type QueueDraft } from './draft.ts';
 import { AttachmentFields } from './form/AttachmentFields.tsx';
+import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { DeliveryFields } from './form/DeliveryFields.tsx';
 import { AfterField, ParentField, TagsField } from './form/LinkFields.tsx';
 import { TaskFields } from './form/TaskFields.tsx';
@@ -75,6 +77,10 @@ function useSubmit(
   // after "add and continue" the cleared form takes the focus once it is drawn
   useEffect(() => {
     if (focusTick === 0) return;
+    if (idPrefix === 'new') {
+      focusNewTaskField(effective.mode);
+      return;
+    }
     const field = effective.mode === 'groups' ? 'group-0-title' : 'task';
     document.getElementById(`${idPrefix}-${field}`)?.focus();
     // only a new tick moves the focus
@@ -142,6 +148,8 @@ interface QueueFormProps {
   /** Adds the task and keeps the form: the button shows only with it; the form clears itself. */
   onSubmitAndContinue?: (fields: QueueFields) => Promise<void>;
   onCancel?: () => void;
+  /** The form fills the height of its parent: the text of the task grows. */
+  fill?: boolean;
 }
 
 export function QueueForm({
@@ -162,6 +170,7 @@ export function QueueForm({
   onSubmit,
   onSubmitAndContinue,
   onCancel,
+  fill = false,
 }: QueueFormProps) {
   const { t } = useTranslation();
   const ids = pipelines?.pipelines.map((pipeline) => pipeline.id) ?? [];
@@ -185,18 +194,22 @@ export function QueueForm({
     options.push(effective.pipeline);
   return (
     <form
-      className="@container flex flex-col gap-3 rounded-lg border bg-card p-3"
+      className={cn(
+        '@container flex flex-col gap-3 rounded-lg border bg-card p-3',
+        fill && 'flex-1',
+      )}
       onSubmit={(event) => {
         event.preventDefault();
         void (!pending && submit());
       }}
     >
-      <div className="grid gap-4 @3xl:grid-cols-2">
+      <div className={cn('grid gap-4 @3xl:grid-cols-2', fill && 'flex-1')}>
         <TaskFields
           state={state}
           pipelines={pipelines}
           options={options}
           repositoryField={repositoryField}
+          fill={fill}
         />
         <div className="flex min-w-0 flex-col gap-3">
           <AfterField state={state} choices={afterChoices} />

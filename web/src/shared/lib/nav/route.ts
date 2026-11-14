@@ -5,7 +5,7 @@ export type View = 'runs' | 'queue' | 'specialists' | 'pipelines' | 'stats' | 's
 export interface Route {
   view: View;
   /**
-   * Run on the runs tab, specialist (or `new`) on the specialists
+   * Run on the runs tab, `new` on the queue tab for the page of a new task, specialist (or `new`) on the specialists
    * tab, group of settings on the settings tab; on the pipeline tab the id of a pipeline, of an
    * action or of a system stage.
    */
@@ -68,7 +68,11 @@ export function parseRoute(hash: string): Route {
   const tab = params.get('tab') || null;
   const parts = path.replace(/^#\/?/, '').split('/');
   const [head, ...rest] = parts;
-  if (head === 'queue') return { view: 'queue', run: null, group: null, step: null, tab: null };
+  if (head === 'queue') {
+    // `#queue/new` is the page of a new task; any other part is the queue itself
+    const run = decode(rest[0]) === 'new' ? 'new' : null;
+    return { view: 'queue', run, group: null, step: null, tab: null };
+  }
   if (head === 'stats')
     return {
       view: 'stats',
@@ -123,7 +127,7 @@ export function parseRoute(hash: string): Route {
 
 export function formatRoute(route: Route): string {
   const enc = encodeURIComponent;
-  if (route.view === 'queue') return '#queue';
+  if (route.view === 'queue') return route.run === 'new' ? '#queue/new' : '#queue';
   if (route.view === 'stats') {
     const project = route.run ? `&project=${enc(route.run)}` : '';
     return `#stats?period=${statsPeriodOf(route.group)}${project}`;

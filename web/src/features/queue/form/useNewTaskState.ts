@@ -84,7 +84,7 @@ export function useNewTaskState(props: {
   selected: string;
   runs?: RunView[];
   queues: ReadonlyMap<string, QueueView>;
-  preset?: { repository: string; parent: string } | null;
+  preset?: { repository: string; parent: string | null } | null;
   onPresetApplied?: () => void;
   open: boolean;
   draft: QueueDraft | undefined;
@@ -128,7 +128,11 @@ export function useNewTaskState(props: {
     if (draft && draftTarget !== target) return;
     if (!pipelines) return;
     const base = draft ?? emptyDraft(pipelines.pipelines[0]?.id);
-    onDraft({ ...base, repository: target, parent: preset.parent, parentTouched: true });
+    onDraft(
+      preset.parent === null
+        ? { ...base, repository: target }
+        : { ...base, repository: target, parent: preset.parent, parentTouched: true },
+    );
     onPresetApplied();
   }, [open, preset, target, draft, draftTarget, pipelines, onDraft, onPresetApplied]);
   const add = async (fields: QueueFields) => {

@@ -12,6 +12,9 @@ import { settingsLocationOf } from '../../shared/lib/nav/settingsGroups.ts';
 export const NewTaskDialog = lazy(() =>
   import('../../features/queue/index.ts').then((module) => ({ default: module.NewTaskDialog })),
 );
+const NewTaskPage = lazy(() =>
+  import('../../features/queue/index.ts').then((module) => ({ default: module.NewTaskPage })),
+);
 const QueuePage = lazy(() =>
   import('../../features/queue/index.ts').then((module) => ({ default: module.QueuePage })),
 );
@@ -61,9 +64,41 @@ export function QueueRoute(props: {
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
   onNewTask: () => void;
+  /** What the page of a new task needs; the page is shown on `#queue/new`. */
+  newTaskPage: {
+    api: Api;
+    selected: string | null;
+    repositories: string[];
+    waiting: React.ComponentProps<typeof NewTaskDialog>['waiting'];
+    queues: ReadonlyMap<string, QueueView>;
+    preset: { repository: string; parent: string | null } | null;
+    onPresetApplied: () => void;
+  };
 }) {
   const { t } = useTranslation();
   const { common } = props;
+  const page = props.newTaskPage;
+  if (common.route.run === 'new' && page.selected !== null) {
+    return (
+      <Suspense fallback={<Loading what={t('app.loadingQueue')} />}>
+        <NewTaskPage
+          key={common.pageKey}
+          api={page.api}
+          selected={page.selected}
+          repositories={page.repositories}
+          waiting={page.waiting}
+          queues={page.queues}
+          runs={common.runs}
+          preset={page.preset}
+          onPresetApplied={page.onPresetApplied}
+          draft={props.drafts.new}
+          onDraft={(draft) => props.onDraft('new', draft)}
+          onQueue={props.onQueue}
+          onLeave={() => common.onRoute(to('queue', null))}
+        />
+      </Suspense>
+    );
+  }
   return (
     <Suspense fallback={<Loading what={t('app.loadingQueue')} />}>
       <QueuePage

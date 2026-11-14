@@ -6,6 +6,20 @@ import type { useRepositoryActions } from '../state/useRepositoryActions.ts';
 
 type RepositoryActions = ReturnType<typeof useRepositoryActions>;
 
+/** What the page of a new task takes from the panel. */
+function newTaskPageProps(panel: PanelData) {
+  const { state, chrome } = panel;
+  return {
+    api: panel.api,
+    selected: state.selected,
+    repositories: state.repositories,
+    waiting: panel.waitingRepositories,
+    queues: state.queues,
+    preset: chrome.newTask.pagePreset,
+    onPresetApplied: () => chrome.newTask.setPagePreset(null),
+  };
+}
+
 /** The page of the open section. */
 export function PageSwitch({ panel, actions }: { panel: PanelData; actions: RepositoryActions }) {
   const { state, chrome, route, scopedApi } = panel;
@@ -31,6 +45,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           onQueue={state.setQueue}
           onError={notifyError}
           onNewTask={chrome.newTask.openNewTask}
+          newTaskPage={newTaskPageProps(panel)}
         />
       );
     case 'settings':

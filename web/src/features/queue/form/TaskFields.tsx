@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { cn } from '../../../shared/lib/browser/cn.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
@@ -170,12 +171,14 @@ export function TaskFields(props: {
   pipelines: PipelinesView | null;
   options: string[];
   repositoryField: ReactNode;
+  /** The text of the task grows with the column. */
+  fill?: boolean;
 }) {
   const { t } = useTranslation();
   const { state } = props;
   const { idPrefix, effective, change, locked } = state;
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className={cn('flex min-w-0 flex-col gap-3', props.fill && 'flex-1')}>
       <fieldset disabled={locked} className="flex min-w-0 flex-col gap-3 border-0 p-0">
         {props.repositoryField !== undefined ? (
           <div className="flex min-w-0 flex-col gap-1.5">
@@ -203,6 +206,7 @@ export function TaskFields(props: {
             id={`${idPrefix}-task`}
             aria-label={t('queue.form.taskText')}
             rows={9}
+            grow={props.fill}
             value={effective.task}
             placeholder={t('queue.form.taskPlaceholder')}
             disabled={locked}

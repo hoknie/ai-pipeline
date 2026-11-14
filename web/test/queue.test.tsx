@@ -99,6 +99,19 @@ describe('routes and order helpers', () => {
     expect(formatRoute(parseRoute('#queue'))).toBe('#queue');
   });
 
+  it('parses and formats #queue/new, any other part is the queue', () => {
+    expect(parseRoute('#queue/new')).toEqual({
+      view: 'queue',
+      run: 'new',
+      group: null,
+      step: null,
+      tab: null,
+    });
+    expect(formatRoute(parseRoute('#queue/new'))).toBe('#queue/new');
+    expect(parseRoute('#queue/abc').run).toBeNull();
+    expect(formatRoute(parseRoute('#queue/abc'))).toBe('#queue');
+  });
+
   it('finds the slot and the position of a drop', () => {
     expect(dropSlot([10, 30, 50], 0)).toBe(0);
     expect(dropSlot([10, 30, 50], 31)).toBe(2);

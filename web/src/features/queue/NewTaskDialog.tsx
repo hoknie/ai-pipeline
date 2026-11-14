@@ -1,10 +1,14 @@
+import { Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { QueueView, RunView } from '../../shared/api/types.ts';
+import { Button } from '../../shared/ui/forms/button.tsx';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../shared/ui/feedback/tooltip.tsx';
 import { Dialog, DialogContent, DialogTitle } from '../../shared/ui/overlays/dialog.tsx';
 
 import { QueueForm, emptyDraft, type QueueDraft } from './QueueForm.tsx';
+import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { useNewTaskState } from './form/useNewTaskState.ts';
 import { itemLabel } from './list/itemText.ts';
 import { afterOptions } from './queueLinks.ts';
@@ -24,7 +28,7 @@ type Props = {
   /** All runs of the panel: the parent choices come from them. */
   runs?: RunView[];
   /** A subtask: the repository to open on and the run to start as the parent. */
-  preset?: { repository: string; parent: string } | null;
+  preset?: { repository: string; parent: string | null } | null;
   /** The preset is in the draft: the opener forgets it. */
   onPresetApplied?: () => void;
   open: boolean;
@@ -32,6 +36,8 @@ type Props = {
   draft: QueueDraft | undefined;
   onDraft: (draft: QueueDraft | null) => void;
   onQueue: (queue: QueueView) => void;
+  /** Moves the form to its own page; the repository of the dialog goes with it. */
+  onExpand?: (repository: string) => void;
 };
 
 /** The one dialog of a new task: opened from the top strip, the queue page and the palette. */
@@ -49,11 +55,28 @@ export default function NewTaskDialog(props: Props) {
         aria-describedby={undefined}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          const field = mode.current === 'task' ? '#new-task' : '#new-group-0-title';
-          document.querySelector<HTMLElement>(field)?.focus();
+          focusNewTaskField(mode.current);
         }}
       >
-        <DialogTitle>{t('queue.newTask')}</DialogTitle>
+        <div className="flex items-center justify-between gap-2">
+          <DialogTitle>{t('queue.newTask')}</DialogTitle>
+          {props.onExpand ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="mr-8"
+                  aria-label={t('queue.page.expand')}
+                  onClick={() => props.onExpand?.(target)}
+                >
+                  <Maximize2 />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t('queue.page.expand')}</TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
         <QueueForm
           idPrefix="new"
           draft={current}

@@ -14,13 +14,14 @@ export function NewTaskHost(props: {
   waiting: React.ComponentProps<typeof NewTaskDialog>['waiting'];
   queues: ReadonlyMap<string, QueueView>;
   runs: RunView[];
-  preset: { repository: string; parent: string } | null;
+  preset: { repository: string; parent: string | null } | null;
   onPresetApplied: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   draft: QueueDraft | undefined;
   onDraft: (draft: QueueDraft | null) => void;
   onQueue: (queue: QueueView) => void;
+  onExpand: (repository: string) => void;
 }) {
   const { pageKey, ...rest } = props;
   return (

@@ -81,6 +81,10 @@ export function CommandPalette({
             go(to('queue'));
             requestFocus('queue-task');
           }}
+          onNewTaskPage={() => {
+            go({ view: 'queue', run: 'new', group: null, step: null, tab: null });
+            requestFocus('new-task-page');
+          }}
           onShortcuts={() => {
             onOpenChange(false);
             onShortcuts();

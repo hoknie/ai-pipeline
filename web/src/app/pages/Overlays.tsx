@@ -47,6 +47,10 @@ export function Overlays({ panel }: { panel: PanelData }) {
           draft={props.queueDrafts.new}
           onDraft={(draft) => props.onQueueDraft('new', draft)}
           onQueue={state.setQueue}
+          onExpand={(repository) => {
+            newTask.expand(repository);
+            panel.setRoute({ view: 'queue', run: 'new', group: null, step: null, tab: null });
+          }}
         />
       ) : null}
       <ShortcutsDialog open={props.shortcuts} onOpenChange={props.onShortcuts} />

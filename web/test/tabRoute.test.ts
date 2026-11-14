@@ -21,6 +21,11 @@ describe('tabRoute', () => {
     expect(tabRoute('runs', runs, 'other')).toBe(runs);
   });
 
+  it('leads from the page of a new task to the queue', () => {
+    const page: Route = { view: 'queue', run: 'new', group: null, step: null, tab: null };
+    expect(formatRoute(tabRoute('queue', page, 'x'))).toBe('#queue');
+  });
+
   it('opens the other sections as before', () => {
     expect(tabRoute('queue', runs, 'x').run).toBeNull();
     expect(tabRoute('specialists', runs, 'x').run).toBeNull();

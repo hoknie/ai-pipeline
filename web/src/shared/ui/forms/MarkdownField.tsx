@@ -1,6 +1,7 @@
 import { useRef, useState, type ClipboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { cn } from '../../lib/browser/cn.ts';
 import { htmlToMarkdown } from '../../lib/markdown/htmlToMarkdown.ts';
 import { applyMarkup, type MarkupAction } from '../../lib/markdown/markdownMarkup.ts';
 import { MarkupToolbar, type Mode } from './MarkupToolbar.tsx';
@@ -15,6 +16,8 @@ interface MarkdownFieldProps {
   rows?: number;
   placeholder?: string;
   disabled?: boolean;
+  /** Takes the free height of its column, never less than `rows` lines. */
+  grow?: boolean;
 }
 
 /**
@@ -54,6 +57,7 @@ export function MarkdownField({
   rows = 4,
   placeholder,
   disabled,
+  grow = false,
 }: MarkdownFieldProps) {
   const [mode, setMode] = useState<Mode>('plain');
   const [preview, setPreview] = useState(false);
@@ -90,7 +94,7 @@ export function MarkdownField({
   const height = `${Math.max(rows, 2) * 1.25 + 0.75}rem`;
   const editing = markdown && !preview && !disabled;
   return (
-    <div className="flex min-w-0 flex-col gap-2">
+    <div className={cn('flex min-w-0 flex-col gap-2', grow && 'flex-1')}>
       <MarkupToolbar
         mode={mode}
         onMode={changeMode}
@@ -104,6 +108,8 @@ export function MarkdownField({
         id={id}
         aria-label={label}
         rows={rows}
+        className={grow ? 'flex-1' : undefined}
+        style={grow ? { minHeight: height } : undefined}
         value={value}
         placeholder={placeholder}
         disabled={disabled}
