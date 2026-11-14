@@ -8,6 +8,7 @@ import {
   validateWebSection,
 } from './validate.ts';
 import { validateStatsSection } from './sections/stats.ts';
+import { validateAttachmentsSection } from './sections/attachments.ts';
 import { ConfigLoadError } from '../types/errors.ts';
 import {
   ACTIONS_DIR,
@@ -22,6 +23,8 @@ import {
 } from '../types/levels.ts';
 import { type ConfigSource } from '../types/merge.ts';
 import {
+  type AttachmentSettings,
+  defaultAttachments,
   defaultNetwork,
   defaultRuntimes,
   defaultStats,
@@ -32,6 +35,14 @@ import {
   type RuntimeSettings,
   type WebSettings,
 } from '../types/settings.ts';
+
+/** Attachment storage for new uploads, reread from the shared settings.yaml on every call. */
+export function loadAttachmentSettings(paths: ConfigPaths): AttachmentSettings {
+  return loadGlobalSection(paths, 'attachments', defaultAttachments, (value) => {
+    const { attachments, errors } = validateAttachmentsSection(value);
+    return { value: attachments, errors };
+  });
+}
 
 export function loadConfig(paths: ConfigPaths): ResolvedConfig {
   return loadConfigSources(paths).config;

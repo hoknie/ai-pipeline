@@ -1626,6 +1626,7 @@ export const en = {
       system_panel: 'Panel settings',
       system_network: 'Network',
       system_stats: 'Statistics',
+      system_attachments: 'Attachments',
     },
     field: {
       max: {
@@ -1720,6 +1721,18 @@ export const en = {
       },
       network_interval: { label: 'Interval', hint: 'Seconds between checks, 5 to 3600.' },
       network_timeout: { label: 'Timeout', hint: 'Seconds a check may take, 1 to 60.' },
+      attachments_storage: { label: 'Storage', hint: 'Where new attachments are saved.' },
+      attachments_s3_bucket: { label: 'Bucket', hint: 'Required for S3.' },
+      attachments_s3_region: { label: 'Region', hint: 'AWS region of the bucket.' },
+      attachments_s3_endpoint: {
+        label: 'Endpoint',
+        hint: 'Optional http(s) address for S3-compatible storage.',
+      },
+      attachments_s3_prefix: { label: 'Prefix', hint: 'Object key prefix; no leading slash.' },
+      attachments_s3_path_style: {
+        label: 'Path-style addressing',
+        hint: 'Put the bucket in the URL path instead of the host.',
+      },
       stats_enabled: {
         label: 'Collect statistics',
         hint: 'Writes the usage of every finished attempt to the journal of statistics.',
@@ -1743,6 +1756,7 @@ export const en = {
         hint: 'Names only: the values are never shown.',
       },
     },
+    attachmentStorage: { local: 'Local folder', s3: 'S3' },
   },
   observers: {
     saved: 'Observer settings saved',
@@ -1929,6 +1943,16 @@ export const en = {
       checked: 'Last check',
       proxy: 'Proxy',
       state: { off: 'Check is off', up: 'Available', down: 'Unavailable' },
+    },
+    attachments: {
+      title: 'Attachments',
+      status: 'Attachment storage status',
+      credentials: 'S3 credentials in daemon environment',
+      set: 'Set',
+      missing: 'Not set',
+      hint: 'Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY only in the daemon environment. Restart the daemon after changing credentials; changing storage applies to new attachments without a restart.',
+      warning:
+        'S3 credentials are not set in the daemon environment: new attachments will not be saved',
     },
     web: {
       title: 'Web panel',

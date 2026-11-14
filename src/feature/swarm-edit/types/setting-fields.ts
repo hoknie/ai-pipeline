@@ -1,4 +1,5 @@
 import {
+  ATTACHMENT_STORAGES,
   CLAUDE_EDIT_MODES,
   CLAUDE_MCP_MODES,
   CLAUDE_SETTINGS_SOURCES,
@@ -73,6 +74,12 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('network.proxy', 'string', { globalOnly: true }),
   field('network.interval', 'integer', { range: NETWORK_INTERVAL_RANGE, globalOnly: true }),
   field('network.timeout', 'integer', { range: NETWORK_TIMEOUT_RANGE, globalOnly: true }),
+  field('attachments.storage', 'choice', { options: ATTACHMENT_STORAGES, globalOnly: true }),
+  field('attachments.s3.bucket', 'string', { globalOnly: true }),
+  field('attachments.s3.region', 'string', { globalOnly: true }),
+  field('attachments.s3.endpoint', 'string', { globalOnly: true }),
+  field('attachments.s3.prefix', 'string', { globalOnly: true }),
+  field('attachments.s3.path_style', 'boolean', { globalOnly: true }),
   field('stats.enabled', 'boolean', { globalOnly: true }),
   field('stats.exclude', 'strings', { globalOnly: true }),
   field('stats.show_cost', 'boolean', { globalOnly: true }),

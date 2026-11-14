@@ -1650,6 +1650,7 @@ export const ru: Dictionary = {
       system_panel: 'Настройки панели',
       system_network: 'Сеть',
       system_stats: 'Статистика',
+      system_attachments: 'Вложения',
     },
     field: {
       max: {
@@ -1735,6 +1736,21 @@ export const ru: Dictionary = {
       },
       network_interval: { label: 'Интервал', hint: 'Секунд между проверками, от 5 до 3600.' },
       network_timeout: { label: 'Таймаут', hint: 'Секунд на одну проверку, от 1 до 60.' },
+      attachments_storage: { label: 'Хранилище', hint: 'Место для новых вложений.' },
+      attachments_s3_bucket: { label: 'Бакет', hint: 'Обязателен для S3.' },
+      attachments_s3_region: { label: 'Регион', hint: 'Регион бакета AWS.' },
+      attachments_s3_endpoint: {
+        label: 'Адрес',
+        hint: 'Необязательный http(s) адрес совместимого хранилища.',
+      },
+      attachments_s3_prefix: {
+        label: 'Префикс',
+        hint: 'Префикс ключа объекта без начального слеша.',
+      },
+      attachments_s3_path_style: {
+        label: 'Адресация по пути',
+        hint: 'Бакет в пути адреса, а не в имени хоста.',
+      },
       stats_enabled: {
         label: 'Собирать статистику',
         hint: 'Записывает расход каждой завершённой попытки в журнал статистики.',
@@ -1758,6 +1774,7 @@ export const ru: Dictionary = {
         hint: 'Только имена: значения не показываются.',
       },
     },
+    attachmentStorage: { local: 'Локальная папка', s3: 'S3' },
   },
   observers: {
     saved: 'Настройки наблюдателей сохранены',
@@ -1945,6 +1962,15 @@ export const ru: Dictionary = {
       checked: 'Последняя проверка',
       proxy: 'Прокси',
       state: { off: 'Проверка выключена', up: 'Доступна', down: 'Недоступна' },
+    },
+    attachments: {
+      title: 'Вложения',
+      status: 'Состояние хранилища вложений',
+      credentials: 'Ключи S3 в окружении демона',
+      set: 'Заданы',
+      missing: 'Не заданы',
+      hint: 'AWS_ACCESS_KEY_ID и AWS_SECRET_ACCESS_KEY задаются только в окружении демона. После смены ключей перезапустите демон; смена хранилища действует для новых вложений без перезапуска.',
+      warning: 'Ключи S3 не заданы в окружении демона: новые вложения не сохранятся',
     },
     web: {
       title: 'Веб-панель',

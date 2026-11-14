@@ -14,6 +14,7 @@ export const systemHandlers = {
       build,
       busy: services.runs.engine.busy(),
       network: services.network.status(),
+      attachments: { s3Credentials: services.attachments.hasS3Credentials() },
     }) satisfies PingResult,
   network_status: async (_params, { services }) => services.network.status(),
   shutdown: async () => ({ stopping: true }),

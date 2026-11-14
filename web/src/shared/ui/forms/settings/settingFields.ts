@@ -19,7 +19,12 @@ export function choiceItems(
   }
   return (setting.options ?? []).map((option) => ({
     value: option,
-    label: setting.path === 'delivery.mode' ? t(`deliveryMode.${option}`) : option,
+    label:
+      setting.path === 'delivery.mode'
+        ? t(`deliveryMode.${option}`)
+        : setting.path === 'attachments.storage'
+          ? t(`settingsPage.attachmentStorage.${option}`)
+          : option,
   }));
 }
 
@@ -103,6 +108,17 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
       ],
     },
     { key: 'stats', paths: ['stats.enabled', 'stats.show_cost', 'stats.exclude'] },
+    {
+      key: 'attachments',
+      paths: [
+        'attachments.storage',
+        'attachments.s3.bucket',
+        'attachments.s3.region',
+        'attachments.s3.endpoint',
+        'attachments.s3.prefix',
+        'attachments.s3.path_style',
+      ],
+    },
   ],
 };
 

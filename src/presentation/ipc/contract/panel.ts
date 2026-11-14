@@ -49,6 +49,7 @@ export const pingResultSchema = z.object({
   busy: z.boolean().optional(),
   /** The state of the network; absent in a daemon older than the network check. */
   network: networkStatusSchema.optional(),
+  attachments: z.object({ s3Credentials: z.boolean() }).optional(),
 });
 
 export type PingResult = z.infer<typeof pingResultSchema>;

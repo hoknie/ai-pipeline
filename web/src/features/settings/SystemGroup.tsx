@@ -4,6 +4,7 @@ import type { Api } from '../../shared/api/api.ts';
 import type { NetworkStatus } from '../../shared/api/types.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
+import { AttachmentsCard } from './system/AttachmentsCard.tsx';
 import { DaemonCard } from './system/DaemonCard.tsx';
 import { NetworkCard } from './system/NetworkCard.tsx';
 import { useSystem } from './system/useSystem.ts';
@@ -16,11 +17,13 @@ export function SystemGroup({
   api,
   streamedNetwork,
   onRestarted,
+  attachmentStorage,
 }: {
   api: Api;
   /** The last `network` event of the stream; it is fresher than the view until the next poll. */
   streamedNetwork: NetworkStatus | null;
   onRestarted: () => void;
+  attachmentStorage: string;
 }) {
   const { t } = useTranslation();
   const { view, offline, pending, failure, run } = useSystem(api, onRestarted);
@@ -46,6 +49,10 @@ export function SystemGroup({
         <DaemonCard view={view} pending={pending} run={run} />
         <WebCard view={view} pending={pending} run={run} />
         <NetworkCard network={streamedNetwork ?? view.network} />
+        <AttachmentsCard
+          s3Credentials={view.attachments.s3Credentials}
+          storage={attachmentStorage}
+        />
       </div>
     </div>
   );

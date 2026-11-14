@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../api/api.ts';
@@ -10,11 +10,11 @@ import { Alert } from '../../feedback/alert.tsx';
 import { Button } from '../button.tsx';
 import { Card } from '../../layout/card.tsx';
 
-import { EnvField } from './EnvField.tsx';
-import { INHERIT, SettingField, savedValue, type DraftValue } from './SettingField.tsx';
-import { SETTINGS_SECTIONS, envPath, type SettingsSection } from './settingFields.ts';
+import { EnvEditor } from './EnvEditor.tsx';
+import { INHERIT, SettingField, savedValue } from './SettingField.tsx';
+import { SETTINGS_SECTIONS, type SettingsSection } from './settingFields.ts';
 import { specialistOptions, type SpecialistOption } from '../../../lib/specialistLabels.ts';
-import { useSettingsDraft, type Drafts } from './useSettingsDraft.ts';
+import { useSettingsDraft } from './useSettingsDraft.ts';
 
 type Draft = ReturnType<typeof useSettingsDraft>;
 
@@ -112,6 +112,8 @@ function SectionCards({
     group === 'runtimes' && byPath.has(switchPath)
       ? !(typeof switchDraft === 'boolean' ? switchDraft : byPath.get(switchPath)?.value)
       : false;
+  const storage =
+    shared.draft.drafts['attachments.storage'] ?? byPath.get('attachments.storage')?.value;
   return (
     <SectionCard
       id={`section-${group}-${section.key}`}
@@ -119,7 +121,11 @@ function SectionCards({
       mark={off ? t('settingsPage.runtimeOff') : undefined}
     >
       {group === 'system' && section.key === 'stats' ? <StatsNote /> : null}
-      <SectionFields fields={fields} {...shared} />
+      <SectionFields
+        fields={fields}
+        {...shared}
+        s3Disabled={group === 'system' && section.key === 'attachments' && storage !== 's3'}
+      />
     </SectionCard>
   );
 }
@@ -132,6 +138,7 @@ function SectionFields({
   projects,
   runtime,
   draft,
+  s3Disabled = false,
 }: {
   fields: EditorSetting[];
   scope: SettingsScope;
@@ -139,6 +146,7 @@ function SectionFields({
   projects: readonly RepositoryView[];
   runtime: string;
   draft: Draft;
+  s3Disabled?: boolean;
 }) {
   return fields.map((field) =>
     field.kind === 'env' ? (
@@ -161,7 +169,7 @@ function SectionFields({
         projects={projects}
         runtime={runtime}
         error={draft.errorOf(field.path)}
-        disabled={draft.busy}
+        disabled={draft.busy || (s3Disabled && field.path.startsWith('attachments.s3.'))}
         onChange={(value) => {
           // Clearing a field the project does not set removes nothing: it stays inherited.
           const empty =
@@ -177,6 +185,24 @@ function SectionFields({
   );
 }
 
+function useAttachmentStorage(
+  group: SettingsGroup,
+  storage: unknown,
+  onAttachmentStorage?: (storage: string) => void,
+) {
+  useEffect(() => {
+    if (group === 'system') onAttachmentStorage?.(storage === 's3' ? 's3' : 'local');
+  }, [storage, group, onAttachmentStorage]);
+}
+
+function selectedRuntime(byPath: Map<string, EditorSetting>, draft: Draft, scope: SettingsScope) {
+  const saved = byPath.get('naming.runtime');
+  const changed = draft.drafts['naming.runtime'];
+  const value =
+    typeof changed === 'string' ? changed : saved ? savedValue(saved, scope) : undefined;
+  return typeof value === 'string' ? value : '';
+}
+
 /**
  * The form of one group: the sections are cards, the fields are the controls of their kind. The
  * changes are a draft; «Save» writes all of them to the file of the tab in one go.
@@ -190,6 +216,7 @@ export function SettingsForm({
   projects = [],
   onSaved,
   onDirty,
+  onAttachmentStorage,
 }: {
   api: Api;
   config: ConfigEditorResponse;
@@ -202,6 +229,7 @@ export function SettingsForm({
   /** Called after a write, and by «Reload»: the page reads the configuration again. */
   onSaved: () => Promise<void> | void;
   onDirty: (dirty: boolean) => void;
+  onAttachmentStorage?: (storage: string) => void;
 }) {
   const { t } = useTranslation();
   const sections = shownSections ?? SETTINGS_SECTIONS[group] ?? [];
@@ -211,16 +239,11 @@ export function SettingsForm({
   );
   const known = useMemo(() => new Set(byPath.keys()), [byPath]);
   const specialists = useMemo(() => specialistOptions(config.specialists), [config.specialists]);
-  const namingRuntime = byPath.get('naming.runtime');
   const draft = useSettingsDraft({ api, config, scope, known, onSaved, onDirty });
-  const runtimeDraft = draft.drafts['naming.runtime'];
-  const runtimeValue =
-    typeof runtimeDraft === 'string'
-      ? runtimeDraft
-      : namingRuntime
-        ? savedValue(namingRuntime, scope)
-        : undefined;
-  const runtime = typeof runtimeValue === 'string' ? runtimeValue : '';
+  const attachmentStorage =
+    draft.drafts['attachments.storage'] ?? byPath.get('attachments.storage')?.value;
+  useAttachmentStorage(group, attachmentStorage, onAttachmentStorage);
+  const runtime = selectedRuntime(byPath, draft, scope);
   const { dirty, busy } = draft;
   const reload = () => {
     draft.discard();
@@ -261,50 +284,5 @@ export function SettingsForm({
         </div>
       </form>
     </ModelCatalogProvider>
-  );
-}
-
-/** The variables of one runtime: the draft keeps one entry per variable. */
-function EnvEditor({
-  field,
-  drafts,
-  error,
-  disabled,
-  onChange,
-  onClear,
-}: {
-  field: EditorSetting;
-  drafts: Drafts;
-  error: string | null;
-  disabled: boolean;
-  onChange: (path: string, value: DraftValue) => void;
-  onClear: (path: string) => void;
-}) {
-  const { t } = useTranslation();
-  const runtime = field.path.split('.')[1] ?? '';
-  const prefix = `${field.path}.`;
-  const mine: Record<string, string | null> = {};
-  for (const [path, draft] of Object.entries(drafts)) {
-    if (path.startsWith(prefix) && draft !== INHERIT) {
-      mine[path.slice(prefix.length)] = draft as string | null;
-    }
-  }
-  const names = Array.isArray(field.value) ? (field.value as string[]) : [];
-  return (
-    <div className="flex flex-col gap-1" data-testid={`setting-${field.path}`}>
-      <span className="text-sm font-medium">{t('settingsPage.field.runtimes_env.label')}</span>
-      <p className="text-xs text-muted-foreground">
-        {t('settingsPage.field.runtimes_env.hint')} <code className="text-xs">{field.path}</code>
-      </p>
-      <EnvField
-        runtime={runtime}
-        names={names}
-        drafts={mine}
-        error={error}
-        disabled={disabled}
-        onSet={(name, value) => onChange(envPath(field.path, name), value)}
-        onUndo={(name) => onClear(envPath(field.path, name))}
-      />
-    </div>
   );
 }

@@ -9,6 +9,7 @@ The configuration is an `aip/` directory with settings, specialists and pipeline
 - [configuration/delivery.md](delivery.md): the `delivery` section;
 - [configuration/runtimes.md](runtimes.md): the `runtimes` section, `claude.mcp` and `claude.settings`;
 - [configuration/network.md](network.md): the `network` section: the network check and the proxy for agents;
+- [configuration/attachments.md](attachments.md): the `attachments` section: local or S3 task attachment storage;
 - [configuration/stats.md](stats.md): the `stats` section: the usage journal and its report.
 
 Every file can also be edited in the [web panel](../web/settings.md).
@@ -58,7 +59,7 @@ The project level overrides the shared one:
 | `max`, `workspace_dir`, `outside_changes` | As a whole |
 | `defaults`, `claude`, `delivery`, `workspace`, `naming` | Field by field |
 | `mcp_servers` | By server name: a project server replaces the shared one with the same name as a whole |
-| `web`, `runtimes`, `network`, `stats` | Read from the shared level only; in a project file they are a validation error |
+| `web`, `runtimes`, `network`, `attachments`, `stats` | Read from the shared level only; in a project file they are a validation error |
 | Specialists, pipelines and actions | As a whole, by name: a project file `coder.yaml` replaces the shared one |
 | `stages` | By point: a point of the project level replaces the shared one |
 
@@ -83,6 +84,7 @@ naming: { ... }
 web: { ... }              # shared directory only
 runtimes: { ... }         # shared directory only
 network: { ... }          # shared directory only
+attachments: { ... }      # shared directory only
 stats: { ... }            # shared directory only
 claude:
   edit_mode: allowlist    # allowlist | accept_edits | auto
@@ -104,6 +106,7 @@ defaults: { ... }
 | `web` | [`web`](#web) |
 | `runtimes` | [configuration/runtimes.md](runtimes.md#runtimes) |
 | `network` | [configuration/network.md](network.md) |
+| `attachments` | [configuration/attachments.md](attachments.md) |
 | `stats` | [configuration/stats.md](stats.md) |
 | `claude.edit_mode` | [configuration/permissions.md](permissions.md#claudeedit_mode) |
 | `claude.mcp` | [configuration/runtimes.md](runtimes.md#claudemcp) |

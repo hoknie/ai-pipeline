@@ -22,6 +22,7 @@ import {
 } from './validate-settings.ts';
 import { checkMcpCatalog, resolveMcpServers } from './sections/mcp-servers.ts';
 import { checkStats } from './sections/stats.ts';
+import { validateAttachmentsSection } from './sections/attachments.ts';
 import { checkSpecialist, checkSpecialists, SPECIALIST_KEYS } from './validate-specialists.ts';
 import { type RuntimeChain } from '../types/chain.ts';
 import { type FieldError } from '../types/errors.ts';
@@ -57,6 +58,7 @@ const SWARM_KEYS = [
   'web',
   'runtimes',
   'network',
+  'attachments',
   'stats',
   'outside_changes',
   'claude',
@@ -155,8 +157,8 @@ export function validateObserverProfile(value: unknown): ObserverProfileResult {
   return { specialist: specialist ?? fallback, errors: ctx.errors };
 }
 
-export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
-  const config: ResolvedConfig = {
+function defaultConfig(): ResolvedConfig {
+  return {
     max: DEFAULT_MAX,
     workspaceDir: DEFAULT_WORKSPACE_DIR,
     workspace: defaultWorkspace(),
@@ -174,6 +176,10 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     actions: [],
     stages: {},
   };
+}
+
+export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
+  const config = defaultConfig();
   if (!isMapping(root)) {
     addError(ctx, 'swarm', 'the file must contain a `swarm` mapping');
     return config;
@@ -198,6 +204,9 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   if ('web' in swarm) checkWeb(ctx, swarm.web, config.web);
   if ('runtimes' in swarm) checkRuntimes(ctx, swarm.runtimes, config.runtimes);
   if ('network' in swarm) checkNetwork(ctx, swarm.network, defaultNetwork());
+  if ('attachments' in swarm) {
+    ctx.errors.push(...validateAttachmentsSection(swarm.attachments).errors);
+  }
   if ('stats' in swarm) checkStats(ctx, swarm.stats, defaultStats());
   if ('outside_changes' in swarm) {
     config.outsideChanges =

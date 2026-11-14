@@ -36,6 +36,7 @@ export interface SystemView {
   };
   /** The network the daemon holds, proxy without credentials; null when the daemon is not running. */
   network: NetworkStatusView | null;
+  attachments: { s3Credentials: boolean };
   /** The daemon log, where the restart helper writes; null when the panel does not know it. */
   logPath: string | null;
 }
@@ -85,6 +86,7 @@ export function systemView(input: SystemInput): SystemView {
       servedBy: input.servedBy,
     },
     network: ping?.network ?? null,
+    attachments: ping?.attachments ?? { s3Credentials: false },
     logPath: input.logPath,
   };
 }

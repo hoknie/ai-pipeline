@@ -182,6 +182,7 @@ export interface NetworkStatus {
 
 /** What `GET /api/system` answers: the daemon, the panel, the network and the daemon log. */
 export interface SystemView {
+  attachments: { s3Credentials: boolean };
   daemon: {
     running: boolean;
     pid: number | null;

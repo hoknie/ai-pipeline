@@ -1586,6 +1586,7 @@ export const zh: Dictionary = {
       system_panel: '面板设置',
       system_network: '网络',
       system_stats: '统计',
+      system_attachments: '附件',
     },
     field: {
       max: { label: '并行组数', hint: '此仓库所有运行中同时工作的组数。' },
@@ -1635,6 +1636,12 @@ export const zh: Dictionary = {
       },
       network_interval: { label: '间隔', hint: '两次检查间隔的秒数，5 到 3600。' },
       network_timeout: { label: '超时', hint: '单次检查的秒数，1 到 60。' },
+      attachments_storage: { label: '存储', hint: '新附件的保存位置。' },
+      attachments_s3_bucket: { label: '存储桶', hint: 'S3 必填。' },
+      attachments_s3_region: { label: '区域', hint: '存储桶的 AWS 区域。' },
+      attachments_s3_endpoint: { label: '端点', hint: '兼容 S3 存储的可选 http(s) 地址。' },
+      attachments_s3_prefix: { label: '前缀', hint: '对象键前缀，不以斜杠开头。' },
+      attachments_s3_path_style: { label: '路径式寻址', hint: '将存储桶放在路径而非主机名中。' },
       stats_enabled: {
         label: '收集统计',
         hint: '把每次完成的尝试的用量写入统计日志。',
@@ -1655,6 +1662,7 @@ export const zh: Dictionary = {
       runtimes_args: { label: '参数', hint: '添加到每次启动的参数。' },
       runtimes_env: { label: '环境变量', hint: '只显示名称：值从不显示。' },
     },
+    attachmentStorage: { local: '本地文件夹', s3: 'S3' },
   },
   observers: {
     saved: '观察者设置已保存',
@@ -1837,6 +1845,15 @@ export const zh: Dictionary = {
       checked: '上次检查',
       proxy: '代理',
       state: { off: '检查已关闭', up: '可用', down: '不可用' },
+    },
+    attachments: {
+      title: '附件',
+      status: '附件存储状态',
+      credentials: '守护进程环境中的 S3 凭据',
+      set: '已设置',
+      missing: '未设置',
+      hint: '仅在守护进程环境中设置 AWS_ACCESS_KEY_ID 和 AWS_SECRET_ACCESS_KEY。更换凭据后需重启守护进程；切换存储无需重启，新附件立即生效。',
+      warning: '守护进程环境中未设置 S3 凭据：新附件将无法保存',
     },
     web: {
       title: 'Web 面板',

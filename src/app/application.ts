@@ -156,6 +156,18 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     database,
     stateDirectory: options.stateDirectory,
     now,
+    config,
+    s3Credentials:
+      context.environment.AWS_ACCESS_KEY_ID && context.environment.AWS_SECRET_ACCESS_KEY
+        ? {
+            accessKeyId: context.environment.AWS_ACCESS_KEY_ID,
+            secretAccessKey: context.environment.AWS_SECRET_ACCESS_KEY,
+            ...(context.environment.AWS_SESSION_TOKEN
+              ? { sessionToken: context.environment.AWS_SESSION_TOKEN }
+              : {}),
+          }
+        : null,
+    log: (message) => console.error(`[aip] ${message}`),
   });
   const queue = createQueueServices({
     ...{ database, runs, tags, registry, config, now, attachments },

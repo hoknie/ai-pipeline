@@ -66,7 +66,7 @@ export const featureGraph: Record<string, readonly string[]> = {
   runs: ['agents', 'repos', 'swarm-config', 'network'],
   'swarm-edit': ['agents', 'repos', 'runs', 'swarm-config'],
   artifacts: ['runs'],
-  attachments: ['runs'],
+  attachments: ['runs', 'swarm-config'],
   delivery: ['runs', 'swarm-config'],
   processes: ['runs'],
   queue: ['runs', 'tags', 'repos', 'swarm-config', 'attachments'],

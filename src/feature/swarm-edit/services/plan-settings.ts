@@ -4,6 +4,7 @@ import {
   assembleLevel,
   parseYaml,
   validateNetworkSection,
+  validateAttachmentsSection,
   validateRuntimesSection,
   validateStatsSection,
   validateWebSection,
@@ -202,6 +203,7 @@ export function planSettings(paths: ConfigPaths, request: SettingsRequest): Edit
       const root = isMapping(source?.value) ? source.value : {};
       return [
         ...validateNetworkSection(root.network).errors,
+        ...validateAttachmentsSection(root.attachments).errors,
         ...validateStatsSection(root.stats).errors,
         ...validateWebSection(root.web).errors,
         ...validateRuntimesSection(root.runtimes).errors,

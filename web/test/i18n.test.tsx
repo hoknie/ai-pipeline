@@ -282,6 +282,7 @@ const SAME_AS_ENGLISH = new Set([
   'MB',
   'GB',
   'Slug',
+  'S3',
   '{{group}} · {{run}}',
   // The name of the agent.
   'Claude',

@@ -1656,6 +1656,7 @@ export const es: Dictionary = {
       system_panel: 'Ajustes del panel',
       system_network: 'Red',
       system_stats: 'Estadísticas',
+      system_attachments: 'Adjuntos',
     },
     field: {
       max: {
@@ -1762,6 +1763,21 @@ export const es: Dictionary = {
       },
       network_interval: { label: 'Intervalo', hint: 'Segundos entre comprobaciones, de 5 a 3600.' },
       network_timeout: { label: 'Tiempo límite', hint: 'Segundos por comprobación, de 1 a 60.' },
+      attachments_storage: {
+        label: 'Almacenamiento',
+        hint: 'Dónde se guardan los adjuntos nuevos.',
+      },
+      attachments_s3_bucket: { label: 'Depósito', hint: 'Obligatorio para S3.' },
+      attachments_s3_region: { label: 'Región', hint: 'Región AWS del bucket.' },
+      attachments_s3_endpoint: {
+        label: 'Dirección',
+        hint: 'Dirección http(s) opcional del almacenamiento compatible con S3.',
+      },
+      attachments_s3_prefix: { label: 'Prefijo', hint: 'Prefijo de la clave sin barra inicial.' },
+      attachments_s3_path_style: {
+        label: 'Dirección por ruta',
+        hint: 'Colocar el bucket en la ruta en vez del host.',
+      },
       stats_enabled: {
         label: 'Recopilar estadísticas',
         hint: 'Escribe el uso de cada intento terminado en el registro de estadísticas.',
@@ -1785,6 +1801,7 @@ export const es: Dictionary = {
         hint: 'Solo nombres: los valores nunca se muestran.',
       },
     },
+    attachmentStorage: { local: 'Carpeta local', s3: 'S3' },
   },
   observers: {
     saved: 'Ajustes de los observadores guardados',
@@ -1972,6 +1989,16 @@ export const es: Dictionary = {
       checked: 'Última comprobación',
       proxy: 'Proxy',
       state: { off: 'Comprobación desactivada', up: 'Disponible', down: 'No disponible' },
+    },
+    attachments: {
+      title: 'Adjuntos',
+      status: 'Estado del almacenamiento de adjuntos',
+      credentials: 'Credenciales S3 en el entorno del daemon',
+      set: 'Configuradas',
+      missing: 'No configuradas',
+      hint: 'Configure AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY solo en el entorno del daemon. Reinicie el daemon tras cambiar las credenciales; el almacenamiento nuevo se aplica sin reiniciar.',
+      warning:
+        'No hay credenciales S3 en el entorno del daemon: los adjuntos nuevos no se guardarán',
     },
     web: {
       title: 'Panel web',

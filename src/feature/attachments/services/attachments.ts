@@ -2,8 +2,10 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { rejected } from '../../../platform/errors/index.ts';
+import type { S3Credentials } from '../../../platform/s3/client.ts';
 import { workspaceRoot } from '../../../platform/git/index.ts';
 import type { Run } from '../../runs/types/index.ts';
+import type { AttachmentSettings } from '../../swarm-config/types/index.ts';
 import {
   attachmentStorageFor,
   type AttachmentRecord,
@@ -18,6 +20,10 @@ export interface AttachmentDependencies {
   attachments: AttachmentRepository;
   storages: AttachmentStorage[];
   now: () => number;
+  attachmentSettings?: () => AttachmentSettings | string;
+  s3Credentials?: S3Credentials | null;
+  s3Storage?: (settings: AttachmentSettings['s3']) => AttachmentStorage;
+  log?: (message: string) => void;
 }
 
 /** What `content` returns: the file and its bytes. */
@@ -40,6 +46,13 @@ export class AttachmentService {
 
   constructor(dependencies: AttachmentDependencies) {
     this.dependencies = dependencies;
+  }
+
+  /** Only the presence of daemon credentials is exposed to the panel. */
+  hasS3Credentials(): boolean {
+    return (
+      this.dependencies.s3Credentials !== null && this.dependencies.s3Credentials !== undefined
+    );
   }
 
   /** The attachments of a queue item, in the order they were attached. */
@@ -80,12 +93,12 @@ export class AttachmentService {
     const records: AttachmentRecord[] = [];
     let replaced: AttachmentRecord[] = [];
     try {
-      const storage = this.defaultStorage();
+      const storage = prepared.length ? this.defaultStorage() : null;
       for (const file of prepared) {
         const bytes = await readPrepared(file);
         const id = newAttachmentId();
-        const uri = await storage.put(params.itemId, id, bytes);
-        written.push({ uri, storage });
+        const uri = await storage!.put(params.itemId, id, bytes);
+        written.push({ uri, storage: storage! });
         records.push(
           newRecord(file, bytes, {
             repository: params.repository,
@@ -103,7 +116,11 @@ export class AttachmentService {
       );
       replaced = removing;
     } catch (error) {
-      for (const item of written) await item.storage.remove(item.uri).catch(() => undefined);
+      for (const item of written) {
+        await item.storage
+          .remove(item.uri)
+          .catch((failure: unknown) => this.logStorageError(failure));
+      }
       throw error;
     }
     await this.removeBytes(replaced);
@@ -166,7 +183,7 @@ export class AttachmentService {
    * Links of a scheme no storage knows are left alone.
    */
   async sweep(live: AttachmentsLiveness): Promise<void> {
-    const { attachments, storages } = this.dependencies;
+    const { attachments } = this.dependencies;
     const orphans = attachments
       .all()
       .filter((record) =>
@@ -178,24 +195,55 @@ export class AttachmentService {
     for (const record of attachments.all()) {
       keep.set(record.itemId, [...(keep.get(record.itemId) ?? []), record.uri]);
     }
-    for (const storage of storages) await storage.sweep(keep).catch(() => undefined);
+    for (const storage of this.storages()) {
+      await storage.sweep(keep).catch((error: unknown) => this.logStorageError(error));
+    }
   }
 
   private defaultStorage(): AttachmentStorage {
+    const settings = this.dependencies.attachmentSettings?.();
+    if (typeof settings === 'string') throw rejected(settings);
+    if (settings?.storage === 's3') {
+      if (!this.dependencies.s3Credentials) {
+        throw rejected('no S3 credentials in the daemon environment');
+      }
+      if (!this.dependencies.s3Storage) throw new Error('S3 attachment storage is not wired');
+      return this.dependencies.s3Storage(settings.s3);
+    }
     const storage = this.dependencies.storages[0];
     if (!storage) throw new Error('no attachment storage');
     return storage;
   }
 
   private async bytesOf(record: AttachmentRecord): Promise<Buffer | null> {
-    const storage = attachmentStorageFor(this.dependencies.storages, record.uri);
-    return storage ? await storage.get(record.uri) : null;
+    const storage = attachmentStorageFor(this.storages(), record.uri);
+    try {
+      return storage ? await storage.get(record.uri) : null;
+    } catch (error) {
+      this.logStorageError(error);
+      return null;
+    }
   }
 
   private async removeBytes(records: AttachmentRecord[]): Promise<void> {
     for (const record of records) {
-      const storage = attachmentStorageFor(this.dependencies.storages, record.uri);
-      if (storage) await storage.remove(record.uri).catch(() => undefined);
+      const storage = attachmentStorageFor(this.storages(), record.uri);
+      if (storage)
+        await storage.remove(record.uri).catch((error: unknown) => this.logStorageError(error));
     }
+  }
+
+  private storages(): AttachmentStorage[] {
+    const settings = this.dependencies.attachmentSettings?.();
+    const credentials = this.dependencies.s3Credentials;
+    return typeof settings !== 'string' && settings && credentials && this.dependencies.s3Storage
+      ? [...this.dependencies.storages, this.dependencies.s3Storage(settings.s3)]
+      : this.dependencies.storages;
+  }
+
+  private logStorageError(error: unknown): void {
+    this.dependencies.log?.(
+      `attachment storage: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

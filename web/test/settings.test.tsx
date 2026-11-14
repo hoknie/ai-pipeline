@@ -1610,6 +1610,72 @@ describe('system group', () => {
     ).toBeTruthy();
   });
 
+  it('shows default attachment storage and locks S3 fields until S3 is chosen', async () => {
+    show(queueOf(), {}, '#settings/global/system');
+    const storage = await screen.findByTestId('setting-attachments.storage');
+    expect(within(storage).getByRole('combobox', { name: 'Storage' }).textContent).toBe(
+      'Local folder',
+    );
+    expect(storage.textContent).toContain('default');
+    const bucket = screen.getByTestId('setting-attachments.s3.bucket');
+    expect(within(bucket).getByLabelText<HTMLInputElement>('Bucket').disabled).toBe(true);
+    const region = screen.getByTestId('setting-attachments.s3.region');
+    expect(within(region).getByLabelText<HTMLInputElement>('Region').value).toBe('us-east-1');
+    expect(region.textContent).toContain('default');
+    expect(
+      within(screen.getByTestId('setting-attachments.s3.prefix')).getByLabelText<HTMLInputElement>(
+        'Prefix',
+      ).value,
+    ).toBe('aip/attachments/');
+    expect(
+      screen.getByRole('switch', { name: 'Path-style addressing' }).getAttribute('aria-checked'),
+    ).toBe('false');
+    for (const path of ['region', 'endpoint', 'prefix']) {
+      expect(
+        screen.getByTestId(`setting-attachments.s3.${path}`).querySelector('input')?.disabled,
+      ).toBe(true);
+    }
+    expect(
+      screen.getByRole('switch', { name: 'Path-style addressing' }).hasAttribute('disabled'),
+    ).toBe(true);
+
+    fireEvent.click(within(storage).getByRole('combobox', { name: 'Storage' }));
+    fireEvent.click(screen.getByRole('option', { name: 'S3' }));
+    await waitFor(() =>
+      expect(within(bucket).getByLabelText<HTMLInputElement>('Bucket').disabled).toBe(false),
+    );
+    for (const path of ['region', 'endpoint', 'prefix']) {
+      expect(
+        screen.getByTestId(`setting-attachments.s3.${path}`).querySelector('input')?.disabled,
+      ).toBe(false);
+    }
+    expect(
+      screen.getByRole('switch', { name: 'Path-style addressing' }).hasAttribute('disabled'),
+    ).toBe(false);
+    expect(
+      await screen.findByText(
+        'S3 credentials are not set in the daemon environment: new attachments will not be saved',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('does not offer attachment settings on the project tab', async () => {
+    show(queueOf(), {}, '#settings/project/general');
+    await screen.findByTestId('settings-sections');
+    expect(screen.queryByTestId('setting-attachments.storage')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Attachments' })).toBeNull();
+  });
+
+  it('shows only whether the daemon has S3 credentials, not their values', async () => {
+    await mountSystem({
+      system: vi.fn(async () => systemView({ attachments: { s3Credentials: true } })),
+    });
+    const attachments = card('Attachment storage status');
+    expect(attachments.getByText(/: Set$/)).toBeTruthy();
+    expect(attachments.queryByRole('alert')).toBeNull();
+    expect(attachments.getByText(/AWS_ACCESS_KEY_ID/)).toBeTruthy();
+  });
+
   it('reads the state again every 3 seconds and shows the daemon as busy', async () => {
     await mountSystem();
     current = systemView({ daemon: daemonOf({ busy: true }) });

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
@@ -102,6 +102,7 @@ function SharedBody({ props, settings }: BodyProps) {
 function FormBody({ props, settings }: BodyProps) {
   const { api, scope, group } = props;
   const { config, failure, reload, setDirty } = settings;
+  const [attachmentStorage, setAttachmentStorage] = useState('local');
   return (
     <>
       {config ? (
@@ -114,6 +115,7 @@ function FormBody({ props, settings }: BodyProps) {
           projects={props.registry}
           onSaved={reload}
           onDirty={setDirty}
+          onAttachmentStorage={setAttachmentStorage}
         />
       ) : failure ? null : (
         <Loading />
@@ -123,6 +125,7 @@ function FormBody({ props, settings }: BodyProps) {
           api={api}
           streamedNetwork={props.streamedNetwork}
           onRestarted={() => void reload().catch(() => undefined)}
+          attachmentStorage={attachmentStorage}
         />
       ) : null}
     </>

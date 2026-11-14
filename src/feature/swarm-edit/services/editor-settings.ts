@@ -1,6 +1,7 @@
 import { key } from '../types/editor.ts';
 import {
   loadNetworkSettings,
+  loadAttachmentSettings,
   loadRuntimeSettings,
   loadStatsSettings,
   loadWebSettings,
@@ -9,6 +10,8 @@ import {
 } from '../../swarm-config/services/index.ts';
 import {
   ConfigLoadError,
+  type AttachmentSettings,
+  defaultAttachments,
   type ConfigPaths,
   type ConfigSource,
   defaultNetwork,
@@ -93,8 +96,9 @@ function globalSectionSettings(
   const web = safe(() => loadWebSettings(paths), defaultWeb);
   const runtimes = safe(() => loadRuntimeSettings(paths), defaultRuntimes);
   const network = safe(() => loadNetworkSettings(paths), defaultNetwork);
+  const attachments = safe(() => loadAttachmentSettings(paths), defaultAttachments);
   const stats = safe(() => loadStatsSettings(paths), defaultStats);
-  return sectionValues(web, runtimes, network, stats).map(([path, value]) => ({
+  return sectionValues(web, runtimes, network, attachments, stats).map(([path, value]) => ({
     path,
     value,
     file: originOf(...(path.split('.') as [string, ...string[]])),
@@ -106,6 +110,7 @@ function sectionValues(
   web: WebSettings,
   runtimes: RuntimeSettings,
   network: NetworkSettings,
+  attachments: AttachmentSettings,
   stats: StatsSettings,
 ): [string, unknown][] {
   const result: [string, unknown][] = [
@@ -119,6 +124,12 @@ function sectionValues(
     ['network.proxy', network.proxy === null ? null : redactProxy(network.proxy)],
     ['network.interval', network.interval],
     ['network.timeout', network.timeout],
+    ['attachments.storage', attachments.storage],
+    ['attachments.s3.bucket', attachments.s3.bucket],
+    ['attachments.s3.region', attachments.s3.region],
+    ['attachments.s3.endpoint', attachments.s3.endpoint],
+    ['attachments.s3.prefix', attachments.s3.prefix],
+    ['attachments.s3.path_style', attachments.s3.pathStyle],
     ['stats.enabled', stats.enabled],
     ['stats.exclude', stats.exclude],
     ['stats.show_cost', stats.showCost],
@@ -185,7 +196,13 @@ export function editorSettings(
   ];
   const defaultValues = new Map<string, unknown>([
     ...settingsOf(configOrDefaults(null)),
-    ...sectionValues(defaultWeb(), defaultRuntimes(), defaultNetwork(), defaultStats()),
+    ...sectionValues(
+      defaultWeb(),
+      defaultRuntimes(),
+      defaultNetwork(),
+      defaultAttachments(),
+      defaultStats(),
+    ),
   ]);
   const proxyCredentials = hasCredentials(globalNetwork(paths));
   const aloneConfig = resolution(global, emptyLevel()).config;

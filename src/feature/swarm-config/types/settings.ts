@@ -260,6 +260,35 @@ export interface NetworkSettings {
   timeout: number;
 }
 
+export const ATTACHMENT_STORAGES = ['local', 's3'] as const;
+
+export type AttachmentStorage = (typeof ATTACHMENT_STORAGES)[number];
+
+/** Storage for new task attachments; read from the shared settings.yaml only. */
+export interface AttachmentSettings {
+  storage: AttachmentStorage;
+  s3: {
+    bucket: string | null;
+    region: string;
+    endpoint: string | null;
+    prefix: string;
+    pathStyle: boolean;
+  };
+}
+
+export function defaultAttachments(): AttachmentSettings {
+  return {
+    storage: 'local',
+    s3: {
+      bucket: null,
+      region: 'us-east-1',
+      endpoint: null,
+      prefix: 'aip/attachments/',
+      pathStyle: false,
+    },
+  };
+}
+
 /** The usage statistics of the daemon; read from the global settings.yaml only. */
 export interface StatsSettings {
   /** The daemon keeps the usage journal. */

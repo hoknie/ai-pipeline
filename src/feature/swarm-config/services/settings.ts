@@ -5,6 +5,7 @@ import {
   pipelineNameOf,
   variantNameOf,
   type ConfigPaths,
+  type AttachmentSettings,
   type DeliveryMode,
   type NetworkSettings,
   type ResolvedConfig,
@@ -13,7 +14,13 @@ import {
 } from '../types/index.ts';
 
 import { configPaths } from './discover.ts';
-import { loadConfig, loadNetworkSettings, loadRuntimeSettings, loadStatsSettings } from './load.ts';
+import {
+  loadAttachmentSettings,
+  loadConfig,
+  loadNetworkSettings,
+  loadRuntimeSettings,
+  loadStatsSettings,
+} from './load.ts';
 
 /** What the queue view shows from the configuration of a repository; nulls when it does not load. */
 export interface DeliverySettings {
@@ -85,6 +92,16 @@ export class ConfigService {
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
       return `invalid swarm.network: ${error.message}`;
+    }
+  }
+
+  /** Current attachment storage from the shared settings.yaml, or the text of its error. */
+  attachmentSettings(): AttachmentSettings | string {
+    try {
+      return loadAttachmentSettings(this.pathsOf('.'));
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw error;
+      return `invalid swarm.attachments: ${error.message}`;
     }
   }
 
