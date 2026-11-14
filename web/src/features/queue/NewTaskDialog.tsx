@@ -82,6 +82,7 @@ export default function NewTaskDialog(props: Props) {
           submitLabel={t('queue.add')}
           onDraft={(next) => onDraft({ ...next, repository: next.repository ?? target })}
           onSubmit={state.submit}
+          onSubmitAndContinue={state.submitAndContinue}
         />
       </DialogContent>
     </Dialog>

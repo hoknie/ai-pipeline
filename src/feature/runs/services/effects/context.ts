@@ -2,7 +2,12 @@ import type { AgentsService } from '../../../agents/services/index.ts';
 import type { NetworkMonitor } from '../../../network/services/index.ts';
 import type { ConfigService } from '../../../swarm-config/services/index.ts';
 import type { Event } from '../../machine/index.ts';
-import type { AgentExitPort, DiffPort, QueueAdvancePort } from '../../ports/index.ts';
+import type {
+  AgentExitPort,
+  DiffPort,
+  QueueAdvancePort,
+  RunAttachmentsPort,
+} from '../../ports/index.ts';
 import type { RunState } from '../../types/index.ts';
 
 /** What the effects take from the engine: the queue, `apply` and `save`. */
@@ -47,6 +52,7 @@ export interface EffectDependencies {
   diff: DiffPort;
   agentExit: AgentExitPort;
   queue: QueueAdvancePort;
+  attachments: RunAttachmentsPort;
 }
 
 /** The attempt of a group an agent works on. */

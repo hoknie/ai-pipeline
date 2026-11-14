@@ -2,6 +2,7 @@ import { RUN_TITLE_LIMIT } from '../../../feature/agents/types/index.ts';
 import { RECOMMENDATION_LIMIT } from '../../../feature/runs/types/index.ts';
 import {
   afterIds,
+  attachmentSources,
   deliveryModeSchema,
   parentRef,
   proposedGroupSchema,
@@ -34,6 +35,7 @@ const queueAddParams = z
     skip: skipSteps.optional(),
     after: afterIds.optional(),
     postponed: z.boolean().optional(),
+    attachments: attachmentSources.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -74,6 +76,8 @@ const queueEditParams = z
     after: afterIds.optional(),
     postponed: z.boolean().optional(),
     position: z.number().int().min(1).optional(),
+    attach: attachmentSources.optional(),
+    detach: z.array(z.string().min(1)).max(50).optional(),
   })
   .refine((params) => params.task === undefined || params.groups === undefined, {
     message: 'pass either task or groups',

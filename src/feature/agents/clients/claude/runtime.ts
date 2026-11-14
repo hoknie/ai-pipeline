@@ -77,6 +77,7 @@ function launchOptions(context: LaunchContext, mcpConfigPath: string): string[] 
   return [
     ...session,
     ...model,
+    ...(!context.attachmentsDirectory ? [] : ['--add-dir', context.attachmentsDirectory]),
     '--append-system-prompt',
     systemPrompt(context.specialist, context.input),
     '--tools',
@@ -105,7 +106,7 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
     args: [
       ...extra.args,
       '-p',
-      userMessage(context.input),
+      userMessage(context.input, context.attachmentsDirectory),
       '--output-format',
       'stream-json',
       '--verbose',

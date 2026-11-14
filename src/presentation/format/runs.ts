@@ -1,3 +1,4 @@
+import { formatAttachmentSize } from '../../feature/attachments/types/index.ts';
 import { type GroupWait, clockTime } from '../../feature/runs/types/index.ts';
 import { formatDiff, limitNote } from './groups.ts';
 import { runHints } from './hints.ts';
@@ -76,6 +77,13 @@ export function formatRun(
       ? [`${style.muted('Title:')} ${run.title}${run.name ? ` (${run.name})` : ''}`]
       : []),
     `${style.muted('Repository:')} ${run.repository}`,
+    ...(run.attachments.length > 0
+      ? [
+          `${style.muted('Attachments:')} ${run.attachments
+            .map((file) => `${file.fileName} (${formatAttachmentSize(file.size)})`)
+            .join(', ')}`,
+        ]
+      : []),
     ...(run.tags && run.tags.length > 0
       ? [`${style.muted('Tags:')} ${formatTagLabels(run.tags, style)}`]
       : []),

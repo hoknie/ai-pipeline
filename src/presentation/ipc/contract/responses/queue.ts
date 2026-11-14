@@ -14,6 +14,7 @@ import type {
   StepProgress,
 } from '../../../../feature/runs/types/index.ts';
 import type { DeliveryMode } from '../../../../feature/swarm-config/types/index.ts';
+import type { AttachmentView } from './attachments.ts';
 import type { DeliveryStage, RowStatus, SystemStepKind } from './runs.ts';
 import type { TagView } from './tags.ts';
 
@@ -51,6 +52,8 @@ export interface QueueItemView {
   run: string | null;
   /** Hold of the run of a returned item; null for a new task and for a run without a hold. */
   hold: RunHold | null;
+  /** Files attached to the task; a returned run shows those of the run. */
+  attachments: AttachmentView[];
 }
 
 export interface DependencyView {

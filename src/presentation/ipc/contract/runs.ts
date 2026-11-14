@@ -46,6 +46,11 @@ export const afterIds = z.array(z.string().min(1)).max(50);
 
 export const deliveryModeSchema = z.enum(DELIVERY_MODES);
 
+/** Files to attach to a task: absolute paths the daemon can read, each with an optional name. */
+export const attachmentSources = z
+  .array(z.object({ path: z.string().min(1), name: z.string().min(1).optional() }))
+  .max(50);
+
 /** Id of a variant of a pipeline. */
 export const variantId = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
 
@@ -65,6 +70,7 @@ const runParams = z
     parent: parentRef.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    attachments: attachmentSources.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',

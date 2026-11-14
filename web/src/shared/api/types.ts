@@ -29,6 +29,7 @@ export type {
   FileDiffView,
   FileStat,
   ArtifactView,
+  AttachmentView,
   RunPatchView,
   GroupRow,
   GroupWait,
@@ -117,6 +118,10 @@ export interface QueueFields {
   after?: string[];
   /** Run id or task number; the task gets the linked task tag of that run. */
   parent?: string | null;
+  /** Ids of the files uploaded before; they become the attachments of the task. */
+  uploads?: string[];
+  /** Names of attachments to remove; an edit only. */
+  detach?: string[];
 }
 
 /** Changes of a queued task; `title: null` removes the title. */
@@ -142,6 +147,10 @@ export interface QueuePatch {
   /** A running queue does not take a postponed task. */
   postponed?: boolean;
   position?: number;
+  /** Ids of uploaded files to attach. */
+  uploads?: string[];
+  /** Names of attachments to remove. */
+  detach?: string[];
 }
 export type {
   EditorMcpServer,

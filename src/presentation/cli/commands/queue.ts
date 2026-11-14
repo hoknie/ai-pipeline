@@ -6,7 +6,13 @@ import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { QueueView, RunCreated } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
-import { collect, parseDeliveryMode, readGroups, type QueueTaskOptions } from '../options.ts';
+import {
+  attachmentSources,
+  collect,
+  parseDeliveryMode,
+  readGroups,
+  type QueueTaskOptions,
+} from '../options.ts';
 import { addEdit, addSettings } from './queue-edit.ts';
 
 function queueKit(program: Command, io: CliIo, style: Style) {
@@ -30,6 +36,7 @@ function queueKit(program: Command, io: CliIo, style: Style) {
         '--delivery-mode <mode>',
         `how the merged result is delivered: ${DELIVERY_MODES.join(', ')}; whatever delivery.mode says`,
       )
+      .option('--attach <path>', 'file to attach to the task; repeat for several', collect)
       .option('--tag <name>', 'tag of the task; repeat for several', collect)
       .option(
         '--parent <run>',
@@ -97,6 +104,7 @@ function addAdd(kit: QueueKit): void {
         'aip queue add feature -g g.yaml',
         'aip queue add feature --task "Fix the typo" --skip review --skip qa',
         'aip queue add feature --task "Add the API" --after q1',
+        'aip queue add feature --task "Fix the layout" --attach shot.png --attach spec.pdf',
         'aip queue add feature --task "Follow-up" --parent 115',
         'aip queue add feature --task "Later" --postpone',
       ]),
@@ -119,6 +127,7 @@ function addAdd(kit: QueueKit): void {
         ...(options.variant !== undefined ? { variant: options.variant } : {}),
         ...(options.skip !== undefined ? { skip: options.skip } : {}),
         ...(options.after !== undefined ? { after: options.after } : {}),
+        ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
         ...(options.postpone ? { postponed: true } : {}),
       })) as QueueView & { item: string };
       if (!options.json) print(`Added ${view.item}.`);

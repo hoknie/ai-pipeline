@@ -65,6 +65,7 @@ describe('RunAttemptHistoryService', () => {
       publish: {} as never,
       diff: {} as never,
       agentExit: {} as never,
+      attachments: {} as never,
     });
     expect(services.attemptHistory).toBeInstanceOf(RunAttemptHistoryService);
     expect(typeof services.attemptHistory.page).toBe('function');

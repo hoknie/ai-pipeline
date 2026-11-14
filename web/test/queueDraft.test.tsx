@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  continueDraft,
   draftOf,
   draftValid,
   emptyDraft,
@@ -204,5 +205,41 @@ describe('queue draft task/title normalization', () => {
       groups: [{ title: '', task: `${'😀'.repeat(length)}\nbody` }],
     };
     expect(fieldsOf(draft).groups?.[0]?.title).toBe('😀'.repeat(Math.min(length, 60)));
+  });
+});
+
+describe('continueDraft', () => {
+  it('clears the name, the text, the groups and the links and keeps the settings', () => {
+    const draft = {
+      ...emptyDraft('feature'),
+      variant: 'fast',
+      mode: 'groups' as const,
+      task: 'text',
+      title: 'name',
+      groups: [
+        { title: 'a', task: 'b' },
+        { title: 'c', task: 'd' },
+      ],
+      postponed: true,
+      autoDeliver: true,
+      deliveryMode: 'branch' as const,
+      tags: ['t1'],
+      after: ['q1'],
+      skip: ['review'],
+      afterTouched: true,
+      parent: 'run-1',
+      parentTouched: true,
+      repository: '/work/app',
+    };
+    const before = structuredClone(draft);
+    expect(continueDraft(draft)).toEqual({
+      ...draft,
+      task: '',
+      title: '',
+      groups: [{ title: '', task: '' }],
+      after: [],
+      afterTouched: false,
+    });
+    expect(draft).toEqual(before);
   });
 });

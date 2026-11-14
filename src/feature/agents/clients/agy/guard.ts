@@ -10,6 +10,8 @@ const policySchema = z.object({
   tools: z.array(z.string()),
   /** Names of the attempt of the MCP servers of the specialist; absent in older policies. */
   servers: z.array(z.string()).default([]),
+  /** Folders outside the worktree the specialist may read; absent in older policies. */
+  readDirectories: z.array(z.string()).default([]),
 });
 export type AgyPolicy = z.infer<typeof policySchema>;
 const hookSchema = z.object({
@@ -63,7 +65,10 @@ function permit(policy: AgyPolicy, name: string, args: Record<string, unknown>):
   if (name === 'call_mcp_tool' || name.startsWith('mcp_')) return false;
   if (READ_TOOLS.has(name))
     return (
-      policy.permissions === 'full' || insideWorktree(policy.worktree, args[READ_PATHS[name] ?? ''])
+      policy.permissions === 'full' ||
+      [policy.worktree, ...policy.readDirectories].some((root) =>
+        insideWorktree(root, args[READ_PATHS[name] ?? '']),
+      )
     );
   const writePath = WRITE_PATHS[name];
   if (writePath)

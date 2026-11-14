@@ -65,7 +65,7 @@ export function useStatusesMounted(showUsage: boolean): boolean {
   return mounted;
 }
 
-type Tab = 'log' | 'changes' | 'task' | 'design' | 'tasks' | 'artifacts';
+type Tab = 'log' | 'changes' | 'task' | 'design' | 'tasks' | 'artifacts' | 'attachments';
 
 /** The open tab and the tabs the group has; the spec tabs appear when the group has a spec. */
 export function useGroupTabs(args: {
@@ -75,11 +75,14 @@ export function useGroupTabs(args: {
   version: string;
   view: GroupView | null;
   caps: Capabilities;
+  /** The run has attachments: the tab of them exists. */
+  hasAttachments: boolean;
   addressTab: string | null;
   onAddressTab: ((tab: string) => void) | undefined;
   onError: (message: string) => void;
 }) {
-  const { api, runId, row, version, view, caps, addressTab, onAddressTab, onError } = args;
+  const { api, runId, row, version, view, caps, hasAttachments } = args;
+  const { addressTab, onAddressTab, onError } = args;
   // without a controlling parent the screen keeps its tab itself
   const [localTab, setLocalTab] = useState<string | null>(null);
   const requestedTab = onAddressTab ? addressTab : localTab;
@@ -100,6 +103,7 @@ export function useGroupTabs(args: {
   if (spec?.design != null) available.add('design');
   if (spec?.tasks != null) available.add('tasks');
   if (row.artifacts > 0) available.add('artifacts');
+  if (hasAttachments) available.add('attachments');
   const loaded = view !== null && (system || spec !== undefined);
   const tab = (available.has(requestedTab ?? 'log') ? (requestedTab ?? 'log') : 'log') as Tab;
   useEffect(() => {

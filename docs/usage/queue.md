@@ -39,6 +39,23 @@ Every task gets an integer number within its repository when it is added: 1, 2, 
 - A queue without autopilot that has only postponed tasks left (and no runs) stops.
 - `aip run start` and specialists cannot postpone a task.
 
+## Attachments
+
+A task can carry files: a screenshot, a mockup, a log, a PDF. At most 10 files of up to 20 MB each, of any type; the names within a task are unique.
+
+```
+aip queue add feature --task "Fix the layout" --attach shot.png --attach spec.pdf
+aip run start feature --task "Fix the layout" --attach shot.png
+aip queue edit <item> --attach new.png --detach old.png
+```
+
+- A relative path is taken from the current directory. The daemon copies the file when it accepts the request, so deleting or changing the original afterwards changes nothing.
+- A bad request is refused as a whole: a missing file, a directory, a relative path in an MCP call, a repeated name, a file over the limit or an eleventh file leaves the queue as it was.
+- Attachments can change while the task waits. A task that has become a run, or a returned run, keeps its attachments as they are; changing them is refused.
+- Removing a waiting task from the queue deletes its attachments.
+- When the task becomes a run, its attachments become the attachments of the run. Before each step the daemon lays them out in `logs/<run id>/_attachments/` of the workspace, outside the worktree, so they never reach a commit or a delivery. The specialist may read that folder at any permission level, and the message to it lists the files with their paths, sizes and types.
+- Runs are never deleted from the database, so the attachments of a run are kept indefinitely, together with the bytes in `attachments/` of the state directory.
+
 ## Running the queue
 
 ```

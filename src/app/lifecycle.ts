@@ -8,8 +8,19 @@ export interface Lifecycle {
 }
 
 export function createLifecycle(services: DaemonServices, database: Database): Lifecycle {
-  const { network, runs, queue, tags, registry, observers, delivery, artifacts, processes, stats } =
-    services;
+  const {
+    network,
+    runs,
+    queue,
+    tags,
+    registry,
+    observers,
+    delivery,
+    artifacts,
+    attachments,
+    processes,
+    stats,
+  } = services;
   return {
     async start() {
       network.start();
@@ -20,6 +31,10 @@ export function createLifecycle(services: DaemonServices, database: Database): L
         queue.store.load();
         tags.load();
         registry.load();
+        await attachments.sweep({
+          items: new Set(queue.store.all().flatMap((one) => one.items.map((item) => item.id))),
+          hasRun: (id) => runs.states.lookup(id) !== undefined,
+        });
         observers.load();
         // The history moves into the usage journal once, before the first new record.
         await stats.ledger.backfill();

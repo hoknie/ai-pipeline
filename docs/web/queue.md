@@ -37,9 +37,13 @@ A task with predecessors shows them on a second line after "Waits for:".
 - **"Waits for"** chooses the [predecessors](../usage/queue.md#dependencies). A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).
 - **"Parent task"** chooses one run of the repository as the [parent](../usage/tags.md#parent-of-a-task), finished runs included, in three parts: "In progress", "Planned" and "Finished". The chosen parent is shown as `#N title`. "No parent task" removes the linked task tags of the task.
 - **"Postpone"** adds the task [postponed](../usage/queue.md#postponed-tasks). The switch is only in the new task; for an existing task the "Postpone" button in the list changes the flag.
+- **"Attachments"** has an "Attach files" button and a drop zone. Each file is uploaded at once, with its progress shown. A file over 20 MB, an eleventh file and a repeated name are refused with a message and stay out of the list; a failed upload shows its error and is not sent with the task. "Add" is unavailable while a file is uploading.
+  The files stay in the draft until the task is added. In the form of a waiting task its files can be removed and new ones attached; the files of a returned run are only shown. A row with files shows a paperclip with their number. See [attachments](../usage/queue.md#attachments).
 - **Tags** and **delivery** are the [tags](../usage/tags.md) and [delivery settings](../configuration/delivery.md#settings-for-one-task) of the task.
 - **"Variant"** chooses a [variant of the pipeline](../usage/queue.md#variants); it is shown only when the pipeline has variants, and changing the pipeline resets it to `default`. The queue and the cards of runs show a badge with the variant name next to the pipeline badge, except for `default`.
 - **"Skip steps"** is a row of segments: a pressed segment is a [skipped step](../usage/queue.md#skipping-steps), and the last unpressed one stays disabled. Steps skipped by the chosen variant are pressed and cannot be changed.
+
+**"Add and continue"**, next to "Add" in the new task dialog, adds the task and keeps the form open: the title, the text, the groups and "Waits for" are cleared, the other settings stay, and the focus returns to the text. The form of an existing task has no such button.
 
 ### The text editor
 

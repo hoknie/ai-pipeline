@@ -1,4 +1,5 @@
 import type { ArtifactService } from '../../feature/artifacts/services/index.ts';
+import type { AttachmentService } from '../../feature/attachments/services/index.ts';
 import type { ComposeServices } from '../../feature/compose/services/index.ts';
 import type { DeliveryServices } from '../../feature/delivery/services/index.ts';
 import type {
@@ -32,6 +33,7 @@ export interface DaemonServices {
   processes: ProcessService;
   delivery: DeliveryServices;
   artifacts: ArtifactService;
+  attachments: AttachmentService;
   queue: QueueServices;
   observers: ObserverService;
   history: ObserverHistoryService;

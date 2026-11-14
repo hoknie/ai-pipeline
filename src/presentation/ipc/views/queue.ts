@@ -13,6 +13,7 @@ import { stepProgress, summarize } from '../../../feature/runs/services/index.ts
 import {
   type Group,
   type GroupWait,
+  type RunAttachment,
   type RunState,
   allGroups,
   attemptStepLabel,
@@ -172,6 +173,7 @@ export function queueView(
   waits: WaitLookup = NO_WAITS,
   names: (id: string) => string = (id) => id,
   variantNames: (pipeline: string, variant: string) => string = (_pipeline, variant) => variant,
+  attachments: (item: string) => RunAttachment[] = () => [],
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -225,6 +227,10 @@ export function queueView(
       error: item.error,
       run: item.run,
       hold: (item.run === null ? undefined : lookup(item.run)?.run.hold) ?? null,
+      attachments:
+        item.run === null
+          ? attachments(item.id)
+          : (lookup(item.run)?.run.attachments ?? []).map((file) => ({ ...file })),
     })),
     runs,
     skipped,

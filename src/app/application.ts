@@ -2,6 +2,7 @@ import { currentBuild, type BuildInfo } from '../platform/build/index.ts';
 import { databasePath, socketPath } from '../platform/paths/index.ts';
 import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
 import { Database } from '../platform/sqlite/index.ts';
+import { createAttachmentsServices } from '../feature/attachments/services/index.ts';
 import { createArtifactsServices } from '../feature/artifacts/services/index.ts';
 import { createComposeServices } from '../feature/compose/services/index.ts';
 import { createDeliveryServices } from '../feature/delivery/services/index.ts';
@@ -127,6 +128,7 @@ function createRuns(context: Context, lower: Lower) {
     observe: ports.observe.port,
     publish: ports.runs.port,
     diff: ports.diff.port,
+    attachments: ports.attachments.port,
     agentExit: processes,
   });
   return { runs, processes };
@@ -150,8 +152,13 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     now,
     publish: ports.artifacts.port,
   });
+  const { attachments } = createAttachmentsServices({
+    database,
+    stateDirectory: options.stateDirectory,
+    now,
+  });
   const queue = createQueueServices({
-    ...{ database, runs, tags, registry, config, now },
+    ...{ database, runs, tags, registry, config, now, attachments },
     repair: ports.repair.port,
     observe: ports.observe.port,
     publish: ports.queuePublish.port,
@@ -181,6 +188,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
   return {
     delivery,
     artifacts,
+    attachments,
     queue,
     observers: observersServices.observers,
     history: observersServices.history,
@@ -253,6 +261,7 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
       void engine.serial(() => engine.wake()).catch(() => undefined);
     },
   });
+  ports.attachments.set({ materialize: (run) => services.attachments.materialize(run) });
   ports.queue.set(services.queue.advance);
   ports.observe.set(services.observers);
   ports.repair.set(services.observers);

@@ -1,3 +1,4 @@
+import type { AttachmentSource } from '../../attachments/types/index.ts';
 import type { NewGroup, RunCreated } from '../../runs/types/index.ts';
 import type { DeliveryMode } from '../../swarm-config/types/index.ts';
 
@@ -27,6 +28,8 @@ export interface QueueAddRequest extends TaskFields {
   /** The run (id or task number) whose linked task tag the new task carries. */
   parent?: string | number | undefined;
   postponed?: boolean | undefined;
+  /** Files to attach: absolute paths; a specialist's task has none. */
+  attachments?: AttachmentSource[] | undefined;
 }
 
 /** `worker_queue_add`: a task a specialist adds to the queue of its run's repository. */
@@ -41,6 +44,10 @@ export interface QueueEditRequest extends Omit<ItemPatch, 'tags' | 'after'> {
   tags?: string[] | undefined;
   parent?: string | number | null | undefined;
   after?: string[] | undefined;
+  /** Files to attach to an item that waits in the queue. */
+  attach?: AttachmentSource[] | undefined;
+  /** Names of attachments to remove. */
+  detach?: string[] | undefined;
 }
 
 /** `queue_settings`: the settings of a queue to change. */

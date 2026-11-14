@@ -1060,3 +1060,232 @@ describe('markdown field of the new task', () => {
     expect(area.value).toBe('см. [сайт](https://e.com)');
   });
 });
+
+describe('add and continue', () => {
+  const added = () =>
+    vi.fn(async () => ({
+      ...queueOf({ items: [queueItem('q12', 'First', 12)] }),
+      item: 'q12',
+    }));
+
+  async function openDialog(api: Api) {
+    render(<App api={api} openStream={openFake} />);
+    const button = strip().getByRole<HTMLButtonElement>('button', { name: 'New task' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    return dialog;
+  }
+
+  it('stands after "Add" and is disabled while the task is empty', async () => {
+    const dialog = await openDialog(fakeApi({ queue: vi.fn(async () => queueOf()) }));
+    const names = within(dialog)
+      .getAllByRole('button')
+      .map((item) => item.textContent);
+    expect(names.indexOf('Add and continue')).toBe(names.indexOf('Add') + 1);
+    const next = within(dialog).getByRole<HTMLButtonElement>('button', {
+      name: 'Add and continue',
+    });
+    expect(next.disabled).toBe(true);
+    expect(next.type).toBe('button');
+  });
+
+  it('sends the request of "Add", keeps the dialog and clears the text', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()), queueAdd: added() });
+    const dialog = await openDialog(api);
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'First' } });
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        title: 'First',
+        task: 'Do it',
+      }),
+    );
+    await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
+    const text = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
+    await waitFor(() => expect(text.value).toBe(''));
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Name').value).toBe('');
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature');
+    await waitFor(() => expect(document.activeElement).toBe(text));
+  });
+
+  it('leaves one empty group and focuses its title in the groups mode', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()), queueAdd: added() });
+    const dialog = await openDialog(api);
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
+    fireEvent.change(within(dialog).getByLabelText('Title of group 1'), {
+      target: { value: 'One' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add group' }));
+    fireEvent.change(within(dialog).getByLabelText('Text of group 2'), {
+      target: { value: 'Two' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({
+        pipeline: 'feature',
+        groups: [
+          { title: 'One', task: 'One' },
+          { title: 'Two', task: 'Two' },
+        ],
+      }),
+    );
+    const title = await within(dialog).findByLabelText<HTMLInputElement>('Title of group 1');
+    await waitFor(() => expect(title.value).toBe(''));
+    expect(within(dialog).queryByLabelText('Title of group 2')).toBeNull();
+    expect(within(dialog).getByRole('radio', { name: 'Groups' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    await waitFor(() => expect(document.activeElement).toBe(title));
+  });
+
+  it('keeps the dialog, the text and the error when the server rejects it', async () => {
+    const api = fakeApi({
+      queue: vi.fn(async () => queueOf()),
+      queueAdd: vi.fn(async () => {
+        throw new Error('rejected');
+      }),
+    });
+    const dialog = await openDialog(api);
+    const shown = screen.queryAllByText('Task #12 created').length;
+    const created = screen.queryAllByText('Task created').length;
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Keep' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() => expect(within(dialog).getByText('rejected')).toBeTruthy());
+    expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('Keep');
+    expect(api.queueAdd).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
+    expect(screen.queryAllByText('Task #12 created')).toHaveLength(shown);
+    expect(screen.queryAllByText('Task created')).toHaveLength(created);
+  });
+
+  const auth = { id: 'ta', repository: '/repo', name: 'auth', color: 'red' as const, task: null };
+
+  /** Fills the dialog: a tag, a parent, a predecessor, "Postpone" and the text. */
+  async function fillSettings(dialog: HTMLElement) {
+    act(() => {
+      FakeEventSource.last?.open();
+      FakeEventSource.last?.send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [runView()],
+        tags: [auth],
+      });
+    });
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'First' } });
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Postpone' }));
+    choose(within(dialog).getByRole('combobox', { name: 'Parent task' }), /добавить вход/);
+    for (const [name, option] of [
+      ['Tags', 'auth'],
+      ['Waits for', /Old/],
+    ] as const) {
+      const field = await within(dialog).findByRole('combobox', { name });
+      fireEvent.click(field);
+      fireEvent.click(await screen.findByRole('option', { name: option }));
+      fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
+      await waitFor(() => {
+        expect(field.getAttribute('aria-expanded')).toBe('false');
+        expect(document.activeElement).toBe(field);
+      });
+    }
+  }
+
+  const withOld = () =>
+    fakeApi({
+      queue: vi.fn(async () => queueOf({ items: [queueItem('q1', 'Old', 1)] })),
+      queueAdd: added(),
+    });
+
+  it('sends the same request as "Add" and keeps tag, parent and postpone, but not "Waits for"', async () => {
+    const api = withOld();
+    const dialog = await openDialog(api);
+    await fillSettings(dialog);
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Parent task' }).textContent).toMatch(
+        /добавить вход/,
+      ),
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
+    const sent = vi.mocked(api.queueAdd).mock.calls[0]![0];
+    expect(sent).toMatchObject({
+      title: 'First',
+      task: 'Do it',
+      tags: ['auth'],
+      parent: 'run1',
+      after: ['q1'],
+      postponed: true,
+    });
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
+    );
+    expect(within(dialog).getAllByText('auth').length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole('combobox', { name: 'Parent task' }).textContent).toMatch(
+      /добавить вход/,
+    );
+    expect(
+      within(dialog).getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked'),
+    ).toBe('true');
+    expect(within(dialog).getByRole('combobox', { name: 'Waits for' }).textContent).not.toMatch(
+      /Old/,
+    );
+
+    // the same input through "Add" gives the same request
+    cleanup();
+    const plain = withOld();
+    const again = await openDialog(plain);
+    await fillSettings(again);
+    await waitFor(() =>
+      expect(within(again).getByRole('combobox', { name: 'Parent task' }).textContent).toMatch(
+        /добавить вход/,
+      ),
+    );
+    fireEvent.click(within(again).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(plain.queueAdd).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(plain.queueAdd).mock.calls[0]![0]).toEqual(sent);
+  }, 15_000);
+
+  it('offers the added task among the tasks to wait for', async () => {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()), queueAdd: added() });
+    const dialog = await openDialog(api);
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Waits for' }));
+    expect(await screen.findByRole('option', { name: /#12/ })).toBeTruthy();
+  });
+
+  it('disables both buttons until the request is done', async () => {
+    let finish: (value: Awaited<ReturnType<Api['queueAdd']>>) => void = () => {};
+    const api = fakeApi({
+      queue: vi.fn(async () => queueOf()),
+      queueAdd: vi.fn(
+        () =>
+          new Promise<Awaited<ReturnType<Api['queueAdd']>>>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    });
+    const dialog = await openDialog(api);
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
+    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
+      true,
+    );
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add and continue' }).disabled,
+    ).toBe(true);
+    await act(async () => {
+      finish({ ...queueOf({ items: [queueItem('q12', 'First', 12)] }), item: 'q12' });
+    });
+    await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
+  });
+});

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import { STATS_MIGRATION } from './stats-migration.ts';
+import { LATER_MIGRATIONS, STATS_MIGRATION } from './parts.ts';
 
 export const MIGRATIONS: string[] = [
   `
@@ -281,8 +281,7 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS runs_history_repository ON runs (repository, id);
   `,
   STATS_MIGRATION,
-  `ALTER TABLE queues ADD COLUMN filter_json TEXT NOT NULL DEFAULT '{"pipelines":[],"tags":[]}'`,
-  `ALTER TABLE runs ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'; ALTER TABLE queue_items ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'`,
+  ...LATER_MIGRATIONS,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

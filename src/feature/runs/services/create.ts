@@ -8,6 +8,7 @@ import type {
   DiffPort,
   ObservePort,
   QueueAdvancePort,
+  RunAttachmentsPort,
   RunsPublishPort,
 } from '../ports/index.ts';
 import {
@@ -42,6 +43,7 @@ export interface RunsDependencies {
   publish: RunsPublishPort;
   diff: DiffPort;
   agentExit: AgentExitPort;
+  attachments: RunAttachmentsPort;
 }
 
 export interface RunsServices {

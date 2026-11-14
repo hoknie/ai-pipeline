@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { normalize } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, normalize } from 'node:path';
 
 import { checkDaemon, request } from '../ipc/client/index.ts';
 import type { Method, ParamsOf } from '../ipc/contract/index.ts';
@@ -21,7 +22,7 @@ import { DEFAULT_ASSETS, type WebOptions, type WebServer } from './options.ts';
 import { serveAsset, servePage } from './pages.ts';
 import { requestBody, requestRepository } from './request.ts';
 import { configRoutes } from './routes/config.ts';
-import { artifactRoute, patchRoute } from './routes/downloads.ts';
+import { artifactRoute, attachmentRoute, patchRoute } from './routes/downloads.ts';
 import { groupsRoutes } from './routes/groups.ts';
 import { processesRoutes } from './routes/processes.ts';
 import { queueRoutes } from './routes/queue.ts';
@@ -32,6 +33,7 @@ import { settingsRoutes } from './routes/settings.ts';
 import { observerHistoryRoutes } from './routes/observers/history.ts';
 import { specialistsRoutes } from './routes/specialists.ts';
 import { statsRoutes } from './routes/stats/stats.ts';
+import { sweepUploads, UPLOAD_SWEEP_MS, uploadRoute } from './uploads.ts';
 import { systemRoute } from './routes/system.ts';
 import { tagsRoutes } from './routes/tags.ts';
 import type { RawRoute, Route, RouteKit } from './routes/types.ts';
@@ -64,6 +66,8 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       systemRoute(kit),
       patchRoute(kit),
       artifactRoute(kit),
+      attachmentRoute(kit),
+      uploadRoute(kit),
     ],
     table: [
       runsRoutes,
@@ -177,6 +181,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
       request(options.socket, method, params),
     options,
     host,
+    uploads: join(options.stateDirectory ?? join(tmpdir(), 'aip-web'), 'uploads'),
     port: () => port,
     open,
     ensureDaemon,
@@ -209,6 +214,9 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     throw error;
   }
   port = (server.address() as AddressInfo).port;
+  sweepUploads(kit.uploads, Date.now());
+  const sweeper = setInterval(() => sweepUploads(kit.uploads, Date.now()), UPLOAD_SWEEP_MS);
+  sweeper.unref();
   const shown = host.includes(':') ? `[${host}]` : host;
   return {
     server,
@@ -218,6 +226,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     url: `http://${shown}:${port}/${token === null ? '' : `?token=${token}`}`,
     close: () =>
       new Promise((resolve) => {
+        clearInterval(sweeper);
         hub.stop();
         server.close(() => resolve());
         server.closeAllConnections();

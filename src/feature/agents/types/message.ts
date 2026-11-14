@@ -27,8 +27,31 @@ export function systemPrompt(specialist: Specialist, input: StepInput): string {
   return lines.join('\n');
 }
 
-export function userMessage(input: StepInput): string {
+function attachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** The task, the attachments (with the folder they are laid out in), then the rest of the input. */
+export function userMessage(
+  input: StepInput,
+  attachmentsDirectory: string | null | undefined = null,
+): string {
   const sections = [input.prompt];
+  if (input.attachments && input.attachments.length > 0 && attachmentsDirectory) {
+    const folder = attachmentsDirectory.replace(/[\\/]+$/, '');
+    sections.push(
+      [
+        '## Attachments',
+        'The person attached these files to the task; take them into account. You may read them:',
+        ...input.attachments.map(
+          (file) =>
+            `- ${folder}/${file.fileName} (${attachmentSize(file.size)}, ${file.mediaType})`,
+        ),
+      ].join('\n'),
+    );
+  }
   if (input.previous.length > 0) {
     sections.push(
       [

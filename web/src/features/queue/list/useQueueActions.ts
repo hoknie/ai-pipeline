@@ -30,6 +30,8 @@ function editPayload(item: QueueItemView, fields: EditFields) {
     skip: fields.skip ?? [],
     ...after,
     ...(fields.parent !== undefined ? { parent: fields.parent } : {}),
+    ...(fields.uploads !== undefined ? { uploads: fields.uploads } : {}),
+    ...(fields.detach !== undefined ? { detach: fields.detach } : {}),
   };
 }
 

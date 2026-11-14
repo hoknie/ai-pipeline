@@ -17,6 +17,7 @@ export function agySettings(context: LaunchContext, server: string): Record<stri
     permissions: {
       allow: [
         `read_file(${context.worktree})`,
+        ...(!context.attachmentsDirectory ? [] : [`read_file(${context.attachmentsDirectory})`]),
         `mcp(${server}/*)`,
         ...agyServerNames(context, server).map((name) => `mcp(${name}/*)`),
       ],

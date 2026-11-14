@@ -1,3 +1,4 @@
+import { Paperclip } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -159,6 +160,16 @@ export function RunCard(props: RunCardProps) {
           <span>{times.duration}</span>
           {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
           {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
+          {run.attachments.length > 0 ? (
+            <span
+              className="inline-flex items-center gap-0.5"
+              title={t('attachments.count', { count: run.attachments.length })}
+              data-attachments={run.attachments.length}
+            >
+              <Paperclip className="size-3" aria-hidden />
+              {run.attachments.length}
+            </span>
+          ) : null}
         </span>
         <span className="text-xs text-muted-foreground">
           {run.liveDiff ? diffText(run.liveDiff, t) : '—'}

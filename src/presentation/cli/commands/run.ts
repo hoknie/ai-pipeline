@@ -13,7 +13,7 @@ import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { RunQueued, RunView } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
-import { collect, parseDeliveryMode, readGroups } from '../options.ts';
+import { attachmentSources, collect, parseDeliveryMode, readGroups } from '../options.ts';
 import { watch } from '../watch.ts';
 import { addApply, addClean, addMarkDelivered, addPause, addSkip } from './run-delivery.ts';
 
@@ -43,6 +43,7 @@ interface StartOptions {
   variant?: string;
   skip?: string[];
   after?: string[];
+  attach?: string[];
   json?: boolean;
 }
 
@@ -66,6 +67,7 @@ function startParams(pipeline: string, options: StartOptions) {
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
+    ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
   };
 }
 
@@ -108,6 +110,7 @@ function addStart(kit: RunKit): void {
       'queue item or run that must be done first; repeat for several',
       collect,
     )
+    .option('--attach <path>', 'file to attach to the task; repeat for several', collect)
     .option('--json', 'print JSON')
     .addHelpText(
       'after',
@@ -118,6 +121,7 @@ function addStart(kit: RunKit): void {
         'aip run start feature --groups groups.yaml --repo ~/projects/app',
         'aip run start feature --task "Add the API" --after q1',
         'aip run start feature --task "Follow-up" --parent 115',
+        'aip run start feature --task "Fix the layout" --attach shot.png',
       ]),
     )
     .action(async (pipeline: string, options: StartOptions) => {

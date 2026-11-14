@@ -655,3 +655,75 @@ describe('cli variants', () => {
     expect(list.stdout).toContain('feature:light');
   });
 });
+
+describe('cli attachments', () => {
+  const listed = async (box: ReturnType<typeof sandbox>) =>
+    JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      items: { id: string; attachments: { fileName: string; size: number }[] }[];
+    };
+
+  it('attaches files by a path relative to the current directory, edits and lists them', async () => {
+    const box = sandbox();
+    writeFileSync(join(box.repo, 'shot.png'), 'png-bytes');
+    writeFileSync(join(box.repo, 'log.txt'), 'log');
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'Починить',
+      '--attach',
+      'shot.png',
+      '--attach',
+      'log.txt',
+    );
+    expect(added.code).toBe(0);
+    expect(added.stdout).toContain('attachments: 2');
+    const { items } = await listed(box);
+    expect(items[0]?.attachments).toMatchObject([
+      { fileName: 'shot.png', size: 9 },
+      { fileName: 'log.txt', size: 3 },
+    ]);
+
+    const edited = await aip(box, 'queue', 'edit', items[0]!.id, '--detach', 'log.txt');
+    expect(edited.code).toBe(0);
+    expect((await listed(box)).items[0]?.attachments.map((file) => file.fileName)).toEqual([
+      'shot.png',
+    ]);
+    const bad = await aip(box, 'queue', 'edit', items[0]!.id, '--detach', 'nope.txt');
+    expect(bad.code).not.toBe(0);
+    expect(bad.stderr).toContain('no attachment');
+    const missing = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'x',
+      '--attach',
+      'nope.png',
+    );
+    expect(missing.code).not.toBe(0);
+  });
+
+  it('shows the attachments in the details of a run started with --attach', async () => {
+    const box = sandbox();
+    writeFileSync(join(box.repo, 'shot.png'), 'png-bytes');
+    const started = await aip(
+      box,
+      'run',
+      'start',
+      'feature',
+      '--task',
+      'Починить',
+      '--attach',
+      'shot.png',
+      '--json',
+    );
+    expect(started.code).toBe(0);
+    const { runId } = JSON.parse(started.stdout).run as { runId: string };
+    const shown = await aip(box, 'run', 'show', runId);
+    expect(shown.stdout).toContain('Attachments: shot.png (9 B)');
+  });
+});

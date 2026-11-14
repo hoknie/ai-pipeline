@@ -62,6 +62,7 @@ export class Snapshots {
       runs.engine.waitOf,
       delivery.names,
       delivery.variantNames,
+      (item) => this.services.attachments.listOf(item),
     );
   }
 

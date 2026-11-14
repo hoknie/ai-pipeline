@@ -44,13 +44,20 @@ export function claudeTools(context: LaunchContext): string[] {
   return [...new Set([...base, ...(skills.length > 0 ? ['Skill'] : []), ...tools])];
 }
 
+/** The rule that lets the specialist read the attachments folder; `//` marks an absolute path. */
+export function attachmentReadRules(context: LaunchContext): string[] {
+  return !context.attachmentsDirectory ? [] : [`Read(/${context.attachmentsDirectory}/**)`];
+}
+
 export function claudeAllowedTools(context: LaunchContext): string[] {
   const { permissions, allowCommands } = context.specialist;
-  if (permissions === 'read') return [...READ_TOOLS, ...mcpTools(context)];
+  if (permissions === 'read')
+    return [...READ_TOOLS, ...attachmentReadRules(context), ...mcpTools(context)];
   if (permissions === 'edit') {
     return [
       ...READ_TOOLS,
       ...EDIT_TOOLS,
+      ...attachmentReadRules(context),
       ...allowCommands.map((pattern) => `Bash(${pattern})`),
       ...mcpTools(context),
     ];
@@ -68,6 +75,7 @@ export function claudePermissionArgs(context: LaunchContext): string[] {
       '--permission-mode',
       context.claudeEditMode === 'auto' ? 'auto' : 'acceptEdits',
       '--allowedTools',
+      ...attachmentReadRules(context),
       ...allowCommands.map((pattern) => `Bash(${pattern})`),
       ...mcpTools(context),
     ];

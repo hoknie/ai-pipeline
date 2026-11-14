@@ -9,6 +9,7 @@ import type {
   DiffPort,
   ObservePort,
   QueueAdvancePort,
+  RunAttachmentsPort,
   RunsPublishPort,
 } from '../feature/runs/ports/index.ts';
 import type { ConfigChangedPort } from '../feature/swarm-edit/ports/index.ts';
@@ -68,6 +69,7 @@ export function declarePorts() {
     observe: wiring.port<ObservePort>('runs.observe'),
     runs: wiring.port<RunsPublishPort>('runs.publish'),
     diff: wiring.port<DiffPort>('runs.diff'),
+    attachments: wiring.port<RunAttachmentsPort>('runs.attachments'),
     delivery: wiring.port<DeliveryPublishPort>('delivery.publish'),
     artifacts: wiring.port<ArtifactsPublishPort>('artifacts.publish'),
     queuePublish: wiring.port<QueuePublishPort>('queue.publish'),

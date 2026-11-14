@@ -6,6 +6,7 @@ import { Skeleton } from '../../../../shared/ui/feedback/skeleton.tsx';
 import { Markdown } from '../../../../shared/ui/layout/Markdown.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../shared/ui/layout/tabs.tsx';
 import { ArtifactsTab } from '../../files/ArtifactsTab.tsx';
+import { AttachmentsTab } from '../../files/AttachmentsTab.tsx';
 import { DiffStat } from '../../files/DiffStat.tsx';
 import { FileTree } from '../../files/FileTree.tsx';
 import { AttemptTimeline } from '../AttemptTimeline.tsx';
@@ -15,6 +16,7 @@ function TabTriggers({ ctx }: { ctx: GroupCtx }) {
   const { t } = useTranslation();
   const { row, view, caps } = ctx;
   const { spec, progress } = ctx.tabs;
+  const attachments = ctx.run?.attachments ?? [];
   return (
     <TabsList aria-label={t('runs.group.tabs')}>
       <TabsTrigger value="log">{t('runs.group.log')}</TabsTrigger>
@@ -42,6 +44,11 @@ function TabTriggers({ ctx }: { ctx: GroupCtx }) {
         {t('runs.group.artifacts')}
         {row.artifacts > 0 ? ` · ${row.artifacts}` : ''}
       </TabsTrigger>
+      {attachments.length > 0 ? (
+        <TabsTrigger value="attachments">
+          {t('attachments.tab')} · {attachments.length}
+        </TabsTrigger>
+      ) : null}
     </TabsList>
   );
 }
@@ -180,6 +187,11 @@ export function GroupTabsView({ ctx }: { ctx: GroupCtx }) {
             revision={row.artifactsRevision}
             onError={ctx.onError}
           />
+        </TabsContent>
+      ) : null}
+      {(ctx.run?.attachments.length ?? 0) > 0 ? (
+        <TabsContent value="attachments">
+          <AttachmentsTab api={api} runId={runId} attachments={ctx.run?.attachments ?? []} />
         </TabsContent>
       ) : null}
     </Tabs>

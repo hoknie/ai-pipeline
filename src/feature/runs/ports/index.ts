@@ -1,4 +1,5 @@
 export type { AgentExitPort } from './agent-exit.ts';
+export type { RunAttachmentsPort } from './attachments.ts';
 export type { DiffPort } from './diff.ts';
 export type { ObservePort } from './observe.ts';
 export type { RunsPublishPort } from './publish.ts';

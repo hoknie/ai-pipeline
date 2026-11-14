@@ -14,6 +14,7 @@ import type {
   Topology,
 } from '../../../../feature/runs/types/index.ts';
 import type { ActionPoint, DeliveryMode } from '../../../../feature/swarm-config/types/index.ts';
+import type { AttachmentView } from './attachments.ts';
 import type { QueueView } from './queue.ts';
 import type { TagView } from './tags.ts';
 
@@ -185,6 +186,8 @@ export interface RunView {
   returnable: boolean;
   /** Id of the queue item that retries the run when taken; null when the run has none. */
   queueItem: string | null;
+  /** Files attached to the task of the run. */
+  attachments: AttachmentView[];
   tags: TagView[];
   counts: string;
   total: number;

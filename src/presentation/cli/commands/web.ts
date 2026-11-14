@@ -76,6 +76,7 @@ async function startOwnServer(ctx: Context, settings: WebSettings, at: Target): 
   try {
     return await startWebServer({
       socket: ctx.socket,
+      stateDirectory: ctx.stateDirectory,
       ensureDaemon: () => daemon(ctx, 'aip web'),
       host: at.host,
       port: at.port,

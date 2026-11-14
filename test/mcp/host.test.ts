@@ -47,6 +47,7 @@ const VIEW: QueueView & { item: string } = {
       error: null,
       run: null,
       hold: null,
+      attachments: [],
     },
   ],
   runs: [],
@@ -908,5 +909,49 @@ describe('host MCP repo as a project slug', () => {
       arguments: { pipeline: 'feature', task: 'x', repo: 'shop' },
     });
     expect(calls.map((call) => call.params.repository)).toEqual(['app', '/repo/sub/dir', 'shop']);
+  });
+});
+
+describe('host MCP attachments', () => {
+  it('passes attachments of swarm_run and swarm_queue_add as paths, and lists them in the schema', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+    });
+    const tools = (await client.listTools()).tools;
+    for (const name of ['swarm_queue_add', 'swarm_run']) {
+      const tool = tools.find((candidate) => candidate.name === name);
+      expect(Object.keys(tool?.inputSchema.properties ?? {})).toContain('attachments');
+    }
+    const files = ['/tmp/shot.png', '/tmp/spec.pdf'];
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', attachments: files },
+    });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { pipeline: 'feature', task: 'x', attachments: ['/tmp/shot.png'] },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: {
+          repository: '/repo',
+          pipeline: 'feature',
+          task: 'x',
+          attachments: [{ path: '/tmp/shot.png' }, { path: '/tmp/spec.pdf' }],
+        },
+      },
+      {
+        method: 'run',
+        params: {
+          repository: '/repo',
+          pipeline: 'feature',
+          task: 'x',
+          attachments: [{ path: '/tmp/shot.png' }],
+        },
+      },
+    ]);
   });
 });

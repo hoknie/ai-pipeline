@@ -20,6 +20,14 @@ type Rule = 'allow' | 'deny' | 'ask';
 export function opencodePermission(
   context: LaunchContext,
 ): Record<string, Rule | Record<string, Rule>> {
+  const rules = specialistPermission(context);
+  // The attachments folder is outside the worktree: reading it is allowed at any level.
+  return !context.attachmentsDirectory
+    ? rules
+    : { ...rules, external_directory: { [`${context.attachmentsDirectory}/**`]: 'allow' } };
+}
+
+function specialistPermission(context: LaunchContext): Record<string, Rule | Record<string, Rule>> {
   const { permissions, allowCommands } = context.specialist;
   const protectedRules = Object.fromEntries(
     PROTECTED_GIT_COMMANDS.map((command) => [`${command}*`, 'deny' as Rule]),
@@ -134,7 +142,7 @@ function launch(executable: string, extra: RuntimeExtra, context: LaunchContext)
       ...modelArgs(context.specialist.model, context.specialist.variant),
       ...(context.resumeSession ? ['-s', context.resumeSession] : []),
       ...(context.specialist.permissions === 'full' ? ['--auto'] : []),
-      userMessage(context.input),
+      userMessage(context.input, context.attachmentsDirectory),
     ],
     env: { ...extra.env, OPENCODE_CONFIG: configPath },
     files: [{ path: configPath, content: JSON.stringify(config, null, 2) }],

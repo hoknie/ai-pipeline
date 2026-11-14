@@ -1,6 +1,18 @@
 import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
-import type { QueueFields } from '../../shared/api/types.ts';
+import type { AttachmentView, QueueFields } from '../../shared/api/types.ts';
 import { pruneSkip } from '../../shared/ui/forms/picker/SkipSteps.tsx';
+
+/** A file picked for the task: being sent to the panel, sent (`upload`) or refused (`error`). */
+export interface AttachmentEntry {
+  key: string;
+  fileName: string;
+  size: number;
+  /** Share sent, 0 to 100. */
+  progress: number;
+  /** Id the panel gave the file; the task is sent with it. */
+  upload: string | null;
+  error: string | null;
+}
 
 /** What the user has typed into a task form; kept outside the form so updates do not erase it. */
 export interface QueueDraft {
@@ -29,6 +41,12 @@ export interface QueueDraft {
   parent: string | null;
   /** The user changed the parent: an edit sends `parent` only then. */
   parentTouched: boolean;
+  /** The files picked for the task; they are sent to the panel at once. */
+  attachments?: AttachmentEntry[];
+  /** The attachments the edited item already has. */
+  existing?: AttachmentView[];
+  /** Names of the existing attachments to remove. */
+  detached?: string[];
   /** The repository the draft was typed for; not sent, the repository goes in the address. */
   repository?: string | null;
 }
@@ -61,6 +79,18 @@ export function emptyDraft(pipeline = ''): QueueDraft {
   };
 }
 
+/** The draft for the next task after "add and continue": name, text, groups and links are cleared. */
+export function continueDraft(draft: QueueDraft): QueueDraft {
+  return {
+    ...draft,
+    task: '',
+    groups: [{ title: '', task: '' }],
+    title: '',
+    after: [],
+    afterTouched: false,
+  };
+}
+
 /** The draft of an existing item, for editing. */
 export function draftOf(item: {
   pipeline: string;
@@ -73,6 +103,7 @@ export function draftOf(item: {
   tags?: { id: string; task?: { run: string } | null }[];
   after?: { id: string }[];
   skip?: string[];
+  attachments?: AttachmentView[];
 }): QueueDraft {
   return {
     pipeline: item.pipeline,
@@ -89,6 +120,9 @@ export function draftOf(item: {
     afterTouched: false,
     parent: (item.tags ?? []).find((tag) => tag.task)?.task?.run ?? null,
     parentTouched: false,
+    ...(item.attachments && item.attachments.length > 0
+      ? { existing: item.attachments.map((file) => ({ ...file })) }
+      : {}),
   };
 }
 
@@ -123,6 +157,7 @@ export function retarget(
 
 export function draftValid(draft: QueueDraft): boolean {
   if (draft.pipeline === '') return false;
+  if (uploading(draft)) return false;
   if ([...draft.title.trim()].length > TITLE_LIMIT) return false;
   if (draft.mode === 'task') return draft.task.trim() !== '' || draft.title.trim() !== '';
   return (
@@ -140,6 +175,16 @@ function groupTitleFromTask(task: string): string {
   return Array.from(firstLine).slice(0, TITLE_LIMIT).join('');
 }
 
+/** Files picked and sent to the panel; the entries still on their way or refused are left out. */
+export function uploadsOf(draft: QueueDraft): string[] {
+  return (draft.attachments ?? []).flatMap((entry) => (entry.upload === null ? [] : entry.upload));
+}
+
+/** A file is still being sent: the form cannot be submitted yet. */
+export function uploading(draft: QueueDraft): boolean {
+  return (draft.attachments ?? []).some((entry) => entry.upload === null && entry.error === null);
+}
+
 /**
  * The fields to send. Tags go by name; an id that is no longer in the catalog is dropped. With
  * `allTags` the list is always sent (an edit replaces the tags), otherwise only when not empty.
@@ -151,6 +196,8 @@ export function fieldsOf(
 ): QueueFields {
   const title = draft.title.trim();
   const tags = draft.tags.flatMap((id) => tagName(id) ?? []);
+  const uploads = uploadsOf(draft);
+  const detach = draft.detached ?? [];
   return {
     pipeline: draft.pipeline,
     ...(allTags || draft.variant !== 'default' ? { variant: draft.variant } : {}),
@@ -175,6 +222,8 @@ export function fieldsOf(
       : draft.after.length > 0
         ? { after: draft.after }
         : {}),
+    ...(uploads.length > 0 ? { uploads } : {}),
+    ...(detach.length > 0 ? { detach } : {}),
     ...(allTags
       ? draft.parentTouched
         ? { parent: draft.parent }

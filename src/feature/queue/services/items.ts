@@ -1,6 +1,8 @@
 import { randomInt } from 'node:crypto';
 
+import type { AttachmentSource } from '../../attachments/types/index.ts';
 import { rejected } from '../../../platform/errors/index.ts';
+import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
 import { checkSkip, type RunState } from '../../runs/types/index.ts';
@@ -23,6 +25,7 @@ import {
   type ItemFields,
   type Queue,
   type QueueAddRequest,
+  type QueueItem,
   type QueueChange,
   type TaskFields,
   type WorkerTaskRequest,
@@ -36,6 +39,7 @@ export interface QueueItemsDependencies {
   store: QueueStore;
   advance: QueueAdvance;
   taskTags: TaskTags;
+  attachments: AttachmentService;
   tags: TagCatalogService;
   registry: RegistryService;
   config: ConfigService;
@@ -85,10 +89,10 @@ export class QueueItems {
     if (parent) this.checkNewItem(queue, task, moment);
     const parentTag = parent ? await taskTags.parentTagFor(repository, parent) : null;
     const own = mergeTags(parentTag ? [parentTag.id] : [], manual);
-    const item = addItem(
+    const item = await this.addWithAttachments(
       queue,
       { ...task, tags: taskTags.inherit(queue, own, after) },
-      queueItemId(moment, randomInt(36 ** 3)),
+      params.attachments,
       moment,
     );
     if (queue.status === 'stopped') {
@@ -115,10 +119,12 @@ export class QueueItems {
 
   /** `queue_remove`: the item leaves the queue; a returned run it stood for is released. */
   async remove(params: { repository: string; item: string }): Promise<Queue> {
-    const { store, registry, runs, now } = this.dependencies;
+    const { store, registry, runs, attachments, now } = this.dependencies;
     const queue = store.of(await registry.rootOf(params.repository));
     const removed = queue.items.find((candidate) => candidate.id === params.item);
     removeItem(queue, params.item, now(), (id) => runs.states.lookup(id));
+    // A returned run keeps its attachments: they belong to the run, not to the item.
+    if (removed && removed.run === null) await attachments.removeOwner(removed.id);
     const held = removed?.run ? runs.states.lookup(removed.run) : undefined;
     if (held && held.run.hold !== null) {
       await runs.engine.apply(held, { kind: 'hold', hold: null });
@@ -207,7 +213,7 @@ export class QueueItems {
 
   private async addTo(
     repository: string,
-    params: TaskFields & Pick<QueueAddRequest, 'tags' | 'parent' | 'postponed'>,
+    params: TaskFields & Pick<QueueAddRequest, 'tags' | 'parent' | 'postponed' | 'attachments'>,
     inherited?: string[],
   ): Promise<QueueChange> {
     const { store, advance, tags, taskTags, now } = this.dependencies;
@@ -224,15 +230,40 @@ export class QueueItems {
       const parentTag = await taskTags.parentTagFor(repository, parent);
       own = mergeTags(parentTag ? [parentTag.id] : [], own);
     }
-    const item = addItem(
+    const item = await this.addWithAttachments(
       queue,
       { ...task, tags: taskTags.inherit(queue, own, after) },
-      queueItemId(moment, randomInt(36 ** 3)),
+      params.attachments,
       moment,
     );
     store.save(queue);
     await advance.advance(repository);
     return { queue, item: item.id };
+  }
+
+  /**
+   * Adds the item together with its attachments: when a file cannot be accepted the item is not
+   * added, and when the item is refused the accepted bytes are deleted.
+   */
+  private async addWithAttachments(
+    queue: Queue,
+    fields: ItemFields,
+    sources: AttachmentSource[] | undefined,
+    moment: number,
+  ): Promise<QueueItem> {
+    const { attachments } = this.dependencies;
+    const id = queueItemId(moment, randomInt(36 ** 3));
+    // Refused before any byte is written: the checks of the item run on a copy.
+    addItem(structuredClone(queue), fields, id, moment);
+    if (sources !== undefined && sources.length > 0) {
+      await attachments.ingest({ repository: queue.repository, itemId: id, sources });
+    }
+    try {
+      return addItem(queue, fields, id, moment);
+    } catch (error) {
+      await attachments.removeOwner(id);
+      throw error;
+    }
   }
 
   /** Runs the checks of `addItem` on a copy of the queue: nothing changes. */

@@ -1,4 +1,5 @@
 export * from './artifacts.ts';
+export * from './attachments.ts';
 export * from './config.ts';
 export * from './groups.ts';
 export * from './observers.ts';

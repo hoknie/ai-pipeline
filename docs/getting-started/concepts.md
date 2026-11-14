@@ -21,7 +21,7 @@
 ## The life of a task
 
 1. **Queue.** `aip run start`, `aip queue add`, an MCP tool, a specialist or the web panel puts a task in the queue of the repository.
-2. **Start.** When a place is free, the queue turns the task into a run. The run takes a snapshot of the configuration and of your working tree (see [`workspace`](../configuration/README.md#workspace)).
+2. **Start.** A task may carry [attachments](../usage/queue.md#attachments); they go with it into the run and specialists read them. When a place is free, the queue turns the task into a run. The run takes a snapshot of the configuration and of your working tree (see [`workspace`](../configuration/README.md#workspace)).
 3. **Split.** If the pipeline has a [`split`](../configuration/pipelines.md#split), a specialist divides the task into groups. Otherwise the task is one group.
 4. **Steps.** Each group goes through the steps in order, in its own worktree. Groups of a run work in parallel, within [`max`](../configuration/README.md#max). Every step ends with `swarm_report`, and its changes are committed inside the run.
 5. **Returns and questions.** A rejection returns the group to an earlier step with the remarks. A question stops the group until [you answer](../usage/runs.md#answering-a-specialist); `aip overview` lists everything that waits for you across all projects.

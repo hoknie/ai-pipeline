@@ -1,4 +1,5 @@
 import type { Database } from '../../../platform/sqlite/index.ts';
+import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
@@ -25,6 +26,7 @@ export interface QueueServices {
 export function createQueueServices(dependencies: {
   database: Database;
   runs: RunsServices;
+  attachments: AttachmentService;
   tags: TagCatalogService;
   registry: RegistryService;
   config: ConfigService;
@@ -33,13 +35,15 @@ export function createQueueServices(dependencies: {
   observe: QueueObservePort;
   publish: QueuePublishPort;
 }): QueueServices {
-  const { database, runs, tags, registry, config, now } = dependencies;
+  const { database, runs, attachments, tags, registry, config, now } = dependencies;
   const queues = new QueueRepository(database);
   const store = new QueueStore({ queues, states: runs.states, now, publish: dependencies.publish });
   const { repair, observe } = dependencies;
-  const advance = new QueueAdvance({ store, runs, tags, config, repair, observe, now });
+  const advance = new QueueAdvance({
+    ...{ store, runs, tags, attachments, config, repair, observe, now },
+  });
   const taskTags = new TaskTags({ database, store, tags, registry, runs, now });
-  const shared = { store, advance, taskTags, tags, registry, config, runs, now };
+  const shared = { store, advance, taskTags, attachments, tags, registry, config, runs, now };
   const items = new QueueItems(shared);
   return {
     store,

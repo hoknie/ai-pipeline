@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { parse as parseYaml } from 'yaml';
 
@@ -19,7 +20,13 @@ export function collect(value: string, previous: string[] = []): string[] {
   return [...previous, value];
 }
 
+/** `--attach` paths as the request names them: relative paths are taken from the current directory. */
+export function attachmentSources(paths: string[] | undefined): { path: string }[] | undefined {
+  return paths === undefined ? undefined : paths.map((path) => ({ path: resolve(path) }));
+}
+
 export interface QueueTaskOptions {
+  attach?: string[];
   tag?: string[];
   parent?: string | false;
   after?: string[];

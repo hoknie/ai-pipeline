@@ -26,6 +26,7 @@ const SAMPLES: Record<Method, unknown> = {
   group_file_diff: { ...target, path: 'a.ts' },
   group_artifacts: target,
   artifact: { ...target, id: 'a1' },
+  attachment: { ...run, id: 'a1' },
   run_patch: run,
   pipelines: repository,
   system_stages: repository,
@@ -104,9 +105,9 @@ const SAMPLES: Record<Method, unknown> = {
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 81 methods, each in the request schema once', () => {
+  it('has 82 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(81);
+    expect(methods).toHaveLength(82);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

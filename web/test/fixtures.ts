@@ -194,6 +194,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     specialists: [],
     groups: [groupRow()],
     system: [],
+    attachments: [],
     decisions: [],
     ...overrides,
   };
@@ -502,6 +503,7 @@ export function queueItem(
     error: null,
     run: null,
     hold: null,
+    attachments: [] as QueueItemView['attachments'],
     ...extra,
   };
 }
@@ -817,6 +819,15 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
         `/api/runs/${run}/groups/${group}/artifacts/${id}${inline ? '?inline=1' : ''}`,
     ),
     artifactText: vi.fn(async () => ''),
+    uploadAttachment: vi.fn(async (file: File) => ({
+      upload: `up-${file.name}`,
+      fileName: file.name,
+      size: file.size,
+    })),
+    attachmentUrl: vi.fn(
+      (run: string, id: string, inline?: boolean) =>
+        `/api/runs/${run}/attachments/${id}${inline ? '?inline=1' : ''}`,
+    ),
     transcript: vi.fn(async () => transcript),
     fileDiff: vi.fn(async (_run: string, _group: string, path: string) => ({
       path,

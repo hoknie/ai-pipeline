@@ -49,6 +49,12 @@ export function hostKit(options: HostOptions) {
     .describe(
       'Ids of queue items or runs of the repository that must be done (finished, merged and delivered) first. Edit replaces the whole list; [] removes the dependencies',
     );
+  const attachments = z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Absolute paths of files to attach to the task (at most 10, each at most 20 MB); the specialists read them',
+    );
   const group = z.string().describe('Group slug from swarm_status; `_split` for the split step');
   const showRun = async (method: string, params: Record<string, unknown>) => {
     const view = (await options.send(method, params)) as RunView;
@@ -80,6 +86,7 @@ export function hostKit(options: HostOptions) {
     variant,
     skip,
     after,
+    attachments,
     group,
     showRun,
     repo,

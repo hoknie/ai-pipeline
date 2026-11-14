@@ -59,6 +59,7 @@ export function hydrateRun(database: Database, row: Row): RunState {
       tags: row.tags_json ? parse(row.tags_json) : [],
       skippedSteps: row.skipped_steps_json ? parse(row.skipped_steps_json) : [],
       repair: hydrateRepair(row.repair_json ?? null),
+      attachments: row.attachments_json ? parse(row.attachments_json) : [],
     },
     split: groups.find((group) => group.slug === SPLIT_GROUP) ?? null,
     groups: groups.filter(

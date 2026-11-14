@@ -42,6 +42,8 @@ interface Prepared {
   runtime: Runtime;
   worktree: string;
   specialist: Specialist;
+  /** The folder the attachments of the run are laid out in; null without attachments. */
+  attachments: string | null;
 }
 
 /** The parts of the effects an attempt of a specialist uses. */
@@ -153,9 +155,18 @@ export class AttemptStarter {
       }
       return null;
     }
+    let attachments: string | null = null;
+    if (state.run.attachments.length > 0) {
+      try {
+        attachments = await this.dependencies.attachments.materialize(state.run);
+      } catch (error) {
+        await this.fail(state, key, { kind: 'spawn', message: (error as Error).message });
+        return null;
+      }
+    }
     // `${NAME}` of the MCP servers is replaced only here: the snapshot of the run keeps the text.
     if (specialist.mcp === undefined)
-      return { state, group, attempt, key, runtime, worktree, specialist };
+      return { state, group, attempt, key, runtime, worktree, specialist, attachments };
     const expanded = expandMcpServers(specialist.mcp, {
       ...environment,
       ...settings[attempt.runtime as Specialist['runtime']].env,
@@ -165,7 +176,7 @@ export class AttemptStarter {
       return null;
     }
     const resolved = { ...specialist, mcp: expanded.servers };
-    return { state, group, attempt, key, runtime, worktree, specialist: resolved };
+    return { state, group, attempt, key, runtime, worktree, specialist: resolved, attachments };
   }
 
   private launch(prepared: Prepared, directory: string, token: string): SupervisedProcess {
@@ -185,6 +196,7 @@ export class AttemptStarter {
       input: attempt.input,
       worktree,
       attemptDirectory: directory,
+      attachmentsDirectory: prepared.attachments,
       workerCommand: [
         ...entry,
         'mcp',

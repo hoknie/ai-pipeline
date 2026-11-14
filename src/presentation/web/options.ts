@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { packageRoot } from '../../platform/build/index.ts';
@@ -30,6 +31,8 @@ export interface WebOptions {
    * (`aip web` on its own) both restarts answer 409 `web_standalone`.
    */
   system?: SystemHooks;
+  /** The state directory of aip; uploads are kept in its `uploads` folder (a temporary one without it). */
+  stateDirectory?: string;
   /** Where failures after a response go (the daemon log); dropped by default. */
   log?: (line: string) => void;
 }

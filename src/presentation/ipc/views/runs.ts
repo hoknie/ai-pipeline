@@ -222,6 +222,7 @@ function runHead(state: RunState, observers: RepairPolicy) {
     returnable: false,
     // The queue is unknown here: the daemon fills it in with `withQueue`.
     queueItem: null,
+    attachments: state.run.attachments.map((file) => ({ ...file })),
   };
 }
 

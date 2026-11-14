@@ -4,7 +4,14 @@ import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { QueueView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
-import { parseDeliveryMode, parseSwitch, readGroups, type QueueTaskOptions } from '../options.ts';
+import {
+  attachmentSources,
+  collect,
+  parseDeliveryMode,
+  parseSwitch,
+  readGroups,
+  type QueueTaskOptions,
+} from '../options.ts';
 import type { QueueKit } from './queue.ts';
 
 /** The `filter` of the request from the flags; empty when no flag is passed. */
@@ -32,6 +39,7 @@ interface EditOptions extends QueueTaskOptions {
   defaultDeliveryMode?: boolean;
   tags?: boolean;
   skips?: boolean;
+  detach?: string[];
 }
 
 /** Which of the paired flags (`--after` / `--no-after`, `--parent` / `--no-parent`) were passed. */
@@ -107,6 +115,8 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
     ...(flags.noAfter ? { after: [] } : {}),
     ...(flags.after && options.after !== undefined ? { after: options.after } : {}),
     ...(options.postpone !== undefined ? { postponed: options.postpone } : {}),
+    ...(options.attach !== undefined ? { attach: attachmentSources(options.attach) } : {}),
+    ...(options.detach !== undefined ? { detach: options.detach } : {}),
   };
 }
 
@@ -132,7 +142,8 @@ export function addEdit(kit: QueueKit): void {
         .option('--no-skips', 'run every step of the pipeline again')
         .option('--no-after', 'remove all predecessors of the task')
         .option('--postpone', 'postpone the task: a running queue does not take it')
-        .option('--no-postpone', 'take the task into work again'),
+        .option('--no-postpone', 'take the task into work again')
+        .option('--detach <name>', 'name of an attachment to remove; repeat for several', collect),
     ),
   )
     .addHelpText(
@@ -148,6 +159,7 @@ export function addEdit(kit: QueueKit): void {
         'aip queue edit 2 --no-parent',
         'aip queue edit 3 --postpone',
         'aip queue edit 3 --no-postpone',
+        'aip queue edit 4 --attach shot.png --detach old.png',
       ]),
     )
     .action(async (item: string, options: EditOptions) => {

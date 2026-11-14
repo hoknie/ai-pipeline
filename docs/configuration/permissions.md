@@ -22,6 +22,12 @@ A Claude specialist gets only the tools of its level.
 - Other built-in Claude tools are not passed, because their descriptions would take up context on every turn.
 - The `swarm_report` tool is loaded at once, without a tool search.
 
+### Attachments of a task
+
+A run with [attachments](../usage/queue.md#attachments) gives every specialist the right to read the folder `logs/<run id>/_attachments/` of the workspace, at every level and for every runtime: `--add-dir` and a `Read` rule for `claude`, `external_directory` for `opencode`, `--add-dir` and an allowed read path for `agy`. Writing outside the worktree stays forbidden.
+
+The folder is laid out again from the stored copy before every attempt, so a changed file does not survive.
+
 ## `claude.edit_mode`
 
 Sets how the `claude` runtime gets the `edit` level. The mode does not affect the `read` and `full` levels. `git push`, `git checkout` and `git switch` are forbidden in all modes.

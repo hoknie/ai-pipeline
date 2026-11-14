@@ -19,6 +19,15 @@ export const groupHandlers = {
   group_artifacts: async (params, { services }) => services.artifacts.list(params),
   artifact: (params, { services }) => services.artifacts.content(params),
   artifact_publish: (params, { services }) => services.artifacts.publish(params),
+  attachment: async (params, { services }) => {
+    const file = await services.attachments.content(params.runId, params.id);
+    return {
+      fileName: file.fileName,
+      mediaType: file.mediaType,
+      size: file.size,
+      base64: file.bytes.toString('base64'),
+    };
+  },
   apply: (params, { services }) => services.delivery.deliver.deliver(params),
   run_mark_delivered: (params, { services }) => services.delivery.deliver.markDelivered(params),
 } satisfies Partial<HandlerTable>;

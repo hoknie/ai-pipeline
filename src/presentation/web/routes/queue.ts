@@ -1,12 +1,46 @@
 import { z } from 'zod';
 import { type ParamsOf } from '../../ipc/contract/index.ts';
 import { parseBody } from '../http.ts';
+import { dropUploads, uploadSources } from '../uploads.ts';
 import { segment, type Route, type RouteKit } from './types.ts';
 
 /** Fields of a queue request body; the repository comes from the query string, never the body. */
 const queueBody = (body: unknown) => parseBody(z.record(z.string(), z.unknown()), body);
 
-export function queueRoutes({ call }: RouteKit): Route[] {
+/** `queue_add` with the uploads of the body turned into attachments; the used uploads go away. */
+async function addTask(kit: RouteKit, body: unknown, repository: string): Promise<unknown> {
+  const { uploads, ...fields } = queueBody(body);
+  const attachments = uploads === undefined ? [] : uploadSources(kit, uploads);
+  const result = await kit.call('queue_add', {
+    ...fields,
+    ...(attachments.length > 0 ? { attachments } : {}),
+    repository,
+  } as ParamsOf<'queue_add'>);
+  dropUploads(kit, uploads);
+  return result;
+}
+
+/** `queue_edit` with the uploads of the body attached; the used uploads go away. */
+async function editTask(
+  kit: RouteKit,
+  item: string,
+  body: unknown,
+  repository: string,
+): Promise<unknown> {
+  const { uploads, ...fields } = queueBody(body);
+  const attach = uploads === undefined ? [] : uploadSources(kit, uploads);
+  const result = await kit.call('queue_edit', {
+    ...fields,
+    ...(attach.length > 0 ? { attach } : {}),
+    item,
+    repository,
+  } as ParamsOf<'queue_edit'>);
+  dropUploads(kit, uploads);
+  return result;
+}
+
+export function queueRoutes(kit: RouteKit): Route[] {
+  const { call } = kit;
   return [
     {
       method: 'GET',
@@ -16,21 +50,12 @@ export function queueRoutes({ call }: RouteKit): Route[] {
     {
       method: 'POST',
       pattern: /^\/api\/queue\/items$/,
-      handle: async (_, body, repository) =>
-        call('queue_add', {
-          ...queueBody(body),
-          repository,
-        } as ParamsOf<'queue_add'>),
+      handle: (_, body, repository) => addTask(kit, body, repository),
     },
     {
       method: 'POST',
       pattern: new RegExp(`^/api/queue/items/${segment}$`),
-      handle: async ([item], body, repository) =>
-        call('queue_edit', {
-          ...queueBody(body),
-          item: item ?? '',
-          repository,
-        } as ParamsOf<'queue_edit'>),
+      handle: ([item], body, repository) => editTask(kit, item ?? '', body, repository),
     },
     {
       method: 'POST',

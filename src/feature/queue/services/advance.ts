@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 
 import { isRejected, rejected } from '../../../platform/errors/index.ts';
+import type { AttachmentService } from '../../attachments/services/index.ts';
 import { currentPermissions, type RunsServices } from '../../runs/services/index.ts';
 import {
   retryableGroups,
@@ -33,6 +34,7 @@ export interface QueueAdvanceDependencies {
   store: QueueStore;
   runs: Pick<RunsServices, 'states' | 'engine' | 'requests'>;
   tags: TagCatalogService;
+  attachments: AttachmentService;
   config: ConfigService;
   repair: RepairPolicyPort;
   observe: QueueObservePort;
@@ -194,9 +196,18 @@ export class QueueAdvance {
   }
 
   /** Creates the run of an item of the queue with the item's tags still in the catalog. */
-  createRun(queue: Queue, item: QueueItem): Promise<RunCreated> {
+  async createRun(queue: Queue, item: QueueItem): Promise<RunCreated> {
+    const { attachments, runs } = this.dependencies;
     const tags = knownTags(this.dependencies.tags.of(queue.repository), item.tags);
-    return this.dependencies.runs.requests.create(itemRequest(queue, item), tags, item);
+    // The run keeps a snapshot of the attachments; the files themselves change owner, not place.
+    const files = attachments.listOf(item.id);
+    const created = await runs.requests.create(
+      { ...itemRequest(queue, item), ...(files.length > 0 ? { attachments: files } : {}) },
+      tags,
+      item,
+    );
+    attachments.bindToRun(item.id, created.runId);
+    return created;
   }
 
   private async answerForAutopilot(queue: Queue): Promise<void> {

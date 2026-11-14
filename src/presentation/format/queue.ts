@@ -122,11 +122,12 @@ export function formatQueue(view: QueueView, style: Style = plainStyle): string 
             .join(', ')}${mark}`;
     const postponed =
       (item.postponed ? ' · postponed' : '') + (item.filtered ? ' · filtered out' : '');
+    const files = item.attachments.length === 0 ? '' : ` · attachments: ${item.attachments.length}`;
     const error = item.error ? style.danger(` — error: ${item.error}`) : '';
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
     const head = `  ${item.position}. ${taskNumber(item.number)} ${style.accent(item.id)}  ${pipelineLabel(item.pipeline, item.pipelineName)}  `;
-    const tail = `${title}${tagText}${delivery}${variant}${skipped}${after}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
+    const tail = `${title}${tagText}${delivery}${variant}${skipped}${after}${files}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
     const room = isTerminal(style)
       ? Math.max(10, style.columns - visibleWidth(head) - visibleWidth(tail))
       : Infinity;

@@ -49,6 +49,8 @@ The tabs:
 - **"Changes"** is a file tree with `+N −M`.
 - **"Task"** shows the task text.
 - **"Artifacts · N"** lists the [artifacts](../usage/runs.md#artifacts) of the group, newest first, with the step, title, file name, time and size. "Open" previews `.md` and `.log` files up to 1 MB, and "Download" saves any file. While the group has no artifacts the tab is dimmed, and `?tab=artifacts` falls back to the log.
+- **"Attachments · N"** is shown only when the run has [attachments](../usage/queue.md#attachments). It lists each file with its size and type and a "Download" link. Pictures (PNG, JPEG, GIF, WebP) get a preview that opens in full size in a new tab.
+  `.md`, `.txt` and `.log` files up to 1 MB show their text; SVG and other files are only downloaded. The card of a run in the list shows a paperclip with the number.
 
 ### Message to the specialist
 

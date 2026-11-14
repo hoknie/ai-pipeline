@@ -1,4 +1,5 @@
 import { rejected } from '../../../platform/errors/index.ts';
+import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
 import { checkSkip, stepStates, type RunState } from '../../runs/types/index.ts';
@@ -32,6 +33,7 @@ export interface QueueEditDependencies {
   advance: QueueAdvance;
   items: QueueItems;
   taskTags: TaskTags;
+  attachments: AttachmentService;
   tags: TagCatalogService;
   registry: RegistryService;
   runs: Pick<RunsServices, 'states' | 'engine'>;
@@ -57,6 +59,7 @@ export class QueueEdit {
     if (existing?.run && params.parent !== undefined) {
       throw rejected('a returned run keeps its own task');
     }
+    const changesAttachments = this.checkAttachments(existing, params);
     const parentState =
       params.parent === undefined || params.parent === null
         ? null
@@ -107,6 +110,16 @@ export class QueueEdit {
     const patch = { pipeline, variant, task, groups, title, position, autoDeliver, deliveryMode };
     const fields = { ...patch, skip, after, postponed };
     const tags = await this.tagsOf(queue, existing, params, parentState, fields, moment);
+    if (existing && changesAttachments) {
+      // The edit is checked on a copy first: no file is stored for an edit that is refused.
+      editItem(structuredClone(queue), params.item, { ...fields, tags }, moment);
+      await this.dependencies.attachments.ingest({
+        repository,
+        itemId: params.item,
+        sources: params.attach ?? [],
+        detach: params.detach ?? [],
+      });
+    }
     editItem(queue, params.item, { ...fields, tags }, moment);
     const edited = queue.items.find((candidate) => candidate.id === params.item);
     if (edited) {
@@ -116,6 +129,16 @@ export class QueueEdit {
     store.save(queue);
     await advance.advance(repository);
     return queue;
+  }
+
+  /**
+   * Whether the edit changes attachments. The attachments of a returned run belong to the run and
+   * do not change: refused before any write.
+   */
+  private checkAttachments(existing: QueueItem | undefined, params: QueueEditRequest): boolean {
+    const changes = (params.attach ?? []).length > 0 || (params.detach ?? []).length > 0;
+    if (existing?.run && changes) throw rejected('a returned run keeps its own attachments');
+    return changes;
   }
 
   /** A returned run has no item-level skip: the steps are skipped in the run itself. */

@@ -8,7 +8,7 @@ import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
 
 export function registerRun(kit: HostKit): void {
-  const { options, server, tags, parent, variant, skip, after, repo } = kit;
+  const { options, server, tags, parent, variant, skip, after, attachments, repo } = kit;
   server.registerTool(
     'swarm_run',
     {
@@ -44,6 +44,7 @@ export function registerRun(kit: HostKit): void {
         variant,
         skip,
         after,
+        attachments,
       },
     },
     ({
@@ -59,6 +60,7 @@ export function registerRun(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      attachments: files,
     }) =>
       attempt(async () => {
         const queued = (await options.send('run', {
@@ -74,6 +76,7 @@ export function registerRun(kit: HostKit): void {
           ...(parentRef !== undefined ? { parent: parentRef } : {}),
           ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
           ...(afterIds !== undefined ? { after: afterIds } : {}),
+          ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
         })) as RunQueued;
         return withData(formatRunQueued(queued), queued);
       }),

@@ -43,7 +43,11 @@ export class PanelError extends AppError {
  * from the text; add no new patterns here, pass a code through the socket instead.
  */
 export function daemonErrorStatus(message: string): number {
-  if (/^(unknown (run|group|attempt|queue item|artifact)\b|not a background process)/.test(message))
+  if (
+    /^(unknown (run|group|attempt|queue item|artifact|attachment)\b|not a background process)/.test(
+      message,
+    )
+  )
     return 404;
   if (/is not changed in group/.test(message)) return 404;
   if (/has no merged changes|is not available/.test(message)) return 409;

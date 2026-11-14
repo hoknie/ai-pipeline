@@ -134,6 +134,7 @@ async function startServer(
   const { options } = ctx;
   return startWebServer({
     socket: options.socket,
+    stateDirectory: options.stateDirectory,
     host: settings.host,
     port: settings.port,
     auth: settings.auth,

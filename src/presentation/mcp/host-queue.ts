@@ -19,7 +19,8 @@ export function registerQueue(kit: HostKit): void {
 }
 
 export function registerQueueAdd(kit: HostKit): void {
-  const { server, tags, parent, variant, skip, after, repo, queueGroups, showQueue } = kit;
+  const { server, tags, parent, variant, skip, after, attachments, repo, queueGroups, showQueue } =
+    kit;
   server.registerTool(
     'swarm_queue_add',
     {
@@ -48,6 +49,7 @@ export function registerQueueAdd(kit: HostKit): void {
         variant,
         skip,
         after,
+        attachments,
         postponed: z
           .boolean()
           .optional()
@@ -67,6 +69,7 @@ export function registerQueueAdd(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      attachments: files,
       postponed,
       repo: where,
     }) =>
@@ -85,6 +88,7 @@ export function registerQueueAdd(kit: HostKit): void {
             ...(parentRef !== undefined ? { parent: parentRef } : {}),
             ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
             ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
             ...(postponed !== undefined ? { postponed } : {}),
           },
           where,

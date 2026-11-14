@@ -17,6 +17,8 @@ export interface LaunchContext {
   input: StepInput;
   worktree: string;
   attemptDirectory: string;
+  /** Where the attachments of the run are laid out; null for a run without attachments. */
+  attachmentsDirectory?: string | null;
   workerCommand: string[];
   sessionId: string;
   resumeSession: string | null;

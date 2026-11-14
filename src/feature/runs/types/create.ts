@@ -12,7 +12,7 @@ import {
 } from '../../swarm-config/types/index.ts';
 import { SPLIT_GROUP } from './constants.ts';
 import { newGroup } from './group.ts';
-import { type RunState, emptyRepair } from './run.ts';
+import { type RunAttachment, type RunState, emptyRepair } from './run.ts';
 import { applySkip } from './skip.ts';
 import { enterPoint } from './stage-status.ts';
 
@@ -33,6 +33,8 @@ export interface RunRequest {
   skip?: string[] | undefined;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string | undefined;
+  /** The files attached to the task. */
+  attachments?: RunAttachment[] | undefined;
 }
 
 /** A run the queue has just created. */
@@ -86,6 +88,8 @@ export interface NewRun {
   skip?: string[] | undefined;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string | undefined;
+  /** Files attached to the task. */
+  attachments?: RunAttachment[] | undefined;
 }
 
 export function createRun(input: NewRun): RunState {
@@ -149,6 +153,7 @@ export function createRun(input: NewRun): RunState {
       skippedSteps: [],
       hold: null,
       repair: emptyRepair(),
+      attachments: (input.attachments ?? []).map((attachment) => ({ ...attachment })),
     },
     split: splitting ? newGroup(SPLIT_GROUP, 'split', task, -1) : null,
     groups: splitting

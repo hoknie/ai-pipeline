@@ -1,3 +1,4 @@
+import { Paperclip } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { when } from '../../../shared/lib/format.ts';
@@ -75,6 +76,16 @@ export function RowMeta({
           {t('queue.list.deliveryMode', { mode: t(`deliveryMode.${item.deliveryMode}`) })}
         </span>
       )}
+      {item.attachments.length > 0 ? (
+        <span
+          className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+          title={t('attachments.count', { count: item.attachments.length })}
+          data-attachments={item.attachments.length}
+        >
+          <Paperclip className="size-3" aria-hidden />
+          {item.attachments.length}
+        </span>
+      ) : null}
       <SkippedSteps item={item} pipelines={pipelines} />
       {item.title && item.groups ? (
         <span className="text-muted-foreground">{groupsText(item.groups.length, t)}</span>

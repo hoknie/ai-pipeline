@@ -55,7 +55,7 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6 - (7 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7 - (7 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -333,7 +333,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-30)).toContain('denials_json');
+    expect(MIGRATIONS.at(-31)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -357,7 +357,7 @@ describe('refused tool calls', () => {
     const reopened = openStorage(databasePath(directory));
     expect(reopened.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-29)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-30)).toContain('outside_changes_json');
   });
 });
 
@@ -586,6 +586,24 @@ describe('next task number', () => {
     const store = temporaryStorage();
     store.runs.saveRun(run(1, { id: 'run000000001' }));
     expect(maxTaskNumber(store, '/nowhere')).toBe(0);
+    store.database.close();
+  });
+});
+
+describe('attachments of a run', () => {
+  it('keeps the snapshot of the attachments and reads an older run as having none', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    expect(store.runs.loadRun(state.run.id)).toBeNull();
+    state.run.attachments = [
+      { id: 'a1', fileName: 'shot.png', size: 2048, mediaType: 'image/png' },
+    ];
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.attachments).toEqual(state.run.attachments);
+    // a repeated save does not change the snapshot
+    state.run.attachments = [];
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.attachments).toHaveLength(1);
     store.database.close();
   });
 });

@@ -842,6 +842,16 @@ describe('automatic delivery switch', () => {
 });
 
 describe('items', () => {
+  it('has no "Add and continue" in the form of an existing task', async () => {
+    show(queueOf({ items: [queueItem('q1', 'Task', 1)] }));
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    fireEvent.click(
+      within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
+    );
+    await screen.findByRole('button', { name: 'Save' });
+    expect(screen.queryByRole('button', { name: 'Add and continue' })).toBeNull();
+  });
+
   it.each([
     {
       label: 'a title-only group',

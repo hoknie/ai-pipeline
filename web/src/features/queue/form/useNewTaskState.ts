@@ -131,11 +131,9 @@ export function useNewTaskState(props: {
     onDraft({ ...base, repository: target, parent: preset.parent, parentTouched: true });
     onPresetApplied();
   }, [open, preset, target, draft, draftTarget, pipelines, onDraft, onPresetApplied]);
-  const submit = async (fields: QueueFields) => {
+  const add = async (fields: QueueFields) => {
     const view = await scoped.queueAdd(fields);
     onQueue(view);
-    onDraft({ ...emptyDraft(fields.pipeline), repository: target });
-    props.onOpenChange(false);
     const number = view.items.find((item) => item.id === view.item)?.number;
     notifySuccess(
       number === undefined
@@ -143,8 +141,14 @@ export function useNewTaskState(props: {
         : t('queue.created', { number: taskNumber(number) }),
     );
   };
+  const submit = async (fields: QueueFields) => {
+    await add(fields);
+    onDraft({ ...emptyDraft(fields.pipeline), repository: target });
+    props.onOpenChange(false);
+  };
   return {
     submit,
+    submitAndContinue: add,
     target,
     setTarget,
     scoped,

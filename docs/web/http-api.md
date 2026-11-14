@@ -82,6 +82,16 @@ All paths start with `/api/runs/<id>/groups/<group>`.
 - An unknown run, group or artifact comes back with code 404, an artifact whose bytes are no longer available with code 409, any method but `GET` with code 405.
 - The bytes lie in `artifacts/<run id>/<artifact id>` of the state directory, and the database keeps their URI (`file:`). They live as long as the run record. Files the database does not know are removed when the daemon starts.
 
+## Uploads and attachments
+
+`POST /api/uploads` takes the bytes of one file as the body (up to 20 MB) and its name in `X-File-Name` (URI-encoded), and answers `{upload, fileName, size}`. A larger file comes back with code 413, a missing or bad name with 400. The file waits in `uploads/<id>/` of the state directory until a task uses it; uploads older than 24 hours are deleted when the panel starts and then every hour.
+
+`POST /api/queue/items` and `POST /api/queue/items/<item>` take `uploads: ["<upload id>"]` and attach those files to the task; the edit also takes `detach: ["<file name>"]`. An unknown upload id is answered with 400 and the task is not created. The used uploads are deleted.
+
+`GET /api/runs/<run>/attachments/<id>` downloads an attachment of a run (`Content-Disposition: attachment` with `filename` and `filename*`, `nosniff`, `no-store`). With `?inline=1` only PNG, JPEG, GIF and WebP pictures (with their own type) and `.md`, `.txt` and `.log` files (as `text/plain`) are shown.
+
+SVG and any other file come back with code 400 and are only downloaded. An unknown run or attachment gives 404, bytes that are gone 409.
+
 ## Queue
 
 | Request | What it does |

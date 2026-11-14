@@ -30,4 +30,8 @@ export const artifactsRequests = [
     params: z.object({ ...target, id: z.string().min(1) }),
   }),
   z.object({ method: z.literal('artifact_publish'), params: artifactPublishParams }),
+  z.object({
+    method: z.literal('attachment'),
+    params: z.object({ runId: z.string().min(1), id: z.string().min(1) }),
+  }),
 ] as const;

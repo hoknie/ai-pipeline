@@ -28,6 +28,8 @@ export interface RouteKit {
   host: string;
   /** The port the server listens on; known once it listens. */
   port(): number;
+  /** Where uploaded files wait for the task that uses them. */
+  uploads: string;
   /** Whether the panel runs without a token. */
   open: boolean;
   ensureDaemon(): Promise<DaemonCheck>;

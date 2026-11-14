@@ -25,6 +25,13 @@ export interface HumanMessage {
   at: number;
 }
 
+/** A file the person attached to the task. */
+export interface InputAttachment {
+  fileName: string;
+  size: number;
+  mediaType: string;
+}
+
 export interface StepInput {
   prompt: string;
   groupTitle: string;
@@ -41,4 +48,6 @@ export interface StepInput {
   reviewed?: boolean;
   /** The step stops for a human review after `done`. */
   humanReview?: boolean;
+  /** Files attached to the task; absent when there are none. */
+  attachments?: InputAttachment[];
 }

@@ -22,6 +22,14 @@ import {
 } from './constants.ts';
 import { type Group, actionOf, actionPointOf, isRepairGroup } from './group.ts';
 
+/** A file attached to the task of a run; the bytes live in the attachment storage. */
+export interface RunAttachment {
+  id: string;
+  fileName: string;
+  size: number;
+  mediaType: string;
+}
+
 export interface Run {
   id: string;
   repository: string;
@@ -57,6 +65,8 @@ export interface Run {
   hold: RunHold | null;
   /** State of the observer repairs of the run. */
   repair: RunRepair;
+  /** Files attached to the task; fixed when the run is created. */
+  attachments: RunAttachment[];
 }
 
 /** A state of a group an observer repairs; `key` includes the attempts of the group. */
