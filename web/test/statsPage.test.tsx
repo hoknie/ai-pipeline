@@ -74,6 +74,10 @@ function twoProjects(overrides: Partial<StatsReportView> = {}): StatsReportView 
           ]
         : []),
     ],
+    models: [
+      { model: 'opus', tokens: lib, costUsd: lib / 100_000, agentMs: lib * 10, attempts: 1 },
+      { model: 'sonnet', tokens: app, costUsd: app / 100_000, agentMs: app * 10, attempts: 1 },
+    ].filter((entry) => entry.tokens > 0),
   });
   return statsReportView({
     totals: totalsOf(100_000, 1.2, 5_400_000, 2),
@@ -227,6 +231,7 @@ describe('daily chart', () => {
           costUsd: null,
           agentMs: 0,
           tasks: 11,
+          models: [],
           projects: repositories.map((repository, index) => ({
             repository,
             tokens: (index + 1) * 1000,
@@ -243,6 +248,63 @@ describe('daily chart', () => {
     expect(within(legend as HTMLElement).getByText('Other')).toBeTruthy();
     const projects = screen.getByRole('table', { name: 'Projects' });
     expect(within(projects).getAllByRole('row')).toHaveLength(1 + 1 + 11);
+  });
+
+  it('splits the bars by model', async () => {
+    mount(twoProjects());
+    await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    expect(screen.getByRole('radio', { name: 'Projects' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Models' }));
+    const chart = screen.getByRole('group', { name: 'Chart by day: Tokens by model' });
+    expect(screen.getByTestId('bar-2026-06-01').querySelectorAll('rect[rx]')).toHaveLength(2);
+    expect(screen.getByTestId('bar-2026-06-02').querySelectorAll('rect[rx]')).toHaveLength(1);
+    fireEvent.focus(chart);
+    const tip = within(screen.getByTestId('chart-tooltip'));
+    expect(tip.getByText('sonnet')).toBeTruthy();
+    expect(tip.getByText('opus')).toBeTruthy();
+    expect(tip.getByText('60k')).toBeTruthy();
+    expect(tip.getByText('10k')).toBeTruthy();
+    expect(tip.getByText('70k')).toBeTruthy();
+  });
+
+  it('offers no tasks in the model split and brings them back with the projects', async () => {
+    mount(twoProjects());
+    await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Tasks' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Models' }));
+    expect(screen.queryByRole('radio', { name: 'Tasks' })).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Tokens' }).getAttribute('aria-checked')).toBe('true');
+    screen.getByRole('group', { name: 'Chart by day: Tokens by model' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Projects' }));
+    expect(screen.getByRole('radio', { name: 'Tasks' }).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('folds more than eight models into «Other»', async () => {
+    const models = Array.from({ length: 10 }, (_, index) => `m${index}`);
+    const base = twoProjects();
+    mount({
+      ...base,
+      series: [
+        {
+          ...base.series[0]!,
+          models: models.map((model, index) => ({
+            model,
+            tokens: (index + 1) * 1000,
+            costUsd: null,
+            agentMs: 0,
+            attempts: 1,
+          })),
+        },
+      ],
+    });
+    await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Models' }));
+    const chart = screen.getByRole('group', { name: 'Chart by day: Tokens by model' });
+    const legend = chart.parentElement!.querySelector('ul')! as HTMLElement;
+    expect(within(legend).getAllByRole('listitem')).toHaveLength(9);
+    expect(within(legend).getByText('Other')).toBeTruthy();
   });
 
   it('switches the metric', async () => {

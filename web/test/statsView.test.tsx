@@ -4,6 +4,8 @@ import {
   compactNumber,
   dailySeries,
   isEmpty,
+  metricsFor,
+  modelOrder,
   nextSort,
   periodSince,
   projectShares,
@@ -13,7 +15,17 @@ import {
 
 import { statsReportView } from './fixtures.ts';
 
-const day = (name: string, projects: { repository: string; tokens: number }[]) => ({
+const day = (
+  name: string,
+  projects: { repository: string; tokens: number }[],
+  models: {
+    model: string;
+    tokens: number;
+    costUsd: number;
+    agentMs: number;
+    attempts: number;
+  }[] = [],
+) => ({
   day: name,
   start: Date.parse(name),
   tokens: projects.reduce((sum, entry) => sum + entry.tokens, 0),
@@ -21,6 +33,7 @@ const day = (name: string, projects: { repository: string; tokens: number }[]) =
   agentMs: 0,
   tasks: 0,
   projects: projects.map((entry) => ({ ...entry, costUsd: 0, agentMs: 0, tasks: 0 })),
+  models,
 });
 
 describe('compactNumber', () => {
@@ -75,7 +88,7 @@ describe('dailySeries', () => {
     const report = statsReportView({
       series: [day('2026-06-01', [{ repository: '/a', tokens: 5 }]), day('2026-06-02', [])],
     });
-    const [only] = dailySeries(report, 'tokens', options);
+    const [only] = dailySeries(report, 'tokens', 'projects', options);
     expect(only).toMatchObject({ key: '/a', label: '/A', color: '#111', values: [5, 0] });
   });
 
@@ -85,9 +98,62 @@ describe('dailySeries', () => {
       tokens: index + 1,
     }));
     const report = statsReportView({ series: [day('2026-06-01', projects)] });
-    const series = dailySeries(report, 'tokens', options);
+    const series = dailySeries(report, 'tokens', 'projects', options);
     expect(series).toHaveLength(9);
     expect(series[8]).toMatchObject({ label: 'Other', values: [6] });
+  });
+});
+
+describe('models split', () => {
+  const options = {
+    labelOf: (repository: string) => repository.toUpperCase(),
+    colors: { opus: '#111' } as Record<string, string>,
+    other: { label: 'Other', color: '#999' },
+  };
+  const entry = (model: string, tokens: number) => ({
+    model,
+    tokens,
+    costUsd: 0,
+    agentMs: 0,
+    attempts: 1,
+  });
+
+  it('makes one series per model with a value for every day', () => {
+    const report = statsReportView({
+      series: [
+        day('2026-06-01', [], [entry('opus', 5), entry('sonnet', 7)]),
+        day('2026-06-02', [], [entry('sonnet', 3)]),
+      ],
+    });
+    const series = dailySeries(report, 'tokens', 'models', options);
+    expect(series).toMatchObject([
+      { key: 'opus', label: 'opus', color: '#111', values: [5, 0] },
+      { key: 'sonnet', label: 'sonnet', color: '#999', values: [7, 3] },
+    ]);
+  });
+
+  it('folds more than eight models', () => {
+    const models = Array.from({ length: 10 }, (_, index) => entry(`m${index}`, index + 1));
+    const report = statsReportView({ series: [day('2026-06-01', [], models)] });
+    const series = dailySeries(report, 'tokens', 'models', options);
+    expect(series).toHaveLength(9);
+    expect(series[8]).toMatchObject({ label: 'Other', values: [3] });
+  });
+
+  it('offers no tasks for models and no cost without one', () => {
+    expect(metricsFor('models', true)).toEqual(['tokens', 'cost', 'agent']);
+    expect(metricsFor('projects', true)).toEqual(['tokens', 'cost', 'agent', 'tasks']);
+    expect(metricsFor('projects', false)).toEqual(['tokens', 'agent', 'tasks']);
+  });
+
+  it('orders the models by the breakdown, then by the series', () => {
+    const base = statsReportView();
+    const row = (key: string) => ({ ...base.byModel[0]!, key });
+    const report = statsReportView({
+      byModel: [row('opus'), row('sonnet')],
+      series: [day('2026-06-01', [], [entry('haiku', 1), entry('sonnet', 2)])],
+    });
+    expect(modelOrder(report)).toEqual(['opus', 'sonnet', 'haiku']);
   });
 });
 

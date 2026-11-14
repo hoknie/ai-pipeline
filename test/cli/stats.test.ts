@@ -70,6 +70,7 @@ describe('aip stats', () => {
     expect(report.totals).toMatchObject({ tasks: 2, tokens: 100_000 });
     expect(report.since).not.toBeNull();
     expect(report.series.length).toBeGreaterThanOrEqual(7);
+    expect(report.series.every((entry) => Array.isArray(entry.models))).toBe(true);
     const all = JSON.parse((await aip(box, 'stats', '--since', 'all', '--json')).stdout);
     expect((all as StatsReportView).since).toBeNull();
   });

@@ -90,6 +90,9 @@ export const zh: Dictionary = {
       total: '合计',
       other: '其他',
       chartLabel: '按天图表：各项目的{{metric}}',
+      chartLabelModels: '按天图表：各模型的{{metric}}',
+      split: '拆分',
+      splits: { projects: '项目', models: '模型' },
       metrics: {
         tokens: 'Token',
         cost: '费用',

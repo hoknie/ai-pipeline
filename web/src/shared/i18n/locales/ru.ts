@@ -92,6 +92,9 @@ export const ru: Dictionary = {
       total: 'Итого',
       other: 'Другие',
       chartLabel: 'График по дням: {{metric}} по проектам',
+      chartLabelModels: 'График по дням: {{metric}} по моделям',
+      split: 'Разрез',
+      splits: { projects: 'Проекты', models: 'Модели' },
       metrics: {
         tokens: 'Токены',
         cost: 'Стоимость',

@@ -12,6 +12,7 @@ import {
   perTaskOf,
   projectRows,
   totalsOf,
+  UNKNOWN_MODEL,
 } from '../types/index.ts';
 
 export interface ReportDependencies {
@@ -69,7 +70,7 @@ export class StatsReportService {
       outcomes: outcomesOf(tasks),
       projects: projectRows(attempts, tasks, taskAttempts),
       bySpecialist: breakdownRows(attempts, (record) => record.specialist),
-      byModel: breakdownRows(attempts, (record) => record.model ?? 'unknown'),
+      byModel: breakdownRows(attempts, (record) => record.model ?? UNKNOWN_MODEL),
       byPipeline: breakdownRows(attempts, (record) => record.pipeline),
       byRuntime: breakdownRows(attempts, (record) => record.runtime),
       series: start === null ? [] : dailySeries(attempts, tasks, start, end),

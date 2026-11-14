@@ -6,9 +6,11 @@ import {
   type PerTask,
   type ProjectRow,
   type SeriesDay,
+  type SeriesModel,
   type Stat,
   type StatsReport,
   type Totals,
+  UNKNOWN_MODEL,
 } from './report.ts';
 
 export function mean(values: number[]): number {
@@ -159,6 +161,18 @@ function nextMidnight(ms: number): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
 }
 
+function modelsOf(records: AttemptRecord[]): SeriesModel[] {
+  return [...groupBy(records, (record) => record.model ?? UNKNOWN_MODEL)]
+    .sort(([left], [right]) => left.localeCompare(right, 'en'))
+    .map(([model, own]) => ({
+      model,
+      tokens: sum(own.map(tokensOf)),
+      costUsd: costOf(own),
+      agentMs: agentMsOf(own),
+      attempts: own.length,
+    }));
+}
+
 /**
  * One entry per local day from `from` to `to` (inclusive); days without data hold zeros. Attempts
  * count on the day they ended and tasks on the day they finished.
@@ -196,6 +210,7 @@ export function dailySeries(
           tasks: finished.filter((task) => task.repository === repository).length,
         };
       }),
+      models: modelsOf(records),
     });
     cursor = nextMidnight(cursor);
   }
@@ -224,6 +239,7 @@ export function maskCosts(report: StatsReport): StatsReport {
     series: report.series.map((day) => ({
       ...row(day),
       projects: day.projects.map(row),
+      models: day.models.map(row),
     })),
   };
 }

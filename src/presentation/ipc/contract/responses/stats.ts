@@ -40,6 +40,14 @@ const seriesProject = z.object({
   tasks: number,
 });
 
+const seriesModel = z.object({
+  model: z.string(),
+  tokens: number,
+  costUsd: nullable,
+  agentMs: number,
+  attempts: number,
+});
+
 /** The report of `stats_report`; the type is `StatsReport` of the `stats` feature. */
 export const statsReportSchema = z.object({
   settings: z.object({
@@ -68,6 +76,7 @@ export const statsReportSchema = z.object({
       agentMs: number,
       tasks: number,
       projects: z.array(seriesProject),
+      models: z.array(seriesModel),
     }),
   ),
 });

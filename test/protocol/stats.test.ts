@@ -98,6 +98,7 @@ describe('statistics view and text', () => {
   it('passes the report through the view and validates against the schema', () => {
     const report = sampleReport();
     const view = statsView(report);
+    expect(report.series.some((entry) => entry.models.length > 0)).toBe(true);
     expect(statsReportSchema.parse(JSON.parse(JSON.stringify(view)))).toEqual(report);
   });
 

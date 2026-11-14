@@ -69,6 +69,18 @@ export interface SeriesProject {
   tasks: number;
 }
 
+/** The name of the model of attempts that carry none. */
+export const UNKNOWN_MODEL = 'unknown';
+
+export interface SeriesModel {
+  model: string;
+  tokens: number;
+  costUsd: number | null;
+  agentMs: number;
+  /** Attempts, not tasks: one task can run on several models. */
+  attempts: number;
+}
+
 /** One local day; days without data have zeros and no projects. */
 export interface SeriesDay {
   /** `YYYY-MM-DD`, in the local time of the daemon. */
@@ -80,6 +92,7 @@ export interface SeriesDay {
   agentMs: number;
   tasks: number;
   projects: SeriesProject[];
+  models: SeriesModel[];
 }
 
 export interface StatsReport {

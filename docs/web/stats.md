@@ -19,7 +19,9 @@ Changing a filter reads the report again without reloading the page. While the s
 
 ## Charts
 
-- "By day": stacked bars by project, in the color of the project (a project without a color gets one from the palette of the panel). The switch picks the metric: "Tokens", "Cost", "Agent time" or "Tasks". Hover a bar or focus the chart and use the arrow keys to read the tip with the day, the sum and every project. More than 8 projects: the 8 largest are drawn and the rest are summed into "Other".
+- "By day": stacked bars. The "Split" switch picks "Projects" (default) or "Models". The metric switch picks "Tokens", "Cost", "Agent time" or "Tasks". Hover a bar or focus the chart and use the arrow keys to read the tip with the day, the sum and every part. More than 8 projects or models: the 8 largest are drawn and the rest are summed into "Other".
+- Colors: a project has its own color (without one it gets a color from the palette of the panel); models take colors from the palette, one per model.
+- "Tasks" is not offered in the model split, because one task can run on several models: the chart shows "Tokens" and "Tasks" returns with the projects.
 - With "All projects": bars of the shares of the projects in tokens and in agent work.
 - A bar of the outcomes of the tasks: finished, failed, cancelled.
 

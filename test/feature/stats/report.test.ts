@@ -163,6 +163,29 @@ describe('the statistics report', () => {
     expect(sumOf(report.series)).toBe(report.totals.tokens);
   });
 
+  it('carries the models of a day with the keys of the model breakdown', async () => {
+    const h = harness();
+    h.records.insertAttempts([
+      attemptRecord({ runId: 'm1', model: 'sonnet', finishedAt: NOW - 1000 }),
+      attemptRecord({ runId: 'm2', model: 'opus', finishedAt: NOW - 2000 }),
+      attemptRecord({ runId: 'm3', model: null, finishedAt: NOW - 3000 }),
+    ]);
+    const report = await h.service.report({});
+    const names = report.series.flatMap((entry) => entry.models.map((m) => m.model));
+    expect([...new Set(names)].sort()).toEqual(report.byModel.map((row) => row.key).sort());
+    expect(names).toContain('unknown');
+  });
+
+  it('hides the cost of the models of a day when the cost is off', async () => {
+    const h = harness({ enabled: true, exclude: [], showCost: false });
+    h.records.insertAttempts([attemptRecord({ runId: 'c1', finishedAt: NOW - 1000 })]);
+    const report = await h.service.report({});
+    const models = report.series.flatMap((entry) => entry.models);
+    expect(models.length).toBeGreaterThan(0);
+    expect(models.every((entry) => entry.costUsd === null)).toBe(true);
+    expect(models[0]?.tokens).toBe(150);
+  });
+
   it('starts the all-time series on the day of the first record', async () => {
     const h = harness();
     const yesterday = new Date(2026, 5, 9, 13).getTime();

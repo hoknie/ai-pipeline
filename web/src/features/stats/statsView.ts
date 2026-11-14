@@ -11,6 +11,26 @@ type Breakdown = StatsReportView['byModel'][number];
 export const METRICS = ['tokens', 'cost', 'agent', 'tasks'] as const;
 export type Metric = (typeof METRICS)[number];
 
+export const SPLITS = ['projects', 'models'] as const;
+export type Split = (typeof SPLITS)[number];
+
+/** The metrics a split offers: a model has no tasks, and cost needs a visible cost. */
+export function metricsFor(split: Split, hasCost: boolean): Metric[] {
+  return METRICS.filter(
+    (metric) => (metric !== 'cost' || hasCost) && (metric !== 'tasks' || split === 'projects'),
+  );
+}
+
+/** The models in the order of their colors: the biggest consumers first, then the rest of the series. */
+export function modelOrder(report: StatsReportView): string[] {
+  return [
+    ...new Set([
+      ...report.byModel.map((row) => row.key),
+      ...report.series.flatMap((day) => day.models.map((entry) => entry.model)),
+    ]),
+  ];
+}
+
 /** How many series the daily chart draws before the rest folds into «Other». */
 export const CHART_SERIES_LIMIT = 8;
 
@@ -54,37 +74,40 @@ export function durationText(milliseconds: number, t: TFunction): string {
 /** The value of a metric of a day or of a project of a day. */
 function metricOf(
   metric: Metric,
-  entry: { tokens: number; costUsd: number | null; agentMs: number; tasks: number },
+  entry: { tokens: number; costUsd: number | null; agentMs: number; tasks?: number },
 ): number {
   if (metric === 'tokens') return entry.tokens;
   if (metric === 'cost') return entry.costUsd ?? 0;
   if (metric === 'agent') return entry.agentMs;
-  return entry.tasks;
+  return entry.tasks ?? 0;
 }
 
 /**
- * The series of the daily chart: one per project, a value for every day of the report. Projects
+ * The series of the daily chart: one per project or per model, a value for every day of the report. Projects
  * beyond `CHART_SERIES_LIMIT` with the smallest sum are folded into «Other».
  */
 export function dailySeries(
   report: StatsReportView,
   metric: Metric,
+  split: Split,
   options: {
     labelOf: (repository: string) => string;
     colors: Record<string, string>;
     other: { label: string; color: string };
   },
 ): ChartSeries[] {
-  const repositories = [
-    ...new Set(report.series.flatMap((day) => day.projects.map((entry) => entry.repository))),
-  ];
-  const series = repositories.map<ChartSeries>((repository) => ({
-    key: repository,
-    label: options.labelOf(repository),
-    color: options.colors[repository] ?? options.other.color,
+  const entriesOf = (day: StatsReportView['series'][number]) =>
+    split === 'models'
+      ? day.models.map((entry) => ({ key: entry.model, entry }))
+      : day.projects.map((entry) => ({ key: entry.repository, entry }));
+  const keys = [...new Set(report.series.flatMap((day) => entriesOf(day).map((item) => item.key)))];
+  const series = keys.map<ChartSeries>((key) => ({
+    key,
+    label: split === 'models' ? key : options.labelOf(key),
+    color: options.colors[key] ?? options.other.color,
     values: report.series.map((day) => {
-      const entry = day.projects.find((candidate) => candidate.repository === repository);
-      return entry === undefined ? 0 : metricOf(metric, entry);
+      const found = entriesOf(day).find((item) => item.key === key);
+      return found === undefined ? 0 : metricOf(metric, found.entry);
     }),
   }));
   return foldSeries(series, CHART_SERIES_LIMIT, options.other);

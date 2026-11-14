@@ -88,6 +88,9 @@ export const en = {
       total: 'Total',
       other: 'Other',
       chartLabel: 'Chart by day: {{metric}} by project',
+      chartLabelModels: 'Chart by day: {{metric}} by model',
+      split: 'Split',
+      splits: { projects: 'Projects', models: 'Models' },
       metrics: {
         tokens: 'Tokens',
         cost: 'Cost',

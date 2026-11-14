@@ -92,6 +92,9 @@ export const es: Dictionary = {
       total: 'Total',
       other: 'Otros',
       chartLabel: 'Gráfico por día: {{metric}} por proyecto',
+      chartLabelModels: 'Gráfico por día: {{metric}} por modelo',
+      split: 'Desglose',
+      splits: { projects: 'Proyectos', models: 'Modelos' },
       metrics: {
         tokens: 'Tokens',
         cost: 'Coste',

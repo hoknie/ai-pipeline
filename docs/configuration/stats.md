@@ -44,7 +44,7 @@ The first time the daemon sees collection on, it moves the history already in it
 - mean and median per task for tokens, cost, agent time and task time;
 - a row per project and a total over all projects;
 - tables by specialist, model, pipeline and runtime;
-- a series by local day with zeros for days without data.
+- a series by local day with zeros for days without data; every day carries values by project and by model (tokens, cost, agent time and attempts; an attempt without a model counts as `unknown`).
 
 Agent time is the time of attempts of every runtime but `command`; command actions are counted as command time. Per-task figures count all records of a task, also those outside the period. An attempt belongs to the period of its end, a task to the period of its finish.
 

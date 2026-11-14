@@ -102,7 +102,29 @@ describe('statistics aggregates', () => {
       '/work/app',
       '/work/lib',
     ]);
-    expect(series[0]).toMatchObject({ tokens: 0, tasks: 0, projects: [] });
+    expect(series[0]).toMatchObject({ tokens: 0, tasks: 0, projects: [], models: [] });
+  });
+
+  it('splits a day by model: the models add up to the day', () => {
+    const at = new Date(2026, 5, 10, 12).getTime();
+    const make = (model: string | null, tokens: number, costUsd: number) =>
+      attemptRecord({ finishedAt: at, model, inputTokens: tokens, outputTokens: 0, costUsd });
+    const attempts = [
+      make('sonnet', 20_000, 0.2),
+      make('sonnet', 10_000, 0.1),
+      make('opus', 10_000, 1),
+      make(null, 5_000, 0.05),
+    ];
+    const [today] = dailySeries(attempts, [], at, at);
+    expect(today?.models.map((entry) => entry.model)).toEqual(['opus', 'sonnet', 'unknown']);
+    expect(today?.models.map((entry) => entry.tokens)).toEqual([10_000, 30_000, 5_000]);
+    expect(today?.models.map((entry) => entry.attempts)).toEqual([1, 2, 1]);
+    const add = (
+      pick: (entry: { tokens: number; costUsd: number | null; agentMs: number }) => number | null,
+    ) => today?.models.reduce((total, entry) => total + (pick(entry) ?? 0), 0);
+    expect(add((entry) => entry.tokens)).toBe(today?.tokens);
+    expect(add((entry) => entry.agentMs)).toBe(today?.agentMs);
+    expect(add((entry) => entry.costUsd)).toBeCloseTo(today?.costUsd ?? 0);
   });
 
   it('keeps a record between a mid-day start and the next midnight in the series', () => {
@@ -153,6 +175,10 @@ describe('statistics aggregates', () => {
     const masked = maskCosts(report);
     expect(JSON.stringify(masked)).not.toMatch(/"costUsd":[0-9]/);
     expect(masked.perTask.costUsd).toEqual({ mean: null, median: null });
+    expect(masked.series.flatMap((entry) => entry.models).every((m) => m.costUsd === null)).toBe(
+      true,
+    );
+    expect(masked.series.flatMap((entry) => entry.models).length).toBeGreaterThan(0);
     expect(masked.totals.tokens).toBe(150);
     expect(masked.bySpecialist[0]?.tokens).toBe(150);
   });
