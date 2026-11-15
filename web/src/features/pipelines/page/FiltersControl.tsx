@@ -1,3 +1,4 @@
+import { projectCounts } from '../../../shared/lib/catalog/projectRows.ts';
 import { PipelineFilters } from '../PipelineFilters.tsx';
 import type { PipelineFilterState } from './usePipelineFilterState.ts';
 
@@ -10,6 +11,7 @@ export function FiltersPanel({ filters }: { filters: PipelineFilterState }) {
       search={filters.search}
       onFilter={filters.setFilter}
       onSearch={filters.setSearch}
+      projectCounts={projectCounts(filters.rowsWithoutProject)}
     />
   );
 }

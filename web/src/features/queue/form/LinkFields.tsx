@@ -22,10 +22,13 @@ import type { FormState } from './TaskFields.tsx';
 const NO_PARENT = '__none__';
 
 /** Picker group of each kind of predecessor. */
-const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global' } as const;
+const SOURCE_OF = { current: 'builtin', item: 'project', run: 'global', other: 'other' } as const;
 
-const labelOf = (choice: { number: number | null; title: string }) =>
-  choice.number === null ? choice.title : `${taskNumber(choice.number)} ${choice.title}`;
+const labelOf = (choice: { number: number | null; title: string; project?: string }) => {
+  const text =
+    choice.number === null ? choice.title : `${taskNumber(choice.number)} ${choice.title}`;
+  return choice.project === undefined ? text : `${choice.project}: ${text}`;
+};
 
 /** What the task waits for: items of the queue and runs. */
 export function AfterField({ state, choices }: { state: FormState; choices: AfterOption[] }) {
@@ -34,7 +37,7 @@ export function AfterField({ state, choices }: { state: FormState; choices: Afte
   const titles = new Map(choices.map((choice) => [choice.id, labelOf(choice)]));
   const options: PickerOption[] = choices.map((choice) => ({
     name: choice.id,
-    source: SOURCE_OF[choice.kind],
+    source: choice.project !== undefined ? 'other' : SOURCE_OF[choice.kind],
     description: labelOf(choice),
   }));
   return (
@@ -51,6 +54,7 @@ export function AfterField({ state, choices }: { state: FormState; choices: Afte
           builtin: t('queue.form.afterCurrent'),
           project: t('queue.form.afterItems'),
           global: t('queue.form.afterRuns'),
+          other: t('queue.form.afterOther'),
         }}
         creatable={false}
         contentClassName="min-w-80"

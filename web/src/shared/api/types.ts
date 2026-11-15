@@ -49,6 +49,9 @@ export type {
   StageStatus,
   GroupSpecView,
   GroupView,
+  GlobalQueueItemView,
+  GlobalQueueRunView,
+  GlobalQueueView,
   QueueItemView,
   QueueRunView,
   QueueView,
@@ -95,6 +98,35 @@ export type ItemReadiness = QueueItemView['readiness'];
 
 /** Build mismatch between the daemon and `aip web`; null when they run the same build. */
 export type DaemonMismatch = DaemonCheck['mismatch'];
+
+/** One task for several projects: the shared fields, an addition per project, a shared tag. */
+export interface QueueProjectsFields {
+  /** Paths of the projects, in the order of the chain. */
+  repositories: string[];
+  pipeline: string;
+  variant?: string;
+  task: string;
+  title?: string;
+  postponed?: boolean;
+  autoDeliver?: boolean;
+  deliveryMode?: DeliveryMode;
+  skip?: string[];
+  after?: string[];
+  /** Additions to the text by project path. */
+  notes?: Record<string, string>;
+  /** Name of the tag every project gets from its catalog. */
+  tag?: string;
+  /** The task of each project waits for the one of the previous project. */
+  chain?: boolean;
+}
+
+/** The item a task of several projects got in one project. */
+export interface AddedToProject {
+  repository: string;
+  project: string;
+  item: string;
+  number: number;
+}
 
 /** Fields of a task in the queue: either `task` or `groups`. */
 export interface QueueFields {

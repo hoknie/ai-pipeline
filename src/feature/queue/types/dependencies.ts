@@ -4,17 +4,37 @@ import { mergeTags } from '../../tags/types/index.ts';
 import type { Queue, QueueItem } from './items.ts';
 import { BLOCKING_REASONS } from './limit-hits.ts';
 
+/** Finds a queue item in any queue, with the queue it stands in. */
+export type ItemLookup = (id: string) => { queue: Queue; item: QueueItem } | undefined;
+
+/** A lookup over the given queues. */
+export function lookupIn(...queues: readonly Queue[]): ItemLookup {
+  return (id) => {
+    for (const queue of queues) {
+      const item = queue.items.find((candidate) => candidate.id === id);
+      if (item) return { queue, item };
+    }
+    return undefined;
+  };
+}
+
 /**
  * Tags of the predecessors in `after`, in the order of the references, without
- * repeats: the tags of a queue item, or `runTags(id)` for a run (unknown: none).
+ * repeats: the tags of a queue item of the same repository, or `runTags(id)` for
+ * a run (unknown: none). A predecessor of another repository gives no tags.
  */
 export function dependencyTags(
   queue: Queue,
   after: readonly string[],
   runTags: (id: string) => readonly string[] | undefined,
+  find: ItemLookup = lookupIn(queue),
 ): string[] {
   return mergeTags(
-    ...after.map((ref) => queue.items.find((item) => item.id === ref)?.tags ?? runTags(ref) ?? []),
+    ...after.map((ref) => {
+      const found = find(ref);
+      if (found) return found.queue.repository === queue.repository ? found.item.tags : [];
+      return runTags(ref) ?? [];
+    }),
   );
 }
 
@@ -55,15 +75,14 @@ export function spreadTags(
  * points at the item itself or closes a cycle. Runs have no dependencies, so a
  * cycle can only pass through items.
  */
-export function checkDependencies(queue: Queue, id: string, after: string[]): void {
+export function checkDependencies(find: ItemLookup, id: string, after: string[]): void {
   if (after.includes(id)) throw rejected('a task cannot depend on itself');
-  const refs = (item: string): string[] =>
-    item === id ? after : (queue.items.find((candidate) => candidate.id === item)?.after ?? []);
+  const refs = (item: string): string[] => (item === id ? after : (find(item)?.item.after ?? []));
   const walk = (current: string, path: string[]): string[] | null => {
     for (const next of refs(current)) {
       if (next === id) return [...path, next];
       if (path.includes(next)) continue;
-      if (!queue.items.some((candidate) => candidate.id === next)) continue;
+      if (!find(next)) continue;
       const found = walk(next, [...path, next]);
       if (found) return found;
     }
@@ -87,15 +106,15 @@ export function runDone(state: RunState): boolean {
 }
 
 export function dependencyState(
-  queue: Queue,
+  find: ItemLookup,
   ref: string,
   lookup: (id: string) => RunState | undefined,
   seen: ReadonlySet<string> = new Set(),
 ): DependencyState {
   if (seen.has(ref)) return 'waiting';
-  const item = queue.items.find((candidate) => candidate.id === ref);
-  if (item) {
-    return itemReadiness(queue, item, lookup, new Set([...seen, ref])) === 'blocked'
+  const found = find(ref);
+  if (found) {
+    return itemReadiness(find, found.item, lookup, new Set([...seen, ref])) === 'blocked'
       ? 'blocked'
       : 'waiting';
   }
@@ -107,12 +126,12 @@ export function dependencyState(
 }
 
 export function itemReadiness(
-  queue: Queue,
+  find: ItemLookup,
   item: QueueItem,
   lookup: (id: string) => RunState | undefined,
   seen: ReadonlySet<string> = new Set(),
 ): ItemReadiness {
-  const states = item.after.map((ref) => dependencyState(queue, ref, lookup, seen));
+  const states = item.after.map((ref) => dependencyState(find, ref, lookup, seen));
   if (states.includes('blocked')) return 'blocked';
   return states.every((state) => state === 'done') ? 'ready' : 'waiting';
 }

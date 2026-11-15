@@ -54,6 +54,12 @@ export function queueRoutes(kit: RouteKit): Route[] {
     },
     {
       method: 'POST',
+      pattern: /^\/api\/queue\/projects$/,
+      handle: (_, body) =>
+        call('queue_add_projects', queueBody(body) as ParamsOf<'queue_add_projects'>),
+    },
+    {
+      method: 'POST',
       pattern: new RegExp(`^/api/queue/items/${segment}$`),
       handle: ([item], body, repository) => editTask(kit, item ?? '', body, repository),
     },

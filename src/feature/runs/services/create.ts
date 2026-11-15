@@ -72,6 +72,12 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     observe: dependencies.observe,
     publish: dependencies.publish,
     network: () => dependencies.network.snapshot(),
+    limit: () => {
+      const queue = dependencies.config.queueSettings();
+      return typeof queue !== 'string' && queue.scope === 'global'
+        ? { kind: 'machine', max: queue.max }
+        : { kind: 'repository' };
+    },
   });
   const effects = new RunEffects({ ...dependencies, context: engine });
   engine.attach(effects);

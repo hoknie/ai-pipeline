@@ -250,6 +250,8 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
     configChanged: (repository) => {
       publications.config.configChanged(repository);
       services.observers.request();
+      // The queue mode is a setting of the shared settings.yaml.
+      services.queue.scope.request();
     },
   });
   ports.processes.set(publications.processes);

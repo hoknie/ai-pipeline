@@ -10,6 +10,7 @@ export const SETTINGS_GROUPS_BY_SCOPE = {
     'general',
     'agents',
     'delivery',
+    'queue',
     'runtimes',
     'chains',
     'specialists',
@@ -98,6 +99,7 @@ export function groupOf(path: string): SettingsGroup {
   if (['defaults', 'claude', 'opencode', 'agy'].includes(section)) return 'agents';
   if (section === 'delivery') return 'delivery';
   if (section === 'runtimes') return 'runtimes';
+  if (section === 'queue') return 'queue';
   if (section === 'web' || section === 'network') return 'system';
   return DEFAULT_SETTINGS_GROUP;
 }

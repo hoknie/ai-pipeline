@@ -23,6 +23,8 @@ export type FormState = {
   effective: QueueDraft;
   change: (patch: Partial<QueueDraft>) => void;
   locked: boolean;
+  /** A task for several projects: no groups. */
+  several?: boolean;
 };
 
 function GroupsEditor({ idPrefix, effective, change, locked }: FormState) {
@@ -120,15 +122,17 @@ function PipelineSelect({
           ))}
         </SelectContent>
       </Select>
-      <ToggleGroup
-        type="single"
-        aria-label={t('queue.form.kind')}
-        value={effective.mode}
-        onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
-      >
-        <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
-        <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
-      </ToggleGroup>
+      {state.several ? null : (
+        <ToggleGroup
+          type="single"
+          aria-label={t('queue.form.kind')}
+          value={effective.mode}
+          onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
+        >
+          <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
+          <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
+        </ToggleGroup>
+      )}
     </div>
   );
 }
@@ -171,6 +175,8 @@ export function TaskFields(props: {
   pipelines: PipelinesView | null;
   options: string[];
   repositoryField: ReactNode;
+  /** Fields under the text of the task. */
+  extras?: ReactNode;
   /** The text of the task grows with the column. */
   fill?: boolean;
 }) {
@@ -216,6 +222,7 @@ export function TaskFields(props: {
       ) : (
         <GroupsEditor {...state} />
       )}
+      {props.extras}
     </div>
   );
 }

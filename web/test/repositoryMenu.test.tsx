@@ -5,7 +5,7 @@ import { RepositoryMenu } from '../src/app/shell/menus/RepositoryMenu.tsx';
 import { displayPaths, repositoryMatches } from '../src/shared/lib/catalog/repositories.ts';
 import '../src/shared/i18n/index.ts';
 
-import { cleanup, fireEvent, render, screen, waitFor } from './render.tsx';
+import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { repositoryView } from './fixtures.ts';
 
 afterEach(cleanup);
@@ -99,5 +99,70 @@ describe('repository paths', () => {
     expect(repositoryMatches('/Users/me/app', '~/app', 'users/me')).toBe(true);
     expect(repositoryMatches('/Users/me/app', '~/app', 'zzz')).toBe(false);
     expect(repositoryMatches('/x', '/x', '  ')).toBe(true);
+  });
+});
+
+describe('the item «All projects»', () => {
+  const browse = async () => ({
+    path: '/Users/me',
+    parent: '/Users',
+    home: '/Users/me',
+    git: false,
+    entries: [],
+    truncated: false,
+  });
+
+  function open(choice: Partial<React.ComponentProps<typeof RepositoryMenu>['choice']> = {}) {
+    const onAllProjects = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <RepositoryMenu
+        choice={{
+          repositories: [...paths.keys()],
+          paths,
+          selected: '/Users/me/projects/shop',
+          waiting: new Map([['/Users/me/projects/blog', 2]]),
+          onSelect,
+          onAllProjects,
+          onAdd: async () => undefined,
+          browse,
+          ...choice,
+        }}
+      />,
+    );
+    const trigger = document.querySelector<HTMLElement>('[data-repository-trigger]')!;
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+    return { onAllProjects, onSelect, trigger };
+  }
+
+  it('comes first, above the list, and turns the mode on', async () => {
+    const { onAllProjects, onSelect } = open();
+    const items = await screen.findAllByRole('menuitemradio');
+    expect(items[0]!.textContent).toBe('All projects');
+    expect(items).toHaveLength(4);
+    expect(document.querySelector('[data-repository-list]')!.contains(items[0]!)).toBe(false);
+    fireEvent.click(items[0]!);
+    expect(onAllProjects).toHaveBeenCalledOnce();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('stays when the search finds nothing', async () => {
+    open();
+    const search = await screen.findByPlaceholderText('Search projects…');
+    fireEvent.change(search, { target: { value: 'zzz' } });
+    expect(screen.getByRole('menuitemradio', { name: 'All projects' })).toBeTruthy();
+    expect(screen.getByText('Nothing found')).toBeTruthy();
+  });
+
+  it('shows «All projects» on the button with the waiting runs of every project', () => {
+    const { trigger } = open({ allProjects: true });
+    expect(trigger.getAttribute('aria-label')).toBe('Repository: All projects');
+    expect(within(trigger).getByLabelText('waiting for an answer: 2').textContent).toBe('2');
+  });
+
+  it('is absent without projects', async () => {
+    open({ repositories: [] });
+    await screen.findByRole('menuitem', { name: 'Add repository…' });
+    expect(screen.queryByRole('menuitemradio', { name: 'All projects' })).toBeNull();
   });
 });

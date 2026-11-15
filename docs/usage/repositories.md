@@ -12,6 +12,7 @@ aip repo list                       # the daemon's repositories with counters
 aip repo add ~/projects/new         # add a repository before its first run
 aip repo edit new --name "New shop" # name, slug, color, enable or disable a project
 aip queue list --repo new           # a project slug works instead of the path
+aip queue list --all                # the queues of all enabled projects
 aip repo move new ~/work/new        # the repository moved: give the project its new path
 aip repo remove ~/projects/old      # remove from the list
 ```
@@ -39,6 +40,12 @@ Each repository of the list is a project with a few attributes of its own. They 
 `aip repo move <project> <path>` gives a project a new path after its repository moved. Its runs, queue with its tasks, tags and observer settings follow, and the name, slug and color stay. The path may start with `~/`.
 It refuses while the project has unfinished runs, or when the new path is already in the list. No files are moved: worktrees of finished runs at the old place are left for `aip clean`.
 
+## Tasks across projects
+
+`--after` of a task may name a task or a run of another project, for example a client in `web` that starts only after the API in `lib` is delivered. See [Dependencies](queue.md#dependencies).
+
+One task can also go to several projects at once, with a shared tag and an order between them: see [one task in several projects](queue.md#one-task-in-several-projects).
+
 ## Choosing a repository
 
 - **CLI.** `--repo <path>` exists on `aip run start`, `aip queue …`, `aip tag …` and `aip config check`. By default it is the current directory. Commands that take a run id work from any directory, and `aip run list` shows the runs of all repositories.
@@ -49,3 +56,5 @@ It refuses while the project has unfinished runs, or when the new path is alread
 ## Limits
 
 [`max`](../configuration/README.md#max) is counted per repository: each repository gets the `max` of its most recently created run, and its runs do not wait for slots taken in another repository. A [specialist's `max`](../configuration/specialists.md#limits) is counted by its slug across all runs, so a specialist in a second repository may wait for one in the first.
+
+In the [global queue mode](../usage/queue.md#global-queue) the specialists of all repositories are counted together against [`queue.max`](../configuration/README.md#queue) (5 by default) instead of `max`; a specialist's own `max` still applies.

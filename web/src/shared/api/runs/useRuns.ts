@@ -5,6 +5,7 @@ import type { ObserversView } from '../observerTypes.ts';
 import { browserEventSource, type Connection, type EventSourceFactory } from '../stream.ts';
 import type {
   DaemonMismatch,
+  GlobalQueueView,
   NetworkStatus,
   QueueView,
   RepositoryView,
@@ -48,6 +49,8 @@ export interface RunsResult {
   queue: QueueView | null;
   /** The queues of all repositories the panel knows, by repository. */
   queues: ReadonlyMap<string, QueueView>;
+  /** The global queue in the global mode; null in the project mode. */
+  globalQueue: GlobalQueueView | null;
   /** Takes a fresher queue, for example the answer to a change made on the page. */
   setQueue: (queue: QueueView) => void;
   /** The tag catalog. */

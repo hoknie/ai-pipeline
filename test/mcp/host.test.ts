@@ -8,6 +8,7 @@ import type { QueueView } from '../../src/presentation/ipc/contract/index.ts';
 import { run } from '../feature/runs/helpers.ts';
 
 const VIEW: QueueView & { item: string } = {
+  scope: 'project',
   repository: '/repo',
   status: 'stopped',
   parallel: 1,

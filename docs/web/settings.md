@@ -8,8 +8,12 @@ The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults, Claude, OpenCode and Antigravity, and the tab ["MCP servers"](#mcp-servers)), "Delivery", "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system).
-Fields of `web.*`, `runtimes.*`, `network.*`, `attachments.*` and `stats.*` exist only here.
+"General" (runs, working copy, naming), "Agents" (defaults, Claude, OpenCode and Antigravity, and the tab ["MCP servers"](#mcp-servers)), "Delivery", ["Queue"](#queue-group), "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system).
+Fields of `web.*`, `runtimes.*`, `network.*`, `attachments.*`, `queue.*` and `stats.*` exist only here.
+
+### Queue group
+
+The group "Queue" of "Shared" holds the [`queue`](../configuration/README.md#queue) section: "Mode" (`project` or `global`) and "Specialists at once" (`queue.max`, the limit of the machine in the global mode). It is a form with "Save". Changing the mode pauses every queue. In the global mode the group "Queue" of "Project" says that the settings of the project queue do not apply.
 
 ## Project groups
 

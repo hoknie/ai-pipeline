@@ -7,6 +7,7 @@ import {
   validateRuntimesSection,
   validateWebSection,
 } from './validate.ts';
+import { validateQueueSection } from './sections/queue.ts';
 import { validateStatsSection } from './sections/stats.ts';
 import { validateAttachmentsSection } from './sections/attachments.ts';
 import { ConfigLoadError } from '../types/errors.ts';
@@ -27,8 +28,10 @@ import {
   defaultAttachments,
   defaultNetwork,
   defaultRuntimes,
+  defaultQueue,
   defaultStats,
   type NetworkSettings,
+  type QueueSettings,
   type StatsSettings,
   defaultWeb,
   type ResolvedConfig,
@@ -153,5 +156,13 @@ export function loadStatsSettings(paths: ConfigPaths): StatsSettings {
   return loadGlobalSection(paths, 'stats', defaultStats, (value) => {
     const { stats, errors } = validateStatsSection(value);
     return { value: stats, errors };
+  });
+}
+
+/** The queue mode and the machine limit from the global settings.yaml only. */
+export function loadQueueSettings(paths: ConfigPaths): QueueSettings {
+  return loadGlobalSection(paths, 'queue', defaultQueue, (value) => {
+    const { queue, errors } = validateQueueSection(value);
+    return { value: queue, errors };
   });
 }

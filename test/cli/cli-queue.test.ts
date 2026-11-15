@@ -1,11 +1,14 @@
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { describe, expect, it } from 'vitest';
 
-import { MANUAL_CONFIG } from '../daemon/harness.ts';
+import { MANUAL_CONFIG, PIPELINE_CONFIG } from '../daemon/harness.ts';
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 import { waitValue } from '../fixtures/wait-until.ts';
 import { aip, main, sandbox, waitUntil } from './sandbox.ts';
 
@@ -725,5 +728,169 @@ describe('cli attachments', () => {
     const { runId } = JSON.parse(started.stdout).run as { runId: string };
     const shown = await aip(box, 'run', 'show', runId);
     expect(shown.stdout).toContain('Attachments: shot.png (9 B)');
+  });
+
+  it('names the project of a predecessor from another project', async () => {
+    const box = sandbox();
+    const lib = join(dirname(box.repo), 'lib');
+    copyTemplateRepo(lib, PIPELINE_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    await aip(box, 'repo', 'add', lib);
+    const api = JSON.parse(
+      (await aip(box, 'queue', 'add', 'feature', '--task', 'API', '--repo', lib, '--json')).stdout,
+    ) as { item: string };
+    await aip(box, 'queue', 'add', 'feature', '--task', 'клиент', '--after', api.item);
+    const list = await aip(box, 'queue', 'list');
+    expect(list.stdout).toContain(`after lib:${api.item} (waiting)`);
+    const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      items: { after: { repository: string }[] }[];
+    };
+    expect(json.items[0]!.after[0]!.repository).toBe(lib);
+  });
+
+  it('adds a task to two projects one after another with a shared tag', async () => {
+    const box = sandbox();
+    const lib = join(dirname(box.repo), 'lib');
+    copyTemplateRepo(lib, PIPELINE_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    await aip(box, 'repo', 'add', lib);
+    await aip(box, 'repo', 'add', box.repo);
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'Поле email',
+      '--repo',
+      'lib',
+      '--repo',
+      box.repo,
+      '--chain',
+      '--tag-all',
+      'email',
+      '--note',
+      'repo=Форма в Settings.tsx',
+    );
+    expect(added.code).toBe(0);
+    const lines = added.stdout.trim().split('\n');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^lib\s+q\S+\s+#1$/);
+    expect(lines[1]).toMatch(/^repo\s+q\S+\s+#1$/);
+    const queueOf = async (repo: string) =>
+      JSON.parse((await aip(box, 'queue', 'list', '--repo', repo, '--json')).stdout) as {
+        items: {
+          id: string;
+          task: string;
+          tags: { name: string }[];
+          after: { id: string; repository: string }[];
+        }[];
+      };
+    const first = (await queueOf('lib')).items[0]!;
+    const second = (await queueOf(box.repo)).items[0]!;
+    expect(first.after).toEqual([]);
+    expect(second.after.map((dependency) => dependency.id)).toEqual([first.id]);
+    expect(second.after[0]!.repository).toBe(lib);
+    expect(first.tags.map((tag) => tag.name)).toEqual(['email']);
+    expect(second.tags.map((tag) => tag.name)).toEqual(['email']);
+    expect(second.task).toBe('Поле email\n\nФорма в Settings.tsx');
+    const json = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'ещё',
+      '--repo',
+      'lib',
+      '--repo',
+      box.repo,
+      '--json',
+    );
+    expect(JSON.parse(json.stdout)).toHaveLength(2);
+  });
+
+  it('resolves the project of a note by a relative path like --repo', async () => {
+    const box = sandbox();
+    const lib = join(dirname(box.repo), 'lib');
+    copyTemplateRepo(lib, PIPELINE_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    await aip(box, 'repo', 'add', lib);
+    await aip(box, 'repo', 'add', box.repo);
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'Поле',
+      '--repo',
+      '.',
+      '--repo',
+      '../lib',
+      '--note',
+      '../lib=для lib',
+      '--note',
+      '.=для repo',
+    );
+    expect(added.code).toBe(0);
+    const taskOf = async (repo: string) =>
+      (
+        JSON.parse((await aip(box, 'queue', 'list', '--repo', repo, '--json')).stdout) as {
+          items: { task: string }[];
+        }
+      ).items[0]!.task;
+    expect(await taskOf(lib)).toBe('Поле\n\nдля lib');
+    expect(await taskOf(box.repo)).toBe('Поле\n\nдля repo');
+  });
+
+  it('refuses the flags of several projects with one project', async () => {
+    const box = sandbox();
+    for (const flags of [['--chain'], ['--tag-all', 'x'], ['--note', 'repo=x']]) {
+      const result = await aip(box, 'queue', 'add', 'feature', '--task', 'x', ...flags);
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain('--tag-all, --chain and --note need several --repo');
+    }
+    expect((await aip(box, 'queue', 'list', '--json')).stdout).toContain('"items": []');
+  });
+});
+
+describe('aip queue list --all', () => {
+  const gitRepository = (name: string): string => {
+    const repo = join(realpathSync(mkdtempSync(join(tmpdir(), 'aip-cli-all-'))), name);
+    execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+    return repo;
+  };
+
+  it('prints the queue of every enabled project under its heading, or a JSON array', async () => {
+    const box = sandbox();
+    await aip(box, 'queue', 'add', 'feature', '--task', 'работа', '--title', 'API');
+    expect((await aip(box, 'repo', 'edit', box.repo, '--name', 'zeta')).code).toBe(0);
+    const lib = gitRepository('lib');
+    await aip(box, 'repo', 'add', lib);
+    const text = await aip(box, 'queue', 'list', '--all');
+    expect(text.code).toBe(0);
+    expect(text.stdout).toMatch(
+      /lib \(lib\)\nQueue: stopped[\s\S]*\n\nzeta \(.+\)\nQueue: stopped[\s\S]*API/,
+    );
+    expect(text.stdout).toContain('No tasks waiting.');
+    const json = await aip(box, 'queue', 'list', '--all', '--json');
+    expect((JSON.parse(json.stdout) as { repository: string }[]).map((v) => v.repository)).toEqual([
+      lib,
+      box.repo,
+    ]);
+  });
+
+  it('refuses an explicit --repo', async () => {
+    const box = sandbox();
+    const result = await aip(box, 'queue', 'list', '--all', '--repo', 'app');
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('--all cannot be combined with --repo');
+  });
+
+  it('says so when every project is disabled', async () => {
+    const box = sandbox();
+    await aip(box, 'queue', 'list');
+    await aip(box, 'repo', 'edit', box.repo, '--disable');
+    const result = await aip(box, 'queue', 'list', '--all');
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('No enabled projects');
   });
 });

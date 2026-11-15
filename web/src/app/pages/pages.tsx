@@ -3,9 +3,16 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { ObserversView } from '../../shared/api/observerTypes.ts';
-import type { NetworkStatus, QueueView, RepositoryView, RunView } from '../../shared/api/types.ts';
-import type { QueueDraft } from '../../features/queue/index.ts';
-import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
+import type {
+  GlobalQueueView,
+  NetworkStatus,
+  QueueView,
+  RepositoryView,
+  RunView,
+} from '../../shared/api/types.ts';
+import { otherQueues, type QueueDraft } from '../../features/queue/index.ts';
+import { Loading } from './Loading.tsx';
+import { AllQueuesRoute, GlobalQueueRoute, type AllQueues } from './queueModes.tsx';
 import { statsPeriodOf, type Route } from '../../shared/lib/nav/route.ts';
 import { settingsLocationOf } from '../../shared/lib/nav/settingsGroups.ts';
 
@@ -33,20 +40,10 @@ const SettingsPage = lazy(() =>
   import('../../features/settings/index.ts').then((module) => ({ default: module.SettingsPage })),
 );
 
-export function Loading({ what }: { what: string }) {
-  const { t } = useTranslation();
-  return (
-    <div role="status" aria-label={t('app.loading', { what })} className="flex flex-col gap-2 p-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-40" />
-    </div>
-  );
-}
-
 const to = (view: Route['view'], run: string | null, group: string | null = null) =>
   ({ view, run, group, step: null, tab: null }) satisfies Route;
 
-type Common = {
+export type Common = {
   api: Api;
   runs: RunView[];
   route: Route;
@@ -58,12 +55,19 @@ type Common = {
 export function QueueRoute(props: {
   common: Common;
   queue: QueueView | null;
+  /** The global queue in the global mode; the page shows it instead of the queue of a project. */
+  globalQueue: GlobalQueueView | null;
+  /** The projects of the registry. */
+  registry: RepositoryView[];
   now: number;
   drafts: Record<string, QueueDraft>;
   onDraft: (key: string, draft: QueueDraft | null) => void;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
   onNewTask: () => void;
+  onOpenProject: (path: string) => void;
+  /** The mode «All projects»: the queues of every enabled project instead of one. */
+  allProjects?: AllQueues;
   /** What the page of a new task needs; the page is shown on `#queue/new`. */
   newTaskPage: {
     api: Api;
@@ -99,6 +103,8 @@ export function QueueRoute(props: {
       </Suspense>
     );
   }
+  if (props.globalQueue) return <GlobalQueueRoute {...props} globalQueue={props.globalQueue} />;
+  if (props.allProjects) return <AllQueuesRoute {...props} allProjects={props.allProjects} />;
   return (
     <Suspense fallback={<Loading what={t('app.loadingQueue')} />}>
       <QueuePage
@@ -112,6 +118,8 @@ export function QueueRoute(props: {
         onError={props.onError}
         onNewTask={props.onNewTask}
         runs={common.runs}
+        others={otherQueues(page.queues, page.repositories, props.queue?.repository ?? null)}
+        onOpenProject={props.onOpenProject}
       />
     </Suspense>
   );
@@ -182,7 +190,16 @@ export function SettingsRoute(props: {
   );
 }
 
-export function ListRoute({ common }: { common: Common }) {
+/** What the lists of specialists and pipelines need of the mode «All projects»; absent outside it. */
+export type AllProjectsList = { registry: RepositoryView[]; last: string | null };
+
+export function ListRoute({
+  common,
+  allProjects,
+}: {
+  common: Common;
+  allProjects?: AllProjectsList;
+}) {
   const { t } = useTranslation();
   const { route, onRoute } = common;
   if (route.view === 'pipelines')
@@ -196,8 +213,17 @@ export function ListRoute({ common }: { common: Common }) {
           selected={route.run}
           section={route.group}
           variant={route.step}
-          onSelect={(id, section = null, variant = null) =>
-            onRoute({ ...to('pipelines', id, section), step: variant })
+          projects={
+            allProjects
+              ? {
+                  registry: allProjects.registry,
+                  project: route.project ?? null,
+                  last: allProjects.last,
+                }
+              : undefined
+          }
+          onSelect={(id, section = null, variant = null, project = null) =>
+            onRoute({ ...to('pipelines', id, section), step: variant, project })
           }
           onOpenGroup={(target, step) =>
             onRoute({ ...to('runs', target.runId, target.slug), step })
@@ -213,8 +239,17 @@ export function ListRoute({ common }: { common: Common }) {
         api={common.api}
         selected={route.run}
         section={route.group}
-        onSelect={(id, section = null) =>
-          common.onRoute({ ...to('specialists', id), group: section })
+        projects={
+          allProjects
+            ? {
+                registry: allProjects.registry,
+                project: route.project ?? null,
+                last: allProjects.last,
+              }
+            : undefined
+        }
+        onSelect={(id, section = null, project = null) =>
+          common.onRoute({ ...to('specialists', id), group: section, project })
         }
       />
     </Suspense>

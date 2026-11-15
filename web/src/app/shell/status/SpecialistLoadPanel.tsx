@@ -1,16 +1,11 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
-import {
-  loadSections,
-  machineLoad,
-  type LoadEntry,
-  type RepositoryUse,
-} from '../../../shared/lib/pipeline/specialistLoad.ts';
+import { type LoadEntry, type RepositoryUse } from '../../../shared/lib/pipeline/specialistLoad.ts';
 import type { RunView } from '../../../shared/api/types.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { StatusBadge } from '../../../shared/ui/feedback/StatusBadge.tsx';
+import { useLoadSections } from './useLoadSections.ts';
 
 function Entries({
   entries,
@@ -74,15 +69,18 @@ function Repository({ use, onOpen }: { use: RepositoryUse; onOpen: (entry: LoadE
 export function SpecialistLoadPanel({
   runs,
   selected,
+  allProjects = false,
   onOpenGroup,
 }: {
   runs: RunView[];
   /** The repository selected in the panel; its rows come first. */
   selected: string | null;
+  /** The mode «All projects»: ordered by name, none first. */
+  allProjects?: boolean;
   onOpenGroup: (entry: LoadEntry) => void;
 }) {
   const { t } = useTranslation();
-  const sections = useMemo(() => loadSections(machineLoad(runs), selected), [runs, selected]);
+  const sections = useLoadSections(runs, selected, allProjects);
   const idle = sections.running === 0 && sections.waiting === 0;
   const limit = (max: number | null) =>
     max === null ? '' : ` ${t('specialistLoad.limit', { max })}`;

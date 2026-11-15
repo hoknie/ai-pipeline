@@ -5,6 +5,7 @@ import {
   addItem,
   advance,
   dependencyState,
+  lookupIn,
   emptyQueue,
   itemStarted,
   occupiesSlot,
@@ -141,7 +142,7 @@ describe('a run on pause and the queue', () => {
     addItem(queue, { pipeline: 'feature', task: 'D', after: ['a'] }, 'q4', 3);
     pause(queue, a);
     group(a).status = 'failed';
-    expect(dependencyState(queue, 'a', lookupOf(a))).toBe('waiting');
+    expect(dependencyState(lookupIn(queue), 'a', lookupOf(a))).toBe('waiting');
   });
 });
 

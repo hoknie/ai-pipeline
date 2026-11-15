@@ -11,13 +11,17 @@ import { QueueAdvance } from './advance.ts';
 import { QueueControl } from './control.ts';
 import { QueueEdit } from './edit.ts';
 import { QueueItems } from './items.ts';
+import { QueueProjects } from './projects.ts';
+import { QueueScope } from './scope.ts';
 import { QueueStore } from './store.ts';
 import { TaskTags } from './task-tags.ts';
 
 export interface QueueServices {
   store: QueueStore;
+  scope: QueueScope;
   advance: QueueAdvance;
   items: QueueItems;
+  projects: QueueProjects;
   edit: QueueEdit;
   control: QueueControl;
   taskTags: TaskTags;
@@ -39,16 +43,34 @@ export function createQueueServices(dependencies: {
   const queues = new QueueRepository(database);
   const store = new QueueStore({ queues, states: runs.states, now, publish: dependencies.publish });
   const { repair, observe } = dependencies;
+  const scope = new QueueScope({ store, config, runs, now });
   const advance = new QueueAdvance({
-    ...{ store, runs, tags, attachments, config, repair, observe, now },
+    ...{ store, scope, registry, runs, tags, attachments, config, repair, observe, now },
   });
   const taskTags = new TaskTags({ database, store, tags, registry, runs, now });
-  const shared = { store, advance, taskTags, attachments, tags, registry, config, runs, now };
-  const items = new QueueItems(shared);
-  return {
+  const shared = {
+    database,
     store,
     advance,
+    taskTags,
+    attachments,
+    tags,
+    registry,
+    config,
+    runs,
+    now,
+  };
+  const items = new QueueItems(shared);
+  const projects = new QueueProjects({
+    ...{ database, store, queues, advance, taskTags, tags, registry, config, items, now },
+    publish: dependencies.publish,
+  });
+  return {
+    store,
+    scope,
+    advance,
     items,
+    projects,
     edit: new QueueEdit({ ...shared, items }),
     control: new QueueControl(shared),
     taskTags,

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -10,7 +10,17 @@ import {
   type StreamEvent,
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
-import { settle, MANUAL_CONFIG, POLL_MS, PIPELINE_CONFIG, startRun, until } from './harness.ts';
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
+import {
+  settle,
+  CODE_ONLY_CONFIG,
+  type Harness,
+  MANUAL_CONFIG,
+  POLL_MS,
+  PIPELINE_CONFIG,
+  startRun,
+  until,
+} from './harness.ts';
 import {
   start,
   stop,
@@ -378,5 +388,232 @@ describe('dependencies of queue items', () => {
     expect(queuesOf(events).at(-1)?.autoDeliver).toBe(value);
     await stop(h);
     expect(await ended).toBe('closed');
+  });
+});
+
+/** A second project of the daemon: a copy of the template repository with the same config. */
+async function otherProject(h: Harness, config = CODE_ONLY_CONFIG): Promise<string> {
+  const path = join(dirname(h.repo), 'lib');
+  copyTemplateRepo(path, config, { 'lib.ts': 'export const value = 1;\n' });
+  await h.call('repository_add', { path });
+  return path;
+}
+
+const queueIn = async (h: Harness, repository: string): Promise<QueueView> =>
+  (await h.call('queue', { repository })) as QueueView;
+
+const addIn = async (
+  h: Harness,
+  repository: string,
+  title: string,
+  extra: Record<string, unknown> = {},
+) =>
+  (await h.call('queue_add', {
+    repository,
+    pipeline: 'feature',
+    task: 'работа',
+    title,
+    ...extra,
+  })) as QueueView & { item: string };
+
+const waitIn = async (
+  h: Harness,
+  repository: string,
+  done: (queue: QueueView) => boolean,
+): Promise<QueueView> => {
+  let last: QueueView | null = null;
+  await until('the queue', async () => {
+    last = await queueIn(h, repository);
+    return done(last);
+  });
+  return last!;
+};
+
+describe('dependencies between projects', () => {
+  it('starts the client only after the API of another project is delivered by apply', async () => {
+    const h = await start(MANUAL_CONFIG);
+    const lib = await otherProject(h, MANUAL_CONFIG);
+    h.script({ code: [WRITE_LIB, {}] });
+    const api = await addIn(h, lib, 'API');
+    const client = await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    expect(itemById(client, client.item)?.after).toEqual([
+      expect.objectContaining({ kind: 'item', id: api.item, repository: lib }),
+    ]);
+    await h.call('queue_start', { repository: lib });
+    await h.call('queue_start', { repository: h.repo });
+    const started = await waitIn(h, lib, (queue) => queue.runs.length === 1);
+    const runId = started.runs[0]!.id;
+    // the reference of the client follows the item that became a run
+    const waiting = await waitIn(
+      h,
+      h.repo,
+      (queue) => itemById(queue, client.item)?.after[0]?.id === runId,
+    );
+    expect(itemById(waiting, client.item)?.after[0]).toMatchObject({
+      kind: 'run',
+      repository: lib,
+    });
+    await h.waitFor(runId, (view) => view.finished);
+    await settle(h);
+    expect(itemById(await queueIn(h, h.repo), client.item)).toMatchObject({ readiness: 'waiting' });
+    expect((await allRuns(h)).filter((run) => run.repository === h.repo)).toHaveLength(0);
+    await h.call('apply', { runId });
+    await waitIn(h, h.repo, (queue) => queue.items.length === 0);
+    const runs = await allRuns(h);
+    expect(runs.filter((run) => run.repository === h.repo)).toHaveLength(1);
+  });
+
+  it('keeps the queue of the client running when the API of another project failed', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    h.script({ code: [{ noReport: true }, {}] });
+    const api = await addIn(h, lib, 'API');
+    const client = await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    await h.call('queue_start', { repository: lib });
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitIn(h, lib, (queue) => queue.stop !== null);
+    expect(stopped.stop).toMatchObject({ kind: 'problem', reason: 'failed' });
+    const web = await waitIn(
+      h,
+      h.repo,
+      (queue) => itemById(queue, client.item)?.readiness === 'blocked',
+    );
+    expect(web.status).toBe('running');
+    expect(web.stop).toBeNull();
+  });
+
+  it('waits for a task in a disabled project', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    const api = await addIn(h, lib, 'API');
+    await h.call('repository_update', { path: lib, enabled: false });
+    const client = await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    await h.call('queue_start', { repository: h.repo });
+    await settle(h);
+    const web = await queueIn(h, h.repo);
+    expect(itemById(web, client.item)).toMatchObject({ readiness: 'waiting' });
+    expect(await allRuns(h)).toHaveLength(0);
+  });
+
+  it('starts the client after a restart once the API of another project is applied', async () => {
+    const h = await start(MANUAL_CONFIG);
+    const lib = await otherProject(h, MANUAL_CONFIG);
+    const api = await addIn(h, lib, 'API');
+    const client = await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    await h.call('queue_start', { repository: lib });
+    await h.call('queue_start', { repository: h.repo });
+    const [runId] = (await waitIn(h, lib, (queue) => queue.runs.length === 1)).runs.map(
+      (run) => run.id,
+    );
+    await h.waitFor(runId!, (view) => view.finished);
+    await h.restart();
+    expect(itemById(await queueIn(h, h.repo), client.item)).toMatchObject({
+      readiness: 'waiting',
+    });
+    await h.call('apply', { runId: runId! });
+    await waitIn(h, h.repo, (queue) => queue.items.length === 0);
+    expect((await allRuns(h)).filter((run) => run.repository === h.repo)).toHaveLength(1);
+  });
+
+  it('rejects a cycle through two projects and an unknown id, and changes no queue', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    const api = await addIn(h, lib, 'API');
+    const client = await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    const before = [await queueIn(h, lib), await queueIn(h, h.repo)];
+    await expect(
+      h.call('queue_edit', { repository: lib, item: api.item, after: [client.item] }),
+    ).rejects.toThrow(`dependency cycle: ${api.item} → ${client.item} → ${api.item}`);
+    await expect(addIn(h, h.repo, 'X', { after: ['nope'] })).rejects.toThrow(
+      'unknown dependency `nope`',
+    );
+    expect([await queueIn(h, lib), await queueIn(h, h.repo)]).toEqual(before);
+  });
+
+  it('points the dependants at the run, and drops a removed predecessor, in another queue', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    const first = await addIn(h, lib, 'A');
+    const second = await addIn(h, lib, 'B');
+    const client = await addIn(h, h.repo, 'Клиент', { after: [first.item, second.item] });
+    expect(itemById(client, client.item)?.after).toHaveLength(2);
+    await h.call('queue_remove', { repository: lib, item: first.item });
+    const dropped = await queueIn(h, h.repo);
+    expect(itemById(dropped, client.item)?.after.map((dependency) => dependency.id)).toEqual([
+      second.item,
+    ]);
+    await h.call('queue_run_now', { repository: lib, item: second.item });
+    const pointed = await queueIn(h, h.repo);
+    expect(itemById(pointed, client.item)?.after[0]).toMatchObject({
+      kind: 'run',
+      repository: lib,
+    });
+  });
+
+  it('starts the waiting task of a running queue when its last predecessor is removed', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    const api = await addIn(h, lib, 'API');
+    await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    await h.call('queue_start', { repository: h.repo });
+    expect((await allRuns(h)).filter((run) => run.repository === h.repo)).toHaveLength(0);
+    await h.call('queue_remove', { repository: lib, item: api.item });
+    await until('the run of the client', async () =>
+      (await allRuns(h)).some((run) => run.repository === h.repo),
+    );
+  });
+
+  it('gives no tags of a predecessor from another project, on add and on edit', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    await h.call('tag_add', { repository: lib, name: 'auth' });
+    await h.call('tag_add', { repository: h.repo, name: 'auth' });
+    const api = await addIn(h, lib, 'API', { tags: ['auth'] });
+    expect(itemById(api, api.item)?.tags).toHaveLength(1);
+    const added = await addIn(h, h.repo, 'Клиент', { after: [api.item] });
+    expect(itemById(added, added.item)?.tags).toEqual([]);
+    const plain = await addIn(h, h.repo, 'Другая');
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: plain.item,
+      after: [api.item],
+    })) as QueueView;
+    expect(itemById(edited, plain.item)?.tags).toEqual([]);
+    expect(itemById(edited, plain.item)?.after.map((dependency) => dependency.id)).toEqual([
+      api.item,
+    ]);
+  });
+
+  it('queues a task after a run of another project', async () => {
+    const h = await start();
+    const lib = await otherProject(h);
+    h.script({ code: [{ waitFor: h.gate('lib') }] });
+    const created = await startRun(h, { repository: lib, pipeline: 'feature', task: 'API' });
+    const client = await addIn(h, h.repo, 'клиент', { after: [created.runId] });
+    expect(itemById(client, client.item)?.after).toEqual([
+      expect.objectContaining({ kind: 'run', id: created.runId, repository: lib }),
+    ]);
+    h.open('lib');
+  });
+
+  it('lets a specialist queue a task after a task of another project', async () => {
+    const h = await start(WORKER_QUEUE_CONFIG);
+    const lib = await otherProject(h, WORKER_QUEUE_CONFIG);
+    const api = await addIn(h, lib, 'API');
+    h.script({
+      code: [
+        {
+          queueChain: [{ pipeline: 'feature', task: 'клиент', title: 'клиент', after: [api.item] }],
+        },
+      ],
+    });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
+    await h.call('queue_pause', { repository: h.repo });
+    await h.waitFor(created.runId, (view) => view.finished);
+    const queue = await queueIn(h, h.repo);
+    expect(queue.items.map((item) => item.title)).toEqual(['клиент']);
+    expect(queue.items[0]!.after).toEqual([
+      expect.objectContaining({ id: api.item, repository: lib, state: 'waiting' }),
+    ]);
   });
 });

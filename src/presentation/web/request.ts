@@ -130,6 +130,7 @@ function repositoryFree(pathname: string, search: URLSearchParams): boolean {
   return (
     pathname.startsWith('/api/runs') ||
     pathname === '/api/finished-runs' ||
+    pathname === '/api/queue/projects' ||
     pathname.startsWith('/api/processes') ||
     pathname.startsWith('/api/specialist-tags') ||
     pathname === '/api/observers' ||

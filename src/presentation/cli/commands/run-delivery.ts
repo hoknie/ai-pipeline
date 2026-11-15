@@ -1,8 +1,9 @@
-import { formatApply, formatQueue, formatRun } from '../../format/index.ts';
+import { formatApply, formatRun } from '../../format/index.ts';
 import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { ApplyResult, QueueView, RunView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
+import { printQueue } from '../queue-print.ts';
 import type { RunKit } from './run.ts';
 
 export function addPause(kit: RunKit): void {
@@ -24,7 +25,7 @@ export function addPause(kit: RunKit): void {
         runId,
         ...(options.repo !== undefined ? { repository: repositoryArgument(options.repo) } : {}),
       })) as QueueView & { item: string };
-      output(options.json, formatQueue(view, activeStyle), view);
+      await printQueue(options.json, view, context(), activeStyle, output);
     });
 }
 

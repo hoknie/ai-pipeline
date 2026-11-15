@@ -68,7 +68,6 @@ describe('tokens of a run', () => {
     onFilters: () => undefined,
     onSelect: () => undefined,
     scope: 'repository' as const,
-    onScope: () => undefined,
     repository: null,
   };
 

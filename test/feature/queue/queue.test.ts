@@ -13,6 +13,7 @@ import {
   dismissRun,
   autopilotAnswers,
   dependencyState,
+  lookupIn,
   dependencyTags,
   editItem,
   emptyQueue,
@@ -287,7 +288,7 @@ describe('problems', () => {
     expect(runDone(state)).toBe(true);
     expect(occupiesSlot(state)).toBe(false);
     expect(
-      dependencyState(queueOf('A'), state.run.id, (id) =>
+      dependencyState(lookupIn(queueOf('A')), state.run.id, (id) =>
         id === state.run.id ? state : undefined,
       ),
     ).toBe('done');
@@ -802,20 +803,20 @@ describe('dependencies', () => {
     step(asked);
     finish(asked, 'needs_human', { feedback: 'q' });
     const lookup = lookupOf(applied, notApplied, failed, working, asked);
-    expect(dependencyState(queue, 'r1', lookup)).toBe('done');
-    expect(dependencyState(queue, 'r2', lookup)).toBe('waiting');
-    expect(dependencyState(queue, 'r3', lookup)).toBe('blocked');
-    expect(dependencyState(queue, 'r4', lookup)).toBe('waiting');
-    expect(dependencyState(queue, 'r5', lookup)).toBe('waiting');
-    expect(dependencyState(queue, 'gone', lookup)).toBe('blocked');
+    expect(dependencyState(lookupIn(queue), 'r1', lookup)).toBe('done');
+    expect(dependencyState(lookupIn(queue), 'r2', lookup)).toBe('waiting');
+    expect(dependencyState(lookupIn(queue), 'r3', lookup)).toBe('blocked');
+    expect(dependencyState(lookupIn(queue), 'r4', lookup)).toBe('waiting');
+    expect(dependencyState(lookupIn(queue), 'r5', lookup)).toBe('waiting');
+    expect(dependencyState(lookupIn(queue), 'gone', lookup)).toBe('blocked');
   });
 
   it('does not call a finished run without groups done', () => {
     const queue = queueOf('A');
     const state = mergedRun('r1', true);
-    expect(dependencyState(queue, 'r1', lookupOf(state))).toBe('done');
+    expect(dependencyState(lookupIn(queue), 'r1', lookupOf(state))).toBe('done');
     state.groups = [];
-    expect(dependencyState(queue, 'r1', lookupOf(state))).toBe('waiting');
+    expect(dependencyState(lookupIn(queue), 'r1', lookupOf(state))).toBe('waiting');
   });
 
   it('treats a cycle in stored data as waiting', () => {
@@ -823,8 +824,8 @@ describe('dependencies', () => {
     queue.items[0]!.after = ['q2'];
     queue.items[1]!.after = ['q1'];
     const [a, b] = queue.items as [QueueItem, QueueItem];
-    expect(itemReadiness(queue, a, none)).toBe('waiting');
-    expect(itemReadiness(queue, b, none)).toBe('waiting');
+    expect(itemReadiness(lookupIn(queue), a, none)).toBe('waiting');
+    expect(itemReadiness(lookupIn(queue), b, none)).toBe('waiting');
     startQueue(queue, [], 3);
     expect(advance(queue, [], none, 4).take.map((item) => item.id)).toEqual(['q3']);
   });
@@ -835,11 +836,11 @@ describe('dependencies', () => {
     withAfter(queue, 'q3', ['q2']);
     withAfter(queue, 'q1', ['r1']);
     const [a, b, c] = queue.items as [QueueItem, QueueItem, QueueItem];
-    expect(itemReadiness(queue, a, lookupOf(mergedRun('r1', true)))).toBe('ready');
-    expect(itemReadiness(queue, a, lookupOf(mergedRun('r1', false)))).toBe('waiting');
-    expect(itemReadiness(queue, b, lookupOf(mergedRun('r1', true)))).toBe('waiting');
-    expect(itemReadiness(queue, c, lookupOf(failedRun('r1')))).toBe('blocked');
-    expect(itemReadiness(queue, b, none)).toBe('blocked');
+    expect(itemReadiness(lookupIn(queue), a, lookupOf(mergedRun('r1', true)))).toBe('ready');
+    expect(itemReadiness(lookupIn(queue), a, lookupOf(mergedRun('r1', false)))).toBe('waiting');
+    expect(itemReadiness(lookupIn(queue), b, lookupOf(mergedRun('r1', true)))).toBe('waiting');
+    expect(itemReadiness(lookupIn(queue), c, lookupOf(failedRun('r1')))).toBe('blocked');
+    expect(itemReadiness(lookupIn(queue), b, none)).toBe('blocked');
   });
 
   it('lets a ready item overtake a waiting one', () => {
@@ -1066,7 +1067,7 @@ describe('skip failed', () => {
     const lookup = lookupOf(state);
     const take = advance(queue, [state], lookup, 5).take;
     expect(take.map((item) => item.id)).toEqual(['q3']);
-    expect(itemReadiness(queue, queue.items[0]!, lookup)).toBe('blocked');
+    expect(itemReadiness(lookupIn(queue), queue.items[0]!, lookup)).toBe('blocked');
     expect(queue.status).toBe('running');
   });
 
@@ -1427,8 +1428,8 @@ describe('postponed items', () => {
     addItem(queue, { pipeline: 'feature', task: 'B', after: ['q1'] }, 'q2', 3);
     editItem(queue, 'q1', { postponed: true }, 4);
     startQueue(queue, [], 5);
-    expect(itemReadiness(queue, queue.items[0]!, none)).toBe('ready');
-    expect(itemReadiness(queue, queue.items[1]!, none)).toBe('waiting');
+    expect(itemReadiness(lookupIn(queue), queue.items[0]!, none)).toBe('ready');
+    expect(itemReadiness(lookupIn(queue), queue.items[1]!, none)).toBe('waiting');
     expect(advance(queue, [], none, 6).take).toEqual([]);
   });
 
@@ -1438,7 +1439,7 @@ describe('postponed items', () => {
     editItem(queue, 'q1', { postponed: true }, 4);
     startQueue(queue, [], 5);
     const failed = failedRun('r1');
-    expect(itemReadiness(queue, queue.items[0]!, lookupOf(failed))).toBe('blocked');
+    expect(itemReadiness(lookupIn(queue), queue.items[0]!, lookupOf(failed))).toBe('blocked');
     expect(advance(queue, [failed], lookupOf(failed), 6).take).toEqual([]);
   });
 
@@ -1636,12 +1637,12 @@ describe('dismiss of a skipped run', () => {
     const queue = skippedQueue(state);
     withAfter(queue, 'q2', ['a']);
     const waiting = queue.items.find((item) => item.id === 'q2')!;
-    expect(itemReadiness(queue, waiting, lookupOf(state))).toBe('blocked');
+    expect(itemReadiness(lookupIn(queue), waiting, lookupOf(state))).toBe('blocked');
     dismissRun(queue, state, 9);
     advance(queue, [state], lookupOf(state), 10);
     expect(queue.skipped).toEqual([]);
     const after = queue.items.find((item) => item.id === 'q2')!;
-    expect(itemReadiness(queue, after, lookupOf(state))).toBe('blocked');
+    expect(itemReadiness(lookupIn(queue), after, lookupOf(state))).toBe('blocked');
   });
 });
 

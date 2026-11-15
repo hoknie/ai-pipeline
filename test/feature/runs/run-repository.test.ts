@@ -55,7 +55,7 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7 - (7 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8 - (7 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -323,7 +323,7 @@ describe('refused tool calls', () => {
     // As a database written before the column existed.
     renameBack(store.database.connection);
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; ALTER TABLE runs DROP COLUMN repair_json; DROP TABLE observers; PRAGMA user_version = 3',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN denials_json; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; ALTER TABLE runs DROP COLUMN repair_json; DROP TABLE observers; DROP TABLE IF EXISTS global_queue; PRAGMA user_version = 3',
     );
     store.database.close();
     const reopened = openStorage(databasePath(directory));
@@ -333,7 +333,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-31)).toContain('denials_json');
+    expect(MIGRATIONS.at(-32)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -351,13 +351,13 @@ describe('refused tool calls', () => {
     // As a database written before the column existed.
     renameBack(store.database.connection);
     store.database.exec(
-      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; ALTER TABLE runs DROP COLUMN repair_json; DROP TABLE observers; PRAGMA user_version = 4',
+      'DROP TABLE tags; ALTER TABLE runs DROP COLUMN tags_json; ALTER TABLE groups DROP COLUMN human_only; ALTER TABLE groups DROP COLUMN questions_json; DROP TABLE repositories; DROP TABLE queue_items; DROP TABLE queues; ALTER TABLE runs DROP COLUMN queue_item; ALTER TABLE runs DROP COLUMN from_queue; ALTER TABLE attempts DROP COLUMN outside_changes_json; ALTER TABLE runs DROP COLUMN skipped_steps_json; ALTER TABLE runs DROP COLUMN number; ALTER TABLE runs DROP COLUMN hold; ALTER TABLE runs DROP COLUMN repair_json; DROP TABLE observers; DROP TABLE IF EXISTS global_queue; PRAGMA user_version = 4',
     );
     store.database.close();
     const reopened = openStorage(databasePath(directory));
     expect(reopened.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-30)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-31)).toContain('outside_changes_json');
   });
 });
 

@@ -8,9 +8,9 @@ import { tabRoute } from './tabRoute.ts';
 
 /** The properties of the navigation strip: tabs, counters and the repository menu. */
 export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavProps {
-  const { route, setRoute, scope, chrome } = panel;
+  const { route, setRoute, allProjects, chrome } = panel;
   const { runs, selected, queue } = panel.state;
-  const { working, waiting } = navRunCounts(runsOf(runs, scope === 'repository' ? selected : null));
+  const { working, waiting } = navRunCounts(runsOf(runs, allProjects ? null : selected));
   return {
     view: route.view,
     hrefFor: (view: View) => formatRoute(tabRoute(view, route, panel.lastRun.current)),
@@ -21,6 +21,8 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
       repositories: panel.state.repositories,
       paths: panel.repositoryPaths,
       selected,
+      allProjects,
+      onAllProjects: () => void actions.selectAllProjects(),
       waiting: panel.waitingRepositories,
       onSelect: (path) => void actions.selectRepository(path),
       onAdd: actions.addRepository,
@@ -28,7 +30,9 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
     },
     working,
     waiting,
-    queued: queue?.items.length ?? 0,
+    queued:
+      panel.state.globalQueue?.items.length ??
+      (allProjects ? queuedInProjects(panel) : (queue?.items.length ?? 0)),
     onPalette: () => chrome.setPalette(true),
     // on the page of a new task the button moves the focus to its form instead of opening the dialog
     onNewTask: queue
@@ -41,3 +45,13 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
 }
 
 type RepositoryActions = ReturnType<typeof useRepositoryActions>;
+
+/** The tasks waiting in the queues of every enabled project. */
+function queuedInProjects(panel: PanelData): number {
+  const enabled = new Set(panel.state.repositories);
+  let sum = 0;
+  for (const [repository, view] of panel.state.queues) {
+    if (enabled.has(repository)) sum += view.items.length;
+  }
+  return sum;
+}

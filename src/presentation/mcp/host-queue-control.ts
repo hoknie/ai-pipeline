@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { formatQueue, formatRunCreated } from '../format/index.ts';
 import { repositoryArgument } from '../ipc/client/index.ts';
-import type { QueueView, RunCreated } from '../ipc/contract/index.ts';
+import type { GlobalQueueView, QueueView, RunCreated } from '../ipc/contract/index.ts';
 import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
 
@@ -126,7 +126,7 @@ export function registerQueueReturn(kit: HostKit): void {
         const view = (await options.send('queue_return', {
           runId: run_id,
           ...(where !== undefined ? { repository: repositoryArgument(where, options.cwd) } : {}),
-        })) as QueueView & { item: string };
+        })) as (QueueView | GlobalQueueView) & { item: string };
         return withData(`Returned ${run_id} as item ${view.item}.\n${formatQueue(view)}`, view);
       }),
   );
@@ -153,7 +153,7 @@ export function registerRunPause(kit: HostKit): void {
         const view = (await options.send('run_pause', {
           runId: run_id,
           ...(where !== undefined ? { repository: repositoryArgument(where, options.cwd) } : {}),
-        })) as QueueView & { item: string };
+        })) as (QueueView | GlobalQueueView) & { item: string };
         return withData(`Paused ${run_id} as item ${view.item}.\n${formatQueue(view)}`, view);
       }),
   );
@@ -180,7 +180,7 @@ export function registerQueueDismiss(kit: HostKit): void {
         const view = (await options.send('queue_dismiss', {
           runId: run_id,
           ...(where !== undefined ? { repository: repositoryArgument(where, options.cwd) } : {}),
-        })) as QueueView;
+        })) as QueueView | GlobalQueueView;
         return withData(`Dismissed ${run_id}.\n${formatQueue(view)}`, view);
       }),
   );

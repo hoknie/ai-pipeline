@@ -172,8 +172,15 @@ describe('queueView dependencies', () => {
     const view = queueView(queue, (id) => (id === working.run.id ? working : undefined));
     expect(view.items.map((item) => item.readiness)).toEqual(['ready', 'waiting', 'ready']);
     expect(view.items[1]!.after).toEqual([
-      { kind: 'item', id: 'q1', number: 1, title: 'API', state: 'waiting' },
-      { kind: 'run', id: 'run00000000a', number: 1, title: 'задача 1', state: 'waiting' },
+      { kind: 'item', id: 'q1', number: 1, title: 'API', state: 'waiting', repository: '/repo' },
+      {
+        kind: 'run',
+        id: 'run00000000a',
+        number: 1,
+        title: 'задача 1',
+        state: 'waiting',
+        repository: '/repo',
+      },
     ]);
     expect(view.items[2]!.after).toEqual([]);
     const lost = queueView(queue, () => undefined);

@@ -864,7 +864,7 @@ describe('runs section columns', () => {
     expect(within(filters).getByRole('searchbox', { name: 'Search runs' })).toBeTruthy();
     expect(within(filters).getByRole('combobox', { name: 'State' })).toBeTruthy();
     expect(within(filters).getByRole('combobox', { name: 'Specialists' })).toBeTruthy();
-    expect(within(filters).getByRole('radio', { name: 'This repository' })).toBeTruthy();
+    expect(within(filters).queryByRole('radio')).toBeNull();
     expect(within(filters).queryByText('Первый')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
     expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('320px');

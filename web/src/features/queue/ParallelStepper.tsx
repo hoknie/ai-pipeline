@@ -74,7 +74,10 @@ export function ParallelStepper({
   onText,
   onQueue,
   onError,
+  id = 'queue-parallel',
 }: {
+  /** The id of the field; one per queue on the page. */
+  id?: string;
   api: Api;
   queue: QueueView;
   /** What is typed in the field; null while it is not edited. */
@@ -98,7 +101,7 @@ export function ParallelStepper({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Label htmlFor="queue-parallel">{t('queue.parallel')}</Label>
+        <Label htmlFor={id}>{t('queue.parallel')}</Label>
         <Button
           type="button"
           variant="outline"
@@ -110,7 +113,7 @@ export function ParallelStepper({
           <Minus aria-hidden />
         </Button>
         <Input
-          id="queue-parallel"
+          id={id}
           type="text"
           inputMode="numeric"
           className="w-16 text-center"

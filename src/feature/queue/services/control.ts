@@ -22,7 +22,6 @@ import {
   deferRun,
   dismissRun,
   occupiesSlot,
-  itemStarted,
   pauseQueue,
   pauseRun,
   problemKeys,
@@ -61,15 +60,23 @@ export class QueueControl {
     this.dependencies = dependencies;
   }
 
-  /** The queue of the repository that holds `path`. */
+  /**
+   * The queue of the repository that holds `path`; in the global mode a line of the global queue,
+   * whatever the path is.
+   */
   async queueOf(path: string): Promise<Queue> {
-    return this.dependencies.store.of(await this.dependencies.registry.rootOf(path));
+    const root = await this.dependencies.registry.rootOf(path);
+    return this.dependencies.store.lines.line(root);
+  }
+
+  private isGlobal(): boolean {
+    return this.dependencies.store.scope() === 'global';
   }
 
   async start(params: { repository: string; parallel?: number | undefined }): Promise<Queue> {
     const { store, advance, registry, now } = this.dependencies;
     const queue = await this.queueOf(params.repository);
-    registry.requireEnabled(queue.repository);
+    if (!this.isGlobal()) registry.requireEnabled(queue.repository);
     if (params.parallel !== undefined) setParallel(queue, params.parallel, now());
     startQueue(queue, this.statesOf(queue), now());
     store.save(queue);
@@ -89,19 +96,54 @@ export class QueueControl {
     const { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer } = params;
     const onLimit = params.onLimit as OnLimit | undefined;
     const enablesAutopilot = autopilot === true && !queue.autopilot;
-    const filter = this.resolveFilter(queue.repository, params.filter);
+    const global = this.isGlobal()
+      ? await this.resolveGlobalFilter(queue, params.filter)
+      : undefined;
+    const filter = global ? global.patch : this.resolveFilter(queue.repository, params.filter);
     setQueueSettings(
       queue,
       { parallel, autopilot, autoAnswer, skipFailed, autopilotAnswer, onLimit, filter },
       now(),
     );
-    const enabled = this.dependencies.registry.entry(queue.repository)?.enabled !== false;
+    // The projects of the filter are stored only after every check of the request has passed.
+    if (global?.projects) this.dependencies.store.globalQueue().filter.projects = global.projects;
+    const enabled =
+      this.isGlobal() || this.dependencies.registry.entry(queue.repository)?.enabled !== false;
     if (enablesAutopilot && enabled && queue.status === 'stopped' && queue.stop === null) {
       startQueue(queue, this.statesOf(queue), now());
     }
     store.save(queue);
     await advance.advance(queue.repository);
     return queue;
+  }
+
+  /**
+   * The filter of the global queue: pipeline ids are taken as they are, projects are resolved to
+   * their paths and stored at once (only a stopped queue changes its filter); a filter by tags is
+   * refused. Returns the part the shared rules of a queue handle.
+   */
+  private async resolveGlobalFilter(
+    queue: Queue,
+    filter: QueueSettingsRequest['filter'],
+  ): Promise<{ patch: QueueSettingsPatch['filter']; projects?: string[] } | undefined> {
+    if (filter === undefined) return undefined;
+    if (filter.tags !== undefined && filter.tags.length > 0) {
+      throw rejected('the global queue has no filter by tags');
+    }
+    let projects: string[] | undefined;
+    if (filter.projects !== undefined) {
+      if (queue.status === 'running') {
+        throw rejected('queue filter can be changed only while the queue is stopped');
+      }
+      const resolved = await Promise.all(
+        filter.projects.map((project) => this.dependencies.registry.resolve(project)),
+      );
+      projects = [...new Set(resolved)];
+    }
+    return {
+      patch: { pipelines: filter.pipelines ?? queue.filter.pipelines },
+      projects,
+    };
   }
 
   /** Checks the pipelines against the configuration and turns tag names into ids. */
@@ -129,9 +171,9 @@ export class QueueControl {
   async runNow(params: { repository: string; item: string }): Promise<RunCreated> {
     const { store, advance, runs, registry, now } = this.dependencies;
     const queue = await this.queueOf(params.repository);
-    registry.requireEnabled(queue.repository);
     const item = queue.items.find((candidate) => candidate.id === params.item);
     if (!item) throw rejected('unknown queue item');
+    registry.requireEnabled(store.lines.repositoryOf(queue, item));
     if (item.run !== null) {
       const target = runs.states.lookup(item.run);
       if (!target) throw rejected(`unknown run \`${item.run}\``);
@@ -145,7 +187,9 @@ export class QueueControl {
     }
     const created = await advance.createRun(queue, item);
     await advance.claimPlace(queue, created.runId);
-    itemStarted(queue, item.id, created.runId, now());
+    for (const other of store.itemStarted(queue, item.id, created.runId)) {
+      advance.request(other.repository);
+    }
     store.save(queue);
     return created;
   }
@@ -153,7 +197,7 @@ export class QueueControl {
   /** `queue_return`: the run goes back to the queue as its first item. */
   returnRun(params: RunRef): Promise<QueueChange> {
     return this.withQueue(params, (queue, state, id, moment) => {
-      this.dependencies.registry.requireEnabled(queue.repository);
+      this.dependencies.registry.requireEnabled(state.run.repository);
       return returnRun(queue, state, id, moment);
     });
   }
@@ -204,7 +248,7 @@ export class QueueControl {
         ? { specialists: currentSpecialists(config, state) }
         : { permissions: currentPermissions(config, state) };
     // A rejected retry leaves the hold in place; the hold is released only after it succeeds.
-    const queue = store.of(state.run.repository);
+    const queue = store.lines.line(state.run.repository);
     const moment = now();
     const itemId = queueItemId(moment, randomInt(36 ** 3));
     if (params.by === 'observer') {
@@ -263,7 +307,7 @@ export class QueueControl {
         const root = await registry.rootOf(params.repository);
         if (root !== state.run.repository) throw rejected('run belongs to another repository');
       }
-      const queue = store.of(state.run.repository);
+      const queue = store.lines.line(state.run.repository);
       const moment = now();
       const item = await change(queue, state, queueItemId(moment, randomInt(36 ** 3)), moment);
       store.save(queue);

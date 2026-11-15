@@ -371,13 +371,18 @@ describe('repository selector', () => {
 });
 
 describe('run list scope', () => {
+  const chooseAll = async () => {
+    fireEvent.keyDown(trigger(), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'All projects' }));
+  };
+
   const mixed = () => [
     runView({ id: 'a1', repository: APP, title: 'app one' }),
     runView({ id: 'a2', repository: APP, title: 'app two' }),
     runView({ id: 'l2', repository: LIB, title: 'lib waits', state: 'needs_human', waiting: 1 }),
   ];
 
-  it('lists only the selected repository by default and all of them on request', async () => {
+  it('lists only the selected repository by default and all of them in the mode «All projects»', async () => {
     window.location.hash = '#runs';
     const { api } = twoRepositories();
     const first = render(<App api={api} openStream={openFake} />);
@@ -389,7 +394,10 @@ describe('run list scope', () => {
     const runsLink = screen.getByRole('link', { name: /Runs/ });
     expect(within(runsLink).getAllByLabelText('running: 2').length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole('radio', { name: 'All repositories' }));
+    await chooseAll();
+    await waitFor(() =>
+      expect(trigger().getAttribute('aria-label')).toBe('Repository: All projects'),
+    );
     expect(await screen.findByText('lib waits')).toBeTruthy();
     expect(screen.getAllByTitle(APP).length).toBeGreaterThan(0);
     expect(screen.getAllByTitle(LIB).length).toBeGreaterThan(0);
@@ -460,7 +468,8 @@ describe('repository registry in the panel', () => {
     await ready(api);
     fireEvent.keyDown(trigger(), { key: 'Enter' });
     const items = await screen.findAllByRole('menuitemradio');
-    expect(items).toHaveLength(2);
+    // «All projects» and the two projects
+    expect(items).toHaveLength(3);
     for (const item of items) {
       expect(within(item).queryByRole('button', { name: 'Remove from list' })).toBeNull();
     }

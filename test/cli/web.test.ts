@@ -10,7 +10,7 @@ import {
 import { request as httpRequest } from 'node:http';
 import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -35,6 +35,7 @@ import type {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { MANUAL_CONFIG, harness, startRun, until, type Harness } from '../daemon/harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 import { waitValue } from '../fixtures/wait-until.ts';
 
 let h: Harness | null = null;
@@ -653,6 +654,30 @@ describe('aip web', () => {
     expect(
       (await post('/api/queue/items', { pipeline: 'feature', task: 'x', tags: ['nope'] })).status,
     ).toBe(400);
+  });
+
+  it('adds a task to several projects through the queue API without a repository', async () => {
+    const { h, web, base } = await setup();
+    const lib = join(dirname(h.repo), 'lib');
+    copyTemplateRepo(lib, MANUAL_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    await h.call('repository_add', { path: lib });
+    await h.call('repository_add', { path: h.repo });
+    const response = await fetch(`${base}/api/queue/projects`, {
+      method: 'POST',
+      headers: authed(web, JSON_TYPE),
+      body: JSON.stringify({ pipeline: 'feature', task: 'x', repositories: [h.repo, lib] }),
+    });
+    const text = await response.text();
+    expect(response.status, text).toBe(200);
+    const added = JSON.parse(text) as { repository: string; item: string }[];
+    expect(added.map((entry) => entry.repository)).toEqual([h.repo, lib]);
+    for (const [repository, entry] of [
+      [h.repo, added[0]!],
+      [lib, added[1]!],
+    ] as const) {
+      const queue = (await h.call('queue', { repository })) as QueueView;
+      expect(queue.items.map((item) => item.id)).toEqual([entry.item]);
+    }
   });
 
   it('rejects an unknown parent of a queued task with 400', async () => {

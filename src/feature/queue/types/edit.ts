@@ -10,7 +10,7 @@ import {
   DELIVERY_MODES,
   DEFAULT_VARIANT,
 } from '../../swarm-config/types/index.ts';
-import { checkDependencies } from './dependencies.ts';
+import { type ItemLookup, checkDependencies, lookupIn } from './dependencies.ts';
 import { type ItemFields, type Queue, type QueueItem, findItem } from './items.ts';
 
 function cleanTitle(title: string | null | undefined): string | null {
@@ -63,9 +63,15 @@ function cleanDeliveryMode(mode: DeliveryMode | null | undefined): DeliveryMode 
   return mode;
 }
 
-export function addItem(queue: Queue, fields: ItemFields, id: string, now: number): QueueItem {
+export function addItem(
+  queue: Queue,
+  fields: ItemFields,
+  id: string,
+  now: number,
+  find: ItemLookup = lookupIn(queue),
+): QueueItem {
   const after = [...new Set(fields.after ?? [])];
-  checkDependencies(queue, id, after);
+  checkDependencies(find, id, after);
   const item: QueueItem = {
     id,
     number: queue.nextNumber,
@@ -113,7 +119,13 @@ export function checkReturnedPatch(patch: ItemPatch, skipInRun = false): void {
   }
 }
 
-export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number): QueueItem {
+export function editItem(
+  queue: Queue,
+  id: string,
+  patch: ItemPatch,
+  now: number,
+  find: ItemLookup = lookupIn(queue),
+): QueueItem {
   const item = findItem(queue, id);
   if (item.run !== null) checkReturnedPatch(patch);
   if (patch.task !== undefined && patch.groups !== undefined) {
@@ -127,7 +139,7 @@ export function editItem(queue: Queue, id: string, patch: ItemPatch, now: number
   const title = patch.title === undefined ? undefined : cleanTitle(patch.title);
   if (patch.position !== undefined) checkPosition(queue, patch.position);
   const after = patch.after === undefined ? undefined : [...new Set(patch.after)];
-  if (after !== undefined) checkDependencies(queue, id, after);
+  if (after !== undefined) checkDependencies(find, id, after);
   const deliveryMode = cleanDeliveryMode(patch.deliveryMode);
   if (pipeline !== null) item.pipeline = pipeline;
   if (patch.variant !== undefined) item.variant = patch.variant;
@@ -152,7 +164,8 @@ export function removeItem(
   id: string,
   now: number,
   lookup?: (id: string) => RunState | undefined,
-): void {
+  all: readonly Queue[] = [],
+): Queue[] {
   const item = findItem(queue, id);
   if (item.run !== null) {
     const state = lookup?.(item.run);
@@ -163,6 +176,48 @@ export function removeItem(
   queue.items = queue.items.filter((candidate) => candidate !== item);
   for (const other of queue.items) other.after = other.after.filter((ref) => ref !== id);
   queue.updatedAt = now;
+  return dropRef(queue, all, id, now);
+}
+
+/** Removes `id` from `after` of the items of the other queues; returns the queues that changed. */
+export function dropRef(queue: Queue, all: readonly Queue[], id: string, now: number): Queue[] {
+  return rewriteRefs(queue, all, now, (refs) => refs.filter((ref) => ref !== id), id);
+}
+
+/** Replaces `id` with `run` in `after` of the items of the other queues; returns those that changed. */
+export function replaceRef(
+  queue: Queue,
+  all: readonly Queue[],
+  id: string,
+  run: string,
+  now: number,
+): Queue[] {
+  return rewriteRefs(
+    queue,
+    all,
+    now,
+    (refs) => [...new Set(refs.map((ref) => (ref === id ? run : ref)))],
+    id,
+  );
+}
+
+function rewriteRefs(
+  queue: Queue,
+  all: readonly Queue[],
+  now: number,
+  rewrite: (refs: string[]) => string[],
+  id: string,
+): Queue[] {
+  const changed: Queue[] = [];
+  for (const other of all) {
+    if (other === queue || !other.items.some((item) => item.after.includes(id))) continue;
+    for (const item of other.items) {
+      if (item.after.includes(id)) item.after = rewrite(item.after);
+    }
+    other.updatedAt = now;
+    changed.push(other);
+  }
+  return changed;
 }
 
 export function checkPosition(queue: Queue, position: number): void {
@@ -183,7 +238,14 @@ export function moveItem(queue: Queue, id: string, position: number, now: number
   queue.updatedAt = now;
 }
 
-export function itemStarted(queue: Queue, id: string, run: string, now: number): void {
+/** The item becomes a run; returns the other queues whose items waited for it. */
+export function itemStarted(
+  queue: Queue,
+  id: string,
+  run: string,
+  now: number,
+  all: readonly Queue[] = [],
+): Queue[] {
   const item = findItem(queue, id);
   queue.items = queue.items.filter((candidate) => candidate !== item);
   for (const other of queue.items) {
@@ -191,6 +253,7 @@ export function itemStarted(queue: Queue, id: string, run: string, now: number):
   }
   if (!queue.runs.includes(run)) queue.runs.push(run);
   queue.updatedAt = now;
+  return replaceRef(queue, all, id, run, now);
 }
 
 export function itemFailed(queue: Queue, id: string, error: string, now: number): void {

@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { usePreference } from '../../../shared/lib/browser/preferences.ts';
 import { FiltersButton } from '../../../shared/ui/layout/FiltersButton.tsx';
-import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
+import type { ConfigEditorResponse, EditorSpecialist } from '../../../shared/api/types.ts';
+import { projectCounts, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
 import { EMPTY_FILTER, activeFilterCount, applyFilter } from '../specialistFilters.ts';
 import { SpecialistFilters } from '../SpecialistFilters.tsx';
 import { useSpecialistFilter } from './useSpecialistFilter.ts';
@@ -13,8 +14,9 @@ export function useSpecialistSearch(view: ConfigEditorResponse | null, columns: 
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = usePreference<boolean>('specialistFiltersCollapsed', false);
   const [search, setSearch] = useState('');
+  const rows: (EditorSpecialist & { project?: ProjectRef | null })[] = view?.specialists ?? [];
   const { filter, setFilter, options } = useSpecialistFilter(
-    view?.specialists ?? [],
+    rows,
     view?.repository ?? null,
     view !== null,
   );
@@ -25,6 +27,7 @@ export function useSpecialistSearch(view: ConfigEditorResponse | null, columns: 
       search={search}
       onFilter={setFilter}
       onSearch={setSearch}
+      projectCounts={projectCounts(applyFilter(rows, { ...filter, projects: [] }, search))}
     />
   ) : null;
   const count = activeFilterCount(filter, search);
@@ -50,7 +53,7 @@ export function useSpecialistSearch(view: ConfigEditorResponse | null, columns: 
           {panel}
         </FiltersButton>
       ) : null,
-    shown: applyFilter(view?.specialists ?? [], filter, search),
+    shown: applyFilter(rows, filter, search),
     count,
     reset: () => {
       setFilter(EMPTY_FILTER);

@@ -337,6 +337,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
 
 export function queueOf(overrides: Partial<QueueView> = {}): QueueView {
   return {
+    scope: 'project',
     repository: '/repo',
     status: 'stopped',
     parallel: 1,
@@ -514,8 +515,9 @@ export function dependency(
   id: string,
   title: string,
   state: 'done' | 'waiting' | 'blocked' = 'waiting',
+  repository: string | null = null,
 ) {
-  return { kind, id, number: null, title, state };
+  return { kind, id, number: null, title, state, repository };
 }
 
 type SettingSpec = [
@@ -582,6 +584,8 @@ const SETTING_SPECS: SettingSpec[] = [
   ['attachments.s3.endpoint', 'string', null, { globalOnly: true }],
   ['attachments.s3.prefix', 'string', 'aip/attachments/', { globalOnly: true }],
   ['attachments.s3.path_style', 'boolean', false, { globalOnly: true }],
+  ['queue.scope', 'choice', 'project', { options: ['project', 'global'], globalOnly: true }],
+  ['queue.max', 'integer', 5, { range: [1, 32], globalOnly: true }],
   ['stats.enabled', 'boolean', true, { globalOnly: true }],
   ['stats.show_cost', 'boolean', true, { globalOnly: true }],
   ['stats.exclude', 'strings', [], { globalOnly: true }],
@@ -868,6 +872,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     setRunTags: vi.fn(async () => runView()),
     queue: vi.fn(async () => queueOf()),
     queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
+    queueAddProjects: vi.fn(async () => []),
     queueEdit: vi.fn(async () => queueOf()),
     queueRemove: vi.fn(async () => queueOf()),
     queueRunNow: vi.fn(async () => ({

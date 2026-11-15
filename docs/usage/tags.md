@@ -62,9 +62,19 @@ aip queue edit <item> --parent 115       # replace the linked task tags of the t
 - A task that returns a run keeps its own task and takes no `parent`.
 - `parent` does not make the task wait for the parent: use [`after`](queue.md#dependencies) for that.
 
+## Shared tag of a task in several projects
+
+`aip queue add --repo <a> --repo <b> --tag-all <name>` (see [one task in several projects](queue.md#one-task-in-several-projects)) puts an ordinary tag named `<name>` on the task of every project.
+
+- A tag of that name (case does not matter) is reused in a catalog that has it; the other catalogs get a new one.
+- The new tags have one color: that of the existing tag in the first project that has it, otherwise the next palette color of the first project's catalog.
+- A name that belongs to a [linked task tag](#linked-task-tags) in any of the projects is refused, and nothing changes.
+- The tags are not linked to each other: renaming one in a catalog does not touch the others. In the web panel, the "Tags" filter of the "All projects" mode finds the tasks of all projects by the name.
+
 ## Tags of tasks with `after`
 
 - A task with `after` also gets the tags of its predecessors (queue items or runs), after its own tags.
 - When `aip queue edit --after` adds a predecessor, its tags are added to the task even if `--tag` is passed.
+- A predecessor from another project gives no tags: the tag catalogs are per project.
 - A tag added later to a predecessor is appended to the waiting tasks that depend on it directly or through a chain.
 - Removing a tag, removing a link and runs that already exist do not change other tags.

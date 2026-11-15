@@ -52,7 +52,6 @@ export function RunList({
   onFilters,
   onSelect,
   scope,
-  onScope,
   repository,
   repositoryPaths,
   showFilters = true,
@@ -70,7 +69,6 @@ export function RunList({
   onSelect: (runId: string, group: string | null) => void;
   /** Whose runs the list shows: those of the selected repository or of every one. */
   scope: RunScope;
-  onScope: (scope: RunScope) => void;
   /** The selected repository; null until known. */
   repository: string | null;
   /** The path of each repository as shown; absent: the path itself. */
@@ -93,7 +91,7 @@ export function RunList({
     <div className="flex flex-col gap-2">
       {showFilters ? (
         <RunFilters
-          {...{ runs, query, onQuery, scope, onScope, repository, repositoryPaths }}
+          {...{ runs, query, onQuery, scope, repository, repositoryPaths }}
           filters={filterState}
           onFilters={onFilters}
         />

@@ -90,7 +90,7 @@ export function pauseQueue(queue: Queue, now: number): void {
 }
 
 /** When a queue stopped by a usage limit starts by itself; null when it does not. */
-export function queueWakeAt(queue: Queue): number | null {
+export function queueWakeAt(queue: Pick<Queue, 'status' | 'stop'>): number | null {
   return queue.status === 'stopped' && queue.stop?.kind === 'limit' && queue.stop.autoResume
     ? queue.stop.resetsAt
     : null;

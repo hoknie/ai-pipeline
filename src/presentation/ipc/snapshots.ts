@@ -1,8 +1,9 @@
 import type { Group, RunState } from '../../feature/runs/types/index.ts';
 import type { Queue } from '../../feature/queue/types/index.ts';
-import { returnItemOf, canReturn } from '../../feature/queue/types/index.ts';
+import { GLOBAL_KEY, returnItemOf, canReturn } from '../../feature/queue/types/index.ts';
 import { retryableGroups } from '../../feature/runs/types/index.ts';
 import type {
+  GlobalQueueView,
   GroupView,
   ObserversView,
   QueueView,
@@ -11,6 +12,7 @@ import type {
 } from './contract/index.ts';
 import type { DaemonServices } from './services.ts';
 import {
+  globalQueueView,
   groupView,
   observersView,
   queueView,
@@ -63,11 +65,40 @@ export class Snapshots {
       delivery.names,
       delivery.variantNames,
       (item) => this.services.attachments.listOf(item),
+      this.services.queue.store.findItem,
     );
+  }
+
+  /** The global queue as clients see it; its tasks are those of every project. */
+  globalQueue(): GlobalQueueView {
+    const { config, tags, runs, queue } = this.services;
+    const line = queue.store.lines.line(GLOBAL_KEY);
+    const delivery = (repository: string) => config.delivery(repository);
+    const settings = config.queueSettings();
+    return globalQueueView(queue.store.globalQueue(), line, {
+      lookup: (id) => runs.states.lookup(id),
+      waits: runs.engine.waitOf,
+      attachments: (item) => this.services.attachments.listOf(item),
+      find: queue.store.findItem,
+      max: typeof settings === 'string' ? 5 : settings.max,
+      ownerOf: (item) => queue.store.lines.repositoryOf(line, item),
+      project: (repository) => ({
+        names: delivery(repository).names,
+        variantNames: delivery(repository).variantNames,
+        catalog: tags.of(repository),
+      }),
+    });
+  }
+
+  /** The answer of a queue request: the queue of the project, or the global queue in its mode. */
+  queueAnswer(queue: Queue): QueueView | GlobalQueueView {
+    return this.services.queue.store.scope() === 'global' ? this.globalQueue() : this.queue(queue);
   }
 
   /** The queues a new subscriber needs: those with items, places, a stop or running. */
   activeQueues(): QueueView[] {
+    // In the global mode the queues of the projects are not shown: the global queue is.
+    if (this.services.queue.store.scope() === 'global') return [];
     return this.services.queue.store
       .all()
       .filter(

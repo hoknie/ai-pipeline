@@ -33,7 +33,13 @@ const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 const ui = { id: 'tu', repository: LIB, name: 'ui', color: 'red' as const, task: null };
 
 function mount(
-  options: { runs?: RunView[]; noSnapshot?: boolean; lateLib?: boolean; tags?: boolean } = {},
+  options: {
+    runs?: RunView[];
+    noSnapshot?: boolean;
+    lateLib?: boolean;
+    tags?: boolean;
+    libIds?: string[];
+  } = {},
 ) {
   const appQueue = queueOf({ repository: APP, items: [queueItem('qa', 'app task', 1)] });
   let asked = 0;
@@ -46,7 +52,10 @@ function mount(
     runs: vi.fn(async () => []),
     pipelines: vi.fn(async (repository?: string) =>
       repository === LIB
-        ? pipelinesView({ repository: LIB, pipelines: [pipelineOf({ id: 'docs' })] })
+        ? pipelinesView({
+            repository: LIB,
+            pipelines: (options.libIds ?? ['docs']).map((id) => pipelineOf({ id })),
+          })
         : pipelinesView({ repository: APP }),
     ),
     queueAdd: vi.fn(async () => ({
@@ -325,5 +334,46 @@ describe('ways to the page', () => {
     fireEvent.click(strip().getByRole('button', { name: 'New task' }));
     await waitFor(() => expect(document.activeElement).toBe(field));
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('page of a new task in several projects', () => {
+  it('adds one task to two projects, in the order chosen, and leads to the queue', async () => {
+    const { api } = mount({ libIds: ['feature'] });
+    const field = await ready();
+    fireEvent.click(screen.getByRole('switch', { name: 'In several projects' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'lib' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move lib up' }));
+    fireEvent.change(await textField(), { target: { value: 'Email' } });
+    expect(screen.queryByRole('radio', { name: 'Groups' })).toBeNull();
+    const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
+    await waitFor(() => expect(add.disabled).toBe(false));
+    fireEvent.click(add);
+    await waitFor(() => expect(api.queueAddProjects).toHaveBeenCalledTimes(1));
+    expect(api.queueAddProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ repositories: [LIB, APP], task: 'Email' }),
+    );
+    expect(api.queueAdd).not.toHaveBeenCalled();
+    await waitFor(() => expect(window.location.hash).toBe('#queue'));
+    expect(field).toBeTruthy();
+  });
+
+  it('keeps the mode and the typed text when the task is added and the form goes on', async () => {
+    const { api } = mount({ libIds: ['feature'] });
+    await ready();
+    fireEvent.click(screen.getByRole('switch', { name: 'In several projects' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'lib' }));
+    fireEvent.change(await textField(), { target: { value: 'One' } });
+    const next = screen.getByRole<HTMLButtonElement>('button', { name: 'Add and continue' });
+    await waitFor(() => expect(next.disabled).toBe(false));
+    fireEvent.click(next);
+    await waitFor(() => expect(api.queueAddProjects).toHaveBeenCalled());
+    await waitFor(() =>
+      expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(''),
+    );
+    expect(window.location.hash).toBe('#queue/new');
+    expect(
+      screen.getByRole('switch', { name: 'In several projects' }).getAttribute('aria-checked'),
+    ).toBe('true');
   });
 });

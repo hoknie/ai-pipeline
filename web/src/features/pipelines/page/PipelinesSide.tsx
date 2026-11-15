@@ -13,6 +13,8 @@ import {
   actionsOf,
   type ActionEntry,
 } from '../../../shared/lib/pipeline/pipelineEntries.ts';
+import { rowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import {
   LEVEL_KEYS,
   NEW_ID,
@@ -33,18 +35,52 @@ import type { PipelineFilterState } from './usePipelineFilterState.ts';
 type Go = (id: string | null, section?: 'actions' | 'system' | null) => Promise<void>;
 type Section = 'actions' | 'system' | null;
 
+function ProjectLabel({ project }: { project: ProjectRef | null | undefined }) {
+  if (!project) return null;
+  return (
+    <span
+      data-project-label={project.slug}
+      className="flex items-center gap-1 text-xs text-muted-foreground"
+    >
+      <ProjectDot color={project.color} />
+      {project.label}
+    </span>
+  );
+}
+
 const levelTag = (t: TFunction) => (level: 'project' | 'global' | 'project_over_global') =>
   t(`settings.editor.levels.${LEVEL_KEYS[level]}`);
+
+/** The hint for a filter that leaves no pipeline, and the button that clears it. */
+function NothingFound({ filters }: { filters: PipelineFilterState }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
+      <p>{t('pipelines.filters.nothing')}</p>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          filters.setFilter(EMPTY_PIPELINE_FILTER);
+          filters.setSearch('');
+        }}
+      >
+        {t('pipelines.filters.reset')}
+      </Button>
+    </div>
+  );
+}
 
 function PipelineList(props: {
   view: ConfigEditorResponse | null;
   filters: PipelineFilterState;
-  shown: ConfigEditorResponse['pipelines'];
+  shown: (ConfigEditorResponse['pipelines'][number] & { project?: ProjectRef | null })[];
   count: number;
   filtersControl: boolean;
   wide: boolean;
   selected: string | null;
   go: Go;
+  onNew: () => void;
   onImport: () => void;
 }) {
   const { t } = useTranslation();
@@ -52,7 +88,7 @@ function PipelineList(props: {
   return (
     <>
       <div className="flex gap-2">
-        <Button className="flex-1" onClick={() => void go(NEW_ID)}>
+        <Button className="flex-1" onClick={props.onNew}>
           <Plus />
           {t('pipelines.new')}
         </Button>
@@ -70,32 +106,19 @@ function PipelineList(props: {
           <FiltersPanel filters={filters} />
         </FiltersButton>
       ) : null}
-      {view && shown.length === 0 && count > 0 ? (
-        <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
-          <p>{t('pipelines.filters.nothing')}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              filters.setFilter(EMPTY_PIPELINE_FILTER);
-              filters.setSearch('');
-            }}
-          >
-            {t('pipelines.filters.reset')}
-          </Button>
-        </div>
-      ) : null}
+      {view && shown.length === 0 && count > 0 ? <NothingFound filters={filters} /> : null}
       <EntryList
         label="pipeline"
         selected={props.selected}
         onSelect={(id) => void go(id)}
         entries={shown.map((entry) => ({
-          id: entry.id,
+          id: rowKey(entry.project?.slug, entry.id),
           title: rawName(entry.raw) ?? entry.id,
           hint: entry.id,
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
           extra: (
             <>
+              <ProjectLabel project={entry.project} />
               <VariantBadges id={entry.id} raw={entry.raw} />
               {tagsOfSpecialist(entry).length > 0 ? (
                 <span data-testid={`tags-${entry.id}`} className="flex flex-wrap gap-1">
@@ -119,15 +142,16 @@ function PipelineList(props: {
 
 function ActionList(props: {
   view: ConfigEditorResponse | null;
-  actions: ActionEntry[];
+  actions: (ActionEntry & { project?: ProjectRef | null })[];
   selected: string | null;
   go: Go;
+  onNew: () => void;
 }) {
   const { t } = useTranslation();
   const { go } = props;
   return (
     <>
-      <Button variant="outline" disabled={!props.view} onClick={() => void go(NEW_ID, 'actions')}>
+      <Button variant="outline" disabled={!props.view} onClick={props.onNew}>
         <Plus />
         {t('pipeline.actions.new')}
       </Button>
@@ -136,12 +160,13 @@ function ActionList(props: {
         selected={props.selected}
         onSelect={(id) => void go(id, 'actions')}
         entries={props.actions.map((entry) => ({
-          id: entry.id,
+          id: rowKey(entry.project?.slug, entry.id),
           title:
             typeof entry.raw.name === 'string' && entry.raw.name !== '' ? entry.raw.name : entry.id,
           hint: entry.id,
           tag: levelTag(t)(entry.level),
           subtitle: entry.id,
+          extra: <ProjectLabel project={entry.project} />,
         }))}
       />
     </>
@@ -157,12 +182,13 @@ export function PipelinesSide(props: {
   filtersControl: boolean;
   wide: boolean;
   go: Go;
+  onNew: () => void;
   onImport: () => void;
 }) {
   const { t } = useTranslation();
   const { section, selected, go, filters } = props;
   const { view, failure, stages } = props.data;
-  const actions = view ? actionsOf(view) : [];
+  const actions: (ActionEntry & { project?: ProjectRef | null })[] = view ? actionsOf(view) : [];
   const shown = applyPipelineFilter(view?.pipelines ?? [], filters.filter, filters.search);
   const count = activePipelineFilterCount(filters.filter, filters.search);
   return (
@@ -173,7 +199,7 @@ export function PipelinesSide(props: {
         <PipelineList {...props} view={view} shown={shown} count={count} />
       ) : null}
       {section === 'actions' ? (
-        <ActionList view={view} actions={actions} selected={selected} go={go} />
+        <ActionList view={view} actions={actions} selected={selected} go={go} onNew={props.onNew} />
       ) : null}
       {section === 'system' ? (
         <EntryList

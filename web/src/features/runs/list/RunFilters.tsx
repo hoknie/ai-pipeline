@@ -2,12 +2,11 @@ import { useTranslation } from 'react-i18next';
 
 import type { RunView } from '../../../shared/api/types.ts';
 import { Input } from '../../../shared/ui/forms/input.tsx';
-import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
 import { FilterField, type FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { useFilterOptions } from './filterOptions.tsx';
 import type { RunFilterKey, RunFilterState, RunScope } from './runFilter.ts';
 
-/** Search, repository switch and the multiselect filters of the run list. */
+/** Search and the multiselect filters of the run list. */
 export function RunFilters({
   runs,
   query,
@@ -15,7 +14,6 @@ export function RunFilters({
   filters,
   onFilters,
   scope,
-  onScope,
   repository,
   repositoryPaths,
 }: {
@@ -26,7 +24,6 @@ export function RunFilters({
   onFilters: (filters: RunFilterState) => void;
   /** Whose runs the list shows: those of the selected repository or of every one. */
   scope: RunScope;
-  onScope: (scope: RunScope) => void;
   /** The selected repository; null until known. */
   repository: string | null;
   /** The path of each repository as shown; absent: the path itself. */
@@ -55,16 +52,6 @@ export function RunFilters({
         value={query}
         onChange={(event) => onQuery(event.target.value)}
       />
-      <ToggleGroup
-        type="single"
-        aria-label={t('runs.list.scope')}
-        value={scope}
-        className="flex-wrap"
-        onValueChange={(value) => value && onScope(value as RunScope)}
-      >
-        <ToggleGroupItem value="repository">{t('runs.list.scopeRepository')}</ToggleGroupItem>
-        <ToggleGroupItem value="all">{t('runs.list.scopeAll')}</ToggleGroupItem>
-      </ToggleGroup>
       {fields.map(([label, key, list]) => (
         <FilterField
           key={key}

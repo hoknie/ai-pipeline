@@ -15,7 +15,7 @@ import type {
 } from '../../../../feature/runs/types/index.ts';
 import type { ActionPoint, DeliveryMode } from '../../../../feature/swarm-config/types/index.ts';
 import type { AttachmentView } from './attachments.ts';
-import type { QueueView } from './queue.ts';
+import type { GlobalQueueView, QueueView } from './queue.ts';
 import type { TagView } from './tags.ts';
 
 export interface FileStat {
@@ -245,7 +245,7 @@ export interface RunQueued {
   /** Number given to the task. */
   number: number;
   run: RunCreated | null;
-  queue: QueueView;
+  queue: QueueView | GlobalQueueView;
 }
 
 export type {

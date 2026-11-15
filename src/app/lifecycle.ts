@@ -29,6 +29,8 @@ export function createLifecycle(services: DaemonServices, database: Database): L
       await runs.engine.serial(async () => {
         const recovered = runs.states.recover();
         queue.store.load();
+        // The mode of the settings may have changed while the daemon was stopped.
+        queue.scope.sync();
         tags.load();
         registry.load();
         await attachments.sweep({

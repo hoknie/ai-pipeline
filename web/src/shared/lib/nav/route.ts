@@ -19,6 +19,8 @@ export interface Route {
   step: string | null;
   /** Tab of the group screen; null for the default log tab. */
   tab: string | null;
+  /** Slug of the project of an entry of the specialists or pipelines tab (`?project=`); null: a shared one. */
+  project?: string | null;
 }
 
 /** Groups of the shared tab whose third address part opens an entry (a slug, an id or `new`). */
@@ -63,6 +65,13 @@ const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : 
 
 /** `#runs/<run>/<group>/<step>`, the older `#topology/<pipeline>` opens the topology section; the older `#<run>/<group>` still works. */
 export function parseRoute(hash: string): Route {
+  const route = parseBase(hash);
+  if (route.view !== 'specialists' && route.view !== 'pipelines') return route;
+  const project = new URLSearchParams(hash.split('?', 2)[1] ?? '').get('project') || null;
+  return project === null ? route : { ...route, project };
+}
+
+function parseBase(hash: string): Route {
   const [path = '', query = ''] = hash.split('?', 2) as [string, string?];
   const params = new URLSearchParams(query);
   const tab = params.get('tab') || null;
@@ -126,6 +135,12 @@ export function parseRoute(hash: string): Route {
 }
 
 export function formatRoute(route: Route): string {
+  const base = formatBase(route);
+  if (!route.project || (route.view !== 'specialists' && route.view !== 'pipelines')) return base;
+  return `${base}${base.includes('?') ? '&' : '?'}project=${encodeURIComponent(route.project)}`;
+}
+
+function formatBase(route: Route): string {
   const enc = encodeURIComponent;
   if (route.view === 'queue') return route.run === 'new' ? '#queue/new' : '#queue';
   if (route.view === 'stats') {

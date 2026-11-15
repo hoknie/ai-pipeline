@@ -112,7 +112,7 @@ export class RunStates {
   }
 
   /** The run a queue item became, or null. */
-  runOfQueueItem(repository: string, item: string): RunState | null {
+  runOfQueueItem(repository: string | null, item: string): RunState | null {
     return this.dependencies.runs.runOfQueueItem(repository, item);
   }
 

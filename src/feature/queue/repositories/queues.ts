@@ -2,7 +2,14 @@ import { DELIVERY_MODES } from '../../swarm-config/types/index.ts';
 import { ON_LIMIT_MODES } from '../../runs/types/index.ts';
 import type { Database, Row } from '../../../platform/sqlite/index.ts';
 import { json, nullable, parse, text } from '../../../platform/sqlite/index.ts';
-import type { Queue, QueueFilter, QueueItem } from '../types/index.ts';
+import { QUEUE_SCOPES } from '../../swarm-config/types/index.ts';
+import {
+  emptyGlobalQueue,
+  type GlobalQueue,
+  type Queue,
+  type QueueFilter,
+  type QueueItem,
+} from '../types/index.ts';
 
 export class QueueRepository {
   private readonly database: Database;
@@ -61,7 +68,12 @@ export class QueueRepository {
   }
 
   saveQueue(queue: Queue): void {
-    this.database.transaction(() => {
+    this.database.transaction(() => this.saveQueueStored(queue));
+  }
+
+  /** The queue and its items; no transaction of its own: a scenario that writes several opens it. */
+  saveQueueStored(queue: Queue): void {
+    {
       this.database
         .prepare(
           `INSERT INTO queues (repository, status, parallel, runs_json, acknowledged_json, stop_json, updated_at, autopilot, skip_failed, skipped_json, autopilot_answer, on_limit, next_number, priority_json, auto_answer, filter_json)
@@ -88,8 +100,8 @@ export class QueueRepository {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number, variant)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number, variant, global_position)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       queue.items.forEach((item, position) =>
         insert.run(
@@ -111,9 +123,60 @@ export class QueueRepository {
           item.postponed ? 1 : 0,
           item.number,
           item.variant,
+          item.globalPosition ?? null,
         ),
       );
-    });
+    }
+  }
+
+  /** The global queue: its row always exists after the migration. */
+  loadGlobal(now: number): GlobalQueue {
+    const row = this.database.prepare('SELECT * FROM global_queue WHERE id = 1').get() as
+      Row | undefined;
+    if (!row) return emptyGlobalQueue(now);
+    const filter = hydrateGlobalFilter(row.filter_json);
+    return {
+      status: String(row.status) === 'running' ? 'running' : 'stopped',
+      parallel: Number(row.parallel),
+      autopilot: Number(row.autopilot ?? 0) === 1,
+      autoAnswer: Number(row.auto_answer ?? 0) === 1,
+      skipFailed: Number(row.skip_failed ?? 0) === 1,
+      autopilotAnswer: text(row.autopilot_answer ?? null),
+      onLimit: ON_LIMIT_MODES.find((mode) => mode === row.on_limit) ?? 'wait',
+      filter,
+      runs: parse(row.runs_json ?? null),
+      priority: parse(row.priority_json ?? null),
+      acknowledged: parse(row.acknowledged_json ?? null),
+      skipped: parse(row.skipped_json ?? null),
+      stop: nullable(row.stop_json ?? null),
+      appliedScope: QUEUE_SCOPES.find((scope) => scope === row.applied_scope) ?? 'project',
+      updatedAt: Number(row.updated_at),
+    };
+  }
+
+  saveGlobal(queue: GlobalQueue): void {
+    this.database
+      .prepare(
+        `UPDATE global_queue SET status = ?, parallel = ?, autopilot = ?, auto_answer = ?, skip_failed = ?, autopilot_answer = ?, on_limit = ?, filter_json = ?, runs_json = ?, priority_json = ?, acknowledged_json = ?, skipped_json = ?, stop_json = ?, applied_scope = ?, updated_at = ?
+         WHERE id = 1`,
+      )
+      .run(
+        queue.status,
+        queue.parallel,
+        queue.autopilot ? 1 : 0,
+        queue.autoAnswer ? 1 : 0,
+        queue.skipFailed ? 1 : 0,
+        queue.autopilotAnswer,
+        queue.onLimit,
+        JSON.stringify(queue.filter),
+        JSON.stringify(queue.runs),
+        JSON.stringify(queue.priority),
+        JSON.stringify(queue.acknowledged),
+        JSON.stringify(queue.skipped),
+        json(queue.stop),
+        queue.appliedScope,
+        queue.updatedAt,
+      );
   }
 
   private hydrateQueue(row: Row): Queue {
@@ -161,6 +224,18 @@ function hydrateFilter(value: unknown): QueueFilter {
   return { pipelines: strings(filter.pipelines), tags: strings(filter.tags) };
 }
 
+function hydrateGlobalFilter(value: unknown): GlobalQueue['filter'] {
+  let parsed: unknown = null;
+  try {
+    parsed = typeof value === 'string' ? JSON.parse(value) : null;
+  } catch {
+    parsed = null;
+  }
+  const filter =
+    typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  return { pipelines: strings(filter.pipelines), projects: strings(filter.projects) };
+}
+
 function hydrateItem(item: Row): QueueItem {
   return {
     id: String(item.id),
@@ -182,5 +257,8 @@ function hydrateItem(item: Row): QueueItem {
     createdAt: Number(item.created_at),
     error: text(item.error ?? null),
     run: text(item.run_id ?? null),
+    ...(item.global_position === null || item.global_position === undefined
+      ? {}
+      : { globalPosition: Number(item.global_position) }),
   };
 }

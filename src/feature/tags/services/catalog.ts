@@ -8,6 +8,7 @@ import {
   addTag,
   editTag,
   tagId,
+  tagNamed,
   tagsOfRepository,
   type Tag,
   type TagTask,
@@ -73,6 +74,16 @@ export class TagCatalogService {
     this.dependencies.tags.saveTag(tag);
     this.catalog = [...this.catalog, tag];
     return tag;
+  }
+
+  /**
+   * The tag of the catalog with the name (case does not matter), or a new one of `color`.
+   * Tells nobody: the caller publishes the catalog when `created`.
+   */
+  ensureNamed(repository: string, name: string, color: string): { tag: Tag; created: boolean } {
+    const found = tagNamed(this.of(repository), name);
+    if (found) return { tag: found, created: false };
+    return { tag: this.create({ repository, name, color }), created: true };
   }
 
   /** `tag_add`: returns the root of the repository whose catalog changed. */

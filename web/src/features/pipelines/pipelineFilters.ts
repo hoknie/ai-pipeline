@@ -2,20 +2,36 @@ import { matchesLevel, type LevelFilter } from '../specialists/index.ts';
 import { existingSelection, filterSpecialists, repositoryTags } from '../specialists/index.ts';
 import { nameOf } from '../../shared/lib/catalog/specialists.ts';
 import type { EditorPipeline } from '../../shared/api/types.ts';
+import {
+  inProjects,
+  projectOptions,
+  type ProjectOption,
+  type ProjectRef,
+} from '../../shared/lib/catalog/projectRows.ts';
 
 /** What the pipelines list is narrowed by; the search text lives apart from it. */
 export interface PipelineFilter {
   level: LevelFilter;
   tags: string[];
   specialists: string[];
+  /** Slugs of projects, or the value of the shared ones; only in the mode «All projects». */
+  projects: string[];
 }
 
-export const EMPTY_PIPELINE_FILTER: PipelineFilter = { level: 'all', tags: [], specialists: [] };
+export const EMPTY_PIPELINE_FILTER: PipelineFilter = {
+  level: 'all',
+  tags: [],
+  specialists: [],
+  projects: [],
+};
 
-type Entry = Pick<EditorPipeline, 'id' | 'level' | 'raw' | 'shared_tags' | 'own_tags'>;
+type Entry = Pick<EditorPipeline, 'id' | 'level' | 'raw' | 'shared_tags' | 'own_tags'> & {
+  project?: ProjectRef | null;
+};
 
 export interface PipelineFilterOptions {
   tags: { name: string; shared: boolean }[];
+  projects: ProjectOption[];
   /** The slug is the value of a choice, the name its label. */
   specialists: { value: string; label: string }[];
 }
@@ -46,7 +62,7 @@ export function pipelineFilterOptions(
   const specialists = [...new Set(entries.flatMap(specialistsOfPipeline))]
     .map((value) => ({ value, label: nameOf(names, value) }))
     .sort((a, b) => a.label.localeCompare(b.label, 'en') || a.value.localeCompare(b.value, 'en'));
-  return { tags: repositoryTags(entries), specialists };
+  return { tags: repositoryTags(entries), projects: projectOptions(entries), specialists };
 }
 
 /** Whether the text is part of the id or the name; case and edge spaces do not matter. */
@@ -67,6 +83,7 @@ export function applyPipelineFilter<T extends Entry>(
     if (!matchesPipelineSearch(entry, search) || !matchesLevel(filter.level, entry.level)) {
       return false;
     }
+    if (!inProjects(entry, filter.projects)) return false;
     if (filter.specialists.length === 0) return true;
     const own = specialistsOfPipeline(entry);
     return filter.specialists.some((name) => own.includes(name));
@@ -81,6 +98,9 @@ export function existingPipelineFilter(
   return {
     ...filter,
     tags: existingSelection(filter.tags, options.tags),
+    projects: filter.projects.filter((value) =>
+      options.projects.some((option) => option.value === value),
+    ),
     specialists: filter.specialists.filter((slug) =>
       options.specialists.some((item) => item.value === slug),
     ),
@@ -93,6 +113,7 @@ export function activePipelineFilterCount(filter: PipelineFilter, search = ''): 
     (search.trim() === '' ? 0 : 1) +
     (filter.level === 'all' ? 0 : 1) +
     (filter.tags.length > 0 ? 1 : 0) +
+    (filter.projects.length > 0 ? 1 : 0) +
     (filter.specialists.length > 0 ? 1 : 0)
   );
 }
@@ -108,5 +129,6 @@ export function savedPipelineFilter(saved: unknown): PipelineFilter {
     level: level === 'project' || level === 'global' ? level : 'all',
     tags: strings(value.tags),
     specialists: strings(value.specialists),
+    projects: strings(value.projects),
   };
 }

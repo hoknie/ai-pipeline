@@ -6,6 +6,7 @@ import {
   retryableGroups,
 } from '../../runs/types/index.ts';
 import type { Queue, QueueItem } from './items.ts';
+import { GLOBAL_KEY } from './global/queue.ts';
 import { problemKeys } from './limit-hits.ts';
 
 /** The queue item that takes `state` back: retries it, or only lifts its hold. */
@@ -212,7 +213,7 @@ export function adoptRun(
   claim?: { states: Iterable<RunState>; itemId: string },
 ): { frozen: string | null } | null {
   const id = state.run.id;
-  if (state.run.repository !== queue.repository) return null;
+  if (queue.repository !== GLOBAL_KEY && state.run.repository !== queue.repository) return null;
   if (queue.runs.includes(id)) return null;
   if (!occupiesSlot(state)) return null;
   queue.items = queue.items.filter((item) => item.run !== id);

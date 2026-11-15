@@ -4,7 +4,8 @@ import {
   retryableGroups,
   runProblems,
 } from '../../runs/types/index.ts';
-import { itemReadiness } from './dependencies.ts';
+import { type ItemLookup, itemReadiness, lookupIn } from './dependencies.ts';
+import { replaceRef } from './edit.ts';
 import { type Queue, type QueueItem, QUEUE_SKIPPED_MAX, newItemId, queueStates } from './items.ts';
 import { BLOCKING_REASONS, SKIPPED_REASONS, STOPPING_REASONS, limitHits } from './limit-hits.ts';
 import { matchesFilter } from './filter.ts';
@@ -103,7 +104,13 @@ function stopOnProblem(queue: Queue, watched: readonly RunState[]): void {
 }
 
 /** The items of finished returned runs are no longer needed: what waited for them waits for the run. */
-function dropFinishedReturns(queue: Queue, lookup: (id: string) => RunState | undefined): void {
+function dropFinishedReturns(
+  queue: Queue,
+  lookup: (id: string) => RunState | undefined,
+  all: readonly Queue[],
+  now: number,
+  touched: Set<Queue>,
+): void {
   for (const item of [...queue.items]) {
     if (item.run === null) continue;
     const state = lookup(item.run);
@@ -119,6 +126,7 @@ function dropFinishedReturns(queue: Queue, lookup: (id: string) => RunState | un
           ...new Set(other.after.map((ref) => (ref === item.id ? item.run : ref))),
         ].filter((ref): ref is string => ref !== null);
       }
+      for (const other of replaceRef(queue, all, item.id, item.run, now)) touched.add(other);
     }
   }
 }
@@ -149,6 +157,7 @@ function takeFrozen(queue: Queue, lookup: (id: string) => RunState | undefined):
 function takeReturned(
   queue: Queue,
   own: readonly RunState[],
+  find: ItemLookup,
   lookup: (id: string) => RunState | undefined,
   now: number,
   result: { take: QueueItem[]; freeze: string[] },
@@ -160,7 +169,7 @@ function takeReturned(
     if (queue.skipFailed && item.error !== null) continue;
     const state = lookup(item.run);
     if (!state || state.run.hold !== null || retryableGroups(state).length === 0) continue;
-    if (itemReadiness(queue, item, lookup) !== 'ready') continue;
+    if (itemReadiness(find, item, lookup) !== 'ready') continue;
     const frozen = claimPlace(queue, live(), item.run, newItemId(queue, now), now, reserved);
     if (frozen !== null) result.freeze.push(frozen);
     result.take.push(item);
@@ -170,6 +179,7 @@ function takeReturned(
 /** The ready items that fit into the free places. */
 function takeReady(
   queue: Queue,
+  find: ItemLookup,
   lookup: (id: string) => RunState | undefined,
   take: readonly QueueItem[],
   frozenTaken: number,
@@ -183,7 +193,7 @@ function takeReady(
         matchesFilter(queue.filter, item) &&
         !(item.run !== null && lookup(item.run)?.run.hold === 'paused') &&
         !(queue.skipFailed && item.error !== null) &&
-        itemReadiness(queue, item, lookup) === 'ready',
+        itemReadiness(find, item, lookup) === 'ready',
     )
     .slice(0, free);
 }
@@ -197,25 +207,33 @@ export function advance(
   states: Iterable<RunState>,
   lookup: (id: string) => RunState | undefined,
   now: number,
-): { take: QueueItem[]; freeze: string[] } {
+  all: readonly Queue[] = [],
+): { take: QueueItem[]; freeze: string[]; touched: Queue[] } {
+  const queues = all.includes(queue) ? all : [queue, ...all];
+  const find = lookupIn(...queues);
+  const touched = new Set<Queue>();
   let own = queueStates(queue, states);
   const wake = queueWakeAt(queue);
   if (wake !== null && now >= wake) startQueue(queue, own, now);
   if (queue.skipFailed) own = skipFailedRuns(queue, own);
   const free = Math.max(0, queue.parallel - own.filter(occupiesSlot).length);
   const revived = returnSkippedRuns(queue, lookup, now, free);
-  const result = { take: [] as QueueItem[], freeze: revived.frozen.map((state) => state.run.id) };
+  const result = {
+    take: [] as QueueItem[],
+    freeze: revived.frozen.map((state) => state.run.id),
+    touched: [] as Queue[],
+  };
   own = [...own, ...revived.returned];
   const watched = own.filter((state) => state.run.hold === null);
   stopOnLimit(queue, watched);
   stopOnProblem(queue, watched);
-  dropFinishedReturns(queue, lookup);
+  dropFinishedReturns(queue, lookup, queues, now, touched);
   releasePlaces(queue, own);
   result.take = takeFrozen(queue, lookup);
   const frozenTaken = result.take.length;
   if (queue.status === 'running') {
-    takeReturned(queue, own, lookup, now, result, frozenTaken);
-    result.take.push(...takeReady(queue, lookup, result.take, frozenTaken));
+    takeReturned(queue, own, find, lookup, now, result, frozenTaken);
+    result.take.push(...takeReady(queue, find, lookup, result.take, frozenTaken));
     if (
       !queue.autopilot &&
       !queue.items.some((item) => !item.postponed && matchesFilter(queue.filter, item)) &&
@@ -226,5 +244,6 @@ export function advance(
   }
   queue.priority = queue.priority.filter((id) => queue.runs.includes(id));
   queue.updatedAt = now;
+  result.touched = [...touched];
   return result;
 }

@@ -84,3 +84,12 @@ A system stage (task split, commit message, delivery conflict resolution, delive
 The screen is view only: "Edit in Settings" opens the "Delivery" group of [Settings](settings.md), on the "Project" tab when the project sets a field of the stage, else on the "Shared" tab. The split has no settings of its own: it is set in the pipeline.
 
 The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`; `#pipelines/actions/<id>` and `#pipelines/system/<kind>` open the other tabs.
+
+## All projects
+
+With "All projects" chosen in the repository picker, "Specialists" (with "Chains") and "Pipeline" show every enabled project at once: shared entries once, project entries one row each with the project name, so the same slug in two projects gives two rows. A project whose configuration cannot be read shows its error, and the others stay.
+
+- The filter "Project" (the shared entries and each project, with the number of rows) narrows the list; it is remembered per tab.
+- A project row opens its form in its own project: reading and saving go to that project. Its address is `#specialists/<slug>?project=<project slug>` (the same for `#pipelines/…`); an address without `project` opens the shared entry, and an unknown project shows "Project not found".
+- "New" and "Import" first ask for the project.
+- "Topology" and "System stages" show one project at a time: choose it in the "Project" field above the content; the mode stays on.

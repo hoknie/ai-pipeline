@@ -1,3 +1,4 @@
+import { repositoryLabel } from '../../shared/lib/catalog/repositories.ts';
 import type { DependencyView, QueueItemView, QueueView, RunView } from '../../shared/api/types.ts';
 
 /** Deepest branch indent: longer chains do not indent further. */
@@ -60,17 +61,21 @@ export interface AfterOption {
   /** Task number of the predecessor; null when unknown. */
   number: number | null;
   title: string;
-  kind: 'item' | 'run' | 'current';
+  kind: 'item' | 'run' | 'current' | 'other';
+  /** Name of the project of a predecessor from another project. */
+  project?: string;
 }
 
 /**
  * What a task can wait for: queued items (not the edited one), runs that hold a place and, when
- * editing, its current predecessors, which may no longer be in either list. Without repeats.
+ * editing, its current predecessors, which may no longer be in either list. The waiting items and
+ * runs of the queues in `others` (other enabled projects) come last. Without repeats.
  */
 export function afterOptions(
-  queue: Pick<QueueView, 'items' | 'runs'>,
+  queue: Pick<QueueView, 'items' | 'runs'> & { repository?: string },
   label: (item: QueueItemView) => string,
   editing?: QueueItemView,
+  others: readonly QueueView[] = [],
 ): AfterOption[] {
   const result = new Map<string, AfterOption>();
   for (const item of queue.items)
@@ -78,15 +83,50 @@ export function afterOptions(
       result.set(item.id, { id: item.id, number: item.number, title: label(item), kind: 'item' });
   for (const run of queue.runs)
     result.set(run.id, { id: run.id, number: run.number, title: run.title, kind: 'run' });
+  for (const other of others) {
+    const project = repositoryLabel(other.repository);
+    for (const item of other.items)
+      if (!result.has(item.id))
+        result.set(item.id, {
+          id: item.id,
+          number: item.number,
+          title: label(item),
+          kind: 'other',
+          project,
+        });
+    for (const run of other.runs)
+      if (!result.has(run.id))
+        result.set(run.id, {
+          id: run.id,
+          number: run.number,
+          title: run.title,
+          kind: 'other',
+          project,
+        });
+  }
   for (const ref of editing?.after ?? [])
-    if (!result.has(ref.id))
+    if (!result.has(ref.id)) {
+      const foreign = ref.repository !== null && ref.repository !== queue.repository;
       result.set(ref.id, {
         id: ref.id,
         number: ref.number,
         title: ref.title || ref.id,
         kind: 'current',
+        ...(foreign && ref.repository ? { project: repositoryLabel(ref.repository) } : {}),
       });
+    }
   return [...result.values()];
+}
+
+/** The queues of the enabled projects other than `repository`. */
+export function otherQueues(
+  queues: ReadonlyMap<string, QueueView>,
+  repositories: readonly string[],
+  repository: string | null,
+): QueueView[] {
+  return repositories
+    .filter((path) => path !== repository)
+    .flatMap((path) => queues.get(path) ?? []);
 }
 
 export interface ParentChoice {

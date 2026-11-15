@@ -1,4 +1,5 @@
 import {
+  type DispatchLimit,
   type Group,
   type GroupWait,
   type RunState,
@@ -6,6 +7,7 @@ import {
   actionPointOf,
   allGroups,
   isRepairGroup,
+  MACHINE_KEY,
   limitHolds,
   networkRetryAt,
   openAction,
@@ -90,18 +92,21 @@ function plannedRuntime(
 
 /**
  * Decides which queued groups start and which wait, without changing any state.
- * `swarm.max` limits the running specialists of each repository separately; a specialist's
- * `max` counts its slug across all runs.
+ * With `dispatchLimit.kind: repository`, `swarm.max` limits the running specialists of each repository
+ * separately; with `machine`, one number limits them across every repository. A specialist's
+ * `max` counts its slug across all runs in both.
  */
 export function planDispatch(
   states: RunState[],
   now: number,
   network: NetworkSnapshot = OFF_NETWORK,
+  dispatchLimit: DispatchLimit = { kind: 'repository' },
 ): DispatchPlan {
   const start: DispatchPlan['start'] = [];
   const waits = new Map<string, GroupWait>();
-  const running = runningByRepository(states);
-  const limits = repositoryLimits(states);
+  const running = runningByRepository(states, dispatchLimit);
+  const limits =
+    dispatchLimit.kind === 'machine' ? new Map<string, number>() : repositoryLimits(states);
   const bySpecialist = runningBySpecialist(states);
   const holds = limitHolds(states, now);
   const queue = states
@@ -156,8 +161,11 @@ export function planDispatch(
       });
       continue;
     }
-    const repository = state.run.repository;
-    const max = limits.get(repository) ?? state.run.config.max;
+    const repository = dispatchLimit.kind === 'machine' ? MACHINE_KEY : state.run.repository;
+    const max =
+      dispatchLimit.kind === 'machine'
+        ? dispatchLimit.max
+        : (limits.get(repository) ?? state.run.config.max);
     if ((running.get(repository) ?? 0) >= max) {
       // A step without a specialist is a configuration error, not a wait.
       if (specialist) waits.set(key, { reason: 'capacity', max });

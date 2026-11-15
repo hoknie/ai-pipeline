@@ -41,6 +41,7 @@ export const es: Dictionary = {
     repositoryManage: 'Gestionar proyectos',
     repositorySearch: 'Buscar proyecto…',
     repositoryNone: 'No se encontró nada',
+    repositoryAll: 'Todos los proyectos',
     repositoryRemove: 'Quitar de la lista',
     repositoryAddTitle: 'Añadir un repositorio',
     repositoryAddDescription:
@@ -295,9 +296,6 @@ export const es: Dictionary = {
       tags: 'Etiquetas',
       search: 'Buscar ejecuciones',
       filter: 'Filtro de ejecuciones',
-      scope: 'Ejecuciones de',
-      scopeRepository: 'Este repositorio',
-      scopeAll: 'Todos los repositorios',
       state: 'Estado',
       pipeline: 'Pipeline',
       variant: 'Variante',
@@ -612,6 +610,12 @@ export const es: Dictionary = {
     commit: 'Confirmación (commit)',
     branch: 'Rama',
   },
+  projectChoice: {
+    title: 'Proyecto',
+    description: 'La nueva entrada se guarda en el proyecto elegido.',
+    label: 'Proyecto',
+    choose: 'Continuar',
+  },
   queue: {
     settings: {
       title: 'Ajustes de la cola',
@@ -646,6 +650,8 @@ export const es: Dictionary = {
       onLimitWait: 'Esperar el reinicio',
       onLimitStop: 'Detener',
       forRepository: 'Estos modos se aplican a la cola de {{name}}.',
+      globalNote:
+        'La cola es global: los ajustes de las colas de los proyectos no se aplican y se conservan para volver.',
       forNoRepository: 'Estos modos se aplican a la cola del repositorio seleccionado.',
       openQueue: 'Abrir la cola',
     },
@@ -661,6 +667,15 @@ export const es: Dictionary = {
       unknown: 'no está en la configuración',
       filtered: 'Fuera del filtro',
       filteredHint: 'Una cola en marcha no toma esta tarea mientras no encaje en el filtro de toma',
+    },
+    global: {
+      badge: 'Cola global',
+      max_one: 'Como máximo {{count}} especialistas a la vez en la máquina',
+      max_other: 'Como máximo {{count}} especialistas a la vez en la máquina',
+      max_many: 'Como máximo {{count}} especialistas a la vez en la máquina',
+      projects: 'Proyectos',
+      projectsHelp:
+        'La cola global toma solo tareas de los proyectos elegidos. Vacío: todos los proyectos activos. Solo se cambia con la cola detenida.',
     },
     controls: {
       label: 'control de la cola',
@@ -680,6 +695,18 @@ export const es: Dictionary = {
     runsPlaces_other: '{{taken}} de {{count}} plazas',
     runsOverflow:
       'Hay más ejecuciones que plazas (se redujo el paralelismo o se ejecutó una tarea ahora): las ejecuciones iniciadas continúan y las nuevas tareas esperan una plaza libre.',
+    all: {
+      startAll: 'Iniciar todas',
+      pauseAll: 'Pausar todas',
+      startedAll: 'Colas iniciadas',
+      pausedAll: 'Colas en pausa',
+      failed: '{{project}} — {{error}}',
+      blockLabel: 'Cola de {{project}}',
+      openProject: 'Abrir la cola del proyecto',
+      empty: 'Colas vacías:',
+      showEmpty: 'Mostrar la cola de {{project}}',
+      nothing: 'Nada que mostrar: no hay proyectos habilitados',
+    },
     freeSlot: 'Plaza libre',
     splitting: 'dividiendo la tarea',
     delivering: 'Entrega',
@@ -733,6 +760,25 @@ export const es: Dictionary = {
     },
     readiness: { ready: 'lista', waiting: 'en espera', blocked: 'bloqueada' },
     dependency: { done: 'hecha', waiting: 'en espera', blocked: 'bloqueada' },
+    multi: {
+      toggle: 'En varios proyectos',
+      projects: 'Proyectos',
+      choose: 'Elige proyectos',
+      order: 'Orden de los proyectos',
+      moveUp: 'Subir {{project}}',
+      moveDown: 'Bajar {{project}}',
+      drag: 'Arrastra {{project}} para cambiar el orden',
+      needMore: 'Elige al menos dos proyectos',
+      noCommon: 'Los proyectos elegidos no tienen ningún pipeline en común',
+      note: 'Adición para {{project}}',
+      notePlaceholder: 'Se añade solo al texto de este proyecto',
+      tag: 'Etiqueta compartida',
+      tagHint:
+        'La etiqueta con este nombre se toma de cada catálogo o se crea; vacío: sin etiqueta',
+      chain: 'Por turnos',
+      chainHint: 'La tarea de cada proyecto espera a la del anterior',
+      created: 'Tareas creadas en {{count}} proyectos',
+    },
     form: {
       repository: 'Repositorio',
       repositorySearch: 'Buscar repositorio…',
@@ -745,6 +791,7 @@ export const es: Dictionary = {
       afterCurrent: 'Predecesores actuales',
       afterItems: 'Tareas en espera',
       afterRuns: 'Ejecuciones de la cola',
+      afterOther: 'Otros proyectos',
       tags: 'Etiquetas',
       postpone: 'Aplazar',
       autoDeliver: 'Entrega automática',
@@ -806,6 +853,8 @@ export const es: Dictionary = {
       linked: 'relacionada con la tarea seleccionada',
       postponed: 'Aplazada',
       waitsFor: 'Espera a:',
+      inProject: 'en {{project}}',
+      openProjectQueue: 'Abrir la cola de {{project}}',
       postpone: 'Aplazar',
       activeHint: 'Una tarea aplazada se queda en su sitio, pero la cola en marcha no la toma',
       readyHint: 'Nada que esperar: la tarea empieza en cuanto haya una plaza libre',
@@ -1053,9 +1102,11 @@ export const es: Dictionary = {
       builtin: 'Integradas',
       project: 'Proyecto',
       global: 'Compartidas',
+      other: 'Otros proyectos',
     },
   },
   specialists: {
+    projectNotFound: 'Proyecto no encontrado',
     tabs: {
       label: 'Secciones de especialistas',
       specialists: 'Especialistas',
@@ -1117,6 +1168,8 @@ export const es: Dictionary = {
       prompt: 'Instrucciones del especialista; se añaden a cada tarea.',
     },
     filters: {
+      project: 'Proyecto',
+      sharedProject: 'Compartidos',
       search: 'Buscar especialistas',
       level: 'Nivel',
       levels: { all: 'Todos', project: 'Del proyecto', global: 'Comunes' },
@@ -1659,6 +1712,7 @@ export const es: Dictionary = {
       system_panel: 'Ajustes del panel',
       system_network: 'Red',
       system_stats: 'Estadísticas',
+      queue_queue: 'Cola',
       system_attachments: 'Adjuntos',
     },
     field: {
@@ -1801,6 +1855,14 @@ export const es: Dictionary = {
         label: 'Dirección por ruta',
         hint: 'Colocar el bucket en la ruta en vez del host.',
       },
+      queue_scope: {
+        label: 'Modo',
+        hint: 'Cada proyecto tiene su cola (project) o una cola lleva las tareas de todos los proyectos (global). Cambiarlo pausa todas las colas.',
+      },
+      queue_max: {
+        label: 'Especialistas a la vez',
+        hint: 'Máximo de especialistas trabajando a la vez en la máquina en el modo global.',
+      },
       stats_enabled: {
         label: 'Recopilar estadísticas',
         hint: 'Escribe el uso de cada intento terminado en el registro de estadísticas.',
@@ -1824,6 +1886,7 @@ export const es: Dictionary = {
         hint: 'Solo nombres: los valores nunca se muestran.',
       },
     },
+    queueScope: { project: 'Proyectos', global: 'Cola global' },
     attachmentStorage: { local: 'Carpeta local', s3: 'S3' },
   },
   observers: {

@@ -450,6 +450,7 @@ const GLOBAL_GROUPS = [
   'General',
   'Agents',
   'Delivery',
+  'Queue',
   'Runtimes',
   'Chains',
   'Specialists',
@@ -550,9 +551,27 @@ describe('settings page', () => {
     await screen.findByTestId('setting-max');
     await waitFor(() => expect(window.location.hash).toBe('#settings/project/general'));
     cleanup();
-    show(queueOf(), {}, '#settings/global/queue');
+    show(queueOf(), {}, '#settings/global/nope');
     await screen.findByTestId('setting-max');
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
+  });
+
+  it('has the group Queue of the Shared tab with the mode and the limit of the machine', async () => {
+    show(queueOf(), {}, '#settings/global/queue');
+    const scope = await screen.findByTestId('setting-queue.scope');
+    expect(scope.textContent).toContain('Mode');
+    const max = screen.getByTestId('setting-queue.max');
+    expect(within(max).getByLabelText<HTMLInputElement>('Specialists at once').value).toBe('5');
+    expect(screen.queryByTestId('setting-max')).toBeNull();
+    expect(
+      within(groupNav()).getByRole('link', { name: 'Queue' }).getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('keeps the queue of the project on the Project tab', async () => {
+    show(queueOf(), {}, '#settings/project/queue');
+    await screen.findByLabelText('queue settings');
+    expect(screen.queryByTestId('setting-queue.scope')).toBeNull();
   });
 
   it.each([
@@ -1447,6 +1466,18 @@ describe('project of the settings', () => {
     await choose();
     await waitFor(() => expect(api.calls).toContainEqual(['config', other]));
     expect(window.location.hash).toBe('#settings/project/general');
+  });
+
+  it('changes the last chosen project and keeps the mode «All projects»', async () => {
+    window.localStorage.setItem('aip.web.projects.all', 'true');
+    const api = open('#settings/project/general');
+    await screen.findByTestId('setting-max');
+    const { other, choose } = await openOther();
+    await choose();
+    await waitFor(() => expect(api.calls).toContainEqual(['config', other]));
+    expect(window.localStorage.getItem('aip.web.repository')).toBe(JSON.stringify(other));
+    expect(window.localStorage.getItem('aip.web.projects.all')).toBe('true');
+    window.localStorage.removeItem('aip.web.projects.all');
   });
 
   it('asks about unsaved changes when the project is changed', async () => {

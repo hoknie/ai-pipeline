@@ -10,11 +10,13 @@ These actions are also in the [`swarm_queue*` tools](../hosts/mcp-tools.md) and 
 aip queue add feature --task "Add a login form"       # to the end of the queue
 aip queue add feature --groups groups.yaml --title "Forms"
 aip queue list                                       # order, state, reason for stopping
+aip queue list --all                                 # the queues of all enabled projects
 aip queue move <item> 1                              # make the task first
 aip queue edit <item> --task "New text"              # or: remove <item>
 aip queue add feature --task "Later" --postpone      # postponed: a running queue does not take it
 ```
 
+- `aip queue list --all` prints the queue of every enabled project under a heading with its name and slug, ordered by name; a project without a queue shows an empty stopped one. With `--json` it prints an array of queues. It cannot be combined with `--repo`. Without enabled projects it prints `No enabled projects`.
 - `aip queue add` does not start the queue. `aip run start` starts a stopped queue and lifts the pause.
 - A waiting task shows when it was added (`added 2026-11-01 14:32`).
 - Delivery for one task is set with [`--delivery-mode` and `--auto-deliver`](../configuration/delivery.md#settings-for-one-task).
@@ -38,6 +40,17 @@ Every task gets an integer number within its repository when it is added: 1, 2, 
 - `swarm_queue_run_now` and "Run now" start a postponed task anyway. Starting the queue does not clear the flag.
 - A queue without autopilot that has only postponed tasks left (and no runs) stops.
 - `aip run start` and specialists cannot postpone a task.
+
+## Global queue
+
+With `queue.scope: global` in the shared [`settings.yaml`](../configuration/README.md#queue) one queue runs the tasks of all projects in one order. Tasks stay in their projects (number, worktree, configuration); the order is shared. When the mode is turned on, the order follows the time the tasks were added.
+
+- The state, `parallel`, autopilot, auto answer, skip failed, `on limit`, the reason for stopping, the runs holding a place and the skipped runs are those of the global queue. The settings of the project queues do not apply and are kept for the way back.
+- Specialists of all projects together are limited by `queue.max`.
+- Tasks of a disabled project are not taken. The take filter names pipelines and projects.
+- `aip queue start`, `pause`, `parallel`, `settings`, `move` and `list` work with the global queue. `--repo` is ignored with the warning `queue scope is global: --repo is ignored`. `aip queue add --repo` still picks the project of the task, and the task goes to the end of the order. The position of `aip queue move` is a place among the tasks of all projects.
+- A task may wait for a task of another project; the same goes for the `swarm_queue*` tools, which answer with the global queue.
+- Changing the mode pauses every queue; running runs go on. Going back to `project` gives each project queue its tasks in their global order.
 
 ## Attachments
 
@@ -217,13 +230,28 @@ aip queue add feature --task "Add the API" --after q1  # starts after item q1 (o
 aip queue edit <item> --no-after                       # clears the list
 ```
 
-`--after <id>` is repeatable and works on `aip queue add`, `aip queue edit` and `aip run start`. The task waits for other tasks of the queue or for runs of the repository.
+`--after <id>` is repeatable and works on `aip queue add`, `aip queue edit` and `aip run start`. The task waits for waiting tasks of any project's queue or for runs of any repository; ids are unique on the machine, so no project prefix is needed.
 
 - A task starts when every predecessor is merged and delivered to the working tree.
 - A ready task starts before a waiting one, so dependencies do not change the order of the list.
 - `aip queue list` shows `after q1 (waiting)` or `after q1 (blocked)`. A predecessor is blocked when its run failed, was cancelled or is gone.
-- A reference to the task itself, a cycle and an unknown id are refused.
+- A predecessor from another project shows its project slug: `after lib:q1 (waiting)`. A problem in its run blocks the task but does not stop the queue of its project. A task whose predecessor waits in a disabled project keeps waiting until the project is enabled and the predecessor is delivered.
+- A reference to the task itself, a cycle (also one through two projects) and an unknown id are refused.
 - `aip run start` with an unmet dependency leaves the task in the queue and answers with `run: null`.
+
+## One task in several projects
+
+```
+aip queue add feature --task "Email field" --repo lib --repo web --chain --tag-all email --note web="Form in Settings.tsx"
+```
+
+With two to twenty `--repo` flags the command adds one item to the end of each queue, in one step: either every project gets its task or none does. The command prints one line per project: slug, item id and task number.
+
+- The pipeline (and variant, and `--skip` steps) must exist in every project; otherwise the whole command is refused and names the project. A disabled or unknown project, a project named twice, groups and attachments are refused too.
+- `--note <project>=<text>` (repeatable; the key is a slug or a path) adds a line of text to the task of that project after the shared text.
+- `--tag-all <name>` puts a [shared tag](tags.md#shared-tag-of-a-task-in-several-projects) on every item. Without it no shared tag is set.
+- `--chain` makes the task of each project wait for the task of the previous one in the order of the flags, like [`--after`](#dependencies) between projects. Without it the tasks are independent.
+- `--tag-all`, `--chain` and `--note` with a single `--repo` are refused. `--tag` and `--parent` take one project. There is no MCP tool for this.
 
 ## Returning, pausing and freezing runs
 

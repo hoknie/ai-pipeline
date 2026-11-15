@@ -11,7 +11,7 @@ export function registerQueue(kit: HostKit): void {
     {
       title: 'Task queue',
       description:
-        'Show the task queue of a repository: state, parallel limit, why it stopped, waiting tasks in order and the runs that hold a place.',
+        'Show the task queue of a repository: state, parallel limit, why it stopped, waiting tasks in order and the runs that hold a place. In the global queue mode it is the one queue of all projects (repo is ignored): tasks carry their project and position is the place among all projects.',
       inputSchema: { repo },
     },
     ({ repo: where }) => attempt(() => showQueue('queue', {}, where)),

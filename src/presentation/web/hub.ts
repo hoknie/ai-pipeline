@@ -10,6 +10,8 @@ export class Hub {
   private readonly socket: string;
   private runs = new Map<string, unknown>();
   private queues = new Map<string, unknown>();
+  /** The global queue of the global mode; null in the project mode. */
+  private globalQueue: unknown = null;
   private repositories: unknown[] = [];
   private tags: unknown[] = [];
   /** The last `processes` event of the daemon, without `seq`; null until it sends one. */
@@ -87,6 +89,7 @@ export class Hub {
       this.tags = event.tags ?? [];
       this.runs = new Map(event.runs.map((run) => [run.id, run]));
       this.queues = new Map((event.queues ?? []).map((queue) => [queue.repository, queue]));
+      this.globalQueue = event.globalQueue ?? null;
       this.repositories = event.repositories ?? [];
       this.processes = null;
       this.ready = true;
@@ -102,6 +105,10 @@ export class Hub {
       this.broadcast(event);
     } else if (event.event === 'queue') {
       this.queues.set(event.queue.repository, event.queue);
+      this.seq = event.seq;
+      this.broadcast(event);
+    } else if (event.event === 'globalQueue') {
+      this.globalQueue = event.globalQueue;
       this.seq = event.seq;
       this.broadcast(event);
     } else if (event.event === 'tags') {
@@ -129,6 +136,7 @@ export class Hub {
       seq: this.seq,
       runs: [...this.runs.values()],
       queues: [...this.queues.values()],
+      ...(this.globalQueue === null ? {} : { globalQueue: this.globalQueue }),
       repositories: this.repositories,
       tags: this.tags,
       daemon: this.daemon,

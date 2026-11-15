@@ -529,7 +529,6 @@ describe('the journal and the author of the observer', () => {
           onFilters={() => undefined}
           onSelect={() => undefined}
           scope="all"
-          onScope={() => undefined}
           repository={null}
         />
       </TagsProvider>,

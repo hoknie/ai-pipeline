@@ -41,6 +41,7 @@ export const ru: Dictionary = {
     repositoryManage: 'Управление проектами',
     repositorySearch: 'Найти проект…',
     repositoryNone: 'Ничего не найдено',
+    repositoryAll: 'Все проекты',
     repositoryRemove: 'Убрать из списка',
     repositoryAddTitle: 'Добавить репозиторий',
     repositoryAddDescription: 'Укажите путь внутри git-репозитория; подкаталог приводится к корню.',
@@ -297,9 +298,6 @@ export const ru: Dictionary = {
       tags: 'Теги',
       search: 'Поиск по запускам',
       filter: 'Фильтр запусков',
-      scope: 'Запуски',
-      scopeRepository: 'Этот репозиторий',
-      scopeAll: 'Все репозитории',
       state: 'Состояние',
       pipeline: 'Pipeline',
       variant: 'Вариант',
@@ -610,6 +608,12 @@ export const ru: Dictionary = {
     commit: 'Коммит',
     branch: 'Ветка',
   },
+  projectChoice: {
+    title: 'Проект',
+    description: 'Новая запись сохранится в выбранный проект.',
+    label: 'Проект',
+    choose: 'Продолжить',
+  },
   queue: {
     settings: {
       title: 'Настройки очереди',
@@ -644,6 +648,8 @@ export const ru: Dictionary = {
       onLimitWait: 'Ждать сброса',
       onLimitStop: 'Остановиться',
       forRepository: 'Режимы относятся к очереди репозитория {{name}}.',
+      globalNote:
+        'Очередь общая: настройки очередей проектов не действуют и сохраняются для возврата.',
       forNoRepository: 'Режимы относятся к очереди выбранного репозитория.',
       openQueue: 'Открыть очередь',
     },
@@ -660,6 +666,16 @@ export const ru: Dictionary = {
       filtered: 'Не по фильтру',
       filteredHint:
         'Работающая очередь не берёт эту задачу, пока она не подходит под фильтр взятия',
+    },
+    global: {
+      badge: 'Общая очередь',
+      max_one: 'Не более {{count}} специалистов одновременно на машине',
+      max_other: 'Не более {{count}} специалистов одновременно на машине',
+      max_few: 'Не более {{count}} специалистов одновременно на машине',
+      max_many: 'Не более {{count}} специалистов одновременно на машине',
+      projects: 'Проекты',
+      projectsHelp:
+        'Общая очередь берёт задачи только выбранных проектов. Пусто: все включённые проекты. Меняется только при остановленной очереди.',
     },
     controls: {
       label: 'управление очередью',
@@ -680,6 +696,18 @@ export const ru: Dictionary = {
     runsPlaces_other: '{{taken}} из {{count}} места',
     runsOverflow:
       'Запусков больше, чем мест (параллельность уменьшена или задачу запустили сейчас): начатые запуски продолжаются, новые задачи ждут свободного места.',
+    all: {
+      startAll: 'Запустить все',
+      pauseAll: 'Пауза всем',
+      startedAll: 'Очереди запущены',
+      pausedAll: 'Очереди на паузе',
+      failed: '{{project}} — {{error}}',
+      blockLabel: 'Очередь проекта {{project}}',
+      openProject: 'Открыть очередь проекта',
+      empty: 'Пустые очереди:',
+      showEmpty: 'Показать очередь проекта {{project}}',
+      nothing: 'Показывать нечего: нет включённых проектов',
+    },
     freeSlot: 'Свободное место',
     splitting: 'Задача делится',
     delivering: 'Доставка',
@@ -734,6 +762,24 @@ export const ru: Dictionary = {
     },
     readiness: { ready: 'готова', waiting: 'ждёт', blocked: 'заблокирована' },
     dependency: { done: 'выполнена', waiting: 'ждёт', blocked: 'заблокирована' },
+    multi: {
+      toggle: 'В несколько проектов',
+      projects: 'Проекты',
+      choose: 'Выберите проекты',
+      order: 'Порядок проектов',
+      moveUp: 'Поднять {{project}}',
+      moveDown: 'Опустить {{project}}',
+      drag: 'Перетащите {{project}}, чтобы изменить порядок',
+      needMore: 'Выберите не меньше двух проектов',
+      noCommon: 'У выбранных проектов нет общих pipeline',
+      note: 'Дополнение для {{project}}',
+      notePlaceholder: 'Добавится к тексту только этого проекта',
+      tag: 'Общий тег',
+      tagHint: 'Тег с этим именем берётся из каждого каталога или создаётся; пусто: без тега',
+      chain: 'По очереди',
+      chainHint: 'Задача каждого проекта ждёт задачу предыдущего',
+      created: 'Задачи созданы в проектах: {{count}}',
+    },
     form: {
       repository: 'Репозиторий',
       repositorySearch: 'Поиск репозитория…',
@@ -746,6 +792,7 @@ export const ru: Dictionary = {
       afterCurrent: 'Текущие предшественники',
       afterItems: 'Ждущие задачи',
       afterRuns: 'Запуски из очереди',
+      afterOther: 'Другие проекты',
       tags: 'Теги',
       postpone: 'Отложить',
       autoDeliver: 'Автодоставка',
@@ -807,6 +854,8 @@ export const ru: Dictionary = {
       linked: 'связана с выбранной задачей',
       postponed: 'Отложена',
       waitsFor: 'Ждёт:',
+      inProject: 'в проекте {{project}}',
+      openProjectQueue: 'Открыть очередь проекта {{project}}',
       postpone: 'Отложить',
       activeHint: 'Отложенная задача остаётся на месте, но работающая очередь её не берёт',
       readyHint: 'Ждать нечего: задача стартует, как только освободится место',
@@ -1055,9 +1104,11 @@ export const ru: Dictionary = {
       builtin: 'Встроенные',
       project: 'Проект',
       global: 'Общие',
+      other: 'Другие проекты',
     },
   },
   specialists: {
+    projectNotFound: 'Проект не найден',
     tabs: {
       label: 'Разделы специалистов',
       specialists: 'Специалисты',
@@ -1117,6 +1168,8 @@ export const ru: Dictionary = {
       prompt: 'Инструкции специалиста; добавляются к каждой задаче.',
     },
     filters: {
+      project: 'Проект',
+      sharedProject: 'Общие',
       search: 'Поиск специалистов',
       level: 'Уровень',
       levels: { all: 'Все', project: 'Проектные', global: 'Общие' },
@@ -1653,6 +1706,7 @@ export const ru: Dictionary = {
       system_panel: 'Настройки панели',
       system_network: 'Сеть',
       system_stats: 'Статистика',
+      queue_queue: 'Очередь',
       system_attachments: 'Вложения',
     },
     field: {
@@ -1774,6 +1828,14 @@ export const ru: Dictionary = {
         label: 'Адресация по пути',
         hint: 'Бакет в пути адреса, а не в имени хоста.',
       },
+      queue_scope: {
+        label: 'Режим',
+        hint: 'У каждого проекта своя очередь (project) или одна очередь ведёт задачи всех проектов (global). Смена режима ставит все очереди на паузу.',
+      },
+      queue_max: {
+        label: 'Специалистов одновременно',
+        hint: 'Больше всего специалистов на машине одновременно в общем режиме.',
+      },
       stats_enabled: {
         label: 'Собирать статистику',
         hint: 'Записывает расход каждой завершённой попытки в журнал статистики.',
@@ -1797,6 +1859,7 @@ export const ru: Dictionary = {
         hint: 'Только имена: значения не показываются.',
       },
     },
+    queueScope: { project: 'Проекты', global: 'Общая очередь' },
     attachmentStorage: { local: 'Локальная папка', s3: 'S3' },
   },
   observers: {

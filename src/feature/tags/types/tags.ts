@@ -40,7 +40,8 @@ function fold(name: string): string {
   return name.trim().toLocaleLowerCase('und');
 }
 
-function cleanName(name: string): string {
+/** The name of a tag as the catalog keeps it: trimmed, within the limit, on one line. */
+export function cleanName(name: string): string {
   const trimmed = name.trim();
   if (trimmed === '') throw rejected('tag name must not be empty');
   if ([...trimmed].length > TAG_NAME_LIMIT) {
@@ -80,6 +81,16 @@ export function findTag(catalog: readonly Tag[], name: string): Tag {
   return tag;
 }
 
+/** The tag with the name, ignoring case and surrounding spaces; undefined when there is none. */
+export function tagNamed(catalog: readonly Tag[], name: string): Tag | undefined {
+  return catalog.find((candidate) => fold(candidate.name) === fold(name));
+}
+
+/** The color a new tag of the catalog gets when the user picks none. */
+export function defaultTagColor(catalog: readonly Tag[]): TagColor {
+  return TAG_COLORS[catalog.length % TAG_COLORS.length] ?? 'gray';
+}
+
 export function addTag(
   catalog: readonly Tag[],
   input: { name: string; color?: string | undefined; repository: string },
@@ -87,10 +98,7 @@ export function addTag(
   now: number,
 ): Tag {
   const name = cleanName(input.name);
-  const color =
-    input.color === undefined
-      ? (TAG_COLORS[catalog.length % TAG_COLORS.length] ?? 'gray')
-      : cleanColor(input.color);
+  const color = input.color === undefined ? defaultTagColor(catalog) : cleanColor(input.color);
   checkUnique(catalog, name, null);
   return { id, repository: input.repository, name, color, createdAt: now, task: null };
 }

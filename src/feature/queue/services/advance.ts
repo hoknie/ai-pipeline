@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 
 import { isRejected, rejected } from '../../../platform/errors/index.ts';
 import type { AttachmentService } from '../../attachments/services/index.ts';
+import type { RegistryService } from '../../repos/services/index.ts';
 import { currentPermissions, type RunsServices } from '../../runs/services/index.ts';
 import {
   retryableGroups,
@@ -20,18 +21,22 @@ import {
   advance,
   autopilotAnswers,
   claimPlace,
+  GLOBAL_KEY,
   itemFailed,
-  itemStarted,
   queueItemId,
   queueWakeAt,
+  type GlobalQueue,
   type Queue,
   type QueueItem,
 } from '../types/index.ts';
 
+import type { QueueScope } from './scope.ts';
 import type { QueueStore } from './store.ts';
 
 export interface QueueAdvanceDependencies {
   store: QueueStore;
+  scope: QueueScope;
+  registry: RegistryService;
   runs: Pick<RunsServices, 'states' | 'engine' | 'requests'>;
   tags: TagCatalogService;
   attachments: AttachmentService;
@@ -42,9 +47,9 @@ export interface QueueAdvanceDependencies {
 }
 
 /** The arguments of `run` that an item of the queue stands for. */
-function itemRequest(queue: Queue, item: QueueItem): RunRequest {
+function itemRequest(repository: string, item: QueueItem): RunRequest {
   return {
-    repository: queue.repository,
+    repository,
     pipeline: item.pipeline,
     variant: item.variant,
     ...(item.task !== null ? { task: item.task } : {}),
@@ -65,9 +70,30 @@ export class QueueAdvance {
     this.dependencies = dependencies;
   }
 
+  /** The key of the queue that moves the runs of the repository: the repository, or the global queue. */
+  private keyOf(repository: string): string {
+    return this.dependencies.scope.current() === 'global' ? GLOBAL_KEY : repository;
+  }
+
   /** A run was saved: the queue of its repository looks at it when it holds or waits for it. */
   runChanged(state: RunState): void {
-    const queue = this.dependencies.store.get(state.run.repository);
+    const { store } = this.dependencies;
+    if (this.keyOf(state.run.repository) === GLOBAL_KEY) {
+      const global = store.globalQueue();
+      if (
+        global.runs.length > 0 ||
+        global.skipped.includes(state.run.id) ||
+        store.all().some((queue) => queue.items.some((item) => item.after.includes(state.run.id)))
+      ) {
+        this.request(GLOBAL_KEY);
+      }
+      return;
+    }
+    // The queues of other projects whose items wait for this run look at it too.
+    for (const waiting of store.lines.waitingFor(state.run.id, state.run.repository)) {
+      this.request(waiting.repository);
+    }
+    const queue = store.get(state.run.repository);
     if (
       queue &&
       (queue.runs.length > 0 ||
@@ -78,74 +104,95 @@ export class QueueAdvance {
     }
   }
 
-  /** Looks at the queue of the repository once, however many changes arrive meanwhile. */
+  /** Looks at the queue of the repository (in the global mode, the global queue) once, however many changes arrive meanwhile. */
   request(repository: string): void {
     const { engine } = this.dependencies.runs;
-    if (engine.stopping || this.requested.has(repository)) return;
-    this.requested.add(repository);
+    const key = this.keyOf(repository);
+    if (engine.stopping || this.requested.has(key)) return;
+    this.requested.add(key);
     void engine
       .serial(async () => {
-        this.requested.delete(repository);
-        if (!engine.stopping) await this.advance(repository);
+        this.requested.delete(key);
+        if (!engine.stopping) await this.advance(key);
       })
       .catch(() => undefined);
   }
 
   /** A look at the queue of the repository is pending: the autopilot answers there first. */
   pending(repository: string): boolean {
-    return this.requested.has(repository);
+    return this.requested.has(this.keyOf(repository));
   }
 
   /** What a usage limit does to the groups of the repository's runs: the queue's setting. */
   onLimitOf(repository: string): OnLimit {
-    return this.dependencies.store.of(repository).onLimit;
+    const { store } = this.dependencies;
+    return this.keyOf(repository) === GLOBAL_KEY
+      ? store.globalQueue().onLimit
+      : store.of(repository).onLimit;
+  }
+
+  /** The queues that move runs now: the project queues, or the global queue. */
+  private lines(): { key: string; queue: Queue | GlobalQueue }[] {
+    const { store } = this.dependencies;
+    return this.dependencies.scope.current() === 'global'
+      ? [{ key: GLOBAL_KEY, queue: store.globalQueue() }]
+      : store.all().map((queue) => ({ key: queue.repository, queue }));
   }
 
   /** Moments a queue stopped by a usage limit may start again. */
   wakeMoments(): number[] {
-    return this.dependencies.store.all().flatMap((queue) => queueWakeAt(queue) ?? []);
+    return this.lines().flatMap(({ queue }) => queueWakeAt(queue) ?? []);
   }
 
   /** Starts the queues that resume after a usage limit. */
   async wake(): Promise<void> {
-    for (const queue of this.dependencies.store.all()) {
-      if (queue.stop?.kind === 'limit') await this.advance(queue.repository);
+    for (const { key, queue } of this.lines()) {
+      if (queue.stop?.kind === 'limit') await this.advance(key);
     }
   }
 
   /** At the start: the queues that run, hold runs or wait for a usage limit move on. */
   async resume(): Promise<void> {
-    for (const queue of this.dependencies.store.all()) {
+    for (const { key, queue } of this.lines()) {
       if (
         queue.status === 'running' ||
         queue.runs.length > 0 ||
         queue.skipped.length > 0 ||
         queue.stop?.kind === 'limit'
       ) {
-        await this.advance(queue.repository);
+        await this.advance(key);
       }
     }
   }
 
   /** Moves the queue on; returns the runs created for its items, by item id. */
   async advance(repository: string): Promise<Map<string, RunCreated>> {
-    const { store, runs, repair, now } = this.dependencies;
-    const queue = store.of(repository);
+    const { store, runs, repair, now, scope, registry } = this.dependencies;
+    scope.sync();
+    const key = this.keyOf(repository);
+    const queue =
+      key === GLOBAL_KEY
+        ? store.lines.line(key, (path) => registry.entry(path)?.enabled !== false)
+        : store.of(repository);
     const fingerprint = () => JSON.stringify({ ...queue, updatedAt: 0 });
     const before = fingerprint();
     const states = queue.runs.flatMap((id) => runs.states.lookup(id) ?? []);
     // An incident an observer takes does not stop the queue.
     for (const state of states) if (repair.takesIncident(state)) acknowledgeRun(queue, state);
     const lookup = (id: string) => runs.states.lookup(id);
-    const { take, freeze } = advance(queue, states, lookup, now());
+    const { take, freeze, touched } = advance(queue, states, lookup, now(), store.all());
+    for (const other of touched) {
+      store.save(other);
+      this.request(other.repository);
+    }
     const changedBefore = fingerprint() !== before;
     for (const id of freeze) await this.freeze(id);
     await this.answerForAutopilot(queue);
     const { started, changed, failed } = await this.takeItems(queue, take);
     if (changedBefore || changed) store.save(queue);
-    else store.check(queue);
+    else store.lines.check(queue);
     if ((take.length > 0 && queue.runs.length > 0) || (failed && queue.status === 'running')) {
-      this.request(repository);
+      this.request(key);
     }
     runs.engine.armWake();
     // After the autopilot: the incidents it did not answer are the observers'.
@@ -191,23 +238,30 @@ export class QueueAdvance {
       await runs.engine.apply(state, { kind: 'retry', group, permissions });
     }
     acknowledgeRun(queue, state);
-    itemStarted(queue, item.id, id, now());
+    this.started(queue, item.id, id);
     return runCreated(state);
   }
 
   /** Creates the run of an item of the queue with the item's tags still in the catalog. */
   async createRun(queue: Queue, item: QueueItem): Promise<RunCreated> {
-    const { attachments, runs } = this.dependencies;
-    const tags = knownTags(this.dependencies.tags.of(queue.repository), item.tags);
+    const { attachments, runs, store } = this.dependencies;
+    const repository = store.lines.repositoryOf(queue, item);
+    const tags = knownTags(this.dependencies.tags.of(repository), item.tags);
     // The run keeps a snapshot of the attachments; the files themselves change owner, not place.
     const files = attachments.listOf(item.id);
     const created = await runs.requests.create(
-      { ...itemRequest(queue, item), ...(files.length > 0 ? { attachments: files } : {}) },
+      { ...itemRequest(repository, item), ...(files.length > 0 ? { attachments: files } : {}) },
       tags,
       item,
     );
     attachments.bindToRun(item.id, created.runId);
     return created;
+  }
+
+  /** The item became a run: the items of other projects that waited for it wait for the run, and look again. */
+  private started(queue: Queue, item: string, run: string): void {
+    const { store } = this.dependencies;
+    for (const other of store.itemStarted(queue, item, run)) this.request(other.repository);
   }
 
   private async answerForAutopilot(queue: Queue): Promise<void> {
@@ -241,7 +295,7 @@ export class QueueAdvance {
           await this.takeReturned(queue, item);
         } else {
           const created = await this.createRun(queue, item);
-          itemStarted(queue, item.id, created.runId, now());
+          this.started(queue, item.id, created.runId);
           started.set(item.id, created);
         }
         store.write(queue);

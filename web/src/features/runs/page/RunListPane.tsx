@@ -24,7 +24,6 @@ export interface ListPaneProps {
   onFilters: (filters: RunFilterState) => void;
   onSelect: (runId: string, group: string | null) => void;
   scope: RunScope;
-  onScope: (scope: RunScope) => void;
   repository: string | null;
   repositoryPaths?: ReadonlyMap<string, string>;
   history?: HistoryState;
@@ -57,7 +56,6 @@ export function RunListPane(props: ListPaneProps) {
       onFilters={rest.onFilters}
       onSelect={rest.onSelect}
       scope={rest.scope}
-      onScope={rest.onScope}
       repository={rest.repository}
       repositoryPaths={rest.repositoryPaths}
       more={moreOf(history)}

@@ -20,6 +20,22 @@ function newTaskPageProps(panel: PanelData) {
   };
 }
 
+/** What the lists of specialists and pipelines need of the mode «All projects»; absent outside it. */
+function listProjects(panel: PanelData) {
+  if (!panel.allProjects) return undefined;
+  return { registry: panel.state.registry, last: panel.state.selected };
+}
+
+/** What the queue page needs of the mode «All projects»; absent outside it. */
+function allQueuesProps(panel: PanelData, actions: RepositoryActions) {
+  if (!panel.allProjects) return undefined;
+  return {
+    registry: panel.state.registry,
+    queues: panel.state.queues,
+    onOpenProject: (path: string) => void actions.openProject(path, 'queue'),
+  };
+}
+
 /** The page of the open section. */
 export function PageSwitch({ panel, actions }: { panel: PanelData; actions: RepositoryActions }) {
   const { state, chrome, route, scopedApi } = panel;
@@ -39,12 +55,16 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
         <QueueRoute
           common={common}
           queue={queue}
+          globalQueue={state.globalQueue}
+          registry={state.registry}
           now={chrome.now}
           drafts={queueDrafts}
           onDraft={onQueueDraft}
           onQueue={state.setQueue}
           onError={notifyError}
           onNewTask={chrome.newTask.openNewTask}
+          onOpenProject={(path) => void actions.openProject(path, 'queue')}
+          allProjects={allQueuesProps(panel, actions)}
           newTaskPage={newTaskPageProps(panel)}
         />
       );
@@ -56,7 +76,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           streamedNetwork={state.streamedNetwork}
           repository={selected}
           repositories={state.repositories}
-          onSelectRepository={(path) => void actions.selectRepository(path)}
+          onSelectRepository={(path) => void actions.switchProject(path)}
           registry={state.registry}
           onRegistry={state.setRegistry}
           onProjectMoved={actions.projectMoved}
@@ -71,7 +91,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
       return <StatsRoute common={common} registry={state.registry} />;
     case 'pipelines':
     case 'specialists':
-      return <ListRoute common={common} />;
+      return <ListRoute common={common} allProjects={listProjects(panel)} />;
     default:
       return (
         <RunsPage
@@ -90,8 +110,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           onRoute={panel.setRoute}
           repository={selected}
           repositoryPaths={panel.repositoryPaths}
-          scope={panel.scope}
-          onScope={panel.setScope}
+          scope={panel.allProjects ? 'all' : 'repository'}
           onSubtask={queue ? chrome.newTask.openSubtask : undefined}
           history={state.history}
         />

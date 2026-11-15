@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import type { LevelFilter } from '../specialists/index.ts';
+import { ProjectFilter } from '../../shared/ui/forms/filters/ProjectFilter.tsx';
 import { Input } from '../../shared/ui/forms/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 import type { PipelineFilter, PipelineFilterOptions } from './pipelineFilters.ts';
@@ -16,7 +17,10 @@ export function PipelineFilters({
   search,
   onFilter,
   onSearch,
+  projectCounts,
 }: {
+  /** How many rows each choice of «Project» shows. */
+  projectCounts?: ReadonlyMap<string, number>;
   filter: PipelineFilter;
   options: PipelineFilterOptions;
   search: string;
@@ -47,6 +51,12 @@ export function PipelineFilters({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
+      <ProjectFilter
+        options={options.projects}
+        selected={filter.projects}
+        counts={projectCounts}
+        onChange={(projects) => onFilter({ ...filter, projects })}
+      />
       {options.tags.length > 0 ? (
         <FilterField
           label={t('pipelines.filters.tags')}

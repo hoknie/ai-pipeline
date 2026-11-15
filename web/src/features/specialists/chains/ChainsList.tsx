@@ -2,6 +2,8 @@ import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { EditorChain, EntryLevel } from '../../../shared/api/types.ts';
+import { rowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { EntryList } from '../../../shared/ui/layout/EntryList.tsx';
@@ -26,7 +28,7 @@ export function ChainsList({
   onNew,
   onSelect,
 }: {
-  chains: EditorChain[];
+  chains: (EditorChain & { project?: ProjectRef | null })[];
   loaded: boolean;
   selected: string | null;
   onNew: () => void;
@@ -52,14 +54,26 @@ export function ChainsList({
               : 'on_error';
           const modeLabel = t(`chains.modes.${mode}`);
           return {
-            id: chain.slug,
+            id: rowKey(chain.project?.slug, chain.slug),
             title: String(chain.raw.name || chain.slug),
             subtitle: subtitleOf(chain, modeLabel),
             tag: t(`settings.editor.levels.${chain.level}`),
-            extra:
-              chain.raw.enabled === false ? (
-                <Badge variant="mute">{t('chains.disabled')}</Badge>
-              ) : null,
+            extra: (
+              <>
+                {chain.project ? (
+                  <span
+                    data-project-label={chain.project.slug}
+                    className="flex items-center gap-1 text-xs text-muted-foreground"
+                  >
+                    <ProjectDot color={chain.project.color} />
+                    {chain.project.label}
+                  </span>
+                ) : null}
+                {chain.raw.enabled === false ? (
+                  <Badge variant="mute">{t('chains.disabled')}</Badge>
+                ) : null}
+              </>
+            ),
           };
         })}
       />

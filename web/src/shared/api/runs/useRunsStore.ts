@@ -4,6 +4,7 @@ import type { ObserversView } from '../observerTypes.ts';
 import type { Connection } from '../stream.ts';
 import type {
   DaemonMismatch,
+  GlobalQueueView,
   NetworkStatus,
   QueueView,
   RepositoryView,
@@ -18,6 +19,8 @@ import type { RunsSetters } from './streamEvents.ts';
 export interface RunsState {
   runs: Map<string, RunView>;
   queues: Map<string, QueueView>;
+  /** The global queue in the global mode; null in the project mode. */
+  globalQueue: GlobalQueueView | null;
   registry: RepositoryView[];
   home: string | null;
   connection: Connection;
@@ -44,6 +47,7 @@ export function useRunsStore(
   const [streamedNetwork, setStreamedNetwork] = useState<NetworkStatus | null>(null);
   const [runs, setRuns] = useState<Map<string, RunView>>(new Map());
   const [queues, setQueues] = useState<Map<string, QueueView>>(new Map());
+  const [globalQueue, setGlobalQueue] = useState<GlobalQueueView | null>(null);
   const [registry, setRegistry] = useState<RepositoryView[]>([]);
   const [home, setHome] = useState<string | null>(null);
   const [connection, setConnection] = useState<Connection>('reconnecting');
@@ -65,6 +69,7 @@ export function useRunsStore(
   const state = {
     runs,
     queues,
+    globalQueue,
     registry,
     home,
     connection,
@@ -80,6 +85,7 @@ export function useRunsStore(
   const set = {
     setRuns,
     setQueues,
+    setGlobalQueue,
     setRegistry,
     setHome,
     setLoaded,

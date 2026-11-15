@@ -42,6 +42,18 @@ export interface QueueTaskOptions {
   json?: boolean;
 }
 
+/** `--note <project>=<text>` into the notes of `queue_add_projects`. */
+export function parseNotes(values: string[] | undefined): Record<string, string> | undefined {
+  if (values === undefined) return undefined;
+  const notes: Record<string, string> = {};
+  for (const value of values) {
+    const split = value.indexOf('=');
+    if (split < 1) throw usage(`--note must be <project>=<text>, got \`${value}\``);
+    notes[value.slice(0, split)] = value.slice(split + 1);
+  }
+  return notes;
+}
+
 export function parseDeliveryMode(value: string | undefined): DeliveryMode | undefined {
   if (value === undefined) return undefined;
   const mode = DELIVERY_MODES.find((candidate) => candidate === value);

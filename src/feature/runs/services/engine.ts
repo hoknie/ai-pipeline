@@ -9,6 +9,7 @@ import {
 import type { ObservePort, QueueAdvancePort, RunsPublishPort } from '../ports/index.ts';
 import type { NetworkSnapshot } from '../../network/types/index.ts';
 import {
+  type DispatchLimit,
   allGroups,
   limitHolds,
   networkRetryAt,
@@ -40,6 +41,8 @@ export interface RunEngineDependencies {
   publish: RunsPublishPort;
   /** The state of the network now: agents do not start while it is down. */
   network: () => NetworkSnapshot;
+  /** What caps the working specialists now: each repository's `swarm.max`, or one machine limit. */
+  limit?: () => DispatchLimit;
 }
 
 /**
@@ -102,7 +105,12 @@ export class RunEngine {
       const all = states.all();
       const active = all.filter((state) => state.run.finishedAt === null);
       // Finished runs too: a usage limit of a failed run still holds its runtime.
-      const effects = dispatch(all, now(), this.dependencies.network());
+      const effects = dispatch(
+        all,
+        now(),
+        this.dependencies.network(),
+        this.dependencies.limit?.(),
+      );
       this.armWake();
       if (effects.length === 0) return;
       for (const state of active) this.save(state);
@@ -184,7 +192,12 @@ export class RunEngine {
   /** Recomputes which queued groups wait, and tells subscribers about runs whose waits changed. */
   private refreshWaits(): void {
     const states = this.dependencies.states.all();
-    this.waits = planDispatch(states, this.dependencies.now(), this.dependencies.network()).waits;
+    this.waits = planDispatch(
+      states,
+      this.dependencies.now(),
+      this.dependencies.network(),
+      this.dependencies.limit?.(),
+    ).waits;
     const changed: RunState[] = [];
     const repositories = new Set<string>();
     for (const state of states) {

@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../shared/api/api.ts';
-import type { RunScope } from '../features/runs/index.ts';
 import { AppShell } from './shell/AppShell.tsx';
 import { DaemonBanner } from './shell/DaemonBanner.tsx';
 import { StatusBar } from './shell/status/StatusBar.tsx';
@@ -43,6 +42,7 @@ function Panel({
           <StatusBar
             runs={state.runs}
             selected={state.selected}
+            allProjects={panel.allProjects}
             connection={state.connection}
             streamedProcesses={state.streamedProcesses}
             api={api}

@@ -34,6 +34,8 @@ export interface QueueItem {
   error: string | null;
   /** A returned run: taking the item retries this run instead of creating one. */
   run: string | null;
+  /** Place among the tasks of all projects (from 1) in the global mode; absent in the project mode. */
+  globalPosition?: number;
 }
 
 export type QueueStop =

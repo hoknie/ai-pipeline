@@ -2,6 +2,7 @@ import { key } from '../types/editor.ts';
 import {
   loadNetworkSettings,
   loadAttachmentSettings,
+  loadQueueSettings,
   loadRuntimeSettings,
   loadStatsSettings,
   loadWebSettings,
@@ -15,6 +16,7 @@ import {
   type ConfigPaths,
   type ConfigSource,
   defaultNetwork,
+  defaultQueue,
   defaultRuntimes,
   defaultStats,
   defaultWeb,
@@ -23,6 +25,7 @@ import {
   type Level,
   type LevelFiles,
   type NetworkSettings,
+  type QueueSettings,
   redactProxy,
   type ResolvedConfig,
   RUNTIMES,
@@ -103,7 +106,8 @@ function globalSectionSettings(
   const network = safe(() => loadNetworkSettings(paths), defaultNetwork);
   const attachments = safe(() => loadAttachmentSettings(paths), defaultAttachments);
   const stats = safe(() => loadStatsSettings(paths), defaultStats);
-  return sectionValues(web, runtimes, network, attachments, stats).map(([path, value]) => ({
+  const queue = safe(() => loadQueueSettings(paths), defaultQueue);
+  return sectionValues(web, runtimes, network, attachments, stats, queue).map(([path, value]) => ({
     path,
     value,
     file: originOf(...(path.split('.') as [string, ...string[]])),
@@ -117,6 +121,7 @@ function sectionValues(
   network: NetworkSettings,
   attachments: AttachmentSettings,
   stats: StatsSettings,
+  queue: QueueSettings,
 ): [string, unknown][] {
   const result: [string, unknown][] = [
     ['web.autostart', web.autostart],
@@ -135,6 +140,8 @@ function sectionValues(
     ['attachments.s3.endpoint', attachments.s3.endpoint],
     ['attachments.s3.prefix', attachments.s3.prefix],
     ['attachments.s3.path_style', attachments.s3.pathStyle],
+    ['queue.scope', queue.scope],
+    ['queue.max', queue.max],
     ['stats.enabled', stats.enabled],
     ['stats.exclude', stats.exclude],
     ['stats.show_cost', stats.showCost],
@@ -207,6 +214,7 @@ export function editorSettings(
       defaultNetwork(),
       defaultAttachments(),
       defaultStats(),
+      defaultQueue(),
     ),
   ]);
   const proxyCredentials = hasCredentials(globalNetwork(paths));

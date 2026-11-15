@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
 import { emptyDraft, fieldsOf, retarget } from '../src/features/queue/QueueForm.tsx';
+import { defaultSharedTag } from '../src/features/queue/form/sharedTag.ts';
 import type { Api } from '../src/shared/api/api.ts';
 import type { QueueView, RunView } from '../src/shared/api/types.ts';
 import { en } from '../src/shared/i18n/locales/en.ts';
@@ -783,8 +784,11 @@ describe('subtask from the run header', () => {
       finishedAt: 6_000,
     });
     const { api } = twoRepositories({ runs: [libRun] });
-    fireEvent.click(await screen.findByRole('radio', { name: 'All repositories' }));
-    fireEvent.click(await screen.findByText('Библиотека'));
+    const menu = await screen.findByRole('button', { name: /Repository:/ });
+    fireEvent.keyDown(menu, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'All projects' }));
+    // the list of all projects opens its first run
+    await waitFor(() => expect(window.location.hash).toBe('#runs/l1'));
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#42 Библиотека'));
     await waitFor(() => expect(api.pipelines).toHaveBeenCalledWith(LIB));
@@ -1287,5 +1291,252 @@ describe('add and continue', () => {
       finish({ ...queueOf({ items: [queueItem('q12', 'First', 12)] }), item: 'q12' });
     });
     await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
+  });
+});
+
+describe('"Waits for" of a new task', () => {
+  it('offers the waiting tasks of other projects in their own group', async () => {
+    twoRepositories();
+    const dialog = await openDialog();
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Waits for' }));
+    expect(await screen.findByRole('option', { name: /app task/ })).toBeTruthy();
+    const other = await screen.findByRole('option', { name: /lib: .*lib old/ });
+    expect(other).toBeTruthy();
+    expect(screen.getByText('Other projects')).toBeTruthy();
+    fireEvent.click(other);
+    await waitFor(() =>
+      expect(within(dialog).getAllByText(/lib: .*lib old/).length).toBeGreaterThan(0),
+    );
+  });
+});
+
+describe('new task in several projects', () => {
+  function multiMount(
+    options: {
+      app?: string[];
+      lib?: string[];
+      add?: Api['queueAddProjects'];
+    } = {},
+  ) {
+    const pipelinesOfIds = (ids: string[]) => ids.map((id) => pipelineOf({ id }));
+    const api = fakeApi({
+      queue: vi.fn(async () => queueOf({ repository: APP })),
+      runs: vi.fn(async () => []),
+      pipelines: vi.fn(async (repository?: string) =>
+        repository === LIB
+          ? pipelinesView({
+              repository: LIB,
+              pipelines: pipelinesOfIds(options.lib ?? ['feature']),
+            })
+          : pipelinesView({
+              repository: APP,
+              pipelines: pipelinesOfIds(options.app ?? ['feature']),
+            }),
+      ),
+      ...(options.add ? { queueAddProjects: options.add } : {}),
+    });
+    render(<App api={api as Api} openStream={openFake} />);
+    act(() => {
+      FakeEventSource.last?.send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [],
+        queues: [queueOf({ repository: APP }), queueOf({ repository: LIB })],
+        repositories: [repositoryView(APP), repositoryView(LIB)],
+      });
+    });
+    return api;
+  }
+
+  async function openMulti() {
+    const dialog = await openDialog();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe(
+        'feature',
+      ),
+    );
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'In several projects' }));
+    return dialog;
+  }
+
+  async function clickAdd(dialog: HTMLElement) {
+    const button = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+  }
+
+  const pickProject = (dialog: HTMLElement, name: string) =>
+    fireEvent.click(within(dialog).getByRole('checkbox', { name }));
+
+  it('adds the task to two projects with one request', async () => {
+    const add = vi.fn(async () => [
+      { repository: APP, project: 'app', item: 'q1', number: 1 },
+      { repository: LIB, project: 'lib', item: 'q2', number: 1 },
+    ]);
+    const api = multiMount({ add });
+    const dialog = await openMulti();
+    // the project of the field is chosen first
+    expect(
+      within(dialog).getByRole<HTMLInputElement>('checkbox', { name: 'app' }).dataset.state,
+    ).toBe('checked');
+    const addButton = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
+    expect(addButton.disabled).toBe(true);
+    expect(within(dialog).getByText('Choose at least two projects')).toBeTruthy();
+    pickProject(dialog, 'lib');
+    await waitFor(() => expect(addButton.disabled).toBe(false));
+    fireEvent.click(addButton);
+    await waitFor(() => expect(add).toHaveBeenCalledTimes(1));
+    expect(add).toHaveBeenCalledWith({
+      repositories: [APP, LIB],
+      pipeline: 'feature',
+      task: 'Email',
+    });
+    expect(api.queueAdd).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+  });
+
+  it('changes the order of the projects and keeps the first one when the mode is switched off', async () => {
+    const add = vi.fn(async () => []);
+    multiMount({ add });
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Move lib up' }));
+    const order = within(dialog).getByRole('list', { name: 'Order of the projects' });
+    expect(
+      within(order)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([expect.stringContaining('lib'), expect.stringContaining('app')]);
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
+    await clickAdd(dialog);
+    await waitFor(() => expect(add).toHaveBeenCalled());
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ repositories: [LIB, APP] }));
+  });
+
+  it('keeps the first chosen project when the switch is turned off', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Move lib up' }));
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'In several projects' }));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Repository' }).textContent).toContain(
+        'lib',
+      ),
+    );
+  });
+
+  it('offers only the pipelines every chosen project has', async () => {
+    multiMount({ app: ['feature', 'fix'], lib: ['feature', 'ui'] });
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    fireEvent.keyDown(await within(dialog).findByRole('combobox', { name: 'Pipeline' }), {
+      key: 'Enter',
+    });
+    const options = await screen.findAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual(['feature']);
+  });
+
+  it('says so when the projects have no pipeline in common and does not add', async () => {
+    multiMount({ app: ['feature'], lib: ['docs'] });
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    expect(
+      await within(dialog).findByText('The selected projects have no pipeline in common'),
+    ).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'x' } });
+    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
+      true,
+    );
+  });
+
+  it('fills the shared tag from the title and sends the additions and the chain', async () => {
+    const add = vi.fn(async () => []);
+    multiMount({ add });
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    fireEvent.change(within(dialog).getByLabelText('Name'), {
+      target: { value: 'Email в профиле' },
+    });
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Shared tag').value).toBe(
+      'Email в профиле',
+    );
+    fireEvent.change(within(dialog).getByLabelText('Task text'), {
+      target: { value: 'Поле email' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Addition for lib'), {
+      target: { value: 'Форма' },
+    });
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'In turn' }));
+    await clickAdd(dialog);
+    await waitFor(() => expect(add).toHaveBeenCalled());
+    expect(add).toHaveBeenCalledWith({
+      repositories: [APP, LIB],
+      pipeline: 'feature',
+      task: 'Поле email',
+      title: 'Email в профиле',
+      notes: { [LIB]: 'Форма' },
+      tag: 'Email в профиле',
+      chain: true,
+    });
+  });
+
+  it('keeps the tag the user typed and sends no tag when it is emptied', async () => {
+    const add = vi.fn(async () => []);
+    multiMount({ add });
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Title' } });
+    const tag = within(dialog).getByLabelText<HTMLInputElement>('Shared tag');
+    fireEvent.change(tag, { target: { value: 'mine' } });
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Other title' } });
+    expect(tag.value).toBe('mine');
+    fireEvent.change(tag, { target: { value: '' } });
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'x' } });
+    await clickAdd(dialog);
+    await waitFor(() => expect(add).toHaveBeenCalled());
+    const [sent] = add.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(sent).not.toHaveProperty('tag');
+    expect(sent).not.toHaveProperty('chain');
+  });
+
+  it('hides the groups, the attachments and the tags of the project', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    expect(within(dialog).queryByRole('radio', { name: 'Groups' })).toBeNull();
+    expect(within(dialog).queryByText('Attachments')).toBeNull();
+    expect(within(dialog).queryByText('Tags')).toBeNull();
+    expect(within(dialog).queryByText('Parent task')).toBeNull();
+  });
+
+  it('shows the error with the project and keeps what was typed', async () => {
+    const add = vi.fn(async () => {
+      throw new Error('unknown pipeline `feature` in project `lib`');
+    });
+    multiMount({ add });
+    const dialog = await openMulti();
+    pickProject(dialog, 'lib');
+    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
+    await clickAdd(dialog);
+    expect(
+      await within(dialog).findByText('unknown pipeline `feature` in project `lib`'),
+    ).toBeTruthy();
+    expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('Email');
+    expect(
+      within(dialog).getByRole<HTMLInputElement>('checkbox', { name: 'lib' }).dataset.state,
+    ).toBe('checked');
+  });
+});
+
+describe('the shared tag of a title', () => {
+  it('cuts at the last whole word within 30 characters', () => {
+    expect(defaultSharedTag('Email в профиле')).toBe('Email в профиле');
+    expect(defaultSharedTag('  Add   the email field to the user profile page ')).toBe(
+      'Add the email field to the',
+    );
+    expect(defaultSharedTag('Add the email field to the user')).toBe('Add the email field to the');
+    expect(defaultSharedTag('x'.repeat(40))).toBe('x'.repeat(30));
+    expect(defaultSharedTag('')).toBe('');
   });
 });

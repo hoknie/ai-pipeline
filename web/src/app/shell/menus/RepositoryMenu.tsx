@@ -35,6 +35,10 @@ export interface RepositoryChoice {
   /** Runs waiting for an answer, by repository. */
   waiting: ReadonlyMap<string, number>;
   onSelect: (repository: string) => void;
+  /** Whether the mode «All projects» is on. */
+  allProjects?: boolean;
+  /** Turns the mode «All projects» on; absent: the menu has no such item. */
+  onAllProjects?: () => void;
   /** Adds the repository of a path; rejects with the daemon's message when it refuses. */
   onAdd: (path: string) => Promise<void>;
   /** The folder browser of the path field. */
@@ -74,16 +78,18 @@ export function RepositoryMenu({
     return () => clearTimeout(timer);
   }, [open]);
   if (selected === null) return <AddFirstRepository compact={compact} {...adder} />;
-  const name = repositoryLabel(selected);
+  const all = choice.allProjects === true;
+  const name = all ? t('nav.repositoryAll') : repositoryLabel(selected);
   const others = repositories
-    .filter((path) => path !== selected)
+    .filter((path) => all || path !== selected)
     .reduce((sum, path) => sum + (waiting.get(path) ?? 0), 0);
   const matching = repositories.filter((path) => repositoryMatches(path, shownPath(path), query));
   const trigger = (
     <RepositoryTrigger
       name={name}
       label={t('nav.repositoryCurrent', { name })}
-      title={selected}
+      title={all ? name : selected}
+      all={all}
       others={others}
       compact={compact}
     />
@@ -106,7 +112,8 @@ export function RepositoryMenu({
           <RepositorySearch ref={search} query={query} onQuery={setQuery} />
           <RepositoryList
             matching={matching}
-            selected={selected}
+            selected={all ? null : selected}
+            onAll={repositories.length > 0 ? choice.onAllProjects : undefined}
             shownPath={shownPath}
             waiting={waiting}
             onSelect={onSelect}

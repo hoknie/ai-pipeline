@@ -36,7 +36,6 @@ export function RunsPage(props: RunsPageProps) {
     filters,
     onFilters: setStored,
     scope,
-    onScope: props.onScope,
     repository,
     repositoryPaths: props.repositoryPaths,
   };

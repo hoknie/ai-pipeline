@@ -6,6 +6,7 @@ import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
 import {
   EMPTY_PIPELINE_FILTER,
   activePipelineFilterCount,
+  applyPipelineFilter,
   existingPipelineFilter,
   pipelineFilterOptions,
   savedPipelineFilter,
@@ -44,6 +45,12 @@ export function usePipelineFilterState(view: ConfigEditorResponse | null) {
     }
   }, [view, repository, filter, stored, savedByRepository, setSavedByRepository]);
   const count = activePipelineFilterCount(filter, search);
+  // the rows the filters leave, but for the choice of the project: they stand for its counts
+  const rowsWithoutProject = applyPipelineFilter(
+    view?.pipelines ?? [],
+    { ...filter, projects: [] },
+    search,
+  );
   return {
     repository,
     options,
@@ -54,6 +61,7 @@ export function usePipelineFilterState(view: ConfigEditorResponse | null) {
     collapsed,
     setCollapsed,
     count,
+    rowsWithoutProject,
   };
 }
 

@@ -6,7 +6,7 @@ import { Badge } from '../../feedback/badge.tsx';
 import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '../../overlays/command.tsx';
 import { PopoverTrigger } from '../../overlays/popover.tsx';
 
-export type OptionSource = 'builtin' | 'project' | 'global';
+export type OptionSource = 'builtin' | 'project' | 'global' | 'other';
 
 export interface PickerOption {
   name: string;
@@ -20,7 +20,7 @@ export interface ValueLook {
   hint?: (value: string) => string | undefined;
 }
 
-export const GROUPS: OptionSource[] = ['builtin', 'project', 'global'];
+export const GROUPS: OptionSource[] = ['builtin', 'project', 'global', 'other'];
 export const CREATE = '__create';
 
 function ValueChip({

@@ -59,8 +59,9 @@ The repository picker lists the enabled [projects of the daemon](../usage/reposi
 
 - "Add repository…" takes a path inside a git repository, absolute or from the home directory (`~/…`), adds its root and selects it. "Browse…" next to the field opens a folder browser of the machine the panel runs on; git roots are marked.
 - The picker does not remove repositories: remove one in the group ["Projects"](settings.md#projects) of the settings or with `aip repo remove`.
-- The choice is remembered in the browser. "Queue", "Specialists", "Pipeline" and the command palette work with the selected repository.
-- Other repositories with runs waiting for an answer get a counter in the list.
+- The first item, "All projects", turns on a mode in which "Runs", "Queue", "Specialists" and "Pipeline" show all enabled projects at once. Choosing a project turns the mode off. The mode and the last chosen project are remembered in the browser; the project stays the default where one project is needed (the new task dialog, the "Project" tab of the settings).
+- Outside that mode "Queue", "Specialists", "Pipeline" and the command palette work with the selected repository.
+- Other repositories with runs waiting for an answer get a counter in the list; with "All projects" on, the header button counts them all.
 
 ## Status
 

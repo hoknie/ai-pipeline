@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { packageVersion } from '../../platform/build/index.ts';
 import { formatQueue, formatRun } from '../format/index.ts';
 import { repositoryArgument } from '../ipc/client/index.ts';
-import type { QueueView, RunView } from '../ipc/contract/index.ts';
+import type { GlobalQueueView, QueueView, RepositoryView, RunView } from '../ipc/contract/index.ts';
 import type { Send } from './tools.ts';
 
 export interface HostOptions {
@@ -15,6 +15,23 @@ export interface HostOptions {
 
 export function withData(text: string, data: unknown): string {
   return `${text}\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+}
+
+/** The registry, when the queue has predecessors from other projects whose slugs the text names. */
+async function projectsOf(
+  send: Send,
+  view: QueueView | GlobalQueueView,
+): Promise<RepositoryView[]> {
+  const foreign = view.items.some((entry) =>
+    entry.after.some(
+      (dependency) =>
+        dependency.repository !== null &&
+        dependency.repository !== ('repository' in view ? view.repository : null),
+    ),
+  );
+  if (!foreign && view.scope !== 'global') return [];
+  const list = await send('repositories', {});
+  return Array.isArray(list) ? (list as RepositoryView[]) : [];
 }
 
 export function hostKit(options: HostOptions) {
@@ -47,7 +64,7 @@ export function hostKit(options: HostOptions) {
     .array(z.string())
     .optional()
     .describe(
-      'Ids of queue items or runs of the repository that must be done (finished, merged and delivered) first. Edit replaces the whole list; [] removes the dependencies',
+      'Ids of queue items or runs of any project that must be done (finished, merged and delivered) first. Edit replaces the whole list; [] removes the dependencies',
     );
   const attachments = z
     .array(z.string())
@@ -72,8 +89,8 @@ export function hostKit(options: HostOptions) {
     const view = (await options.send(method, {
       repository: where === undefined ? options.cwd : repositoryArgument(where, options.cwd),
       ...params,
-    })) as QueueView & { item?: string };
-    const text = formatQueue(view);
+    })) as (QueueView | GlobalQueueView) & { item?: string };
+    const text = formatQueue(view, undefined, await projectsOf(options.send, view));
     return withData(view.item ? `Added item ${view.item}.\n${text}` : text, view);
   };
   return {

@@ -61,12 +61,14 @@ const SAMPLES: Record<Method, unknown> = {
   answer: { ...target, answer: 'yes' },
   message: { ...target, seq: 1, text: 'hi' },
   queue: repository,
+  queues: {},
   repositories: {},
   repository_add: { path: '/repo' },
   repository_update: { path: '/repo', name: 'App' },
   repository_move: { path: '/repo', to: '/other' },
   repository_remove: { path: '/repo' },
   queue_add: { ...repository, pipeline: 'feature', task: 'do it' },
+  queue_add_projects: { repositories: ['/a', '/b'], pipeline: 'feature', task: 'do it' },
   queue_edit: { ...repository, item: 'q1' },
   queue_remove: { ...repository, item: 'q1' },
   queue_start: repository,
@@ -105,9 +107,9 @@ const SAMPLES: Record<Method, unknown> = {
 const methods = Object.keys(SAMPLES) as Method[];
 
 describe('IPC requests', () => {
-  it('has 82 methods, each in the request schema once', () => {
+  it('has 84 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(82);
+    expect(methods).toHaveLength(84);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

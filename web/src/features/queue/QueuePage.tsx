@@ -15,6 +15,7 @@ import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import type { QueueDraft } from './QueueForm.tsx';
 import { QueueList } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
+import { QueueLinksContext } from './list/links.tsx';
 import { related } from './queueLinks.ts';
 import { parseParallel } from './ParallelStepper.tsx';
 import { QueueSide } from './QueueSide.tsx';
@@ -22,7 +23,7 @@ import { StopReason } from './cards/StopReason.tsx';
 
 export { parseParallel };
 
-function usePipelines(api: Api): PipelinesView | null {
+export function usePipelines(api: Api): PipelinesView | null {
   const [pipelines, setPipelines] = useState<PipelinesView | null>(null);
   useEffect(() => {
     let closed = false;
@@ -39,7 +40,7 @@ function usePipelines(api: Api): PipelinesView | null {
   return pipelines;
 }
 
-export default function QueuePage({
+function QueueBody({
   api,
   queue,
   now,
@@ -119,5 +120,19 @@ export default function QueuePage({
         </div>
       </div>
     </div>
+  );
+}
+
+type PageProps = React.ComponentProps<typeof QueueBody> & {
+  /** The queues of the other enabled projects. */
+  others?: readonly QueueView[];
+  onOpenProject?: (path: string) => void;
+};
+
+export default function QueuePage({ others = [], onOpenProject, ...props }: PageProps) {
+  return (
+    <QueueLinksContext.Provider value={{ others, openProject: onOpenProject }}>
+      <QueueBody {...props} />
+    </QueueLinksContext.Provider>
   );
 }

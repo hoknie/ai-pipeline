@@ -1,5 +1,11 @@
 import { existingSelection, filterSpecialists, repositoryTags } from './specialistTags.ts';
 import type { EditorSpecialist } from '../../shared/api/types.ts';
+import {
+  inProjects,
+  projectOptions,
+  type ProjectOption,
+  type ProjectRef,
+} from '../../shared/lib/catalog/projectRows.ts';
 
 export type LevelFilter = 'all' | 'project' | 'global';
 
@@ -7,6 +13,8 @@ export type LevelFilter = 'all' | 'project' | 'global';
 export interface SpecialistFilter {
   level: LevelFilter;
   tags: string[];
+  /** Slugs of projects, or the value of the shared ones; only in the mode «All projects». */
+  projects: string[];
   runtimes: string[];
   models: string[];
   skills: string[];
@@ -17,6 +25,7 @@ export interface SpecialistFilter {
 export const EMPTY_FILTER: SpecialistFilter = {
   level: 'all',
   tags: [],
+  projects: [],
   runtimes: [],
   models: [],
   skills: [],
@@ -30,7 +39,7 @@ export const LIST_FIELDS: ListField[] = ['runtimes', 'models', 'skills', 'tools'
 type Entry = Pick<
   EditorSpecialist,
   'slug' | 'level' | 'raw' | 'effective' | 'shared_tags' | 'own_tags'
->;
+> & { project?: ProjectRef | null };
 
 export interface SpecialistValues {
   name: string | null;
@@ -70,6 +79,7 @@ export function specialistValues(entry: Entry): SpecialistValues {
 
 export interface FilterOptions {
   tags: { name: string; shared: boolean }[];
+  projects: ProjectOption[];
   runtimes: string[];
   models: string[];
   skills: string[];
@@ -87,6 +97,7 @@ export function filterOptions(entries: readonly Entry[]): FilterOptions {
     values.filter((value): value is string => value !== null);
   return {
     tags: repositoryTags(entries),
+    projects: projectOptions(entries),
     runtimes: unique(nonEmpty(all.map((value) => value.runtime))),
     models: unique(nonEmpty(all.map((value) => value.model))),
     skills: unique(all.flatMap((value) => value.skills)),
@@ -128,6 +139,7 @@ export function applyFilter<T extends Entry>(
   const byTags = filterSpecialists(entries, filter.tags);
   return byTags.filter((entry) => {
     if (!matchesSearch(entry, search) || !matchesLevel(filter.level, entry.level)) return false;
+    if (!inProjects(entry, filter.projects)) return false;
     const values = specialistValues(entry);
     return LIST_FIELDS.every((field) => {
       const chosen = filter[field];
@@ -143,6 +155,9 @@ export function existingFilter(filter: SpecialistFilter, options: FilterOptions)
   const next: SpecialistFilter = {
     ...filter,
     tags: existingSelection(filter.tags, options.tags),
+    projects: filter.projects.filter((value) =>
+      options.projects.some((option) => option.value === value),
+    ),
   };
   for (const field of LIST_FIELDS) {
     next[field] = filter[field].filter((value) => options[field].includes(value));
@@ -156,6 +171,7 @@ export function activeFilterCount(filter: SpecialistFilter, search = ''): number
     (search.trim() === '' ? 0 : 1) +
     (filter.level === 'all' ? 0 : 1) +
     (filter.tags.length > 0 ? 1 : 0) +
+    (filter.projects.length > 0 ? 1 : 0) +
     LIST_FIELDS.filter((field) => filter[field].length > 0).length
   );
 }

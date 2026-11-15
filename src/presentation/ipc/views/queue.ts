@@ -6,7 +6,9 @@ import {
   dependencyState,
   freezeCandidate,
   itemReadiness,
+  lookupIn,
   matchesFilter,
+  type ItemLookup,
   occupiesSlot,
 } from '../../../feature/queue/types/index.ts';
 import { stepProgress, summarize } from '../../../feature/runs/services/index.ts';
@@ -144,15 +146,23 @@ function itemBody(
 
 /** A predecessor of a queue item: another item of the queue, or a run. */
 function dependencyView(
-  queue: Queue,
+  find: ItemLookup,
   ref: string,
   lookup: (id: string) => RunState | undefined,
 ): DependencyView {
-  const other = queue.items.find((candidate) => candidate.id === ref);
-  const state = dependencyState(queue, ref, lookup);
-  if (other) {
+  const found = find(ref);
+  const state = dependencyState(find, ref, lookup);
+  if (found) {
+    const other = found.item;
     const label = other.title ?? (other.task ? other.task.trim().split('\n')[0] : null);
-    return { kind: 'item', id: ref, number: other.number, title: label ?? other.pipeline, state };
+    return {
+      kind: 'item',
+      id: ref,
+      number: other.number,
+      title: label ?? other.pipeline,
+      state,
+      repository: found.queue.repository,
+    };
   }
   const run = lookup(ref);
   return {
@@ -161,6 +171,7 @@ function dependencyView(
     number: run ? run.run.number : null,
     title: run ? runTitle(run) : ref,
     state,
+    repository: run ? run.run.repository : null,
   };
 }
 
@@ -174,6 +185,7 @@ export function queueView(
   names: (id: string) => string = (id) => id,
   variantNames: (pipeline: string, variant: string) => string = (_pipeline, variant) => variant,
   attachments: (item: string) => RunAttachment[] = () => [],
+  find: ItemLookup = lookupIn(queue),
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -183,6 +195,7 @@ export function queueView(
   const runs = cards(queue.runs, false);
   const skipped = cards(queue.skipped, true);
   return {
+    scope: 'project',
     repository: queue.repository,
     status: queue.status,
     parallel: queue.parallel,
@@ -219,8 +232,8 @@ export function queueView(
       deliveryMode: item.deliveryMode,
       tags: tagViews(catalog, item.tags),
       skip: [...(item.run === null ? item.skip : (lookup(item.run)?.run.skippedSteps ?? []))],
-      readiness: itemReadiness(queue, item, lookup),
-      after: item.after.map((ref) => dependencyView(queue, ref, lookup)),
+      readiness: itemReadiness(find, item, lookup),
+      after: item.after.map((ref) => dependencyView(find, ref, lookup)),
       postponed: item.postponed,
       filtered: !matchesFilter(queue.filter, item),
       createdAt: item.createdAt,

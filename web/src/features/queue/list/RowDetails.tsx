@@ -7,6 +7,7 @@ import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { QueueForm, type QueueDraft } from '../QueueForm.tsx';
 import { afterOptions, type ParentChoice } from '../queueLinks.ts';
 import { itemLabel } from './itemText.ts';
+import { useQueueLinks } from './links.tsx';
 import { DependencyChip } from './RowParts.tsx';
 import type { useQueueActions } from './useQueueActions.ts';
 
@@ -32,6 +33,7 @@ export function RowDetails({
 }) {
   const { t } = useTranslation();
   const { started } = actions;
+  const { others } = useQueueLinks();
   return (
     <>
       {item.after.length > 0 ? (
@@ -41,7 +43,7 @@ export function RowDetails({
         >
           <span className="text-muted-foreground">{t('queue.list.waitsFor')}</span>
           {item.after.map((ref) => (
-            <DependencyChip key={ref.id} dependency={ref} />
+            <DependencyChip key={ref.id} dependency={ref} repository={queue.repository} />
           ))}
         </div>
       ) : null}
@@ -76,7 +78,7 @@ export function RowDetails({
           api={api}
           autoDeliverDefault={queue.autoDeliver}
           deliveryModeDefault={queue.deliveryMode}
-          afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item)}
+          afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item, others)}
           parentChoices={parents}
           locked={item.run !== null}
           submitLabel={t('queue.list.save')}

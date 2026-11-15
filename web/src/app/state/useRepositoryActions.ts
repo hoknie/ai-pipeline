@@ -10,6 +10,7 @@ import { notifyError } from '../../shared/lib/browser/notify.ts';
 import type { Route } from '../../shared/lib/nav/route.ts';
 import type { PanelData } from './usePanelData.ts';
 import { useConfirm } from '../../shared/ui/overlays/confirm.tsx';
+import { useProjectSwitch } from './useProjectSwitch.ts';
 
 const closedRuns: Route = { view: 'runs', run: null, group: null, step: null, tab: null };
 
@@ -27,26 +28,7 @@ export function useRepositoryActions(panel: PanelData) {
     dirty.current = false;
     lastRun.current = null;
   };
-  /** Makes a repository the panel's; false when the user stays with unsaved edits. */
-  const selectRepository = async (path: string): Promise<boolean> => {
-    if (path === selected) return true;
-    if (
-      dirty.current &&
-      !(await confirm({
-        title: t('settings.editor.leaveTitle'),
-        description: t('settings.editor.leaveDescription'),
-        confirmLabel: t('settings.editor.leave'),
-        cancelLabel: t('settings.editor.stay'),
-        destructive: true,
-      }))
-    )
-      return false;
-    reset();
-    setChosen(path);
-    // A run of the previous repository cannot stay open: the list is about to show another.
-    if (route.view === 'runs') setRoute(closedRuns);
-    return true;
-  };
+  const { selectAllProjects, selectRepository, switchProject } = useProjectSwitch(panel, reset);
 
   const addRepository = async (path: string) => {
     const list = await api.addRepository(path);
@@ -85,7 +67,8 @@ export function useRepositoryActions(panel: PanelData) {
 
   /** A project moved: the chosen repository follows it to the new path. */
   const projectMoved = (from: string, to: string) => {
-    if (latest.current.chosen === from || latest.current.selected === from) setChosen(to);
+    if (latest.current.chosen === from || latest.current.selected === from)
+      panel.rememberProject(to);
   };
 
   /** Makes a project the panel's repository, then opens its settings or its queue. */
@@ -97,5 +80,13 @@ export function useRepositoryActions(panel: PanelData) {
         : { view: 'settings', run: 'general', group: 'project', step: null, tab: null },
     );
   };
-  return { selectRepository, addRepository, removeRepository, projectMoved, openProject };
+  return {
+    selectAllProjects,
+    switchProject,
+    selectRepository,
+    addRepository,
+    removeRepository,
+    projectMoved,
+    openProject,
+  };
 }

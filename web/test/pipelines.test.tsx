@@ -1035,7 +1035,7 @@ describe('pipeline tags and filters', () => {
     await waitFor(() => expect(rows()).toHaveLength(2));
     expect(rows().some((row) => row.includes('feature'))).toBe(false);
     expect(JSON.parse(window.localStorage.getItem('aip.web.pipelineFilters') ?? '{}')).toEqual({
-      '/repo': { level: 'all', tags: ['fast'], specialists: [] },
+      '/repo': { level: 'all', tags: ['fast'], specialists: [], projects: [] },
     });
     view.unmount();
     render(<Page api={api} />);

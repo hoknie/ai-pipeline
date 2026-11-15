@@ -6,6 +6,7 @@ import {
   type LevelFilter,
   type SpecialistFilter,
 } from './specialistFilters.ts';
+import { ProjectFilter } from '../../shared/ui/forms/filters/ProjectFilter.tsx';
 import { Input } from '../../shared/ui/forms/input.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 
@@ -20,7 +21,10 @@ export function SpecialistFilters({
   search,
   onFilter,
   onSearch,
+  projectCounts,
 }: {
+  /** How many rows each choice of «Project» shows; absent: no counts. */
+  projectCounts?: ReadonlyMap<string, number>;
   filter: SpecialistFilter;
   options: FilterOptions;
   search: string;
@@ -56,6 +60,12 @@ export function SpecialistFilters({
           ))}
         </ToggleGroup>
       </div>
+      <ProjectFilter
+        options={options.projects}
+        selected={filter.projects}
+        counts={projectCounts}
+        onChange={(projects) => onFilter({ ...filter, projects })}
+      />
       {options.tags.length > 0 ? (
         <FilterField
           label={t('specialists.filters.tags')}

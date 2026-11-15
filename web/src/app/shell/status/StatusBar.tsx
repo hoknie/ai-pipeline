@@ -5,7 +5,6 @@ import type { Api } from '../../../shared/api/api.ts';
 import { useBackgroundProcesses } from './backgroundProcesses.ts';
 import { usePreference } from '../../../shared/lib/browser/preferences.ts';
 import { useStatusBarHeight } from './statusBarHeight.ts';
-import { loadSections, machineLoad } from '../../../shared/lib/pipeline/specialistLoad.ts';
 import type { Connection } from '../../../shared/api/stream.ts';
 import type { StreamedProcesses } from '../../../shared/api/runs/runsState.ts';
 import type { RunView } from '../../../shared/api/types.ts';
@@ -15,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../shared/ui/lay
 import { BackgroundProcesses } from './BackgroundProcesses.tsx';
 import { StatusBarHeader } from './StatusBarHeader.tsx';
 import { SpecialistLoadPanel } from './SpecialistLoadPanel.tsx';
+import { useLoadSections } from './useLoadSections.ts';
 import { StatusBarResizeHandle } from './StatusBarResizeHandle.tsx';
 
 /** Where a click on a group of the strip leads. */
@@ -30,6 +30,7 @@ type StatusTab = 'specialists' | 'processes';
 export function StatusBar({
   runs,
   selected,
+  allProjects = false,
   connection,
   streamedProcesses = null,
   api,
@@ -38,6 +39,8 @@ export function StatusBar({
   runs: RunView[];
   /** The repository selected in the panel; its rows come first. */
   selected: string | null;
+  /** The mode «All projects»: the projects are ordered by name, none first. */
+  allProjects?: boolean;
   connection: Connection;
   /** What the event stream last said about background processes. */
   streamedProcesses?: StreamedProcesses | null;
@@ -50,7 +53,7 @@ export function StatusBar({
   const size = useStatusBarHeight();
   const [preview, setPreview] = useState<number | null>(null);
   const polled = useBackgroundProcesses(api, streamedProcesses, connection);
-  const sections = useMemo(() => loadSections(machineLoad(runs), selected), [runs, selected]);
+  const sections = useLoadSections(runs, selected, allProjects);
   const processes = polled.processes === null ? '—' : String(polled.processes.length);
   return (
     <Collapsible
@@ -92,7 +95,7 @@ export function StatusBar({
             <TabsTrigger value="processes">{t('statusBar.tabProcesses')}</TabsTrigger>
           </TabsList>
           <TabsContent value="specialists" className="min-h-0 flex-1 overflow-y-auto pt-3">
-            <SpecialistLoadPanel runs={runs} selected={selected} onOpenGroup={onOpenGroup} />
+            <SpecialistLoadPanel {...{ runs, selected, allProjects, onOpenGroup }} />
           </TabsContent>
           <TabsContent value="processes" className="min-h-0 flex-1 overflow-y-auto">
             <BackgroundProcesses api={api} polled={polled} onOpenGroup={onOpenGroup} />

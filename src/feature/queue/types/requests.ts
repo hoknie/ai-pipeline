@@ -32,6 +32,29 @@ export interface QueueAddRequest extends TaskFields {
   attachments?: AttachmentSource[] | undefined;
 }
 
+/** `queue_add_projects`: one task for the queues of several repositories. */
+export interface QueueAddProjectsRequest extends TaskFields {
+  /** Paths or slugs, in the order of the chain. */
+  repositories: string[];
+  task: string;
+  postponed?: boolean | undefined;
+  /** An addition to the task text per project, by path or slug. */
+  notes?: Record<string, string> | undefined;
+  /** The name of the tag every item gets from the catalog of its project; empty: none. */
+  tag?: string | undefined;
+  /** Each task waits for the one of the previous project. */
+  chain?: boolean | undefined;
+}
+
+/** One item of `queue_add_projects`. */
+export interface AddedToProject {
+  repository: string;
+  /** The slug of the project. */
+  project: string;
+  item: string;
+  number: number;
+}
+
 /** `worker_queue_add`: a task a specialist adds to the queue of its run's repository. */
 export interface WorkerTaskRequest extends TaskFields {
   token: string;
@@ -60,7 +83,14 @@ export interface QueueSettingsRequest {
   autopilotAnswer?: string | null | undefined;
   onLimit?: string | undefined;
   /** Pipeline ids and tag names; the service resolves them. */
-  filter?: { pipelines?: string[] | undefined; tags?: string[] | undefined } | undefined;
+  filter?:
+    | {
+        pipelines?: string[] | undefined;
+        tags?: string[] | undefined;
+        /** Projects of the global queue: paths or slugs. */
+        projects?: string[] | undefined;
+      }
+    | undefined;
 }
 
 /** A queue after a change, with the item the change concerns. */

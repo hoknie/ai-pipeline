@@ -81,7 +81,7 @@ export class QueueItems {
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
-    const after = this.resolveDependencies(queue, params.after ?? []);
+    const after = this.resolveDependencies(params.after ?? []);
     const manual = resolveManualTags(tags.of(repository), params.tags ?? []);
     const parent =
       params.parent === undefined ? null : this.resolveParent(repository, params.parent);
@@ -95,7 +95,10 @@ export class QueueItems {
       params.attachments,
       moment,
     );
-    if (queue.status === 'stopped') {
+    const global = store.scope() === 'global';
+    // A stopped queue is started: the queue of the project, or in the global mode the global one.
+    const stopped = global ? store.globalQueue() : queue;
+    if (!global && stopped.status === 'stopped') {
       startQueue(
         queue,
         queue.runs.flatMap((id) => runs.states.lookup(id) ?? []),
@@ -103,10 +106,20 @@ export class QueueItems {
       );
     }
     store.save(queue);
+    if (global && stopped.status === 'stopped') {
+      const line = store.lines.line(repository);
+      startQueue(
+        line,
+        line.runs.flatMap((id) => runs.states.lookup(id) ?? []),
+        moment,
+      );
+      store.save(line);
+    }
     const started = await advance.advance(repository);
     const run = started.get(item.id) ?? null;
-    if (!run && queue.stop?.kind === 'item' && queue.stop.item === item.id) {
-      throw rejected(queue.stop.error);
+    const stop = global ? store.globalQueue().stop : queue.stop;
+    if (!run && stop?.kind === 'item' && stop.item === item.id) {
+      throw rejected(stop.error);
     }
     return { item: item.id, number: item.number, run, queue };
   }
@@ -120,14 +133,26 @@ export class QueueItems {
   /** `queue_remove`: the item leaves the queue; a returned run it stood for is released. */
   async remove(params: { repository: string; item: string }): Promise<Queue> {
     const { store, registry, runs, attachments, now } = this.dependencies;
-    const queue = store.of(await registry.rootOf(params.repository));
+    const queue = store.lines.ownerOf(await registry.rootOf(params.repository), params.item);
     const removed = queue.items.find((candidate) => candidate.id === params.item);
-    removeItem(queue, params.item, now(), (id) => runs.states.lookup(id));
+    const touched = removeItem(
+      queue,
+      params.item,
+      now(),
+      (id) => runs.states.lookup(id),
+      store.all(),
+    );
     // A returned run keeps its attachments: they belong to the run, not to the item.
     if (removed && removed.run === null) await attachments.removeOwner(removed.id);
     const held = removed?.run ? runs.states.lookup(removed.run) : undefined;
     if (held && held.run.hold !== null) {
       await runs.engine.apply(held, { kind: 'hold', hold: null });
+    }
+    for (const other of touched) {
+      store.save(other);
+      // An item of another project that waited for the removed one may be ready now.
+      if (other.repository !== queue.repository)
+        this.dependencies.advance.request(other.repository);
     }
     return store.save(queue);
   }
@@ -153,7 +178,7 @@ export class QueueItems {
       this.dependencies.registry.requireEnabled(repository);
       await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
       const queue = store.of(repository);
-      const after = this.resolveDependencies(queue, params.after ?? []);
+      const after = this.resolveDependencies(params.after ?? []);
       this.checkNewItem(queue, fields({ ...params, after }), now());
       const tag = await taskTags.linkedTagFor(state);
       const inherited = mergeTags([tag.id], knownTags(tags.of(repository), state.run.tags));
@@ -180,16 +205,15 @@ export class QueueItems {
   }
 
   /**
-   * Turns the ids a task waits for into ids of queue items or runs of the repository.
+   * Turns the ids a task waits for into ids of queue items or runs of any project.
    * An item that already became a run is replaced by that run.
    */
-  resolveDependencies(queue: Queue, ids: string[]): string[] {
+  resolveDependencies(ids: string[]): string[] {
     const { states } = this.dependencies.runs;
     return [...new Set(ids)].map((id) => {
-      if (queue.items.some((item) => item.id === id)) return id;
-      const own = states.lookup(id);
-      if (own?.run.repository === queue.repository) return id;
-      const started = states.runOfQueueItem(queue.repository, id);
+      if (this.dependencies.store.findItem(id)) return id;
+      if (states.lookup(id)) return id;
+      const started = states.runOfQueueItem(null, id);
       if (started) return started.run.id;
       throw rejected(`unknown dependency \`${id}\``);
     });
@@ -221,7 +245,7 @@ export class QueueItems {
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
-    const after = this.resolveDependencies(queue, params.after ?? []);
+    const after = this.resolveDependencies(params.after ?? []);
     let own = inherited ?? resolveManualTags(tags.of(repository), params.tags ?? []);
     const task = fields({ ...params, after });
     if (params.parent !== undefined) {
@@ -254,12 +278,12 @@ export class QueueItems {
     const { attachments } = this.dependencies;
     const id = queueItemId(moment, randomInt(36 ** 3));
     // Refused before any byte is written: the checks of the item run on a copy.
-    addItem(structuredClone(queue), fields, id, moment);
+    addItem(structuredClone(queue), fields, id, moment, this.dependencies.store.findItem);
     if (sources !== undefined && sources.length > 0) {
       await attachments.ingest({ repository: queue.repository, itemId: id, sources });
     }
     try {
-      return addItem(queue, fields, id, moment);
+      return addItem(queue, fields, id, moment, this.dependencies.store.findItem);
     } catch (error) {
       await attachments.removeOwner(id);
       throw error;
@@ -268,6 +292,12 @@ export class QueueItems {
 
   /** Runs the checks of `addItem` on a copy of the queue: nothing changes. */
   private checkNewItem(queue: Queue, fields: ItemFields, now: number): void {
-    addItem(structuredClone(queue), fields, queueItemId(now, 0), now);
+    addItem(
+      structuredClone(queue),
+      fields,
+      queueItemId(now, 0),
+      now,
+      this.dependencies.store.findItem,
+    );
   }
 }

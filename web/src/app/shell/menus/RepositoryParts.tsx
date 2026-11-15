@@ -1,4 +1,4 @@
-import { FolderGit2, Plus } from 'lucide-react';
+import { FolderGit2, Layers, Plus } from 'lucide-react';
 import { useState, type FormEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -108,7 +108,9 @@ export function RepositoryTrigger({
   title,
   others,
   compact,
+  all = false,
 }: {
+  all?: boolean;
   name: string;
   label: string;
   title: string;
@@ -126,8 +128,8 @@ export function RepositoryTrigger({
         aria-label={label}
         title={title}
       >
-        <FolderGit2 aria-hidden />
-        <ProjectDot path={title} />
+        {all ? <Layers aria-hidden /> : <FolderGit2 aria-hidden />}
+        {all ? null : <ProjectDot path={title} />}
         <span className="flex-1 truncate text-left">{name}</span>
         {others > 0 ? (
           <Badge variant="warn" aria-label={t('nav.repositoryWaiting', { count: others })}>
@@ -198,10 +200,16 @@ export function RepositorySearch({
   );
 }
 
+/** Value of the item «All projects» in the radio group; a path never looks like it. */
+const ALL_PROJECTS = '*';
+
 /** The matching repositories as radio items, or a note when none matches. */
 export function RepositoryList(props: {
   matching: string[];
-  selected: string;
+  /** The selected repository; null while the mode «All projects» is on. */
+  selected: string | null;
+  /** Turns the mode «All projects» on; absent: no such item. */
+  onAll?: (() => void) | undefined;
   shownPath: (path: string) => string;
   waiting: ReadonlyMap<string, number>;
   onSelect: (repository: string) => void;
@@ -209,8 +217,17 @@ export function RepositoryList(props: {
   const { t } = useTranslation();
   const { matching, waiting } = props;
   return (
-    <div data-repository-list className="max-h-[calc(3.25rem*5.5)] overflow-y-auto">
-      <DropdownMenuRadioGroup value={props.selected} onValueChange={props.onSelect}>
+    <DropdownMenuRadioGroup
+      value={props.selected ?? ALL_PROJECTS}
+      onValueChange={(value) => (value === ALL_PROJECTS ? props.onAll?.() : props.onSelect(value))}
+    >
+      {props.onAll ? (
+        <DropdownMenuRadioItem value={ALL_PROJECTS} data-all-projects>
+          <Layers aria-hidden className="size-4" />
+          {t('nav.repositoryAll')}
+        </DropdownMenuRadioItem>
+      ) : null}
+      <div data-repository-list className="max-h-[calc(3.25rem*5.5)] overflow-y-auto">
         {matching.map((path) => (
           <RepositoryItem
             key={path}
@@ -219,13 +236,13 @@ export function RepositoryList(props: {
             count={waiting.get(path) ?? 0}
           />
         ))}
-      </DropdownMenuRadioGroup>
-      {matching.length === 0 ? (
-        <p className="px-2 py-3 text-center text-sm text-muted-foreground">
-          {t('nav.repositoryNone')}
-        </p>
-      ) : null}
-    </div>
+        {matching.length === 0 ? (
+          <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+            {t('nav.repositoryNone')}
+          </p>
+        ) : null}
+      </div>
+    </DropdownMenuRadioGroup>
   );
 }
 

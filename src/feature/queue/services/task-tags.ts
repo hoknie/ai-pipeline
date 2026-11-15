@@ -46,8 +46,7 @@ export class TaskTags {
     database.transaction(() => {
       tags.deleteStored(repository, id);
       runs.states.changeStored(repository, { dropTag: id });
-      store.dropItemTag(repository, id);
-      store.dropFilterTag(repository, id);
+      store.dropTag(repository, id);
     });
     tags.forget(id);
     for (const state of runs.states.all()) {
@@ -72,7 +71,15 @@ export class TaskTags {
   /** Own tags plus the tags of the predecessors in `after`, only those still in the catalog. */
   inherit(queue: Queue, own: string[], after: string[]): string[] {
     const { runs, tags } = this.dependencies;
-    const inherited = dependencyTags(queue, after, (id) => runs.states.lookup(id)?.run.tags);
+    const inherited = dependencyTags(
+      queue,
+      after,
+      (id) => {
+        const run = runs.states.lookup(id)?.run;
+        return run?.repository === queue.repository ? run.tags : undefined;
+      },
+      this.dependencies.store.findItem,
+    );
     return knownTags(tags.of(queue.repository), mergeTags(own, inherited));
   }
 

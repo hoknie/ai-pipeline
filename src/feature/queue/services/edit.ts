@@ -15,6 +15,8 @@ import {
   checkDependencies,
   checkPosition,
   checkReturnedPatch,
+  globalCount,
+  moveGlobal,
   dependencyTags,
   editItem,
   spreadTags,
@@ -50,10 +52,14 @@ export class QueueEdit {
 
   async edit(params: QueueEditRequest): Promise<Queue> {
     const { store, advance, registry, items, now } = this.dependencies;
-    const repository = await registry.rootOf(params.repository);
-    const queue = store.of(repository);
+    const queue = store.lines.ownerOf(await registry.rootOf(params.repository), params.item);
+    const repository = queue.repository;
     const moment = now();
     const existing = queue.items.find((candidate) => candidate.id === params.item);
+    // In the global mode the position is a place among the tasks of all projects.
+    const global = store.scope() === 'global';
+    const place = global ? params.position : undefined;
+    if (place !== undefined) this.checkGlobalPosition(place);
     // The tags before the edit: those added by it spread to the items that wait for this one.
     const before = existing?.tags ?? [];
     if (existing?.run && params.parent !== undefined) {
@@ -69,21 +75,7 @@ export class QueueEdit {
       await this.skipInRun(queue, existing, params);
       skip = undefined;
     }
-    if (existing?.run) {
-      // before any check of the new values: a returned run answers with its own error
-      checkReturnedPatch({
-        pipeline: params.pipeline,
-        variant: params.variant,
-        task: params.task,
-        groups: params.groups,
-        title: params.title,
-        tags: params.tags,
-        autoDeliver: params.autoDeliver,
-        deliveryMode: params.deliveryMode,
-        postponed: params.postponed,
-        skip,
-      });
-    }
+    if (existing?.run) this.checkReturned(params, skip);
     if (params.pipeline !== undefined || params.variant !== undefined || skip !== undefined) {
       if (existing) {
         await items.ensureItem(
@@ -94,8 +86,7 @@ export class QueueEdit {
         );
       }
     }
-    const after =
-      params.after === undefined ? undefined : items.resolveDependencies(queue, params.after);
+    const after = params.after === undefined ? undefined : items.resolveDependencies(params.after);
     const {
       pipeline,
       variant,
@@ -107,12 +98,15 @@ export class QueueEdit {
       deliveryMode,
       postponed,
     } = params;
-    const patch = { pipeline, variant, task, groups, title, position, autoDeliver, deliveryMode };
+    const patch = {
+      ...{ pipeline, variant, task, groups, title, autoDeliver, deliveryMode },
+      position: global ? undefined : position,
+    };
     const fields = { ...patch, skip, after, postponed };
     const tags = await this.tagsOf(queue, existing, params, parentState, fields, moment);
     if (existing && changesAttachments) {
       // The edit is checked on a copy first: no file is stored for an edit that is refused.
-      editItem(structuredClone(queue), params.item, { ...fields, tags }, moment);
+      editItem(structuredClone(queue), params.item, { ...fields, tags }, moment, store.findItem);
       await this.dependencies.attachments.ingest({
         repository,
         itemId: params.item,
@@ -120,15 +114,43 @@ export class QueueEdit {
         detach: params.detach ?? [],
       });
     }
-    editItem(queue, params.item, { ...fields, tags }, moment);
+    editItem(queue, params.item, { ...fields, tags }, moment, store.findItem);
     const edited = queue.items.find((candidate) => candidate.id === params.item);
     if (edited) {
       const added = edited.tags.filter((id) => !before.includes(id));
       spreadTags(queue, params.item, added, moment);
     }
-    store.save(queue);
+    if (global && existing && (place !== undefined || existing.error !== null)) {
+      moveGlobal(store.all(), params.item, place ?? 1);
+      store.saveEverything();
+    } else {
+      store.save(queue);
+    }
     await advance.advance(repository);
     return queue;
+  }
+
+  /** Before any check of the new values: a returned run answers with its own error. */
+  private checkReturned(params: QueueEditRequest, skip: string[] | undefined): void {
+    checkReturnedPatch({
+      pipeline: params.pipeline,
+      variant: params.variant,
+      task: params.task,
+      groups: params.groups,
+      title: params.title,
+      tags: params.tags,
+      autoDeliver: params.autoDeliver,
+      deliveryMode: params.deliveryMode,
+      postponed: params.postponed,
+      skip,
+    });
+  }
+
+  private checkGlobalPosition(position: number): void {
+    const count = globalCount(this.dependencies.store.all());
+    if (!Number.isInteger(position) || position < 1 || position > count) {
+      throw rejected(`position must be an integer from 1 to ${count}`);
+    }
   }
 
   /**
@@ -164,10 +186,12 @@ export class QueueEdit {
     const state = runs.states.lookup(item.run as string);
     if (!state) throw rejected(`unknown run \`${item.run}\``);
     const changes = this.skipChanges(state, new Set(skip));
-    if (params.position !== undefined) checkPosition(queue, params.position);
+    if (params.position !== undefined && this.dependencies.store.scope() === 'project') {
+      checkPosition(queue, params.position);
+    }
     if (params.after !== undefined) {
-      const after = [...new Set(items.resolveDependencies(queue, params.after))];
-      checkDependencies(queue, params.item, after);
+      const after = [...new Set(items.resolveDependencies(params.after))];
+      checkDependencies(this.dependencies.store.findItem, params.item, after);
     }
     for (const [step, on] of changes) {
       await runs.engine.apply(state, { kind: 'step_skip', step, skip: on });
@@ -210,7 +234,15 @@ export class QueueEdit {
     if (existing && tags !== undefined) {
       tags = keepLinkedTags(catalog(), knownTags(catalog(), existing.tags), tags);
     }
-    if (existing && parentState) editItem(structuredClone(queue), params.item, fields, moment);
+    if (existing && parentState) {
+      editItem(
+        structuredClone(queue),
+        params.item,
+        fields,
+        moment,
+        this.dependencies.store.findItem,
+      );
+    }
     if (existing && params.parent !== undefined) {
       const parentTag = parentState
         ? await taskTags.parentTagFor(queue.repository, parentState)
@@ -222,7 +254,15 @@ export class QueueEdit {
       const fresh = fields.after.filter((ref) => !existing.after.includes(ref));
       const inherited = knownTags(
         catalog(),
-        dependencyTags(queue, fresh, (id) => runs.states.lookup(id)?.run.tags),
+        dependencyTags(
+          queue,
+          fresh,
+          (id) => {
+            const run = runs.states.lookup(id)?.run;
+            return run?.repository === queue.repository ? run.tags : undefined;
+          },
+          this.dependencies.store.findItem,
+        ),
       );
       if (inherited.length > 0) tags = mergeTags(tags ?? existing.tags, inherited);
     }

@@ -1,27 +1,24 @@
-import { Option, type Command } from 'commander';
+import type { Command } from 'commander';
 
 import { DELIVERY_MODES } from '../../../feature/swarm-config/types/index.ts';
-import { formatQueue, formatRunCreated, type Style } from '../../format/index.ts';
+import { formatRunCreated, type Style } from '../../format/index.ts';
 import { repositoryArgument } from '../../ipc/client/index.ts';
-import type { QueueView, RunCreated } from '../../ipc/contract/index.ts';
+import type { GlobalQueueView, QueueView, RunCreated } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
-import { usage, type CliIo } from '../io.ts';
-import {
-  attachmentSources,
-  collect,
-  parseDeliveryMode,
-  readGroups,
-  type QueueTaskOptions,
-} from '../options.ts';
-import { addEdit, addSettings } from './queue-edit.ts';
+import type { CliIo } from '../io.ts';
+import { collect } from '../options.ts';
+import { addAdd } from '../queue-add.ts';
+import { printQueue, watchRepo } from '../queue-print.ts';
+import { addEdit, addList, addSettings } from './queue-edit.ts';
 
 function queueKit(program: Command, io: CliIo, style: Style) {
   const { print, output, examples, context, activeStyle } = bind(io, style);
-  const showQueue = (json: boolean | undefined, view: QueueView): void =>
-    output(json, formatQueue(view, activeStyle), view);
   const queue = program
     .command('queue')
     .description('Tasks waiting for a start: add, reorder and run them one by one or in parallel');
+  const repoGiven = watchRepo(queue);
+  const showQueue = (json: boolean | undefined, view: QueueView | GlobalQueueView) =>
+    printQueue(json, view, context(), activeStyle, output, repoGiven());
   const taskOptions = (command: Command): Command =>
     command
       .option('-t, --task <text>', 'one task; the pipeline may split it into groups')
@@ -72,69 +69,6 @@ function queueKit(program: Command, io: CliIo, style: Style) {
 
 export type QueueKit = ReturnType<typeof queueKit>;
 
-function addList(kit: QueueKit): void {
-  const { examples, context, showQueue, queue, common } = kit;
-  common(queue.command('list').description('Show the queue of the repository'))
-    .addHelpText('after', examples(['aip queue list', 'aip queue list --json']))
-    .action(async (options: { repo: string; json?: boolean }) => {
-      showQueue(
-        options.json,
-        (await call(context(), 'queue', {
-          repository: repositoryArgument(options.repo),
-        })) as QueueView,
-      );
-    });
-}
-
-function addAdd(kit: QueueKit): void {
-  const { print, examples, context, showQueue, queue, taskOptions, common } = kit;
-  common(
-    taskOptions(
-      queue
-        .command('add')
-        .description('Add a task to the end of the queue; it does not start the queue')
-        .argument('<pipeline>', 'pipeline id from swarm.yaml')
-        .option('--postpone', 'postpone the task: a running queue does not take it'),
-    ),
-  )
-    .addHelpText(
-      'after',
-      examples([
-        'aip queue add feature --task "Add a login form"',
-        'aip queue add feature -g g.yaml',
-        'aip queue add feature --task "Fix the typo" --skip review --skip qa',
-        'aip queue add feature --task "Add the API" --after q1',
-        'aip queue add feature --task "Fix the layout" --attach shot.png --attach spec.pdf',
-        'aip queue add feature --task "Follow-up" --parent 115',
-        'aip queue add feature --task "Later" --postpone',
-      ]),
-    )
-    .action(async (pipeline: string, options: QueueTaskOptions) => {
-      if ((options.task === undefined) === (options.groups === undefined)) {
-        throw usage('pass exactly one of --task and --groups');
-      }
-      const deliveryMode = parseDeliveryMode(options.deliveryMode);
-      const view = (await call(context(), 'queue_add', {
-        repository: repositoryArgument(options.repo),
-        pipeline,
-        ...(options.task !== undefined ? { task: options.task } : {}),
-        ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
-        ...(options.title !== undefined ? { title: options.title } : {}),
-        ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
-        ...(deliveryMode !== undefined ? { deliveryMode } : {}),
-        ...(options.tag !== undefined ? { tags: options.tag } : {}),
-        ...(typeof options.parent === 'string' ? { parent: options.parent } : {}),
-        ...(options.variant !== undefined ? { variant: options.variant } : {}),
-        ...(options.skip !== undefined ? { skip: options.skip } : {}),
-        ...(options.after !== undefined ? { after: options.after } : {}),
-        ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
-        ...(options.postpone ? { postponed: true } : {}),
-      })) as QueueView & { item: string };
-      if (!options.json) print(`Added ${view.item}.`);
-      showQueue(options.json, view);
-    });
-}
-
 function addRemove(kit: QueueKit): void {
   const { examples, context, showQueue, queue, common } = kit;
   common(
@@ -145,12 +79,12 @@ function addRemove(kit: QueueKit): void {
   )
     .addHelpText('after', examples(['aip queue remove 1']))
     .action(async (item: string, options: { repo: string; json?: boolean }) => {
-      showQueue(
+      await showQueue(
         options.json,
         (await call(context(), 'queue_remove', {
           repository: repositoryArgument(options.repo),
           item,
-        })) as QueueView,
+        })) as QueueView | GlobalQueueView,
       );
     });
 }
@@ -166,13 +100,13 @@ function addMove(kit: QueueKit): void {
   )
     .addHelpText('after', examples(['aip queue move 3 1']))
     .action(async (item: string, position: string, options: { repo: string; json?: boolean }) => {
-      showQueue(
+      await showQueue(
         options.json,
         (await call(context(), 'queue_edit', {
           repository: repositoryArgument(options.repo),
           item,
           position: Number(position),
-        })) as QueueView,
+        })) as QueueView | GlobalQueueView,
       );
     });
 }
@@ -187,12 +121,12 @@ function addStart(kit: QueueKit): void {
   )
     .addHelpText('after', examples(['aip queue start', 'aip queue start --parallel 2']))
     .action(async (options: { repo: string; parallel?: string; json?: boolean }) => {
-      showQueue(
+      await showQueue(
         options.json,
         (await call(context(), 'queue_start', {
           repository: repositoryArgument(options.repo),
           ...(options.parallel !== undefined ? { parallel: Number(options.parallel) } : {}),
-        })) as QueueView,
+        })) as QueueView | GlobalQueueView,
       );
     });
 }
@@ -207,12 +141,12 @@ function addParallel(kit: QueueKit): void {
   )
     .addHelpText('after', examples(['aip queue parallel 3']))
     .action(async (n: string, options: { repo: string; json?: boolean }) => {
-      showQueue(
+      await showQueue(
         options.json,
         (await call(context(), 'queue_settings', {
           repository: repositoryArgument(options.repo),
           parallel: Number(n),
-        })) as QueueView,
+        })) as QueueView | GlobalQueueView,
       );
     });
 }
@@ -222,11 +156,11 @@ function addPause(kit: QueueKit): void {
   common(queue.command('pause').description('Stop taking tasks; runs already started keep going'))
     .addHelpText('after', examples(['aip queue pause']))
     .action(async (options: { repo: string; json?: boolean }) => {
-      showQueue(
+      await showQueue(
         options.json,
         (await call(context(), 'queue_pause', {
           repository: repositoryArgument(options.repo),
-        })) as QueueView,
+        })) as QueueView | GlobalQueueView,
       );
     });
 }
@@ -247,7 +181,7 @@ function addReturn(kit: QueueKit): void {
         runId: run,
         ...(options.repo !== undefined ? { repository: repositoryArgument(options.repo) } : {}),
       })) as QueueView & { item: string };
-      showQueue(options.json, view);
+      await showQueue(options.json, view);
     });
 }
 
@@ -267,7 +201,7 @@ function addDismiss(kit: QueueKit): void {
         runId: run,
         ...(options.repo !== undefined ? { repository: repositoryArgument(options.repo) } : {}),
       })) as QueueView;
-      showQueue(options.json, view);
+      await showQueue(options.json, view);
     });
 }
 

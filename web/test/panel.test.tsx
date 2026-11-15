@@ -59,7 +59,6 @@ function list(runs: Parameters<typeof RunList>[0]['runs'], props: ListProps = {}
     onFilters: () => undefined,
     onSelect: () => undefined,
     scope: 'repository' as const,
-    onScope: () => undefined,
     repository: null,
   };
   return <RunList runs={runs} {...base} {...props} />;

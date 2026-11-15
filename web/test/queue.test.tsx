@@ -39,6 +39,7 @@ import {
   queueItem,
   queueOf,
   queueRun,
+  repositoryView,
   runView,
   configView,
   settingsOf,
@@ -2997,5 +2998,72 @@ describe('parentChoices', () => {
       ['f1', 'finished'],
     ]);
     expect(parentChoices(runs, '/b').map((choice) => choice.id)).toEqual(['x1']);
+  });
+});
+
+describe('predecessor from another project', () => {
+  it('names the project of the predecessor and links to its queue', async () => {
+    const foreign = { ...dependency('item', 'ql', 'API', 'waiting', '/other'), number: 3 };
+    const own = dependency('item', 'q1', 'A', 'waiting', '/repo');
+    const queue = queueOf({
+      items: [
+        queueItem('q1', 'A', 1),
+        queueItem('q2', 'B', 2, { readiness: 'waiting', after: [own, foreign] }),
+      ],
+    });
+    show(queue);
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [],
+        queues: [queue],
+        repositories: [repositoryView('/repo'), repositoryView('/other')],
+      });
+    });
+    const chips = document.querySelector('[data-dependencies]') as HTMLElement;
+    await waitFor(() => expect(within(chips).getByText('other')).toBeTruthy());
+    // only the predecessor of the other project carries the mark and the link
+    expect(within(chips).getAllByText(/after:/)).toHaveLength(2);
+    expect(within(chips).getAllByRole('button')).toHaveLength(1);
+    expect(within(chips).getByRole('button', { name: /other/ }).getAttribute('title')).toBe(
+      'Open queue of other',
+    );
+    fireEvent.click(within(chips).getByRole('button', { name: /other/ }));
+    await waitFor(() =>
+      expect(document.querySelector('[aria-label="Repository: other"]')).toBeTruthy(),
+    );
+    expect(window.location.hash).toBe('#queue');
+  });
+
+  it('offers a current predecessor of another project once, in the other group', () => {
+    const foreign = { ...dependency('item', 'ql', 'API', 'waiting', '/other'), number: 3 };
+    const edited = apiItem({ after: [foreign] });
+    const lib = queueOf({
+      items: [queueItem('ql', 'API', 3)],
+      runs: [],
+    });
+    const options = afterOptions(
+      { ...queueOf({ items: [edited] }), repository: '/repo' },
+      (item) => item.title ?? '',
+      edited,
+      [{ ...lib, repository: '/other' }],
+    );
+    const found = options.filter((option) => option.id === 'ql');
+    expect(found).toHaveLength(1);
+    expect(found[0]!.kind).toBe('other');
+    expect(found[0]!.project).toBe('other');
+    // when the project is not among the others, the current predecessor still names it
+    const alone = afterOptions(
+      { ...queueOf({ items: [edited] }), repository: '/repo' },
+      (item) => item.title ?? '',
+      edited,
+    );
+    expect(alone.find((option) => option.id === 'ql')).toMatchObject({
+      kind: 'current',
+      project: 'other',
+    });
   });
 });

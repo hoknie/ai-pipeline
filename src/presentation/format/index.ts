@@ -1,5 +1,5 @@
 export { formatApply, formatDiff, formatGroup } from './groups.ts';
-export { formatQueue, formatRepositories } from './queue.ts';
+export { formatAddedToProjects, formatQueue, formatQueues, formatRepositories } from './queue.ts';
 export { formatRun, formatRunCreated, formatRunList, formatRunQueued, waitNote } from './runs.ts';
 export * from './style.ts';
 export { pipelineLabel, table, taskNumber } from './table.ts';

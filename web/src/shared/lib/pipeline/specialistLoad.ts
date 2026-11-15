@@ -1,4 +1,5 @@
 import type { RunView } from '../../api/types.ts';
+import { repositoryLabel } from '../catalog/repositories.ts';
 
 export type UseLevel = 'global' | 'project';
 
@@ -126,14 +127,25 @@ function byText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function repositoryOrder(selected: string | null) {
+/** The selected repository first, then by path; with `byName`, by project name without regard to case. */
+function repositoryOrder(selected: string | null, byName: boolean) {
+  if (byName) {
+    return (left: string, right: string): number =>
+      byText(repositoryLabel(left).toLowerCase(), repositoryLabel(right).toLowerCase()) ||
+      byText(left, right);
+  }
   return (left: string, right: string): number =>
     Number(right === selected) - Number(left === selected) || byText(left, right);
 }
 
 /** The panel blocks: global specialists by repository, project ones by repository. */
-export function loadSections(load: MachineLoad, selected: string | null): LoadSections {
-  const order = repositoryOrder(selected);
+export function loadSections(
+  load: MachineLoad,
+  selected: string | null,
+  /** The mode «All projects»: no repository comes first, the order is the one of the names. */
+  allProjects = false,
+): LoadSections {
+  const order = repositoryOrder(selected, allProjects);
   const global: GlobalSection[] = [];
   const projects = new Map<string, ProjectSection>();
   let running = 0;

@@ -11,7 +11,7 @@ import { Button } from '../../shared/ui/forms/button.tsx';
 import { ParallelStepper, parseParallel } from './ParallelStepper.tsx';
 import { StatusBadge } from '../../shared/ui/feedback/StatusBadge.tsx';
 
-function StartPause({
+export function StartPause({
   api,
   queue,
   parsed,

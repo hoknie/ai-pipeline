@@ -238,7 +238,6 @@ function Harness({ initial = EMPTY_FILTERS }: { initial?: RunFilterState }) {
       onFilters={setFilters}
       onSelect={() => undefined}
       scope="repository"
-      onScope={() => undefined}
       repository={null}
     />
   );
@@ -385,7 +384,6 @@ describe('filter by tags', () => {
         onFilters={onFilters}
         onSelect={() => undefined}
         scope="repository"
-        onScope={() => undefined}
         repository={null}
       />,
     );
@@ -437,7 +435,6 @@ describe('filter by the tag of a linked task', () => {
           onFilters={setFilters}
           onSelect={() => undefined}
           scope="repository"
-          onScope={() => undefined}
           repository="/repo"
         />
       </TagsProvider>
@@ -486,7 +483,6 @@ describe('repository filter', () => {
       filters: EMPTY_FILTERS,
       onFilters: () => undefined,
       onSelect: () => undefined,
-      onScope: () => undefined,
       repository: '/work/app',
       repositoryPaths: paths,
     };

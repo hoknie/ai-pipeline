@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { EditorSpecialist, EntryLevel } from '../../../shared/api/types.ts';
+import { rowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { EntryList } from '../../../shared/ui/layout/EntryList.tsx';
@@ -38,7 +40,7 @@ export function SpecialistsList({
   onReset,
   onSelect,
 }: {
-  specialists: EditorSpecialist[];
+  specialists: (EditorSpecialist & { project?: ProjectRef | null })[];
   loaded: boolean;
   selected: string | null;
   narrowed: boolean;
@@ -75,18 +77,30 @@ export function SpecialistsList({
         selected={selected}
         onSelect={onSelect}
         entries={specialists.map((entry) => ({
-          id: entry.slug,
+          id: rowKey(entry.project?.slug, entry.slug),
           title: specialistName(entry),
           subtitle: subtitleOf(entry),
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
-          extra:
-            tagsOfSpecialist(entry).length > 0 ? (
-              <span data-testid={`tags-${entry.slug}`} className="flex flex-wrap gap-1">
-                {tagsOfSpecialist(entry).map((tag) => (
-                  <SpecialistTagChip key={tag.name} name={tag.name} shared={tag.shared} />
-                ))}
-              </span>
-            ) : undefined,
+          extra: (
+            <>
+              {entry.project ? (
+                <span
+                  data-project-label={entry.project.slug}
+                  className="flex items-center gap-1 text-xs text-muted-foreground"
+                >
+                  <ProjectDot color={entry.project.color} />
+                  {entry.project.label}
+                </span>
+              ) : null}
+              {tagsOfSpecialist(entry).length > 0 ? (
+                <span data-testid={`tags-${entry.slug}`} className="flex flex-wrap gap-1">
+                  {tagsOfSpecialist(entry).map((tag) => (
+                    <SpecialistTagChip key={tag.name} name={tag.name} shared={tag.shared} />
+                  ))}
+                </span>
+              ) : null}
+            </>
+          ),
         }))}
       />
     </>

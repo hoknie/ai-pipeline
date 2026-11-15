@@ -22,9 +22,11 @@ export function choiceItems(
     label:
       setting.path === 'delivery.mode'
         ? t(`deliveryMode.${option}`)
-        : setting.path === 'attachments.storage'
-          ? t(`settingsPage.attachmentStorage.${option}`)
-          : option,
+        : setting.path === 'queue.scope'
+          ? t(`settingsPage.queueScope.${option}`)
+          : setting.path === 'attachments.storage'
+            ? t(`settingsPage.attachmentStorage.${option}`)
+            : option,
   }));
 }
 
@@ -70,6 +72,7 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
       paths: ['delivery.resolver', 'delivery.resolver_rounds', 'delivery.resolver_prompt'],
     },
   ],
+  queue: [{ key: 'queue', paths: ['queue.scope', 'queue.max'] }],
   runtimes: [
     {
       key: 'claude',

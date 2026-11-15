@@ -41,6 +41,29 @@ const queueAddParams = z
     message: 'pass either task or groups',
   });
 
+const queueAddProjectsParams = z
+  .object({
+    repositories: z.array(queueRepository).min(2).max(20),
+    pipeline: z.string().min(1),
+    variant: variantId.optional(),
+    task: queueTask,
+    title: queueTitle.optional(),
+    autoDeliver: z.boolean().optional(),
+    deliveryMode: deliveryModeSchema.optional(),
+    skip: skipSteps.optional(),
+    after: afterIds.optional(),
+    postponed: z.boolean().optional(),
+    notes: z.record(queueRepository, z.string()).optional(),
+    tag: z.string().optional(),
+    chain: z.boolean().optional(),
+    // Declared only to be refused with a clear message: stripped keys would be dropped silently.
+    groups: z.unknown().optional(),
+    attachments: z.unknown().optional(),
+  })
+  .refine((params) => params.groups === undefined && params.attachments === undefined, {
+    message: 'groups and attachments are not supported for several projects',
+  });
+
 /** A task added by a specialist: the repository is the one of the run the token belongs to. */
 export const workerQueueAddParams = z
   .object({
@@ -86,8 +109,10 @@ const queueEditParams = z
 const queueParallel = z.number().int().min(1).max(20);
 
 export const queueRequests = [
+  z.object({ method: z.literal('queues'), params: z.object({}) }),
   z.object({ method: z.literal('queue'), params: z.object({ repository: queueRepository }) }),
   z.object({ method: z.literal('queue_add'), params: queueAddParams }),
+  z.object({ method: z.literal('queue_add_projects'), params: queueAddProjectsParams }),
   z.object({ method: z.literal('queue_edit'), params: queueEditParams }),
   z.object({
     method: z.literal('queue_remove'),
@@ -114,6 +139,7 @@ export const queueRequests = [
           .object({
             pipelines: z.array(z.string().min(1)).max(50).optional(),
             tags: z.array(z.string().min(1)).max(50).optional(),
+            projects: z.array(z.string().min(1)).max(50).optional(),
           })
           .strict()
           .optional(),

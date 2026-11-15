@@ -2,6 +2,7 @@ import type {
   BackgroundProcessView,
   NetworkStatus,
   DaemonMismatch,
+  GlobalQueueView,
   QueueView,
   RepositoryView,
   RunView,
@@ -26,6 +27,7 @@ export type StreamEvent =
       event: 'snapshot';
       runs: RunView[];
       queues?: QueueView[];
+      globalQueue?: GlobalQueueView;
       repositories?: RepositoryView[];
       tags?: TagView[];
       daemon?: DaemonMismatch;
@@ -35,6 +37,8 @@ export type StreamEvent =
   | { event: 'tags'; repository?: string; tags: TagView[] }
   | { event: 'run'; run: RunView }
   | { event: 'queue'; queue: QueueView }
+  /** The global queue; null once the daemon is back in the project mode. */
+  | { event: 'globalQueue'; globalQueue: GlobalQueueView | null }
   | { event: 'processes'; processes?: BackgroundProcessView[]; error?: string }
   | { event: 'network'; network: NetworkStatus };
 
@@ -52,6 +56,7 @@ const STREAM_EVENTS = new Set([
   'tags',
   'run',
   'queue',
+  'globalQueue',
   'processes',
   'network',
 ]);

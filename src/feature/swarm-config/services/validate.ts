@@ -21,6 +21,7 @@ import {
   checkWorkspace,
 } from './validate-settings.ts';
 import { checkMcpCatalog, resolveMcpServers } from './sections/mcp-servers.ts';
+import { checkQueue } from './sections/queue.ts';
 import { checkStats } from './sections/stats.ts';
 import { validateAttachmentsSection } from './sections/attachments.ts';
 import { checkSpecialist, checkSpecialists, SPECIALIST_KEYS } from './validate-specialists.ts';
@@ -35,6 +36,7 @@ import {
   defaultNaming,
   defaultNetwork,
   defaultRuntimes,
+  defaultQueue,
   defaultStats,
   defaultWeb,
   defaultWorkspace,
@@ -60,6 +62,7 @@ const SWARM_KEYS = [
   'network',
   'attachments',
   'stats',
+  'queue',
   'outside_changes',
   'claude',
   'opencode',
@@ -212,6 +215,7 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     ctx.errors.push(...validateAttachmentsSection(swarm.attachments).errors);
   }
   if ('stats' in swarm) checkStats(ctx, swarm.stats, defaultStats());
+  if ('queue' in swarm) checkQueue(ctx, swarm.queue, defaultQueue());
   if ('outside_changes' in swarm) {
     config.outsideChanges =
       readChoice<OutsideChanges>(

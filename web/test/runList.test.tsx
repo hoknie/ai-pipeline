@@ -27,7 +27,6 @@ function show(run: ReturnType<typeof runView>, props: Props = {}) {
         onFilters={() => undefined}
         onSelect={() => undefined}
         scope="repository"
-        onScope={() => undefined}
         repository="/repo"
         {...props}
       />
@@ -153,7 +152,6 @@ describe('run row layout', () => {
       onFilters: () => undefined,
       onSelect: () => undefined,
       scope: 'repository' as const,
-      onScope: () => undefined,
       repository: '/repo',
     };
     const { rerender } = render(<RunList runs={[done]} {...props} />);
@@ -312,7 +310,6 @@ describe('undelivered result in the list', () => {
       onFilters: () => undefined,
       onSelect: () => undefined,
       scope: 'repository' as const,
-      onScope: () => undefined,
       repository: '/repo',
     };
     const view = render(<RunList runs={[stopped()]} {...props} />);
@@ -350,7 +347,6 @@ describe('stage in the status badge', () => {
     onFilters: () => undefined,
     onSelect: () => undefined,
     scope: 'repository' as const,
-    onScope: () => undefined,
     repository: '/repo',
   };
 

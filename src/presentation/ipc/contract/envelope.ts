@@ -66,6 +66,7 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     seq: z.number().int(),
     runs: z.array(z.looseObject({ id: z.string() })),
     queues: z.array(z.looseObject({ repository: z.string() })).optional(),
+    globalQueue: z.looseObject({ scope: z.literal('global') }).optional(),
     repositories: z.array(z.looseObject({ path: z.string() })).optional(),
     tags: z.array(z.looseObject({ id: z.string() })).optional(),
   }),
@@ -84,6 +85,12 @@ export const streamEventSchema = z.discriminatedUnion('event', [
     event: z.literal('queue'),
     seq: z.number().int(),
     queue: z.looseObject({ repository: z.string() }),
+  }),
+  z.object({
+    event: z.literal('globalQueue'),
+    seq: z.number().int(),
+    /** The global queue in the global mode; null once the mode is back to `project`. */
+    globalQueue: z.looseObject({ scope: z.literal('global') }).nullable(),
   }),
   z.object({
     event: z.literal('run'),

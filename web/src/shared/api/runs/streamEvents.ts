@@ -5,6 +5,7 @@ import { isStreamEvent, type ReadEvent, type StreamEvent } from '../stream.ts';
 import type {
   BackgroundProcessView,
   DaemonMismatch,
+  GlobalQueueView,
   NetworkStatus,
   QueueView,
   RepositoryView,
@@ -27,6 +28,7 @@ type Setter<T> = Dispatch<SetStateAction<T>>;
 export interface RunsSetters {
   setRuns: Setter<Map<string, RunView>>;
   setQueues: Setter<Map<string, QueueView>>;
+  setGlobalQueue: Setter<GlobalQueueView | null>;
   setRegistry: Setter<RepositoryView[]>;
   setHome: Setter<string | null>;
   setLoaded: Setter<boolean>;
@@ -54,6 +56,7 @@ function applySnapshot(
   if (catalog) set.setTags((current) => sameTags(current, catalog));
   const known = event.repositories;
   if (known) set.setRegistry((current) => sameRepositories(current, known));
+  set.setGlobalQueue(event.globalQueue ?? null);
   const listed = event.queues ?? [];
   if (listed.length > 0) {
     set.setQueues((current) => listed.reduce((map, view) => putQueue(map, view), current));
@@ -99,6 +102,13 @@ function applyKnown(
     case 'queue': {
       const view = event.queue;
       set.setQueues((current) => putQueue(current, view));
+      return;
+    }
+    case 'globalQueue': {
+      const view = event.globalQueue;
+      set.setGlobalQueue((current) =>
+        JSON.stringify(current) === JSON.stringify(view) ? current : view,
+      );
       return;
     }
     case 'run':

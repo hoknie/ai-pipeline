@@ -1,5 +1,6 @@
 import {
   type Attempt,
+  type DispatchLimit,
   type Group,
   type RunState,
   COMMAND_RUNTIME,
@@ -18,8 +19,9 @@ export function dispatch(
   states: RunState[],
   now: number,
   network: NetworkSnapshot = OFF_NETWORK,
+  limit: DispatchLimit = { kind: 'repository' },
 ): Effect[] {
-  return planDispatch(states, now, network).start.map(({ state, group }) => {
+  return planDispatch(states, now, network, limit).start.map(({ state, group }) => {
     const attempt = isCommandAction(state, group)
       ? startCommand(state, group, now)
       : startAttempt(state, group, now);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
 import type { EditorSpecialist } from '../../../shared/api/types.ts';
+import type { ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
 import { usePreference } from '../../../shared/lib/browser/preferences.ts';
 import {
   EMPTY_FILTER,
@@ -18,7 +19,9 @@ function savedOthers(saved: unknown): Partial<Omit<SpecialistFilter, 'tags'>> {
   if (typeof saved !== 'object' || saved === null) return {};
   const record = saved as Record<string, unknown>;
   const result: Record<string, unknown> = {};
-  for (const field of LIST_FIELDS) if (isStrings(record[field])) result[field] = record[field];
+  for (const field of [...LIST_FIELDS, 'projects'] as const) {
+    if (isStrings(record[field])) result[field] = record[field];
+  }
   if (record.level === 'all' || record.level === 'project' || record.level === 'global') {
     result.level = record.level;
   }
@@ -27,7 +30,7 @@ function savedOthers(saved: unknown): Partial<Omit<SpecialistFilter, 'tags'>> {
 
 /** The filter of the list, kept per repository; a value nobody has any more drops out. */
 export function useSpecialistFilter(
-  specialists: readonly EditorSpecialist[],
+  specialists: readonly (EditorSpecialist & { project?: ProjectRef | null })[],
   repository: string | null,
   loaded: boolean,
 ) {

@@ -33,7 +33,10 @@ export function useSelection(
       .forRepository(selected)
       .queue()
       .then((view) => {
-        if (!closed) setQueues((current) => putQueue(current, view));
+        // the global mode answers with the global queue, which the stream carries
+        if (!closed && (view as { scope?: string }).scope !== 'global') {
+          setQueues((current) => putQueue(current, view));
+        }
       })
       .catch(() => {
         // the queue stays unknown; the page shows its own loading state

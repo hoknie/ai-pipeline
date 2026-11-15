@@ -16,7 +16,7 @@ import { AttachmentFields } from './form/AttachmentFields.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { DeliveryFields } from './form/DeliveryFields.tsx';
 import { AfterField, ParentField, TagsField } from './form/LinkFields.tsx';
-import { TaskFields } from './form/TaskFields.tsx';
+import { TaskFields, type FormState } from './form/TaskFields.tsx';
 
 export {
   TITLE_LIMIT,
@@ -32,11 +32,14 @@ export {
 
 function FormButtons({
   disabled,
+  hint,
   label,
   onContinue,
   onCancel,
 }: {
   disabled: boolean;
+  /** Why the task cannot be added yet. */
+  hint?: string | undefined;
   label: string;
   onContinue: (() => void) | undefined;
   onCancel: (() => void) | undefined;
@@ -44,7 +47,7 @@ function FormButtons({
   const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button type="submit" disabled={disabled}>
+      <Button type="submit" disabled={disabled} title={hint}>
         {label}
       </Button>
       {onContinue ? (
@@ -57,6 +60,7 @@ function FormButtons({
           {t('queue.form.cancel')}
         </Button>
       ) : null}
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </div>
   );
 }
@@ -119,6 +123,38 @@ function useSubmit(
   };
 }
 
+/** The right half of the form: links, tags, attachments and delivery. */
+function SideFields(props: {
+  state: FormState;
+  pipelines: PipelinesView | null;
+  repository: string | null;
+  api: Api | undefined;
+  afterChoices: AfterOption[];
+  parentChoices: ParentChoice[];
+  autoDeliverDefault: boolean | null;
+  deliveryModeDefault: DeliveryMode | null;
+}) {
+  const { state, pipelines, repository, api } = props;
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <AfterField state={state} choices={props.afterChoices} />
+      {state.several ? null : (
+        <>
+          <ParentField state={state} choices={props.parentChoices} repository={repository} />
+          <TagsField state={state} repository={repository} api={api} />
+          {api ? <AttachmentFields state={state} api={api} /> : null}
+        </>
+      )}
+      <DeliveryFields
+        state={state}
+        pipelines={pipelines}
+        autoDeliverDefault={props.autoDeliverDefault}
+        deliveryModeDefault={props.deliveryModeDefault}
+      />
+    </div>
+  );
+}
+
 interface QueueFormProps {
   idPrefix: string;
   draft: QueueDraft;
@@ -139,6 +175,12 @@ interface QueueFormProps {
   locked?: boolean;
   /** The field of the repository, the first in the left half; only a new task has it. */
   repositoryField?: ReactNode;
+  /** The task goes to several projects: no groups, attachments, project tags or parent. */
+  several?: boolean;
+  /** Fields of a task in several projects, under the text of the task. */
+  extras?: ReactNode;
+  /** Why the task cannot be added yet, shown next to the button. */
+  blockedHint?: string;
   /** The data of the form is still loading: the form cannot be sent. */
   pending?: boolean;
   submitLabel: string;
@@ -150,6 +192,11 @@ interface QueueFormProps {
   onCancel?: () => void;
   /** The form fills the height of its parent: the text of the task grows. */
   fill?: boolean;
+}
+
+/** The pipeline ids to offer; a pipeline the draft has that is gone stays in the list. */
+function withCurrent(ids: string[], pipeline: string): string[] {
+  return pipeline !== '' && !ids.includes(pipeline) ? [...ids, pipeline] : ids;
 }
 
 export function QueueForm({
@@ -164,6 +211,9 @@ export function QueueForm({
   parentChoices = [],
   locked = false,
   repositoryField,
+  several = false,
+  extras,
+  blockedHint,
   pending = false,
   submitLabel,
   onDraft,
@@ -179,19 +229,11 @@ export function QueueForm({
     draft.pipeline === '' && ids[0] ? { ...draft, pipeline: ids[0] } : draft;
   const change = (patch: Partial<QueueDraft>) => onDraft({ ...effective, ...patch });
   const valid = draftValid(effective);
-  const state = { idPrefix, effective, change, locked };
-  const { submit, submitAndContinue, busy, error } = useSubmit(
-    effective,
-    repository,
-    idPrefix,
-    onSubmit,
-    onSubmitAndContinue,
-    onDraft,
-  );
+  const state = { idPrefix, effective, change, locked, several };
+  const sent = useSubmit(effective, repository, idPrefix, onSubmit, onSubmitAndContinue, onDraft);
 
-  const options = [...ids];
-  if (effective.pipeline !== '' && !ids.includes(effective.pipeline))
-    options.push(effective.pipeline);
+  const options = withCurrent(ids, effective.pipeline);
+  const blocked = pending || blockedHint !== undefined;
   return (
     <form
       className={cn(
@@ -200,7 +242,7 @@ export function QueueForm({
       )}
       onSubmit={(event) => {
         event.preventDefault();
-        void (!pending && submit());
+        void (!blocked && sent.submit());
       }}
     >
       <div className={cn('grid gap-4 @3xl:grid-cols-2', fill && 'flex-1')}>
@@ -209,28 +251,30 @@ export function QueueForm({
           pipelines={pipelines}
           options={options}
           repositoryField={repositoryField}
+          extras={extras}
           fill={fill}
         />
-        <div className="flex min-w-0 flex-col gap-3">
-          <AfterField state={state} choices={afterChoices} />
-          <ParentField state={state} choices={parentChoices} repository={repository} />
-          <TagsField state={state} repository={repository} api={api} />
-          {api ? <AttachmentFields state={state} api={api} /> : null}
-          <DeliveryFields
-            state={state}
-            pipelines={pipelines}
-            autoDeliverDefault={autoDeliverDefault}
-            deliveryModeDefault={deliveryModeDefault}
-          />
-        </div>
+        <SideFields
+          state={state}
+          pipelines={pipelines}
+          repository={repository}
+          api={api}
+          afterChoices={afterChoices}
+          parentChoices={parentChoices}
+          autoDeliverDefault={autoDeliverDefault}
+          deliveryModeDefault={deliveryModeDefault}
+        />
       </div>
       <FormButtons
-        disabled={!valid || busy || pending}
+        disabled={!valid || sent.busy || blocked}
+        hint={blockedHint}
         label={submitLabel}
-        onContinue={submitAndContinue ? () => void (!pending && submitAndContinue()) : undefined}
+        onContinue={
+          sent.submitAndContinue ? () => void (!blocked && sent.submitAndContinue?.()) : undefined
+        }
         onCancel={onCancel}
       />
-      {error ? <Alert variant="destructive">{error}</Alert> : null}
+      {sent.error ? <Alert variant="destructive">{sent.error}</Alert> : null}
     </form>
   );
 }

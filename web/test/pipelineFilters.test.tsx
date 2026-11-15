@@ -96,7 +96,10 @@ describe('pipeline filters', () => {
   it('counts the filters together with the search', () => {
     expect(activePipelineFilterCount(EMPTY_PIPELINE_FILTER)).toBe(0);
     expect(
-      activePipelineFilterCount({ level: 'global', tags: ['a', 'b'], specialists: ['plan'] }, 'q'),
+      activePipelineFilterCount(
+        { level: 'global', tags: ['a', 'b'], specialists: ['plan'], projects: [] },
+        'q',
+      ),
     ).toBe(4);
     expect(activePipelineFilterCount(EMPTY_PIPELINE_FILTER, '  ')).toBe(0);
   });
@@ -119,10 +122,15 @@ describe('pipeline filters', () => {
     expect(options.tags.map((tag) => tag.name).sort()).toEqual(['Backend', 'fast']);
     expect(
       existingPipelineFilter(
-        { level: 'global', tags: ['fast', 'gone'], specialists: ['plan', 'gone'] },
+        { level: 'global', tags: ['fast', 'gone'], specialists: ['plan', 'gone'], projects: [] },
         options,
       ),
-    ).toEqual({ level: 'global', tags: ['fast'], specialists: ['plan'] });
+    ).toEqual({
+      level: 'global',
+      tags: ['fast'],
+      specialists: ['plan'],
+      projects: [],
+    });
   });
 
   it('reads only the well-formed parts of a saved choice', () => {
@@ -131,11 +139,13 @@ describe('pipeline filters', () => {
       level: 'all',
       tags: ['a'],
       specialists: [],
+      projects: [],
     });
     expect(savedPipelineFilter({ level: 'project', tags: ['a'], specialists: ['b'] })).toEqual({
       level: 'project',
       tags: ['a'],
       specialists: ['b'],
+      projects: [],
     });
   });
 });

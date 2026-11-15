@@ -6,6 +6,7 @@ import {
   validateNetworkSection,
   validateAttachmentsSection,
   validateRuntimesSection,
+  validateQueueSection,
   validateStatsSection,
   validateWebSection,
 } from '../../swarm-config/services/index.ts';
@@ -213,6 +214,7 @@ export function planSettings(paths: ConfigPaths, request: SettingsRequest): Edit
         ...validateNetworkSection(root.network).errors,
         ...validateAttachmentsSection(root.attachments).errors,
         ...validateStatsSection(root.stats).errors,
+        ...validateQueueSection(root.queue).errors,
         ...validateWebSection(root.web).errors,
         ...validateRuntimesSection(root.runtimes).errors,
       ];

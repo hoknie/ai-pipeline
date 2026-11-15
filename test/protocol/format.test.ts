@@ -486,6 +486,7 @@ describe('colored text', () => {
     state.groups[0]!.status = 'cancelled';
     expect(formatRun(runView(state, 2000), 2000, style)).toContain('⊘ cancelled');
     const queue = {
+      scope: 'project' as const,
       repository: '/repo',
       status: 'stopped' as const,
       parallel: 1,

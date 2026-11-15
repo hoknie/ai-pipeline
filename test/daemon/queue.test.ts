@@ -1,9 +1,15 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { QueueView, RunCreated } from '../../src/presentation/ipc/contract/index.ts';
+import {
+  parseRequest,
+  type QueueView,
+  type RunCreated,
+} from '../../src/presentation/ipc/contract/index.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 import { MANUAL_CONFIG, PIPELINE_CONFIG } from './harness.ts';
 import { start, queueOf, add, waitQueue, allRuns, WRITE_LIB } from './queue-harness.ts';
@@ -421,5 +427,81 @@ describe('pipeline variants in the queue', () => {
     expect(queue.stop).toMatchObject({ kind: 'item' });
     expect(queue.items[0]?.error).toContain('unknown variant `light` of pipeline `feature`');
     expect(await allRuns(h)).toEqual([]);
+  });
+});
+
+describe('queues of all projects', () => {
+  const gitRepository = (name: string): string => {
+    const repo = join(realpathSync(mkdtempSync(join(tmpdir(), 'aip-queues-'))), name);
+    execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+    return repo;
+  };
+
+  it('lists the queues of enabled projects by label, empty for a project without one', async () => {
+    const h = await start();
+    await add(h, 'A');
+    await add(h, 'B');
+    const lib = gitRepository('lib');
+    await h.call('repository_add', { path: lib });
+    await h.call('repository_update', { path: lib, name: 'AAA' });
+    const views = (await h.call('queues', {})) as QueueView[];
+    expect(views.map((view) => view.repository)).toEqual([lib, h.repo]);
+    expect(views[0]).toMatchObject({ status: 'stopped', items: [], runs: [] });
+    expect(views[1]!.items.map((item) => item.title)).toEqual(['A', 'B']);
+  });
+
+  it('leaves out a disabled project and changes neither the registry nor the database', async () => {
+    const h = await start();
+    await add(h, 'A');
+    const off = gitRepository('off');
+    await h.call('repository_add', { path: off });
+    await h.call('repository_update', { path: off, enabled: false });
+    const before = await h.call('repositories', {});
+    const views = (await h.call('queues', {})) as QueueView[];
+    expect(views.map((view) => view.repository)).toEqual([h.repo]);
+    expect(await h.call('repositories', {})).toEqual(before);
+  });
+
+  it('answers an empty list without enabled projects', async () => {
+    const h = await start();
+    expect(await h.call('queues', {})).toEqual([]);
+  });
+});
+
+describe('parameters of queue_add_projects', () => {
+  const base = { pipeline: 'feature', task: 'x' };
+  const parse = (params: Record<string, unknown>) =>
+    parseRequest(JSON.stringify({ id: 1, method: 'queue_add_projects', params }));
+
+  it('takes two to twenty projects with notes, tag and chain', () => {
+    const projects = (count: number) => Array.from({ length: count }, (_, i) => `p${i}`);
+    expect(
+      parse({
+        ...base,
+        repositories: ['lib', 'web'],
+        notes: { web: 'y' },
+        tag: 'email',
+        chain: true,
+      }),
+    ).toMatchObject({ request: { method: 'queue_add_projects' } });
+    expect('error' in parse({ ...base, repositories: projects(20) })).toBe(false);
+    expect('error' in parse({ ...base, repositories: projects(21) })).toBe(true);
+    expect('error' in parse({ ...base, repositories: ['lib'] })).toBe(true);
+  });
+
+  it('refuses groups and attachments with a message, and a missing task', () => {
+    const groups = parse({
+      ...base,
+      repositories: ['a', 'b'],
+      groups: [{ title: 'a', task: 'b' }],
+    });
+    expect(JSON.stringify(groups)).toContain(
+      'groups and attachments are not supported for several projects',
+    );
+    const files = parse({ ...base, repositories: ['a', 'b'], attachments: ['/f'] });
+    expect(JSON.stringify(files)).toContain(
+      'groups and attachments are not supported for several projects',
+    );
+    expect('error' in parse({ pipeline: 'feature', repositories: ['a', 'b'] })).toBe(true);
   });
 });

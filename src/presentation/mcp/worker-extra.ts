@@ -40,7 +40,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
       {
         title: 'Add a task to the queue',
         description:
-          'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups; pass after with ids returned by earlier calls to order dependent tasks. The answer contains the id of the new item. It does not start the queue. Call swarm_report afterwards as usual.',
+          'Put a task at the end of the queue of the repository this run belongs to, to be started later as its own run. Pass either task or groups; pass after with ids to order dependent tasks: ids returned by earlier calls, waiting items of the queues of any project or runs of any repository. The answer contains the id of the new item. It does not start the queue. Call swarm_report afterwards as usual.',
         inputSchema: {
           pipeline: z.string().min(1).describe('Pipeline id of the configuration, e.g. feature'),
           task: z.string().trim().min(1).optional().describe('One task text'),
@@ -76,7 +76,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
             .array(z.string().min(1))
             .optional()
             .describe(
-              'Ids of queue items or runs that must be done first, e.g. the ids returned by earlier swarm_queue_add calls',
+              'Ids that must be done first: waiting items of the queues of any project, runs of any repository, e.g. the ids returned by earlier swarm_queue_add calls',
             ),
         },
       },

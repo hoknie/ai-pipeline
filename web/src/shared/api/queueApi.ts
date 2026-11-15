@@ -1,4 +1,12 @@
-import type { QueueFields, QueuePatch, QueueView, RunCreated, TagView } from './types.ts';
+import type {
+  AddedToProject,
+  QueueFields,
+  QueuePatch,
+  QueueProjectsFields,
+  QueueView,
+  RunCreated,
+  TagView,
+} from './types.ts';
 import { call, enc, post, withRepository } from './http.ts';
 
 export interface QueueSettingsPatch {
@@ -11,7 +19,7 @@ export interface QueueSettingsPatch {
   /** On a usage limit: wait for the reset, or stop. */
   onLimit?: 'wait' | 'stop';
   /** Replaces the passed lists (pipeline ids, tag ids); only while the queue is stopped. */
-  filter?: { pipelines?: string[]; tags?: string[] };
+  filter?: { pipelines?: string[]; tags?: string[]; projects?: string[] };
 }
 
 export interface QueueApi {
@@ -25,6 +33,8 @@ export interface QueueApi {
   /** The queue of the bound repository. */
   queue(): Promise<QueueView>;
   queueAdd(fields: QueueFields): Promise<QueueView & { item: string }>;
+  /** One task for several projects, added in one step; the repository of the client is not used. */
+  queueAddProjects(fields: QueueProjectsFields): Promise<AddedToProject[]>;
   queueEdit(item: string, patch: QueuePatch): Promise<QueueView>;
   queueRemove(item: string): Promise<QueueView>;
   queueRunNow(item: string): Promise<RunCreated>;
@@ -45,6 +55,7 @@ export function queueApi(at: (path: string) => string): QueueApi {
     removeTag: (tag) => post(at('/api/tags/remove'), { tag }),
     queue: () => call(at('/api/queue')),
     queueAdd: (fields) => post(at('/api/queue/items'), fields),
+    queueAddProjects: (fields) => post(at('/api/queue/projects'), fields),
     queueEdit: (item, patch) => post(at(`/api/queue/items/${enc(item)}`), patch),
     queueRemove: (item) => post(at(`/api/queue/items/${enc(item)}/remove`)),
     queueRunNow: (item) => post(at(`/api/queue/items/${enc(item)}/run`)),

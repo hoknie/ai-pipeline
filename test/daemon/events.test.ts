@@ -1,12 +1,17 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   streamEventSchema,
+  type QueueView,
   type RunCreated,
   type StreamEvent,
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
+import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 import { POLL_MS, PIPELINE_CONFIG, harness, startRun, until, type Harness } from './harness.ts';
 
 // Each test needs a fresh daemon: the snapshot, the registry of repositories and the seq of the
@@ -116,6 +121,105 @@ describe('event stream', () => {
     ).map((item) => item.task);
     expect(tasks).toEqual(['B', 'A']);
     expect(first).toBeDefined();
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
+});
+
+describe('queue event of a dependent project', () => {
+  it('sends the queue of the client when the task it waits for in another project starts', async () => {
+    const h = (current = await harness());
+    const lib = join(dirname(h.repo), 'lib');
+    copyTemplateRepo(lib, PIPELINE_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    await h.call('repository_add', { path: lib });
+    const api = (await h.call('queue_add', {
+      repository: lib,
+      pipeline: 'feature',
+      task: 'API',
+    })) as { item: string };
+    await h.call('queue_add', {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'клиент',
+      after: [api.item],
+    });
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await until('the snapshot', () => events.length > 0);
+    await h.call('queue_run_now', { repository: lib, item: api.item });
+    await until('the queue event of the client', () =>
+      events.some(
+        (event) =>
+          event.event === 'queue' &&
+          (event.queue as unknown as QueueView).repository === h.repo &&
+          (event.queue as unknown as QueueView).items[0]?.after[0]?.kind === 'run',
+      ),
+    );
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
+
+  it('sends the queue of the client when the waiting task it waits for is edited', async () => {
+    const h = (current = await harness());
+    const lib = join(dirname(h.repo), 'lib');
+    copyTemplateRepo(lib, PIPELINE_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
+    await h.call('repository_add', { path: lib });
+    const api = (await h.call('queue_add', {
+      repository: lib,
+      pipeline: 'feature',
+      task: 'API',
+    })) as { item: string };
+    await h.call('queue_add', {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'клиент',
+      after: [api.item],
+    });
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await until('the snapshot', () => events.length > 0);
+    await h.call('queue_edit', { repository: lib, item: api.item, task: 'новый API' });
+    await until('the queue event of the client with the new title', () =>
+      events.some(
+        (event) =>
+          event.event === 'queue' &&
+          (event.queue as unknown as QueueView).repository === h.repo &&
+          (event.queue as unknown as QueueView).items[0]?.after[0]?.title === 'новый API',
+      ),
+    );
+    await h.close();
+    current = null;
+    expect(await ended).toBe('closed');
+  });
+});
+
+describe('global queue event', () => {
+  it('sends the global queue in the snapshot and when a task is added', async () => {
+    const h = (current = await harness());
+    const directory = join(h.environment.XDG_CONFIG_HOME!, 'aip');
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, 'settings.yaml'), 'queue: { scope: global }\n');
+    const events: StreamEvent[] = [];
+    const ended = subscribe(h.socket, (line) =>
+      events.push(streamEventSchema.parse(JSON.parse(line))),
+    );
+    await until('the snapshot', () => events.length > 0);
+    const snapshot = events[0]!;
+    expect(snapshot).toMatchObject({ event: 'snapshot', queues: [] });
+    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'работа' });
+    await until('the event of the global queue', () =>
+      events.some(
+        (event) =>
+          event.event === 'globalQueue' &&
+          (event.globalQueue as { items: unknown[] } | null)?.items.length === 1,
+      ),
+    );
     await h.close();
     current = null;
     expect(await ended).toBe('closed');

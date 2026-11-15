@@ -6,4 +6,8 @@ export interface QueuePublishPort {
   queueSaved(queue: Queue): void;
   /** The queue may look different without a change of its own: the clients get it when it does. */
   queueChecked(queue: Queue): void;
+  /** The global queue was saved: the clients get it as it is now. */
+  globalQueueSaved(): void;
+  /** The global queue may look different without a change of its own: the clients get it when it does. */
+  globalQueueChecked(): void;
 }

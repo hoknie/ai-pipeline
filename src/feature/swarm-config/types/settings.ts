@@ -326,6 +326,22 @@ export function defaultStats(): StatsSettings {
   return { enabled: true, exclude: [], showCost: true };
 }
 
+export const QUEUE_SCOPES = ['project', 'global'] as const;
+export type QueueScopeName = (typeof QUEUE_SCOPES)[number];
+export const QUEUE_MAX_RANGE = [1, 32] as const;
+
+/** The mode of the task queue and the specialist limit of the machine; the global settings.yaml only. */
+export interface QueueSettings {
+  /** `project`: a queue per project; `global`: one queue for all projects. */
+  scope: QueueScopeName;
+  /** The most specialists working at once on the machine in the `global` mode. */
+  max: number;
+}
+
+export function defaultQueue(): QueueSettings {
+  return { scope: 'project', max: 5 };
+}
+
 export const DEFAULT_NETWORK_TARGET = 'https://api.anthropic.com';
 
 export function defaultNetwork(): NetworkSettings {

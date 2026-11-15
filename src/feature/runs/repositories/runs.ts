@@ -27,10 +27,15 @@ export class RunRepository {
   }
 
   /** The run that started from queue item `item` in the repository, if any. */
-  runOfQueueItem(repository: string, item: string): RunState | null {
-    const row = this.database
-      .prepare('SELECT * FROM runs WHERE repository = ? AND queue_item = ? LIMIT 1')
-      .get(repository, item) as Row | undefined;
+  /** The run created from a queue item; `repository` null looks in every repository: item ids are unique on the machine. */
+  runOfQueueItem(repository: string | null, item: string): RunState | null {
+    const row = (
+      repository === null
+        ? this.database.prepare('SELECT * FROM runs WHERE queue_item = ? LIMIT 1').get(item)
+        : this.database
+            .prepare('SELECT * FROM runs WHERE repository = ? AND queue_item = ? LIMIT 1')
+            .get(repository, item)
+    ) as Row | undefined;
     return row ? hydrateRun(this.database, row) : null;
   }
 

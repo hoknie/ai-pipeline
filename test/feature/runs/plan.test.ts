@@ -244,3 +244,63 @@ describe('a run with a hold', () => {
     expect(state.groups[0]!.pending?.stepIndex).toBe(1);
   });
 });
+
+describe('planDispatch with a limit of the machine', () => {
+  const machine = (max: number) => ({ kind: 'machine', max }) as const;
+
+  function twoProjects() {
+    const app = run(2, { id: 'run000000001', max: 1 });
+    const lib = run(2, { id: 'run000000002', now: 2000, max: 1 });
+    lib.run.repository = '/other';
+    return { app, lib };
+  }
+
+  const started = (plan: ReturnType<typeof planDispatch>) =>
+    plan.start.map((entry) => `${entry.state.run.id}/${entry.group.slug}`);
+
+  it('counts the working specialists of every repository together', () => {
+    const { app, lib } = twoProjects();
+    const plan = planDispatch([app, lib], 3000, undefined, machine(3));
+    expect(started(plan)).toEqual([
+      'run000000001/gruppa-1',
+      'run000000001/gruppa-2',
+      'run000000002/gruppa-1',
+    ]);
+    expect(plan.waits.get(waitKey('run000000002', 'gruppa-2'))).toEqual({
+      reason: 'capacity',
+      max: 3,
+    });
+  });
+
+  it('ignores swarm.max of the runs', () => {
+    const { app, lib } = twoProjects();
+    withMax(app, 0);
+    withMax(lib, 0);
+    expect(planDispatch([app, lib], 3000, undefined, machine(4)).start).toHaveLength(4);
+    expect(planDispatch([app, lib], 3000).start).toHaveLength(0);
+  });
+
+  it('keeps the max of a specialist in both modes', () => {
+    const app = planned(2, { id: 'run000000001' });
+    const repository = planDispatch([app], 3000, undefined, { kind: 'repository' });
+    const global = planDispatch([app], 3000, undefined, machine(5));
+    for (const plan of [repository, global]) {
+      expect(plan.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
+      expect(plan.waits.get(waitKey('run000000001', 'gruppa-2'))).toMatchObject({
+        reason: 'specialist',
+      });
+    }
+  });
+
+  it('leaves the mode of the projects as it was', () => {
+    const { app, lib } = twoProjects();
+    const plan = planDispatch([app, lib], 3000, undefined, { kind: 'repository' });
+    expect(started(plan)).toEqual(['run000000001/gruppa-1', 'run000000002/gruppa-1']);
+  });
+
+  it('lets the older run take the places of the machine first', () => {
+    const { app, lib } = twoProjects();
+    const plan = planDispatch([lib, app], 3000, undefined, machine(1));
+    expect(started(plan)).toEqual(['run000000001/gruppa-1']);
+  });
+});

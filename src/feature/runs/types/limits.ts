@@ -40,8 +40,20 @@ export function limitHolds(states: Iterable<RunState>, now: number): Map<string,
   return holds;
 }
 
+/**
+ * What caps the specialists that work at once: `swarm.max` of each repository, or one number for
+ * the whole machine (the global queue mode).
+ */
+export type DispatchLimit = { kind: 'repository' } | { kind: 'machine'; max: number };
+
+/** The key the specialists are counted under: their repository, or one key for the machine. */
+export const MACHINE_KEY = '*';
+
 /** Running attempts of each repository. */
-export function runningByRepository(states: RunState[]): Map<string, number> {
+export function runningByRepository(
+  states: RunState[],
+  limit: DispatchLimit = { kind: 'repository' },
+): Map<string, number> {
   const counts = new Map<string, number>();
   for (const state of states) {
     const running = allGroups(state).reduce(
@@ -52,7 +64,7 @@ export function runningByRepository(states: RunState[]): Map<string, number> {
         ).length,
       0,
     );
-    const repository = state.run.repository;
+    const repository = limit.kind === 'machine' ? MACHINE_KEY : state.run.repository;
     counts.set(repository, (counts.get(repository) ?? 0) + running);
   }
   return counts;

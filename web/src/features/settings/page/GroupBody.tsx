@@ -44,16 +44,24 @@ function QueueBody({ props, settings }: BodyProps) {
       </div>
     );
   }
+  const scope = settings.config?.settings.find((entry) => entry.path === 'queue.scope')?.value;
   return (
-    <QueueModes
-      api={props.api}
-      queue={queue}
-      repositoryName={repository === null ? null : repositoryLabel(repository)}
-      config={settings.config}
-      onReload={settings.reload}
-      onQueue={props.onQueue}
-      onError={props.onError}
-    />
+    <>
+      {scope === 'global' ? (
+        <p className="mb-3 max-w-xl text-sm text-muted-foreground">
+          {t('queue.settings.globalNote')}
+        </p>
+      ) : null}
+      <QueueModes
+        api={props.api}
+        queue={queue}
+        repositoryName={repository === null ? null : repositoryLabel(repository)}
+        config={settings.config}
+        onReload={settings.reload}
+        onQueue={props.onQueue}
+        onError={props.onError}
+      />
+    </>
   );
 }
 
@@ -138,7 +146,8 @@ export function GroupBody({ props, settings }: BodyProps) {
   if (group === 'tags') {
     return repository === null ? null : <TagsSettings api={api} repository={repository} />;
   }
-  if (group === 'queue') return <QueueBody props={props} settings={settings} />;
+  if (group === 'queue' && props.scope === 'project')
+    return <QueueBody props={props} settings={settings} />;
   if (group === 'projects') {
     return (
       <ProjectsGroup

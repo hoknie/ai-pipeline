@@ -38,6 +38,7 @@ export const en = {
     repositoryManage: 'Manage projects',
     repositorySearch: 'Search projects…',
     repositoryNone: 'Nothing found',
+    repositoryAll: 'All projects',
     repositoryRemove: 'Remove from list',
     repositoryAddTitle: 'Add a repository',
     repositoryAddDescription:
@@ -287,9 +288,6 @@ export const en = {
       tags: 'Tags',
       search: 'Search runs',
       filter: 'Run filter',
-      scope: 'Runs of',
-      scopeRepository: 'This repository',
-      scopeAll: 'All repositories',
       state: 'State',
       pipeline: 'Pipeline',
       variant: 'Variant',
@@ -597,6 +595,12 @@ export const en = {
     commit: 'Commit',
     branch: 'Branch',
   },
+  projectChoice: {
+    title: 'Project',
+    description: 'The new entry is saved into the project you choose.',
+    label: 'Project',
+    choose: 'Continue',
+  },
   queue: {
     settings: {
       title: 'Queue settings',
@@ -631,6 +635,8 @@ export const en = {
       onLimitWait: 'Wait for the reset',
       onLimitStop: 'Stop',
       forRepository: 'These modes apply to the queue of {{name}}.',
+      globalNote:
+        'The queue is global: the settings of the queues of projects do not apply and are kept for the way back.',
       forNoRepository: 'These modes apply to the queue of the selected repository.',
       openQueue: 'Open the queue',
     },
@@ -646,6 +652,14 @@ export const en = {
       unknown: 'not in the configuration',
       filtered: 'Filtered out',
       filteredHint: 'A running queue does not take this task until it fits the take filter',
+    },
+    global: {
+      badge: 'Global queue',
+      max_one: 'At most {{count}} specialist at once on the machine',
+      max_other: 'At most {{count}} specialists at once on the machine',
+      projects: 'Projects',
+      projectsHelp:
+        'The global queue takes tasks of the chosen projects only. Empty: all enabled projects. Changed only while the queue is stopped.',
     },
     controls: {
       label: 'queue controls',
@@ -664,6 +678,18 @@ export const en = {
     runsPlaces_other: '{{taken}} of {{count}} places',
     runsOverflow:
       'More runs than places (parallelism was lowered or a task was run now): runs already started keep going, new tasks wait for a free place.',
+    all: {
+      startAll: 'Start all',
+      pauseAll: 'Pause all',
+      startedAll: 'Queues started',
+      pausedAll: 'Queues paused',
+      failed: '{{project}}: {{error}}',
+      blockLabel: 'Queue of {{project}}',
+      openProject: 'Open the project queue',
+      empty: 'Empty queues:',
+      showEmpty: 'Show the queue of {{project}}',
+      nothing: 'Nothing to show: no enabled projects',
+    },
     freeSlot: 'Free place',
     splitting: 'splitting the task',
     delivering: 'Delivery',
@@ -716,6 +742,24 @@ export const en = {
     },
     readiness: { ready: 'ready', waiting: 'waiting', blocked: 'blocked' },
     dependency: { done: 'done', waiting: 'waiting', blocked: 'blocked' },
+    multi: {
+      toggle: 'In several projects',
+      projects: 'Projects',
+      choose: 'Choose projects',
+      order: 'Order of the projects',
+      moveUp: 'Move {{project}} up',
+      moveDown: 'Move {{project}} down',
+      drag: 'Drag {{project}} to change the order',
+      needMore: 'Choose at least two projects',
+      noCommon: 'The selected projects have no pipeline in common',
+      note: 'Addition for {{project}}',
+      notePlaceholder: 'Added to the text of this project only',
+      tag: 'Shared tag',
+      tagHint: 'A tag with this name is taken from each catalog or created; empty: no tag',
+      chain: 'In turn',
+      chainHint: 'The task of each project waits for the task of the previous one',
+      created: 'Tasks created in {{count}} projects',
+    },
     form: {
       repository: 'Repository',
       repositorySearch: 'Search repository…',
@@ -728,6 +772,7 @@ export const en = {
       afterCurrent: 'Current predecessors',
       afterItems: 'Waiting tasks',
       afterRuns: 'Runs from the queue',
+      afterOther: 'Other projects',
       tags: 'Tags',
       postpone: 'Postpone',
       autoDeliver: 'Auto delivery',
@@ -789,6 +834,8 @@ export const en = {
       linked: 'linked to the selected task',
       postponed: 'Postponed',
       waitsFor: 'Waits for:',
+      inProject: 'in {{project}}',
+      openProjectQueue: 'Open queue of {{project}}',
       postpone: 'Postpone',
       activeHint: 'A postponed task stays in place, but a running queue does not take it',
       readyHint: 'Nothing to wait for: the task starts as soon as a place is free',
@@ -1034,9 +1081,11 @@ export const en = {
       builtin: 'Built-in',
       project: 'Project',
       global: 'Shared',
+      other: 'Other projects',
     },
   },
   specialists: {
+    projectNotFound: 'Project not found',
     tabs: {
       label: 'Specialist sections',
       specialists: 'Specialists',
@@ -1096,6 +1145,8 @@ export const en = {
       prompt: 'Instructions of the specialist; added to every task.',
     },
     filters: {
+      project: 'Project',
+      sharedProject: 'Shared',
       search: 'Search specialists',
       level: 'Level',
       levels: { all: 'All', project: 'Project only', global: 'Shared only' },
@@ -1629,6 +1680,7 @@ export const en = {
       system_panel: 'Panel settings',
       system_network: 'Network',
       system_stats: 'Statistics',
+      queue_queue: 'Queue',
       system_attachments: 'Attachments',
     },
     field: {
@@ -1750,6 +1802,14 @@ export const en = {
         label: 'Path-style addressing',
         hint: 'Put the bucket in the URL path instead of the host.',
       },
+      queue_scope: {
+        label: 'Mode',
+        hint: 'Projects have a queue each (project), or one queue runs the tasks of all projects (global). Changing it pauses every queue.',
+      },
+      queue_max: {
+        label: 'Specialists at once',
+        hint: 'Most specialists working at once on the machine in the global mode.',
+      },
       stats_enabled: {
         label: 'Collect statistics',
         hint: 'Writes the usage of every finished attempt to the journal of statistics.',
@@ -1773,6 +1833,7 @@ export const en = {
         hint: 'Names only: the values are never shown.',
       },
     },
+    queueScope: { project: 'Project', global: 'Global' },
     attachmentStorage: { local: 'Local folder', s3: 'S3' },
   },
   observers: {

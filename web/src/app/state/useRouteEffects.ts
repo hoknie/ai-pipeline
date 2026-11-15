@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import type { RunView } from '../../shared/api/types.ts';
+import type { RepositoryView, RunView } from '../../shared/api/types.ts';
 import type { Route } from '../../shared/lib/nav/route.ts';
 
 /** Opens the first run of the repository, and follows a link into a run of another repository. */
@@ -9,11 +9,17 @@ export function useRouteEffects(
   runs: RunView[],
   selected: string | null,
   setRoute: (update: (current: Route) => Route) => void,
-  setChosen: (path: string) => void,
-  /** Whether a repository is a disabled project: a run of one does not select it. */
-  disabled: (repository: string) => boolean,
+  panel: {
+    /** The mode «All projects»: links do not leave it. */
+    allProjects: boolean;
+    setChosen: (path: string) => void;
+    registry: readonly RepositoryView[];
+    /** Whether a repository is a disabled project: a run of one does not select it. */
+    disabled: (repository: string) => boolean;
+  },
 ): void {
-  const first = runs.find((candidate) => candidate.repository === selected);
+  const { allProjects, setChosen, registry, disabled } = panel;
+  const first = runs.find((candidate) => allProjects || candidate.repository === selected);
   useEffect(() => {
     if (route.view === 'runs' && route.run === null && first)
       setRoute((current) => ({ ...current, run: first.id }));
@@ -25,8 +31,15 @@ export function useRouteEffects(
     route.view === 'runs' && route.run
       ? (runs.find((candidate) => candidate.id === route.run)?.repository ?? null)
       : null;
-  const routedRepository = found !== null && !disabled(found) ? found : null;
+  // An address of an entry of a project (`?project=<slug>`) does the same.
+  const projectPath =
+    route.project !== undefined && route.project !== null
+      ? (registry.find((entry) => entry.slug === route.project)?.path ?? null)
+      : null;
+  const target = found ?? projectPath;
+  const routedRepository = target !== null && !disabled(target) ? target : null;
   useEffect(() => {
-    if (routedRepository !== null && routedRepository !== selected) setChosen(routedRepository);
-  }, [routedRepository, selected, setChosen]);
+    if (!allProjects && routedRepository !== null && routedRepository !== selected)
+      setChosen(routedRepository);
+  }, [allProjects, routedRepository, selected, setChosen]);
 }

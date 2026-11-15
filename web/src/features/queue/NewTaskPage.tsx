@@ -6,13 +6,13 @@ import type { QueueView, RunView } from '../../shared/api/types.ts';
 import { takeFocusRequest } from '../../shared/lib/browser/hotkeys.ts';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
-import { RepositoryPicker } from '../repositories/index.ts';
 
 import { QueueForm, type QueueDraft } from './QueueForm.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { useNewTaskState } from './form/useNewTaskState.ts';
+import { projectsFormProps } from './form/ProjectsFields.tsx';
 import { itemLabel } from './list/itemText.ts';
-import { afterOptions } from './queueLinks.ts';
+import { afterOptions, otherQueues } from './queueLinks.ts';
 
 type Props = {
   /** Not bound to a repository: the page binds it to the repository it picks. */
@@ -70,19 +70,22 @@ export default function NewTaskPage(props: Props) {
           api={scoped}
           autoDeliverDefault={queue.autoDeliver ?? null}
           deliveryModeDefault={queue.deliveryMode ?? null}
-          afterChoices={afterOptions(queue, (item) => itemLabel(item, t))}
+          afterChoices={afterOptions(
+            queue,
+            (item) => itemLabel(item, t),
+            undefined,
+            otherQueues(props.queues, repositories, target),
+          )}
           parentChoices={parents}
           pending={pipelines === null || (draft !== undefined && draftTarget !== target)}
-          repositoryField={
-            <RepositoryPicker
-              id="new-repository"
-              label={t('queue.form.repository')}
-              repositories={repositories}
-              value={target}
-              waiting={waiting}
-              onChange={setTarget}
-            />
-          }
+          {...projectsFormProps({
+            multi: state.multi,
+            repositories,
+            waiting,
+            target,
+            onTarget: setTarget,
+            needMore: t('queue.multi.needMore'),
+          })}
           submitLabel={t('queue.add')}
           onDraft={(next) => onDraft({ ...next, repository: next.repository ?? target })}
           onSubmit={state.submit}

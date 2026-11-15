@@ -63,6 +63,8 @@ export interface DependencyView {
   number: number | null;
   title: string;
   state: DependencyState;
+  /** Root of the repository of the item or run; null when the run is unknown. */
+  repository: string | null;
 }
 
 export interface QueueRunView {
@@ -104,6 +106,8 @@ export interface QueueRunView {
 }
 
 export interface QueueView {
+  /** The queue of one project; the global mode answers with `GlobalQueueView`. */
+  scope: 'project';
   repository: string;
   status: 'stopped' | 'running';
   parallel: number;
@@ -132,4 +136,51 @@ export interface QueueView {
   /** Runs taken off the places because of a stopping problem, the latest first. */
   skipped: QueueRunView[];
   updatedAt: number;
+}
+
+/** A task of the global queue: the task with the project whose queue it stands in. */
+export interface GlobalQueueItemView extends QueueItemView {
+  /** Root of the project of the task. */
+  repository: string;
+}
+
+/** A run that occupies a place of the global queue, with its project. */
+export interface GlobalQueueRunView extends QueueRunView {
+  /** Root of the project of the run. */
+  repository: string;
+}
+
+/** The one queue of the `global` mode: the tasks and runs of all projects in one order. */
+export interface GlobalQueueView extends Omit<
+  QueueView,
+  | 'scope'
+  | 'repository'
+  | 'autoDeliver'
+  | 'deliveryMode'
+  | 'filter'
+  | 'filterTags'
+  | 'items'
+  | 'runs'
+  | 'skipped'
+> {
+  scope: 'global';
+  /** The take filter: ids of pipelines and paths of projects; an empty list means any. */
+  filter: { pipelines: string[]; projects: string[] };
+  /** The tasks in the global order; `position` is the place among all projects. */
+  items: GlobalQueueItemView[];
+  runs: GlobalQueueRunView[];
+  skipped: GlobalQueueRunView[];
+  /** The most specialists working at once on the machine (`queue.max`). */
+  max: number;
+}
+
+/** One item of a task added to several projects, in the order of the request. */
+export interface AddedToProjectView {
+  /** Root of the repository. */
+  repository: string;
+  /** Slug of the project. */
+  project: string;
+  item: string;
+  /** Number of the task in its project. */
+  number: number;
 }

@@ -16,6 +16,7 @@ describe('groups of settings', () => {
       'general',
       'agents',
       'delivery',
+      'queue',
       'runtimes',
       'chains',
       'specialists',
@@ -43,6 +44,8 @@ describe('groups of settings', () => {
     expect(groupOf('defaults.allow_commands')).toBe('agents');
     expect(groupOf('claude.mcp')).toBe('agents');
     expect(groupOf('runtimes.claude.env')).toBe('runtimes');
+    expect(groupOf('queue.scope')).toBe('queue');
+    expect(groupOf('swarm.queue.max')).toBe('queue');
     expect(groupOf('web.port')).toBe('system');
     expect(groupOf('swarm.web.port')).toBe('system');
   });
@@ -63,7 +66,7 @@ describe('groups of settings', () => {
 
   it('opens general for a group the tab does not have, and leads old keys to their place', () => {
     expect(settingsLocationOf('project', 'queue')).toEqual({ scope: 'project', group: 'queue' });
-    expect(settingsLocationOf('global', 'queue')).toEqual({ scope: 'global', group: 'general' });
+    expect(settingsLocationOf('global', 'queue')).toEqual({ scope: 'global', group: 'queue' });
     expect(settingsLocationOf('project', 'nope')).toEqual({ scope: 'project', group: 'general' });
     expect(settingsLocationOf('global', 'specialist-tags')).toEqual({
       scope: 'global',

@@ -240,7 +240,6 @@ describe('useNearEnd and the list end', () => {
           onFilters={() => undefined}
           onSelect={() => undefined}
           scope="all"
-          onScope={() => undefined}
           repository="/repo"
           more={more}
           onMore={onMore}
@@ -489,7 +488,6 @@ describe('history per repository', () => {
           onFilters={() => undefined}
           onSelect={() => undefined}
           scope="repository"
-          onScope={() => undefined}
           repository={repository}
           more="idle"
           onMore={onMore}

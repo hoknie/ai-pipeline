@@ -28,7 +28,6 @@ export interface RunsPageProps {
   onSubtask?: (run: RunView) => void;
   /** Loading of older finished runs; without it the list is all there is. */
   history?: HistoryState;
-  onScope: (scope: RunScope) => void;
 }
 
 /** What the parts of the page need to render the filters. */
@@ -39,7 +38,6 @@ export interface FilterProps {
   filters: RunFilterState;
   onFilters: (filters: RunFilterState) => void;
   scope: RunScope;
-  onScope: (scope: RunScope) => void;
   repository: string | null;
   repositoryPaths?: ReadonlyMap<string, string>;
 }

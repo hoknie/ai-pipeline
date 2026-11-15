@@ -82,6 +82,7 @@ outside_changes: warn     # warn | stop | off
 workspace: { ... }
 naming: { ... }
 web: { ... }              # shared directory only
+queue: { ... }            # shared directory only
 runtimes: { ... }         # shared directory only
 network: { ... }          # shared directory only
 attachments: { ... }      # shared directory only
@@ -104,6 +105,7 @@ defaults: { ... }
 | `workspace` | [`workspace`](#workspace) |
 | `naming` | [`naming`](#naming) |
 | `web` | [`web`](#web) |
+| `queue` | [`queue`](#queue) |
 | `runtimes` | [configuration/runtimes.md](runtimes.md#runtimes) |
 | `network` | [configuration/network.md](network.md) |
 | `attachments` | [configuration/attachments.md](attachments.md) |
@@ -122,6 +124,21 @@ defaults: { ... }
 ### `max`
 
 `max` limits the specialists running at once across all runs of one repository; runs of other repositories do not take its slots. The value from the configuration of the repository's most recently created run applies. A specialist can have [its own `max`](specialists.md#limits). The number of runs at once is a separate setting, [`parallel`](../usage/queue.md#running-the-queue) of the queue.
+
+### `queue`
+
+Shared directory only: the section in a project is an error.
+
+```yaml
+queue:
+  scope: project    # project | global
+  max: 5            # specialists running at once on the machine in the global mode, 1..32
+```
+
+- `scope: project` (default): every project has its own queue, and [`max`](#max) is counted per repository.
+- `scope: global`: one [global queue](../usage/queue.md#global-queue) takes the tasks of all projects in one order, and `queue.max` limits the specialists of all repositories together instead of `max`. A [specialist's `max`](specialists.md#limits) applies in both modes.
+
+Changing `scope` pauses every queue; running runs go on. A wrong value is reported as `swarm.queue.scope` or `swarm.queue.max` and the mode stays as it was.
 
 ### `workspace`
 

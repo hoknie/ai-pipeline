@@ -10,7 +10,7 @@ import type { RunsPublishPort } from '../../feature/runs/ports/index.ts';
 import type { RunState } from '../../feature/runs/types/index.ts';
 import type { ConfigChangedPort } from '../../feature/swarm-edit/ports/index.ts';
 import type { TagsPublishPort } from '../../feature/tags/ports/index.ts';
-import type { QueueView } from './contract/index.ts';
+import type { GlobalQueueView, QueueView } from './contract/index.ts';
 import type { DaemonServices } from './services.ts';
 import type { Snapshots } from './snapshots.ts';
 import { catalogView } from './views/index.ts';
@@ -22,6 +22,18 @@ function queueSignature(view: QueueView): string {
     skipped: view.skipped,
     autoDeliver: view.autoDeliver,
     deliveryMode: view.deliveryMode,
+    items: view.items.map((item) => [item.id, item.readiness, item.after, item.postponed]),
+  });
+}
+
+/** What subscribers of the `globalQueue` event see: places, readiness and order of the tasks. */
+function globalSignature(view: GlobalQueueView | null): string {
+  if (view === null) return 'project';
+  return JSON.stringify({
+    status: view.status,
+    stop: view.stop,
+    runs: view.runs,
+    skipped: view.skipped,
     items: view.items.map((item) => [item.id, item.readiness, item.after, item.postponed]),
   });
 }
@@ -50,6 +62,8 @@ export class Publisher {
   private readonly queueRuns = new Map<string, string>();
   /** Per repository: return item of each returned run, as subscribers last saw it. */
   private readonly returnItems = new Map<string, Map<string, string>>();
+  /** The signature of the global queue as subscribers last saw it. */
+  private globalSeen = 'project';
   private repositoriesJson = '';
   private observersJson = '';
 
@@ -73,11 +87,14 @@ export class Publisher {
             const queue = this.services.queue.store.get(repository);
             if (queue) this.queueChecked(queue);
           }
+          if (this.services.queue.store.scope() === 'global') this.globalQueue(false);
         },
       },
       queue: {
         queueSaved: (queue) => this.queue(queue),
         queueChecked: (queue) => this.queueChecked(queue),
+        globalQueueSaved: () => this.globalQueue(true),
+        globalQueueChecked: () => this.globalQueue(false),
       },
       repos: { repositoriesChanged: () => this.repositories() },
       tags: { tagsChanged: (repository) => this.tags(repository) },
@@ -119,7 +136,19 @@ export class Publisher {
     const repositories = this.snapshots.repositories();
     this.repositoriesJson = JSON.stringify(repositories);
     const tags = catalogView(this.services.tags.all());
-    send(JSON.stringify({ event: 'snapshot', seq: this.seq, runs, queues, repositories, tags }));
+    const globalQueue = this.currentGlobal();
+    this.globalSeen = globalSignature(globalQueue);
+    send(
+      JSON.stringify({
+        event: 'snapshot',
+        seq: this.seq,
+        runs,
+        queues,
+        repositories,
+        tags,
+        ...(globalQueue === null ? {} : { globalQueue }),
+      }),
+    );
     const processes = this.services.processes.lastSent();
     if (processes !== null) {
       this.seq += 1;
@@ -137,6 +166,13 @@ export class Publisher {
   run(state: RunState): void {
     if (this.subscribers.size === 0) return;
     this.send('run', { run: this.snapshots.run(state) });
+    // The queues of other projects that wait for this run show its new state.
+    for (const waiting of this.services.queue.store.lines.waitingFor(
+      state.run.id,
+      state.run.repository,
+    )) {
+      this.queueChecked(waiting);
+    }
   }
 
   /** Sends the `queue` event and remembers which runs subscribers have seen. */
@@ -146,12 +182,38 @@ export class Publisher {
     this.send('queue', { queue: view });
     this.repositories();
     this.returned(queue);
+    // The queues of other projects whose items wait for an item of this queue show its changes.
+    const waiting = new Map<string, Queue>();
+    for (const item of queue.items)
+      for (const other of this.services.queue.store.lines.waitingFor(item.id, queue.repository))
+        waiting.set(other.repository, other);
+    for (const other of waiting.values()) this.queueChecked(other);
   }
 
   /** Sends the queue when it looks different to the subscribers. */
   queueChecked(queue: Queue): void {
     const seen = this.queueRuns.get(queue.repository);
     if (seen !== queueSignature(this.snapshots.queue(queue))) this.queue(queue);
+  }
+
+  /** The global queue in the global mode; null in the project mode. */
+  private currentGlobal(): GlobalQueueView | null {
+    return this.services.queue.store.scope() === 'global' ? this.snapshots.globalQueue() : null;
+  }
+
+  /**
+   * Sends the `globalQueue` event: after a save, or when the queue looks different to subscribers.
+   * When the mode goes back to `project` the event carries `null` once.
+   */
+  globalQueue(saved: boolean): void {
+    if (this.subscribers.size === 0) return;
+    const view = this.currentGlobal();
+    const signature = globalSignature(view);
+    if (!saved && signature === this.globalSeen) return;
+    if (view === null && this.globalSeen === 'project') return;
+    this.globalSeen = signature;
+    this.send('globalQueue', { globalQueue: view });
+    this.repositories();
   }
 
   /** Publishes the registry when its counters or entries differ from what subscribers last saw. */
