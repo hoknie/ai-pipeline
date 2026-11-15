@@ -316,7 +316,6 @@ export const en = {
     newTask: 'Create a task',
     project: 'Switch project',
     moveItem: 'Move a task in the queue',
-    then: 'then',
     groups: { general: 'General', navigation: 'Navigation', runs: 'Runs', queue: 'Queue' },
   },
   format: {

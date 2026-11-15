@@ -322,7 +322,6 @@ export const ru: Dictionary = {
     newTask: 'Новая задача',
     project: 'Переключить проект',
     moveItem: 'Сдвинуть задачу в очереди',
-    then: 'затем',
     groups: { general: 'Общие', navigation: 'Переходы', runs: 'Запуски', queue: 'Очередь' },
   },
   format: {

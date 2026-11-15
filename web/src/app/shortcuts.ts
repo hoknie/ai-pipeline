@@ -18,10 +18,10 @@ export const SHORTCUTS: Shortcut[] = [
   { combo: 'mod+k', label: 'shortcuts.palette', group: 'general' },
   { combo: '?', label: 'shortcuts.help', group: 'general' },
   { combo: 'Escape', label: 'shortcuts.close', group: 'general' },
-  { combo: 'n', label: 'shortcuts.newTask', group: 'general' },
-  { combo: 'p', label: 'shortcuts.project', group: 'general' },
+  { combo: 'ctrl+n', label: 'shortcuts.newTask', group: 'general' },
+  { combo: 'ctrl+p', label: 'shortcuts.project', group: 'general' },
   ...SECTIONS.map((section) => ({
-    combo: `g ${section.key}`,
+    combo: `ctrl+${section.key}`,
     label: `nav.${section.labelKey}` as const,
     group: 'navigation' as const,
   })),

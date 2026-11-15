@@ -322,7 +322,6 @@ export const es: Dictionary = {
     newTask: 'Nueva tarea',
     project: 'Cambiar de proyecto',
     moveItem: 'Mover una tarea en la cola',
-    then: 'luego',
     groups: { general: 'General', navigation: 'Navegación', runs: 'Ejecuciones', queue: 'Cola' },
   },
   format: {

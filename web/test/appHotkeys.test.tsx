@@ -29,9 +29,9 @@ const press = (key: string, code: string, init: KeyboardEventInit = {}) =>
   fireEvent.keyDown(document.body, { key, code, ...init });
 
 describe('shortcut list', () => {
-  it('has exactly one `g` row per section and unique combos', () => {
+  it('has exactly one ctrl row per section and unique combos', () => {
     for (const section of SECTIONS) {
-      expect(SHORTCUTS.filter((item) => item.combo === `g ${section.key}`)).toHaveLength(1);
+      expect(SHORTCUTS.filter((item) => item.combo === `ctrl+${section.key}`)).toHaveLength(1);
     }
     const combos = SHORTCUTS.map((item) => item.combo);
     expect(new Set(combos).size).toBe(combos.length);
@@ -39,59 +39,61 @@ describe('shortcut list', () => {
 });
 
 describe('panel hotkeys', () => {
-  it('goes to the queue, the runs and the settings with g and a letter', async () => {
+  it('goes to the queue, the runs and the settings with ctrl and a letter', async () => {
     mount();
-    press('g', 'KeyG');
-    press('q', 'KeyQ');
+    press('q', 'KeyQ', { ctrlKey: true });
     await waitFor(() => expect(window.location.hash).toMatch(/^#queue/));
-    press('g', 'KeyG');
-    press('r', 'KeyR');
+    press('r', 'KeyR', { ctrlKey: true });
     await waitFor(() => expect(window.location.hash).toMatch(/^#runs/));
-    press('g', 'KeyG');
-    press('c', 'KeyC');
+    press('c', 'KeyC', { ctrlKey: true });
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/general'));
+  });
+
+  it('ctrl+b goes to the pipelines and ctrl+t to the stats', async () => {
+    mount();
+    press('b', 'KeyB', { ctrlKey: true });
+    await waitFor(() => expect(window.location.hash).toMatch(/^#pipelines/));
+    press('t', 'KeyT', { ctrlKey: true });
+    await waitFor(() => expect(window.location.hash).toMatch(/^#stats/));
   });
 
   it('works in the Russian layout', async () => {
     mount();
-    press('п', 'KeyG');
-    press('й', 'KeyQ');
+    press('й', 'KeyQ', { ctrlKey: true });
     await waitFor(() => expect(window.location.hash).toMatch(/^#queue/));
   });
 
-  it('opens the new task dialog with n', async () => {
+  it('opens the new task dialog with ctrl+n', async () => {
     mount();
     await waitFor(() =>
       expect(
         screen.getAllByRole<HTMLButtonElement>('button', { name: 'New task' })[0]!.disabled,
       ).toBe(false),
     );
-    press('n', 'KeyN');
+    press('n', 'KeyN', { ctrlKey: true });
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
     const text = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
     await waitFor(() => expect(document.activeElement).toBe(text));
     expect(text.value).toBe('');
   });
 
-  it('leaves Ctrl+R and Cmd+R to the browser', async () => {
+  it('takes ctrl+r for itself and leaves cmd+r to the browser', async () => {
     mount();
-    press('g', 'KeyG');
-    press('q', 'KeyQ');
+    press('q', 'KeyQ', { ctrlKey: true });
     await waitFor(() => expect(window.location.hash).toMatch(/^#queue/));
-    for (const init of [{ ctrlKey: true }, { metaKey: true }]) {
-      press('g', 'KeyG');
-      const event = new KeyboardEvent('keydown', {
-        key: 'r',
-        code: 'KeyR',
-        cancelable: true,
-        bubbles: true,
-        ...init,
-      });
-      document.body.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(false);
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(window.location.hash).toMatch(/^#queue/);
-    }
+    press('r', 'KeyR', { ctrlKey: true });
+    await waitFor(() => expect(window.location.hash).toMatch(/^#runs/));
+    const event = new KeyboardEvent('keydown', {
+      key: 'r',
+      code: 'KeyR',
+      cancelable: true,
+      bubbles: true,
+      metaKey: true,
+    });
+    document.body.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(window.location.hash).toMatch(/^#runs/);
   });
 
   it('shows the reference by groups with ?', async () => {
@@ -105,8 +107,8 @@ describe('panel hotkeys', () => {
     const row = within(navigation).getByText('Queue').closest('div')!;
     expect(
       within(row)
-        .getAllByText(/^[gq]$/)
+        .getAllByText(/^(Ctrl|Q)$/)
         .map((node) => node.textContent),
-    ).toEqual(['g', 'q']);
+    ).toEqual(['Ctrl', 'Q']);
   });
 });

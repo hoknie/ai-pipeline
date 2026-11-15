@@ -108,75 +108,62 @@ describe('hotkeys by physical key', () => {
   });
 });
 
-function Sequence({ onSeq, onP }: { onSeq: () => void; onP?: () => void }) {
-  useHotkey('g q', onSeq);
-  useHotkey('g p', onSeq);
-  useHotkey('p', onP ?? (() => undefined));
+function CtrlCombos({ onSeq }: { onSeq: () => void }) {
+  useHotkey('ctrl+q', onSeq);
   return <input aria-label="field" />;
 }
 
-describe('hotkey sequences', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-  const press = (key: string, target: Element = document.body) =>
-    fireEvent.keyDown(target, { key, code: `Key${key.toUpperCase()}` });
-  const settle = () => {
-    // a separate key press clears a pending sequence of an earlier test
-    press('z');
-  };
+describe('hotkey combos with ctrl', () => {
+  const press = (key: string, init: KeyboardEventInit = {}, target: Element = document.body) =>
+    fireEvent.keyDown(target, { key, code: `Key${key.toUpperCase()}`, ...init });
 
-  it('fires on the second key and ignores an unrelated key between', () => {
+  it('fires with ctrl, but not with cmd, alt, shift or without a modifier', () => {
     const onSeq = vi.fn();
-    render(<Sequence onSeq={onSeq} />);
-    settle();
-    press('g');
+    render(<CtrlCombos onSeq={onSeq} />);
     press('q');
-    expect(onSeq).toHaveBeenCalledTimes(1);
-    press('g');
-    press('x');
-    press('q');
-    expect(onSeq).toHaveBeenCalledTimes(1);
-  });
-
-  it('forgets the first key after the timeout', () => {
-    const onSeq = vi.fn();
-    render(<Sequence onSeq={onSeq} />);
-    press('g');
-    vi.setSystemTime(Date.now() + 2000);
-    press('q');
+    press('q', { metaKey: true });
+    press('q', { altKey: true });
+    press('q', { shiftKey: true });
     expect(onSeq).not.toHaveBeenCalled();
-  });
-
-  it('does not start in an input field', () => {
-    const onSeq = vi.fn();
-    render(<Sequence onSeq={onSeq} />);
-    press('g', screen.getByLabelText('field'));
-    press('q');
-    expect(onSeq).not.toHaveBeenCalled();
-  });
-
-  it('g p does not trigger the single key p', () => {
-    const onSeq = vi.fn();
-    const onP = vi.fn();
-    render(<Sequence onSeq={onSeq} onP={onP} />);
-    press('g');
-    press('p');
+    press('q', { ctrlKey: true });
     expect(onSeq).toHaveBeenCalledTimes(1);
-    expect(onP).not.toHaveBeenCalled();
-    press('p');
-    expect(onP).toHaveBeenCalledTimes(1);
+    // a Russian layout fires too: the physical key counts
+    fireEvent.keyDown(document.body, { key: 'й', code: 'KeyQ', ctrlKey: true });
+    expect(onSeq).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not fire inside an input field', () => {
+    const onSeq = vi.fn();
+    render(<CtrlCombos onSeq={onSeq} />);
+    press('q', { ctrlKey: true }, screen.getByLabelText('field'));
+    expect(onSeq).not.toHaveBeenCalled();
+    press('q', { ctrlKey: true });
+    expect(onSeq).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fire while a dialog is open', async () => {
+    const onSeq = vi.fn();
+    render(
+      <>
+        <CtrlCombos onSeq={onSeq} />
+        <Dialog open>
+          <DialogContent>
+            <DialogTitle>Dialog</DialogTitle>
+            <DialogDescription>description</DialogDescription>
+          </DialogContent>
+        </Dialog>
+      </>,
+    );
+    await screen.findByRole('dialog');
+    press('q', { ctrlKey: true });
+    expect(onSeq).not.toHaveBeenCalled();
   });
 });
 
 describe('comboKeys', () => {
   it('splits a combo into the keys to show', () => {
     expect(comboKeys('mod+k')).toEqual([isMac ? '⌘' : 'Ctrl', 'K']);
-    expect(comboKeys('g q')).toEqual(['g', 'q']);
+    expect(comboKeys('ctrl+q')).toEqual(['Ctrl', 'Q']);
     expect(comboKeys('?')).toEqual(['?']);
     expect(comboKeys('Escape')).toEqual(['Esc']);
     expect(comboKeys('Alt+ArrowUp')).toEqual(['Alt', '↑']);

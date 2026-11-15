@@ -14,8 +14,6 @@ export function modLabel(): string {
 }
 
 const LETTER = /^[a-z]$/;
-/** How long the second key of a sequence such as `g q` may follow the first. */
-export const SEQUENCE_MS = 1500;
 
 /** Whether the event is the key of the combo: letters by physical key, so any layout works. */
 function keyMatches(key: string, event: KeyboardEvent): boolean {
@@ -32,63 +30,38 @@ function matches(combo: string, event: KeyboardEvent): boolean {
       keyMatches(combo.slice(4), event)
     );
   }
+  if (combo.startsWith('ctrl+')) {
+    const key = combo.slice(5);
+    return (
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !(LETTER.test(key) && event.shiftKey) &&
+      keyMatches(key, event)
+    );
+  }
   if (event.metaKey || event.ctrlKey || event.altKey) return false;
   if (LETTER.test(combo) && event.shiftKey) return false;
   return keyMatches(combo, event);
 }
 
-/** The keys to show for a combo: `mod+k` → `⌘`, `K`; `g q` → `g`, `q`. */
+/** The keys to show for a combo: `mod+k` → `⌘`, `K`; `ctrl+q` → `Ctrl`, `Q`. */
 export function comboKeys(combo: string): string[] {
   if (combo.startsWith('mod+')) return [modLabel(), combo.slice(4).toUpperCase()];
+  if (combo.startsWith('ctrl+')) return ['Ctrl', combo.slice(5).toUpperCase()];
   const shown: Record<string, string> = { Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓' };
   return combo.split(/ |\+/).map((key) => shown[key] ?? key);
 }
-
-const MODIFIER_KEYS = new Set(['Shift', 'Meta', 'Control', 'Alt']);
-const firstKeys = new Map<string, number>();
-let armed: { key: string; at: number } | null = null;
-/** The first key of a sequence pressed right before the current event, if any. */
-let prior: { key: string; at: number } | null = null;
 
 function blockedByInput(event: KeyboardEvent): boolean {
   const target = event.target instanceof Element ? event.target : null;
   return Boolean(target?.closest(INPUT) || document.querySelector(OPEN_DIALOG));
 }
 
-function recent(entry: { at: number } | null): boolean {
-  return entry !== null && Date.now() - entry.at <= SEQUENCE_MS;
-}
-
-// Runs before the hooks' listeners: remembers whether the previous key began a sequence.
-if (typeof window !== 'undefined') {
-  window.addEventListener(
-    'keydown',
-    (event) => {
-      if (MODIFIER_KEYS.has(event.key)) return;
-      prior = armed;
-      armed = null;
-      if (blockedByInput(event)) return;
-      for (const key of firstKeys.keys()) {
-        if (matches(key, event)) armed = { key, at: Date.now() };
-      }
-    },
-    true,
-  );
-}
-
-function trackFirstKey(key: string): () => void {
-  firstKeys.set(key, (firstKeys.get(key) ?? 0) + 1);
-  return () => {
-    const count = (firstKeys.get(key) ?? 1) - 1;
-    if (count <= 0) firstKeys.delete(key);
-    else firstKeys.set(key, count);
-  };
-}
-
 /**
- * Runs the handler on a key (`j`, `?`), on `mod+k` or on a sequence (`g q`). A plain key is ignored
- * while typing and while a dialog is open; `allowInInputs` (set for `mod+…`) lets it work in fields
- * too. A single key does not fire right after the first key of a sequence.
+ * Runs the handler on a key (`j`, `?`), on `mod+k` (Cmd on macOS, Ctrl elsewhere) or on `ctrl+q`.
+ * A plain key and a `ctrl+…` combo are ignored while typing and while a dialog is open;
+ * `allowInInputs` (set for `mod+…`) lets it work in fields too.
  */
 export function useHotkey(
   combo: string,
@@ -99,25 +72,13 @@ export function useHotkey(
   latest.current = handler;
   const allow = options.allowInInputs ?? combo.startsWith('mod+');
   useEffect(() => {
-    const [first, second] = combo.split(' ');
-    const sequence = second !== undefined;
-    const untrack = sequence && first ? trackFirstKey(first) : undefined;
     const listener = (event: KeyboardEvent) => {
-      if (sequence) {
-        if (!first || !second || !prior || prior.key !== first || !recent(prior)) return;
-        if (!matches(second, event)) return;
-      } else {
-        if (!matches(combo, event)) return;
-        if (recent(prior)) return;
-      }
+      if (!matches(combo, event)) return;
       if (!allow && blockedByInput(event)) return;
       latest.current(event);
     };
     window.addEventListener('keydown', listener);
-    return () => {
-      window.removeEventListener('keydown', listener);
-      untrack?.();
-    };
+    return () => window.removeEventListener('keydown', listener);
   }, [combo, allow]);
 }
 

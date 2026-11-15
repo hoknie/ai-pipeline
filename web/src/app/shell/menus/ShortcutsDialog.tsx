@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { comboKeys } from '../../../shared/lib/browser/hotkeys.ts';
@@ -37,15 +36,8 @@ export function ShortcutsDialog({
               {SHORTCUTS.filter((shortcut) => shortcut.group === group).map((shortcut) => (
                 <div key={shortcut.combo} className="contents">
                   <dt className="flex items-center gap-1">
-                    {comboKeys(shortcut.combo).map((key, index) => (
-                      <Fragment key={key}>
-                        {index > 0 && shortcut.combo.includes(' ') ? (
-                          <span className="text-xs text-muted-foreground">
-                            {t('shortcuts.then')}
-                          </span>
-                        ) : null}
-                        <Kbd>{key}</Kbd>
-                      </Fragment>
+                    {comboKeys(shortcut.combo).map((key) => (
+                      <Kbd key={key}>{key}</Kbd>
                     ))}
                   </dt>
                   <dd>{t(shortcut.label)}</dd>

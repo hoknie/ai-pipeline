@@ -312,7 +312,6 @@ export const zh: Dictionary = {
     newTask: '新建任务',
     project: '切换项目',
     moveItem: '在队列中移动任务',
-    then: '然后',
     groups: { general: '通用', navigation: '导航', runs: '运行', queue: '队列' },
   },
   format: {

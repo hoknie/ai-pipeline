@@ -167,7 +167,7 @@ describe('the item «All projects»', () => {
   });
 });
 
-describe('the key p', () => {
+describe('the key ctrl+p', () => {
   const choice = (selected: string | null) => ({
     repositories: [...paths.keys()],
     paths,
@@ -180,14 +180,14 @@ describe('the key p', () => {
 
   it('opens the menu with the focus in the search field', async () => {
     render(<RepositoryMenu choice={choice('/Users/me/projects/shop')} />);
-    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP' });
+    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP', ctrlKey: true });
     const search = await screen.findByRole('searchbox');
     await waitFor(() => expect(document.activeElement).toBe(search));
   });
 
   it('does nothing without a selected project', () => {
     render(<RepositoryMenu choice={choice(null)} />);
-    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP' });
+    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP', ctrlKey: true });
     expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
@@ -198,7 +198,7 @@ describe('the key p', () => {
         <RepositoryMenu choice={choice('/Users/me/projects/shop')} />
       </>,
     );
-    fireEvent.keyDown(screen.getByLabelText('other'), { key: 'p', code: 'KeyP' });
+    fireEvent.keyDown(screen.getByLabelText('other'), { key: 'p', code: 'KeyP', ctrlKey: true });
     expect(screen.queryByRole('menu')).toBeNull();
   });
 });

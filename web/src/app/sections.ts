@@ -16,8 +16,8 @@ export interface Section {
   view: View;
   labelKey: 'runs' | 'queue' | 'specialists' | 'pipelines' | 'stats' | 'settings';
   icon: LucideIcon;
-  /** The key after `g` that goes to the section. */
-  key: 'r' | 'q' | 's' | 'p' | 't' | 'c';
+  /** The letter of the `ctrl` shortcut that goes to the section. */
+  key: 'r' | 'q' | 's' | 'b' | 't' | 'c';
 }
 
 /** Sections of the panel: navigation, palette and headings take labels from here. */
@@ -25,7 +25,8 @@ export const SECTIONS: Section[] = [
   { view: 'runs', labelKey: 'runs', icon: Activity, key: 'r' },
   { view: 'queue', labelKey: 'queue', icon: ListOrdered, key: 'q' },
   { view: 'specialists', labelKey: 'specialists', icon: Users, key: 's' },
-  { view: 'pipelines', labelKey: 'pipelines', icon: GitBranch, key: 'p' },
+  // `ctrl+p` opens the project menu, so pipelines take the letter of their git-branch icon
+  { view: 'pipelines', labelKey: 'pipelines', icon: GitBranch, key: 'b' },
   { view: 'stats', labelKey: 'stats', icon: BarChart3, key: 't' },
   { view: 'settings', labelKey: 'settings', icon: Settings, key: 'c' },
 ];

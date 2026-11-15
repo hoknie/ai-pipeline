@@ -55,13 +55,13 @@ const PROJECTS_LINK = formatRoute({
   tab: null,
 });
 
-/** The open state of the menu: the key `p` opens it, and the search field takes the focus. */
+/** The open state of the menu: the key `ctrl+p` opens it, and the search field takes the focus. */
 function useOpenOnKey(
   enabled: boolean,
   search: RefObject<HTMLInputElement | null>,
 ): [boolean, (open: boolean) => void] {
   const [open, setOpen] = useState(false);
-  useHotkey('p', (event) => {
+  useHotkey('ctrl+p', (event) => {
     if (!enabled) return;
     event.preventDefault();
     setOpen(true);
