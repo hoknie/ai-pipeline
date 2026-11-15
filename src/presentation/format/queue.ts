@@ -16,6 +16,7 @@ import type {
   QueueView,
   RepositoryView,
 } from '../ipc/contract/index.ts';
+import { formatLinks } from './links.ts';
 
 export function stopReason(view: QueueView | GlobalQueueView): string | null {
   const stop = view.stop;
@@ -34,6 +35,7 @@ function filterLine(view: QueueView | GlobalQueueView): string | null {
   if (view.filter.pipelines.length > 0) parts.push(`pipelines ${view.filter.pipelines.join(', ')}`);
   if (view.scope === 'global') {
     if (view.filter.projects.length > 0) parts.push(`projects ${view.filter.projects.join(', ')}`);
+    if (view.filter.tags?.length > 0) parts.push(`tags ${view.filter.tags.join(', ')}`);
   } else if (view.filter.tags.length > 0) {
     const names = new Map(view.filterTags.map((tag) => [tag.id, tag.name]));
     parts.push(`tags ${view.filter.tags.map((id) => names.get(id) ?? id).join(', ')}`);
@@ -123,6 +125,7 @@ export function formatQueue(
   const slug: Slugs = (repository) =>
     global && repository !== undefined ? `[${slugs.get(repository) ?? repository}] ` : '';
   const lines = [queueHead(view, style)];
+  const own = 'repository' in view ? view.repository : null;
   if (view.autopilotAnswer !== null) {
     lines.push(`${style.muted('Autopilot answer:')} ${firstLine(view.autopilotAnswer)}`);
   }
@@ -164,6 +167,9 @@ export function formatQueue(
         ? ''
         : ` (${item.readiness === 'blocked' ? style.danger('blocked') : item.readiness})`;
     const after = afterText(item.after, view, slugs, mark);
+    const links = formatLinks(item.links, item.linkedBy, (repository) =>
+      repository !== null && repository !== own ? slugs.get(repository) : undefined,
+    );
     const postponed =
       (item.postponed ? ' · postponed' : '') + (item.filtered ? ' · filtered out' : '');
     const files = item.attachments.length === 0 ? '' : ` · attachments: ${item.attachments.length}`;
@@ -171,7 +177,7 @@ export function formatQueue(
     const returned =
       item.run === null ? '' : ` · ${item.hold ?? 'returns'} ${style.accent(item.run)}`;
     const head = `  ${item.position}. ${slug('repository' in item ? item.repository : undefined)}${taskNumber(item.number)} ${style.accent(item.id)}  ${pipelineLabel(item.pipeline, item.pipelineName)}  `;
-    const tail = `${title}${tagText}${delivery}${variant}${skipped}${after}${files}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
+    const tail = `${title}${tagText}${delivery}${variant}${skipped}${after}${links}${files}${postponed}${returned}  added ${addedAt(item.createdAt)}${error}`;
     const room = isTerminal(style)
       ? Math.max(10, style.columns - visibleWidth(head) - visibleWidth(tail))
       : Infinity;

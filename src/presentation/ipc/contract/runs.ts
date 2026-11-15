@@ -56,6 +56,9 @@ export const variantId = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
 
 export const parentRef = z.union([z.string().trim().min(1), z.number().int().positive()]);
 
+/** A link of a task: the kind is checked by the queue, so an unknown one gets its own error. */
+export const linkInputs = z.array(z.object({ kind: z.string().min(1), target: parentRef })).max(50);
+
 const runParams = z
   .object({
     repository: z.string().min(1),
@@ -70,6 +73,7 @@ const runParams = z
     parent: parentRef.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    links: linkInputs.optional(),
     attachments: attachmentSources.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {

@@ -42,6 +42,8 @@ const VIEW: QueueView & { item: string } = {
       skip: [],
       readiness: 'ready',
       after: [],
+      links: [],
+      linkedBy: [],
       postponed: false,
       filtered: false,
       createdAt: 1,
@@ -70,6 +72,64 @@ async function connect(
 
 const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string =>
   (result.content as { text: string }[])[0]?.text ?? '';
+
+describe('host MCP links of tasks', () => {
+  const links = [
+    { kind: 'related', target: 'r1' },
+    { kind: 'parent', target: 7 },
+  ];
+
+  it('passes links of swarm_run, swarm_queue_add and swarm_queue_edit, also []', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', links },
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', links } });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', links: [] } });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { pipeline: 'feature', task: 'x', links },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', pipeline: 'feature', task: 'x', links },
+      },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', links } },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', links: [] } },
+      { method: 'run', params: { repository: '/repo', pipeline: 'feature', task: 'x', links } },
+    ]);
+  });
+
+  it('offers swarm_task_link and swarm_task_unlink and forwards them to the daemon', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(['swarm_task_link', 'swarm_task_unlink']));
+    const linked = await client.callTool({
+      name: 'swarm_task_link',
+      arguments: { source: 'r2', kind: 'duplicates', target: 1 },
+    });
+    expect(textOf(linked)).toContain('Linked.');
+    const unlinked = await client.callTool({
+      name: 'swarm_task_unlink',
+      arguments: { source: 'r2', kind: 'duplicates', target: 1 },
+    });
+    expect(textOf(unlinked)).toContain('Unlinked.');
+    expect(calls).toEqual([
+      { method: 'task_link', params: { source: 'r2', kind: 'duplicates', target: 1 } },
+      { method: 'task_unlink', params: { source: 'r2', kind: 'duplicates', target: 1 } },
+    ]);
+  });
+});
 
 describe('host MCP parent of a task', () => {
   const LINKED = {

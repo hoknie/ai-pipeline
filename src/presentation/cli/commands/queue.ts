@@ -6,6 +6,7 @@ import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { GlobalQueueView, QueueView, RunCreated } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import type { CliIo } from '../io.ts';
+import { addTaskLinks } from '../links.ts';
 import { collect } from '../options.ts';
 import { addAdd } from '../queue-add.ts';
 import { printQueue, watchRepo } from '../queue-print.ts';
@@ -241,4 +242,5 @@ export function registerQueue(program: Command, io: CliIo, style: Style): void {
     add(kit);
   }
   for (const add of [addSettings, addPause, addReturn, addDismiss, addRunNow]) add(kit);
+  addTaskLinks(kit);
 }

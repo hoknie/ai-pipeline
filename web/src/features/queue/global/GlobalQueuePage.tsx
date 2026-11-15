@@ -13,6 +13,7 @@ import type { QueueDraft } from '../QueueForm.tsx';
 import { QueueControls } from '../QueueControls.tsx';
 import { QueueList } from '../QueueList.tsx';
 import { QueueRuns } from '../QueueRuns.tsx';
+import { related } from '../queueLinks.ts';
 import { StopReason } from '../cards/StopReason.tsx';
 import { QueueLinksContext } from '../list/links.tsx';
 import { GlobalTakeFilter } from './GlobalTakeFilter.tsx';
@@ -41,6 +42,12 @@ type SideProps = {
   onError: (message: string) => void;
   onNewTask: () => void;
 };
+
+function useHighlight(queue: QueueView) {
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const chain = highlight === null ? null : related(queue, highlight);
+  return { linked: chain !== null && chain.size > 1 ? chain : null, setHighlight };
+}
 
 /** The left column: the take filter above the queue controls. */
 function GlobalSide({ api, queue, projects, pipelines, onQueue, onError, onNewTask }: SideProps) {
@@ -98,6 +105,7 @@ export default function GlobalQueuePage({
 }) {
   const { t } = useTranslation();
   const shape = useMemo(() => asQueue(queue), [queue]);
+  const { linked, setHighlight } = useHighlight(shape);
   const paths = useMemo(() => projects.map((entry) => entry.path), [projects]);
   const pipelines = useProjectPipelines(api, paths);
   useProjectTags(api, paths);
@@ -126,6 +134,7 @@ export default function GlobalQueuePage({
               api={api}
               onQueue={onQueue}
               onError={onError}
+              highlight={linked}
               repositoryOf={runRepository}
               projectOf={runRepository}
             />
@@ -141,6 +150,8 @@ export default function GlobalQueuePage({
                 onDraft={onDraft}
                 onQueue={onQueue}
                 scope={scope}
+                highlight={linked}
+                onHighlight={setHighlight}
               />
             </section>
           </div>

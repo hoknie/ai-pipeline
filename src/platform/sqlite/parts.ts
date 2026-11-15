@@ -1,4 +1,5 @@
 import { ATTACHMENTS_MIGRATION } from './attachments-migration.ts';
+import { TASK_LINKS_MIGRATION } from './links-migration.ts';
 
 export { STATS_MIGRATION } from './stats-migration.ts';
 
@@ -34,4 +35,5 @@ export const LATER_MIGRATIONS: string[] = [
   UPDATE attempts SET usage_json = json_remove(usage_json, '$.costUsd') WHERE usage_json IS NOT NULL;
   UPDATE runs SET naming_usage_json = json_remove(naming_usage_json, '$.costUsd') WHERE naming_usage_json IS NOT NULL;
   `,
+  TASK_LINKS_MIGRATION,
 ];

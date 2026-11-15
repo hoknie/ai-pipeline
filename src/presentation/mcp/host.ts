@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { hostKit, type HostOptions } from './host-kit.ts';
+import { registerTaskLinks } from './host-links.ts';
 import {
   registerAnswer,
   registerApply,
@@ -48,6 +49,7 @@ export function createHostServer(options: HostOptions): McpServer {
     registerQueueEdit,
     registerQueueRemove,
     registerQueueStart,
+    registerTaskLinks,
     registerQueueParallel,
     registerQueueSettings,
     registerQueuePause,

@@ -993,14 +993,13 @@ describe('parent of a task', () => {
     expect((await tagsOf(h)).filter((tag) => tag.task)).toHaveLength(1);
   });
 
-  it('refuses an unknown run, an unknown number and the number of a waiting task, changing nothing', async () => {
+  it('refuses an unknown run and an unknown number, changing nothing', async () => {
     const h = await start();
     const parent = await parentRun(h, 'Fix login');
-    const waiting = await add(h, {});
-    const waitingNumber = waiting.items[0]!.number;
+    await add(h, {});
     const before = await queueOf(h);
     const catalog = await tagsOf(h);
-    for (const value of ['nope', 9999, '#9999', waitingNumber]) {
+    for (const value of ['nope', 9999, '#9999']) {
       await expect(add(h, { parent: value })).rejects.toThrow(`unknown parent \`${value}\``);
       await expect(
         h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', parent: value }),

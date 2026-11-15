@@ -160,7 +160,7 @@ export class RunEngine {
   async wake(): Promise<void> {
     if (this.halted) return;
     await this.schedule();
-    await this.dependencies.queue.wake();
+    await this.dependencies.queue.resume('wake');
     this.dependencies.observe.request();
     this.armWake();
   }

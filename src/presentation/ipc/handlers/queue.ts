@@ -87,4 +87,14 @@ export const queueHandlers = {
     const { queue, item } = await context.services.queue.items.workerAdd(params);
     return { ...context.snapshots.queueAnswer(queue), item };
   },
+  task_link: (params, context) =>
+    serial(context, async () => {
+      const source = await context.services.queue.links.link(params);
+      return { source, ...context.services.queue.links.index.viewsOf(source) };
+    }),
+  task_unlink: (params, context) =>
+    serial(context, async () => {
+      const source = await context.services.queue.links.unlink(params);
+      return { source, ...context.services.queue.links.index.viewsOf(source) };
+    }),
 } satisfies Partial<HandlerTable>;

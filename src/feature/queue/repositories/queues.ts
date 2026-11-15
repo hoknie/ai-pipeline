@@ -10,12 +10,15 @@ import {
   type QueueFilter,
   type QueueItem,
 } from '../types/index.ts';
+import { TaskLinksRepository } from './links.ts';
 
 export class QueueRepository {
   private readonly database: Database;
+  private readonly links: TaskLinksRepository;
 
-  constructor(database: Database) {
+  constructor(database: Database, links: TaskLinksRepository) {
     this.database = database;
+    this.links = links;
   }
 
   loadQueue(repository: string): Queue | null {
@@ -100,10 +103,16 @@ export class QueueRepository {
         );
       this.database.prepare('DELETE FROM queue_items WHERE repository = ?').run(queue.repository);
       const insert = this.database.prepare(
-        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, after_json, delivery_mode, run_id, postponed, number, variant, global_position)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO queue_items (id, repository, position, pipeline, task, groups_json, title, error, created_at, auto_deliver, tags_json, skip_json, delivery_mode, run_id, postponed, number, variant, global_position)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
-      queue.items.forEach((item, position) =>
+      queue.items.forEach((item, position) => {
+        this.links.replaceSource(
+          item.id,
+          ['blocked_by'],
+          item.after.map((target) => ({ kind: 'blocked_by' as const, target })),
+          queue.updatedAt,
+        );
         insert.run(
           item.id,
           queue.repository,
@@ -117,15 +126,14 @@ export class QueueRepository {
           item.autoDeliver === null ? null : item.autoDeliver ? 1 : 0,
           JSON.stringify(item.tags),
           JSON.stringify(item.skip),
-          JSON.stringify(item.after),
           item.deliveryMode,
           item.run,
           item.postponed ? 1 : 0,
           item.number,
           item.variant,
           item.globalPosition ?? null,
-        ),
-      );
+        );
+      });
     }
   }
 
@@ -184,6 +192,7 @@ export class QueueRepository {
     const items = this.database
       .prepare('SELECT * FROM queue_items WHERE repository = ? ORDER BY position')
       .all(repository) as Row[];
+    const blocked = this.links.blockedBy(repository);
     return {
       repository,
       status: String(row.status) as Queue['status'],
@@ -197,7 +206,7 @@ export class QueueRepository {
       nextNumber: Number(row.next_number ?? 1),
       priority: row.priority_json ? parse(row.priority_json) : [],
       filter: hydrateFilter(row.filter_json),
-      items: items.map(hydrateItem),
+      items: items.map((item) => hydrateItem(item, blocked.get(String(item.id)) ?? [])),
       runs: parse(row.runs_json ?? null),
       acknowledged: parse(row.acknowledged_json ?? null),
       stop: nullable(row.stop_json ?? null),
@@ -233,10 +242,14 @@ function hydrateGlobalFilter(value: unknown): GlobalQueue['filter'] {
   }
   const filter =
     typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
-  return { pipelines: strings(filter.pipelines), projects: strings(filter.projects) };
+  return {
+    pipelines: strings(filter.pipelines),
+    projects: strings(filter.projects),
+    tags: strings(filter.tags),
+  };
 }
 
-function hydrateItem(item: Row): QueueItem {
+function hydrateItem(item: Row, after: string[]): QueueItem {
   return {
     id: String(item.id),
     number: Number(item.number),
@@ -252,7 +265,7 @@ function hydrateItem(item: Row): QueueItem {
     deliveryMode: DELIVERY_MODES.find((mode) => mode === item.delivery_mode) ?? null,
     tags: item.tags_json ? parse(item.tags_json) : [],
     skip: item.skip_json ? parse(item.skip_json) : [],
-    after: item.after_json ? parse(item.after_json) : [],
+    after,
     postponed: Number(item.postponed ?? 0) === 1,
     createdAt: Number(item.created_at),
     error: text(item.error ?? null),

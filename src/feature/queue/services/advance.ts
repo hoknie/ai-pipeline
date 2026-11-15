@@ -25,11 +25,13 @@ import {
   itemFailed,
   queueItemId,
   queueWakeAt,
+  takesTags,
   type GlobalQueue,
   type Queue,
   type QueueItem,
 } from '../types/index.ts';
 
+import type { TaskLinks } from './links.ts';
 import type { QueueScope } from './scope.ts';
 import type { QueueStore } from './store.ts';
 
@@ -43,6 +45,7 @@ export interface QueueAdvanceDependencies {
   config: ConfigService;
   repair: RepairPolicyPort;
   observe: QueueObservePort;
+  links: TaskLinks;
   now: () => number;
 }
 
@@ -144,24 +147,20 @@ export class QueueAdvance {
     return this.lines().flatMap(({ queue }) => queueWakeAt(queue) ?? []);
   }
 
-  /** Starts the queues that resume after a usage limit. */
-  async wake(): Promise<void> {
+  /**
+   * The queues move: at the start (`start`) every one that runs, holds runs, has skips or waits
+   * for a usage limit; after the limit resets (`wake`) only the stopped ones.
+   */
+  async resume(mode: 'start' | 'wake' = 'start'): Promise<void> {
     for (const { key, queue } of this.lines()) {
-      if (queue.stop?.kind === 'limit') await this.advance(key);
-    }
-  }
-
-  /** At the start: the queues that run, hold runs or wait for a usage limit move on. */
-  async resume(): Promise<void> {
-    for (const { key, queue } of this.lines()) {
-      if (
-        queue.status === 'running' ||
-        queue.runs.length > 0 ||
-        queue.skipped.length > 0 ||
-        queue.stop?.kind === 'limit'
-      ) {
-        await this.advance(key);
-      }
+      const moves =
+        mode === 'wake'
+          ? queue.stop?.kind === 'limit'
+          : queue.status === 'running' ||
+            queue.runs.length > 0 ||
+            queue.skipped.length > 0 ||
+            queue.stop?.kind === 'limit';
+      if (moves) await this.advance(key);
     }
   }
 
@@ -172,7 +171,13 @@ export class QueueAdvance {
     const key = this.keyOf(repository);
     const queue =
       key === GLOBAL_KEY
-        ? store.lines.line(key, (path) => registry.entry(path)?.enabled !== false)
+        ? store.lines.line(
+            key,
+            (path) => registry.entry(path)?.enabled !== false,
+            (path, item) =>
+              item.run !== null ||
+              takesTags(store.globalQueue().filter, item.tags, this.dependencies.tags.of(path)),
+          )
         : store.of(repository);
     const fingerprint = () => JSON.stringify({ ...queue, updatedAt: 0 });
     const before = fingerprint();
@@ -180,7 +185,13 @@ export class QueueAdvance {
     // An incident an observer takes does not stop the queue.
     for (const state of states) if (repair.takesIncident(state)) acknowledgeRun(queue, state);
     const lookup = (id: string) => runs.states.lookup(id);
+    const returns = queue.items.filter((item) => item.run !== null);
     const { take, freeze, touched } = advance(queue, states, lookup, now(), store.all());
+    for (const item of returns) {
+      if (item.run !== null && !queue.items.includes(item)) {
+        await this.dependencies.links.onStarted(item.id, item.run);
+      }
+    }
     for (const other of touched) {
       store.save(other);
       this.request(other.repository);
@@ -238,7 +249,7 @@ export class QueueAdvance {
       await runs.engine.apply(state, { kind: 'retry', group, permissions });
     }
     acknowledgeRun(queue, state);
-    this.started(queue, item.id, id);
+    await this.started(queue, item.id, id);
     return runCreated(state);
   }
 
@@ -259,9 +270,10 @@ export class QueueAdvance {
   }
 
   /** The item became a run: the items of other projects that waited for it wait for the run, and look again. */
-  private started(queue: Queue, item: string, run: string): void {
-    const { store } = this.dependencies;
+  async started(queue: Queue, item: string, run: string): Promise<void> {
+    const { store, links } = this.dependencies;
     for (const other of store.itemStarted(queue, item, run)) this.request(other.repository);
+    await links.onStarted(item, run);
   }
 
   private async answerForAutopilot(queue: Queue): Promise<void> {
@@ -295,7 +307,7 @@ export class QueueAdvance {
           await this.takeReturned(queue, item);
         } else {
           const created = await this.createRun(queue, item);
-          this.started(queue, item.id, created.runId);
+          await this.started(queue, item.id, created.runId);
           started.set(item.id, created);
         }
         store.write(queue);

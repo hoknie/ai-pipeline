@@ -15,7 +15,7 @@ import {
 } from '../../runs/types/index.ts';
 import { findPipeline } from '../../swarm-config/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
-import { resolveTags } from '../../tags/types/index.ts';
+import { cleanName, resolveTags } from '../../tags/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
 import {
   adoptRun,
@@ -107,6 +107,7 @@ export class QueueControl {
     );
     // The projects of the filter are stored only after every check of the request has passed.
     if (global?.projects) this.dependencies.store.globalQueue().filter.projects = global.projects;
+    if (global?.tags) this.dependencies.store.globalQueue().filter.tags = global.tags;
     const enabled =
       this.isGlobal() || this.dependencies.registry.entry(queue.repository)?.enabled !== false;
     if (enablesAutopilot && enabled && queue.status === 'stopped' && queue.stop === null) {
@@ -119,17 +120,25 @@ export class QueueControl {
 
   /**
    * The filter of the global queue: pipeline ids are taken as they are, projects are resolved to
-   * their paths and stored at once (only a stopped queue changes its filter); a filter by tags is
-   * refused. Returns the part the shared rules of a queue handle.
+   * their paths; tag names are independent of project catalogs. Returns the part the shared rules handle.
    */
   private async resolveGlobalFilter(
     queue: Queue,
     filter: QueueSettingsRequest['filter'],
-  ): Promise<{ patch: QueueSettingsPatch['filter']; projects?: string[] } | undefined> {
+  ): Promise<
+    { patch: QueueSettingsPatch['filter']; projects?: string[]; tags?: string[] } | undefined
+  > {
     if (filter === undefined) return undefined;
-    if (filter.tags !== undefined && filter.tags.length > 0) {
-      throw rejected('the global queue has no filter by tags');
-    }
+    const tags =
+      filter.tags === undefined
+        ? undefined
+        : [
+            ...new Map(
+              filter.tags
+                .map((name) => cleanName(name))
+                .map((name) => [name.toLocaleLowerCase('und'), name]),
+            ).values(),
+          ];
     let projects: string[] | undefined;
     if (filter.projects !== undefined) {
       if (queue.status === 'running') {
@@ -143,6 +152,7 @@ export class QueueControl {
     return {
       patch: { pipelines: filter.pipelines ?? queue.filter.pipelines },
       projects,
+      tags,
     };
   }
 
@@ -187,9 +197,7 @@ export class QueueControl {
     }
     const created = await advance.createRun(queue, item);
     await advance.claimPlace(queue, created.runId);
-    for (const other of store.itemStarted(queue, item.id, created.runId)) {
-      advance.request(other.repository);
-    }
+    await advance.started(queue, item.id, created.runId);
     store.save(queue);
     return created;
   }

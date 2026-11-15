@@ -6,8 +6,8 @@ export interface QueueAdvancePort {
   runChanged(state: RunState): void;
   /** Moments a queue stopped by a usage limit may start again. */
   wakeMoments(): number[];
-  /** Starts the queues that resume after a usage limit. */
-  wake(): Promise<void>;
+  /** Starts the queues that resume after a usage limit resets. */
+  resume(mode: 'wake'): Promise<void>;
   /** What a usage limit does to the groups of the repository's runs: the queue's setting. */
   onLimitOf(repository: string): OnLimit;
 }

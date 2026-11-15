@@ -6,6 +6,7 @@ import { repositoryArgument } from '../ipc/client/index.ts';
 import type { ApplyResult, GroupView, RunQueued, RunView } from '../ipc/contract/index.ts';
 import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
+import { linkInputs } from './host-links.ts';
 
 export function registerRun(kit: HostKit): void {
   const { options, server, tags, parent, variant, skip, after, attachments, repo } = kit;
@@ -44,6 +45,7 @@ export function registerRun(kit: HostKit): void {
         variant,
         skip,
         after,
+        links: linkInputs,
         attachments,
       },
     },
@@ -60,6 +62,7 @@ export function registerRun(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      links: taskLinks,
       attachments: files,
     }) =>
       attempt(async () => {
@@ -76,6 +79,7 @@ export function registerRun(kit: HostKit): void {
           ...(parentRef !== undefined ? { parent: parentRef } : {}),
           ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
           ...(afterIds !== undefined ? { after: afterIds } : {}),
+          ...(taskLinks !== undefined ? { links: taskLinks } : {}),
           ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
         })) as RunQueued;
         return withData(formatRunQueued(queued), queued);

@@ -5,7 +5,7 @@ import { rejected } from '../../../platform/errors/index.ts';
 import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunsServices } from '../../runs/services/index.ts';
-import { checkSkip, type RunState } from '../../runs/types/index.ts';
+import { checkSkip } from '../../runs/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
 import {
   DEFAULT_VARIANT,
@@ -15,7 +15,7 @@ import {
   variantSkip,
 } from '../../swarm-config/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
-import { knownTags, mergeTags, parseParentRef, resolveManualTags } from '../../tags/types/index.ts';
+import { knownTags, mergeTags, resolveManualTags } from '../../tags/types/index.ts';
 import {
   addItem,
   queueItemId,
@@ -27,11 +27,13 @@ import {
   type QueueAddRequest,
   type QueueItem,
   type QueueChange,
+  type LinkPlan,
   type TaskFields,
   type WorkerTaskRequest,
 } from '../types/index.ts';
 
 import type { QueueAdvance } from './advance.ts';
+import type { TaskLinks } from './links.ts';
 import type { QueueStore } from './store.ts';
 import type { TaskTags } from './task-tags.ts';
 
@@ -39,6 +41,7 @@ export interface QueueItemsDependencies {
   store: QueueStore;
   advance: QueueAdvance;
   taskTags: TaskTags;
+  links: TaskLinks;
   attachments: AttachmentService;
   tags: TagCatalogService;
   registry: RegistryService;
@@ -75,23 +78,22 @@ export class QueueItems {
 
   /** `run`: the task goes to the end of the queue, a stopped queue is started, then the queue advances. */
   async enqueue(params: QueueAddRequest): Promise<Enqueued> {
-    const { store, advance, registry, tags, taskTags, runs, now } = this.dependencies;
+    const { store, advance, registry, tags, links, runs, now } = this.dependencies;
     const repository = await registry.rootOf(params.repository);
     registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
-    const after = this.resolveDependencies(params.after ?? []);
+    const plan = links.plan(repository, params, params.links);
+    const { after } = plan;
     const manual = resolveManualTags(tags.of(repository), params.tags ?? []);
-    const parent =
-      params.parent === undefined ? null : this.resolveParent(repository, params.parent);
     const { postponed: _postponed, ...task } = fields({ ...params, after });
-    if (parent) this.checkNewItem(queue, task, moment);
-    const parentTag = parent ? await taskTags.parentTagFor(repository, parent) : null;
+    if (plan.parent !== null) this.checkNewItem(queue, task, moment);
+    const parentTag = await links.parentTag(repository, plan.parent);
     const own = mergeTags(parentTag ? [parentTag.id] : [], manual);
     const item = await this.addWithAttachments(
       queue,
-      { ...task, tags: taskTags.inherit(queue, own, after) },
+      { ...task, tags: this.dependencies.taskTags.inherit(queue, own, after) },
       params.attachments,
       moment,
     );
@@ -105,6 +107,7 @@ export class QueueItems {
         moment,
       );
     }
+    links.replaceFor(item.id, plan);
     store.save(queue);
     if (global && stopped.status === 'stopped') {
       const line = store.lines.line(repository);
@@ -154,12 +157,13 @@ export class QueueItems {
       if (other.repository !== queue.repository)
         this.dependencies.advance.request(other.repository);
     }
+    this.dependencies.links.onRemoved(params.item);
     return store.save(queue);
   }
 
   /** A task from a specialist with `queue: true` goes to the queue of the repository of its run. */
   workerAdd(params: WorkerTaskRequest): Promise<QueueChange> {
-    const { runs, store, taskTags, tags, now } = this.dependencies;
+    const { runs, store, taskTags, links, tags, now } = this.dependencies;
     return runs.engine.serial(async () => {
       const key = runs.effects.attemptFor(params.token);
       if (!key) throw rejected('unknown or expired report token');
@@ -178,11 +182,14 @@ export class QueueItems {
       this.dependencies.registry.requireEnabled(repository);
       await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
       const queue = store.of(repository);
-      const after = this.resolveDependencies(params.after ?? []);
+      if (params.links?.some((link) => link.kind === 'parent')) {
+        throw rejected("a specialist's task has its run as the parent");
+      }
+      const { after } = links.plan(repository, params, params.links);
       this.checkNewItem(queue, fields({ ...params, after }), now());
       const tag = await taskTags.linkedTagFor(state);
       const inherited = mergeTags([tag.id], knownTags(tags.of(repository), state.run.tags));
-      return this.addTo(repository, params, inherited);
+      return this.addTo(repository, params, inherited, state.run.id);
     });
   }
 
@@ -204,54 +211,30 @@ export class QueueItems {
     if (error !== null) throw rejected(error);
   }
 
-  /**
-   * Turns the ids a task waits for into ids of queue items or runs of any project.
-   * An item that already became a run is replaced by that run.
-   */
+  /** The ids a task waits for: ids of queue items or runs of any project (see `TaskLinks.resolveAfter`). */
   resolveDependencies(ids: string[]): string[] {
-    const { states } = this.dependencies.runs;
-    return [...new Set(ids)].map((id) => {
-      if (this.dependencies.store.findItem(id)) return id;
-      if (states.lookup(id)) return id;
-      const started = states.runOfQueueItem(null, id);
-      if (started) return started.run.id;
-      throw rejected(`unknown dependency \`${id}\``);
-    });
-  }
-
-  /** The run a `parent` refers to: a run id first, then a task number of the repository. */
-  resolveParent(repository: string, ref: string | number): RunState {
-    const { states } = this.dependencies.runs;
-    const parsed = parseParentRef(ref);
-    if (parsed.id !== null) {
-      const state = states.lookup(parsed.id);
-      if (state) return state;
-    }
-    if (parsed.number !== null) {
-      const id = states.idByNumber(repository, parsed.number);
-      const state = id === null ? undefined : states.lookup(id);
-      if (state) return state;
-    }
-    throw rejected(`unknown parent \`${ref}\``);
+    return this.dependencies.links.resolveAfter(ids);
   }
 
   private async addTo(
     repository: string,
     params: TaskFields & Pick<QueueAddRequest, 'tags' | 'parent' | 'postponed' | 'attachments'>,
     inherited?: string[],
+    specialistRun?: string,
   ): Promise<QueueChange> {
-    const { store, advance, tags, taskTags, now } = this.dependencies;
+    const { store, advance, tags, taskTags, links, now } = this.dependencies;
     this.dependencies.registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
     await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
-    const after = this.resolveDependencies(params.after ?? []);
+    const plan: LinkPlan = links.plan(repository, params, params.links);
+    const { after } = plan;
     let own = inherited ?? resolveManualTags(tags.of(repository), params.tags ?? []);
     const task = fields({ ...params, after });
-    if (params.parent !== undefined) {
-      const parent = this.resolveParent(repository, params.parent);
+    if (specialistRun !== undefined) plan.parent = specialistRun;
+    else if (plan.parent !== null) {
       this.checkNewItem(queue, task, moment);
-      const parentTag = await taskTags.parentTagFor(repository, parent);
+      const parentTag = await links.parentTag(repository, plan.parent);
       own = mergeTags(parentTag ? [parentTag.id] : [], own);
     }
     const item = await this.addWithAttachments(
@@ -260,6 +243,7 @@ export class QueueItems {
       params.attachments,
       moment,
     );
+    links.replaceFor(item.id, plan);
     store.save(queue);
     await advance.advance(repository);
     return { queue, item: item.id };

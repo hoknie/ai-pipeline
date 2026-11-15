@@ -2,6 +2,7 @@ import { formatAttachmentSize } from '../../feature/attachments/types/index.ts';
 import { type GroupWait, clockTime } from '../../feature/runs/types/index.ts';
 import { formatDiff, limitNote } from './groups.ts';
 import { runHints } from './hints.ts';
+import { formatLinks } from './links.ts';
 import { progressLine, stepsLine } from './run-steps.ts';
 import { formatUsage } from './numbers.ts';
 import { type Style, isTerminal, plainStyle, statusBadge } from './style.ts';
@@ -87,6 +88,7 @@ export function formatRun(
     ...(run.tags && run.tags.length > 0
       ? [`${style.muted('Tags:')} ${formatTagLabels(run.tags, style)}`]
       : []),
+    ...[formatLinks(run.links, run.linkedBy, () => undefined)].filter((links) => links !== ''),
     ...(run.steps.some((step) => step.skipped)
       ? [
           `${style.muted('Skipped steps:')} ${run.steps

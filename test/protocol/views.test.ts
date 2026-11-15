@@ -28,6 +28,7 @@ import {
   repositoryViews,
   runView,
   systemGroups,
+  withLinks,
   withQueue,
 } from '../../src/presentation/ipc/views/index.ts';
 import { CONFIG_TEXT, finish, group, run, step } from '../feature/runs/helpers.ts';
@@ -186,6 +187,50 @@ describe('queueView dependencies', () => {
     const lost = queueView(queue, () => undefined);
     expect(lost.items[1]!.readiness).toBe('blocked');
     expect(lost.items[1]!.after[1]).toMatchObject({ kind: 'run', state: 'blocked' });
+  });
+});
+
+describe('queueView links', () => {
+  const link = (id: string) => ({
+    kind: 'parent' as const,
+    id,
+    ref: 'item' as const,
+    number: 1,
+    title: id,
+    repository: '/repo',
+  });
+
+  it('shows links and linkedBy of every item from the lookup, and none by default', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'A' }, 'q1', 2);
+    const seen: string[][] = [];
+    const view = queueView(
+      queue,
+      () => undefined,
+      null,
+      [],
+      null,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      (ids) => {
+        seen.push(ids);
+        return { links: [link('q9')], linkedBy: [link('q8')] };
+      },
+    );
+    expect(seen).toEqual([['q1']]);
+    expect(view.items[0]).toMatchObject({ links: [link('q9')], linkedBy: [link('q8')] });
+    const plain = queueView(queue, () => undefined);
+    expect(plain.items[0]).toMatchObject({ links: [], linkedBy: [] });
+  });
+
+  it('puts links into a run view with withLinks', () => {
+    const state = run(1, { id: 'r' });
+    const view = withLinks(runView(state, 1), { links: [link('q9')], linkedBy: [link('q8')] });
+    expect(view).toMatchObject({ links: [link('q9')], linkedBy: [link('q8')] });
+    expect(runView(state, 1)).toMatchObject({ links: [], linkedBy: [] });
   });
 });
 

@@ -7,7 +7,10 @@ import { Database } from '../../src/platform/sqlite/index.ts';
 import { ArtifactRepository } from '../../src/feature/artifacts/repositories/index.ts';
 import { PatchRepository } from '../../src/feature/delivery/repositories/index.ts';
 import { ObserverRepository } from '../../src/feature/observers/repositories/index.ts';
-import { QueueRepository } from '../../src/feature/queue/repositories/index.ts';
+import {
+  QueueRepository,
+  TaskLinksRepository,
+} from '../../src/feature/queue/repositories/index.ts';
 import { KnownRepositories } from '../../src/feature/repos/repositories/index.ts';
 import { FinishedRunRepository, RunRepository } from '../../src/feature/runs/repositories/index.ts';
 import { TagRepository } from '../../src/feature/tags/repositories/index.ts';
@@ -20,7 +23,7 @@ export function openStorage(path: string) {
     database,
     runs,
     finished: new FinishedRunRepository(database, runs),
-    queues: new QueueRepository(database),
+    queues: new QueueRepository(database, new TaskLinksRepository(database)),
     known: new KnownRepositories(database),
     tags: new TagRepository(database),
     patches: new PatchRepository(database),

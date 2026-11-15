@@ -4,6 +4,7 @@ import type { DeliveryMode } from '../../swarm-config/types/index.ts';
 
 import type { ItemPatch } from './edit.ts';
 import type { Queue } from './items.ts';
+import type { LinkInput } from './links.ts';
 
 /** The task of a queue item as a client or a specialist describes it. */
 export interface TaskFields {
@@ -18,6 +19,8 @@ export interface TaskFields {
   skip?: string[] | undefined;
   /** Ids of queue items or runs this task waits for. */
   after?: string[] | undefined;
+  /** Links of the task: `{kind, target}`; not together with `after` or `parent`. */
+  links?: LinkInput[] | undefined;
 }
 
 /** `run` and `queue_add`: a task for the queue of a repository. */
@@ -67,6 +70,8 @@ export interface QueueEditRequest extends Omit<ItemPatch, 'tags' | 'after'> {
   tags?: string[] | undefined;
   parent?: string | number | null | undefined;
   after?: string[] | undefined;
+  /** Replaces every link of the item; not together with `after` or `parent`. */
+  links?: LinkInput[] | undefined;
   /** Files to attach to an item that waits in the queue. */
   attach?: AttachmentSource[] | undefined;
   /** Names of attachments to remove. */

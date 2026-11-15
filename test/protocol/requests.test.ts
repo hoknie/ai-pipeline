@@ -70,6 +70,8 @@ const SAMPLES: Record<Method, unknown> = {
   queue_add: { ...repository, pipeline: 'feature', task: 'do it' },
   queue_add_projects: { repositories: ['/a', '/b'], pipeline: 'feature', task: 'do it' },
   queue_edit: { ...repository, item: 'q1' },
+  task_link: { source: 'r2', kind: 'related', target: 'r1' },
+  task_unlink: { source: 'r2', kind: 'related', target: 'r1' },
   queue_remove: { ...repository, item: 'q1' },
   queue_start: repository,
   queue_pause: repository,
@@ -106,10 +108,39 @@ const SAMPLES: Record<Method, unknown> = {
 
 const methods = Object.keys(SAMPLES) as Method[];
 
+describe('links in requests', () => {
+  const links = [
+    { kind: 'blocked_by', target: 'r1' },
+    { kind: 'related', target: 3 },
+  ];
+  const parse = (method: string, params: unknown) =>
+    parseRequest(JSON.stringify({ id: 1, method, params }));
+
+  it('accepts links in queue_add, run and queue_edit', () => {
+    for (const [method, params] of [
+      ['queue_add', SAMPLES.queue_add],
+      ['run', SAMPLES.run],
+      ['queue_edit', SAMPLES.queue_edit],
+    ] as const) {
+      const parsed = parse(method, { ...(params as object), links });
+      expect(parsed).toMatchObject({ request: { method } });
+      expect('error' in parsed).toBe(false);
+    }
+  });
+
+  it('parses task_unlink and refuses a link without a kind', () => {
+    expect(parse('task_unlink', SAMPLES.task_unlink)).toMatchObject({
+      request: { method: 'task_unlink' },
+    });
+    const bad = parse('queue_add', { ...(SAMPLES.queue_add as object), links: [{ target: 'r1' }] });
+    expect('error' in bad).toBe(true);
+  });
+});
+
 describe('IPC requests', () => {
-  it('has 84 methods, each in the request schema once', () => {
+  it('has 86 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(84);
+    expect(methods).toHaveLength(86);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -111,6 +111,37 @@ describe('queues', () => {
     expect(store.runs.loadRun(state.run.id)?.run.skippedSteps).toEqual([]);
   });
 
+  it('keeps after as blocked_by links and leaves the other links alone', () => {
+    const store = temporaryStorage();
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a', after: ['r1', 'q0'] }, 'q1', 1);
+    store.queues.saveQueue(queue);
+    const rows = () =>
+      store.database
+        .prepare('SELECT kind, target FROM task_links WHERE source = ? ORDER BY position, rowid')
+        .all('q1');
+    expect(rows()).toEqual([
+      { kind: 'blocked_by', target: 'r1' },
+      { kind: 'blocked_by', target: 'q0' },
+    ]);
+    store.database
+      .prepare(
+        "INSERT INTO task_links (source, kind, target, position, created_at) VALUES ('q1', 'related', 'r9', 5, 1)",
+      )
+      .run();
+    const loaded = store.queues.loadQueue('/repo')!;
+    expect(loaded.items[0]?.after).toEqual(['r1', 'q0']);
+    loaded.items[0]!.after = ['r2'];
+    store.queues.saveQueue(loaded);
+    expect(rows()).toEqual(
+      expect.arrayContaining([
+        { kind: 'blocked_by', target: 'r2' },
+        { kind: 'related', target: 'r9' },
+      ]),
+    );
+    expect(rows()).toHaveLength(2);
+  });
+
   it('keeps the dependencies of an item and the queue item of a run', () => {
     const store = temporaryStorage();
     const queue = emptyQueue('/repo', 1);
@@ -156,7 +187,7 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (7 + 8 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (7 + 8 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.queues.loadQueue('/repo')?.items[0]?.after).toEqual([]);
@@ -195,7 +226,7 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (5 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (5 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.queues.loadQueue('/on')).toMatchObject({ autopilot: true, autoAnswer: true });
@@ -228,7 +259,7 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (6 + 8 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (6 + 8 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.queues.loadQueue('/repo')).toMatchObject({
@@ -283,7 +314,7 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (3 + 8 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (3 + 8 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.queues.loadQueue('/repo')?.items.map((item) => item.postponed)).toEqual([
@@ -308,7 +339,7 @@ describe('queues', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (1 + 8 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (1 + 8 + 1)}`);
     old.database.close();
   }
 
@@ -488,7 +519,7 @@ describe('queue items and automatic delivery', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (10 + 8 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (10 + 8 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.queues.loadQueue('/repo')?.items[0]?.autoDeliver).toBeNull();

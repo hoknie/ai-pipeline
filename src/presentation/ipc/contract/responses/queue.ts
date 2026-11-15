@@ -3,6 +3,7 @@ import type {
   DependencyState,
   ItemReadiness,
   QueueStop,
+  TaskLinkView,
 } from '../../../../feature/queue/types/index.ts';
 import type {
   GroupWait,
@@ -42,6 +43,10 @@ export interface QueueItemView {
   /** Whether the task can start now: its predecessors are done, still pending or blocked. */
   readiness: ItemReadiness;
   after: DependencyView[];
+  /** Links where the task is the source; `related` shows from both sides. */
+  links: TaskLinkView[];
+  /** Links where the task is the target, with the kind of the original link. */
+  linkedBy: TaskLinkView[];
   /** A running queue does not take the task; "run now" still starts it. */
   postponed: boolean;
   /** The item does not fit the take filter: a running queue does not take it. */
@@ -164,8 +169,8 @@ export interface GlobalQueueView extends Omit<
   | 'skipped'
 > {
   scope: 'global';
-  /** The take filter: ids of pipelines and paths of projects; an empty list means any. */
-  filter: { pipelines: string[]; projects: string[] };
+  /** Pipeline ids, project paths and tag names; an empty list means any. */
+  filter: { pipelines: string[]; projects: string[]; tags: string[] };
   /** The tasks in the global order; `position` is the place among all projects. */
   items: GlobalQueueItemView[];
   runs: GlobalQueueRunView[];

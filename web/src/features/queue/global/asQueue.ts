@@ -20,7 +20,7 @@ export function asQueue(queue: GlobalQueueView): QueueView {
     repository: '',
     autoDeliver: null,
     deliveryMode: null,
-    filter: { pipelines: filter.pipelines, tags: [] },
+    filter: { pipelines: filter.pipelines, tags: filter.tags },
     filterTags: [],
   };
 }

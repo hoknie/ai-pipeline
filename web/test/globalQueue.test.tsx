@@ -11,6 +11,7 @@ import type { GlobalQueueItemView, GlobalQueueView, QueueView } from '../src/sha
 import {
   FakeEventSource,
   fakeApi,
+  dependency,
   openFake,
   queueItem,
   queueRun,
@@ -41,7 +42,7 @@ function globalOf(overrides: Partial<GlobalQueueView> = {}): GlobalQueueView {
   return {
     ...rest,
     scope: 'global',
-    filter: { pipelines: [], projects: [] },
+    filter: { pipelines: [], projects: [], tags: [] },
     filterTags: undefined,
     max: 4,
     items: [globalItem('qa', 'task of app', 1, APP), globalItem('ql', 'task of lib', 2, LIB)],
@@ -52,7 +53,11 @@ function globalOf(overrides: Partial<GlobalQueueView> = {}): GlobalQueueView {
 /** The daemon answers an action of the global mode with the global queue. */
 const asAnswer = (view: GlobalQueueView) => view as unknown as QueueView;
 
-function mount(globalQueue: GlobalQueueView | null, api: Partial<Api> = {}) {
+function mount(
+  globalQueue: GlobalQueueView | null,
+  api: Partial<Api> = {},
+  tags: ReturnType<typeof tagView>[] = [],
+) {
   const fake = fakeApi({ queue: vi.fn(async () => queueOf({ repository: APP })), ...api });
   render(<App api={fake as Api} openStream={openFake} />);
   act(() => {
@@ -63,6 +68,7 @@ function mount(globalQueue: GlobalQueueView | null, api: Partial<Api> = {}) {
       queues: globalQueue ? [] : [queueOf({ repository: APP })],
       ...(globalQueue ? { globalQueue } : {}),
       repositories: [repositoryView(APP), repositoryView(LIB)],
+      tags,
     });
   });
   return fake;
@@ -93,6 +99,49 @@ describe('page of the global queue', () => {
     expect(section.querySelector(`[data-project="${LIB}"]`)).not.toBeNull();
   });
 
+  it('highlights cross-project dependency chains and their run, except while dragging', async () => {
+    mount(
+      globalOf({
+        status: 'running',
+        runs: [{ ...queueRun('r1', { title: 'predecessor run' }), repository: LIB }] as never,
+        items: [
+          {
+            ...globalItem('q1', 'first', 1, APP),
+            after: [dependency('run', 'r1', 'predecessor run')],
+          },
+          { ...globalItem('q2', 'second', 2, LIB), after: [dependency('item', 'q1', 'first')] },
+          { ...globalItem('q3', 'third', 3, APP), after: [dependency('item', 'q2', 'second')] },
+          globalItem('q4', 'independent', 4, LIB),
+        ],
+      }),
+    );
+    await screen.findByRole('list', { name: 'tasks in the queue' });
+    const row = (id: string) => document.querySelector(`li[data-id="${id}"]`) as HTMLElement;
+    const card = screen.getByRole('group', { name: 'predecessor run' });
+    expect(['q1', 'q2', 'q3', 'q4'].map((id) => row(id).getAttribute('data-depth'))).toEqual([
+      '0',
+      '1',
+      '2',
+      '0',
+    ]);
+    fireEvent.mouseEnter(row('q2'));
+    for (const id of ['q1', 'q2', 'q3'])
+      expect(row(id).hasAttribute('data-highlighted')).toBe(true);
+    expect(row('q4').hasAttribute('data-highlighted')).toBe(false);
+    fireEvent.mouseLeave(row('q2'));
+    fireEvent.focus(row('q1'));
+    expect(card.hasAttribute('data-highlighted')).toBe(true);
+    fireEvent.dragStart(row('q1'), { dataTransfer: { setData: vi.fn() } });
+    fireEvent.mouseEnter(row('q2'));
+    fireEvent.focus(row('q1'));
+    expect(card.hasAttribute('data-highlighted')).toBe(false);
+    for (const id of ['q1', 'q2', 'q3'])
+      expect(row(id).hasAttribute('data-highlighted')).toBe(false);
+    fireEvent.dragEnd(row('q1'));
+    fireEvent.mouseEnter(row('q4'));
+    expect(row('q4').hasAttribute('data-highlighted')).toBe(false);
+  });
+
   it('moves a task by its place among all projects through the project of the task', async () => {
     const edit = vi.fn(async () => queueOf());
     const api = mount(globalOf(), { queueEdit: edit });
@@ -108,7 +157,7 @@ describe('page of the global queue', () => {
     const block = within(await screen.findByLabelText('take filter'));
     fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
     expect(await block.findByText(/Stop the queue to change the filter/)).toBeTruthy();
-    for (const name of ['Pipeline', 'Projects']) {
+    for (const name of ['Pipeline', 'Projects', 'Tags']) {
       expect((block.getByRole('combobox', { name }) as HTMLButtonElement).disabled).toBe(true);
     }
     expect(settings).not.toHaveBeenCalled();
@@ -137,6 +186,39 @@ describe('page of the global queue', () => {
     fireEvent.click(await block.findByRole('combobox', { name: 'Pipeline' }));
     await screen.findByRole('option', { name: 'feature' });
     expect(screen.getAllByRole('option', { name: 'feature' })).toHaveLength(1);
+  });
+
+  it('offers distinct tag names from all projects and sends the chosen name', async () => {
+    const settings = vi.fn(async () =>
+      asAnswer(globalOf({ filter: { pipelines: [], projects: [], tags: ['shared'] } as never })),
+    );
+    mount(globalOf(), { queueSettings: settings }, [
+      { ...tagView('shared'), id: 'a', repository: APP },
+      { ...tagView('Shared'), id: 'b', repository: LIB },
+      { ...tagView('lib-only'), id: 'c', repository: LIB },
+    ]);
+    const block = within(await screen.findByLabelText('take filter'));
+    fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
+    fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
+    expect(await screen.findAllByRole('option', { name: 'shared' })).toHaveLength(1);
+    expect(screen.getByRole('option', { name: 'lib-only' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('option', { name: 'shared' }));
+    await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { tags: ['shared'] } }));
+    expect(await block.findByText('shared')).toBeTruthy();
+  });
+
+  it('counts and resets selected tag names, including names no longer in the catalog', async () => {
+    const settings = vi.fn(async () => asAnswer(globalOf()));
+    mount(globalOf({ filter: { pipelines: [], projects: [], tags: ['missing'] } as never }), {
+      queueSettings: settings,
+    });
+    const block = within(await screen.findByLabelText('take filter'));
+    expect(block.getByText('1')).toBeTruthy();
+    expect(block.getByText('missing')).toBeTruthy();
+    fireEvent.click(block.getByRole('button', { name: 'Reset' }));
+    await waitFor(() =>
+      expect(settings).toHaveBeenCalledWith({ filter: { pipelines: [], projects: [], tags: [] } }),
+    );
   });
 
   it('starts and pauses the one queue', async () => {

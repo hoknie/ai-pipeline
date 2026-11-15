@@ -153,6 +153,18 @@ describe('grouped help', () => {
     }
   });
 
+  it('documents the link commands and flags', async () => {
+    const queue = await aip(['queue', '--help']);
+    expect(queue.stdout).toContain('link');
+    expect(queue.stdout).toContain('unlink');
+    const add = await aip(['queue', 'add', '--help']);
+    expect(add.stdout).toContain('--link <kind>:<task>');
+    const edit = await aip(['queue', 'edit', '--help']);
+    expect(edit.stdout).toContain('--no-links');
+    const run = await aip(['run', 'start', '--help']);
+    expect(run.stdout + (await aip(['run', '--help'])).stdout).toContain('--link');
+  });
+
   it('does not treat `run --json` as a bare noun', async () => {
     const result = await aip(['run', '--json']);
     expect(result.stdout).not.toContain('Usage: aip run [options] [command]');

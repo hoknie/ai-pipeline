@@ -167,6 +167,11 @@ export function withQueue(view: RunView, item: string | null): RunView {
   return { ...view, queueItem: item, state };
 }
 
+/** Marks the view with the links of the run. */
+export function withLinks(view: RunView, links: Pick<RunView, 'links' | 'linkedBy'>): RunView {
+  return { ...view, ...links };
+}
+
 function runProgress(state: RunState): { done: number; total: number } {
   const { done, total } = stepProgress(state);
   return { done, total };
@@ -222,6 +227,9 @@ function runHead(state: RunState, observers: RepairPolicy) {
     returnable: false,
     // The queue is unknown here: the daemon fills it in with `withQueue`.
     queueItem: null,
+    // The links are unknown here: the daemon fills them in with `withLinks`.
+    links: [],
+    linkedBy: [],
     attachments: state.run.attachments.map((file) => ({ ...file })),
   };
 }

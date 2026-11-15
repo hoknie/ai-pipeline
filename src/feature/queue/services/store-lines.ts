@@ -33,14 +33,20 @@ export class StoreLines {
    * the waiting tasks of all projects). `enabled` leaves out the tasks of projects the global
    * queue does not take: a disabled project and a project the filter does not name.
    */
-  line(repository: string, enabled?: (repository: string) => boolean): Queue {
+  line(
+    repository: string,
+    enabled?: (repository: string) => boolean,
+    matches?: (repository: string, item: QueueItem) => boolean,
+  ): Queue {
     const { store } = this;
     if (store.scope() === 'project') return store.of(repository);
     const filter = store.globalQueue().filter;
     const entries = globalOrder(store.all()).filter(
       (entry) =>
         enabled === undefined ||
-        (enabled(entry.repository) && takesProject(filter, entry.repository)),
+        (enabled(entry.repository) &&
+          takesProject(filter, entry.repository) &&
+          (matches?.(entry.repository, entry.item) ?? true)),
     );
     const line = lineOf(
       store.globalQueue(),

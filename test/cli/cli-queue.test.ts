@@ -539,6 +539,8 @@ describe('cli', () => {
       'swarm_run_pause',
       'swarm_skip_step',
       'swarm_status',
+      'swarm_task_link',
+      'swarm_task_unlink',
     ]);
     const added = await client.callTool({
       name: 'swarm_queue_add',
@@ -892,5 +894,72 @@ describe('aip queue list --all', () => {
     const result = await aip(box, 'queue', 'list', '--all');
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('No enabled projects');
+  });
+});
+
+describe('cli task links', () => {
+  it('adds a task with --link, links and unlinks tasks and edits with --no-links', async () => {
+    const box = sandbox();
+    await aip(box, 'queue', 'add', 'feature', '--task', 'первая', '--title', 'One');
+    await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'вторая',
+      '--title',
+      'Two',
+      '--link',
+      'related:1',
+    );
+    const view = async () =>
+      JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+        items: { id: string; links: { kind: string }[]; linkedBy: { kind: string }[] }[];
+      };
+    let queue = await view();
+    expect(queue.items[1]!.links.map((link) => link.kind)).toEqual(['related']);
+    expect(queue.items[0]!.links.map((link) => link.kind)).toEqual(['related']);
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('links: related #');
+
+    const unlinked = await aip(box, 'queue', 'unlink', '2', 'related', '1');
+    expect(unlinked.code).toBe(0);
+    queue = await view();
+    expect(queue.items[1]!.links).toEqual([]);
+
+    const linked = await aip(box, 'queue', 'link', '2', 'duplicates', '1');
+    expect(linked.code).toBe(0);
+    expect(linked.stdout).toContain('Linked 2');
+    queue = await view();
+    expect(queue.items[0]!.linkedBy.map((link) => link.kind)).toEqual(['duplicates']);
+
+    const edited = await aip(box, 'queue', 'edit', queue.items[1]!.id, '--no-links');
+    expect(edited.code).toBe(0);
+    queue = await view();
+    expect(queue.items[1]!.links).toEqual([]);
+  });
+
+  it('refuses wrong flag combinations before the daemon is called', async () => {
+    const box = sandbox();
+    const both = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'x',
+      '--link',
+      'related:1',
+      '--parent',
+      '1',
+    );
+    expect(both.code).not.toBe(0);
+    expect(both.stderr).toContain('--link cannot be combined with --after or --parent');
+    const bad = await aip(box, 'queue', 'add', 'feature', '--task', 'x', '--link', 'oops');
+    expect(bad.code).not.toBe(0);
+    expect(bad.stderr).toContain('--link expects <kind>:<task>');
+    const conflict = await aip(box, 'queue', 'edit', 'q1', '--no-links', '--link', 'related:1');
+    expect(conflict.code).not.toBe(0);
+    expect(conflict.stderr).toContain('--no-links cannot be combined with --link');
   });
 });

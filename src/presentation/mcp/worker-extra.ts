@@ -5,6 +5,7 @@ import { FEEDBACK_LIMIT } from '../../feature/runs/types/index.ts';
 import { RUN_TITLE_LIMIT, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
 import { attempt } from './tools.ts';
+import { linkInputs } from './host-links.ts';
 import type { WorkerKit } from './worker-tools.ts';
 
 export function registerSplit(kit: WorkerKit): void {
@@ -78,9 +79,10 @@ export function registerQueueAdd(kit: WorkerKit): void {
             .describe(
               'Ids that must be done first: waiting items of the queues of any project, runs of any repository, e.g. the ids returned by earlier swarm_queue_add calls',
             ),
+          links: linkInputs,
         },
       },
-      ({ pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after }) =>
+      ({ pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after, links }) =>
         attempt(async () => {
           if ((task === undefined) === (groups === undefined)) {
             throw invalid('mcp.invalid_arguments', 'pass either task or groups');
@@ -96,6 +98,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
             ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(skip !== undefined ? { skip } : {}),
             ...(after !== undefined ? { after } : {}),
+            ...(links !== undefined ? { links } : {}),
           })) as { item?: string };
           return `Queued ${result.item ?? 'the task'} for pipeline ${pipeline}. It starts when the queue runs.`;
         }),

@@ -4,6 +4,7 @@ import {
   type QueueItem,
   type ItemLookup,
   takesProject,
+  takesTags,
 } from '../../../feature/queue/types/index.ts';
 import type { RunAttachment, RunState } from '../../../feature/runs/types/index.ts';
 import type { Tag } from '../../../feature/tags/types/index.ts';
@@ -18,6 +19,7 @@ export interface GlobalViewSources {
   waits: WaitLookup;
   attachments: (item: string) => RunAttachment[];
   find: ItemLookup;
+  links?: Parameters<typeof queueView>[10];
   /** `queue.max`. */
   max: number;
   /** The root of the project whose queue holds the item. */
@@ -59,6 +61,7 @@ export function globalQueueView(
     (_pipeline, variant) => variant,
     sources.attachments,
     sources.find,
+    sources.links,
   );
   const ofRun = (view: QueueRunView) => {
     const state = lookup(view.id);
@@ -75,7 +78,11 @@ export function globalQueueView(
   return {
     ...rest,
     scope: 'global',
-    filter: { pipelines: filter.pipelines, projects: [...global.filter.projects] },
+    filter: {
+      pipelines: filter.pipelines,
+      projects: [...global.filter.projects],
+      tags: [...global.filter.tags],
+    },
     max: sources.max,
     items: items.map((view, index) => {
       const item = line.items[index]!;
@@ -87,7 +94,10 @@ export function globalQueueView(
         pipelineName: names(view.pipeline),
         variantName: variantNames(view.pipeline, view.variant),
         tags: tagViews(catalog, item.tags),
-        filtered: view.filtered || !takesProject(global.filter, repository),
+        filtered:
+          view.filtered ||
+          !takesProject(global.filter, repository) ||
+          (item.run === null && !takesTags(global.filter, item.tags, catalog)),
       };
     }),
     runs: runs.map(ofRun),

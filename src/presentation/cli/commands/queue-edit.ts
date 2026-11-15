@@ -5,6 +5,7 @@ import { formatQueues } from '../../format/index.ts';
 import type { GlobalQueueView, QueueView, RepositoryView } from '../../ipc/contract/index.ts';
 import { call } from '../context.ts';
 import { usage } from '../io.ts';
+import { linkInputsOf } from '../links.ts';
 import {
   attachmentSources,
   collect,
@@ -41,6 +42,9 @@ interface EditOptions extends QueueTaskOptions {
   tags?: boolean;
   skips?: boolean;
   detach?: string[];
+  /** commander sets this to `false` when `--no-links` is passed. */
+  links?: boolean;
+  link?: string[];
 }
 
 /** Which of the paired flags (`--after` / `--no-after`, `--parent` / `--no-parent`) were passed. */
@@ -89,6 +93,7 @@ function checkEdit(options: EditOptions, flags: EditFlags): void {
 function editParams(item: string, options: EditOptions, flags: EditFlags) {
   const pipeline = options.pipeline ?? options.workflow;
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
+  const links = linkInputsOf(options, flags);
   return {
     repository: repositoryArgument(options.repo),
     item,
@@ -115,6 +120,8 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(flags.noAfter ? { after: [] } : {}),
     ...(flags.after && options.after !== undefined ? { after: options.after } : {}),
+    ...(links !== undefined ? { links } : {}),
+    ...(options.links === false ? { links: [] } : {}),
     ...(options.postpone !== undefined ? { postponed: options.postpone } : {}),
     ...(options.attach !== undefined ? { attach: attachmentSources(options.attach) } : {}),
     ...(options.detach !== undefined ? { detach: options.detach } : {}),
@@ -142,6 +149,12 @@ export function addEdit(kit: QueueKit): void {
         .option('--no-parent', 'remove the linked task tags of the task')
         .option('--no-skips', 'run every step of the pipeline again')
         .option('--no-after', 'remove all predecessors of the task')
+        .option(
+          '--link <kind>:<task>',
+          'link of the task, e.g. related:#12; repeat for several',
+          collect,
+        )
+        .option('--no-links', 'remove every link of the task')
         .option('--postpone', 'postpone the task: a running queue does not take it')
         .option('--no-postpone', 'take the task into work again')
         .option('--detach <name>', 'name of an attachment to remove; repeat for several', collect),
@@ -158,6 +171,8 @@ export function addEdit(kit: QueueKit): void {
         'aip queue edit 2 --no-after',
         'aip queue edit 2 --parent 115',
         'aip queue edit 2 --no-parent',
+        'aip queue edit 2 --link related:#12',
+        'aip queue edit 2 --no-links',
         'aip queue edit 3 --postpone',
         'aip queue edit 3 --no-postpone',
         'aip queue edit 4 --attach shot.png --detach old.png',

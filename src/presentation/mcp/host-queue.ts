@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { DELIVERY_MODES } from '../../feature/swarm-config/types/index.ts';
 import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
+import { linkInputs, present } from './host-links.ts';
 
 export function registerQueue(kit: HostKit): void {
   const { server, repo, showQueue } = kit;
@@ -49,6 +50,7 @@ export function registerQueueAdd(kit: HostKit): void {
         variant,
         skip,
         after,
+        links: linkInputs,
         attachments,
         postponed: z
           .boolean()
@@ -69,6 +71,7 @@ export function registerQueueAdd(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      links: taskLinks,
       attachments: files,
       postponed,
       repo: where,
@@ -86,8 +89,7 @@ export function registerQueueAdd(kit: HostKit): void {
             ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(parentRef !== undefined ? { parent: parentRef } : {}),
-            ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
-            ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
             ...(files !== undefined ? { attachments: files.map((path) => ({ path })) } : {}),
             ...(postponed !== undefined ? { postponed } : {}),
           },
@@ -136,6 +138,7 @@ export function registerQueueEdit(kit: HostKit): void {
           ),
         skip,
         after,
+        links: linkInputs,
         postponed: postponedEdit,
         repo,
       },
@@ -154,6 +157,7 @@ export function registerQueueEdit(kit: HostKit): void {
       parent: parentRef,
       skip: skipSteps,
       after: afterIds,
+      links: taskLinks,
       postponed,
       repo: where,
     }) =>
@@ -172,8 +176,7 @@ export function registerQueueEdit(kit: HostKit): void {
             ...(deliveryMode !== undefined ? { deliveryMode } : {}),
             ...(tagNames !== undefined ? { tags: tagNames } : {}),
             ...(parentRef !== undefined ? { parent: parentRef } : {}),
-            ...(skipSteps !== undefined ? { skip: skipSteps } : {}),
-            ...(afterIds !== undefined ? { after: afterIds } : {}),
+            ...present({ skip: skipSteps, after: afterIds, links: taskLinks }),
             ...(postponed !== undefined ? { postponed } : {}),
           },
           where,

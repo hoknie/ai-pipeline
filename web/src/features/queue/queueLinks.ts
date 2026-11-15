@@ -19,10 +19,12 @@ export function related(queue: Linked, id: string): Set<string> {
   const result = new Set<string>([id]);
   const walk = (start: string, next: (at: string) => string[]) => {
     const pending = [start];
+    const visited = new Set<string>([start]);
     while (pending.length > 0) {
       const at = pending.pop() as string;
       for (const other of next(at)) {
-        if (result.has(other) && other !== start) continue;
+        if (visited.has(other)) continue;
+        visited.add(other);
         result.add(other);
         pending.push(other);
       }

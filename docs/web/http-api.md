@@ -102,6 +102,8 @@ SVG and any other file come back with code 400 and are only downloaded. An unkno
 | `POST /api/queue/items/<item>/remove` | Removes a task |
 | `POST /api/queue/items/<item>/run` | Runs a task now |
 | `POST /api/queue/start`, `POST /api/queue/pause` | Starts or pauses the queue |
+| `POST /api/tasks/link` | Links two tasks: `{source, kind, target}` |
+| `POST /api/tasks/unlink` | Removes a link: `{source, kind, target}` |
 | `POST /api/queue/return` | Returns a run to the queue |
 | `POST /api/queue/dismiss` | Removes a run from the skipped list |
 | `POST /api/queue/settings` | Changes the queue settings |

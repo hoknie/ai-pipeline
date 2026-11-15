@@ -283,6 +283,32 @@ describe('worker MCP server', () => {
     ]);
   });
 
+  it('passes links of a queued task from a specialist and offers no parent', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q-abc' };
+      },
+      true,
+    );
+    const add = (await client.listTools()).tools.find((tool) => tool.name === 'swarm_queue_add');
+    expect(Object.keys(add?.inputSchema.properties ?? {})).toContain('links');
+    expect(Object.keys(add?.inputSchema.properties ?? {})).not.toContain('parent');
+    const links = [{ kind: 'related', target: 'r1' }];
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', links },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', pipeline: 'feature', task: 'x', links },
+      },
+    ]);
+  });
+
   it('passes variant of a queued task from a specialist', async () => {
     const calls: unknown[] = [];
     const client = await connect(

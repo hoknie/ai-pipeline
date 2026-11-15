@@ -1684,6 +1684,16 @@ describe('queue links', () => {
     expect([depth(chain, 'q1'), depth(chain, 'q2'), depth(chain, 'q3')]).toEqual([0, 1, 2]);
   });
 
+  it('terminates on cyclic dependencies', () => {
+    const queue = queueOf({
+      items: [
+        queueItem('q1', 'a', 1, { after: [dependency('item', 'q2', 'b')] }),
+        queueItem('q2', 'b', 2, { after: [dependency('item', 'q1', 'a')] }),
+      ],
+    });
+    expect([...related(queue, 'q1')].sort()).toEqual(['q1', 'q2']);
+  });
+
   it('branches: one task waits for two, both are related', () => {
     const queue = queueOf({
       items: [

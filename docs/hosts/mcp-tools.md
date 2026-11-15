@@ -20,8 +20,8 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 | `swarm_apply` | `run_id`, `groups?`, `force?` | Delivers ready groups (the command is `aip run apply`) |
 | `swarm_mark_delivered` | `run_id`, `groups?` | Marks merged groups as delivered when you merged them by hand (the command is `aip run mark-delivered`) |
 | `swarm_queue` | `repo?` | The queue: state, `parallel`, reason for stopping, places taken, waiting tasks in order with their readiness and predecessors, and the runs that hold a place |
-| `swarm_queue_add` | `pipeline`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `attachments?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
-| `swarm_queue_edit` | `item`, `pipeline?`, `variant?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `postponed?`, `position?`, `repo?` | Changes or moves a waiting task (1 is first). `deliveryMode: null` follows the config. `after` and `skip` replace the list, `[]` clears it. A returned run's task takes only `skip` (applied to it), `after`, `position` |
+| `swarm_queue_add` | `pipeline`, `task` or `groups[{title, task}]`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `variant?`, `skip?`, `after?`, `links?`, `attachments?`, `postponed?`, `repo?` | Puts a task at the end of the queue; does not start the queue. `postponed: true`: a running queue skips the task until the flag is cleared |
+| `swarm_queue_edit` | `item`, `pipeline?`, `variant?`, `task` or `groups?`, `title?`, `deliveryMode?`, `tags?`, `parent?`, `skip?`, `after?`, `links?`, `postponed?`, `position?`, `repo?` | Changes or moves a waiting task (1 is first). `deliveryMode: null` follows the config. `after`, `skip`, `links` replace the list, `[]` clears it. A returned run's task takes only `skip`, `after`, `position` |
 | `swarm_queue_remove` | `item`, `repo?` | Removes a waiting task |
 | `swarm_queue_start` | `parallel?`, `repo?` | Starts the queue and continues one that stopped on a problem |
 | `swarm_queue_parallel` | `parallel`, `repo?` | Changes the number of simultaneous runs in any queue state |
@@ -33,6 +33,8 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 | `swarm_queue_run_now` | `item`, `repo?` | Turns a task into a queue run at once; if no place is free, the last run that took a place is frozen. For a paused or frozen run it is Continue |
 
 - `attachments` of `swarm_run` and `swarm_queue_add` is a list of absolute paths of files the daemon can read (at most 10, each up to 20 MB); see [attachments](../usage/queue.md#attachments). The `swarm_queue_add` of a specialist has no such parameter.
+- `links` of `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` is a list of `{kind, target}` (`blocked_by`, `parent`, `related`, `duplicates`). It cannot be combined with `after` or `parent`; an edit replaces every link.
+- `swarm_task_link` and `swarm_task_unlink` (`source`, `kind`, `target`, `repo?`) add or remove one link. A task a specialist queues gets a `parent` link to its run. See [task links](../usage/queue.md#task-links).
 - `parent` of `swarm_run`, `swarm_queue_add` and `swarm_queue_edit` takes a run id or a task number; `null` on edit removes it. See [Parent of a task](../usage/tags.md#parent-of-a-task).
 - Queue behaviour, `after` and `skip` are described in [usage/queue.md](../usage/queue.md). Tags are in [usage/tags.md](../usage/tags.md); the tag catalog cannot be managed through MCP.
 
@@ -46,7 +48,7 @@ Specialists inside a run get their own MCP server (`aip mcp --worker`) with othe
 | `swarm_artifact` | Every step | Publishes a file of the step as an [artifact](../usage/runs.md#artifacts): `file_name`, `title?`, and `content` or `path` |
 | `swarm_run_show` | Every step | Reads a run of the same repository without changing it: `run` (id, task number `#333` or a panel link `…#runs/<id>[/<group>]`), `group?`, `tail_lines?` |
 | `swarm_split` | The split step | Proposes the [groups](../configuration/pipelines.md#split) of a task |
-| `swarm_queue_add` | A specialist with [`queue: true`](../configuration/specialists.md#queueing-tasks) | Puts a task in the queue of the run's repository: `pipeline`, `task` or `groups`, `title?`, `deliveryMode?`, `variant?`, `skip?`, `after?` |
+| `swarm_queue_add` | A specialist with [`queue: true`](../configuration/specialists.md#queueing-tasks) | Puts a task in the queue of the run's repository: `pipeline`, `task` or `groups`, `title?`, `deliveryMode?`, `variant?`, `skip?`, `after?`, `links?` (no `parent`) |
 
 `swarm_run_show` shows only runs of the repository the specialist's run belongs to; any other run is refused. Without a group it returns the run overview and the full task of every group, with a group (from the parameter or from the link) every attempt of the group and the tail of its latest log.
 

@@ -18,6 +18,7 @@ import {
   queueView,
   repositoryViews,
   runView,
+  withLinks,
   withQueue,
 } from './views/index.ts';
 
@@ -44,7 +45,8 @@ export class Snapshots {
     );
     const own = queue.store.get(state.run.repository);
     const item = own ? returnItemOf(own, state.run.id) : null;
-    return withQueue({ ...view, returnable: this.returnable(state) }, item?.id ?? null);
+    const linked = withLinks(view, queue.links.index.viewsOf(state.run.id));
+    return withQueue({ ...linked, returnable: this.returnable(state) }, item?.id ?? null);
   }
 
   /** The recent runs, the latest first. */
@@ -66,6 +68,7 @@ export class Snapshots {
       delivery.variantNames,
       (item) => this.services.attachments.listOf(item),
       this.services.queue.store.findItem,
+      (ids) => this.services.queue.links.index.viewsOf(...ids),
     );
   }
 
@@ -80,6 +83,7 @@ export class Snapshots {
       waits: runs.engine.waitOf,
       attachments: (item) => this.services.attachments.listOf(item),
       find: queue.store.findItem,
+      links: (ids) => queue.links.index.viewsOf(...ids),
       max: typeof settings === 'string' ? 5 : settings.max,
       ownerOf: (item) => queue.store.lines.repositoryOf(line, item),
       project: (repository) => ({

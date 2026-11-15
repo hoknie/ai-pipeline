@@ -7,6 +7,15 @@ import { segment, type Route, type RouteKit } from './types.ts';
 /** Fields of a queue request body; the repository comes from the query string, never the body. */
 const queueBody = (body: unknown) => parseBody(z.record(z.string(), z.unknown()), body);
 
+/** The ends of `task_link` and `task_unlink`; the repository is optional and comes from the query too. */
+const linkBody = (body: unknown, repository: string | undefined) => {
+  const { source, kind, target } = parseBody(
+    z.object({ source: z.string().min(1), kind: z.string().min(1), target: z.string().min(1) }),
+    body,
+  );
+  return { source, kind, target, ...(repository ? { repository } : {}) };
+};
+
 /** `queue_add` with the uploads of the body turned into attachments; the used uploads go away. */
 async function addTask(kit: RouteKit, body: unknown, repository: string): Promise<unknown> {
   const { uploads, ...fields } = queueBody(body);
@@ -37,6 +46,24 @@ async function editTask(
   } as ParamsOf<'queue_edit'>);
   dropUploads(kit, uploads);
   return result;
+}
+
+/** Linking and unlinking two tasks. */
+function linkRoutes({ call }: RouteKit): Route[] {
+  return [
+    {
+      method: 'POST',
+      pattern: /^\/api\/tasks\/link$/,
+      handle: (_match, body, repository) =>
+        call('task_link', linkBody(body, repository) as ParamsOf<'task_link'>),
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/tasks\/unlink$/,
+      handle: (_match, body, repository) =>
+        call('task_unlink', linkBody(body, repository) as ParamsOf<'task_unlink'>),
+    },
+  ];
 }
 
 export function queueRoutes(kit: RouteKit): Route[] {
@@ -104,6 +131,7 @@ export function queueRoutes(kit: RouteKit): Route[] {
         return call('queue_dismiss', { runId: run, ...(repository ? { repository } : {}) });
       },
     },
+    ...linkRoutes(kit),
     {
       method: 'POST',
       pattern: /^\/api\/queue\/settings$/,

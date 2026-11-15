@@ -8,10 +8,11 @@ import type {
   QueueView,
   RepositoryView,
 } from '../../../shared/api/types.ts';
+import { useTags } from '../../../shared/lib/catalog/tags.tsx';
 import { FilterField, type FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { FilterBlock } from '../filter/FilterBlock.tsx';
 
-type Lists = { pipelines: string[]; projects: string[] };
+type Lists = { pipelines: string[]; projects: string[]; tags: string[] };
 
 /** The pipelines of all projects without repeats by id: the first name wins. */
 function pipelineOptions(
@@ -30,7 +31,7 @@ function pipelineOptions(
   ];
 }
 
-/** The take filter of the global queue: pipelines of all projects and the projects themselves. */
+/** The take filter of the global queue: pipelines and tags of all projects, and the projects themselves. */
 export function GlobalTakeFilter({
   api,
   queue,
@@ -49,10 +50,12 @@ export function GlobalTakeFilter({
   onError: (message: string) => void;
 }) {
   const { t } = useTranslation();
+  const { tags } = useTags();
   const [pending, setPending] = useState<Partial<Lists> | null>(null);
   const shown: Lists = {
     pipelines: pending?.pipelines ?? queue.filter.pipelines,
     projects: pending?.projects ?? queue.filter.projects,
+    tags: pending?.tags ?? queue.filter.tags,
   };
   const change = async (patch: Partial<Lists>) => {
     setPending(patch);
@@ -66,12 +69,19 @@ export function GlobalTakeFilter({
   };
   const running = queue.status === 'running';
   const locked = running || pending !== null;
+  const tagNames = new Map<string, string>();
+  for (const tag of tags) {
+    const key = tag.name.toLocaleLowerCase('und');
+    if (!tagNames.has(key)) tagNames.set(key, tag.name);
+  }
+  // Preserve selected spelling when equivalent names occur in different catalogs.
+  for (const name of shown.tags) tagNames.set(name.toLocaleLowerCase('und'), name);
   return (
     <FilterBlock
-      count={shown.pipelines.length + shown.projects.length}
+      count={shown.pipelines.length + shown.projects.length + shown.tags.length}
       running={running}
       locked={locked}
-      onReset={() => void change({ pipelines: [], projects: [] })}
+      onReset={() => void change({ pipelines: [], projects: [], tags: [] })}
     >
       <FilterField
         label={t('queue.filter.pipelines')}
@@ -86,6 +96,17 @@ export function GlobalTakeFilter({
         options={projects.map((entry) => ({ value: entry.path, label: entry.label }))}
         selected={shown.projects}
         onChange={(values) => void change({ projects: values })}
+        clearLabel={t('queue.filter.clear')}
+        disabled={locked}
+      />
+      <FilterField
+        label={t('queue.filter.tags')}
+        options={[...tagNames.values()].map((name) => ({
+          value: name,
+          label: name,
+        }))}
+        selected={shown.tags}
+        onChange={(values) => void change({ tags: values })}
         clearLabel={t('queue.filter.clear')}
         disabled={locked}
       />

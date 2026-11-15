@@ -186,6 +186,10 @@ export function queueView(
   variantNames: (pipeline: string, variant: string) => string = (_pipeline, variant) => variant,
   attachments: (item: string) => RunAttachment[] = () => [],
   find: ItemLookup = lookupIn(queue),
+  links: (ids: string[]) => Pick<QueueItemView, 'links' | 'linkedBy'> = () => ({
+    links: [],
+    linkedBy: [],
+  }),
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -234,6 +238,7 @@ export function queueView(
       skip: [...(item.run === null ? item.skip : (lookup(item.run)?.run.skippedSteps ?? []))],
       readiness: itemReadiness(find, item, lookup),
       after: item.after.map((ref) => dependencyView(find, ref, lookup)),
+      ...links(item.run === null ? [item.id] : [item.id, item.run]),
       postponed: item.postponed,
       filtered: !matchesFilter(queue.filter, item),
       createdAt: item.createdAt,

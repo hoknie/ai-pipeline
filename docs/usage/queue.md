@@ -47,7 +47,7 @@ With `queue.scope: global` in the shared [`settings.yaml`](../configuration/READ
 
 - The state, `parallel`, autopilot, auto answer, skip failed, `on limit`, the reason for stopping, the runs holding a place and the skipped runs are those of the global queue. The settings of the project queues do not apply and are kept for the way back.
 - Specialists of all projects together are limited by `queue.max`.
-- Tasks of a disabled project are not taken. The take filter names pipelines and projects.
+- Tasks of a disabled project are not taken. The take filter selects pipelines, projects and tag names across projects; a task matches a nonempty tag filter if it has at least one of those names.
 - `aip queue start`, `pause`, `parallel`, `settings`, `move` and `list` work with the global queue. `--repo` is ignored with the warning `queue scope is global: --repo is ignored`. `aip queue add --repo` still picks the project of the task, and the task goes to the end of the order. The position of `aip queue move` is a place among the tasks of all projects.
 - A task may wait for a task of another project; the same goes for the `swarm_queue*` tools, which answer with the global queue.
 - Changing the mode pauses every queue; running runs go on. Going back to `project` gives each project queue its tasks in their global order.
@@ -98,6 +98,30 @@ For chains of tasks, turn auto-delivery on.
 
 Only when nothing can be frozen does the run take a place beyond the limit (for example, "3 of 2 places taken"), and the next task starts when the number of runs drops below `parallel`. A problem in such a run stops the queue.
 
+## Task links
+
+A task can be linked to other tasks. The kinds:
+
+| Kind | Meaning |
+| --- | --- |
+| `blocked_by` | the task waits for the target (what `--after` sets) |
+| `parent` | the target is the parent task; the task gets its [linked task tag](tags.md#parent-of-a-task) |
+| `related` | a symmetric note, shown on both tasks |
+| `duplicates` | the task duplicates the target |
+
+```
+aip queue add feature --task "Docs" --link related:#12 --link blocked_by:#9
+aip queue edit <item> --link parent:#5   # replaces every link of the task; --no-links removes them
+aip queue link <task> related <target>   # add one link to a waiting task or a run
+aip queue unlink <task> related <target>
+```
+
+- A target is an id of an item or a run of any project, or a task number of this repository (`#12`). A waiting item can be a parent too.
+- The other side is computed: a task shows `links` and `linkedBy`; `aip queue list` and `aip run show` print them as `links: parent #3 · children #8`.
+- `--link` cannot be combined with `--after` or `--parent` (the short forms of `blocked_by` and `parent`). `aip queue edit --after` changes only the `blocked_by` links.
+- A task cannot link to itself, has one `parent` at most, and a `parent` cycle is refused. A task that returns a run takes no `blocked_by` or `parent`.
+- The links go to the run when the item starts. A link to an item points to its run after that.
+
 ## Queue settings
 
 `aip queue settings` changes only the settings you pass.
@@ -131,7 +155,7 @@ The take filter tells a running queue which new tasks to take: the pipeline must
 
 - The filter changes only while the queue is stopped; a running queue refuses it with `queue filter can be changed only while the queue is stopped`.
 - Returned and frozen runs are taken regardless of the filter; "Run now" ignores it.
-- Removing a tag from the catalog removes it from the filter.
+- In project mode, removing a tag from the catalog removes it from the filter. The global filter stores names independently of project catalogs.
 - In the panel the filter is a collapsible block above the queue controls. `aip queue list` shows it on the `Filter:` line.
 
 ### Autopilot

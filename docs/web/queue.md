@@ -75,7 +75,7 @@ With the [global queue mode](../usage/queue.md#global-queue) the section "Queue"
 
 - The badge "Global queue" and the limit "At most N specialists" (`queue.max`) are on top.
 - Every task and every run carries the label of its project. Waiting tasks stand in the global order; drag a task by its handle (or `Alt+↑` / `Alt+↓`) to a place among the tasks of all projects.
-- The block "Projects" is the take filter by projects; like the filter of pipelines it changes only while the queue is stopped. Tasks of a disabled project are not taken.
+- The take filter selects projects, pipelines and tag names across projects; it changes only while the queue is stopped. A task matches the tag filter when it has at least one selected name. Tasks of a disabled project are not taken.
 - "Start", "Pause", the parallelism and the reason for stopping are those of the global queue.
 - The counter of the section "Queue" counts the waiting tasks of all projects.
 

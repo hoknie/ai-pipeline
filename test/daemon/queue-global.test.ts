@@ -209,6 +209,78 @@ describe('switching to the global mode', () => {
 });
 
 describe('the global queue moves', () => {
+  it('does not mark a paused run as filtered by tag name', async () => {
+    const h = await start();
+    writeScope(h, '{ scope: global }');
+    h.script({ code: [{ waitFor: h.gate('paused') }, {}] });
+    await addIn(h, h.repo, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    const run = (await allRuns(h))[0]!;
+    await h.call('queue_pause', { repository: h.repo });
+    await h.call('run_pause', { runId: run.id });
+    const view = (await h.call('queue_settings', {
+      repository: h.repo,
+      filter: { tags: ['missing'] },
+    })) as GlobalQueueView;
+    expect(view.items.find((item) => item.run === run.id)?.filtered).toBe(false);
+    h.open('paused');
+  });
+
+  it('refreshes and advances when a tag is renamed to a selected name', async () => {
+    const h = await start();
+    await h.call('tag_add', { repository: h.repo, name: 'before' });
+    await h.call('tag_add', { repository: h.repo, name: 'selected' });
+    writeScope(h, '{ scope: global }');
+    h.script({ code: [{ waitFor: h.gate('rename') }, { waitFor: h.gate('rename') }] });
+    await addIn(h, h.repo, 'A', { tags: ['selected'] });
+    await addIn(h, h.repo, 'B', { tags: ['before'] });
+    await h.call('queue_settings', {
+      repository: h.repo,
+      parallel: 2,
+      filter: { tags: ['selected', 'after'] },
+    });
+    await h.call('queue_start', { repository: h.repo });
+    expect((await globalOf(h)).items[0]?.filtered).toBe(true);
+    await h.call('tag_edit', { repository: h.repo, tag: 'before', name: 'after' });
+    await waitGlobal(h, (view) => view.items.length === 0 && view.runs.length === 2);
+    h.open('rename');
+  });
+
+  it('filters by tag names across project catalogs, persists and only changes while stopped', async () => {
+    const h = await start();
+    const other = await lib(h);
+    await h.call('tag_add', { repository: h.repo, name: 'Auth' });
+    await h.call('tag_add', { repository: other, name: 'auth' });
+    await h.call('tag_add', { repository: other, name: 'Other' });
+    writeScope(h, '{ scope: global }');
+    await addIn(h, h.repo, 'A', { tags: ['Auth'] });
+    await addIn(h, other, 'B', { tags: ['auth'] });
+    await addIn(h, other, 'C', { tags: ['Other'] });
+    await addIn(h, h.repo, 'D');
+    const filtered = (await h.call('queue_settings', {
+      repository: h.repo,
+      filter: { tags: ['auth', 'missing'] },
+    })) as GlobalQueueView;
+    expect(filtered.filter.tags).toEqual(['auth', 'missing']);
+    expect(filtered.items.map((item) => item.filtered)).toEqual([false, false, true, true]);
+    await h.restart();
+    expect((await globalOf(h)).filter.tags).toEqual(['auth', 'missing']);
+    h.script({ code: [{ waitFor: h.gate('tags') }] });
+    await h.call('queue_start', { repository: h.repo });
+    await expect(
+      h.call('queue_settings', { repository: h.repo, filter: { tags: [] } }),
+    ).rejects.toThrow('queue filter can be changed only while the queue is stopped');
+    h.open('tags');
+    const done = await waitGlobal(h, (view) => view.status === 'stopped' && view.runs.length === 0);
+    expect(titles(done)).toEqual(['C', 'D']);
+    expect((await allRuns(h)).map((run) => run.repository).sort()).toEqual([h.repo, other].sort());
+    const cleared = (await h.call('queue_settings', {
+      repository: h.repo,
+      filter: { tags: [] },
+    })) as GlobalQueueView;
+    expect(cleared.items.map((item) => item.filtered)).toEqual([false, false]);
+  });
+
   it('has one parallel for all projects', async () => {
     const h = await start();
     const other = await lib(h);
@@ -273,11 +345,8 @@ describe('the global queue moves', () => {
       repository: h.repo,
       filter: { projects: [slug] },
     })) as GlobalQueueView;
-    expect(filtered.filter).toEqual({ pipelines: [], projects: [other] });
+    expect(filtered.filter).toEqual({ pipelines: [], projects: [other], tags: [] });
     expect(filtered.items.map((item) => item.filtered)).toEqual([true, false]);
-    await expect(
-      h.call('queue_settings', { repository: h.repo, filter: { tags: ['x'] } }),
-    ).rejects.toThrow('the global queue has no filter by tags');
     await h.call('queue_start', { repository: h.repo });
     const done = await waitGlobal(h, (view) => view.runs.length === 0 && view.status === 'stopped');
     expect(titles(done)).toEqual(['A']);

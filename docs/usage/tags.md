@@ -60,6 +60,7 @@ aip queue edit <item> --parent 115       # replace the linked task tags of the t
 - An unknown run or number, and the number of a task that has not started yet, are errors: nothing changes and no tag is created.
 - `aip queue edit --parent` (or `parent` of `swarm_queue_edit`) replaces all linked task tags of the task, including those inherited through `after`; `--no-parent` (`parent: null`) removes them. An edit without `parent` leaves them alone. The tag stays in the catalog and on the parent run.
 - A task that returns a run keeps its own task and takes no `parent`.
+- `parent` is the [task link](queue.md#task-links) of kind `parent`: the tag follows the link, and removing the tag by hand does not remove the link. The parent can also be a waiting item: its children get the tag of the item once it starts.
 - `parent` does not make the task wait for the parent: use [`after`](queue.md#dependencies) for that.
 
 ## Shared tag of a task in several projects

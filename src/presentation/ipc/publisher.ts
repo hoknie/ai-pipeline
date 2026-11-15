@@ -22,7 +22,10 @@ function queueSignature(view: QueueView): string {
     skipped: view.skipped,
     autoDeliver: view.autoDeliver,
     deliveryMode: view.deliveryMode,
-    items: view.items.map((item) => [item.id, item.readiness, item.after, item.postponed]),
+    items: view.items.map((item) => [
+      ...[item.id, item.readiness, item.after, item.postponed],
+      ...[item.links, item.linkedBy],
+    ]),
   });
 }
 
@@ -34,7 +37,12 @@ function globalSignature(view: GlobalQueueView | null): string {
     stop: view.stop,
     runs: view.runs,
     skipped: view.skipped,
-    items: view.items.map((item) => [item.id, item.readiness, item.after, item.postponed]),
+    items: view.items.map((item) => [
+      ...[item.id, item.readiness, item.after, item.postponed],
+      ...[item.links, item.linkedBy],
+      item.filtered,
+      item.tags,
+    ]),
   });
 }
 
@@ -93,11 +101,20 @@ export class Publisher {
       queue: {
         queueSaved: (queue) => this.queue(queue),
         queueChecked: (queue) => this.queueChecked(queue),
+        runChanged,
         globalQueueSaved: () => this.globalQueue(true),
         globalQueueChecked: () => this.globalQueue(false),
       },
       repos: { repositoriesChanged: () => this.repositories() },
-      tags: { tagsChanged: (repository) => this.tags(repository) },
+      tags: {
+        tagsChanged: (repository) => {
+          this.tags(repository);
+          if (this.services.queue.store.scope() === 'global') {
+            this.globalQueue(false);
+            this.services.queue.advance.request(repository);
+          }
+        },
+      },
       // Configuration may change `delivery.auto`, which the queue view shows.
       config: {
         configChanged: (repository) => {

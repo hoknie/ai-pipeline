@@ -480,7 +480,7 @@ describe('cli run view', () => {
     const colored = await aip(forced, 'run', 'show', runId);
     expect(colored.stdout).toContain(`→ aip group answer ${runId} ${group} "<answer>"`);
     expect(colored.stdout.replace(/\x1b\[[0-9;]*m/g, '')).toContain(
-      'Progress: ░░░░░░░░░░ 0/2 steps · working changes',
+      'Progress: ░░░░░░░░░░ 0/2 steps',
     );
     const plain = await aip(box, 'run', 'show', runId);
     expect(plain.stdout).not.toMatch(/^→ /m);

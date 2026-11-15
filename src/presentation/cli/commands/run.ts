@@ -13,6 +13,7 @@ import { repositoryArgument } from '../../ipc/client/index.ts';
 import type { RunQueued, RunView } from '../../ipc/contract/index.ts';
 import { bind, call } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
+import { linkInputsOf } from '../links.ts';
 import { attachmentSources, collect, parseDeliveryMode, readGroups } from '../options.ts';
 import { watch } from '../watch.ts';
 import { addApply, addClean, addMarkDelivered, addPause, addSkip } from './run-delivery.ts';
@@ -44,6 +45,7 @@ interface StartOptions {
   skip?: string[];
   after?: string[];
   attach?: string[];
+  link?: string[];
   json?: boolean;
 }
 
@@ -54,6 +56,10 @@ function startParams(pipeline: string, options: StartOptions) {
   }
   const groups = options.groups ? readGroups(options.groups) : undefined;
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
+  const links = linkInputsOf(options, {
+    after: options.after !== undefined,
+    parent: options.parent !== undefined,
+  });
   return {
     repository: repositoryArgument(options.repo),
     pipeline,
@@ -67,6 +73,7 @@ function startParams(pipeline: string, options: StartOptions) {
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
+    ...(links !== undefined ? { links } : {}),
     ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
   };
 }
@@ -110,6 +117,11 @@ function addStart(kit: RunKit): void {
       'queue item or run that must be done first; repeat for several',
       collect,
     )
+    .option(
+      '--link <kind>:<task>',
+      'link of the task, e.g. related:#12; repeat for several',
+      collect,
+    )
     .option('--attach <path>', 'file to attach to the task; repeat for several', collect)
     .option('--json', 'print JSON')
     .addHelpText(
@@ -121,6 +133,7 @@ function addStart(kit: RunKit): void {
         'aip run start feature --groups groups.yaml --repo ~/projects/app',
         'aip run start feature --task "Add the API" --after q1',
         'aip run start feature --task "Follow-up" --parent 115',
+        'aip run start feature --task "Related work" --link related:#12',
         'aip run start feature --task "Fix the layout" --attach shot.png',
       ]),
     )

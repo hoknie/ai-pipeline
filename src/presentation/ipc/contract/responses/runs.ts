@@ -1,4 +1,5 @@
 import type { HumanDecision, Usage } from '../../../../feature/agents/types/index.ts';
+import type { TaskLinkView } from '../../../../feature/queue/types/index.ts';
 import type {
   GroupDelivery,
   GroupStatus,
@@ -186,6 +187,10 @@ export interface RunView {
   returnable: boolean;
   /** Id of the queue item that retries the run when taken; null when the run has none. */
   queueItem: string | null;
+  /** Links where the run is the source. */
+  links: TaskLinkView[];
+  /** Links where the run is the target. */
+  linkedBy: TaskLinkView[];
   /** Files attached to the task of the run. */
   attachments: AttachmentView[];
   tags: TagView[];

@@ -3,6 +3,7 @@ import { repositoryArgument } from '../ipc/client/index.ts';
 import type { AddedToProjectView, QueueView } from '../ipc/contract/index.ts';
 import { call } from './context.ts';
 import { usage } from './io.ts';
+import { linkInputsOf } from './links.ts';
 import {
   attachmentSources,
   collect,
@@ -19,6 +20,7 @@ type AddOptions = Omit<QueueTaskOptions, 'repo'> & {
   tagAll?: string;
   chain?: boolean;
   note?: string[];
+  link?: string[];
 };
 
 /** The flags that fit only one project or only several; a wrong mix is a usage error. */
@@ -40,6 +42,10 @@ function checkRepos(options: AddOptions, several: boolean): void {
 /** The fields of the task that one project and several projects take alike. */
 function taskFields(pipeline: string, options: AddOptions) {
   const deliveryMode = parseDeliveryMode(options.deliveryMode);
+  const links = linkInputsOf(options, {
+    after: options.after !== undefined,
+    parent: typeof options.parent === 'string',
+  });
   return {
     pipeline,
     ...(options.task !== undefined ? { task: options.task } : {}),
@@ -50,6 +56,7 @@ function taskFields(pipeline: string, options: AddOptions) {
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
+    ...(links !== undefined ? { links } : {}),
     ...(options.attach !== undefined ? { attachments: attachmentSources(options.attach) } : {}),
     ...(options.postpone ? { postponed: true } : {}),
   };
@@ -76,6 +83,11 @@ export function addAdd(kit: QueueKit): void {
       'with several --repo: an addition to the task text for one project; repeat for several',
       collect,
     )
+    .option(
+      '--link <kind>:<task>',
+      'link of the task, e.g. related:#12; repeat for several',
+      collect,
+    )
     .option('--json', 'print JSON')
     .addHelpText(
       'after',
@@ -84,6 +96,7 @@ export function addAdd(kit: QueueKit): void {
         'aip queue add feature -g g.yaml',
         'aip queue add feature --task "Fix the typo" --skip review --skip qa',
         'aip queue add feature --task "Add the API" --after q1',
+        'aip queue add feature --task "Related" --link related:#12',
         'aip queue add feature --task "Fix the layout" --attach shot.png --attach spec.pdf',
         'aip queue add feature --task "Follow-up" --parent 115',
         'aip queue add feature --task "Later" --postpone',

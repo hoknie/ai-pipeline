@@ -13,8 +13,10 @@ import {
   resolveTags,
   type Tag,
 } from '../../tags/types/index.ts';
-import { dependencyTags, spreadTags, type Queue } from '../types/index.ts';
+import { dependencyTags, spreadTags, checkParentCycle, type Queue } from '../types/index.ts';
 
+import type { LinkIndex } from './link-index.ts';
+import type { TaskLinksRepository } from '../repositories/index.ts';
 import type { QueueStore } from './store.ts';
 
 export interface TaskTagsDependencies {
@@ -139,4 +141,45 @@ export class TaskTags {
     }
     return tag;
   }
+}
+
+/** What changing the parent of a run needs: the services around the tags and the links. */
+export interface RunParentChange {
+  runs: Pick<RunsServices, 'states' | 'engine'>;
+  store: QueueStore;
+  tags: TagCatalogService;
+  taskTags: TaskTags;
+  links: TaskLinksRepository;
+  now: () => number;
+}
+
+/** The parent of a run changes; the linked tag of the old parent goes, that of the new one comes first. */
+export async function setRunParent(
+  deps: RunParentChange,
+  index: LinkIndex,
+  run: string,
+  parent: string | null,
+): Promise<void> {
+  const { runs, store, tags, taskTags, links, now } = deps;
+  const state = runs.states.get(run);
+  if (parent !== null) checkParentCycle((other) => index.parentOf(other), run, parent);
+  const old = index.parentOf(run);
+  const catalog = tags.of(state.run.repository);
+  let next = knownTags(catalog, state.run.tags);
+  const oldTag = old === undefined ? undefined : linkedTagOf(catalog, old);
+  if (oldTag) next = next.filter((id) => id !== oldTag.id);
+  const target = parent === null ? undefined : runs.states.lookup(parent);
+  const added: string[] = [];
+  if (target && target.run.repository === state.run.repository) {
+    const tag = await taskTags.linkedTagFor(target);
+    next = mergeTags([tag.id], next);
+    added.push(tag.id);
+  }
+  const rows = parent === null ? [] : [{ kind: 'parent' as const, target: parent }];
+  links.replaceSource(run, ['parent'], rows, now());
+  if (next.join() !== state.run.tags.join()) {
+    await runs.engine.apply(state, { kind: 'tags_set', tags: next });
+  }
+  const queue = store.of(state.run.repository);
+  if (spreadTags(queue, run, added, now()).length > 0) store.save(queue);
 }

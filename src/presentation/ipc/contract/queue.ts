@@ -4,6 +4,7 @@ import {
   afterIds,
   attachmentSources,
   deliveryModeSchema,
+  linkInputs,
   parentRef,
   proposedGroupSchema,
   skipSteps,
@@ -34,6 +35,7 @@ const queueAddParams = z
     parent: parentRef.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    links: linkInputs.optional(),
     postponed: z.boolean().optional(),
     attachments: attachmentSources.optional(),
   })
@@ -77,6 +79,7 @@ export const workerQueueAddParams = z
     deliveryMode: deliveryModeSchema.optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    links: linkInputs.optional(),
   })
   .refine((params) => (params.task === undefined) !== (params.groups === undefined), {
     message: 'pass either task or groups',
@@ -97,6 +100,7 @@ const queueEditParams = z
     parent: parentRef.nullable().optional(),
     skip: skipSteps.optional(),
     after: afterIds.optional(),
+    links: linkInputs.optional(),
     postponed: z.boolean().optional(),
     position: z.number().int().min(1).optional(),
     attach: attachmentSources.optional(),
@@ -105,6 +109,13 @@ const queueEditParams = z
   .refine((params) => params.task === undefined || params.groups === undefined, {
     message: 'pass either task or groups',
   });
+
+const taskLinkParams = z.object({
+  source: parentRef,
+  kind: z.string().min(1),
+  target: parentRef,
+  repository: queueRepository.optional(),
+});
 
 const queueParallel = z.number().int().min(1).max(20);
 
@@ -176,4 +187,6 @@ export const queueRequests = [
     params: z.object({ repository: queueRepository, item: queueItem }),
   }),
   z.object({ method: z.literal('worker_queue_add'), params: workerQueueAddParams }),
+  z.object({ method: z.literal('task_link'), params: taskLinkParams }),
+  z.object({ method: z.literal('task_unlink'), params: taskLinkParams }),
 ] as const;

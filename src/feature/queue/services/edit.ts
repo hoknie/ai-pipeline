@@ -27,6 +27,7 @@ import {
 
 import type { QueueAdvance } from './advance.ts';
 import type { QueueItems } from './items.ts';
+import type { TaskLinks } from './links.ts';
 import type { QueueStore } from './store.ts';
 import type { TaskTags } from './task-tags.ts';
 
@@ -34,6 +35,7 @@ export interface QueueEditDependencies {
   store: QueueStore;
   advance: QueueAdvance;
   items: QueueItems;
+  links: TaskLinks;
   taskTags: TaskTags;
   attachments: AttachmentService;
   tags: TagCatalogService;
@@ -50,26 +52,28 @@ export class QueueEdit {
     this.dependencies = dependencies;
   }
 
-  async edit(params: QueueEditRequest): Promise<Queue> {
-    const { store, advance, registry, items, now } = this.dependencies;
-    const queue = store.lines.ownerOf(await registry.rootOf(params.repository), params.item);
+  async edit(request: QueueEditRequest): Promise<Queue> {
+    const { store, advance, registry, items, links, now } = this.dependencies;
+    const queue = store.lines.ownerOf(await registry.rootOf(request.repository), request.item);
     const repository = queue.repository;
     const moment = now();
-    const existing = queue.items.find((candidate) => candidate.id === params.item);
+    const existing = queue.items.find((candidate) => candidate.id === request.item);
     // In the global mode the position is a place among the tasks of all projects.
     const global = store.scope() === 'global';
-    const place = global ? params.position : undefined;
+    const place = global ? request.position : undefined;
     if (place !== undefined) this.checkGlobalPosition(place);
     // The tags before the edit: those added by it spread to the items that wait for this one.
     const before = existing?.tags ?? [];
-    if (existing?.run && params.parent !== undefined) {
+    if (existing?.run && request.parent !== undefined) {
       throw rejected('a returned run keeps its own task');
     }
+    const plan = links.planEdit(repository, request, existing?.run != null);
+    const params: QueueEditRequest = {
+      ...request,
+      after: plan.after,
+      parent: plan.parent,
+    };
     const changesAttachments = this.checkAttachments(existing, params);
-    const parentState =
-      params.parent === undefined || params.parent === null
-        ? null
-        : items.resolveParent(repository, params.parent);
     let skip = params.skip;
     if (existing?.run && skip !== undefined) {
       await this.skipInRun(queue, existing, params);
@@ -103,7 +107,7 @@ export class QueueEdit {
       position: global ? undefined : position,
     };
     const fields = { ...patch, skip, after, postponed };
-    const tags = await this.tagsOf(queue, existing, params, parentState, fields, moment);
+    const tags = await this.tagsOf(queue, existing, params, fields, moment);
     if (existing && changesAttachments) {
       // The edit is checked on a copy first: no file is stored for an edit that is refused.
       editItem(structuredClone(queue), params.item, { ...fields, tags }, moment, store.findItem);
@@ -120,6 +124,7 @@ export class QueueEdit {
       const added = edited.tags.filter((id) => !before.includes(id));
       spreadTags(queue, params.item, added, moment);
     }
+    links.replaceFor(params.item, plan);
     if (global && existing && (place !== undefined || existing.error !== null)) {
       moveGlobal(store.all(), params.item, place ?? 1);
       store.saveEverything();
@@ -224,17 +229,16 @@ export class QueueEdit {
     queue: Queue,
     existing: QueueItem | undefined,
     params: QueueEditRequest,
-    parentState: RunState | null,
     fields: Parameters<typeof editItem>[2],
     moment: number,
   ): Promise<string[] | undefined> {
-    const { tags: catalogs, taskTags, runs } = this.dependencies;
+    const { tags: catalogs, runs } = this.dependencies;
     const catalog = () => catalogs.of(queue.repository);
     let tags = params.tags === undefined ? undefined : resolveManualTags(catalog(), params.tags);
     if (existing && tags !== undefined) {
       tags = keepLinkedTags(catalog(), knownTags(catalog(), existing.tags), tags);
     }
-    if (existing && parentState) {
+    if (existing && typeof params.parent === 'string') {
       editItem(
         structuredClone(queue),
         params.item,
@@ -244,9 +248,10 @@ export class QueueEdit {
       );
     }
     if (existing && params.parent !== undefined) {
-      const parentTag = parentState
-        ? await taskTags.parentTagFor(queue.repository, parentState)
-        : null;
+      const parentTag = await this.dependencies.links.parentTag(
+        queue.repository,
+        typeof params.parent === 'string' ? params.parent : null,
+      );
       const rest = withoutLinkedTags(catalog(), tags ?? existing.tags);
       tags = mergeTags(parentTag ? [parentTag.id] : [], rest);
     }
