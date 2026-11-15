@@ -6,11 +6,12 @@ import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import type { QueueRunView, QueueView } from '../../../shared/api/types.ts';
 import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
+import { ProjectLabel } from '../list/ProjectLabel.tsx';
 import { RunCard } from './RunCard.tsx';
 
 /** Putting a skipped run back and dismissing it, one at a time. */
 function useSkippedActions(
-  queue: QueueView,
+  repositoryOf: (run: QueueRunView) => string,
   api: Api,
   onQueue: (queue: QueueView) => void,
   onError: (message: string) => void,
@@ -19,10 +20,10 @@ function useSkippedActions(
   const confirm = useConfirm();
   const [returning, setReturning] = useState<string | null>(null);
   const [dismissing, setDismissing] = useState<string | null>(null);
-  const putBack = async (run: string) => {
-    setReturning(run);
+  const putBack = async (run: QueueRunView) => {
+    setReturning(run.id);
     try {
-      onQueue(await api.queueReturn(run, queue.repository));
+      onQueue(await api.queueReturn(run.id, repositoryOf(run)));
       notifySuccess(t('queue.returned'));
     } catch (error) {
       onError((error as Error).message);
@@ -41,7 +42,7 @@ function useSkippedActions(
     if (!yes) return;
     setDismissing(run.id);
     try {
-      onQueue(await api.queueDismiss(run.id, queue.repository));
+      onQueue(await api.queueDismiss(run.id, repositoryOf(run)));
       notifySuccess(t('queue.dismissed'));
     } catch (error) {
       onError((error as Error).message);
@@ -59,16 +60,22 @@ export function SkippedRuns({
   api,
   onQueue,
   onError,
+  repositoryOf = () => queue.repository,
+  projectOf,
 }: {
   queue: QueueView;
   now: number;
   api: Api;
   onQueue: (queue: QueueView) => void;
   onError: (message: string) => void;
+  /** The project a run belongs to; default: the project of `queue`. */
+  repositoryOf?: (run: QueueRunView) => string;
+  /** The path to label a run with; without it no label. */
+  projectOf?: (run: QueueRunView) => string | undefined;
 }) {
   const { t } = useTranslation();
   const { returning, dismissing, putBack, dismiss } = useSkippedActions(
-    queue,
+    repositoryOf,
     api,
     onQueue,
     onError,
@@ -79,7 +86,10 @@ export function SkippedRuns({
       <h3 className="mb-2 font-semibold">{t('queue.skipped', { count: queue.skipped.length })}</h3>
       <ul className="grid gap-2 sm:grid-cols-2">
         {queue.skipped.map((run) => (
-          <li key={run.id} className="min-w-0">
+          <li key={run.id} className="flex min-w-0 flex-col gap-1">
+            {projectOf?.(run) !== undefined ? (
+              <ProjectLabel repository={projectOf(run) as string} />
+            ) : null}
             <RunCard
               run={run}
               now={now}
@@ -92,7 +102,7 @@ export function SkippedRuns({
                       variant="outline"
                       loading={returning === run.id}
                       disabled={busy}
-                      onClick={() => void putBack(run.id)}
+                      onClick={() => void putBack(run)}
                     >
                       {t('queue.returnRun')}
                     </Button>

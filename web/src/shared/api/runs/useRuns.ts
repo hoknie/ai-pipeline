@@ -52,7 +52,7 @@ export interface RunsResult {
   /** The global queue in the global mode; null in the project mode. */
   globalQueue: GlobalQueueView | null;
   /** Takes a fresher queue, for example the answer to a change made on the page. */
-  setQueue: (queue: QueueView) => void;
+  setQueue: (queue: QueueView | GlobalQueueView) => void;
   /** The tag catalog. */
   tags: TagView[];
   /** Takes a fresher catalog of one repository, for example the answer to creating a tag. */
@@ -100,8 +100,10 @@ export function useRuns(
     return sortRuns(all.values());
   }, [runs, extra, pages]);
   const listedRuns = useMemo(() => new Set(runs.keys()), [runs]);
-  const setQueue = useCallback((view: QueueView) => {
-    set.setQueues((current) => putQueue(current, view));
+  const setQueue = useCallback((view: QueueView | GlobalQueueView) => {
+    // an answer of the global mode is the global queue, not the queue of a project
+    if (view.scope === 'global') set.setGlobalQueue(view);
+    else set.setQueues((current) => putQueue(current, view));
   }, []);
   const setTags = useCallback((repository: string, next: TagView[]) => {
     set.setTags((current) => replaceTags(current, next, repository));

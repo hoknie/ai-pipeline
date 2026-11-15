@@ -62,7 +62,7 @@ export function QueueRoute(props: {
   now: number;
   drafts: Record<string, QueueDraft>;
   onDraft: (key: string, draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   onError: (message: string) => void;
   onNewTask: () => void;
   onOpenProject: (path: string) => void;

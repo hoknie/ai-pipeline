@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
-import type { PipelinesView, QueueItemView, QueueView } from '../../../shared/api/types.ts';
+import type { QueueItemView } from '../../../shared/api/types.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { QueueForm, type QueueDraft } from '../QueueForm.tsx';
-import { afterOptions, type ParentChoice } from '../queueLinks.ts';
+import { afterOptions } from '../queueLinks.ts';
+import type { ItemScope } from './itemScope.ts';
 import { itemLabel } from './itemText.ts';
 import { useQueueLinks } from './links.tsx';
 import { DependencyChip } from './RowParts.tsx';
@@ -13,20 +13,14 @@ import type { useQueueActions } from './useQueueActions.ts';
 
 /** Under a row: the predecessors, a start error, the started run and the edit form. */
 export function RowDetails({
-  api,
+  scope,
   item,
-  queue,
-  pipelines,
-  parents,
   editing,
   actions,
   onDraft,
 }: {
-  api: Api;
+  scope: ItemScope;
   item: QueueItemView;
-  queue: QueueView;
-  pipelines: PipelinesView | null;
-  parents: ParentChoice[];
   editing: QueueDraft | undefined;
   actions: ReturnType<typeof useQueueActions>;
   onDraft: (key: string, draft: QueueDraft | null) => void;
@@ -34,6 +28,7 @@ export function RowDetails({
   const { t } = useTranslation();
   const { started } = actions;
   const { others } = useQueueLinks();
+  const queue = scope.queueOf(item);
   return (
     <>
       {item.after.length > 0 ? (
@@ -73,13 +68,18 @@ export function RowDetails({
         <QueueForm
           idPrefix={`edit-${item.id}`}
           draft={editing}
-          pipelines={pipelines}
+          pipelines={scope.pipelinesOf(item)}
           repository={queue.repository}
-          api={api}
+          api={scope.apiOf(item)}
           autoDeliverDefault={queue.autoDeliver}
           deliveryModeDefault={queue.deliveryMode}
-          afterChoices={afterOptions(queue, (other) => itemLabel(other, t), item, others)}
-          parentChoices={parents}
+          afterChoices={afterOptions(
+            queue,
+            (other) => itemLabel(other, t),
+            item,
+            others.filter((other) => other.repository !== queue.repository),
+          )}
+          parentChoices={scope.parentsOf(item)}
           locked={item.run !== null}
           submitLabel={t('queue.list.save')}
           onDraft={(draft) => onDraft(`edit:${item.id}`, draft)}

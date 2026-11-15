@@ -3,25 +3,26 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
 import { notifySuccess } from '../../shared/lib/browser/notify.ts';
-import type { QueueView } from '../../shared/api/types.ts';
+import type { QueueRunView, QueueView } from '../../shared/api/types.ts';
 
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { RunCard } from './cards/RunCard.tsx';
+import { ProjectLabel } from './list/ProjectLabel.tsx';
 import { SkippedRuns } from './cards/SkippedRuns.tsx';
 
 /** Pausing a run of the queue, one at a time. */
 function usePause(
-  queue: QueueView,
+  repositoryOf: (run: QueueRunView) => string,
   api: Api,
   onQueue: (queue: QueueView) => void,
   onError: (message: string) => void,
 ) {
   const { t } = useTranslation();
   const [pausing, setPausing] = useState<string | null>(null);
-  const pause = async (run: string) => {
-    setPausing(run);
+  const pause = async (run: QueueRunView) => {
+    setPausing(run.id);
     try {
-      onQueue(await api.pauseRun(run, queue.repository));
+      onQueue(await api.pauseRun(run.id, repositoryOf(run)));
       notifySuccess(t('queue.runPaused'));
     } catch (error) {
       onError((error as Error).message);
@@ -32,6 +33,19 @@ function usePause(
   return { pausing, pause };
 }
 
+/** The places of the queue that no run holds. */
+function FreeSlots({ count }: { count: number }) {
+  const { t } = useTranslation();
+  return Array.from({ length: count }, (_, index) => (
+    <li
+      key={`free-${index}`}
+      className="flex items-center justify-center rounded-xl border border-dashed p-3 text-sm text-muted-foreground"
+    >
+      {t('queue.freeSlot')}
+    </li>
+  ));
+}
+
 export function QueueRuns({
   queue,
   now,
@@ -39,6 +53,8 @@ export function QueueRuns({
   onQueue,
   onError,
   highlight = null,
+  repositoryOf = () => queue.repository,
+  projectOf,
 }: {
   queue: QueueView;
   now: number;
@@ -47,13 +63,25 @@ export function QueueRuns({
   onError: (message: string) => void;
   /** Ids linked to the item under the pointer or the focus. */
   highlight?: Set<string> | null;
+  /** The project a run belongs to; default: the project of `queue`. */
+  repositoryOf?: (run: QueueRunView) => string;
+  /** The path to label a run with; without it no label. */
+  projectOf?: (run: QueueRunView) => string | undefined;
 }) {
   const { t } = useTranslation();
   const running = queue.status === 'running';
-  const { pausing, pause } = usePause(queue, api, onQueue, onError);
+  const { pausing, pause } = usePause(repositoryOf, api, onQueue, onError);
   const skipped =
     queue.skipped.length > 0 ? (
-      <SkippedRuns queue={queue} now={now} api={api} onQueue={onQueue} onError={onError} />
+      <SkippedRuns
+        queue={queue}
+        now={now}
+        api={api}
+        onQueue={onQueue}
+        onError={onError}
+        repositoryOf={repositoryOf}
+        {...(projectOf ? { projectOf } : {})}
+      />
     ) : null;
   if (queue.runs.length === 0 && !running) return skipped;
   const free = running ? Math.max(0, queue.parallel - queue.runs.length) : 0;
@@ -69,7 +97,10 @@ export function QueueRuns({
         ) : null}
         <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 2xl:grid-cols-3">
           {queue.runs.map((run) => (
-            <li key={run.id} className="min-w-0">
+            <li key={run.id} className="flex min-w-0 flex-col gap-1">
+              {projectOf?.(run) !== undefined ? (
+                <ProjectLabel repository={projectOf(run) as string} />
+              ) : null}
               <RunCard
                 run={run}
                 now={now}
@@ -81,7 +112,7 @@ export function QueueRuns({
                       variant="outline"
                       loading={pausing === run.id}
                       disabled={pausing !== null}
-                      onClick={() => void pause(run.id)}
+                      onClick={() => void pause(run)}
                     >
                       {t('queue.pauseRun')}
                     </Button>
@@ -90,14 +121,7 @@ export function QueueRuns({
               />
             </li>
           ))}
-          {Array.from({ length: free }, (_, index) => (
-            <li
-              key={`free-${index}`}
-              className="flex items-center justify-center rounded-xl border border-dashed p-3 text-sm text-muted-foreground"
-            >
-              {t('queue.freeSlot')}
-            </li>
-          ))}
+          <FreeSlots count={free} />
         </ul>
       </section>
       {skipped}

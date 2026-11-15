@@ -21,7 +21,7 @@ export type QueueRouteProps = {
   now: number;
   drafts: Record<string, QueueDraft>;
   onDraft: (key: string, draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   onError: (message: string) => void;
   onNewTask: () => void;
 };
@@ -65,7 +65,11 @@ export function GlobalQueueRoute(
         api={props.common.api}
         queue={props.globalQueue}
         projects={props.registry.filter((entry) => entry.enabled !== false)}
+        runs={props.common.runs}
         now={props.now}
+        drafts={props.drafts}
+        onDraft={props.onDraft}
+        onQueue={props.onQueue}
         onNewTask={props.onNewTask}
         onError={props.onError}
       />

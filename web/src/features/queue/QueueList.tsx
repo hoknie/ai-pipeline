@@ -7,7 +7,7 @@ import type { PipelinesView, QueueView, RunView } from '../../shared/api/types.t
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Empty } from '../../shared/ui/feedback/empty.tsx';
 import type { QueueDraft } from './QueueForm.tsx';
-import { parentChoices } from './queueLinks.ts';
+import { projectScope, type ItemScope } from './list/itemScope.ts';
 import { QueueRow } from './list/QueueRow.tsx';
 import { useQueueActions } from './list/useQueueActions.ts';
 import { useQueueDrag } from './list/useQueueDrag.ts';
@@ -24,6 +24,7 @@ export function QueueList({
   onQueue,
   highlight = null,
   onHighlight = () => undefined,
+  scope,
 }: {
   api: Api;
   queue: QueueView;
@@ -38,9 +39,15 @@ export function QueueList({
   highlight?: Set<string> | null;
   /** The item under the pointer or the focus, null when there is none. */
   onHighlight?: (id: string | null) => void;
+  /** What a task is handled through; without it every task belongs to `queue`'s project. */
+  scope?: ItemScope;
 }) {
   const { t } = useTranslation();
-  const parents = useMemo(() => parentChoices(runs, queue.repository), [runs, queue.repository]);
+  const own = useMemo(
+    () => projectScope(api, queue, pipelines, runs),
+    [api, queue, pipelines, runs],
+  );
+  const itemScope = scope ?? own;
   const [message, setMessage] = useState<string | null>(null);
   const refresh = async () => {
     try {
@@ -50,8 +57,8 @@ export function QueueList({
     }
   };
   const notice = { message, setMessage, refresh };
-  const { shown, move } = useQueueOrder(api, queue, onQueue, notice);
-  const actions = useQueueActions(api, queue, onQueue, onDraft, notice);
+  const { shown, move } = useQueueOrder(itemScope, queue, onQueue, notice);
+  const actions = useQueueActions(itemScope, onQueue, onDraft, notice);
   const drag = useQueueDrag(shown, move);
   const alert = message ? <Alert variant="destructive">{message}</Alert> : null;
 
@@ -72,12 +79,10 @@ export function QueueList({
         {shown.map((item, index) => (
           <QueueRow
             key={item.id}
-            api={api}
+            scope={itemScope}
             queue={queue}
             item={item}
             index={index}
-            pipelines={pipelines}
-            parents={parents}
             now={now}
             editing={drafts[`edit:${item.id}`]}
             highlighted={highlight?.has(item.id) === true}

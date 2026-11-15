@@ -1,15 +1,16 @@
 import { GripVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { taskNumber } from '../../../shared/lib/format.ts';
-import type { PipelinesView, QueueItemView, QueueView } from '../../../shared/api/types.ts';
+import type { QueueItemView, QueueView } from '../../../shared/api/types.ts';
 import { TagChips } from '../../../shared/ui/feedback/TagChip.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
 import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import type { QueueDraft } from '../QueueForm.tsx';
-import { depth, type ParentChoice } from '../queueLinks.ts';
+import { depth } from '../queueLinks.ts';
+import type { ItemScope } from './itemScope.ts';
+import { ProjectLabel } from './ProjectLabel.tsx';
 import { itemLabel } from './itemText.ts';
 import { RowActions } from './RowActions.tsx';
 import { RowMeta, RowStatus } from './RowBadges.tsx';
@@ -18,12 +19,11 @@ import type { QueueDrag } from './useQueueDrag.ts';
 import type { useQueueActions } from './useQueueActions.ts';
 
 export type RowProps = {
-  api: Api;
+  scope: ItemScope;
+  /** The whole queue of the page: the order and the links of the tasks. */
   queue: QueueView;
   item: QueueItemView;
   index: number;
-  pipelines: PipelinesView | null;
-  parents: ParentChoice[];
   now: number;
   editing: QueueDraft | undefined;
   highlighted: boolean;
@@ -36,7 +36,7 @@ export type RowProps = {
 /** One item of the queue: its line, the buttons, and what hangs under it. */
 export function QueueRow(props: RowProps) {
   const { t } = useTranslation();
-  const { item, index, queue, drag, editing, onHighlight } = props;
+  const { item, index, queue, scope, drag, editing, onHighlight } = props;
   const level = depth(queue, item.id);
   const postponed = props.actions.pending[item.id] ?? item.postponed === true;
   const linked = drag.dragging === null && props.highlighted;
@@ -81,6 +81,7 @@ export function QueueRow(props: RowProps) {
           <title>{t('queue.list.drag')}</title>
         </GripVertical>
         <span className="w-5 text-muted-foreground tabular-nums">{index + 1}</span>
+        {scope.projectOf ? <ProjectLabel repository={scope.projectOf(item)} /> : null}
         <span className="font-mono text-xs text-muted-foreground">{taskNumber(item.number)}</span>
         <PipelineBadge id={item.pipeline} name={item.pipelineName} />
         <VariantBadge id={item.variant} name={item.variantName} />
@@ -89,17 +90,23 @@ export function QueueRow(props: RowProps) {
         </span>
         <TagChips tags={item.tags ?? []} />
         <RowStatus item={item} postponed={postponed} linked={linked} />
-        <RowMeta item={item} pipelines={props.pipelines} now={props.now} />
+        <RowMeta item={item} pipelines={scope.pipelinesOf(item)} now={props.now} />
         <RowActions
           item={item}
-          queue={queue}
+          queue={scope.queueOf(item)}
           editing={editing}
           postponed={postponed}
           actions={props.actions}
           onDraft={props.onDraft}
         />
       </div>
-      <RowDetails {...props} editing={editing} />
+      <RowDetails
+        scope={scope}
+        item={item}
+        editing={editing}
+        actions={props.actions}
+        onDraft={props.onDraft}
+      />
     </li>
   );
 }

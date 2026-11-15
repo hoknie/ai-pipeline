@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
 import type { QueueItemView, QueueView } from '../../../shared/api/types.ts';
+import type { ItemScope } from './itemScope.ts';
 import { moveId } from '../../../shared/lib/listOrder.ts';
 
 export type QueueNotice = {
@@ -13,7 +13,7 @@ export type QueueNotice = {
 
 /** The shown order of the items (own moves first, the queue's truth after) and moving an item. */
 export function useQueueOrder(
-  api: Api,
+  scope: ItemScope,
   queue: QueueView,
   onQueue: (queue: QueueView) => void,
   notice: QueueNotice,
@@ -40,7 +40,7 @@ export function useQueueOrder(
     notice.setMessage(null);
     inFlight.current = true;
     try {
-      onQueue(await api.queueEdit(id, { position }));
+      onQueue(await scope.apiOf(byId.get(id) as QueueItemView).queueEdit(id, { position }));
     } catch (failure) {
       notice.setMessage(t('queue.list.moveFailed', { error: (failure as Error).message }));
       void notice.refresh();

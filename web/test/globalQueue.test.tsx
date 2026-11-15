@@ -3,9 +3,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from './rend
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
+import { lineOf } from '../src/features/queue/global/asQueue.ts';
 import { applyEvent } from '../src/shared/api/runs/streamEvents.ts';
 import type { Api } from '../src/shared/api/api.ts';
-import type { GlobalQueueItemView, GlobalQueueView } from '../src/shared/api/types.ts';
+import type { GlobalQueueItemView, GlobalQueueView, QueueView } from '../src/shared/api/types.ts';
 
 import {
   FakeEventSource,
@@ -16,6 +17,7 @@ import {
   queueOf,
   repositoryView,
   runView,
+  tagView,
 } from './fixtures.ts';
 
 const APP = '/work/app';
@@ -46,6 +48,9 @@ function globalOf(overrides: Partial<GlobalQueueView> = {}): GlobalQueueView {
     ...overrides,
   } as unknown as GlobalQueueView;
 }
+
+/** The daemon answers an action of the global mode with the global queue. */
+const asAnswer = (view: GlobalQueueView) => view as unknown as QueueView;
 
 function mount(globalQueue: GlobalQueueView | null, api: Partial<Api> = {}) {
   const fake = fakeApi({ queue: vi.fn(async () => queueOf({ repository: APP })), ...api });
@@ -97,12 +102,41 @@ describe('page of the global queue', () => {
     expect(api.calls).toContainEqual(['queueEdit', APP]);
   });
 
-  it('sets the filter of projects only while the queue is stopped', async () => {
+  it('locks the filter fields of a running queue and says why', async () => {
     const settings = vi.fn(async () => queueOf());
     mount(globalOf({ status: 'running' }), { queueSettings: settings });
-    const block = within(await screen.findByRole('region', { name: 'Projects' }));
-    expect(block.getByText(/Stop the queue to change the filter/)).toBeTruthy();
+    const block = within(await screen.findByLabelText('take filter'));
+    fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
+    expect(await block.findByText(/Stop the queue to change the filter/)).toBeTruthy();
+    for (const name of ['Pipeline', 'Projects']) {
+      expect((block.getByRole('combobox', { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
     expect(settings).not.toHaveBeenCalled();
+  });
+
+  it('sets the filter of projects and of pipelines of a stopped queue', async () => {
+    const settings = vi.fn(async () => asAnswer(globalOf()));
+    mount(globalOf(), { queueSettings: settings });
+    const block = within(await screen.findByLabelText('take filter'));
+    fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
+    fireEvent.click(await block.findByRole('combobox', { name: 'Projects' }));
+    fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
+    await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { projects: [LIB] } }));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    fireEvent.click(await block.findByRole('combobox', { name: 'Pipeline' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'feature' }));
+    await waitFor(() =>
+      expect(settings).toHaveBeenCalledWith({ filter: { pipelines: ['feature'] } }),
+    );
+  });
+
+  it('offers a pipeline of several projects once', async () => {
+    mount(globalOf());
+    const block = within(await screen.findByLabelText('take filter'));
+    fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
+    fireEvent.click(await block.findByRole('combobox', { name: 'Pipeline' }));
+    await screen.findByRole('option', { name: 'feature' });
+    expect(screen.getAllByRole('option', { name: 'feature' })).toHaveLength(1);
   });
 
   it('starts and pauses the one queue', async () => {
@@ -135,6 +169,151 @@ describe('page of the global queue', () => {
     mount(globalOf());
     await screen.findByText('Global queue');
     expect(screen.getAllByLabelText('in the queue: 2').length).toBeGreaterThan(0);
+  });
+});
+
+describe('controls of the global queue', () => {
+  const row = async (id: string) =>
+    within(
+      (await screen.findAllByRole('listitem')).find((li) => li.getAttribute('data-id') === id)!,
+    );
+
+  it('loads the pipelines of every project through the project', async () => {
+    const api = mount(globalOf());
+    await screen.findByText('Global queue');
+    await waitFor(() => {
+      expect(api.calls).toContainEqual(['pipelines', APP]);
+      expect(api.calls).toContainEqual(['pipelines', LIB]);
+    });
+  });
+
+  it('gives a task of another project the buttons of a project queue', async () => {
+    const edit = vi.fn(async () => asAnswer(globalOf()));
+    const api = mount(globalOf(), { queueEdit: edit });
+    const lib = await row('ql');
+    for (const name of ['Edit', 'Postpone', 'Run now', 'Remove']) {
+      expect(lib.getByRole('button', { name })).toBeTruthy();
+    }
+    fireEvent.click(lib.getByRole('button', { name: 'Postpone' }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith('ql', { postponed: true }));
+    expect(api.calls).toContainEqual(['queueEdit', LIB]);
+  });
+
+  it('opens the edit form of a task with the tags of its project', async () => {
+    const tag = { ...tagView('Lib tag'), repository: LIB };
+    const tags = vi.fn(async () => [tag]);
+    const api = mount(globalOf(), { tags });
+    fireEvent.click((await row('ql')).getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeTruthy();
+    await waitFor(() => expect(api.calls).toContainEqual(['tags', LIB]));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Tags' }));
+    expect(await screen.findByRole('option', { name: 'Lib tag' })).toBeTruthy();
+  });
+
+  it('offers other tasks to wait for, but not the edited task itself', async () => {
+    mount(globalOf());
+    fireEvent.click((await row('ql')).getByRole('button', { name: 'Edit' }));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Waits for' }));
+    expect(await screen.findByRole('option', { name: /task of app/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /task of lib/ })).toBeNull();
+  });
+
+  it('saves the edit form through the project of the task', async () => {
+    const edit = vi.fn(async () => asAnswer(globalOf()));
+    const api = mount(globalOf(), { queueEdit: edit });
+    fireEvent.click((await row('ql')).getByRole('button', { name: 'Edit' }));
+    fireEvent.change(await screen.findByLabelText('Task text'), {
+      target: { value: 'changed text' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith('ql', expect.anything()));
+    expect(api.calls).toContainEqual(['queueEdit', LIB]);
+  });
+
+  it('runs and removes a task through its project', async () => {
+    const remove = vi.fn(async () => asAnswer(globalOf()));
+    const runNow = vi.fn(async () => ({
+      runId: 'run9',
+      number: 9,
+      branch: 'refs/aip/run9/run',
+      groups: [],
+      split: true,
+      warnings: [],
+    }));
+    const api = mount(globalOf(), { queueRemove: remove, queueRunNow: runNow });
+    const lib = await row('ql');
+    fireEvent.click(lib.getByRole('button', { name: 'Run now' }));
+    await waitFor(() => expect(runNow).toHaveBeenCalledWith('ql'));
+    expect(api.calls).toContainEqual(['queueRunNow', LIB]);
+    fireEvent.click((await row('ql')).getByRole('button', { name: 'Remove' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('ql'));
+    expect(api.calls).toContainEqual(['queueRemove', LIB]);
+  });
+
+  it('puts an answer of the global mode into the global queue, not into a project queue', async () => {
+    const answer = globalOf({ items: [globalItem('qz', 'answered', 1, LIB)] });
+    mount(globalOf(), { queueRemove: vi.fn(async () => answer as never) });
+    fireEvent.click((await row('ql')).getByRole('button', { name: 'Remove' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll('li[data-id]')].map((li) => li.getAttribute('data-id')),
+      ).toEqual(['qz']),
+    );
+  });
+
+  it('pauses a run and shows the free places', async () => {
+    const pause = vi.fn(async () => asAnswer(globalOf()));
+    mount(
+      globalOf({
+        status: 'running',
+        parallel: 3,
+        runs: [{ ...queueRun('r1', { title: 'lib run' }), repository: LIB }] as never,
+      }),
+      { pauseRun: pause as never },
+    );
+    const section = within(await screen.findByRole('region', { name: /running from the queue/i }));
+    expect(section.getAllByText('Free place')).toHaveLength(2);
+    fireEvent.click(section.getByRole('button', { name: 'Pause run' }));
+    await waitFor(() => expect(pause).toHaveBeenCalledWith('r1', LIB));
+  });
+
+  it('returns and dismisses a skipped run with the project of the run', async () => {
+    const skippedLib = globalOf({
+      skipped: [
+        { ...queueRun('s1', { title: 'skipped lib', state: 'failed' }), repository: LIB },
+      ] as never,
+    });
+    const back = vi.fn(async () => asAnswer(skippedLib));
+    const dismiss = vi.fn(async () => asAnswer(globalOf()));
+    mount(skippedLib, { queueReturn: back as never, queueDismiss: dismiss });
+    const skipped = within(await screen.findByRole('region', { name: 'skipped with a problem' }));
+    expect(skipped.getByText('skipped lib')).toBeTruthy();
+    fireEvent.click(skipped.getByRole('button', { name: 'Return to the queue' }));
+    await waitFor(() => expect(back).toHaveBeenCalledWith('s1', LIB));
+    fireEvent.click(skipped.getByRole('button', { name: 'Remove from list' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove from list' }));
+    await waitFor(() => expect(dismiss).toHaveBeenCalledWith('s1', LIB));
+  });
+});
+
+describe('line of a project in the global queue', () => {
+  it('holds only the tasks and runs of the project', () => {
+    const view = globalOf({
+      runs: [
+        { ...queueRun('r1'), repository: LIB },
+        { ...queueRun('r2'), repository: APP },
+      ] as never,
+    });
+    const line = lineOf(view, LIB);
+    expect(line.repository).toBe(LIB);
+    expect(line.items.map((item) => item.id)).toEqual(['ql']);
+    expect(line.runs.map((run) => run.id)).toEqual(['r1']);
+    expect(line.autoDeliver).toBeNull();
   });
 });
 

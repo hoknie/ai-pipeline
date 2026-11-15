@@ -2,13 +2,13 @@ import { useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
 import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import type { QueueItemView, QueueView } from '../../../shared/api/types.ts';
 import type { QueueDraft } from '../QueueForm.tsx';
 import { dependents, unmet } from '../queueLinks.ts';
 import { itemLabel } from './itemText.ts';
+import type { ItemScope } from './itemScope.ts';
 import type { QueueNotice } from './useQueueOrder.ts';
 
 type EditFields = Parameters<
@@ -55,8 +55,7 @@ async function confirmUnmet(confirm: Confirm, t: TFunction, item: QueueItemView)
 
 /** Removing, starting, postponing and editing an item; the failures go to the shared notice. */
 export function useQueueActions(
-  api: Api,
-  queue: QueueView,
+  scope: ItemScope,
   onQueue: (queue: QueueView) => void,
   onDraft: (key: string, draft: QueueDraft | null) => void,
   notice: QueueNotice,
@@ -73,7 +72,7 @@ export function useQueueActions(
   };
 
   const remove = async (item: QueueItemView) => {
-    const waiting = dependents(queue, item.id);
+    const waiting = dependents(scope.queueOf(item), item.id);
     const yes = await confirm({
       title: t('queue.list.removeTitle', { item: itemLabel(item, t) }),
       ...(waiting.length > 0
@@ -90,7 +89,7 @@ export function useQueueActions(
     if (!yes) return;
     setMessage(null);
     try {
-      onQueue(await api.queueRemove(item.id));
+      onQueue(await scope.apiOf(item).queueRemove(item.id));
       onDraft(`edit:${item.id}`, null);
       notifySuccess(t('queue.list.removed'));
     } catch (failure) {
@@ -102,7 +101,7 @@ export function useQueueActions(
     if (!(await confirmUnmet(confirm, t, item))) return;
     setMessage(null);
     try {
-      const created = await api.queueRunNow(item.id);
+      const created = await scope.apiOf(item).queueRunNow(item.id);
       setStarted({ item: item.id, runId: created.runId });
       notifySuccess(t('queue.list.runStarted'));
       onDraft(`edit:${item.id}`, null);
@@ -116,7 +115,7 @@ export function useQueueActions(
     setPending((current) => ({ ...current, [item.id]: postponed }));
     setMessage(null);
     try {
-      onQueue(await api.queueEdit(item.id, { postponed }));
+      onQueue(await scope.apiOf(item).queueEdit(item.id, { postponed }));
     } catch (failure) {
       fail(failure);
     } finally {
@@ -129,7 +128,7 @@ export function useQueueActions(
 
   const edit = async (item: QueueItemView, fields: EditFields) => {
     try {
-      const view = await api.queueEdit(item.id, editPayload(item, fields));
+      const view = await scope.apiOf(item).queueEdit(item.id, editPayload(item, fields));
       onQueue(view);
       onDraft(`edit:${item.id}`, null);
     } catch (failure) {
