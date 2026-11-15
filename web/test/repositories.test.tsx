@@ -56,6 +56,12 @@ describe('repositoryList, waitingByRepository, repositoryLabel', () => {
     entry('/work/home'),
   ];
 
+  it('never lists an undefined home repository', () => {
+    const list = repositoryList(undefined as never, registry);
+    expect(list).not.toContain(undefined);
+    expect(list).toHaveLength(registry.length);
+  });
+
   it('lists each repository once, home first, the rest by directory name', () => {
     expect(repositoryList('/work/home', registry)).toEqual([
       '/work/home',

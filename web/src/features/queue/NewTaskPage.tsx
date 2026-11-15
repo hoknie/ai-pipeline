@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
-import type { QueueView, RunView } from '../../shared/api/types.ts';
+import type { GlobalQueueView, QueueView, RunView } from '../../shared/api/types.ts';
 import { takeFocusRequest } from '../../shared/lib/browser/hotkeys.ts';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
@@ -23,13 +23,15 @@ type Props = {
   repositories: readonly string[];
   waiting: ReadonlyMap<string, number>;
   queues: ReadonlyMap<string, QueueView>;
+  /** The global queue in the global mode. */
+  globalQueue?: GlobalQueueView | null;
   runs?: RunView[];
   /** The repository the page opens on, when it differs from the panel's. */
   preset?: { repository: string; parent: string | null } | null;
   onPresetApplied?: () => void;
   draft: QueueDraft | undefined;
   onDraft: (draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   /** Leaves the page for the queue. */
   onLeave: () => void;
 };
@@ -80,7 +82,7 @@ export default function NewTaskPage(props: Props) {
               props.runs ?? [],
               (item) => itemLabel(item, t),
               undefined,
-              otherQueues(props.queues, repositories, target),
+              otherQueues(state.queues, repositories, target),
             )
           }
           pending={pipelines === null || (draft !== undefined && draftTarget !== target)}

@@ -22,6 +22,8 @@ export interface FilterOption {
   count?: number;
   /** Heading of the section of the list the option belongs to. */
   group?: string;
+  /** Text searched but not shown. */
+  keywords?: string;
   render?: ReactNode;
 }
 
@@ -37,7 +39,8 @@ export function visibleOptions(
       (option) =>
         needle === '' ||
         option.label.toLowerCase().includes(needle) ||
-        (option.hint ?? '').toLowerCase().includes(needle),
+        (option.hint ?? '').toLowerCase().includes(needle) ||
+        (option.keywords ?? '').toLowerCase().includes(needle),
     )
     .map((option, index) => ({ option, index }))
     .sort(

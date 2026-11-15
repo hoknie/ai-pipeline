@@ -1,6 +1,6 @@
 import type { Api } from '../api.ts';
 import { createFallback, listen, type EventSourceFactory } from '../stream.ts';
-import type { RunView } from '../types.ts';
+import type { GlobalQueueView, QueueView, RunView } from '../types.ts';
 import { applyEvent, type RunsSetters } from './streamEvents.ts';
 import { mergeRuns, putQueue, putRun, replaceTags, sameRepositories } from './runsState.ts';
 
@@ -35,8 +35,13 @@ function refreshOpened({ api, set, refs, closed }: Connection, listed: RunView[]
 
 async function loadQueue({ api, set, closed }: Connection): Promise<void> {
   try {
-    const view = await api.queue();
+    // in the global mode the daemon answers with the global queue, which has no repository
+    const view = (await api.queue()) as QueueView | GlobalQueueView;
     if (closed()) return;
+    if (view.scope === 'global') {
+      set.setGlobalQueue(view);
+      return;
+    }
     set.setHome(view.repository);
     set.setQueues((current) => putQueue(current, view));
   } catch {

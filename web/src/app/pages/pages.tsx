@@ -75,6 +75,7 @@ export function QueueRoute(props: {
     repositories: string[];
     waiting: React.ComponentProps<typeof NewTaskDialog>['waiting'];
     queues: ReadonlyMap<string, QueueView>;
+    globalQueue: GlobalQueueView | null;
     preset: { repository: string; parent: string | null } | null;
     onPresetApplied: () => void;
   };
@@ -92,6 +93,7 @@ export function QueueRoute(props: {
           repositories={page.repositories}
           waiting={page.waiting}
           queues={page.queues}
+          globalQueue={page.globalQueue}
           runs={common.runs}
           preset={page.preset}
           onPresetApplied={page.onPresetApplied}

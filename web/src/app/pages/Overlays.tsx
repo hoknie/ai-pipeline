@@ -31,7 +31,7 @@ export function Overlays({ panel }: { panel: PanelData }) {
         onRoute={props.onRoute}
         onShortcuts={() => props.onShortcuts(true)}
       />
-      {queue !== null && selected !== null && newTask.opened ? (
+      {(queue !== null || state.globalQueue !== null) && selected !== null && newTask.opened ? (
         <NewTaskHost
           api={props.api}
           pageKey={selected}
@@ -39,6 +39,7 @@ export function Overlays({ panel }: { panel: PanelData }) {
           repositories={state.repositories}
           waiting={props.waiting}
           queues={state.queues}
+          globalQueue={state.globalQueue}
           runs={runs}
           preset={newTask.preset}
           onPresetApplied={() => newTask.setPreset(null)}

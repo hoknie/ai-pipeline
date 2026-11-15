@@ -10,7 +10,7 @@ import type { RunsState } from './useRunsStore.ts';
 /** The chosen repository and its queue; a queue the daemon has not sent yet is asked for. */
 export function useSelection(
   api: Api,
-  { home, registry, queues }: RunsState,
+  { home, registry, queues, globalQueue }: RunsState,
   setQueues: RunsSetters['setQueues'],
   wanted: string | null,
 ): { repositories: string[]; selected: string | null; queue: QueueView | null } {
@@ -20,12 +20,19 @@ export function useSelection(
     return repositoryList(home, registry);
   }, [home, registry]);
   // The home repository is the server's default; a disabled one gives way to the latest enabled.
+  // The global mode has no home repository: the latest enabled project stands in for it.
   const fallback =
-    home === null || repositories.includes(home) ? home : (latestEnabled(registry) ?? home);
+    home === null
+      ? globalQueue !== null
+        ? latestEnabled(registry)
+        : null
+      : repositories.includes(home)
+        ? home
+        : (latestEnabled(registry) ?? home);
   const selected = wanted !== null && repositories.includes(wanted) ? wanted : fallback;
   const queue = selected ? (queues.get(selected) ?? null) : null;
   // The daemon answers with an empty queue for a repository that has none yet.
-  const missing = selected !== null && selected !== home && queue === null;
+  const missing = selected !== null && selected !== home && queue === null && globalQueue === null;
   useEffect(() => {
     if (!missing || selected === null) return;
     let closed = false;

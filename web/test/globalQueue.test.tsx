@@ -261,6 +261,19 @@ describe('page of the global queue', () => {
     ).toBeNull();
   });
 
+  it('finds a tag by the name of its project', async () => {
+    mount(globalOf(), {}, [
+      { ...tagView('app-only'), id: 'c', repository: APP },
+      { ...tagView('lib-only'), id: 'd', repository: LIB },
+    ]);
+    const block = within(await screen.findByLabelText('take filter'));
+    fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
+    fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
+    fireEvent.change(await screen.findByPlaceholderText(/search/i), { target: { value: 'lib' } });
+    await waitFor(() => expect(screen.queryByRole('option', { name: /^app-only/ })).toBeNull());
+    expect(screen.getByRole('option', { name: /^lib-only/ })).toBeTruthy();
+  });
+
   it('keeps out-of-scope criteria removable and rolls back a failed project change', async () => {
     const settings = vi.fn(async () => {
       throw new Error('save failed');
@@ -334,11 +347,10 @@ describe('page of the global queue', () => {
       );
       if (app && lib) {
         const shared = screen.getByRole('option', { name: /^shared/i });
-        expect(
-          within(screen.getByRole('group', { name: 'app · lib' })).getByRole('option', {
-            name: /^shared/i,
-          }),
-        ).toBe(shared);
+        expect(screen.queryByRole('group', { name: 'app · lib' })).toBeNull();
+        expect(within(shared).queryByText('app · lib')).toBeNull();
+        expect(within(shared).getAllByText('app')).toHaveLength(1);
+        expect(within(shared).getAllByText('lib')).toHaveLength(1);
         expect(within(shared).getByText('app').className).toContain('bg-[#fee2e2]');
         expect(within(shared).getByText('lib').className).toContain('bg-[#dbeafe]');
         expect(shared.querySelector('a')).toBeNull();
@@ -528,6 +540,91 @@ describe('line of a project in the global queue', () => {
     expect(line.items.map((item) => item.id)).toEqual(['ql']);
     expect(line.runs.map((run) => run.id)).toEqual(['r1']);
     expect(line.autoDeliver).toBeNull();
+  });
+});
+
+describe('new task in the global mode', () => {
+  /** The daemon answers `queue` with the global queue, which has no repository. */
+  const globalApi = (extra: Partial<Api> = {}) => ({
+    queue: vi.fn(async () => asAnswer(globalOf())),
+    ...extra,
+  });
+  const openDialog = async () => {
+    const button = within(screen.getAllByRole('banner')[0]!).getByRole<HTMLButtonElement>(
+      'button',
+      { name: 'New task' },
+    );
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    return screen.findByRole('dialog', { name: 'New task' });
+  };
+
+  it('opens the dialog although the answer of the queue has no repository', async () => {
+    mount(globalOf(), globalApi());
+    const dialog = await openDialog();
+    const field = within(dialog).getByRole('combobox', { name: 'Repository' });
+    expect(field.textContent).toMatch(/app|lib/);
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe(
+        'feature',
+      ),
+    );
+  });
+
+  it('adds a task of the chosen project and shows it in the global queue', async () => {
+    const added = globalOf({
+      items: [
+        globalItem('qa', 'task of app', 1, APP),
+        globalItem('ql', 'task of lib', 2, LIB),
+        globalItem('qn', 'new one', 3, LIB),
+      ],
+      item: 'qn',
+    } as never);
+    const add = vi.fn(async () => asAnswer(added) as QueueView & { item: string });
+    const fake = mount(globalOf(), globalApi({ queueAdd: add }));
+    const dialog = await openDialog();
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Repository' }));
+    fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe(
+        'feature',
+      ),
+    );
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'new one' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(add).toHaveBeenCalled());
+    expect(fake.calls).toContainEqual(['queueAdd', LIB]);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
+    const rows = within(await screen.findByRole('list', { name: /tasks|queue/i })).getAllByRole(
+      'listitem',
+    );
+    expect(rows.map((row) => row.getAttribute('data-id'))).toEqual(['qa', 'ql', 'qn']);
+    expect(rows[2]!.querySelector(`[data-project="${LIB}"]`)).not.toBeNull();
+  });
+
+  it('offers the tasks of all projects under «Waits for»', async () => {
+    mount(globalOf(), globalApi());
+    const dialog = await openDialog();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe(
+        'feature',
+      ),
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    fireEvent.click(await within(dialog).findByRole('combobox', { name: 'Linked task' }));
+    expect(await screen.findByRole('option', { name: /task of app/ })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /task of lib/ })).toBeTruthy();
+  });
+
+  it('moves the form to its own page', async () => {
+    mount(globalOf(), globalApi());
+    const dialog = await openDialog();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Expand to page' }));
+    await waitFor(() => expect(window.location.hash).toBe('#queue/new'));
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    expect(screen.queryByRole('status', { name: /loading/i })).toBeNull();
   });
 });
 

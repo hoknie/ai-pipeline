@@ -79,11 +79,11 @@ function optionsForTags(grouped: Map<string, TagEntry[]>, selected: string[], un
     return {
       value,
       label: value,
-      group: names,
-      hint: names,
+      keywords: names,
       render: (
-        <span>
-          {value} {labeledMarkers(entries)}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate">{value}</span>
+          <span className="flex flex-wrap gap-1">{labeledMarkers(entries)}</span>
         </span>
       ),
     };

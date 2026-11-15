@@ -44,7 +44,7 @@ export function repositoryList(home: string | null, registry: readonly Repositor
     registry.filter((entry) => !enabledOf(entry)).map((entry) => entry.path),
   );
   const others = new Set(registry.filter(enabledOf).map((entry) => entry.path));
-  const first = home !== null && !disabled.has(home) ? home : null;
+  const first = typeof home === 'string' && !disabled.has(home) ? home : null;
   if (first !== null) others.delete(first);
   const sorted = [...others].sort(byLabel);
   return first === null ? sorted : [first, ...sorted];

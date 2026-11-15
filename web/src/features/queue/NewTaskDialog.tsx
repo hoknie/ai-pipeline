@@ -2,7 +2,7 @@ import { Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../shared/api/api.ts';
-import type { QueueView, RunView } from '../../shared/api/types.ts';
+import type { GlobalQueueView, QueueView, RunView } from '../../shared/api/types.ts';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../shared/ui/feedback/tooltip.tsx';
 import { Dialog, DialogContent, DialogTitle } from '../../shared/ui/overlays/dialog.tsx';
@@ -29,6 +29,8 @@ type Props = {
   waiting: ReadonlyMap<string, number>;
   /** The queues of all repositories the panel knows. */
   queues: ReadonlyMap<string, QueueView>;
+  /** The global queue in the global mode. */
+  globalQueue?: GlobalQueueView | null;
   /** All runs of the panel: the parent choices come from them. */
   runs?: RunView[];
   /** A subtask: the repository to open on and the run to start as the parent. */
@@ -39,7 +41,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   draft: QueueDraft | undefined;
   onDraft: (draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   /** Moves the form to its own page; the repository of the dialog goes with it. */
   onExpand?: (repository: string) => void;
 };
@@ -115,7 +117,7 @@ export default function NewTaskDialog(props: Props) {
                   props.runs ?? [],
                   (item) => itemLabel(item, t),
                   undefined,
-                  otherQueues(props.queues, props.repositories, target),
+                  otherQueues(state.queues, props.repositories, target),
                 )
               : []
           }

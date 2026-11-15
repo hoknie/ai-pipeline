@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 
 import type { Api } from '../../shared/api/api.ts';
-import type { QueueView, RunView } from '../../shared/api/types.ts';
+import type { GlobalQueueView, QueueView, RunView } from '../../shared/api/types.ts';
 import type { QueueDraft } from '../../features/queue/index.ts';
 import { NewTaskDialog } from './pages.tsx';
 
@@ -13,6 +13,7 @@ export function NewTaskHost(props: {
   repositories: string[];
   waiting: React.ComponentProps<typeof NewTaskDialog>['waiting'];
   queues: ReadonlyMap<string, QueueView>;
+  globalQueue: GlobalQueueView | null;
   runs: RunView[];
   preset: { repository: string; parent: string | null } | null;
   onPresetApplied: () => void;
@@ -20,7 +21,7 @@ export function NewTaskHost(props: {
   onOpenChange: (open: boolean) => void;
   draft: QueueDraft | undefined;
   onDraft: (draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   onExpand: (repository: string) => void;
 }) {
   const { pageKey, ...rest } = props;

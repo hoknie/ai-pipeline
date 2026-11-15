@@ -20,6 +20,7 @@ function newTaskPageProps(panel: PanelData) {
     repositories: state.repositories,
     waiting: panel.waitingRepositories,
     queues: state.queues,
+    globalQueue: state.globalQueue,
     preset: chrome.newTask.pagePreset,
     onPresetApplied: () => chrome.newTask.setPagePreset(null),
   };
@@ -59,7 +60,8 @@ function commonProps(panel: PanelData) {
  */
 function runLinkProps(panel: PanelData, t: TFunction) {
   return {
-    onSubtask: panel.state.queue ? panel.chrome.newTask.openSubtask : undefined,
+    onSubtask:
+      panel.state.queue || panel.state.globalQueue ? panel.chrome.newTask.openSubtask : undefined,
     linkChoices: (run: RunView) => {
       // a project whose queue is not loaded (or has no tasks) still lets a run change its links
       const own = panel.state.queues.get(run.repository) ?? {

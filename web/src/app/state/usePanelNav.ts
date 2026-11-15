@@ -35,11 +35,12 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
       (allProjects ? queuedInProjects(panel) : (queue?.items.length ?? 0)),
     onPalette: () => chrome.setPalette(true),
     // on the page of a new task the button moves the focus to its form instead of opening the dialog
-    onNewTask: queue
-      ? route.view === 'queue' && route.run === 'new'
-        ? () => requestFocus('new-task-page')
-        : chrome.newTask.openNewTask
-      : undefined,
+    onNewTask:
+      queue || panel.state.globalQueue
+        ? route.view === 'queue' && route.run === 'new'
+          ? () => requestFocus('new-task-page')
+          : chrome.newTask.openNewTask
+        : undefined,
     notifications: panel.notifications,
   };
 }

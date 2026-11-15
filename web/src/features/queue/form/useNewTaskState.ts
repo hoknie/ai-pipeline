@@ -5,9 +5,16 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../../../shared/api/api.ts';
 import { taskNumber } from '../../../shared/lib/format.ts';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
-import type { PipelinesView, QueueFields, QueueView, RunView } from '../../../shared/api/types.ts';
+import type {
+  GlobalQueueView,
+  PipelinesView,
+  QueueFields,
+  QueueView,
+  RunView,
+} from '../../../shared/api/types.ts';
 import { emptyDraft, retarget, type QueueDraft } from '../draft.ts';
 import { useOpenTarget, usePresetDraft } from './usePresetDraft.ts';
+import { useTargetQueue, useTargetQueues } from './useTargetQueue.ts';
 import { commonPipelines, defaultSharedTag, projectsFields } from './sharedTag.ts';
 
 function stepIds(pipeline: { steps: { id: string }[] } | undefined): string[] {
@@ -61,27 +68,6 @@ function useRetargetedDraft(input: {
       repository: target,
     });
   }, [open, draft, pipelines, draftTarget, target, clearTags, onDraft]);
-}
-
-/** A repository without a queue in the snapshot: load it once. */
-function useTargetQueue(
-  scoped: Api,
-  queueKnown: boolean,
-  onQueue: (queue: QueueView) => void,
-): void {
-  useEffect(() => {
-    if (queueKnown) return;
-    let closed = false;
-    scoped
-      .queue()
-      .then((view) => {
-        if (!closed) onQueue(view);
-      })
-      .catch(() => undefined);
-    return () => {
-      closed = true;
-    };
-  }, [scoped, queueKnown, onQueue]);
 }
 
 /** The task in several projects: the projects in the order of the chain and the shared fields. */
@@ -168,7 +154,7 @@ function useTaskSubmit(input: {
   multi: ReturnType<typeof useMultiProjects>;
   sharedTag: string;
   target: string;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   onDraft: (draft: QueueDraft | null) => void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -215,17 +201,21 @@ export function useNewTaskState(props: {
   api: Api;
   selected: string;
   runs?: RunView[];
+  repositories: readonly string[];
   queues: ReadonlyMap<string, QueueView>;
+  /** The global queue in the global mode: the form reads the line of the project from it. */
+  globalQueue?: GlobalQueueView | null;
   preset?: { repository: string; parent: string | null } | null;
   onPresetApplied?: () => void;
   open: boolean;
   draft: QueueDraft | undefined;
   onDraft: (draft: QueueDraft | null) => void;
-  onQueue: (queue: QueueView) => void;
+  onQueue: (queue: QueueView | GlobalQueueView) => void;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { api, selected, queues, open, draft, onDraft, onQueue } = props;
-  const { preset = null, onPresetApplied = () => undefined } = props;
+  const { api, selected, open, draft, onDraft, onQueue } = props;
+  const { preset = null, onPresetApplied = () => undefined, globalQueue = null } = props;
+  const queues = useTargetQueues(props.queues, globalQueue, props.repositories);
   // the choice is local to the dialog: it neither moves the panel nor outlives the opening
   const [target, setTarget] = useState(preset?.repository ?? selected);
   const scoped = useMemo(() => api.forRepository(target), [api, target]);
@@ -247,8 +237,7 @@ export function useNewTaskState(props: {
 
   useOpenTarget(open, selected, preset, setTarget, multi.reset);
 
-  const queueKnown = queue !== undefined;
-  useTargetQueue(scoped, queueKnown, onQueue);
+  useTargetQueue(scoped, queue !== undefined || globalQueue !== null, onQueue);
 
   const draftTarget = draft ? (draft.repository ?? selected) : null;
   useRetargetedDraft({
@@ -278,6 +267,7 @@ export function useNewTaskState(props: {
     scoped,
     pipelines,
     queue,
+    queues,
     current,
     mode,
     draftTarget,
