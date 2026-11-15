@@ -38,7 +38,6 @@ describe('time in the transcript', () => {
       verdict: 'done',
       inputTokens: 1,
       outputTokens: 2,
-      costUsd: null,
       at: AT + 3000,
     },
   ];

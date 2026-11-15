@@ -109,13 +109,13 @@ describe('AttemptHistoryRepository', () => {
   it('preserves nullable values, zero usage and result fallbacks', () => {
     const { store, repository, runId } = historyRun();
     insertAttempt(store, runId, 1, {
-      usage: JSON.stringify({ inputTokens: 0, outputTokens: 0, costUsd: null }),
+      usage: JSON.stringify({ inputTokens: 0, outputTokens: 0 }),
     });
     insertAttempt(store, runId, 2, { status: 'running', usage: null });
     const items = repository.page({ group: '_repair', limit: 20 }).items;
     expect(items.find((item) => item.attemptSeq === 1)).toMatchObject({
       result: 'unknown',
-      usage: { inputTokens: 0, outputTokens: 0, costUsd: null },
+      usage: { inputTokens: 0, outputTokens: 0 },
     });
     expect(items.find((item) => item.attemptSeq === 2)).toMatchObject({
       result: 'running',

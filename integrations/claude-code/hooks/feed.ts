@@ -302,8 +302,7 @@ export function formatDuration(milliseconds: number): string {
 
 export function formatUsage(usage: AipUsage | null): string {
   if (!usage) return 'no usage yet';
-  const tokens = `${usage.inputTokens} in / ${usage.outputTokens} out`;
-  return usage.costUsd === null ? tokens : `$${usage.costUsd.toFixed(4)} · ${tokens}`;
+  return `${usage.inputTokens} in / ${usage.outputTokens} out`;
 }
 
 export type ApplyDescription = { text: string; plain: string; isError: boolean };
@@ -546,10 +545,6 @@ export function formatAge(milliseconds: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function costOf(usage: AipUsage | null): string | null {
-  return usage && usage.costUsd !== null ? `$${usage.costUsd.toFixed(2)}` : null;
-}
-
 export type PaneOptions = { compact: boolean; now: number };
 
 export type RunRow = {
@@ -563,7 +558,6 @@ export type RunRow = {
   done: number;
   total: number;
   age: string | null;
-  cost: string | null;
 };
 
 export type GroupCard = {
@@ -589,7 +583,6 @@ export type RunCard = {
   style: StatusStyle;
   diff: string | null;
   delivery: string;
-  cost: string;
   actions: RunAction[];
   groups: GroupCard[];
 };
@@ -696,7 +689,6 @@ export function paneView(
         bar: progressBar(progress.done, progress.total),
         ...progress,
         age: options.compact ? null : formatAge(options.now - run.createdAt),
-        cost: options.compact ? null : costOf(run.usage),
       };
     }),
     hiddenRuns: Math.max(0, sorted.length - shown.length),
@@ -712,7 +704,6 @@ export function paneView(
           delivery: `delivered ${current.delivery.applied}/${current.delivery.merged}${
             current.delivery.failed > 0 ? ` · ${current.delivery.failed} failed` : ''
           }${current.delivery.inProgress ? ' · in progress' : ''}`,
-          cost: formatUsage(current.usage),
           actions: runActions(current),
           groups: runGroups(current).map(groupCard),
         }
@@ -759,7 +750,6 @@ function runLine(run: AipRun): string {
     `\`${run.id}\``,
     `${progress.done}/${progress.total}`,
     formatDiff(run.diff),
-    costOf(run.usage),
   ].filter((part): part is string => part !== null);
   return `- ${parts.join(' · ')}`;
 }

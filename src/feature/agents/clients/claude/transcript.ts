@@ -83,7 +83,6 @@ function resultEntry(event: JsonObject, at: number | null): TranscriptEntry {
     verdict: null,
     inputTokens: isJsonObject(event.usage) ? input : null,
     outputTokens: typeof usage.output_tokens === 'number' ? usage.output_tokens : null,
-    costUsd: typeof event.total_cost_usd === 'number' ? event.total_cost_usd : null,
     at,
   };
 }

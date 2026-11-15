@@ -55,7 +55,7 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8 - (7 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9 - (7 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -126,7 +126,7 @@ describe('runs', () => {
     finish(state, 'done', { summary: 'план' });
     step(state);
     finish(state, 'rejected', { slug: 'gruppa-2', feedback: 'нет' });
-    state.groups[0]!.attempts.at(-1)!.usage = { inputTokens: 10, outputTokens: 5, costUsd: 0.01 };
+    state.groups[0]!.attempts.at(-1)!.usage = { inputTokens: 10, outputTokens: 5 };
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)).toEqual(state);
   });
@@ -172,7 +172,7 @@ describe('runs', () => {
         kind: 'run_named',
         title: 'Флаг --json',
         name: 'add-json-flag',
-        usage: { inputTokens: 30, outputTokens: 10, costUsd: 0.002 },
+        usage: { inputTokens: 30, outputTokens: 10 },
       },
       60,
     );
@@ -180,7 +180,7 @@ describe('runs', () => {
     expect(store.runs.loadRun(state.run.id)?.run).toMatchObject({
       title: 'Флаг --json',
       name: 'add-json-flag',
-      namingUsage: { inputTokens: 30, outputTokens: 10, costUsd: 0.002 },
+      namingUsage: { inputTokens: 30, outputTokens: 10 },
     });
   });
 
@@ -333,7 +333,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-32)).toContain('denials_json');
+    expect(MIGRATIONS.at(-33)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -357,7 +357,7 @@ describe('refused tool calls', () => {
     const reopened = openStorage(databasePath(directory));
     expect(reopened.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-31)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-32)).toContain('outside_changes_json');
   });
 });
 

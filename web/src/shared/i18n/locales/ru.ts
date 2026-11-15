@@ -73,16 +73,10 @@ export const ru: Dictionary = {
     tiles: {
       tokens: 'Токены',
       tokensSplit: 'вход {{input}} · выход {{output}}',
-      cost: 'Стоимость',
       agent: 'Работа агентов',
       tasks: 'Задачи',
       outcomes: 'завершены {{finished}} · с ошибкой {{failed}} · отменены {{cancelled}}',
-      noCost_one: 'без стоимости: {{count}} попытка',
-      noCost_few: 'без стоимости: {{count}} попытки',
-      noCost_many: 'без стоимости: {{count}} попыток',
-      noCost_other: 'без стоимости: {{count}} попытки',
       perTaskTokens: 'Токены на задачу',
-      perTaskCost: 'Стоимость на задачу',
       perTaskAgent: 'Работа агентов на задачу',
       median: 'медиана {{value}}',
     },
@@ -98,7 +92,6 @@ export const ru: Dictionary = {
       splits: { projects: 'Проекты', models: 'Модели' },
       metrics: {
         tokens: 'Токены',
-        cost: 'Стоимость',
         agent: 'Время агентов',
         tasks: 'Задачи',
       },
@@ -356,7 +349,6 @@ export const ru: Dictionary = {
         path: 'Путь',
         time: 'Время',
         tokens: 'Токены',
-        cost: 'Стоимость',
       },
       tags: 'Теги запуска',
       label: 'запуск',
@@ -1850,10 +1842,6 @@ export const ru: Dictionary = {
         label: 'Собирать статистику',
         hint: 'Записывает расход каждой завершённой попытки в журнал статистики.',
       },
-      stats_show_cost: {
-        label: 'Показывать стоимость',
-        hint: 'Стоимость видна в отчётах и в панели; выключенная скрывается везде.',
-      },
       stats_exclude: {
         label: 'Исключённые проекты',
         hint: 'Проекты, которые не собираются и не показываются в отчётах.',
@@ -1911,7 +1899,7 @@ export const ru: Dictionary = {
       model: 'Модель',
       started: 'Начало',
       result: 'Результат',
-      usage: 'Вход / выход · USD',
+      usage: 'Вход / выход',
       results: {
         running: 'Выполняется',
         done: 'Готово',

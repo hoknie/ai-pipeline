@@ -9,6 +9,7 @@ import {
 import { type FieldError } from '../../types/errors.ts';
 import { defaultStats, type StatsSettings } from '../../types/settings.ts';
 
+/** `show_cost` is accepted and ignored: older files keep it, and a wrong section turns collection off. */
 const STATS_KEYS = ['enabled', 'exclude', 'show_cost'];
 
 /** Checks `swarm.stats`; fills `stats` with the valid fields. */
@@ -19,7 +20,6 @@ export function checkStats(ctx: ValidateContext, value: unknown, stats: StatsSet
     const path = join('swarm.stats', key);
     if (key === 'enabled') stats.enabled = readBoolean(ctx, field, path) ?? stats.enabled;
     if (key === 'exclude') stats.exclude = readStrings(ctx, field, path);
-    if (key === 'show_cost') stats.showCost = readBoolean(ctx, field, path) ?? stats.showCost;
   }
 }
 

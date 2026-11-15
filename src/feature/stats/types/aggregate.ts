@@ -2,13 +2,11 @@ import { COMMAND_RUNTIME } from '../../runs/types/index.ts';
 import { type AttemptRecord, type TaskOutcome, type TaskRecord } from './records.ts';
 import {
   type BreakdownRow,
-  type CostStat,
   type PerTask,
   type ProjectRow,
   type SeriesDay,
   type SeriesModel,
   type Stat,
-  type StatsReport,
   type Totals,
   UNKNOWN_MODEL,
 } from './report.ts';
@@ -42,9 +40,6 @@ const agentMsOf = (records: AttemptRecord[]): number =>
 
 const durationOf = (record: AttemptRecord): number => record.durationMs;
 
-const costOf = (records: AttemptRecord[]): number =>
-  sum(records.map((record) => record.costUsd ?? 0));
-
 /** Sums of the attempts and the tasks of one scope. */
 export function totalsOf(attempts: AttemptRecord[], tasks: TaskRecord[]): Totals {
   const inputTokens = sum(attempts.map((record) => record.inputTokens));
@@ -55,8 +50,6 @@ export function totalsOf(attempts: AttemptRecord[], tasks: TaskRecord[]): Totals
     inputTokens,
     outputTokens,
     tokens: inputTokens + outputTokens,
-    costUsd: costOf(attempts),
-    attemptsWithoutCost: attempts.filter((record) => record.costUsd === null).length,
     agentMs: agentMsOf(attempts),
     commandMs: sum(
       attempts
@@ -73,10 +66,8 @@ export function perTaskOf(attempts: AttemptRecord[], tasks: TaskRecord[]): PerTa
   for (const record of attempts)
     byRun.set(record.runId, [...(byRun.get(record.runId) ?? []), record]);
   const rows = tasks.map((task) => byRun.get(task.runId) ?? []);
-  const costs = rows.map(costOf);
   return {
     tokens: stat(rows.map((records) => sum(records.map(tokensOf)))),
-    costUsd: { mean: mean(costs), median: median(costs) },
     agentMs: stat(rows.map(agentMsOf)),
     wallMs: stat(tasks.map((task) => task.wallMs)),
   };
@@ -135,7 +126,6 @@ export function breakdownRows(
       inputTokens,
       outputTokens,
       tokens: inputTokens + outputTokens,
-      costUsd: costOf(records),
       agentMs: agentMsOf(records),
       tokensPerAttempt: (inputTokens + outputTokens) / records.length,
     };
@@ -169,7 +159,6 @@ function modelsOf(records: AttemptRecord[]): SeriesModel[] {
     .map(([model, own]) => ({
       model,
       tokens: sum(own.map(tokensOf)),
-      costUsd: costOf(own),
       agentMs: agentMsOf(own),
       attempts: own.length,
     }));
@@ -199,7 +188,6 @@ export function dailySeries(
       day,
       start: cursor,
       tokens: sum(records.map(tokensOf)),
-      costUsd: costOf(records),
       agentMs: agentMsOf(records),
       tasks: finished.length,
       projects: repositories.sort().map((repository) => {
@@ -207,7 +195,6 @@ export function dailySeries(
         return {
           repository,
           tokens: sum(own.map(tokensOf)),
-          costUsd: costOf(own),
           agentMs: agentMsOf(own),
           tasks: finished.filter((task) => task.repository === repository).length,
         };
@@ -217,31 +204,4 @@ export function dailySeries(
     cursor = nextMidnight(cursor);
   }
   return days;
-}
-
-/** The report with every cost field null: tokens and times stay. */
-export function maskCosts(report: StatsReport): StatsReport {
-  const noCost = (): CostStat => ({ mean: null, median: null });
-  const totals = (value: Totals): Totals => ({ ...value, costUsd: null });
-  const perTask = (value: PerTask): PerTask => ({ ...value, costUsd: noCost() });
-  const row = <T extends { costUsd: number | null }>(value: T): T => ({ ...value, costUsd: null });
-  return {
-    ...report,
-    totals: totals(report.totals),
-    perTask: perTask(report.perTask),
-    projects: report.projects.map((project) => ({
-      ...project,
-      totals: totals(project.totals),
-      perTask: perTask(project.perTask),
-    })),
-    bySpecialist: report.bySpecialist.map(row),
-    byModel: report.byModel.map(row),
-    byPipeline: report.byPipeline.map(row),
-    byRuntime: report.byRuntime.map(row),
-    series: report.series.map((day) => ({
-      ...row(day),
-      projects: day.projects.map(row),
-      models: day.models.map(row),
-    })),
-  };
 }

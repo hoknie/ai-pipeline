@@ -1933,7 +1933,7 @@ describe('statistics settings', () => {
     return api;
   };
 
-  it('shows the form with collection and cost on and no excluded projects by default', async () => {
+  it('shows the form with collection on and no excluded projects by default', async () => {
     showStats();
     const enabled = await screen.findByTestId('setting-stats.enabled');
     expect(
@@ -1941,10 +1941,7 @@ describe('statistics settings', () => {
         .getByRole('switch', { name: 'Collect statistics' })
         .getAttribute('aria-checked'),
     ).toBe('true');
-    const cost = screen.getByTestId('setting-stats.show_cost');
-    expect(
-      within(cost).getByRole('switch', { name: 'Show cost' }).getAttribute('aria-checked'),
-    ).toBe('true');
+    expect(screen.queryByTestId('setting-stats.show_cost')).toBeNull();
     const exclude = screen.getByTestId('setting-stats.exclude');
     expect(exclude.textContent).toContain('default');
     expect(within(exclude).queryAllByRole('button', { name: /^Remove/ })).toHaveLength(0);

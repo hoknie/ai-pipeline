@@ -80,7 +80,7 @@ export interface GroupRow {
   diffRevision: string | null;
   /** The group waits in `queued` until its runtime's usage limit resets (ms); null otherwise. */
   limitUntil: number | null;
-  /** Tokens and cost of all attempts of the group so far, live ones included. */
+  /** Tokens of all attempts of the group so far, live ones included. */
   usage: Usage | null;
   /** Answers accepted for the group, oldest first. */
   decisions: ViewDecision[];

@@ -7,12 +7,7 @@ import {
   statsClearSchema,
   statsReportSchema,
 } from '../../src/presentation/ipc/contract/index.ts';
-import {
-  formatCost,
-  formatSpan,
-  formatStats,
-  formatTokens,
-} from '../../src/presentation/format/index.ts';
+import { formatSpan, formatStats, formatTokens } from '../../src/presentation/format/index.ts';
 import { statsView } from '../../src/presentation/ipc/views/stats.ts';
 import { attemptRecord, taskRecord } from '../feature/stats/helpers.ts';
 import {
@@ -62,7 +57,6 @@ function sampleReport(): StatsReport {
       runId: 'a',
       inputTokens: 12_000,
       outputTokens: 3_000,
-      costUsd: 0.42,
       durationMs: 90 * 60_000,
     }),
     attemptRecord({
@@ -70,7 +64,6 @@ function sampleReport(): StatsReport {
       repository: '/work/lib',
       inputTokens: 2_500_000,
       outputTokens: 0,
-      costUsd: null,
     }),
   ];
   const tasks = [
@@ -78,7 +71,7 @@ function sampleReport(): StatsReport {
     taskRecord({ runId: 'b', repository: '/work/lib', outcome: 'failed' }),
   ];
   return {
-    settings: { enabled: true, exclude: [], showCost: true, backfilledAt: 1 },
+    settings: { enabled: true, exclude: [], backfilledAt: 1 },
     since: null,
     until: null,
     repository: null,
@@ -106,7 +99,7 @@ describe('statistics view and text', () => {
     expect(statsReportSchema.parse(JSON.parse(JSON.stringify(view)))).toEqual(report);
   });
 
-  it('formats tokens, spans and costs', () => {
+  it('formats tokens and spans', () => {
     expect(formatTokens(950)).toBe('950');
     expect(formatTokens(12_500)).toBe('12.5k');
     expect(formatTokens(3_200_000)).toBe('3.2M');
@@ -115,8 +108,6 @@ describe('statistics view and text', () => {
     expect(formatSpan(45 * 60_000)).toBe('45m');
     expect(formatSpan(2 * 3_600_000)).toBe('2h');
     expect(formatSpan(30_000)).toBe('30s');
-    expect(formatCost(0.42)).toBe('$0.42');
-    expect(formatCost(null)).toBe('—');
   });
 
   it('prints the totals, a row per project and the tables', () => {
@@ -132,16 +123,16 @@ describe('statistics view and text', () => {
       expect(text).toMatch(new RegExp(`${title}\\s+attempts`));
     }
     expect(text).not.toContain('Collection is off');
+    expect(text).not.toMatch(/cost|\$/i);
   });
 
-  it('starts with a note when collection is off and shows dashes without a cost', () => {
+  it('starts with a note when collection is off', () => {
     const report = sampleReport();
     const text = formatStats({
       ...report,
       settings: { ...report.settings, enabled: false },
-      totals: { ...report.totals, costUsd: null },
     });
     expect(text.split('\n')[0]).toContain('Collection is off');
-    expect(text).toContain('cost —');
+    expect(text).not.toMatch(/cost/i);
   });
 });

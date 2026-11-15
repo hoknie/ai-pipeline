@@ -62,7 +62,7 @@ describe('usage statistics of the daemon', () => {
     const h = await start();
     await finishedRun(h);
     const view = await reportWithTasks(h, 1);
-    expect(view.settings).toMatchObject({ enabled: true, exclude: [], showCost: true });
+    expect(view.settings).toMatchObject({ enabled: true, exclude: [] });
     expect(view.settings.backfilledAt).not.toBeNull();
     const coder = view.bySpecialist.find((row) => row.key === 'coder');
     expect(coder).toMatchObject({ attempts: 1, inputTokens: 100, outputTokens: 20 });
@@ -104,13 +104,14 @@ describe('usage statistics of the daemon', () => {
     expect(coderAttempts(shown)).toBe(2);
   });
 
-  it('hides the cost with show_cost false and keeps the tokens', async () => {
+  it('ignores show_cost and keeps collecting', async () => {
     const h = await start();
     await finishedRun(h);
     await reportWithTasks(h, 1);
     await settings(h, 'stats: { show_cost: false }\n');
     const view = await report(h);
-    expect(view.totals.costUsd).toBeNull();
+    expect(view.settings.enabled).toBe(true);
+    expect(JSON.stringify(view)).not.toMatch(/cost/i);
     expect(view.totals.tokens).toBeGreaterThan(0);
   });
 

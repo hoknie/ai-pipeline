@@ -94,7 +94,6 @@ describe('naming answers', () => {
           verdict: null,
           inputTokens: 1,
           outputTokens: 1,
-          costUsd: 0,
         },
       ]),
     ).toBe('final');

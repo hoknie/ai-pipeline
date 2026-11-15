@@ -40,7 +40,7 @@ function where(scope: Scope): { sql: string; values: (string | number)[] } {
 }
 
 const ATTEMPT_COLUMNS = `run_id, group_slug, seq, kind, repository, pipeline, step_id, specialist, runtime,
-  model, status, reason, started_at, finished_at, duration_ms, input_tokens, output_tokens, cost_usd`;
+  model, status, reason, started_at, finished_at, duration_ms, input_tokens, output_tokens`;
 
 function attemptOf(row: Row): AttemptRecord {
   return {
@@ -61,7 +61,6 @@ function attemptOf(row: Row): AttemptRecord {
     durationMs: Number(row.duration_ms),
     inputTokens: Number(row.input_tokens),
     outputTokens: Number(row.output_tokens),
-    costUsd: row.cost_usd === null ? null : Number(row.cost_usd),
   };
 }
 

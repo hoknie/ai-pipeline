@@ -15,11 +15,6 @@ export function duration(milliseconds: number): string {
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
 }
 
-export function cost(usage: { costUsd: number | null } | null | undefined): string {
-  if (!usage || usage.costUsd === null || usage.costUsd === 0) return '';
-  return `$${usage.costUsd.toFixed(2)}`;
-}
-
 export function tokens(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;

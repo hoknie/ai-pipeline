@@ -4,7 +4,6 @@ import {
   formatDuration,
   formatRunHref,
   formatTime,
-  formatUsd,
 } from '../src/features/settings/observers/history/format.ts';
 import { observerHistory, type ObserverHistoryPage } from '../src/shared/api/observerHistoryApi.ts';
 import { ApiError } from '../src/shared/api/http.ts';
@@ -17,10 +16,7 @@ describe('observer history formatting', () => {
     expect(formatRunHref('run/one')).toContain('run%2Fone');
     expect(formatRunHref('run/one')).toContain('_repair');
   });
-  it('distinguishes unknown and zero metrics and formats precise time and duration', () => {
-    expect(formatUsd(null)).toBe('—');
-    expect(formatUsd(0)).toBe('$0.00');
-    expect(formatUsd(0.000001)).not.toBe('—');
+  it('formats precise time and duration', () => {
     expect(formatTime(0)).toBeTruthy();
     expect(formatDuration(1000, null, 61000)).toContain('1m');
     expect(formatDuration(1000, 61000, 999999)).not.toContain('…');
@@ -45,7 +41,7 @@ describe('observer history api client', () => {
         verdict: 'done',
         result: 'done',
         failureKind: null,
-        usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+        usage: { inputTokens: 0, outputTokens: 0 },
       },
     ],
     nextCursor: 'cur1',
@@ -79,7 +75,7 @@ describe('observer history api client', () => {
     );
     expect(page.items[0]?.model).toBeNull();
     expect(page.items[0]?.usage?.inputTokens).toBe(0);
-    expect(page.items[0]?.usage?.costUsd).toBe(0);
+    expect(page.items[0]?.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
     vi.unstubAllGlobals();
   });
 
@@ -109,9 +105,7 @@ describe('observer history api client', () => {
       { ...samplePage, asOf: Number.MAX_SAFE_INTEGER },
       {
         ...samplePage,
-        items: [
-          { ...samplePage.items[0]!, usage: { inputTokens: -1, outputTokens: 0, costUsd: null } },
-        ],
+        items: [{ ...samplePage.items[0]!, usage: { inputTokens: -1, outputTokens: 0 } }],
       },
       { ...samplePage, items: [{ ...samplePage.items[0]!, result: 'wat' }] },
       { ...samplePage, projects: [42] },

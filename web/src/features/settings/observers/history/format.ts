@@ -22,10 +22,3 @@ export const formatDuration = (start: number, finish: number | null, now: number
   }
   return finish === null ? `${str} · …` : str;
 };
-
-export const formatUsd = (value: number | null) => {
-  if (value === null) return '—';
-  if (value === 0) return '$0.00';
-  if (value < 0.01) return `$${value.toPrecision(3)}`;
-  return `$${value.toFixed(2)}`;
-};

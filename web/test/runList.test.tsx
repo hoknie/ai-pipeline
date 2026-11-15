@@ -52,7 +52,7 @@ const full = () =>
     name: 'login-form',
     tags: [tagView('auth')],
     progress: { done: 2, total: 4 },
-    usage: { inputTokens: 12_300, outputTokens: 1_100, costUsd: 0.42 },
+    usage: { inputTokens: 12_300, outputTokens: 1_100 },
     diff: null,
     liveDiff: { files: 2, added: 367, removed: 0 },
   });
@@ -61,7 +61,8 @@ describe('run row layout', () => {
   it('shows the lines in order', () => {
     const row = show(full());
     const text = row.textContent!;
-    const order = ['#7', 'login-form', 'feature', 'auth', '50%', '12.3k/1.1k', '$0.42', '+367 −0'];
+    expect(text).not.toContain('$');
+    const order = ['#7', 'login-form', 'feature', 'auth', '50%', '12.3k/1.1k', '+367 −0'];
     const at = order.map((part) => text.indexOf(part));
     expect(at.every((index) => index >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);

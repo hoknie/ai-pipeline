@@ -21,8 +21,6 @@ export interface AttemptRecord {
   durationMs: number;
   inputTokens: number;
   outputTokens: number;
-  /** USD; null when the runtime did not report it. */
-  costUsd: number | null;
 }
 
 export type NamingRecord = AttemptRecord & { kind: 'naming' };

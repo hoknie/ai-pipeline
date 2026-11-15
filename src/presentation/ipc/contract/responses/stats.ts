@@ -9,17 +9,14 @@ const totals = z.object({
   inputTokens: number,
   outputTokens: number,
   tokens: number,
-  costUsd: nullable,
-  attemptsWithoutCost: number,
   agentMs: number,
   commandMs: number,
   wallMs: number,
 });
 
 const stat = z.object({ mean: number, median: number });
-const costStat = z.object({ mean: nullable, median: nullable });
 
-const perTask = z.object({ tokens: stat, costUsd: costStat, agentMs: stat, wallMs: stat });
+const perTask = z.object({ tokens: stat, agentMs: stat, wallMs: stat });
 
 const breakdown = z.object({
   key: z.string(),
@@ -28,7 +25,6 @@ const breakdown = z.object({
   inputTokens: number,
   outputTokens: number,
   tokens: number,
-  costUsd: nullable,
   agentMs: number,
   tokensPerAttempt: number,
 });
@@ -36,7 +32,6 @@ const breakdown = z.object({
 const seriesProject = z.object({
   repository: z.string(),
   tokens: number,
-  costUsd: nullable,
   agentMs: number,
   tasks: number,
 });
@@ -44,7 +39,6 @@ const seriesProject = z.object({
 const seriesModel = z.object({
   model: z.string(),
   tokens: number,
-  costUsd: nullable,
   agentMs: number,
   attempts: number,
 });
@@ -54,7 +48,6 @@ export const statsReportSchema = z.object({
   settings: z.object({
     enabled: z.boolean(),
     exclude: z.array(z.string()),
-    showCost: z.boolean(),
     backfilledAt: nullable,
   }),
   since: nullable,
@@ -73,7 +66,6 @@ export const statsReportSchema = z.object({
       day: z.string(),
       start: number,
       tokens: number,
-      costUsd: nullable,
       agentMs: number,
       tasks: number,
       projects: z.array(seriesProject),

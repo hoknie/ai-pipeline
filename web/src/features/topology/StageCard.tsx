@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '../../shared/lib/browser/cn.ts';
-import { cost, usageText } from '../../shared/lib/format.ts';
+import { usageText } from '../../shared/lib/format.ts';
 import { StatusBadge } from '../../shared/ui/feedback/StatusBadge.tsx';
 import { Card } from '../../shared/ui/layout/card.tsx';
 import type { StageData, StageNode } from './topologyLayout.ts';
@@ -63,12 +63,7 @@ function StageLines({ data, testId }: { data: StageData; testId: string }) {
 function StageLoad({ data, testId }: { data: StageData; testId: string }) {
   const { t } = useTranslation();
   const usageLine =
-    [
-      usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 }),
-      cost({ costUsd: data.costUsd }),
-    ]
-      .filter(Boolean)
-      .join(' · ') || '—';
+    usageText({ inputTokens: data.inputTokens ?? 0, outputTokens: data.outputTokens ?? 0 }) || '—';
   return (
     <>
       {data.busy && (data.busy.running > 0 || data.busy.max !== null) ? (

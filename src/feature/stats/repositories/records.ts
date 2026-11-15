@@ -19,8 +19,8 @@ export class StatsRecordRepository {
     const statement = this.database.prepare(
       `INSERT OR IGNORE INTO stats_attempts (run_id, group_slug, seq, kind, repository, pipeline, step_id,
          specialist, runtime, model, status, reason, started_at, finished_at, duration_ms,
-         input_tokens, output_tokens, cost_usd)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         input_tokens, output_tokens)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     let added = 0;
     for (const record of records) {
@@ -42,7 +42,6 @@ export class StatsRecordRepository {
         record.durationMs,
         record.inputTokens,
         record.outputTokens,
-        record.costUsd,
       );
       added += Number(result.changes);
     }

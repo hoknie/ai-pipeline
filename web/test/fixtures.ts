@@ -75,7 +75,7 @@ export function topologyOf(overrides: Partial<Topology> = {}): Topology {
       step('code', 'coder', {
         groups: [{ slug: 'login', title: 'Вход', status: 'running' }],
         attempts: 2,
-        usage: { inputTokens: 10, outputTokens: 1, costUsd: 0.3 },
+        usage: { inputTokens: 10, outputTokens: 1 },
       }),
       step('review', 'reviewer', {
         onReject: { goto: 'code', maxRounds: 3 },
@@ -178,7 +178,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     counts: 'running 1',
     total: 1,
     progress: { done: 0, total: 1 },
-    usage: { inputTokens: 1000, outputTokens: 100, costUsd: 0.42 },
+    usage: { inputTokens: 1000, outputTokens: 100 },
     split: null,
     delivery: { applied: 0, merged: 0, failed: 0, inProgress: false, finishedAt: null },
     resolver: null,
@@ -587,7 +587,6 @@ const SETTING_SPECS: SettingSpec[] = [
   ['queue.scope', 'choice', 'project', { options: ['project', 'global'], globalOnly: true }],
   ['queue.max', 'integer', 5, { range: [1, 32], globalOnly: true }],
   ['stats.enabled', 'boolean', true, { globalOnly: true }],
-  ['stats.show_cost', 'boolean', true, { globalOnly: true }],
   ['stats.exclude', 'strings', [], { globalOnly: true }],
   ['runtimes.claude.enabled', 'boolean', false, { globalOnly: true }],
   ['runtimes.claude.command', 'string', 'claude', { globalOnly: true }],
@@ -756,7 +755,6 @@ export function configView(overrides: Partial<ConfigEditorResponse> = {}): Confi
 
 const NO_PER_TASK = {
   tokens: { mean: 0, median: 0 },
-  costUsd: { mean: 0, median: 0 },
   agentMs: { mean: 0, median: 0 },
   wallMs: { mean: 0, median: 0 },
 };
@@ -764,7 +762,7 @@ const NO_PER_TASK = {
 /** An empty report of the statistics: nothing in the period, collection on. */
 export function statsReportView(overrides: Partial<StatsReportView> = {}): StatsReportView {
   return {
-    settings: { enabled: true, exclude: [], showCost: true, backfilledAt: null },
+    settings: { enabled: true, exclude: [], backfilledAt: null },
     since: null,
     until: null,
     repository: null,
@@ -774,8 +772,6 @@ export function statsReportView(overrides: Partial<StatsReportView> = {}): Stats
       inputTokens: 0,
       outputTokens: 0,
       tokens: 0,
-      costUsd: 0,
-      attemptsWithoutCost: 0,
       agentMs: 0,
       commandMs: 0,
       wallMs: 0,

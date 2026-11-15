@@ -47,7 +47,6 @@ function stepFinishEntry(part: JsonObject, at: number | null): TranscriptEntry {
     verdict: null,
     inputTokens: typeof tokens.input === 'number' ? tokens.input : null,
     outputTokens: typeof tokens.output === 'number' ? tokens.output : null,
-    costUsd: typeof part.cost === 'number' ? part.cost : null,
     at,
   };
 }

@@ -3,7 +3,7 @@ export { formatAddedToProjects, formatQueue, formatQueues, formatRepositories } 
 export { formatRun, formatRunCreated, formatRunList, formatRunQueued, waitNote } from './runs.ts';
 export * from './style.ts';
 export { pipelineLabel, table, taskNumber } from './table.ts';
-export { formatCost, formatTokens, formatUsage } from './numbers.ts';
+export { formatTokens, formatUsage } from './numbers.ts';
 export { formatSpan, formatStats } from './stats.ts';
 export { filterByTags, formatTagLabels, formatTagList } from './tags.ts';
 export { type HintAction, hintCommand, hintLine, runHints } from './hints.ts';

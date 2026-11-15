@@ -318,12 +318,10 @@ export interface StatsSettings {
   enabled: boolean;
   /** Project paths whose usage is not recorded and not reported. */
   exclude: string[];
-  /** Reports show the cost of attempts. */
-  showCost: boolean;
 }
 
 export function defaultStats(): StatsSettings {
-  return { enabled: true, exclude: [], showCost: true };
+  return { enabled: true, exclude: [] };
 }
 
 export const QUEUE_SCOPES = ['project', 'global'] as const;

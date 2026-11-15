@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { StatsReportView } from '../../shared/api/types.ts';
 import { Card } from '../../shared/ui/layout/card.tsx';
-import { compactNumber, durationText, money } from './statsView.ts';
+import { compactNumber, durationText } from './statsView.ts';
 
 function Tile({
   label,
@@ -33,7 +33,6 @@ export function KpiTiles({ report }: { report: StatsReportView }) {
   const { t, i18n } = useTranslation();
   const { totals, perTask, outcomes } = report;
   const exact = (value: number) => value.toLocaleString(i18n.language);
-  const showCost = totals.costUsd !== null;
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -47,19 +46,12 @@ export function KpiTiles({ report }: { report: StatsReportView }) {
             output: compactNumber(totals.outputTokens),
           })}
         </Tile>
-        {totals.costUsd === null ? null : (
-          <Tile label={t('stats.tiles.cost')} value={money(totals.costUsd)}>
-            {totals.attemptsWithoutCost > 0
-              ? t('stats.tiles.noCost', { count: totals.attemptsWithoutCost })
-              : null}
-          </Tile>
-        )}
         <Tile label={t('stats.tiles.agent')} value={durationText(totals.agentMs, t)} />
         <Tile label={t('stats.tiles.tasks')} value={String(totals.tasks)}>
           {t('stats.tiles.outcomes', outcomes)}
         </Tile>
       </div>
-      <div className={`grid grid-cols-2 gap-3 ${showCost ? 'xl:grid-cols-3' : 'xl:grid-cols-2'}`}>
+      <div className="grid grid-cols-2 gap-3">
         <Tile
           label={t('stats.tiles.perTaskTokens')}
           value={compactNumber(perTask.tokens.mean)}
@@ -67,13 +59,6 @@ export function KpiTiles({ report }: { report: StatsReportView }) {
         >
           {t('stats.tiles.median', { value: compactNumber(perTask.tokens.median) })}
         </Tile>
-        {showCost && perTask.costUsd.mean !== null ? (
-          <Tile label={t('stats.tiles.perTaskCost')} value={money(perTask.costUsd.mean)}>
-            {perTask.costUsd.median === null
-              ? null
-              : t('stats.tiles.median', { value: money(perTask.costUsd.median) })}
-          </Tile>
-        ) : null}
         <Tile label={t('stats.tiles.perTaskAgent')} value={durationText(perTask.agentMs.mean, t)}>
           {t('stats.tiles.median', { value: durationText(perTask.agentMs.median, t) })}
         </Tile>

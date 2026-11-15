@@ -48,8 +48,8 @@ export function settle(
   return state;
 }
 
-export function usage(input: number, output: number, costUsd: number | null = null): Usage {
-  return { inputTokens: input, outputTokens: output, costUsd };
+export function usage(input: number, output: number): Usage {
+  return { inputTokens: input, outputTokens: output };
 }
 
 let counter = 0;
@@ -74,7 +74,6 @@ export function attemptRecord(overrides: Partial<AttemptRecord> = {}): AttemptRe
     durationMs: 1000,
     inputTokens: 100,
     outputTokens: 50,
-    costUsd: 0.1,
     ...overrides,
   };
 }

@@ -7,7 +7,7 @@ import type { Usage } from '../../../src/feature/agents/types/index.ts';
 
 import { group, run, runningAttempt, step } from './helpers.ts';
 
-const live: Usage = { inputTokens: 1200, outputTokens: 300, costUsd: null };
+const live: Usage = { inputTokens: 1200, outputTokens: 300 };
 const exitOf = (usage: Usage | null, failure = null) => ({
   sessionId: null,
   usage,
@@ -87,7 +87,7 @@ describe('attempt_exited and usage', () => {
       { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
       2000,
     );
-    const final = { inputTokens: 900, outputTokens: 90, costUsd: 0.5 };
+    const final = { inputTokens: 900, outputTokens: 90 };
     transition(
       state,
       { kind: 'attempt_exited', group: 'gruppa-1', seq: 1, exit: exitOf(final) },
@@ -168,7 +168,7 @@ describe('sums with a running attempt', () => {
         kind: 'attempt_exited',
         group: 'gruppa-1',
         seq: 1,
-        exit: exitOf({ inputTokens: 1000, outputTokens: 200, costUsd: 0 }),
+        exit: exitOf({ inputTokens: 1000, outputTokens: 200 }),
       },
       10,
     );
@@ -190,7 +190,7 @@ describe('sums with a running attempt', () => {
           {
             group: '_repair',
             seq: 1,
-            usage: { inputTokens: 500, outputTokens: 50, costUsd: 0.25 },
+            usage: { inputTokens: 500, outputTokens: 50 },
           },
         ],
       },
@@ -199,7 +199,6 @@ describe('sums with a running attempt', () => {
     expect(summarize(state).usage).toEqual({
       inputTokens: 1500,
       outputTokens: 250,
-      costUsd: 0.25,
     });
   });
 });

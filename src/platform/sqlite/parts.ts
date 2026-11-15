@@ -2,7 +2,7 @@ import { ATTACHMENTS_MIGRATION } from './attachments-migration.ts';
 
 export { STATS_MIGRATION } from './stats-migration.ts';
 
-/** The migrations after the usage journal: the queue filter, pipeline variants, attachments. */
+/** The migrations after the usage journal: the queue filter, pipeline variants, attachments, the removal of the cost. */
 export const LATER_MIGRATIONS: string[] = [
   `ALTER TABLE queues ADD COLUMN filter_json TEXT NOT NULL DEFAULT '{"pipelines":[],"tags":[]}'`,
   `ALTER TABLE runs ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'; ALTER TABLE queue_items ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'`,
@@ -28,5 +28,10 @@ export const LATER_MIGRATIONS: string[] = [
   );
   INSERT INTO global_queue (id) VALUES (1);
   ALTER TABLE queue_items ADD COLUMN global_position INTEGER;
+  `,
+  `
+  ALTER TABLE stats_attempts DROP COLUMN cost_usd;
+  UPDATE attempts SET usage_json = json_remove(usage_json, '$.costUsd') WHERE usage_json IS NOT NULL;
+  UPDATE runs SET naming_usage_json = json_remove(naming_usage_json, '$.costUsd') WHERE naming_usage_json IS NOT NULL;
   `,
 ];

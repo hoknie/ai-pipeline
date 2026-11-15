@@ -15,7 +15,6 @@ import {
   metricsFor,
   modelLabel,
   modelOrder,
-  money,
   SPLITS,
   type Metric,
   type Split,
@@ -73,7 +72,7 @@ export function DailyChart({ report }: { report: StatsReportView }) {
   const { t, i18n } = useTranslation();
   const [chosen, setChosen] = useState<Metric>('tokens');
   const [split, setSplit] = useState<Split>('projects');
-  const metrics = metricsFor(split, report.totals.costUsd !== null);
+  const metrics = metricsFor(split);
   const metric = metrics.includes(chosen) ? chosen : 'tokens';
 
   const keys =
@@ -96,11 +95,9 @@ export function DailyChart({ report }: { report: StatsReportView }) {
   const format = (value: number) =>
     metric === 'tokens'
       ? compactNumber(value)
-      : metric === 'cost'
-        ? money(value)
-        : metric === 'agent'
-          ? durationText(value, t)
-          : String(Math.round(value));
+      : metric === 'agent'
+        ? durationText(value, t)
+        : String(Math.round(value));
   const name = t(`stats.daily.metrics.${metric}` as never);
   const labelKey = split === 'models' ? 'stats.daily.chartLabelModels' : 'stats.daily.chartLabel';
   return (

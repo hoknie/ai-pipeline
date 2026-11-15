@@ -1179,13 +1179,13 @@ describe('aip web', () => {
       seq: number;
       cursor: number;
       running: boolean;
-      entries: { kind: string; verdict?: string; costUsd?: number }[];
+      entries: { kind: string; verdict?: string }[];
     };
     expect(transcript).toMatchObject({ seq: 1, running: false });
     expect(transcript.entries.find((entry) => entry.kind === 'result')).toMatchObject({
       verdict: 'done',
-      costUsd: 0.01,
     });
+    expect(JSON.stringify(transcript.entries)).not.toContain('costUsd');
     const rest = await fetch(`${path}?seq=1&after=${transcript.cursor}`, { headers: authed(web) });
     expect(((await rest.json()) as { entries: unknown[] }).entries).toEqual([]);
     expect((await fetch(`${path}?after=-1`, { headers: authed(web) })).status).toBe(400);

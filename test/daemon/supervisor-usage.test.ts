@@ -17,7 +17,7 @@ import type { OutputParser } from '../../src/feature/agents/types/index.ts';
 function summing(): OutputParser {
   let total: number | null = null;
   const usage = (): Usage | null =>
-    total === null ? null : { inputTokens: total, outputTokens: 0, costUsd: null };
+    total === null ? null : { inputTokens: total, outputTokens: 0 };
   return {
     push(line) {
       const value = Number(line);

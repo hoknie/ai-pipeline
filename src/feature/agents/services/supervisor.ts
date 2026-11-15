@@ -103,8 +103,7 @@ function readOutput(
       usage !== null &&
       (reported === null ||
         reported.inputTokens !== usage.inputTokens ||
-        reported.outputTokens !== usage.outputTokens ||
-        reported.costUsd !== usage.costUsd)
+        reported.outputTokens !== usage.outputTokens)
     ) {
       reported = usage;
       options.onUsage(usage);

@@ -101,7 +101,7 @@ export interface QueueRunView {
   problem: { group: string | null; reason: ProblemReason } | null;
   /** The latest moment a group of the run waits for its usage limit to reset; null when none waits. */
   limitUntil: number | null;
-  /** Tokens and cost of the run so far, live attempts included; null before any usage. */
+  /** Tokens of the run so far, live attempts included; null before any usage. */
   usage: Usage | null;
 }
 

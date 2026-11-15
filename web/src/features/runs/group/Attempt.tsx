@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
-import { clockSeconds, cost, dateTime, duration, tokens } from '../../../shared/lib/format.ts';
+import { clockSeconds, dateTime, duration, tokens } from '../../../shared/lib/format.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { statusTone, type Tone } from '../../../shared/lib/status.ts';
 import type { AttemptView, TranscriptEntry } from '../../../shared/api/types.ts';

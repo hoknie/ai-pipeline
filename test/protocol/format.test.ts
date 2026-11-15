@@ -91,14 +91,14 @@ describe('text for people', () => {
     const state = run(1);
     step(state, 1000);
     finish(state, 'done', { summary: 'план готов', now: 4000 });
-    state.groups[0]!.attempts[0]!.usage = { inputTokens: 10, outputTokens: 2, costUsd: 0.5 };
+    state.groups[0]!.attempts[0]!.usage = { inputTokens: 10, outputTokens: 2 };
     const text = formatGroup(
       groupView(state, state.groups[0]!, '/w/gruppa-1', { seq: 1, lines: ['line'] }, 5000),
     );
     expect(text).toContain('Group gruppa-1 (Группа 1) · queued · run run000000001');
     expect(text).toContain('Ref: refs/aip/run000000001/groups/gruppa-1');
     expect(text).toContain(
-      '#1 Планировщик r1 · plan (claude) · finished done · 3s · 10 in / 2 out · $0.5000',
+      '#1 Планировщик r1 · plan (claude) · finished done · 3s · 10 in / 2 out',
     );
     expect(text).toContain('summary: план готов');
     expect(text).toContain('Log of attempt #1:\n  line');
@@ -773,7 +773,7 @@ describe('live usage in text', () => {
           {
             group: 'gruppa-1',
             seq: 1,
-            usage: { inputTokens: 1200, outputTokens: 300, costUsd: null },
+            usage: { inputTokens: 1200, outputTokens: 300 },
           },
         ],
       },

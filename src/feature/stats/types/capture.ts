@@ -42,7 +42,6 @@ export function recordsOf(state: RunState): RunRecords {
         durationMs: Math.max(0, attempt.finishedAt - attempt.startedAt),
         inputTokens: attempt.usage?.inputTokens ?? 0,
         outputTokens: attempt.usage?.outputTokens ?? 0,
-        costUsd: attempt.usage?.costUsd ?? null,
       });
     }
   }
@@ -70,7 +69,6 @@ function namingRecord(state: RunState): NamingRecord {
     durationMs: 0,
     inputTokens: usage?.inputTokens ?? 0,
     outputTokens: usage?.outputTokens ?? 0,
-    costUsd: usage?.costUsd ?? null,
   };
 }
 

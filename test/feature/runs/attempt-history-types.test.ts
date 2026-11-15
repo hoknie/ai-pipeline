@@ -29,11 +29,11 @@ describe('attempt history types helpers', () => {
   });
 
   it('keeps unknown and zero values distinct in the structural contract', () => {
-    const usage: Usage = { inputTokens: 0, outputTokens: 0, costUsd: null };
-    expect(usage).toEqual({ inputTokens: 0, outputTokens: 0, costUsd: null });
+    const usage: Usage = { inputTokens: 0, outputTokens: 0 };
+    expect(usage).toEqual({ inputTokens: 0, outputTokens: 0 });
     const item = { model: null, usage } as Pick<AttemptHistoryItem, 'model' | 'usage'>;
     expect(item.model).toBeNull();
     expect(item.usage?.inputTokens).toBe(0);
-    expect(item.usage?.costUsd).toBeNull();
+    expect(item.usage).not.toHaveProperty('costUsd');
   });
 });

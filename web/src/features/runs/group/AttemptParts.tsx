@@ -1,7 +1,7 @@
 import { ChevronRight, MessageSquare, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { clockSeconds, cost, dateTime, duration, tokens } from '../../../shared/lib/format.ts';
+import { clockSeconds, dateTime, duration, tokens } from '../../../shared/lib/format.ts';
 import type { AttemptView, TranscriptEntry } from '../../../shared/api/types.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
@@ -63,7 +63,7 @@ export function AttemptHeading({ attempt, verdict }: { attempt: AttemptView; ver
       <StatusBadge status={verdict} />
       <span className="text-xs text-muted-foreground tabular-nums">
         {duration(attempt.durationMs)} · {tokens(attempt.usage?.inputTokens)}/
-        {tokens(attempt.usage?.outputTokens)} · {cost(attempt.usage) || '—'}
+        {tokens(attempt.usage?.outputTokens)}
       </span>
       {denials.length > 0 ? (
         <span className="text-xs text-status-warn" title={t('runs.attempt.denialsTitle')}>

@@ -1,6 +1,6 @@
 import type { StatsReportView } from '../ipc/contract/index.ts';
 import { type Style, plainStyle } from './style.ts';
-import { formatCost, formatTokens } from './numbers.ts';
+import { formatTokens } from './numbers.ts';
 import { addedAt, table } from './table.ts';
 
 type Breakdown = StatsReportView['bySpecialist'][number];
@@ -28,11 +28,10 @@ function breakdown(title: string, rows: Breakdown[], style: Style): string[] {
     row.key,
     String(row.attempts),
     formatTokens(row.tokens),
-    formatCost(row.costUsd),
     formatSpan(row.agentMs),
     formatTokens(row.tokensPerAttempt),
   ]);
-  const header = [title, 'attempts', 'tokens', 'cost', 'agent time', 'tokens/attempt'];
+  const header = [title, 'attempts', 'tokens', 'agent time', 'tokens/attempt'];
   return ['', table([header, ...body], style)];
 }
 
@@ -42,12 +41,11 @@ function projects(report: StatsReportView, style: Style): string[] {
     project.repository,
     String(project.totals.tasks),
     formatTokens(project.totals.tokens),
-    formatCost(project.totals.costUsd),
     formatSpan(project.totals.agentMs),
     formatTokens(project.perTask.tokens.mean),
     formatSpan(project.perTask.wallMs.mean),
   ]);
-  const header = ['project', 'tasks', 'tokens', 'cost', 'agent time', 'tokens/task', 'time/task'];
+  const header = ['project', 'tasks', 'tokens', 'agent time', 'tokens/task', 'time/task'];
   return ['', table([header, ...rows], style)];
 }
 
@@ -61,14 +59,13 @@ export function formatStats(report: StatsReportView, style: Style = plainStyle):
   const { totals, perTask, outcomes } = report;
   lines.push(
     `Tasks ${totals.tasks} (finished ${outcomes.finished}, failed ${outcomes.failed}, cancelled ${outcomes.cancelled}) · attempts ${totals.attempts}`,
-    `Tokens ${formatTokens(totals.tokens)} (in ${formatTokens(totals.inputTokens)}, out ${formatTokens(totals.outputTokens)}) · cost ${formatCost(totals.costUsd)}`,
+    `Tokens ${formatTokens(totals.tokens)} (in ${formatTokens(totals.inputTokens)}, out ${formatTokens(totals.outputTokens)})`,
     `Agent time ${formatSpan(totals.agentMs)} · commands ${formatSpan(totals.commandMs)} · task time ${formatSpan(totals.wallMs)}`,
     '',
     table(
       [
         ['per task', 'mean', 'median'],
         ['tokens', formatTokens(perTask.tokens.mean), formatTokens(perTask.tokens.median)],
-        ['cost', formatCost(perTask.costUsd.mean), formatCost(perTask.costUsd.median)],
         ['agent time', formatSpan(perTask.agentMs.mean), formatSpan(perTask.agentMs.median)],
         ['task time', formatSpan(perTask.wallMs.mean), formatSpan(perTask.wallMs.median)],
       ],

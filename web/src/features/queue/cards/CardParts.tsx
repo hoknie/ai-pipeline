@@ -2,7 +2,7 @@ import { Truck } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import { clock, cost, duration, usageText } from '../../../shared/lib/format.ts';
+import { clock, duration, usageText } from '../../../shared/lib/format.ts';
 import { waitText } from '../../../shared/lib/status.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import type { QueueRunView } from '../../../shared/api/types.ts';
@@ -80,7 +80,6 @@ export function Usage({ run, now }: { run: QueueRunView; now: number }) {
     <div className="flex flex-wrap items-center gap-x-3 text-muted-foreground">
       <span>{t('format.running', { duration: duration(now - run.createdAt) })}</span>
       {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
-      {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
       {run.limitUntil !== null ? (
         <span className="text-status-warn">
           {t('runs.group.limitUntil', { time: clock(run.limitUntil) })}

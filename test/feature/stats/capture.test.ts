@@ -6,7 +6,7 @@ import { runWith, settle, usage } from './helpers.ts';
 describe('records of a saved run', () => {
   it('leaves a running attempt out', () => {
     const state = runWith('r1', [
-      { startedAt: 1000, finishedAt: 2000, usage: usage(10, 5, 0.1) },
+      { startedAt: 1000, finishedAt: 2000, usage: usage(10, 5) },
       { startedAt: 3000, finishedAt: null, usage: usage(50_000, 0) },
     ]);
     const { attempts, task } = recordsOf(state);
@@ -21,7 +21,7 @@ describe('records of a saved run', () => {
         {
           startedAt: 1000,
           finishedAt: 91_000,
-          usage: usage(12_000, 3_000, 0.42),
+          usage: usage(12_000, 3_000),
           model: 'sonnet',
           specialist: 'coder',
         },
@@ -41,22 +41,22 @@ describe('records of a saved run', () => {
       durationMs: 90_000,
       inputTokens: 12_000,
       outputTokens: 3_000,
-      costUsd: 0.42,
     });
+    expect(record).not.toHaveProperty('costUsd');
   });
 
-  it('writes an attempt without usage as zeros and a cost of null', () => {
+  it('writes an attempt without usage as zeros', () => {
     const [record] = recordsOf(runWith('r3', [{ startedAt: 1000, finishedAt: 2000 }])).attempts;
-    expect(record).toMatchObject({ inputTokens: 0, outputTokens: 0, costUsd: null });
+    expect(record).toMatchObject({ inputTokens: 0, outputTokens: 0 });
     const [agy] = recordsOf(
       runWith('r3b', [{ startedAt: 1, finishedAt: 2, runtime: 'agy', usage: usage(5000, 0) }]),
     ).attempts;
-    expect(agy).toMatchObject({ inputTokens: 5000, costUsd: null, runtime: 'agy' });
+    expect(agy).toMatchObject({ inputTokens: 5000, runtime: 'agy' });
   });
 
   it('adds the naming call as its own record without time', () => {
     const state = runWith('r4', [], { createdAt: 777 });
-    state.run.namingUsage = usage(800, 40, 0.01);
+    state.run.namingUsage = usage(800, 40);
     const { attempts } = recordsOf(state);
     expect(attempts).toHaveLength(1);
     expect(attempts[0]).toMatchObject({

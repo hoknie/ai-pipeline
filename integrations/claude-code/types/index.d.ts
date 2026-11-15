@@ -11,7 +11,7 @@ export type AipGroupStatus =
 
 export type AipDeliveryState = 'pending' | 'applied' | 'apply_failed';
 
-export type AipUsage = { inputTokens: number; outputTokens: number; costUsd: number | null };
+export type AipUsage = { inputTokens: number; outputTokens: number };
 
 export type AipQuestion = {
   text: string;

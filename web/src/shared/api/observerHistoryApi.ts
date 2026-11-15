@@ -25,7 +25,7 @@ export interface ObserverHistoryItem {
   verdict: string | null;
   result: HistoryResult;
   failureKind: string | null;
-  usage: { inputTokens: number; outputTokens: number; costUsd: number | null } | null;
+  usage: { inputTokens: number; outputTokens: number } | null;
 }
 export interface ObserverHistoryQuery {
   repository?: string;
@@ -83,11 +83,7 @@ function isPage(value: unknown): value is ObserverHistoryPage {
           Number.isSafeInteger(i.usage.inputTokens) &&
           i.usage.inputTokens! >= 0 &&
           Number.isSafeInteger(i.usage.outputTokens) &&
-          i.usage.outputTokens! >= 0 &&
-          (i.usage.costUsd === null ||
-            (typeof i.usage.costUsd === 'number' &&
-              Number.isFinite(i.usage.costUsd) &&
-              i.usage.costUsd >= 0))))
+          i.usage.outputTokens! >= 0))
     );
   };
   return (

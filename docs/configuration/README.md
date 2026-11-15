@@ -170,7 +170,7 @@ Right after a run starts, `aip` asks this model once in the background, with no 
 
 - The answer is a short title in the language of the task (up to 60 characters) and an English kebab-case name (up to 40 characters), for example "The --json flag for aip version" and `add-version-json-flag`.
 - While there is no title, or if the call failed, the run is labeled with the first line of its task.
-- The call costs a fraction of a cent and counts toward the run's cost.
+- The call is short and its tokens count toward the run's usage.
 - `aip run start --title "…"` sets the title at once. The model is not called then, and the name is built by transliterating the title.
 
 ### `outside_changes`

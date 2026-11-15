@@ -368,7 +368,7 @@ describe('run page', () => {
       stream().send({
         event: 'run',
         seq: 2,
-        run: { ...run, usage: { inputTokens: 5000, outputTokens: 1, costUsd: 1 } },
+        run: { ...run, usage: { inputTokens: 5000, outputTokens: 1 } },
       }),
     );
     expect((screen.getByLabelText('answer for Регистрация') as HTMLTextAreaElement).value).toBe(
@@ -636,7 +636,6 @@ describe('attempts and transcript', () => {
             verdict: 'done',
             inputTokens: 1500,
             outputTokens: 20,
-            costUsd: 0.1,
           },
         ],
       })),

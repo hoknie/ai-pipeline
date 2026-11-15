@@ -396,7 +396,7 @@ describe('run names', () => {
   it('takes the first title it gets and counts the usage of naming', () => {
     const state = run(1);
     expect(state.run).toMatchObject({ title: null, name: null });
-    const usage = { inputTokens: 30, outputTokens: 10, costUsd: 0.002 };
+    const usage = { inputTokens: 30, outputTokens: 10 };
     transition(state, { kind: 'run_named', title: 'Вход', name: 'login', usage }, 10);
     transition(state, { kind: 'run_named', title: 'Другое', name: 'other', usage: null }, 20);
     expect(state.run).toMatchObject({ title: 'Вход', name: 'login', namingUsage: usage });
@@ -405,7 +405,7 @@ describe('run names', () => {
 
   it('records the usage of a failed naming call without a title', () => {
     const state = run(1);
-    const usage = { inputTokens: 5, outputTokens: 0, costUsd: 0.001 };
+    const usage = { inputTokens: 5, outputTokens: 0 };
     transition(state, { kind: 'run_named', title: null, name: null, usage }, 10);
     expect(state.run).toMatchObject({ title: null, name: null, namingUsage: usage });
   });
@@ -531,7 +531,7 @@ describe('title_set', () => {
 
   it('is not overwritten by a late run_named, which still counts its usage', () => {
     const state = run(1);
-    const usage = { inputTokens: 30, outputTokens: 10, costUsd: 0.002 };
+    const usage = { inputTokens: 30, outputTokens: 10 };
     transition(state, { kind: 'title_set', title: 'Ручное' }, 10);
     transition(state, { kind: 'run_named', title: 'Модель', name: 'model', usage }, 20);
     expect(state.run).toMatchObject({ title: 'Ручное', namingUsage: usage });

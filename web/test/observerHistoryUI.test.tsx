@@ -38,7 +38,7 @@ describe('observer history UI components', () => {
     verdict: null,
     result: 'failed',
     failureKind: 'process_aborted',
-    usage: { inputTokens: 12500, outputTokens: 800, costUsd: 0.045 },
+    usage: { inputTokens: 12500, outputTokens: 800 },
   };
 
   it('renders run number, attempt seq, failureKind, badges, finished time and exact tokens in tooltip', () => {

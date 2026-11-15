@@ -27,9 +27,9 @@ function write(path: string, text: string): void {
 }
 
 describe('stats settings', () => {
-  it('default to collection on, nothing excluded and the cost shown', () => {
+  it('default to collection on, nothing excluded', () => {
     const paths = temporaryPaths();
-    expect(loadStatsSettings(paths)).toEqual({ enabled: true, exclude: [], showCost: true });
+    expect(loadStatsSettings(paths)).toEqual({ enabled: true, exclude: [] });
     write(join(paths.global.directory, 'settings.yaml'), 'max: 2\n');
     expect(loadStatsSettings(paths).enabled).toBe(true);
   });
@@ -43,7 +43,6 @@ describe('stats settings', () => {
     expect(loadStatsSettings(paths)).toEqual({
       enabled: false,
       exclude: ['/work/app'],
-      showCost: false,
     });
     expect(() => loadConfig(paths)).toThrow(ConfigLoadError);
   });
@@ -58,10 +57,15 @@ describe('stats settings', () => {
     expect(validateStatsSection({ exclude: '/work/app' }).errors.map((e) => e.path)).toEqual([
       'swarm.stats.exclude',
     ]);
-    expect(validateStatsSection({ show_cost: 1, color: 1 }).errors.map((e) => e.path)).toEqual([
+    expect(validateStatsSection({ show_price: 1, color: 1 }).errors.map((e) => e.path)).toEqual([
+      'swarm.stats.show_price',
       'swarm.stats.color',
-      'swarm.stats.show_cost',
     ]);
+    expect(validateStatsSection({ show_cost: false }).errors).toEqual([]);
+    expect(validateStatsSection({ show_cost: false }).stats).toEqual({
+      enabled: true,
+      exclude: [],
+    });
     expect(validateStatsSection({ enabled: true, exclude: ['/a'] }).errors).toEqual([]);
   });
 
@@ -84,7 +88,6 @@ describe('stats settings', () => {
     expect(service.statsSettings()).toEqual({
       enabled: true,
       exclude: ['/work/lib'],
-      showCost: true,
     });
   });
 

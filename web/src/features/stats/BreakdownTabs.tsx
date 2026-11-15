@@ -11,7 +11,6 @@ import {
   type BreakdownTab,
   compactNumber,
   durationText,
-  money,
   nextSort,
   sortRows,
   type Sort,
@@ -31,7 +30,6 @@ export function BreakdownTabs({ report }: { report: StatsReportView }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<string>('specialist');
   const [sort, setSort] = useState<Sort | null>(null);
-  const showCost = report.totals.costUsd !== null;
   const number = (key: string, label: string, text: (row: Row) => string): StatsColumn<Row> => ({
     key,
     label,
@@ -50,13 +48,6 @@ export function BreakdownTabs({ report }: { report: StatsReportView }) {
     number('attempts', t('stats.breakdown.attempts'), (row) => String(row.attempts)),
     number('input', t('stats.breakdown.input'), (row) => compactNumber(row.inputTokens)),
     number('output', t('stats.breakdown.output'), (row) => compactNumber(row.outputTokens)),
-    ...(showCost
-      ? [
-          number('cost', t('stats.tiles.cost'), (row) =>
-            row.costUsd === null ? '—' : money(row.costUsd),
-          ),
-        ]
-      : []),
     number('agent', t('stats.tiles.agent'), (row) => durationText(row.agentMs, t)),
     number('perAttempt', t('stats.breakdown.perAttempt'), (row) =>
       compactNumber(row.tokensPerAttempt),

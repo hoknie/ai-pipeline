@@ -64,7 +64,7 @@ If `aip` is not found, the panel and the status line show an error with a hint a
 ## Commands
 
 - `/aip:run <pipeline> <task>` starts a run in the repository of the current session;
-- `/aip:status [run-id]` lists the runs (icon, title, `id`, `3/5`, diff, cost) or the groups of one run, in Markdown;
+- `/aip:status [run-id]` lists the runs (icon, title, `id`, `3/5`, diff) or the groups of one run, in Markdown;
 - `/aip:apply <run-id> [group...] [--force]` delivers a run;
 - `/aip:panel` opens the panel, `/aip:panel close` closes it;
 - `/aip:web [start|stop|restart|status] [--port <n>]` manages `aip web` for the session's repository.
@@ -88,8 +88,8 @@ The panel lets you control the swarm in the Claude Code window. It does not open
 The header is `aip · 2 active · 1 needs you`, with a connection indicator: `● live` for the event stream, `◌ polling` for polling, `✕ offline` when aip is not found.
 
 - **Needs you.** A frame under the header. The questions of the selected run are expanded in it, with the text, the options and an answer field. Other things that wait for you (questions of other runs, a conflict, a failure, a rejected delivery) are one-line items, at most five, the rest collapse into `+N more`. With nothing to decide, the frame is hidden.
-- **Runs.** Active runs first, finished ones dimmed, the selected one marked with `›`. A row has a status icon, the title (the `id` if there is none), a progress bar `▰▰▰▰▰▰▱▱▱▱ 3/5`, the age and the cost. The keys `1`–`8` select the first eight runs.
-- **The selected run.** The title with a status icon, and "cancel run" and "apply run" buttons when they make sense. One line shows `id · pipeline · phase · diff · delivery · cost`. Below are the groups, ordered by urgency: waiting for you, failed and conflicting, running, queued, merged and cancelled.
+- **Runs.** Active runs first, finished ones dimmed, the selected one marked with `›`. A row has a status icon, the title (the `id` if there is none), a progress bar `▰▰▰▰▰▰▱▱▱▱ 3/5`, and the age. The keys `1`–`8` select the first eight runs.
+- **The selected run.** The title with a status icon, and "cancel run" and "apply run" buttons when they make sense. One line shows `id · pipeline · phase · diff · delivery`. Below are the groups, ordered by urgency: waiting for you, failed and conflicting, running, queued, merged and cancelled.
 - **A group.** An icon and a status label, the step, round, time, diff and delivery, and the failure reason as the first line.
 - **A group's question.** If the agent asked [structured questions](../configuration/pipelines.md#questions), each one has buttons with options and a field for your own answer. The recommended option is marked `recommended` and is put in the field by default. "answer" sends all the answers as one text. While some question has no answer, the panel names its number and sends nothing.
 - **Buttons.** "retry" for a failed group and a group with a conflict, "cancel" for a group in progress, "apply" for a merged group that is not delivered yet. For a run with a single group, cancel and apply are shown only on the run.

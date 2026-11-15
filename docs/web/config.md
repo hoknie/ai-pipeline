@@ -10,7 +10,7 @@ The list shows the pipelines of the repository with the number of active runs. T
 - Dashed arcs are `on_reject` returns with their round limit.
 - The groups of active runs sit at their current step. A click on a group opens it in "Runs".
 - A node whose specialist has a limit shows "busy N of M · in other runs: K". It is highlighted when the limit is reached.
-- A step node shows "attempts N" and the tokens and cost of the active runs: `in/out · $cost`.
+- A step node shows "attempts N" and the tokens of the active runs: `in/out`.
 
 ## How editing works
 

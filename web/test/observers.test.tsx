@@ -179,7 +179,7 @@ describe('settings of the observers', () => {
             verdict: 'done',
             result: 'done' as const,
             failureKind: null,
-            usage: { inputTokens: 0, outputTokens: 10, costUsd: 0 },
+            usage: { inputTokens: 0, outputTokens: 10 },
           },
         ],
         nextCursor: null,

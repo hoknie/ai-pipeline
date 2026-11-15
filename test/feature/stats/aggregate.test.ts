@@ -5,7 +5,6 @@ import {
   breakdownRows,
   dailySeries,
   dayOf,
-  maskCosts,
   median,
   outcomesOf,
   parseStatsPeriod,
@@ -49,15 +48,6 @@ describe('statistics aggregates', () => {
     expect(totals.inputTokens).toBe(900);
     expect(totals.outputTokens).toBe(90);
     expect(totals.tokens).toBe(990);
-  });
-
-  it('counts attempts without a cost and keeps the sum of the known ones', () => {
-    const totals = totalsOf(
-      [attemptRecord({ costUsd: 0.5 }), attemptRecord({ costUsd: null })],
-      [],
-    );
-    expect(totals.costUsd).toBeCloseTo(0.5);
-    expect(totals.attemptsWithoutCost).toBe(1);
   });
 
   it('counts the tasks by outcome', () => {
@@ -153,24 +143,22 @@ describe('statistics aggregates', () => {
 
   it('splits a day by model: the models add up to the day', () => {
     const at = new Date(2026, 5, 10, 12).getTime();
-    const make = (model: string | null, tokens: number, costUsd: number) =>
-      attemptRecord({ finishedAt: at, model, inputTokens: tokens, outputTokens: 0, costUsd });
+    const make = (model: string | null, tokens: number) =>
+      attemptRecord({ finishedAt: at, model, inputTokens: tokens, outputTokens: 0 });
     const attempts = [
-      make('sonnet', 20_000, 0.2),
-      make('sonnet', 10_000, 0.1),
-      make('opus', 10_000, 1),
-      make(null, 5_000, 0.05),
+      make('sonnet', 20_000),
+      make('sonnet', 10_000),
+      make('opus', 10_000),
+      make(null, 5_000),
     ];
     const [today] = dailySeries(attempts, [], at, at);
     expect(today?.models.map((entry) => entry.model)).toEqual(['opus', 'sonnet', 'unknown']);
     expect(today?.models.map((entry) => entry.tokens)).toEqual([10_000, 30_000, 5_000]);
     expect(today?.models.map((entry) => entry.attempts)).toEqual([1, 2, 1]);
-    const add = (
-      pick: (entry: { tokens: number; costUsd: number | null; agentMs: number }) => number | null,
-    ) => today?.models.reduce((total, entry) => total + (pick(entry) ?? 0), 0);
+    const add = (pick: (entry: { tokens: number; agentMs: number }) => number) =>
+      today?.models.reduce((total, entry) => total + pick(entry), 0);
     expect(add((entry) => entry.tokens)).toBe(today?.tokens);
     expect(add((entry) => entry.agentMs)).toBe(today?.agentMs);
-    expect(add((entry) => entry.costUsd)).toBeCloseTo(today?.costUsd ?? 0);
   });
 
   it('keeps a record between a mid-day start and the next midnight in the series', () => {
@@ -199,12 +187,12 @@ describe('statistics aggregates', () => {
     }
   });
 
-  it('empties every cost field and keeps tokens and times', () => {
-    const attempts = [attemptRecord({ costUsd: 1 })];
+  it('keeps no cost field in the totals, the rows and the series', () => {
+    const attempts = [attemptRecord()];
     const tasks = [taskRecord({ runId: attempts[0]!.runId })];
     const perTask = perTaskOf(attempts, tasks);
     const report = {
-      settings: { enabled: true, exclude: [], showCost: false, backfilledAt: null },
+      settings: { enabled: true, exclude: [], backfilledAt: null },
       since: null,
       until: null,
       repository: null,
@@ -218,14 +206,9 @@ describe('statistics aggregates', () => {
       byRuntime: [],
       series: dailySeries(attempts, tasks, 1000, 2000),
     } satisfies StatsReport;
-    const masked = maskCosts(report);
-    expect(JSON.stringify(masked)).not.toMatch(/"costUsd":[0-9]/);
-    expect(masked.perTask.costUsd).toEqual({ mean: null, median: null });
-    expect(masked.series.flatMap((entry) => entry.models).every((m) => m.costUsd === null)).toBe(
-      true,
-    );
-    expect(masked.series.flatMap((entry) => entry.models).length).toBeGreaterThan(0);
-    expect(masked.totals.tokens).toBe(150);
-    expect(masked.bySpecialist[0]?.tokens).toBe(150);
+    expect(report.series.flatMap((entry) => entry.models).length).toBeGreaterThan(0);
+    expect(JSON.stringify(report)).not.toMatch(/cost/i);
+    expect(report.totals.tokens).toBe(150);
+    expect(report.bySpecialist[0]?.tokens).toBe(150);
   });
 });

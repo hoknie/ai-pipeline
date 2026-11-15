@@ -74,7 +74,6 @@ function active(groups: LiveGroup[]): boolean {
 
 const EMPTY = {
   attempts: null,
-  costUsd: null,
   inputTokens: null,
   outputTokens: null,
   step: null,
@@ -146,7 +145,6 @@ function stepNode(ctx: NodeContext, stage: PipelineStage, common: Common): NodeS
       detail: `${step.runtime}${step.model ? ` ${step.model}` : ''} · ${step.permissions}`,
       groups,
       attempts: live.attempts.get(step.id) ?? 0,
-      costUsd: live.cost.get(step.id) ?? null,
       inputTokens: live.inputTokens.get(step.id) ?? 0,
       outputTokens: live.outputTokens.get(step.id) ?? 0,
       active: active(groups),

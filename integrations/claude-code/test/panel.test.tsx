@@ -31,7 +31,7 @@ test('a group row is updated live after an event', SLOW, async ($, on) => {
     const row = await ui.find({ type: 'Text', text: /^step / });
     expect(row?.text).toContain('step review');
     expect(row?.text).toContain('round 2');
-    expect(await ui.find({ type: 'Text', text: /^r1 · feature · .*\$0\.0123$/ })).toBeDefined();
+    expect(await ui.find({ type: 'Text', text: /^r1 · feature · .*1\.2k\/300$/ })).toBeDefined();
     await aip.send(runLine(run('r1', [group('login', { step: 'code' })])));
     await ui.unmount();
   }

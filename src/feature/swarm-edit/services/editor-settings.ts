@@ -144,7 +144,6 @@ function sectionValues(
     ['queue.max', queue.max],
     ['stats.enabled', stats.enabled],
     ['stats.exclude', stats.exclude],
-    ['stats.show_cost', stats.showCost],
   ];
   for (const runtime of RUNTIMES) {
     const command = runtimes[runtime];

@@ -25,7 +25,7 @@ describe('stats settings in the editor', () => {
   it('excludes a project: writes stats.* to the global file and the daemon reads it', () => {
     const paths = setup();
     const plan = planSettings(paths, {
-      values: { 'stats.exclude': ['/work/app'], 'stats.show_cost': false },
+      values: { 'stats.exclude': ['/work/app'] },
       revision: null,
     });
     if (!plan.ok) throw new Error(JSON.stringify(plan));
@@ -33,8 +33,13 @@ describe('stats settings in the editor', () => {
     expect(loadStatsSettings(paths)).toEqual({
       enabled: true,
       exclude: ['/work/app'],
-      showCost: false,
     });
+  });
+
+  it('no longer writes the display of the cost', () => {
+    expect(() =>
+      planSettings(setup(), { values: { 'stats.show_cost': false }, revision: null }),
+    ).toThrow(/stats.show_cost/);
   });
 
   it('refuses the project level', () => {
@@ -63,6 +68,6 @@ describe('stats settings in the editor', () => {
     const find = (path: string) => view.settings.find((setting) => setting.path === path);
     expect(find('stats.enabled')?.value).toBe(true);
     expect(find('stats.exclude')?.value).toEqual([]);
-    expect(find('stats.show_cost')?.value).toBe(true);
+    expect(find('stats.show_cost')).toBeUndefined();
   });
 });

@@ -12,7 +12,6 @@ export interface LiveGroup {
 export interface Live {
   steps: Map<string, LiveGroup[]>;
   attempts: Map<string, number>;
-  cost: Map<string, number>;
   inputTokens: Map<string, number>;
   outputTokens: Map<string, number>;
   merging: LiveGroup[];
@@ -36,7 +35,6 @@ export function liveState(
   const live: Live = {
     steps: new Map(),
     attempts: new Map(),
-    cost: new Map(),
     inputTokens: new Map(),
     outputTokens: new Map(),
     merging: [],
@@ -73,9 +71,6 @@ export function liveState(
       if (known.has(step.id)) {
         live.steps.set(step.id, target);
         live.attempts.set(step.id, (live.attempts.get(step.id) ?? 0) + step.attempts);
-        if (step.usage?.costUsd != null) {
-          live.cost.set(step.id, (live.cost.get(step.id) ?? 0) + step.usage.costUsd);
-        }
         live.inputTokens.set(
           step.id,
           (live.inputTokens.get(step.id) ?? 0) + (step.usage?.inputTokens ?? 0),

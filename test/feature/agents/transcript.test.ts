@@ -116,7 +116,6 @@ describe('claude transcript', () => {
       verdict: null,
       inputTokens: 110,
       outputTokens: 50,
-      costUsd: 0.25,
       at: null,
     });
   });
@@ -196,7 +195,7 @@ describe('opencode transcript', () => {
       { kind: 'text', text: 'Сделаю', at: null },
       expect.objectContaining({ kind: 'tool_call', id: 'c1', name: 'bash', summary: 'ls' }),
       { kind: 'tool_result', id: 'c1', text: 'a.ts', error: false, at: null },
-      expect.objectContaining({ kind: 'result', inputTokens: 7, outputTokens: 3, costUsd: 0.01 }),
+      expect.objectContaining({ kind: 'result', inputTokens: 7, outputTokens: 3 }),
       { kind: 'raw', text: 'not json', at: null },
     ]);
   });
@@ -235,7 +234,7 @@ describe('opencode transcript of a recorded run', () => {
       at: null,
     });
     expect(entries[3]).toEqual({ kind: 'text', text: 'OK', at: null });
-    expect(entries[4]).toMatchObject({ inputTokens: 19090, outputTokens: 3, costUsd: 0 });
+    expect(entries[4]).toMatchObject({ inputTokens: 19090, outputTokens: 3 });
   });
 
   it('writes the message of an error event', () => {

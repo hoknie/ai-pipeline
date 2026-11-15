@@ -434,16 +434,15 @@ describe('pane view', () => {
     expect(paneView(runs, null, STREAM, FULL).summary).toBe('aip · 1 active · 1 needs you');
   });
 
-  test('the narrow layout drops age and cost', () => {
+  test('the narrow layout drops the age', () => {
     const merged = run('r1', [
       group('a', { status: 'merged', diff: { files: 1, added: 2, removed: 3 } }),
     ]);
     const wide = paneView([merged], null, STREAM, FULL);
     const narrow = paneView([merged], null, STREAM, { compact: true, now: 1_000_000 });
     expect(wide.runs[0]?.age).toBe('16m');
-    expect(wide.runs[0]?.cost).toBe('$0.01');
+    expect(wide.runs[0]).not.toHaveProperty('cost');
     expect(narrow.runs[0]?.age).toBeNull();
-    expect(narrow.runs[0]?.cost).toBeNull();
   });
 
   test('the connection is a symbol, a label and a theme key', () => {

@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { clockSeconds, cost, dateTime, tokens } from '../../../shared/lib/format.ts';
+import { clockSeconds, dateTime, tokens } from '../../../shared/lib/format.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import type { TranscriptEntry } from '../../../shared/api/types.ts';
 import {
@@ -176,8 +176,7 @@ function Entry({ entry, showJson }: { entry: TranscriptEntry; showJson: boolean 
             {t('runs.transcript.usage', {
               input: tokens(entry.inputTokens),
               output: tokens(entry.outputTokens),
-            })}{' '}
-            {cost(entry)}
+            })}
           </span>
           <EntryTime at={entry.at} />
         </div>

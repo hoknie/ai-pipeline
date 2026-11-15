@@ -1,14 +1,7 @@
 import { Paperclip } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  cost,
-  diffText,
-  runTimes,
-  runTitle,
-  taskNumber,
-  usageText,
-} from '../../../shared/lib/format.ts';
+import { diffText, runTimes, runTitle, taskNumber, usageText } from '../../../shared/lib/format.ts';
 import { useLocale } from '../../../shared/i18n/index.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
@@ -159,7 +152,6 @@ export function RunCard(props: RunCardProps) {
           <span>{times.created}</span>
           <span>{times.duration}</span>
           {usageText(run.usage) ? <span>{usageText(run.usage)}</span> : null}
-          {cost(run.usage) ? <span>{cost(run.usage)}</span> : null}
           {run.attachments.length > 0 ? (
             <span
               className="inline-flex items-center gap-0.5"

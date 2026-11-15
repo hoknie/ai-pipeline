@@ -202,7 +202,6 @@ export function renderPane(elements: PaneElements, model: PaneModel, actions: Pa
           {row.label}
           {row.bar ? ` ${row.bar}` : ''} {row.done}/{row.total}
           {row.age ? ` · ${row.age}` : ''}
-          {row.cost ? ` · ${row.cost}` : ''}
         </Button>
       </Box>
     );

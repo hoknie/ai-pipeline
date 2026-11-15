@@ -14,7 +14,6 @@ const resultEvent = z.looseObject({
   session_id: z.string().optional(),
   is_error: z.boolean().optional(),
   result: z.unknown().optional(),
-  total_cost_usd: z.number().optional(),
   permission_denials: z.unknown().optional(),
   usage: tokenUsage.optional(),
 });
@@ -175,7 +174,6 @@ class ClaudeParser implements OutputParser {
     return {
       inputTokens: all.reduce((sum, item) => sum + item.inputTokens, 0),
       outputTokens: all.reduce((sum, item) => sum + item.outputTokens, 0),
-      costUsd: null,
     };
   }
 
@@ -197,7 +195,6 @@ class ClaudeParser implements OutputParser {
     const entry: Usage = {
       inputTokens: inputTokens(tokens),
       outputTokens: tokens.output_tokens ?? 0,
-      costUsd: null,
     };
     const id = assistant.data.message.id;
     if (id === undefined) this.anonymous.push(entry);
@@ -224,11 +221,10 @@ class ClaudeParser implements OutputParser {
     }
     this.sessionId = event.session_id ?? this.sessionId;
     const tokens = event.usage;
-    if (tokens || event.total_cost_usd !== undefined) {
+    if (tokens) {
       this.finalUsage = {
         inputTokens: inputTokens(tokens),
-        outputTokens: tokens?.output_tokens ?? 0,
-        costUsd: event.total_cost_usd ?? null,
+        outputTokens: tokens.output_tokens ?? 0,
       };
     }
     if (event.is_error) {

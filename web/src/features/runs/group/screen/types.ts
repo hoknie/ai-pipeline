@@ -7,7 +7,7 @@ export type GroupScreenProps = {
   onTab?: (tab: string) => void;
   /** Opens a group or a system step of the run (the resolver badge). */
   onSelectEntry?: (slug: string) => void;
-  /** The run header is scrolled out of view: show the run title, statuses, duration, tokens and cost in the header. */
+  /** The run header is scrolled out of view: show the run title, statuses, duration and tokens in the header. */
   showUsage?: boolean;
   api: Api;
   runId: string;

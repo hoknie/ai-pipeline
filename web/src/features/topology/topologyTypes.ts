@@ -23,7 +23,6 @@ export interface StageData extends Record<string, unknown> {
   detail: string | null;
   groups: LiveGroup[];
   attempts: number | null;
-  costUsd: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
   active: boolean;

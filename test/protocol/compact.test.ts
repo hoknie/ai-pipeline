@@ -71,22 +71,22 @@ describe('run list in a terminal', () => {
   });
 
   it('is unchanged without color or without a width', () => {
-    const usage = { inputTokens: 92519, outputTokens: 77, costUsd: 0.0123 };
+    const usage = { inputTokens: 92519, outputTokens: 77 };
     const withUsage = { ...view('/a'), usage } as ReturnType<typeof view>;
     const full = formatRunList([withUsage], plainStyle);
     expect(full).toContain(longTitle.slice(0, 47));
-    expect(full).toContain('92519 in / 77 out · $0.0123');
+    expect(full).toContain('92519 in / 77 out');
     // colored but without a width: nothing is cut, usage is full, the project column stays
     const colored = ansi(formatRunList([withUsage], createStyle(true)));
     expect(colored).toContain('REPOSITORY');
     expect(colored).toContain(longTitle.slice(0, 47));
-    expect(colored).toContain('92519 in / 77 out · $0.0123');
+    expect(colored).toContain('92519 in / 77 out');
     const tail = (line: string) => line.slice(line.indexOf('Очень'));
     expect(tail(colored.split('\n')[1]!)).toBe(tail(full.split('\n')[1]!));
   });
 
   it('cuts only the flexible column, the others stay', () => {
-    const usage = { inputTokens: 92519, outputTokens: 77, costUsd: 0.0123 };
+    const usage = { inputTokens: 92519, outputTokens: 77 };
     const rows = [
       { ...view('/a'), usage },
       { ...view('/b', 'y'), id: 'run000000002', usage },
@@ -94,7 +94,7 @@ describe('run list in a terminal', () => {
     const text = ansi(formatRunList(rows, createStyle(true, 120)));
     const first = text.split('\n')[1]!;
     expect(first).toContain('…');
-    expect(first).toContain('92.5k in / 77 out · $0.01');
+    expect(first).toContain('92.5k in / 77 out');
     expect(first).toContain('/a');
   });
 
@@ -121,14 +121,12 @@ describe('run list in a terminal', () => {
 });
 
 describe('short usage', () => {
-  const usage = { inputTokens: 92519, outputTokens: 77, costUsd: 0.0123 } as Parameters<
-    typeof formatUsage
-  >[0];
+  const usage = { inputTokens: 92519, outputTokens: 77 } as Parameters<typeof formatUsage>[0];
 
   it('is full without a width and short in a terminal', () => {
-    expect(formatUsage(usage)).toBe('92519 in / 77 out · $0.0123');
-    expect(formatUsage(usage, createStyle(true))).toBe('92519 in / 77 out · $0.0123');
-    expect(formatUsage(usage, createStyle(true, 120))).toBe('92.5k in / 77 out · $0.01');
+    expect(formatUsage(usage)).toBe('92519 in / 77 out');
+    expect(formatUsage(usage, createStyle(true))).toBe('92519 in / 77 out');
+    expect(formatUsage(usage, createStyle(true, 120))).toBe('92.5k in / 77 out');
     expect(formatUsage(null, createStyle(true, 120))).toBe('—');
   });
 });

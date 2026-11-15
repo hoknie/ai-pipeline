@@ -191,7 +191,7 @@ describe('diff in the Changes tab while the step runs', () => {
     const api = await openedDiff();
     const loads = vi.mocked(api.group).mock.calls.length;
     served.added = 6; // a visible sign that the new answer is applied
-    send(2, 6, { usage: { inputTokens: 10, outputTokens: 2, costUsd: 0 } });
+    send(2, 6, { usage: { inputTokens: 10, outputTokens: 2 } });
     await waitFor(() => expect(vi.mocked(api.group).mock.calls.length).toBeGreaterThan(loads));
     await waitFor(() => expect(screen.getByRole('tabpanel').textContent).toContain('+6 −1'));
     expect(screen.queryByText('Loading the diff…')).toBeNull();

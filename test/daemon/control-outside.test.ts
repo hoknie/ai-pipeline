@@ -136,7 +136,6 @@ describe('failures and control', () => {
     expect((await h.group(runId, 'g1')).attempts[0]?.usage).toEqual({
       inputTokens: 50,
       outputTokens: 10,
-      costUsd: 0.002,
     });
   });
 

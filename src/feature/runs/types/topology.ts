@@ -262,7 +262,7 @@ export function pipelineTopology(config: ResolvedConfig, id: string): PipelineTo
   return pipeline ? shape(config, pipeline) : null;
 }
 
-/** Steps of the pipeline of a run with where each group is and what each step has cost. */
+/** Steps of the pipeline of a run with where each group is. */
 export function topology(state: RunState): Topology {
   const { config } = state.run;
   const pipeline = runPipeline(state.run);

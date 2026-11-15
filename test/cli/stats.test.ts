@@ -17,7 +17,6 @@ async function fill(box: Sandbox): Promise<void> {
       repository: box.repo,
       inputTokens: 60_000,
       outputTokens: 30_000,
-      costUsd: 0.42,
       durationMs: 90 * 60_000,
       finishedAt: at,
     }),
@@ -26,7 +25,6 @@ async function fill(box: Sandbox): Promise<void> {
       repository: '/work/lib',
       inputTokens: 10_000,
       outputTokens: 0,
-      costUsd: 0.1,
       durationMs: 60_000,
       finishedAt: at,
     }),
@@ -43,7 +41,7 @@ describe('aip stats', () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('Usage');
     expect(result.stdout).toContain('Tokens 100k');
-    expect(result.stdout).toContain('$0.52');
+    expect(result.stdout).not.toMatch(/cost|\$/);
     expect(result.stdout).toContain('1h 30m');
     expect(result.stdout).toContain(box.repo);
     expect(result.stdout).toContain('/work/lib');

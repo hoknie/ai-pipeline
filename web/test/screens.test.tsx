@@ -246,7 +246,7 @@ describe('run header', () => {
     expect(screen.queryByRole('button', { name: 'Cancel run' })).toBeNull();
   });
 
-  it('shows the summary block: path, time, tokens and cost, in this order', () => {
+  it('shows the summary block: path, time and tokens, in this order', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={() => undefined} />);
     const summary = screen.getByRole('complementary', { name: 'Run summary' });
     expect(summary.className).toContain('border-l');
@@ -257,12 +257,10 @@ describe('run header', () => {
       'Path',
       'Time',
       'Tokens',
-      'Cost',
     ]);
     const values = [...summary.querySelectorAll('dd')].map((node) => node.textContent);
     expect(values[2]).toBe('/repo');
     expect(values[4]).toBe('1.0k/100');
-    expect(values[5]).toBe('$0.42');
   });
 
   it('shows the type badge under the title, outside the summary block', () => {
@@ -332,7 +330,7 @@ describe('run header', () => {
     await waitFor(() => expect(onError).toHaveBeenCalledWith('run refs are removed'));
   });
 
-  it('has no tokens and cost rows without usage or price', () => {
+  it('has no tokens row without usage', () => {
     render(
       <RunHeader
         run={runView({ usage: null })}
@@ -343,11 +341,10 @@ describe('run header', () => {
     );
     const summary = screen.getByRole('complementary', { name: 'Run summary' });
     expect(within(summary).queryByText('Tokens')).toBeNull();
-    expect(within(summary).queryByText('Cost')).toBeNull();
     cleanup();
     render(
       <RunHeader
-        run={runView({ usage: { inputTokens: 1000, outputTokens: 100, costUsd: null } })}
+        run={runView({ usage: { inputTokens: 1000, outputTokens: 100 } })}
         api={fakeApi()}
         now={0}
         onError={() => undefined}
@@ -356,6 +353,7 @@ describe('run header', () => {
     const next = screen.getByRole('complementary', { name: 'Run summary' });
     expect(within(next).getByText('Tokens')).toBeTruthy();
     expect(within(next).queryByText('Cost')).toBeNull();
+    expect(within(next).queryByText(/\$/)).toBeNull();
   });
 
   it('puts the state badge into the summary, not on the line of the title, and keeps the sum of changes in the summary only', () => {
@@ -1016,7 +1014,7 @@ describe('diff stat', () => {
 describe('usage in the group header', () => {
   const row = groupRow({
     durationMs: 65_000,
-    usage: { inputTokens: 1000, outputTokens: 100, costUsd: 0.42 },
+    usage: { inputTokens: 1000, outputTokens: 100 },
   });
   const show = (showUsage?: boolean) =>
     render(
@@ -1034,17 +1032,16 @@ describe('usage in the group header', () => {
       />,
     );
 
-  it('hides duration, tokens and cost by default', () => {
+  it('hides duration and tokens by default', () => {
     show();
     expect(screen.queryByText('1.0k/100')).toBeNull();
-    expect(screen.queryByText('$0.42')).toBeNull();
     expect(screen.queryByText('1m05s')).toBeNull();
   });
 
   it('shows them when the run header is scrolled out of view', () => {
     show(true);
     expect(screen.getByText('1.0k/100')).toBeTruthy();
-    expect(screen.getByText('$0.42')).toBeTruthy();
+    expect(screen.queryByText(/\$/)).toBeNull();
     expect(screen.getByText('1m05s')).toBeTruthy();
   });
   describe('header layout', () => {
@@ -1088,7 +1085,6 @@ describe('usage in the group header', () => {
       expect(rows()).toHaveLength(1);
       const row0 = within(rows()[0] as HTMLElement);
       expect(row0.getByText(row.stepName ?? '')).toBeTruthy();
-      expect(row0.getByText('$0.42')).toBeTruthy();
       expect(row0.getByRole('button', cancel)).toBeTruthy();
       expect(
         row0.getByRole('switch', { name: /Specialist replies|Ответы специалиста/ }),

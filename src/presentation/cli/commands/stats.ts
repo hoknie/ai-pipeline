@@ -13,7 +13,7 @@ export function registerStats(program: Command, io: CliIo, style: Style): void {
   const { print, output, examples, context, activeStyle } = bind(io, style);
   program
     .command('stats')
-    .description('Usage statistics: tokens, cost and time of the agents, per task and per project')
+    .description('Usage statistics: tokens and time of the agents, per task and per project')
     .argument('[action]', 'clear: delete the collected statistics of --project; its runs stay')
     .option('-p, --project <path>', 'project path or slug (default: every project)')
     .option('--since <period>', 'period: <n>h, <n>d, <n>w or all', DEFAULT_PERIOD)

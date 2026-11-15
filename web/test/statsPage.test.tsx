@@ -18,63 +18,51 @@ beforeEach(() => rememberProjects(registry));
 afterEach(() => cleanup());
 
 const stat = (mean: number, median = mean) => ({ mean, median });
-const perTask = (tokens: number, cost: number | null, agentMs: number) => ({
+const perTask = (tokens: number, agentMs: number) => ({
   tokens: stat(tokens),
-  costUsd: { mean: cost, median: cost },
   agentMs: stat(agentMs),
   wallMs: stat(agentMs),
 });
 
-function totalsOf(tokens: number, costUsd: number | null, agentMs: number, tasks = 1) {
+function totalsOf(tokens: number, agentMs: number, tasks = 1) {
   return {
     tasks,
     attempts: tasks,
     inputTokens: Math.round(tokens * 0.7),
     outputTokens: Math.round(tokens * 0.3),
     tokens,
-    costUsd,
-    attemptsWithoutCost: 0,
     agentMs,
     commandMs: 0,
     wallMs: agentMs,
   };
 }
 
-const row = (
-  key: string,
-  tokens: number,
-  costUsd: number | null,
-  agentMs: number,
-  name: string | null = null,
-) => ({
+const row = (key: string, tokens: number, agentMs: number, name: string | null = null) => ({
   key,
   name,
   attempts: 2,
   inputTokens: Math.round(tokens * 0.7),
   outputTokens: Math.round(tokens * 0.3),
   tokens,
-  costUsd,
   agentMs,
   tokensPerAttempt: tokens / 2,
 });
 
-/** Two projects over two days: `app` 90 000 tokens, `lib` 10 000; 2 tasks, 1.20 USD, 1 h 30 min. */
+/** Two projects over two days: `app` 90 000 tokens, `lib` 10 000; 2 tasks, 1 h 30 min. */
 function twoProjects(overrides: Partial<StatsReportView> = {}): StatsReportView {
   const day = (name: string, start: number, app: number, lib: number) => ({
     day: name,
     start,
     tokens: app + lib,
-    costUsd: (app + lib) / 100_000,
     agentMs: (app + lib) * 10,
     tasks: 1,
     projects: [
-      { repository: '/work/app', tokens: app, costUsd: app / 100_000, agentMs: app * 10, tasks: 1 },
+      { repository: '/work/app', tokens: app, agentMs: app * 10, tasks: 1 },
       ...(lib > 0
         ? [
             {
               repository: '/work/lib',
               tokens: lib,
-              costUsd: lib / 100_000,
               agentMs: lib * 10,
               tasks: 1,
             },
@@ -82,28 +70,28 @@ function twoProjects(overrides: Partial<StatsReportView> = {}): StatsReportView 
         : []),
     ],
     models: [
-      { model: 'opus', tokens: lib, costUsd: lib / 100_000, agentMs: lib * 10, attempts: 1 },
-      { model: 'sonnet', tokens: app, costUsd: app / 100_000, agentMs: app * 10, attempts: 1 },
+      { model: 'opus', tokens: lib, agentMs: lib * 10, attempts: 1 },
+      { model: 'sonnet', tokens: app, agentMs: app * 10, attempts: 1 },
     ].filter((entry) => entry.tokens > 0),
   });
   return statsReportView({
-    totals: totalsOf(100_000, 1.2, 5_400_000, 2),
-    perTask: perTask(50_000, 0.6, 2_700_000),
+    totals: totalsOf(100_000, 5_400_000, 2),
+    perTask: perTask(50_000, 2_700_000),
     outcomes: { finished: 1, failed: 1, cancelled: 0 },
     projects: [
       {
         repository: '/work/app',
-        totals: totalsOf(90_000, 1.08, 4_860_000),
-        perTask: perTask(90_000, 1.08, 4_860_000),
+        totals: totalsOf(90_000, 4_860_000),
+        perTask: perTask(90_000, 4_860_000),
       },
       {
         repository: '/work/lib',
-        totals: totalsOf(10_000, 0.12, 540_000),
-        perTask: perTask(10_000, 0.12, 540_000),
+        totals: totalsOf(10_000, 540_000),
+        perTask: perTask(10_000, 540_000),
       },
     ],
-    byModel: [row('sonnet', 80_000, 1.0, 100), row('opus', 20_000, 5.0, 50)],
-    bySpecialist: [row('coder', 100_000, 1.2, 150)],
+    byModel: [row('sonnet', 80_000, 100), row('opus', 20_000, 50)],
+    bySpecialist: [row('coder', 100_000, 150)],
     series: [day('2026-06-01', 1, 60_000, 10_000), day('2026-06-02', 2, 30_000, 0)],
     ...overrides,
   });
@@ -139,13 +127,11 @@ describe('tiles', () => {
     mount(twoProjects());
     await screen.findByText('Tokens per task');
     expect(tile('Tokens').getByText('100k')).toBeTruthy();
-    expect(tile('Cost').getByText('$1.20')).toBeTruthy();
     expect(tile('Agent work').getByText('1 h 30 min')).toBeTruthy();
     expect(tile('Tasks').getByText('2')).toBeTruthy();
     expect(tile('Tasks').getByText('finished 1 · failed 1 · cancelled 0')).toBeTruthy();
     expect(tile('Tokens per task').getByText('50k')).toBeTruthy();
     expect(tile('Tokens per task').getByText('median 50k')).toBeTruthy();
-    expect(tile('Cost per task').getByText('$0.60')).toBeTruthy();
     expect(tile('Agent work per task').getByText('45 min')).toBeTruthy();
   });
 
@@ -155,29 +141,15 @@ describe('tiles', () => {
     expect(tile('Tokens').getByText('100k').getAttribute('title')).toBe('100,000');
   });
 
-  it('notes the attempts without a cost', async () => {
-    const report = twoProjects();
-    mount({ ...report, totals: { ...report.totals, attemptsWithoutCost: 3 } });
-    await screen.findByText('without cost: 3 attempts');
-  });
-
-  it('hides the cost when the report has none', async () => {
-    const report = twoProjects();
-    mount({
-      ...report,
-      totals: { ...report.totals, costUsd: null },
-      perTask: { ...report.perTask, costUsd: { mean: null, median: null } },
-      projects: report.projects.map((project) => ({
-        ...project,
-        totals: { ...project.totals, costUsd: null },
-      })),
-      byModel: report.byModel.map((entry) => ({ ...entry, costUsd: null })),
-    });
+  it('shows no cost tile, column or metric', async () => {
+    mount(twoProjects());
     await screen.findByText('Tokens per task');
     expect(screen.queryByText('Cost')).toBeNull();
     expect(screen.queryByText('Cost per task')).toBeNull();
+    expect(screen.queryByText(/without cost/)).toBeNull();
     expect(screen.queryByRole('radio', { name: 'Cost' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Cost' })).toBeNull();
+    expect(screen.queryByText(/\$/)).toBeNull();
   });
 });
 
@@ -227,22 +199,20 @@ describe('daily chart', () => {
       ...base,
       projects: repositories.map((repository, index) => ({
         repository,
-        totals: totalsOf((index + 1) * 1000, null, 1000),
-        perTask: perTask(1000, null, 1000),
+        totals: totalsOf((index + 1) * 1000, 1000),
+        perTask: perTask(1000, 1000),
       })),
       series: [
         {
           day: '2026-06-01',
           start: 1,
           tokens: 66_000,
-          costUsd: null,
           agentMs: 0,
           tasks: 11,
           models: [],
           projects: repositories.map((repository, index) => ({
             repository,
             tokens: (index + 1) * 1000,
-            costUsd: null,
             agentMs: 0,
             tasks: 1,
           })),
@@ -299,7 +269,6 @@ describe('daily chart', () => {
           models: models.map((model, index) => ({
             model,
             tokens: (index + 1) * 1000,
-            costUsd: null,
             agentMs: 0,
             attempts: 1,
           })),
@@ -322,8 +291,8 @@ describe('daily chart', () => {
         {
           ...base.series[0]!,
           models: [
-            { model: 'unknown', tokens: 5000, costUsd: null, agentMs: 0, attempts: 1 },
-            { model: 'opus', tokens: 3000, costUsd: null, agentMs: 0, attempts: 1 },
+            { model: 'unknown', tokens: 5000, agentMs: 0, attempts: 1 },
+            { model: 'opus', tokens: 3000, agentMs: 0, attempts: 1 },
           ],
         },
       ],
@@ -398,30 +367,30 @@ describe('tables', () => {
     expect(onFilter).toHaveBeenCalledWith('30d', '/work/lib');
   });
 
-  it('puts the most expensive model first when sorted by cost descending', async () => {
+  it('puts the biggest consumer of tokens first when sorted by tokens descending', async () => {
     mount(twoProjects());
     await screen.findByRole('table', { name: 'Projects' });
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Models' }), { button: 0, ctrlKey: false });
     const table = await screen.findByRole('table', { name: 'Models' });
-    fireEvent.click(within(table).getByRole('button', { name: 'Cost' }));
-    fireEvent.click(within(table).getByRole('button', { name: /Cost/ }));
+    fireEvent.click(within(table).getByRole('button', { name: /Output/ }));
+    fireEvent.click(within(table).getByRole('button', { name: /Output/ }));
     const names = within(table)
       .getAllByRole('row')
       .slice(1)
       .map((line) => within(line).getAllByRole('cell')[0]?.textContent);
-    expect(names).toEqual(['opus', 'sonnet']);
+    expect(names).toEqual(['sonnet', 'opus']);
   });
 
   it('shows names of the breakdown rows, labels service keys and sorts by the shown text', async () => {
     mount(
       twoProjects({
         bySpecialist: [
-          row('coder', 100_000, 1.2, 150, 'Zed coder'),
-          row('naming', 50_000, 0.1, 10),
-          row('plain', 10_000, 0.1, 10),
+          row('coder', 100_000, 150, 'Zed coder'),
+          row('naming', 50_000, 10),
+          row('plain', 10_000, 10),
         ],
-        byModel: [row('unknown', 5_000, 0.1, 10), row('opus', 20_000, 5.0, 50)],
-        byRuntime: [row('command', 1_000, null, 10), row('claude', 99_000, 1, 10)],
+        byModel: [row('unknown', 5_000, 10), row('opus', 20_000, 50)],
+        byRuntime: [row('command', 1_000, 10), row('claude', 99_000, 10)],
       }),
     );
     await screen.findByRole('table', { name: 'Projects' });
@@ -520,7 +489,7 @@ describe('states', () => {
   it('warns that collection is off and still shows the collected data', async () => {
     mount(
       twoProjects({
-        settings: { enabled: false, exclude: [], showCost: true, backfilledAt: null },
+        settings: { enabled: false, exclude: [], backfilledAt: null },
       }),
     );
     expect(await screen.findByText('Statistics collection is off')).toBeTruthy();

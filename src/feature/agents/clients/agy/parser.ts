@@ -6,7 +6,6 @@ function usageOf(tokens: { input_tokens?: number; output_tokens?: number }): Usa
   return {
     inputTokens: tokens.input_tokens ?? 0,
     outputTokens: tokens.output_tokens ?? 0,
-    costUsd: null,
   };
 }
 
@@ -49,9 +48,8 @@ class AgyParser implements OutputParser {
       (total, usage) => ({
         inputTokens: total.inputTokens + usage.inputTokens,
         outputTokens: total.outputTokens + usage.outputTokens,
-        costUsd: null,
       }),
-      { inputTokens: 0, outputTokens: 0, costUsd: null },
+      { inputTokens: 0, outputTokens: 0 },
     );
   }
 

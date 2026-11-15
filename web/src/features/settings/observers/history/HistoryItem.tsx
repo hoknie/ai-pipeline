@@ -7,7 +7,7 @@ import { repositoryLabel } from '../../../../shared/lib/catalog/repositories.ts'
 import { tokens, when } from '../../../../shared/lib/format.ts';
 import { Badge } from '../../../../shared/ui/feedback/badge.tsx';
 import { ProjectDot } from '../../../../shared/ui/feedback/ProjectDot.tsx';
-import { formatDuration, formatRunHref, formatTime, formatUsd } from './format.ts';
+import { formatDuration, formatRunHref, formatTime } from './format.ts';
 
 function resultVariant(result: HistoryResult) {
   if (result === 'running') return 'run';
@@ -91,7 +91,6 @@ function Usage({ item }: { item: Item }) {
       <span title={exact}>
         {tokens(item.usage.inputTokens)} / {tokens(item.usage.outputTokens)}
       </span>
-      <span className="text-xs text-muted-foreground">{formatUsd(item.usage.costUsd)}</span>
     </div>
   );
 }

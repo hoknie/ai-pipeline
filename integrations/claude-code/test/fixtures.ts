@@ -28,7 +28,7 @@ export function run(id: string, groups: AipGroup[], overrides: Partial<AipRun> =
     dirtyWarning: false,
     counts: `${groups.length} groups`,
     total: groups.length,
-    usage: { inputTokens: 1200, outputTokens: 300, costUsd: 0.0123 },
+    usage: { inputTokens: 1200, outputTokens: 300 },
     split: null,
     delivery: { applied: 0, merged: 0, failed: 0, inProgress: false },
     groups,

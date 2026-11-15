@@ -1,14 +1,7 @@
 import { MoreHorizontal, RefreshCw, RotateCcw, SkipForward } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  clock,
-  cost,
-  duration,
-  runTitle,
-  taskNumber,
-  usageText,
-} from '../../../../shared/lib/format.ts';
+import { clock, duration, runTitle, taskNumber, usageText } from '../../../../shared/lib/format.ts';
 import { notifySuccess } from '../../../../shared/lib/browser/notify.ts';
 import { isRepairStep } from '../../../../shared/api/observerTypes.ts';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
@@ -188,7 +181,6 @@ function Details({ ctx }: { ctx: GroupCtx }) {
         <>
           <span>{duration(row.durationMs)}</span>
           {usageText(row.usage) ? <span>{usageText(row.usage)}</span> : null}
-          {cost(row.usage) ? <span>{cost(row.usage)}</span> : null}
         </>
       ) : null}
     </>

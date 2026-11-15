@@ -71,14 +71,10 @@ export const en = {
     tiles: {
       tokens: 'Tokens',
       tokensSplit: 'in {{input}} · out {{output}}',
-      cost: 'Cost',
       agent: 'Agent work',
       tasks: 'Tasks',
       outcomes: 'finished {{finished}} · failed {{failed}} · cancelled {{cancelled}}',
-      noCost_one: 'without cost: {{count}} attempt',
-      noCost_other: 'without cost: {{count}} attempts',
       perTaskTokens: 'Tokens per task',
-      perTaskCost: 'Cost per task',
       perTaskAgent: 'Agent work per task',
       median: 'median {{value}}',
     },
@@ -94,7 +90,6 @@ export const en = {
       splits: { projects: 'Projects', models: 'Models' },
       metrics: {
         tokens: 'Tokens',
-        cost: 'Cost',
         agent: 'Agent time',
         tasks: 'Tasks',
       },
@@ -346,7 +341,6 @@ export const en = {
         path: 'Path',
         time: 'Time',
         tokens: 'Tokens',
-        cost: 'Cost',
       },
       tags: 'Run tags',
       label: 'run',
@@ -1824,10 +1818,6 @@ export const en = {
         label: 'Collect statistics',
         hint: 'Writes the usage of every finished attempt to the journal of statistics.',
       },
-      stats_show_cost: {
-        label: 'Show cost',
-        hint: 'Cost is shown in the reports and the panel; off hides it everywhere.',
-      },
       stats_exclude: {
         label: 'Excluded projects',
         hint: 'Projects that are not collected and not shown in the reports.',
@@ -1885,7 +1875,7 @@ export const en = {
       model: 'Model',
       started: 'Started',
       result: 'Result',
-      usage: 'In / Out · USD',
+      usage: 'In / Out',
       results: {
         running: 'Running',
         done: 'Done',

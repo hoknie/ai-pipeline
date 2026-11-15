@@ -5,7 +5,7 @@ The "Queue" section adds, orders and runs tasks. How the queue behaves is descri
 ## Layout
 
 - The "Queue controls" block on the left holds the state, the buttons "New task", "Start" and "Pause", the parallelism and the link "Queue settings".
-- Below the controls are the running runs and the waiting tasks. A running run's card shows its duration, tokens and cost.
+- Below the controls are the running runs and the waiting tasks. A running run's card shows its duration and tokens.
 - Runs the queue skipped because of a problem are in the "Skipped with a problem" block. They do not count as taken places.
 
 ## Task rows

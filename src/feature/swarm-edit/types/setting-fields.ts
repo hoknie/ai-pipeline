@@ -93,7 +93,6 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('queue.max', 'integer', { range: QUEUE_MAX_RANGE, globalOnly: true }),
   field('stats.enabled', 'boolean', { globalOnly: true }),
   field('stats.exclude', 'strings', { globalOnly: true }),
-  field('stats.show_cost', 'boolean', { globalOnly: true }),
   ...RUNTIMES.flatMap((runtime) => [
     field(`runtimes.${runtime}.enabled`, 'boolean', { globalOnly: true }),
     field(`runtimes.${runtime}.command`, 'string', { globalOnly: true }),

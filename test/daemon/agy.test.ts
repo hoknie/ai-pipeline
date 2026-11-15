@@ -19,7 +19,7 @@ describe('agy execution', () => {
     expect(view.groups[0]?.status).toBe('merged');
     const attempt = (await h.group(id, 'g1')).attempts[0]!;
     expect(attempt.runtime).toBe('agy');
-    expect(attempt.usage).toEqual({ inputTokens: 100, outputTokens: 20, costUsd: null });
+    expect(attempt.usage).toEqual({ inputTokens: 100, outputTokens: 20 });
     expect(calls(h)[0]?.args).toContain('stream-json');
     expect(readFileSync(join(h.fakeState, 'worker.jsonl'), 'utf8')).toContain('"via":"mcp"');
   });

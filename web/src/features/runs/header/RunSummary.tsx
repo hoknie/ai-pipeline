@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 
-import { cost, duration, runClockEnd, usageText } from '../../../shared/lib/format.ts';
+import { duration, runClockEnd, usageText } from '../../../shared/lib/format.ts';
 import type { GroupRow, RunView, SystemStepRow } from '../../../shared/api/types.ts';
 import { FilePath } from '../../../shared/ui/layout/FilePath.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
@@ -36,7 +36,7 @@ function useRunDownload(run: RunView, api?: Api, onError?: (message: string) => 
   return { downloading, download };
 }
 
-/** The summary block of a run: statuses, path, time, tokens and cost. */
+/** The summary block of a run: statuses, path, time and tokens. */
 export function RunSummary({
   run,
   now,
@@ -55,7 +55,6 @@ export function RunSummary({
   const { t } = useTranslation();
   const { downloading, download } = useRunDownload(run, api, onError);
   const tokens = usageText(run.usage);
-  const price = cost(run.usage);
   const rows: { key: string; label: string; value: React.ReactNode }[] = [
     {
       key: 'status',
@@ -92,7 +91,6 @@ export function RunSummary({
       value: duration(runClockEnd(run, now) - run.createdAt),
     },
     ...(tokens ? [{ key: 'tokens', label: t('runs.header.summary.tokens'), value: tokens }] : []),
-    ...(price ? [{ key: 'cost', label: t('runs.header.summary.cost'), value: price }] : []),
   ];
   return (
     <aside

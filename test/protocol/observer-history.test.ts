@@ -41,7 +41,7 @@ describe('observer history IPC contract', () => {
           verdict: null,
           result: 'running',
           failureKind: null,
-          usage: { inputTokens: 0, outputTokens: 0, costUsd: null },
+          usage: { inputTokens: 0, outputTokens: 0 },
         },
       ],
       nextCursor: null,
@@ -49,7 +49,7 @@ describe('observer history IPC contract', () => {
       projects: ['/repo'],
       asOf: 5,
     });
-    expect(view.items[0]?.usage).toEqual({ inputTokens: 0, outputTokens: 0, costUsd: null });
+    expect(view.items[0]?.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
     expect(view.items[0]).not.toHaveProperty('input');
     expect(view.items[0]).not.toHaveProperty('sessionId');
   });

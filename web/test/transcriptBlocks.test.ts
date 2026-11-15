@@ -51,7 +51,6 @@ describe('transcript blocks', () => {
         verdict: null,
         inputTokens: null,
         outputTokens: null,
-        costUsd: null,
         at: 8,
       },
       { kind: 'tool_result', id: 'missing', text: 'orphan', error: true, at: 9 },

@@ -14,10 +14,6 @@ export interface Totals {
   inputTokens: number;
   outputTokens: number;
   tokens: number;
-  /** USD; null when cost is hidden. */
-  costUsd: number | null;
-  /** Attempts whose runtime reported no cost. */
-  attemptsWithoutCost: number;
   /** Time of attempts of every runtime but `command`. */
   agentMs: number;
   /** Time of `command` attempts. */
@@ -31,14 +27,8 @@ export interface Stat {
   median: number;
 }
 
-export interface CostStat {
-  mean: number | null;
-  median: number | null;
-}
-
 export interface PerTask {
   tokens: Stat;
-  costUsd: CostStat;
   agentMs: Stat;
   wallMs: Stat;
 }
@@ -57,7 +47,6 @@ export interface BreakdownRow {
   inputTokens: number;
   outputTokens: number;
   tokens: number;
-  costUsd: number | null;
   agentMs: number;
   /** Average tokens of one attempt. */
   tokensPerAttempt: number;
@@ -66,7 +55,6 @@ export interface BreakdownRow {
 export interface SeriesProject {
   repository: string;
   tokens: number;
-  costUsd: number | null;
   agentMs: number;
   tasks: number;
 }
@@ -77,7 +65,6 @@ export const UNKNOWN_MODEL = 'unknown';
 export interface SeriesModel {
   model: string;
   tokens: number;
-  costUsd: number | null;
   agentMs: number;
   /** Attempts, not tasks: one task can run on several models. */
   attempts: number;
@@ -90,7 +77,6 @@ export interface SeriesDay {
   /** Start of the day, ms. */
   start: number;
   tokens: number;
-  costUsd: number | null;
   agentMs: number;
   tasks: number;
   projects: SeriesProject[];

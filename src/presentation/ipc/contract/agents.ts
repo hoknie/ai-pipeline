@@ -46,7 +46,6 @@ export const transcriptEntrySchema = z.discriminatedUnion('kind', [
     verdict: z.string().nullable(),
     inputTokens: z.number().nullable(),
     outputTokens: z.number().nullable(),
-    costUsd: z.number().nullable(),
     at,
   }),
   z.object({ kind: z.literal('raw'), text: z.string(), at }),

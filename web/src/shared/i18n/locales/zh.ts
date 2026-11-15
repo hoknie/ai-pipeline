@@ -73,14 +73,10 @@ export const zh: Dictionary = {
     tiles: {
       tokens: 'Token',
       tokensSplit: '输入 {{input}} · 输出 {{output}}',
-      cost: '费用',
       agent: '智能体工作',
       tasks: '任务',
       outcomes: '已完成 {{finished}} · 失败 {{failed}} · 已取消 {{cancelled}}',
-      noCost_one: '无费用：{{count}} 次尝试',
-      noCost_other: '无费用：{{count}} 次尝试',
       perTaskTokens: '每任务 Token',
-      perTaskCost: '每任务费用',
       perTaskAgent: '每任务智能体工作',
       median: '中位数 {{value}}',
     },
@@ -96,7 +92,6 @@ export const zh: Dictionary = {
       splits: { projects: '项目', models: '模型' },
       metrics: {
         tokens: 'Token',
-        cost: '费用',
         agent: '智能体时间',
         tasks: '任务',
       },
@@ -345,7 +340,6 @@ export const zh: Dictionary = {
         path: '路径',
         time: '时间',
         tokens: '令牌',
-        cost: '费用',
       },
       tags: '运行标签',
       label: '运行',
@@ -1728,10 +1722,6 @@ export const zh: Dictionary = {
         label: '收集统计',
         hint: '把每次完成的尝试的用量写入统计日志。',
       },
-      stats_show_cost: {
-        label: '显示费用',
-        hint: '报告和面板中显示费用；关闭后在各处隐藏。',
-      },
       stats_exclude: {
         label: '排除的项目',
         hint: '不收集也不在报告中显示的项目。',
@@ -1786,7 +1776,7 @@ export const zh: Dictionary = {
       model: '模型',
       started: '开始时间',
       result: '结果',
-      usage: '输入 / 输出 · USD',
+      usage: '输入 / 输出',
       results: {
         running: '运行中',
         done: '完成',

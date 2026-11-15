@@ -83,7 +83,7 @@ OpenCode applies the selected variant after the agent options. A variant that se
 - The user-level command is controlled by the normal `runtimes.agy` settings or `AIP_AGY_BIN`.
 - Skills are read from `.agents/skills` and the standard Antigravity folders under `~/.gemini`.
 - Antigravity model names are passed through unchanged. Without `model`, Antigravity selects its default.
-- `agy` does not report a billing cost. Token usage on a resumed conversation is cumulative, so only usage attributable to the current attempt is counted.
+- Token usage on a resumed conversation is cumulative, so only usage attributable to the current attempt is counted.
 - `aip` applies its own permission check to file writes and commands. A shell command is denied unless it matches `allow_commands`; commands with uninspectable shell syntax are denied.
 - `variant` and `reasoning_effort` are OpenCode-only and cannot be used with agy.
 

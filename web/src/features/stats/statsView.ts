@@ -8,17 +8,15 @@ type Totals = StatsReportView['totals'];
 type PerTask = StatsReportView['perTask'];
 type Breakdown = StatsReportView['byModel'][number];
 
-export const METRICS = ['tokens', 'cost', 'agent', 'tasks'] as const;
+export const METRICS = ['tokens', 'agent', 'tasks'] as const;
 export type Metric = (typeof METRICS)[number];
 
 export const SPLITS = ['projects', 'models'] as const;
 export type Split = (typeof SPLITS)[number];
 
-/** The metrics a split offers: a model has no tasks, and cost needs a visible cost. */
-export function metricsFor(split: Split, hasCost: boolean): Metric[] {
-  return METRICS.filter(
-    (metric) => (metric !== 'cost' || hasCost) && (metric !== 'tasks' || split === 'projects'),
-  );
+/** The metrics a split offers: a model has no tasks. */
+export function metricsFor(split: Split): Metric[] {
+  return METRICS.filter((metric) => metric !== 'tasks' || split === 'projects');
 }
 
 /** The models in the order of their colors: the biggest consumers first, then the rest of the series. */
@@ -55,8 +53,6 @@ export function compactNumber(value: number): string {
   return String(Math.round(value));
 }
 
-export const money = (usd: number): string => `$${usd.toFixed(2)}`;
-
 /** `1 h 30 min`, `45 min`, `20 s`: the units come from the dictionary of the panel. */
 export function durationText(milliseconds: number, t: TFunction): string {
   const minutes = Math.round(Math.max(0, milliseconds) / 60_000);
@@ -74,10 +70,9 @@ export function durationText(milliseconds: number, t: TFunction): string {
 /** The value of a metric of a day or of a project of a day. */
 function metricOf(
   metric: Metric,
-  entry: { tokens: number; costUsd: number | null; agentMs: number; tasks?: number },
+  entry: { tokens: number; agentMs: number; tasks?: number },
 ): number {
   if (metric === 'tokens') return entry.tokens;
-  if (metric === 'cost') return entry.costUsd ?? 0;
   if (metric === 'agent') return entry.agentMs;
   return entry.tasks ?? 0;
 }
@@ -163,8 +158,6 @@ export function projectValue(
       return totals.tasks;
     case 'tokens':
       return totals.tokens;
-    case 'cost':
-      return totals.costUsd;
     case 'agent':
       return totals.agentMs;
     case 'wall':
@@ -222,8 +215,6 @@ export function breakdownValue(row: Breakdown, key: string): string | number | n
       return row.inputTokens;
     case 'output':
       return row.outputTokens;
-    case 'cost':
-      return row.costUsd;
     case 'agent':
       return row.agentMs;
     case 'perAttempt':

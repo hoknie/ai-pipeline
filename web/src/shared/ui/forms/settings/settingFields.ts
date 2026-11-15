@@ -115,7 +115,7 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
         'network.timeout',
       ],
     },
-    { key: 'stats', paths: ['stats.enabled', 'stats.show_cost', 'stats.exclude'] },
+    { key: 'stats', paths: ['stats.enabled', 'stats.exclude'] },
     {
       key: 'attachments',
       paths: [

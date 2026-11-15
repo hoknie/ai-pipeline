@@ -9,7 +9,6 @@ export interface LedgerSettings {
 export interface StatsSettingsView {
   enabled: boolean;
   exclude: string[];
-  showCost: boolean;
   /** When the accumulated history was moved into the journal; null before that. */
   backfilledAt: number | null;
 }

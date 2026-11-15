@@ -74,15 +74,10 @@ export const es: Dictionary = {
     tiles: {
       tokens: 'Tokens',
       tokensSplit: 'entrada {{input}} · salida {{output}}',
-      cost: 'Coste',
       agent: 'Trabajo de agentes',
       tasks: 'Tareas',
       outcomes: 'terminadas {{finished}} · con error {{failed}} · canceladas {{cancelled}}',
-      noCost_one: 'sin coste: {{count}} intento',
-      noCost_many: 'sin coste: {{count}} intentos',
-      noCost_other: 'sin coste: {{count}} intentos',
       perTaskTokens: 'Tokens por tarea',
-      perTaskCost: 'Coste por tarea',
       perTaskAgent: 'Trabajo de agentes por tarea',
       median: 'mediana {{value}}',
     },
@@ -98,7 +93,6 @@ export const es: Dictionary = {
       splits: { projects: 'Proyectos', models: 'Modelos' },
       metrics: {
         tokens: 'Tokens',
-        cost: 'Coste',
         agent: 'Tiempo de agentes',
         tasks: 'Tareas',
       },
@@ -354,7 +348,6 @@ export const es: Dictionary = {
         path: 'Ruta',
         time: 'Tiempo',
         tokens: 'Tokens',
-        cost: 'Coste',
       },
       tags: 'Etiquetas de la ejecución',
       label: 'ejecución',
@@ -1877,10 +1870,6 @@ export const es: Dictionary = {
         label: 'Recopilar estadísticas',
         hint: 'Escribe el uso de cada intento terminado en el registro de estadísticas.',
       },
-      stats_show_cost: {
-        label: 'Mostrar el coste',
-        hint: 'El coste se muestra en los informes y en el panel; desactivado lo oculta en todas partes.',
-      },
       stats_exclude: {
         label: 'Proyectos excluidos',
         hint: 'Proyectos que no se recopilan ni aparecen en los informes.',
@@ -1938,7 +1927,7 @@ export const es: Dictionary = {
       model: 'Modelo',
       started: 'Inicio',
       result: 'Resultado',
-      usage: 'Entrada / salida · USD',
+      usage: 'Entrada / salida',
       results: {
         running: 'En curso',
         done: 'Listo',

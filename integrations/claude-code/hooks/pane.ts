@@ -59,7 +59,6 @@ export type RunLine = {
   done: number;
   total: number;
   age: string | null;
-  cost: string | null;
 };
 
 export type NeedRow = {
@@ -199,26 +198,16 @@ export function resultLine(action: AipActionResult | null): ResultLine | null {
   return { icon: kind.icon, text: action.text, color: kind.color };
 }
 
-function costOf(run: AipRun): string | null {
-  return run.usage && run.usage.costUsd !== null ? `$${run.usage.costUsd.toFixed(2)}` : null;
-}
-
 function compactTokens(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
 }
 
-/** Cost when known and tokens as `in/out` when any; null without both. */
+/** Tokens as `in/out` when any; null without them. */
 export function usageLabel(usage: AipRun['usage']): string | null {
-  if (!usage) return null;
-  const parts = [
-    usage.costUsd !== null ? `$${usage.costUsd.toFixed(4)}` : null,
-    usage.inputTokens > 0 || usage.outputTokens > 0
-      ? `${compactTokens(usage.inputTokens)}/${compactTokens(usage.outputTokens)}`
-      : null,
-  ].filter((part) => part !== null);
-  return parts.length > 0 ? parts.join(' · ') : null;
+  if (!usage || (usage.inputTokens === 0 && usage.outputTokens === 0)) return null;
+  return `${compactTokens(usage.inputTokens)}/${compactTokens(usage.outputTokens)}`;
 }
 
 export function runRow(
@@ -239,7 +228,6 @@ export function runRow(
     bar: options.compact ? null : progressBar(progress.done, progress.total),
     ...progress,
     age: options.compact ? null : formatAge(options.now - run.createdAt),
-    cost: options.compact ? null : costOf(run),
   };
 }
 

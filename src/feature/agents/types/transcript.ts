@@ -32,7 +32,6 @@ export type TranscriptEntry =
       verdict: string | null;
       inputTokens: number | null;
       outputTokens: number | null;
-      costUsd: number | null;
       at?: number | null | undefined;
     }
   | { kind: 'raw'; text: string; at?: number | null | undefined };

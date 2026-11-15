@@ -25,7 +25,6 @@ const day = (
   models: {
     model: string;
     tokens: number;
-    costUsd: number;
     agentMs: number;
     attempts: number;
   }[] = [],
@@ -33,10 +32,9 @@ const day = (
   day: name,
   start: Date.parse(name),
   tokens: projects.reduce((sum, entry) => sum + entry.tokens, 0),
-  costUsd: 0,
   agentMs: 0,
   tasks: 0,
-  projects: projects.map((entry) => ({ ...entry, costUsd: 0, agentMs: 0, tasks: 0 })),
+  projects: projects.map((entry) => ({ ...entry, agentMs: 0, tasks: 0 })),
   models,
 });
 
@@ -62,7 +60,7 @@ describe('sorting', () => {
     const first = nextSort(null, 'tokens');
     expect(first).toEqual({ key: 'tokens', direction: 'asc' });
     expect(nextSort(first, 'tokens').direction).toBe('desc');
-    expect(nextSort(first, 'cost')).toEqual({ key: 'cost', direction: 'asc' });
+    expect(nextSort(first, 'agent')).toEqual({ key: 'agent', direction: 'asc' });
   });
 
   it('puts a missing number last in both directions', () => {
@@ -117,7 +115,6 @@ describe('models split', () => {
   const entry = (model: string, tokens: number) => ({
     model,
     tokens,
-    costUsd: 0,
     agentMs: 0,
     attempts: 1,
   });
@@ -144,10 +141,9 @@ describe('models split', () => {
     expect(series[8]).toMatchObject({ label: 'Other', values: [3] });
   });
 
-  it('offers no tasks for models and no cost without one', () => {
-    expect(metricsFor('models', true)).toEqual(['tokens', 'cost', 'agent']);
-    expect(metricsFor('projects', true)).toEqual(['tokens', 'cost', 'agent', 'tasks']);
-    expect(metricsFor('projects', false)).toEqual(['tokens', 'agent', 'tasks']);
+  it('offers no tasks for models and no cost at all', () => {
+    expect(metricsFor('models')).toEqual(['tokens', 'agent']);
+    expect(metricsFor('projects')).toEqual(['tokens', 'agent', 'tasks']);
   });
 
   it('orders the models by the breakdown, then by the series', () => {
@@ -164,7 +160,7 @@ describe('models split', () => {
 describe('projects', () => {
   it('reads the columns of a row', () => {
     const base = statsReportView();
-    const row = { totals: { ...base.totals, tokens: 7, costUsd: null }, perTask: base.perTask };
+    const row = { totals: { ...base.totals, tokens: 7 }, perTask: base.perTask };
     expect(projectValue(row, 'tokens')).toBe(7);
     expect(projectValue(row, 'cost')).toBeNull();
     expect(projectValue(row, 'unknown')).toBeNull();
@@ -195,7 +191,6 @@ describe('labels of the breakdown rows', () => {
     inputTokens: 0,
     outputTokens: 0,
     tokens: 0,
-    costUsd: null,
     agentMs: 0,
     tokensPerAttempt: 0,
   });
@@ -231,13 +226,7 @@ describe('labels of the breakdown rows', () => {
   it('labels the unknown model in the daily series', () => {
     expect(modelLabel('opus', t)).toBe('opus');
     const report = statsReportView({
-      series: [
-        day(
-          '2026-06-01',
-          [],
-          [{ model: 'unknown', tokens: 1, costUsd: 0, agentMs: 0, attempts: 1 }],
-        ),
-      ],
+      series: [day('2026-06-01', [], [{ model: 'unknown', tokens: 1, agentMs: 0, attempts: 1 }])],
     });
     const series = dailySeries(report, 'tokens', 'models', {
       labelOf: (repository) => repository,

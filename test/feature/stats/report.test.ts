@@ -21,7 +21,7 @@ function sumOf(series: { tokens: number }[]): number {
 }
 const NOW = new Date(2026, 5, 10, 12).getTime();
 
-function harness(settings: StatsSettings = { enabled: true, exclude: [], showCost: true }) {
+function harness(settings: StatsSettings = { enabled: true, exclude: [] }) {
   const { database } = temporaryStorage();
   const records = new StatsRecordRepository(database);
   const state = {
@@ -57,7 +57,6 @@ function addTask(
         outputTokens: 0,
         durationMs: part.minutes * MINUTE,
         finishedAt,
-        costUsd: 0.1,
       }),
     ]),
   );
@@ -177,37 +176,34 @@ describe('the statistics report', () => {
     const h = harness();
     addTask(h, 'a', '/work/app', [{ tokens: 90_000, minutes: 5 }]);
     addTask(h, 'b', '/work/lib', [{ tokens: 10_000, minutes: 5 }]);
-    h.state.settings = { enabled: true, exclude: ['/work/lib'], showCost: true };
+    h.state.settings = { enabled: true, exclude: ['/work/lib'] };
     const report = await h.service.report({});
     expect(report.totals.tokens).toBe(90_000);
     expect(report.projects.map((project) => project.repository)).toEqual(['/work/app']);
     expect(JSON.stringify(report.series)).not.toContain('/work/lib');
     expect((await h.service.report({ repository: '/work/lib' })).totals.tokens).toBe(0);
-    h.state.settings = { enabled: true, exclude: [], showCost: true };
+    h.state.settings = { enabled: true, exclude: [] };
     expect((await h.service.report({})).totals.tokens).toBe(100_000);
   });
 
-  it('empties the costs and keeps tokens and times when the cost is hidden', async () => {
-    const h = harness({ enabled: true, exclude: [], showCost: false });
+  it('has no cost field anywhere in the report', async () => {
+    const h = harness();
     addTask(h, 'a', '/work/app', [{ tokens: 1000, minutes: 5 }]);
     const report = await h.service.report({});
-    expect(report.totals.costUsd).toBeNull();
-    expect(report.perTask.costUsd).toEqual({ mean: null, median: null });
     expect(report.totals.tokens).toBe(1000);
     expect(report.totals.agentMs).toBe(5 * MINUTE);
-    expect(JSON.stringify(report)).not.toMatch(/"costUsd":[0-9]/);
+    expect(JSON.stringify(report)).not.toMatch(/cost/i);
   });
 
   it('returns zeros and empty lists for an empty journal', async () => {
     const report = await harness().service.report({});
-    expect(report.totals).toMatchObject({ tasks: 0, attempts: 0, tokens: 0, costUsd: 0 });
+    expect(report.totals).toMatchObject({ tasks: 0, attempts: 0, tokens: 0 });
     expect(report.projects).toEqual([]);
     expect(report.series).toEqual([]);
     expect(report.perTask.tokens).toEqual({ mean: 0, median: 0 });
     expect(report.settings).toEqual({
       enabled: true,
       exclude: [],
-      showCost: true,
       backfilledAt: null,
     });
   });
@@ -247,16 +243,6 @@ describe('the statistics report', () => {
     const names = report.series.flatMap((entry) => entry.models.map((m) => m.model));
     expect([...new Set(names)].sort()).toEqual(report.byModel.map((row) => row.key).sort());
     expect(names).toContain('unknown');
-  });
-
-  it('hides the cost of the models of a day when the cost is off', async () => {
-    const h = harness({ enabled: true, exclude: [], showCost: false });
-    h.records.insertAttempts([attemptRecord({ runId: 'c1', finishedAt: NOW - 1000 })]);
-    const report = await h.service.report({});
-    const models = report.series.flatMap((entry) => entry.models);
-    expect(models.length).toBeGreaterThan(0);
-    expect(models.every((entry) => entry.costUsd === null)).toBe(true);
-    expect(models[0]?.tokens).toBe(150);
   });
 
   it('starts the all-time series on the day of the first record', async () => {

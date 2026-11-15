@@ -12,7 +12,6 @@ import { StatsTable, type StatsColumn } from './StatsTable.tsx';
 import {
   compactNumber,
   durationText,
-  money,
   nextSort,
   projectValue,
   sortRows,
@@ -26,11 +25,10 @@ type Row =
 
 function columnsOf(options: {
   t: TFunction;
-  showCost: boolean;
   onSelect: (repository: string) => void;
   actions: (repository: string) => ReactNode;
 }): StatsColumn<Row>[] {
-  const { t, showCost, onSelect, actions } = options;
+  const { t, onSelect, actions } = options;
   const number = (
     key: string,
     label: string,
@@ -60,13 +58,6 @@ function columnsOf(options: {
     },
     number('tasks', t('stats.projects.tasks'), (row) => String(row.totals.tasks)),
     number('tokens', t('stats.tiles.tokens'), (row) => compactNumber(row.totals.tokens)),
-    ...(showCost
-      ? [
-          number('cost', t('stats.tiles.cost'), (row) =>
-            row.totals.costUsd === null ? null : money(row.totals.costUsd),
-          ),
-        ]
-      : []),
     number('agent', t('stats.tiles.agent'), (row) => duration(row.totals.agentMs)),
     number('wall', t('stats.projects.wall'), (row) => duration(row.totals.wallMs)),
     number('meanTokens', t('stats.projects.meanTokens'), (row) =>
@@ -107,7 +98,6 @@ export function ProjectsTable({
   const total: Row = { repository: null, totals: report.totals, perTask: report.perTask };
   const columns = columnsOf({
     t,
-    showCost: report.totals.costUsd !== null,
     onSelect,
     actions: (repository) => (
       <ClearProjectAction api={api} repository={repository} onCleared={onCleared} />

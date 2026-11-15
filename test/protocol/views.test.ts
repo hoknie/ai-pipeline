@@ -669,7 +669,7 @@ describe('a group waiting for a usage limit', () => {
 });
 
 describe('live usage in views', () => {
-  const live = { inputTokens: 1200, outputTokens: 300, costUsd: null };
+  const live = { inputTokens: 1200, outputTokens: 300 };
 
   it('counts the usage of a running attempt in the queue card, the run and the group row', () => {
     const state = run(1);

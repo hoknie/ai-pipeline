@@ -7,7 +7,7 @@ Addresses can be shared: `#runs/<run-id>` opens a run, `#runs/<run-id>/<group>` 
 ## The run list
 
 - Filters: a search (title, name, task number `#N`, pipeline, specialists, groups, tags), and the filters "State", "Pipeline", "Variant", "Specialists", "Tags" and, in the "All projects" mode, "Repository". The list shows the runs of the repository chosen in the header; "All projects" in the repository picker shows the runs of every repository, and each card names its project.
-- A run card shows the first line of the task, the status, the name of its pipeline (the id is in the tooltip) and, unless it is `default`, a badge with its variant, time, cost and a summary of changes (`2 files +367 −0`).
+- A run card shows the first line of the task, the status, the name of its pipeline (the id is in the tooltip) and, unless it is `default`, a badge with its variant, time, tokens and a summary of changes (`2 files +367 −0`).
 - The state "Repair" is shown by a badge in the list, in the header and in the statuses, and can be chosen in the "State" filter. A run in "Repair" counts as working in the navigation, and its question, failure, conflict and refused delivery raise no notifications while the observer works on it.
 - A finished run with group warnings has a yellow "Warnings: N" badge.
 - A stopped run (finished, failed or cancelled) whose merged result is not delivered to the working tree has a yellow "Not delivered" badge, and its card is tinted with a soft warning colour. The tooltip tells how many groups are delivered.
@@ -45,7 +45,7 @@ The "Steps" block lists each step of the pipeline with its state (done, running,
 
 The tabs:
 
-- **"Log"** shows the attempts of the group: specialist, runtime, verdict, tokens and cost. Consecutive fragments of one answer grow in a single block, timestamped with the first fragment's time. The log of a running attempt keeps loading by itself; the raw-log view retains the original events.
+- **"Log"** shows the attempts of the group: specialist, runtime, verdict and tokens. Consecutive fragments of one answer grow in a single block, timestamped with the first fragment's time. The log of a running attempt keeps loading by itself; the raw-log view retains the original events.
 - **"Changes"** is a file tree with `+N −M`.
 - **"Task"** shows the task text.
 - **"Artifacts · N"** lists the [artifacts](../usage/runs.md#artifacts) of the group, newest first, with the step, title, file name, time and size. "Open" previews `.md` and `.log` files up to 1 MB, and "Download" saves any file. While the group has no artifacts the tab is dimmed, and `?tab=artifacts` falls back to the log.

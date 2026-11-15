@@ -69,7 +69,7 @@ describe('run_title', () => {
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     await h.call('run_title', { runId, title: 'Ручное' });
     h.open('naming');
-    const named = await h.waitFor(runId, (view) => (view.usage?.costUsd ?? 0) >= 0.002);
+    const named = await h.waitFor(runId, (view) => (view.usage?.inputTokens ?? 0) > 0);
     h.open('code');
     expect(named).toMatchObject({ title: 'Ручное', name: null });
   });

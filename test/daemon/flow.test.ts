@@ -49,7 +49,7 @@ describe('daemon flow', () => {
     expect(git(h.repo, 'branch', '--show-current')).toBe('main');
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
     expect(existsSync(join(h.repo, 'feature.ts'))).toBe(false);
-    expect(final.usage).toEqual({ inputTokens: 400, outputTokens: 80, costUsd: 0.04 });
+    expect(final.usage).toEqual({ inputTokens: 400, outputTokens: 80 });
     const detail = await h.group(runId, 'login');
     expect(detail.attempts.map((attempt) => [attempt.stepId, attempt.verdict])).toEqual([
       ['code', 'done'],

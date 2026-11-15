@@ -45,7 +45,7 @@ describe('topology', () => {
     finish(state, 'rejected', { feedback: 'нет тестов' });
     finish(state, 'done', { slug: 'gruppa-2' });
     step(state);
-    state.groups[0]!.attempts.at(-1)!.usage = { inputTokens: 10, outputTokens: 2, costUsd: 0.5 };
+    state.groups[0]!.attempts.at(-1)!.usage = { inputTokens: 10, outputTokens: 2 };
     const view = topology(state);
     expect(view.steps.map((entry) => entry.id)).toEqual(['plan', 'code', 'review', 'qa']);
     const [plan, code, review, qa] = view.steps;
@@ -56,7 +56,7 @@ describe('topology', () => {
       model: 'anthropic/sonnet',
       attempts: 3,
       groups: [{ slug: 'gruppa-1', status: 'running' }],
-      usage: { costUsd: 0.5 },
+      usage: { inputTokens: 10, outputTokens: 2 },
     });
     expect(review).toMatchObject({
       attempts: 2,

@@ -503,6 +503,30 @@ describe('cli run view', () => {
     expect(watched.stdout).not.toMatch(/^→ /m);
   });
 
+  it('lists the usage of a run as tokens only, in the text and in the JSON', async () => {
+    const box = sandbox();
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'расход', '--json')).stdout,
+    );
+    await waitUntil('the run ends', async () => {
+      const view = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
+        finished: boolean;
+      };
+      return view.finished;
+    });
+    const listed = JSON.parse((await aip(box, 'run', 'list', '--json')).stdout) as {
+      id: string;
+      usage: Record<string, number> | null;
+    }[];
+    const usage = listed.find((entry) => entry.id === runId)?.usage;
+    expect(usage).toMatchObject({
+      inputTokens: expect.any(Number),
+      outputTokens: expect.any(Number),
+    });
+    expect(Object.keys(usage ?? {}).sort()).toEqual(['inputTokens', 'outputTokens']);
+    expect((await aip(box, 'run', 'list')).stdout).not.toContain('$');
+  });
+
   it('shows the last log line of a running group in run watch only', async () => {
     const box = sandbox();
     writeFileSync(

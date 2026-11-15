@@ -15,7 +15,6 @@ import {
   breakdownNames,
   breakdownRows,
   dailySeries,
-  maskCosts,
   outcomesOf,
   perTaskOf,
   projectRows,
@@ -49,7 +48,7 @@ export class StatsReportService {
     const { reads, meta, now } = this.dependencies;
     const read = this.dependencies.settings();
     const settings: StatsSettings =
-      typeof read === 'string' ? { enabled: false, exclude: [], showCost: true } : read;
+      typeof read === 'string' ? { enabled: false, exclude: [] } : read;
     const exclude = await Promise.all(settings.exclude.map((path) => this.rootOf(path)));
     const repository =
       query.repository === undefined ? undefined : await this.rootOf(query.repository);
@@ -85,7 +84,6 @@ export class StatsReportService {
       settings: {
         enabled: settings.enabled,
         exclude: settings.exclude,
-        showCost: settings.showCost,
         backfilledAt: meta.backfilledAt(),
       },
       since: query.since ?? null,
@@ -101,7 +99,7 @@ export class StatsReportService {
       byRuntime: breakdownRows(attempts, (record) => record.runtime),
       series: start === null ? [] : dailySeries(attempts, tasks, start, end),
     };
-    return settings.showCost ? report : maskCosts(report);
+    return report;
   }
 
   private rootOf(path: string): Promise<string> {

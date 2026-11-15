@@ -19,7 +19,7 @@ function harness(history: RunState[] = [], start = 100_000) {
   const reads = new StatsReportRepository(database);
   const clock = { now: start };
   const settings: { value: StatsSettings | string } = {
-    value: { enabled: true, exclude: [], showCost: true },
+    value: { enabled: true, exclude: [] },
   };
   const warnings: string[] = [];
   const build = () =>
@@ -58,20 +58,20 @@ describe('the statistics ledger', () => {
 
   it('leaves the history of an excluded project out of the move', async () => {
     const h = harness([finished('a', 50_000, '/work/app'), finished('b', 50_000, '/work/lib')]);
-    h.settings.value = { enabled: true, exclude: ['/work/lib'], showCost: true };
+    h.settings.value = { enabled: true, exclude: ['/work/lib'] };
     await h.build().backfill();
     expect(h.attempts()).toEqual(['a']);
   });
 
   it('puts the move off while collection is off and does it at the first save with it on', async () => {
     const h = harness([finished('old', 50_000)]);
-    h.settings.value = { enabled: false, exclude: [], showCost: true };
+    h.settings.value = { enabled: false, exclude: [] };
     const ledger = h.build();
     await ledger.backfill();
     expect(h.meta.backfilledAt()).toBeNull();
     await ledger.capture(finished('during-off', 100_500));
     expect(h.attempts()).toEqual([]);
-    h.settings.value = { enabled: true, exclude: [], showCost: true };
+    h.settings.value = { enabled: true, exclude: [] };
     h.clock.now = 200_000;
     await ledger.capture(finished('new', 200_000));
     expect(h.meta.backfilledAt()).toBe(200_000);
@@ -83,10 +83,10 @@ describe('the statistics ledger', () => {
     const ledger = h.build();
     await ledger.backfill();
     const state = finished('r1', 100_100);
-    h.settings.value = { enabled: false, exclude: [], showCost: true };
+    h.settings.value = { enabled: false, exclude: [] };
     h.clock.now = 100_200;
     await ledger.capture(state);
-    h.settings.value = { enabled: true, exclude: [], showCost: true };
+    h.settings.value = { enabled: true, exclude: [] };
     h.clock.now = 100_300;
     await ledger.capture(state);
     expect(h.attempts()).toEqual([]);
@@ -98,9 +98,9 @@ describe('the statistics ledger', () => {
     h.clock.now = 100_200;
     const ledger = h.build();
     const state = finished('r1', 100_300);
-    h.settings.value = { enabled: true, exclude: ['/work/app'], showCost: true };
+    h.settings.value = { enabled: true, exclude: ['/work/app'] };
     await ledger.capture(state);
-    h.settings.value = { enabled: true, exclude: [], showCost: true };
+    h.settings.value = { enabled: true, exclude: [] };
     h.clock.now = 100_400;
     await ledger.capture(state);
     h.clock.now = 200_000;
@@ -125,10 +125,10 @@ describe('the statistics ledger', () => {
     const ledger = h.build();
     await ledger.backfill();
     h.clock.now = 100_400;
-    h.settings.value = { enabled: false, exclude: [], showCost: true };
+    h.settings.value = { enabled: false, exclude: [] };
     const skipped = settle(finished('off', 100_200), 'merged', 100_300);
     await ledger.capture(skipped);
-    h.settings.value = { enabled: true, exclude: [], showCost: true };
+    h.settings.value = { enabled: true, exclude: [] };
     h.clock.now = 100_500;
     const kept = settle(finished('on', 100_600), 'merged', 100_700);
     await ledger.capture(kept);

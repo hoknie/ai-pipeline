@@ -31,7 +31,6 @@ export function agyTranscript(lines: string[], times?: (number | null)[]): Trans
         verdict: null,
         inputTokens: result.usage?.input_tokens ?? null,
         outputTokens: result.usage?.output_tokens ?? null,
-        costUsd: null,
         at,
       });
       continue;

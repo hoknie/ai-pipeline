@@ -78,7 +78,7 @@ describe('live usage', () => {
     );
     expect(live.finished).toBe(false);
     expect(live.groups[0]?.status).toBe('running');
-    expect(live.usage).toEqual({ inputTokens: 3000, outputTokens: 300, costUsd: null });
+    expect(live.usage).toEqual({ inputTokens: 3000, outputTokens: 300 });
     expect(live.groups[0]?.usage).toEqual(live.usage);
     const detail = await h.group(runId, 'login');
     expect(detail.attempts[0]?.usage).toEqual(live.usage);
@@ -103,12 +103,11 @@ describe('live usage', () => {
     const runId = await run(h);
     const final = await h.waitFor(runId, (view) => view.finished);
     // code: 3000/350 from the result; review: the default 100/20.
-    expect(final.usage).toEqual({ inputTokens: 3100, outputTokens: 370, costUsd: 0.02 });
+    expect(final.usage).toEqual({ inputTokens: 3100, outputTokens: 370 });
     const detail = await h.group(runId, 'login');
     expect(detail.attempts[0]?.usage).toEqual({
       inputTokens: 3000,
       outputTokens: 350,
-      costUsd: 0.01,
     });
   });
 
@@ -131,16 +130,13 @@ describe('live usage', () => {
     const runId = await run(h);
     // the agent goes on once the live usage of all twenty updates reached the stream
     await h.waitFor(runId, () =>
-      views.some(
-        (view) =>
-          view.id === runId && view.usage?.costUsd === null && view.usage.inputTokens === 200,
-      ),
+      views.some((view) => view.id === runId && view.usage?.inputTokens === 200),
     );
     h.open('done');
     await h.waitFor(runId, (view) => view.finished);
     const live = new Set(
       views
-        .filter((view) => view.id === runId && view.usage !== null && view.usage.costUsd === null)
+        .filter((view) => view.id === runId && view.usage !== null && view.usage.inputTokens <= 200)
         .map((view) => view.usage!.inputTokens),
     );
     expect(live.size).toBeGreaterThan(0);
@@ -156,7 +152,7 @@ describe('live usage', () => {
     await h.restart();
     const after = await h.status(runId);
     expect(after.groups[0]).toMatchObject({ status: 'failed', reason: 'interrupted' });
-    expect(after.usage).toEqual({ inputTokens: 4000, outputTokens: 400, costUsd: null });
+    expect(after.usage).toEqual({ inputTokens: 4000, outputTokens: 400 });
     const detail = await h.group(runId, 'login');
     expect(detail.attempts[0]?.usage).toEqual(after.usage);
   });
@@ -169,7 +165,7 @@ describe('live usage', () => {
     await h.call('cancel', { runId, group: 'login' });
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(final.groups[0]?.status).toBe('cancelled');
-    expect(final.usage).toEqual({ inputTokens: 4000, outputTokens: 400, costUsd: null });
+    expect(final.usage).toEqual({ inputTokens: 4000, outputTokens: 400 });
     const detail = await h.group(runId, 'login');
     expect(detail.attempts[0]).toMatchObject({
       verdict: null,

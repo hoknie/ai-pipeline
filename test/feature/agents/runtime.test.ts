@@ -390,7 +390,7 @@ describe('claude adapter', () => {
     parser.push('not json');
     expect(parser.outcome()).toEqual({
       sessionId: 'fa86c288-6f1b-44f7-889b-779235a84990',
-      usage: { inputTokens: 2 + 23287, outputTokens: 4, costUsd: 0.00477342 },
+      usage: { inputTokens: 2 + 23287, outputTokens: 4 },
       error: null,
       denials: [],
       usageLimit: null,
@@ -863,13 +863,13 @@ describe('opencode run --format json output', () => {
     for (const line of recorded) parser.push(line);
     expect(parser.outcome()).toEqual({
       sessionId: 'ses_ses1',
-      usage: { inputTokens: 19026 + 19090, outputTokens: 25 + 20 + 3 + 1, costUsd: 0 },
+      usage: { inputTokens: 19026 + 19090, outputTokens: 25 + 20 + 3 + 1 },
       error: null,
       denials: [],
     });
   });
 
-  it('sums the cost and reasoning tokens of steps and ignores cache reads', () => {
+  it('sums the reasoning tokens of steps, ignores cache reads and the cost of a step', () => {
     const parser = runtime.createParser();
     const step = (cost: number, reasoning = 0, cacheRead = 0, cacheWrite = 0) =>
       JSON.stringify({
@@ -891,8 +891,8 @@ describe('opencode run --format json output', () => {
     expect(parser.outcome().usage).toEqual({
       inputTokens: 30,
       outputTokens: 60,
-      costUsd: 0.75,
     });
+    expect(parser.outcome().usage).not.toHaveProperty('costUsd');
   });
 
   it('reports the message of an error event, not its response headers', () => {
@@ -955,9 +955,9 @@ describe('live usage', () => {
   it('sums the messages of the assistant without a cost and ignores cache reads', () => {
     const parser = createClaudeRuntime('/bin/claude').createParser();
     parser.push(assistant('m1', 100, 10, 50, 5));
-    expect(parser.usage()).toEqual({ inputTokens: 105, outputTokens: 10, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 105, outputTokens: 10 });
     parser.push(assistant('m2', 200, 20));
-    expect(parser.usage()).toEqual({ inputTokens: 305, outputTokens: 30, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 305, outputTokens: 30 });
   });
 
   it('counts a message of several events once, by the last event', () => {
@@ -965,23 +965,23 @@ describe('live usage', () => {
     parser.push(assistant('m1', 100, 1));
     parser.push(assistant('m1', 100, 5));
     parser.push(assistant('m1', 100, 12));
-    expect(parser.usage()).toEqual({ inputTokens: 100, outputTokens: 12, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 100, outputTokens: 12 });
   });
 
   it('adds messages without an id each time', () => {
     const parser = createClaudeRuntime('/bin/claude').createParser();
     parser.push(assistant(undefined, 10, 1));
     parser.push(assistant(undefined, 10, 1));
-    expect(parser.usage()).toEqual({ inputTokens: 20, outputTokens: 2, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 20, outputTokens: 2 });
   });
 
   it('lets the result override the sum and the cost, and later messages change nothing', () => {
     const parser = createClaudeRuntime('/bin/claude').createParser();
     parser.push(assistant('m1', 100, 10));
     parser.push(result);
-    expect(parser.usage()).toEqual({ inputTokens: 900, outputTokens: 90, costUsd: 0.5 });
+    expect(parser.usage()).toEqual({ inputTokens: 900, outputTokens: 90 });
     parser.push(assistant('m2', 5000, 500));
-    expect(parser.usage()).toEqual({ inputTokens: 900, outputTokens: 90, costUsd: 0.5 });
+    expect(parser.usage()).toEqual({ inputTokens: 900, outputTokens: 90 });
     expect(parser.outcome().usage).toEqual(parser.usage());
   });
 
@@ -989,7 +989,7 @@ describe('live usage', () => {
     const parser = createClaudeRuntime('/bin/claude').createParser();
     parser.push(assistant('m1', 100, 10));
     parser.push(assistant('m2', 200, 20));
-    expect(parser.outcome().usage).toEqual({ inputTokens: 300, outputTokens: 30, costUsd: null });
+    expect(parser.outcome().usage).toEqual({ inputTokens: 300, outputTokens: 30 });
   });
 
   it('ignores assistant events without usage', () => {
@@ -1010,9 +1010,9 @@ describe('live usage', () => {
         part: { type: 'step-finish', tokens: { input, output }, cost: 0.25 },
       });
     parser.push(step(10, 1));
-    expect(parser.usage()).toEqual({ inputTokens: 10, outputTokens: 1, costUsd: 0.25 });
+    expect(parser.usage()).toEqual({ inputTokens: 10, outputTokens: 1 });
     parser.push(step(20, 2));
-    expect(parser.usage()).toEqual({ inputTokens: 30, outputTokens: 3, costUsd: 0.5 });
+    expect(parser.usage()).toEqual({ inputTokens: 30, outputTokens: 3 });
     expect(parser.outcome().usage).toEqual(parser.usage());
   });
 });

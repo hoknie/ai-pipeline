@@ -26,7 +26,7 @@ describe('RunAttemptHistoryService', () => {
          (run_id, group_slug, seq, step_id, step_index, round, specialist, runtime, model, status,
           input_json, report_json, started_at, finished_at, usage_json)
          VALUES (?, '_repair', 1, 'repair', 0, 1, 'observer', 'claude', 'old-model', 'finished',
-          '{}', '{"verdict":"done"}', 10, 20, '{"inputTokens":0,"outputTokens":7,"costUsd":null}')`,
+          '{}', '{"verdict":"done"}', 10, 20, '{"inputTokens":0,"outputTokens":7}')`,
       )
       .run(state.run.id);
 
@@ -39,7 +39,7 @@ describe('RunAttemptHistoryService', () => {
           runtime: 'claude',
           model: 'old-model',
           result: 'done',
-          usage: { inputTokens: 0, outputTokens: 7, costUsd: null },
+          usage: { inputTokens: 0, outputTokens: 7 },
         },
       ],
     });

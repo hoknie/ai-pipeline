@@ -23,7 +23,7 @@ describe('Antigravity output', () => {
       sessionId: 'conv-1',
       error: null,
       denials: [],
-      usage: { inputTokens: 150, outputTokens: 10, costUsd: null },
+      usage: { inputTokens: 150, outputTokens: 10 },
     });
     const copy = parser.usage()!;
     copy.inputTokens = 1;
@@ -45,7 +45,7 @@ describe('Antigravity output', () => {
       }),
     );
     expect(parser.outcome().sessionId).toBe('conv-2');
-    expect(parser.usage()).toEqual({ inputTokens: 130, outputTokens: 7, costUsd: null });
+    expect(parser.usage()).toEqual({ inputTokens: 130, outputTokens: 7 });
   });
 
   it.each([true, false])(
@@ -63,9 +63,7 @@ describe('Antigravity output', () => {
           },
         }),
       );
-      expect(parser.usage()).toEqual(
-        steps ? { inputTokens: 30, outputTokens: 5, costUsd: null } : null,
-      );
+      expect(parser.usage()).toEqual(steps ? { inputTokens: 30, outputTokens: 5 } : null);
     },
   );
 

@@ -103,7 +103,7 @@ The group "Projects" of "Shared" manages the [projects of the daemon](../usage/r
 - The form "Attachments" sets the shared `attachments` section: choose "Local folder" (the default) or "S3", then set the bucket, region (`us-east-1` by default), endpoint, prefix (`aip/attachments/` by default) and path-style addressing (off by default).
   S3 fields are unavailable while "Local folder" is selected. The status card shows only whether `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are set in the daemon environment, not their values; S3 without credentials shows a warning.
   Credentials must be set in the daemon environment (optional `AWS_SESSION_TOKEN`); restart the daemon after changing credentials. Switching storage applies to new attachments without restarting and does not move existing attachments. See [Attachment storage](../configuration/attachments.md).
-- The form "Statistics" sets the `stats` section of the shared settings: "Collect statistics", "Show cost" and the excluded projects. See [Statistics](stats.md).
+- The form "Statistics" sets the `stats` section of the shared settings: "Collect statistics" and the excluded projects. See [Statistics](stats.md).
   - Excluded projects are chosen from the list of projects, with the path. A path that is not in the list is marked "not in the registry" and can be removed.
   - An excluded project is no longer collected and is hidden from the reports; its records stay.
   - Changes apply without restarting the daemon.
