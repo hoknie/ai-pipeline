@@ -3,6 +3,7 @@ import type { AgentsService } from '../../agents/services/index.ts';
 import type { NetworkMonitor } from '../../network/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
+import { defaultQueue } from '../../swarm-config/types/index.ts';
 import type {
   AgentExitPort,
   DiffPort,
@@ -74,9 +75,14 @@ export function createRunsServices(dependencies: RunsDependencies): RunsServices
     network: () => dependencies.network.snapshot(),
     limit: () => {
       const queue = dependencies.config.queueSettings();
-      return typeof queue !== 'string' && queue.scope === 'global'
-        ? { kind: 'machine', max: queue.max }
-        : { kind: 'repository' };
+      // A wrong `queue` section: the project mode with the default limit and no pools.
+      const settings = typeof queue === 'string' ? defaultQueue() : queue;
+      return {
+        kind: settings.scope === 'global' ? 'machine' : 'repository',
+        max: settings.max,
+        pools: settings.pools,
+        defaultPool: settings.defaultPool,
+      };
     },
   });
   const effects = new RunEffects({ ...dependencies, context: engine });

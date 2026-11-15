@@ -141,12 +141,14 @@ describe('admission', () => {
 
 describe('worker pool of observers', () => {
   const none = new Map<string, number>();
+  /** After every pause: the tests here care about the pool, not about pacing. */
+  const NOW = Number.POSITIVE_INFINITY;
 
   it('takes the oldest incidents first, up to workers', () => {
     const newer = failedRun('run000000001', 5000);
     const older = failedRun('run000000002', 1000);
     const third = failedRun('run000000003', 3000);
-    const plan = planRepairs(settings({ workers: 2 }), [newer, older, third], none);
+    const plan = planRepairs(settings({ workers: 2 }), [newer, older, third], none, NOW);
     expect(plan.map((start) => start.state.run.id)).toEqual(['run000000002', 'run000000003']);
   });
 
@@ -154,34 +156,71 @@ describe('worker pool of observers', () => {
     const busy = failedRun('run000000001');
     busy.run.repair.incident = incidentOf(busy);
     const other = failedRun('run000000002');
-    expect(planRepairs(settings(), [busy, other], none)).toEqual([]);
-    expect(planRepairs(settings({ workers: 2 }), [busy, other], none)).toHaveLength(1);
+    expect(planRepairs(settings(), [busy, other], none, NOW)).toEqual([]);
+    expect(planRepairs(settings({ workers: 2 }), [busy, other], none, NOW)).toHaveLength(1);
     const limited = settings({
       workers: 5,
       projects: [{ repository: '/repo', maxWorkers: 1 }],
     });
-    expect(planRepairs(limited, [busy, other], none)).toEqual([]);
+    expect(planRepairs(limited, [busy, other], none, NOW)).toEqual([]);
   });
 
   it('starts nothing when off, held by a limit of the runtime, or a task has a repair', () => {
     const state = failedRun('run000000001');
-    expect(planRepairs(settings({ enabled: false }), [state], none)).toEqual([]);
-    expect(planRepairs(settings(), [state], new Map([['claude', 9]]))).toEqual([]);
+    expect(planRepairs(settings({ enabled: false }), [state], none, NOW)).toEqual([]);
+    expect(planRepairs(settings(), [state], new Map([['claude', 9]]), NOW)).toEqual([]);
     expect(
       planRepairs(
         settings({ specialist: { runtime: 'opencode' } }),
         [state],
         new Map([['claude', 9]]),
+        NOW,
       ),
     ).toHaveLength(1);
     state.run.repair.incident = incidentOf(state);
-    expect(planRepairs(settings(), [state], none)).toEqual([]);
+    expect(planRepairs(settings(), [state], none, NOW)).toEqual([]);
   });
 
   it('stops giving a task to observers after maxRepairs', () => {
     const state = failedRun('run000000001');
     state.run.repair.repairs = 5;
-    expect(planRepairs(settings(), [state], none)).toEqual([]);
+    expect(planRepairs(settings(), [state], none, NOW)).toEqual([]);
+  });
+});
+
+describe('pause after a failed repair', () => {
+  const none = new Map<string, number>();
+
+  it('takes no incident during the pause, however many times the runs are reviewed', () => {
+    const state = failedRun('run000000001');
+    state.run.repair.retryAt = 10_000;
+    expect(planRepairs(settings(), [state], none, 5_000)).toEqual([]);
+    expect(planRepairs(settings(), [state], none, 9_999)).toEqual([]);
+    expect(planRepairs(settings(), [state], none, 9_999)).toEqual([]);
+  });
+
+  it('takes the incident again once the pause is over', () => {
+    const state = failedRun('run000000001');
+    state.run.repair.retryAt = 10_000;
+    expect(planRepairs(settings(), [state], none, 10_000)).toHaveLength(1);
+    expect(planRepairs(settings(), [state], none, 10_001)).toHaveLength(1);
+  });
+
+  it('takes a task without a pause at once, also when another task waits', () => {
+    const paused = failedRun('run000000001');
+    paused.run.repair.retryAt = 10_000;
+    const ready = failedRun('run000000002');
+    const plan = planRepairs(settings({ workers: 2 }), [paused, ready], none, 5_000);
+    expect(plan.map((start) => start.state.run.id)).toEqual(['run000000002']);
+  });
+
+  it('still answers takesIncident for a task in the pause', () => {
+    const state = failedRun('run000000001');
+    state.run.repair.retryAt = 10_000;
+    const policy = repairPolicy(settings());
+    expect(policy.takesIncident(state)).toBe(true);
+    expect(policy.admitted(state)).toBe(true);
+    expect(repairAdmitted(state, settings())).toBe(true);
   });
 });
 
@@ -239,6 +278,7 @@ describe('unavailable runtimes', () => {
   }
   const off = (_repository: string, runtime: string) => runtime === 'claude';
   const none = new Map<string, number>();
+  const NOW = Number.POSITIVE_INFINITY;
 
   it.each(['runtime_disabled', 'runtime_not_found'] as const)(
     'hides a group that failed with %s while its runtime is unavailable',
@@ -248,8 +288,8 @@ describe('unavailable runtimes', () => {
       expect(repairIncidents(state)).toHaveLength(1);
       expect(repairIncidents(state, off)).toEqual([]);
       expect(repairIncidents(state, () => false)).toHaveLength(1);
-      expect(planRepairs(settings(), [state], none, off)).toEqual([]);
-      expect(planRepairs(settings(), [state], none)).toHaveLength(1);
+      expect(planRepairs(settings(), [state], none, NOW, off)).toEqual([]);
+      expect(planRepairs(settings(), [state], none, NOW)).toHaveLength(1);
     },
   );
 
@@ -263,7 +303,7 @@ describe('unavailable runtimes', () => {
     expect(observerRuntime(settings())).toBe('claude');
     expect(observerRuntime(settings({ specialist: { runtime: 'opencode' } }))).toBe('opencode');
     expect(repairAdmitted(state, settings(), off)).toBe(false);
-    expect(planRepairs(settings(), [state], none, off)).toEqual([]);
+    expect(planRepairs(settings(), [state], none, NOW, off)).toEqual([]);
     expect(repairAdmitted(state, settings({ specialist: { runtime: 'opencode' } }), off)).toBe(
       true,
     );

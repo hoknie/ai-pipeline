@@ -15,6 +15,7 @@ Without `repo`, a tool works with the repository of the current directory. `repo
 | `swarm_group` | `run_id`, `group`, `tail_lines?` | Step attempts, verdicts, remarks, tokens and the tail of the log |
 | `swarm_cancel` | `run_id`, `group?` | Stops a group or a whole run |
 | `swarm_retry` | `run_id`, `group`, `refresh_config?` | Retries a failed or cancelled step from where it stopped, or retries the merge after a conflict. `refresh_config: true` first takes the whole specialists from the current configuration, as `aip group retry --refresh-config` |
+| `swarm_run_variant` | `run_id`, `variant` | Switches a run that is not finished to another variant of its pipeline; a running step whose specialist, model or prompt changes is stopped without a commit and starts again. The `skip` of the variant is not applied |
 | `swarm_skip_step` | `run_id`, `step`, `skip?` | Skips a step that is running or still ahead (`skip=false` brings it back); a running step is stopped without a commit |
 | `swarm_answer` | `run_id`, `group`, `answer` | Answers a specialist who is waiting for a human decision |
 | `swarm_apply` | `run_id`, `groups?`, `force?` | Delivers ready groups (the command is `aip run apply`) |

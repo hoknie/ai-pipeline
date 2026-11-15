@@ -858,6 +858,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     message: vi.fn(async () => ({})),
     retry: vi.fn(async () => ({})),
     skipStep: vi.fn(async () => ({})),
+    setRunVariant: vi.fn(async () => runView()),
     cancel: vi.fn(async () => ({})),
     apply: vi.fn(async () => ({ runId: 'run1', number: 1, pending: false, groups: [] })),
     markDelivered: vi.fn(async () => ({ runId: 'run1', number: 1, pending: false, groups: [] })),

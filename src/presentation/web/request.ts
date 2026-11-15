@@ -52,13 +52,19 @@ function historyQuery(search: URLSearchParams): object {
   return result;
 }
 
-/** `since`, `until` and `repository` of `/api/stats`; the moments are whole milliseconds. */
+/** `since`, `until`, `repository` and `bucket` of `/api/stats`; the moments are whole milliseconds. */
 function statsQuery(search: URLSearchParams): {
   since?: number;
   until?: number;
   repository?: string;
+  bucket?: 'auto' | '6h' | 'day' | 'week';
 } {
-  const result: { since?: number; until?: number; repository?: string } = {};
+  const result: {
+    since?: number;
+    until?: number;
+    repository?: string;
+    bucket?: 'auto' | '6h' | 'day' | 'week';
+  } = {};
   for (const key of ['since', 'until'] as const) {
     const value = search.get(key);
     if (value === null) continue;
@@ -73,6 +79,12 @@ function statsQuery(search: URLSearchParams): {
     if (!isAbsolute(repository) && !isProjectSlug(repository))
       throw panel('invalid', 'repository must be an absolute path or a project slug');
     result.repository = repository;
+  }
+  const bucket = search.get('bucket');
+  if (bucket !== null && bucket !== '') {
+    if (bucket !== 'auto' && bucket !== '6h' && bucket !== 'day' && bucket !== 'week')
+      throw panel('invalid', 'bucket must be auto, 6h, day or week');
+    result.bucket = bucket;
   }
   return result;
 }

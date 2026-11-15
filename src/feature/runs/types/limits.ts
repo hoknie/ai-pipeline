@@ -7,7 +7,8 @@ import type {
 import type { Attempt } from './attempt.ts';
 import { COMMAND_RUNTIME, USAGE_LIMIT_FALLBACK_MS, type AttemptRuntime } from './constants.ts';
 import { NETWORK_RETRY_MS } from '../../network/types/index.ts';
-import { type Group, isRepairGroup } from './group.ts';
+import { type Group } from './group.ts';
+import type { PoolConfig } from './pools/pools.ts';
 import { type RunState, allGroups } from './run.ts';
 
 /** When the usage limit of an attempt that ran out of it resets; null for other attempts. */
@@ -41,31 +42,35 @@ export function limitHolds(states: Iterable<RunState>, now: number): Map<string,
 }
 
 /**
- * What caps the specialists that work at once: `swarm.max` of each repository, or one number for
- * the whole machine (the global queue mode).
+ * What caps the agent attempts that work at once: `max` of the machine (`queue.max`) in both queue
+ * modes, `swarm.max` of each repository in `repository` (the project mode), and the quotas of the pools.
  */
-export type DispatchLimit = { kind: 'repository' } | { kind: 'machine'; max: number };
+export interface DispatchLimit extends PoolConfig {
+  kind: 'repository' | 'machine';
+  max: number;
+}
 
-/** The key the specialists are counted under: their repository, or one key for the machine. */
-export const MACHINE_KEY = '*';
+/** No limit of the machine and no pools: only `swarm.max` of each repository. */
+export const REPOSITORY_LIMIT: DispatchLimit = {
+  kind: 'repository',
+  max: Number.POSITIVE_INFINITY,
+  pools: [],
+  defaultPool: null,
+};
 
-/** Running attempts of each repository. */
-export function runningByRepository(
-  states: RunState[],
-  limit: DispatchLimit = { kind: 'repository' },
-): Map<string, number> {
+/** Running agent attempts of each repository, repair included. */
+export function runningByRepository(states: RunState[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const state of states) {
     const running = allGroups(state).reduce(
       (count, group) =>
         count +
-        (isRepairGroup(group) ? [] : group.attempts).filter(
+        group.attempts.filter(
           (attempt) => attempt.status === 'running' && attempt.runtime !== COMMAND_RUNTIME,
         ).length,
       0,
     );
-    const repository = limit.kind === 'machine' ? MACHINE_KEY : state.run.repository;
-    counts.set(repository, (counts.get(repository) ?? 0) + running);
+    counts.set(state.run.repository, (counts.get(state.run.repository) ?? 0) + running);
   }
   return counts;
 }
@@ -89,7 +94,6 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const state of states) {
     for (const group of allGroups(state)) {
-      if (isRepairGroup(group)) continue;
       for (const attempt of group.attempts) {
         if (attempt.status !== 'running' || attempt.runtime === COMMAND_RUNTIME) continue;
         counts.set(attempt.specialist, (counts.get(attempt.specialist) ?? 0) + 1);
@@ -103,7 +107,9 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
 export type GroupWait =
   | { reason: 'limit'; runtime: string; until: number }
   | { reason: 'specialist'; specialist: string; name: string; max: number }
-  | { reason: 'capacity'; max: number }
+  | { reason: 'pool'; pool: string; max: number }
+  /** `machine`: `queue.max` is taken; `repository`: `swarm.max` of the project mode. */
+  | { reason: 'capacity'; scope: 'machine' | 'repository'; max: number }
   /** The network is down (`until` null) or the last attempt failed because of it (`until`: retry). */
   | { reason: 'network'; problem: string; until: number | null };
 
@@ -142,16 +148,7 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
         : {}),
     };
   }
-  const chain = chains.find((c) => c.slug === specialist.runtimeChain);
-  if (!chain || !chain.enabled) {
-    return { runtime: defaults.runtime, model: null };
-  }
-  const enabledItems = chain.runtimes
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => item.enabled);
-  if (enabledItems.length === 0) {
-    return { runtime: defaults.runtime, model: null };
-  }
+  // A resumed attempt keeps its runtime and model even when the chain is off or has no items.
   if (resume || keepRuntime) {
     const prev = [...attempts].reverse().find((a) => a.stepIndex === stepIndex);
     if (prev) {
@@ -165,6 +162,16 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
           : {}),
       };
     }
+  }
+  const chain = chains.find((c) => c.slug === specialist.runtimeChain);
+  if (!chain || !chain.enabled) {
+    return { runtime: defaults.runtime, model: null };
+  }
+  const enabledItems = chain.runtimes
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.enabled);
+  if (enabledItems.length === 0) {
+    return { runtime: defaults.runtime, model: null };
   }
   return pickChainItem(
     chain.mode,

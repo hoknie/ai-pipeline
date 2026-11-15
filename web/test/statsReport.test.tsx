@@ -42,6 +42,7 @@ describe('useStatsReport', () => {
     await waitFor(() => expect(api.statsReport).toHaveBeenCalled());
     const query = vi.mocked(api.statsReport).mock.calls[0]?.[0];
     expect(query?.repository).toBe('/work/app');
+    expect(query?.bucket).toBe('auto');
     expect(typeof query?.since).toBe('number');
     expect(query?.until).toBeUndefined();
   });
@@ -50,7 +51,7 @@ describe('useStatsReport', () => {
     const api = fakeApi();
     renderHook(() => useStatsReport(api, 'all', null, []));
     await waitFor(() => expect(api.statsReport).toHaveBeenCalled());
-    expect(vi.mocked(api.statsReport).mock.calls[0]?.[0]).toEqual({});
+    expect(vi.mocked(api.statsReport).mock.calls[0]?.[0]).toEqual({ bucket: 'auto' });
   });
 
   it('keeps the error and reads again on reload', async () => {

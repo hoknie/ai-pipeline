@@ -46,7 +46,7 @@ Every task gets an integer number within its repository when it is added: 1, 2, 
 With `queue.scope: global` in the shared [`settings.yaml`](../configuration/README.md#queue) one queue runs the tasks of all projects in one order. Tasks stay in their projects (number, worktree, configuration); the order is shared. When the mode is turned on, the order follows the time the tasks were added.
 
 - The state, `parallel`, autopilot, auto answer, skip failed, `on limit`, the reason for stopping, the runs holding a place and the skipped runs are those of the global queue. The settings of the project queues do not apply and are kept for the way back.
-- Specialists of all projects together are limited by `queue.max`.
+- Agents of all projects together are limited by `queue.max`, and [pools](../configuration/README.md#queue) can split these places between runtimes and models. `max` of a repository does not apply.
 - Tasks of a disabled project are not taken. The take filter selects pipelines, projects and tag names across projects; a task matches a nonempty tag filter if it has at least one of those names.
 - `aip queue start`, `pause`, `parallel`, `settings`, `move` and `list` work with the global queue. `--repo` is ignored with the warning `queue scope is global: --repo is ignored`. `aip queue add --repo` still picks the project of the task, and the task goes to the end of the order. The position of `aip queue move` is a place among the tasks of all projects.
 - A task may wait for a task of another project; the same goes for the `swarm_queue*` tools, which answer with the global queue.

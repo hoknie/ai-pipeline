@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 
 import {
   breakdownLabel,
+  buildChartCategories,
   compactNumber,
   dailySeries,
   isEmpty,
@@ -235,5 +236,67 @@ describe('labels of the breakdown rows', () => {
       other: { label: 'Other', color: '#000' },
     });
     expect(series[0]).toMatchObject({ key: 'unknown', label: '<stats.breakdown.keys.unknown>' });
+  });
+});
+
+describe('buildChartCategories', () => {
+  it('formats 6-hour buckets with label at 00:00 and interval title', () => {
+    const start0 = new Date(2026, 5, 1, 0, 0).getTime();
+    const start6 = new Date(2026, 5, 1, 6, 0).getTime();
+    const categories = buildChartCategories(
+      [
+        { ...day('2026-06-01T00:00', []), start: start0 },
+        { ...day('2026-06-01T06:00', []), start: start6 },
+      ],
+      '6h',
+      'en',
+    );
+    expect(categories[0]?.label).toBeTruthy();
+    expect(categories[0]?.title).toContain('00:00–06:00');
+    expect(categories[1]?.label).toBe('');
+    expect(categories[1]?.title).toContain('06:00–12:00');
+
+    const start18 = new Date(2026, 5, 1, 18, 0).getTime();
+    const [c18] = buildChartCategories(
+      [{ ...day('2026-06-01T18:00', []), start: start18 }],
+      '6h',
+      'en',
+    );
+    expect(c18?.title).toContain('18:00–00:00');
+  });
+
+  it('formats week buckets with start date and week range title', () => {
+    const start = new Date(2026, 5, 1).getTime();
+    const sunday = new Date(2026, 5, 7).getTime();
+    const short = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' });
+    const categories = buildChartCategories([{ ...day('2026-W23', []), start }], 'week', 'en');
+    expect(categories[0]?.label).toBe(short.format(start));
+    expect(categories[0]?.title).toBe(`${short.format(start)} – ${short.format(sunday)}`);
+  });
+
+  it('formats week buckets spanning a fall-back DST transition using calendar dates', () => {
+    const prevTz = process.env.TZ;
+    try {
+      process.env.TZ = 'Asia/Beirut';
+      const monday = new Date(2026, 9, 19, 0, 0);
+      const categories = buildChartCategories(
+        [{ ...day('2026-W43', []), start: monday.getTime() }],
+        'week',
+        'en',
+      );
+      // Fall-back transition happens Saturday night; adding fixed 6 * 86_400_000 ms lands on Sat Oct 24 23:00.
+      // Calendar date arithmetic ensures Sunday Oct 25 is used.
+      expect(categories[0]?.title).toContain('Oct 25');
+      expect(categories[0]?.title).not.toContain('Oct 24');
+    } finally {
+      process.env.TZ = prevTz;
+    }
+  });
+
+  it('formats day buckets with standard date title and label', () => {
+    const start = new Date(2026, 5, 1).getTime();
+    const categories = buildChartCategories([{ ...day('2026-06-01', []), start }], 'day', 'en');
+    expect(categories[0]?.label).toBeTruthy();
+    expect(categories[0]?.title).toBeTruthy();
   });
 });

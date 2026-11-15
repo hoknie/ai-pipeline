@@ -15,10 +15,17 @@ type EditFields = Parameters<
   Parameters<typeof import('../QueueForm.tsx').QueueForm>[0]['onSubmit']
 >[0];
 
-/** The body of an edit: a returned run keeps its task, only the predecessors can change. */
+/** The body of an edit: a returned run keeps its task, only the predecessors and the variant can change. */
 function editPayload(item: QueueItemView, fields: EditFields) {
   const after = fields.after !== undefined ? { after: fields.after } : {};
-  if (item.run !== null) return after;
+  if (item.run !== null) {
+    return {
+      ...after,
+      ...(fields.variant !== undefined && fields.variant !== item.variant
+        ? { variant: fields.variant }
+        : {}),
+    };
+  }
   return {
     pipeline: fields.pipeline,
     ...(fields.variant !== undefined ? { variant: fields.variant } : {}),

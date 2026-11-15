@@ -5,6 +5,8 @@ import { segment, type Route, type RouteKit } from './types.ts';
 
 const skipBody = z.object({ step: z.string().trim().min(1), skip: z.boolean() });
 
+const variantBody = z.object({ variant: z.string().trim().min(1) });
+
 const applyBody = z.object({
   groups: z.array(z.string().min(1)).optional(),
   force: z.boolean().optional(),
@@ -52,6 +54,14 @@ export function runsRoutes({ call }: RouteKit): Route[] {
       handle: async ([runId], body) => {
         const { step, skip } = parseBody(skipBody, body);
         return call('run_skip', { runId: runId ?? '', step, skip });
+      },
+    },
+    {
+      method: 'POST',
+      pattern: new RegExp(`^/api/runs/${segment}/variant$`),
+      handle: async ([runId], body) => {
+        const { variant } = parseBody(variantBody, body);
+        return call('run_variant', { runId: runId ?? '', variant });
       },
     },
     {

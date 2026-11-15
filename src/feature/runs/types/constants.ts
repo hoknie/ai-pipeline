@@ -70,6 +70,9 @@ export type OnLimit = (typeof ON_LIMIT_MODES)[number];
 /** How long a usage limit holds when the runtime did not say when it resets. */
 export const USAGE_LIMIT_FALLBACK_MS = 15 * 60 * 1000;
 
+/** How long a task waits before an observer takes its incident again after a failed repair. */
+export const REPAIR_RETRY_MS = 300_000;
+
 /** Why the scheduler does not start new steps of a run. */
 export const RUN_HOLDS = ['paused', 'frozen'] as const;
 

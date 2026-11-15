@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { findSpecialist } from '../../../src/feature/swarm-config/types/index.ts';
 import {
+  type FailReason,
   type Incident,
   type RunState,
   REPAIR_GROUP,
+  REPAIR_RETRY_MS,
   finishedApartFromRepair,
   isRunFinished,
+  pacesRepair,
+  refundsRepair,
   runPhase,
 } from '../../../src/feature/runs/types/index.ts';
 import {
@@ -20,6 +24,7 @@ import {
   dispatch,
   planDispatch,
   transition,
+  waitKey,
 } from '../../../src/feature/runs/machine/index.ts';
 import {
   repairIncidents,
@@ -80,6 +85,48 @@ function repairExit(state: RunState, failure: unknown = null, now = 3000): Effec
     now,
   );
 }
+
+describe('what a failure of a repair does to the count', () => {
+  const reasons: FailReason[] = [
+    { kind: 'timeout' },
+    { kind: 'no_report' },
+    { kind: 'interrupted' },
+    { kind: 'exit_code', code: 1 },
+    { kind: 'no_groups' },
+    { kind: 'runtime_not_found', runtime: 'claude' },
+    { kind: 'runtime_disabled', runtime: 'claude' },
+    { kind: 'spawn', message: 'boom' },
+    { kind: 'git', message: 'boom' },
+    { kind: 'skipped' },
+    { kind: 'usage_limit', resetsAt: null },
+    { kind: 'network', problem: 'down' },
+    { kind: 'message', text: 'стоп', at: 1 },
+    { kind: 'paused', at: 1 },
+  ];
+
+  it('refunds the repair for failures that are nobodys fault and for runtime obstacles', () => {
+    const refunded = [
+      'timeout',
+      'no_report',
+      'interrupted',
+      'runtime_not_found',
+      'runtime_disabled',
+      'spawn',
+      'usage_limit',
+      'network',
+    ];
+    for (const reason of reasons) {
+      expect(refundsRepair(reason)).toBe(refunded.includes(reason.kind));
+    }
+  });
+
+  it('paces only the failures where the agent could not run to a report', () => {
+    const paced = ['timeout', 'no_report', 'interrupted', 'spawn', 'network'];
+    for (const reason of reasons) {
+      expect(pacesRepair(reason)).toBe(paced.includes(reason.kind));
+    }
+  });
+});
 
 describe('run state with an incident under repair', () => {
   it('is not finished while the repair has no group yet', () => {
@@ -160,11 +207,14 @@ describe('end of a repair', () => {
     expect(state.run.repair.repairs).toBe(1);
   });
 
-  it('a timeout releases the incident', () => {
+  it('a timeout gives the repair back and pauses the next taking', () => {
     const { state } = repairing();
     transition(state, { kind: 'timed_out', group: REPAIR_GROUP, seq: 1 }, 3000);
+    expect(state.repair?.status).toBe('failed');
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.retryAt).toBe(3000 + REPAIR_RETRY_MS);
   });
 });
 
@@ -205,9 +255,9 @@ describe('pause during a repair', () => {
   });
 });
 
-describe('repair is outside the limits of the places', () => {
-  it('starts although swarm.max is used up and counts nothing', () => {
-    const state = run(2, { max: 1 });
+describe('repair keeps to the limits of the places', () => {
+  it('waits for swarm.max like any agent and starts when a place is free', () => {
+    const state = run(2, { max: 2 });
     step(state);
     transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 1100);
     transition(
@@ -215,10 +265,17 @@ describe('repair is outside the limits of the places', () => {
       { kind: 'repair_start', incident: incidentOf(state), specialist: profile(state) },
       1200,
     );
-    dispatch([state], 1300);
+    state.run.config.max = 1;
+    expect(dispatch([state], 1300)).toEqual([]);
+    expect(planDispatch([state], 1300).waits.get(waitKey(state.run.id, REPAIR_GROUP))).toEqual({
+      reason: 'capacity',
+      scope: 'repository',
+      max: 1,
+    });
+    state.run.config.max = 2;
+    dispatch([state], 1400);
     expect(runningAttempt(state, REPAIR_GROUP)).toBeDefined();
     expect(runningAttempt(state, 'gruppa-2')).toBeDefined();
-    expect(planDispatch([state], 1400).waits.size).toBe(0);
   });
 });
 
@@ -265,10 +322,68 @@ describe('queue view of a task under repair', () => {
     },
   );
 
-  it('does not give the repair back for a spawn failure', () => {
+  it('gives the repair back for a spawn failure, with a pause', () => {
     const { state } = repairing();
     repairExit(state, { kind: 'spawn', message: 'boom' });
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.retryAt).toBe(3000 + REPAIR_RETRY_MS);
+  });
+
+  it('the observer report spends the repair as before and sets no pause', () => {
+    const { state } = repairing();
+    finish(state, 'done', { slug: REPAIR_GROUP, now: 3000 });
     expect(state.run.repair.repairs).toBe(1);
+    expect(state.run.repair.retryAt).toBeNull();
+  });
+});
+
+describe('the pause of a failed repair', () => {
+  it('a network failure gives the repair back and sets the pause', () => {
+    const { state } = repairing();
+    repairExit(state, { kind: 'network', problem: 'down' }, 3000);
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.retryAt).toBe(3000 + REPAIR_RETRY_MS);
+  });
+
+  it.each([
+    { kind: 'usage_limit', resetsAt: 9_999_999 },
+    { kind: 'runtime_disabled', runtime: 'claude' },
+    { kind: 'runtime_not_found', runtime: 'claude' },
+  ] as const)('a %s gives the repair back without a pause', (failure) => {
+    const { state } = repairing();
+    expect(state.run.repair.repairs).toBe(1);
+    repairExit(state, failure);
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.incident).toBeNull();
+    expect(state.run.repair.retryAt).toBeNull();
+  });
+
+  it('a crash leaves the count and sets no pause', () => {
+    const { state } = repairing();
+    repairExit(state, { kind: 'crash', message: 'boom' });
+    expect(state.run.repair.repairs).toBe(1);
+    expect(state.run.repair.retryAt).toBeNull();
+  });
+
+  it('a new repair clears the pause', () => {
+    const { state } = repairing();
+    transition(state, { kind: 'timed_out', group: REPAIR_GROUP, seq: 1 }, 3000);
+    expect(state.run.repair.retryAt).not.toBeNull();
+    transition(
+      state,
+      { kind: 'repair_start', incident: incidentOf(state), specialist: profile(state) },
+      4000,
+    );
+    expect(state.run.repair.retryAt).toBeNull();
+  });
+
+  it('returning the task to observers clears the pause', () => {
+    const { state } = repairing();
+    transition(state, { kind: 'timed_out', group: REPAIR_GROUP, seq: 1 }, 3000);
+    expect(state.run.repair.retryAt).not.toBeNull();
+    transition(state, { kind: 'repair_allowed', allowed: false }, 3100);
+    transition(state, { kind: 'repair_allowed', allowed: true }, 3200);
+    expect(state.run.repair).toMatchObject({ allowed: true, repairs: 0, retryAt: null });
   });
 });
 
@@ -404,17 +519,32 @@ describe('repair of a delivery', () => {
     expect(state.groups[0]?.delivery.state).toBe('apply_failed');
   });
 
-  it('is not resumed after a restart: the incident is taken again', () => {
+  it('is not resumed after a restart: the incident is taken again and paused', () => {
     const state = refusedDelivery();
     startDeliveryRepair(state);
+    expect(state.run.repair.repairs).toBe(1);
     transition(state, { kind: 'resolve_prepared', conflicts: ['src/app.ts'] }, 7100);
     dispatch([state], 7200);
     transition(state, { kind: 'interrupted' }, 8000);
     expect(state.run.pendingDelivery).toBeNull();
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.retryAt).toBe(8000 + REPAIR_RETRY_MS);
     expect(state.groups[0]?.delivery.state).toBe('apply_failed');
     expect(repairIncidents(state)).toHaveLength(2);
+  });
+
+  it('refunds and pauses delivery repair when restarted during tree preparation', () => {
+    const state = refusedDelivery();
+    startDeliveryRepair(state);
+    expect(state.run.repair.repairs).toBe(1);
+    transition(state, { kind: 'interrupted' }, 8000);
+    expect(state.run.pendingDelivery).toBeNull();
+    expect(state.run.repair.incident).toBeNull();
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.retryAt).toBe(8000 + REPAIR_RETRY_MS);
+    expect(state.repair).toBeNull();
   });
 
   it('cancelling the task during preparation drops the delivery', () => {
@@ -429,5 +559,70 @@ describe('repair of a delivery', () => {
     const { state } = repairing();
     finish(state, 'rejected', { slug: REPAIR_GROUP, now: 3000 });
     expect(() => transition(state, { kind: 'retry', group: REPAIR_GROUP }, 3100)).toThrow();
+  });
+});
+
+describe('repair and the limit of its specialist', () => {
+  const LIMITED = CONFIG_TEXT.replace(
+    'coder: { name: Кодировщик,',
+    'coder: { name: Кодировщик, max: 1,',
+  );
+
+  /** A run that failed and has a repair of the coder queued. */
+  function repairOf(): RunState {
+    const state = failedRun({ configText: LIMITED });
+    startRepair(state);
+    return state;
+  }
+
+  /** A run whose only group waits for the coder (or already runs it). */
+  function coderRun(id: string, running: boolean): RunState {
+    const state = run(1, { id, now: 3000, configText: LIMITED });
+    state.run.repository = '/other';
+    step(state);
+    finish(state, 'done');
+    if (running) step(state, 2600);
+    return state;
+  }
+
+  it('makes the repair wait while an ordinary attempt of the same specialist works', () => {
+    const state = repairOf();
+    const coder = coderRun('run000000002', true);
+    const plan = planDispatch([state, coder], 4000);
+    expect(plan.start).toEqual([]);
+    expect(plan.waits.get(waitKey(state.run.id, REPAIR_GROUP))).toMatchObject({
+      reason: 'specialist',
+      specialist: 'coder',
+      max: 1,
+    });
+  });
+
+  it('makes an ordinary attempt wait while the repair of the same specialist works', () => {
+    const state = repairOf();
+    dispatch([state], 2100);
+    expect(runningAttempt(state, REPAIR_GROUP).specialist).toBe('coder');
+    const coder = coderRun('run000000002', false);
+    const plan = planDispatch([state, coder], 4000);
+    expect(plan.start).toEqual([]);
+    expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toMatchObject({
+      reason: 'specialist',
+      specialist: 'coder',
+    });
+  });
+
+  it('keeps the old way round a usage limit hold of the runtime', () => {
+    const state = repairOf();
+    const attempt = state.groups[0]!.attempts[0]!;
+    state.groups[0]!.attempts.push({
+      ...attempt,
+      seq: 2,
+      status: 'failed',
+      runtime: 'opencode',
+      reason: { kind: 'usage_limit', resetsAt: 90_000 },
+      finishedAt: 2000,
+    });
+    const plan = planDispatch([state], 3000);
+    expect(plan.waits.get(waitKey(state.run.id, REPAIR_GROUP))).toBeUndefined();
+    expect(plan.start.map((entry) => entry.group.slug)).toEqual([REPAIR_GROUP]);
   });
 });

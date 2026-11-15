@@ -6,8 +6,8 @@ import {
   COMMAND_RUNTIME,
   actionOf,
   buildInput,
-  limitHolds,
-  selectAttemptRuntime,
+  REPOSITORY_LIMIT,
+  type SelectedRuntime,
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
@@ -19,12 +19,12 @@ export function dispatch(
   states: RunState[],
   now: number,
   network: NetworkSnapshot = OFF_NETWORK,
-  limit: DispatchLimit = { kind: 'repository' },
+  limit: DispatchLimit = REPOSITORY_LIMIT,
 ): Effect[] {
-  return planDispatch(states, now, network, limit).start.map(({ state, group }) => {
+  return planDispatch(states, now, network, limit).start.map(({ state, group, selected }) => {
     const attempt = isCommandAction(state, group)
       ? startCommand(state, group, now)
-      : startAttempt(state, group, now);
+      : startAttempt(state, group, now, selected);
     return {
       kind: attempt.runtime === COMMAND_RUNTIME ? 'run_action' : 'start_attempt',
       run: state.run.id,
@@ -81,7 +81,13 @@ function startCommand(state: RunState, group: Group, now: number): Attempt {
   return attempt;
 }
 
-function startAttempt(state: RunState, group: Group, now: number): Attempt {
+/** Starts the attempt on the runtime and model the plan chose, so the pool it counted is the pool it takes. */
+function startAttempt(
+  state: RunState,
+  group: Group,
+  now: number,
+  selected: SelectedRuntime | undefined,
+): Attempt {
   const pending = group.pending;
   if (pending === null) throw new Error(`group ${group.slug} has nothing to start`);
   const step = stepsOf(state.run, group)[pending.stepIndex];
@@ -95,19 +101,7 @@ function startAttempt(state: RunState, group: Group, now: number): Attempt {
       previousOfStep.findLast((attempt) => attempt.resumeSession !== null)?.resumeSession ??
       null)
     : null;
-  const holds = limitHolds([state], now);
-  const selected = selectAttemptRuntime({
-    specialist,
-    chains: state.run.config.chains,
-    defaults: state.run.config.defaults,
-    limitHolds: holds,
-    attempts: group.attempts,
-    stepIndex: pending.stepIndex,
-    round: previousOfStep.length + 1,
-    resume: pending.resume,
-    keepRuntime: pending.keepRuntime ?? false,
-    seed: (group.attempts.at(-1)?.seq ?? 0) + now,
-  });
+  if (!selected) throw new Error(`group ${group.slug} has no runtime chosen`);
   const attempt: Attempt = {
     seq: (group.attempts.at(-1)?.seq ?? 0) + 1,
     stepId: step.id,

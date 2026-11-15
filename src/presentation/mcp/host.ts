@@ -12,6 +12,7 @@ import {
   registerRun,
   registerSkipStep,
   registerStatus,
+  registerVariant,
 } from './host-runs.ts';
 import {
   registerQueue,
@@ -41,6 +42,7 @@ export function createHostServer(options: HostOptions): McpServer {
     registerCancel,
     registerRetry,
     registerSkipStep,
+    registerVariant,
     registerAnswer,
     registerApply,
     registerMarkDelivered,

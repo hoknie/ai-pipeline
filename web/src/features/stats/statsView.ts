@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import type { StatsPeriodId } from '../../shared/lib/nav/route.ts';
 import type { StatsReportView } from '../../shared/api/types.ts';
 import { foldSeries, type ChartSeries } from '../../shared/ui/charts/scale.ts';
+import type { ChartCategory } from '../../shared/ui/charts/index.ts';
 
 type Totals = StatsReportView['totals'];
 type PerTask = StatsReportView['perTask'];
@@ -241,4 +242,45 @@ export function projectShares(
 /** Whether the report has nothing to show in its period. */
 export function isEmpty(report: StatsReportView): boolean {
   return report.totals.tasks === 0 && report.totals.attempts === 0;
+}
+
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+export function buildChartCategories(
+  series: StatsReportView['series'],
+  bucket: '6h' | 'day' | 'week',
+  language: string,
+): ChartCategory[] {
+  const short = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' });
+  const long = new Intl.DateTimeFormat(language, { dateStyle: 'medium' });
+
+  return series.map((day) => {
+    if (bucket === '6h') {
+      const date = new Date(day.start);
+      const startHour = pad(date.getHours());
+      const endHour = pad(
+        new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate(),
+          date.getHours() + 6,
+        ).getHours(),
+      );
+      const label = date.getHours() === 0 ? short.format(day.start) : '';
+      const title = `${long.format(day.start)}, ${startHour}:00–${endHour}:00`;
+      return { key: day.day, label, title };
+    }
+    if (bucket === 'week') {
+      const date = new Date(day.start);
+      const endMs = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 6).getTime();
+      const label = short.format(day.start);
+      const title = `${short.format(day.start)} – ${short.format(endMs)}`;
+      return { key: day.day, label, title };
+    }
+    return {
+      key: day.day,
+      label: short.format(day.start),
+      title: long.format(day.start),
+    };
+  });
 }

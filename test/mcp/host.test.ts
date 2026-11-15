@@ -892,6 +892,39 @@ describe('host MCP texts', () => {
   });
 });
 
+describe('host MCP swarm_run_variant', () => {
+  it('sends run_variant and answers with the view of the run', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return runView(run(1), 1000);
+    });
+    const tool = (await client.listTools()).tools.find((item) => item.name === 'swarm_run_variant');
+    expect(tool?.description).toContain('starts again');
+    const switched = await client.callTool({
+      name: 'swarm_run_variant',
+      arguments: { run_id: 'run000000001', variant: 'strong' },
+    });
+    expect(switched.isError).toBeFalsy();
+    expect(textOf(switched)).toContain('run000000001');
+    expect(calls).toEqual([
+      { method: 'run_variant', params: { runId: 'run000000001', variant: 'strong' } },
+    ]);
+  });
+
+  it('reports a refusal of the daemon as a tool error', async () => {
+    const client = await connect(async () => {
+      throw new Error('unknown variant `fast` of pipeline `feature`; known: default, strong');
+    });
+    const result = await client.callTool({
+      name: 'swarm_run_variant',
+      arguments: { run_id: 'run000000001', variant: 'fast' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('unknown variant');
+  });
+});
+
 describe('host MCP swarm_skip_step', () => {
   it('sends run_skip, skipping by default and bringing back with skip=false', async () => {
     const calls: unknown[] = [];

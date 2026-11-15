@@ -84,13 +84,17 @@ export function statusInfo(code: string, t: TFunction): StatusInfo {
   };
 }
 
-/** Why a group waits, for people: the busy specialist, the full swarm, the usage limit or the network. */
+/** Why a group waits, for people: the busy specialist, the full pool, the machine or the repository limit, the usage limit or the network. */
 export function waitText(wait: GroupWait, t: TFunction): string {
   switch (wait.reason) {
     case 'specialist':
       return t('wait.specialist', { specialist: wait.name ?? wait.specialist, max: wait.max });
+    case 'pool':
+      return t('wait.pool', { pool: wait.pool, max: wait.max });
     case 'capacity':
-      return t('wait.capacity', { max: wait.max });
+      return wait.scope === 'machine'
+        ? t('wait.capacityMachine', { max: wait.max })
+        : t('wait.capacityRepository', { max: wait.max });
     case 'limit':
       return t('wait.limit', { runtime: wait.runtime, time: clock(wait.until) });
     case 'network':

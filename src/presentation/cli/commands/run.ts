@@ -16,7 +16,14 @@ import { usage, type CliIo } from '../io.ts';
 import { linkInputsOf } from '../links.ts';
 import { attachmentSources, collect, parseDeliveryMode, readGroups } from '../options.ts';
 import { watch } from '../watch.ts';
-import { addApply, addClean, addMarkDelivered, addPause, addSkip } from './run-delivery.ts';
+import {
+  addApply,
+  addClean,
+  addMarkDelivered,
+  addPause,
+  addSkip,
+  addVariant,
+} from './run-delivery.ts';
 
 function runKit(program: Command, io: CliIo, style: Style) {
   const { print, output, examples, context, activeStyle } = bind(io, style);
@@ -239,5 +246,5 @@ function addCancel(kit: RunKit): void {
 export function registerRun(program: Command, io: CliIo, style: Style): void {
   const kit = runKit(program, io, style);
   for (const add of [addStart, addList, addTag, addUntag, addShow, addWatch, addCancel]) add(kit);
-  for (const add of [addPause, addApply, addMarkDelivered, addSkip, addClean]) add(kit);
+  for (const add of [addPause, addApply, addMarkDelivered, addSkip, addVariant, addClean]) add(kit);
 }

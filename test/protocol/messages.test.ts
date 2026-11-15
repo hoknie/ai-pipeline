@@ -587,6 +587,12 @@ describe('tag requests', () => {
     bad('run_skip', { runId: 'r', step: 'qa' });
   });
 
+  it('accepts run_variant only with a non-empty variant', () => {
+    ok('run_variant', { runId: 'r', variant: 'strong' });
+    bad('run_variant', { runId: 'r', variant: '  ' });
+    bad('run_variant', { runId: 'r' });
+  });
+
   it('takes a run id in run_auto_deliver_cancel', () => {
     ok('run_auto_deliver_cancel', { runId: 'r' });
     bad('run_auto_deliver_cancel', {});

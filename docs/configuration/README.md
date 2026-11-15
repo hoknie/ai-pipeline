@@ -132,13 +132,31 @@ Shared directory only: the section in a project is an error.
 ```yaml
 queue:
   scope: project    # project | global
-  max: 5            # specialists running at once on the machine in the global mode, 1..32
+  max: 5            # agent attempts running at once on the machine, 1..32, in both modes
+  pools:            # optional quotas by runtime and model
+    claude: { max: 2, members: [claude] }
+    mix: { max: 2, members: ["opencode:google/*", "opencode:openai/*"] }
+    glm: { max: 1, members: ["opencode:zai/*"] }
+  default_pool: { max: 1 }   # required with pools: every attempt no pool takes
 ```
 
 - `scope: project` (default): every project has its own queue, and [`max`](#max) is counted per repository.
-- `scope: global`: one [global queue](../usage/queue.md#global-queue) takes the tasks of all projects in one order, and `queue.max` limits the specialists of all repositories together instead of `max`. A [specialist's `max`](specialists.md#limits) applies in both modes.
+- `scope: global`: one [global queue](../usage/queue.md#global-queue) takes the tasks of all projects in one order, and `max` of a repository does not apply.
+- `queue.max` limits the agent attempts of all repositories together in both modes; direct runs and repairs count, shell commands of actions do not. In the `project` mode `max` of the repository applies on top, and a [specialist's `max`](specialists.md#limits) in both.
+- `queue.max` is not [`parallel`](../usage/queue.md#running-the-queue): `parallel` limits the runs of a queue, `queue.max` the agents working at once.
 
-Changing `scope` pauses every queue; running runs go on. A wrong value is reported as `swarm.queue.scope` or `swarm.queue.max` and the mode stays as it was.
+Pools are quotas for a runtime and a model:
+
+- Selectors are case-sensitive: `claude`, `agy`, `opencode` (an OpenCode agent without an explicit model) and `opencode:provider/model`, where a trailing `*` makes a prefix (`opencode:google/*`).
+- A selector may be in one pool only, and selectors of different pools may not overlap. `max` is 1 to 32 and `members` is not empty. The quotas need not add up to `queue.max`.
+- An attempt takes a place in the pool of the runtime and model it starts with, otherwise in `default_pool`. Give OpenCode agents an explicit `model: provider/model` to count them exactly. Without `pools` there are no quotas.
+- Quotas are strict: an idle pool lends nothing to a full one, and a full pool never switches a [runtime chain](runtimes.md#runtime-chains) to another runtime: the attempt waits for its pool. A resumed attempt keeps the runtime and model of the previous one.
+
+Lowering a limit or a quota stops no running agent: new attempts wait until enough finish. Places are counted by the runtime and model the running attempts started with. After a restart interrupted attempts take no places.
+
+A wrong value is reported as `swarm.queue.scope`, `swarm.queue.max` or `swarm.queue.pools.<name>.…`; the daemon then works in the `project` mode with `queue.max` 5 and no pools. Check the file with `aip config check`. Changing `scope` pauses every queue; running runs go on.
+
+Limits written through the panel or the settings API apply to waiting groups at once. After a hand edit of `settings.yaml` the daemon takes them at its next scheduling event (a run starting, finishing or changing) or at a restart.
 
 ### `workspace`
 

@@ -252,6 +252,10 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
       services.observers.request();
       // The queue mode is a setting of the shared settings.yaml.
       services.queue.scope.request();
+      // The limits and the pools are settings of the same file: the waits and the free places are
+      // looked at again, queued after the change of the mode, without a run event.
+      const { engine } = services.runs;
+      void engine.serial(() => engine.schedule()).catch(() => undefined);
     },
   });
   ports.processes.set(publications.processes);

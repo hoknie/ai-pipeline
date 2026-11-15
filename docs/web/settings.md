@@ -13,7 +13,9 @@ Fields of `web.*`, `runtimes.*`, `network.*`, `attachments.*`, `queue.*` and `st
 
 ### Queue group
 
-The group "Queue" of "Shared" holds the [`queue`](../configuration/README.md#queue) section: "Mode" (`project` or `global`) and "Specialists at once" (`queue.max`, the limit of the machine in the global mode). It is a form with "Save". Changing the mode pauses every queue. In the global mode the group "Queue" of "Project" says that the settings of the project queue do not apply.
+The group "Queue" of "Shared" holds the [`queue`](../configuration/README.md#queue) section: "Mode" (`project` or `global`) and "Agents at once" (`queue.max`, the limit of the machine in both modes). It is a form with "Save".
+
+Quota pools (`queue.pools`, `queue.default_pool`) are written in `settings.yaml`; the hint of the field says so. A waiting group names the limit that holds it: `queue.max`, `swarm.max` or a pool. Changing the mode pauses every queue. In the global mode the group "Queue" of "Project" says that the settings of the project queue do not apply.
 
 ## Project groups
 

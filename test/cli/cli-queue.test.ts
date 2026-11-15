@@ -537,6 +537,7 @@ describe('cli', () => {
       'swarm_retry',
       'swarm_run',
       'swarm_run_pause',
+      'swarm_run_variant',
       'swarm_skip_step',
       'swarm_status',
       'swarm_task_link',

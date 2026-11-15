@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   breakdownNames,
   breakdownRows,
+  bucketSeries,
   dailySeries,
   dayOf,
   median,
   outcomesOf,
   parseStatsPeriod,
   perTaskOf,
+  resolveBucket,
   totalsOf,
   type StatsReport,
 } from '../../../src/feature/stats/types/index.ts';
@@ -210,5 +212,52 @@ describe('statistics aggregates', () => {
     expect(JSON.stringify(report)).not.toMatch(/cost/i);
     expect(report.totals.tokens).toBe(150);
     expect(report.bySpecialist[0]?.tokens).toBe(150);
+  });
+
+  it('resolves bucket granularity across 10, 11, 120 and 121 day boundaries', () => {
+    const DAY = 86_400_000;
+    expect(resolveBucket(0, 10 * DAY, 'auto')).toBe('6h');
+    expect(resolveBucket(0, 11 * DAY, 'auto')).toBe('day');
+    expect(resolveBucket(0, 120 * DAY, 'auto')).toBe('day');
+    expect(resolveBucket(0, 121 * DAY, 'auto')).toBe('week');
+    expect(resolveBucket(null, 1000, 'auto')).toBe('day');
+    expect(resolveBucket(1000, null, 'auto')).toBe('day');
+    expect(resolveBucket(0, 10 * DAY, undefined)).toBe('day');
+    expect(resolveBucket(0, 10 * DAY, 'week')).toBe('week');
+    expect(resolveBucket(0, 200 * DAY, '6h')).toBe('6h');
+  });
+
+  it('builds 6h buckets with empty slots having zeros and models/projects empty', () => {
+    const start = new Date(2026, 5, 10, 0).getTime();
+    const end = new Date(2026, 5, 10, 18).getTime();
+    const at = new Date(2026, 5, 10, 13).getTime();
+    const attempt = attemptRecord({
+      finishedAt: at,
+      repository: '/work/app',
+      inputTokens: 50,
+      outputTokens: 0,
+    });
+    const series = bucketSeries([attempt], [], start, end, '6h');
+    expect(series).toHaveLength(4);
+    expect(series.map((item) => item.day.slice(-5))).toEqual(['00:00', '06:00', '12:00', '18:00']);
+    expect(series[2]?.tokens).toBe(50);
+    expect(series[2]?.projects[0]?.repository).toBe('/work/app');
+    expect(series[0]).toMatchObject({ tokens: 0, tasks: 0, projects: [], models: [] });
+    expect(series[3]).toMatchObject({ tokens: 0, tasks: 0, projects: [], models: [] });
+  });
+
+  it('navigates weeks starting on Mondays and handles DST transitions', () => {
+    const wednesday = new Date(2026, 5, 10).getTime();
+    const nextFriday = new Date(2026, 5, 19).getTime();
+    const weekly = bucketSeries([], [], wednesday, nextFriday, 'week');
+    expect(weekly).toHaveLength(2);
+    expect(new Date(weekly[0]!.start).getDay()).toBe(1);
+    expect(new Date(weekly[1]!.start).getDay()).toBe(1);
+
+    const springDstStart = new Date(2026, 2, 29, 0).getTime();
+    const springDstEnd = new Date(2026, 2, 30, 0).getTime();
+    const dst6h = bucketSeries([], [], springDstStart, springDstEnd, '6h');
+    expect(dst6h.length).toBeGreaterThanOrEqual(4);
+    expect(dst6h.at(-1)?.day.endsWith('00:00')).toBe(true);
   });
 });

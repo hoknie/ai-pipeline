@@ -759,7 +759,7 @@ describe('waiting groups in views', () => {
 
   it('shows the full swarm as capacity', () => {
     const state = run(2);
-    const wait: GroupWait = { reason: 'capacity', max: 1 };
+    const wait: GroupWait = { reason: 'capacity', scope: 'repository', max: 1 };
     const view = runView(
       state,
       5000,
@@ -773,9 +773,20 @@ describe('waiting groups in views', () => {
     expect(single).toMatchObject({ status: 'waiting', wait });
   });
 
+  it.each<GroupWait>([
+    { reason: 'capacity', scope: 'machine', max: 5 },
+    { reason: 'capacity', scope: 'repository', max: 2 },
+    { reason: 'pool', pool: 'mix', max: 2 },
+  ])('passes the wait %j to the clients as it is', (wait) => {
+    const state = run(1);
+    const single = groupView(state, group(state), '/w', null, 5000, null, () => wait);
+    expect(single).toMatchObject({ status: 'waiting', wait });
+    expect(JSON.parse(JSON.stringify(single)).wait).toEqual(wait);
+  });
+
   it('shows a waiting system step and puts it on the topology', () => {
     const state = run(1, { split: true, configText: SPLIT_CONFIG });
-    const wait: GroupWait = { reason: 'capacity', max: 0 };
+    const wait: GroupWait = { reason: 'capacity', scope: 'repository', max: 0 };
     const view = runView(state, 5000, () => null, [], only('_split', wait));
     expect(view.system[0]).toMatchObject({ kind: 'split', status: 'waiting', wait });
     expect(view.split).toMatchObject({ status: 'waiting', wait });
@@ -1165,7 +1176,7 @@ describe('statuses of the groups of a held run', () => {
   it('shows a queued group of a held run as its hold, without a wait', () => {
     const state = run(1);
     state.run.hold = 'frozen';
-    const wait: GroupWait = { reason: 'capacity', max: 1 };
+    const wait: GroupWait = { reason: 'capacity', scope: 'repository', max: 1 };
     const view = runView(state, 1000, undefined, [], () => wait);
     expect(view.groups[0]).toMatchObject({ status: 'frozen', hold: 'frozen', wait: null });
     expect(view.counts).toBe('frozen 1');
@@ -1206,7 +1217,7 @@ describe('statuses of the groups of a held run', () => {
 
   it('has no hold on a row of a run without one', () => {
     const state = run(1);
-    const wait: GroupWait = { reason: 'capacity', max: 1 };
+    const wait: GroupWait = { reason: 'capacity', scope: 'repository', max: 1 };
     const view = runView(state, 1000, undefined, [], () => wait);
     expect(view.groups[0]).toMatchObject({ status: 'waiting', hold: null });
     expect(view.clockStoppedAt).toBeNull();
@@ -1438,7 +1449,9 @@ describe('pipeline actions in the views', () => {
       () => null,
       [],
       (_run, slug) =>
-        slug === '_action-before-split-prepare' ? { reason: 'capacity', max: 1 } : null,
+        slug === '_action-before-split-prepare'
+          ? { reason: 'capacity', scope: 'repository', max: 1 }
+          : null,
     );
     expect(view.system[0]?.status).toBe('waiting');
     expect(view.topology.stages[0]?.status).toBe('waiting');

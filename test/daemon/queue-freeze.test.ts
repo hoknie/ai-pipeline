@@ -162,16 +162,50 @@ describe('freezing for a priority run', () => {
     expect(await h.call('tags', { repository: h.repo })).toEqual(catalog);
   });
 
-  it('refuses to change the variant of a returned run, even an unknown one', async () => {
-    const h = await start(PIPELINE_CONFIG);
+  it('changes the variant of a returned run through its queue item and keeps its task', async () => {
+    const h = await start(`${PIPELINE_CONFIG}      variants:
+        careful:
+          name: Внимательный
+          steps:
+            review: { additional_prompt: "Be careful" }
+`);
     const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
     await h.call('queue_return', { runId: a });
     const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
-    for (const variant of ['light', 'fast', 'default']) {
-      await expect(
-        h.call('queue_edit', { repository: h.repo, item: item.id, variant }),
-      ).rejects.toThrow('a returned run keeps its own task');
-    }
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: item.id, variant: 'fast' }),
+    ).rejects.toThrow('unknown variant `fast`');
+    expect((await h.status(b)).variant).toBe('default');
+    await h.call('queue_edit', { repository: h.repo, item: item.id, variant: 'careful' });
+    expect(await h.status(b)).toMatchObject({ variant: 'careful', variantName: 'Внимательный' });
+    expect((await queueOf(h)).items.find((entry) => entry.run === b)).toMatchObject({
+      variant: 'careful',
+    });
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item: item.id,
+        variant: 'default',
+        task: 'другое',
+      }),
+    ).rejects.toThrow('a returned run keeps its own task');
+    expect((await h.status(b)).variant).toBe('careful');
+  });
+
+  it('shows in the queue the variant set on the returned run from its details', async () => {
+    const h = await start(`${PIPELINE_CONFIG}      variants:
+        careful:
+          name: Внимательный
+          steps:
+            review: { additional_prompt: "Be careful" }
+`);
+    const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
+    await h.call('queue_return', { runId: a });
+    await h.call('run_variant', { runId: b, variant: 'careful' });
+    expect((await queueOf(h)).items.find((entry) => entry.run === b)).toMatchObject({
+      variant: 'careful',
+      variantName: 'Внимательный',
+    });
   });
 
   it('skips a step of a returned run through its queue item and keeps its task', async () => {

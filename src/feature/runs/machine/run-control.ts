@@ -9,6 +9,7 @@ import {
   type PendingDelivery,
   type RunHold,
   REPAIR_GROUP,
+  REPAIR_RETRY_MS,
   actionGroupsOf,
   allGroups,
   attemptVerdict,
@@ -150,7 +151,13 @@ function dropRepairDelivery(m: Ctx): void {
     group.reason = 'interrupted';
     group.pending = null;
   }
-  closeRepair(m.state, { taken: [], refund: false });
+  if (m.state.run.repair.incident !== null) {
+    closeRepair(m.state, {
+      taken: [],
+      refund: true,
+      retryAt: m.now + REPAIR_RETRY_MS,
+    });
+  }
 }
 
 /** A delivery that waited for the checks when the daemon stopped. */

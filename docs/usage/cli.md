@@ -12,6 +12,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | `aip run watch [run-id]` | Redraws the state of a run in place until it finishes |
 | `aip run cancel <run-id>` | Stops a whole run |
 | `aip run pause <run-id>` | [Pauses a run](queue.md#pausing-a-run) |
+| `aip run variant <run-id> <variant> [--json]` | [Switches the variant](runs.md#changing-the-variant) of a run that is not finished; a running step whose definition changes starts again |
 | `aip run skip <run-id> <step> [--off] [--json]` | [Skips a step](runs.md#skipping-a-step) for the whole run, or brings it back |
 | `aip run apply <run-id> [group...] [--force]` | [Delivers](../configuration/delivery.md#automatic-and-manual-delivery) ready groups |
 | `aip run mark-delivered <run-id> [--group <slug...>]` | Marks merged groups as delivered after you merged them by hand; nothing is applied |

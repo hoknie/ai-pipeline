@@ -138,12 +138,15 @@ export function MoreMenu({
   delivery,
   onSubtask,
   onAddLink,
+  onChangeVariant,
 }: {
   run: RunView;
   retry: ReturnType<typeof useRetryFailed>;
   delivery: ReturnType<typeof useRunDelivery>;
   onSubtask: ((run: RunView) => void) | undefined;
   onAddLink?: (() => void) | undefined;
+  /** Opens the choice of another variant; undefined: the run has no other variant or is finished. */
+  onChangeVariant?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   return (
@@ -159,6 +162,11 @@ export function MoreMenu({
         <DropdownMenuItem disabled={!onAddLink} onSelect={onAddLink}>
           {t('links.add')}…
         </DropdownMenuItem>
+        {onChangeVariant ? (
+          <DropdownMenuItem onSelect={onChangeVariant}>
+            {t('runs.header.changeVariant')}
+          </DropdownMenuItem>
+        ) : null}
         {onSubtask ? (
           <>
             <DropdownMenuItem onSelect={() => onSubtask(run)}>

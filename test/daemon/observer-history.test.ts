@@ -10,6 +10,8 @@ import { CODE_ONLY_CONFIG, harness, startRun, until, type Harness } from './harn
 
 let current: Harness | null = null;
 let panel: WebServer | null = null;
+/** The clock of the daemon runs this many ms ahead of the wall clock. */
+let skewMs = 0;
 
 afterEach(async () => {
   await panel?.close();
@@ -20,6 +22,9 @@ afterEach(async () => {
 
 const failed = { exitCode: 1, noReport: true };
 const group = [{ title: 'Вход', task: 'вход' }];
+
+/** How long a task waits before an observer takes its incident again after a failed repair. */
+const REPAIR_PAUSE_MS = 300_000;
 
 function lines(h: Harness, file: string): Record<string, unknown>[] {
   const path = join(h.fakeState, file);
@@ -37,13 +42,26 @@ async function start(): Promise<Harness> {
   return current;
 }
 
+/** A daemon with a movable clock: the tests shift it over the pause after a failed repair. */
+async function startTimed(): Promise<Harness> {
+  skewMs = 0;
+  current = await harness(CODE_ONLY_CONFIG, {}, { now: () => Date.now() + skewMs });
+  return current;
+}
+
+/** The daemon wakes up as it does after a timer: schedules and lets the observers look again. */
+async function wake(h: Harness): Promise<void> {
+  const { engine } = h.running.application.services.runs;
+  await engine.serial(() => engine.wake());
+}
+
 async function history(h: Harness): Promise<ObserverHistoryView> {
   return (await h.call('observers_history', { limit: 20 })) as ObserverHistoryView;
 }
 
 describe('история попыток наблюдателя через демон', () => {
   it('сохраняет обе попытки одной задачи после рестарта, включая модель и расход, а чтение не запускает агента', async () => {
-    const h = await start();
+    const h = await startTimed();
     h.script({
       code: [failed, {}],
       repair: [
@@ -68,6 +86,14 @@ describe('история попыток наблюдателя через дем
       pipeline: 'feature',
       groups: group,
     })) as RunCreated;
+    await until('the failed repair', () =>
+      lines(h, 'calls.jsonl').some((call) => call.step === 'repair'),
+    );
+    await h.waitFor(runId, (run) => run.repair?.incident === null && run.repair?.repairs === 0);
+    expect(h.running.application.services.runs.engine.hasWakeTimer()).toBe(true);
+    // The failed attempt gave the repair back: the next one starts after the pause.
+    skewMs += REPAIR_PAUSE_MS + 60_000;
+    await wake(h);
     await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
 
     const beforeRestart = await history(h);
@@ -346,13 +372,22 @@ describe('история попыток наблюдателя через дем
       settings: { enabled: true, projects: [{ repository: h.repo, maxWorkers: null }] },
     });
     const runs: string[] = [];
-    for (let i = 0; i < 11; i += 1) {
+    const { runId: firstRunId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: group,
+    })) as RunCreated;
+    runs.push(firstRunId);
+    await h.waitFor(firstRunId, (run) => run.finished);
+
+    for (let i = 0; i < 10; i += 1) {
       const { runId } = (await startRun(h, {
         repository: h.repo,
         pipeline: 'feature',
         groups: group,
       })) as RunCreated;
       runs.push(runId);
+      await h.call('cancel', { runId });
       await h.waitFor(runId, (run) => run.finished);
     }
     panel = await startWebServer({

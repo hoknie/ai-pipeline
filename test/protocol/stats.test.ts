@@ -26,7 +26,13 @@ describe('statistics IPC contract', () => {
   });
 
   it('accepts a period and a project, and an empty request', () => {
-    for (const params of [{}, { since: 1 }, { since: 1, until: 2, repository: '/work/app' }]) {
+    for (const params of [
+      {},
+      { since: 1 },
+      { since: 1, until: 2, repository: '/work/app' },
+      { bucket: 'auto' },
+      { bucket: '6h' },
+    ]) {
       expect(requestSchema.safeParse({ method: 'stats_report', params }).success).toBe(true);
     }
     expect(requestSchema.safeParse({ method: 'stats_report' }).success).toBe(true);
@@ -44,6 +50,7 @@ describe('statistics IPC contract', () => {
       { since: 5, until: 5 },
       { since: 9, until: 3 },
       { repository: '' },
+      { bucket: 'invalid' },
     ]) {
       expect(requestSchema.safeParse({ method: 'stats_report', params }).success).toBe(false);
     }

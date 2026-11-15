@@ -48,6 +48,7 @@ export function useStatsReport(
       if (fresh) setLoading(true);
       api
         .statsReport({
+          bucket: 'auto',
           since: periodSince(period, Date.now()),
           ...(repository === null ? {} : { repository }),
         })

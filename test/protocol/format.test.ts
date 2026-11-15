@@ -840,8 +840,14 @@ describe('system stages and waiting in text', () => {
     expect(text).toContain('waiting 1');
   });
 
-  it('shows the swarm capacity and the usage limit in the note', () => {
-    expect(waitNote({ reason: 'capacity', max: 2 })).toBe('waiting for a free place (swarm.max 2)');
+  it('shows the machine or the repository capacity, the pool and the usage limit in the note', () => {
+    expect(waitNote({ reason: 'capacity', scope: 'repository', max: 2 })).toBe(
+      'waiting for a free place (swarm.max 2)',
+    );
+    expect(waitNote({ reason: 'capacity', scope: 'machine', max: 5 })).toBe(
+      'waiting for a free place (queue.max 5)',
+    );
+    expect(waitNote({ reason: 'pool', pool: 'mix', max: 2 })).toBe('waiting for pool mix (max 2)');
     expect(waitNote({ reason: 'limit', runtime: 'claude', until: 0 })).toMatch(
       /^waiting for claude usage limit, until \d\d:\d\d$/,
     );

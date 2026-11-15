@@ -4,7 +4,7 @@ import type {
   SpecialistsRefresh,
   Usage,
 } from '../../agents/types/index.ts';
-import type { Specialist } from '../../swarm-config/types/index.ts';
+import type { ResolvedConfig, Specialist } from '../../swarm-config/types/index.ts';
 import type {
   FailReason,
   Incident,
@@ -114,6 +114,8 @@ export type Event =
   /** The user turns the automatic delivery of an unfinished run off. */
   | { kind: 'auto_delivery_cancelled' }
   | { kind: 'step_skip'; step: string; skip: boolean }
+  /** The variant of the run changes; `config` is the current configuration with the variant applied. */
+  | { kind: 'variant_set'; variant: string; config: ResolvedConfig }
   | { kind: 'hold'; hold: RunHold | null }
   /** An observer takes the incident; `specialist` is its profile at this moment. */
   | { kind: 'repair_start'; incident: Incident; specialist: Specialist }

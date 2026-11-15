@@ -141,8 +141,8 @@ export function failGroup(m: Ctx, group: Group, reason: FailReason): void {
   group.reason = describeFailReason(reason);
   if (isMessageGroup(group)) finishMessageGroup(m, group, null);
   if (isRepairGroup(group)) {
-    // A crash or a timeout: the incident is taken again. A usage limit or an unavailable
-    // runtime gives the repair back and does not wait.
+    // Nobody's fault (a timeout, no report, a crash of the daemon, a spawn or network error) and
+    // the obstacles of the runtime give the repair back; the first ones also pause the next taking.
     group.pending = null;
     failRepair(m, reason);
   }

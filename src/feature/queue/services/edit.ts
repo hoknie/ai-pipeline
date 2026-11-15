@@ -1,7 +1,8 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
-import type { RunsServices } from '../../runs/services/index.ts';
+import { variantConfig, type RunsServices } from '../../runs/services/index.ts';
+import type { ConfigService } from '../../swarm-config/services/index.ts';
 import { checkSkip, stepStates, type RunState } from '../../runs/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
 import {
@@ -40,6 +41,7 @@ export interface QueueEditDependencies {
   attachments: AttachmentService;
   tags: TagCatalogService;
   registry: RegistryService;
+  config: ConfigService;
   runs: Pick<RunsServices, 'states' | 'engine'>;
   now: () => number;
 }
@@ -68,11 +70,9 @@ export class QueueEdit {
       throw rejected('a returned run keeps its own task');
     }
     const plan = links.planEdit(repository, request, existing?.run != null);
-    const params: QueueEditRequest = {
-      ...request,
-      after: plan.after,
-      parent: plan.parent,
-    };
+    const runVariant = existing?.run ? request.variant : undefined;
+    const params: QueueEditRequest = { ...request, after: plan.after, parent: plan.parent };
+    if (runVariant !== undefined) delete params.variant;
     const changesAttachments = this.checkAttachments(existing, params);
     let skip = params.skip;
     if (existing?.run && skip !== undefined) {
@@ -80,6 +80,7 @@ export class QueueEdit {
       skip = undefined;
     }
     if (existing?.run) this.checkReturned(params, skip);
+    if (existing?.run && runVariant !== undefined) await this.variantInRun(existing, runVariant);
     if (params.pipeline !== undefined || params.variant !== undefined || skip !== undefined) {
       if (existing) {
         await items.ensureItem(
@@ -166,6 +167,22 @@ export class QueueEdit {
     const changes = (params.attach ?? []).length > 0 || (params.detach ?? []).length > 0;
     if (existing?.run && changes) throw rejected('a returned run keeps its own attachments');
     return changes;
+  }
+
+  /**
+   * A returned run keeps its task but may follow another variant: the variant goes to the run
+   * itself, as `run_variant` does, not to the item.
+   */
+  private async variantInRun(item: QueueItem, variant: string): Promise<void> {
+    const { runs, config } = this.dependencies;
+    const state = runs.states.lookup(item.run as string);
+    if (!state) throw rejected(`unknown run \`${item.run}\``);
+    await runs.engine.apply(state, {
+      kind: 'variant_set',
+      variant,
+      config: variantConfig(config, state, variant),
+    });
+    item.variant = variant;
   }
 
   /** A returned run has no item-level skip: the steps are skipped in the run itself. */

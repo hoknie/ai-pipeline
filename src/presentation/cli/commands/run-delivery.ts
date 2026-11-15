@@ -112,6 +112,26 @@ export function addSkip(kit: RunKit): void {
     });
 }
 
+export function addVariant(kit: RunKit): void {
+  const { output, examples, context, activeStyle, run } = kit;
+  run
+    .command('variant')
+    .description(
+      'Switch a run that is not finished yet to another variant of its pipeline; a running step whose specialist, model or prompt changes is stopped without a commit and starts again',
+    )
+    .argument('<run-id>', 'run id')
+    .argument('<variant>', 'variant id; "default" is the pipeline as it is')
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples(['aip run variant 0mh3k2ab1x9z strong', 'aip run variant 0mh3k2ab1x9z default']),
+    )
+    .action(async (runId: string, variant: string, options: { json?: boolean }) => {
+      const view = (await call(context(), 'run_variant', { runId, variant })) as RunView;
+      output(options.json, formatRun(view, Date.now(), activeStyle), view);
+    });
+}
+
 export function addClean(kit: RunKit): void {
   const { print, output, examples, context, activeStyle, run } = kit;
   run

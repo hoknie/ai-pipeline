@@ -46,6 +46,7 @@ export function createLifecycle(services: DaemonServices, database: Database): L
         await queue.advance.resume();
         // Incidents from before the start, in finished runs too.
         await observers.observe(true);
+        runs.engine.armWake();
       });
     },
     async stop() {

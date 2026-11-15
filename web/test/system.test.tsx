@@ -53,6 +53,40 @@ describe('order of entries', () => {
     const run = runView({ groups: [], system: [systemRow('split')] });
     expect(defaultEntry(run)?.slug).toBe('_split');
   });
+
+  it('addresses to an active group instead of a failed observer', () => {
+    const run = runView({
+      groups: [groupRow({ slug: 'feature', status: 'running' })],
+      system: [systemRow('repair' as string as 'split', { status: 'failed' })],
+    });
+    expect(defaultEntry(run)?.slug).toBe('feature');
+  });
+
+  it('addresses to the active group among multiple groups', () => {
+    const run = runView({
+      groups: [
+        groupRow({ slug: 'first', status: 'merged' }),
+        groupRow({ slug: 'second', status: 'running' }),
+      ],
+    });
+    expect(defaultEntry(run)?.slug).toBe('second');
+  });
+
+  it('addresses to the observer during its work', () => {
+    const run = runView({
+      groups: [groupRow({ slug: 'feature', status: 'failed' })],
+      system: [systemRow('repair' as string as 'split', { status: 'running' })],
+    });
+    expect(defaultEntry(run)?.slug).toBe('_repair');
+  });
+
+  it('does not address to observer when it has finished', () => {
+    const run = runView({
+      groups: [groupRow({ slug: 'feature', status: 'merged' })],
+      system: [systemRow('repair' as string as 'split', { status: 'failed' })],
+    });
+    expect(defaultEntry(run)?.slug).toBe('feature');
+  });
 });
 
 describe('system steps in the runs section', () => {

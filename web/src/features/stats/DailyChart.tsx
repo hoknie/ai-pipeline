@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 
 import type { StatsReportView } from '../../shared/api/types.ts';
 import { repositoryColor, repositoryLabel } from '../../shared/lib/catalog/repositories.ts';
-import { BarChart, type ChartCategory } from '../../shared/ui/charts/index.ts';
+import { AreaChart } from '../../shared/ui/charts/index.ts';
 import { assignColors, NEUTRAL_COLOR } from '../../shared/ui/charts/palette.ts';
+import { Badge } from '../../shared/ui/feedback/badge.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../shared/ui/forms/toggle-group.tsx';
 import { Card } from '../../shared/ui/layout/card.tsx';
 import {
+  buildChartCategories,
   compactNumber,
   dailySeries,
   durationText,
@@ -22,6 +24,7 @@ import {
 
 /** The daily bars of one metric, stacked by project or by model. */
 function DailyChartHeader(props: {
+  bucket: '6h' | 'day' | 'week';
   metrics: Metric[];
   metric: Metric;
   split: Split;
@@ -31,7 +34,12 @@ function DailyChartHeader(props: {
   const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-sm font-semibold">{t('stats.daily.title')}</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold">{t('stats.daily.title')}</h2>
+        <Badge variant="outline" className="font-normal text-muted-foreground">
+          {t(`stats.daily.buckets.${props.bucket}` as never)}
+        </Badge>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <ToggleGroup
           type="single"
@@ -74,6 +82,7 @@ export function DailyChart({ report }: { report: StatsReportView }) {
   const [split, setSplit] = useState<Split>('projects');
   const metrics = metricsFor(split);
   const metric = metrics.includes(chosen) ? chosen : 'tokens';
+  const bucket = report.bucket ?? 'day';
 
   const keys =
     split === 'models'
@@ -85,13 +94,7 @@ export function DailyChart({ report }: { report: StatsReportView }) {
     colors: assignColors(keys, split === 'models' ? () => null : repositoryColor),
     other: { label: t('stats.daily.other'), color: NEUTRAL_COLOR },
   });
-  const short = new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short' });
-  const long = new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' });
-  const categories: ChartCategory[] = report.series.map((day) => ({
-    key: day.day,
-    label: short.format(day.start),
-    title: long.format(day.start),
-  }));
+  const categories = buildChartCategories(report.series, bucket, i18n.language);
   const format = (value: number) =>
     metric === 'tokens'
       ? compactNumber(value)
@@ -103,18 +106,19 @@ export function DailyChart({ report }: { report: StatsReportView }) {
   return (
     <Card className="flex flex-col gap-3 p-4">
       <DailyChartHeader
+        bucket={bucket}
         metrics={metrics}
         metric={metric}
         split={split}
         onMetric={setChosen}
         onSplit={setSplit}
       />
-      <BarChart
+      <AreaChart
         label={t(labelKey, { metric: name })}
         categories={categories}
         series={series}
         format={format}
-        categoryHead={t('stats.daily.day')}
+        categoryHead={t(`stats.daily.categoryHeads.${bucket}` as never)}
         totalLabel={t('stats.daily.total')}
       />
     </Card>

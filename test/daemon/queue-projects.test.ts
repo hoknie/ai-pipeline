@@ -10,7 +10,19 @@ import {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
-import { CODE_ONLY_CONFIG, until, type Harness } from './harness.ts';
+import { CODE_ONLY_CONFIG, settle, until, type Harness } from './harness.ts';
+import {
+  POOLS_CONFIG,
+  SPLIT_QUEUE,
+  addProject,
+  direct,
+  rowsOf,
+  setQueueMax,
+  statusesIn,
+  waitRow,
+  workingIn,
+  writeQueue,
+} from './pools-harness.ts';
 import { itemById, start, stop } from './queue-harness.ts';
 
 interface Added {
@@ -284,5 +296,259 @@ describe('the shared tag of a task in several projects', () => {
     );
     expect(await tagsIn(h, lib)).toEqual([]);
     expect((await queueIn(h, lib)).items).toEqual([]);
+  });
+});
+
+describe('the limit of the machine and the pools in the project mode', () => {
+  /** The fake agents of every group wait for the gate `go` until the test opens it. */
+  function hold(h: Harness, gate = 'go'): void {
+    h.script({ code: [{ waitFor: h.gate(gate) }] });
+  }
+
+  const rowsOfRuns = async (h: Harness, ids: string[]) =>
+    (await Promise.all(ids.map((id) => rowsOf(h, id)))).flat();
+
+  it('runs five attempts split 2/2/1 over direct runs, holds the rest and frees the places', async () => {
+    const h = await start(POOLS_CONFIG);
+    writeQueue(h, SPLIT_QUEUE);
+    hold(h);
+    const [lib, web, api] = [
+      await addProject(h, 'lib'),
+      await addProject(h, 'web'),
+      await addProject(h, 'api'),
+    ];
+    const claude = await direct(h, 'on-claude', ['c1', 'c2', 'c3']);
+    const gemini = await direct(h, 'on-gemini', ['g1'], lib);
+    const gpt = await direct(h, 'on-gpt', ['p1', 'p2'], web);
+    const glm = await direct(h, 'on-glm', ['z1', 'z2'], api);
+    await waitRow(h, claude, 'c2', 'running');
+    await waitRow(h, gpt, 'p1', 'running');
+    await waitRow(h, glm, 'z1', 'running');
+    await waitRow(h, claude, 'c3', 'waiting');
+    await waitRow(h, gpt, 'p2', 'waiting');
+    await waitRow(h, glm, 'z2', 'waiting');
+    expect(await workingIn(h, [claude, gemini, gpt, glm])).toBe(5);
+    expect((await rowsOf(h, claude)).find((row) => row.slug === 'c3')?.wait).toEqual({
+      reason: 'pool',
+      pool: 'claude',
+      max: 2,
+    });
+    expect((await rowsOf(h, gpt)).find((row) => row.slug === 'p2')?.wait).toEqual({
+      reason: 'pool',
+      pool: 'mix',
+      max: 2,
+    });
+    expect((await rowsOf(h, glm)).find((row) => row.slug === 'z2')?.wait).toEqual({
+      reason: 'pool',
+      pool: 'glm',
+      max: 1,
+    });
+    // The attempts keep the runtime and the model of their pools.
+    const attempt = (await h.group(gpt, 'p1')).attempts[0]!;
+    expect([attempt.runtime, attempt.model]).toEqual(['opencode', 'openai/gpt-5']);
+    h.open('go');
+    for (const id of [claude, gemini, gpt, glm]) {
+      expect((await h.waitFor(id, (view) => view.finished)).state).toBe('finished');
+    }
+  });
+
+  it('holds an attempt of a project for the machine, then for its repository, in this order', async () => {
+    const h = await start(POOLS_CONFIG);
+    const narrow = await addProject(h, 'narrow', POOLS_CONFIG.replace('max: 5', 'max: 2'));
+    writeQueue(h, '{ max: 3 }');
+    h.script({
+      'code@a1': [{ waitFor: h.gate('a') }],
+      code: [{ waitFor: h.gate('b') }],
+    });
+    const first = await direct(h, 'on-claude', ['a1']);
+    const second = await direct(h, 'on-claude', ['b1', 'b2', 'b3'], narrow);
+    await waitRow(h, second, 'b2', 'running');
+    const both = await waitRow(h, second, 'b3', 'waiting');
+    // Machine: 3 of 3 busy; the repository of `narrow` is full too, and the machine is named first.
+    expect(both.wait).toEqual({ reason: 'capacity', scope: 'machine', max: 3 });
+    h.open('a');
+    await h.waitFor(first, (view) => view.finished);
+    await until('the wait names swarm.max', async () => {
+      const row = (await rowsOf(h, second)).find((entry) => entry.slug === 'b3');
+      return row?.wait?.reason === 'capacity' && row.wait.scope === 'repository';
+    });
+    const repository = (await rowsOf(h, second)).find((row) => row.slug === 'b3')!;
+    expect(repository.wait).toEqual({ reason: 'capacity', scope: 'repository', max: 2 });
+    expect(repository.status).toBe('waiting');
+    h.open('b');
+    expect((await h.waitFor(second, (view) => view.finished)).state).toBe('finished');
+  });
+
+  it('names only the machine while the repository has room, and only the repository while the machine has', async () => {
+    const h = await start(POOLS_CONFIG);
+    const narrow = await addProject(h, 'narrow', POOLS_CONFIG.replace('max: 5', 'max: 1'));
+    writeQueue(h, '{ max: 2 }');
+    hold(h);
+    const wide = await direct(h, 'on-claude', ['w1', 'w2', 'w3']);
+    await waitRow(h, wide, 'w2', 'running');
+    const machine = await waitRow(h, wide, 'w3', 'waiting');
+    expect(machine.wait).toEqual({ reason: 'capacity', scope: 'machine', max: 2 });
+    h.open('go');
+    await h.waitFor(wide, (view) => view.finished);
+    // The machine has room for two, the repository of `narrow` for one.
+    hold(h, 'later');
+    const tight = await direct(h, 'on-claude', ['n1', 'n2'], narrow);
+    await waitRow(h, tight, 'n1', 'running');
+    const repository = await waitRow(h, tight, 'n2', 'waiting');
+    expect(repository.wait).toEqual({ reason: 'capacity', scope: 'repository', max: 1 });
+    h.open('later');
+    await h.waitFor(tight, (view) => view.finished);
+  });
+
+  it('holds a group for swarm.max in the project mode while queue.max has room', async () => {
+    const h = await start(POOLS_CONFIG.replace('max: 5', 'max: 1'));
+    writeQueue(h, '{ max: 5 }');
+    hold(h);
+    const run = await direct(h, 'on-claude', ['r1', 'r2']);
+    await waitRow(h, run, 'r1', 'running');
+    expect((await waitRow(h, run, 'r2', 'waiting')).wait).toMatchObject({
+      reason: 'capacity',
+      scope: 'repository',
+      max: 1,
+    });
+    h.open('go');
+    expect((await h.waitFor(run, (view) => view.finished)).state).toBe('finished');
+  });
+
+  it('holds the repair of a failed group until swarm.max has a free place', async () => {
+    const h = await start(POOLS_CONFIG.replace('max: 5', 'max: 2'));
+    writeQueue(h, '{ max: 5 }');
+    await h.call('repository_add', { path: h.repo });
+    await h.call('observers_set', {
+      settings: { enabled: true, projects: [{ repository: h.repo, maxWorkers: null }] },
+    });
+    h.script({
+      'code@entry': [{ waitFor: h.gate('fail'), exitCode: 1, noReport: true }, {}],
+      code: [{ waitFor: h.gate('go') }],
+      repair: [{ toolCalls: [{ name: 'swarm_repair_retry', arguments: { group: 'entry' } }] }],
+    });
+    const failing = await direct(h, 'on-claude', ['entry']);
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    const other = await direct(h, 'on-claude', ['b1', 'b2']);
+    await waitRow(h, failing, 'entry', 'running');
+    await waitRow(h, other, 'b1', 'running');
+    await waitRow(h, other, 'b2', 'waiting');
+    h.open('fail');
+    // The place of the failed group goes to the waiting group; the repair finds swarm.max full.
+    await waitRow(h, other, 'b2', 'running');
+    const held = await h.waitFor(failing, (view) =>
+      view.system.some((group) => group.kind === 'repair' && group.status === 'waiting'),
+    );
+    expect(held.system.find((group) => group.kind === 'repair')?.wait).toEqual({
+      reason: 'capacity',
+      scope: 'repository',
+      max: 2,
+    });
+    h.open('go');
+    const done = await h.waitFor(failing, (view) => view.finished && view.state === 'finished');
+    expect(done.repair?.repairs).toBe(1);
+  });
+
+  it('keeps the working attempts when the limit drops and starts the waiting one when it grows', async () => {
+    const h = await start(POOLS_CONFIG);
+    writeQueue(h, '{ max: 2 }');
+    hold(h);
+    const run = await direct(h, 'on-claude', ['d1', 'd2', 'd3']);
+    await waitRow(h, run, 'd2', 'running');
+    await waitRow(h, run, 'd3', 'waiting');
+    // Lowering through the settings API: nothing is interrupted, the wait shows the new number.
+    await setQueueMax(h, 1);
+    await until('the wait shows queue.max 1', async () => {
+      const row = (await rowsOf(h, run)).find((entry) => entry.slug === 'd3');
+      return row?.wait?.reason === 'capacity' && row.wait.max === 1;
+    });
+    expect(statusesIn(await rowsOf(h, run))).toEqual(['running', 'running', 'waiting']);
+    // Raising it frees a place with no event of any run.
+    await setQueueMax(h, 3);
+    await waitRow(h, run, 'd3', 'running');
+    h.open('go');
+    expect((await h.waitFor(run, (view) => view.finished)).state).toBe('finished');
+  });
+
+  it('applies a hand edit of settings.yaml only at the next event of the scheduler', async () => {
+    const h = await start(POOLS_CONFIG);
+    writeQueue(h, '{ max: 2 }');
+    hold(h);
+    const events: unknown[] = [];
+    const ended = subscribe(h.socket, (line) => events.push(line));
+    const run = await direct(h, 'on-claude', ['e1', 'e2', 'e3']);
+    await waitRow(h, run, 'e2', 'running');
+    await waitRow(h, run, 'e3', 'waiting');
+    // The agents report their start and the diffs arrive later: wait until the daemon is quiet.
+    for (let quiet = 0; quiet < 3;) {
+      const seen = events.length;
+      await settle(h);
+      quiet = seen === events.length ? quiet + 1 : 0;
+    }
+    writeQueue(h, '{ max: 3 }');
+    await settle(h);
+    expect((await waitRow(h, run, 'e3', 'waiting')).wait).toMatchObject({
+      scope: 'machine',
+      max: 2,
+    });
+    // Another run starts: that is an event of the scheduler, and it reads the new limit.
+    const next = await direct(h, 'on-claude', ['f1'], await addProject(h, 'other'));
+    await waitRow(h, run, 'e3', 'running');
+    expect((await waitRow(h, next, 'f1', 'waiting')).wait).toMatchObject({
+      scope: 'machine',
+      max: 3,
+    });
+    h.open('go');
+    for (const id of [run, next]) await h.waitFor(id, (view) => view.finished);
+    await stop(h);
+    await ended;
+  });
+
+  it('takes the places of a pool again after a restart: no attempt of the old daemon holds one', async () => {
+    const h = await start(POOLS_CONFIG);
+    writeQueue(
+      h,
+      '{ max: 5, pools: { glm: { max: 1, members: ["opencode:zai/*"] } }, default_pool: { max: 3 } }',
+    );
+    h.script({ code: [{ hang: true }] });
+    const old = await direct(h, 'on-glm', ['g1']);
+    await waitRow(h, old, 'g1', 'running');
+    h.script({ code: [{ waitFor: h.gate('after') }] });
+    await h.restart();
+    const interrupted = await h.waitFor(old, (view) => view.groups[0]?.status === 'failed');
+    expect(interrupted.groups[0]).toMatchObject({ status: 'failed', reason: 'interrupted' });
+    // The history of the attempt keeps its runtime and model.
+    const history = (await h.group(old, 'g1')).attempts[0]!;
+    expect([history.runtime, history.model, history.status]).toEqual([
+      'opencode',
+      'zai/glm-5',
+      'failed',
+    ]);
+    // The only place of the pool is free: a new attempt takes it, the second one waits for it.
+    const fresh = await direct(h, 'on-glm', ['n1', 'n2']);
+    await waitRow(h, fresh, 'n1', 'running');
+    expect((await waitRow(h, fresh, 'n2', 'waiting')).wait).toEqual({
+      reason: 'pool',
+      pool: 'glm',
+      max: 1,
+    });
+    h.open('after');
+    await h.waitFor(fresh, (view) => view.finished);
+  });
+
+  it('counts a group without an explicit OpenCode model in the default pool', async () => {
+    const h = await start(POOLS_CONFIG);
+    writeQueue(h, SPLIT_QUEUE);
+    hold(h);
+    const run = await direct(h, 'on-plain', ['m1', 'm2']);
+    await waitRow(h, run, 'm1', 'running');
+    expect((await waitRow(h, run, 'm2', 'waiting')).wait).toEqual({
+      reason: 'pool',
+      pool: 'default',
+      max: 1,
+    });
+    expect(await rowsOfRuns(h, [run])).toHaveLength(2);
+    h.open('go');
+    await h.waitFor(run, (view) => view.finished);
   });
 });

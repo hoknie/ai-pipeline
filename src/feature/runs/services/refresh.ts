@@ -6,7 +6,13 @@ import {
   type SpecialistsRefresh,
 } from '../../agents/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
-import { ConfigLoadError, firstConfigError } from '../../swarm-config/types/index.ts';
+import {
+  ConfigLoadError,
+  type ResolvedConfig,
+  applyVariant,
+  checkVariant,
+  firstConfigError,
+} from '../../swarm-config/types/index.ts';
 import type { RunState } from '../types/index.ts';
 
 /**
@@ -30,4 +36,26 @@ export function currentPermissions(config: ConfigService, state: RunState): Perm
     if (!(error instanceof ConfigLoadError)) return { error: (error as Error).message };
     return { error: firstConfigError(error) };
   }
+}
+
+/**
+ * The current configuration of the run's repository with the variant applied (the skips are not):
+ * the machine takes the definitions of the steps from it. A configuration that does not load or a
+ * variant the pipeline does not have refuses the request.
+ */
+export function variantConfig(
+  config: ConfigService,
+  state: RunState,
+  variant: string,
+): ResolvedConfig {
+  let current: ResolvedConfig;
+  try {
+    current = config.load(state.run.repository);
+  } catch (error) {
+    if (!(error instanceof ConfigLoadError)) throw rejected((error as Error).message);
+    throw rejected(`configuration not loaded: ${firstConfigError(error)}`);
+  }
+  const problem = checkVariant(current, state.run.pipeline, variant);
+  if (problem !== null) throw rejected(problem);
+  return applyVariant(current, state.run.pipeline, variant);
 }

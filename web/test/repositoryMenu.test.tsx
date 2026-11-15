@@ -166,3 +166,39 @@ describe('the item «All projects»', () => {
     expect(screen.queryByRole('menuitemradio', { name: 'All projects' })).toBeNull();
   });
 });
+
+describe('the key p', () => {
+  const choice = (selected: string | null) => ({
+    repositories: [...paths.keys()],
+    paths,
+    selected,
+    waiting: new Map<string, number>(),
+    onSelect: vi.fn(),
+    onAdd: vi.fn(async () => undefined),
+    browse: vi.fn(),
+  });
+
+  it('opens the menu with the focus in the search field', async () => {
+    render(<RepositoryMenu choice={choice('/Users/me/projects/shop')} />);
+    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP' });
+    const search = await screen.findByRole('searchbox');
+    await waitFor(() => expect(document.activeElement).toBe(search));
+  });
+
+  it('does nothing without a selected project', () => {
+    render(<RepositoryMenu choice={choice(null)} />);
+    fireEvent.keyDown(document.body, { key: 'p', code: 'KeyP' });
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+
+  it('is typed into an input field instead', () => {
+    render(
+      <>
+        <input aria-label="other" />
+        <RepositoryMenu choice={choice('/Users/me/projects/shop')} />
+      </>,
+    );
+    fireEvent.keyDown(screen.getByLabelText('other'), { key: 'p', code: 'KeyP' });
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+});

@@ -116,6 +116,16 @@ export const en = {
       day: 'Day',
       total: 'Total',
       other: 'Other',
+      buckets: {
+        '6h': '6h',
+        day: 'by day',
+        week: 'by week',
+      },
+      categoryHeads: {
+        '6h': 'Interval',
+        day: 'Day',
+        week: 'Week',
+      },
       chartLabel: 'Chart by day: {{metric}} by project',
       chartLabelModels: 'Chart by day: {{metric}} by model',
       split: 'Split',
@@ -210,7 +220,9 @@ export const en = {
   },
   wait: {
     specialist: 'Waiting for {{specialist}}: {{max}} of {{max}} busy',
-    capacity: 'Waiting for a free place: swarm.max is {{max}}',
+    capacityMachine: 'Waiting for a free place: queue.max is {{max}}',
+    capacityRepository: 'Waiting for a free place: swarm.max is {{max}}',
+    pool: 'Waiting for the pool {{pool}}: {{max}} of {{max}} busy',
     limit: 'Waiting for the {{runtime}} usage limit to reset, until {{time}}',
     network: 'Waiting for the network: {{problem}}',
     networkUntil: 'Waiting for the network, until {{time}}',
@@ -301,6 +313,11 @@ export const en = {
     previousRun: 'Previous run',
     help: 'This dialog',
     close: 'Close a dialog or a menu',
+    newTask: 'Create a task',
+    project: 'Switch project',
+    moveItem: 'Move a task in the queue',
+    then: 'then',
+    groups: { general: 'General', navigation: 'Navigation', runs: 'Runs', queue: 'Queue' },
   },
   format: {
     unitSec: 's',
@@ -403,6 +420,13 @@ export const en = {
       continued: 'The run continues',
       deliver: 'Deliver',
       more: 'More',
+      changeVariant: 'Change variant…',
+      changeVariantTitle: 'Change the variant of the run',
+      changeVariantDescription:
+        'The step that is running now stops without a commit and starts again with the new variant if its specialist, model or prompt differs. Changes it already made stay in the working copy.',
+      changeVariantConfirm: 'Change variant',
+      changeVariantKeep: 'Keep as is',
+      variantChanged: 'Variant changed',
       forceDeliver: 'Deliver with --force…',
       markDelivered: 'Mark as delivered…',
       markDeliveredTitle: 'Mark the run as delivered?',
@@ -691,8 +715,8 @@ export const en = {
     },
     global: {
       badge: 'Global queue',
-      max_one: 'At most {{count}} specialist at once on the machine',
-      max_other: 'At most {{count}} specialists at once on the machine',
+      max_one: 'At most {{count}} agent at once on the machine',
+      max_other: 'At most {{count}} agents at once on the machine',
       projects: 'Projects',
       projectsHelp:
         'The global queue takes tasks of the chosen projects only. Empty: all enabled projects. Changed only while the queue is stopped.',
@@ -1836,8 +1860,8 @@ export const en = {
         hint: 'Projects have a queue each (project), or one queue runs the tasks of all projects (global). Changing it pauses every queue.',
       },
       queue_max: {
-        label: 'Specialists at once',
-        hint: 'Most specialists working at once on the machine in the global mode.',
+        label: 'Agents at once',
+        hint: 'Most agent attempts working at once on the machine, in both queue modes. Quota pools (queue.pools) are set in settings.yaml.',
       },
       stats_enabled: {
         label: 'Collect statistics',

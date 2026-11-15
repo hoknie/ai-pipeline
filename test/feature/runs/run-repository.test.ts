@@ -25,6 +25,49 @@ describe('configuration snapshot of a run', () => {
   });
 });
 
+describe('variant of a run', () => {
+  it('keeps the variant changed after the run was saved', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.variant).toBe('default');
+    state.run.variant = 'strong';
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.variant).toBe('strong');
+  });
+});
+
+describe('repair state of a run', () => {
+  it('keeps the pause of a repair across a save and a load', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    state.run.repair.retryAt = 12345;
+    store.runs.saveRun(state);
+    expect(store.runs.loadRun(state.run.id)?.run.repair.retryAt).toBe(12345);
+    store.database.close();
+  });
+
+  it('reads an old repair_json without retryAt as no pause', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    store.runs.saveRun(state);
+    const old = {
+      allowed: true,
+      repairs: 2,
+      taken: ['k'],
+      incident: null,
+      specialist: null,
+      cancelReason: null,
+    };
+    store.database
+      .prepare('UPDATE runs SET repair_json = ? WHERE id = ?')
+      .run(JSON.stringify(old), state.run.id);
+    const loaded = store.runs.loadRun(state.run.id)!;
+    expect(loaded.run.repair).toEqual({ ...old, retryAt: null });
+    store.database.close();
+  });
+});
+
 describe('hold of a run and priority runs', () => {
   it('keeps the hold of a run and the priority list of a queue', () => {
     const store = temporaryStorage();

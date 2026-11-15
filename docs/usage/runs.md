@@ -85,6 +85,19 @@ aip run skip <run-id> review --off    # bring it back
 
 This works on a step that is running or still ahead. A running step is stopped without a commit, and its partial changes stay uncommitted in the group worktree. A step every group has passed cannot be skipped.
 
+## Changing the variant
+
+```sh
+aip run variant <run-id> strong       # follow another variant of the pipeline
+aip run variant <run-id> default      # back to the pipeline as it is
+```
+
+In the panel it is **More → Change variant…** of a run that is not finished; the item appears when the pipeline has a variant besides `default`.
+
+- The steps, the skipped steps and the passed steps stay. Each step takes the specialist, model and additional prompt of the new variant from the current configuration; the `skip` of the new variant is not applied.
+- A running step whose definition changed is stopped without a commit and starts again with the new variant in a new session, keeping the remarks and the answer it had. Its partial changes stay in the group worktree. A step whose definition did not change keeps running.
+- The switch is refused for a finished run, an unknown variant, a configuration that does not load, or a pipeline that no longer has a step of the run.
+
 ## Stopping a run
 
 - `aip run cancel <run-id>` stops a whole run, `aip group cancel <run-id> <group>` stops a group. `aip group retry` continues a cancelled group from the interrupted step.
@@ -141,8 +154,16 @@ The daemon applies the rules a person has: a retry of a group a person cancelled
   The group never changes the result of the run.
 - A delivery incident is repaired in a separate copy where the changes of the task lie over your working tree with conflict markers. When the observer reports `done`, the daemon checks that no marker is left and delivers without force; your edits are never lost. A failed delivery leaves `apply_failed`.
 - `done` ends the repair. `rejected` and `needs_human` end it as unsuccessful: the incident stays for a person, and the text of the report is shown in the task. An incident the observer reported on is not taken again.
-- A crash or a timeout of the observer agent uses up one repair, and the incident can be taken again. A task has at most `maxRepairs` repairs; after that it waits for a person. An incident a person resolves while it waits for a worker is not repaired.
-- A usage limit of the observer agent ends the attempt without waiting, does not use up a repair and does not stop the queue. The incident is taken again after the reset.
+- A failure of the observer agent that is nobody's fault — a timeout, a crash without a report, an
+  interruption by a daemon restart, a spawn error or a network problem — does not use up a repair:
+  the incident can be taken again, and the failed attempt only shows in the history of the
+  observers. Before an observer takes the incident again, the task waits five minutes; until the
+  pause ends no new call of the agent starts, while the queue and the views keep treating the task
+  as waiting for an observer. A new repair or giving the task back to the observers clears the
+  pause. A task has at most `maxRepairs` repairs; after that it waits for a person. An incident a
+  person resolves while it waits for a worker is not repaired.
+- A usage limit of the observer agent ends the attempt without waiting, does not use up a repair
+  and does not stop the queue. The incident is taken again after the reset, without an extra pause.
 - A runtime that is off or whose command is not found (`runtime disabled`, `runtime not found`) is unavailable.
   An incident of a group that failed for this reason is not taken while that runtime stays unavailable, and the task is not in `repair`.
   While the runtime of the observer is unavailable, no repair starts and none is used up: a repair that fails this way is given back.

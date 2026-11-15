@@ -1,3 +1,4 @@
+export { AreaChart, type AreaChartProps } from './AreaChart.tsx';
 export { BarChart, type ChartCategory } from './BarChart.tsx';
 export { ChartTooltip } from './ChartTooltip.tsx';
 export { ShareBars, type ShareRow } from './ShareBars.tsx';

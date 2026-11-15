@@ -26,6 +26,8 @@ import {
 const fakeClaude = join(import.meta.dirname, '..', 'fakes', 'claude');
 
 let current: Harness | null = null;
+/** The clock of the daemon runs this many ms ahead of the wall clock. */
+let skewMs = 0;
 
 afterEach(async () => {
   await current?.close();
@@ -35,9 +37,25 @@ afterEach(async () => {
 const FAIL = { exitCode: 1, noReport: true };
 const GROUPS = [{ title: 'Вход', task: 'вход' }];
 
+/** How long a task waits before an observer takes its incident again after a failed repair. */
+const REPAIR_PAUSE_MS = 300_000;
+
 async function start(config = CODE_ONLY_CONFIG): Promise<Harness> {
   current = await harness(config);
   return current;
+}
+
+/** A daemon with a movable clock: the tests shift it over the pause after a failed repair. */
+async function startTimed(config = CODE_ONLY_CONFIG): Promise<Harness> {
+  skewMs = 0;
+  current = await harness(config, {}, { now: () => Date.now() + skewMs });
+  return current;
+}
+
+/** The daemon wakes up as it does after a timer: schedules and lets the observers look again. */
+async function wake(h: Harness): Promise<void> {
+  const { engine } = h.running.application.services.runs;
+  await engine.serial(() => engine.wake());
 }
 
 type Result = { ok: true; view: ObserversView } | { ok: false; errors: unknown[] };
@@ -147,13 +165,29 @@ describe('Статус Repair', () => {
     expect(fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'repair')).toHaveLength(2);
   });
 
-  it('counts a crashed observer against maxRepairs and takes the incident again', async () => {
-    const h = await start();
+  it('gives the repair back when the observer cannot report, and takes the incident after the pause', async () => {
+    const h = await startTimed();
     h.script({ code: [FAIL, {}], repair: [FAIL, retry()] });
     await configure(h);
     const runId = await launch(h);
+    await until('the failed repair', () =>
+      fakeLines(h, 'calls.jsonl').some((call) => call.step === 'repair'),
+    );
+    const crashed = await h.waitFor(
+      runId,
+      (view) => view.repair?.incident === null && view.repair?.repairs === 0,
+    );
+    expect(crashed.repair).toMatchObject({ repairs: 0, incident: null });
+    await settle(h);
+    expect(fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'repair')).toHaveLength(1);
+    expect(h.running.application.services.runs.engine.hasWakeTimer()).toBe(true);
+    // Restarting the daemon restores the wake-up timer for the paused finished run.
+    await h.restart();
+    expect(h.running.application.services.runs.engine.hasWakeTimer()).toBe(true);
+    skewMs += REPAIR_PAUSE_MS + 60_000;
+    await wake(h);
     const view = await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
-    expect(view.repair?.repairs).toBe(2);
+    expect(view.repair?.repairs).toBe(1);
   });
 });
 
@@ -213,6 +247,72 @@ describe('Недоступный исполнитель', () => {
     const view = await h.status(runId);
     expect(view.repair).toMatchObject({ active: false, repairs: 0 });
     expect(callsOf(h, 'repair')).toHaveLength(0);
+  });
+});
+
+describe('Пауза после таймаута наблюдателя', () => {
+  const callsOf = (h: Harness) =>
+    fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'repair');
+
+  it('does not call the agent again during the pause, and takes the incident after it', async () => {
+    const h = await startTimed();
+    h.script({ code: [FAIL, {}], repair: [{ hang: true }, retry()] });
+    await configure(h, { specialist: { timeout: '1s' } });
+    const runId = await launch(h);
+    await until('the repair call', () => callsOf(h).length === 1);
+    // The agent hangs until the low timeout of the profile: the repair is given back and paused.
+    const failed = await h.waitFor(
+      runId,
+      (view) => view.repair?.incident === null && view.repair?.repairs === 0,
+    );
+    expect(failed.repair).toMatchObject({ repairs: 0, incident: null });
+    await settle(h);
+    expect((await h.status(runId)).state).toBe('repair');
+    expect(callsOf(h)).toHaveLength(1);
+    expect(h.running.application.services.runs.engine.hasWakeTimer()).toBe(true);
+    // The pause holds while the settings return to a timeout the agent can work under: the next
+    // call starts only after it, so the low timeout of the first failure stays alone in the run.
+    await configure(h, { specialist: { timeout: '30s' } });
+    expect(callsOf(h)).toHaveLength(1);
+    skewMs += REPAIR_PAUSE_MS + 60_000;
+    await wake(h);
+    const done = await h.waitFor(runId, (run) => run.finished && run.state === 'finished', 30_000);
+    expect(done.repair).toMatchObject({ repairs: 1, incident: null });
+    expect(callsOf(h)).toHaveLength(2);
+  });
+
+  it('keeps a queued task waiting for the observer during the pause', async () => {
+    const h = await startTimed();
+    h.script({ code: [FAIL, {}], repair: [{ hang: true }, retry()] });
+    await configure(h, { specialist: { timeout: '1s' } });
+    await h.call('queue_add', {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: GROUPS,
+      title: 'один',
+    });
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await h.call('queue_start', { repository: h.repo });
+    await until('the run', async () => ((await h.call('status', {})) as RunView[]).length > 0);
+    const runId = ((await h.call('status', {})) as RunView[])[0]!.id;
+    await until('the repair call', () => callsOf(h).length === 1);
+    await h.waitFor(runId, (view) => view.repair?.incident === null && view.repair?.repairs === 0);
+    await settle(h);
+    // The pause is invisible to the queue: as while the agent works, the failed run waits
+    // off the places under `skipFailed`, the queue does not stop for it, and the run is
+    // not shown as failed.
+    const queue = (await h.call('queue', { repository: h.repo })) as QueueView;
+    expect(queue.stop).toBeNull();
+    expect(queue.skipped.map((run) => run.id)).toContain(runId);
+    expect((await h.status(runId)).state).toBe('repair');
+    expect(h.running.application.services.runs.engine.hasWakeTimer()).toBe(true);
+    // A timeout the agent can work under while the pause still holds, so the next call finishes.
+    await configure(h, { specialist: { timeout: '30s' } });
+    expect(callsOf(h)).toHaveLength(1);
+    skewMs += REPAIR_PAUSE_MS + 60_000;
+    await wake(h);
+    await h.waitFor(runId, (run) => run.finished && run.state === 'finished', 30_000);
+    expect(callsOf(h)).toHaveLength(2);
   });
 });
 
@@ -972,19 +1072,32 @@ describe('Разрешение доставки наблюдателем', () =>
     expect(repairCalls(h)).toHaveLength(1);
   });
 
-  it('takes the delivery incident again when the observer crashes', async () => {
-    const h = await start(`${CODE_ONLY_CONFIG}  delivery: { auto: true }\n`);
-    const runId = await conflicting(h, [FAIL, FAIL], { maxRepairs: 2 });
+  it('takes the delivery incident again after the pause when the observer crashes', async () => {
+    const h = await startTimed(`${CODE_ONLY_CONFIG}  delivery: { auto: true }\n`);
+    const runId = await conflicting(
+      h,
+      [FAIL, { read: ['lib.ts'], write: { 'lib.ts': 'export const value = 7;\n' } }],
+      {},
+    );
+    await until('the crashed repair', () => repairCalls(h).length === 1);
     await h.waitFor(
       runId,
       (run) =>
-        run.repair?.repairs === 2 && run.delivery.failed === 1 && run.repair.incident === null,
+        run.repair?.repairs === 0 && run.delivery.failed === 1 && run.repair.incident === null,
       30_000,
     );
     await settle(h);
+    expect(repairCalls(h)).toHaveLength(1);
+    expect(h.running.application.services.runs.engine.hasWakeTimer()).toBe(true);
+    skewMs += REPAIR_PAUSE_MS + 60_000;
+    await wake(h);
+    const view = await h.waitFor(
+      runId,
+      (run) => run.finished && run.delivery.applied === 1 && run.repair?.incident === null,
+      30_000,
+    );
+    expect(view.repair?.repairs).toBe(1);
     expect(repairCalls(h)).toHaveLength(2);
-    expect((await h.status(runId)).repair?.repairs).toBe(2);
-    expect((await h.group(runId, 'vhod')).delivery).toMatchObject({ state: 'apply_failed' });
   });
 
   it('delivers without an agent when the conflict is gone by the time the observer starts', async () => {

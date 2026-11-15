@@ -5,9 +5,11 @@ import {
   type Incident,
   type RunState,
   REPAIR_GROUP,
+  REPAIR_RETRY_MS,
   freshPending,
   isTerminal,
   newGroup,
+  pacesRepair,
   refundsRepair,
   runProblems,
 } from '../types/index.ts';
@@ -88,17 +90,22 @@ export function deliveryKeys(state: RunState, groups: readonly string[]): string
 
 /** The repair group failed: the incident is taken again; nobody's fault gives the repair back. */
 export function failRepair(m: Ctx, reason: FailReason): void {
-  closeRepair(m.state, { taken: [], refund: refundsRepair(reason) });
+  closeRepair(m.state, {
+    taken: [],
+    refund: refundsRepair(reason),
+    // The agent could not run to a report: the observers wait before taking the incident again.
+    retryAt: pacesRepair(reason) ? m.now + REPAIR_RETRY_MS : null,
+  });
 }
 
 /**
  * The only way out of a repair: clears the incident and the profile, drops the delivery the repair
  * started, adds `taken` to the incidents already reported on and, with `refund`, gives the repair
- * back.
+ * back. `retryAt`, when given, sets or clears the pause before the next repair.
  */
 export function closeRepair(
   state: RunState,
-  options: { taken: readonly string[]; refund: boolean },
+  options: { taken: readonly string[]; refund: boolean; retryAt?: number | null },
 ): void {
   const { repair } = state.run;
   if (options.refund && repair.repairs > 0) repair.repairs -= 1;
@@ -107,6 +114,7 @@ export function closeRepair(
   }
   repair.incident = null;
   repair.specialist = null;
+  if (options.retryAt !== undefined) repair.retryAt = options.retryAt;
   if (state.run.pendingDelivery?.repair) state.run.pendingDelivery = null;
 }
 
@@ -114,6 +122,8 @@ export function repairStart(m: Ctx, incident: Incident, specialist: Specialist):
   const { run } = m.state;
   if (run.repair.incident !== null) throw rejected('a repair of this run is already going');
   if (run.hold !== null) throw rejected(`run is ${run.hold}; observers do not take it`);
+  // A new repair may start at once, whatever pause an earlier failure left.
+  run.repair.retryAt = null;
   if (incident.kind === 'delivery') {
     if (run.pendingDelivery !== null) {
       throw rejected(`a delivery of run ${run.id} is already in progress`);
@@ -155,9 +165,10 @@ export function repairAllowed(m: Ctx, allowed: boolean): void {
     stopRepair(m, { reason: null, refund: false });
     return;
   }
-  // Returning the task to observers starts its count again.
+  // Returning the task to observers starts its count and its pauses again.
   repair.repairs = 0;
   repair.taken = [];
+  repair.retryAt = null;
 }
 
 /**

@@ -7,6 +7,7 @@ const reportParams = z
     since: moment.optional(),
     until: moment.optional(),
     repository: z.string().min(1).max(4096).optional(),
+    bucket: z.enum(['auto', '6h', 'day', 'week']).optional(),
   })
   .refine(({ since, until }) => since === undefined || until === undefined || since < until, {
     message: 'since must be less than until',

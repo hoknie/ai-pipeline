@@ -57,4 +57,6 @@ One task can also go to several projects at once, with a shared tag and an order
 
 [`max`](../configuration/README.md#max) is counted per repository: each repository gets the `max` of its most recently created run, and its runs do not wait for slots taken in another repository. A [specialist's `max`](../configuration/specialists.md#limits) is counted by its slug across all runs, so a specialist in a second repository may wait for one in the first.
 
-In the [global queue mode](../usage/queue.md#global-queue) the specialists of all repositories are counted together against [`queue.max`](../configuration/README.md#queue) (5 by default) instead of `max`; a specialist's own `max` still applies.
+[`queue.max`](../configuration/README.md#queue) (5 by default) limits the agents of all repositories together in both modes of the queue, so in the project mode an agent also waits for a free place on the machine; `max` of the repository applies on top, and in the [global queue mode](../usage/queue.md#global-queue) it does not.
+
+A waiting group shows which limit holds it: `queue.max` for the machine, `swarm.max` for the repository, or the [pool](../configuration/README.md#queue) of its runtime and model. A repair counts like any other agent.

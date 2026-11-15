@@ -203,8 +203,9 @@ export function TaskFields(props: {
           />
         </div>
         <PipelineSelect state={state} pipelines={props.pipelines} options={props.options} />
-        <VariantSelect state={state} pipelines={props.pipelines} />
       </fieldset>
+      {/* a returned run keeps its task but may follow another variant */}
+      <VariantSelect state={state} pipelines={props.pipelines} />
       {effective.mode === 'task' ? (
         <>
           <p className="text-xs text-muted-foreground">{t('queue.form.alternativeHint')}</p>

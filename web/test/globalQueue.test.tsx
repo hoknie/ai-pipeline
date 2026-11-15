@@ -82,7 +82,7 @@ describe('page of the global queue', () => {
   it('shows the badge, the limit and the tasks of all projects with their projects', async () => {
     mount(globalOf());
     expect(await screen.findByText('Global queue')).toBeTruthy();
-    expect(screen.getByText(/At most 4 specialists/)).toBeTruthy();
+    expect(screen.getByText(/At most 4 agents/)).toBeTruthy();
     const items = within(await screen.findByRole('list', { name: /tasks|queue/i }));
     const rows = items.getAllByRole('listitem');
     expect(rows.map((row) => row.getAttribute('data-id'))).toEqual(['qa', 'ql']);

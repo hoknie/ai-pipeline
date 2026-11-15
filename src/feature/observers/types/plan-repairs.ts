@@ -144,13 +144,15 @@ export interface RepairStart {
 
 /**
  * The tasks whose incident an observer takes now. `holds` maps runtimes held by a usage limit to
- * the moment it resets; the repairs running now count against `workers` and `maxWorkers`, a task
- * has one repair at a time, and the oldest incidents go first.
+ * the moment it resets; a task whose last repair failed waits until `run.repair.retryAt` before an
+ * observer takes it again. The repairs running now count against `workers` and `maxWorkers`, a
+ * task has one repair at a time, and the oldest incidents go first.
  */
 export function planRepairs(
   settings: ObserverSettings,
   states: Iterable<RunState>,
   holds: ReadonlyMap<string, number>,
+  now: number,
   unavailable: RuntimeUnavailable = ALL_AVAILABLE,
 ): RepairStart[] {
   if (!settings.enabled) return [];
@@ -165,7 +167,12 @@ export function planRepairs(
   }
   const candidates: (RepairStart & { since: number })[] = [];
   for (const state of all) {
-    if (state.run.repair.incident !== null || !repairAdmitted(state, settings, unavailable))
+    const { retryAt } = state.run.repair;
+    if (
+      state.run.repair.incident !== null ||
+      (retryAt !== null && retryAt > now) ||
+      !repairAdmitted(state, settings, unavailable)
+    )
       continue;
     const found = repairIncidents(state, unavailable)
       // Another delivery of the task goes on: its refusal is not a state to repair yet.

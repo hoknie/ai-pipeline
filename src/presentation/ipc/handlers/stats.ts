@@ -10,6 +10,7 @@ export const statsHandlers = {
         ...(params.since === undefined ? {} : { since: params.since }),
         ...(params.until === undefined ? {} : { until: params.until }),
         ...(params.repository === undefined ? {} : { repository: params.repository }),
+        ...(params.bucket === undefined ? {} : { bucket: params.bucket }),
       }),
     ),
   stats_clear: async (params, { services }): Promise<StatsClearView> => {

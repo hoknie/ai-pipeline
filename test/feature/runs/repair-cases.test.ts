@@ -5,6 +5,7 @@ import {
   type Incident,
   type RunState,
   REPAIR_GROUP,
+  REPAIR_RETRY_MS,
   limitHolds,
 } from '../../../src/feature/runs/types/index.ts';
 import {
@@ -30,6 +31,9 @@ const SETTINGS = {
   enabled: true,
   projects: [{ repository: '/repo', maxWorkers: null }],
 };
+
+/** After every pause: the tests here care about the pool and the queue, not about pacing. */
+const NOW = Number.POSITIVE_INFINITY;
 
 const applied = { kind: 'applied' as const, files: ['src/app.ts'], conflicts: [], commit: null };
 const refused = {
@@ -109,7 +113,7 @@ describe('pause during the repair of a delivery', () => {
     expect(state.run.repair.taken).toEqual([]);
     expect(state.run.pendingDelivery).toBeNull();
     expect(repairAdmitted(state, SETTINGS)).toBe(false);
-    expect(planRepairs(SETTINGS, [state], new Map())).toEqual([]);
+    expect(planRepairs(SETTINGS, [state], new Map(), NOW)).toEqual([]);
   }
 
   function expectTakenAgain(state: RunState): void {
@@ -146,7 +150,7 @@ describe('pause during the repair of a delivery', () => {
     transition(state, { kind: 'hold', hold: null }, 9100);
     itemStarted(queue, item.id, state.run.id, 9100);
     expect(repairAdmitted(state, SETTINGS)).toBe(true);
-    expect(planRepairs(SETTINGS, [state], new Map())).toHaveLength(1);
+    expect(planRepairs(SETTINGS, [state], new Map(), NOW)).toHaveLength(1);
   });
 
   it('keeps the hold after done, before the delivery ends', () => {
@@ -197,9 +201,9 @@ describe('limit of the repair', () => {
     expect(holds.size).toBe(1);
     const [runtime] = [...holds.keys()];
     const settings = { ...SETTINGS, specialist: { ...SETTINGS.specialist, runtime } };
-    expect(planRepairs(settings, [state], holds)).toEqual([]);
+    expect(planRepairs(settings, [state], holds, NOW)).toEqual([]);
     const later = limitHolds([state], 10_000_000);
-    expect(planRepairs(settings, [state], later)).toHaveLength(1);
+    expect(planRepairs(settings, [state], later, NOW)).toHaveLength(1);
   });
 });
 
@@ -255,7 +259,7 @@ describe('skipped task under repair', () => {
 });
 
 describe('restart during a repair', () => {
-  it('fails the running group and gives the incident back', () => {
+  it('fails the running group, gives the incident back and pauses the next taking', () => {
     const state = failedRun();
     startRepair(state);
     dispatch([state], 2100);
@@ -263,7 +267,8 @@ describe('restart during a repair', () => {
     expect(state.repair?.status).toBe('failed');
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.repair.taken).toEqual([]);
-    expect(state.run.repair.repairs).toBe(1);
+    expect(state.run.repair.repairs).toBe(0);
+    expect(state.run.repair.retryAt).toBe(3000 + REPAIR_RETRY_MS);
     expect(repairIncidents(state)).toHaveLength(1);
   });
 
@@ -367,7 +372,7 @@ describe('delivery repair outcomes', () => {
     const state = refusedDelivery();
     transition(state, { kind: 'deliver_requested', groups: null, force: false, files: [] }, 6200);
     expect(state.run.pendingDelivery).not.toBeNull();
-    expect(planRepairs(SETTINGS, [state], new Map())).toEqual([]);
+    expect(planRepairs(SETTINGS, [state], new Map(), NOW)).toEqual([]);
   });
 });
 

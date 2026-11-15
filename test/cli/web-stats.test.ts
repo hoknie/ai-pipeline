@@ -55,10 +55,10 @@ describe('GET and DELETE /api/stats', () => {
     expect(received).toEqual({ method: 'stats_report', params: {} });
   });
 
-  it('passes the period and the project of a report', async () => {
+  it('passes the period, bucket and the project of a report', async () => {
     const { base, headers } = await panel();
     const response = await fetch(
-      `${base}/api/stats?since=1000&until=2000&repository=%2Fwork%2Fapp`,
+      `${base}/api/stats?since=1000&until=2000&repository=%2Fwork%2Fapp&bucket=auto`,
       {
         headers,
       },
@@ -66,19 +66,24 @@ describe('GET and DELETE /api/stats', () => {
     expect(response.status).toBe(200);
     expect(received).toEqual({
       method: 'stats_report',
-      params: { since: 1000, until: 2000, repository: '/work/app' },
+      params: { since: 1000, until: 2000, repository: '/work/app', bucket: 'auto' },
     });
   });
 
-  it.each(['since=abc', 'since=-5', 'until=1.5', 'since=9&until=3', 'repository=relative%2Fpath'])(
-    'answers 400 to the query %s without asking the daemon',
-    async (query) => {
-      const { base, headers } = await panel();
-      const response = await fetch(`${base}/api/stats?${query}`, { headers });
-      expect(response.status).toBe(400);
-      expect(received).toBeNull();
-    },
-  );
+  it.each([
+    'since=abc',
+    'since=-5',
+    'until=1.5',
+    'since=9&until=3',
+    'repository=relative%2Fpath',
+    'bucket=5m',
+    'bucket=invalid',
+  ])('answers 400 to the query %s without asking the daemon', async (query) => {
+    const { base, headers } = await panel();
+    const response = await fetch(`${base}/api/stats?${query}`, { headers });
+    expect(response.status).toBe(400);
+    expect(received).toBeNull();
+  });
 
   it('clears the records of a project', async () => {
     const { base, headers } = await panel();

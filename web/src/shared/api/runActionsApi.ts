@@ -9,6 +9,8 @@ export interface RunActionsApi {
   retry(runId: string, group: string, options?: { refreshConfig?: boolean }): Promise<unknown>;
   /** Skips a step of the run (or brings it back with `skip=false`); returns the run. */
   skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
+  /** Switches an unfinished run to another variant of its pipeline; a running step whose definition changes starts again. */
+  setRunVariant(runId: string, variant: string): Promise<RunView>;
   cancel(runId: string, group?: string): Promise<unknown>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
   /** Marks merged groups delivered after the user merged them by hand; nothing is applied. */
@@ -35,6 +37,7 @@ export function runActionsApi(): RunActionsApi {
         options?.refreshConfig ? { refreshConfig: true } : {},
       ),
     skipStep: (runId, step, skip) => post(`/api/runs/${enc(runId)}/skip`, { step, skip }),
+    setRunVariant: (runId, variant) => post(`/api/runs/${enc(runId)}/variant`, { variant }),
     cancel: (runId, group) =>
       group
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)

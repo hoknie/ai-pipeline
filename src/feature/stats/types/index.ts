@@ -3,4 +3,5 @@ export * from './capture.ts';
 export * from './names.ts';
 export * from './records.ts';
 export * from './report.ts';
+export * from './series.ts';
 export * from './settings.ts';

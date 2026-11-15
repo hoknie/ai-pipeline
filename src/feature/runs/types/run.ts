@@ -90,6 +90,8 @@ export interface RunRepair {
   specialist: Specialist | null;
   /** Why the observer cancelled the whole run. */
   cancelReason: string | null;
+  /** Until this moment (ms) a new repair does not start; null when there is no pause. */
+  retryAt: number | null;
 }
 
 export function emptyRepair(): RunRepair {
@@ -100,6 +102,7 @@ export function emptyRepair(): RunRepair {
     incident: null,
     specialist: null,
     cancelReason: null,
+    retryAt: null,
   };
 }
 

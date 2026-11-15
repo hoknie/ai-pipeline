@@ -61,18 +61,21 @@ function runLinkProps(panel: PanelData, t: TFunction) {
   return {
     onSubtask: panel.state.queue ? panel.chrome.newTask.openSubtask : undefined,
     linkChoices: (run: RunView) => {
-      const own = panel.state.queues.get(run.repository);
-      return own
-        ? (kind: LinkKind) =>
-            linkTargets(
-              kind,
-              own,
-              panel.state.runs,
-              (item) => itemLabel(item, t),
-              run,
-              otherQueues(panel.state.queues, panel.state.repositories, run.repository),
-            )
-        : undefined;
+      // a project whose queue is not loaded (or has no tasks) still lets a run change its links
+      const own = panel.state.queues.get(run.repository) ?? {
+        repository: run.repository,
+        items: [],
+        runs: [],
+      };
+      return (kind: LinkKind) =>
+        linkTargets(
+          kind,
+          own,
+          panel.state.runs,
+          (item) => itemLabel(item, t),
+          run,
+          otherQueues(panel.state.queues, panel.state.repositories, run.repository),
+        );
     },
   };
 }

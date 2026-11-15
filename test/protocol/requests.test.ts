@@ -56,6 +56,7 @@ const SAMPLES: Record<Method, unknown> = {
   cancel: run,
   retry: target,
   run_skip: { ...run, step: 'review', skip: true },
+  run_variant: { ...run, variant: 'strong' },
   apply: run,
   run_mark_delivered: run,
   answer: { ...target, answer: 'yes' },
@@ -138,9 +139,9 @@ describe('links in requests', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 86 methods, each in the request schema once', () => {
+  it('has 87 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(86);
+    expect(methods).toHaveLength(87);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

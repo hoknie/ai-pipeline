@@ -1,11 +1,15 @@
 import type { StatsClearView, StatsReportView } from './types.ts';
 import { call } from './http.ts';
 
+export type StatsBucket = '6h' | 'day' | 'week';
+export type StatsBucketRequest = 'auto' | StatsBucket;
+
 /** What a report covers; no field means all time and all projects. Moments are whole milliseconds. */
 export interface StatsQuery {
   since?: number;
   until?: number;
   repository?: string;
+  bucket?: StatsBucketRequest;
 }
 
 export interface StatsApi {
@@ -22,6 +26,7 @@ export function statsApi(): StatsApi {
       if (query.since !== undefined) params.set('since', String(query.since));
       if (query.until !== undefined) params.set('until', String(query.until));
       if (query.repository) params.set('repository', query.repository);
+      if (query.bucket) params.set('bucket', query.bucket);
       const search = params.toString();
       return call(`/api/stats${search ? `?${search}` : ''}`);
     },

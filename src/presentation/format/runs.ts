@@ -206,7 +206,10 @@ export function waitNote(wait: GroupWait | null | undefined, withProblem = true)
   if (wait.reason === 'limit')
     return `waiting for ${wait.runtime} usage limit, until ${clockTime(wait.until)}`;
   if (wait.reason === 'specialist') return `waiting for ${wait.specialist}`;
-  return `waiting for a free place (swarm.max ${wait.max})`;
+  if (wait.reason === 'pool') return `waiting for pool ${wait.pool} (max ${wait.max})`;
+  return wait.scope === 'machine'
+    ? `waiting for a free place (queue.max ${wait.max})`
+    : `waiting for a free place (swarm.max ${wait.max})`;
 }
 
 const SYSTEM_NAMES = {

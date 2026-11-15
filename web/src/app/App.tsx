@@ -11,6 +11,7 @@ import { TagsProvider } from '../shared/lib/catalog/tags.tsx';
 import { Overlays } from './pages/Overlays.tsx';
 import { PageSwitch } from './pages/PageSwitch.tsx';
 import { usePanelData } from './state/usePanelData.ts';
+import { useAppHotkeys } from './state/useAppHotkeys.ts';
 import { usePanelNav } from './state/usePanelNav.ts';
 import { useRepositoryActions } from './state/useRepositoryActions.ts';
 
@@ -35,6 +36,7 @@ function Panel({
   const { state, route, setRoute } = panel;
   const actions = useRepositoryActions(panel);
   const nav = usePanelNav(panel, actions);
+  useAppHotkeys(nav);
   return (
     <TagsProvider tags={state.tags} onTags={state.setTags}>
       <AppShell

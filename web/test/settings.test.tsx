@@ -561,7 +561,11 @@ describe('settings page', () => {
     const scope = await screen.findByTestId('setting-queue.scope');
     expect(scope.textContent).toContain('Mode');
     const max = screen.getByTestId('setting-queue.max');
-    expect(within(max).getByLabelText<HTMLInputElement>('Specialists at once').value).toBe('5');
+    expect(within(max).getByLabelText<HTMLInputElement>('Agents at once').value).toBe('5');
+    // The field limits both modes; the pools are written in the file, and the hint says so.
+    expect(max.textContent).toContain('both queue modes');
+    expect(max.textContent).toContain('queue.pools');
+    expect(max.textContent).not.toContain('global mode');
     expect(screen.queryByTestId('setting-max')).toBeNull();
     expect(
       within(groupNav()).getByRole('link', { name: 'Queue' }).getAttribute('aria-current'),

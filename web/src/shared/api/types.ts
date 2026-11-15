@@ -256,3 +256,5 @@ export interface SystemView {
   network: NetworkStatus | null;
   logPath: string | null;
 }
+
+export type { StatsBucket, StatsBucketRequest } from './statsApi.ts';

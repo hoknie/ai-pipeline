@@ -13,14 +13,20 @@ function stub(body: unknown) {
 }
 
 describe('the statistics API of the panel', () => {
-  it('asks the report with the period and the project', async () => {
+  it('asks the report with the period, bucket and the project', async () => {
     const fetchMock = stub(statsReportView());
-    const report = await httpApi.statsReport({ since: 10, repository: '/work/app' });
+    const report = await httpApi.statsReport({
+      since: 10,
+      repository: '/work/app',
+      bucket: 'auto',
+    });
     expect(report.totals.tasks).toBe(0);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/stats?since=10&repository=%2Fwork%2Fapp');
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/stats?since=10&repository=%2Fwork%2Fapp&bucket=auto',
+    );
   });
 
-  it('asks the whole report without a query', async () => {
+  it('asks the whole report without a query and without bucket parameter', async () => {
     const fetchMock = stub(statsReportView());
     await httpApi.statsReport();
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/stats');

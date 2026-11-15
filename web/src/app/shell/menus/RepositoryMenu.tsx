@@ -1,9 +1,10 @@
 import { Plus, Settings2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { BrowseDirectories } from '../../../features/repositories/index.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
+import { useHotkey } from '../../../shared/lib/browser/hotkeys.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import { repositoryLabel, repositoryMatches } from '../../../shared/lib/catalog/repositories.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
@@ -54,6 +55,26 @@ const PROJECTS_LINK = formatRoute({
   tab: null,
 });
 
+/** The open state of the menu: the key `p` opens it, and the search field takes the focus. */
+function useOpenOnKey(
+  enabled: boolean,
+  search: RefObject<HTMLInputElement | null>,
+): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(false);
+  useHotkey('p', (event) => {
+    if (!enabled) return;
+    event.preventDefault();
+    setOpen(true);
+  });
+  // the menu focuses itself on opening; the search takes the focus after it
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => search.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [open, search]);
+  return [open, setOpen];
+}
+
 /** Picks the repository whose queue, configuration and pipelines the panel shows. */
 export function RepositoryMenu({
   choice,
@@ -70,13 +91,7 @@ export function RepositoryMenu({
   const search = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [open, setOpen] = useState(false);
-  // the menu focuses itself on opening; the search takes the focus after it
-  useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => search.current?.focus(), 0);
-    return () => clearTimeout(timer);
-  }, [open]);
+  const [open, setOpen] = useOpenOnKey(selected !== null, search);
   if (selected === null) return <AddFirstRepository compact={compact} {...adder} />;
   const all = choice.allProjects === true;
   const name = all ? t('nav.repositoryAll') : repositoryLabel(selected);

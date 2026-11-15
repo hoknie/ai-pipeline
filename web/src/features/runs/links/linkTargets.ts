@@ -81,7 +81,7 @@ function currentTarget(ref: TaskLinkView, repository: string): LinkTarget {
 /** Ordered, deduplicated choices for a link; queues must contain enabled projects only. */
 export function linkTargets(
   kind: LinkKind,
-  queue: QueueView,
+  queue: Pick<QueueView, 'repository' | 'items' | 'runs'>,
   runs: readonly RunView[],
   label: (item: QueueItemView) => string,
   editing?: Pick<QueueItemView, 'id' | 'links'>,
@@ -97,7 +97,7 @@ export function linkTargets(
     });
     if (options.length) groups.push({ section, options });
   };
-  const forQueue = (source: QueueView, foreign: boolean) => {
+  const forQueue = (source: Pick<QueueView, 'repository' | 'items' | 'runs'>, foreign: boolean) => {
     const project = foreign ? repositoryLabel(source.repository) : undefined;
     const decorate = (choice: LinkTarget): LinkTarget =>
       project ? { ...choice, project } : choice;

@@ -42,6 +42,8 @@ export type FailReason =
   | { kind: 'git'; message: string }
   /** The step was skipped while its attempt ran. */
   | { kind: 'skipped' }
+  /** The variant of the run was changed while the attempt ran; the step starts again. */
+  | { kind: 'variant'; from: string; to: string }
   /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
   | { kind: 'usage_limit'; resetsAt: number | null }
   /** The network was down or the API of the agent was unreachable; the step goes on after a pause. */
@@ -59,7 +61,18 @@ export function clockTime(ms: number): string {
 
 /** A failure of the observer's attempt that gives the repair back: nobody's fault, the incident waits. */
 export function refundsRepair(reason: FailReason): boolean {
-  return ['usage_limit', 'runtime_disabled', 'runtime_not_found'].includes(reason.kind);
+  return (
+    ['usage_limit', 'runtime_disabled', 'runtime_not_found'].includes(reason.kind) ||
+    pacesRepair(reason)
+  );
+}
+
+/**
+ * A failure of the observer's attempt that also pauses the next taking of the incident: the agent
+ * could not run to a report, so starting again at once would only spend calls.
+ */
+export function pacesRepair(reason: FailReason): boolean {
+  return ['timeout', 'no_report', 'interrupted', 'spawn', 'network'].includes(reason.kind);
 }
 
 export function describeFailReason(reason: FailReason): string {
@@ -84,6 +97,8 @@ export function describeFailReason(reason: FailReason): string {
       return `git: ${reason.message}`;
     case 'skipped':
       return 'step skipped';
+    case 'variant':
+      return `variant changed: ${reason.from} → ${reason.to}`;
     case 'message':
       return 'interrupted by a message';
     case 'paused':

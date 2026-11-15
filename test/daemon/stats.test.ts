@@ -163,4 +163,14 @@ describe('usage statistics of the daemon', () => {
     await h.restart();
     expect((await report(h)).totals.tasks).toBe(0);
   });
+
+  it('returns requested bucket and series with 6h granularity on bucket: 6h', async () => {
+    const h = await start();
+    await finishedRun(h);
+    await reportWithTasks(h, 1);
+    const view = await report(h, { bucket: '6h' });
+    expect(view.bucket).toBe('6h');
+    expect(view.series.length).toBeGreaterThanOrEqual(1);
+    expect(view.series[0]?.day).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:00$/);
+  });
 });

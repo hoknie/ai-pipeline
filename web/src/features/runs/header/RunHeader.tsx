@@ -21,6 +21,7 @@ import {
 } from './useRunHeader.ts';
 
 import { ApplyDialog } from './ApplyDialog.tsx';
+import { useRunVariantSwitch } from './variant/index.ts';
 import { RunLinks, type RunLinkChoices } from '../links/RunLinks.tsx';
 
 function RunInfo({
@@ -100,6 +101,7 @@ export function RunHeader({
   const retry = useRetryFailed(run, api, onError);
   const delivery = useRunDelivery(run, api, onError, onDeliver);
   const [linksOpen, setLinksOpen] = useState(false);
+  const variantSwitch = useRunVariantSwitch(run, api);
   return (
     <header ref={headerRef} aria-label={t('runs.header.label')} className="@container border-b p-4">
       <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-start">
@@ -121,6 +123,7 @@ export function RunHeader({
               delivery={delivery}
               onSubtask={onSubtask}
               onAddLink={linkChoices ? () => setLinksOpen(true) : undefined}
+              onChangeVariant={variantSwitch.open}
             />
           </div>
         </div>
@@ -141,6 +144,7 @@ export function RunHeader({
         onOpenChange={setLinksOpen}
         onProject={onOpenProject}
       />
+      {variantSwitch.dialog}
       {delivery.forcing ? (
         <ApplyDialog
           run={run}

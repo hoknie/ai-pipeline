@@ -85,7 +85,9 @@ The tab lists what the agents of the daemon started: their child processes and t
 ## Keyboard and look
 
 - `Cmd+K` on macOS, `Ctrl+K` elsewhere, opens the command palette. It searches sections, runs (those waiting for an answer first), groups of the open run, pipelines and specialists, and runs actions such as "New task in the queue" and "New task on a page".
-- Outside input fields and dialogs: `j` and `k` move to the next and previous run, `?` shows the shortcuts.
+- Outside input fields and dialogs: `n` opens a new task, `p` opens the project menu, `j` and `k` move to the next and previous run, `?` shows all shortcuts.
+- `g` then a letter goes to a section: `r` runs, `q` queue, `s` specialists, `p` pipelines, `t` statistics, `c` settings.
+- Letters work in any keyboard layout, because the physical key counts.
 - Cancelling a run or a group, removing from the queue, leaving an unsaved form and rereading the configuration ask for confirmation. Focus is on the refusal, and `Esc` refuses.
 - Results of actions are notifications. Errors stay until you dismiss them.
 - Themes are "System", "Light" and "Dark". The choice is remembered.

@@ -14,10 +14,11 @@ import {
   type StatsReport,
   breakdownNames,
   breakdownRows,
-  dailySeries,
+  bucketSeries,
   outcomesOf,
   perTaskOf,
   projectRows,
+  resolveBucket,
   totalsOf,
   UNKNOWN_MODEL,
 } from '../types/index.ts';
@@ -80,6 +81,7 @@ export class StatsReportService {
     const end = query.until ?? now();
     const first = query.since ?? reads.firstFinished(exclude);
     const start = first === null ? null : Math.max(first, end - MAX_SERIES_DAYS * DAY_MS);
+    const bucket = resolveBucket(start, end, query.bucket);
     const report: StatsReport = {
       settings: {
         enabled: settings.enabled,
@@ -89,6 +91,7 @@ export class StatsReportService {
       since: query.since ?? null,
       until: query.until ?? null,
       repository: repository ?? null,
+      bucket,
       totals: totalsOf(attempts, tasks),
       perTask: perTaskOf(taskAttempts, tasks),
       outcomes: outcomesOf(tasks),
@@ -97,7 +100,7 @@ export class StatsReportService {
       byModel: breakdownRows(attempts, (record) => record.model ?? UNKNOWN_MODEL),
       byPipeline: breakdownRows(attempts, pipelineKey, pipelineNames),
       byRuntime: breakdownRows(attempts, (record) => record.runtime),
-      series: start === null ? [] : dailySeries(attempts, tasks, start, end),
+      series: start === null ? [] : bucketSeries(attempts, tasks, start, end, bucket),
     };
     return report;
   }

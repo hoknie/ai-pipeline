@@ -261,4 +261,20 @@ describe('the statistics report', () => {
     h.state.settings = 'invalid swarm.stats';
     expect((await h.service.report({})).settings.enabled).toBe(false);
   });
+
+  it('adapts bucket granularity for default, auto on 7 days and long periods', async () => {
+    const h = harness();
+    addTask(h, 'a', '/work/app', [{ tokens: 1000, minutes: 1 }], NOW - 1000);
+    const day = 86_400_000;
+    const defaultReport = await h.service.report({});
+    expect(defaultReport.bucket).toBe('day');
+
+    const auto7d = await h.service.report({ since: NOW - 7 * day, bucket: 'auto' });
+    expect(auto7d.bucket).toBe('6h');
+    expect(auto7d.series.length).toBeGreaterThanOrEqual(25);
+
+    const autoLong = await h.service.report({ since: NOW - 150 * day, bucket: 'auto' });
+    expect(autoLong.bucket).toBe('week');
+    expect(autoLong.series.length).toBeGreaterThanOrEqual(21);
+  });
 });

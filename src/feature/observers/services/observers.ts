@@ -132,7 +132,13 @@ export class ObserverService {
     if (specialist) {
       // Over all runs, so the repairs of the waiting repositories count against the workers.
       const holds = limitHolds(all, now());
-      for (const { state, incident } of planRepairs(settings, all, holds, this.unavailability())) {
+      for (const { state, incident } of planRepairs(
+        settings,
+        all,
+        holds,
+        now(),
+        this.unavailability(),
+      )) {
         if (pending(state)) continue;
         try {
           await runs.engine.apply(state, { kind: 'repair_start', incident, specialist });
@@ -142,6 +148,7 @@ export class ObserverService {
       }
     }
     publish.observersChanged();
+    runs.engine.armWake();
   }
 
   /** `observers_set`: new settings replace the old ones only when every value is right. */

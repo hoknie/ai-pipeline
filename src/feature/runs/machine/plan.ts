@@ -7,7 +7,12 @@ import {
   actionPointOf,
   allGroups,
   isRepairGroup,
-  MACHINE_KEY,
+  REPOSITORY_LIMIT,
+  attemptSeed,
+  poolOf,
+  runningByPool,
+  type PoolSlot,
+  type SelectedRuntime,
   limitHolds,
   networkRetryAt,
   openAction,
@@ -25,7 +30,7 @@ import { OFF_NETWORK, type NetworkSnapshot } from '../../network/types/index.ts'
 
 export interface DispatchPlan {
   /** Groups the scheduler starts now, in start order. */
-  start: { state: RunState; group: Group }[];
+  start: { state: RunState; group: Group; selected?: SelectedRuntime }[];
   /** Queued groups that stay queued, keyed by `waitKey(run, slug)`. */
   waits: Map<string, GroupWait>;
 }
@@ -69,14 +74,28 @@ function networkWaitOf(group: Group, now: number, network: NetworkSnapshot): Gro
   return { reason: 'network', problem: network.problem ?? 'network is down', until: null };
 }
 
-/** The runtime the next attempt of the group would run on. */
+/** What is running now, and what the groups accepted in this pass add to it. */
+interface Counters {
+  machine: number;
+  repository: Map<string, number>;
+  specialist: Map<string, number>;
+  pool: Map<string, number>;
+}
+
+function bump(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/** The runtime and model the next attempt of the group would start with. */
 function plannedRuntime(
   state: RunState,
   group: Group,
   specialist: Specialist,
+  stepId: string,
   holds: Map<string, number>,
-): string {
+): SelectedRuntime {
   const stepIndex = group.pending?.stepIndex ?? 0;
+  const seq = (group.attempts.at(-1)?.seq ?? 0) + 1;
   return selectAttemptRuntime({
     specialist,
     chains: state.run.config.chains,
@@ -87,29 +106,33 @@ function plannedRuntime(
     round: group.attempts.filter((a) => a.stepIndex === stepIndex).length + 1,
     resume: group.pending?.resume ?? false,
     keepRuntime: group.pending?.keepRuntime ?? false,
-  }).runtime;
+    seed: attemptSeed(state.run.id, group.slug, stepId, seq),
+  });
 }
 
-/**
- * Decides which queued groups start and which wait, without changing any state.
- * With `dispatchLimit.kind: repository`, `swarm.max` limits the running specialists of each repository
- * separately; with `machine`, one number limits them across every repository. A specialist's
- * `max` counts its slug across all runs in both.
- */
-export function planDispatch(
-  states: RunState[],
-  now: number,
-  network: NetworkSnapshot = OFF_NETWORK,
-  dispatchLimit: DispatchLimit = { kind: 'repository' },
-): DispatchPlan {
-  const start: DispatchPlan['start'] = [];
-  const waits = new Map<string, GroupWait>();
-  const running = runningByRepository(states, dispatchLimit);
-  const limits =
-    dispatchLimit.kind === 'machine' ? new Map<string, number>() : repositoryLimits(states);
-  const bySpecialist = runningBySpecialist(states);
-  const holds = limitHolds(states, now);
-  const queue = states
+/** The one limit of the machine, the pool or the repository that holds the candidate; null when none. */
+function capacityWaitOf(
+  repository: string,
+  pool: PoolSlot | null,
+  counters: Counters,
+  limit: DispatchLimit,
+  repositoryMax: number,
+): GroupWait | null {
+  if (pool && (counters.pool.get(pool.key) ?? 0) >= pool.max) {
+    return { reason: 'pool', pool: pool.name, max: pool.max };
+  }
+  if (counters.machine >= limit.max) {
+    return { reason: 'capacity', scope: 'machine', max: limit.max };
+  }
+  if (limit.kind === 'repository' && (counters.repository.get(repository) ?? 0) >= repositoryMax) {
+    return { reason: 'capacity', scope: 'repository', max: repositoryMax };
+  }
+  return null;
+}
+
+/** The groups ready to start in the order of the queue: the older run first, then by position. */
+function queuedGroups(states: RunState[]): { state: RunState; group: Group }[] {
+  return states
     .filter((state) => state.run.finishedAt === null)
     .sort(
       (left, right) =>
@@ -124,6 +147,33 @@ export function planDispatch(
         .filter((group) => !gated(state, group))
         .map((group) => ({ state, group })),
     );
+}
+
+/**
+ * Decides which queued groups start and which wait, without changing any state.
+ * `dispatchLimit.max` (`queue.max`) limits the running agent attempts of the machine in both modes;
+ * with `kind: repository`, `swarm.max` also limits those of each repository; pools limit the attempts
+ * of their runtimes and models. A specialist's `max` counts its slug across all runs. Repair attempts
+ * count like the others and wait for all of them but a usage limit; shell commands count for none.
+ */
+export function planDispatch(
+  states: RunState[],
+  now: number,
+  network: NetworkSnapshot = OFF_NETWORK,
+  dispatchLimit: DispatchLimit = REPOSITORY_LIMIT,
+): DispatchPlan {
+  const start: DispatchPlan['start'] = [];
+  const waits = new Map<string, GroupWait>();
+  const repository = runningByRepository(states);
+  const counters: Counters = {
+    machine: [...repository.values()].reduce((sum, count) => sum + count, 0),
+    repository,
+    specialist: runningBySpecialist(states),
+    pool: runningByPool(states, dispatchLimit),
+  };
+  const limits = repositoryLimits(states);
+  const holds = limitHolds(states, now);
+  const queue = queuedGroups(states);
   for (const { state, group } of queue) {
     if (isCommandAction(state, group)) {
       start.push({ state, group });
@@ -136,44 +186,45 @@ export function planDispatch(
       continue;
     }
     const step = group.pending ? stepsOf(state.run, group)[group.pending.stepIndex] : undefined;
-    const slug = step?.specialist;
     const specialist = step ? specialistOfStep(state.run, group, step) : undefined;
-    // The repair waits for no limit here: an agent that hits one ends the repair.
-    if (isRepairGroup(group)) {
-      start.push({ state, group });
+    // The real specialist: for a repair `step.specialist` is only a placeholder.
+    const slug = specialist?.slug;
+    const selected =
+      specialist && step ? plannedRuntime(state, group, specialist, step.id, holds) : undefined;
+    const until = selected ? holds.get(selected.runtime) : undefined;
+    // A repair ignores the hold of a usage limit: an agent that hits it ends the repair.
+    if (selected && until !== undefined && !isRepairGroup(group)) {
+      waits.set(key, { reason: 'limit', runtime: selected.runtime, until });
       continue;
     }
-    const effectiveRuntime = specialist
-      ? plannedRuntime(state, group, specialist, holds)
-      : undefined;
-    const until = effectiveRuntime ? holds.get(effectiveRuntime) : undefined;
-    if (effectiveRuntime && until !== undefined) {
-      waits.set(key, { reason: 'limit', runtime: effectiveRuntime, until });
-      continue;
-    }
-    const limit = specialist?.max ?? null;
-    if (slug && limit !== null && (bySpecialist.get(slug) ?? 0) >= limit) {
+    const max = specialist?.max ?? null;
+    if (slug && max !== null && (counters.specialist.get(slug) ?? 0) >= max) {
       waits.set(key, {
         reason: 'specialist',
         specialist: slug,
         name: specialistName(state.run.config, slug),
-        max: limit,
+        max,
       });
       continue;
     }
-    const repository = dispatchLimit.kind === 'machine' ? MACHINE_KEY : state.run.repository;
-    const max =
-      dispatchLimit.kind === 'machine'
-        ? dispatchLimit.max
-        : (limits.get(repository) ?? state.run.config.max);
-    if ((running.get(repository) ?? 0) >= max) {
+    const pool = selected ? poolOf(dispatchLimit, selected.runtime, selected.model) : null;
+    const wait = capacityWaitOf(
+      state.run.repository,
+      pool,
+      counters,
+      dispatchLimit,
+      limits.get(state.run.repository) ?? state.run.config.max,
+    );
+    if (wait !== null) {
       // A step without a specialist is a configuration error, not a wait.
-      if (specialist) waits.set(key, { reason: 'capacity', max });
+      if (specialist) waits.set(key, wait);
       continue;
     }
-    start.push({ state, group });
-    if (slug) bySpecialist.set(slug, (bySpecialist.get(slug) ?? 0) + 1);
-    running.set(repository, (running.get(repository) ?? 0) + 1);
+    start.push(selected ? { state, group, selected } : { state, group });
+    if (slug) bump(counters.specialist, slug);
+    if (pool) bump(counters.pool, pool.key);
+    counters.machine += 1;
+    bump(counters.repository, state.run.repository);
   }
   return { start, waits };
 }

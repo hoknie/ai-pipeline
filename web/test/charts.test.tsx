@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { BarChart, ShareBars, StackBar } from '../src/shared/ui/charts/index.ts';
+import { AreaChart, BarChart, ShareBars, StackBar } from '../src/shared/ui/charts/index.ts';
 
 import { cleanup, fireEvent, render, screen, within } from './render.tsx';
 
@@ -92,6 +92,106 @@ describe('BarChart', () => {
         .getAllByRole('cell')
         .map((cell) => cell.textContent),
     ).toEqual(['0t', '300t', '300t']);
+  });
+});
+
+function mountArea(customCats = categories, customSeries = series) {
+  render(
+    <AreaChart
+      label="Area chart: Tokens by project"
+      categories={customCats}
+      series={customSeries}
+      format={(value) => `${value}t`}
+      categoryHead="Day"
+      totalLabel="Total"
+    />,
+  );
+  return screen.getByRole('group', { name: 'Area chart: Tokens by project' });
+}
+
+describe('AreaChart', () => {
+  it('has an accessible name and renders smooth area paths with gradients', () => {
+    const chart = mountArea();
+    expect(chart.getAttribute('tabindex')).toBe('0');
+    expect(screen.getByTestId('area-series-app')).toBeTruthy();
+    expect(screen.getByTestId('area-series-lib')).toBeTruthy();
+    for (const cat of categories) {
+      expect(screen.getByTestId(`slot-${cat.key}`)).toBeTruthy();
+    }
+  });
+
+  it('navigates with keyboard showing crosshair, active markers and tooltip', () => {
+    const chart = mountArea();
+    expect(screen.queryByTestId('chart-tooltip')).toBeNull();
+    fireEvent.focus(chart);
+    expect(screen.getByTestId('crosshair')).toBeTruthy();
+    const first = within(screen.getByTestId('chart-tooltip'));
+    expect(first.getByText('Jun 1, 2026')).toBeTruthy();
+    expect(first.getByText('120t')).toBeTruthy();
+    expect(screen.getByTestId('marker-app')).toBeTruthy();
+    expect(screen.getByTestId('marker-lib')).toBeTruthy();
+
+    fireEvent.keyDown(chart, { key: 'ArrowRight' });
+    const second = within(screen.getByTestId('chart-tooltip'));
+    expect(second.getByText('Jun 2, 2026')).toBeTruthy();
+    expect(second.getByText('lib')).toBeTruthy();
+    expect(second.queryByText('app')).toBeNull();
+    expect(screen.getByTestId('marker-lib')).toBeTruthy();
+    expect(screen.queryByTestId('marker-app')).toBeNull();
+
+    fireEvent.keyDown(chart, { key: 'End' });
+    expect(within(screen.getByTestId('chart-tooltip')).getByText('Jun 3, 2026')).toBeTruthy();
+    fireEvent.keyDown(chart, { key: 'Home' });
+    expect(within(screen.getByTestId('chart-tooltip')).getByText('Jun 1, 2026')).toBeTruthy();
+  });
+
+  it('shows tooltip on hover and hides on mouse leave', () => {
+    const chart = mountArea();
+    const slot = screen.getByTestId('slot-2026-06-02').querySelector('rect');
+    fireEvent.mouseEnter(slot!);
+    expect(within(screen.getByTestId('chart-tooltip')).getByText('Jun 2, 2026')).toBeTruthy();
+    fireEvent.mouseLeave(chart);
+    expect(screen.queryByTestId('chart-tooltip')).toBeNull();
+  });
+
+  it('renders single point mode with vertical guide line and center markers', () => {
+    mountArea([categories[0]!], [{ key: 'app', label: 'app', color: '#3b82f6', values: [100] }]);
+    expect(screen.getByTestId('area-single-point')).toBeTruthy();
+    expect(screen.getByTestId('point-app')).toBeTruthy();
+  });
+
+  it('renders accessible data table', () => {
+    mountArea();
+    const table = screen.getByRole('table', { name: 'Area chart: Tokens by project' });
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+  });
+
+  it('uses safe index-based gradient ids avoiding collisions and malformed url references', () => {
+    mountArea(categories, [
+      { key: '/work/my repo #1 (prod)', label: 'repo', color: '#ff0000', values: [10, 20, 30] },
+    ]);
+    const area = screen.getByTestId('area-series-/work/my repo #1 (prod)');
+    const fill = area.getAttribute('fill');
+    expect(fill).toMatch(/^url\(#[a-zA-Z0-9-_]+-grad-0\)$/);
+  });
+
+  it('renders x-axis date labels for all 7 day boundaries without dropping dates on 6h scale', () => {
+    const cats28 = Array.from({ length: 28 }, (_, index) => {
+      const dayNum = Math.floor(index / 4) + 1;
+      const hour = (index % 4) * 6;
+      return {
+        key: `2026-06-${String(dayNum).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00`,
+        label: hour === 0 ? `Jun ${dayNum}` : '',
+        title: `Jun ${dayNum}, ${hour}:00`,
+      };
+    });
+    const s28 = [
+      { key: 'app', label: 'app', color: '#3b82f6', values: new Array<number>(28).fill(10) },
+    ];
+    mountArea(cats28, s28);
+    for (let day = 1; day <= 7; day += 1) {
+      expect(screen.getByText(`Jun ${day}`)).toBeTruthy();
+    }
   });
 });
 

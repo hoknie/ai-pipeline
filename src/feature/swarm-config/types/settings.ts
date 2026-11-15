@@ -328,16 +328,34 @@ export const QUEUE_SCOPES = ['project', 'global'] as const;
 export type QueueScopeName = (typeof QUEUE_SCOPES)[number];
 export const QUEUE_MAX_RANGE = [1, 32] as const;
 
-/** The mode of the task queue and the specialist limit of the machine; the global settings.yaml only. */
-export interface QueueSettings {
-  /** `project`: a queue per project; `global`: one queue for all projects. */
-  scope: QueueScopeName;
-  /** The most specialists working at once on the machine in the `global` mode. */
+/** A named quota of the agent attempts that work at once on the machine. */
+export interface QueuePool {
+  name: string;
+  /** The most attempts of the pool working at once; the pool lends and borrows no places. */
+  max: number;
+  /** `claude`, `agy`, `opencode` (no explicit model) or `opencode:provider/model` (a trailing `*` for a prefix). */
+  members: string[];
+}
+
+/** The quota of the attempts no pool takes. */
+export interface DefaultQueuePool {
   max: number;
 }
 
+/** The mode of the task queue and the specialist limits of the machine; the global settings.yaml only. */
+export interface QueueSettings {
+  /** `project`: a queue per project; `global`: one queue for all projects. */
+  scope: QueueScopeName;
+  /** The most agent attempts working at once on the machine in both modes. */
+  max: number;
+  /** Quotas of the attempts by runtime and model; empty: no quotas. */
+  pools: QueuePool[];
+  /** The quota of the attempts outside every pool; set exactly when `pools` is not empty. */
+  defaultPool: DefaultQueuePool | null;
+}
+
 export function defaultQueue(): QueueSettings {
-  return { scope: 'project', max: 5 };
+  return { scope: 'project', max: 5, pools: [], defaultPool: null };
 }
 
 export const DEFAULT_NETWORK_TARGET = 'https://api.anthropic.com';

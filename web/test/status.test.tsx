@@ -113,13 +113,36 @@ describe('waiting', () => {
     expect(waitText({ reason: 'specialist', specialist: 'coder', max: 1 } as never, t)).toBe(
       'Waiting for coder: 1 of 1 busy',
     );
-    expect(waitText({ reason: 'capacity', max: 3 }, t)).toBe(
+    expect(waitText({ reason: 'capacity', scope: 'repository', max: 3 }, t)).toBe(
       'Waiting for a free place: swarm.max is 3',
+    );
+    expect(waitText({ reason: 'capacity', scope: 'machine', max: 5 }, t)).toBe(
+      'Waiting for a free place: queue.max is 5',
+    );
+    expect(waitText({ reason: 'pool', pool: 'mix', max: 2 }, t)).toBe(
+      'Waiting for the pool mix: 2 of 2 busy',
     );
     expect(waitText({ reason: 'limit', runtime: 'claude', until: 0 }, t)).toMatch(
       /^Waiting for the claude usage limit to reset, until \d\d:\d\d$/,
     );
   });
+
+  it.each(['en', 'es', 'ru', 'zh'])(
+    'names queue.max for the machine, swarm.max for the repository and the pool in %s',
+    (language) => {
+      const local = i18next.getFixedT(language);
+      const machine = waitText({ reason: 'capacity', scope: 'machine', max: 5 }, local);
+      const repository = waitText({ reason: 'capacity', scope: 'repository', max: 2 }, local);
+      const pool = waitText({ reason: 'pool', pool: 'mix', max: 2 }, local);
+      expect(machine).toContain('queue.max');
+      expect(machine).not.toContain('swarm.max');
+      expect(repository).toContain('swarm.max');
+      expect(repository).not.toContain('queue.max');
+      expect(pool).toContain('mix');
+      expect(pool).toContain('2');
+      expect(new Set([machine, repository, pool]).size).toBe(3);
+    },
+  );
 
   it('explains a wait for the network, with the problem or the end of the pause', () => {
     expect(waitText({ reason: 'network', problem: 'interface wt0 is down', until: null }, t)).toBe(

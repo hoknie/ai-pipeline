@@ -121,6 +121,10 @@ export const runsRequests = [
     }),
   }),
   z.object({
+    method: z.literal('run_variant'),
+    params: z.object({ runId: z.string().min(1), variant: z.string().trim().min(1) }),
+  }),
+  z.object({
     method: z.literal('apply'),
     params: z.object({
       runId: z.string().min(1),

@@ -152,6 +152,29 @@ describe('cli', () => {
     await aip(box, 'run', 'cancel', runId);
   });
 
+  it('switches a running run to another variant and refuses an unknown one', async () => {
+    const box = sandbox(
+      `${PIPELINE_CONFIG}      variants:
+        strong:
+          steps:
+            code: { model: opus }
+`,
+    );
+    writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
+    const { runId } = runOf(
+      (await aip(box, 'run', 'start', 'feature', '--task', 'x', '--json')).stdout,
+    );
+    const switched = await aip(box, 'run', 'variant', runId, 'strong');
+    expect(switched.code).toBe(0);
+    expect(switched.stdout).toContain('strong');
+    const view = JSON.parse((await aip(box, 'run', 'variant', runId, 'default', '--json')).stdout);
+    expect(view.variant).toBe('default');
+    const unknown = await aip(box, 'run', 'variant', runId, 'nope');
+    expect(unknown.code).toBe(1);
+    expect(unknown.stderr).toContain('unknown variant `nope`');
+    await aip(box, 'run', 'cancel', runId);
+  });
+
   it('lists finished runs to clean', async () => {
     const box = sandbox();
     const empty = await aip(box, 'run', 'clean');

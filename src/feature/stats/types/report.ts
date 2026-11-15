@@ -1,11 +1,15 @@
 import { type StatsSettingsView } from './settings.ts';
 import { type TaskOutcome } from './records.ts';
 
+export type StatsBucket = '6h' | 'day' | 'week';
+export type StatsBucketRequest = 'auto' | StatsBucket;
+
 /** What a report covers; no `since` and `until` mean all time, no `repository` all projects. */
 export interface StatsQuery {
   since?: number;
   until?: number;
   repository?: string;
+  bucket?: StatsBucketRequest;
 }
 
 export interface Totals {
@@ -88,6 +92,7 @@ export interface StatsReport {
   since: number | null;
   until: number | null;
   repository: string | null;
+  bucket?: StatsBucket;
   totals: Totals;
   perTask: PerTask;
   outcomes: Record<TaskOutcome, number>;

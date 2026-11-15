@@ -144,6 +144,11 @@ function itemBody(
   };
 }
 
+/** The variant of an item; a returned run keeps its own, which is changed in the run details. */
+function variantOf(item: QueueItem, lookup: (id: string) => RunState | undefined): string {
+  return (item.run === null ? undefined : lookup(item.run)?.run.variant) ?? item.variant;
+}
+
 /** A predecessor of a queue item: another item of the queue, or a run. */
 function dependencyView(
   find: ItemLookup,
@@ -228,8 +233,8 @@ export function queueView(
       position: index + 1,
       pipeline: item.pipeline,
       pipelineName: names(item.pipeline),
-      variant: item.variant,
-      variantName: variantNames(item.pipeline, item.variant),
+      variant: variantOf(item, lookup),
+      variantName: variantNames(item.pipeline, variantOf(item, lookup)),
       ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,

@@ -119,6 +119,16 @@ export const es: Dictionary = {
       day: 'Día',
       total: 'Total',
       other: 'Otros',
+      buckets: {
+        '6h': '6 h',
+        day: 'por día',
+        week: 'por semana',
+      },
+      categoryHeads: {
+        '6h': 'Intervalo',
+        day: 'Día',
+        week: 'Semana',
+      },
       chartLabel: 'Gráfico por día: {{metric}} por proyecto',
       chartLabelModels: 'Gráfico por día: {{metric}} por modelo',
       split: 'Desglose',
@@ -216,7 +226,9 @@ export const es: Dictionary = {
   },
   wait: {
     specialist: 'Espera a {{specialist}}: {{max}} de {{max}} ocupados',
-    capacity: 'Espera un lugar libre: swarm.max es {{max}}',
+    capacityMachine: 'Espera un lugar libre: queue.max es {{max}}',
+    capacityRepository: 'Espera un lugar libre: swarm.max es {{max}}',
+    pool: 'Espera el grupo {{pool}}: {{max}} de {{max}} ocupados',
     limit: 'Espera el reinicio del límite de {{runtime}}, hasta {{time}}',
     network: 'Espera la red: {{problem}}',
     networkUntil: 'Espera la red, hasta {{time}}',
@@ -307,6 +319,11 @@ export const es: Dictionary = {
     previousRun: 'Ejecución anterior',
     help: 'Este diálogo',
     close: 'Cerrar un diálogo o un menú',
+    newTask: 'Nueva tarea',
+    project: 'Cambiar de proyecto',
+    moveItem: 'Mover una tarea en la cola',
+    then: 'luego',
+    groups: { general: 'General', navigation: 'Navegación', runs: 'Ejecuciones', queue: 'Cola' },
   },
   format: {
     unitSec: 's',
@@ -410,6 +427,13 @@ export const es: Dictionary = {
       continued: 'La ejecución continúa',
       deliver: 'Entregar',
       more: 'Más',
+      changeVariant: 'Cambiar variante…',
+      changeVariantTitle: 'Cambiar la variante de la ejecución',
+      changeVariantDescription:
+        'El paso en curso se detiene sin commit y empieza de nuevo con la nueva variante si su especialista, modelo o prompt es distinto. Los cambios que ya hizo se quedan en la copia de trabajo.',
+      changeVariantConfirm: 'Cambiar variante',
+      changeVariantKeep: 'Dejar como está',
+      variantChanged: 'Variante cambiada',
       forceDeliver: 'Entregar con --force…',
       markDelivered: 'Marcar como entregado…',
       markDeliveredTitle: '¿Marcar la ejecución como entregada?',
@@ -705,8 +729,8 @@ export const es: Dictionary = {
     },
     global: {
       badge: 'Cola global',
-      max_one: 'Como máximo {{count}} especialistas a la vez en la máquina',
-      max_other: 'Como máximo {{count}} especialistas a la vez en la máquina',
+      max_one: 'Como máximo {{count}} agente a la vez en la máquina',
+      max_other: 'Como máximo {{count}} agentes a la vez en la máquina',
       max_many: 'Como máximo {{count}} especialistas a la vez en la máquina',
       projects: 'Proyectos',
       projectsHelp:
@@ -1889,8 +1913,8 @@ export const es: Dictionary = {
         hint: 'Cada proyecto tiene su cola (project) o una cola lleva las tareas de todos los proyectos (global). Cambiarlo pausa todas las colas.',
       },
       queue_max: {
-        label: 'Especialistas a la vez',
-        hint: 'Máximo de especialistas trabajando a la vez en la máquina en el modo global.',
+        label: 'Agentes a la vez',
+        hint: 'Máximo de intentos de agentes a la vez en la máquina, en ambos modos de la cola. Los grupos de cuotas (queue.pools) se definen en settings.yaml.',
       },
       stats_enabled: {
         label: 'Recopilar estadísticas',

@@ -53,6 +53,7 @@ export const statsReportSchema = z.object({
   since: nullable,
   until: nullable,
   repository: z.string().nullable(),
+  bucket: z.enum(['6h', 'day', 'week']).optional(),
   totals,
   perTask,
   outcomes: z.object({ finished: number, failed: number, cancelled: number }),

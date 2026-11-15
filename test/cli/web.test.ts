@@ -1052,6 +1052,32 @@ describe('aip web', () => {
     expect(((await refused.json()) as { error: string }).error).toContain('unknown step');
   });
 
+  it('switches the variant of a run through POST with validation', async () => {
+    const { h, web, base } = await setup();
+    h.script({ code: [{ waitFor: h.gate('hold') }] });
+    const { runId } = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'login', task: 'x' }],
+    })) as RunCreated;
+    await h.waitFor(runId, (run) => run.groups.some((group) => group.status === 'running'));
+    const post = (body: unknown) =>
+      fetch(`${base}/api/runs/${runId}/variant`, {
+        method: 'POST',
+        headers: authed(web, JSON_TYPE),
+        body: JSON.stringify(body),
+      });
+    expect((await post({})).status).toBe(400);
+    expect((await post({ variant: '  ' })).status).toBe(400);
+    const refused = await post({ variant: 'nope' });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: string }).error).toContain('unknown variant');
+    // the pipeline of the test has no variants but default: the same variant changes nothing
+    const same = await post({ variant: 'default' });
+    expect(same.status).toBe(200);
+    expect(((await same.json()) as RunView).variant).toBe('default');
+  });
+
   it('sends a message to the running specialist through POST', async () => {
     const { h, web, base } = await setup();
     h.script({ code: [{ waitFor: h.gate('code') }, { waitFor: h.gate('hold') }] });

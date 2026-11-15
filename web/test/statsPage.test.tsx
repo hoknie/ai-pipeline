@@ -179,11 +179,13 @@ describe('filters', () => {
 });
 
 describe('daily chart', () => {
-  it('draws a bar of the projects for every day', async () => {
+  it('draws stacked area layers of the projects', async () => {
     mount(twoProjects());
     const chart = await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
-    expect(screen.getByTestId('bar-2026-06-01').querySelectorAll('rect[rx]')).toHaveLength(2);
-    expect(screen.getByTestId('bar-2026-06-02').querySelectorAll('rect[rx]')).toHaveLength(1);
+    expect(screen.getByTestId('area-series-/work/app')).toBeTruthy();
+    expect(screen.getByTestId('area-series-/work/lib')).toBeTruthy();
+    expect(screen.getByTestId('slot-2026-06-01')).toBeTruthy();
+    expect(screen.getByTestId('slot-2026-06-02')).toBeTruthy();
     fireEvent.focus(chart);
     const tip = within(screen.getByTestId('chart-tooltip'));
     expect(tip.getByText('app')).toBeTruthy();
@@ -227,7 +229,7 @@ describe('daily chart', () => {
     expect(within(projects).getAllByRole('row')).toHaveLength(1 + 1 + 11);
   });
 
-  it('splits the bars by model', async () => {
+  it('splits the areas by model', async () => {
     mount(twoProjects());
     await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
     expect(screen.getByRole('radio', { name: 'Projects' }).getAttribute('aria-checked')).toBe(
@@ -235,8 +237,10 @@ describe('daily chart', () => {
     );
     fireEvent.click(screen.getByRole('radio', { name: 'Models' }));
     const chart = screen.getByRole('group', { name: 'Chart by day: Tokens by model' });
-    expect(screen.getByTestId('bar-2026-06-01').querySelectorAll('rect[rx]')).toHaveLength(2);
-    expect(screen.getByTestId('bar-2026-06-02').querySelectorAll('rect[rx]')).toHaveLength(1);
+    expect(screen.getByTestId('area-series-sonnet')).toBeTruthy();
+    expect(screen.getByTestId('area-series-opus')).toBeTruthy();
+    expect(screen.getByTestId('slot-2026-06-01')).toBeTruthy();
+    expect(screen.getByTestId('slot-2026-06-02')).toBeTruthy();
     fireEvent.focus(chart);
     const tip = within(screen.getByTestId('chart-tooltip'));
     expect(tip.getByText('sonnet')).toBeTruthy();
@@ -318,6 +322,94 @@ describe('daily chart', () => {
     expect(
       within(screen.getByTestId('chart-tooltip')).getAllByText('12 min').length,
     ).toBeGreaterThan(0);
+  });
+
+  it('requests report with bucket=auto', async () => {
+    const { api } = mount(twoProjects());
+    await waitFor(() => expect(api.statsReport).toHaveBeenCalled());
+    expect(vi.mocked(api.statsReport).mock.calls[0]?.[0]?.bucket).toBe('auto');
+  });
+
+  it('renders 6-hour interval titles and badge', async () => {
+    const base = twoProjects();
+    mount({
+      ...base,
+      bucket: '6h',
+      series: [
+        {
+          day: '2026-06-01T00:00',
+          start: new Date(2026, 5, 1, 0, 0).getTime(),
+          tokens: 10_000,
+          agentMs: 1000,
+          tasks: 1,
+          projects: [{ repository: '/work/app', tokens: 10_000, agentMs: 1000, tasks: 1 }],
+          models: [],
+        },
+        {
+          day: '2026-06-01T06:00',
+          start: new Date(2026, 5, 1, 6, 0).getTime(),
+          tokens: 20_000,
+          agentMs: 2000,
+          tasks: 1,
+          projects: [{ repository: '/work/app', tokens: 20_000, agentMs: 2000, tasks: 1 }],
+          models: [],
+        },
+      ],
+    });
+    await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    expect(screen.getByText('6h')).toBeTruthy();
+    const slot0 = screen.getByTestId('slot-2026-06-01T00:00');
+    expect(slot0.querySelector('title')?.textContent).toContain('00:00–06:00');
+    const slot1 = screen.getByTestId('slot-2026-06-01T06:00');
+    expect(slot1.querySelector('title')?.textContent).toContain('06:00–12:00');
+  });
+
+  it('renders week bucket badge and week range title', async () => {
+    const base = twoProjects();
+    mount({
+      ...base,
+      bucket: 'week',
+      series: [
+        {
+          day: '2026-W23',
+          start: new Date(2026, 5, 1).getTime(),
+          tokens: 30_000,
+          agentMs: 3000,
+          tasks: 1,
+          projects: [{ repository: '/work/app', tokens: 30_000, agentMs: 3000, tasks: 1 }],
+          models: [],
+        },
+      ],
+    });
+    await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    expect(screen.getByText('by week')).toBeTruthy();
+    const slot = screen.getByTestId('slot-2026-W23');
+    expect(slot.querySelector('title')?.textContent).toContain('–');
+  });
+
+  it('renders a single point with center guide and point markers without crashing', async () => {
+    const base = twoProjects();
+    mount({
+      ...base,
+      series: [
+        {
+          day: '2026-06-01',
+          start: new Date(2026, 5, 1).getTime(),
+          tokens: 60_000,
+          agentMs: 6000,
+          tasks: 1,
+          projects: [{ repository: '/work/app', tokens: 60_000, agentMs: 6000, tasks: 1 }],
+          models: [],
+        },
+      ],
+    });
+    const chart = await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    expect(screen.getByTestId('area-single-point')).toBeTruthy();
+    expect(screen.getByTestId('point-/work/app')).toBeTruthy();
+    fireEvent.focus(chart);
+    const tip = within(screen.getByTestId('chart-tooltip'));
+    expect(tip.getByText('app')).toBeTruthy();
+    expect(tip.getAllByText('60k').length).toBeGreaterThanOrEqual(1);
   });
 });
 

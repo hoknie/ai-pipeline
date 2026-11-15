@@ -1,4 +1,8 @@
-import { currentPermissions, type RunRequests } from '../../../feature/runs/services/index.ts';
+import {
+  currentPermissions,
+  variantConfig,
+  type RunRequests,
+} from '../../../feature/runs/services/index.ts';
 
 import type { HandlerTable, IpcContext } from './types.ts';
 
@@ -27,6 +31,12 @@ export const runHandlers = {
     event(context, params.runId, { kind: 'cancel', group: params.group ?? null }),
   run_skip: (params, context) =>
     event(context, params.runId, { kind: 'step_skip', step: params.step, skip: params.skip }),
+  run_variant: (params, context) =>
+    event(context, params.runId, (state) => ({
+      kind: 'variant_set',
+      variant: params.variant,
+      config: variantConfig(context.services.config, state, params.variant),
+    })),
   run_observer: (params, context) =>
     event(context, params.runId, { kind: 'repair_allowed', allowed: params.enabled }),
   answer: (params, context) =>

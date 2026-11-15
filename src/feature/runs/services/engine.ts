@@ -128,8 +128,9 @@ export class RunEngine {
     this.waits.get(waitKey(run, slug)) ?? null;
 
   /**
-   * Sets the timer to the nearest moment a usage limit resets or a pause after a network failure ends: a held runtime may start its
-   * steps again, a queue stopped by the limit may start by itself.
+   * Sets the timer to the nearest moment a usage limit resets, a pause after a network failure or
+   * a failed repair ends: a held runtime may start its steps again, a queue stopped by the limit
+   * may start by itself, and the observers look at the incidents again.
    */
   armWake(): void {
     if (this.wakeTimer) clearTimeout(this.wakeTimer);
@@ -137,14 +138,21 @@ export class RunEngine {
     if (this.halted) return;
     const { states, now, wakeMarginMs, queue } = this.dependencies;
     const moment = now();
-    const retries = states
-      .all()
-      .filter((state) => state.run.finishedAt === null)
+    const unfinished = states.all().filter((state) => state.run.finishedAt === null);
+    const retries = unfinished
       .flatMap((state) => allGroups(state).map((group) => networkRetryAt(group)))
+      .filter((at): at is number => at !== null && at > moment);
+    // The end of a pause after a failed repair: the observers look at the incidents again.
+    // Finished runs too: a pause after a failed repair still holds the next attempt of the task.
+    const repairs = states
+      .all()
+      .filter((state) => state.run.repair.allowed && state.run.repair.incident === null)
+      .map((state) => state.run.repair.retryAt)
       .filter((at): at is number => at !== null && at > moment);
     const moments = [
       ...limitHolds(states.all(), moment).values(),
       ...retries,
+      ...repairs,
       ...queue.wakeMoments(),
     ];
     if (moments.length === 0) return;
@@ -181,6 +189,11 @@ export class RunEngine {
     this.halted = true;
     if (this.wakeTimer) clearTimeout(this.wakeTimer);
     this.wakeTimer = null;
+  }
+
+  /** Whether the timer for the next wake-up is currently set. */
+  hasWakeTimer(): boolean {
+    return this.wakeTimer !== null;
   }
 
   /** Stops the agents and waits for the work already queued. */

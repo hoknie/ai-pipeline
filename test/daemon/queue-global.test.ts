@@ -10,6 +10,14 @@ import type {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { copyTemplateRepo } from '../fixtures/template-repo.ts';
 import { CODE_ONLY_CONFIG, settle, until, type Harness } from './harness.ts';
+import {
+  POOLS_CONFIG,
+  addProject,
+  direct,
+  setQueueMax,
+  waitRow,
+  writeQueue,
+} from './pools-harness.ts';
 import { allRuns, start, stop } from './queue-harness.ts';
 
 type AnyQueue = QueueView | GlobalQueueView;
@@ -404,5 +412,70 @@ describe('the global queue moves', () => {
     await waitGlobal(h, (view) => view.items.length === 0 && view.runs.length === 0);
     expect(await allRuns(h)).toHaveLength(1);
     await stop(h);
+  });
+});
+
+describe('the limit of the machine and the pools in the global mode', () => {
+  const GLOBAL = (rest = '') => `{ scope: global, max: 2${rest} }`;
+  const NARROW = POOLS_CONFIG.replace('max: 5', 'max: 1');
+
+  it('counts the attempts of every project against queue.max and ignores swarm.max', async () => {
+    const h = await start(NARROW);
+    const other = await addProject(h, 'other', NARROW);
+    writeQueue(h, GLOBAL());
+    await globalOf(h);
+    await h.call('queue_settings', { repository: h.repo, parallel: 4 });
+    h.script({ code: [{ waitFor: h.gate('go') }] });
+    const app = await direct(h, 'on-claude', ['a1', 'a2']);
+    // swarm.max of the project is 1 and does not apply: both groups work.
+    await waitRow(h, app, 'a2', 'running');
+    const lib = await direct(h, 'on-claude', ['b1'], other);
+    expect((await waitRow(h, lib, 'b1', 'waiting')).wait).toEqual({
+      reason: 'capacity',
+      scope: 'machine',
+      max: 2,
+    });
+    h.open('go');
+    for (const id of [app, lib]) await h.waitFor(id, (view) => view.finished);
+  });
+
+  it('shares a pool between a direct run and a run of another project', async () => {
+    const h = await start(POOLS_CONFIG);
+    const other = await addProject(h, 'other');
+    writeQueue(
+      h,
+      '{ scope: global, max: 5, pools: { mix: { max: 1, members: ["opencode:google/*"] } }, default_pool: { max: 5 } }',
+    );
+    await globalOf(h);
+    await h.call('queue_settings', { repository: h.repo, parallel: 4 });
+    h.script({ code: [{ waitFor: h.gate('go') }] });
+    const first = await direct(h, 'on-gemini', ['g1']);
+    await waitRow(h, first, 'g1', 'running');
+    const second = await direct(h, 'on-gemini', ['g2'], other);
+    expect((await waitRow(h, second, 'g2', 'waiting')).wait).toEqual({
+      reason: 'pool',
+      pool: 'mix',
+      max: 1,
+    });
+    // A group of another pool is not held by the full one.
+    const third = await direct(h, 'on-claude', ['c1'], other);
+    await waitRow(h, third, 'c1', 'running');
+    h.open('go');
+    for (const id of [first, second, third]) await h.waitFor(id, (view) => view.finished);
+  });
+
+  it('applies queue.max written through the settings API at once', async () => {
+    const h = await start(POOLS_CONFIG);
+    writeQueue(h, GLOBAL());
+    await globalOf(h);
+    await h.call('queue_settings', { repository: h.repo, parallel: 4 });
+    h.script({ code: [{ waitFor: h.gate('go') }] });
+    const run = await direct(h, 'on-claude', ['x1', 'x2', 'x3']);
+    await waitRow(h, run, 'x2', 'running');
+    await waitRow(h, run, 'x3', 'waiting');
+    await setQueueMax(h, 3);
+    await waitRow(h, run, 'x3', 'running');
+    h.open('go');
+    await h.waitFor(run, (view) => view.finished);
   });
 });

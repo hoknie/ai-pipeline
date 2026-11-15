@@ -189,6 +189,20 @@ export function registerSkipStep(kit: HostKit): void {
   );
 }
 
+export function registerVariant(kit: HostKit): void {
+  const { server, runId, showRun } = kit;
+  server.registerTool(
+    'swarm_run_variant',
+    {
+      title: 'Switch a run to another variant of its pipeline',
+      description:
+        'Switch a run that is not finished to another variant of its pipeline (default is the pipeline as it is). A running step whose specialist, model or prompt changes is stopped without a commit and starts again with the new variant; the other steps go on. The skips of the variant are not applied to a run that has started.',
+      inputSchema: { run_id: runId, variant: z.string().min(1) },
+    },
+    ({ run_id, variant }) => attempt(() => showRun('run_variant', { runId: run_id, variant })),
+  );
+}
+
 export function registerAnswer(kit: HostKit): void {
   const { server, runId, group, showRun } = kit;
   server.registerTool(
