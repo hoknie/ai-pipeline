@@ -373,6 +373,7 @@ describe('pipeline variants in the queue', () => {
       variant: 'light',
     })) as QueueView;
     expect(edited.items[0]?.variant).toBe('light');
+    expect((await queueOf(h)).items[0]).toMatchObject({ variant: 'light', variantName: 'Лёгкий' });
   });
 
   it('rejects a change of pipeline that keeps a variant the new pipeline lacks', async () => {

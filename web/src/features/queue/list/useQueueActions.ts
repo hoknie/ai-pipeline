@@ -21,6 +21,7 @@ function editPayload(item: QueueItemView, fields: EditFields) {
   if (item.run !== null) return after;
   return {
     pipeline: fields.pipeline,
+    ...(fields.variant !== undefined ? { variant: fields.variant } : {}),
     ...(fields.task !== undefined ? { task: fields.task } : {}),
     ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
     title: fields.title ?? null,

@@ -97,8 +97,13 @@ export function registerQueueAdd(kit: HostKit): void {
   );
 }
 
+const postponedEdit = z
+  .boolean()
+  .optional()
+  .describe('true: a running queue does not take the task until you clear the flag');
+
 export function registerQueueEdit(kit: HostKit): void {
-  const { server, tags, parent, skip, after, repo, item, queueGroups, showQueue } = kit;
+  const { server, tags, parent, variant, skip, after, repo, item, queueGroups, showQueue } = kit;
   server.registerTool(
     'swarm_queue_edit',
     {
@@ -108,6 +113,7 @@ export function registerQueueEdit(kit: HostKit): void {
       inputSchema: {
         item,
         pipeline: z.string().optional(),
+        variant,
         task: z.string().optional(),
         groups: queueGroups.optional(),
         title: z.string().nullable().optional().describe('null removes the title'),
@@ -130,16 +136,14 @@ export function registerQueueEdit(kit: HostKit): void {
           ),
         skip,
         after,
-        postponed: z
-          .boolean()
-          .optional()
-          .describe('true: a running queue does not take the task until you clear the flag'),
+        postponed: postponedEdit,
         repo,
       },
     },
     ({
       item: id,
       pipeline,
+      variant: variantId,
       task,
       groups,
       title,
@@ -159,6 +163,7 @@ export function registerQueueEdit(kit: HostKit): void {
           {
             item: id,
             ...(pipeline !== undefined ? { pipeline } : {}),
+            ...(variantId !== undefined ? { variant: variantId } : {}),
             ...(task !== undefined ? { task } : {}),
             ...(groups !== undefined ? { groups } : {}),
             ...(title !== undefined ? { title } : {}),

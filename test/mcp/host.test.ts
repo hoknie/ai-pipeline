@@ -435,6 +435,20 @@ describe('host MCP queue tools', () => {
     ]);
   });
 
+  it('passes the variant to queue_edit only when given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', variant: 'hard' } });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 'T' } });
+    expect(calls).toEqual([
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', variant: 'hard' } },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 'T' } },
+    ]);
+  });
+
   it('passes tag names to run, queue_add and queue_edit only when they are given', async () => {
     const calls: unknown[] = [];
     const client = await connect(async (method, params) => {

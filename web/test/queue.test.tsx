@@ -844,6 +844,7 @@ describe('automatic delivery switch', () => {
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
         pipeline: 'feature',
+        variant: 'default',
         task: 'A',
         title: null,
         autoDeliver: null,
@@ -952,6 +953,7 @@ describe('items', () => {
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
         pipeline: 'feature',
+        variant: 'default',
         task: 'X',
         title: 'X',
         autoDeliver: null,
@@ -1078,6 +1080,7 @@ describe('items', () => {
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
         pipeline: 'feature',
+        variant: 'default',
         task: 'A2',
         title: null,
         autoDeliver: null,
@@ -2301,6 +2304,7 @@ describe('delivery mode of a task', () => {
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', {
         pipeline: 'feature',
+        variant: 'default',
         task: 'A',
         title: null,
         autoDeliver: null,
@@ -2763,6 +2767,43 @@ describe('two halves of the task form', () => {
           task: 'T',
           skip: ['plan'],
         }),
+      );
+    });
+
+    it('sends the selected variant and a return to default when editing', async () => {
+      const initial = queueOf({ items: [queueItem('q1', 'A', 1)] });
+      const light = queueOf({ items: [queueItem('q1', 'A', 1, { variant: 'light' })] });
+      const api = show(initial, {
+        pipelines: vi.fn(async () => withVariants),
+        queueEdit: vi.fn().mockResolvedValueOnce(light).mockResolvedValueOnce(initial),
+      });
+      const edit = async () => {
+        const item = (await screen.findAllByRole('listitem'))[0]!;
+        fireEvent.click(within(item).getByRole('button', { name: 'Edit' }));
+        await screen.findByRole('combobox', { name: 'Variant' });
+      };
+      await edit();
+      fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Лёгкий' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.queueEdit).toHaveBeenNthCalledWith(
+          1,
+          'q1',
+          expect.objectContaining({ variant: 'light' }),
+        ),
+      );
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Save' })).toBeNull());
+      await edit();
+      fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'default' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.queueEdit).toHaveBeenNthCalledWith(
+          2,
+          'q1',
+          expect.objectContaining({ variant: 'default' }),
+        ),
       );
     });
 
