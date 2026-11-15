@@ -31,6 +31,8 @@ export type DetailProps = Pick<
   | 'onOnlyReplies'
   | 'onRoute'
   | 'onSubtask'
+  | 'linkChoices'
+  | 'onOpenProject'
 > & {
   run: RunView | null;
   onSelect: (runId: string, group: string | null) => void;
@@ -84,6 +86,8 @@ export function RunDetail(props: DetailProps) {
         onError={props.onError}
         onDeliver={(force) => deliver(run, force)}
         onSubtask={props.onSubtask}
+        linkChoices={props.linkChoices?.(run)}
+        onOpenProject={props.onOpenProject}
         onSelect={(slug) => onSelect(run.id, slug)}
         headerRef={setHeaderElement}
         entry={group}
@@ -107,6 +111,7 @@ export function RunDetail(props: DetailProps) {
           deliverable={canDeliver(run)}
           onDeliver={() => deliver(run, false)}
           run={run}
+          linkChoices={props.linkChoices?.(run)}
           onForceDeliver={() => deliver(run, true)}
           showUsage={headerOut}
           onSelectEntry={(slug) => onSelect(run.id, slug)}

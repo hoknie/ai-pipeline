@@ -6,7 +6,7 @@ import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import type { QueueItemView, QueueView } from '../../../shared/api/types.ts';
 import type { QueueDraft } from '../QueueForm.tsx';
-import { dependents, unmet } from '../queueLinks.ts';
+import { dependents, unmet } from './links.tsx';
 import { itemLabel } from './itemText.ts';
 import type { ItemScope } from './itemScope.ts';
 import type { QueueNotice } from './useQueueOrder.ts';
@@ -30,7 +30,7 @@ function editPayload(item: QueueItemView, fields: EditFields) {
     tags: fields.tags ?? [],
     skip: fields.skip ?? [],
     ...after,
-    ...(fields.parent !== undefined ? { parent: fields.parent } : {}),
+    ...(fields.links !== undefined ? { links: fields.links } : {}),
     ...(fields.uploads !== undefined ? { uploads: fields.uploads } : {}),
     ...(fields.detach !== undefined ? { detach: fields.detach } : {}),
   };

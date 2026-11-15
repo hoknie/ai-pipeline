@@ -1,5 +1,6 @@
 import type { Api } from '../../../../shared/api/api.ts';
 import type { GroupRow, RunView, SystemStepRow } from '../../../../shared/api/types.ts';
+import type { RunLinkChoices } from '../../links/RunLinks.tsx';
 
 export type GroupScreenProps = {
   /** Tab asked for by the address; null for the log. */
@@ -29,4 +30,6 @@ export type GroupScreenProps = {
   /** The run of the group, for the `--force` delivery dialog. */
   run?: RunView;
   onForceDeliver?: () => Promise<unknown>;
+  /** Targets of the links of the run: with them the «Links» tab exists. */
+  linkChoices?: RunLinkChoices | undefined;
 };

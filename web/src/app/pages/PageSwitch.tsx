@@ -1,8 +1,13 @@
-import { RunsPage } from '../../features/runs/index.ts';
+import { useTranslation } from 'react-i18next';
+import { RunsPage, linkTargets } from '../../features/runs/index.ts';
+import { itemLabel, otherQueues } from '../../features/queue/index.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
 import { ListRoute, QueueRoute, SettingsRoute, StatsRoute } from './pages.tsx';
 import type { PanelData } from '../state/usePanelData.ts';
 import type { useRepositoryActions } from '../state/useRepositoryActions.ts';
+import type { LinkKind } from '../../features/runs/index.ts';
+import type { RunView } from '../../shared/api/types.ts';
+import type { TFunction } from 'i18next';
 
 type RepositoryActions = ReturnType<typeof useRepositoryActions>;
 
@@ -36,25 +41,54 @@ function allQueuesProps(panel: PanelData, actions: RepositoryActions) {
   };
 }
 
+/** The props of the settings, stats and list routes: the api of the selected project. */
+function commonProps(panel: PanelData) {
+  return {
+    api: panel.scopedApi,
+    runs: panel.state.runs,
+    route: panel.route,
+    onRoute: panel.setRoute,
+    pageKey: panel.state.selected ?? '',
+    dirty: panel.chrome.dirty,
+  };
+}
+
+/**
+ * The links and subtasks of the runs page: the choices of the run's project and the preset of a
+ * child task. Without the queue of the selected project the page adds no links.
+ */
+function runLinkProps(panel: PanelData, t: TFunction) {
+  return {
+    onSubtask: panel.state.queue ? panel.chrome.newTask.openSubtask : undefined,
+    linkChoices: (run: RunView) => {
+      const own = panel.state.queues.get(run.repository);
+      return own
+        ? (kind: LinkKind) =>
+            linkTargets(
+              kind,
+              own,
+              panel.state.runs,
+              (item) => itemLabel(item, t),
+              run,
+              otherQueues(panel.state.queues, panel.state.repositories, run.repository),
+            )
+        : undefined;
+    },
+  };
+}
+
 /** The page of the open section. */
 export function PageSwitch({ panel, actions }: { panel: PanelData; actions: RepositoryActions }) {
-  const { state, chrome, route, scopedApi } = panel;
-  const { runs, queue, selected } = state;
-  const common = {
-    api: scopedApi,
-    runs,
-    route,
-    onRoute: panel.setRoute,
-    pageKey: selected ?? '',
-    dirty: chrome.dirty,
-  };
+  const { t } = useTranslation();
+  const { state, chrome, route } = panel;
+  const common = commonProps(panel);
   const { queueDrafts, onQueueDraft } = chrome.drafts;
   switch (route.view) {
     case 'queue':
       return (
         <QueueRoute
           common={common}
-          queue={queue}
+          queue={state.queue}
           globalQueue={state.globalQueue}
           registry={state.registry}
           now={chrome.now}
@@ -74,7 +108,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           common={common}
           streamedObservers={state.streamedObservers}
           streamedNetwork={state.streamedNetwork}
-          repository={selected}
+          repository={state.selected}
           repositories={state.repositories}
           onSelectRepository={(path) => void actions.switchProject(path)}
           registry={state.registry}
@@ -82,7 +116,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           onProjectMoved={actions.projectMoved}
           onRemoveProject={actions.removeRepository}
           onOpenProject={(path, target) => void actions.openProject(path, target)}
-          queue={queue}
+          queue={state.queue}
           onQueue={state.setQueue}
           onError={notifyError}
         />
@@ -96,7 +130,7 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
       return (
         <RunsPage
           api={panel.api}
-          runs={runs}
+          runs={state.runs}
           loaded={state.loaded}
           openedState={state.openedState}
           route={route}
@@ -108,10 +142,11 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
           onlyReplies={panel.onlyReplies}
           onOnlyReplies={panel.setOnlyReplies}
           onRoute={panel.setRoute}
-          repository={selected}
+          repository={state.selected}
           repositoryPaths={panel.repositoryPaths}
           scope={panel.allProjects ? 'all' : 'repository'}
-          onSubtask={queue ? chrome.newTask.openSubtask : undefined}
+          {...runLinkProps(panel, t)}
+          onOpenProject={(path) => void actions.openProject(path, 'queue')}
           history={state.history}
         />
       );

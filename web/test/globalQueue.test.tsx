@@ -3,7 +3,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from './rend
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
+import { GlobalTakeFilter } from '../src/features/queue/global/GlobalTakeFilter.tsx';
 import { lineOf } from '../src/features/queue/global/asQueue.ts';
+import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
 import { applyEvent } from '../src/shared/api/runs/streamEvents.ts';
 import type { Api } from '../src/shared/api/api.ts';
 import type { GlobalQueueItemView, GlobalQueueView, QueueView } from '../src/shared/api/types.ts';
@@ -19,6 +21,8 @@ import {
   repositoryView,
   runView,
   tagView,
+  pipelineOf,
+  pipelinesView,
 } from './fixtures.ts';
 
 const APP = '/work/app';
@@ -200,9 +204,9 @@ describe('page of the global queue', () => {
     const block = within(await screen.findByLabelText('take filter'));
     fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
     fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
-    expect(await screen.findAllByRole('option', { name: 'shared' })).toHaveLength(1);
-    expect(screen.getByRole('option', { name: 'lib-only' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('option', { name: 'shared' }));
+    expect(await screen.findAllByRole('option', { name: /^shared/ })).toHaveLength(1);
+    expect(screen.getByRole('option', { name: /^lib-only/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('option', { name: /^shared/ }));
     await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { tags: ['shared'] } }));
     expect(await block.findByText('shared')).toBeTruthy();
   });
@@ -214,12 +218,139 @@ describe('page of the global queue', () => {
     });
     const block = within(await screen.findByLabelText('take filter'));
     expect(block.getByText('1')).toBeTruthy();
-    expect(block.getByText('missing')).toBeTruthy();
+    expect(block.getByText(/missing/)).toBeTruthy();
     fireEvent.click(block.getByRole('button', { name: 'Reset' }));
     await waitFor(() =>
       expect(settings).toHaveBeenCalledWith({ filter: { pipelines: [], projects: [], tags: [] } }),
     );
   });
+
+  it('groups same-name tags with each project color and scopes choices without dropping selections', async () => {
+    const settings = vi.fn(async () =>
+      asAnswer(globalOf({ filter: { pipelines: [], projects: [LIB], tags: ['shared'] } as never })),
+    );
+    mount(
+      globalOf({ filter: { pipelines: [], projects: [], tags: ['shared'] } as never }),
+      { queueSettings: settings },
+      [
+        { ...tagView('shared'), id: 'a', repository: APP, color: 'red' },
+        { ...tagView('Shared'), id: 'b', repository: LIB, color: 'blue' },
+        { ...tagView('app-only'), id: 'c', repository: APP, color: 'red' },
+        { ...tagView('lib-only'), id: 'd', repository: LIB, color: 'blue' },
+      ],
+    );
+    const block = within(await screen.findByLabelText('take filter'));
+    expect(block.getByTitle('app').className).toContain('bg-[#fee2e2]');
+    expect(block.getByTitle('lib').className).toContain('bg-[#dbeafe]');
+    expect(block.getByTitle('app · lib').textContent).toBe('shared');
+    fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
+    const shared = await screen.findByRole('option', { name: /^shared/ });
+    expect(shared.querySelector('[title="app"]')?.className).toContain('bg-[#fee2e2]');
+    expect(shared.querySelector('[title="lib"]')?.className).toContain('bg-[#dbeafe]');
+    expect(block.getByTitle('app · lib')).toBeTruthy();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    fireEvent.click(block.getByRole('combobox', { name: 'Projects' }));
+    fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
+    await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { projects: [LIB] } }));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
+    expect(await screen.findByRole('option', { name: /^lib-only/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /^app-only/ })).toBeNull();
+    expect(
+      screen.getByRole('option', { name: /^shared/ }).querySelector('[title="app"]'),
+    ).toBeNull();
+  });
+
+  it('keeps out-of-scope criteria removable and rolls back a failed project change', async () => {
+    const settings = vi.fn(async () => {
+      throw new Error('save failed');
+    });
+    mount(
+      globalOf({ filter: { pipelines: ['gone'], projects: [LIB], tags: ['old'] } as never }),
+      { queueSettings: settings },
+      [{ ...tagView('old'), repository: APP }],
+    );
+    const block = within(await screen.findByLabelText('take filter'));
+    expect(block.getByText(/old \(not in the configuration\)/)).toBeTruthy();
+    expect(block.getByText(/gone \(not in the configuration\)/)).toBeTruthy();
+    expect(block.getByTitle('not in the configuration').textContent).toContain('old');
+    fireEvent.click(block.getByRole('combobox', { name: 'Projects' }));
+    fireEvent.click(await screen.findByRole('option', { name: /app/ }));
+    await waitFor(() =>
+      expect(settings).toHaveBeenCalledWith({ filter: { projects: [LIB, APP] } }),
+    );
+    expect((await screen.findAllByText('save failed')).length).toBeGreaterThan(0);
+    expect(block.getByText(/old \(not in the configuration\)/)).toBeTruthy();
+    fireEvent.click(block.getByRole('button', { name: /Remove old/ }));
+    await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { tags: [] } }));
+    fireEvent.click(block.getByRole('button', { name: /Remove gone/ }));
+    await waitFor(() => expect(settings).toHaveBeenCalledWith({ filter: { pipelines: [] } }));
+    fireEvent.click(block.getByRole('button', { name: 'Reset' }));
+    await waitFor(() =>
+      expect(settings).toHaveBeenCalledWith({ filter: { projects: [], tags: [], pipelines: [] } }),
+    );
+  });
+
+  it.each([
+    { projects: [] as string[], app: true, lib: true },
+    { projects: [APP, LIB], app: true, lib: true },
+    { projects: [LIB], app: false, lib: true },
+    { projects: ['/work/missing'], app: false, lib: false },
+  ])(
+    'limits tags and pipelines to the chosen project scope: $projects',
+    async ({ projects, app, lib }) => {
+      const tags = [
+        { ...tagView('shared', 'red', 'a'), repository: APP },
+        { ...tagView('Shared', 'blue', 'b'), repository: LIB },
+        { ...tagView('app-only'), repository: APP },
+        { ...tagView('lib-only'), repository: LIB },
+        { ...tagView('excluded'), repository: '/work/disabled' },
+      ];
+      const pipelines = new Map([
+        [APP, pipelinesView({ pipelines: [pipelineOf(), pipelineOf({ id: 'explore' })] })],
+        [LIB, pipelinesView({ pipelines: [pipelineOf(), pipelineOf({ id: 'build' })] })],
+        ['/work/disabled', pipelinesView({ pipelines: [pipelineOf({ id: 'excluded' })] })],
+      ]);
+      render(
+        <TagsProvider tags={tags}>
+          <GlobalTakeFilter
+            api={fakeApi() as Api}
+            queue={globalOf({ filter: { projects, tags: [], pipelines: [] } as never })}
+            projects={[repositoryView(APP), repositoryView(LIB)]}
+            pipelines={pipelines}
+            onQueue={() => {}}
+            onError={() => {}}
+          />
+        </TagsProvider>,
+      );
+      const block = within(screen.getByLabelText('take filter'));
+      if (!projects.length) fireEvent.click(block.getByRole('button', { name: /Take filter/ }));
+      fireEvent.click(block.getByRole('combobox', { name: 'Tags' }));
+      expect(Boolean(screen.queryByRole('option', { name: /^app-only/ }))).toBe(app);
+      expect(Boolean(screen.queryByRole('option', { name: /^lib-only/ }))).toBe(lib);
+      expect(screen.queryByRole('option', { name: /^excluded/ })).toBeNull();
+      expect(screen.queryAllByRole('option', { name: /^shared/i })).toHaveLength(
+        app || lib ? 1 : 0,
+      );
+      if (app && lib) {
+        const shared = screen.getByRole('option', { name: /^shared/i });
+        expect(
+          within(screen.getByRole('group', { name: 'app · lib' })).getByRole('option', {
+            name: /^shared/i,
+          }),
+        ).toBe(shared);
+        expect(within(shared).getByText('app').className).toContain('bg-[#fee2e2]');
+        expect(within(shared).getByText('lib').className).toContain('bg-[#dbeafe]');
+        expect(shared.querySelector('a')).toBeNull();
+      }
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      fireEvent.click(block.getByRole('combobox', { name: 'Pipeline' }));
+      expect(Boolean(screen.queryByRole('option', { name: 'explore' }))).toBe(app);
+      expect(Boolean(screen.queryByRole('option', { name: 'build' }))).toBe(lib);
+      expect(screen.queryByRole('option', { name: 'excluded' })).toBeNull();
+      expect(screen.queryAllByRole('option', { name: 'feature' })).toHaveLength(app || lib ? 1 : 0);
+    },
+  );
 
   it('starts and pauses the one queue', async () => {
     const start = vi.fn(async () => queueOf());
@@ -295,7 +426,8 @@ describe('controls of the global queue', () => {
   it('offers other tasks to wait for, but not the edited task itself', async () => {
     mount(globalOf());
     fireEvent.click((await row('ql')).getByRole('button', { name: 'Edit' }));
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Waits for' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add link' }));
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Linked task' }));
     expect(await screen.findByRole('option', { name: /task of app/ })).toBeTruthy();
     expect(screen.queryByRole('option', { name: /task of lib/ })).toBeNull();
   });

@@ -1,6 +1,7 @@
 import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
 import type { AttachmentView, QueueFields } from '../../shared/api/types.ts';
 import { pruneSkip } from '../../shared/ui/forms/picker/SkipSteps.tsx';
+import type { LinkRow } from '../runs/index.ts';
 
 /** A file picked for the task: being sent to the panel, sent (`upload`) or refused (`error`). */
 export interface AttachmentEntry {
@@ -31,16 +32,10 @@ export interface QueueDraft {
   deliveryMode: DeliveryMode | null;
   /** Ids of the chosen tags. */
   tags: string[];
-  /** Ids of the items and runs the task waits for, in the order of choice. */
-  after: string[];
+  links: LinkRow[];
   /** Ids of the pipeline steps the task skips. */
   skip: string[];
-  /** The user changed the field: an edit sends `after` only then. */
-  afterTouched: boolean;
-  /** Id of the run whose linked task tag the task gets; `null`: none. */
-  parent: string | null;
-  /** The user changed the parent: an edit sends `parent` only then. */
-  parentTouched: boolean;
+  linksTouched: boolean;
   /** The files picked for the task; they are sent to the panel at once. */
   attachments?: AttachmentEntry[];
   /** The attachments the edited item already has. */
@@ -71,11 +66,9 @@ export function emptyDraft(pipeline = ''): QueueDraft {
     autoDeliver: null,
     deliveryMode: null,
     tags: [],
-    after: [],
+    links: [],
     skip: [],
-    afterTouched: false,
-    parent: null,
-    parentTouched: false,
+    linksTouched: false,
   };
 }
 
@@ -86,8 +79,8 @@ export function continueDraft(draft: QueueDraft): QueueDraft {
     task: '',
     groups: [{ title: '', task: '' }],
     title: '',
-    after: [],
-    afterTouched: false,
+    links: draft.links.filter((link) => link.kind === 'parent'),
+    linksTouched: false,
   };
 }
 
@@ -101,7 +94,7 @@ export function draftOf(item: {
   autoDeliver: boolean | null;
   deliveryMode?: DeliveryMode | null;
   tags?: { id: string; task?: { run: string } | null }[];
-  after?: { id: string }[];
+  links?: { id: string; kind: LinkRow['kind'] }[];
   skip?: string[];
   attachments?: AttachmentView[];
 }): QueueDraft {
@@ -115,11 +108,9 @@ export function draftOf(item: {
     autoDeliver: item.autoDeliver,
     deliveryMode: item.deliveryMode ?? null,
     tags: (item.tags ?? []).map((tag) => tag.id),
-    after: (item.after ?? []).map((ref) => ref.id),
+    links: (item.links ?? []).map((ref) => ({ kind: ref.kind, target: ref.id })),
     skip: [...(item.skip ?? [])],
-    afterTouched: false,
-    parent: (item.tags ?? []).find((tag) => tag.task)?.task?.run ?? null,
-    parentTouched: false,
+    linksTouched: false,
     ...(item.attachments && item.attachments.length > 0
       ? { existing: item.attachments.map((file) => ({ ...file })) }
       : {}),
@@ -129,8 +120,7 @@ export function draftOf(item: {
 /**
  * The draft moved to another repository: the links to its items and runs are cleared, the
  * pipeline stays when the new repository has it and is replaced by the first one otherwise.
- * The tags are cleared (every repository has its own catalog); the text, the name and the
- * delivery settings are kept.
+ * The tags, text, name and delivery settings are kept.
  */
 export function retarget(
   draft: QueueDraft,
@@ -146,12 +136,9 @@ export function retarget(
     ...draft,
     pipeline,
     variant: variants.includes(draft.variant) ? draft.variant : 'default',
-    after: [],
-    afterTouched: false,
-    parent: null,
-    parentTouched: false,
+    links: [],
+    linksTouched: false,
     skip: pruneSkip(draft.skip, stepIdsOf(pipeline)),
-    tags: [],
   };
 }
 
@@ -193,11 +180,13 @@ export function fieldsOf(
   draft: QueueDraft,
   tagName: (id: string) => string | undefined = () => undefined,
   allTags = false,
+  returned = false,
 ): QueueFields {
   const title = draft.title.trim();
   const tags = draft.tags.flatMap((id) => tagName(id) ?? []);
   const uploads = uploadsOf(draft);
   const detach = draft.detached ?? [];
+  const links = draft.links.filter((link) => link.target !== '');
   return {
     pipeline: draft.pipeline,
     ...(allTags || draft.variant !== 'default' ? { variant: draft.variant } : {}),
@@ -215,21 +204,14 @@ export function fieldsOf(
     ...(draft.deliveryMode !== null ? { deliveryMode: draft.deliveryMode } : {}),
     ...(allTags || tags.length > 0 ? { tags } : {}),
     ...(allTags || draft.skip.length > 0 ? { skip: draft.skip } : {}),
-    ...(allTags
-      ? draft.afterTouched
-        ? { after: draft.after }
+    ...(returned
+      ? draft.linksTouched
+        ? { after: links.filter((link) => link.kind === 'blocked_by').map((link) => link.target) }
         : {}
-      : draft.after.length > 0
-        ? { after: draft.after }
+      : (allTags ? draft.linksTouched : links.length > 0)
+        ? { links }
         : {}),
     ...(uploads.length > 0 ? { uploads } : {}),
     ...(detach.length > 0 ? { detach } : {}),
-    ...(allTags
-      ? draft.parentTouched
-        ? { parent: draft.parent }
-        : {}
-      : draft.parent !== null
-        ? { parent: draft.parent }
-        : {}),
   };
 }

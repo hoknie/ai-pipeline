@@ -7,8 +7,10 @@ import type {
   PipelinesView,
   QueueView,
   RepositoryView,
+  TagView,
 } from '../../../shared/api/types.ts';
 import { useTags } from '../../../shared/lib/catalog/tags.tsx';
+import { TAG_CLASSES } from '../../../shared/lib/catalog/tagColors.ts';
 import { FilterField, type FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { FilterBlock } from '../filter/FilterBlock.tsx';
 
@@ -17,18 +19,90 @@ type Lists = { pipelines: string[]; projects: string[]; tags: string[] };
 /** The pipelines of all projects without repeats by id: the first name wins. */
 function pipelineOptions(
   byPath: ReadonlyMap<string, PipelinesView>,
+  projects: readonly RepositoryView[],
   shown: string[],
   unknown: string,
 ): FilterOption[] {
   const known = new Map<string, string>();
-  for (const view of byPath.values())
-    for (const item of view.pipelines) if (!known.has(item.id)) known.set(item.id, item.name);
+  for (const project of projects)
+    for (const item of byPath.get(project.path)?.pipelines ?? [])
+      if (!known.has(item.id)) known.set(item.id, item.name);
   return [
     ...[...known].map(([value, label]) => ({ value, label })),
     ...shown
       .filter((id) => !known.has(id))
       .map((value) => ({ value, label: `${value} (${unknown})` })),
   ];
+}
+
+type TagEntry = { project: string; tag: TagView };
+const tagKey = (name: string) => name.toLocaleLowerCase('und');
+
+function groupedTags(projects: readonly RepositoryView[], tags: TagView[]) {
+  const groups = new Map<string, TagEntry[]>();
+  for (const project of projects) {
+    for (const tag of tags.filter((item) => item.repository === project.path)) {
+      const key = tagKey(tag.name);
+      groups.set(key, [...(groups.get(key) ?? []), { project: project.label, tag }]);
+    }
+  }
+  return groups;
+}
+
+function markers(entries: TagEntry[]) {
+  return entries.map(({ project, tag }, index) => (
+    <span
+      key={`${project}:${index}`}
+      title={project}
+      aria-label={project}
+      className={`inline-block size-3 rounded-full ${TAG_CLASSES[tag.color] ?? TAG_CLASSES.gray}`}
+    />
+  ));
+}
+
+function labeledMarkers(entries: TagEntry[]) {
+  return entries.map(({ project, tag }, index) => (
+    <span
+      key={`${project}:${index}`}
+      title={project}
+      className={`inline-flex rounded px-1 text-xs ${TAG_CLASSES[tag.color] ?? TAG_CLASSES.gray}`}
+    >
+      {project}
+    </span>
+  ));
+}
+
+function optionsForTags(grouped: Map<string, TagEntry[]>, selected: string[], unknown: string) {
+  const options: FilterOption[] = [...grouped].map(([key, entries]) => {
+    const value = selected.find((name) => tagKey(name) === key) ?? entries[0]!.tag.name;
+    const names = [...new Set(entries.map((entry) => entry.project))].join(' · ');
+    return {
+      value,
+      label: value,
+      group: names,
+      hint: names,
+      render: (
+        <span>
+          {value} {labeledMarkers(entries)}
+        </span>
+      ),
+    };
+  });
+  for (const value of selected) {
+    if (!grouped.has(tagKey(value))) options.push({ value, label: `${value} (${unknown})` });
+  }
+  return options;
+}
+
+function tagLook(grouped: Map<string, TagEntry[]>, unknown: string) {
+  return {
+    icon: (value: string) => markers(grouped.get(tagKey(value)) ?? []),
+    hint: (value: string) =>
+      grouped
+        .get(tagKey(value))
+        ?.map(({ project }) => project)
+        .join(' · ') ?? unknown,
+  };
 }
 
 /** The take filter of the global queue: pipelines and tags of all projects, and the projects themselves. */
@@ -69,13 +143,12 @@ export function GlobalTakeFilter({
   };
   const running = queue.status === 'running';
   const locked = running || pending !== null;
-  const tagNames = new Map<string, string>();
-  for (const tag of tags) {
-    const key = tag.name.toLocaleLowerCase('und');
-    if (!tagNames.has(key)) tagNames.set(key, tag.name);
-  }
-  // Preserve selected spelling when equivalent names occur in different catalogs.
-  for (const name of shown.tags) tagNames.set(name.toLocaleLowerCase('und'), name);
+  const scoped = projects.filter(
+    (project) => !shown.projects.length || shown.projects.includes(project.path),
+  );
+  const grouped = groupedTags(scoped, tags);
+  const unknown = t('queue.filter.unknown');
+  const tagOptions = optionsForTags(grouped, shown.tags, unknown);
   return (
     <FilterBlock
       count={shown.pipelines.length + shown.projects.length + shown.tags.length}
@@ -85,7 +158,7 @@ export function GlobalTakeFilter({
     >
       <FilterField
         label={t('queue.filter.pipelines')}
-        options={pipelineOptions(pipelines, shown.pipelines, t('queue.filter.unknown'))}
+        options={pipelineOptions(pipelines, scoped, shown.pipelines, unknown)}
         selected={shown.pipelines}
         onChange={(values) => void change({ pipelines: values })}
         clearLabel={t('queue.filter.clear')}
@@ -101,10 +174,8 @@ export function GlobalTakeFilter({
       />
       <FilterField
         label={t('queue.filter.tags')}
-        options={[...tagNames.values()].map((name) => ({
-          value: name,
-          label: name,
-        }))}
+        options={tagOptions}
+        look={tagLook(grouped, unknown)}
         selected={shown.tags}
         onChange={(values) => void change({ tags: values })}
         clearLabel={t('queue.filter.clear')}

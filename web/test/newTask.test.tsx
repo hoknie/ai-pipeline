@@ -23,6 +23,7 @@ import {
   waitFor,
   within,
 } from './render.tsx';
+import { chooseKind } from './linkKind.ts';
 import {
   FakeEventSource,
   fakeApi,
@@ -418,9 +419,9 @@ describe('new task from the top strip', () => {
     expect(field.getByRole('combobox', { name: 'Repository' }).className).toContain('h-9.5');
     expect(field.getByRole('combobox', { name: 'Pipeline' }).className).toContain('h-9.5');
     expect(field.getByRole('combobox', { name: 'Delivery mode' }).className).toContain('h-9.5');
-    expect(field.getByRole('combobox', { name: 'Waits for' }).parentElement?.className).toContain(
-      'min-h-9.5',
-    );
+    fireEvent.click(field.getByRole('button', { name: 'Add link' }));
+    expect(field.getByRole('combobox', { name: 'Link kind' }).className).toContain('h-9.5');
+    expect(field.getByRole('combobox', { name: 'Linked task' }).className).toContain('h-9.5');
     expect(field.getByRole('combobox', { name: 'Tags' }).parentElement?.className).toContain(
       'min-h-9.5',
     );
@@ -435,10 +436,11 @@ describe('retarget', () => {
     task: 'text',
     tags: ['t1'],
     autoDeliver: false,
-    after: ['q1'],
-    afterTouched: true,
-    parent: 'run1',
-    parentTouched: true,
+    links: [
+      { kind: 'blocked_by' as const, target: 'q1' },
+      { kind: 'parent' as const, target: 'run1' },
+    ],
+    linksTouched: true,
     skip: ['plan', 'review'],
     repository: '/work/app',
   };
@@ -446,16 +448,13 @@ describe('retarget', () => {
   it('keeps a pipeline the new repository has and clears the links', () => {
     const moved = retarget(draft, ['docs', 'feature'], steps);
     expect(moved.pipeline).toBe('feature');
-    expect(moved.after).toEqual([]);
-    expect(moved.parent).toBeNull();
-    expect(moved.afterTouched).toBe(false);
-    expect(moved.parentTouched).toBe(false);
+    expect(moved.links).toEqual([]);
+    expect(moved.linksTouched).toBe(false);
     expect(moved.skip).toEqual(['plan']);
-    // the tags belong to the catalog of the old repository
     expect([moved.title, moved.task, moved.tags, moved.autoDeliver]).toEqual([
       'name',
       'text',
-      [],
+      ['t1'],
       false,
     ]);
   });
@@ -473,6 +472,20 @@ describe('retarget', () => {
 
 const APP = '/work/app';
 const LIB = '/work/lib';
+const appTag = {
+  id: 'app-tag',
+  name: 'app-tag',
+  repository: APP,
+  color: 'red' as const,
+  task: null,
+};
+const libTag = {
+  id: 'lib-tag',
+  name: 'lib-tag',
+  repository: LIB,
+  color: 'blue' as const,
+  task: null,
+};
 
 /** A panel started in /work/app that knows a second repository, /work/lib. */
 function twoRepositories(
@@ -512,6 +525,7 @@ function twoRepositories(
       seq: 1,
       runs: options.runs ?? [runView({ id: 'a1', repository: APP })],
       queues,
+      tags: [appTag, libTag],
       repositories: [repositoryView(APP), repositoryView(LIB)],
     });
   });
@@ -619,11 +633,16 @@ describe('repository of the new task', () => {
     fireEvent.change(within(dialog).getByPlaceholderText('Name (optional)'), {
       target: { value: 'my name' },
     });
-    const after = within(dialog).getByRole('combobox', { name: 'Waits for' });
+    const tags = within(dialog).getByRole('combobox', { name: 'Tags' });
+    fireEvent.click(tags);
+    fireEvent.click(await screen.findByRole('option', { name: 'app-tag' }));
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
+    await waitFor(() => expect(tags.getAttribute('aria-expanded')).toBe('false'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    const after = within(dialog).getByRole('combobox', { name: 'Linked task' });
     fireEvent.click(after);
     fireEvent.click(await screen.findByRole('option', { name: /app task/ }));
     await waitFor(() => expect(within(dialog).getAllByText(/app task/).length).toBeGreaterThan(0));
-    fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
     // the closed popover hands the focus back to its trigger on a timer; a select opened before
     // that would lose the focus and close
     await waitFor(() => {
@@ -632,6 +651,7 @@ describe('repository of the new task', () => {
     });
     await pickLib(dialog);
     await waitFor(() => expect(within(dialog).queryByText(/app task/)).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Remove tag app-tag' })).toBeTruthy();
     expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(
       'keep me',
     );
@@ -665,6 +685,33 @@ describe('repository of the new task', () => {
     await waitFor(() => expect(add.disabled).toBe(false));
   });
 
+  it('blocks submission during retargeting and clears prior links once the new repository loads', async () => {
+    const { api, release } = twoRepositories({ libPipelinesLate: true });
+    const dialog = await openDialog();
+    fireEvent.change(within(dialog).getByLabelText('Task text'), {
+      target: { value: 'keep text' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    const task = within(dialog).getByRole('combobox', { name: 'Linked task' });
+    fireEvent.click(task);
+    fireEvent.click(await screen.findByRole('option', { name: /app task/ }));
+    await waitFor(() => {
+      expect(task.textContent).toContain('app task');
+      expect(document.activeElement).toBe(task);
+    });
+    await pickLib(dialog);
+    const add = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
+    expect(add.disabled).toBe(true);
+    fireEvent.click(add);
+    expect(api.queueAdd).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(add.disabled).toBe(false));
+    expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
+    fireEvent.click(add);
+    await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
+    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).not.toHaveProperty('links');
+  });
+
   it('opens again on the repository of the top bar with the text kept', async () => {
     twoRepositories();
     const dialog = await openDialog();
@@ -693,7 +740,7 @@ describe('subtask from the run header', () => {
     finishedAt: 5_000,
   });
   const parentField = (dialog: HTMLElement) =>
-    within(dialog).getByRole('combobox', { name: 'Parent task' });
+    within(dialog).getByRole('combobox', { name: 'Linked task' });
 
   async function createSubtask() {
     const more = await screen.findByRole('button', { name: 'More' });
@@ -720,7 +767,7 @@ describe('subtask from the run header', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith(
-        expect.objectContaining({ task: 'child', parent: 'a1' }),
+        expect.objectContaining({ task: 'child', links: [{ kind: 'parent', target: 'a1' }] }),
       ),
     );
   });
@@ -735,18 +782,45 @@ describe('subtask from the run header', () => {
     expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('kept');
   });
 
+  it('keeps the preset parent after add and continue', async () => {
+    const { api } = twoRepositories({ runs: [finished] });
+    const dialog = await createSubtask();
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    fireEvent.change(within(dialog).getByLabelText('Task text'), {
+      target: { value: 'first child' },
+    });
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add and continue' })
+          .disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ links: [{ kind: 'parent', target: 'a1' }] }),
+      ),
+    );
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
+    );
+    expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке');
+  });
+
   it('moves a draft typed for another repository and sets the parent', async () => {
     twoRepositories({ runs: [finished] });
     const first = await openDialog();
     await pickLib(first);
     fireEvent.change(within(first).getByLabelText('Task text'), { target: { value: 'for lib' } });
-    await waitFor(() =>
-      expect(within(first).getByRole('combobox', { name: 'Waits for' }).textContent).toBeDefined(),
-    );
-    fireEvent.click(within(first).getByRole('combobox', { name: 'Waits for' }));
+    const tags = within(first).getByRole('combobox', { name: 'Tags' });
+    fireEvent.click(tags);
+    fireEvent.click(await screen.findByRole('option', { name: 'lib-tag' }));
+    fireEvent.keyDown(document.activeElement ?? first, { key: 'Escape' });
+    await waitFor(() => expect(tags.getAttribute('aria-expanded')).toBe('false'));
+    fireEvent.click(within(first).getByRole('button', { name: 'Add link' }));
+    fireEvent.click(within(first).getByRole('combobox', { name: 'Linked task' }));
     fireEvent.click(await screen.findByRole('option', { name: /lib old/ }));
     await waitFor(() => expect(within(first).getAllByText(/lib old/).length).toBeGreaterThan(0));
-    fireEvent.keyDown(document.activeElement ?? first, { key: 'Escape' });
     await close();
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
@@ -757,6 +831,7 @@ describe('subtask from the run header', () => {
       'for lib',
     );
     expect(within(dialog).queryByText(/lib old/)).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Remove tag lib-tag' })).toBeNull();
   });
 
   it('keeps the parent when queue and run events arrive while the dialog is open', async () => {
@@ -807,7 +882,9 @@ describe('subtask from the run header', () => {
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith(expect.objectContaining({ parent: 'l1' })),
+      expect(api.queueAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ links: [{ kind: 'parent', target: 'l1' }] }),
+      ),
     );
     expect(api.calls.filter(([name]) => name === 'queueAdd')).toEqual([['queueAdd', LIB]]);
   });
@@ -816,17 +893,16 @@ describe('subtask from the run header', () => {
     const { api } = twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
     await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
-    fireEvent.click(parentField(dialog));
-    fireEvent.click(await screen.findByRole('option', { name: 'No parent task' }));
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('No parent task'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove link' }));
+    expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     // an event of a run while the dialog is open does not bring the parent back
     act(() => {
       FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Вход' } });
     });
-    expect(parentField(dialog).textContent).toBe('No parent task');
+    expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     await close();
     const again = await openDialog();
-    expect(parentField(again).textContent).toBe('No parent task');
+    expect(within(again).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     fireEvent.change(within(again).getByLabelText('Task text'), { target: { value: 'plain' } });
     await waitFor(() =>
       expect(within(again).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
@@ -835,7 +911,7 @@ describe('subtask from the run header', () => {
     );
     fireEvent.click(within(again).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).not.toHaveProperty('parent');
+    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).not.toHaveProperty('links');
   });
 });
 
@@ -1185,20 +1261,28 @@ describe('add and continue', () => {
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'First' } });
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
     fireEvent.click(within(dialog).getByRole('switch', { name: 'Postpone' }));
-    choose(within(dialog).getByRole('combobox', { name: 'Parent task' }), /добавить вход/);
-    for (const [name, option] of [
-      ['Tags', 'auth'],
-      ['Waits for', /Old/],
-    ] as const) {
-      const field = await within(dialog).findByRole('combobox', { name });
-      fireEvent.click(field);
-      fireEvent.click(await screen.findByRole('option', { name: option }));
-      fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
-      await waitFor(() => {
-        expect(field.getAttribute('aria-expanded')).toBe('false');
-        expect(document.activeElement).toBe(field);
-      });
-    }
+    const tags = within(dialog).getByRole('combobox', { name: 'Tags' });
+    fireEvent.click(tags);
+    fireEvent.click(await screen.findByRole('option', { name: 'auth' }));
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' });
+    await waitFor(() => expect(tags.getAttribute('aria-expanded')).toBe('false'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    await chooseKind(within(dialog).getByRole('combobox', { name: 'Link kind' }), 'Parent');
+    const parent = within(dialog).getByRole('combobox', { name: 'Linked task' });
+    fireEvent.click(parent);
+    fireEvent.click(await screen.findByRole('option', { name: /добавить вход/ }));
+    await waitFor(() => {
+      expect(parent.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(parent);
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    fireEvent.click(within(dialog).getAllByRole('combobox', { name: 'Linked task' })[1]!);
+    fireEvent.click(await screen.findByRole('option', { name: /Old/ }));
+    await waitFor(() =>
+      expect(
+        within(dialog).getAllByRole('combobox', { name: 'Linked task' })[1]!.textContent,
+      ).toContain('Old'),
+    );
   }
 
   const withOld = () =>
@@ -1207,14 +1291,14 @@ describe('add and continue', () => {
       queueAdd: added(),
     });
 
-  it('sends the same request as "Add" and keeps tag, parent and postpone, but not "Waits for"', async () => {
+  it('sends the same request as "Add" and keeps tag, parent row and postpone, but not the blocked-by rows"', async () => {
     const api = withOld();
     const dialog = await openDialog(api);
     await fillSettings(dialog);
     await waitFor(() =>
-      expect(within(dialog).getByRole('combobox', { name: 'Parent task' }).textContent).toMatch(
-        /добавить вход/,
-      ),
+      expect(
+        within(dialog).getAllByRole('combobox', { name: 'Linked task' })[0]!.textContent,
+      ).toMatch(/добавить вход/),
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
@@ -1223,23 +1307,23 @@ describe('add and continue', () => {
       title: 'First',
       task: 'Do it',
       tags: ['auth'],
-      parent: 'run1',
-      after: ['q1'],
+      links: [
+        { kind: 'parent', target: 'run1' },
+        { kind: 'blocked_by', target: 'q1' },
+      ],
       postponed: true,
     });
     await waitFor(() =>
       expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
     );
     expect(within(dialog).getAllByText('auth').length).toBeGreaterThan(0);
-    expect(within(dialog).getByRole('combobox', { name: 'Parent task' }).textContent).toMatch(
+    expect(within(dialog).getByRole('combobox', { name: 'Linked task' }).textContent).toMatch(
       /добавить вход/,
     );
     expect(
       within(dialog).getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked'),
     ).toBe('true');
-    expect(within(dialog).getByRole('combobox', { name: 'Waits for' }).textContent).not.toMatch(
-      /Old/,
-    );
+    expect(within(dialog).queryByText(/Old/)).toBeNull();
 
     // the same input through "Add" gives the same request
     cleanup();
@@ -1247,9 +1331,9 @@ describe('add and continue', () => {
     const again = await openDialog(plain);
     await fillSettings(again);
     await waitFor(() =>
-      expect(within(again).getByRole('combobox', { name: 'Parent task' }).textContent).toMatch(
-        /добавить вход/,
-      ),
+      expect(
+        within(again).getAllByRole('combobox', { name: 'Linked task' })[0]!.textContent,
+      ).toMatch(/добавить вход/),
     );
     fireEvent.click(within(again).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(plain.queueAdd).toHaveBeenCalledTimes(1));
@@ -1262,7 +1346,8 @@ describe('add and continue', () => {
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Do it' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
-    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Waits for' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Linked task' }));
     expect(await screen.findByRole('option', { name: /#12/ })).toBeTruthy();
   });
 
@@ -1298,14 +1383,15 @@ describe('"Waits for" of a new task', () => {
   it('offers the waiting tasks of other projects in their own group', async () => {
     twoRepositories();
     const dialog = await openDialog();
-    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Waits for' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Linked task' }));
     expect(await screen.findByRole('option', { name: /app task/ })).toBeTruthy();
-    const other = await screen.findByRole('option', { name: /lib: .*lib old/ });
+    const other = await screen.findByRole('option', { name: /lib · .*lib old/ });
     expect(other).toBeTruthy();
     expect(screen.getByText('Other projects')).toBeTruthy();
     fireEvent.click(other);
     await waitFor(() =>
-      expect(within(dialog).getAllByText(/lib: .*lib old/).length).toBeGreaterThan(0),
+      expect(within(dialog).getAllByText(/lib · .*lib old/).length).toBeGreaterThan(0),
     );
   });
 });

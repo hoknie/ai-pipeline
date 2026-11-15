@@ -4,18 +4,19 @@ import { useTranslation } from 'react-i18next';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { cn } from '../../shared/lib/browser/cn.ts';
+import { formatRoute } from '../../shared/lib/nav/route.ts';
 import { Label } from '../../shared/ui/forms/label.tsx';
 
 import type { Api } from '../../shared/api/api.ts';
 import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
 import { useTags } from '../../shared/lib/catalog/tags.tsx';
 import type { QueueFields, PipelinesView } from '../../shared/api/types.ts';
-import type { AfterOption, ParentChoice } from './queueLinks.ts';
+import { LinksEditor, type LinkKind, type LinkTargetGroup } from '../runs/index.ts';
 import { continueDraft, draftValid, fieldsOf, type QueueDraft } from './draft.ts';
 import { AttachmentFields } from './form/AttachmentFields.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { DeliveryFields } from './form/DeliveryFields.tsx';
-import { AfterField, ParentField, TagsField } from './form/LinkFields.tsx';
+import { TagsField, withCurrent } from './form/LinkFields.tsx';
 import { TaskFields, type FormState } from './form/TaskFields.tsx';
 
 export {
@@ -73,6 +74,7 @@ function useSubmit(
   onSubmit: (fields: QueueFields) => Promise<void>,
   onSubmitAndContinue: ((fields: QueueFields) => Promise<void>) | undefined,
   onDraft: (draft: QueueDraft) => void,
+  returned: boolean,
 ) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +103,7 @@ function useSubmit(
           return tag && tag.repository === repository && !tag.task ? tag.name : undefined;
         },
         idPrefix !== 'new',
+        returned,
       );
       if (keep && onSubmitAndContinue) {
         await onSubmitAndContinue(fields);
@@ -129,20 +132,39 @@ function SideFields(props: {
   pipelines: PipelinesView | null;
   repository: string | null;
   api: Api | undefined;
-  afterChoices: AfterOption[];
-  parentChoices: ParentChoice[];
+  linkChoices: (kind: LinkKind) => LinkTargetGroup[];
   autoDeliverDefault: boolean | null;
   deliveryModeDefault: DeliveryMode | null;
   projectsPanel?: ReactNode;
+  returnedRun?: string | null;
 }) {
   const { state, pipelines, repository, api } = props;
+  const { t } = useTranslation();
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {state.several ? props.projectsPanel : null}
-      <AfterField state={state} choices={props.afterChoices} />
+      <LinksEditor
+        value={state.effective.links}
+        choices={props.linkChoices}
+        editableKinds={state.locked || state.several ? ['blocked_by'] : undefined}
+        onChange={(links) => state.change({ links, linksTouched: true })}
+      />
+      {props.returnedRun && state.effective.links.some((link) => link.kind !== 'blocked_by') ? (
+        <a
+          className="text-sm text-primary underline"
+          href={formatRoute({
+            view: 'runs',
+            run: props.returnedRun,
+            group: null,
+            step: null,
+            tab: null,
+          })}
+        >
+          {t('links.editRun')}
+        </a>
+      ) : null}
       {state.several ? null : (
         <>
-          <ParentField state={state} choices={props.parentChoices} repository={repository} />
           <TagsField state={state} repository={repository} api={api} />
           {api ? <AttachmentFields state={state} api={api} /> : null}
         </>
@@ -169,12 +191,10 @@ interface QueueFormProps {
   autoDeliverDefault?: boolean | null;
   /** `delivery.mode` of the repository now; null when it is not known. */
   deliveryModeDefault?: DeliveryMode | null;
-  /** What the task can wait for. */
-  afterChoices?: AfterOption[];
-  /** The runs the task can be a child of, in the order to show them. */
-  parentChoices?: ParentChoice[];
+  linkChoices?: (kind: LinkKind) => LinkTargetGroup[];
   /** A returned run keeps its own task: only the predecessors can change. */
   locked?: boolean;
+  returnedRun?: string | null;
   /** The field of the repository, the first in the left half; only a new task has it. */
   repositoryField?: ReactNode;
   /** The task goes to several projects: no groups, attachments, project tags or parent. */
@@ -198,9 +218,32 @@ interface QueueFormProps {
   fill?: boolean;
 }
 
-/** The pipeline ids to offer; a pipeline the draft has that is gone stays in the list. */
-function withCurrent(ids: string[], pipeline: string): string[] {
-  return pipeline !== '' && !ids.includes(pipeline) ? [...ids, pipeline] : ids;
+function SubmitButtons({
+  valid,
+  blocked,
+  blockedHint,
+  sent,
+  submitLabel,
+  onCancel,
+}: {
+  valid: boolean;
+  blocked: boolean;
+  blockedHint: string | undefined;
+  sent: ReturnType<typeof useSubmit>;
+  submitLabel: string;
+  onCancel: (() => void) | undefined;
+}) {
+  return (
+    <FormButtons
+      disabled={!valid || sent.busy || blocked}
+      hint={blockedHint}
+      label={submitLabel}
+      onContinue={
+        sent.submitAndContinue ? () => void (!blocked && sent.submitAndContinue?.()) : undefined
+      }
+      onCancel={onCancel}
+    />
+  );
 }
 
 export function QueueForm({
@@ -211,9 +254,9 @@ export function QueueForm({
   api,
   autoDeliverDefault = null,
   deliveryModeDefault = null,
-  afterChoices = [],
-  parentChoices = [],
+  linkChoices = () => [],
   locked = false,
+  returnedRun = null,
   repositoryField,
   several = false,
   extras,
@@ -235,7 +278,15 @@ export function QueueForm({
   const change = (patch: Partial<QueueDraft>) => onDraft({ ...effective, ...patch });
   const valid = draftValid(effective);
   const state = { idPrefix, effective, change, locked, several };
-  const sent = useSubmit(effective, repository, idPrefix, onSubmit, onSubmitAndContinue, onDraft);
+  const sent = useSubmit(
+    effective,
+    repository,
+    idPrefix,
+    onSubmit,
+    onSubmitAndContinue,
+    onDraft,
+    locked,
+  );
 
   const options = withCurrent(ids, effective.pipeline);
   const blocked = pending || blockedHint !== undefined;
@@ -264,22 +315,14 @@ export function QueueForm({
           pipelines={pipelines}
           repository={repository}
           api={api}
-          afterChoices={afterChoices}
-          parentChoices={parentChoices}
+          linkChoices={linkChoices}
+          returnedRun={returnedRun}
           autoDeliverDefault={autoDeliverDefault}
           deliveryModeDefault={deliveryModeDefault}
           projectsPanel={projectsPanel}
         />
       </div>
-      <FormButtons
-        disabled={!valid || sent.busy || blocked}
-        hint={blockedHint}
-        label={submitLabel}
-        onContinue={
-          sent.submitAndContinue ? () => void (!blocked && sent.submitAndContinue?.()) : undefined
-        }
-        onCancel={onCancel}
-      />
+      <SubmitButtons {...{ valid, blocked, blockedHint, sent, submitLabel, onCancel }} />
       {sent.error ? <Alert variant="destructive">{sent.error}</Alert> : null}
     </form>
   );

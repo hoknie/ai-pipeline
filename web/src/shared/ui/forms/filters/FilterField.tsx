@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 
 import { Popover, PopoverContent } from '../../overlays/popover.tsx';
-import { AddTrigger, PickerChips } from '../picker/pickerParts.tsx';
+import { AddTrigger, PickerChips, type ValueLook } from '../picker/pickerParts.tsx';
 import { FilterList, type FilterOption } from './FilterList.tsx';
 
 export type { FilterOption };
@@ -17,6 +17,7 @@ export function FilterField({
   selected,
   onChange,
   clearLabel,
+  look,
   disabled = false,
 }: {
   id?: string;
@@ -25,6 +26,7 @@ export function FilterField({
   selected: string[];
   onChange: (values: string[]) => void;
   clearLabel: string;
+  look?: ValueLook;
   disabled?: boolean;
 }) {
   const listId = useId();
@@ -46,6 +48,7 @@ export function FilterField({
             inherited={[]}
             values={selected}
             display={display}
+            look={look}
             mark={undefined}
             disabled={disabled}
             onRemove={(value) => onChange(selected.filter((v) => v !== value))}

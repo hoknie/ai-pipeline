@@ -874,6 +874,8 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
     queueAddProjects: vi.fn(async () => []),
     queueEdit: vi.fn(async () => queueOf()),
+    taskLink: vi.fn(async () => ({})),
+    taskUnlink: vi.fn(async () => ({})),
     queueRemove: vi.fn(async () => queueOf()),
     queueRunNow: vi.fn(async () => ({
       runId: 'run9',

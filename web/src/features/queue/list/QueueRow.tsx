@@ -8,7 +8,7 @@ import { TagChips } from '../../../shared/ui/feedback/TagChip.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
 import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import type { QueueDraft } from '../QueueForm.tsx';
-import { depth } from '../queueLinks.ts';
+import { depth } from './links.tsx';
 import type { ItemScope } from './itemScope.ts';
 import { ProjectLabel } from './ProjectLabel.tsx';
 import { itemLabel } from './itemText.ts';

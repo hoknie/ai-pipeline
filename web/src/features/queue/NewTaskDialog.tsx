@@ -16,7 +16,8 @@ import {
   type MultiProjects,
 } from './form/ProjectsFields.tsx';
 import { itemLabel } from './list/itemText.ts';
-import { afterOptions, otherQueues } from './queueLinks.ts';
+import { otherQueues } from './list/links.tsx';
+import { linkTargets } from '../runs/index.ts';
 
 type Props = {
   /** Not bound to a repository: the dialog binds it to the repository it picks. */
@@ -85,8 +86,7 @@ export default function NewTaskDialog(props: Props) {
   const { t } = useTranslation();
   const { open, onOpenChange, repositories, waiting, draft, onDraft } = props;
   const state = useNewTaskState(props);
-  const { target, setTarget, scoped, pipelines, queue, current, mode, draftTarget, parents } =
-    state;
+  const { target, setTarget, scoped, pipelines, queue, current, mode, draftTarget } = state;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -107,17 +107,18 @@ export default function NewTaskDialog(props: Props) {
           api={scoped}
           autoDeliverDefault={queue?.autoDeliver ?? null}
           deliveryModeDefault={queue?.deliveryMode ?? null}
-          afterChoices={
+          linkChoices={(kind) =>
             queue
-              ? afterOptions(
+              ? linkTargets(
+                  kind,
                   queue,
+                  props.runs ?? [],
                   (item) => itemLabel(item, t),
                   undefined,
                   otherQueues(props.queues, props.repositories, target),
                 )
               : []
           }
-          parentChoices={parents}
           pending={
             pipelines === null ||
             queue === undefined ||

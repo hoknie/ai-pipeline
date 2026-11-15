@@ -32,6 +32,7 @@ export function useGroupCtx(props: GroupScreenProps, section: HTMLElement | null
     view,
     caps,
     hasAttachments: (run?.attachments.length ?? 0) > 0,
+    hasLinks: !!run && !!props.linkChoices,
     addressTab: props.tab ?? null,
     onAddressTab: props.onTab,
     onError,

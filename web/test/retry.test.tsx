@@ -260,6 +260,7 @@ describe('retry every failed group', () => {
     expect(names).toEqual([
       'Retry failed (2)',
       'Retry with current config (2)',
+      'Add link…',
       'Deliver with --force…',
       'Mark as delivered…',
       'Copy run id',

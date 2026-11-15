@@ -4,6 +4,7 @@ import type {
   QueuePatch,
   QueueProjectsFields,
   QueueView,
+  TaskLinkView,
   RunCreated,
   TagView,
 } from './types.ts';
@@ -36,6 +37,8 @@ export interface QueueApi {
   /** One task for several projects, added in one step; the repository of the client is not used. */
   queueAddProjects(fields: QueueProjectsFields): Promise<AddedToProject[]>;
   queueEdit(item: string, patch: QueuePatch): Promise<QueueView>;
+  taskLink(source: string, kind: TaskLinkView['kind'], target: string): Promise<unknown>;
+  taskUnlink(source: string, kind: TaskLinkView['kind'], target: string): Promise<unknown>;
   queueRemove(item: string): Promise<QueueView>;
   queueRunNow(item: string): Promise<RunCreated>;
   queueStart(parallel?: number): Promise<QueueView>;
@@ -57,6 +60,8 @@ export function queueApi(at: (path: string) => string): QueueApi {
     queueAdd: (fields) => post(at('/api/queue/items'), fields),
     queueAddProjects: (fields) => post(at('/api/queue/projects'), fields),
     queueEdit: (item, patch) => post(at(`/api/queue/items/${enc(item)}`), patch),
+    taskLink: (source, kind, target) => post(at('/api/tasks/link'), { source, kind, target }),
+    taskUnlink: (source, kind, target) => post(at('/api/tasks/unlink'), { source, kind, target }),
     queueRemove: (item) => post(at(`/api/queue/items/${enc(item)}/remove`)),
     queueRunNow: (item) => post(at(`/api/queue/items/${enc(item)}/run`)),
     queueStart: (parallel) =>

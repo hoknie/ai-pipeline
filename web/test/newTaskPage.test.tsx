@@ -232,10 +232,10 @@ describe('repository of the page', () => {
     mount();
     const field = await ready();
     fireEvent.change(field, { target: { value: 'keep me' } });
-    const waits = screen.getByRole('combobox', { name: 'Waits for' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    const waits = screen.getByRole('combobox', { name: 'Linked task' });
     fireEvent.click(waits);
     fireEvent.click(await screen.findByRole('option', { name: /app task/ }));
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     await waitFor(() => {
       expect(waits.getAttribute('aria-expanded')).toBe('false');
       expect(screen.queryAllByText(/app task/).length).toBeGreaterThan(0);
@@ -305,14 +305,14 @@ describe('ways to the page', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Create subtask…' }));
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
     await waitFor(() =>
-      expect(within(dialog).getByRole('combobox', { name: 'Parent task' }).textContent).toBe(
+      expect(within(dialog).getByRole('combobox', { name: 'Linked task' }).textContent).toBe(
         '#115 Вход',
       ),
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Expand to page' }));
     await waitFor(() => expect(window.location.hash).toBe('#queue/new'));
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Parent task' }).textContent).toBe('#115 Вход'),
+      expect(screen.getByRole('combobox', { name: 'Linked task' }).textContent).toBe('#115 Вход'),
     );
   });
 

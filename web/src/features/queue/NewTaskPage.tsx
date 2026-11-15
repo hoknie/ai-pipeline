@@ -12,7 +12,8 @@ import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { useNewTaskState } from './form/useNewTaskState.ts';
 import { MultiProjectsToggle, projectsFormProps } from './form/ProjectsFields.tsx';
 import { itemLabel } from './list/itemText.ts';
-import { afterOptions, otherQueues } from './queueLinks.ts';
+import { otherQueues } from './list/links.tsx';
+import { linkTargets } from '../runs/index.ts';
 
 type Props = {
   /** Not bound to a repository: the page binds it to the repository it picks. */
@@ -38,8 +39,7 @@ export default function NewTaskPage(props: Props) {
   const { t } = useTranslation();
   const { onLeave, repositories, waiting, draft, onDraft } = props;
   const state = useNewTaskState({ ...props, open: true, onOpenChange: () => onLeave() });
-  const { target, setTarget, scoped, pipelines, queue, current, mode, draftTarget, parents } =
-    state;
+  const { target, setTarget, scoped, pipelines, queue, current, mode, draftTarget } = state;
 
   useEffect(() => {
     const focus = () => focusNewTaskField(mode.current);
@@ -73,13 +73,16 @@ export default function NewTaskPage(props: Props) {
           api={scoped}
           autoDeliverDefault={queue.autoDeliver ?? null}
           deliveryModeDefault={queue.deliveryMode ?? null}
-          afterChoices={afterOptions(
-            queue,
-            (item) => itemLabel(item, t),
-            undefined,
-            otherQueues(props.queues, repositories, target),
-          )}
-          parentChoices={parents}
+          linkChoices={(kind) =>
+            linkTargets(
+              kind,
+              queue,
+              props.runs ?? [],
+              (item) => itemLabel(item, t),
+              undefined,
+              otherQueues(props.queues, repositories, target),
+            )
+          }
           pending={pipelines === null || (draft !== undefined && draftTarget !== target)}
           {...projectsFormProps({
             multi: state.multi,

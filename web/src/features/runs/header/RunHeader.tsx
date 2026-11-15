@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
 
 import type { Api } from '../../../shared/api/api.ts';
 import { repairOf } from '../../../shared/api/observerTypes.ts';
@@ -20,6 +21,7 @@ import {
 } from './useRunHeader.ts';
 
 import { ApplyDialog } from './ApplyDialog.tsx';
+import { RunLinks, type RunLinkChoices } from '../links/RunLinks.tsx';
 
 function RunInfo({
   run,
@@ -58,17 +60,7 @@ function RunInfo({
   );
 }
 
-export function RunHeader({
-  run,
-  api,
-  now,
-  onError,
-  onSelect,
-  onDeliver,
-  onSubtask,
-  headerRef,
-  entry = null,
-}: {
+export interface RunHeaderProps {
   run: RunView;
   api: Api;
   now: number;
@@ -83,7 +75,23 @@ export function RunHeader({
   headerRef?: (element: HTMLElement | null) => void;
   /** The open group or system step; its status joins the statuses of the summary. */
   entry?: GroupRow | SystemStepRow | null;
-}) {
+  linkChoices?: RunLinkChoices | undefined;
+  onOpenProject?: ((path: string) => void) | undefined;
+}
+
+export function RunHeader({
+  run,
+  api,
+  now,
+  onError,
+  onSelect,
+  onDeliver,
+  onSubtask,
+  headerRef,
+  entry = null,
+  linkChoices,
+  onOpenProject,
+}: RunHeaderProps) {
   const { t } = useTranslation();
   const repair = repairOf(run);
   const hold = useRunHold(run, api, onError);
@@ -91,6 +99,7 @@ export function RunHeader({
   const tags = useRunTags(run, api);
   const retry = useRetryFailed(run, api, onError);
   const delivery = useRunDelivery(run, api, onError, onDeliver);
+  const [linksOpen, setLinksOpen] = useState(false);
   return (
     <header ref={headerRef} aria-label={t('runs.header.label')} className="@container border-b p-4">
       <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-start">
@@ -106,7 +115,13 @@ export function RunHeader({
               delivery={delivery}
             />
             <RunSteps run={run} api={api} onError={onError} />
-            <MoreMenu run={run} retry={retry} delivery={delivery} onSubtask={onSubtask} />
+            <MoreMenu
+              run={run}
+              retry={retry}
+              delivery={delivery}
+              onSubtask={onSubtask}
+              onAddLink={linkChoices ? () => setLinksOpen(true) : undefined}
+            />
           </div>
         </div>
         <RunSummary
@@ -118,6 +133,14 @@ export function RunHeader({
           onError={onError}
         />
       </div>
+      <RunLinks
+        run={run}
+        api={api}
+        choices={linkChoices}
+        open={linksOpen}
+        onOpenChange={setLinksOpen}
+        onProject={onOpenProject}
+      />
       {delivery.forcing ? (
         <ApplyDialog
           run={run}

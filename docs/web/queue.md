@@ -19,33 +19,40 @@ Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. The row a
 
 "Run now" on a task that is not ready asks to confirm "Dependencies are not met" and lists them.
 
-A task with predecessors shows them on a second line after "Waits for:". A predecessor from another project carries the project name and opens that project's queue.
-
-The "Waits for" field also offers the waiting tasks and runs of the other enabled projects, in the group "Other projects"; they can be found by the project name.
+A task with links shows them on a second line, grouped by kind; see [Links](#links). Only the "Blocked by" links affect readiness and the "Dependencies are not met" confirmation. A chip of another project carries the project name and opens that project's queue.
 
 ## Runs out of line
 
-- "Return to the queue" is on a skipped run only when it has failed or cancelled groups to retry. It is also in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run. Only its place and predecessors can be changed. See [Returning a run](../usage/queue.md#returning-a-run).
+- "Return to the queue" is on a skipped run only when it has failed or cancelled groups to retry. It is also in the header of any run with failed or cancelled groups that is not in its queue. The run becomes the first task, marked "Return" with a link to the run.
+  Only its place and its "Blocked by" links can be changed; the other links are shown locked, with an "Edit on the run page" link (the "Links" tab). See [Returning a run](../usage/queue.md#returning-a-run).
 - "Remove from list" is on every skipped run. After a confirmation the card disappears; the run itself does not change.
 
 ## The task form
 
 "New task" opens a dialog with two halves: the task on the left and its settings on the right.
 
-- **"Repository"** defaults to the repository selected in the top bar. Choosing another one adds the task to its queue and does not switch the panel. The pipelines, "Waits for", the parent task and the delivery defaults come from that repository; the links are cleared on a switch, the text and tags stay.
+- **"Repository"** defaults to the repository selected in the top bar. Choosing another one adds the task to its queue and does not switch the panel. The pipelines, the link choices and the delivery defaults come from that repository; the links are cleared on a switch, the text and tags stay.
 - **Title, pipeline, text or groups** describe the task.
-- In task mode, either the title or the description is enough. If the description is empty, the title is sent as the task text.
-- In groups mode, each group needs a title, a description or both; an entirely empty group is not allowed. For example, a group with only the description `Fix login\nCheck errors` gets the title `Fix login` and keeps the full description. When editing a saved task, these canonical values appear in their fields.
-- **"Waits for"** chooses the [predecessors](../usage/queue.md#dependencies). A row shows the state of each predecessor and a readiness badge (ready, waiting, blocked).
-- **"Parent task"** chooses one run of the repository as the [parent](../usage/tags.md#parent-of-a-task), finished runs included, in three parts: "In progress", "Planned" and "Finished". The chosen parent is shown as `#N title`. "No parent task" removes the linked task tags of the task.
+- **"Links"** holds one row per [link](../usage/queue.md#task-links): a kind and a task picked by number or title; "Add link" adds a row, and the × on a row removes it.
 - **"Postpone"** adds the task [postponed](../usage/queue.md#postponed-tasks). The switch is only in the new task; for an existing task the "Postpone" button in the list changes the flag.
 - **"Attachments"** has an "Attach files" button and a drop zone. Each file is uploaded at once, with its progress shown. A file over 20 MB, an eleventh file and a repeated name are refused with a message and stay out of the list; a failed upload shows its error and is not sent with the task. "Add" is unavailable while a file is uploading.
-  The files stay in the draft until the task is added. In the form of a waiting task its files can be removed and new ones attached; the files of a returned run are only shown. A row with files shows a paperclip with their number. See [attachments](../usage/queue.md#attachments).
 - **Tags** and **delivery** are the [tags](../usage/tags.md) and [delivery settings](../configuration/delivery.md#settings-for-one-task) of the task.
 - **"Variant"** chooses a [variant of the pipeline](../usage/queue.md#variants); it is shown only when the pipeline has variants, and changing the pipeline resets it to `default`. The queue and the cards of runs show a badge with the variant name next to the pipeline badge, except for `default`.
 - **"Skip steps"** is a row of segments: a pressed segment is a [skipped step](../usage/queue.md#skipping-steps), and the last unpressed one stays disabled. Steps skipped by the chosen variant are pressed and cannot be changed.
 
-**"Add and continue"**, next to "Add" in the new task dialog, adds the task and keeps the form open: the title, the text, the groups and "Waits for" are cleared, the other settings stay, and the focus returns to the text. The form of an existing task has no such button.
+**"Add and continue"**, next to "Add" in the new task dialog, adds the task and keeps the form open: the title, the text, the groups and every link row except "Parent" are cleared, the other settings stay, and the focus returns to the text. The form of an existing task has no such button.
+
+### Links
+
+The [links](../usage/queue.md#task-links) of a task are edited in the "Links" block of the task form; the links of a run — in the "Links" section of its page.
+
+- The block of the form shows only the direct links. The section of the run page and the row in the queue also show the inverse sides: "Blocks", "Subtasks" and "Duplicated by".
+- The run page shows a collapsible "Links" section under the status line, separated by a rule, only when the run has links. It has two blocks, "Outgoing" and "Incoming". The chips link to the run page or to the project's queue; a chip of the "Blocked by" group carries a state icon, and the × on a direct chip removes the link.
+- The "Links" tab among the tabs of the run page is always there, even without links. Rows are added, changed and removed there like in the task form; "Save" applies all changes at once (removals first), "Reset" drops them. An error of the daemon stays under the rows and the edits are kept.
+  The "Add link…" item of the "More" menu opens a small dialog with a kind and a task; the "Blocked by" kind is not offered there.
+- In the queue, a row's second line holds the chips: the direct groups "Blocked by:", "Parent:", "Related:" and "Duplicates:", then the inverse groups "Blocks:", "Subtasks:" and "Duplicated by:".
+  A "Blocked by" chip shows the state of the target (done, waiting, blocked) as an icon. More than three subtasks collapse into "More N" with the full list in the tooltip. A task without links has no second line.
+- Hovering over or focusing a row highlights it together with everything reachable over its "Blocked by" and "Parent" links in both directions, including the run cards; "Related" and "Duplicates" never highlight. The branch line on the left still follows the "Blocked by" chains.
 
 ### One task in several projects
 
@@ -76,6 +83,7 @@ With the [global queue mode](../usage/queue.md#global-queue) the section "Queue"
 - The badge "Global queue" and the limit "At most N specialists" (`queue.max`) are on top.
 - Every task and every run carries the label of its project. Waiting tasks stand in the global order; drag a task by its handle (or `Alt+↑` / `Alt+↓`) to a place among the tasks of all projects.
 - The take filter selects projects, pipelines and tag names across projects; it changes only while the queue is stopped. A task matches the tag filter when it has at least one selected name. Tasks of a disabled project are not taken.
+- With no projects selected, pipeline and tag choices come from all enabled projects; selecting projects limits both lists to those projects.
 - "Start", "Pause", the parallelism and the reason for stopping are those of the global queue.
 - The counter of the section "Queue" counts the waiting tasks of all projects.
 

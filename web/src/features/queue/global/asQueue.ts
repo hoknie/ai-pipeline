@@ -6,7 +6,6 @@ import type {
   RunView,
 } from '../../../shared/api/types.ts';
 import type { ItemScope } from '../list/itemScope.ts';
-import { parentChoices } from '../queueLinks.ts';
 
 /**
  * The global queue in the shape of a project queue, for the parts of the page that read the
@@ -55,7 +54,7 @@ export function globalScope(
     apiOf: (item) => api.forRepository(of(item)),
     queueOf: (item) => lineOf(queue, of(item)),
     pipelinesOf: (item) => pipelines.get(of(item)) ?? null,
-    parentsOf: (item) => parentChoices(runs, of(item)),
+    runs,
     projectOf: of,
   };
 }

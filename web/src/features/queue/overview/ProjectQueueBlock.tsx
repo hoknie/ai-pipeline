@@ -9,7 +9,7 @@ import { QueueList } from '../QueueList.tsx';
 import { usePipelines } from '../QueuePage.tsx';
 import { ProjectQueueHeader } from './ProjectQueueHeader.tsx';
 import { QueueRuns } from '../QueueRuns.tsx';
-import { related } from '../queueLinks.ts';
+import { related } from '../list/links.tsx';
 
 /**
  * The queue of one project in the mode «All projects»: its header with the state and the

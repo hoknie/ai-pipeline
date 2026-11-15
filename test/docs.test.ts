@@ -352,7 +352,7 @@ describe('documentation examples', () => {
     expect(queue).toContain('--after <id>');
     expect(queue).toContain('--no-after');
     const web = readFileSync(join(root, 'docs/web/queue.md'), 'utf8');
-    expect(web).toContain('"Waits for"');
+    expect(web).toContain('"Links"');
     expect(web).toContain('Dependencies are not met');
     const hosts = readFileSync(join(root, 'docs/hosts/mcp-tools.md'), 'utf8');
     expect(hosts.split('\n').find((line) => line.includes('| `swarm_queue_add`'))).toContain(

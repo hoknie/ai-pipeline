@@ -64,6 +64,35 @@ function mount(
 const block = (name: string) => screen.findByRole('region', { name: `Queue of ${name}` });
 
 describe('queue in the mode «All projects»', () => {
+  it('shows links to another project in its queue block', async () => {
+    mount([
+      queueOf({
+        repository: APP,
+        items: [
+          queueItem('a1', 'app task', 1, {
+            readiness: 'waiting',
+            links: [
+              {
+                kind: 'blocked_by',
+                id: 'l1',
+                ref: 'item',
+                number: 7,
+                title: 'lib task',
+                repository: LIB,
+                state: 'waiting',
+              },
+            ],
+          }),
+        ],
+      }),
+      queueOf({ repository: LIB, items: [queueItem('l1', 'lib task', 7)] }),
+    ]);
+    const app = await block('app');
+    const row = within(app).getByRole('listitem', { name: /app task/ });
+    expect(within(row).getByText('Blocked by:')).toBeTruthy();
+    expect(within(row).getByText('lib')).toBeTruthy();
+    expect(within(row).getByText('#7 lib task')).toBeTruthy();
+  });
   it('shows a block per project with its state and tasks, ordered by name', async () => {
     mount([
       queueOf({

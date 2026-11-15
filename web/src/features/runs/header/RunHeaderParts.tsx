@@ -137,11 +137,13 @@ export function MoreMenu({
   retry,
   delivery,
   onSubtask,
+  onAddLink,
 }: {
   run: RunView;
   retry: ReturnType<typeof useRetryFailed>;
   delivery: ReturnType<typeof useRunDelivery>;
   onSubtask: ((run: RunView) => void) | undefined;
+  onAddLink?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   return (
@@ -154,6 +156,9 @@ export function MoreMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         <RetryItems retry={retry} />
+        <DropdownMenuItem disabled={!onAddLink} onSelect={onAddLink}>
+          {t('links.add')}…
+        </DropdownMenuItem>
         {onSubtask ? (
           <>
             <DropdownMenuItem onSelect={() => onSubtask(run)}>

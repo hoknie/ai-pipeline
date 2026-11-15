@@ -9,6 +9,7 @@ import { ArtifactsTab } from '../../files/ArtifactsTab.tsx';
 import { AttachmentsTab } from '../../files/AttachmentsTab.tsx';
 import { DiffStat } from '../../files/DiffStat.tsx';
 import { FileTree } from '../../files/FileTree.tsx';
+import { LinksEditTab } from '../../links/LinksEditTab.tsx';
 import { AttemptTimeline } from '../AttemptTimeline.tsx';
 import type { GroupCtx } from './useGroupCtx.ts';
 
@@ -47,6 +48,14 @@ function TabTriggers({ ctx }: { ctx: GroupCtx }) {
       {attachments.length > 0 ? (
         <TabsTrigger value="attachments">
           {t('attachments.tab')} · {attachments.length}
+        </TabsTrigger>
+      ) : null}
+      {ctx.run && ctx.linkChoices ? (
+        <TabsTrigger value="links">
+          {t('links.title')}
+          {ctx.run.links.length + ctx.run.linkedBy.length > 0
+            ? ` · ${ctx.run.links.length + ctx.run.linkedBy.length}`
+            : ''}
         </TabsTrigger>
       ) : null}
     </TabsList>
@@ -192,6 +201,11 @@ export function GroupTabsView({ ctx }: { ctx: GroupCtx }) {
       {(ctx.run?.attachments.length ?? 0) > 0 ? (
         <TabsContent value="attachments">
           <AttachmentsTab api={api} runId={runId} attachments={ctx.run?.attachments ?? []} />
+        </TabsContent>
+      ) : null}
+      {ctx.run && ctx.linkChoices ? (
+        <TabsContent value="links">
+          <LinksEditTab run={ctx.run} api={api} choices={ctx.linkChoices} />
         </TabsContent>
       ) : null}
     </Tabs>

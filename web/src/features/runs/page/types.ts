@@ -3,6 +3,7 @@ import type { HistoryState, OpenedState } from '../../../shared/api/runs/runsSta
 import type { RunView } from '../../../shared/api/types.ts';
 import type { Route } from '../../../shared/lib/nav/route.ts';
 import type { RunFilterState, RunScope } from '../list/runFilter.ts';
+import type { RunLinkChoices } from '../links/RunLinks.tsx';
 
 export interface RunsPageProps {
   api: Api;
@@ -26,6 +27,8 @@ export interface RunsPageProps {
   scope: RunScope;
   /** Opens a new task as a child of the run; absent while the queue is unknown. */
   onSubtask?: (run: RunView) => void;
+  linkChoices?: (run: RunView) => RunLinkChoices | undefined;
+  onOpenProject?: (repository: string) => void;
   /** Loading of older finished runs; without it the list is all there is. */
   history?: HistoryState;
 }

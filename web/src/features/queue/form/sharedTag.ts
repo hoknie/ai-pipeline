@@ -69,7 +69,13 @@ export function projectsFields(
     ...(fields.autoDeliver !== undefined ? { autoDeliver: fields.autoDeliver } : {}),
     ...(fields.deliveryMode !== undefined ? { deliveryMode: fields.deliveryMode } : {}),
     ...(fields.skip !== undefined && fields.skip.length > 0 ? { skip: fields.skip } : {}),
-    ...(fields.after !== undefined && fields.after.length > 0 ? { after: fields.after } : {}),
+    ...((fields.links ?? []).some((link) => link.kind === 'blocked_by')
+      ? {
+          after: (fields.links ?? [])
+            .filter((link) => link.kind === 'blocked_by')
+            .map((link) => String(link.target)),
+        }
+      : {}),
     ...(Object.keys(notes).length > 0 ? { notes } : {}),
     ...(tag !== '' ? { tag } : {}),
     ...(input.chain ? { chain: true } : {}),

@@ -82,8 +82,18 @@ import type {
   RuntimeChain,
 } from '../../../../src/feature/swarm-config/types/index.ts';
 import type { TagColor } from '../../../../src/feature/tags/types/index.ts';
+import type { LinkInput, TaskLinkView } from '../../../../src/feature/queue/types/index.ts';
 
-export type { ChainMode, ChainRuntimeItem, DeliveryMode, ReasoningEffort, RuntimeChain, TagColor };
+export type {
+  ChainMode,
+  ChainRuntimeItem,
+  DeliveryMode,
+  ReasoningEffort,
+  RuntimeChain,
+  TagColor,
+  LinkInput,
+  TaskLinkView,
+};
 import type {
   DaemonCheck,
   DependencyView,
@@ -148,6 +158,7 @@ export interface QueueFields {
   skip?: string[];
   /** Ids of queue items and runs the task waits for. */
   after?: string[];
+  links?: LinkInput[];
   /** Run id or task number; the task gets the linked task tag of that run. */
   parent?: string | null;
   /** Ids of the files uploaded before; they become the attachments of the task. */
@@ -174,6 +185,7 @@ export interface QueuePatch {
   skip?: string[];
   /** Ids of queue items and runs the task waits for; replaces the list of the item. */
   after?: string[];
+  links?: LinkInput[];
   /** Run id or task number; `null` removes the linked task tags. */
   parent?: string | null;
   /** A running queue does not take a postponed task. */

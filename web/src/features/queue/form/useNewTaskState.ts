@@ -7,7 +7,7 @@ import { taskNumber } from '../../../shared/lib/format.ts';
 import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
 import type { PipelinesView, QueueFields, QueueView, RunView } from '../../../shared/api/types.ts';
 import { emptyDraft, retarget, type QueueDraft } from '../draft.ts';
-import { parentChoices } from '../queueLinks.ts';
+import { useOpenTarget, usePresetDraft } from './usePresetDraft.ts';
 import { commonPipelines, defaultSharedTag, projectsFields } from './sharedTag.ts';
 
 function stepIds(pipeline: { steps: { id: string }[] } | undefined): string[] {
@@ -43,9 +43,10 @@ function useRetargetedDraft(input: {
   draftTarget: string | null;
   target: string;
   pipelines: PipelinesView | null;
+  clearTags: boolean;
   onDraft: (draft: QueueDraft | null) => void;
 }): void {
-  const { open, draft, draftTarget, target, pipelines, onDraft } = input;
+  const { open, draft, draftTarget, target, pipelines, clearTags, onDraft } = input;
   useEffect(() => {
     if (!open || !draft || !pipelines || draftTarget === target) return;
     const found = (id: string) => pipelines.pipelines.find((pipeline) => pipeline.id === id);
@@ -56,9 +57,10 @@ function useRetargetedDraft(input: {
         (id) => stepIds(found(id)),
         (id) => found(id)?.variants.map((variant) => variant.id) ?? [],
       ),
+      ...(clearTags ? { tags: [] } : {}),
       repository: target,
     });
-  }, [open, draft, pipelines, draftTarget, target, onDraft]);
+  }, [open, draft, pipelines, draftTarget, target, clearTags, onDraft]);
 }
 
 /** A repository without a queue in the snapshot: load it once. */
@@ -159,32 +161,6 @@ function useCommonDraft(input: {
   }, [draft, common, onDraft]);
 }
 
-/** The preset parent goes into the draft once, when the draft belongs to the target repository. */
-function usePresetDraft(input: {
-  open: boolean;
-  preset: { repository: string; parent: string | null } | null;
-  target: string;
-  draft: QueueDraft | undefined;
-  draftTarget: string | null;
-  pipelines: PipelinesView | null;
-  onDraft: (draft: QueueDraft | null) => void;
-  onPresetApplied: () => void;
-}): void {
-  const { open, preset, target, draft, draftTarget, pipelines, onDraft, onPresetApplied } = input;
-  useEffect(() => {
-    if (!open || !preset || target !== preset.repository) return;
-    if (draft && draftTarget !== target) return;
-    if (!pipelines) return;
-    const base = draft ?? emptyDraft(pipelines.pipelines[0]?.id);
-    onDraft(
-      preset.parent === null
-        ? { ...base, repository: target }
-        : { ...base, repository: target, parent: preset.parent, parentTouched: true },
-    );
-    onPresetApplied();
-  }, [open, preset, target, draft, draftTarget, pipelines, onDraft, onPresetApplied]);
-}
-
 /** Adds the task to its queue, or to the queues of the chosen projects, and tells the user. */
 function useTaskSubmit(input: {
   api: Api;
@@ -249,7 +225,7 @@ export function useNewTaskState(props: {
   onOpenChange: (open: boolean) => void;
 }) {
   const { api, selected, queues, open, draft, onDraft, onQueue } = props;
-  const { runs = [], preset = null, onPresetApplied = () => undefined } = props;
+  const { preset = null, onPresetApplied = () => undefined } = props;
   // the choice is local to the dialog: it neither moves the panel nor outlives the opening
   const [target, setTarget] = useState(preset?.repository ?? selected);
   const scoped = useMemo(() => api.forRepository(target), [api, target]);
@@ -269,27 +245,22 @@ export function useNewTaskState(props: {
   const mode = useRef<'task' | 'groups'>('task');
   mode.current = current.mode;
 
-  // the target is chosen on opening only: forgetting the preset must not move it back
-  const wasOpen = useRef(false);
-  const latest = useRef({ selected, preset });
-  latest.current = { selected, preset };
-  const resetMulti = useRef(multi.reset);
-  resetMulti.current = multi.reset;
-  useEffect(() => {
-    if (open && !wasOpen.current) {
-      setTarget(latest.current.preset?.repository ?? latest.current.selected);
-      resetMulti.current();
-    }
-    wasOpen.current = open;
-  }, [open]);
+  useOpenTarget(open, selected, preset, setTarget, multi.reset);
 
   const queueKnown = queue !== undefined;
   useTargetQueue(scoped, queueKnown, onQueue);
 
   const draftTarget = draft ? (draft.repository ?? selected) : null;
-  useRetargetedDraft({ open, draft, draftTarget, target, pipelines: targetPipelines, onDraft });
+  useRetargetedDraft({
+    open,
+    draft,
+    draftTarget,
+    target,
+    pipelines: targetPipelines,
+    onDraft,
+    clearTags: preset?.parent != null && preset.repository === target,
+  });
 
-  const parents = useMemo(() => parentChoices(runs, target), [runs, target]);
   usePresetDraft({
     ...{ open, preset, target, draft, draftTarget, pipelines: targetPipelines },
     ...{ onDraft, onPresetApplied },
@@ -310,7 +281,6 @@ export function useNewTaskState(props: {
     current,
     mode,
     draftTarget,
-    parents,
     multi: {
       ...multi,
       sharedTag,

@@ -16,7 +16,7 @@ import type { QueueDraft } from './QueueForm.tsx';
 import { QueueList } from './QueueList.tsx';
 import { QueueRuns } from './QueueRuns.tsx';
 import { QueueLinksContext } from './list/links.tsx';
-import { related } from './queueLinks.ts';
+import { related } from './list/links.tsx';
 import { parseParallel } from './ParallelStepper.tsx';
 import { QueueSide } from './QueueSide.tsx';
 import { StopReason } from './cards/StopReason.tsx';

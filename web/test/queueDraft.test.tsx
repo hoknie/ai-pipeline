@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { projectsFields } from '../src/features/queue/form/sharedTag.ts';
 
 import {
   continueDraft,
@@ -224,11 +225,12 @@ describe('continueDraft', () => {
       autoDeliver: true,
       deliveryMode: 'branch' as const,
       tags: ['t1'],
-      after: ['q1'],
+      links: [
+        { kind: 'blocked_by' as const, target: 'q1' },
+        { kind: 'parent' as const, target: 'run-1' },
+      ],
       skip: ['review'],
-      afterTouched: true,
-      parent: 'run-1',
-      parentTouched: true,
+      linksTouched: true,
       repository: '/work/app',
     };
     const before = structuredClone(draft);
@@ -237,9 +239,91 @@ describe('continueDraft', () => {
       task: '',
       title: '',
       groups: [{ title: '', task: '' }],
-      after: [],
-      afterTouched: false,
+      links: [{ kind: 'parent', target: 'run-1' }],
+      linksTouched: false,
     });
     expect(draft).toEqual(before);
+  });
+});
+
+describe('draft links', () => {
+  it('converts blockers to after for a task in several projects', () => {
+    const result = projectsFields(
+      {
+        pipeline: 'feature',
+        task: 'Task',
+        links: [
+          { kind: 'blocked_by', target: 'q1' },
+          { kind: 'related', target: 'r1' },
+        ],
+      },
+      { projects: ['/a', '/b'], notes: {}, tag: '', chain: false },
+    );
+    expect(result.after).toEqual(['q1']);
+    expect(result).not.toHaveProperty('links');
+  });
+  it('reads link rows from the item rather than its tags or predecessors', () => {
+    const draft = draftOf({
+      pipeline: 'feature',
+      task: 'Task',
+      groups: null,
+      title: null,
+      autoDeliver: null,
+      tags: [{ id: 'tag', task: { run: 'old' } }],
+      links: [
+        { kind: 'parent', id: 'parent' },
+        { kind: 'blocked_by', id: 'blocker' },
+      ],
+    });
+    expect(draft.links).toEqual([
+      { kind: 'parent', target: 'parent' },
+      { kind: 'blocked_by', target: 'blocker' },
+    ]);
+    expect(draft.linksTouched).toBe(false);
+  });
+  it('sends links on creation and only touched edits, including an empty list', () => {
+    const draft = {
+      ...emptyDraft('feature'),
+      task: 'Task',
+      links: [
+        { kind: 'related' as const, target: 'r1' },
+        { kind: 'parent' as const, target: '' },
+      ],
+    };
+    expect(fieldsOf(draft).links).toEqual([{ kind: 'related', target: 'r1' }]);
+    expect(fieldsOf(draft, undefined, true)).not.toHaveProperty('links');
+    expect(fieldsOf({ ...draft, links: [], linksTouched: true }, undefined, true).links).toEqual(
+      [],
+    );
+  });
+  it('sends only changed blockers as after for returned items', () => {
+    const draft = {
+      ...emptyDraft('feature'),
+      task: 'Task',
+      links: [
+        { kind: 'parent' as const, target: 'p' },
+        { kind: 'blocked_by' as const, target: 'b' },
+      ],
+    };
+    expect(fieldsOf(draft, undefined, true, true)).not.toHaveProperty('after');
+    expect(fieldsOf({ ...draft, linksTouched: true }, undefined, true, true)).toMatchObject({
+      after: ['b'],
+    });
+    expect(fieldsOf({ ...draft, linksTouched: true }, undefined, true, true)).not.toHaveProperty(
+      'links',
+    );
+  });
+  it('clears links and keeps tags when retargeting', () => {
+    const draft = {
+      ...emptyDraft('feature'),
+      tags: ['t1'],
+      links: [{ kind: 'parent' as const, target: 'p' }],
+      linksTouched: true,
+    };
+    expect(retarget(draft, ['feature'], () => [])).toMatchObject({
+      links: [],
+      linksTouched: false,
+      tags: ['t1'],
+    });
   });
 });

@@ -73,6 +73,16 @@ describe('route with a tab', () => {
   });
 });
 
+describe('links tab', () => {
+  it('is on the group screen even when the run has no links', async () => {
+    window.location.hash = '#runs/run1/login';
+    mount();
+    await screen.findByRole('tab', { name: 'Links' });
+    openTab('Links');
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeTruthy();
+  });
+});
+
 describe('taskProgress', () => {
   it('counts checkboxes of any list marker', () => {
     expect(taskProgress('- [x] a\n* [X] b\n  + [ ] c\n- [ ] d\n')).toEqual({ done: 2, total: 4 });
