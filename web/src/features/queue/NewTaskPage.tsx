@@ -10,7 +10,7 @@ import { Skeleton } from '../../shared/ui/feedback/skeleton.tsx';
 import { QueueForm, type QueueDraft } from './QueueForm.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { useNewTaskState } from './form/useNewTaskState.ts';
-import { projectsFormProps } from './form/ProjectsFields.tsx';
+import { MultiProjectsToggle, projectsFormProps } from './form/ProjectsFields.tsx';
 import { itemLabel } from './list/itemText.ts';
 import { afterOptions, otherQueues } from './queueLinks.ts';
 
@@ -54,7 +54,10 @@ export default function NewTaskPage(props: Props) {
         <Button variant="ghost" size="sm" asChild>
           <a href="#queue">{t('queue.page.back')}</a>
         </Button>
-        <h1 className="text-lg font-semibold">{t('queue.page.title')}</h1>
+        <h1 className="text-lg font-semibold">
+          {t(state.multi.on ? 'queue.multi.title' : 'queue.page.title')}
+        </h1>
+        <MultiProjectsToggle multi={state.multi} />
       </div>
       {queue === undefined ? (
         <div role="status" aria-label={t('queue.loading')}>
@@ -85,6 +88,7 @@ export default function NewTaskPage(props: Props) {
             target,
             onTarget: setTarget,
             needMore: t('queue.multi.needMore'),
+            repositoryLabel: t('queue.form.repository'),
           })}
           submitLabel={t('queue.add')}
           onDraft={(next) => onDraft({ ...next, repository: next.repository ?? target })}

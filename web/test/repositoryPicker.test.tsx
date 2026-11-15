@@ -87,6 +87,26 @@ describe('repository picker', () => {
     expect(screen.queryAllByRole('option')).toHaveLength(0);
   });
 
+  it('shows the placeholder for an empty value and still picks', async () => {
+    const onChange = vi.fn();
+    render(
+      <RepositoryPicker
+        label="Add project"
+        placeholder="Choose a project…"
+        repositories={ALL}
+        value=""
+        waiting={new Map([['', 3]])}
+        onChange={onChange}
+      />,
+    );
+    const trigger = screen.getByRole('combobox', { name: 'Add project' });
+    expect(trigger.textContent).toBe('Choose a project…');
+    expect(trigger.querySelector('[data-project-color]')).toBeNull();
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole('option', { name: /library/ }));
+    expect(onChange).toHaveBeenCalledWith(LIBRARY);
+  });
+
   it('picks with a click and closes the list', async () => {
     const { trigger, onChange } = mount();
     fireEvent.click(trigger);

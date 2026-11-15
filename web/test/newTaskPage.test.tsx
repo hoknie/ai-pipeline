@@ -337,12 +337,30 @@ describe('ways to the page', () => {
   });
 });
 
+async function addLib() {
+  fireEvent.click(await screen.findByRole('combobox', { name: 'Add project' }));
+  const option = (await screen.findAllByRole('option')).find((item) =>
+    item.textContent?.startsWith('lib'),
+  );
+  fireEvent.click(option!);
+}
+
 describe('page of a new task in several projects', () => {
+  it('puts the button next to the title and changes the title when it is pressed', async () => {
+    mount({ libIds: ['feature'] });
+    await ready();
+    const toggle = screen.getByRole('button', { name: 'In several projects' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('heading', { name: 'New task in several projects' })).toBeTruthy();
+  });
+
   it('adds one task to two projects, in the order chosen, and leads to the queue', async () => {
     const { api } = mount({ libIds: ['feature'] });
     const field = await ready();
-    fireEvent.click(screen.getByRole('switch', { name: 'In several projects' }));
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'lib' }));
+    fireEvent.click(screen.getByRole('button', { name: 'In several projects' }));
+    await addLib();
     fireEvent.click(screen.getByRole('button', { name: 'Move lib up' }));
     fireEvent.change(await textField(), { target: { value: 'Email' } });
     expect(screen.queryByRole('radio', { name: 'Groups' })).toBeNull();
@@ -361,8 +379,8 @@ describe('page of a new task in several projects', () => {
   it('keeps the mode and the typed text when the task is added and the form goes on', async () => {
     const { api } = mount({ libIds: ['feature'] });
     await ready();
-    fireEvent.click(screen.getByRole('switch', { name: 'In several projects' }));
-    fireEvent.click(await screen.findByRole('checkbox', { name: 'lib' }));
+    fireEvent.click(screen.getByRole('button', { name: 'In several projects' }));
+    await addLib();
     fireEvent.change(await textField(), { target: { value: 'One' } });
     const next = screen.getByRole<HTMLButtonElement>('button', { name: 'Add and continue' });
     await waitFor(() => expect(next.disabled).toBe(false));
@@ -373,7 +391,7 @@ describe('page of a new task in several projects', () => {
     );
     expect(window.location.hash).toBe('#queue/new');
     expect(
-      screen.getByRole('switch', { name: 'In several projects' }).getAttribute('aria-checked'),
+      screen.getByRole('button', { name: 'In several projects' }).getAttribute('aria-pressed'),
     ).toBe('true');
   });
 });

@@ -133,10 +133,12 @@ function SideFields(props: {
   parentChoices: ParentChoice[];
   autoDeliverDefault: boolean | null;
   deliveryModeDefault: DeliveryMode | null;
+  projectsPanel?: ReactNode;
 }) {
   const { state, pipelines, repository, api } = props;
   return (
     <div className="flex min-w-0 flex-col gap-3">
+      {state.several ? props.projectsPanel : null}
       <AfterField state={state} choices={props.afterChoices} />
       {state.several ? null : (
         <>
@@ -179,6 +181,8 @@ interface QueueFormProps {
   several?: boolean;
   /** Fields of a task in several projects, under the text of the task. */
   extras?: ReactNode;
+  /** The projects of a task in several projects, first in the right half. */
+  projectsPanel?: ReactNode;
   /** Why the task cannot be added yet, shown next to the button. */
   blockedHint?: string;
   /** The data of the form is still loading: the form cannot be sent. */
@@ -213,6 +217,7 @@ export function QueueForm({
   repositoryField,
   several = false,
   extras,
+  projectsPanel,
   blockedHint,
   pending = false,
   submitLabel,
@@ -263,6 +268,7 @@ export function QueueForm({
           parentChoices={parentChoices}
           autoDeliverDefault={autoDeliverDefault}
           deliveryModeDefault={deliveryModeDefault}
+          projectsPanel={projectsPanel}
         />
       </div>
       <FormButtons

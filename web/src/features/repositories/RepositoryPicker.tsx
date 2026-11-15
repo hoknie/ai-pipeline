@@ -2,6 +2,7 @@ import { Check, FolderGit2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { cn } from '../../shared/lib/browser/cn.ts';
 import { repositoryLabel, repositoryMatches } from '../../shared/lib/catalog/repositories.ts';
 import { Badge } from '../../shared/ui/feedback/badge.tsx';
 import { ProjectDot } from '../../shared/ui/feedback/ProjectDot.tsx';
@@ -28,15 +29,18 @@ function PickerTrigger({
   open,
   listId,
   count,
+  placeholder,
 }: {
   id?: string;
   label: string;
   value: string;
+  placeholder?: string | undefined;
   open: boolean;
   listId: string;
   count: number;
 }) {
   const { t } = useTranslation();
+  const empty = value === '' && placeholder !== undefined;
   return (
     <PopoverTrigger asChild>
       <Button
@@ -52,9 +56,11 @@ function PickerTrigger({
         className="h-9.5 w-full justify-start px-2.5"
       >
         <FolderGit2 aria-hidden />
-        <ProjectDot path={value} />
-        <span className="flex-1 truncate text-left">{repositoryLabel(value)}</span>
-        {count > 0 ? (
+        {empty ? null : <ProjectDot path={value} />}
+        <span className={cn('flex-1 truncate text-left', empty && 'text-muted-foreground')}>
+          {empty ? placeholder : repositoryLabel(value)}
+        </span>
+        {count > 0 && !empty ? (
           <Badge variant="warn" aria-label={t('nav.repositoryWaiting', { count })}>
             {count}
           </Badge>
@@ -102,6 +108,7 @@ export function RepositoryPicker({
   repositories,
   value,
   waiting,
+  placeholder,
   onChange,
 }: {
   id?: string;
@@ -111,6 +118,8 @@ export function RepositoryPicker({
   value: string;
   /** Runs waiting for an answer, by repository. */
   waiting: ReadonlyMap<string, number>;
+  /** Shown instead of a repository while the value is empty. */
+  placeholder?: string;
   onChange: (repository: string) => void;
 }) {
   const { t } = useTranslation();
@@ -134,6 +143,7 @@ export function RepositoryPicker({
         open={open}
         listId={listId}
         count={count}
+        placeholder={placeholder}
       />
       <PopoverContent align="start" className="w-(--radix-popover-trigger-width) min-w-64 p-0">
         <Command shouldFilter={false} label={t('picker.search', { label })}>

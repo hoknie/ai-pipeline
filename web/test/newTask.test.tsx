@@ -1355,7 +1355,7 @@ describe('new task in several projects', () => {
         'feature',
       ),
     );
-    fireEvent.click(within(dialog).getByRole('switch', { name: 'In several projects' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'In several projects' }));
     return dialog;
   }
 
@@ -1365,8 +1365,18 @@ describe('new task in several projects', () => {
     fireEvent.click(button);
   }
 
-  const pickProject = (dialog: HTMLElement, name: string) =>
-    fireEvent.click(within(dialog).getByRole('checkbox', { name }));
+  async function pickProject(dialog: HTMLElement, name: string) {
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Add project' }));
+    const option = (await screen.findAllByRole('option')).find((item) =>
+      item.textContent?.startsWith(name),
+    );
+    fireEvent.click(option!);
+  }
+
+  const projectNames = (dialog: HTMLElement) =>
+    within(within(dialog).getByRole('list', { name: 'Order of the projects' }))
+      .getAllByRole('listitem')
+      .map((item) => item.querySelector('span.truncate')?.textContent);
 
   it('adds the task to two projects with one request', async () => {
     const add = vi.fn(async () => [
@@ -1376,14 +1386,12 @@ describe('new task in several projects', () => {
     const api = multiMount({ add });
     const dialog = await openMulti();
     // the project of the field is chosen first
-    expect(
-      within(dialog).getByRole<HTMLInputElement>('checkbox', { name: 'app' }).dataset.state,
-    ).toBe('checked');
+    expect(projectNames(dialog)).toEqual(['app']);
     const addButton = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
     expect(addButton.disabled).toBe(true);
-    expect(within(dialog).getByText('Choose at least two projects')).toBeTruthy();
-    pickProject(dialog, 'lib');
+    expect(within(dialog).getAllByText('Choose at least two projects').length).toBeGreaterThan(0);
+    await pickProject(dialog, 'lib');
     await waitFor(() => expect(addButton.disabled).toBe(false));
     fireEvent.click(addButton);
     await waitFor(() => expect(add).toHaveBeenCalledTimes(1));
@@ -1400,7 +1408,7 @@ describe('new task in several projects', () => {
     const add = vi.fn(async () => []);
     multiMount({ add });
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Move lib up' }));
     const order = within(dialog).getByRole('list', { name: 'Order of the projects' });
     expect(
@@ -1414,23 +1422,40 @@ describe('new task in several projects', () => {
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ repositories: [LIB, APP] }));
   });
 
-  it('keeps the first chosen project when the switch is turned off', async () => {
+  it('keeps the first chosen project when the mode is turned off', async () => {
     multiMount();
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Move lib up' }));
-    fireEvent.click(within(dialog).getByRole('switch', { name: 'In several projects' }));
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Email' } });
+    const toggle = within(dialog).getByRole('button', { name: 'In several projects' });
+    fireEvent.click(toggle);
     await waitFor(() =>
       expect(within(dialog).getByRole('combobox', { name: 'Repository' }).textContent).toContain(
         'lib',
       ),
     );
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Email');
+  });
+
+  it('drags a card only by its header row, not by the addition field', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    await pickProject(dialog, 'lib');
+    let node: HTMLElement | null = within(dialog).getByLabelText('Addition for lib');
+    while (node && node.tagName !== 'LI') {
+      expect(node.getAttribute('draggable')).not.toBe('true');
+      node = node.parentElement;
+    }
+    expect(node?.tagName).toBe('LI');
   });
 
   it('offers only the pipelines every chosen project has', async () => {
     multiMount({ app: ['feature', 'fix'], lib: ['feature', 'ui'] });
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     fireEvent.keyDown(await within(dialog).findByRole('combobox', { name: 'Pipeline' }), {
       key: 'Enter',
     });
@@ -1441,7 +1466,7 @@ describe('new task in several projects', () => {
   it('says so when the projects have no pipeline in common and does not add', async () => {
     multiMount({ app: ['feature'], lib: ['docs'] });
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     expect(
       await within(dialog).findByText('The selected projects have no pipeline in common'),
     ).toBeTruthy();
@@ -1455,7 +1480,7 @@ describe('new task in several projects', () => {
     const add = vi.fn(async () => []);
     multiMount({ add });
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     fireEvent.change(within(dialog).getByLabelText('Name'), {
       target: { value: 'Email в профиле' },
     });
@@ -1486,7 +1511,7 @@ describe('new task in several projects', () => {
     const add = vi.fn(async () => []);
     multiMount({ add });
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Title' } });
     const tag = within(dialog).getByLabelText<HTMLInputElement>('Shared tag');
     fireEvent.change(tag, { target: { value: 'mine' } });
@@ -1510,22 +1535,81 @@ describe('new task in several projects', () => {
     expect(within(dialog).queryByText('Parent task')).toBeNull();
   });
 
+  it('puts the button in the title and shows the other view when it is pressed', async () => {
+    multiMount();
+    const dialog = await openDialog();
+    const toggle = within(dialog).getByRole('button', { name: 'In several projects' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(within(dialog).queryByRole('switch', { name: 'In several projects' })).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('dialog', { name: 'New task in several projects' })).toBeTruthy();
+    expect(within(dialog).queryByRole('combobox', { name: 'Repository' })).toBeNull();
+    expect(within(dialog).queryByRole('checkbox', { name: 'lib' })).toBeNull();
+  });
+
+  it('keeps the addition inside the card of the project', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    await pickProject(dialog, 'lib');
+    const card = within(dialog).getByLabelText('Addition for lib').closest('li')!;
+    expect(card.textContent).toContain('lib');
+    expect(within(card).getByRole('button', { name: 'Remove lib' })).toBeTruthy();
+  });
+
+  it('offers only the projects not chosen yet and puts the new one last', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Add project' }));
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]!.textContent).toContain('lib');
+    fireEvent.click(options[0]!);
+    expect(projectNames(dialog)).toEqual(['app', 'lib']);
+    // every project is chosen: nothing to add
+    expect(within(dialog).queryByRole('combobox', { name: 'Add project' })).toBeNull();
+    expect(within(dialog).getByText('The task goes to 2 projects')).toBeTruthy();
+  });
+
+  it('removes a project and offers it again; the only project cannot be removed', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Remove app' }).disabled,
+    ).toBe(true);
+    await pickProject(dialog, 'lib');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove app' }));
+    expect(projectNames(dialog)).toEqual(['lib']);
+    expect(within(dialog).getAllByText('Choose at least two projects').length).toBeGreaterThan(0);
+    expect(
+      within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Remove lib' }).disabled,
+    ).toBe(true);
+    expect(within(dialog).getByRole('combobox', { name: 'Add project' })).toBeTruthy();
+  });
+
+  it('says which project waits for which when the tasks go in turn', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    await pickProject(dialog, 'lib');
+    expect(within(dialog).queryByText('lib waits for app')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'In turn' }));
+    expect(within(dialog).getByText('lib waits for app')).toBeTruthy();
+  });
+
   it('shows the error with the project and keeps what was typed', async () => {
     const add = vi.fn(async () => {
       throw new Error('unknown pipeline `feature` in project `lib`');
     });
     multiMount({ add });
     const dialog = await openMulti();
-    pickProject(dialog, 'lib');
+    await pickProject(dialog, 'lib');
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'Email' } });
     await clickAdd(dialog);
     expect(
       await within(dialog).findByText('unknown pipeline `feature` in project `lib`'),
     ).toBeTruthy();
     expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('Email');
-    expect(
-      within(dialog).getByRole<HTMLInputElement>('checkbox', { name: 'lib' }).dataset.state,
-    ).toBe('checked');
+    expect(projectNames(dialog)).toEqual(['app', 'lib']);
   });
 });
 

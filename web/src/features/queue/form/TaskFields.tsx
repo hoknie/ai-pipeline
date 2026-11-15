@@ -174,7 +174,7 @@ export function TaskFields(props: {
   state: FormState;
   pipelines: PipelinesView | null;
   options: string[];
-  repositoryField: ReactNode;
+  repositoryField?: ReactNode;
   /** Fields under the text of the task. */
   extras?: ReactNode;
   /** The text of the task grows with the column. */
@@ -186,7 +186,7 @@ export function TaskFields(props: {
   return (
     <div className={cn('flex min-w-0 flex-col gap-3', props.fill && 'flex-1')}>
       <fieldset disabled={locked} className="flex min-w-0 flex-col gap-3 border-0 p-0">
-        {props.repositoryField !== undefined ? (
+        {props.repositoryField ? (
           <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor={`${idPrefix}-repository`}>{t('queue.form.repository')}</Label>
             {props.repositoryField}

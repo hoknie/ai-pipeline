@@ -49,7 +49,9 @@ The "Waits for" field also offers the waiting tasks and runs of the other enable
 
 ### One task in several projects
 
-The switch **"In several projects"** in the new task dialog and on the new task page turns "Repository" into a multi-select of enabled projects. The project that was in the field is selected first. The order of selection is shown by numbers and changed by dragging; switching the mode off keeps the first selected project.
+The button **"In several projects"** in the header of the new task dialog and of the new task page switches the form to another view; the title becomes "New task in several projects".
+
+The left half holds what is shared: name, pipeline and variant, text and the shared tag.
 
 - "Add" is available with two or more projects and sends one request, so every project gets its task or none does.
 - "Variant" and the pipeline list offer only pipelines that every selected project has; without any, the form says so and does not add.

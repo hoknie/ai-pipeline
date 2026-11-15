@@ -10,11 +10,14 @@ import { Dialog, DialogContent, DialogTitle } from '../../shared/ui/overlays/dia
 import { QueueForm, emptyDraft, type QueueDraft } from './QueueForm.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { useNewTaskState } from './form/useNewTaskState.ts';
-import { projectsFormProps } from './form/ProjectsFields.tsx';
+import {
+  MultiProjectsToggle,
+  projectsFormProps,
+  type MultiProjects,
+} from './form/ProjectsFields.tsx';
 import { itemLabel } from './list/itemText.ts';
 import { afterOptions, otherQueues } from './queueLinks.ts';
 
-/** The one dialog of a new task: opened from the top strip, the queue page and the palette. */
 type Props = {
   /** Not bound to a repository: the dialog binds it to the repository it picks. */
   api: Api;
@@ -40,6 +43,43 @@ type Props = {
   onExpand?: (repository: string) => void;
 };
 
+function NewTaskHeader({
+  multi,
+  onExpand,
+  target,
+}: {
+  multi: MultiProjects;
+  onExpand: ((repository: string) => void) | undefined;
+  target: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <DialogTitle className="min-w-0">
+        {t(multi.on ? 'queue.multi.title' : 'queue.newTask')}
+      </DialogTitle>
+      <div className="mr-8 flex items-center gap-2">
+        <MultiProjectsToggle multi={multi} />
+        {onExpand ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('queue.page.expand')}
+                onClick={() => onExpand?.(target)}
+              >
+                <Maximize2 />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('queue.page.expand')}</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /** The one dialog of a new task: opened from the top strip, the queue page and the palette. */
 export default function NewTaskDialog(props: Props) {
   const { t } = useTranslation();
@@ -58,25 +98,7 @@ export default function NewTaskDialog(props: Props) {
           focusNewTaskField(mode.current);
         }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <DialogTitle>{t('queue.newTask')}</DialogTitle>
-          {props.onExpand ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="mr-8"
-                  aria-label={t('queue.page.expand')}
-                  onClick={() => props.onExpand?.(target)}
-                >
-                  <Maximize2 />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t('queue.page.expand')}</TooltipContent>
-            </Tooltip>
-          ) : null}
-        </div>
+        <NewTaskHeader multi={state.multi} onExpand={props.onExpand} target={target} />
         <QueueForm
           idPrefix="new"
           draft={current}
@@ -108,6 +130,7 @@ export default function NewTaskDialog(props: Props) {
             target,
             onTarget: setTarget,
             needMore: t('queue.multi.needMore'),
+            repositoryLabel: t('queue.form.repository'),
           })}
           submitLabel={t('queue.add')}
           onDraft={(next) => onDraft({ ...next, repository: next.repository ?? target })}
