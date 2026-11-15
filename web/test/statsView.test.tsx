@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import type { TFunction } from 'i18next';
+
 import {
+  breakdownLabel,
   compactNumber,
   dailySeries,
   isEmpty,
   metricsFor,
+  modelLabel,
   modelOrder,
   nextSort,
   periodSince,
@@ -179,5 +183,68 @@ describe('projects', () => {
 
   it('knows an empty report', () => {
     expect(isEmpty(statsReportView())).toBe(true);
+  });
+});
+
+describe('labels of the breakdown rows', () => {
+  const t = ((key: string) => `<${key}>`) as unknown as TFunction;
+  const make = (key: string, name: string | null) => ({
+    key,
+    name,
+    attempts: 1,
+    inputTokens: 0,
+    outputTokens: 0,
+    tokens: 0,
+    costUsd: null,
+    agentMs: 0,
+    tokensPerAttempt: 0,
+  });
+
+  it('shows the name and keeps the key in the tooltip', () => {
+    expect(breakdownLabel('specialist', make('coder', 'Coder'), t)).toEqual({
+      text: 'Coder',
+      title: 'coder',
+    });
+  });
+
+  it('shows the key of a row without a name', () => {
+    expect(breakdownLabel('pipeline', make('main', null), t)).toEqual({
+      text: 'main',
+      title: undefined,
+    });
+  });
+
+  it('labels the service keys', () => {
+    expect(breakdownLabel('specialist', make('naming', null), t).text).toBe(
+      '<stats.breakdown.keys.naming>',
+    );
+    expect(breakdownLabel('model', make('unknown', null), t).text).toBe(
+      '<stats.breakdown.keys.unknown>',
+    );
+    expect(breakdownLabel('runtime', make('command', null), t)).toEqual({
+      text: '<stats.breakdown.runtimes.command>',
+      title: 'command',
+    });
+    expect(breakdownLabel('runtime', make('other', null), t).text).toBe('other');
+  });
+
+  it('labels the unknown model in the daily series', () => {
+    expect(modelLabel('opus', t)).toBe('opus');
+    const report = statsReportView({
+      series: [
+        day(
+          '2026-06-01',
+          [],
+          [{ model: 'unknown', tokens: 1, costUsd: 0, agentMs: 0, attempts: 1 }],
+        ),
+      ],
+    });
+    const series = dailySeries(report, 'tokens', 'models', {
+      labelOf: (repository) => repository,
+      modelLabelOf: (model) => modelLabel(model, t),
+      colors: {},
+      other: { label: 'Other', color: '#000' },
+    });
+    expect(series[0]).toMatchObject({ key: 'unknown', label: '<stats.breakdown.keys.unknown>' });
   });
 });

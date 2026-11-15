@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  breakdownNames,
   breakdownRows,
   dailySeries,
   dayOf,
@@ -84,6 +85,51 @@ describe('statistics aggregates', () => {
       ['sonnet', 2, 400],
     ]);
     expect(rows[1]?.tokensPerAttempt).toBe(200);
+  });
+
+  it('puts names of the map into the rows and null where there is none', () => {
+    const attempts = [
+      attemptRecord({ specialist: 'coder' }),
+      attemptRecord({ specialist: 'other' }),
+    ];
+    const rows = breakdownRows(
+      attempts,
+      (record) => record.specialist,
+      new Map([['coder', 'Coder']]),
+    );
+    expect(Object.fromEntries(rows.map((row) => [row.key, row.name]))).toEqual({
+      coder: 'Coder',
+      other: null,
+    });
+    expect(breakdownRows(attempts, (record) => record.specialist)[0]?.name).toBeNull();
+  });
+
+  describe('names of a breakdown', () => {
+    const attempt = (repository: string) => attemptRecord({ repository, specialist: 'coder' });
+    const keyOf = (record: { specialist: string }) => record.specialist;
+
+    it('takes the name, but not one equal to the key', () => {
+      const attempts = [attempt('/a')];
+      expect(breakdownNames(attempts, keyOf, () => 'Coder').get('coder')).toBe('Coder');
+      expect(breakdownNames(attempts, keyOf, () => 'coder').has('coder')).toBe(false);
+      expect(breakdownNames(attempts, keyOf, () => null).has('coder')).toBe(false);
+    });
+
+    it('prefers the project with more attempts, then the smaller path', () => {
+      const names = (repository: string) => (repository === '/a' ? 'A' : 'B');
+      const unequal = [attempt('/a'), attempt('/a'), ...[1, 2, 3, 4, 5].map(() => attempt('/b'))];
+      expect(breakdownNames(unequal, keyOf, names).get('coder')).toBe('B');
+      const equal = [attempt('/b'), attempt('/b'), attempt('/a'), attempt('/a')];
+      expect(breakdownNames(equal, keyOf, names).get('coder')).toBe('A');
+    });
+
+    it('tries the next project when the first has no name', () => {
+      const attempts = [attempt('/a'), attempt('/a'), attempt('/b')];
+      const names = breakdownNames(attempts, keyOf, (repository) =>
+        repository === '/b' ? 'B' : undefined,
+      );
+      expect(names.get('coder')).toBe('B');
+    });
   });
 
   it('draws seven days with zeros where nothing happened', () => {

@@ -252,6 +252,7 @@ const SAME_AS_ENGLISH = new Set([
   'Pipelines',
   'Repair',
   'OpenCode',
+  'Antigravity CLI (agy)',
   'Tokens',
   'pipeline {{id}}',
   'Pipeline: {{id}}',

@@ -138,6 +138,16 @@ export const ru: Dictionary = {
         pipeline: 'Pipeline',
         runtime: 'Исполнители',
       },
+      keys: {
+        naming: 'Название запуска',
+        unknown: 'Неизвестная модель',
+      },
+      runtimes: {
+        claude: 'Claude',
+        opencode: 'OpenCode',
+        agy: 'Antigravity CLI (agy)',
+        command: 'Команда',
+      },
     },
     clear: {
       action: 'Очистить статистику: {{name}}',

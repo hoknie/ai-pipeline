@@ -134,6 +134,16 @@ export const en = {
         pipeline: 'Pipeline',
         runtime: 'Runtimes',
       },
+      keys: {
+        naming: 'Run naming',
+        unknown: 'Unknown model',
+      },
+      runtimes: {
+        claude: 'Claude',
+        opencode: 'OpenCode',
+        agy: 'Antigravity CLI (agy)',
+        command: 'Command',
+      },
     },
     clear: {
       action: 'Clear statistics of {{name}}',

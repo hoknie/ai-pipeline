@@ -92,6 +92,8 @@ export function dailySeries(
   split: Split,
   options: {
     labelOf: (repository: string) => string;
+    /** The label of a model; the id by default. */
+    modelLabelOf?: (model: string) => string;
     colors: Record<string, string>;
     other: { label: string; color: string };
   },
@@ -103,7 +105,7 @@ export function dailySeries(
   const keys = [...new Set(report.series.flatMap((day) => entriesOf(day).map((item) => item.key)))];
   const series = keys.map<ChartSeries>((key) => ({
     key,
-    label: split === 'models' ? key : options.labelOf(key),
+    label: split === 'models' ? (options.modelLabelOf?.(key) ?? key) : options.labelOf(key),
     color: options.colors[key] ?? options.other.color,
     values: report.series.map((day) => {
       const found = entriesOf(day).find((item) => item.key === key);
@@ -178,6 +180,35 @@ export function projectValue(
     default:
       return null;
   }
+}
+
+export type BreakdownTab = 'specialist' | 'model' | 'pipeline' | 'runtime';
+
+const UNKNOWN_MODEL = 'unknown';
+const RUNTIMES = ['claude', 'opencode', 'agy', 'command'];
+
+/** The label of a model: the id, «unknown» in words of the panel. */
+export function modelLabel(model: string, t: TFunction): string {
+  return model === UNKNOWN_MODEL ? t('stats.breakdown.keys.unknown' as never) : model;
+}
+
+/** What a row of a breakdown shows: the name, else the label of a service key, else the key; `title` is the key. */
+export function breakdownLabel(
+  tab: BreakdownTab,
+  row: Breakdown,
+  t: TFunction,
+): { text: string; title: string | undefined } {
+  let text = row.name ?? row.key;
+  if (row.name === null) {
+    if (tab === 'specialist' && row.key === 'naming') {
+      text = t('stats.breakdown.keys.naming' as never);
+    } else if (tab === 'model') {
+      text = modelLabel(row.key, t);
+    } else if (tab === 'runtime' && RUNTIMES.includes(row.key)) {
+      text = t(`stats.breakdown.runtimes.${row.key}` as never);
+    }
+  }
+  return { text, title: text === row.key ? undefined : row.key };
 }
 
 /** The value of a column of a table of a breakdown. */

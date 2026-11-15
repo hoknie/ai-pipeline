@@ -138,6 +138,16 @@ export const es: Dictionary = {
         pipeline: 'Pipeline',
         runtime: 'Ejecutores',
       },
+      keys: {
+        naming: 'Nombre de las ejecuciones',
+        unknown: 'Modelo desconocido',
+      },
+      runtimes: {
+        claude: 'Claude',
+        opencode: 'OpenCode',
+        agy: 'Antigravity CLI (agy)',
+        command: 'Comando',
+      },
     },
     clear: {
       action: 'Borrar las estadísticas de {{name}}',

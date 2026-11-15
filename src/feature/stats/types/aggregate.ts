@@ -123,12 +123,14 @@ export function projectRows(
 export function breakdownRows(
   attempts: AttemptRecord[],
   key: (record: AttemptRecord) => string,
+  names?: ReadonlyMap<string, string>,
 ): BreakdownRow[] {
   const rows = [...groupBy(attempts, key)].map(([name, records]) => {
     const inputTokens = sum(records.map((record) => record.inputTokens));
     const outputTokens = sum(records.map((record) => record.outputTokens));
     return {
       key: name,
+      name: names?.get(name) ?? null,
       attempts: records.length,
       inputTokens,
       outputTokens,

@@ -7,7 +7,10 @@ import {
 } from '../../../src/feature/stats/repositories/index.ts';
 import { StatsReportService } from '../../../src/feature/stats/services/index.ts';
 import { dayOf, parseStatsPeriod } from '../../../src/feature/stats/types/index.ts';
-import type { StatsSettings } from '../../../src/feature/swarm-config/types/index.ts';
+import type {
+  ResolvedConfig,
+  StatsSettings,
+} from '../../../src/feature/swarm-config/types/index.ts';
 import { temporaryStorage } from '../storage.ts';
 import { attemptRecord, taskRecord } from './helpers.ts';
 
@@ -21,12 +24,16 @@ const NOW = new Date(2026, 5, 10, 12).getTime();
 function harness(settings: StatsSettings = { enabled: true, exclude: [], showCost: true }) {
   const { database } = temporaryStorage();
   const records = new StatsRecordRepository(database);
-  const state = { settings: settings as StatsSettings | string };
+  const state = {
+    settings: settings as StatsSettings | string,
+    configs: new Map<string, ResolvedConfig | null>(),
+  };
   const service = new StatsReportService({
     reads: new StatsReportRepository(database),
     meta: new StatsMetaRepository(database),
     settings: () => state.settings,
     resolve: async (reference) => reference,
+    config: (repository) => state.configs.get(repository) ?? null,
     now: () => NOW,
   });
   return { records, service, state };
@@ -64,6 +71,72 @@ function addTask(
     }),
   );
 }
+
+function configOf(parts: {
+  specialists?: { slug: string; name: string }[];
+  actions?: { id: string; name: string | null }[];
+  pipelines?: { id: string; name: string | null }[];
+}): ResolvedConfig {
+  return {
+    specialists: parts.specialists ?? [],
+    actions: parts.actions ?? [],
+    pipelines: parts.pipelines ?? [],
+  } as unknown as ResolvedConfig;
+}
+
+function addAttempts(
+  h: ReturnType<typeof harness>,
+  repository: string,
+  count: number,
+  overrides: Partial<Parameters<typeof attemptRecord>[0]>,
+): void {
+  for (let index = 0; index < count; index += 1)
+    h.records.insertAttempts([attemptRecord({ repository, finishedAt: NOW - 1000, ...overrides })]);
+}
+
+describe('names of the breakdown rows', () => {
+  it('names specialists, actions and pipelines from the configuration', async () => {
+    const h = harness();
+    h.state.configs.set(
+      '/work/app',
+      configOf({
+        specialists: [{ slug: 'coder', name: 'Coder' }],
+        actions: [{ id: 'lint', name: 'Linter' }],
+        pipelines: [
+          { id: 'main', name: 'Main flow' },
+          { id: 'plain', name: null },
+        ],
+      }),
+    );
+    addAttempts(h, '/work/app', 1, { specialist: 'coder', pipeline: 'main' });
+    addAttempts(h, '/work/app', 1, { specialist: 'lint', pipeline: 'plain' });
+    addAttempts(h, '/work/app', 1, { specialist: 'gone', pipeline: 'missing' });
+    const report = await h.service.report({});
+    const names = (rows: { key: string; name: string | null }[]) =>
+      Object.fromEntries(rows.map((row) => [row.key, row.name]));
+    expect(names(report.bySpecialist)).toEqual({ coder: 'Coder', lint: 'Linter', gone: null });
+    expect(names(report.byPipeline)).toEqual({ main: 'Main flow', plain: null, missing: null });
+    expect(report.byModel.every((row) => row.name === null)).toBe(true);
+    expect(report.byRuntime.every((row) => row.name === null)).toBe(true);
+  });
+
+  it('takes the name of the project with more attempts', async () => {
+    const h = harness();
+    h.state.configs.set('/work/a', configOf({ specialists: [{ slug: 'coder', name: 'Few' }] }));
+    h.state.configs.set('/work/b', configOf({ specialists: [{ slug: 'coder', name: 'Many' }] }));
+    addAttempts(h, '/work/a', 2, { specialist: 'coder' });
+    addAttempts(h, '/work/b', 5, { specialist: 'coder' });
+    const report = await h.service.report({});
+    expect(report.bySpecialist[0]?.name).toBe('Many');
+  });
+
+  it('falls back to the key when the configuration does not load', async () => {
+    const h = harness();
+    addAttempts(h, '/work/app', 1, { specialist: 'coder' });
+    const report = await h.service.report({});
+    expect(report.bySpecialist[0]).toMatchObject({ key: 'coder', name: null });
+  });
+});
 
 describe('the statistics report', () => {
   it('gives the totals and the means of a project', async () => {

@@ -1,10 +1,18 @@
 import { resolve as resolvePath } from 'node:path';
 
-import type { StatsSettings } from '../../swarm-config/types/index.ts';
+import {
+  findAction,
+  findPipeline,
+  findSpecialist,
+  type ResolvedConfig,
+  type StatsSettings,
+} from '../../swarm-config/types/index.ts';
 import type { StatsMetaRepository, StatsReportRepository } from '../repositories/index.ts';
 import {
+  type AttemptRecord,
   type StatsQuery,
   type StatsReport,
+  breakdownNames,
   breakdownRows,
   dailySeries,
   maskCosts,
@@ -20,6 +28,8 @@ export interface ReportDependencies {
   meta: StatsMetaRepository;
   settings: () => StatsSettings | string;
   resolve: (reference: string) => Promise<string>;
+  /** Configuration of a project; null when it cannot be loaded. */
+  config: (repository: string) => ResolvedConfig | null;
   now: () => number;
 }
 
@@ -52,6 +62,22 @@ export class StatsReportService {
     const attempts = reads.attempts(scope);
     const tasks = reads.tasks(scope);
     const taskAttempts = reads.attemptsOfRuns(tasks.map((task) => task.runId));
+    const configs = new Map<string, ResolvedConfig | null>();
+    const configOf = (project: string): ResolvedConfig | null => {
+      if (!configs.has(project)) configs.set(project, this.dependencies.config(project));
+      return configs.get(project) ?? null;
+    };
+    const specialistKey = (record: AttemptRecord): string => record.specialist;
+    const pipelineKey = (record: AttemptRecord): string => record.pipeline;
+    const specialistNames = breakdownNames(attempts, specialistKey, (project, key) => {
+      const config = configOf(project);
+      if (config === null) return null;
+      return findSpecialist(config, key)?.name ?? findAction(config, key)?.name ?? null;
+    });
+    const pipelineNames = breakdownNames(attempts, pipelineKey, (project, key) => {
+      const config = configOf(project);
+      return config === null ? null : (findPipeline(config, key)?.name ?? null);
+    });
     const end = query.until ?? now();
     const first = query.since ?? reads.firstFinished(exclude);
     const start = first === null ? null : Math.max(first, end - MAX_SERIES_DAYS * DAY_MS);
@@ -69,9 +95,9 @@ export class StatsReportService {
       perTask: perTaskOf(taskAttempts, tasks),
       outcomes: outcomesOf(tasks),
       projects: projectRows(attempts, tasks, taskAttempts),
-      bySpecialist: breakdownRows(attempts, (record) => record.specialist),
+      bySpecialist: breakdownRows(attempts, specialistKey, specialistNames),
       byModel: breakdownRows(attempts, (record) => record.model ?? UNKNOWN_MODEL),
-      byPipeline: breakdownRows(attempts, (record) => record.pipeline),
+      byPipeline: breakdownRows(attempts, pipelineKey, pipelineNames),
       byRuntime: breakdownRows(attempts, (record) => record.runtime),
       series: start === null ? [] : dailySeries(attempts, tasks, start, end),
     };

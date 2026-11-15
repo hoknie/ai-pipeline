@@ -136,6 +136,16 @@ export const zh: Dictionary = {
         pipeline: 'Pipeline',
         runtime: '执行器',
       },
+      keys: {
+        naming: '运行命名',
+        unknown: '未知模型',
+      },
+      runtimes: {
+        claude: 'Claude',
+        opencode: 'OpenCode',
+        agy: 'Antigravity CLI (agy)',
+        command: '命令',
+      },
     },
     clear: {
       action: '清除 {{name}} 的统计',

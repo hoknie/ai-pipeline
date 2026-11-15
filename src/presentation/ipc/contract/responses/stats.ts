@@ -23,6 +23,7 @@ const perTask = z.object({ tokens: stat, costUsd: costStat, agentMs: stat, wallM
 
 const breakdown = z.object({
   key: z.string(),
+  name: z.string().nullable(),
   attempts: number,
   inputTokens: number,
   outputTokens: number,

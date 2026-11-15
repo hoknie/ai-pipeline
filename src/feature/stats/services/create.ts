@@ -3,6 +3,7 @@ import type { RegistryService } from '../../repos/services/index.ts';
 import type { RunStates } from '../../runs/services/index.ts';
 import type { RunState } from '../../runs/types/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
+import { ConfigLoadError } from '../../swarm-config/types/index.ts';
 import {
   StatsMetaRepository,
   StatsRecordRepository,
@@ -66,6 +67,14 @@ export function createStatsServices(dependencies: StatsDependencies): StatsServi
       meta,
       settings,
       resolve,
+      config: (repository) => {
+        try {
+          return config.load(repository);
+        } catch (error) {
+          if (error instanceof ConfigLoadError) return null;
+          throw error;
+        }
+      },
       now,
     }),
   };

@@ -40,8 +40,15 @@ function totalsOf(tokens: number, costUsd: number | null, agentMs: number, tasks
   };
 }
 
-const row = (key: string, tokens: number, costUsd: number | null, agentMs: number) => ({
+const row = (
+  key: string,
+  tokens: number,
+  costUsd: number | null,
+  agentMs: number,
+  name: string | null = null,
+) => ({
   key,
+  name,
   attempts: 2,
   inputTokens: Math.round(tokens * 0.7),
   outputTokens: Math.round(tokens * 0.3),
@@ -307,6 +314,32 @@ describe('daily chart', () => {
     expect(within(legend).getByText('Other')).toBeTruthy();
   });
 
+  it('labels attempts without a model in the model split', async () => {
+    const base = twoProjects();
+    mount({
+      ...base,
+      series: [
+        {
+          ...base.series[0]!,
+          models: [
+            { model: 'unknown', tokens: 5000, costUsd: null, agentMs: 0, attempts: 1 },
+            { model: 'opus', tokens: 3000, costUsd: null, agentMs: 0, attempts: 1 },
+          ],
+        },
+      ],
+    });
+    await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Models' }));
+    const chart = screen.getByRole('group', { name: 'Chart by day: Tokens by model' });
+    const legend = chart.parentElement!.querySelector('ul')! as HTMLElement;
+    expect(within(legend).getByText('Unknown model')).toBeTruthy();
+    expect(within(legend).queryByText('unknown')).toBeNull();
+    fireEvent.focus(chart);
+    const tip = within(screen.getByTestId('chart-tooltip'));
+    expect(tip.getByText('Unknown model')).toBeTruthy();
+    expect(tip.queryByText('unknown')).toBeNull();
+  });
+
   it('switches the metric', async () => {
     mount(twoProjects());
     await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
@@ -377,6 +410,45 @@ describe('tables', () => {
       .slice(1)
       .map((line) => within(line).getAllByRole('cell')[0]?.textContent);
     expect(names).toEqual(['opus', 'sonnet']);
+  });
+
+  it('shows names of the breakdown rows, labels service keys and sorts by the shown text', async () => {
+    mount(
+      twoProjects({
+        bySpecialist: [
+          row('coder', 100_000, 1.2, 150, 'Zed coder'),
+          row('naming', 50_000, 0.1, 10),
+          row('plain', 10_000, 0.1, 10),
+        ],
+        byModel: [row('unknown', 5_000, 0.1, 10), row('opus', 20_000, 5.0, 50)],
+        byRuntime: [row('command', 1_000, null, 10), row('claude', 99_000, 1, 10)],
+      }),
+    );
+    await screen.findByRole('table', { name: 'Projects' });
+    const names = (table: HTMLElement) =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((line) => within(line).getAllByRole('cell')[0]?.textContent);
+    const specialists = await screen.findByRole('table', { name: 'Specialists' });
+    expect(names(specialists)).toEqual(['Zed coder', 'Run naming', 'plain']);
+    expect(within(specialists).getByText('Zed coder').getAttribute('title')).toBe('coder');
+    fireEvent.click(within(specialists).getByRole('button', { name: 'Name' }));
+    expect(names(specialists)).toEqual(['plain', 'Run naming', 'Zed coder']);
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Models' }), { button: 0, ctrlKey: false });
+    expect(names(await screen.findByRole('table', { name: 'Models' }))).toEqual([
+      'opus',
+      'Unknown model',
+    ]);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Runtimes' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(names(await screen.findByRole('table', { name: 'Runtimes' }))).toEqual([
+      'Claude',
+      'Command',
+    ]);
   });
 });
 

@@ -13,6 +13,7 @@ import {
   durationText,
   METRICS,
   metricsFor,
+  modelLabel,
   modelOrder,
   money,
   SPLITS,
@@ -81,6 +82,7 @@ export function DailyChart({ report }: { report: StatsReportView }) {
       : [...new Set(report.series.flatMap((day) => day.projects.map((entry) => entry.repository)))];
   const series = dailySeries(report, metric, split, {
     labelOf: repositoryLabel,
+    modelLabelOf: (model) => modelLabel(model, t),
     colors: assignColors(keys, split === 'models' ? () => null : repositoryColor),
     other: { label: t('stats.daily.other'), color: NEUTRAL_COLOR },
   });

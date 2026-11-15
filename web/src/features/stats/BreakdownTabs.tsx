@@ -6,7 +6,9 @@ import { Card } from '../../shared/ui/layout/card.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../shared/ui/layout/tabs.tsx';
 import { StatsTable, type StatsColumn } from './StatsTable.tsx';
 import {
+  breakdownLabel,
   breakdownValue,
+  type BreakdownTab,
   compactNumber,
   durationText,
   money,
@@ -36,8 +38,15 @@ export function BreakdownTabs({ report }: { report: StatsReportView }) {
     numeric: true,
     cell: text,
   });
-  const columns: StatsColumn<Row>[] = [
-    { key: 'name', label: t('stats.breakdown.name'), cell: (row) => row.key },
+  const columnsOf = (tabId: BreakdownTab): StatsColumn<Row>[] => [
+    {
+      key: 'name',
+      label: t('stats.breakdown.name'),
+      cell: (row) => {
+        const { text, title } = breakdownLabel(tabId, row, t);
+        return title === undefined ? text : <span title={title}>{text}</span>;
+      },
+    },
     number('attempts', t('stats.breakdown.attempts'), (row) => String(row.attempts)),
     number('input', t('stats.breakdown.input'), (row) => compactNumber(row.inputTokens)),
     number('output', t('stats.breakdown.output'), (row) => compactNumber(row.outputTokens)),
@@ -53,6 +62,8 @@ export function BreakdownTabs({ report }: { report: StatsReportView }) {
       compactNumber(row.tokensPerAttempt),
     ),
   ];
+  const valueOf = (tabId: BreakdownTab) => (row: Row, key: string) =>
+    key === 'name' ? breakdownLabel(tabId, row, t).text : breakdownValue(row, key);
   return (
     <Card className="p-4">
       <Tabs value={tab} onValueChange={setTab}>
@@ -67,8 +78,8 @@ export function BreakdownTabs({ report }: { report: StatsReportView }) {
           <TabsContent key={id} value={id}>
             <StatsTable<Row>
               caption={t(`stats.breakdown.tabs.${id}`)}
-              columns={columns}
-              rows={sortRows(rows(report), sort, breakdownValue)}
+              columns={columnsOf(id)}
+              rows={sortRows(rows(report), sort, valueOf(id))}
               sort={sort}
               onSort={(key) => setSort((current) => nextSort(current, key))}
               rowKey={(row) => row.key}

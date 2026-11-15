@@ -51,6 +51,8 @@ export interface ProjectRow {
 
 export interface BreakdownRow {
   key: string;
+  /** Display name from the configuration of the projects; null when there is none. */
+  name: string | null;
   attempts: number;
   inputTokens: number;
   outputTokens: number;

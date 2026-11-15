@@ -86,7 +86,11 @@ function sampleReport(): StatsReport {
     perTask: perTaskOf(attempts, tasks),
     outcomes: outcomesOf(tasks),
     projects: projectRows(attempts, tasks, attempts),
-    bySpecialist: breakdownRows(attempts, (record) => record.specialist),
+    bySpecialist: breakdownRows(
+      attempts,
+      (record) => record.specialist,
+      new Map([['coder', 'Coder']]),
+    ),
     byModel: breakdownRows(attempts, (record) => record.model ?? 'unknown'),
     byPipeline: breakdownRows(attempts, (record) => record.pipeline),
     byRuntime: breakdownRows(attempts, (record) => record.runtime),
