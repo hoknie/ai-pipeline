@@ -61,6 +61,7 @@ function mount(
   globalQueue: GlobalQueueView | null,
   api: Partial<Api> = {},
   tags: ReturnType<typeof tagView>[] = [],
+  colors: { app: string | null; lib: string | null } = { app: null, lib: null },
 ) {
   const fake = fakeApi({ queue: vi.fn(async () => queueOf({ repository: APP })), ...api });
   render(<App api={fake as Api} openStream={openFake} />);
@@ -71,7 +72,10 @@ function mount(
       runs: [runView({ id: 'a1', repository: APP })],
       queues: globalQueue ? [] : [queueOf({ repository: APP })],
       ...(globalQueue ? { globalQueue } : {}),
-      repositories: [repositoryView(APP), repositoryView(LIB)],
+      repositories: [
+        repositoryView(APP, { color: colors.app }),
+        repositoryView(LIB, { color: colors.lib }),
+      ],
       tags,
     });
   });
@@ -238,15 +242,20 @@ describe('page of the global queue', () => {
         { ...tagView('app-only'), id: 'c', repository: APP, color: 'red' },
         { ...tagView('lib-only'), id: 'd', repository: LIB, color: 'blue' },
       ],
+      { app: 'green', lib: 'violet' },
     );
     const block = within(await screen.findByLabelText('take filter'));
-    expect(block.getByTitle('app').className).toContain('bg-[#fee2e2]');
-    expect(block.getByTitle('lib').className).toContain('bg-[#dbeafe]');
+    expect(block.getByTitle('app').className).toContain('bg-[#22c55e]');
+    expect(block.getByTitle('lib').className).toContain('bg-[#8b5cf6]');
     expect(block.getByTitle('app · lib').textContent).toBe('shared');
     fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
     const shared = await screen.findByRole('option', { name: /^shared/ });
-    expect(shared.querySelector('[title="app"]')?.className).toContain('bg-[#fee2e2]');
-    expect(shared.querySelector('[title="lib"]')?.className).toContain('bg-[#dbeafe]');
+    expect(shared.querySelector('[title="app"] [data-project-color]')?.className).toContain(
+      'bg-[#22c55e]',
+    );
+    expect(shared.querySelector('[title="lib"] [data-project-color]')?.className).toContain(
+      'bg-[#8b5cf6]',
+    );
     expect(block.getByTitle('app · lib')).toBeTruthy();
     fireEvent.keyDown(document.body, { key: 'Escape' });
     fireEvent.click(block.getByRole('combobox', { name: 'Projects' }));
@@ -259,6 +268,26 @@ describe('page of the global queue', () => {
     expect(
       screen.getByRole('option', { name: /^shared/ }).querySelector('[title="app"]'),
     ).toBeNull();
+  });
+
+  it('draws a gray dot for a project without a color in the selection and in the list', async () => {
+    mount(
+      globalOf({ filter: { pipelines: [], projects: [], tags: ['shared'] } as never }),
+      {},
+      [
+        { ...tagView('shared'), id: 'a', repository: APP, color: 'red' },
+        { ...tagView('shared'), id: 'b', repository: LIB, color: 'blue' },
+      ],
+      { app: null, lib: 'violet' },
+    );
+    const block = within(await screen.findByLabelText('take filter'));
+    expect(block.getByTitle('app').className).toContain('bg-[#6b7280]');
+    expect(block.getByTitle('lib').className).toContain('bg-[#8b5cf6]');
+    fireEvent.click(await block.findByRole('combobox', { name: 'Tags' }));
+    const shared = await screen.findByRole('option', { name: /^shared/ });
+    expect(shared.querySelector('[title="app"] [data-project-color]')?.className).toContain(
+      'bg-[#6b7280]',
+    );
   });
 
   it('finds a tag by the name of its project', async () => {
@@ -329,7 +358,10 @@ describe('page of the global queue', () => {
           <GlobalTakeFilter
             api={fakeApi() as Api}
             queue={globalOf({ filter: { projects, tags: [], pipelines: [] } as never })}
-            projects={[repositoryView(APP), repositoryView(LIB)]}
+            projects={[
+              repositoryView(APP, { color: 'green' }),
+              repositoryView(LIB, { color: 'violet' }),
+            ]}
             pipelines={pipelines}
             onQueue={() => {}}
             onError={() => {}}
@@ -351,8 +383,12 @@ describe('page of the global queue', () => {
         expect(within(shared).queryByText('app · lib')).toBeNull();
         expect(within(shared).getAllByText('app')).toHaveLength(1);
         expect(within(shared).getAllByText('lib')).toHaveLength(1);
-        expect(within(shared).getByText('app').className).toContain('bg-[#fee2e2]');
-        expect(within(shared).getByText('lib').className).toContain('bg-[#dbeafe]');
+        expect(
+          within(shared).getByText('app').querySelector('[data-project-color]')?.className,
+        ).toContain('bg-[#22c55e]');
+        expect(
+          within(shared).getByText('lib').querySelector('[data-project-color]')?.className,
+        ).toContain('bg-[#8b5cf6]');
         expect(shared.querySelector('a')).toBeNull();
       }
       fireEvent.keyDown(document.body, { key: 'Escape' });

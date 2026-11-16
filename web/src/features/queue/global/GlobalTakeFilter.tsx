@@ -10,7 +10,7 @@ import type {
   TagView,
 } from '../../../shared/api/types.ts';
 import { useTags } from '../../../shared/lib/catalog/tags.tsx';
-import { TAG_CLASSES } from '../../../shared/lib/catalog/tagColors.ts';
+import { ProjectDot, PROJECT_DOT_CLASSES } from '../../../shared/ui/feedback/ProjectDot.tsx';
 import { FilterField, type FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { FilterBlock } from '../filter/FilterBlock.tsx';
 
@@ -35,7 +35,7 @@ function pipelineOptions(
   ];
 }
 
-type TagEntry = { project: string; tag: TagView };
+type TagEntry = { project: string; color: string | null; tag: TagView };
 const tagKey = (name: string) => name.toLocaleLowerCase('und');
 
 function groupedTags(projects: readonly RepositoryView[], tags: TagView[]) {
@@ -43,30 +43,35 @@ function groupedTags(projects: readonly RepositoryView[], tags: TagView[]) {
   for (const project of projects) {
     for (const tag of tags.filter((item) => item.repository === project.path)) {
       const key = tagKey(tag.name);
-      groups.set(key, [...(groups.get(key) ?? []), { project: project.label, tag }]);
+      groups.set(key, [
+        ...(groups.get(key) ?? []),
+        { project: project.label, color: project.color ?? null, tag },
+      ]);
     }
   }
   return groups;
 }
 
 function markers(entries: TagEntry[]) {
-  return entries.map(({ project, tag }, index) => (
+  return entries.map(({ project, color }, index) => (
     <span
       key={`${project}:${index}`}
       title={project}
       aria-label={project}
-      className={`inline-block size-3 rounded-full ${TAG_CLASSES[tag.color] ?? TAG_CLASSES.gray}`}
+      data-project-color={color ?? 'gray'}
+      className={`inline-block size-3 rounded-full ${PROJECT_DOT_CLASSES[color ?? 'gray'] ?? PROJECT_DOT_CLASSES.gray}`}
     />
   ));
 }
 
 function labeledMarkers(entries: TagEntry[]) {
-  return entries.map(({ project, tag }, index) => (
+  return entries.map(({ project, color }, index) => (
     <span
       key={`${project}:${index}`}
       title={project}
-      className={`inline-flex rounded px-1 text-xs ${TAG_CLASSES[tag.color] ?? TAG_CLASSES.gray}`}
+      className="inline-flex items-center gap-1 rounded border px-1 text-xs"
     >
+      <ProjectDot color={color ?? 'gray'} />
       {project}
     </span>
   ));
