@@ -6,6 +6,7 @@ import type { ConfigEditorResponse, SettingValue } from '../../../api/types.ts';
 import { notifySuccess } from '../../../lib/browser/notify.ts';
 import type { SettingsScope } from '../../../lib/nav/settingsGroups.ts';
 import { INHERIT, type DraftValue } from './SettingField.tsx';
+import { poolProblems, poolsToValue, type PoolDraft } from './poolsDraft.ts';
 
 export type Drafts = Record<string, DraftValue>;
 
@@ -15,6 +16,8 @@ function fieldPathOf(path: string, known: ReadonlySet<string>): string | null {
   if (known.has(bare)) return bare;
   const overrides = /^(claude|opencode|agy)\.overrides\./.exec(bare);
   if (overrides && known.has(`${overrides[1]}.overrides`)) return `${overrides[1]}.overrides`;
+  if (bare.startsWith('queue.default_pool') && known.has('queue.default_pool.max'))
+    return 'queue.default_pool.max';
   const env = /^(runtimes\.[a-z]+\.env)\./.exec(bare);
   return env && known.has(env[1] as string) ? (env[1] as string) : null;
 }
@@ -25,15 +28,17 @@ const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.st
 function splitErrors(
   errors: { path: string; message: string }[],
   known: ReadonlySet<string>,
-): { fields: Map<string, string>; others: string[] } {
+): Pick<Outcome, 'fields' | 'others' | 'errors'> {
   const fields = new Map<string, string>();
   const others: string[] = [];
   for (const error of errors) {
+    // The errors of the pools are shown at the pool and the selector, not on the card.
+    if (/^swarm\.queue\.pools(\.|\[|$)/.test(error.path) && known.has('queue.pools')) continue;
     const path = fieldPathOf(error.path, known);
     if (path === null) others.push(`${error.path}: ${error.message}`);
     else if (!fields.has(path)) fields.set(path, error.message);
   }
-  return { fields, others };
+  return { fields, others, errors: [...errors] };
 }
 
 /** The values to write: «inherit» and an empty list remove the key. */
@@ -41,7 +46,11 @@ function valuesOf(drafts: Drafts): Record<string, SettingValue> {
   const values: Record<string, SettingValue> = {};
   for (const [path, draft] of Object.entries(drafts)) {
     const value = draft === INHERIT ? null : draft;
-    values[path] = Array.isArray(value) && value.length === 0 ? null : value;
+    if (path === 'queue.pools') {
+      values[path] = poolsToValue((value ?? []) as PoolDraft[]);
+      continue;
+    }
+    values[path] = Array.isArray(value) && value.length === 0 ? null : (value as SettingValue);
   }
   return values;
 }
@@ -52,11 +61,27 @@ interface Outcome {
   failure: string | null;
   fields: Map<string, string>;
   others: string[];
+  /** The errors of the last write as the daemon reported them. */
+  errors: { path: string; message: string }[];
 }
-const NO_OUTCOME: Outcome = { conflict: null, failure: null, fields: new Map(), others: [] };
+const NO_OUTCOME: Outcome = {
+  conflict: null,
+  failure: null,
+  fields: new Map(),
+  others: [],
+  errors: [],
+};
 
-function parseJsonDrafts(drafts: Drafts, config: ConfigEditorResponse, message: string) {
+function parseJsonDrafts(
+  drafts: Drafts,
+  config: ConfigEditorResponse,
+  message: string,
+  poolsMessage: string,
+) {
   const fields = new Map<string, string>();
+  const pools = drafts['queue.pools'];
+  if (Array.isArray(pools) && poolProblems(pools as PoolDraft[]).length > 0)
+    fields.set('queue.pools', poolsMessage);
   const parsed = { ...drafts };
   for (const [path, value] of Object.entries(drafts)) {
     if (config.settings.find((field) => field.path === path)?.kind !== 'json' || value === INHERIT)
@@ -121,7 +146,8 @@ export function useSettingsDraft({
     setOutcome(NO_OUTCOME);
   };
   const save = async () => {
-    const { parsed, fields } = parseJsonDrafts(drafts, config, t('settingsPage.invalidJson'));
+    const messages = [t('settingsPage.invalidJson'), t('settingsPage.pools.invalid')] as const;
+    const { parsed, fields } = parseJsonDrafts(drafts, config, ...messages);
     if (fields.size > 0) {
       setOutcome({ ...NO_OUTCOME, fields });
       return;
@@ -150,5 +176,6 @@ export function useSettingsDraft({
       setBusy(false);
     }
   };
-  return { ...outcome, drafts, busy, dirty, errorOf, change, clear, discard, save };
+  const poolErrors = [...outcome.errors, ...config.errors];
+  return { ...outcome, poolErrors, drafts, busy, dirty, errorOf, change, clear, discard, save };
 }

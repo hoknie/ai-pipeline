@@ -1543,6 +1543,30 @@ export const zh: Dictionary = {
   },
   settingsPage: {
     invalidJson: '请输入有效的 JSON 对象。',
+    pools: {
+      name: '池',
+      max: '最多',
+      remove: '删除池',
+      add: '添加池',
+      selectors: '选择器',
+      nameHint: '简短名称，例如代理或提供商。',
+      maxHint: '同时运行的尝试数，1 到 32。',
+      selectorsHint:
+        '池接收哪些尝试：claude、agy、opencode、opencode:提供商/模型 或 opencode:google/*（末尾的 * 表示前缀）。',
+      empty: '还没有池：所有尝试共用一个配额。添加池可单独限制某个代理或模型。',
+      invalid: '保存前请先修正这些池。',
+      refuse: { overlap: '该选择器与池“{{pool}}”的“{{selector}}”重叠。' },
+      problem: {
+        emptyName: '池需要名称。',
+        duplicateName: '该名称已被其他池使用。',
+        noMembers: '至少添加一个选择器。',
+        duplicateMember: '该选择器在此池中重复。',
+        max: '上限为 1 到 32 的整数。',
+        format: '请使用 claude、agy、opencode 或 opencode:提供商/模型（末尾的 * 表示前缀）。',
+        noModel: '请在提供商后写出模型，例如 opencode:google/*。',
+        overlap: '该选择器与另一个池的选择器重叠。',
+      },
+    },
     groups: '设置分组',
     beta: 'beta',
     betaHint: '仍在开发中：行为和设置可能会变化',
@@ -1686,6 +1710,7 @@ export const zh: Dictionary = {
       system_network: '网络',
       system_stats: '统计',
       queue_queue: '队列',
+      queue_pools: '执行器池',
       system_attachments: '附件',
     },
     field: {
@@ -1762,7 +1787,15 @@ export const zh: Dictionary = {
       },
       queue_max: {
         label: '同时工作的代理数',
-        hint: '两种队列模式下本机同时工作的代理尝试上限。配额池（queue.pools）在 settings.yaml 中设置。',
+        hint: '两种队列模式下本机同时工作的代理尝试上限。',
+      },
+      queue_pools: {
+        label: '执行器池',
+        hint: '按代理和模型划分的尝试配额。每个池同时最多占用其上限，不会借出名额；不属于任何池的尝试共用下面的配额。各池上限之和可以不同于 queue.max。已在运行的尝试不会因修改而被中断。',
+      },
+      queue_default_pool_max: {
+        label: '其余尝试',
+        hint: '不属于任何池的尝试同时工作的上限。与池一起保存。',
       },
       stats_enabled: {
         label: '收集统计',

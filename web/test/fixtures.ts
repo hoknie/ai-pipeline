@@ -590,6 +590,8 @@ const SETTING_SPECS: SettingSpec[] = [
   ['attachments.s3.path_style', 'boolean', false, { globalOnly: true }],
   ['queue.scope', 'choice', 'project', { options: ['project', 'global'], globalOnly: true }],
   ['queue.max', 'integer', 5, { range: [1, 32], globalOnly: true }],
+  ['queue.pools', 'pools', {}, { globalOnly: true }],
+  ['queue.default_pool.max', 'integer', null, { range: [1, 32], globalOnly: true }],
   ['stats.enabled', 'boolean', true, { globalOnly: true }],
   ['stats.exclude', 'strings', [], { globalOnly: true }],
   ['runtimes.claude.enabled', 'boolean', false, { globalOnly: true }],

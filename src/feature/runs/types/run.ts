@@ -340,10 +340,10 @@ export interface SpecialistUse {
 }
 
 export interface StepProgress {
-  /** Steps reached by all work groups; a return to an earlier step does not lower it. */
+  /** Passes of steps made by all work groups; a step repeated after a return counts again. */
   done: number;
-  /** Steps of all work groups; 0 while the task is split. */
+  /** Passes made plus the path ahead, returns included; 0 while the task is split. */
   total: number;
-  /** Step of the only group, counted from one; null with several groups or when all steps are passed. */
+  /** Step of the only group; number is the ordinal of its pass, from one; null with several groups or when all steps are passed. */
   current: { step: string; name: string; number: number } | null;
 }

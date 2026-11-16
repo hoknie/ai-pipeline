@@ -1606,6 +1606,32 @@ export const es: Dictionary = {
   },
   settingsPage: {
     invalidJson: 'Introduzca un objeto JSON válido.',
+    pools: {
+      name: 'Grupo',
+      max: 'Máximo',
+      remove: 'Quitar grupo',
+      add: 'Añadir grupo',
+      selectors: 'Selectores',
+      nameHint: 'Un nombre corto, por ejemplo el agente o el proveedor.',
+      maxHint: 'Intentos a la vez, de 1 a 32.',
+      selectorsHint:
+        'Qué intentos toma el grupo: claude, agy, opencode, opencode:proveedor/modelo u opencode:google/* (un * final es un prefijo).',
+      empty:
+        'Aún no hay grupos: todos los intentos comparten una cuota. Añada un grupo para limitar un agente o un modelo por separado.',
+      invalid: 'Corrija los grupos antes de guardar.',
+      refuse: { overlap: 'El selector se solapa con «{{selector}}» del grupo «{{pool}}».' },
+      problem: {
+        emptyName: 'El grupo necesita un nombre.',
+        duplicateName: 'Otro grupo ya usa este nombre.',
+        noMembers: 'Añada al menos un selector.',
+        duplicateMember: 'El selector se repite en este grupo.',
+        max: 'El límite es un entero de 1 a 32.',
+        format:
+          'Use claude, agy, opencode u opencode:proveedor/modelo (un * final marca un prefijo).',
+        noModel: 'Indique un modelo tras el proveedor, por ejemplo opencode:google/*.',
+        overlap: 'El selector se solapa con un selector de otro grupo.',
+      },
+    },
     groups: 'grupos de ajustes',
     beta: 'beta',
     betaHint: 'aún en desarrollo: el comportamiento y los ajustes pueden cambiar',
@@ -1765,6 +1791,7 @@ export const es: Dictionary = {
       system_network: 'Red',
       system_stats: 'Estadísticas',
       queue_queue: 'Cola',
+      queue_pools: 'Grupos de ejecutores',
       system_attachments: 'Adjuntos',
     },
     field: {
@@ -1913,7 +1940,15 @@ export const es: Dictionary = {
       },
       queue_max: {
         label: 'Agentes a la vez',
-        hint: 'Máximo de intentos de agentes a la vez en la máquina, en ambos modos de la cola. Los grupos de cuotas (queue.pools) se definen en settings.yaml.',
+        hint: 'Máximo de intentos de agentes a la vez en la máquina, en ambos modos de la cola.',
+      },
+      queue_pools: {
+        label: 'Grupos de ejecutores',
+        hint: 'Cuotas de intentos por agente y modelo. Un grupo toma como máximo su límite a la vez y no presta plazas; los intentos fuera de todo grupo comparten la cuota de abajo. La suma de los límites puede diferir de queue.max. Los intentos en curso no se interrumpen al cambiar.',
+      },
+      queue_default_pool_max: {
+        label: 'Otros intentos',
+        hint: 'Máximo de intentos a la vez que no toma ningún grupo. Se guarda junto con los grupos.',
       },
       stats_enabled: {
         label: 'Recopilar estadísticas',

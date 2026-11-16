@@ -142,6 +142,13 @@ function sectionValues(
     ['attachments.s3.path_style', attachments.s3.pathStyle],
     ['queue.scope', queue.scope],
     ['queue.max', queue.max],
+    [
+      'queue.pools',
+      Object.fromEntries(
+        queue.pools.map((pool) => [pool.name, { max: pool.max, members: pool.members }]),
+      ),
+    ],
+    ['queue.default_pool.max', queue.defaultPool?.max ?? null],
     ['stats.enabled', stats.enabled],
     ['stats.exclude', stats.exclude],
   ];

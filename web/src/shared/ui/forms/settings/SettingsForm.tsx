@@ -11,6 +11,8 @@ import { Button } from '../button.tsx';
 import { Card } from '../../layout/card.tsx';
 
 import { EnvEditor } from './EnvEditor.tsx';
+import { PoolsField } from './PoolsField.tsx';
+import type { PoolDraft } from './poolsDraft.ts';
 import { INHERIT, SettingField, savedValue } from './SettingField.tsx';
 import { SETTINGS_SECTIONS, type SettingsSection } from './settingFields.ts';
 import { specialistOptions, type SpecialistOption } from '../../../lib/specialistLabels.ts';
@@ -130,6 +132,35 @@ function SectionCards({
   );
 }
 
+/** The pools of the queue and the default pool, kept in one draft with the rest of the form. */
+function PoolsCard({
+  field,
+  fallback,
+  draft,
+}: {
+  field: EditorSetting;
+  fallback: EditorSetting | undefined;
+  draft: Draft;
+}) {
+  const pools = draft.drafts['queue.pools'];
+  const other = draft.drafts['queue.default_pool.max'];
+  const shown = other === undefined ? (fallback?.written.global ?? fallback?.value) : other;
+  return (
+    <PoolsField
+      setting={field}
+      fallback={fallback}
+      drafts={Array.isArray(pools) ? (pools as PoolDraft[]) : undefined}
+      defaultValue={typeof shown === 'number' ? shown : null}
+      errors={draft.poolErrors}
+      error={draft.fields.get('queue.pools') ?? null}
+      defaultError={draft.errorOf('queue.default_pool.max')}
+      disabled={draft.busy}
+      onPools={(next, saved) => draft.change('queue.pools', next, saved)}
+      onDefault={(value, saved) => draft.change('queue.default_pool.max', value, saved)}
+    />
+  );
+}
+
 /** The fields of one card. */
 function SectionFields({
   fields,
@@ -148,8 +179,12 @@ function SectionFields({
   draft: Draft;
   s3Disabled?: boolean;
 }) {
+  const defaultPool = fields.find((field) => field.path === 'queue.default_pool.max');
   return fields.map((field) =>
-    field.kind === 'env' ? (
+    field.path === 'queue.default_pool.max' &&
+    fields.some((other) => other.kind === 'pools') ? null : field.kind === 'pools' ? (
+      <PoolsCard key={field.path} field={field} fallback={defaultPool} draft={draft} />
+    ) : field.kind === 'env' ? (
       <EnvEditor
         key={field.path}
         field={field}

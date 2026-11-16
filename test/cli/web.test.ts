@@ -2064,6 +2064,32 @@ describe('aip web batch settings', () => {
     expect(readFileSync(file, 'utf8')).toBe(text);
   });
 
+  it('writes the queue pools with the default pool and refuses a list', async () => {
+    h = await harness(MANUAL_CONFIG);
+    web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });
+    const base = `http://127.0.0.1:${web.port}`;
+    const file = join(h.environment.XDG_CONFIG_HOME ?? '', 'aip', 'settings.yaml');
+    const pools = { claude: { max: 2, members: ['claude'] } };
+
+    const list = await putSettings(web, base, { values: { 'queue.pools': ['x'] }, revision: null });
+    expect(list.status).toBe(400);
+
+    const alone = await putSettings(web, base, {
+      values: { 'queue.pools': pools },
+      revision: null,
+    });
+    expect(alone.status).toBe(422);
+
+    const done = await putSettings(web, base, {
+      values: { 'queue.pools': pools, 'queue.default_pool.max': 3 },
+      revision: null,
+    });
+    expect(done.status).toBe(200);
+    const text = readFileSync(file, 'utf8');
+    expect(text).toContain('pools:');
+    expect(text).toContain('default_pool:');
+  });
+
   it('writes a variable of a runtime and never returns its value', async () => {
     h = await harness(MANUAL_CONFIG);
     web = await startWebServer({ socket: h.socket, port: 0, repository: h.repo });

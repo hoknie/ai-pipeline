@@ -72,7 +72,10 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
       paths: ['delivery.resolver', 'delivery.resolver_rounds', 'delivery.resolver_prompt'],
     },
   ],
-  queue: [{ key: 'queue', paths: ['queue.scope', 'queue.max'] }],
+  queue: [
+    { key: 'queue', paths: ['queue.scope', 'queue.max'] },
+    { key: 'pools', paths: ['queue.pools', 'queue.default_pool.max'] },
+  ],
   runtimes: [
     {
       key: 'claude',

@@ -83,6 +83,7 @@ export type SettingKind =
   | 'strings'
   | 'specialist'
   | 'env'
+  | 'pools'
   | 'json';
 
 /** A value the editor writes into settings.yaml; null removes the field. */

@@ -28,7 +28,12 @@ import {
   type WriteLevel,
   type SettingValue,
 } from '../types/editor.ts';
-import { isEnvVariable, SETTING_FIELDS, settingFieldOf } from '../types/setting-fields.ts';
+import {
+  isEnvVariable,
+  isObjectSetting,
+  SETTING_FIELDS,
+  settingFieldOf,
+} from '../types/setting-fields.ts';
 
 /** Text of settings.yaml with one field set (or removed); comments and other keys survive. */
 export function editSetting(
@@ -57,10 +62,11 @@ export function editSetting(
     document.contents = document.createNode({}) as never;
   }
   if (value === null) {
-    document.deleteIn(keys);
-    const parent = document.getIn(keys.slice(0, -1), true);
-    if (keys.length > 1 && isMap(parent) && parent.items.length === 0) {
-      document.deleteIn(keys.slice(0, -1));
+    if (document.hasIn(keys)) document.deleteIn(keys);
+    for (let depth = keys.length - 1; depth >= 1; depth -= 1) {
+      const parent = document.getIn(keys.slice(0, depth), true);
+      if (!isMap(parent) || parent.items.length > 0) break;
+      document.deleteIn(keys.slice(0, depth));
     }
   } else {
     document.setIn(keys, value);
@@ -83,6 +89,13 @@ function settingTypeError(
   switch (setting.kind) {
     case 'json':
       return isMapping(value) ? null : fail('must be an object');
+    case 'pools': {
+      if (!isMapping(value)) return fail('must be an object');
+      for (const [name, pool] of Object.entries(value)) {
+        if (!isMapping(pool)) return fail('must be an object', `.${name}`);
+      }
+      return null;
+    }
     case 'boolean':
       return typeof value === 'boolean' ? null : fail('must be true or false');
     case 'choice': {
@@ -183,9 +196,7 @@ export function planSettings(paths: ConfigPaths, request: SettingsRequest): Edit
   try {
     for (const [path, value] of entries) {
       const next =
-        settingFieldOf(path)?.kind === 'json' && isMapping(value) && Object.keys(value).length === 0
-          ? null
-          : value;
+        isObjectSetting(path) && isMapping(value) && Object.keys(value).length === 0 ? null : value;
       text = editSetting(text, path, next);
     }
   } catch (error) {

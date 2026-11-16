@@ -76,6 +76,33 @@ describe('ValuesPicker', () => {
     expect(screen.getAllByRole('button', { name: 'Remove npm run check' })).toHaveLength(1);
   });
 
+  it('refuses a value that validate rejects, keeps the text and shows the reason', async () => {
+    const onChange = vi.fn();
+    const validate = (value: string) => (value.startsWith('x') ? null : 'must start with x');
+    render(<Harness validate={validate} onChange={onChange} />);
+    const input = (await search()) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('abc');
+    expect(screen.getByRole('alert').textContent).toBe('must start with x');
+    fireEvent.change(input, { target: { value: 'xyz' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenLastCalledWith(['xyz']);
+  });
+
+  it('adds the accepted lines of a paste and reports the refused one', async () => {
+    const validate = (value: string) => (value === 'bad' ? 'no' : null);
+    render(<Harness validate={validate} />);
+    const input = await search();
+    fireEvent.paste(input, { clipboardData: { getData: () => 'a\nbad\nb' } });
+    expect(screen.getByRole('button', { name: 'Remove a' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remove b' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Remove bad' })).toBeNull();
+    expect(screen.getByRole('alert').textContent).toBe('no');
+  });
+
   it('does not offer a free value when not creatable', async () => {
     render(<Harness options={OPTIONS} creatable={false} />);
     const input = await search();

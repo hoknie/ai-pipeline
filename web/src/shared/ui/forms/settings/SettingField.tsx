@@ -12,13 +12,14 @@ import { ValuesPicker } from '../ValuesPicker.tsx';
 import { ModelSettingControl } from './ModelSettingControl.tsx';
 import { ProjectsField } from './ProjectsField.tsx';
 import { JsonField } from './JsonField.tsx';
+import type { PoolDraft } from './poolsDraft.ts';
 
 import { MULTILINE_FIELDS, NONE, choiceItems, fieldKey } from './settingFields.ts';
 import type { SpecialistOption } from '../../../lib/specialistLabels.ts';
 
 /** The draft value that returns a field of the project to the shared value (the key is removed). */
 export const INHERIT = Symbol('inherit');
-export type DraftValue = SettingValue | typeof INHERIT;
+export type DraftValue = SettingValue | PoolDraft[] | typeof INHERIT;
 
 /** The value of the field on the tab, without the draft: the shared level or the project result. */
 export function savedValue(setting: EditorSetting, scope: SettingsScope): unknown {

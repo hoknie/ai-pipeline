@@ -158,3 +158,29 @@ describe('IPC requests', () => {
     expect('error' in parsed).toBe(true);
   });
 });
+
+describe('queue pools in config_settings', () => {
+  const parse = (values: unknown) =>
+    parseRequest(
+      JSON.stringify({
+        id: 1,
+        method: 'config_settings',
+        params: { ...repository, values, revision: null },
+      }),
+    );
+  const pools = { claude: { max: 2, members: ['claude'] } };
+
+  it('accepts an object in queue.pools and a number in queue.default_pool.max', () => {
+    const parsed = parse({ 'queue.pools': pools, 'queue.default_pool.max': 1 });
+    expect('error' in parsed).toBe(false);
+  });
+
+  it('accepts null in both fields', () => {
+    expect('error' in parse({ 'queue.pools': null, 'queue.default_pool.max': null })).toBe(false);
+  });
+
+  it('refuses a list in queue.pools and an object in a number field', () => {
+    expect('error' in parse({ 'queue.pools': ['claude'] })).toBe(true);
+    expect('error' in parse({ 'queue.default_pool.max': pools })).toBe(true);
+  });
+});

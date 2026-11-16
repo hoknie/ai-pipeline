@@ -1012,20 +1012,19 @@ describe('runView progress', () => {
     expect(runView(state, 2000).progress).toEqual({ done: 1, total: 4 });
   });
 
-  it('does not lower after the reviewer sends the work back', () => {
+  it('lengthens the path after the reviewer sends the work back', () => {
     const state = run(1);
     for (let index = 0; index < 2; index += 1) {
       step(state);
       finish(state, 'done', { slug: 'gruppa-1' });
     }
     step(state);
-    const before = runView(state, 2000).progress.done;
     finish(state, 'rejected', { slug: 'gruppa-1', feedback: 'переделать' });
-    expect(runView(state, 2000).progress).toEqual({ done: before, total: 4 });
+    expect(runView(state, 2000).progress).toEqual({ done: 3, total: 6 });
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
     const view = queueView(queue, (id) => (id === state.run.id ? state : undefined)).runs[0]!;
-    expect(view.steps.done).toBe(before);
+    expect(view.steps).toMatchObject({ done: 3, total: 6 });
   });
 
   it('is empty while the task is split', () => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { findGroup } from '../../../src/feature/runs/types/index.ts';
 import { stepProgress } from '../../../src/feature/runs/services/index.ts';
 
-import { CONFIG_TEXT, finish, run, step } from './helpers.ts';
+import { CONFIG_TEXT, finish, run, runningAttempt as runningAttemptOf, step } from './helpers.ts';
 
 describe('stepProgress', () => {
   it('counts every step of merged, merging and conflict groups', () => {
@@ -14,13 +14,13 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({ done: 12, total: 12, current: null });
   });
 
-  it('counts a queued group by its pending step, or 0 without attempts', () => {
+  it('counts a queued group without passes as 0 and its path from the pending step', () => {
     const state = run(2);
     findGroup(state, 'gruppa-2')!.pending!.stepIndex = 2;
-    expect(stepProgress(state)).toEqual({ done: 2, total: 8, current: null });
+    expect(stepProgress(state)).toEqual({ done: 0, total: 6, current: null });
   });
 
-  it('counts a running group by the step of its last attempt', () => {
+  it('counts a running group by the step of its running attempt', () => {
     const state = run(1);
     step(state);
     finish(state, 'done');
@@ -32,7 +32,7 @@ describe('stepProgress', () => {
     });
   });
 
-  it('counts failed, cancelled and needs_human groups by the last attempt', () => {
+  it('counts failed, cancelled and needs_human groups by their passes', () => {
     for (const status of ['failed', 'cancelled', 'needs_human'] as const) {
       const state = run(1);
       step(state);
@@ -52,17 +52,17 @@ describe('stepProgress', () => {
     finish(state, 'rejected', { feedback: 'переделать' });
   }
 
-  it('keeps the progress when a group returns to an earlier step', () => {
+  it('lengthens the path when a group returns to an earlier step', () => {
     const state = run(1);
     sentBack(state, 2);
     expect(stepProgress(state)).toEqual({
-      done: 2,
-      total: 4,
-      current: { step: 'code', name: 'Кодировщик', number: 2 },
+      done: 3,
+      total: 6,
+      current: { step: 'code', name: 'Кодировщик', number: 4 },
     });
   });
 
-  it('does not reset the progress on a return to the first step', () => {
+  it('counts a return to the first step as a pass', () => {
     const state = run(1, {
       configText: CONFIG_TEXT.replace('        - { id: plan, specialist: plan }\n', ''),
     });
@@ -71,31 +71,85 @@ describe('stepProgress', () => {
     step(state);
     finish(state, 'rejected', { feedback: 'переделать' });
     const progress = stepProgress(state);
-    expect(progress.done).toBe(1);
-    expect(progress.current).toMatchObject({ step: 'code', number: 1 });
+    expect([progress.done, progress.total]).toEqual([2, 5]);
+    expect(progress.current).toMatchObject({ step: 'code', number: 3 });
   });
 
-  it('does not grow beyond the maximum on a repeated pass, then grows on a new step', () => {
+  it('grows with every repeated pass', () => {
     const state = run(1);
     sentBack(state, 2);
-    const before = stepProgress(state).done;
     step(state);
     finish(state, 'done');
-    expect(stepProgress(state).done).toBe(before);
+    expect(stepProgress(state)).toMatchObject({ done: 4, total: 6 });
     step(state);
-    expect(stepProgress(state).done).toBe(before);
     finish(state, 'done');
-    step(state);
-    expect(stepProgress(state).done).toBe(before + 1);
+    expect(stepProgress(state)).toMatchObject({ done: 5, total: 6 });
   });
 
-  it('counts failed and cancelled groups after a return by the furthest step', () => {
+  it('counts failed and cancelled groups after a return by their passes', () => {
     for (const status of ['failed', 'cancelled'] as const) {
       const state = run(1);
       sentBack(state, 2);
       findGroup(state, 'gruppa-1')!.status = status;
-      expect(stepProgress(state).done).toBe(2);
+      expect(stepProgress(state).done).toBe(3);
     }
+  });
+
+  it('does not count a failed attempt or needs_human as a pass', () => {
+    const state = run(1);
+    step(state);
+    finish(state, 'done');
+    step(state);
+    finish(state, 'needs_human', { questions: [{ text: 'что делать?' } as never] });
+    expect(stepProgress(state).done).toBe(1);
+    const failed = run(1);
+    step(failed);
+    runningAttemptOf(failed).status = 'failed';
+    expect(stepProgress(failed).done).toBe(0);
+  });
+
+  it('gives the user example: code, review, qa, summary with a return from qa', () => {
+    const configText = `swarm:
+  max: 5
+  specialists:
+    coder: { name: Кодировщик }
+    reviewer: { name: Ревьюер, permissions: read }
+    qa: { name: Тестировщик }
+    sum: { name: Сумматор }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+        - { id: review, specialist: reviewer }
+        - { id: qa, specialist: qa, on_reject: { goto: code, max_rounds: 3 } }
+        - { id: sum, specialist: sum }
+`;
+    const state = run(1, { configText });
+    for (let index = 0; index < 2; index += 1) {
+      step(state);
+      finish(state, 'done');
+    }
+    step(state);
+    finish(state, 'rejected', { feedback: 'переделать' });
+    expect(stepProgress(state)).toMatchObject({ done: 3, total: 7 });
+    step(state);
+    finish(state, 'done');
+    expect(stepProgress(state)).toEqual({
+      done: 4,
+      total: 7,
+      current: { step: 'review', name: 'Ревьюер', number: 5 },
+    });
+  });
+
+  it('counts a merged group after a return by all its passes', () => {
+    const state = run(1);
+    sentBack(state, 2);
+    for (let index = 0; index < 3; index += 1) {
+      step(state);
+      finish(state, 'done');
+    }
+    findGroup(state, 'gruppa-1')!.status = 'merged';
+    expect(stepProgress(state)).toEqual({ done: 6, total: 6, current: null });
   });
 
   it('does not count a skipped step', () => {

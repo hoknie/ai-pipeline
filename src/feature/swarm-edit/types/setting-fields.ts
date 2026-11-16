@@ -91,6 +91,8 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   field('attachments.s3.path_style', 'boolean', { globalOnly: true }),
   field('queue.scope', 'choice', { options: QUEUE_SCOPES, globalOnly: true }),
   field('queue.max', 'integer', { range: QUEUE_MAX_RANGE, globalOnly: true }),
+  field('queue.pools', 'pools', { globalOnly: true }),
+  field('queue.default_pool.max', 'integer', { range: QUEUE_MAX_RANGE, globalOnly: true }),
   field('stats.enabled', 'boolean', { globalOnly: true }),
   field('stats.exclude', 'strings', { globalOnly: true }),
   ...RUNTIMES.flatMap((runtime) => [
@@ -116,6 +118,12 @@ export function settingFieldOf(path: string): SettingField | undefined {
     return field(path, 'env', { globalOnly: true });
   }
   return undefined;
+}
+
+/** Whether the field takes an object as its value (`json` and `pools`). */
+export function isObjectSetting(path: string): boolean {
+  const kind = settingFieldOf(path)?.kind;
+  return kind === 'json' || kind === 'pools';
 }
 
 /** A variable of `runtimes.<runtime>.env` (a string), as opposed to the whole `env` section. */

@@ -8,27 +8,44 @@ export function usePickerState({
   onChange,
   options,
   creatable,
+  validate,
 }: {
   values: string[];
   onChange: (values: string[]) => void;
   options: PickerOption[];
   creatable: boolean;
+  validate?: (value: string) => string | null;
 }) {
   const listId = useId();
   const [open, setOpenState] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQueryState] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const typed = query.trim();
   const visible = matchingOptions(options, typed);
   const canCreate = creatable && typed !== '' && !options.some((option) => option.name === typed);
 
+  const setQuery = (next: string) => {
+    setQueryState(next);
+    setError(null);
+  };
   const setOpen = (next: boolean) => {
     setOpenState(next);
     if (!next) setQuery('');
   };
+  /** Adds the values; one that `validate` refuses stays out and its message is shown, the text stays. */
   const add = (added: string[]) => {
-    const next = withValues(values, added);
+    let refusal: string | null = null;
+    const accepted = added.filter((raw) => {
+      const value = raw.trim();
+      if (value === '' || validate === undefined) return true;
+      const problem = validate(value);
+      refusal ??= problem;
+      return problem === null;
+    });
+    const next = withValues(values, accepted);
     if (next.length !== values.length) onChange(next);
-    setQuery('');
+    if (refusal === null) setQuery('');
+    else setError(refusal);
   };
   const onPaste = (event: ClipboardEvent<HTMLInputElement>) => {
     const text = event.clipboardData.getData('text');
@@ -47,6 +64,7 @@ export function usePickerState({
     setOpen,
     query,
     setQuery,
+    error,
     typed,
     visible,
     canCreate,

@@ -1576,6 +1576,32 @@ export const en = {
   },
   settingsPage: {
     invalidJson: 'Enter a valid JSON object.',
+    pools: {
+      name: 'Pool',
+      max: 'At most',
+      remove: 'Remove pool',
+      add: 'Add pool',
+      selectors: 'Selectors',
+      nameHint: 'A short name, for example the agent or provider.',
+      maxHint: 'Attempts at once, 1–32.',
+      selectorsHint:
+        'Which attempts the pool takes: claude, agy, opencode, opencode:provider/model or opencode:google/* (a trailing * is a prefix).',
+      empty:
+        'No pools yet: all attempts share one quota. Add a pool to limit an agent or a model separately.',
+      invalid: 'Fix the pools before saving.',
+      refuse: { overlap: 'The selector overlaps `{{selector}}` of the pool “{{pool}}”.' },
+      problem: {
+        emptyName: 'The pool needs a name.',
+        duplicateName: 'The name is already used by another pool.',
+        noMembers: 'Add at least one selector.',
+        duplicateMember: 'The selector is repeated in this pool.',
+        max: 'The limit is a whole number from 1 to 32.',
+        format:
+          'Use claude, agy, opencode or opencode:provider/model (a trailing * marks a prefix).',
+        noModel: 'Name a model after the provider, for example opencode:google/*.',
+        overlap: 'The selector overlaps a selector of another pool.',
+      },
+    },
     groups: 'groups of settings',
     beta: 'beta',
     betaHint: 'still in development: behaviour and settings may change',
@@ -1733,6 +1759,7 @@ export const en = {
       system_network: 'Network',
       system_stats: 'Statistics',
       queue_queue: 'Queue',
+      queue_pools: 'Executor pools',
       system_attachments: 'Attachments',
     },
     field: {
@@ -1860,7 +1887,15 @@ export const en = {
       },
       queue_max: {
         label: 'Agents at once',
-        hint: 'Most agent attempts working at once on the machine, in both queue modes. Quota pools (queue.pools) are set in settings.yaml.',
+        hint: 'Most agent attempts working at once on the machine, in both queue modes.',
+      },
+      queue_pools: {
+        label: 'Executor pools',
+        hint: 'Quotas of the attempts by agent and model. A pool takes at most its limit at once and lends no places; attempts outside every pool share the quota below. The sum of the limits may differ from queue.max. Running attempts are not interrupted by a change.',
+      },
+      queue_default_pool_max: {
+        label: 'Other attempts',
+        hint: 'Most attempts working at once that no pool takes. Set together with the pools.',
       },
       stats_enabled: {
         label: 'Collect statistics',

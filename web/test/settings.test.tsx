@@ -562,9 +562,9 @@ describe('settings page', () => {
     expect(scope.textContent).toContain('Mode');
     const max = screen.getByTestId('setting-queue.max');
     expect(within(max).getByLabelText<HTMLInputElement>('Agents at once').value).toBe('5');
-    // The field limits both modes; the pools are written in the file, and the hint says so.
+    // The field limits both modes.
     expect(max.textContent).toContain('both queue modes');
-    expect(max.textContent).toContain('queue.pools');
+    expect(max.textContent).not.toContain('settings.yaml');
     expect(max.textContent).not.toContain('global mode');
     expect(screen.queryByTestId('setting-max')).toBeNull();
     expect(

@@ -36,6 +36,8 @@ interface ValuesPickerProps {
   /** Group headings instead of the names of the sources; an empty string shows no heading. */
   headings?: Partial<Record<OptionSource, string>>;
   creatable?: boolean;
+  /** A reason to refuse a typed or chosen value, shown under the search line; null accepts it. */
+  validate?: (value: string) => string | null;
   disabled?: boolean;
   invalid?: boolean;
   /** Extra classes of the popover with the list. */
@@ -51,7 +53,13 @@ export function ValuesPicker(props: ValuesPickerProps) {
   const look: ValueLook = { icon: props.icon, hint: props.hint };
   const { headings, creatable = true, disabled = false, invalid = false } = props;
   const { t } = useTranslation();
-  const picker = usePickerState({ values, onChange, options, creatable });
+  const picker = usePickerState({
+    values,
+    onChange,
+    options,
+    creatable,
+    validate: props.validate,
+  });
   return (
     <Popover open={picker.open} onOpenChange={picker.setOpen}>
       <div
@@ -84,6 +92,11 @@ export function ValuesPicker(props: ValuesPickerProps) {
             onKeyDown={picker.onKeyDown}
             placeholder={creatable ? t('picker.searchOrType') : t('picker.searchOnly')}
           />
+          {picker.error === null ? null : (
+            <p role="alert" className="px-3 py-1.5 text-xs text-destructive">
+              {picker.error}
+            </p>
+          )}
           <PickerList
             listId={picker.listId}
             options={options}

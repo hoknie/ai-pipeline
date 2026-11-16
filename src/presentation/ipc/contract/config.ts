@@ -1,5 +1,5 @@
 import { SLUG_PATTERN_TEXT, isValidSlug } from '../../../feature/swarm-config/types/index.ts';
-import { settingFieldOf } from '../../../feature/swarm-edit/types/index.ts';
+import { isObjectSetting, settingFieldOf } from '../../../feature/swarm-edit/types/index.ts';
 import { z } from 'zod';
 
 /** A value of a field of settings.yaml; null removes the field. */
@@ -22,7 +22,7 @@ const settingPathSchema = z
 function settingValueFits(path: string, value: unknown): boolean {
   if (value === null) return true;
   const object = typeof value === 'object' && !Array.isArray(value);
-  return (settingFieldOf(path)?.kind === 'json') === object;
+  return isObjectSetting(path) === object;
 }
 
 /** The name of a server of the catalog: letters, digits, `-` and `_`; `aip` is the worker of aip. */

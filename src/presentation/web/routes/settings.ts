@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { settingFieldOf } from '../../../feature/swarm-edit/types/index.ts';
+import { isObjectSetting, settingFieldOf } from '../../../feature/swarm-edit/types/index.ts';
 import {
   settingValueSchema,
   type ConfigEditResult,
@@ -24,8 +24,7 @@ const settingsBody = z.object({
 function checkValue(path: string, value: unknown): void {
   if (value === null) return;
   const object = typeof value === 'object' && !Array.isArray(value);
-  if ((settingFieldOf(path)?.kind === 'json') !== object)
-    throw panel('invalid', `invalid value for ${path}`);
+  if (isObjectSetting(path) !== object) throw panel('invalid', `invalid value for ${path}`);
 }
 
 export function settingsRoutes({ call }: RouteKit): Route[] {
