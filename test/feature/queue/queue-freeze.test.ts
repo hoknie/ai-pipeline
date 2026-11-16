@@ -96,7 +96,7 @@ describe('claim of a place', () => {
     const [a, b] = [working('a'), working('b')];
     const queue = queueWith(2, 'a', 'b');
     addItem(queue, { pipeline: 'feature', task: 'W' }, 'q1', 2);
-    queue.acknowledged = ['b/gruppa-1/failed/1'];
+    queue.acknowledged = ['b/group-1/failed/1'];
     expect(claimPlace(queue, [a, b], 'c', 'ret', 5)).toBe('b');
     expect(queue.runs).toEqual(['a', 'c']);
     expect(queue.priority).toEqual(['c']);
@@ -249,11 +249,11 @@ describe('deferring a run', () => {
     queue.skipped = ['a'];
     addItem(queue, { pipeline: 'feature', task: 'W' }, 'q1', 2);
     const a = working('a');
-    const item = deferRun(queue, a, ['a/gruppa-1/x'], 'ra', 5);
+    const item = deferRun(queue, a, ['a/group-1/x'], 'ra', 5);
     expect(item.run).toBe('a');
     expect(queue.items.map((entry) => entry.id)).toEqual(['ra', 'q1']);
     expect(queue).toMatchObject({ runs: ['b'], priority: ['b'], skipped: [] });
-    expect(queue.acknowledged).toContain('a/gruppa-1/x');
+    expect(queue.acknowledged).toContain('a/group-1/x');
   });
 });
 

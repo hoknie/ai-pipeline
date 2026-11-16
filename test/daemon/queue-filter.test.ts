@@ -117,7 +117,7 @@ describe('queue take filter', () => {
     const queued = (await h.call('run', {
       repository: h.repo,
       pipeline: 'other',
-      task: 'работа',
+      task: 'work',
     })) as { run: unknown; queue: QueueView; item: string };
     expect(queued.run).toBeNull();
     expect(itemById(queued.queue, queued.item)?.filtered).toBe(true);

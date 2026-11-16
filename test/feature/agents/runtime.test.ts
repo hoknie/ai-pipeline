@@ -30,20 +30,18 @@ function specialist(overrides: Partial<Specialist> = {}): Specialist {
 }
 
 const input: StepInput = {
-  prompt: 'Сделай: добавить логин',
-  groupTitle: 'Логин',
+  prompt: 'Do: add a login',
+  groupTitle: 'Login',
   stepId: 'code',
-  specialistName: 'Кодировщик',
+  specialistName: 'Coder',
   skills: [],
   previous: [
-    { stepId: 'plan', specialist: 'plan', verdict: 'done', summary: 'план готов' },
-    { stepId: 'review', specialist: 'reviewer', verdict: 'rejected', summary: 'есть ошибки' },
+    { stepId: 'plan', specialist: 'plan', verdict: 'done', summary: 'plan ready' },
+    { stepId: 'review', specialist: 'reviewer', verdict: 'rejected', summary: 'has errors' },
   ],
-  feedback: 'нет тестов',
-  humanAnswer: 'используй OAuth',
-  decisions: [
-    { stepId: 'plan', question: 'OAuth или пароль?', answer: 'используй OAuth', by: 'human' },
-  ],
+  feedback: 'no tests',
+  humanAnswer: 'use OAuth',
+  decisions: [{ stepId: 'plan', question: 'OAuth or password?', answer: 'use OAuth', by: 'human' }],
 };
 
 function context(overrides: Partial<LaunchContext> = {}): LaunchContext {
@@ -70,21 +68,19 @@ describe('message to the specialist', () => {
   it('lists previous steps, feedback and the answer after the prompt', () => {
     expect(userMessage(input)).toBe(
       [
-        'Сделай: добавить логин',
-        '## Previous steps\n- plan (plan, done): план готов\n- review (reviewer, rejected): есть ошибки',
-        '## Accepted answers to questions in this group (do not ask them again)\n- plan: Q: OAuth или пароль? A: используй OAuth (by human)',
-        '## Feedback to address\nнет тестов',
-        '## Latest accepted answer\nиспользуй OAuth',
+        'Do: add a login',
+        '## Previous steps\n- plan (plan, done): plan ready\n- review (reviewer, rejected): has errors',
+        '## Accepted answers to questions in this group (do not ask them again)\n- plan: Q: OAuth or password? A: use OAuth (by human)',
+        '## Feedback to address\nno tests',
+        '## Latest accepted answer\nuse OAuth',
       ].join('\n\n'),
     );
   });
 
   it('adds the message of the person with its time after the answer', () => {
-    const text = userMessage({ ...input, message: { text: 'смотри в src/auth', at: 0 } });
+    const text = userMessage({ ...input, message: { text: 'look in src/auth', at: 0 } });
     expect(
-      text.endsWith(
-        '## Message from the person (sent 1970-01-01T00:00:00.000Z)\nсмотри в src/auth',
-      ),
+      text.endsWith('## Message from the person (sent 1970-01-01T00:00:00.000Z)\nlook in src/auth'),
     ).toBe(true);
     expect(text.indexOf('## Latest accepted answer')).toBeLessThan(
       text.indexOf('## Message from the person'),
@@ -103,8 +99,8 @@ describe('message to the specialist', () => {
   });
 
   it('shows the answer to a review under its own heading', () => {
-    const text = userMessage({ ...input, reviewed: true, humanAnswer: 'Принято' });
-    expect(text).toContain('## Answer of the person who reviewed this step\nПринято');
+    const text = userMessage({ ...input, reviewed: true, humanAnswer: 'Accepted' });
+    expect(text).toContain('## Answer of the person who reviewed this step\nAccepted');
     expect(text).toContain('report "done"');
     expect(text).not.toContain('## Latest accepted answer');
   });

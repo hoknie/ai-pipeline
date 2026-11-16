@@ -35,7 +35,7 @@ afterEach(async () => {
 });
 
 const FAIL = { exitCode: 1, noReport: true };
-const GROUPS = [{ title: 'Вход', task: 'вход' }];
+const GROUPS = [{ title: 'Login', task: 'login' }];
 
 /** How long a task waits before an observer takes its incident again after a failed repair. */
 const REPAIR_PAUSE_MS = 300_000;
@@ -77,7 +77,7 @@ async function launch(h: Harness, groups = GROUPS): Promise<string> {
   return runId;
 }
 
-const retry = (group = 'vhod') => ({
+const retry = (group = 'login') => ({
   toolCalls: [{ name: 'swarm_repair_retry', arguments: { group } }],
 });
 
@@ -100,7 +100,7 @@ function listen(h: Harness): StreamEvent[] {
 
 const incidents = (events: StreamEvent[]) => events.filter((event) => event.event === 'incident');
 
-describe('Статус Repair', () => {
+describe('Repair status', () => {
   it('shows a failed run as repair while the observer works, then as it was', async () => {
     const h = await start();
     h.script({ code: [FAIL, {}], repair: [{ waitFor: h.gate('repair'), ...retry() }] });
@@ -116,11 +116,11 @@ describe('Статус Repair', () => {
       allowed: true,
       active: true,
       repairs: 1,
-      incident: { kind: 'failed', group: 'vhod' },
+      incident: { kind: 'failed', group: 'login' },
     });
     expect(working.system.some((group) => group.kind === 'repair')).toBe(true);
     const observers = (await h.call('observers', {})) as ObserversView;
-    expect(observers.workers.running).toMatchObject([{ runId, incident: { group: 'vhod' } }]);
+    expect(observers.workers.running).toMatchObject([{ runId, incident: { group: 'login' } }]);
     h.open('repair');
     const done = await h.waitFor(runId, (view) => view.finished);
     expect(done.state).toBe('finished');
@@ -191,7 +191,7 @@ describe('Статус Repair', () => {
   });
 });
 
-describe('Недоступный исполнитель', () => {
+describe('Unavailable runtime', () => {
   const callsOf = (h: Harness, step: string) =>
     fakeLines(h, 'calls.jsonl').filter((call) => call.step === step);
 
@@ -211,7 +211,7 @@ describe('Недоступный исполнитель', () => {
     const waiting = await h.status(runId);
     expect(waiting.state).toBe('failed');
     expect(waiting.repair).toMatchObject({ active: false, repairs: 0, incident: null });
-    expect((await h.group(runId, 'vhod')).attempts).toHaveLength(1);
+    expect((await h.group(runId, 'login')).attempts).toHaveLength(1);
     expect(callsOf(h, 'repair')).toHaveLength(0);
     expect(((await h.call('observers', {})) as ObserversView).workers.waiting).toBe(0);
 
@@ -229,8 +229,8 @@ describe('Недоступный исполнитель', () => {
   it('does not repair a group whose command is not found', async () => {
     current = await harness(
       CODE_ONLY_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, runtime: opencode }',
+        'coder: { name: Coder }',
+        'coder: { name: Coder, runtime: opencode }',
       ),
       { AIP_OPENCODE_BIN: '/nonexistent/opencode' },
     );
@@ -250,7 +250,7 @@ describe('Недоступный исполнитель', () => {
   });
 });
 
-describe('Пауза после таймаута наблюдателя', () => {
+describe('Pause after an observer timeout', () => {
   const callsOf = (h: Harness) =>
     fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'repair');
 
@@ -289,7 +289,7 @@ describe('Пауза после таймаута наблюдателя', () => 
       repository: h.repo,
       pipeline: 'feature',
       groups: GROUPS,
-      title: 'один',
+      title: 'one',
     });
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await h.call('queue_start', { repository: h.repo });
@@ -316,7 +316,7 @@ describe('Пауза после таймаута наблюдателя', () => 
   });
 });
 
-describe('Событие инцидента', () => {
+describe('Incident event', () => {
   it('sends one incident event, also where no observer is connected', async () => {
     const h = await start();
     h.script({ code: [FAIL] });
@@ -329,7 +329,7 @@ describe('Событие инцидента', () => {
     expect(incidents(events)[0]).toMatchObject({
       runId,
       repository: h.repo,
-      incident: { group: 'vhod', kind: 'failed' },
+      incident: { group: 'login', kind: 'failed' },
     });
   });
 
@@ -347,7 +347,7 @@ describe('Событие инцидента', () => {
   });
 });
 
-describe('Задачи на паузе и очередь', () => {
+describe('Paused tasks and the queue', () => {
   it('gives the repair back when a pause stops it, and takes nothing while paused', async () => {
     const h = await start();
     h.script({ code: [FAIL, {}], repair: [{ waitFor: h.gate('never') }, retry()] });
@@ -376,7 +376,7 @@ describe('Задачи на паузе и очередь', () => {
       repository: h.repo,
       pipeline: 'feature',
       groups: GROUPS,
-      title: 'один',
+      title: 'one',
     });
     await h.call('queue_start', { repository: h.repo });
     await until('the repair', async () => {
@@ -402,7 +402,7 @@ describe('Задачи на паузе и очередь', () => {
       repository: h.repo,
       pipeline: 'feature',
       groups: GROUPS,
-      title: 'один',
+      title: 'one',
     });
     await h.call('queue_start', { repository: h.repo });
     await until('the queue stop', async () => {
@@ -415,7 +415,7 @@ describe('Задачи на паузе и очередь', () => {
   });
 });
 
-describe('Задача вне очереди', () => {
+describe('Task outside the queue', () => {
   it('notices a failed run without a restart or a saved setting', async () => {
     const h = await start();
     h.script({ code: [FAIL, {}], repair: [retry()] });
@@ -428,15 +428,15 @@ describe('Задача вне очереди', () => {
   });
 });
 
-describe('Действия наблюдателя', () => {
+describe('Observer actions', () => {
   it('answers a question with the author observer', async () => {
     const h = await start();
     h.script({
-      code: [{ verdict: 'needs_human', questions: [{ text: 'Какой вариант?' }] }, {}],
+      code: [{ verdict: 'needs_human', questions: [{ text: 'Which option?' }] }, {}],
       repair: [
         {
           toolCalls: [
-            { name: 'swarm_repair_answer', arguments: { group: 'vhod', answer: 'Первый' } },
+            { name: 'swarm_repair_answer', arguments: { group: 'login', answer: 'First' } },
           ],
         },
       ],
@@ -445,17 +445,17 @@ describe('Действия наблюдателя', () => {
     const runId = await launch(h);
     const view = await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
     expect(view.decisions.map((decision) => decision.by)).toEqual(['observer']);
-    expect(view.decisions[0]?.answer).toBe('Первый');
+    expect(view.decisions[0]?.answer).toBe('First');
   });
 
   it('cancels a group with a reason that shows in the group', async () => {
     const h = await start();
     h.script({
-      code: [{ verdict: 'needs_human', questions: [{ text: 'Как быть?' }] }],
+      code: [{ verdict: 'needs_human', questions: [{ text: 'What to do?' }] }],
       repair: [
         {
           toolCalls: [
-            { name: 'swarm_repair_cancel', arguments: { group: 'vhod', reason: 'не нужно' } },
+            { name: 'swarm_repair_cancel', arguments: { group: 'login', reason: 'not needed' } },
           ],
         },
       ],
@@ -466,7 +466,7 @@ describe('Действия наблюдателя', () => {
       runId,
       (run) => run.finished && run.groups[0]?.status === 'cancelled',
     );
-    expect((await h.group(runId, 'vhod')).reason).toBe('не нужно');
+    expect((await h.group(runId, 'login')).reason).toBe('not needed');
     expect(view.state).toBe('cancelled');
   });
 
@@ -474,12 +474,12 @@ describe('Действия наблюдателя', () => {
     const h = await start();
     h.script({
       code: [FAIL],
-      repair: [{ toolCalls: [{ name: 'swarm_repair_cancel', arguments: { reason: 'тупик' } }] }],
+      repair: [{ toolCalls: [{ name: 'swarm_repair_cancel', arguments: { reason: 'dead end' } }] }],
     });
     await configure(h);
     const runId = await launch(h);
-    const view = await h.waitFor(runId, (run) => run.repair?.cancelReason === 'тупик');
-    expect(view.repair?.cancelReason).toBe('тупик');
+    const view = await h.waitFor(runId, (run) => run.repair?.cancelReason === 'dead end');
+    expect(view.repair?.cancelReason).toBe('dead end');
     await h.waitFor(runId, (run) => run.finished);
   });
 
@@ -494,7 +494,7 @@ describe('Действия наблюдателя', () => {
       repository: h.repo,
       pipeline: 'feature',
       groups: GROUPS,
-      title: 'один',
+      title: 'one',
     });
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await h.call('queue_start', { repository: h.repo });
@@ -524,7 +524,7 @@ describe('Действия наблюдателя', () => {
       repair: [{ waitFor: h.gate('repair'), ...retry() }],
     });
     await configure(h);
-    for (const title of ['один', 'два']) {
+    for (const title of ['one', 'two']) {
       await h.call('queue_add', { repository: h.repo, pipeline: 'feature', groups: GROUPS, title });
     }
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
@@ -565,7 +565,7 @@ describe('Действия наблюдателя', () => {
   it('lets the autopilot answer before an observer sees the question', async () => {
     const h = await start();
     h.script({
-      code: [{ verdict: 'needs_human', questions: [{ text: 'Как?' }] }, {}],
+      code: [{ verdict: 'needs_human', questions: [{ text: 'How?' }] }, {}],
       repair: [retry()],
     });
     await configure(h);
@@ -575,7 +575,7 @@ describe('Действия наблюдателя', () => {
       repository: h.repo,
       pipeline: 'feature',
       groups: GROUPS,
-      title: 'один',
+      title: 'one',
     });
     await h.call('queue_start', { repository: h.repo });
     await until('the run', async () => ((await h.call('status', {})) as RunView[]).length > 0);
@@ -590,16 +590,18 @@ describe('Действия наблюдателя', () => {
   it('starts the repair of a question only after the pause is lifted', async () => {
     const h = await start();
     h.script({
-      'code@Вход': [{ verdict: 'needs_human', questions: [{ text: 'Как?' }] }, {}],
-      'code@Второй': [{ waitFor: h.gate('second') }],
+      'code@Login': [{ verdict: 'needs_human', questions: [{ text: 'How?' }] }, {}],
+      'code@Second': [{ waitFor: h.gate('second') }],
       repair: [
         {
-          toolCalls: [{ name: 'swarm_repair_answer', arguments: { group: 'vhod', answer: 'так' } }],
+          toolCalls: [
+            { name: 'swarm_repair_answer', arguments: { group: 'login', answer: 'like this' } },
+          ],
         },
       ],
     });
     await configure(h, { enabled: false });
-    for (const title of ['Вход', 'Второй']) {
+    for (const title of ['Login', 'Second']) {
       await h.call('queue_add', {
         repository: h.repo,
         pipeline: 'feature',
@@ -634,7 +636,7 @@ describe('Действия наблюдателя', () => {
   });
 });
 
-describe('Границы действий наблюдателя', () => {
+describe('Limits of observer actions', () => {
   it('refuses an unknown group and the repair group itself', async () => {
     const h = await start();
     h.script({
@@ -642,7 +644,7 @@ describe('Границы действий наблюдателя', () => {
       repair: [
         {
           toolCalls: [
-            { name: 'swarm_repair_retry', arguments: { group: 'chuzhaya' } },
+            { name: 'swarm_repair_retry', arguments: { group: 'unknown-group' } },
             { name: 'swarm_repair_retry', arguments: { group: '_repair' } },
             { name: 'swarm_repair_cancel', arguments: { group: '_repair', reason: 'x' } },
           ],
@@ -667,14 +669,14 @@ describe('Границы действий наблюдателя', () => {
       ),
     );
     h.script({
-      split: [FAIL, { split: [{ title: 'Вход', task: 'вход' }] }],
+      split: [FAIL, { split: [{ title: 'Login', task: 'login' }] }],
       repair: [retry('_split')],
     });
     await configure(h);
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'вход',
+      task: 'login',
     })) as RunCreated;
     const view = await h.waitFor(runId, (run) => run.finished && run.state === 'finished');
     expect(view.repair?.repairs).toBe(1);
@@ -710,32 +712,32 @@ describe('Границы действий наблюдателя', () => {
   it('refuses to restart a group a person cancelled', async () => {
     const h = await start();
     h.script({
-      'code@Вход': [{ waitFor: h.gate('code') }],
-      'code@Второй': [FAIL, {}],
+      'code@Login': [{ waitFor: h.gate('code') }],
+      'code@Second': [FAIL, {}],
       repair: [
         {
           waitFor: h.gate('repair'),
           toolCalls: [
-            { name: 'swarm_repair_retry', arguments: { group: 'vhod' } },
-            { name: 'swarm_repair_retry', arguments: { group: 'vtoroi' } },
+            { name: 'swarm_repair_retry', arguments: { group: 'login' } },
+            { name: 'swarm_repair_retry', arguments: { group: 'second' } },
           ],
         },
       ],
     });
     await configure(h);
     const runId = await launch(h, [
-      { title: 'Вход', task: 'вход' },
-      { title: 'Второй', task: 'второй' },
+      { title: 'Login', task: 'login' },
+      { title: 'Second', task: 'second' },
     ]);
     await h.waitFor(
       runId,
       (view) =>
-        view.groups.some((group) => group.slug === 'vhod' && group.status === 'running') &&
-        view.groups.some((group) => group.slug === 'vtoroi' && group.status === 'failed'),
+        view.groups.some((group) => group.slug === 'login' && group.status === 'running') &&
+        view.groups.some((group) => group.slug === 'second' && group.status === 'failed'),
     );
-    await h.call('cancel', { runId, group: 'vhod' });
+    await h.call('cancel', { runId, group: 'login' });
     await h.waitFor(runId, (run) =>
-      run.groups.some((group) => group.slug === 'vhod' && group.status === 'cancelled'),
+      run.groups.some((group) => group.slug === 'login' && group.status === 'cancelled'),
     );
     h.open('repair');
     const view = await h.waitFor(runId, (run) => run.finished && run.state !== 'repair');
@@ -744,32 +746,30 @@ describe('Границы действий наблюдателя', () => {
     expect(first?.isError).toBe(true);
     expect(JSON.stringify(first)).toContain('was cancelled');
     expect(second?.isError).toBeUndefined();
-    expect(view.groups.find((group) => group.slug === 'vhod')?.status).toBe('cancelled');
+    expect(view.groups.find((group) => group.slug === 'login')?.status).toBe('cancelled');
   });
 
   it('refuses to answer a question for a person only', async () => {
     const h = await start();
-    const question = { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Скажи' }] };
+    const question = { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Tell me' }] };
     h.script({
-      'code@Вход': [FAIL, {}],
-      'code@Тихая': [question],
+      'code@Login': [FAIL, {}],
+      'code@Quiet': [question],
       repair: [
         {
-          toolCalls: [
-            { name: 'swarm_repair_answer', arguments: { group: 'tihaya', answer: 'нет' } },
-          ],
+          toolCalls: [{ name: 'swarm_repair_answer', arguments: { group: 'quiet', answer: 'no' } }],
         },
       ],
     });
     await configure(h, { maxRepairs: 1 });
     const runId = await launch(h, [
-      { title: 'Вход', task: 'вход' },
-      { title: 'Тихая', task: 'тихо' },
+      { title: 'Login', task: 'login' },
+      { title: 'Quiet', task: 'quietly' },
     ]);
     await h.waitFor(runId, (view) => view.repair?.repairs === 1 && view.repair.incident === null);
     const [result] = toolResults(h);
     expect(result?.isError).toBe(true);
-    expect((await h.status(runId)).groups.find((group) => group.slug === 'tihaya')?.status).toBe(
+    expect((await h.status(runId)).groups.find((group) => group.slug === 'quiet')?.status).toBe(
       'needs_human',
     );
   });
@@ -780,17 +780,17 @@ const REVIEW_CONFIG = PIPELINE_CONFIG.replace(
   'specialist: reviewer, human_review: true,',
 );
 
-const ASKING = { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Скажи' }] };
+const ASKING = { verdict: 'needs_human', humanOnly: true, questions: [{ text: 'Tell me' }] };
 const TWO = [
-  { title: 'Вход', task: 'вход' },
-  { title: 'Тихая', task: 'тихо' },
+  { title: 'Login', task: 'login' },
+  { title: 'Quiet', task: 'quietly' },
 ];
 
-/** Starts a task whose group `tihaya` waits for a person while `vhod` fails and is repaired. */
+/** Starts a task whose group `quiet` waits for a person while `login` fails and is repaired. */
 async function askingRun(h: Harness, calls: unknown[]): Promise<string> {
   h.script({
-    'code@Вход': [FAIL, {}],
-    'code@Тихая': [ASKING],
+    'code@Login': [FAIL, {}],
+    'code@Quiet': [ASKING],
     repair: [{ toolCalls: calls }],
   });
   await configure(h, { maxRepairs: 1 });
@@ -799,16 +799,16 @@ async function askingRun(h: Harness, calls: unknown[]): Promise<string> {
   return runId;
 }
 
-describe('Вопрос только для человека', () => {
+describe('Human-only question', () => {
   it('refuses to cancel the group that waits for a person', async () => {
     const h = await start();
     const runId = await askingRun(h, [
-      { name: 'swarm_repair_cancel', arguments: { group: 'tihaya', reason: 'надоело' } },
+      { name: 'swarm_repair_cancel', arguments: { group: 'quiet', reason: 'fed up' } },
     ]);
     const [result] = toolResults(h);
     expect(result?.isError).toBe(true);
     expect(JSON.stringify(result)).toContain('waits for a person');
-    expect((await h.status(runId)).groups.find((group) => group.slug === 'tihaya')?.status).toBe(
+    expect((await h.status(runId)).groups.find((group) => group.slug === 'quiet')?.status).toBe(
       'needs_human',
     );
   });
@@ -816,39 +816,39 @@ describe('Вопрос только для человека', () => {
   it('refuses to cancel the task while such a question is open', async () => {
     const h = await start();
     const runId = await askingRun(h, [
-      { name: 'swarm_repair_cancel', arguments: { reason: 'тупик' } },
+      { name: 'swarm_repair_cancel', arguments: { reason: 'dead end' } },
     ]);
     const [result] = toolResults(h);
     expect(result?.isError).toBe(true);
-    expect(JSON.stringify(result)).toContain('tihaya');
+    expect(JSON.stringify(result)).toContain('quiet');
     const view = await h.status(runId);
     expect(view.repair?.cancelReason ?? null).toBeNull();
-    expect(view.groups.find((group) => group.slug === 'tihaya')?.status).toBe('needs_human');
+    expect(view.groups.find((group) => group.slug === 'quiet')?.status).toBe('needs_human');
   });
 
   it('still cancels a task without such a question', async () => {
     const h = await start();
     h.script({
       code: [FAIL],
-      repair: [{ toolCalls: [{ name: 'swarm_repair_cancel', arguments: { reason: 'тупик' } }] }],
+      repair: [{ toolCalls: [{ name: 'swarm_repair_cancel', arguments: { reason: 'dead end' } }] }],
     });
     await configure(h);
     const runId = await launch(h);
-    const view = await h.waitFor(runId, (run) => run.repair?.cancelReason === 'тупик');
-    expect(view.repair?.cancelReason).toBe('тупик');
+    const view = await h.waitFor(runId, (run) => run.repair?.cancelReason === 'dead end');
+    expect(view.repair?.cancelReason).toBe('dead end');
     expect(toolResults(h)[0]?.isError).toBeUndefined();
   });
 
   it('refuses to answer a human review of a step', async () => {
     const h = await start(REVIEW_CONFIG);
     h.script({
-      'code@Вход': [FAIL, {}],
-      review: [{ summary: 'проверь' }],
+      'code@Login': [FAIL, {}],
+      review: [{ summary: 'check' }],
       repair: [
         {
           waitFor: h.gate('repair'),
           toolCalls: [
-            { name: 'swarm_repair_answer', arguments: { group: 'tihaya', answer: 'Принято' } },
+            { name: 'swarm_repair_answer', arguments: { group: 'quiet', answer: 'Accepted' } },
           ],
         },
       ],
@@ -856,18 +856,18 @@ describe('Вопрос только для человека', () => {
     await configure(h, { maxRepairs: 1 });
     const runId = await launch(h, TWO);
     await h.waitFor(runId, (view) =>
-      view.groups.some((group) => group.slug === 'tihaya' && group.status === 'needs_human'),
+      view.groups.some((group) => group.slug === 'quiet' && group.status === 'needs_human'),
     );
     h.open('repair');
     await h.waitFor(runId, (view) => view.repair?.repairs === 1 && view.repair.incident === null);
     const [result] = toolResults(h);
     expect(result?.isError).toBe(true);
-    const row = (await h.status(runId)).groups.find((group) => group.slug === 'tihaya');
+    const row = (await h.status(runId)).groups.find((group) => group.slug === 'quiet');
     expect(row).toMatchObject({ status: 'needs_human', humanOnly: 'review' });
   });
 });
 
-describe('Настройки наблюдателей', () => {
+describe('Observer settings', () => {
   it('keeps the settings across a restart', async () => {
     const h = await start();
     const saved = await configure(h, { workers: 2 });
@@ -932,7 +932,7 @@ describe('Настройки наблюдателей', () => {
     const h = await start();
     h.script({ code: [FAIL], repair: [{ waitFor: h.gate('repair') }] });
     await configure(h, { enabled: false });
-    const failedRun = await launch(h, [{ title: 'Второй', task: 'второй' }]);
+    const failedRun = await launch(h, [{ title: 'Second', task: 'second' }]);
     await h.waitFor(failedRun, (view) => view.groups[0]?.status === 'failed');
     const events = listen(h);
     await h.call('observers_set', { settings: { enabled: true } });
@@ -964,14 +964,14 @@ describe('Настройки наблюдателей', () => {
   it('runs at most `workers` repairs, the oldest incident first', async () => {
     const h = await start();
     h.script({
-      'code@Вход': [FAIL, {}],
-      'code@Второй': [FAIL, {}],
-      repair: [{ waitFor: h.gate('repair'), ...retry() }, retry('vtoroi')],
+      'code@Login': [FAIL, {}],
+      'code@Second': [FAIL, {}],
+      repair: [{ waitFor: h.gate('repair'), ...retry() }, retry('second')],
     });
     await configure(h, { workers: 1 });
     const first = await launch(h);
     await h.waitFor(first, (view) => view.repair?.incident !== null);
-    const second = await launch(h, [{ title: 'Второй', task: 'второй' }]);
+    const second = await launch(h, [{ title: 'Second', task: 'second' }]);
     await h.waitFor(second, (view) => view.groups[0]?.status === 'failed');
     await settle(h);
     expect((await h.status(second)).repair).toMatchObject({ incident: null, repairs: 0 });
@@ -985,19 +985,19 @@ describe('Настройки наблюдателей', () => {
   });
 });
 
-describe('Включение только в настройках', () => {
+describe('Enabling only in the settings', () => {
   it('lets a running repair end, and starts no new one after switching off', async () => {
     const h = await start();
     h.script({
-      'code@Вход': [FAIL, {}],
-      'code@Второй': [FAIL, {}],
+      'code@Login': [FAIL, {}],
+      'code@Second': [FAIL, {}],
       repair: [{ waitFor: h.gate('repair'), ...retry() }],
     });
     await configure(h);
     const first = await launch(h);
     await h.waitFor(first, (view) => view.repair?.incident !== null);
     await h.call('observers_set', { settings: { enabled: false } });
-    const second = await launch(h, [{ title: 'Второй', task: 'второй' }]);
+    const second = await launch(h, [{ title: 'Second', task: 'second' }]);
     await h.waitFor(second, (view) => view.groups[0]?.status === 'failed');
     await settle(h);
     expect((await h.status(second)).repair).toMatchObject({ incident: null, repairs: 0 });
@@ -1019,7 +1019,7 @@ describe('Включение только в настройках', () => {
   });
 });
 
-describe('Разрешение доставки наблюдателем', () => {
+describe('Delivery resolution by the observer', () => {
   const repairCalls = (h: Harness) =>
     fakeLines(h, 'calls.jsonl').filter((call) => call.step === 'repair');
 
@@ -1057,7 +1057,7 @@ describe('Разрешение доставки наблюдателем', () =>
 
   it('leaves apply_failed and the user edits when markers remain', async () => {
     const h = await start(`${CODE_ONLY_CONFIG}  delivery: { auto: true }\n`);
-    const runId = await conflicting(h, [{ summary: 'готово' }]);
+    const runId = await conflicting(h, [{ summary: 'done' }]);
     await until('the observer', () => repairCalls(h).length >= 1);
     await h.waitFor(
       runId,
@@ -1066,7 +1066,7 @@ describe('Разрешение доставки наблюдателем', () =>
       30_000,
     );
     await settle(h);
-    expect((await h.group(runId, 'vhod')).delivery).toMatchObject({ state: 'apply_failed' });
+    expect((await h.group(runId, 'login')).delivery).toMatchObject({ state: 'apply_failed' });
     expect(readFileSync(join(h.repo, 'lib.ts'), 'utf8')).toBe('export const value = 9;\n');
     // the same attempt is not taken again
     expect(repairCalls(h)).toHaveLength(1);

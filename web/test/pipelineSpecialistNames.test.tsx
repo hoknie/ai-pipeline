@@ -19,9 +19,9 @@ afterEach(() => {
 });
 
 const specialists = [
-  specialistEntry('coder', {}, { name: 'Кодировщик' }),
-  specialistEntry('reviewer', {}, { name: 'Ревьюер' }),
-  specialistEntry('local-only', { sources: undefined }, { name: 'Локальный' }),
+  specialistEntry('coder', {}, { name: 'Code author' }),
+  specialistEntry('reviewer', {}, { name: 'Inspector' }),
+  specialistEntry('local-only', { sources: undefined }, { name: 'Local one' }),
 ];
 
 function pipeline(id: string, raw: Record<string, unknown>): EditorPipeline {
@@ -75,14 +75,14 @@ describe('specialists of the pipeline editor are shown by name', () => {
   it('labels the list and the closed select of a step with the name', async () => {
     render(<Page api={api([pipeline('feature', raw)])} start="feature" />);
     const select = within(await stepBox(0)).getByRole('combobox', { name: 'step specialist' });
-    expect(select.textContent).toContain('Ревьюер');
+    expect(select.textContent).toContain('Inspector');
     expect(select.textContent).not.toContain('reviewer');
     fireEvent.keyDown(select, { key: 'Enter' });
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
       '—',
-      'Кодировщик',
-      'Ревьюер',
-      'Локальный',
+      'Code author',
+      'Inspector',
+      'Local one',
     ]);
   });
 
@@ -91,7 +91,7 @@ describe('specialists of the pipeline editor are shown by name', () => {
     render(<Page api={api([pipeline('feature', raw)], { writePipeline })} start="feature" />);
     choose(
       within(await stepBox(0)).getByRole('combobox', { name: 'step specialist' }),
-      'Кодировщик',
+      'Code author',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writePipeline).toHaveBeenCalled());
@@ -122,15 +122,15 @@ describe('specialists of the pipeline editor are shown by name', () => {
     const epic = { split: { specialist: 'reviewer' }, steps: [{ id: 'a', specialist: 'coder' }] };
     render(<Page api={api([pipeline('epic', epic)])} start="epic" />);
     const select = await screen.findByRole('combobox', { name: 'split specialist' });
-    expect(select.textContent).toContain('Ревьюер');
+    expect(select.textContent).toContain('Inspector');
   });
 
   it('labels the specialist of an action with the name and writes the slug', async () => {
     const writeAction = saved();
     render(<Page api={api([], { writeAction })} start="review" section="actions" />);
     const select = await screen.findByRole('combobox', { name: 'action specialist' });
-    expect(select.textContent).toContain('Ревьюер');
-    choose(select, 'Кодировщик');
+    expect(select.textContent).toContain('Inspector');
+    choose(select, 'Code author');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeAction).toHaveBeenCalled());
     const call = writeAction.mock.calls[0] as unknown as [string, Record<string, unknown>];

@@ -39,10 +39,10 @@ describe('queues', () => {
   it('keeps items, order, stop and known problems', () => {
     const store = temporaryStorage();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'first' }, 'q1', 2);
     addItem(
       queue,
-      { pipeline: 'feature', groups: [{ title: 'Вход', task: 'форма' }], title: 'Группы' },
+      { pipeline: 'feature', groups: [{ title: 'Login', task: 'form' }], title: 'Groups' },
       'q2',
       3,
     );
@@ -274,7 +274,7 @@ describe('queues', () => {
   it('keeps onLimit, a stop by a usage limit and a returned run', () => {
     const store = temporaryStorage();
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'first' }, 'q1', 2);
     queue.items[0]!.run = 'r1';
     queue.onLimit = 'stop';
     queue.stop = {
@@ -449,11 +449,11 @@ describe('queue items and automatic delivery', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { pipeline: 'feature', task: 'a', deliveryMode: 'commit' }, 'q0', 1);
     addItem(queue, { pipeline: 'feature', task: 'b' }, 'q1', 1);
-    queue.autopilotAnswer = 'Согласен';
+    queue.autopilotAnswer = 'Agreed';
     store.queues.saveQueue(queue);
     const loaded = store.queues.loadQueue('/repo');
     expect(loaded?.items.map((item) => item.deliveryMode)).toEqual(['commit', null]);
-    expect(loaded?.autopilotAnswer).toBe('Согласен');
+    expect(loaded?.autopilotAnswer).toBe('Agreed');
     store.database.exec("UPDATE queue_items SET delivery_mode = 'tar' WHERE id = 'q0'");
     expect(store.queues.loadQueue('/repo')?.items[0]?.deliveryMode).toBeNull();
   });
@@ -463,7 +463,7 @@ describe('queue items and automatic delivery', () => {
     const state = run(1);
     step(state);
     finish(state, 'needs_human', { feedback: 'q' });
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ok', by: 'autopilot' }, 5);
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'ok', by: 'autopilot' }, 5);
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)?.groups[0]?.decisions[0]?.by).toBe('autopilot');
     store.database.exec(
@@ -477,7 +477,7 @@ describe('queue items and automatic delivery', () => {
     const state = run(1);
     step(state);
     finish(state, 'needs_human', { feedback: 'q' });
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ok' }, 5);
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'ok' }, 5);
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)?.groups[0]?.decisions[0]?.attemptSeq).toBe(1);
     store.database.exec(

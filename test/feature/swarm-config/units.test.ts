@@ -45,35 +45,33 @@ describe('slugs', () => {
 
 describe('prompt assembly', () => {
   it('substitutes the task for every placeholder', () => {
-    expect(buildPrompt('Сделай: %s', 'добавить логин')).toBe('Сделай: добавить логин');
-    expect(buildPrompt('%s и ещё %s', 'x')).toBe('x и ещё x');
-    expect(buildPrompt('Проверь: %s', 'логин', 'Только тесты')).toBe(
-      'Проверь: логин\n\nТолько тесты',
+    expect(buildPrompt('Do: %s', 'add a login')).toBe('Do: add a login');
+    expect(buildPrompt('%s and also %s', 'x')).toBe('x and also x');
+    expect(buildPrompt('Check: %s', 'login', 'Tests only')).toBe('Check: login\n\nTests only');
+    expect(buildPrompt('Check the changes', 'login', 'Tests only')).toBe(
+      'Check the changes\n\nlogin\n\nTests only',
     );
-    expect(buildPrompt('Проверь изменения', 'логин', 'Только тесты')).toBe(
-      'Проверь изменения\n\nлогин\n\nТолько тесты',
+    expect(buildPrompt(null, 'login', '  Backend only  ')).toBe('login\n\nBackend only');
+    expect(buildPrompt('Do: %s', 'x', 'Coverage at least 80% and no %s')).toBe(
+      'Do: x\n\nCoverage at least 80% and no %s',
     );
-    expect(buildPrompt(null, 'логин', '  Только backend  ')).toBe('логин\n\nТолько backend');
-    expect(buildPrompt('Сделай: %s', 'x', 'Покрытие не ниже 80% и без %s')).toBe(
-      'Сделай: x\n\nПокрытие не ниже 80% и без %s',
-    );
-    expect(buildPrompt('Сделай: %s', 'x', null)).toBe(buildPrompt('Сделай: %s', 'x'));
+    expect(buildPrompt('Do: %s', 'x', null)).toBe(buildPrompt('Do: %s', 'x'));
   });
 
   it('appends the task as a paragraph when there is no placeholder', () => {
-    expect(buildPrompt('Проверь изменения и выведи QA Check List\n', 'добавить логин')).toBe(
-      'Проверь изменения и выведи QA Check List\n\nдобавить логин',
+    expect(buildPrompt('Check the changes and print a QA Check List\n', 'add a login')).toBe(
+      'Check the changes and print a QA Check List\n\nadd a login',
     );
   });
 
   it('uses the task alone without a prompt', () => {
-    expect(buildPrompt(null, 'добавить логин')).toBe('добавить логин');
+    expect(buildPrompt(null, 'add a login')).toBe('add a login');
   });
 
   it('treats a double percent as a literal percent', () => {
-    expect(buildPrompt('100%% готово: %s', 'x')).toBe('100% готово: x');
+    expect(buildPrompt('100%% done: %s', 'x')).toBe('100% done: x');
     expect(buildPrompt('%%s', 'x')).toBe('%s\n\nx');
-    expect(buildPrompt('50% и %d', 'x')).toBe('50% и %d\n\nx');
+    expect(buildPrompt('50% and %d', 'x')).toBe('50% and %d\n\nx');
   });
 });
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { webEntryViolations, webImportViolations, webPlacementViolations } from './web.ts';
 import { makeTree, stub } from './tree.ts';
 
-/** Нарушения импортов для файла `from`, который импортирует `specifier`. */
+/** Import violations for a file `from` that imports `specifier`. */
 function imports(from: string, specifier: string, extra: Record<string, string> = {}): string[] {
   const root = makeTree({
     [from]: `import { value } from '${specifier}';\nexport const x = value;\n`,

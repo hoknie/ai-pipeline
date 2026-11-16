@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { importViolations } from './check.ts';
 import { makeTree, stub } from './tree.ts';
 
-/** Нарушения для одного файла `from`, который импортирует `to`. */
+/** Violations for a single file `from` that imports `to`. */
 function check(from: string, to: string, extra: Record<string, string> = {}): string[] {
   const relative = to.split('/');
   const fromParts = from.split('/');

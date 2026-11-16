@@ -33,8 +33,8 @@ function kinds(effects: Effect[]): string[] {
   return effects.map((effect) => effect.kind);
 }
 
-function answer(state: RunState, text = 'Принято'): void {
-  transition(state, { kind: 'answer', group: 'gruppa-1', answer: text }, 2500);
+function answer(state: RunState, text = 'Accepted'): void {
+  transition(state, { kind: 'answer', group: 'group-1', answer: text }, 2500);
 }
 
 /** A run stopped on the review of its `review` step. */
@@ -42,16 +42,16 @@ function atReview(configText = REVIEW_CONFIG): RunState {
   const state = run(1, { configText });
   for (const _ of ['plan', 'code', 'review']) {
     step(state);
-    finish(state, 'done', { summary: 'готово, смотри архитектуру' });
+    finish(state, 'done', { summary: 'done, see the architecture' });
   }
   return state;
 }
 
 describe('reviewQuestion', () => {
   it('names the step and carries its summary', () => {
-    const text = reviewQuestion('review', 'нет миграций');
+    const text = reviewQuestion('review', 'no migrations');
     expect(text).toContain('`review`');
-    expect(text).toContain('нет миграций');
+    expect(text).toContain('no migrations');
     expect(text).toContain('review');
   });
 });
@@ -64,7 +64,7 @@ describe('human review after done', () => {
       finish(state, 'done');
     }
     step(state);
-    const effects = finish(state, 'done', { summary: 'смотри архитектуру' });
+    const effects = finish(state, 'done', { summary: 'see the architecture' });
     expect(kinds(effects)).toEqual(['commit']);
     expect(group(state)).toMatchObject({
       status: 'needs_human',
@@ -72,7 +72,7 @@ describe('human review after done', () => {
       questions: null,
       pending: { stepIndex: 2, resume: true },
     });
-    expect(group(state).question).toContain('смотри архитектуру');
+    expect(group(state).question).toContain('see the architecture');
     expect(group(state).question).toContain('review');
   });
 
@@ -100,7 +100,7 @@ describe('human review after done', () => {
 
   it('resumes the same step on the answer, and its done goes on without a new review', () => {
     const state = atReview();
-    answer(state, 'выглядит хорошо');
+    answer(state, 'looks good');
     expect(group(state)).toMatchObject({ status: 'queued', humanOnly: null, question: null });
     expect(group(state).pending).toMatchObject({ stepIndex: 2, reviewed: true });
     step(state);
@@ -110,7 +110,7 @@ describe('human review after done', () => {
     expect(attempt.input).toMatchObject({
       reviewed: true,
       humanReview: true,
-      humanAnswer: 'выглядит хорошо',
+      humanAnswer: 'looks good',
     });
     finish(state, 'done');
     expect(group(state).status).toBe('queued');
@@ -122,7 +122,7 @@ describe('human review after done', () => {
     const state = atReview();
     answer(state);
     step(state);
-    finish(state, 'rejected', { feedback: 'нужны тесты' });
+    finish(state, 'rejected', { feedback: 'tests needed' });
     step(state);
     expect(runningAttempt(state).stepId).toBe('code');
     expect(runningAttempt(state).input.reviewed).toBeUndefined();
@@ -137,7 +137,7 @@ describe('human review after done', () => {
     const state = run(1, { configText: REVIEW_CONFIG.replace('max_rounds: 3', 'max_rounds: 1') });
     for (const id of ['plan', 'code', 'review', 'code', 'review']) {
       step(state);
-      finish(state, id === 'review' ? 'rejected' : 'done', { feedback: 'плохо' });
+      finish(state, id === 'review' ? 'rejected' : 'done', { feedback: 'bad' });
     }
     expect(group(state)).toMatchObject({ status: 'needs_human', humanOnly: null });
   });
@@ -164,10 +164,10 @@ describe('a request of the specialist', () => {
   it('marks the question human-only', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'Посмотри сам', humanOnly: true });
+    finish(state, 'needs_human', { feedback: 'Look yourself', humanOnly: true });
     expect(group(state)).toMatchObject({ status: 'needs_human', humanOnly: 'request' });
     expect(group(state).attempts[0]?.report?.humanOnly).toBe(true);
-    answer(state, 'ок');
+    answer(state, 'ok');
     expect(group(state).humanOnly).toBeNull();
     expect(group(state).pending?.reviewed).toBeUndefined();
   });
@@ -175,7 +175,7 @@ describe('a request of the specialist', () => {
   it('leaves a plain question unmarked and does not store the flag', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'Какой вариант?' });
+    finish(state, 'needs_human', { feedback: 'Which option?' });
     expect(group(state).humanOnly).toBeNull();
     expect(group(state).attempts[0]?.report).not.toHaveProperty('humanOnly');
   });
@@ -200,7 +200,7 @@ describe('a request of the specialist', () => {
         state,
         {
           kind: 'report',
-          group: 'gruppa-1',
+          group: 'group-1',
           seq: attempt.seq,
           report: { verdict: 'done', summary: 's', feedback: null, humanOnly: true },
         },
@@ -225,7 +225,7 @@ describe('the reviewed mark survives interruptions', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: {
           sessionId: 's',
@@ -247,14 +247,14 @@ describe('the reviewed mark survives interruptions', () => {
     const attempt = runningAttempt(state);
     transition(
       state,
-      { kind: 'message', group: 'gruppa-1', seq: attempt.seq, text: 'ещё одно' },
+      { kind: 'message', group: 'group-1', seq: attempt.seq, text: 'one more' },
       3000,
     );
     transition(
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: { sessionId: 's', usage: null, failure: null, outsideChanges: [] },
       },
@@ -282,7 +282,7 @@ describe('autopilot of the queue', () => {
     expect(autopilotAnswers(queued(review), [review])).toEqual([]);
     const request = run(1);
     step(request);
-    finish(request, 'needs_human', { feedback: 'Глянь', humanOnly: true });
+    finish(request, 'needs_human', { feedback: 'Take a look', humanOnly: true });
     expect(autopilotAnswers(queued(request), [request])).toEqual([]);
   });
 
@@ -290,7 +290,7 @@ describe('autopilot of the queue', () => {
     const state = atReview();
     answer(state);
     step(state);
-    finish(state, 'needs_human', { feedback: 'Какой вариант?' });
+    finish(state, 'needs_human', { feedback: 'Which option?' });
     expect(group(state)).toMatchObject({ status: 'needs_human', humanOnly: null });
     expect(autopilotAnswers(queued(state), [state])).toHaveLength(1);
   });

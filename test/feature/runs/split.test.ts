@@ -29,31 +29,31 @@ describe('split step', () => {
     expect(attempt).toMatchObject({ specialist: 'plan', stepId: 'split' });
     expect(attempt.input.prompt).toContain('swarm_split');
     propose(state, [
-      { title: 'Вход', task: 'сделать вход' },
-      { title: 'Регистрация', task: 'сделать регистрацию' },
+      { title: 'Login', task: 'build the login' },
+      { title: 'Registration', task: 'build the registration' },
     ]);
     const effects = finish(state, 'done', { slug: SPLIT_GROUP });
     expect(effects).toEqual([]);
     expect(state.split?.status).toBe('merged');
     expect(state.groups.map((group) => [group.slug, group.status])).toEqual([
-      ['vhod', 'queued'],
-      ['registratsiya', 'queued'],
+      ['login', 'queued'],
+      ['registration', 'queued'],
     ]);
     dispatch([state], 1300);
-    expect(runningAttempt(state, 'vhod').stepId).toBe('plan');
+    expect(runningAttempt(state, 'login').stepId).toBe('plan');
     expect(state.run.finishedAt).toBeNull();
   });
 
   it('puts the additional prompt of the split before the swarm_split instruction', () => {
     const text = CONFIG_TEXT.replace(
       '    feature:\n      steps:',
-      '    feature:\n      split: { specialist: plan, additional_prompt: Не больше одной группы на модуль }\n      steps:',
+      '    feature:\n      split: { specialist: plan, additional_prompt: No more than one group per module }\n      steps:',
     );
     const state = run(1, { split: true, configText: text });
     dispatch([state], 1100);
     const prompt = runningAttempt(state, SPLIT_GROUP).input.prompt;
-    const extra = prompt.indexOf('Не больше одной группы на модуль');
-    expect(extra).toBeGreaterThan(prompt.indexOf('задача 1'));
+    const extra = prompt.indexOf('No more than one group per module');
+    expect(extra).toBeGreaterThan(prompt.indexOf('task 1'));
     expect(extra).toBeLessThan(prompt.indexOf('swarm_split'));
   });
 
@@ -87,11 +87,11 @@ describe('split step', () => {
 
   it('asks a human and cancels like a normal step', () => {
     const state = splitting();
-    finish(state, 'needs_human', { slug: SPLIT_GROUP, feedback: 'на сколько частей?' });
+    finish(state, 'needs_human', { slug: SPLIT_GROUP, feedback: 'into how many parts?' });
     expect(state.split?.status).toBe('needs_human');
-    transition(state, { kind: 'answer', group: SPLIT_GROUP, answer: 'на две' }, 1400);
+    transition(state, { kind: 'answer', group: SPLIT_GROUP, answer: 'into two' }, 1400);
     dispatch([state], 1500);
-    expect(runningAttempt(state, SPLIT_GROUP).input.humanAnswer).toBe('на две');
+    expect(runningAttempt(state, SPLIT_GROUP).input.humanAnswer).toBe('into two');
     transition(state, { kind: 'cancel', group: null }, 1600);
     expect(state.split?.status).toBe('cancelled');
     expect(state.run.finishedAt).toBe(1600);
@@ -108,10 +108,7 @@ describe('split step', () => {
 
 describe('specialist limit on the split step', () => {
   it('makes the second split wait while the first one is running', () => {
-    const text = SPLIT_CONFIG.replace(
-      'plan: { name: Планировщик,',
-      'plan: { name: Планировщик, max: 1,',
-    );
+    const text = SPLIT_CONFIG.replace('plan: { name: Planner,', 'plan: { name: Planner, max: 1,');
     const first = run(1, { id: 'run000000001', split: true, configText: text });
     const second = run(1, { id: 'run000000002', now: 2000, split: true, configText: text });
     expect(dispatch([first, second], 3000)).toHaveLength(1);
@@ -160,10 +157,10 @@ describe('split into another pipeline', () => {
     dispatch([state], 1100);
     finish(state, 'done');
     dispatch([state], 1500);
-    finish(state, 'rejected', { feedback: 'мало' });
+    finish(state, 'rejected', { feedback: 'too few' });
     dispatch([state], 1600);
     expect(runningAttempt(state).stepId).toBe('research');
-    expect(runningAttempt(state).input.feedback).toBe('мало');
+    expect(runningAttempt(state).input.feedback).toBe('too few');
   });
 
   it('keeps the steps of the run when the target changes in the configuration', () => {

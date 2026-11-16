@@ -230,17 +230,17 @@ describe('specialists in the palette', () => {
   it('shows the name and finds the specialist by the name and by the slug', async () => {
     mount([runView()], {
       config: vi.fn(async () =>
-        configView({ specialists: [specialistEntry('reviewer', {}, { name: 'Ревьюер' })] }),
+        configView({ specialists: [specialistEntry('reviewer', {}, { name: 'Inspector' })] }),
       ),
     });
     openPalette();
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByRole('option', { name: 'Ревьюер' })).toBeTruthy();
+    expect(await within(dialog).findByRole('option', { name: 'Inspector' })).toBeTruthy();
     const box = within(dialog).getByRole('combobox');
-    fireEvent.change(box, { target: { value: 'ревью' } });
-    expect(within(dialog).queryByRole('option', { name: 'Ревьюер' })).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'inspec' } });
+    expect(within(dialog).queryByRole('option', { name: 'Inspector' })).toBeTruthy();
     fireEvent.change(box, { target: { value: 'reviewer' } });
-    const item = await within(dialog).findByRole('option', { name: 'Ревьюер' });
+    const item = await within(dialog).findByRole('option', { name: 'Inspector' });
     fireEvent.click(item);
     await waitFor(() => expect(window.location.hash).toBe('#specialists/reviewer'));
   });

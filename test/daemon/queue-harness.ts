@@ -35,7 +35,7 @@ export async function add(h: Harness, task: string, extra: Record<string, unknow
     repository: h.repo,
     pipeline: 'feature',
     // the fake agent counts its script per group: one task text makes the counter global
-    task: 'работа',
+    task: 'work',
     title: task,
     ...extra,
   })) as QueueView & { item: string };
@@ -62,8 +62,8 @@ export const allRuns = async (h: Harness): Promise<RunView[]> =>
 export const WRITE_LIB = { write: { 'lib.ts': 'export const value = 2;\n' } };
 
 export const WORKER_QUEUE_CONFIG = PIPELINE_CONFIG.replace(
-  'coder: { name: Кодировщик }',
-  'coder: { name: Кодировщик, queue: true }',
+  'coder: { name: Coder }',
+  'coder: { name: Coder, queue: true }',
 );
 
 export const itemById = (queue: QueueView, id: string) =>
@@ -73,7 +73,7 @@ export async function run_(h: Harness, title: string, after: string[]): Promise<
   return (await h.call('run', {
     repository: h.repo,
     pipeline: 'feature',
-    task: 'работа',
+    task: 'work',
     title,
     after,
   })) as RunQueued;

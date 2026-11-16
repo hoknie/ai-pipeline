@@ -9,8 +9,8 @@ import { run, start } from './control-harness.ts';
 
 function configuration(effort: string, variant: string): string {
   return CODE_ONLY_CONFIG.replace(
-    'coder: { name: Кодировщик }',
-    `coder: { name: Кодировщик, runtime: opencode, model: openai/gpt-6.1-sol, reasoning_effort: ${effort}, variant: ${variant} }`,
+    'coder: { name: Coder }',
+    `coder: { name: Coder, runtime: opencode, model: openai/gpt-6.1-sol, reasoning_effort: ${effort}, variant: ${variant} }`,
   );
 }
 
@@ -51,11 +51,11 @@ describe('OpenCode reasoning settings of a run', () => {
 
   it('continues the same session after an answer with snapshot options', async () => {
     const h = await start(configuration('high', 'deep'));
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'Продолжить?' }, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'Continue?' }, {}] });
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
     writeConfigDirectory(h.repo, configuration('xhigh', 'concise'));
-    await h.call('answer', { runId, group: 'g1', answer: 'Да' });
+    await h.call('answer', { runId, group: 'g1', answer: 'Yes' });
     await h.waitFor(runId, (view) => view.finished);
     const calls = launches(h);
     expect(calls.map(({ effort, variant }) => ({ effort, variant }))).toEqual([

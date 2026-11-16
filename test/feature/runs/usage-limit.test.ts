@@ -19,7 +19,7 @@ function hitLimit(
   state: RunState,
   options: { onLimit?: OnLimit; resetsAt?: number | null; now?: number; slug?: string } = {},
 ) {
-  const slug = options.slug ?? 'gruppa-1';
+  const slug = options.slug ?? 'group-1';
   const attempt = runningAttempt(state, slug);
   return transition(
     state,
@@ -75,7 +75,7 @@ describe('a group that ran out of the usage limit', () => {
       status: 'failed',
       reason: `usage limit, resets ${clockTime(RESET)}`,
     });
-    transition(state, { kind: 'retry', group: 'gruppa-1' }, 3000);
+    transition(state, { kind: 'retry', group: 'group-1' }, 3000);
     expect(group(state).status).toBe('queued');
   });
 
@@ -84,7 +84,7 @@ describe('a group that ran out of the usage limit', () => {
     step(state);
     hitLimit(state, { onLimit: 'stop' });
     expect(state.run.finishedAt).not.toBeNull();
-    const effects = transition(state, { kind: 'retry', group: 'gruppa-1', hold: 'frozen' }, 3000);
+    const effects = transition(state, { kind: 'retry', group: 'group-1', hold: 'frozen' }, 3000);
     expect(group(state).status).toBe('queued');
     expect(state.run.hold).toBe('frozen');
     expect(state.run.finishedAt).toBeNull();
@@ -100,9 +100,9 @@ describe('a group that ran out of the usage limit', () => {
       state,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
-        report: { verdict: 'done', summary: 'план', feedback: null },
+        report: { verdict: 'done', summary: 'plan', feedback: null },
       },
       1800,
     );
@@ -150,7 +150,7 @@ describe('holding a runtime until the limit resets', () => {
     finish(other, 'done');
     const effects = dispatch([limited, other], 3000);
     expect(effects).toEqual([
-      { kind: 'start_attempt', run: 'run000000002', group: 'gruppa-1', seq: 2 },
+      { kind: 'start_attempt', run: 'run000000002', group: 'group-1', seq: 2 },
     ]);
     expect(runningAttempt(other).runtime).toBe('opencode');
   });

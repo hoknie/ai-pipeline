@@ -13,10 +13,10 @@ afterEach(() => cleanup());
 const artifact = (over: Partial<ArtifactView> = {}): ArtifactView => ({
   id: 'a1',
   step: 'review',
-  stepName: 'Ревьюер',
+  stepName: 'Inspector',
   seq: 2,
   specialist: 'reviewer',
-  title: 'Итог ревью',
+  title: 'Review summary',
   fileName: 'report.md',
   size: 1536,
   createdAt: new Date(2026, 0, 10, 14, 32).getTime(),
@@ -24,7 +24,7 @@ const artifact = (over: Partial<ArtifactView> = {}): ArtifactView => ({
   ...over,
 });
 
-function mount(list: ArtifactView[], text = '# Заголовок\n\nтекст') {
+function mount(list: ArtifactView[], text = '# Heading\n\nbody') {
   const api = fakeApi({
     groupArtifacts: vi.fn(async () => list),
     artifactText: vi.fn(async () => text),
@@ -46,9 +46,9 @@ function mount(list: ArtifactView[], text = '# Заголовок\n\nтекст'
 describe('artifacts tab', () => {
   it('shows the step, title, file, date and size of an artifact', async () => {
     mount([artifact()]);
-    const row = (await screen.findByText('Итог ревью')).closest('tr')!;
+    const row = (await screen.findByText('Review summary')).closest('tr')!;
     const cells = within(row).getAllByRole('cell');
-    expect(cells[0]!.textContent).toBe('Ревьюер · #2');
+    expect(cells[0]!.textContent).toBe('Inspector · #2');
     expect(cells[0]!.getAttribute('title')).toBe('review · reviewer');
     expect(cells[2]!.querySelector('code')?.textContent).toBe('report.md');
     const time = cells[3]!.querySelector('time')!;
@@ -72,7 +72,7 @@ describe('artifacts tab', () => {
     const restore = setWindowWidth(1600);
     const { api } = mount([artifact()]);
     fireEvent.click(await screen.findByRole('button', { name: 'Open report.md' }));
-    const heading = await screen.findByRole('heading', { name: 'Заголовок' });
+    const heading = await screen.findByRole('heading', { name: 'Heading' });
     expect(heading).toBeTruthy();
     expect(api.artifactText).toHaveBeenCalledWith('run1', 'login', 'a1');
     restore();
@@ -93,7 +93,7 @@ describe('artifacts tab', () => {
     mount([artifact()]);
     fireEvent.click(await screen.findByRole('button', { name: 'Open report.md' }));
     const pane = await screen.findByRole('region', { name: 'Preview of report.md' });
-    expect(within(pane).getByText('Итог ревью')).toBeTruthy();
+    expect(within(pane).getByText('Review summary')).toBeTruthy();
     expect(within(pane).getByText('report.md')).toBeTruthy();
     expect(within(pane).getByRole('link', { name: 'Download report.md' })).toBeTruthy();
     fireEvent.click(within(pane).getByRole('button', { name: 'Close preview' }));
@@ -145,7 +145,7 @@ describe('artifacts tab', () => {
     mount([artifact()]);
     fireEvent.click(await screen.findByRole('button', { name: 'Open report.md' }));
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByRole('heading', { name: 'Заголовок' })).toBeTruthy();
+    expect(await within(dialog).findByRole('heading', { name: 'Heading' })).toBeTruthy();
     restore();
   });
 

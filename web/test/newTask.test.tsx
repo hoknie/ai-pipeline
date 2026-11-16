@@ -347,7 +347,7 @@ describe('new task from the top strip', () => {
     const api = fakeApi({
       queue: vi.fn(async () => queueOf()),
       queueAdd: vi.fn(async () => ({
-        ...queueOf({ items: [queueItem('q12', 'Сделать вход', 12)] }),
+        ...queueOf({ items: [queueItem('q12', 'Build sign-in', 12)] }),
         item: 'q12',
       })),
     });
@@ -363,7 +363,7 @@ describe('new task from the top strip', () => {
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'Сделать вход' },
+      target: { value: 'Build sign-in' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task #12 created').length).toBeGreaterThan(0));
@@ -396,7 +396,9 @@ describe('new task from the top strip', () => {
     await waitFor(() => expect(button.disabled).toBe(false));
     fireEvent.click(button);
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
-    fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'черновик' } });
+    fireEvent.change(within(dialog).getByLabelText('Task text'), {
+      target: { value: 'rough draft' },
+    });
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New task' })).toBeNull());
     window.location.hash = '#queue';
@@ -404,7 +406,7 @@ describe('new task from the top strip', () => {
     fireEvent.click(within(controls).getByRole('button', { name: 'New task' }));
     const again = await screen.findByRole('dialog', { name: 'New task' });
     expect((within(again).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(
-      'черновик',
+      'rough draft',
     );
   });
   it('gives every field of the new task dialog the same height', async () => {
@@ -734,7 +736,7 @@ describe('subtask from the run header', () => {
     id: 'a1',
     repository: APP,
     number: 115,
-    title: 'Вход по ссылке',
+    title: 'Sign-in by link',
     finished: true,
     state: 'finished',
     finishedAt: 5_000,
@@ -757,7 +759,7 @@ describe('subtask from the run header', () => {
   it('opens the dialog with the finished run as the parent and sends it', async () => {
     const { api } = twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'child' } });
     await waitFor(() =>
       expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
@@ -778,14 +780,14 @@ describe('subtask from the run header', () => {
     fireEvent.change(within(first).getByLabelText('Task text'), { target: { value: 'kept' } });
     await close();
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('kept');
   });
 
   it('keeps the preset parent after add and continue', async () => {
     const { api } = twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     fireEvent.change(within(dialog).getByLabelText('Task text'), {
       target: { value: 'first child' },
     });
@@ -804,7 +806,7 @@ describe('subtask from the run header', () => {
     await waitFor(() =>
       expect(within(dialog).getByLabelText<HTMLTextAreaElement>('Task text').value).toBe(''),
     );
-    expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке');
+    expect(parentField(dialog).textContent).toBe('#115 Sign-in by link');
   });
 
   it('moves a draft typed for another repository and sets the parent', async () => {
@@ -823,7 +825,7 @@ describe('subtask from the run header', () => {
     await waitFor(() => expect(within(first).getAllByText(/lib old/).length).toBeGreaterThan(0));
     await close();
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     expect(within(dialog).getByRole('combobox', { name: 'Repository' }).textContent).toContain(
       'app',
     );
@@ -837,13 +839,13 @@ describe('subtask from the run header', () => {
   it('keeps the parent when queue and run events arrive while the dialog is open', async () => {
     twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     act(() => {
       FakeEventSource.last?.send({
         event: 'queue',
         queue: queueOf({ repository: APP, items: [queueItem('qa', 'app task', 1)] }),
       });
-      FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Вход' } });
+      FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Sign-in' } });
     });
     expect(parentField(dialog).textContent).toMatch(/^#115 /);
   });
@@ -853,7 +855,7 @@ describe('subtask from the run header', () => {
       id: 'l1',
       repository: LIB,
       number: 42,
-      title: 'Библиотека',
+      title: 'Library',
       finished: true,
       state: 'finished',
       finishedAt: 6_000,
@@ -865,7 +867,7 @@ describe('subtask from the run header', () => {
     // the list of all projects opens its first run
     await waitFor(() => expect(window.location.hash).toBe('#runs/l1'));
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#42 Библиотека'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#42 Library'));
     await waitFor(() => expect(api.pipelines).toHaveBeenCalledWith(LIB));
     await waitFor(() =>
       expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('docs'),
@@ -873,7 +875,7 @@ describe('subtask from the run header', () => {
     expect(within(dialog).getByRole('combobox', { name: 'Repository' }).textContent).toContain(
       'lib',
     );
-    expect(parentField(dialog).textContent).toBe('#42 Библиотека');
+    expect(parentField(dialog).textContent).toBe('#42 Library');
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: 'child' } });
     await waitFor(() =>
       expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' }).disabled).toBe(
@@ -892,12 +894,12 @@ describe('subtask from the run header', () => {
   it('lets the parent be removed and does not set it again on a plain New task', async () => {
     const { api } = twoRepositories({ runs: [finished] });
     const dialog = await createSubtask();
-    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Вход по ссылке'));
+    await waitFor(() => expect(parentField(dialog).textContent).toBe('#115 Sign-in by link'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove link' }));
     expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     // an event of a run while the dialog is open does not bring the parent back
     act(() => {
-      FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Вход' } });
+      FakeEventSource.last?.send({ event: 'run', run: { ...finished, title: 'Sign-in' } });
     });
     expect(within(dialog).queryByRole('combobox', { name: 'Linked task' })).toBeNull();
     await close();
@@ -936,11 +938,11 @@ describe('markdown field of the new task', () => {
 
   it('shows the text as Markdown in the preview and keeps the draft', async () => {
     const { api, dialog } = await openDialog();
-    const text = '# Заголовок\n\n- [x] готово\n\n**жирный**';
+    const text = '# Overview\n\n- [x] done\n\n**bold text**';
     fireEvent.change(within(dialog).getByLabelText('Task text'), { target: { value: text } });
     previewMarkdown(dialog);
-    expect(within(dialog).getByRole('heading', { name: 'Заголовок' })).toBeTruthy();
-    expect(within(dialog).getByText('жирный').tagName).toBe('STRONG');
+    expect(within(dialog).getByRole('heading', { name: 'Overview' })).toBeTruthy();
+    expect(within(dialog).getByText('bold text').tagName).toBe('STRONG');
     expect(within(dialog).getByRole<HTMLInputElement>('checkbox').checked).toBe(true);
     previewMarkdown(dialog, false);
     expect((within(dialog).getByLabelText('Task text') as HTMLTextAreaElement).value).toBe(text);
@@ -988,7 +990,7 @@ describe('markdown field of the new task', () => {
       expect(within(dialog).getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
     }
     const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    fireEvent.change(area, { target: { value: '# Итог' } });
+    fireEvent.change(area, { target: { value: '# Total' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Preview' }));
     expect(area.hidden).toBe(true);
     expect(
@@ -999,45 +1001,48 @@ describe('markdown field of the new task', () => {
     );
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Plain' }));
     expect(area.hidden).toBe(false);
-    expect(within(dialog).queryByRole('heading', { name: 'Итог' })).toBeNull();
+    expect(within(dialog).queryByRole('heading', { name: 'Total' })).toBeNull();
     expect(
       within(dialog).getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed'),
     ).toBe('false');
-    expect(area.value).toBe('# Итог');
+    expect(area.value).toBe('# Total');
   });
 
   it('puts the markup of a button into the draft and keeps the selection in the field', async () => {
     const { api, dialog } = await openDialog();
     fireEvent.click(within(dialog).getByRole('radio', { name: 'MD' }));
     const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    fireEvent.change(area, { target: { value: 'раз два' } });
+    fireEvent.change(area, { target: { value: 'one two' } });
     area.setSelectionRange(0, 3);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Bold' }));
-    expect(area.value).toBe('**раз** два');
+    expect(area.value).toBe('**one** two');
     expect([area.selectionStart, area.selectionEnd]).toEqual([2, 5]);
     expect(document.activeElement).toBe(area);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Bulleted list' }));
-    expect(area.value).toBe('- **раз** два');
+    expect(area.value).toBe('- **one** two');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Bulleted list' }));
-    expect(area.value).toBe('**раз** два');
+    expect(area.value).toBe('**one** two');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Quote' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: '> **раз** два' });
+    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: '> **one** two' });
   });
 
   it('pastes formatted text on Plain as Markdown', async () => {
     const { dialog } = await openDialog();
     const area = within(dialog).getByLabelText<HTMLTextAreaElement>('Task text');
-    const event = paste(area, { 'text/html': '<strong>важно</strong>', 'text/plain': 'важно' });
+    const event = paste(area, {
+      'text/html': '<strong>important</strong>',
+      'text/plain': 'important',
+    });
     expect(event.defaultPrevented).toBe(true);
-    expect(area.value).toBe('**важно**');
+    expect(area.value).toBe('**important**');
   });
 
   it('shows HTML in the text as text', async () => {
     const { dialog } = await openDialog();
     fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: '<img src=x alt="pic"> тут' },
+      target: { value: '<img src=x alt="pic"> here' },
     });
     previewMarkdown(dialog);
     expect(dialog.querySelector('img')).toBeNull();
@@ -1085,48 +1090,48 @@ describe('markdown field of the new task', () => {
     const second = within(dialog).getByLabelText('Text of group 2').closest('fieldset')!;
     const first = within(dialog).getByLabelText('Text of group 1').closest('fieldset')!;
     fireEvent.change(within(first).getByLabelText('Text of group 1'), {
-      target: { value: '## Раздел' },
+      target: { value: '## Section' },
     });
     fireEvent.change(within(second).getByLabelText('Text of group 2'), {
-      target: { value: '## Второй' },
+      target: { value: '## Second' },
     });
     previewMarkdown(second);
-    expect(within(second).getByRole('heading', { name: 'Второй' })).toBeTruthy();
+    expect(within(second).getByRole('heading', { name: 'Second' })).toBeTruthy();
     expect(within(first).queryByRole('heading')).toBeNull();
     expect(within(first).getByRole('radio', { name: 'Plain' }).getAttribute('aria-checked')).toBe(
       'true',
     );
     expect(within(first).getByLabelText<HTMLTextAreaElement>('Text of group 1').hidden).toBe(false);
     previewMarkdown(first);
-    expect(within(first).getByRole('heading', { name: 'Раздел' })).toBeTruthy();
+    expect(within(first).getByRole('heading', { name: 'Section' })).toBeTruthy();
   });
 
   it('pastes formatted text into the middle of the text as Markdown', async () => {
     const { api, dialog } = await openDialog();
     const area = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
-    fireEvent.change(area, { target: { value: 'до после' } });
+    fireEvent.change(area, { target: { value: 'in out' } });
     area.setSelectionRange(3, 3);
     const event = paste(area, {
-      'text/html': '<h2>Итог</h2><ul><li>раз</li><li>два</li></ul>',
-      'text/plain': 'Итог раз два',
+      'text/html': '<h2>Total</h2><ul><li>one</li><li>two</li></ul>',
+      'text/plain': 'Total one two',
     });
     expect(event.defaultPrevented).toBe(true);
-    const md = '## Итог\n\n- раз\n- два';
-    expect(area.value).toBe(`до ${md}после`);
+    const md = '## Total\n\n- one\n- two';
+    expect(area.value).toBe(`in ${md}out`);
     expect(area.selectionStart).toBe(3 + md.length);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
-    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: `до ${md}после` });
+    expect(vi.mocked(api.queueAdd).mock.calls[0]![0]).toMatchObject({ task: `in ${md}out` });
   });
 
   it('leaves Markdown source and plain text to the browser', async () => {
     const { dialog } = await openDialog();
     const area = within(dialog).getByLabelText('Task text') as HTMLTextAreaElement;
-    const plain = paste(area, { 'text/plain': '# Заголовок\n- пункт' });
+    const plain = paste(area, { 'text/plain': '# Overview\n- item' });
     expect(plain.defaultPrevented).toBe(false);
     const code = paste(area, {
-      'text/html': '<div><span># Заголовок</span></div><div><span>- пункт</span></div>',
-      'text/plain': '# Заголовок\n- пункт',
+      'text/html': '<div><span># Overview</span></div><div><span>- item</span></div>',
+      'text/plain': '# Overview\n- item',
     });
     expect(code.defaultPrevented).toBe(false);
     expect(area.value).toBe('');
@@ -1136,8 +1141,8 @@ describe('markdown field of the new task', () => {
     const { dialog } = await openDialog();
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Groups' }));
     const area = within(dialog).getByLabelText('Text of group 1') as HTMLTextAreaElement;
-    paste(area, { 'text/html': '<p>см. <a href="https://e.com">сайт</a></p>' });
-    expect(area.value).toBe('см. [сайт](https://e.com)');
+    paste(area, { 'text/html': '<p>see <a href="https://e.com">site</a></p>' });
+    expect(area.value).toBe('see [site](https://e.com)');
   });
 });
 
@@ -1270,7 +1275,7 @@ describe('add and continue', () => {
     await chooseKind(within(dialog).getByRole('combobox', { name: 'Link kind' }), 'Parent');
     const parent = within(dialog).getByRole('combobox', { name: 'Linked task' });
     fireEvent.click(parent);
-    fireEvent.click(await screen.findByRole('option', { name: /добавить вход/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /add sign-in/ }));
     await waitFor(() => {
       expect(parent.getAttribute('aria-expanded')).toBe('false');
       expect(document.activeElement).toBe(parent);
@@ -1298,7 +1303,7 @@ describe('add and continue', () => {
     await waitFor(() =>
       expect(
         within(dialog).getAllByRole('combobox', { name: 'Linked task' })[0]!.textContent,
-      ).toMatch(/добавить вход/),
+      ).toMatch(/add sign-in/),
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add and continue' }));
     await waitFor(() => expect(api.queueAdd).toHaveBeenCalledTimes(1));
@@ -1318,7 +1323,7 @@ describe('add and continue', () => {
     );
     expect(within(dialog).getAllByText('auth').length).toBeGreaterThan(0);
     expect(within(dialog).getByRole('combobox', { name: 'Linked task' }).textContent).toMatch(
-      /добавить вход/,
+      /add sign-in/,
     );
     expect(
       within(dialog).getByRole('switch', { name: 'Postpone' }).getAttribute('aria-checked'),
@@ -1333,7 +1338,7 @@ describe('add and continue', () => {
     await waitFor(() =>
       expect(
         within(again).getAllByRole('combobox', { name: 'Linked task' })[0]!.textContent,
-      ).toMatch(/добавить вход/),
+      ).toMatch(/add sign-in/),
     );
     fireEvent.click(within(again).getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(plain.queueAdd).toHaveBeenCalledTimes(1));
@@ -1568,16 +1573,16 @@ describe('new task in several projects', () => {
     const dialog = await openMulti();
     await pickProject(dialog, 'lib');
     fireEvent.change(within(dialog).getByLabelText('Name'), {
-      target: { value: 'Email в профиле' },
+      target: { value: 'Email in profile' },
     });
     expect(within(dialog).getByLabelText<HTMLInputElement>('Shared tag').value).toBe(
-      'Email в профиле',
+      'Email in profile',
     );
     fireEvent.change(within(dialog).getByLabelText('Task text'), {
-      target: { value: 'Поле email' },
+      target: { value: 'Email field' },
     });
     fireEvent.change(within(dialog).getByLabelText('Addition for lib'), {
-      target: { value: 'Форма' },
+      target: { value: 'Form' },
     });
     fireEvent.click(within(dialog).getByRole('switch', { name: 'In turn' }));
     await clickAdd(dialog);
@@ -1585,10 +1590,10 @@ describe('new task in several projects', () => {
     expect(add).toHaveBeenCalledWith({
       repositories: [APP, LIB],
       pipeline: 'feature',
-      task: 'Поле email',
-      title: 'Email в профиле',
-      notes: { [LIB]: 'Форма' },
-      tag: 'Email в профиле',
+      task: 'Email field',
+      title: 'Email in profile',
+      notes: { [LIB]: 'Form' },
+      tag: 'Email in profile',
       chain: true,
     });
   });
@@ -1701,7 +1706,7 @@ describe('new task in several projects', () => {
 
 describe('the shared tag of a title', () => {
   it('cuts at the last whole word within 30 characters', () => {
-    expect(defaultSharedTag('Email в профиле')).toBe('Email в профиле');
+    expect(defaultSharedTag('Email in profile')).toBe('Email in profile');
     expect(defaultSharedTag('  Add   the email field to the user profile page ')).toBe(
       'Add the email field to the',
     );

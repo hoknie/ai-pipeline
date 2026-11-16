@@ -24,19 +24,19 @@ describe('text for people', () => {
   it('shows the run header, counts and one line per group', () => {
     const state = run(2);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'OAuth или пароль?\nподробности', now: 61_000 });
+    finish(state, 'needs_human', { feedback: 'OAuth or password?\ndetails', now: 61_000 });
     expect(formatRun(runView(state, 121_000), 121_000)).toBe(
       [
         'Run #1 run000000001 · feature · needs_human · refs/aip/run000000001/run',
-        'Title: Группа 1, Группа 2',
+        'Title: Group 1, Group 2',
         'Repository: /repo',
         'Groups: running 1 · needs_human 1 (2) · usage — · started 2m00s ago',
-        'Steps: Планировщик [active] → Кодировщик → Ревьюер → Тестировщик',
+        'Steps: Planner [active] → Coder → Reviewer → Tester',
         'Progress: 0/8 steps',
         '',
-        'GROUP     STATUS       STEP         ROUND  TIME   CHANGES  DELIVERY  NOTE',
-        'gruppa-1  needs_human  Планировщик  1      1m00s  —        —         question: OAuth или пароль?',
-        'gruppa-2  running      Планировщик  1      2m00s  —        —',
+        'GROUP    STATUS       STEP     ROUND  TIME   CHANGES  DELIVERY  NOTE',
+        'group-1  needs_human  Planner  1      1m00s  —        —         question: OAuth or password?',
+        'group-2  running      Planner  1      2m00s  —        —',
       ].join('\n'),
     );
   });
@@ -44,15 +44,15 @@ describe('text for people', () => {
   it('marks a question only a person answers in the table and the details', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'Глянь сам', humanOnly: true, now: 61_000 });
+    finish(state, 'needs_human', { feedback: 'See for yourself', humanOnly: true, now: 61_000 });
     expect(formatRun(runView(state, 121_000), 121_000)).toContain(
-      'question (human only): Глянь сам',
+      'question (human only): See for yourself',
     );
     expect(runView(state, 121_000).groups[0]?.humanOnly).toBe('request');
     state.groups[0]!.humanOnly = 'review';
     expect(formatRun(runView(state, 121_000), 121_000)).toContain('question (human review)');
     expect(formatGroup(groupView(state, group(state), '/w', null, 121_000))).toContain(
-      'Question (human review): Глянь сам',
+      'Question (human review): See for yourself',
     );
   });
 
@@ -61,7 +61,7 @@ describe('text for people', () => {
     state.run.hold = 'frozen';
     const text = formatRun(runView(state, 2000), 2000);
     expect(text).toContain('Groups: frozen 1');
-    expect(text).toMatch(/gruppa-1\s+frozen/);
+    expect(text).toMatch(/group-1\s+frozen/);
   });
 
   it('shows the resolver round and conflicting files of a delivery', () => {
@@ -74,7 +74,7 @@ describe('text for people', () => {
     }
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
       5000,
     );
     transition(state, { kind: 'deliver_requested', groups: null, force: false, files: [] }, 6000);
@@ -90,24 +90,22 @@ describe('text for people', () => {
   it('lists every attempt with its verdict, summary and feedback', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'done', { summary: 'план готов', now: 4000 });
+    finish(state, 'done', { summary: 'plan ready', now: 4000 });
     state.groups[0]!.attempts[0]!.usage = { inputTokens: 10, outputTokens: 2 };
     const text = formatGroup(
-      groupView(state, state.groups[0]!, '/w/gruppa-1', { seq: 1, lines: ['line'] }, 5000),
+      groupView(state, state.groups[0]!, '/w/group-1', { seq: 1, lines: ['line'] }, 5000),
     );
-    expect(text).toContain('Group gruppa-1 (Группа 1) · queued · run run000000001');
-    expect(text).toContain('Ref: refs/aip/run000000001/groups/gruppa-1');
-    expect(text).toContain(
-      '#1 Планировщик r1 · plan (claude) · finished done · 3s · 10 in / 2 out',
-    );
-    expect(text).toContain('summary: план готов');
+    expect(text).toContain('Group group-1 (Group 1) · queued · run run000000001');
+    expect(text).toContain('Ref: refs/aip/run000000001/groups/group-1');
+    expect(text).toContain('#1 Planner r1 · plan (claude) · finished done · 3s · 10 in / 2 out');
+    expect(text).toContain('summary: plan ready');
     expect(text).toContain('Log of attempt #1:\n  line');
   });
 
   it('lists refused calls under the attempt and hints the patterns once per group', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'запустите тесты', now: 4000 });
+    finish(state, 'needs_human', { feedback: 'run the tests', now: 4000 });
     state.groups[0]!.attempts[0]!.denials = [
       { tool: 'Bash', command: 'claude plugin test a' },
       { tool: 'Bash', command: 'cd w && claude plugin test b' },
@@ -153,7 +151,7 @@ describe('text for people', () => {
     expect(view.warnings).toEqual([]);
     expect(view.attempts[0]?.outsideChanges).toEqual(['README.md', 'docs/a.md']);
     expect(formatGroup(view)).toContain(
-      'Warning: files in the working copy changed during step Планировщик: README.md, docs/a.md',
+      'Warning: files in the working copy changed during step Planner: README.md, docs/a.md',
     );
     expect(runView(state, 2000).groups[0]?.warnings).toBe(1);
     state.groups[0]!.warnings.push('other');
@@ -181,7 +179,7 @@ describe('text for people', () => {
     ]);
     expect(runView(state, 4000).groups[0]?.warnings).toBe(3);
     expect(formatGroup(view)).toContain(
-      'Warning: files in the working copy changed during step Планировщик: swarm.yaml, README.md',
+      'Warning: files in the working copy changed during step Planner: swarm.yaml, README.md',
     );
   });
 
@@ -190,7 +188,7 @@ describe('text for people', () => {
     for (const now of [1000, 2000, 3000]) {
       step(state, now);
       finish(state, 'needs_human', { now: now + 500 });
-      transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'да' }, now + 600);
+      transition(state, { kind: 'answer', group: 'group-1', answer: 'yes' }, now + 600);
     }
     const group = state.groups[0]!;
     expect(group.attempts.map((attempt) => attempt.stepId)).toEqual(['plan', 'plan', 'plan']);
@@ -259,15 +257,15 @@ describe('text for people', () => {
 
   it('shows the title and the name of a named run', () => {
     const state = run(1);
-    state.run.title = 'Флаг --json';
+    state.run.title = 'Flag --json';
     state.run.name = 'add-json-flag';
-    expect(formatRun(runView(state, 2000), 2000)).toContain('Title: Флаг --json (add-json-flag)');
-    expect(formatRunList([runView(state, 2000)])).toContain('Флаг --json');
+    expect(formatRun(runView(state, 2000), 2000)).toContain('Title: Flag --json (add-json-flag)');
+    expect(formatRunList([runView(state, 2000)])).toContain('Flag --json');
   });
 
   it('lists runs by the first line of their task with the totals of merged groups', () => {
     const state = run(1);
-    state.groups[0]!.task = 'добавить команду aip version\nподробности';
+    state.groups[0]!.task = 'add the aip version command\ndetails';
     state.groups[0]!.status = 'merged';
     const diff = {
       files: [{ path: 'a.ts', added: 5, removed: 1 }],
@@ -276,7 +274,7 @@ describe('text for people', () => {
       revision: 'aaa..bbb',
     };
     const list = formatRunList([runView(state, 2000, () => diff)]);
-    expect(list).toContain('добавить команду aip version');
+    expect(list).toContain('add the aip version command');
     expect(list).toContain('1 file +5 −1');
     expect(list.split('\n')[0]).toContain('TITLE');
   });
@@ -287,7 +285,7 @@ describe('text for people', () => {
     const view = runView(state, 2000);
     expect(view.topology.steps.map((entry) => entry.id)).toEqual(['plan', 'code', 'review', 'qa']);
     expect(view.topology.steps[0]?.groups).toEqual([
-      { slug: 'gruppa-1', title: 'Группа 1', status: 'running' },
+      { slug: 'group-1', title: 'Group 1', status: 'running' },
     ]);
   });
 });
@@ -296,12 +294,12 @@ describe('queue text', () => {
   it('shows the state, the stop reason, runs and numbered items', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'вопрос', now: 2000 });
+    finish(state, 'needs_human', { feedback: 'a question', now: 2000 });
     const queue = emptyQueue('/repo', 1);
     // local time: the expected text does not depend on the time zone of the machine
     const first = new Date(2026, 10, 1, 14, 32).getTime();
     const second = new Date(2026, 11, 3, 9, 5).getTime();
-    addItem(queue, { pipeline: 'feature', task: 'первая строка\nвторая' }, 'q1', first);
+    addItem(queue, { pipeline: 'feature', task: 'first line\nsecond' }, 'q1', first);
     addItem(
       queue,
       {
@@ -310,26 +308,26 @@ describe('queue text', () => {
           { title: 'a', task: 'b' },
           { title: 'c', task: 'd' },
         ],
-        title: 'Пара',
+        title: 'Pair',
       },
       'q2',
       second,
     );
     queue.parallel = 2;
     queue.runs = [state.run.id];
-    queue.stop = { kind: 'problem', run: state.run.id, group: 'gruppa-1', reason: 'needs_human' };
+    queue.stop = { kind: 'problem', run: state.run.id, group: 'group-1', reason: 'needs_human' };
     const view = queueView(queue, (id) => (id === state.run.id ? state : undefined));
     expect(view.runs[0]).toMatchObject({ problem: { reason: 'needs_human' } });
     expect(formatQueue(view)).toBe(
       [
         'Queue: stopped, parallel 2 (1 of 2 places taken), autopilot off, auto answer off, skip failed off',
-        'Stopped: run run000000001, group gruppa-1: needs_human',
+        'Stopped: run run000000001, group group-1: needs_human',
         'Runs holding a place:',
-        '  #1 run000000001  needs_human  feature  задача 1  0/1 groups · steps 0/4',
-        '    problem: needs_human in gruppa-1',
+        '  #1 run000000001  needs_human  feature  task 1  0/1 groups · steps 0/4',
+        '    problem: needs_human in group-1',
         'Waiting:',
-        '  1. #1 q1  feature  первая строка  added 2026-11-01 14:32',
-        '  2. #2 q2  feature  2 groups [Пара]  added 2026-12-03 09:05',
+        '  1. #1 q1  feature  first line  added 2026-11-01 14:32',
+        '  2. #2 q2  feature  2 groups [Pair]  added 2026-12-03 09:05',
       ].join('\n'),
     );
   });
@@ -337,7 +335,7 @@ describe('queue text', () => {
   it('shows progress, active steps, delivery and splitting', () => {
     const working = run(3, { id: 'run00000000a' });
     step(working);
-    group(working, 'gruppa-1').status = 'merged';
+    group(working, 'group-1').status = 'merged';
     const delivered = run(1, { id: 'run00000000b' });
     group(delivered).status = 'merged';
     group(delivered).delivery.state = 'pending';
@@ -352,7 +350,7 @@ describe('queue text', () => {
     const text = formatQueue(view);
     expect(text).toContain('Queue: running, parallel 2 (2 of 2 places taken)');
     expect(text).toContain(
-      'feature  Группа 1, Группа 2, Группа 3  1/3 groups · steps 4/12\n    gruppa-2: Планировщик',
+      'feature  Group 1, Group 2, Group 3  1/3 groups · steps 4/12\n    group-2: Planner',
     );
     expect(text).toContain('1/1 groups · steps 4/4 · delivering');
     const splitting = {
@@ -419,8 +417,8 @@ describe('queue text', () => {
     expect(plain.find((line) => line.includes('q1'))).toContain('delivery: commit');
     expect(plain.find((line) => line.includes('q2'))).not.toContain('delivery:');
     expect(plain.join('\n')).not.toContain('Autopilot answer');
-    queue.autopilotAnswer = 'Согласен\nи точка';
-    expect(formatQueue(queueView(queue, () => undefined))).toContain('Autopilot answer: Согласен');
+    queue.autopilotAnswer = 'Agreed\nand that is it';
+    expect(formatQueue(queueView(queue, () => undefined))).toContain('Autopilot answer: Agreed');
   });
 
   it('shows an item error and an empty queue', () => {
@@ -461,14 +459,14 @@ describe('colored text', () => {
   it('puts badges on states and aligns columns by visible width', () => {
     const state = run(2);
     state.groups[0]!.status = 'failed';
-    state.groups[0]!.reason = 'сломалось';
+    state.groups[0]!.reason = 'broke';
     state.groups[1]!.status = 'running';
     const text = formatRun(runView(state, 5000), 5000, style);
     expect(text).toContain(style.danger('✗ failed'));
     expect(text).toContain(style.command('▸ running'));
     const lines = ansi(text).split('\n');
     const header = lines.find((line) => line.startsWith('GROUP'))!;
-    const rows = lines.filter((line) => line.startsWith('gruppa-'));
+    const rows = lines.filter((line) => line.startsWith('group-'));
     expect(rows).toHaveLength(2);
     for (const row of rows) {
       const at = header.indexOf('STEP');
@@ -476,7 +474,7 @@ describe('colored text', () => {
       expect(row[at]).not.toBe(' ');
     }
     expect(text).toContain(style.muted('GROUP'));
-    expect(text).toContain(style.danger('сломалось'));
+    expect(text).toContain(style.danger('broke'));
   });
 
   it('shows waiting and stopped states with badges', () => {
@@ -549,8 +547,8 @@ describe('colored text', () => {
       [
         'Queue: stopped, parallel 1 (0 of 1 places taken), autopilot on, auto answer off, skip failed on',
         'Skipped with a problem:',
-        `  #1 ${state.run.id}  failed  feature  задача 1  1/1 groups · steps 0/4 · delivering`,
-        '    problem: failed in gruppa-1',
+        `  #1 ${state.run.id}  failed  feature  task 1  1/1 groups · steps 0/4 · delivering`,
+        '    problem: failed in group-1',
         'No tasks waiting.',
       ].join('\n'),
     );
@@ -569,8 +567,8 @@ describe('colored text', () => {
   it('paints warnings yellow in a group', () => {
     const state = run(1);
     const view = groupView(state, state.groups[0]!, '/w', null, 2000);
-    view.warnings = ['осторожно'];
-    expect(formatGroup(view, style)).toContain(style.warning('Warning: осторожно'));
+    view.warnings = ['careful'];
+    expect(formatGroup(view, style)).toContain(style.warning('Warning: careful'));
     expect(strip(formatGroup(view, style))).toBe(strip(formatGroup(view)));
   });
 
@@ -688,7 +686,7 @@ describe('usage limit in the text output', () => {
 
   it('shows the stop by a usage limit and a returned run in the queue', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'работа' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'work' }, 'q1', 2);
     queue.items[0]!.run = 'run000000001';
     queue.stop = {
       kind: 'limit',
@@ -713,7 +711,7 @@ describe('usage limit in the text output', () => {
 
   it('marks the item of a paused run', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'работа' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'work' }, 'q1', 2);
     queue.items[0]!.run = 'run000000001';
     const paused = run(1);
     paused.run.hold = 'paused';
@@ -723,7 +721,7 @@ describe('usage limit in the text output', () => {
 
   it('shows frozen for the item of a frozen run, priority on a card and frozen in the state column', () => {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'работа' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'work' }, 'q1', 2);
     queue.items[0]!.run = 'run000000001';
     const frozen = run(1);
     frozen.run.hold = 'frozen';
@@ -746,7 +744,7 @@ describe('usage limit in the text output', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq,
         exit: {
           sessionId: 's',
@@ -771,7 +769,7 @@ describe('live usage in text', () => {
         kind: 'attempt_usage',
         updates: [
           {
-            group: 'gruppa-1',
+            group: 'group-1',
             seq: 1,
             usage: { inputTokens: 1200, outputTokens: 300 },
           },
@@ -836,7 +834,7 @@ describe('system stages and waiting in text', () => {
       3000,
     );
     expect(text).toContain('waiting for coder');
-    expect(text).toMatch(/gruppa-1\s+waiting/);
+    expect(text).toMatch(/group-1\s+waiting/);
     expect(text).toContain('waiting 1');
   });
 
@@ -877,7 +875,7 @@ describe('system stages and waiting in text', () => {
         () => ({ reason: 'network', problem: 'interface wt0 is down', until: null }),
       ),
     );
-    expect(text).toContain('gruppa-1: Планировщик (waiting for network)');
+    expect(text).toContain('group-1: Planner (waiting for network)');
     expect(text).not.toContain('wt0');
     const shown = formatRun(
       runView(
@@ -906,7 +904,7 @@ describe('system stages and waiting in text', () => {
         () => specialistWait,
       ),
     );
-    expect(text).toContain('gruppa-1: Планировщик (waiting for coder)');
+    expect(text).toContain('group-1: Planner (waiting for coder)');
   });
 });
 
@@ -916,7 +914,7 @@ describe('skipped steps in text', () => {
     expect(formatRun(runView(state, 1000), 1000)).not.toContain('Skipped steps');
     state.run.skippedSteps = ['review', 'qa'];
     expect(formatRun(runView(state, 1000), 1000)).toContain(
-      'Skipped steps: Ревьюер (review), Тестировщик (qa)',
+      'Skipped steps: Reviewer (review), Tester (qa)',
     );
   });
 
@@ -926,37 +924,39 @@ describe('skipped steps in text', () => {
       {
         id: 'review',
         specialist: 'reviewer',
-        name: 'Ревьюер (review)',
+        name: 'Reviewer (review)',
         skipped: true,
         state: 'upcoming',
       },
       {
         id: 'review-2',
         specialist: 'reviewer',
-        name: 'Ревьюер (review-2)',
+        name: 'Reviewer (review-2)',
         skipped: true,
         state: 'upcoming',
       },
     ];
-    expect(formatRun(view, 1000)).toContain('Skipped steps: Ревьюер (review), Ревьюер (review-2)');
+    expect(formatRun(view, 1000)).toContain(
+      'Skipped steps: Reviewer (review), Reviewer (review-2)',
+    );
   });
 });
 
 describe('name of the pipeline in text', () => {
-  const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n');
+  const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: New feature\n');
 
   it('prints «name (id)» in the run header, and the id alone without a name', () => {
     expect(formatRun(runView(run(1, { configText: named }), 1000), 1000)).toContain(
-      'Новая функция (feature) ·',
+      'New feature (feature) ·',
     );
     expect(formatRun(runView(run(1), 1000), 1000)).toContain(' · feature · ');
   });
 
   it('prints «name (id)» in the run list and in the queue lines', () => {
-    expect(pipelineLabel('feature', 'Новая функция')).toBe('Новая функция (feature)');
+    expect(pipelineLabel('feature', 'New feature')).toBe('New feature (feature)');
     expect(pipelineLabel('feature', 'feature')).toBe('feature');
     expect(formatRunList([runView(run(1, { configText: named }), 1000)])).toContain(
-      'Новая функция (feature)',
+      'New feature (feature)',
     );
   });
 });
@@ -967,30 +967,30 @@ describe('accepted answers of a group', () => {
     step(state, 1000);
     const group = state.groups[0]!;
     group.decisions.push(
-      { stepId: 'plan', question: 'Какой формат?', answer: 'JSON', by: 'human' },
-      { stepId: 'code', question: 'Продолжать?', answer: 'Да', by: 'autopilot' },
+      { stepId: 'plan', question: 'Which format?', answer: 'JSON', by: 'human' },
+      { stepId: 'code', question: 'Continue?', answer: 'Yes', by: 'autopilot' },
     );
     const view = groupView(state, group, '/w', null, 5000);
     expect(view.decisions.map((d) => d.by)).toEqual(['human', 'autopilot']);
     const text = formatGroup(view);
-    expect(text).toContain('Answer (human, plan): Какой формат? → JSON');
-    expect(text).toContain('Answer (autopilot, code): Продолжать? → Да');
+    expect(text).toContain('Answer (human, plan): Which format? → JSON');
+    expect(text).toContain('Answer (autopilot, code): Continue? → Yes');
   });
 
   it('attaches each answer to the attempt that asked the question', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'Какой формат?', now: 2000 });
+    finish(state, 'needs_human', { feedback: 'Which format?', now: 2000 });
     const group = state.groups[0]!;
     group.decisions.push({
       stepId: 'plan',
-      question: 'Какой формат?',
+      question: 'Which format?',
       answer: 'JSON',
       by: 'human',
     });
     const first = groupView(state, group, '/w', null, 5000);
     expect(first.attempts.map((a) => a.decision)).toEqual([
-      { question: 'Какой формат?', answer: 'JSON', by: 'human' },
+      { question: 'Which format?', answer: 'JSON', by: 'human' },
     ]);
     expect(formatGroup(first)).toContain('answer (human): JSON');
 
@@ -1006,37 +1006,37 @@ describe('accepted answers of a group', () => {
       report: null,
       status: 'running',
     });
-    group.decisions.push({ stepId: 'plan', question: 'Ещё?', answer: 'Да', by: 'autopilot' });
+    group.decisions.push({ stepId: 'plan', question: 'More?', answer: 'Yes', by: 'autopilot' });
     const second = groupView(state, group, '/w', null, 5000);
     expect(second.attempts.map((a) => a.decision?.by ?? null)).toEqual([
       'human',
       'autopilot',
       null,
     ]);
-    expect(formatGroup(second)).toContain('answer (autopilot): Да');
+    expect(formatGroup(second)).toContain('answer (autopilot): Yes');
   });
 
   it('keeps the answer on the second attempt after a skipped question', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'Первый?', now: 2000 });
+    finish(state, 'needs_human', { feedback: 'First?', now: 2000 });
     const group = state.groups[0]!;
     group.attempts.push({ ...group.attempts[0]!, seq: 2, round: 2 });
     group.decisions.push({
       stepId: 'plan',
-      question: 'Второй?',
-      answer: 'Да',
+      question: 'Second?',
+      answer: 'Yes',
       by: 'human',
       attemptSeq: 2,
     });
     const view = groupView(state, group, '/w', null, 5000);
-    expect(view.attempts.map((a) => a.decision?.answer ?? null)).toEqual([null, 'Да']);
+    expect(view.attempts.map((a) => a.decision?.answer ?? null)).toEqual([null, 'Yes']);
   });
 
   it('shows an answer on a rejected attempt and mixes numbered and plain decisions', () => {
     const state = run(1);
     step(state, 1000);
-    finish(state, 'needs_human', { feedback: 'Первый?', now: 2000 });
+    finish(state, 'needs_human', { feedback: 'First?', now: 2000 });
     const group = state.groups[0]!;
     group.attempts.push({ ...group.attempts[0]!, seq: 2, round: 2 });
     group.attempts.push({
@@ -1061,7 +1061,7 @@ describe('accepted answers of a run', () => {
     step(state, 1000);
     state.groups[0]!.decisions.push({
       stepId: 'plan',
-      question: 'OAuth или пароль?\nПодробности',
+      question: 'OAuth or password?\nDetails',
       answer: 'OAuth',
       by: 'human',
     });
@@ -1093,7 +1093,7 @@ describe('accepted answers of a run', () => {
     expect(text).toContain('Answers:');
     expect(text).toContain('→ OAuth');
     const line = text.split('\n').find((l) => l.includes('(human)'))!;
-    expect(line).toMatch(/^ {2}\S+ · plan \(human\): OAuth или пароль\? → OAuth$/);
+    expect(line).toMatch(/^ {2}\S+ · plan \(human\): OAuth or password\? → OAuth$/);
     expect(text.indexOf('GROUP')).toBeLessThan(text.indexOf('Answers:'));
   });
 
@@ -1111,8 +1111,8 @@ describe('actions in the System line', () => {
       split: true,
       configText: `swarm:
   specialists:
-    plan: { name: Планировщик }
-    coder: { name: Кодировщик }
+    plan: { name: Planner }
+    coder: { name: Coder }
   actions:
     prepare: { run: make }
     commit: { run: commit }
@@ -1153,7 +1153,7 @@ describe('observer in the text output', () => {
     const state = run(1);
     step(state, 1000);
     state.groups[0]!.status = 'failed';
-    state.run.repair.incident = { key: 'k', kind: 'failed', group: 'gruppa-1', detail: 'x' };
+    state.run.repair.incident = { key: 'k', kind: 'failed', group: 'group-1', detail: 'x' };
     state.repair = { ...state.groups[0]!, slug: '_repair', status: 'running' };
     const view = runView(state, 2000);
     expect(formatRunList([view])).toContain('repair');
@@ -1161,9 +1161,9 @@ describe('observer in the text output', () => {
     expect(text).toContain('repair');
     expect(text).toMatch(/System: observer/);
     expect(text).not.toContain('Observer cancelled');
-    state.run.repair.cancelReason = 'задача невыполнима';
+    state.run.repair.cancelReason = 'the task is impossible';
     expect(formatRun(runView(state, 2000), 2000)).toContain(
-      'Observer cancelled: задача невыполнима',
+      'Observer cancelled: the task is impossible',
     );
   });
 

@@ -39,8 +39,8 @@ export const TEST_TIMINGS: DaemonTimings = {
 export const PIPELINE_CONFIG = `swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
-    reviewer: { name: Ревьюер, permissions: read }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
   pipelines:
     feature:
       steps:
@@ -52,8 +52,8 @@ export const PIPELINE_CONFIG = `swarm:
 export const CODE_ONLY_CONFIG = `swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
-    reviewer: { name: Ревьюер, permissions: read }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
   pipelines:
     feature:
       steps:

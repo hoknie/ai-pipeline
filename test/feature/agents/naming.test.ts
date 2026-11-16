@@ -51,16 +51,18 @@ describe('one-shot calls', () => {
 
 describe('naming answers', () => {
   it('builds a prompt that carries the task', () => {
-    const prompt = namingPrompt('Добавить флаг --json');
-    expect(prompt).toContain('Добавить флаг --json');
+    const prompt = namingPrompt('Add a --json flag');
+    expect(prompt).toContain('Add a --json flag');
     expect(prompt).toContain('kebab-case');
   });
 
   it('reads the first JSON object and checks lengths and the name pattern', () => {
-    expect(parseNaming('Вот: {"title": "Флаг --json", "name": "add-json-flag"} готово')).toEqual({
-      title: 'Флаг --json',
-      name: 'add-json-flag',
-    });
+    expect(parseNaming('Here: {"title": "The --json flag", "name": "add-json-flag"} done')).toEqual(
+      {
+        title: 'The --json flag',
+        name: 'add-json-flag',
+      },
+    );
     expect(parseNaming('{"title": "x", "name": "Not Kebab"}')).toEqual({
       title: 'x',
       name: 'not-kebab',
@@ -73,11 +75,11 @@ describe('naming answers', () => {
 
   it('cuts a long title at a word and a long name at a hyphen', () => {
     const answer = JSON.stringify({
-      title: 'aip clean без аргументов: список завершённых ранов и подсказка команды',
+      title: 'aip clean without arguments: a list of finished runs and a hint of the command',
       name: 'clean-list-finished-runs-with-a-hint-of-the-command',
     });
     const naming = parseNaming(answer);
-    expect(naming?.title).toBe('aip clean без аргументов: список завершённых ранов и…');
+    expect(naming?.title).toBe('aip clean without arguments: a list of finished runs and a…');
     expect(naming?.title.length).toBeLessThanOrEqual(60);
     expect(naming?.name).toBe('clean-list-finished-runs-with-a-hint-of');
     expect(naming?.name.length).toBeLessThanOrEqual(40);

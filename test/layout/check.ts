@@ -42,11 +42,11 @@ export type Rule =
 
 export interface Violation {
   rule: Rule;
-  /** Путь от корня проверки, `/` вместо разделителя. */
+  /** Path from the check root, `/` instead of the separator. */
   path: string;
-  /** Функция, класс или конечный пакет цепочки, если нарушение относится к ним. */
+  /** Function, class or final package of the chain, if the violation is about them. */
   name?: string;
-  /** Размер для правил с пределом; у остальных 0. */
+  /** Size for rules with a limit; 0 for the rest. */
   size: number;
   message: string;
 }
@@ -83,7 +83,7 @@ export function loadTree(root: string): Tree {
   return { root, files };
 }
 
-/** Путь импортируемого файла от корня или `undefined`, если импорт выходит за корень. */
+/** Path of the imported file from the root, or `undefined` if the import leaves the root. */
 function resolveTarget(from: string, specifier: string, tree: Tree): string | undefined {
   const joined = posix.normalize(posix.join(posix.dirname(from), specifier));
   if (joined.startsWith('..')) return undefined;
@@ -110,7 +110,7 @@ function locate(path: string): Where {
   if (top === 'platform') return { kind: 'platform', sub: stripExtension(parts[1]) };
   if (top === 'feature') {
     const rest = parts.slice(3);
-    // Файл прямо в корне фичи не имеет вида: `view` пуст.
+    // A file directly in the feature root has no view: `view` is empty.
     return {
       kind: 'feature',
       feature: parts[1] ?? '',
@@ -137,7 +137,7 @@ function locate(path: string): Where {
 const isFeatureView = (view: string): view is FeatureView =>
   (featureViews as readonly string[]).includes(view);
 
-/** Файл — вход вида: `<вид>/index.ts` (у `clients` ещё `clients/<адаптер>/index.ts`). */
+/** The file is a view entry: `<view>/index.ts` (for `clients` also `clients/<adapter>/index.ts`). */
 function isViewEntry(target: Where & { kind: 'feature' }): boolean {
   if (target.rest.length === 1) return target.rest[0] === 'index.ts';
   return target.view === 'clients' && target.rest.length === 2 && target.rest[1] === 'index.ts';
@@ -176,7 +176,7 @@ function featureImportProblem(
   targetPath: string,
 ): string | undefined {
   const view = source.view;
-  if (!isFeatureView(view)) return undefined; // вид без правил ловит placementViolations
+  if (!isFeatureView(view)) return undefined; // a view without rules is caught by placementViolations
   if (source.feature === 'compose' && !composeViews.includes(view)) return undefined;
   if (target.kind === 'platform') {
     const open = ['services', 'repositories', 'usecases', 'clients'].includes(view);
@@ -312,7 +312,7 @@ export function importViolations(root: string, tree: Tree = loadTree(root)): Vio
   return found;
 }
 
-/** Цикл в графе фич: последовательность имён от фичи до неё же или `undefined`. */
+/** A cycle in the feature graph: the sequence of names from a feature back to itself, or `undefined`. */
 export function findCycle(graph: Record<string, readonly string[]>): string[] | undefined {
   const state = new Map<string, 'open' | 'done'>();
   const stack: string[] = [];
@@ -386,7 +386,7 @@ function pureEntry(path: string): boolean {
   return purePaths.some((place) => matchesPlace(path, place));
 }
 
-/** Кратчайшая цепочка выполняемых импортов от файла до внешнего пакета или `node:*`. */
+/** Shortest chain of runtime imports from a file to an external package or `node:*`. */
 function impureChains(entry: string, tree: Tree): { terminal: string; chain: string[] }[] {
   const found = new Map<string, string[]>();
   const seen = new Set<string>([entry]);
@@ -423,7 +423,7 @@ export function purityViolations(root: string, tree: Tree = loadTree(root)): Vio
         ),
       );
     }
-    // Одно нарушение на конечную зависимость: подмена зависимости меняет ключ записи.
+    // One violation per final dependency: replacing the dependency changes the entry key.
     const chains = impureChains(path, tree).sort((x, y) => x.terminal.localeCompare(y.terminal));
     for (const item of chains) {
       found.push(
@@ -540,7 +540,7 @@ export function sizeViolations(root: string, tree: Tree = loadTree(root)): Viola
         ),
       );
     }
-    // Размер записи — сумма строк всех превышающих функций с этим именем: вторая такая функция его увеличивает.
+    // The entry size is the sum of lines of all oversized functions with this name: a second such function increases it.
     const biggest = new Map<string, number>();
     for (const item of parsed.functions) {
       if (item.lines > sizeLimits.function) {

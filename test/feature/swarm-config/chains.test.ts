@@ -46,19 +46,19 @@ describe('runtime chains', () => {
     const paths = temporaryPaths();
     write(
       join(paths.global.directory, 'chains', 'fallback.yaml'),
-      'name: Общая цепочка\nmode: on_error\nruntimes:\n  - runtime: claude\n    model: sonnet\n',
+      'name: Shared chain\nmode: on_error\nruntimes:\n  - runtime: claude\n    model: sonnet\n',
     );
     write(
       join(paths.project.directory, 'chains', 'fallback.yaml'),
-      'name: Проектная цепочка\nmode: round_robin\nruntimes:\n  - runtime: opencode\n    model: openai/gpt-5\n',
+      'name: Project chain\nmode: round_robin\nruntimes:\n  - runtime: opencode\n    model: openai/gpt-5\n',
     );
     write(
       join(paths.project.directory, 'chains', 'extra.yaml'),
-      'name: Дополнительная\nmode: random\nruntimes:\n  - runtime: agy\n',
+      'name: Additional\nmode: random\nruntimes:\n  - runtime: agy\n',
     );
     write(
       join(paths.project.directory, 'specialists', 'coder.yaml'),
-      'name: Кодировщик\nruntime_chain: fallback\n',
+      'name: Coder\nruntime_chain: fallback\n',
     );
 
     const config = loadConfig(paths);
@@ -67,7 +67,7 @@ describe('runtime chains', () => {
     const fallback = config.chains.find((c) => c.slug === 'fallback');
     expect(fallback).toEqual({
       slug: 'fallback',
-      name: 'Проектная цепочка',
+      name: 'Project chain',
       mode: 'round_robin',
       enabled: true,
       level: 'project',
@@ -77,7 +77,7 @@ describe('runtime chains', () => {
     const extra = config.chains.find((c) => c.slug === 'extra');
     expect(extra).toEqual({
       slug: 'extra',
-      name: 'Дополнительная',
+      name: 'Additional',
       mode: 'random',
       enabled: true,
       level: 'project',

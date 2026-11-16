@@ -129,21 +129,21 @@ describe('tasks from a specialist', () => {
   it('adds a task to the queue of the run repository, not of the worktree, and does not start it', async () => {
     const h = await start(
       PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, queue: true }',
+        'coder: { name: Coder }',
+        'coder: { name: Coder, queue: true }',
       ).replace(
-        'reviewer: { name: Ревьюер, permissions: read }',
-        'reviewer: { name: Ревьюер, permissions: read, queue: true }',
+        'reviewer: { name: Reviewer, permissions: read }',
+        'reviewer: { name: Reviewer, permissions: read, queue: true }',
       ),
     );
     h.script({
-      code: [{ ...WRITE_LIB, queue: { pipeline: 'nope', task: 'никуда' } }],
-      review: [{ queue: { pipeline: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' } }],
+      code: [{ ...WRITE_LIB, queue: { pipeline: 'nope', task: 'nowhere' } }],
+      review: [{ queue: { pipeline: 'feature', task: 'Implement web-i18n', title: 'web-i18n' } }],
     });
     const created = await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'подвести итоги',
+      task: 'sum up',
     });
     // a task of a specialist never starts the queue: pause it so the finished run does not take it
     await h.call('queue_pause', { repository: h.repo });
@@ -167,7 +167,7 @@ describe('tasks from a specialist', () => {
     expect(queue.items).toHaveLength(1);
     expect(queue.items[0]).toMatchObject({
       pipeline: 'feature',
-      task: 'Реализовать web-i18n',
+      task: 'Implement web-i18n',
       title: 'web-i18n',
     });
   });
@@ -238,7 +238,7 @@ describe('run goes through the queue', () => {
     h.call('run', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
       ...extra,
     } as never) as Promise<RunQueued>;
 

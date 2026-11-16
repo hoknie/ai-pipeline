@@ -290,7 +290,7 @@ describe('ways to the page', () => {
           id: 'a1',
           repository: APP,
           number: 115,
-          title: 'Вход',
+          title: 'Sign-in',
           finished: true,
           state: 'finished',
           finishedAt: 5_000,
@@ -306,13 +306,15 @@ describe('ways to the page', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New task' });
     await waitFor(() =>
       expect(within(dialog).getByRole('combobox', { name: 'Linked task' }).textContent).toBe(
-        '#115 Вход',
+        '#115 Sign-in',
       ),
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Expand to page' }));
     await waitFor(() => expect(window.location.hash).toBe('#queue/new'));
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Linked task' }).textContent).toBe('#115 Вход'),
+      expect(screen.getByRole('combobox', { name: 'Linked task' }).textContent).toBe(
+        '#115 Sign-in',
+      ),
     );
   });
 

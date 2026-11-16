@@ -106,8 +106,8 @@ describe('failures and control', () => {
   it('fails a step whose runtime is not installed', async () => {
     const h = await start(
       PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, runtime: opencode }',
+        'coder: { name: Coder }',
+        'coder: { name: Coder, runtime: opencode }',
       ),
       {
         AIP_OPENCODE_BIN: '/nonexistent/opencode',
@@ -124,8 +124,8 @@ describe('failures and control', () => {
   it('runs a specialist through the opencode runtime', async () => {
     const h = await start(
       PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, runtime: opencode, model: x/y }',
+        'coder: { name: Coder }',
+        'coder: { name: Coder, runtime: opencode, model: x/y }',
       ),
     );
     const runId = await run(h);
@@ -150,8 +150,8 @@ describe('failures and control', () => {
       split: [
         {
           split: [
-            { title: 'Вход', task: 'вход' },
-            { title: 'Выход', task: 'выход' },
+            { title: 'Login', task: 'login' },
+            { title: 'Logout', task: 'logout' },
           ],
         },
       ],
@@ -159,14 +159,14 @@ describe('failures and control', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'вход и выход',
+      task: 'login and logout',
     })) as RunCreated;
     expect(created.split).toBe(true);
     const final = await h.waitFor(created.runId, (view) => view.finished);
     expect(final.split?.status).toBe('done');
     expect(final.groups.map((group) => [group.slug, group.status])).toEqual([
-      ['vhod', 'merged'],
-      ['vyhod', 'merged'],
+      ['login', 'merged'],
+      ['logout', 'merged'],
     ]);
   });
 
@@ -174,8 +174,8 @@ describe('failures and control', () => {
     const h = await start(`swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
-    reviewer: { name: Ревьюер, permissions: read }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
   pipelines:
     explore:
       steps:
@@ -188,8 +188,8 @@ describe('failures and control', () => {
       split: [
         {
           split: [
-            { title: 'Вход', task: 'вход' },
-            { title: 'Выход', task: 'выход' },
+            { title: 'Login', task: 'login' },
+            { title: 'Logout', task: 'logout' },
           ],
         },
       ],
@@ -197,11 +197,11 @@ describe('failures and control', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'epic',
-      task: 'вход и выход',
+      task: 'login and logout',
     })) as RunCreated;
     const final = await h.waitFor(created.runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged', 'merged']);
-    const detail = await h.group(created.runId, 'vhod');
+    const detail = await h.group(created.runId, 'login');
     expect(detail.attempts.map((attempt) => [attempt.stepId, attempt.specialist])).toEqual([
       ['research', 'reviewer'],
       ['write', 'coder'],
@@ -212,8 +212,8 @@ describe('failures and control', () => {
     const h = await start(`swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
-    reviewer: { name: Ревьюер, permissions: read }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
   pipelines:
     explore:
       steps:
@@ -223,13 +223,13 @@ describe('failures and control', () => {
       split: { specialist: coder, pipeline: explore }
 `);
     h.script({
-      split: [{ split: [{ title: 'Вход', task: 'вход' }] }],
+      split: [{ split: [{ title: 'Login', task: 'login' }] }],
       write: [{ exitCode: 1, noReport: true }],
     });
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'epic',
-      task: 'вход',
+      task: 'login',
     })) as RunCreated;
     await h.waitFor(created.runId, (view) => view.groups[0]?.status === 'failed');
     await h.restart(() => {
@@ -246,11 +246,11 @@ describe('failures and control', () => {
       store.runs.saveRun(state);
       store.database.close();
     });
-    h.script({ split: [{ split: [{ title: 'Вход', task: 'вход' }] }], write: [{}] });
-    await h.call('retry', { runId: created.runId, group: 'vhod' });
+    h.script({ split: [{ split: [{ title: 'Login', task: 'login' }] }], write: [{}] });
+    await h.call('retry', { runId: created.runId, group: 'login' });
     const final = await h.waitFor(created.runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged']);
-    const detail = await h.group(created.runId, 'vhod');
+    const detail = await h.group(created.runId, 'login');
     expect(detail.attempts.map((attempt) => attempt.stepId)).toContain('write');
   });
 
@@ -292,11 +292,11 @@ describe('transcripts', () => {
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
-    let running = (await h.call('transcript', { runId, group: 'vhod' })) as Transcript;
+    let running = (await h.call('transcript', { runId, group: 'login' })) as Transcript;
     await until('the attempt started', async () => {
-      running = (await h.call('transcript', { runId, group: 'vhod' })) as Transcript;
+      running = (await h.call('transcript', { runId, group: 'login' })) as Transcript;
       return running.seq !== null;
     });
     expect(running).toMatchObject({ seq: 1, running: true, entries: [] });
@@ -304,7 +304,7 @@ describe('transcripts', () => {
     await h.waitFor(runId, (view) => view.finished);
     const done = (await h.call('transcript', {
       runId,
-      group: 'vhod',
+      group: 'login',
       seq: 1,
       after: running.cursor,
     })) as Transcript;
@@ -312,7 +312,7 @@ describe('transcripts', () => {
     expect(done.entries).toContainEqual(
       expect.objectContaining({ kind: 'result', verdict: 'done', outputTokens: 20 }),
     );
-    await expect(h.call('transcript', { runId, group: 'vhod', seq: 9 })).rejects.toThrow(
+    await expect(h.call('transcript', { runId, group: 'login', seq: 9 })).rejects.toThrow(
       'unknown attempt 9',
     );
   });

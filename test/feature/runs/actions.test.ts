@@ -26,9 +26,9 @@ function configText(extra: string, pipeline = ''): string {
   return `swarm:
   max: 2
   specialists:
-    coder: { name: Кодировщик }
-    writer: { name: Писатель }
-    fixer: { name: Фиксер }
+    coder: { name: Coder }
+    writer: { name: Writer }
+    fixer: { name: Fixer }
 ${extra}
   pipelines:
     feature:
@@ -54,8 +54,8 @@ function start(
     config: config(text),
     dirtyWarning: false,
     groups: Array.from({ length: count }, (_, index) => ({
-      title: `Группа ${index + 1}`,
-      task: `задача ${index + 1}`,
+      title: `Group ${index + 1}`,
+      task: `task ${index + 1}`,
     })),
     split: options.split ?? false,
     now: 1000,
@@ -84,7 +84,7 @@ function lastOf(state: RunState, slug: string) {
 }
 
 /** The first group of work finishes its single step. */
-function finishWork(state: RunState, slug = 'gruppa-1'): Effect[] {
+function finishWork(state: RunState, slug = 'group-1'): Effect[] {
   dispatch([state], 1500);
   const effects = finish(state, 'done', { slug });
   // A merge: the daemon would do it; the test reports it done.
@@ -207,7 +207,7 @@ describe('a command action', () => {
     other.run.createdAt = 2000;
     other.run.config.max = 1;
     expect(planDispatch([state, other], 1600).start.map((entry) => entry.group.slug)).toEqual([
-      'gruppa-1',
+      'group-1',
     ]);
   });
 
@@ -353,8 +353,8 @@ describe('actions after the split', () => {
         kind: 'split_proposed',
         seq: attempt.seq,
         groups: [
-          { title: 'Первая', task: 'один' },
-          { title: 'Вторая', task: 'два' },
+          { title: 'First', task: 'one' },
+          { title: 'Second', task: 'two' },
         ],
       },
       2000,
@@ -417,7 +417,7 @@ describe('actions before delivery', () => {
     dispatch([state], 3300);
     const effects = commandExit(state, '_action-before-delivery-check', 0, 3400);
     expect(effects).toEqual([
-      expect.objectContaining({ kind: 'deliver', groups: ['gruppa-1'], force: false }),
+      expect.objectContaining({ kind: 'deliver', groups: ['group-1'], force: false }),
     ]);
     expect(state.run.pendingDelivery?.checks).toBe(false);
   });
@@ -465,7 +465,7 @@ describe('actions before delivery', () => {
     finish(state, 'done');
     const effects = transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'm1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'm1' } },
       2500,
     );
     expect(kinds(effects)).not.toContain('deliver');
@@ -478,7 +478,7 @@ describe('actions before delivery', () => {
     lint: { run: "a" }
   stages:
     before_delivery: [lint]
-  delivery: { mode: commit, message_specialist: writer, message_prompt: Пиши кратко }`);
+  delivery: { mode: commit, message_specialist: writer, message_prompt: Write briefly }`);
     const state = start(text);
     finishWork(state);
     transition(
@@ -491,7 +491,7 @@ describe('actions before delivery', () => {
     commandExit(state, '_action-before-delivery-lint', 0, 3200);
     // The files of the request survive the wait for the checks.
     expect(state.message?.task).toContain('- a.ts');
-    expect(state.message?.task.endsWith('Пиши кратко')).toBe(true);
+    expect(state.message?.task.endsWith('Write briefly')).toBe(true);
   });
 
   it('do not restart a delivery that the restart of the daemon cut off at an action', () => {
@@ -586,8 +586,8 @@ describe('actions after delivery', () => {
   it('wait for the last of the groups', () => {
     const state = start(configText(AFTER_DELIVERY), { groups: 2 });
     dispatch([state], 1500);
-    finish(state, 'done', { slug: 'gruppa-1' });
-    finish(state, 'done', { slug: 'gruppa-2' });
+    finish(state, 'done', { slug: 'group-1' });
+    finish(state, 'done', { slug: 'group-2' });
     for (const group of state.groups) {
       transition(
         state,
@@ -597,7 +597,7 @@ describe('actions after delivery', () => {
     }
     transition(
       state,
-      { kind: 'deliver_requested', groups: ['gruppa-1'], force: false, files: [] },
+      { kind: 'deliver_requested', groups: ['group-1'], force: false, files: [] },
       3000,
     );
     transition(
@@ -611,7 +611,7 @@ describe('actions after delivery', () => {
     expect(state.actions).toEqual([]);
     transition(
       state,
-      { kind: 'deliver_requested', groups: ['gruppa-2'], force: false, files: [] },
+      { kind: 'deliver_requested', groups: ['group-2'], force: false, files: [] },
       3200,
     );
     transition(
@@ -649,7 +649,7 @@ describe('actions after delivery', () => {
     expect(state.groups[0]?.delivery).toMatchObject({
       state: 'applied',
       files: ['a.ts'],
-      message: expect.stringContaining('Группа 1'),
+      message: expect.stringContaining('Group 1'),
     });
   });
 });
@@ -657,7 +657,7 @@ describe('actions after delivery', () => {
 describe('specialist actions', () => {
   const TEXT = configText(
     `  actions:
-    notes: { specialist: writer, additional_prompt: Пиши заметки }
+    notes: { specialist: writer, additional_prompt: Write notes }
   stages:
     before_delivery: [notes]`,
   );
@@ -681,7 +681,7 @@ describe('specialist actions', () => {
     ]);
     const attempt = runningAttempt(state, '_action-before-delivery-notes');
     expect(attempt).toMatchObject({ specialist: 'writer', runtime: 'claude', stepId: 'notes' });
-    expect(attempt.input.prompt).toContain('Пиши заметки');
+    expect(attempt.input.prompt).toContain('Write notes');
   });
 
   it('go on when the specialist reports done, without a commit effect', () => {
@@ -697,7 +697,7 @@ describe('specialist actions', () => {
     const state = merged();
     transition(state, { kind: 'deliver_requested', groups: null, force: false, files: [] }, 3000);
     dispatch([state], 3100);
-    finish(state, 'rejected', { slug: '_action-before-delivery-notes', feedback: 'плохо' });
+    finish(state, 'rejected', { slug: '_action-before-delivery-notes', feedback: 'bad' });
     expect(lastOf(state, '_action-before-delivery-notes').status).toBe('failed');
     expect(state.run.pendingDelivery).toBeNull();
   });
@@ -722,7 +722,7 @@ describe('specialist actions', () => {
     const state = merged();
     transition(state, { kind: 'deliver_requested', groups: null, force: false, files: [] }, 3000);
     dispatch([state], 3100);
-    finish(state, 'needs_human', { slug: '_action-before-delivery-notes', feedback: 'как?' });
+    finish(state, 'needs_human', { slug: '_action-before-delivery-notes', feedback: 'how?' });
     expect(lastOf(state, '_action-before-delivery-notes').status).toBe('needs_human');
     expect(runPhase(state)).toBe('needs_human');
   });
@@ -732,7 +732,7 @@ describe('the list of stages', () => {
   const FULL = configText(
     `  actions:
     commit: { run: "git commit" }
-    prepare: { run: "make", name: Подготовка }
+    prepare: { run: "make", name: Preparation }
   stages:
     before_split: [prepare]
   delivery: { mode: commit, message_specialist: writer, resolver: fixer }`,
@@ -768,13 +768,13 @@ describe('the list of stages', () => {
     expect(byId.get('action:before_split:prepare')).toMatchObject({
       kind: 'action',
       section: 'prepare',
-      name: 'Подготовка',
+      name: 'Preparation',
       performer: { type: 'command', command: 'make' },
       condition: null,
     });
     expect(byId.get('step:code')).toMatchObject({
       section: 'work',
-      performer: { type: 'specialist', slug: 'coder', name: 'Кодировщик' },
+      performer: { type: 'specialist', slug: 'coder', name: 'Coder' },
     });
     expect(byId.get('merge')).toMatchObject({ section: 'merge', performer: { type: 'system' } });
     expect(byId.get('message')).toMatchObject({
@@ -843,7 +843,7 @@ describe('prompts of the built-in steps', () => {
   it('append message_prompt to the task of the commit message author', () => {
     const state = start(
       configText(
-        '  delivery: { mode: commit, message_specialist: writer, message_prompt: "Пиши по-русски" }',
+        '  delivery: { mode: commit, message_specialist: writer, message_prompt: "Write in English" }',
       ),
     );
     finishWork(state);
@@ -853,7 +853,7 @@ describe('prompts of the built-in steps', () => {
       3000,
     );
     const task = state.message?.task ?? '';
-    expect(task.endsWith('Пиши по-русски')).toBe(true);
+    expect(task.endsWith('Write in English')).toBe(true);
     expect(task).toContain('Changed files:\n- a.ts');
   });
 
@@ -867,7 +867,7 @@ describe('prompts of the built-in steps', () => {
   it('append resolver_prompt to the task of the resolver', () => {
     const state = start(
       configText(
-        '  delivery: { resolver: fixer, resolver_prompt: "Всегда сохраняй правки пользователя" }',
+        '  delivery: { resolver: fixer, resolver_prompt: "Always keep the edits of the user" }',
       ),
     );
     finishWork(state);
@@ -882,7 +882,7 @@ describe('prompts of the built-in steps', () => {
     );
     transition(state, { kind: 'resolve_prepared', conflicts: ['a.ts'] }, 3200);
     const task = state.resolve?.task ?? '';
-    expect(task.endsWith('Всегда сохраняй правки пользователя')).toBe(true);
+    expect(task.endsWith('Always keep the edits of the user')).toBe(true);
     expect(task).toContain('Conflicting files:\n- a.ts');
   });
 });
@@ -901,7 +901,7 @@ describe('actions before an automatic delivery', () => {
     finish(state, 'done');
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'm1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'm1' } },
       2500,
     );
     dispatch([state], 2600);
@@ -972,7 +972,7 @@ describe('actions before delivery that do not stop the pipeline', () => {
     finish(state, 'done');
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'm1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'm1' } },
       2500,
     );
     if (!autoDeliver) {
@@ -1025,12 +1025,12 @@ describe('commit failure of an action before the split', () => {
     commandExit(state, '_action-before-split-prepare', 0);
     transition(
       state,
-      { kind: 'commit_failed', group: '_action-before-split-prepare', message: 'нет места' },
+      { kind: 'commit_failed', group: '_action-before-split-prepare', message: 'no space left' },
       3500,
     );
     const group = lastOf(state, '_action-before-split-prepare');
     expect(group.status).toBe('failed');
-    expect(group.reason).toContain('нет места');
+    expect(group.reason).toContain('no space left');
     expect(dispatch([state], 3600)).toEqual([]);
   });
 });
@@ -1079,7 +1079,7 @@ describe('pause and messages with actions', () => {
     expect(() =>
       transition(
         state,
-        { kind: 'message', group: '_action-before-split-prepare', seq: attempt.seq, text: 'эй' },
+        { kind: 'message', group: '_action-before-split-prepare', seq: attempt.seq, text: 'hey' },
         2000,
       ),
     ).toThrow(/command/);
@@ -1121,7 +1121,7 @@ describe('merges and checks before delivery', () => {
   const deliverFirst = (state: RunState, now: number): Effect[] =>
     transition(
       state,
-      { kind: 'deliver_requested', groups: ['gruppa-1'], force: false, files: [] },
+      { kind: 'deliver_requested', groups: ['group-1'], force: false, files: [] },
       now,
     );
 
@@ -1129,8 +1129,8 @@ describe('merges and checks before delivery', () => {
   function firstMerged(): RunState {
     const state = start(TEXT, { groups: 2 });
     dispatch([state], 1500);
-    finish(state, 'done', { slug: 'gruppa-1', now: 2000 });
-    mergeFinished(state, 'gruppa-1', 2100);
+    finish(state, 'done', { slug: 'group-1', now: 2000 });
+    mergeFinished(state, 'group-1', 2100);
     return state;
   }
 
@@ -1139,11 +1139,11 @@ describe('merges and checks before delivery', () => {
     const state = firstMerged();
     deliverFirst(state, 2200);
     expect(kinds(dispatch([state], 2300))).toEqual(['run_action']);
-    finish(state, 'done', { slug: 'gruppa-2', now: 2400 });
+    finish(state, 'done', { slug: 'group-2', now: 2400 });
     return state;
   }
 
-  const second = (state: RunState) => findGroup(state, 'gruppa-2')!;
+  const second = (state: RunState) => findGroup(state, 'group-2')!;
 
   it('hold a merge while a check runs or waits for its turn, and let it go after them', () => {
     const state = merging();
@@ -1169,18 +1169,18 @@ describe('merges and checks before delivery', () => {
     commandExit(state, LINT, 1, 2400);
     expect(state.run.pendingDelivery).toBeNull();
     transition(state, { kind: 'retry', group: LINT }, 2500);
-    finish(state, 'done', { slug: 'gruppa-2', now: 2600 });
+    finish(state, 'done', { slug: 'group-2', now: 2600 });
     expect(second(state).status).toBe('merging');
     expect(second(state).mergeInFlight).toBe(false);
   });
 
   it('do not start while a merge is in flight, and start after it', () => {
     const state = firstMerged();
-    finish(state, 'done', { slug: 'gruppa-2', now: 2200 });
+    finish(state, 'done', { slug: 'group-2', now: 2200 });
     expect(second(state).mergeInFlight).toBe(true);
     deliverFirst(state, 2300);
     expect(dispatch([state], 2400)).toEqual([]);
-    mergeFinished(state, 'gruppa-2', 2500);
+    mergeFinished(state, 'group-2', 2500);
     expect(kinds(dispatch([state], 2600))).toEqual(['run_action']);
   });
 });

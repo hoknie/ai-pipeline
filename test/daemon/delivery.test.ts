@@ -23,7 +23,7 @@ async function start(extra = '  delivery: { auto: false }\n'): Promise<Harness> 
 
 async function finishedRun(
   h: Harness,
-  groups = [{ title: 'Вход', task: 'вход' }],
+  groups = [{ title: 'Login', task: 'login' }],
 ): Promise<string> {
   const { runId } = (await startRun(h, {
     repository: h.repo,
@@ -45,7 +45,7 @@ describe('delivery through the daemon', () => {
     const result = (await h.call('apply', { runId })) as ApplyResult;
     expect(result.groups).toEqual([
       {
-        slug: 'vhod',
+        slug: 'login',
         delivery: {
           state: 'applied',
           reason: null,
@@ -63,7 +63,9 @@ describe('delivery through the daemon', () => {
     expect(git(h.repo, 'branch', '--list', 'aip/*')).toBe('');
     expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toBe('');
     expect((await h.status(runId)).delivery).toMatchObject({ applied: 1, merged: 1 });
-    await expect(h.call('apply', { runId, groups: ['vhod'] })).rejects.toThrow('already delivered');
+    await expect(h.call('apply', { runId, groups: ['login'] })).rejects.toThrow(
+      'already delivered',
+    );
   });
 
   it('refuses when the user edits the same file and applies with markers when forced', async () => {
@@ -101,7 +103,7 @@ describe('delivery through the daemon', () => {
     expect(result.pending).toBe(false);
     expect(result.groups).toEqual([
       {
-        slug: 'vhod',
+        slug: 'login',
         delivery: {
           state: 'applied',
           reason: null,
@@ -120,7 +122,7 @@ describe('delivery through the daemon', () => {
     expect(git(h.repo, 'branch', '--list', 'aip/*')).toBe('');
     expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toBe('');
     await expect(h.call('run_mark_delivered', { runId })).rejects.toThrow('nothing to mark');
-    await expect(h.call('run_mark_delivered', { runId, groups: ['vhod'] })).rejects.toThrow(
+    await expect(h.call('run_mark_delivered', { runId, groups: ['login'] })).rejects.toThrow(
       'already delivered',
     );
   });
@@ -129,7 +131,7 @@ describe('delivery through the daemon', () => {
     const h = await start('  delivery: { auto: false, keep: true }\n');
     h.script(WRITE_LIB);
     const runId = await finishedRun(h);
-    await h.call('run_mark_delivered', { runId, groups: ['vhod'] });
+    await h.call('run_mark_delivered', { runId, groups: ['login'] });
     expect(git(h.repo, 'for-each-ref', 'refs/aip/')).toContain(`refs/aip/${runId}/`);
     expect((await h.status(runId)).deliveryStage).toEqual({ status: 'applied', manual: true });
   });
@@ -143,12 +145,12 @@ describe('delivery through the daemon', () => {
     const h = await start(
       '  delivery: { mode: commit, auto: false, message_specialist: reviewer }\n',
     );
-    h.script({ ...WRITE_LIB, message: [{ summary: 'feat: вход\n\nдобавлен вход' }] });
+    h.script({ ...WRITE_LIB, message: [{ summary: 'feat: login\n\nadded login' }] });
     const runId = await finishedRun(h);
     const result = (await h.call('apply', { runId })) as ApplyResult;
     expect(result.pending).toBe(true);
     await h.waitFor(runId, (view) => view.delivery.applied === 1);
-    expect(git(h.repo, 'log', '-1', '--format=%B')).toBe('feat: вход\n\nдобавлен вход');
+    expect(git(h.repo, 'log', '-1', '--format=%B')).toBe('feat: login\n\nadded login');
     expect(git(h.repo, 'show', '--name-only', '--format=', 'HEAD')).toBe('lib.ts');
   });
 
@@ -158,7 +160,7 @@ describe('delivery through the daemon', () => {
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
       autoDeliver: true,
     })) as RunCreated;
     expect((await h.status(runId)).autoDeliver).toBe(true);
@@ -172,7 +174,7 @@ describe('delivery through the daemon', () => {
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
       autoDeliver: false,
     })) as RunCreated;
     const view = await h.waitFor(runId, (run) => run.finished);
@@ -189,7 +191,7 @@ describe('delivery through the daemon', () => {
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     const view = (await h.call('run_auto_deliver_cancel', { runId })) as { autoDeliver: boolean };
@@ -231,7 +233,7 @@ describe('delivery through the daemon', () => {
       // The daemon stopped after it recorded the delivery and before it did the git work.
       const store = openStorage(databasePath(h.state));
       const state = store.runs.loadRun(runId)!;
-      state.run.pendingDelivery = { groups: ['vhod'], force: false, auto: true };
+      state.run.pendingDelivery = { groups: ['login'], force: false, auto: true };
       store.runs.saveRun(state);
       store.database.close();
     });
@@ -277,7 +279,7 @@ describe('runs from the working tree', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     expect(created.warnings).toEqual([]);
     await h.waitFor(created.runId, (view) => view.delivery.applied === 1);
@@ -305,7 +307,7 @@ describe('runs from the working tree', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     expect(created.warnings).toEqual([
       'the repository has uncommitted changes; they are not part of this run',
@@ -330,7 +332,7 @@ describe('delivery resolver', () => {
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     writeFileSync(join(h.repo, 'lib.ts'), 'export const value = 9;\n');
     h.open('code');
@@ -367,8 +369,8 @@ describe('delivery resolver', () => {
 
   it('fails the delivery when conflict markers remain and keeps the working tree', async () => {
     const h = await start('  delivery: { resolver: coder }\n');
-    const runId = await conflictingRun(h, [{ summary: 'готово' }]);
-    const view = await h.group(runId, 'vhod');
+    const runId = await conflictingRun(h, [{ summary: 'done' }]);
+    const view = await h.group(runId, 'login');
     expect(view.delivery).toMatchObject({
       state: 'apply_failed',
       reason: 'conflict markers remain in: lib.ts',
@@ -410,8 +412,8 @@ describe('diff statistics', () => {
     );
     expect(view.diff).toEqual({ files: 2, added: 3, removed: 1 });
     expect(view.groups[0]?.diff).toEqual({ files: 2, added: 3, removed: 1 });
-    expect(view.title).toBe('вход');
-    expect((await h.group(runId, 'vhod')).diff?.files).toEqual([
+    expect(view.title).toBe('login');
+    expect((await h.group(runId, 'login')).diff?.files).toEqual([
       { path: 'extra.ts', added: 2, removed: 0 },
       { path: 'lib.ts', added: 1, removed: 1 },
     ]);

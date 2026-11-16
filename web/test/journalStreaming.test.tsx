@@ -22,8 +22,8 @@ const fragment = (text: string, streamId = 'same'): TranscriptEntry => ({
 describe('streamed journal rendering', () => {
   it('renders merged markdown safely and preserves boundaries before text filtering', () => {
     const entries: TranscriptEntry[] = [
-      fragment('**Привет'),
-      fragment(' мир**\n<script>alert('),
+      fragment('**Hello'),
+      fragment(' world**\n<script>alert('),
       fragment('1)</script>'),
       { kind: 'raw', text: '{"hidden":true}' },
       fragment('!'),
@@ -32,7 +32,7 @@ describe('streamed journal rendering', () => {
     ];
     const { container } = render(<Transcript entries={entries} onlyText showJson={false} />);
     expect(container.firstElementChild?.children).toHaveLength(4);
-    expect(screen.getByText('Привет мир').tagName).toBe('STRONG');
+    expect(screen.getByText('Hello world').tagName).toBe('STRONG');
     expect(container.querySelector('script')).toBeNull();
     expect(container.textContent).toContain('<script>alert(1)</script>');
   });
@@ -101,7 +101,7 @@ describe('streamed journal rendering', () => {
   it('accumulates poll pages into one response, continues at the cursor and shows original raw lines', async () => {
     vi.useFakeTimers();
     const streamedEntries = agyTranscript(
-      [...'Привет'].map((text_delta) =>
+      [...'Salute'].map((text_delta) =>
         JSON.stringify({
           event: 'step_update',
           step_update: { step_index: 7, state: 'ACTIVE', step_type: 'agent_response', text_delta },
@@ -131,8 +131,8 @@ describe('streamed journal rendering', () => {
       log: {
         seq: 1,
         lines: [
-          '{"event":"step_update","text_delta":"При"}',
-          '{"event":"step_update","text_delta":"вет"}',
+          '{"event":"step_update","text_delta":"Sal"}',
+          '{"event":"step_update","text_delta":"ute"}',
         ],
       },
     });
@@ -155,21 +155,21 @@ describe('streamed journal rendering', () => {
     const textCards = () =>
       [...document.querySelectorAll('section[aria-label]')].filter(
         (section) =>
-          (section.textContent?.includes('При') || section.textContent?.includes('Привет')) &&
+          (section.textContent?.includes('Sal') || section.textContent?.includes('Salute')) &&
           section.classList.contains('p-3'),
       );
     expect(textCards()).toHaveLength(1);
-    expect(screen.getByText('При')).toBeTruthy();
+    expect(screen.getByText('Sal')).toBeTruthy();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1500);
     });
     expect(transcript).toHaveBeenNthCalledWith(2, 'run1', 'login', 1, 2);
     expect(textCards()).toHaveLength(1);
-    expect(screen.getByText('Привет')).toBeTruthy();
+    expect(screen.getByText('Salute')).toBeTruthy();
     fireEvent.click(screen.getByRole('switch'));
-    expect(screen.getByText(/"text_delta":"При"/)).toBeTruthy();
+    expect(screen.getByText(/"text_delta":"Sal"/)).toBeTruthy();
     fireEvent.click(screen.getByRole('switch'));
-    const liveText = screen.getByText('Привет').textContent;
+    const liveText = screen.getByText('Salute').textContent;
     const liveCount = textCards().length;
     view.attempts[0]!.status = 'completed';
     const completedView = groupView({

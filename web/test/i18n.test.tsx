@@ -170,8 +170,8 @@ describe('language menu', () => {
   });
 
   it('shows data as it is on any language', () => {
-    mount([runView({ title: 'Флаг --json для aip version', state: 'needs_human', waiting: 1 })]);
-    expect(screen.getAllByText('Флаг --json для aip version').length).toBeGreaterThan(0);
+    mount([runView({ title: 'Flag --json for aip version', state: 'needs_human', waiting: 1 })]);
+    expect(screen.getAllByText('Flag --json for aip version').length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText(/^Needs answer.* \(needs_human\)$/).length).toBeGreaterThan(0);
   });
 });

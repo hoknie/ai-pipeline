@@ -231,7 +231,7 @@ describe('pipeline rename', () => {
     const state = run(1);
     old.runs.saveRun(state);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'первая' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'first' }, 'q1', 2);
     old.queues.saveQueue(queue);
     const snapshot = JSON.parse(JSON.stringify(state.run.config)) as Record<string, unknown>;
     const pipelines = snapshot.pipelines as Record<string, unknown>[];
@@ -335,7 +335,7 @@ describe('migration to pipeline variants', () => {
     const state = run(1, { id: 'variant-run' });
     old.runs.saveRun(state);
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'задача', variant: 'light' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'task', variant: 'light' }, 'q1', 2);
     old.queues.saveQueue(queue);
     // a database written before the variants: the column is not there, the rows are
     dropQueueFilter(old.database.connection);
@@ -435,7 +435,7 @@ describe('migration to task links', () => {
   ) =>
     db
       .prepare(
-        "INSERT INTO queue_items (id, repository, position, pipeline, task, created_at, tags_json, after_json) VALUES (?, ?, ?, 'f', 'задача', 1, ?, ?)",
+        "INSERT INTO queue_items (id, repository, position, pipeline, task, created_at, tags_json, after_json) VALUES (?, ?, ?, 'f', 'task', 1, ?, ?)",
       )
       .run(id, repository, position, JSON.stringify(tags), JSON.stringify(after));
   const addRun = (
@@ -452,7 +452,7 @@ describe('migration to task links', () => {
   const addTag = (db: import('node:sqlite').DatabaseSync, id: string, taskRun: string | null) =>
     db
       .prepare(
-        "INSERT INTO tags (id, repository, name, color, created_at, task_run, task_number) VALUES (?, '/a', 'метка', 'blue', 1, ?, ?)",
+        "INSERT INTO tags (id, repository, name, color, created_at, task_run, task_number) VALUES (?, '/a', 'label', 'blue', 1, ?, ?)",
       )
       .run(id, taskRun, taskRun === null ? null : 3);
   const links = (db: import('node:sqlite').DatabaseSync) =>
@@ -526,7 +526,7 @@ describe('migration to the global queue', () => {
     const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
     const old = openStorage(databasePath(directory));
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'задача' }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'task' }, 'q1', 2);
     old.queues.saveQueue(queue);
     dropQueueFilter(old.database.connection);
     old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);

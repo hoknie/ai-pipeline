@@ -18,7 +18,7 @@ describe('stepOfGroup', () => {
         step.id === 'code'
           ? { ...step, groups: [] }
           : step.id === 'review'
-            ? { ...step, groups: [{ slug: 'login', title: 'Вход', status: 'queued' as const }] }
+            ? { ...step, groups: [{ slug: 'login', title: 'Sign-in', status: 'queued' as const }] }
             : step,
       ),
     };

@@ -14,7 +14,7 @@ const attempts = [
     ...groupView().attempts[0]!,
     seq: 1,
     stepId: 'plan',
-    stepName: 'Планировщик',
+    stepName: 'Planner',
     status: 'finished',
     verdict: 'done',
   },
@@ -22,7 +22,7 @@ const attempts = [
     ...groupView().attempts[0]!,
     seq: 2,
     stepId: 'code',
-    stepName: 'Кодер',
+    stepName: 'Coder',
     status: 'failed',
     verdict: null,
     reason: 'interrupted',
@@ -52,7 +52,7 @@ function openMore() {
   fireEvent.keyDown(screen.getByRole('button', { name: 'More' }), { key: 'Enter' });
 }
 
-function openGroupMenu(title = 'Вход') {
+function openGroupMenu(title = 'Sign-in') {
   fireEvent.keyDown(screen.getByRole('button', { name: `More actions: ${title}` }), {
     key: 'Enter',
   });
@@ -61,7 +61,7 @@ function openGroupMenu(title = 'Вход') {
 describe('retry a failed step', () => {
   it('offers the retry in the last attempt of a failed group and keeps it open', async () => {
     const api = panel('failed');
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     const blocks = screen.getAllByRole('listitem').filter((item) => item.closest('ol'));
     expect(within(blocks[0]!).queryByText('Retry step')).toBeNull();
     const buttons = within(blocks[1]!).getAllByRole('button', { name: 'Retry step' });
@@ -78,7 +78,7 @@ describe('retry a failed step', () => {
 
   it('offers the retry for a cancelled group, in the panel and in the last attempt', async () => {
     const api = panel('cancelled');
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
     openGroupMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Retry' }));
@@ -88,14 +88,14 @@ describe('retry a failed step', () => {
 
   it('offers no retry for a merged group', async () => {
     panel('merged');
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     expect(screen.queryByText('Retry step')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'More actions: Вход' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'More actions: Sign-in' })).toBeNull();
   });
 
   it('offers no retry for a group that did not fail', async () => {
     panel('running');
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     expect(screen.queryByText('Retry step')).toBeNull();
   });
 });
@@ -103,7 +103,7 @@ describe('retry a failed step', () => {
 describe('retry with the current config', () => {
   it('offers it next to the retry of a failed group and sends refreshConfig', async () => {
     const api = panel('failed');
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
     openGroupMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Retry with current config' }));
@@ -132,7 +132,7 @@ describe('retry with the current config', () => {
         onError={onError}
       />,
     );
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     expect(screen.queryByRole('button', { name: 'Retry with current config' })).toBeNull();
     openGroupMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Retry with current config' }));
@@ -143,7 +143,7 @@ describe('retry with the current config', () => {
 
   it('is not offered for a merged group', async () => {
     panel('merged');
-    await screen.findByText('#2 Кодер');
+    await screen.findByText('#2 Coder');
     expect(screen.queryByText('Retry with current config')).toBeNull();
   });
 
@@ -298,7 +298,7 @@ describe('accepted answers', () => {
               status: 'finished',
               verdict: 'needs_human',
               feedback: null,
-              decision: { question: 'Формат?', answer: 'JSON', by: 'autopilot' },
+              decision: { question: 'Format?', answer: 'JSON', by: 'autopilot' },
             },
           ],
         }),

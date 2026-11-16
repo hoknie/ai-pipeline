@@ -142,12 +142,12 @@ describe('failures and control', () => {
   it('returns rejected work to the coder and resumes the session after an answer', async () => {
     const h = await start();
     h.script({
-      code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}],
-      review: [{ verdict: 'rejected', feedback: 'нет тестов' }, {}],
+      code: [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}],
+      review: [{ verdict: 'rejected', feedback: 'no tests' }, {}],
     });
     const runId = await run(h);
     const waiting = await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
-    expect(waiting.groups[0]?.question).toBe('OAuth или пароль?');
+    expect(waiting.groups[0]?.question).toBe('OAuth or password?');
     expect(waiting).toMatchObject({ state: 'needs_human', waiting: 1, finished: false });
     await h.call('answer', { runId, group: 'g1', answer: 'OAuth' });
     const answered = await h.status(runId);
@@ -158,7 +158,7 @@ describe('failures and control', () => {
     const codeCalls = calls(h).filter((call) => call.step === 'code');
     expect(codeCalls).toHaveLength(3);
     expect(codeCalls[1]?.args).toContain('--resume');
-    expect(codeCalls[2]?.args.join(' ')).toContain('нет тестов');
+    expect(codeCalls[2]?.args.join(' ')).toContain('no tests');
     const detail = await h.group(runId, 'g1');
     expect(detail.attempts.map((attempt) => `${attempt.stepId}:${attempt.verdict}`)).toEqual([
       'code:needs_human',
@@ -172,14 +172,14 @@ describe('failures and control', () => {
   it('keeps structured questions of the specialist until the human answers', async () => {
     const h = await start();
     const questions = [
-      { text: 'OAuth или пароль?', options: ['OAuth', 'пароль'], recommendation: 'OAuth' },
-      { text: 'Где хранить сессии?' },
+      { text: 'OAuth or password?', options: ['OAuth', 'password'], recommendation: 'OAuth' },
+      { text: 'Where to store sessions?' },
     ];
     h.script({ code: [{ verdict: 'needs_human', questions }, {}] });
     const runId = await run(h);
     const waiting = await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
     expect(waiting.groups[0]?.questions).toEqual(questions);
-    expect(waiting.groups[0]?.question).toContain('1. OAuth или пароль?');
+    expect(waiting.groups[0]?.question).toContain('1. OAuth or password?');
     expect(waiting.groups[0]?.question).toContain('Recommended: OAuth');
     expect((await h.group(runId, 'g1')).questions).toEqual(questions);
     await h.call('answer', { runId, group: 'g1', answer: 'Q1: OAuth\nA1: OAuth' });
@@ -196,7 +196,7 @@ describe('failures and control', () => {
       code: [
         {
           verdict: 'needs_human',
-          feedback: 'запустите claude plugin test',
+          feedback: 'run claude plugin test',
           denied: ['claude plugin test integrations/claude-code'],
         },
         {},
@@ -218,11 +218,11 @@ describe('failures and control', () => {
     writeConfigDirectory(
       h.repo,
       PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        "coder: { name: Кодировщик, allow_commands: ['claude plugin *'] }",
+        'coder: { name: Coder }',
+        "coder: { name: Coder, allow_commands: ['claude plugin *'] }",
       ),
     );
-    await h.call('answer', { runId, group: 'g1', answer: 'добавил' });
+    await h.call('answer', { runId, group: 'g1', answer: 'added' });
     await h.waitFor(runId, (view) => view.finished);
     const codeCalls = calls(h).filter((call) => call.step === 'code');
     expect(codeCalls[0]?.args).not.toContain('Bash(claude plugin *)');
@@ -248,8 +248,8 @@ describe('failures and control', () => {
   it('retries with the current specialists only when asked to', async () => {
     const h = await start(
       PIPELINE_CONFIG.replace(
-        'reviewer: { name: Ревьюер, permissions: read }',
-        'reviewer: { name: Ревьюер, permissions: read, model: opsu }',
+        'reviewer: { name: Reviewer, permissions: read }',
+        'reviewer: { name: Reviewer, permissions: read, model: opsu }',
       ),
     );
     h.script({ review: [{ exitCode: 1, noReport: true }, { exitCode: 1, noReport: true }, {}] });
@@ -258,8 +258,8 @@ describe('failures and control', () => {
     writeConfigDirectory(
       h.repo,
       PIPELINE_CONFIG.replace(
-        'reviewer: { name: Ревьюер, permissions: read }',
-        'reviewer: { name: Ревьюер, permissions: read, model: opus }',
+        'reviewer: { name: Reviewer, permissions: read }',
+        'reviewer: { name: Reviewer, permissions: read, model: opus }',
       ),
     );
     await h.call('retry', { runId, group: 'g1' });

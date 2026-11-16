@@ -63,7 +63,7 @@ async function addIn(
   return (await h.call('queue_add', {
     repository,
     pipeline: 'feature',
-    task: 'работа',
+    task: 'work',
     title,
     ...extra,
   })) as { item: string };
@@ -406,7 +406,7 @@ describe('the global queue moves', () => {
     const queued = (await h.call('run', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
     })) as { queue: AnyQueue };
     expect(queued.queue.scope).toBe('global');
     await waitGlobal(h, (view) => view.items.length === 0 && view.runs.length === 0);

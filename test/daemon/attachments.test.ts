@@ -121,7 +121,7 @@ describe('attachments of a run', () => {
     const queued = (await h.call('run', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
       attachments: [{ path: paths['shot.png']! }],
     })) as RunQueued;
     const runId = queued.run!.runId;
@@ -168,7 +168,7 @@ describe('attachments of a run', () => {
     const queued = (await h.call('run', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
     })) as RunQueued;
     await h.waitFor(queued.run!.runId, (view) => view.finished);
     const call = agentCalls(h)[0]!;
@@ -208,7 +208,7 @@ describe('attachments of a run', () => {
     const queued = (await h.call('run', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
       attachments: [{ path: paths['shot.png']! }],
     })) as RunQueued;
     const runId = queued.run!.runId;

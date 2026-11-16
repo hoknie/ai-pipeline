@@ -179,7 +179,7 @@ describe('Antigravity transcript', () => {
   });
 
   it('preserves exact fragment text, timestamps and source lines including whitespace and empty deltas', () => {
-    const deltas = ['Привет', ' ', 'мир', '\n\n', ''];
+    const deltas = ['Hello', ' ', 'world', '\n\n', ''];
     const lines = deltas.map((text_delta) =>
       JSON.stringify({
         event: 'step_update',
@@ -198,7 +198,7 @@ describe('Antigravity transcript', () => {
         .filter((entry) => entry.kind === 'text')
         .map((entry) => entry.text)
         .join(''),
-    ).toBe('Привет мир\n\n');
+    ).toBe('Hello world\n\n');
     expect(lines).toEqual(original);
   });
 });

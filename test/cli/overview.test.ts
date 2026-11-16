@@ -28,11 +28,11 @@ describe('aip overview', () => {
     writeFileSync(
       box.env.AIP_FAKE_SCRIPT!,
       JSON.stringify({
-        code: [{ verdict: 'needs_human', feedback: 'Какой вход?' }, { hang: true }],
+        code: [{ verdict: 'needs_human', feedback: 'Which login?' }, { hang: true }],
       }),
     );
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'вход', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'login', '--json')).stdout,
     );
     await waitUntil('the question of the group', async () =>
       (await aip(box, 'run', 'show', runId)).stdout.includes('needs_human'),
@@ -40,12 +40,12 @@ describe('aip overview', () => {
     const text = (await aip(box, 'overview')).stdout;
     expect(text).toMatch(/^aip \S+ · daemon pid \d+ · (busy|idle)/);
     expect(text).toContain('Needs you (1):');
-    expect(text).toContain(`${runId} vhod  question: Какой вход?`);
+    expect(text).toContain(`${runId} login  question: Which login?`);
     expect(text).toContain('Projects:');
     expect(text).toContain('Runs:');
     expect(text).not.toContain('→ ');
     const json = JSON.parse((await aip(box, 'overview', '--json')).stdout) as Json;
-    expect(json.attention[0]).toMatchObject({ kind: 'question', runId, group: 'vhod' });
+    expect(json.attention[0]).toMatchObject({ kind: 'question', runId, group: 'login' });
     expect(json.runs.map((run) => run.id)).toEqual([runId]);
     expect(json.projects).toHaveLength(1);
     await aip(box, 'run', 'cancel', runId);

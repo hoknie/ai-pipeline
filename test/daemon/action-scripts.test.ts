@@ -23,7 +23,7 @@ async function start(action: string): Promise<Harness> {
   current = await harness(`swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   actions:
     check: ${action}
   stages:
@@ -42,7 +42,7 @@ async function runCheck(h: Harness): Promise<string> {
   const created = (await startRun(h, {
     repository: h.repo,
     pipeline: 'plain',
-    groups: [{ title: 'Вход', task: 'вход' }],
+    groups: [{ title: 'Login', task: 'login' }],
   })) as RunCreated;
   await h.waitFor(created.runId, (run) => run.finished);
   await h.call('apply', { runId: created.runId });
@@ -88,7 +88,7 @@ describe('an action with one script', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'plain',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     await h.waitFor(created.runId, (run) => run.finished);
     await h.restart(() => {

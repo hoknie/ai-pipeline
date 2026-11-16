@@ -4,15 +4,15 @@ import { formatCleanable } from '../../src/presentation/cli/local/clean.ts';
 import { createStyle } from '../../src/presentation/format/index.ts';
 
 const RUNS = [
-  { id: 'run1', title: 'Первый', finishedAt: Date.UTC(2026, 0, 2, 12, 0), repository: '/r' },
-  { id: 'run-longer', title: 'Второй', finishedAt: Date.UTC(2026, 0, 3, 12, 0), repository: '/r' },
+  { id: 'run1', title: 'First', finishedAt: Date.UTC(2026, 0, 2, 12, 0), repository: '/r' },
+  { id: 'run-longer', title: 'Second', finishedAt: Date.UTC(2026, 0, 3, 12, 0), repository: '/r' },
 ];
 
 describe('formatCleanable', () => {
   it('lists runs in aligned columns with a hint', () => {
     const lines = formatCleanable(RUNS).split('\n');
     expect(lines[0]).toMatch(/^RUN {9}FINISHED {10}TITLE$/);
-    expect(lines[1]).toMatch(/^run1 {8}\d{4}-\d\d-\d\d \d\d:\d\d {2}Первый$/);
+    expect(lines[1]).toMatch(/^run1 {8}\d{4}-\d\d-\d\d \d\d:\d\d {2}First$/);
     expect(lines.slice(-2)).toEqual(['', 'To clean one: aip run clean <run-id>']);
     expect(formatCleanable([])).toBe('No finished runs to clean.');
   });

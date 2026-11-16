@@ -33,7 +33,7 @@ const VIEW: QueueView & { item: string } = {
       variant: 'default',
       variantName: 'default',
       pipelineName: 'feature',
-      task: 'Сделать вход',
+      task: 'Build the login',
       groups: null,
       title: null,
       autoDeliver: null,
@@ -306,15 +306,15 @@ describe('host MCP queue tools', () => {
     });
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { pipeline: 'feature', task: 'Сделать вход' },
+      arguments: { pipeline: 'feature', task: 'Build the login' },
     });
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('Added item q1.');
-    expect(textOf(result)).toContain('1. #1 q1  feature  Сделать вход');
+    expect(textOf(result)).toContain('1. #1 q1  feature  Build the login');
     expect(calls).toEqual([
       {
         method: 'queue_add',
-        params: { repository: '/repo', pipeline: 'feature', task: 'Сделать вход' },
+        params: { repository: '/repo', pipeline: 'feature', task: 'Build the login' },
       },
     ]);
   });
@@ -486,11 +486,11 @@ describe('host MCP queue tools', () => {
     });
     await client.callTool({
       name: 'swarm_queue_settings',
-      arguments: { autopilot_answer: 'Согласен' },
+      arguments: { autopilot_answer: 'Agreed' },
     });
     await client.callTool({ name: 'swarm_queue_settings', arguments: { autopilot_answer: null } });
     expect(calls).toEqual([
-      { method: 'queue_settings', params: { repository: '/repo', autopilotAnswer: 'Согласен' } },
+      { method: 'queue_settings', params: { repository: '/repo', autopilotAnswer: 'Agreed' } },
       { method: 'queue_settings', params: { repository: '/repo', autopilotAnswer: null } },
     ]);
   });
@@ -619,7 +619,7 @@ describe('host MCP queue tools', () => {
               kind: 'item' as const,
               id: 'q0',
               number: 5,
-              title: 'модель',
+              title: 'model',
               state: 'waiting' as const,
             },
           ],
@@ -971,18 +971,18 @@ describe('host MCP swarm_skip_step', () => {
     });
     await client.callTool({
       name: 'swarm_retry',
-      arguments: { run_id: 'run000000001', group: 'gruppa-1' },
+      arguments: { run_id: 'run000000001', group: 'group-1' },
     });
     const refreshed = await client.callTool({
       name: 'swarm_retry',
-      arguments: { run_id: 'run000000001', group: 'gruppa-1', refresh_config: true },
+      arguments: { run_id: 'run000000001', group: 'group-1', refresh_config: true },
     });
     expect(refreshed.isError).toBeFalsy();
     expect(calls).toEqual([
-      { method: 'retry', params: { runId: 'run000000001', group: 'gruppa-1' } },
+      { method: 'retry', params: { runId: 'run000000001', group: 'group-1' } },
       {
         method: 'retry',
-        params: { runId: 'run000000001', group: 'gruppa-1', refreshConfig: true },
+        params: { runId: 'run000000001', group: 'group-1', refreshConfig: true },
       },
     ]);
   });

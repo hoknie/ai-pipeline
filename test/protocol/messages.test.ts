@@ -28,7 +28,7 @@ describe('requests', () => {
   it('takes a message to a running attempt with a non-empty, bounded text', () => {
     const parse = (params: object) =>
       requestSchema.safeParse({ method: 'message', params }).success;
-    const target = { runId: 'r', group: 'g', seq: 1, text: 'привет' };
+    const target = { runId: 'r', group: 'g', seq: 1, text: 'hello' };
     expect(parse(target)).toBe(true);
     expect(parse({ ...target, text: '   ' })).toBe(false);
     expect(parse({ ...target, text: 'x'.repeat(MESSAGE_TEXT_LIMIT) })).toBe(true);
@@ -76,12 +76,12 @@ describe('requests', () => {
     const line = JSON.stringify({
       id: 7,
       method: 'answer',
-      params: { runId: 'r', group: 'g', answer: 'да' },
+      params: { runId: 'r', group: 'g', answer: 'yes' },
     });
     const parsed = parseRequest(line);
     expect(parsed).toEqual({
       id: 7,
-      request: { method: 'answer', params: { runId: 'r', group: 'g', answer: 'да' } },
+      request: { method: 'answer', params: { runId: 'r', group: 'g', answer: 'yes' } },
     });
     if ('request' in parsed)
       expect(requestSchema.parse(JSON.parse(JSON.stringify(parsed.request)))).toEqual(
@@ -149,7 +149,9 @@ describe('artifact requests', () => {
   it('takes content or a path, never both and never neither', () => {
     const base = { token: 't', fileName: 'report.md' };
     expect(parse('artifact_publish', { ...base, content: '# x' })).toBe(true);
-    expect(parse('artifact_publish', { ...base, path: 'out/report.md', title: 'Итог' })).toBe(true);
+    expect(parse('artifact_publish', { ...base, path: 'out/report.md', title: 'Summary' })).toBe(
+      true,
+    );
     expect(parse('artifact_publish', base)).toBe(false);
     expect(parse('artifact_publish', { ...base, content: 'x', path: 'a' })).toBe(false);
   });
@@ -241,7 +243,7 @@ describe('queue requests', () => {
 
   it('accepts a task or groups', () => {
     ok('queue', { repository: '/r' });
-    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', title: 'Вход' });
+    ok('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', title: 'Login' });
     ok('queue_add', { repository: '/r', pipeline: 'feature', groups: [{ title: 'a', task: 'b' }] });
     ok('queue_edit', { repository: '/r', item: 'q1', position: 2, title: null });
     ok('queue_remove', { repository: '/r', item: 'q1' });
@@ -333,7 +335,7 @@ describe('queue requests', () => {
   });
 
   it('takes the text of the autopilot answer, and null to reset it', () => {
-    ok('queue_settings', { repository: '/r', autopilotAnswer: 'Согласен' });
+    ok('queue_settings', { repository: '/r', autopilotAnswer: 'Agreed' });
     ok('queue_settings', { repository: '/r', autopilotAnswer: null });
     bad('queue_settings', { repository: '/r', autopilotAnswer: '  ' });
     bad('queue_settings', { repository: '/r', autopilotAnswer: 'x'.repeat(2001) });
@@ -408,7 +410,7 @@ describe('queue requests', () => {
     });
     bad('queue_add', { repository: '/r', pipeline: 'feature' });
     bad('queue_add', { repository: '/r', pipeline: 'feature', task: '   ' });
-    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', title: 'я'.repeat(61) });
+    bad('queue_add', { repository: '/r', pipeline: 'feature', task: 'x', title: 'z'.repeat(61) });
     bad('queue_add', { repository: '/r', pipeline: 'feature', groups: [] });
     bad('queue_edit', {
       repository: '/r',
@@ -600,7 +602,7 @@ describe('tag requests', () => {
   });
 
   it('takes a trimmed title of 1 to 60 characters in run_title', () => {
-    ok('run_title', { runId: 'r', title: ' Вход ' });
+    ok('run_title', { runId: 'r', title: ' Login ' });
     ok('run_title', { runId: 'r', title: 'x'.repeat(60) });
     bad('run_title', { runId: 'r', title: '' });
     bad('run_title', { runId: 'r', title: '   ' });
@@ -786,7 +788,7 @@ describe('observer requests and events', () => {
 
   it('takes the three repair actions with a token', () => {
     const token = 't';
-    expect(parse('repair_action', { action: 'answer', token, group: 'g', answer: 'Да' })).toBe(
+    expect(parse('repair_action', { action: 'answer', token, group: 'g', answer: 'Yes' })).toBe(
       true,
     );
     expect(parse('repair_action', { action: 'answer', token, group: 'g', answer: '  ' })).toBe(
@@ -797,10 +799,10 @@ describe('observer requests and events', () => {
       parse('repair_action', { action: 'retry', token, group: 'g', refreshConfig: true }),
     ).toBe(true);
     expect(parse('repair_action', { action: 'retry', token })).toBe(false);
-    expect(parse('repair_action', { action: 'cancel', token, reason: 'нельзя' })).toBe(true);
-    expect(parse('repair_action', { action: 'cancel', token, group: 'g', reason: 'нельзя' })).toBe(
-      true,
-    );
+    expect(parse('repair_action', { action: 'cancel', token, reason: 'impossible' })).toBe(true);
+    expect(
+      parse('repair_action', { action: 'cancel', token, group: 'g', reason: 'impossible' }),
+    ).toBe(true);
     expect(parse('repair_action', { action: 'cancel', token, reason: ' ' })).toBe(false);
     expect(parse('repair_action', { action: 'cancel', token })).toBe(false);
     expect(parse('repair_action', { action: 'answer', group: 'g', answer: 'x' })).toBe(false);

@@ -9,9 +9,9 @@ afterEach(() => cleanup());
 
 describe('variant badge', () => {
   it('shows the name, with the id in the tooltip', async () => {
-    render(<VariantBadge id="light" name="Лёгкий" />);
-    const badge = screen.getByLabelText('Variant: Лёгкий (light)');
-    expect(badge.textContent).toBe('Лёгкий');
+    render(<VariantBadge id="light" name="Lightweight" />);
+    const badge = screen.getByLabelText('Variant: Lightweight (light)');
+    expect(badge.textContent).toBe('Lightweight');
     fireEvent.focus(badge);
     expect((await screen.findByRole('tooltip')).textContent).toContain('(light)');
   });

@@ -13,9 +13,11 @@ import { specialistEntry } from './fixtures.ts';
 
 describe('names of the specialists', () => {
   it('takes the validated name, then the one of the file, then the slug', () => {
-    expect(specialistName(specialistEntry('reviewer', {}, { name: 'Ревьюер' }))).toBe('Ревьюер');
-    const invalid = specialistEntry('coder', { effective: null, raw: { name: '  Кодер ' } });
-    expect(specialistName(invalid)).toBe('Кодер');
+    expect(specialistName(specialistEntry('reviewer', {}, { name: 'Inspector' }))).toBe(
+      'Inspector',
+    );
+    const invalid = specialistEntry('coder', { effective: null, raw: { name: '  Coder ' } });
+    expect(specialistName(invalid)).toBe('Coder');
     expect(specialistName(specialistEntry('plan', { effective: null, raw: { name: ' ' } }))).toBe(
       'plan',
     );
@@ -24,12 +26,12 @@ describe('names of the specialists', () => {
 
   it('shows «Name (slug)» in a choice and the bare slug when there is no other name', () => {
     const names = specialistNames([
-      specialistEntry('reviewer', {}, { name: 'Ревьюер' }),
+      specialistEntry('reviewer', {}, { name: 'Inspector' }),
       specialistEntry('same', {}, { name: 'same' }),
     ]);
-    expect(nameOf(names, 'reviewer')).toBe('Ревьюер');
+    expect(nameOf(names, 'reviewer')).toBe('Inspector');
     expect(nameOf(names, 'ghost')).toBe('ghost');
-    expect(specialistOption(names, 'reviewer')).toBe('Ревьюер (reviewer)');
+    expect(specialistOption(names, 'reviewer')).toBe('Inspector (reviewer)');
     expect(specialistOption(names, 'same')).toBe('same');
     expect(specialistOption(names, 'ghost')).toBe('ghost');
   });
@@ -47,14 +49,14 @@ describe('names of the specialists', () => {
       stages: null,
       errors: [],
       editable: true,
-      specialistName: (slug) => (slug === 'reviewer' ? 'Ревьюер' : slug),
+      specialistName: (slug) => (slug === 'reviewer' ? 'Inspector' : slug),
     });
     const step = graph.nodes.find((node) => node.data.kind === 'step')!.data;
     expect(step.title).toBe('review');
-    expect(step.subtitle).toBe('Ревьюер');
+    expect(step.subtitle).toBe('Inspector');
     expect(step.subtitleHint).toBe('reviewer');
     const split = graph.nodes.find((node) => node.data.kind === 'split')!.data;
-    expect(split.subtitle).toBe('Ревьюер');
+    expect(split.subtitle).toBe('Inspector');
     expect(split.subtitleHint).toBe('reviewer');
   });
 
@@ -71,10 +73,10 @@ describe('names of the specialists', () => {
       stages: null,
       errors: [],
       editable: false,
-      specialistName: () => 'Ревьюер',
+      specialistName: () => 'Inspector',
     });
     const follow = graph.nodes.find((node) => node.data.kind === 'follow')!.data;
-    expect(follow.subtitle).toBe('Ревьюер');
+    expect(follow.subtitle).toBe('Inspector');
     expect(follow.subtitleHint).toBe('reviewer');
     const split = graph.nodes.find((node) => node.data.kind === 'split')!.data;
     expect(split.title).toBe('base');

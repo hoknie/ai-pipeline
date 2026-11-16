@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 const stream = () => FakeEventSource.last!;
-const old = () => runView({ id: 'old', title: 'Старый запуск', finished: true, state: 'finished' });
+const old = () => runView({ id: 'old', title: 'Old run', finished: true, state: 'finished' });
 
 describe('a run missing from the list', () => {
   it('is fetched once by id and joins the list', async () => {
@@ -53,8 +53,8 @@ describe('a run missing from the list', () => {
     await waitFor(() => expect(result.current.runs).toHaveLength(2));
     act(() => stream().send({ event: 'snapshot', seq: 2, runs: [runView()] }));
     expect(result.current.runs.map((run) => run.id)).toContain('old');
-    act(() => stream().send({ event: 'run', seq: 3, run: { ...old(), title: 'Новое имя' } }));
-    expect(result.current.runs.find((run) => run.id === 'old')?.title).toBe('Новое имя');
+    act(() => stream().send({ event: 'run', seq: 3, run: { ...old(), title: 'New name' } }));
+    expect(result.current.runs.find((run) => run.id === 'old')?.title).toBe('New name');
   });
 
   it('reports an unknown id as missing and does not ask again', async () => {
@@ -85,12 +85,12 @@ describe('the panel', () => {
     window.location.hash = '#runs/old/login';
     const api = fakeApi({
       run: vi.fn(async () =>
-        runView({ id: 'old', title: 'Старый запуск', groups: [groupRow({ slug: 'login' })] }),
+        runView({ id: 'old', title: 'Old run', groups: [groupRow({ slug: 'login' })] }),
       ),
     });
     render(<App api={api} openStream={openFake} />);
     act(() => stream().send({ event: 'snapshot', seq: 1, runs: [runView()] }));
-    expect((await screen.findAllByText('Старый запуск')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Old run')).length).toBeGreaterThan(0);
     expect(api.group).toHaveBeenCalledWith('old', 'login');
   });
 
@@ -107,7 +107,7 @@ describe('the panel', () => {
     const api = fakeApi({
       queue: vi.fn(async () =>
         queueOf({
-          skipped: [queueRun('old', { title: 'Старый запуск', state: 'failed' })],
+          skipped: [queueRun('old', { title: 'Old run', state: 'failed' })],
         }),
       ),
       run: vi.fn(async () => old()),
@@ -115,8 +115,8 @@ describe('the panel', () => {
     render(<App api={api} openStream={openFake} />);
     act(() => stream().send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const region = within(await screen.findByRole('region', { name: 'skipped with a problem' }));
-    fireEvent.click(region.getByRole('link', { name: /Старый запуск|old/ }));
+    fireEvent.click(region.getByRole('link', { name: /Old run|old/ }));
     await waitFor(() => expect(api.run).toHaveBeenCalledWith('old'));
-    expect(await screen.findByRole('heading', { name: /Старый запуск/ })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /Old run/ })).toBeTruthy();
   });
 });

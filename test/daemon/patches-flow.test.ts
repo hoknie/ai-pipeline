@@ -33,7 +33,7 @@ async function finishedRun(h: Harness): Promise<string> {
   const { runId } = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
-    groups: [{ title: 'Вход', task: 'вход' }],
+    groups: [{ title: 'Login', task: 'login' }],
   })) as RunCreated;
   await h.waitFor(runId, (view) => view.finished);
   return runId;
@@ -126,7 +126,7 @@ describe('diff of a file of a group', () => {
     await mergedDiff(h, runId);
     const diff = (await h.call('group_file_diff', {
       runId,
-      group: 'vhod',
+      group: 'login',
       path: 'lib.ts',
     })) as FileDiffView;
     expect(diff).toMatchObject({
@@ -139,7 +139,7 @@ describe('diff of a file of a group', () => {
     expect(diff.lines).toContain('+export const value = 2;');
     expect(diff.lines.some((line) => line.startsWith('diff --git'))).toBe(false);
     await expect(
-      h.call('group_file_diff', { runId, group: 'vhod', path: 'other.ts' }),
+      h.call('group_file_diff', { runId, group: 'login', path: 'other.ts' }),
     ).rejects.toThrow('is not changed in group');
     await expect(
       h.call('group_file_diff', { runId, group: 'nope', path: 'lib.ts' }),
@@ -153,13 +153,13 @@ describe('diff of a file of a group', () => {
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.finished);
     await mergedDiff(h, runId);
     const diff = (await h.call('group_file_diff', {
       runId,
-      group: 'vhod',
+      group: 'login',
       path: 'logo.bin',
     })) as FileDiffView;
     expect(diff).toMatchObject({ binary: true, lines: [], totalLines: 0 });
@@ -176,7 +176,7 @@ describe('revision of the changes of a group', () => {
     expect(revision).toMatch(/^[0-9a-f]{40}\.\.[0-9a-f]{40}$/);
     const [from, to] = revision!.split('..');
     expect(from).not.toBe(to);
-    expect((await h.group(runId, 'vhod')).diff?.revision).toBe(revision);
+    expect((await h.group(runId, 'login')).diff?.revision).toBe(revision);
     expect(git(h.repo, 'diff', '--name-only', from!, to!)).toBe('lib.ts');
   });
 
@@ -189,14 +189,14 @@ describe('revision of the changes of a group', () => {
         { write: { 'lib.ts': 'export const value = 3;\n' } },
       ],
       review: [
-        { waitFor: h.gate('round-1'), verdict: 'rejected', feedback: 'переделать' },
+        { waitFor: h.gate('round-1'), verdict: 'rejected', feedback: 'redo' },
         { waitFor: h.gate('round-2') },
       ],
     });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Вход', task: 'вход' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     const first = (
       await h.waitFor(
@@ -216,7 +216,7 @@ describe('revision of the changes of a group', () => {
     ).groups[0]!;
     expect(second.diff).toEqual(first.diff);
     expect(second.diffRevision).not.toBe(first.diffRevision);
-    expect((await h.group(runId, 'vhod')).diff?.revision).toBe(second.diffRevision);
+    expect((await h.group(runId, 'login')).diff?.revision).toBe(second.diffRevision);
     h.open('round-2');
 
     const merged = (

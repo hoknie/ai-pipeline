@@ -18,8 +18,8 @@ const SPLIT_CONFIG = PIPELINE_CONFIG.replace(
   '    feature:\n      split: { specialist: coder, max_groups: 3 }\n      steps:',
 );
 const QUEUE_CONFIG = PIPELINE_CONFIG.replace(
-  'coder: { name: Кодировщик }',
-  'coder: { name: Кодировщик, queue: true }',
+  'coder: { name: Coder }',
+  'coder: { name: Coder, queue: true }',
 );
 
 interface ToolResult {
@@ -51,12 +51,12 @@ describe('the worker MCP server through a real agent', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Логин', task: 'логин' }],
+      groups: [{ title: 'Login', task: 'login' }],
     })) as RunCreated;
     await h.waitFor(created.runId, (view) => view.finished);
     expect(workers(h)).toEqual([
-      { step: 'code', group: 'Логин', via: 'mcp' },
-      { step: 'review', group: 'Логин', via: 'direct' },
+      { step: 'code', group: 'Login', via: 'mcp' },
+      { step: 'review', group: 'Login', via: 'direct' },
     ]);
   });
 
@@ -69,12 +69,12 @@ describe('the worker MCP server through a real agent', () => {
           toolCalls: [
             {
               name: 'swarm_split',
-              arguments: { groups: [{ title: 'Вход', task: 'вход' }] },
+              arguments: { groups: [{ title: 'Sign in', task: 'sign in' }] },
             },
           ],
           split: [
-            { title: 'Вход', task: 'вход' },
-            { title: 'Выход', task: 'выход' },
+            { title: 'Sign in', task: 'sign in' },
+            { title: 'Sign out', task: 'sign out' },
           ],
         },
       ],
@@ -82,11 +82,11 @@ describe('the worker MCP server through a real agent', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'вход и выход',
+      task: 'sign in and sign out',
     })) as RunCreated;
     const final = await h.waitFor(created.runId, (view) => view.finished);
     // the second call replaced the first proposal
-    expect(final.groups.map((group) => group.slug)).toEqual(['vhod', 'vyhod']);
+    expect(final.groups.map((group) => group.slug)).toEqual(['sign-in', 'sign-out']);
     expect(textOf(toolResults(h)[0])).toBe(
       'Recorded 1 group(s). Call swarm_report when you are done.',
     );
@@ -99,14 +99,14 @@ describe('the worker MCP server through a real agent', () => {
         {
           realWorker: true,
           toolCalls: [{ name: 'swarm_split', arguments: { groups: [] } }],
-          split: [{ title: 'Вход', task: 'вход' }],
+          split: [{ title: 'Sign in', task: 'sign in' }],
         },
       ],
     });
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'вход',
+      task: 'sign in',
     })) as RunCreated;
     await h.waitFor(created.runId, (view) => view.finished);
     const [refused] = toolResults(h);
@@ -121,27 +121,27 @@ describe('the worker MCP server through a real agent', () => {
         {
           realWorker: true,
           toolCalls: [
-            { name: 'swarm_queue_add', arguments: { pipeline: 'feature', task: 'первая' } },
+            { name: 'swarm_queue_add', arguments: { pipeline: 'feature', task: 'first' } },
             {
               name: 'swarm_queue_add',
               arguments: {
                 pipeline: 'feature',
-                groups: [{ title: 'Часть', task: 'часть' }],
-                title: 'Вторая',
+                groups: [{ title: 'Part', task: 'part' }],
+                title: 'Second',
               },
             },
           ],
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'summary' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const results = toolResults(h);
     expect(results.map((entry) => entry.result.isError)).toEqual([undefined, undefined]);
     expect(textOf(results[0])).toMatch(/^Queued \S+ for pipeline feature\. It starts when/);
     const queue: QueueView = await queueOf(h);
-    expect(queue.items.map((item) => item.title)).toEqual([null, 'Вторая']);
+    expect(queue.items.map((item) => item.title)).toEqual([null, 'Second']);
   });
 
   it('swarm_queue_add: refuses both a task and groups, and neither', async () => {
@@ -155,8 +155,8 @@ describe('the worker MCP server through a real agent', () => {
               name: 'swarm_queue_add',
               arguments: {
                 pipeline: 'feature',
-                task: 'задача',
-                groups: [{ title: 'Часть', task: 'часть' }],
+                task: 'task',
+                groups: [{ title: 'Part', task: 'part' }],
               },
             },
             { name: 'swarm_queue_add', arguments: { pipeline: 'feature' } },
@@ -164,7 +164,7 @@ describe('the worker MCP server through a real agent', () => {
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'summary' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const results = toolResults(h);
@@ -183,19 +183,19 @@ describe('the worker MCP server through a real agent', () => {
         {
           realWorker: true,
           queueChain: [
-            { pipeline: 'feature', task: 'первая', title: 'Первая' },
-            { pipeline: 'feature', task: 'вторая', title: 'Вторая', after: ['$prev'] },
+            { pipeline: 'feature', task: 'first', title: 'First' },
+            { pipeline: 'feature', task: 'second', title: 'Second', after: ['$prev'] },
           ],
         },
       ],
     });
-    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'итоги' });
+    const created = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'summary' });
     await h.call('queue_pause', { repository: h.repo });
     await h.waitFor(created.runId, (view) => view.finished);
     const queue = await queueOf(h);
     const [first, second] = queue.items;
-    expect(first?.title).toBe('Первая');
-    expect(second?.title).toBe('Вторая');
+    expect(first?.title).toBe('First');
+    expect(second?.title).toBe('Second');
     expect(second?.after.map((dependency) => dependency.id)).toEqual([first?.id]);
   });
 
@@ -205,12 +205,12 @@ describe('the worker MCP server through a real agent', () => {
     const first = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Логин', task: 'Починить вход по паролю' }],
+      groups: [{ title: 'Login', task: 'Fix password sign-in' }],
     })) as RunCreated;
     const done = await h.waitFor(first.runId, (view) => view.finished);
     const slug = done.groups[0]?.slug ?? '';
     h.script({
-      'code@Чтение': [
+      'code@Reading': [
         {
           realWorker: true,
           toolCalls: [
@@ -229,7 +229,7 @@ describe('the worker MCP server through a real agent', () => {
     const second = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Чтение', task: `Сделать как в ${first.runId}` }],
+      groups: [{ title: 'Reading', task: `Do it like in ${first.runId}` }],
     })) as RunCreated;
     await h.waitFor(second.runId, (view) => view.finished);
     const results = toolResults(h);
@@ -241,10 +241,10 @@ describe('the worker MCP server through a real agent', () => {
     ]);
     const [overview, byNumber, byLink, unknown] = results.map(textOf);
     expect(overview).toContain(first.runId);
-    expect(overview).toContain(`- ${slug} (Логин): Починить вход по паролю`);
-    expect(byNumber).toContain(`Group ${slug} (Логин)`);
-    expect(byNumber).toContain('Task: Починить вход по паролю');
-    expect(byLink).toContain(`Group ${slug} (Логин)`);
+    expect(overview).toContain(`- ${slug} (Login): Fix password sign-in`);
+    expect(byNumber).toContain(`Group ${slug} (Login)`);
+    expect(byNumber).toContain('Task: Fix password sign-in');
+    expect(byLink).toContain(`Group ${slug} (Login)`);
     expect(unknown).toBe('unknown task #9999 in this repository');
   });
 
@@ -256,11 +256,11 @@ describe('the worker MCP server through a real agent', () => {
     const foreign = (await startRun(h, {
       repository: other,
       pipeline: 'feature',
-      groups: [{ title: 'Секрет', task: 'Секретная задача' }],
+      groups: [{ title: 'Secret', task: 'Secret task' }],
     })) as RunCreated;
     await h.waitFor(foreign.runId, (view) => view.finished);
     h.script({
-      'code@Чтение': [
+      'code@Reading': [
         {
           realWorker: true,
           toolCalls: [{ name: 'swarm_run_show', arguments: { run: foreign.runId } }],
@@ -271,13 +271,13 @@ describe('the worker MCP server through a real agent', () => {
     const own = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      groups: [{ title: 'Чтение', task: 'читать' }],
+      groups: [{ title: 'Reading', task: 'read' }],
     })) as RunCreated;
     await h.waitFor(own.runId, (view) => view.finished);
     const [refused] = toolResults(h);
     expect(refused?.result.isError).toBe(true);
     expect(textOf(refused)).toBe(`run ${foreign.runId} belongs to another repository`);
-    expect(textOf(refused)).not.toContain('Секрет');
+    expect(textOf(refused)).not.toContain('Secret');
   });
 
   it('swarm_run_show: refuses a token of no running attempt', async () => {

@@ -4,7 +4,7 @@ import { parseSync } from 'oxc-parser';
 
 export interface SourceImport {
   specifier: string;
-  /** Тип стирается при сборке: `import type`, `export type … from`, все имена с `type`. */
+  /** The type is erased at build time: `import type`, `export type … from`, all names with `type`. */
   typeOnly: boolean;
   dynamic: boolean;
   reexport: boolean;
@@ -14,14 +14,14 @@ export interface SourceImport {
 export interface SourceFunction {
   name: string;
   line: number;
-  /** Строки кода: без пустых и без строк только с комментарием. */
+  /** Lines of code: without blank lines and without comment-only lines. */
   lines: number;
 }
 
 export interface SourceClass {
   name: string;
   line: number;
-  /** Методы вне `private`; конструктор не считается. */
+  /** Methods outside `private`; the constructor does not count. */
   methods: number;
 }
 
@@ -29,16 +29,16 @@ export interface ParsedSource {
   imports: SourceImport[];
   functions: SourceFunction[];
   classes: SourceClass[];
-  /** Классы, созданные через `new`. */
+  /** Classes created with `new`. */
   created: { name: string; line: number }[];
-  /** Сколько раз встречается `process.env`. */
+  /** How many times `process.env` occurs. */
   processEnv: number;
-  /** В файле только объявления `export … from`. */
+  /** The file has only `export … from` declarations. */
   onlyReexports: boolean;
   codeLines: number;
 }
 
-// Узлы oxc — обычные объекты ESTree; типизировать их целиком нет смысла.
+// oxc nodes are plain ESTree objects; there is no point in typing them fully.
 type Node = Record<string, any>;
 
 interface Comment {
@@ -62,7 +62,7 @@ function maskComments(text: string, comments: Comment[]): string {
   return masked;
 }
 
-/** Число строк кода: пустые строки и строки только с комментарием не входят. */
+/** Number of lines of code: blank lines and comment-only lines are not counted. */
 export function codeLines(text: string, file = 'file.ts'): number {
   const { comments } = parse(file, text);
   return maskComments(text, comments)
@@ -87,7 +87,7 @@ export function parseText(file: string, text: string): ParsedSource {
   const { program, comments } = parse(file, text);
   const masked = maskComments(text, comments);
   const lines = masked.split('\n');
-  // codePrefix[n] — число строк кода среди первых n строк файла.
+  // codePrefix[n] is the number of lines of code among the first n lines of the file.
   const codePrefix: number[] = [0];
   for (const line of lines) {
     codePrefix.push((codePrefix[codePrefix.length - 1] ?? 0) + (line.trim() === '' ? 0 : 1));

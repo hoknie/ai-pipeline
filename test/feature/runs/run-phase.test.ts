@@ -12,8 +12,8 @@ function needsHuman(state: ReturnType<typeof run>, slug: string) {
 describe('run phase needs_human', () => {
   it('is needs_human when one group waits and another is running', () => {
     const state = run(2);
-    group(state, 'gruppa-2').status = 'running';
-    needsHuman(state, 'gruppa-1');
+    group(state, 'group-2').status = 'running';
+    needsHuman(state, 'group-1');
     expect(runPhase(state)).toBe('needs_human');
     expect(summarize(state)).toMatchObject({ state: 'needs_human', waiting: 1, finished: false });
   });
@@ -21,7 +21,7 @@ describe('run phase needs_human', () => {
   it('counts a waiting split group', () => {
     const state = run(2);
     state.split = { ...group(state), slug: '_split', status: 'needs_human', attempts: [] };
-    needsHuman(state, 'gruppa-1');
+    needsHuman(state, 'group-1');
     expect(runPhase(state)).toBe('needs_human');
     expect(summarize(state).waiting).toBe(2);
   });
@@ -69,25 +69,25 @@ describe('run phase failed', () => {
 
   it('is active again after a retry of the failed group', () => {
     const state = run(2);
-    group(state, 'gruppa-1').status = 'failed';
-    group(state, 'gruppa-2').status = 'merged';
+    group(state, 'group-1').status = 'failed';
+    group(state, 'group-2').status = 'merged';
     expect(runPhase(state)).toBe('failed');
-    group(state, 'gruppa-1').status = 'queued';
+    group(state, 'group-1').status = 'queued';
     expect(runPhase(state)).toBe('active');
   });
 
   it('prefers cancelled over failed', () => {
     const state = run(2);
-    group(state, 'gruppa-1').status = 'failed';
-    group(state, 'gruppa-2').status = 'cancelled';
+    group(state, 'group-1').status = 'failed';
+    group(state, 'group-2').status = 'cancelled';
     expect(runPhase(state)).toBe('cancelled');
   });
 
   it('is finished for merged groups with pending or applied delivery', () => {
     const state = run(2);
-    group(state, 'gruppa-1').status = 'merged';
-    group(state, 'gruppa-2').status = 'merged';
-    group(state, 'gruppa-2').delivery = { ...group(state, 'gruppa-2').delivery, state: 'applied' };
+    group(state, 'group-1').status = 'merged';
+    group(state, 'group-2').status = 'merged';
+    group(state, 'group-2').delivery = { ...group(state, 'group-2').delivery, state: 'applied' };
     expect(runPhase(state)).toBe('finished');
   });
 

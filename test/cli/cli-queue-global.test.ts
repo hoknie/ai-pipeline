@@ -20,12 +20,12 @@ describe('cli: the global queue', () => {
 
   it('lists the global queue with the project of every task', async () => {
     const box = globalBox();
-    await aip(box, 'queue', 'add', 'feature', '--task', 'первая задача');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'first task');
     const list = await aip(box, 'queue', 'list');
     expect(list.code).toBe(0);
     expect(list.stdout).toContain('Global queue: stopped, parallel 1');
     expect(list.stdout).toContain('at most 3 specialists at once');
-    expect(list.stdout).toContain('первая задача');
+    expect(list.stdout).toContain('first task');
     expect(list.stderr).not.toContain('--repo is ignored');
     const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout);
     expect(json).toMatchObject({ scope: 'global', max: 3 });
@@ -37,12 +37,12 @@ describe('cli: the global queue', () => {
     copyTemplateRepo(lib, PIPELINE_CONFIG, { 'lib.ts': 'export const value = 1;\n' });
     await aip(box, 'repo', 'add', box.repo, '--slug', 'app');
     await aip(box, 'repo', 'add', lib, '--slug', 'lib');
-    await aip(box, 'queue', 'add', 'feature', '--task', 'задача A', '--repo', box.repo);
-    await aip(box, 'queue', 'add', 'feature', '--task', 'задача B', '--repo', lib);
+    await aip(box, 'queue', 'add', 'feature', '--task', 'task A', '--repo', box.repo);
+    await aip(box, 'queue', 'add', 'feature', '--task', 'task B', '--repo', lib);
     const list = await aip(box, 'queue', 'list');
     const lines = list.stdout.split('\n');
-    expect(lines.find((line) => line.includes('задача A'))).toContain('[app]');
-    expect(lines.find((line) => line.includes('задача B'))).toContain('[lib]');
+    expect(lines.find((line) => line.includes('task A'))).toContain('[app]');
+    expect(lines.find((line) => line.includes('task B'))).toContain('[lib]');
   });
 
   it('does not warn about --repo when a task is added, edited, moved or removed', async () => {

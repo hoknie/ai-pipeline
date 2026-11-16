@@ -50,7 +50,7 @@ async function add(h: Harness, title: string): Promise<string> {
   const view = (await h.call('queue_add', {
     repository: h.repo,
     pipeline: 'feature',
-    task: 'работа',
+    task: 'work',
     title,
   })) as QueueView & { item: string };
   return view.item;

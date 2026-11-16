@@ -10,7 +10,7 @@ afterEach(() => {
   for (const directory of created.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
-/** Временное дерево исходников: ключ — путь от корня, значение — текст файла. */
+/** Temporary source tree: the key is the path from the root, the value is the file text. */
 export function makeTree(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), 'aip-layout-'));
   created.push(root);
@@ -22,5 +22,5 @@ export function makeTree(files: Record<string, string>): string {
   return root;
 }
 
-/** Файл, который что-то экспортирует: у импортируемых файлов должно быть содержимое. */
+/** A file that exports something: imported files must have content. */
 export const stub = 'export const value = 1;\n';

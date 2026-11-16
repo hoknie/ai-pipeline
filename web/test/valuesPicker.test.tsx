@@ -14,7 +14,7 @@ afterEach(cleanup);
 
 const OPTIONS: PickerOption[] = [
   { name: 'WebFetch', source: 'builtin' },
-  { name: 'review', source: 'project', description: 'Проверка кода' },
+  { name: 'review', source: 'project', description: 'Code review' },
   { name: 'review', source: 'global' },
 ];
 
@@ -56,8 +56,8 @@ describe('ValuesPicker', () => {
     render(<Harness options={OPTIONS} onChange={onChange} />);
     const input = await search();
     expect(screen.getByText('Built-in')).toBeTruthy();
-    expect(screen.getByText('Проверка кода')).toBeTruthy();
-    fireEvent.change(input, { target: { value: 'проверка' } });
+    expect(screen.getByText('Code review')).toBeTruthy();
+    fireEvent.change(input, { target: { value: 'code' } });
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(2); // the match and the free-input row
     fireEvent.click(options[0]!);
@@ -144,10 +144,10 @@ describe('ValuesPicker', () => {
   it('shows the display text in the chip and the remove button, and in the list', async () => {
     const onChange = vi.fn();
     const options: PickerOption[] = [
-      { name: 'q1', source: 'project', description: 'Модель' },
+      { name: 'q1', source: 'project', description: 'Model' },
       { name: 'q2', source: 'project', description: 'API' },
     ];
-    const titles: Record<string, string> = { q1: 'Модель', q2: 'API' };
+    const titles: Record<string, string> = { q1: 'Model', q2: 'API' };
     render(
       <Harness
         options={options}
@@ -168,7 +168,7 @@ describe('ValuesPicker', () => {
   });
 
   it('keeps a long chosen value inside the field and a long option whole', async () => {
-    const long = 'д'.repeat(120);
+    const long = 'w'.repeat(120);
     render(
       <Harness
         start={['q1']}
@@ -193,7 +193,7 @@ describe('ValuesPicker', () => {
   });
 
   it('keeps options aligned with a long description', async () => {
-    const description = 'очень длинное описание навыка '.repeat(7);
+    const description = 'a very long skill description '.repeat(7);
     render(
       <Harness
         start={['tdd']}

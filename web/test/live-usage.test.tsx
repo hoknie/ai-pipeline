@@ -166,7 +166,7 @@ describe('statuses in the group header', () => {
       const api = fakeApi({ group: vi.fn(async () => groupView()) });
       render(<App api={api} openStream={openFake} />);
       act(() => stream().send({ event: 'snapshot', seq: 1, runs: [run] }));
-      const region = await screen.findByRole('region', { name: 'group Вход' });
+      const region = await screen.findByRole('region', { name: 'group Sign-in' });
       const inGroup = () => region.querySelector('header h2')!.parentElement!;
       expect(within(inGroup()).queryByLabelText(/\(finished\)$/)).toBeNull();
       expect(within(inGroup()).queryByLabelText('Merged (merged)')).toBeNull();

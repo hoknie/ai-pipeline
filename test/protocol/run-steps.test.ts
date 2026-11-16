@@ -25,10 +25,10 @@ function view(patch: Partial<RunView> = {}): RunView {
 }
 
 const steps: RunView['steps'] = [
-  { id: 'plan', specialist: 'p', name: 'План', skipped: false, state: 'done' },
-  { id: 'code', specialist: 'c', name: 'Код', skipped: false, state: 'active' },
-  { id: 'review', specialist: 'r', name: 'Ревью', skipped: false, state: 'upcoming' },
-  { id: 'qa', specialist: 'q', name: 'Тесты', skipped: true, state: 'upcoming' },
+  { id: 'plan', specialist: 'p', name: 'Plan', skipped: false, state: 'done' },
+  { id: 'code', specialist: 'c', name: 'Code', skipped: false, state: 'active' },
+  { id: 'review', specialist: 'r', name: 'Review', skipped: false, state: 'upcoming' },
+  { id: 'qa', specialist: 'q', name: 'Tests', skipped: true, state: 'upcoming' },
 ];
 
 describe('stepsLine', () => {
@@ -36,13 +36,13 @@ describe('stepsLine', () => {
 
   it('marks the states with words without color', () => {
     expect(stepsLine(run4, plainStyle)).toBe(
-      'Steps: План [done] → Код [active] → Ревью → Тесты [skipped]',
+      'Steps: Plan [done] → Code [active] → Review → Tests [skipped]',
     );
   });
 
   it('marks the states with badges in color', () => {
     const line = stepsLine(run4, rich) ?? '';
-    expect(strip(line)).toBe('Steps: План ✓ → Код ▸ → Ревью ◦ → Тесты ⊘');
+    expect(strip(line)).toBe('Steps: Plan ✓ → Code ▸ → Review ◦ → Tests ⊘');
     expect(line).toContain(rich.success('✓'));
   });
 
@@ -51,7 +51,7 @@ describe('stepsLine', () => {
       steps: [{ ...steps[0]!, skipped: true }],
       progress: { done: 0, total: 1 },
     });
-    expect(stepsLine(skippedDone, plainStyle)).toBe('Steps: План [skipped]');
+    expect(stepsLine(skippedDone, plainStyle)).toBe('Steps: Plan [skipped]');
   });
 
   it('gives nothing while the task is split', () => {

@@ -75,7 +75,7 @@ function attempt(seq: number, overrides: Record<string, unknown> = {}) {
     ...groupView().attempts[0]!,
     seq,
     stepId: ['plan', 'code', 'review'][seq - 1] ?? 'qa',
-    stepName: ['Планировщик', 'Кодер', 'Ревьюер'][seq - 1] ?? 'qa',
+    stepName: ['Planner', 'Coder', 'Reviewer'][seq - 1] ?? 'qa',
     status: 'finished',
     verdict: 'done',
     ...overrides,
@@ -89,7 +89,6 @@ describe('top bar and connection', () => {
     render(<App api={api} openStream={openFake} />);
     expect(screen.getByRole('link', { name: /aip\s*web/ })).toBeTruthy();
     expect(screen.getByRole('link', { name: /^Runs/ }).getAttribute('aria-current')).toBe('page');
-    expect(screen.queryByRole('link', { name: 'Раны' })).toBeNull();
     expect(screen.getByRole('link', { name: /^Queue/ }).getAttribute('href')).toBe('#queue');
     for (const name of ['Specialists', 'Pipeline'])
       expect(screen.getByRole('link', { name })).toBeTruthy();
@@ -123,7 +122,12 @@ describe('top bar and connection', () => {
 
 describe('run state', () => {
   it('shows the cancelled badge in the list and in the header', () => {
-    const cancelled = runView({ id: 'c', title: 'отменённый', finished: true, state: 'cancelled' });
+    const cancelled = runView({
+      id: 'c',
+      title: 'stopped early',
+      finished: true,
+      state: 'cancelled',
+    });
     render(list([cancelled]));
     expect(screen.getByLabelText('Cancelled (cancelled)')).toBeTruthy();
     cleanup();
@@ -139,10 +143,10 @@ describe('run times', () => {
     render(
       list(
         [
-          runView({ id: 'a', title: 'активный', createdAt: started }),
+          runView({ id: 'a', title: 'active one', createdAt: started }),
           runView({
             id: 'b',
-            title: 'готовый',
+            title: 'complete one',
             createdAt: started,
             finished: true,
             state: 'finished',
@@ -159,7 +163,7 @@ describe('run times', () => {
 
 describe('needs_human runs', () => {
   const waiting = () =>
-    runView({ id: 'w', title: 'ждущий', state: 'needs_human', waiting: 3, createdAt: 1 });
+    runView({ id: 'w', title: 'waiting one', state: 'needs_human', waiting: 3, createdAt: 1 });
 
   it('sorts waiting runs first, then active, then finished, newest first', () => {
     const runs = [
@@ -262,15 +266,15 @@ describe('run tree', () => {
     render(
       list(
         [
-          runView({ id: 'a', title: 'из очереди тест', fromQueue: true }),
-          runView({ id: 'b', title: 'вручную', fromQueue: false }),
+          runView({ id: 'a', title: 'queued test', fromQueue: true }),
+          runView({ id: 'b', title: 'manual start', fromQueue: false }),
         ],
         { now: 61_000 },
       ),
     );
     expect(screen.queryByText('from the queue')).toBeNull();
-    expect(screen.getByText('из очереди тест')).toBeTruthy();
-    expect(screen.getByText('вручную')).toBeTruthy();
+    expect(screen.getByText('queued test')).toBeTruthy();
+    expect(screen.getByText('manual start')).toBeTruthy();
   });
 
   it('labels runs by their tasks and lists the groups of the selected run', () => {
@@ -279,12 +283,12 @@ describe('run tree', () => {
         [
           runView({
             id: 'a',
-            title: 'добавить команду aip version',
-            groups: [groupRow(), groupRow({ slug: 'signup', title: 'Регистрация' })],
+            title: 'add the aip version command',
+            groups: [groupRow(), groupRow({ slug: 'signup', title: 'Sign-up' })],
           }),
           runView({
             id: 'b',
-            title: 'сделай веб интерфейс',
+            title: 'build a web interface',
             liveDiff: { files: 2, added: 367, removed: 0 },
           }),
         ],
@@ -294,13 +298,13 @@ describe('run tree', () => {
     const runs = screen
       .getAllByRole('button', { expanded: true })
       .concat(screen.getAllByRole('button', { expanded: false }));
-    expect(within(runs[0]!).getByText('добавить команду aip version')).toBeTruthy();
+    expect(within(runs[0]!).getByText('add the aip version command')).toBeTruthy();
     expect(within(runs[0]!).getByText('feature')).toBeTruthy();
     expect(within(runs[1]!).getByText('2 files +367 −0')).toBeTruthy();
     const groups = screen.getAllByRole('list', { name: 'run groups' });
     expect(groups).toHaveLength(1);
-    expect(within(groups[0]!).getByText('Вход')).toBeTruthy();
-    expect(within(groups[0]!).getByText('Регистрация')).toBeTruthy();
+    expect(within(groups[0]!).getByText('Sign-in')).toBeTruthy();
+    expect(within(groups[0]!).getByText('Sign-up')).toBeTruthy();
   });
 
   function renderSelected(run: ReturnType<typeof runView>) {
@@ -310,7 +314,7 @@ describe('run tree', () => {
   it('shows no group list for a run with a single group', () => {
     renderSelected(runView());
     expect(screen.queryByRole('list', { name: 'run groups' })).toBeNull();
-    expect(screen.queryByText('Вход')).toBeNull();
+    expect(screen.queryByText('Sign-in')).toBeNull();
   });
 
   it('shows no group list while the task is still being split', () => {
@@ -326,7 +330,7 @@ describe('run page', () => {
     const api = fakeApi({ group: vi.fn(async () => groupView()) });
     render(<App api={api} openStream={openFake} />);
     act(() => stream().send({ event: 'snapshot', seq: 1, runs: [runView()] }));
-    expect(await screen.findByRole('region', { name: 'group Вход' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'group Sign-in' })).toBeTruthy();
     expect(screen.queryByRole('list', { name: 'run groups' })).toBeNull();
   });
 
@@ -335,19 +339,19 @@ describe('run page', () => {
     const api = fakeApi({ group: vi.fn(async () => groupView()) });
     render(<App api={api} openStream={openFake} />);
     act(() => stream().send({ event: 'snapshot', seq: 1, runs: [runView()] }));
-    expect(await screen.findByRole('region', { name: 'group Вход' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'group Sign-in' })).toBeTruthy();
     expect(screen.queryByRole('list', { name: 'run groups' })).toBeNull();
   });
 
   it('opens the group that needs attention, switches groups and keeps a typed answer', async () => {
     const api = fakeApi({
       group: vi.fn(async (_run: string, slug: string) =>
-        groupView({ slug, title: slug === 'signup' ? 'Регистрация' : 'Вход' }),
+        groupView({ slug, title: slug === 'signup' ? 'Sign-up' : 'Sign-in' }),
       ),
     });
     const asking = groupRow({
       slug: 'signup',
-      title: 'Регистрация',
+      title: 'Sign-up',
       status: 'needs_human',
       question: 'OAuth?',
     });
@@ -359,10 +363,10 @@ describe('run page', () => {
       stream().send({ event: 'snapshot', seq: 1, runs: [run], repositories: [repositoryView()] }),
     );
     const tree = screen.getByRole('list', { name: 'run groups' });
-    expect(within(tree).getAllByRole('button')[0]?.textContent).toContain('Регистрация');
-    expect(screen.getByRole('region', { name: 'group Регистрация' })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('answer for Регистрация'), {
-      target: { value: 'пароль' },
+    expect(within(tree).getAllByRole('button')[0]?.textContent).toContain('Sign-up');
+    expect(screen.getByRole('region', { name: 'group Sign-up' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('answer for Sign-up'), {
+      target: { value: 'password' },
     });
     act(() =>
       stream().send({
@@ -371,11 +375,11 @@ describe('run page', () => {
         run: { ...run, usage: { inputTokens: 5000, outputTokens: 1 } },
       }),
     );
-    expect((screen.getByLabelText('answer for Регистрация') as HTMLTextAreaElement).value).toBe(
-      'пароль',
+    expect((screen.getByLabelText('answer for Sign-up') as HTMLTextAreaElement).value).toBe(
+      'password',
     );
-    fireEvent.click(within(tree).getByText('Вход'));
-    const login = screen.getByRole('region', { name: 'group Вход' });
+    fireEvent.click(within(tree).getByText('Sign-in'));
+    const login = screen.getByRole('region', { name: 'group Sign-in' });
     expect(login.querySelector('header')!.textContent).not.toContain('2 files');
     expect(
       within(screen.getByRole('complementary', { name: 'Run summary' })).getByLabelText(
@@ -383,12 +387,12 @@ describe('run page', () => {
       ).className,
     ).toContain('bg-status-ok-bg');
     expect(window.location.hash).toBe('#runs/run1/login');
-    fireEvent.click(within(tree).getByText('Регистрация'));
-    expect((screen.getByLabelText('answer for Регистрация') as HTMLTextAreaElement).value).toBe(
-      'пароль',
+    fireEvent.click(within(tree).getByText('Sign-up'));
+    expect((screen.getByLabelText('answer for Sign-up') as HTMLTextAreaElement).value).toBe(
+      'password',
     );
     fireEvent.click(screen.getByText('Answer'));
-    await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', 'signup', 'пароль'));
+    await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', 'signup', 'password'));
   });
 
   it('delivers, and asks before delivering with --force', async () => {
@@ -507,7 +511,7 @@ describe('attempts and transcript', () => {
       ),
     });
     panel(api);
-    await screen.findByText('#3 Ревьюер');
+    await screen.findByText('#3 Reviewer');
     const heads = () => screen.getAllByRole('button', { name: /^attempt \d+/ });
     expect(heads().map((head) => head.getAttribute('aria-expanded'))).toEqual([
       'false',
@@ -526,7 +530,7 @@ describe('attempts and transcript', () => {
       group: vi.fn(async () =>
         groupView({
           status: 'needs_human',
-          question: 'запустите claude plugin test',
+          question: 'run claude plugin test',
           permissionHints: ['claude plugin *'],
           attempts: [
             attempt(1, {
@@ -572,20 +576,20 @@ describe('attempts and transcript', () => {
     delete legacy.permissionHints;
     for (const item of legacy.attempts ?? []) delete (item as Partial<typeof item>).denials;
     panel(fakeApi({ group: vi.fn(async () => legacy as ReturnType<typeof groupView>) }));
-    expect(await screen.findByText('#1 Кодер')).toBeTruthy();
+    expect(await screen.findByText('#1 Coder')).toBeTruthy();
     expect(screen.queryByText(/denials:/)).toBeNull();
   });
 
   it('shows the model, not the specialist slug, in the title of an attempt', async () => {
     panel(fakeApi());
-    await screen.findByText('#1 Кодер');
+    await screen.findByText('#1 Coder');
     expect(screen.getByText('sonnet').getAttribute('title')).toBe('coder · claude sonnet');
     expect(screen.queryByText('coder')).toBeNull();
   });
 
   it('shows no refused commands for a group without them', async () => {
     panel(fakeApi());
-    await screen.findByText('#1 Кодер');
+    await screen.findByText('#1 Coder');
     expect(screen.queryByText(/denials:/)).toBeNull();
     expect(screen.queryByRole('region', { name: 'permissions hint' })).toBeNull();
   });
@@ -594,7 +598,7 @@ describe('attempts and transcript', () => {
     const api = fakeApi({
       group: vi.fn(async () =>
         groupView({
-          attempts: [attempt(1, { summary: 'итог шага' })],
+          attempts: [attempt(1, { summary: 'summary of the step' })],
           diff: {
             files: [
               { path: 'README.md', added: 1, removed: 0 },
@@ -613,7 +617,7 @@ describe('attempts and transcript', () => {
         cursor: 6,
         running: false,
         entries: [
-          { kind: 'text' as const, text: '## План\n\n- пункт\n\n<script>alert(1)</script>' },
+          { kind: 'text' as const, text: '## Plan outline\n\n- item\n\n<script>alert(1)</script>' },
           {
             kind: 'tool_call' as const,
             id: 't1',
@@ -643,11 +647,11 @@ describe('attempts and transcript', () => {
     panel(api);
     const message = await screen.findByRole('region', { name: 'specialist text' });
     expect(within(message).getByText('Specialist')).toBeTruthy();
-    expect(within(message).getByRole('heading', { name: 'План' })).toBeTruthy();
+    expect(within(message).getByRole('heading', { name: 'Plan outline' })).toBeTruthy();
     expect(document.querySelector('script')).toBeNull();
     expect(screen.getByText('<script>alert(1)</script>')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'attempt summary' }).textContent).toContain(
-      'итог шага',
+      'summary of the step',
     );
     expect(screen.getByText('src/app.ts')).toBeTruthy();
     const ok = screen.getByRole('button', { name: /result · updated/ });
@@ -675,7 +679,7 @@ describe('attempts and transcript', () => {
         seq: 1,
         cursor: 2,
         running: true,
-        entries: [{ kind: 'text', text: 'первый' }],
+        entries: [{ kind: 'text', text: 'first entry' }],
       })
       .mockResolvedValue({
         runId: 'run1',
@@ -683,15 +687,15 @@ describe('attempts and transcript', () => {
         seq: 1,
         cursor: 5,
         running: false,
-        entries: [{ kind: 'text', text: 'второй' }],
+        entries: [{ kind: 'text', text: 'second entry' }],
       });
     panel(fakeApi({ transcript }));
-    expect(await screen.findByText('первый')).toBeTruthy();
+    expect(await screen.findByText('first entry')).toBeTruthy();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1600);
     });
-    expect(await screen.findByText('второй')).toBeTruthy();
-    expect(screen.getByText('первый')).toBeTruthy();
+    expect(await screen.findByText('second entry')).toBeTruthy();
+    expect(screen.getByText('first entry')).toBeTruthy();
     expect(transcript).toHaveBeenLastCalledWith('run1', 'login', 1, 2);
   });
 
@@ -699,7 +703,9 @@ describe('attempts and transcript', () => {
     return fakeApi({
       group: vi.fn(async () =>
         groupView({
-          attempts: [attempt(1, { summary: 'итог шага', feedback: 'замечание', ...extra })],
+          attempts: [
+            attempt(1, { summary: 'summary of the step', feedback: 'a remark', ...extra }),
+          ],
         }),
       ),
       transcript: vi.fn(async () => ({
@@ -709,7 +715,7 @@ describe('attempts and transcript', () => {
         cursor: 4,
         running: false,
         entries: [
-          { kind: 'text' as const, text: 'ответ специалиста' },
+          { kind: 'text' as const, text: 'specialist answer' },
           { kind: 'tool_call' as const, id: 't1', name: 'Read', summary: 'a.ts', input: '{}' },
           { kind: 'tool_result' as const, id: 't1', text: 'ok', error: false },
           {
@@ -728,7 +734,7 @@ describe('attempts and transcript', () => {
     const list = Array.from({ length: 10 }, (_, index) => `docs/file-${index}.md`);
     panel(logApi({ outsideChanges: list }));
     const head = await screen.findByRole('button', {
-      name: '10 files in the working copy changed during step Планировщик (#1)',
+      name: '10 files in the working copy changed during step Planner (#1)',
     });
     expect(head.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(head);
@@ -753,7 +759,7 @@ describe('attempts and transcript', () => {
     expect(head.getAttribute('aria-expanded')).toBe('true');
     cleanup();
     panel(fakeApi());
-    await screen.findByText('#1 Кодер');
+    await screen.findByText('#1 Coder');
     expect(
       screen.queryByRole('button', { name: /in the working copy changed during step/ }),
     ).toBeNull();
@@ -785,7 +791,7 @@ describe('attempts and transcript', () => {
 
     it('shows only the reason of a failure', async () => {
       crowded({}, groupRow({ status: 'failed', reason: 'boom' }));
-      await screen.findByText('#1 Планировщик');
+      await screen.findByText('#1 Planner');
       expect(screen.getByText('boom')).toBeTruthy();
       expect(screen.queryByText(/config refreshed/)).toBeNull();
       expect(screen.queryByText(/permissions not refreshed/)).toBeNull();
@@ -800,7 +806,7 @@ describe('attempts and transcript', () => {
       expect(screen.queryByText('permissions not refreshed: boom')).toBeNull();
       first.unmount();
       crowded({ attempts: [attempt(1)] });
-      await screen.findByText('#1 Планировщик');
+      await screen.findByText('#1 Planner');
       expect(screen.queryByText('permissions not refreshed: boom')).toBeNull();
       expect(screen.queryByText('config refreshed: no changes')).toBeNull();
     });
@@ -849,7 +855,7 @@ describe('attempts and transcript', () => {
 
   it('keeps the attempt open when a nested block is folded', async () => {
     panel(logApi());
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     const attemptHead = screen.getByRole('button', { name: /^attempt 1/ });
     const nested = screen.getByText('mcp__aip__swarm_report').closest('button')!;
     fireEvent.click(nested);
@@ -857,12 +863,12 @@ describe('attempts and transcript', () => {
     fireEvent.click(nested);
     expect(nested.getAttribute('aria-expanded')).toBe('false');
     expect(attemptHead.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByText('ответ специалиста')).toBeTruthy();
+    expect(screen.getByText('specialist answer')).toBeTruthy();
   });
 
   it('puts the summary and the feedback under the log', async () => {
     panel(logApi());
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     const heading = screen.getByRole('heading', { name: 'Log' });
     const summary = screen.getByRole('region', { name: 'attempt summary' });
     const feedback = screen.getByRole('region', { name: 'feedback' });
@@ -874,7 +880,7 @@ describe('attempts and transcript', () => {
 
   it('shows the whole log without a scroll area of its own', async () => {
     panel(logApi());
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     expect(
       document.querySelector('[class*="overflow-y"]:has(ol[aria-label="attempts"])'),
     ).toBeNull();
@@ -883,7 +889,7 @@ describe('attempts and transcript', () => {
 
   it('shows only the specialist answers when the run asks for it, with no switch of its own', async () => {
     const { rerender } = panel(logApi(), true);
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     expect(screen.queryByText('Read')).toBeNull();
     expect(screen.queryByLabelText('Specialist replies')).toBeNull();
     rerender(
@@ -905,7 +911,7 @@ describe('attempts and transcript', () => {
   it('has the switch of the filter in the group header', async () => {
     const onOnlyReplies = vi.fn();
     panel(logApi(), false, onOnlyReplies);
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     fireEvent.click(screen.getByRole('switch', { name: 'Specialist replies' }));
     expect(onOnlyReplies).toHaveBeenCalledWith(true);
   });
@@ -927,7 +933,7 @@ describe('attempts and transcript', () => {
 
     it('stands before the switch, hides after a click and returns after scrolling up', async () => {
       panel(logApi(), false, vi.fn());
-      await screen.findByText('ответ специалиста');
+      await screen.findByText('specialist answer');
       const watch = screen.getByRole('button', { name: 'Watch' });
       const toggle = screen.getByRole('switch', { name: 'Specialist replies' });
       expect(watch.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -942,14 +948,14 @@ describe('attempts and transcript', () => {
       'is absent for a group with status %s',
       async (status) => {
         panel(logApi(), false, vi.fn(), groupRow({ status }));
-        await screen.findByText('ответ специалиста');
+        await screen.findByText('specialist answer');
         expect(screen.queryByRole('button', { name: 'Watch' })).toBeNull();
       },
     );
 
     it('is absent on other tabs and turns the mode off when leaving the log', async () => {
       panel(logApi());
-      await screen.findByText('ответ специалиста');
+      await screen.findByText('specialist answer');
       fireEvent.click(screen.getByRole('button', { name: 'Watch' }));
       await screen.findByRole('tab', { name: 'Changes' });
       openTab('Changes');
@@ -961,7 +967,7 @@ describe('attempts and transcript', () => {
 
   it('has no switch of JSON', async () => {
     panel(logApi());
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     expect(screen.queryByRole('switch', { name: /JSON/ })).toBeNull();
   });
 
@@ -1003,25 +1009,25 @@ describe('run names', () => {
       stream().send({
         event: 'snapshot',
         seq: 1,
-        runs: [runView({ id: 'mvwed8krym92', title: 'добавить флаг', name: null })],
+        runs: [runView({ id: 'mvwed8krym92', title: 'add a flag', name: null })],
         repositories: [repositoryView()],
       }),
     );
-    expect(screen.getAllByText('добавить флаг').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('add a flag').length).toBeGreaterThan(0);
     act(() =>
       stream().send({
         event: 'run',
         seq: 2,
         run: runView({
           id: 'mvwed8krym92',
-          title: 'Флаг --json для version',
+          title: 'Flag --json for version',
           name: 'add-version-json-flag',
         }),
       }),
     );
     // the third occurrence is the hidden run title in the group header
     const visible = screen
-      .getAllByText('Флаг --json для version')
+      .getAllByText('Flag --json for version')
       .filter((element) => !element.closest('[aria-hidden="true"]'));
     expect(visible).toHaveLength(2);
     expect(screen.getAllByText('add-version-json-flag')).toHaveLength(2);
@@ -1089,13 +1095,15 @@ describe('useRuns stability', () => {
     expect(result.current.runs).toBe(first);
     act(() => source.send({ event: 'run', seq: 2, run: a }));
     expect(result.current.runs).toBe(first);
-    act(() => source.send({ event: 'run', seq: 3, run: { ...a, title: 'Другое' } }));
+    act(() => source.send({ event: 'run', seq: 3, run: { ...a, title: 'Something else' } }));
     expect(result.current.runs).not.toBe(first);
     expect(result.current.runs.find((run) => run.id === 'b')).toBe(
       first.find((run) => run.id === 'b'),
     );
     const second = result.current.runs;
-    act(() => source.send({ event: 'snapshot', seq: 4, runs: [{ ...a, title: 'Другое' }, b] }));
+    act(() =>
+      source.send({ event: 'snapshot', seq: 4, runs: [{ ...a, title: 'Something else' }, b] }),
+    );
     expect(result.current.runs).toBe(second);
   });
 });
@@ -1114,8 +1122,8 @@ describe('tag catalog and filter', () => {
 
   it('keeps the tag filter after a reload, under the new name', async () => {
     window.localStorage.setItem('aip.web.runTags', JSON.stringify(['ta', 'removed']));
-    const tagged = runView({ id: 'a', title: 'С тегом', tags: [auth] });
-    const plain = runView({ id: 'b', title: 'Без тега' });
+    const tagged = runView({ id: 'a', title: 'With a tag', tags: [auth] });
+    const plain = runView({ id: 'b', title: 'Without a tag' });
     render(
       <App api={fakeApi({ runs: vi.fn(async () => [tagged, plain]) })} openStream={openFake} />,
     );
@@ -1129,8 +1137,8 @@ describe('tag catalog and filter', () => {
       });
     });
     const list = await screen.findByRole('list');
-    expect(within(list).getByText('С тегом')).toBeTruthy();
-    expect(within(list).queryByText('Без тега')).toBeNull();
+    expect(within(list).getByText('With a tag')).toBeTruthy();
+    expect(within(list).queryByText('Without a tag')).toBeNull();
     expect(within(list).getByText('login')).toBeTruthy();
     // the removed tag drops out; the chosen one is a chip under the label
     expect(screen.getByRole('button', { name: 'Remove login' })).toBeTruthy();
@@ -1148,8 +1156,8 @@ describe('tag catalog and filter', () => {
         repositories: [],
       }),
     );
-    const done = runView({ id: 'a', title: 'Готов', state: 'finished', finished: true });
-    const live = runView({ id: 'b', title: 'Идёт' });
+    const done = runView({ id: 'a', title: 'Wrapped up', state: 'finished', finished: true });
+    const live = runView({ id: 'b', title: 'Ongoing work' });
     render(<App api={fakeApi({ runs: vi.fn(async () => [done, live]) })} openStream={openFake} />);
     act(() => {
       stream().open();
@@ -1161,7 +1169,7 @@ describe('tag catalog and filter', () => {
 
   it('shows nothing found with a reset that clears the tags', async () => {
     window.localStorage.setItem('aip.web.runTags', JSON.stringify(['ta']));
-    const plain = runView({ id: 'b', title: 'Без тега' });
+    const plain = runView({ id: 'b', title: 'Without a tag' });
     render(<App api={fakeApi({ runs: vi.fn(async () => [plain]) })} openStream={openFake} />);
     act(() => {
       stream().open();
@@ -1193,8 +1201,8 @@ describe('JSON in the transcript', () => {
       kind: 'tool_call' as const,
       id: 'b',
       name: 'TodoWrite',
-      summary: '{"todos":[{"content":"Спека","status":"done"}]}',
-      input: '{"todos":[{"content":"Спека","status":"done"}]}',
+      summary: '{"todos":[{"content":"Spec","status":"done"}]}',
+      input: '{"todos":[{"content":"Spec","status":"done"}]}',
     },
     { kind: 'tool_call' as const, id: 'c', name: 'Edit', summary: 'src/app.ts', input: '{}' },
     { kind: 'tool_call' as const, id: 'd', name: 'Bash', summary: 'npm test', input: '{}' },
@@ -1217,7 +1225,7 @@ describe('JSON in the transcript', () => {
     expect(container.textContent).toContain('parallel: 2');
     expect(container.textContent).not.toContain('{"');
     expect(container.textContent).not.toContain('{\n');
-    expect(container.textContent).toContain('- content: Спека');
+    expect(container.textContent).toContain('- content: Spec');
     expect(container.textContent).toContain('status: done');
     expect(screen.getByText('src/app.ts')).toBeTruthy();
     expect(screen.getByText('npm test')).toBeTruthy();
@@ -1442,7 +1450,7 @@ describe('skip step on the group screen', () => {
       ...base,
       steps: base.steps.map((step) => ({
         ...step,
-        groups: step.id === stepId ? [{ slug: 'login', title: 'Вход', status }] : [],
+        groups: step.id === stepId ? [{ slug: 'login', title: 'Sign-in', status }] : [],
       })),
     };
   };
@@ -1503,7 +1511,7 @@ describe('skip step on the group screen', () => {
     const run = runView({
       topology: onStep('review'),
       steps: steps(),
-      groups: [groupRow({ status: 'queued' }), groupRow({ slug: 'other', title: 'Другая' })],
+      groups: [groupRow({ status: 'queued' }), groupRow({ slug: 'other', title: 'Another one' })],
     });
     screenOf(run, api, groupRow({ status: 'queued' }));
     fireEvent.click(button()!);
@@ -1514,7 +1522,10 @@ describe('skip step on the group screen', () => {
 
   it('has no button for a merged group, a skipped step or a system step', () => {
     const merged = runView({
-      topology: { ...onStep('none'), merged: [{ slug: 'login', title: 'Вход', status: 'merged' }] },
+      topology: {
+        ...onStep('none'),
+        merged: [{ slug: 'login', title: 'Sign-in', status: 'merged' }],
+      },
     });
     screenOf(merged, fakeApi(), groupRow({ status: 'merged' }));
     expect(button()).toBeNull();

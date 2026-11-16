@@ -27,10 +27,10 @@ describe('a disabled project', () => {
     ).rejects.toThrow(refusal);
     await expect(add(h, 'B')).rejects.toThrow(refusal);
     await expect(h.call('queue_start', { repository: h.repo })).rejects.toThrow(refusal);
-    await h.call('queue_edit', { repository: h.repo, item: waiting.item, task: 'другая работа' });
+    await h.call('queue_edit', { repository: h.repo, item: waiting.item, task: 'other work' });
     const queue = await queueOf(h);
     expect(queue.status).toBe('stopped');
-    expect(queue.items.map((item) => item.task)).toEqual(['другая работа']);
+    expect(queue.items.map((item) => item.task)).toEqual(['other work']);
     // a request to the project does not enable it
     const [entry] = (await h.call('repositories', {})) as RepositoryView[];
     expect(entry!.enabled).toBe(false);
@@ -60,7 +60,7 @@ describe('a disabled project', () => {
 
   it('takes the answer to a question of its run', async () => {
     const h = await start();
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}] });
     const { runId } = await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'x' });
     const asked = await h.waitFor(runId, (view) => view.groups[0]?.status === 'needs_human');
     await disable(h);
@@ -76,7 +76,9 @@ describe('a disabled project', () => {
         {
           waitFor: h.gate('a'),
           realWorker: true,
-          toolCalls: [{ name: 'swarm_queue_add', arguments: { pipeline: 'feature', task: 'ещё' } }],
+          toolCalls: [
+            { name: 'swarm_queue_add', arguments: { pipeline: 'feature', task: 'more' } },
+          ],
         },
       ],
     });

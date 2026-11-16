@@ -19,7 +19,7 @@ import { reconcile } from './layout/reconcile.ts';
 
 const repository = join(import.meta.dirname, '..');
 
-// Корень проверки и путь для сообщений и списка исключений.
+// Check root and the path for messages and the exception list.
 const roots = [
   { directory: join(repository, 'src'), prefix: 'src' },
   { directory: join(repository, 'web', 'src'), prefix: 'web/src' },
@@ -30,8 +30,8 @@ function collect(prefix: string): Violation[] {
   for (const { directory, prefix: current } of roots.filter((root) => root.prefix === prefix)) {
     const prefix = current;
     const tree = loadTree(directory);
-    // Панель — отдельное дерево со своими правилами импортов и расположения; список исключений
-    // для неё пуст.
+    // The panel is a separate tree with its own import and placement rules; its exception list
+    // is empty.
     const checks =
       prefix === 'src'
         ? [

@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 const failed = { exitCode: 1, noReport: true };
-const group = [{ title: 'Вход', task: 'вход' }];
+const group = [{ title: 'Login', task: 'login' }];
 
 /** How long a task waits before an observer takes its incident again after a failed repair. */
 const REPAIR_PAUSE_MS = 300_000;
@@ -59,8 +59,8 @@ async function history(h: Harness): Promise<ObserverHistoryView> {
   return (await h.call('observers_history', { limit: 20 })) as ObserverHistoryView;
 }
 
-describe('история попыток наблюдателя через демон', () => {
-  it('сохраняет обе попытки одной задачи после рестарта, включая модель и расход, а чтение не запускает агента', async () => {
+describe('observer attempt history through the daemon', () => {
+  it('keeps both attempts of one task after a restart, with model and usage, and reading does not start an agent', async () => {
     const h = await startTimed();
     h.script({
       code: [failed, {}],
@@ -69,7 +69,7 @@ describe('история попыток наблюдателя через дем
         {
           verdict: 'done',
           usage: [{ input: 30, output: 3 }],
-          toolCalls: [{ name: 'swarm_repair_retry', arguments: { group: 'vhod' } }],
+          toolCalls: [{ name: 'swarm_repair_retry', arguments: { group: 'login' } }],
         },
       ],
     });
@@ -182,10 +182,10 @@ describe('история попыток наблюдателя через дем
     h.script({
       code: [failed, failed],
       repair: [
-        { verdict: 'rejected', feedback: 'Нужно исправить', usage: [{ input: 41, output: 9 }] },
+        { verdict: 'rejected', feedback: 'Needs a fix', usage: [{ input: 41, output: 9 }] },
         {
           verdict: 'needs_human',
-          questions: [{ text: 'Продолжать?' }],
+          questions: [{ text: 'Continue?' }],
           usage: [{ input: 51, output: 11 }],
         },
       ],

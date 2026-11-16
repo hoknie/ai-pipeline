@@ -136,7 +136,7 @@ describe('freezing for a priority run', () => {
     const h = await start();
     const { a, b } = await skippedAndRunning(h, {
       verdict: 'needs_human',
-      feedback: 'как?',
+      feedback: 'how?',
     });
     await h.call('queue_return', { runId: a });
     await until('the priority run asks', async () => (await h.status(a)).state === 'needs_human');
@@ -165,7 +165,7 @@ describe('freezing for a priority run', () => {
   it('changes the variant of a returned run through its queue item and keeps its task', async () => {
     const h = await start(`${PIPELINE_CONFIG}      variants:
         careful:
-          name: Внимательный
+          name: Careful
           steps:
             review: { additional_prompt: "Be careful" }
 `);
@@ -177,7 +177,7 @@ describe('freezing for a priority run', () => {
     ).rejects.toThrow('unknown variant `fast`');
     expect((await h.status(b)).variant).toBe('default');
     await h.call('queue_edit', { repository: h.repo, item: item.id, variant: 'careful' });
-    expect(await h.status(b)).toMatchObject({ variant: 'careful', variantName: 'Внимательный' });
+    expect(await h.status(b)).toMatchObject({ variant: 'careful', variantName: 'Careful' });
     expect((await queueOf(h)).items.find((entry) => entry.run === b)).toMatchObject({
       variant: 'careful',
     });
@@ -186,7 +186,7 @@ describe('freezing for a priority run', () => {
         repository: h.repo,
         item: item.id,
         variant: 'default',
-        task: 'другое',
+        task: 'something else',
       }),
     ).rejects.toThrow('a returned run keeps its own task');
     expect((await h.status(b)).variant).toBe('careful');
@@ -195,7 +195,7 @@ describe('freezing for a priority run', () => {
   it('shows in the queue the variant set on the returned run from its details', async () => {
     const h = await start(`${PIPELINE_CONFIG}      variants:
         careful:
-          name: Внимательный
+          name: Careful
           steps:
             review: { additional_prompt: "Be careful" }
 `);
@@ -204,7 +204,7 @@ describe('freezing for a priority run', () => {
     await h.call('run_variant', { runId: b, variant: 'careful' });
     expect((await queueOf(h)).items.find((entry) => entry.run === b)).toMatchObject({
       variant: 'careful',
-      variantName: 'Внимательный',
+      variantName: 'Careful',
     });
   });
 
@@ -218,14 +218,14 @@ describe('freezing for a priority run', () => {
     await h.call('queue_edit', { repository: h.repo, item: item.id, skip: [] });
     expect((await h.status(b)).steps.find((step) => step.id === 'review')?.skipped).toBe(false);
     await expect(
-      h.call('queue_edit', { repository: h.repo, item: item.id, task: 'другое' }),
+      h.call('queue_edit', { repository: h.repo, item: item.id, task: 'something else' }),
     ).rejects.toThrow('a returned run keeps its own task');
     await expect(
       h.call('queue_edit', {
         repository: h.repo,
         item: item.id,
         skip: ['review'],
-        task: 'другое',
+        task: 'something else',
       }),
     ).rejects.toThrow('a returned run keeps its own task');
     expect((await h.status(b)).steps.find((step) => step.id === 'review')?.skipped).toBe(false);

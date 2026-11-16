@@ -53,8 +53,8 @@ describe('checkSkip', () => {
   });
 
   it('does not accept the name of a step in place of its id', () => {
-    expect(checkSkip(config(CONFIG_TEXT), 'feature', ['Планировщик'])).toMatch(
-      /^unknown step `Планировщик` in skip/,
+    expect(checkSkip(config(CONFIG_TEXT), 'feature', ['Planner'])).toMatch(
+      /^unknown step `Planner` in skip/,
     );
   });
 
@@ -115,7 +115,7 @@ describe('stepStates', () => {
     const state = run(2);
     step(state);
     finish(state, 'done');
-    finish(state, 'done', { slug: 'gruppa-2' });
+    finish(state, 'done', { slug: 'group-2' });
     step(state);
     finish(state, 'done');
     expect(stepStates(state).map((entry) => entry.state)).toEqual([
@@ -138,10 +138,10 @@ describe('stepStates', () => {
   it('names a step after its specialist, or by the slug without a name', () => {
     const state = run(1);
     expect(stepStates(state).map((entry) => entry.name)).toEqual([
-      'Планировщик',
-      'Кодировщик',
-      'Ревьюер',
-      'Тестировщик',
+      'Planner',
+      'Coder',
+      'Reviewer',
+      'Tester',
     ]);
     (state.run.config.specialists.find((item) => item.slug === 'qa') as { name: string }).name =
       '  ';
@@ -152,8 +152,8 @@ describe('stepStates', () => {
     const state = run(1, {
       configText: `swarm:
   specialists:
-    coder: { name: Кодер }
-    reviewer: { name: Ревьюер }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer }
   pipelines:
     feature:
       steps:
@@ -163,9 +163,9 @@ describe('stepStates', () => {
 `,
     });
     expect(stepStates(state).map((entry) => entry.name)).toEqual([
-      'Кодер',
-      'Ревьюер (review)',
-      'Ревьюер (review-2)',
+      'Coder',
+      'Reviewer (review)',
+      'Reviewer (review-2)',
     ]);
   });
 

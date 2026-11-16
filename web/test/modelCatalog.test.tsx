@@ -22,7 +22,7 @@ function Page({ api, start }: { api: Api; start: string }) {
 const okWrite = () => vi.fn(async () => ({ ok: true as const, revision: 'r2', file: '/f' }));
 
 function specialistApi(runtime: string, model: string, overrides: Partial<Api> = {}) {
-  const raw = { name: 'Кодировщик', runtime, ...(model ? { model } : {}) };
+  const raw = { name: 'Code author', runtime, ...(model ? { model } : {}) };
   const entry = specialistEntry('coder', { raw }, raw);
   return fakeApi({ config: vi.fn(async () => configView({ specialists: [entry] })), ...overrides });
 }
@@ -41,7 +41,7 @@ describe('model choice in the specialist form', () => {
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist).toHaveBeenCalledWith(
       'coder',
-      { name: 'Кодировщик', runtime: 'opencode', model: 'openrouter/anthropic/claude-opus-5-5' },
+      { name: 'Code author', runtime: 'opencode', model: 'openrouter/anthropic/claude-opus-5-5' },
       'rev-coder',
       'project',
     );
@@ -58,7 +58,7 @@ describe('model choice in the specialist form', () => {
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist.mock.calls[0]).toEqual([
       'coder',
-      { name: 'Кодировщик', runtime: 'claude', model: 'sonnet' },
+      { name: 'Code author', runtime: 'claude', model: 'sonnet' },
       'rev-coder',
       'project',
     ]);

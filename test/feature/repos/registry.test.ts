@@ -94,8 +94,8 @@ describe('registry of repositories', () => {
         'project slug `app` is taken',
       );
       expect(registry.entry(lib)?.slug).toBe('lib');
-      await projects.update('app', { slug: 'shop', name: '  Магазин ', color: 'teal' });
-      expect(registry.entry(app)).toMatchObject({ slug: 'shop', name: 'Магазин', color: 'teal' });
+      await projects.update('app', { slug: 'shop', name: '  Shop ', color: 'teal' });
+      expect(registry.entry(app)).toMatchObject({ slug: 'shop', name: 'Shop', color: 'teal' });
       await expect(registry.rootOf('app')).rejects.toThrow('unknown project `app`');
       await projects.update('shop', { name: null });
       expect(registry.entry(app)?.name).toBeNull();

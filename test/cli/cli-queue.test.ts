@@ -16,11 +16,11 @@ describe('cli', () => {
   const fillQueue = async (box: ReturnType<typeof sandbox>) => {
     writeFileSync(
       join(box.repo, 'groups.yaml'),
-      '- { title: Вход, task: форма }\n- { title: Выход, task: кнопка }\n',
+      '- { title: Sign in, task: form }\n- { title: Sign out, task: button }\n',
     );
-    await aip(box, 'queue', 'add', 'feature', '--task', 'первая задача');
-    await aip(box, 'queue', 'add', 'feature', '--groups', 'groups.yaml', '--title', 'Две группы');
-    await aip(box, 'queue', 'add', 'feature', '--task', 'третья');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'first task');
+    await aip(box, 'queue', 'add', 'feature', '--groups', 'groups.yaml', '--title', 'Two groups');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'third');
     return JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
       items: { id: string; task: string | null }[];
     };
@@ -30,16 +30,16 @@ describe('cli', () => {
     const box = sandbox();
     writeFileSync(
       join(box.repo, 'groups.yaml'),
-      '- { title: Вход, task: форма }\n- { title: Выход, task: кнопка }\n',
+      '- { title: Sign in, task: form }\n- { title: Sign out, task: button }\n',
     );
-    const first = await aip(box, 'queue', 'add', 'feature', '--task', 'первая задача', '--json');
+    const first = await aip(box, 'queue', 'add', 'feature', '--task', 'first task', '--json');
     expect(first.code).toBe(0);
     expect(JSON.parse(first.stdout)).toMatchObject({ status: 'stopped', parallel: 1 });
-    await aip(box, 'queue', 'add', 'feature', '--groups', 'groups.yaml', '--title', 'Две группы');
+    await aip(box, 'queue', 'add', 'feature', '--groups', 'groups.yaml', '--title', 'Two groups');
     const list = await aip(box, 'queue', 'list');
     expect(list.stdout).toContain('Queue: stopped, parallel 1');
     expect(list.stdout).toContain('1.');
-    expect(list.stdout).toContain('первая задача');
+    expect(list.stdout).toContain('first task');
     expect(list.stdout).toContain('2 groups');
   });
 
@@ -59,7 +59,7 @@ describe('cli', () => {
       'add',
       'feature',
       '--task',
-      'продолжение',
+      'follow-up',
       '--parent',
       `#${parent.number}`,
       '--json',
@@ -69,7 +69,7 @@ describe('cli', () => {
       JSON.parse(added.stdout) as {
         items: { id: string; task: string | null; tags: { name: string; task: unknown }[] }[];
       }
-    ).items.find((entry) => entry.task === 'продолжение')!;
+    ).items.find((entry) => entry.task === 'follow-up')!;
     expect(item.tags).toHaveLength(1);
     expect(item.tags[0]!.task).toEqual({ run: parent.id, number: parent.number });
     const label = `#${item.tags[0]!.name}→#${parent.number}`;
@@ -78,7 +78,7 @@ describe('cli', () => {
     expect(edited.stdout).toContain(label);
     const removed = await aip(box, 'queue', 'edit', item.id, '--no-parent');
     expect(removed.code).toBe(0);
-    const line = removed.stdout.split('\n').find((row) => row.includes('продолжение'));
+    const line = removed.stdout.split('\n').find((row) => row.includes('follow-up'));
     expect(line).toBeDefined();
     expect(line).not.toContain('→');
   });
@@ -105,19 +105,19 @@ describe('cli', () => {
     const view = await fillQueue(box);
     const moved = await aip(box, 'queue', 'move', view.items[2]!.id, '1', '--json');
     expect((JSON.parse(moved.stdout) as typeof view).items.map((item) => item.task)).toEqual([
-      'третья',
-      'первая задача',
+      'third',
+      'first task',
       null,
     ]);
-    const edited = await aip(box, 'queue', 'edit', view.items[0]!.id, '--task', 'изменённая');
-    expect(edited.stdout).toContain('изменённая');
+    const edited = await aip(box, 'queue', 'edit', view.items[0]!.id, '--task', 'changed');
+    expect(edited.stdout).toContain('changed');
     const removed = await aip(box, 'queue', 'remove', view.items[0]!.id, '--json');
     expect(JSON.parse(removed.stdout).items).toHaveLength(2);
   });
 
   it('refuses an unknown pipeline and both a task and groups', async () => {
     const box = sandbox();
-    writeFileSync(join(box.repo, 'groups.yaml'), '- { title: Вход, task: форма }\n');
+    writeFileSync(join(box.repo, 'groups.yaml'), '- { title: Sign in, task: form }\n');
     const bad = await aip(box, 'queue', 'add', 'nope', '--task', 'x');
     expect(bad.code).not.toBe(0);
     expect(`${bad.stdout}${bad.stderr}`).toContain('unknown pipeline `nope`; known: feature');
@@ -231,7 +231,7 @@ describe('cli', () => {
       join(box.repo, '..', 'script.json'),
       JSON.stringify({ code: [{ noReport: true }, {}] }),
     );
-    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'work')).code).toBe(0);
     await aip(box, 'queue', 'start');
     const run = await waitValue('the queue to stop on a problem', async () => {
       const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
@@ -266,8 +266,8 @@ describe('cli', () => {
       join(box.repo, '..', 'script.json'),
       JSON.stringify({ code: [{ waitFor: gate }, { waitFor: gate }] }),
     );
-    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
-    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'вторая')).code).toBe(0);
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'work')).code).toBe(0);
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'second')).code).toBe(0);
     await aip(box, 'queue', 'start');
     const run = await waitValue('a run in the queue', async () => {
       const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
@@ -288,7 +288,7 @@ describe('cli', () => {
   it('refuses to pause a finished run', async () => {
     const box = sandbox();
     const started = JSON.parse(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'работа', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'work', '--json')).stdout,
     ) as { run: { runId: string } };
     const id = started.run.runId;
     await waitUntil('the run to finish', async () =>
@@ -306,7 +306,7 @@ describe('cli', () => {
       JSON.stringify({ code: [{ noReport: true }, {}] }),
     );
     await aip(box, 'queue', 'settings', '--skip-failed', 'on');
-    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'работа')).code).toBe(0);
+    expect((await aip(box, 'queue', 'add', 'feature', '--task', 'work')).code).toBe(0);
     await aip(box, 'queue', 'start');
     const run = await waitValue('a skipped run', async () => {
       const view = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
@@ -432,10 +432,10 @@ describe('cli', () => {
   it('sets and resets the autopilot answer from flags', async () => {
     const box = sandbox();
     const set = JSON.parse(
-      (await aip(box, 'queue', 'settings', '--autopilot-answer', 'Согласен', '--json')).stdout,
+      (await aip(box, 'queue', 'settings', '--autopilot-answer', 'Agreed', '--json')).stdout,
     ) as { autopilotAnswer: string | null };
-    expect(set.autopilotAnswer).toBe('Согласен');
-    expect((await aip(box, 'queue', 'list')).stdout).toContain('Autopilot answer: Согласен');
+    expect(set.autopilotAnswer).toBe('Agreed');
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('Autopilot answer: Agreed');
     const reset = JSON.parse(
       (await aip(box, 'queue', 'settings', '--default-autopilot-answer', '--json')).stdout,
     ) as { autopilotAnswer: string | null };
@@ -454,7 +454,7 @@ describe('cli', () => {
 
   it('rejects a wrong parallel limit and starts the queue', async () => {
     const box = sandbox();
-    await aip(box, 'queue', 'add', 'feature', '--task', 'первая');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'first');
     const wrong = await aip(box, 'queue', 'start', '--parallel', '0');
     expect(wrong.code).not.toBe(0);
     const started = await aip(box, 'queue', 'start', '--parallel', '2', '--json');
@@ -468,9 +468,9 @@ describe('cli', () => {
       join(box.repo, '..', 'script.json'),
       JSON.stringify({ code: [{ waitFor: join(box.repo, '..', 'never') }] }),
     );
-    await aip(box, 'queue', 'add', 'feature', '--task', 'первая');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'first');
     await aip(box, 'queue', 'start');
-    await aip(box, 'queue', 'add', 'feature', '--task', 'вторая');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'second');
     const raised = await aip(box, 'queue', 'parallel', '2');
     expect(raised.code).toBe(0);
     expect(raised.stdout).toContain('parallel 2 (2 of 2 places taken)');
@@ -485,14 +485,14 @@ describe('cli', () => {
   it('queues `run start` behind busy places and freezes the last run for a task started now', async () => {
     const box = sandbox();
     writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
-    const first = await aip(box, 'run', 'start', 'feature', '--task', 'первая', '--json');
+    const first = await aip(box, 'run', 'start', 'feature', '--task', 'first', '--json');
     expect(JSON.parse(first.stdout)).toMatchObject({ run: { runId: expect.any(String) } });
-    const waiting = await aip(box, 'run', 'start', 'feature', '--task', 'вторая');
+    const waiting = await aip(box, 'run', 'start', 'feature', '--task', 'second');
     expect(waiting.code).toBe(0);
     expect(waiting.stdout).toContain('queued at position 1');
     expect(waiting.stdout).toContain('1 of 1 places taken');
     const json = JSON.parse(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'третья', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'third', '--json')).stdout,
     ) as { item: string; run: unknown; queue: { items: unknown[] } };
     expect(json.run).toBeNull();
     expect(json.item).toMatch(/^q/);
@@ -545,7 +545,7 @@ describe('cli', () => {
     ]);
     const added = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { pipeline: 'feature', task: 'Из Claude Code', title: 'Из очереди' },
+      arguments: { pipeline: 'feature', task: 'From Claude Code', title: 'From the queue' },
     });
     expect((added.content as { text: string }[])[0]!.text).toMatch(/Added item q\w+/);
     const raised = await client.callTool({
@@ -554,10 +554,10 @@ describe('cli', () => {
     });
     expect((raised.content as { text: string }[])[0]!.text).toContain('parallel 3');
     const listed = await client.callTool({ name: 'swarm_queue', arguments: {} });
-    expect((listed.content as { text: string }[])[0]!.text).toContain('Из очереди');
+    expect((listed.content as { text: string }[])[0]!.text).toContain('From the queue');
     const created = await client.callTool({
       name: 'swarm_run',
-      arguments: { pipeline: 'feature', task: 'Сделать вход', title: 'Вход в систему' },
+      arguments: { pipeline: 'feature', task: 'Add sign-in', title: 'Sign-in page' },
     });
     const text = (created.content as { text: string }[])[0]!.text;
     expect(text).toContain('started (refs/aip/');
@@ -567,7 +567,7 @@ describe('cli', () => {
       new RegExp(`Run #\\d+ ${runId}`),
     );
     expect((status.content as { text: string }[])[0]!.text).toContain(
-      'Title: Вход в систему (vhod-v-sistemu)',
+      'Title: Sign-in page (sign-in-page)',
     );
     expect((status.content as { text: string }[])[0]!.text).toContain('"topology"');
     expect((status.content as { text: string }[])[0]!.text).toContain('"onReject"');
@@ -583,7 +583,7 @@ describe('cli', () => {
     await waitUntil('the changes of the group', async () => {
       const group = await client.callTool({
         name: 'swarm_group',
-        arguments: { run_id: runId, group: 'sdelat-vhod' },
+        arguments: { run_id: runId, group: 'add-sign-in' },
       });
       changes = (group.content as { text: string }[])[0]!.text;
       return changes.includes('Changes:');
@@ -616,7 +616,7 @@ describe('cli variants', () => {
       'add',
       'feature',
       '--task',
-      'Поправить опечатку',
+      'Fix a typo',
       '--variant',
       'light',
     );
@@ -649,7 +649,7 @@ describe('cli variants', () => {
       'start',
       'feature',
       '--task',
-      'легко',
+      'easy',
       '--variant',
       'light',
     );
@@ -678,7 +678,7 @@ describe('cli attachments', () => {
       'add',
       'feature',
       '--task',
-      'Починить',
+      'Fix',
       '--attach',
       'shot.png',
       '--attach',
@@ -722,7 +722,7 @@ describe('cli attachments', () => {
       'start',
       'feature',
       '--task',
-      'Починить',
+      'Fix',
       '--attach',
       'shot.png',
       '--json',
@@ -741,7 +741,7 @@ describe('cli attachments', () => {
     const api = JSON.parse(
       (await aip(box, 'queue', 'add', 'feature', '--task', 'API', '--repo', lib, '--json')).stdout,
     ) as { item: string };
-    await aip(box, 'queue', 'add', 'feature', '--task', 'клиент', '--after', api.item);
+    await aip(box, 'queue', 'add', 'feature', '--task', 'client', '--after', api.item);
     const list = await aip(box, 'queue', 'list');
     expect(list.stdout).toContain(`after lib:${api.item} (waiting)`);
     const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
@@ -762,7 +762,7 @@ describe('cli attachments', () => {
       'add',
       'feature',
       '--task',
-      'Поле email',
+      'Email field',
       '--repo',
       'lib',
       '--repo',
@@ -771,7 +771,7 @@ describe('cli attachments', () => {
       '--tag-all',
       'email',
       '--note',
-      'repo=Форма в Settings.tsx',
+      'repo=Form in Settings.tsx',
     );
     expect(added.code).toBe(0);
     const lines = added.stdout.trim().split('\n');
@@ -794,14 +794,14 @@ describe('cli attachments', () => {
     expect(second.after[0]!.repository).toBe(lib);
     expect(first.tags.map((tag) => tag.name)).toEqual(['email']);
     expect(second.tags.map((tag) => tag.name)).toEqual(['email']);
-    expect(second.task).toBe('Поле email\n\nФорма в Settings.tsx');
+    expect(second.task).toBe('Email field\n\nForm in Settings.tsx');
     const json = await aip(
       box,
       'queue',
       'add',
       'feature',
       '--task',
-      'ещё',
+      'more',
       '--repo',
       'lib',
       '--repo',
@@ -823,15 +823,15 @@ describe('cli attachments', () => {
       'add',
       'feature',
       '--task',
-      'Поле',
+      'Field',
       '--repo',
       '.',
       '--repo',
       '../lib',
       '--note',
-      '../lib=для lib',
+      '../lib=for lib',
       '--note',
-      '.=для repo',
+      '.=for repo',
     );
     expect(added.code).toBe(0);
     const taskOf = async (repo: string) =>
@@ -840,8 +840,8 @@ describe('cli attachments', () => {
           items: { task: string }[];
         }
       ).items[0]!.task;
-    expect(await taskOf(lib)).toBe('Поле\n\nдля lib');
-    expect(await taskOf(box.repo)).toBe('Поле\n\nдля repo');
+    expect(await taskOf(lib)).toBe('Field\n\nfor lib');
+    expect(await taskOf(box.repo)).toBe('Field\n\nfor repo');
   });
 
   it('refuses the flags of several projects with one project', async () => {
@@ -864,7 +864,7 @@ describe('aip queue list --all', () => {
 
   it('prints the queue of every enabled project under its heading, or a JSON array', async () => {
     const box = sandbox();
-    await aip(box, 'queue', 'add', 'feature', '--task', 'работа', '--title', 'API');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'work', '--title', 'API');
     expect((await aip(box, 'repo', 'edit', box.repo, '--name', 'zeta')).code).toBe(0);
     const lib = gitRepository('lib');
     await aip(box, 'repo', 'add', lib);
@@ -901,14 +901,14 @@ describe('aip queue list --all', () => {
 describe('cli task links', () => {
   it('adds a task with --link, links and unlinks tasks and edits with --no-links', async () => {
     const box = sandbox();
-    await aip(box, 'queue', 'add', 'feature', '--task', 'первая', '--title', 'One');
+    await aip(box, 'queue', 'add', 'feature', '--task', 'first', '--title', 'One');
     await aip(
       box,
       'queue',
       'add',
       'feature',
       '--task',
-      'вторая',
+      'second',
       '--title',
       'Two',
       '--link',

@@ -25,14 +25,14 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => cleanup());
 
 const runs = [
-  runView({ id: 'w', title: 'Ждущий Запуск', state: 'needs_human', waiting: 1 }),
-  runView({ id: 'a', title: 'Активный', name: 'feature-login' }),
-  runView({ id: 'f', title: 'Готовый', state: 'finished', finished: true }),
-  runView({ id: 'c', title: 'Отменённый', state: 'cancelled', finished: true }),
+  runView({ id: 'w', title: 'Waiting Launch', state: 'needs_human', waiting: 1 }),
+  runView({ id: 'a', title: 'Ongoing', name: 'feature-login' }),
+  runView({ id: 'f', title: 'Completed', state: 'finished', finished: true }),
+  runView({ id: 'c', title: 'Aborted', state: 'cancelled', finished: true }),
   runView({
     id: 'g',
-    title: 'С группами',
-    groups: [groupRow({ title: 'Регистрация' }), groupRow({ slug: 'x', title: 'Выход' })],
+    title: 'With groups',
+    groups: [groupRow({ title: 'Registration' }), groupRow({ slug: 'x', title: 'Logout' })],
   }),
 ];
 
@@ -49,7 +49,7 @@ const find = (
 
 describe('search by task number', () => {
   const numbered = [7, 17, 70].map((number) =>
-    runView({ id: `n${number}`, title: 'Задача', number }),
+    runView({ id: `n${number}`, title: 'Task', number }),
   );
 
   it('finds the run by #N exactly, not the numbers that contain it', () => {
@@ -59,14 +59,14 @@ describe('search by task number', () => {
   });
 
   it('keeps the text search for other queries', () => {
-    expect(find(numbered, 'задача')).toHaveLength(3);
+    expect(find(numbered, 'task')).toHaveLength(3);
   });
 });
 
 describe('filter by the variant', () => {
   const mixed = [
-    runView({ id: 'l1', variant: 'light', variantName: 'Лёгкий' }),
-    runView({ id: 'l2', variant: 'light', variantName: 'Лёгкий' }),
+    runView({ id: 'l1', variant: 'light', variantName: 'Lite' }),
+    runView({ id: 'l2', variant: 'light', variantName: 'Lite' }),
     runView({ id: 'd1' }),
   ];
 
@@ -80,7 +80,7 @@ describe('filter by the variant', () => {
   });
 
   it('finds a run by the name of its variant', () => {
-    expect(ids(find(mixed, 'лёгк'))).toEqual(['l1', 'l2']);
+    expect(ids(find(mixed, 'lit'))).toEqual(['l1', 'l2']);
   });
 });
 
@@ -96,9 +96,9 @@ describe('navRunCounts', () => {
 
 describe('filterRuns', () => {
   it('searches without regard to case in the title, the name, the pipeline, the id and the groups', () => {
-    expect(ids(find(runs, 'жДущИй'))).toEqual(['w']);
+    expect(ids(find(runs, 'wAiTiNg'))).toEqual(['w']);
     expect(ids(find(runs, 'FEATURE-login'))).toEqual(['a']);
-    expect(ids(find(runs, 'регистр'))).toEqual(['g']);
+    expect(ids(find(runs, 'regist'))).toEqual(['g']);
     expect(find(runs, 'feature')).toHaveLength(runs.length);
     expect(find(runs, '  ')).toHaveLength(runs.length);
     expect(find(runs, 'run1')).toHaveLength(0);
@@ -135,8 +135,8 @@ describe('filterRuns', () => {
   });
 
   it('keeps the order of the runs and combines the query with the filter', () => {
-    expect(find(runs, 'готовый', only({ states: ['active'] }))).toEqual([]);
-    expect(ids(find(runs, 'о'))).toEqual(['w', 'a', 'f', 'c', 'g']);
+    expect(find(runs, 'completed', only({ states: ['active'] }))).toEqual([]);
+    expect(ids(find(runs, 'e'))).toEqual(['w', 'a', 'f', 'c', 'g']);
   });
 
   it('keeps only the runs of one repository in the scope «repository»', () => {
@@ -218,7 +218,7 @@ describe('filterRuns', () => {
     const pipelines = optionCounts(rows, '', state, 'all', null, new Map(), 'pipelines');
     expect(pipelines.get('feature')).toBe(2);
     expect(pipelines.get('fix')).toBe(1);
-    const searched = optionCounts(rows, 'нет', EMPTY_FILTERS, 'all', null, new Map(), 'states');
+    const searched = optionCounts(rows, 'nomatch', EMPTY_FILTERS, 'all', null, new Map(), 'states');
     expect(searched.size).toBe(0);
   });
 });
@@ -265,21 +265,21 @@ describe('run list', () => {
   it('finds a run by its title', () => {
     render(<Harness />);
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {
-      target: { value: 'готов' },
+      target: { value: 'complet' },
     });
     expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
-    expect(screen.getByText('Готовый')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
   it('shows only the runs waiting for an answer, with the choice shown as a chip', async () => {
     render(<Harness />);
     await choose('State', /Needs answer/);
     expect(screen.getByRole('button', { name: 'Remove Needs answer' })).toBeTruthy();
-    expect(screen.getByText('Ждущий Запуск')).toBeTruthy();
-    expect(screen.queryByText('Активный')).toBeNull();
+    expect(screen.getByText('Waiting Launch')).toBeTruthy();
+    expect(screen.queryByText('Ongoing')).toBeNull();
     // the list stays open: another state can be added
     fireEvent.click(screen.getByRole('option', { name: /Cancelled/ }));
-    expect(screen.getByText('Отменённый')).toBeTruthy();
+    expect(screen.getByText('Aborted')).toBeTruthy();
   });
 
   it('clears both chosen values of a filter with «Clear» and leaves the others alone', async () => {
@@ -297,7 +297,7 @@ describe('run list', () => {
   it('says that nothing is found and resets the search and every filter', async () => {
     render(<Harness />);
     await choose('State', /Finished/);
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'нет такого' } });
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no such thing' } });
     expect(screen.getByText('Nothing found')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     expect(screen.queryByText('Nothing found')).toBeNull();
@@ -308,8 +308,8 @@ describe('run list', () => {
   it('puts the cancelled run into «Cancelled» and keeps the order', () => {
     render(<Harness initial={only({ states: ['finished', 'cancelled'] })} />);
     const items = screen.getAllByRole('listitem');
-    expect(within(items[0]!).getByText('Готовый')).toBeTruthy();
-    expect(within(items[1]!).getByText('Отменённый')).toBeTruthy();
+    expect(within(items[0]!).getByText('Completed')).toBeTruthy();
+    expect(within(items[1]!).getByText('Aborted')).toBeTruthy();
   });
 });
 
@@ -318,10 +318,10 @@ describe('filter by tags', () => {
   const v2 = { id: 'tv', repository: '/repo', name: 'v2', color: 'blue' as const, task: null };
   const catalog = new Map([auth, v2].map((tag) => [tag.id, tag]));
   const tagged = [
-    runView({ id: 'A', title: 'Веб-панель', tags: [auth], state: 'needs_human' }),
-    runView({ id: 'B', title: 'Другое', tags: [v2] }),
-    runView({ id: 'C', title: 'Без тегов' }),
-    runView({ id: 'D', title: 'Ещё', tags: [auth], state: 'finished', finished: true }),
+    runView({ id: 'A', title: 'Dashboard', tags: [auth], state: 'needs_human' }),
+    runView({ id: 'B', title: 'Something else', tags: [v2] }),
+    runView({ id: 'C', title: 'Untagged' }),
+    runView({ id: 'D', title: 'One more', tags: [auth], state: 'finished', finished: true }),
   ];
 
   it('keeps the runs with any of the chosen tags', () => {
@@ -416,8 +416,8 @@ describe('filter by the tag of a linked task', () => {
     task: { run: 'run9', number: 115 },
   };
   const rows = [
-    runView({ id: 'A', title: 'Первый', tags: [linked] }),
-    runView({ id: 'B', title: 'Второй' }),
+    runView({ id: 'A', title: 'First run', tags: [linked] }),
+    runView({ id: 'B', title: 'Second run' }),
   ];
 
   function Filtered() {
@@ -458,10 +458,10 @@ describe('filter by the tag of a linked task', () => {
 describe('search by the name of the pipeline', () => {
   it('finds a run by the name and by the id of its pipeline', () => {
     const named = [
-      runView({ id: 'a', title: 'Первый', pipeline: 'feature', pipelineName: 'Новая функция' }),
-      runView({ id: 'b', title: 'Второй', pipeline: 'fix', pipelineName: 'Исправление' }),
+      runView({ id: 'a', title: 'First run', pipeline: 'feature', pipelineName: 'New feature' }),
+      runView({ id: 'b', title: 'Second run', pipeline: 'fix', pipelineName: 'Bugfix' }),
     ];
-    expect(ids(find(named, 'функци'))).toEqual(['a']);
+    expect(ids(find(named, 'new feat'))).toEqual(['a']);
     expect(ids(find(named, 'fix'))).toEqual(['b']);
   });
 });
@@ -519,7 +519,7 @@ describe('the specialists filter of the run list', () => {
       id: 'r',
       steps: steps('coder', 'plan', 'ghost'),
       topology: {
-        stages: [stage('coder', 'Кодировщик'), stage('plan', 'Аналитик')],
+        stages: [stage('coder', 'Code author'), stage('plan', 'Analyst')],
       } as unknown as RunView['topology'],
     });
     const { result } = renderHook(() =>
@@ -532,9 +532,9 @@ describe('the specialists filter of the run list', () => {
       }),
     );
     expect(result.current.specialists.map(({ value, label }) => ({ value, label }))).toEqual([
+      { value: 'plan', label: 'Analyst' },
+      { value: 'coder', label: 'Code author' },
       { value: 'ghost', label: 'ghost' },
-      { value: 'plan', label: 'Аналитик' },
-      { value: 'coder', label: 'Кодировщик' },
     ]);
   });
 });

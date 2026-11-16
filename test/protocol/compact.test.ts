@@ -15,7 +15,7 @@ import { addItem, emptyQueue } from '../../src/feature/queue/types/index.ts';
 import { run } from '../feature/runs/helpers.ts';
 
 const ansi = (text: string): string => text.replace(/\x1b\[[0-9;]*m/g, '');
-const longTitle = 'Очень длинное название задачи '.repeat(6).trim();
+const longTitle = 'A very long title of the task '.repeat(6).trim();
 
 function view(repository: string, title = longTitle) {
   return { ...runView(run(1), 3000), title, repository };
@@ -81,7 +81,7 @@ describe('run list in a terminal', () => {
     expect(colored).toContain('REPOSITORY');
     expect(colored).toContain(longTitle.slice(0, 47));
     expect(colored).toContain('92519 in / 77 out');
-    const tail = (line: string) => line.slice(line.indexOf('Очень'));
+    const tail = (line: string) => line.slice(line.indexOf('A very long'));
     expect(tail(colored.split('\n')[1]!)).toBe(tail(full.split('\n')[1]!));
   });
 
@@ -110,11 +110,11 @@ describe('run list in a terminal', () => {
   it('cuts NOTE of a group table to the width', () => {
     const state = run(1);
     state.groups[0]!.status = 'failed';
-    state.groups[0]!.reason = 'причина '.repeat(30);
+    state.groups[0]!.reason = 'broken because '.repeat(30);
     const text = formatRun(runView(state, 3000), 3000, createStyle(true, 90));
     const row = ansi(text)
       .split('\n')
-      .find((line) => line.includes('причина'))!;
+      .find((line) => line.includes('broken because'))!;
     expect(row.length).toBeLessThanOrEqual(90);
     expect(row).toContain('…');
   });
@@ -134,7 +134,7 @@ describe('short usage', () => {
 describe('queue line in a terminal', () => {
   function build() {
     const queue = emptyQueue('/repo', 1);
-    addItem(queue, { pipeline: 'feature', task: 'я'.repeat(120) }, 'q1', 1000);
+    addItem(queue, { pipeline: 'feature', task: 'z'.repeat(120) }, 'q1', 1000);
     return queueView(queue, () => undefined);
   }
 
@@ -149,7 +149,7 @@ describe('queue line in a terminal', () => {
   });
 
   it('keeps the whole text without a width', () => {
-    const full = `${'я'.repeat(79)}…`;
+    const full = `${'z'.repeat(79)}…`;
     expect(formatQueue(build())).toContain(`  ${full}  added`);
     expect(formatQueue(build(), createStyle(true))).toContain(`  ${full}  added`);
   });

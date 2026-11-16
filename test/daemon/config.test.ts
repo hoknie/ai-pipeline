@@ -120,7 +120,12 @@ describe('config editor', () => {
     const h = await start();
     const coder = (await view(h)).specialists[0]!;
     const text = readFileSync(coderFile(h), 'utf8');
-    const result = await write(h, 'coder', { ...coder.raw, timeout: 'полчаса' }, coder.revision);
+    const result = await write(
+      h,
+      'coder',
+      { ...coder.raw, timeout: 'half an hour' },
+      coder.revision,
+    );
     expect(result).toMatchObject({
       ok: false,
       reason: 'invalid',
@@ -132,12 +137,12 @@ describe('config editor', () => {
   it('reports a conflict after an outside edit and creates a new specialist', async () => {
     const h = await start();
     const coder = (await view(h)).specialists[0]!;
-    writeFileSync(coderFile(h), 'name: Правка руками\n');
+    writeFileSync(coderFile(h), 'name: Edited by hand\n');
     expect(await write(h, 'coder', { name: 'X' }, coder.revision)).toMatchObject({
       ok: false,
       reason: 'conflict',
     });
-    expect(readFileSync(coderFile(h), 'utf8')).toBe('name: Правка руками\n');
+    expect(readFileSync(coderFile(h), 'utf8')).toBe('name: Edited by hand\n');
     expect(await write(h, 'qa', { name: 'QA' }, null)).toMatchObject({ ok: true });
     expect(existsSync(join(h.repo, 'aip', 'specialists', 'qa.yaml'))).toBe(true);
   });
@@ -178,10 +183,7 @@ describe('config editor', () => {
 
   it('keeps the snapshot of a running run and gives the new model to new runs', async () => {
     const h = await start(
-      PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, model: sonnet }',
-      ),
+      PIPELINE_CONFIG.replace('coder: { name: Coder }', 'coder: { name: Coder, model: sonnet }'),
     );
     h.script({ code: [{ exitCode: 1, noReport: true }, {}] });
     const first = (
@@ -235,12 +237,12 @@ describe('pipeline editing', () => {
 
   it('previews a new step without changing the file', async () => {
     const h = await start();
-    await write(h, 'writer', { name: 'Автор' }, null);
+    await write(h, 'writer', { name: 'Author' }, null);
     const before = readFileSync(featureFile(h), 'utf8');
     const result = await preview(h, { steps: [...steps, { id: 'docs', specialist: 'writer' }] });
     expect(result.errors).toEqual([]);
     expect(result.topology?.steps.map((step) => step.id)).toEqual(['code', 'review', 'docs']);
-    expect(result.topology?.steps[2]).toMatchObject({ specialist: 'writer', name: 'Автор' });
+    expect(result.topology?.steps[2]).toMatchObject({ specialist: 'writer', name: 'Author' });
     expect(readFileSync(featureFile(h), 'utf8')).toBe(before);
   });
 

@@ -772,7 +772,7 @@ describe('cli', () => {
       'add',
       'feature',
       '--task',
-      'Форма входа',
+      'Sign-in form',
       '--tag',
       'auth',
       '--tag',
@@ -787,7 +787,7 @@ describe('cli', () => {
     const id = view.items[0]!.id;
     const both = await aipFast(box, 'queue', 'edit', id, '--tag', 'auth', '--no-tags');
     expect(both.code).not.toBe(0);
-    expect((await aipFast(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain(
+    expect((await aipFast(box, 'queue', 'edit', id, '--task', 'other')).stdout).toContain(
       '#auth #v2',
     );
     const replaced = await aipFast(box, 'queue', 'edit', id, '--tag', 'v2');
@@ -809,7 +809,7 @@ describe('cli', () => {
         - { id: code, specialist: coder }
 `;
     const box = sandbox(config);
-    await aipFast(box, 'queue', 'add', 'feature', '--task', 'Форма входа');
+    await aipFast(box, 'queue', 'add', 'feature', '--task', 'Sign-in form');
     const pipelineOf = async (): Promise<string> =>
       (
         JSON.parse((await aipFast(box, 'queue', 'list', '--json')).stdout) as {
@@ -843,7 +843,7 @@ describe('cli', () => {
       'add',
       'feature',
       '--task',
-      'Форма входа',
+      'Sign-in form',
       '--skip',
       'review',
       '--json',
@@ -856,7 +856,7 @@ describe('cli', () => {
     const both = await aipFast(box, 'queue', 'edit', id, '--skip', 'review', '--no-skips');
     expect(both.code).not.toBe(0);
     expect(both.stderr).toContain('--no-skips cannot be combined with --skip');
-    expect((await aipFast(box, 'queue', 'edit', id, '--task', 'другое')).stdout).toContain(
+    expect((await aipFast(box, 'queue', 'edit', id, '--task', 'other')).stdout).toContain(
       'skip: review',
     );
     const cleared = await aipFast(box, 'queue', 'edit', id, '--no-skips', '--json');
@@ -915,7 +915,7 @@ describe('cli', () => {
   it('queues a task after another one, clears the dependencies and refuses both flags', async () => {
     const box = sandbox();
     const first = JSON.parse(
-      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
+      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'model', '--json')).stdout,
     ) as { item: string };
     const added = await aipFast(
       box,
@@ -970,7 +970,7 @@ describe('cli', () => {
   it('queues run start with an unfinished dependency instead of creating a run', async () => {
     const box = sandbox();
     const first = JSON.parse(
-      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'модель', '--json')).stdout,
+      (await aipFast(box, 'queue', 'add', 'feature', '--task', 'model', '--json')).stdout,
     ) as { item: string };
     const started = await aipFast(
       box,

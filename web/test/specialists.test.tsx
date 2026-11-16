@@ -159,7 +159,7 @@ describe('specialist form', () => {
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist).toHaveBeenCalledWith(
       'coder',
-      { name: 'Кодировщик', model: 'opus' },
+      { name: 'Code author', model: 'opus' },
       'rev-coder',
       'project',
     );
@@ -182,7 +182,9 @@ describe('specialist form', () => {
       ],
     }));
     render(<Page api={fakeApi({ writeSpecialist })} start="coder" />);
-    fireEvent.change(await screen.findByLabelText('Timeout'), { target: { value: 'полчаса' } });
+    fireEvent.change(await screen.findByLabelText('Timeout'), {
+      target: { value: 'half an hour' },
+    });
     await chooseModel('opus');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const field = (await screen.findByLabelText('Timeout')).closest('div')!;
@@ -190,7 +192,7 @@ describe('specialist form', () => {
       'textContent',
       expect.stringContaining('positive duration'),
     );
-    expect((screen.getByLabelText('Timeout') as HTMLInputElement).value).toBe('полчаса');
+    expect((screen.getByLabelText('Timeout') as HTMLInputElement).value).toBe('half an hour');
     expect(modelValue()).toBe('opus');
   });
 
@@ -232,9 +234,9 @@ describe('specialist form', () => {
   });
 
   it('removes a cleared field from the value', () => {
-    const raw = { name: 'Кодировщик', timeout: '1h', model: 'sonnet', color: 'red' };
+    const raw = { name: 'Code author', timeout: '1h', model: 'sonnet', color: 'red' };
     const draft = {
-      name: 'Кодировщик',
+      name: 'Code author',
       runtime_chain: '',
       runtime: '',
       model: 'sonnet',
@@ -251,7 +253,7 @@ describe('specialist form', () => {
       tags: [],
     };
     expect(valueOf(draft, raw)).toEqual({
-      name: 'Кодировщик',
+      name: 'Code author',
       model: 'sonnet',
       color: 'red',
       skills: ['a', 'b'],
@@ -296,8 +298,8 @@ describe('creating, copying and deleting', () => {
     }));
     const entry = specialistEntry(
       'coder',
-      { raw: { name: 'Кодировщик', runtime: 'opencode', model } },
-      { name: 'Кодировщик', runtime: 'opencode', model },
+      { raw: { name: 'Code author', runtime: 'opencode', model } },
+      { name: 'Code author', runtime: 'opencode', model },
     );
     const api = fakeApi({
       writeSpecialist,
@@ -342,7 +344,7 @@ describe('creating, copying and deleting', () => {
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalledTimes(1));
     expect(writeSpecialist).toHaveBeenCalledWith(
       'coder-fast',
-      { name: 'Кодировщик', model: 'haiku' },
+      { name: 'Code author', model: 'haiku' },
       null,
       'project',
     );
@@ -480,17 +482,17 @@ describe('creating, copying and deleting', () => {
         specialists: [
           specialistEntry('qa', {
             level: 'project_over_global',
-            raw: { name: 'Проект' },
+            raw: { name: 'Project coder' },
             sources: {
               project: {
                 file: '/repo/aip/specialists/qa.yaml',
                 revision: 'p',
-                raw: { name: 'Проект' },
+                raw: { name: 'Project coder' },
               },
               global: {
                 file: '/xdg/aip/specialists/qa.yaml',
                 revision: 'g',
-                raw: { name: 'Общий' },
+                raw: { name: 'Global coder' },
               },
             },
           }),
@@ -499,17 +501,17 @@ describe('creating, copying and deleting', () => {
     );
     render(<Page api={fakeApi({ config, deleteSpecialist })} start="qa" />);
     const name = (await screen.findByLabelText('Name')) as HTMLInputElement;
-    expect(name.value).toBe('Проект');
+    expect(name.value).toBe('Project coder');
     fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
     await waitFor(() =>
-      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Общий'),
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Global coder'),
     );
     expect(screen.getByText(/the project file overrides it/)).toBeTruthy();
     // the shared file is view only: it cannot be deleted from here
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'Project' }));
     await waitFor(() =>
-      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Проект'),
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Project coder'),
     );
     fireEvent.click(screen.getByRole('button', { name: /Remove the override|Delete/ }));
     fireEvent.click(
@@ -525,8 +527,8 @@ describe('creating, copying and deleting', () => {
           specialistEntry('qa', {
             level: 'project_over_global',
             sources: {
-              project: { file: '/p', revision: 'p', raw: { name: 'Проект' } },
-              global: { file: '/g', revision: 'g', raw: { name: 'Общий' } },
+              project: { file: '/p', revision: 'p', raw: { name: 'Project coder' } },
+              global: { file: '/g', revision: 'g', raw: { name: 'Global coder' } },
             },
           }),
         ],
@@ -534,10 +536,10 @@ describe('creating, copying and deleting', () => {
     );
     render(<Page api={fakeApi({ config })} start="qa" />);
     const name = (await screen.findByLabelText('Name')) as HTMLInputElement;
-    fireEvent.change(name, { target: { value: 'Правка' } });
+    fireEvent.change(name, { target: { value: 'Edited coder' } });
     fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Stay' }));
-    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Правка');
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Edited coder');
   });
 });
 
@@ -574,7 +576,7 @@ describe('MCP servers of the catalog in the form', () => {
   const view = (raw: Record<string, unknown>) =>
     configView({
       specialists: [
-        specialistEntry('plan', { raw: { name: 'План', runtime: 'opencode', ...raw } }),
+        specialistEntry('plan', { raw: { name: 'Planner', runtime: 'opencode', ...raw } }),
       ],
       mcpServers: [catalogServer('github'), catalogServer('graph', true)],
     });
@@ -591,7 +593,7 @@ describe('MCP servers of the catalog in the form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist.mock.calls[0]![1]).toEqual({
-      name: 'План',
+      name: 'Planner',
       runtime: 'opencode',
       mcp_servers: ['github'],
     });
@@ -611,7 +613,7 @@ describe('MCP servers of the catalog in the form', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Remove github' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
-    expect(writeSpecialist.mock.calls[0]![1]).toEqual({ name: 'План', runtime: 'opencode' });
+    expect(writeSpecialist.mock.calls[0]![1]).toEqual({ name: 'Planner', runtime: 'opencode' });
   });
 
   it('lists the servers for all specialists with a link to the tab', async () => {
@@ -641,7 +643,7 @@ describe('MCP servers of the catalog in the form', () => {
 describe('tools and skills', () => {
   const reviewer = (raw: Record<string, unknown>) =>
     configView({
-      specialists: [specialistEntry('reviewer', { raw: { name: 'Ревьюер', ...raw } })],
+      specialists: [specialistEntry('reviewer', { raw: { name: 'Reviewer', ...raw } })],
     });
   const okWrite = () =>
     vi.fn(async (..._args: unknown[]) => ({ ok: true as const, revision: 'n', file: '/f' }));
@@ -683,7 +685,7 @@ describe('tools and skills', () => {
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist.mock.calls[0]).toEqual([
       'reviewer',
-      { name: 'Ревьюер', skills: ['review'] },
+      { name: 'Reviewer', skills: ['review'] },
       'rev-reviewer',
       'project',
     ]);
@@ -737,7 +739,7 @@ describe('tools and skills', () => {
     expect(screen.getByText('not found')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
-    expect(writeSpecialist.mock.calls[0]![1]).toEqual({ name: 'Ревьюер', skills: ['grill-me'] });
+    expect(writeSpecialist.mock.calls[0]![1]).toEqual({ name: 'Reviewer', skills: ['grill-me'] });
   });
 
   it('shows tools of defaults as grey chips and does not write them', async () => {
@@ -807,7 +809,7 @@ describe('tools and skills', () => {
 
   it('does not mark an MCP tool when the user settings are inherited', async () => {
     const view = configView({
-      specialists: [specialistEntry('reviewer', { raw: { name: 'Ревьюер' } })],
+      specialists: [specialistEntry('reviewer', { raw: { name: 'Reviewer' } })],
     });
     const catalog = vi.fn(async () => catalogView({ mcpInherited: true }));
     render(<Page api={fakeApi({ catalog, config: vi.fn(async () => view) })} start="reviewer" />);
@@ -909,10 +911,10 @@ describe('form layout', () => {
         specialists: [
           specialistEntry('qa', {
             level: 'project_over_global',
-            raw: { name: 'Проект' },
+            raw: { name: 'Project coder' },
             sources: {
-              project: { file: '/repo/aip/specialists/qa.yaml', revision: 'p', raw: { name: 'П' } },
-              global: { file: '/xdg/aip/specialists/qa.yaml', revision: 'g', raw: { name: 'О' } },
+              project: { file: '/repo/aip/specialists/qa.yaml', revision: 'p', raw: { name: 'P' } },
+              global: { file: '/xdg/aip/specialists/qa.yaml', revision: 'g', raw: { name: 'G' } },
             },
           }),
         ],
@@ -1314,7 +1316,7 @@ describe('specialist tags', () => {
     const view = configView({
       specialists: [
         specialistEntry('coder', {
-          raw: { name: 'Кодировщик', tags: ['legacy'] },
+          raw: { name: 'Code author', tags: ['legacy'] },
           shared_tags: ['backend'],
           own_tags: ['legacy'],
         }),
@@ -1338,7 +1340,7 @@ describe('specialist tags', () => {
     const view = configView({
       specialists: [
         specialistEntry('coder', {
-          raw: { name: 'Кодировщик', tags: ['legacy'] },
+          raw: { name: 'Code author', tags: ['legacy'] },
           shared_tags: ['backend'],
           own_tags: ['legacy'],
         }),
@@ -1357,7 +1359,7 @@ describe('specialist tags', () => {
     await waitFor(() => expect(writeSpecialist).toHaveBeenCalled());
     expect(writeSpecialist.mock.calls[0]).toEqual([
       'coder',
-      { name: 'Кодировщик', tags: ['slow'] },
+      { name: 'Code author', tags: ['slow'] },
       'rev-coder',
       'project',
     ]);

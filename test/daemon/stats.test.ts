@@ -35,7 +35,7 @@ async function finishedRun(h: Harness): Promise<string> {
   const created = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
-    groups: [{ title: 'Вход', task: 'вход' }],
+    groups: [{ title: 'Sign in', task: 'sign in' }],
   })) as RunCreated;
   await h.waitFor(created.runId, (view) => view.finished);
   return created.runId;

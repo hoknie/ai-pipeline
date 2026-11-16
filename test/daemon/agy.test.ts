@@ -6,7 +6,7 @@ import { calls, run, start } from './control-harness.ts';
 import { writeConfigDirectory } from '../fixtures/config.ts';
 
 export const AGY_CONFIG = CODE_ONLY_CONFIG.replace(
-  'coder: { name: Кодировщик }',
+  'coder: { name: Coder }',
   'coder: { name: C, runtime: agy }',
 );
 

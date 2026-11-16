@@ -295,7 +295,7 @@ describe('attachments of a queued item', () => {
   });
 
   it('shows the files of a returned run without a way to change them', async () => {
-    const api = withItem({ run: 'r1', title: 'Логин', attachments: [attachment()] });
+    const api = withItem({ run: 'r1', title: 'Login page', attachments: [attachment()] });
     render(<App api={api} openStream={openFake} />);
     const list = await screen.findByRole('list', { name: 'tasks in the queue' });
     fireEvent.click(within(list).getByRole('button', { name: 'Edit' }));

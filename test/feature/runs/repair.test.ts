@@ -49,7 +49,7 @@ function failedRun(options: { configText?: string; groups?: number } = {}): RunS
   const state = run(options.groups ?? 1, { configText: options.configText });
   state.run.config.delivery.auto = false;
   step(state);
-  transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 1100);
+  transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 1100);
   return state;
 }
 
@@ -100,7 +100,7 @@ describe('what a failure of a repair does to the count', () => {
     { kind: 'skipped' },
     { kind: 'usage_limit', resetsAt: null },
     { kind: 'network', problem: 'down' },
-    { kind: 'message', text: 'стоп', at: 1 },
+    { kind: 'message', text: 'stop', at: 1 },
     { kind: 'paused', at: 1 },
   ];
 
@@ -142,7 +142,7 @@ describe('run state with an incident under repair', () => {
 
   it('is not changed in outcome by the repair group', () => {
     const { state } = repairing();
-    expect(state.groups.map((g) => g.slug)).toEqual(['gruppa-1']);
+    expect(state.groups.map((g) => g.slug)).toEqual(['group-1']);
     expect(runPhase(state)).not.toBe('cancelled');
     const before = runPhase(failedRun());
     expect(before).toBe('failed');
@@ -156,7 +156,7 @@ describe('run state with an incident under repair', () => {
     ).toThrow('already going');
     const paused = run(2);
     step(paused);
-    transition(paused, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 1100);
+    transition(paused, { kind: 'timed_out', group: 'group-1', seq: 1 }, 1100);
     transition(paused, { kind: 'hold', hold: 'paused' }, 1500);
     expect(() =>
       transition(
@@ -188,7 +188,7 @@ describe('end of a repair', () => {
       finish(state, verdict, {
         slug: REPAIR_GROUP,
         now: 3000,
-        ...(verdict === 'needs_human' ? { questions: [{ text: 'Не знаю' }] } : {}),
+        ...(verdict === 'needs_human' ? { questions: [{ text: 'I do not know' }] } : {}),
       });
       expect(state.repair?.status).toBe('failed');
       expect(state.repair?.reason).toContain(`observer reported ${verdict}`);
@@ -221,10 +221,10 @@ describe('end of a repair', () => {
 describe('cancelling the work of an observer', () => {
   it('cancels the repair with the task and writes the reason', () => {
     const { state } = repairing();
-    const effects = transition(state, { kind: 'cancel', group: null, reason: 'не нужно' }, 3000);
+    const effects = transition(state, { kind: 'cancel', group: null, reason: 'not needed' }, 3000);
     expect(state.repair?.status).toBe('cancelled');
     expect(state.run.repair.incident).toBeNull();
-    expect(state.run.repair.cancelReason).toBe('не нужно');
+    expect(state.run.repair.cancelReason).toBe('not needed');
     expect(effects).toContainEqual(
       expect.objectContaining({ kind: 'stop_attempt', group: REPAIR_GROUP }),
     );
@@ -259,7 +259,7 @@ describe('repair keeps to the limits of the places', () => {
   it('waits for swarm.max like any agent and starts when a place is free', () => {
     const state = run(2, { max: 2 });
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 1100);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 1100);
     transition(
       state,
       { kind: 'repair_start', incident: incidentOf(state), specialist: profile(state) },
@@ -275,7 +275,7 @@ describe('repair keeps to the limits of the places', () => {
     state.run.config.max = 2;
     dispatch([state], 1400);
     expect(runningAttempt(state, REPAIR_GROUP)).toBeDefined();
-    expect(runningAttempt(state, 'gruppa-2')).toBeDefined();
+    expect(runningAttempt(state, 'group-2')).toBeDefined();
   });
 });
 
@@ -292,8 +292,8 @@ describe('queue view of a task under repair', () => {
   it('keeps the keys of the problems when the repair has attempts', () => {
     const state = run(2);
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 1100);
-    transition(state, { kind: 'cancel', group: 'gruppa-2' }, 1200);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 1100);
+    transition(state, { kind: 'cancel', group: 'group-2' }, 1200);
     const before = problemKeys(state);
     expect(before.some((key) => key.includes('/cancelled/'))).toBe(true);
     startRepair(state);
@@ -432,14 +432,14 @@ describe('repair of a delivery', () => {
     expect(repairIncidents(state).map((item) => item.kind)).toEqual(['delivery', 'delivery']);
     const effects = startDeliveryRepair(state);
     expect(effects).toEqual([
-      { kind: 'prepare_resolve', run: state.run.id, groups: ['gruppa-1', 'gruppa-2'], round: 1 },
+      { kind: 'prepare_resolve', run: state.run.id, groups: ['group-1', 'group-2'], round: 1 },
     ]);
     expect(state.run.pendingDelivery).toMatchObject({
       repair: true,
       force: false,
-      groups: ['gruppa-1', 'gruppa-2'],
+      groups: ['group-1', 'group-2'],
     });
-    expect(state.run.pendingDelivery?.message).toContain('Группа 1');
+    expect(state.run.pendingDelivery?.message).toContain('Group 1');
     expect(state.run.repair.incident).not.toBeNull();
     expect(state.run.finishedAt).toBeNull();
   });
@@ -457,7 +457,7 @@ describe('repair of a delivery', () => {
     expect(effects).toEqual([
       expect.objectContaining({
         kind: 'finish_resolve',
-        groups: ['gruppa-1', 'gruppa-2'],
+        groups: ['group-1', 'group-2'],
         conflicts: ['src/app.ts'],
       }),
     ]);
@@ -550,7 +550,7 @@ describe('repair of a delivery', () => {
   it('cancelling the task during preparation drops the delivery', () => {
     const state = refusedDelivery();
     startDeliveryRepair(state);
-    transition(state, { kind: 'cancel', group: null, reason: 'стоп' }, 7100);
+    transition(state, { kind: 'cancel', group: null, reason: 'stop' }, 7100);
     expect(state.run.pendingDelivery).toBeNull();
     expect(state.run.repair.incident).toBeNull();
   });
@@ -563,10 +563,7 @@ describe('repair of a delivery', () => {
 });
 
 describe('repair and the limit of its specialist', () => {
-  const LIMITED = CONFIG_TEXT.replace(
-    'coder: { name: Кодировщик,',
-    'coder: { name: Кодировщик, max: 1,',
-  );
+  const LIMITED = CONFIG_TEXT.replace('coder: { name: Coder,', 'coder: { name: Coder, max: 1,');
 
   /** A run that failed and has a repair of the coder queued. */
   function repairOf(): RunState {
@@ -604,7 +601,7 @@ describe('repair and the limit of its specialist', () => {
     const coder = coderRun('run000000002', false);
     const plan = planDispatch([state, coder], 4000);
     expect(plan.start).toEqual([]);
-    expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toMatchObject({
+    expect(plan.waits.get(waitKey('run000000002', 'group-1'))).toMatchObject({
       reason: 'specialist',
       specialist: 'coder',
     });

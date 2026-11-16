@@ -116,15 +116,15 @@ describe('items out of the filter', () => {
       queueOf({
         filter: { pipelines: ['feature'], tags: [] },
         items: [
-          queueItem('q1', 'Подходит', 1),
-          queueItem('q2', 'Другая', 2, { pipeline: 'other', filtered: true }),
+          queueItem('q1', 'Fitting task', 1),
+          queueItem('q2', 'Filtered task', 2, { pipeline: 'other', filtered: true }),
         ],
       }),
     );
-    const out = await screen.findByRole('listitem', { name: /Другая/ });
+    const out = await screen.findByRole('listitem', { name: /Filtered task/ });
     expect(within(out).getByText('Filtered out')).toBeTruthy();
     expect(out.className).toContain('opacity-60');
-    const fits = screen.getByRole('listitem', { name: /Подходит/ });
+    const fits = screen.getByRole('listitem', { name: /Fitting task/ });
     expect(within(fits).queryByText('Filtered out')).toBeNull();
   });
 });

@@ -30,7 +30,7 @@ async function run(h: Harness): Promise<string> {
   const created = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
-    groups: [{ title: 'Логин', task: 'x' }],
+    groups: [{ title: 'Login', task: 'x' }],
   })) as RunCreated;
   return created.runId;
 }

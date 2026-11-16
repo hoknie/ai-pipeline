@@ -12,8 +12,8 @@ import { transition } from '../../../src/feature/runs/machine/index.ts';
 import { CONFIG_TEXT, finish, run, step } from './helpers.ts';
 
 const LIMITED = CONFIG_TEXT.replace(
-  'coder: { name: Кодировщик, runtime: opencode, model: anthropic/sonnet }',
-  'coder: { name: Кодировщик, runtime: opencode, model: anthropic/sonnet, max: 1 }',
+  'coder: { name: Coder, runtime: opencode, model: anthropic/sonnet }',
+  'coder: { name: Coder, runtime: opencode, model: anthropic/sonnet, max: 1 }',
 );
 
 const SERVICES = `${LIMITED}  delivery:
@@ -29,26 +29,26 @@ describe('specialistUse', () => {
   it('lists a running and a waiting group of the same specialist with the limit', () => {
     const state = run(2, { configText: LIMITED });
     step(state);
-    finish(state, 'done', { slug: 'gruppa-1' });
-    finish(state, 'done', { slug: 'gruppa-2' });
+    finish(state, 'done', { slug: 'group-1' });
+    finish(state, 'done', { slug: 'group-2' });
     // both groups are on `code`; the limit lets only one run
     step(state);
     expect(specialistUse(state)).toMatchObject([
       {
         specialist: 'coder',
-        name: 'Кодировщик',
+        name: 'Coder',
         level: 'project',
         max: 1,
         running: [
           {
-            slug: 'gruppa-1',
-            title: 'Группа 1',
+            slug: 'group-1',
+            title: 'Group 1',
             step: 'code',
-            stepName: 'Кодировщик',
+            stepName: 'Coder',
             startedAt: 1500,
           },
         ],
-        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code', stepName: 'Кодировщик' }],
+        waiting: [{ slug: 'group-2', title: 'Group 2', step: 'code', stepName: 'Coder' }],
       },
     ]);
   });
@@ -60,7 +60,7 @@ describe('specialistUse', () => {
     const uses = specialistUse(state);
     expect(uses.map((use) => use.specialist)).toEqual(['plan']);
     expect(uses[0]).toMatchObject({ level: 'global', max: null });
-    expect(uses[0]?.running.map((item) => item.slug)).toEqual(['gruppa-1', 'gruppa-2']);
+    expect(uses[0]?.running.map((item) => item.slug)).toEqual(['group-1', 'group-2']);
   });
 
   it('counts the split, the commit message and the resolver', () => {
@@ -82,7 +82,7 @@ describe('specialistUse', () => {
   it('is empty for a finished run and for a run that waits for a human', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'вопрос?' });
+    finish(state, 'needs_human', { feedback: 'question?' });
     expect(specialistUse(state)).toEqual([]);
     transition(state, { kind: 'cancel', group: null }, 10);
     expect(specialistUse(state)).toEqual([]);

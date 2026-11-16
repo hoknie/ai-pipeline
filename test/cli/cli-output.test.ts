@@ -16,12 +16,12 @@ describe('cli', () => {
       JSON.stringify({ code: [{ write: { 'feature.ts': 'export const on = true;\n' } }] }),
     );
     const first = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'первое', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'first', '--json')).stdout,
     );
     await aip(box, 'run', 'watch', first.runId);
     const applied = await aip(box, 'run', 'apply', first.runId);
     expect(applied).toMatchObject({ code: 0 });
-    expect(applied.stdout).toContain('pervoe: applied (feature.ts)');
+    expect(applied.stdout).toContain('first: applied (feature.ts)');
     expect(readFileSync(join(box.repo, 'feature.ts'), 'utf8')).toBe('export const on = true;\n');
   });
 
@@ -32,7 +32,7 @@ describe('cli', () => {
       JSON.stringify({ code: [{ write: { 'feature.ts': 'export const on = false;\n' } }] }),
     );
     const second = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'второе', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'second', '--json')).stdout,
     );
     await aip(box, 'run', 'watch', second.runId);
     writeFileSync(join(box.repo, 'feature.ts'), 'export const on = 1;\n');
@@ -52,7 +52,7 @@ describe('cli', () => {
       JSON.stringify({ code: [{ write: { 'feature.ts': 'export const on = true;\n' } }] }),
     );
     const started = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'ручное', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'manual', '--json')).stdout,
     );
     await aip(box, 'run', 'watch', started.runId);
     const marked = await aip(box, 'run', 'mark-delivered', started.runId, '--json');
@@ -86,7 +86,7 @@ describe('cli', () => {
     });
     await waitUntil('the snapshot event', () => lines.length > 0);
     expect(JSON.parse(lines[0] ?? '{}')).toMatchObject({ event: 'snapshot', runs: [] });
-    await aip(box, 'run', 'start', 'feature', '--task', 'поток');
+    await aip(box, 'run', 'start', 'feature', '--task', 'stream');
     await waitUntil('a run event', () => lines.some((line) => line.includes('"event":"run"')));
     expect(lines.some((line) => line.includes('"event":"run"'))).toBe(true);
     const exited = new Promise<number | null>((resolve) =>
@@ -99,7 +99,7 @@ describe('cli', () => {
   it('prints JSON without ANSI even with FORCE_COLOR=1', async () => {
     const box = sandbox();
     const forced = { ...box, env: { ...box.env, FORCE_COLOR: '1' } };
-    const started = await aip(box, 'run', 'start', 'feature', '--task', 'цвет', '--json');
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'color', '--json');
     const { runId } = runOf(started.stdout);
     await aip(box, 'run', 'watch', runId);
     const shown = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
@@ -129,7 +129,7 @@ describe('cli', () => {
   it('colors state words with FORCE_COLOR=1 and keeps pipes and --no-color plain', async () => {
     const box = sandbox();
     const forced = { ...box, env: { ...box.env, FORCE_COLOR: '1' } };
-    const started = await aip(box, 'run', 'start', 'feature', '--task', 'цвет', '--json');
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'color', '--json');
     const {
       run: { runId },
     } = JSON.parse(started.stdout) as { run: { runId: string } };
@@ -255,8 +255,8 @@ describe('cli', () => {
   it('shows split.pipeline and no steps for such a pipeline in config check', async () => {
     const box = sandbox(`swarm:
   specialists:
-    plan: { name: Планировщик }
-    coder: { name: Кодировщик }
+    plan: { name: Planner }
+    coder: { name: Coder }
   pipelines:
     explore:
       steps:
@@ -274,7 +274,7 @@ describe('cli', () => {
   it('shows human_review in config check only for steps that have it', async () => {
     const box = sandbox(`swarm:
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   pipelines:
     feature:
       steps:
@@ -289,10 +289,10 @@ describe('cli', () => {
   it('shows the name of a pipeline in config check only when it is set', async () => {
     const box = sandbox(`swarm:
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   pipelines:
     feature:
-      name: Новая функция
+      name: New feature
       steps:
         - { id: code, specialist: coder }
     plain:
@@ -302,13 +302,13 @@ describe('cli', () => {
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
     const feature = (result.stdout.split('    feature:')[1] ?? '').split('    plain:')[0] ?? '';
-    expect(feature).toContain('name: Новая функция');
+    expect(feature).toContain('name: New feature');
     expect(result.stdout.split('    plain:')[1] ?? '').not.toContain('name:');
   });
 
   it('shows max of a specialist in config check only when it is set', async () => {
     const box = sandbox(
-      PIPELINE_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+      PIPELINE_CONFIG.replace('coder: { name: Coder }', 'coder: { name: Coder, max: 1 }'),
     );
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
@@ -321,8 +321,8 @@ describe('cli', () => {
   it('shows OpenCode options only for specialists that set them', async () => {
     const box = sandbox(
       PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, runtime: opencode, model: openai/gpt-6.1-sol, variant: company-deep, reasoning_effort: xhigh }',
+        'coder: { name: Coder }',
+        'coder: { name: Coder, runtime: opencode, model: openai/gpt-6.1-sol, variant: company-deep, reasoning_effort: xhigh }',
       ),
     );
     const result = await aip(box, 'config', 'check');
@@ -346,7 +346,7 @@ describe('cli', () => {
           model: openai/gpt-5
   specialists:
     coder:
-      name: Кодировщик
+      name: Coder
       runtime_chain: fallback
   pipelines:
     feature:
@@ -378,8 +378,8 @@ describe('cli', () => {
 
   it('lists the configuration files in config check in the order they merge', async () => {
     const box = sandbox();
-    writeFileSync(join(box.repo, 'aip', 'specialists', 'b.yaml'), 'name: Второй\n');
-    writeFileSync(join(box.repo, 'aip', 'specialists', 'a.yaml'), 'name: Первый\n');
+    writeFileSync(join(box.repo, 'aip', 'specialists', 'b.yaml'), 'name: Second\n');
+    writeFileSync(join(box.repo, 'aip', 'specialists', 'a.yaml'), 'name: First\n');
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
     const files = result.stdout.split('Config files:\n')[1]?.split('\n\n')[0] ?? '';
@@ -412,12 +412,12 @@ describe('cli', () => {
     const box = sandbox(
       PIPELINE_CONFIG.replace(
         '- { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }',
-        '- { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 }, additional_prompt: Только тесты }',
+        '- { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 }, additional_prompt: Tests only }',
       ),
     );
     const result = await aip(box, 'config', 'check');
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('additional_prompt: Только тесты');
+    expect(result.stdout).toContain('additional_prompt: Tests only');
     expect(result.stdout.match(/additional_prompt/g)).toHaveLength(1);
   });
 
@@ -431,7 +431,7 @@ describe('cli', () => {
       '--title',
       'x'.repeat(61),
       '--task',
-      'вход',
+      'login',
     );
     expect(long.code).toBe(1);
     expect(`${long.stdout}${long.stderr}`).toContain('title');
@@ -445,7 +445,7 @@ describe('cli', () => {
           '--title',
           'Вход',
           '--task',
-          'сделать вход',
+          'add sign-in',
           '--json',
         )
       ).stdout,
@@ -467,7 +467,7 @@ describe('cli run view', () => {
     );
     const forced = { ...box, env: { ...box.env, FORCE_COLOR: '1' } };
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'вопрос', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'question', '--json')).stdout,
     );
     await waitUntil('the group asks', async () => {
       const view = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
@@ -484,7 +484,7 @@ describe('cli run view', () => {
     );
     const plain = await aip(box, 'run', 'show', runId);
     expect(plain.stdout).not.toMatch(/^→ /m);
-    expect(plain.stdout).toContain('Steps: Кодировщик [active] → Ревьюер');
+    expect(plain.stdout).toContain('Steps: Coder [active] → Reviewer');
     expect(plain.stdout).toContain('Progress: 0/2 steps');
     expect(plain.stdout).not.toMatch(ansi);
     const piped = await aip(forced, 'run', 'show', runId, '--no-color');
@@ -494,7 +494,7 @@ describe('cli run view', () => {
   it('watches a run to its end without terminal sequences outside a terminal', async () => {
     const box = sandbox();
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'труба', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'pipe', '--json')).stdout,
     );
     const watched = await aip(box, 'run', 'watch', runId);
     expect(watched.code).toBe(0);
@@ -506,7 +506,7 @@ describe('cli run view', () => {
   it('lists the usage of a run as tokens only, in the text and in the JSON', async () => {
     const box = sandbox();
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'расход', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'usage', '--json')).stdout,
     );
     await waitUntil('the run ends', async () => {
       const view = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
@@ -534,16 +534,16 @@ describe('cli run view', () => {
       JSON.stringify({ code: [{ usage: [{ input: 10, output: 5 }], delayMs: 2600 }, {}] }),
     );
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'активность', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'activity', '--json')).stdout,
     );
     const watched = await aip(box, 'run', 'watch', runId);
-    expect(watched.stdout).toMatch(/^aktivnost: \S/m);
+    expect(watched.stdout).toMatch(/^activity: \S/m);
     await waitUntil('the run ends', async () => {
       const view = JSON.parse((await aip(box, 'run', 'show', runId, '--json')).stdout) as {
         finished: boolean;
       };
       return view.finished;
     });
-    expect((await aip(box, 'run', 'show', runId)).stdout).not.toMatch(/^aktivnost: /m);
+    expect((await aip(box, 'run', 'show', runId)).stdout).not.toMatch(/^activity: /m);
   });
 });

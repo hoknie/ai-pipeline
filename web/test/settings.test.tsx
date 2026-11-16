@@ -426,16 +426,19 @@ describe('answer of the autopilot in the queue settings', () => {
     show(queueOf({ autopilotAnswerDefault: 'Agree with all' }));
     const block = await settingsBlock();
     const field = block.getByRole<HTMLTextAreaElement>('textbox', { name: 'Answer to questions' });
-    fireEvent.change(field, { target: { value: 'Мой текст' } });
+    fireEvent.change(field, { target: { value: 'My own text' } });
     act(() => {
       stream().open();
       stream().send({
         event: 'queue',
         seq: 5,
-        queue: queueOf({ autopilotAnswer: 'Другой', autopilotAnswerDefault: 'Agree with all' }),
+        queue: queueOf({
+          autopilotAnswer: 'Another answer',
+          autopilotAnswerDefault: 'Agree with all',
+        }),
       });
     });
-    expect(field.value).toBe('Мой текст');
+    expect(field.value).toBe('My own text');
   });
 });
 
@@ -790,8 +793,8 @@ describe('settings form', () => {
     const config = vi.fn(async () =>
       configView({
         specialists: [
-          specialistEntry('coder', {}, { name: 'Кодировщик' }),
-          specialistEntry('resolver', {}, { name: 'Разрешатель конфликтов' }),
+          specialistEntry('coder', {}, { name: 'Code author' }),
+          specialistEntry('resolver', {}, { name: 'Conflict fixer' }),
         ],
         settings: settingsOf({
           'delivery.resolver': { path: 'delivery.resolver', value: 'resolver', written: {} },
@@ -800,15 +803,15 @@ describe('settings form', () => {
     );
     const api = show(queueOf(), { config }, '#settings/global/delivery');
     const resolver = await screen.findByRole('combobox', { name: 'Conflict resolver' });
-    expect(resolver.textContent).toContain('Разрешатель конфликтов');
+    expect(resolver.textContent).toContain('Conflict fixer');
     expect(resolver.textContent).not.toContain('resolver');
     fireEvent.keyDown(resolver, { key: 'Enter' });
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
       'not set',
-      'Кодировщик',
-      'Разрешатель конфликтов',
+      'Code author',
+      'Conflict fixer',
     ]);
-    fireEvent.click(screen.getByRole('option', { name: 'Кодировщик' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Code author' }));
     fireEvent.click(saveButton());
     await waitFor(() =>
       expect(api.writeSettings).toHaveBeenCalledWith(
@@ -823,8 +826,8 @@ describe('settings form', () => {
     const config = vi.fn(async () =>
       configView({
         specialists: [
-          specialistEntry('a', {}, { name: 'Ревью' }),
-          specialistEntry('b', {}, { name: 'Ревью' }),
+          specialistEntry('a', {}, { name: 'Review' }),
+          specialistEntry('b', {}, { name: 'Review' }),
         ],
       }),
     );
@@ -833,8 +836,8 @@ describe('settings form', () => {
     fireEvent.keyDown(resolver, { key: 'Enter' });
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
       'not set',
-      'Ревью (a)',
-      'Ревью (b)',
+      'Review (a)',
+      'Review (b)',
     ]);
   });
 
@@ -842,8 +845,8 @@ describe('settings form', () => {
     const config = vi.fn(async () =>
       configView({
         specialists: [
-          specialistEntry('coder', {}, { name: 'Кодировщик' }),
-          specialistEntry('writer', {}, { name: 'Автор коммитов' }),
+          specialistEntry('coder', {}, { name: 'Code author' }),
+          specialistEntry('writer', {}, { name: 'Commit author' }),
         ],
         settings: settingsOf({
           'delivery.message_specialist': {
@@ -856,15 +859,15 @@ describe('settings form', () => {
     );
     const api = show(queueOf(), { config }, '#settings/global/delivery');
     const message = await screen.findByRole('combobox', { name: 'Message specialist' });
-    expect(message.textContent).toContain('Автор коммитов');
+    expect(message.textContent).toContain('Commit author');
     expect(message.textContent).not.toContain('writer');
     fireEvent.keyDown(message, { key: 'Enter' });
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
       'not set',
-      'Кодировщик',
-      'Автор коммитов',
+      'Code author',
+      'Commit author',
     ]);
-    fireEvent.click(screen.getByRole('option', { name: 'Кодировщик' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Code author' }));
     fireEvent.click(saveButton());
     await waitFor(() =>
       expect(api.writeSettings).toHaveBeenCalledWith(

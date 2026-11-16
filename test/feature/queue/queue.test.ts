@@ -54,7 +54,7 @@ function taken(queue: Queue, state: RunState): void {
   queue.runs.push(state.run.id);
 }
 
-function merge(state: RunState, slug = 'gruppa-1'): void {
+function merge(state: RunState, slug = 'group-1'): void {
   transition(
     state,
     { kind: 'merge_finished', group: slug, outcome: { kind: 'merged', commit: 'c1' } },
@@ -62,7 +62,7 @@ function merge(state: RunState, slug = 'gruppa-1'): void {
   );
 }
 
-function toMerging(state: RunState, slug = 'gruppa-1'): void {
+function toMerging(state: RunState, slug = 'group-1'): void {
   for (let index = 0; index < 4; index += 1) {
     step(state);
     finish(state, 'done', { slug });
@@ -74,9 +74,9 @@ const none = (): undefined => undefined;
 describe('items', () => {
   it('appends to the end and trims', () => {
     const queue = queueOf('A', 'B');
-    addItem(queue, { pipeline: 'feature', task: '  C  ', title: ' Вход ' }, 'q3', 5);
+    addItem(queue, { pipeline: 'feature', task: '  C  ', title: ' Login ' }, 'q3', 5);
     expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
-    expect(queue.items[2]).toMatchObject({ task: 'C', groups: null, title: 'Вход', error: null });
+    expect(queue.items[2]).toMatchObject({ task: 'C', groups: null, title: 'Login', error: null });
   });
 
   it('takes groups instead of a task', () => {
@@ -86,8 +86,8 @@ describe('items', () => {
       {
         pipeline: 'feature',
         groups: [
-          { title: 'форма входа', task: 'x' },
-          { title: 'форма регистрации', task: 'y' },
+          { title: 'login form', task: 'x' },
+          { title: 'sign-up form', task: 'y' },
         ],
       },
       'q1',
@@ -108,9 +108,9 @@ describe('items', () => {
     fail({ pipeline: 'feature', groups: [{ title: ' ', task: 'b' }] });
     fail({ pipeline: 'feature', groups: [{ title: 'a', task: ' ' }] });
     fail({ pipeline: 'feature', task: 'x', title: '  ' });
-    fail({ pipeline: 'feature', task: 'x', title: 'я'.repeat(61) });
+    fail({ pipeline: 'feature', task: 'x', title: 'a'.repeat(61) });
     expect(() =>
-      addItem(queue, { pipeline: 'feature', task: 'x', title: 'я'.repeat(60) }, 'q', 1),
+      addItem(queue, { pipeline: 'feature', task: 'x', title: 'a'.repeat(60) }, 'q', 1),
     ).not.toThrow();
     expect(queue.items).toHaveLength(1);
   });
@@ -132,8 +132,8 @@ describe('items', () => {
     editItem(queue, 'q2', { groups: [{ title: 'a', task: 'b' }], title: 'T', position: 1 }, 7);
     expect(ids(queue)).toEqual(['q2', 'q1']);
     expect(queue.items[0]).toMatchObject({ task: null, title: 'T', error: null });
-    editItem(queue, 'q2', { task: 'снова', title: null }, 8);
-    expect(queue.items[0]).toMatchObject({ task: 'снова', groups: null, title: null });
+    editItem(queue, 'q2', { task: 'again', title: null }, 8);
+    expect(queue.items[0]).toMatchObject({ task: 'again', groups: null, title: null });
     expect(() =>
       editItem(queue, 'q2', { task: 'a', groups: [{ title: 'a', task: 'b' }] }, 9),
     ).toThrow();
@@ -228,14 +228,14 @@ describe('problems', () => {
     step(state, 2000);
     expect(runProblems(state)).toEqual([
       {
-        key: 'run000000001/gruppa-1/needs_human/1',
+        key: 'run000000001/group-1/needs_human/1',
         run: 'run000000001',
-        group: 'gruppa-1',
+        group: 'group-1',
         reason: 'needs_human',
       },
     ]);
-    group(state, 'gruppa-2').status = 'failed';
-    group(state, 'gruppa-3').status = 'conflict';
+    group(state, 'group-2').status = 'failed';
+    group(state, 'group-3').status = 'conflict';
     expect(runProblems(state).map((problem) => problem.reason)).toEqual([
       'needs_human',
       'failed',
@@ -258,8 +258,8 @@ describe('problems', () => {
 
   it('keeps the problems of a run with failed and cancelled groups', () => {
     const state = run(2);
-    group(state, 'gruppa-1').status = 'failed';
-    group(state, 'gruppa-2').status = 'cancelled';
+    group(state, 'group-1').status = 'failed';
+    group(state, 'group-2').status = 'cancelled';
     expect(runPhase(state)).toBe('cancelled');
     expect(runProblems(state).map((problem) => problem.reason)).toEqual(['failed', 'cancelled']);
   });
@@ -322,7 +322,7 @@ describe('automatic delivery of an item', () => {
   it('changes only when the patch names it, and null resets it', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { pipeline: 'feature', task: 'A', autoDeliver: false }, 'q1', 2);
-    editItem(queue, 'q1', { title: 'Имя' }, 3);
+    editItem(queue, 'q1', { title: 'Name' }, 3);
     expect(queue.items[0]?.autoDeliver).toBe(false);
     editItem(queue, 'q1', { autoDeliver: true }, 4);
     expect(queue.items[0]?.autoDeliver).toBe(true);
@@ -344,7 +344,7 @@ describe('skip of an item', () => {
   it('is replaced as a whole, cleared by [] and kept by other edits', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { pipeline: 'feature', task: 'A', skip: ['qa'] }, 'q1', 2);
-    editItem(queue, 'q1', { title: 'Имя' }, 3);
+    editItem(queue, 'q1', { title: 'Name' }, 3);
     expect(queue.items[0]?.skip).toEqual(['qa']);
     editItem(queue, 'q1', { skip: ['review', 'qa'] }, 4);
     expect(queue.items[0]?.skip).toEqual(['review', 'qa']);
@@ -394,7 +394,7 @@ describe('place', () => {
     toMerging(state);
     merge(state);
     group(state).delivery = { ...group(state).delivery, state: 'applied' };
-    state.run.pendingDelivery = { groups: ['gruppa-1'], force: false, auto: true };
+    state.run.pendingDelivery = { groups: ['group-1'], force: false, auto: true };
     expect(occupiesSlot(state)).toBe(true);
   });
 });
@@ -486,7 +486,7 @@ describe('start, pause, advance', () => {
       advance(queue, [state], none, 5);
       expect(queue).toMatchObject({
         status: 'stopped',
-        stop: { kind: 'problem', run: 'a', group: 'gruppa-1', reason },
+        stop: { kind: 'problem', run: 'a', group: 'group-1', reason },
       });
       expect(advance(queue, [state], none, 6).take).toEqual([]);
       expect(queue.runs).toEqual(['a']);
@@ -573,9 +573,9 @@ describe('start, pause, advance', () => {
     startQueue(queue, [state], 6);
     advance(queue, [state], none, 7);
     expect(queue.status).toBe('running');
-    group(state, 'gruppa-2').status = 'conflict';
+    group(state, 'group-2').status = 'conflict';
     advance(queue, [state], none, 8);
-    expect(queue.stop).toMatchObject({ reason: 'conflict', group: 'gruppa-2' });
+    expect(queue.stop).toMatchObject({ reason: 'conflict', group: 'group-2' });
   });
 
   it('stops again when a retried group fails again', () => {
@@ -586,7 +586,7 @@ describe('start, pause, advance', () => {
     step(state);
     group(state).status = 'failed';
     advance(queue, [state], none, 5);
-    expect(queue.stop).toMatchObject({ reason: 'failed', group: 'gruppa-1' });
+    expect(queue.stop).toMatchObject({ reason: 'failed', group: 'group-1' });
     startQueue(queue, [state], 6);
     // retry: another attempt, the group fails again; the queue did not see the state in between
     group(state).attempts.push({ ...group(state).attempts[0]!, seq: 2 });
@@ -594,7 +594,7 @@ describe('start, pause, advance', () => {
     advance(queue, [state], none, 7);
     expect(queue).toMatchObject({
       status: 'stopped',
-      stop: { reason: 'failed', group: 'gruppa-1' },
+      stop: { reason: 'failed', group: 'group-1' },
     });
   });
 
@@ -1163,7 +1163,7 @@ describe('delivery mode of an item', () => {
   it('changes only when the patch names it, and null resets it', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { pipeline: 'feature', task: 'A', deliveryMode: 'branch' }, 'q1', 2);
-    editItem(queue, 'q1', { title: 'Имя' }, 3);
+    editItem(queue, 'q1', { title: 'Name' }, 3);
     expect(queue.items[0]?.deliveryMode).toBe('branch');
     editItem(queue, 'q1', { deliveryMode: 'commit' }, 4);
     expect(queue.items[0]?.deliveryMode).toBe('commit');
@@ -1183,8 +1183,8 @@ describe('autopilot answer text', () => {
   it('is null by default, trimmed when set, and null restores the default', () => {
     const queue = emptyQueue('/repo', 1);
     expect(queue.autopilotAnswer).toBeNull();
-    setQueueSettings(queue, { autopilotAnswer: '  Да, согласен  ' }, 2);
-    expect(queue.autopilotAnswer).toBe('Да, согласен');
+    setQueueSettings(queue, { autopilotAnswer: '  Yes, agreed  ' }, 2);
+    expect(queue.autopilotAnswer).toBe('Yes, agreed');
     setQueueSettings(queue, { autopilotAnswer: null }, 3);
     expect(queue.autopilotAnswer).toBeNull();
   });
@@ -1205,7 +1205,7 @@ describe('answers of the autopilot', () => {
   function asking(id = 'a'): RunState {
     const state = run(1, { id });
     step(state);
-    finish(state, 'needs_human', { feedback: 'Какой вариант?' });
+    finish(state, 'needs_human', { feedback: 'Which option?' });
     return state;
   }
 
@@ -1222,14 +1222,14 @@ describe('answers of the autopilot', () => {
     const queue = running();
     const state = asking();
     expect(autopilotAnswers(queue, [state])).toEqual([
-      { run: 'a', group: 'gruppa-1', answer: DEFAULT_AUTOPILOT_ANSWER },
+      { run: 'a', group: 'group-1', answer: DEFAULT_AUTOPILOT_ANSWER },
     ]);
   });
 
   it('uses the text of the queue', () => {
     const queue = running();
-    queue.autopilotAnswer = 'Согласен';
-    expect(autopilotAnswers(queue, [asking()])[0]?.answer).toBe('Согласен');
+    queue.autopilotAnswer = 'Agreed';
+    expect(autopilotAnswers(queue, [asking()])[0]?.answer).toBe('Agreed');
   });
 
   it('answers with auto answer on and autopilot off', () => {
@@ -1251,7 +1251,7 @@ describe('answers of the autopilot', () => {
     const queue = running();
     const rejected = run(1, { id: 'a' });
     step(rejected);
-    finish(rejected, 'rejected', { feedback: 'нет' });
+    finish(rejected, 'rejected', { feedback: 'no' });
     expect(group(rejected).status).toBe('needs_human');
     expect(autopilotAnswers(queue, [rejected])).toEqual([]);
     expect(autopilotAnswers(queue, [asking('other')])).toEqual([]);
@@ -1287,10 +1287,10 @@ describe('answers of the autopilot', () => {
 
   it('records who answered', () => {
     const state = asking();
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ok', by: 'autopilot' }, 5);
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'ok', by: 'autopilot' }, 5);
     expect(group(state).decisions[0]?.by).toBe('autopilot');
     const other = asking('b');
-    transition(other, { kind: 'answer', group: 'gruppa-1', answer: 'ok' }, 5);
+    transition(other, { kind: 'answer', group: 'group-1', answer: 'ok' }, 5);
     expect(group(other).decisions[0]?.by).toBe('human');
   });
 });
@@ -1380,12 +1380,12 @@ describe('fixed runs go first', () => {
   it('puts an item with an error first after an edit, unless a position is given', () => {
     const queue = queueOf('A', 'B', 'C');
     itemFailed(queue, 'q3', 'boom', 5);
-    editItem(queue, 'q3', { title: 'Имя' }, 6);
+    editItem(queue, 'q3', { title: 'Name' }, 6);
     expect(ids(queue)).toEqual(['q3', 'q1', 'q2']);
     itemFailed(queue, 'q3', 'boom', 7);
     editItem(queue, 'q3', { position: 3 }, 8);
     expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
-    editItem(queue, 'q3', { title: 'Ещё' }, 9);
+    editItem(queue, 'q3', { title: 'More' }, 9);
     expect(ids(queue)).toEqual(['q1', 'q2', 'q3']);
   });
 });
@@ -1488,7 +1488,7 @@ describe('adopting a retried run', () => {
     const queue = queueOf('W');
     startQueue(queue, [], 3);
     queue.status = 'stopped';
-    queue.stop = { kind: 'problem', run: 'a', group: 'gruppa-1', reason: 'failed' };
+    queue.stop = { kind: 'problem', run: 'a', group: 'group-1', reason: 'failed' };
     return queue;
   }
 
@@ -1567,10 +1567,10 @@ describe('adopting a retried run', () => {
     startQueue(queue, [], 3);
     const state = run(2, { id: 'a' });
     step(state);
-    group(state, 'gruppa-1').status = 'failed';
-    group(state, 'gruppa-2').status = 'failed';
+    group(state, 'group-1').status = 'failed';
+    group(state, 'group-2').status = 'failed';
     const keys = problemKeys(state);
-    group(state, 'gruppa-1').status = 'running';
+    group(state, 'group-1').status = 'running';
     expect(adoptRun(queue, state, keys, 4)).toEqual({ frozen: null });
     advance(queue, [state], lookupOf(state), 5);
     expect(queue).toMatchObject({ status: 'running', stop: null });
@@ -1586,7 +1586,7 @@ describe('adopting a retried run', () => {
     advance(queue, [state], lookupOf(state), 5);
     expect(queue).toMatchObject({
       status: 'stopped',
-      stop: { kind: 'problem', run: 'a', group: 'gruppa-1' },
+      stop: { kind: 'problem', run: 'a', group: 'group-1' },
     });
   });
 });

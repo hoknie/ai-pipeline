@@ -47,7 +47,7 @@ function queue(extra: Partial<QueueView> = {}): QueueView {
 function asked(options: { humanOnly?: boolean } = {}): RunView {
   const state = run(1, { id: 'r1' });
   step(state, 1000);
-  finish(state, 'needs_human', { feedback: 'OAuth или пароль?\nещё', ...options, now: 2000 });
+  finish(state, 'needs_human', { feedback: 'OAuth or password?\nmore', ...options, now: 2000 });
   return runView(state, 3000);
 }
 
@@ -89,11 +89,11 @@ describe('overview: items of attention', () => {
       kind: 'question',
       runId: 'r1',
       number: 1,
-      group: 'gruppa-1',
-      text: 'OAuth или пароль?',
+      group: 'group-1',
+      text: 'OAuth or password?',
       humanOnly: 'request',
     });
-    expect(attentionAction(item!)).toEqual({ kind: 'answer', runId: 'r1', group: 'gruppa-1' });
+    expect(attentionAction(item!)).toEqual({ kind: 'answer', runId: 'r1', group: 'group-1' });
   });
 
   it('finds failed and conflicting groups of an unfinished run', () => {
@@ -109,12 +109,12 @@ describe('overview: items of attention', () => {
     ]);
     expect(attentionItems(data([failed]))[0]).toMatchObject({
       text: 'tests red',
-      group: 'gruppa-1',
+      group: 'group-1',
     });
     expect(attentionAction(attentionItems(data([failed]))[0]!)).toEqual({
       kind: 'retry',
       runId: 'r3',
-      group: 'gruppa-1',
+      group: 'group-1',
     });
   });
 
@@ -216,11 +216,11 @@ describe('overview: text', () => {
       'aip 1.2.3 · daemon pid 4242 · idle · network down · panel http://127.0.0.1:7341',
     );
     expect(text).toContain('Needs you (1):');
-    expect(text).toContain('  #1 r1 gruppa-1  question: OAuth или пароль?');
+    expect(text).toContain('  #1 r1 group-1  question: OAuth or password?');
     expect(text).toMatch(/PROJECT\s+QUEUE\s+PLACES\s+RUNS\s+WAITING\s+QUEUED/);
     expect(text).toMatch(/app\s+running\s+0 of 2\s+1\s+1\s+0/);
     expect(text).toMatch(/#1 r1 {2}\S+ {2}feature .*2\/6 steps {2}app/);
-    expect(text).not.toContain('    gruppa-1: ');
+    expect(text).not.toContain('    group-1: ');
     expect(text.indexOf('Needs you')).toBeLessThan(text.indexOf('Projects:'));
     expect(text.indexOf('Projects:')).toBeLessThan(text.indexOf('Runs:'));
     expect(text).not.toContain('→');
@@ -231,7 +231,7 @@ describe('overview: text', () => {
     const state = run(1, { id: 'r2' });
     step(state, 1000);
     const text = formatOverview(data([runView(state, 3000)]), createStyle(false));
-    expect(text).toContain('\n    gruppa-1: Планировщик');
+    expect(text).toContain('\n    group-1: Planner');
   });
 
   it('prints placeholders for an empty swarm', () => {
@@ -248,12 +248,12 @@ describe('overview: text', () => {
 
   it('marks a question for a person only', () => {
     const text = formatOverview(data([asked({ humanOnly: true })]), createStyle(false));
-    expect(text).toContain('question (human only): OAuth или пароль?');
+    expect(text).toContain('question (human only): OAuth or password?');
   });
 
   it('adds hints and the progress bar with color', () => {
     const text = formatOverview(full, createStyle(true));
-    expect(text).toContain('→ aip group answer r1 gruppa-1 "<answer>"');
+    expect(text).toContain('→ aip group answer r1 group-1 "<answer>"');
     expect(text).toContain('███');
     expect(text).toContain('2/6 steps');
     expect(text).toContain('\x1b[');

@@ -25,7 +25,7 @@ const plan = specialistEntry(
 );
 const broken = specialistEntry('broken', {
   effective: null,
-  raw: { name: 'Сломанный', model: 'x/y', tools: ['Read', 3] },
+  raw: { name: 'Damaged', model: 'x/y', tools: ['Read', 3] },
 });
 const all = [coder, plan, broken];
 
@@ -41,7 +41,7 @@ describe('specialist filters', () => {
 
   it('searches slug and name without case and edge spaces', () => {
     expect(matchesSearch(coder, '  CODE ')).toBe(true);
-    expect(matchesSearch(broken, 'сломан')).toBe(true);
+    expect(matchesSearch(broken, 'damag')).toBe(true);
     expect(matchesSearch(plan, 'zzz')).toBe(false);
     expect(matchesSearch(plan, '  ')).toBe(true);
   });

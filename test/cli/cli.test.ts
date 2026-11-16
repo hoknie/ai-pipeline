@@ -28,16 +28,16 @@ describe('cli', () => {
 
   it('runs a task, follows it with watch and shows status and group details', async () => {
     const box = sandbox();
-    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Добавить логин', '--json');
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Add login', '--json');
     expect(started.code).toBe(0);
     const { runId } = runOf(started.stdout);
     const watched = await aip(box, 'run', 'watch', runId);
     expect(watched.code).toBe(0);
     expect(watched.stdout).toContain('finished');
     const status = await aip(box, 'run', 'show', runId);
-    expect(status.stdout).toMatch(/dobavit-login\s+merged\s+Ревьюер/);
-    const group = await aip(box, 'group', 'show', runId, 'dobavit-login', '--tail', '5');
-    expect(group.stdout).toContain('#2 Ревьюер r1');
+    expect(status.stdout).toMatch(/add-login\s+merged\s+Reviewer/);
+    const group = await aip(box, 'group', 'show', runId, 'add-login', '--tail', '5');
+    expect(group.stdout).toContain('#2 Reviewer r1');
     expect(group.stdout).toContain('Log of attempt #2');
     const list = await aip(box, 'run', 'list');
     expect(list.stdout).toContain(runId);
@@ -46,12 +46,12 @@ describe('cli', () => {
   it('starts groups from a file and reports wrong commands with exit code 1', async () => {
     const box = sandbox();
     const file = join(box.repo, '..', 'groups.yaml');
-    writeFileSync(file, '- { title: Один, task: первое }\n- { title: Два, task: второе }\n');
+    writeFileSync(file, '- { title: One, task: first }\n- { title: Two, task: second }\n');
     const started = await aip(box, 'run', 'start', 'feature', '--groups', file);
-    expect(started.stdout).toContain('Groups: odin (Один), dva (Два)');
+    expect(started.stdout).toContain('Groups: one (One), two (Two)');
     const runId = /Run #\d+ (\w+) started/.exec(started.stdout)?.[1] ?? '';
     await aip(box, 'run', 'watch', runId);
-    const retry = await aip(box, 'group', 'retry', runId, 'odin');
+    const retry = await aip(box, 'group', 'retry', runId, 'one');
     expect(retry.code).toBe(1);
     expect(retry.stderr).toContain('needs failed, cancelled or conflict');
     expect((await aip(box, 'run', 'start', 'feature')).stderr).toContain(
@@ -64,8 +64,8 @@ describe('cli', () => {
 
   it('retries with the current specialists after --refresh-config', async () => {
     const typo = PIPELINE_CONFIG.replace(
-      'reviewer: { name: Ревьюер, permissions: read }',
-      'reviewer: { name: Ревьюер, permissions: read, model: opsu }',
+      'reviewer: { name: Reviewer, permissions: read }',
+      'reviewer: { name: Reviewer, permissions: read, model: opsu }',
     );
     const box = sandbox(typo);
     writeFileSync(
@@ -73,20 +73,20 @@ describe('cli', () => {
       JSON.stringify({ review: [{ exitCode: 1, noReport: true }, {}] }),
     );
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'вход', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'login', '--json')).stdout,
     );
     await waitUntil('the failed review', async () =>
       (await aip(box, 'run', 'show', runId)).stdout.includes('failed'),
     );
     writeConfigDirectory(box.repo, PIPELINE_CONFIG.replace('max: 3', 'max: 100'));
-    const broken = await aip(box, 'group', 'retry', runId, 'vhod', '--refresh-config');
+    const broken = await aip(box, 'group', 'retry', runId, 'login', '--refresh-config');
     expect(broken.code).toBe(1);
     expect(broken.stderr).toContain('configuration not loaded: swarm.max');
     writeConfigDirectory(box.repo, typo.replace('model: opsu', 'model: opus'));
-    const retried = await aip(box, 'group', 'retry', runId, 'vhod', '--refresh-config');
+    const retried = await aip(box, 'group', 'retry', runId, 'login', '--refresh-config');
     expect(retried.code).toBe(0);
     await aip(box, 'run', 'watch', runId);
-    const group = await aip(box, 'group', 'show', runId, 'vhod', '--json');
+    const group = await aip(box, 'group', 'show', runId, 'login', '--json');
     expect(JSON.parse(group.stdout).warnings).toContain(
       'config refreshed: reviewer model opsu → opus',
     );
@@ -97,19 +97,19 @@ describe('cli', () => {
     writeFileSync(
       box.env.AIP_FAKE_SCRIPT!,
       JSON.stringify({
-        code: [{ verdict: 'needs_human', feedback: 'Какой вход?' }, { hang: true }],
+        code: [{ verdict: 'needs_human', feedback: 'Which login?' }, { hang: true }],
       }),
     );
     const { runId } = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--task', 'вход', '--json')).stdout,
+      (await aip(box, 'run', 'start', 'feature', '--task', 'login', '--json')).stdout,
     );
     await waitUntil('the question of the group', async () =>
       (await aip(box, 'run', 'show', runId)).stdout.includes('needs_human'),
     );
-    const answered = await aip(box, 'group', 'answer', runId, 'vhod', 'по', 'паролю');
+    const answered = await aip(box, 'group', 'answer', runId, 'login', 'by', 'password');
     expect(answered.code).toBe(0);
-    const groupCancelled = await aip(box, 'group', 'cancel', runId, 'vhod');
-    expect(groupCancelled.stdout).toMatch(/vhod\s+cancelled/);
+    const groupCancelled = await aip(box, 'group', 'cancel', runId, 'login');
+    expect(groupCancelled.stdout).toMatch(/login\s+cancelled/);
     const cancelled = await aip(box, 'run', 'cancel', runId);
     expect(cancelled.code).toBe(0);
   });
@@ -142,7 +142,7 @@ describe('cli', () => {
     );
     const skipped = await aip(box, 'run', 'skip', runId, 'review');
     expect(skipped.code).toBe(0);
-    expect(skipped.stdout).toContain('Skipped steps: Ревьюер (review)');
+    expect(skipped.stdout).toContain('Skipped steps: Reviewer (review)');
     const back = await aip(box, 'run', 'skip', runId, 'review', '--off', '--json');
     const view = JSON.parse(back.stdout) as { steps: { id: string; skipped: boolean }[] };
     expect(view.steps.find((entry) => entry.id === 'review')?.skipped).toBe(false);
@@ -184,11 +184,11 @@ describe('cli', () => {
     writeFileSync(box.env.AIP_FAKE_SCRIPT!, JSON.stringify({ code: [{ hang: true }] }));
     await aip(box, 'queue', 'parallel', '2');
     const first = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--title', 'Первый', '--task', 'a', '--json'))
+      (await aip(box, 'run', 'start', 'feature', '--title', 'First', '--task', 'a', '--json'))
         .stdout,
     );
     const second = runOf(
-      (await aip(box, 'run', 'start', 'feature', '--title', 'Второй', '--task', 'b', '--json'))
+      (await aip(box, 'run', 'start', 'feature', '--title', 'Second', '--task', 'b', '--json'))
         .stdout,
     );
     await aip(box, 'run', 'cancel', first.runId);
@@ -196,7 +196,7 @@ describe('cli', () => {
     const listed = await aip(box, 'run', 'clean');
     expect(listed.code).toBe(0);
     expect(listed.stdout).toContain(first.runId);
-    expect(listed.stdout).toContain('Первый');
+    expect(listed.stdout).toContain('First');
     expect(listed.stdout).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
     expect(listed.stdout).toContain('aip run clean <run-id>');
     expect(listed.stdout).not.toContain(second.runId);
@@ -206,7 +206,7 @@ describe('cli', () => {
       unknown
     >[];
     expect(json).toHaveLength(1);
-    expect(json[0]).toMatchObject({ id: first.runId, title: 'Первый', repository: box.repo });
+    expect(json[0]).toMatchObject({ id: first.runId, title: 'First', repository: box.repo });
     expect(typeof json[0]!.finishedAt).toBe('number');
 
     expect((await aip(box, 'run', 'clean', '--all')).code).toBe(1);
@@ -220,8 +220,8 @@ describe('cli', () => {
   it('checks the configuration, prints CLI versions and warns about full permissions', async () => {
     const box = sandbox(
       PIPELINE_CONFIG.replace(
-        'coder: { name: Кодировщик }',
-        'coder: { name: Кодировщик, permissions: full }',
+        'coder: { name: Coder }',
+        'coder: { name: Coder, permissions: full }',
       ),
     );
     const result = await aip(box, 'config', 'check');
@@ -320,7 +320,7 @@ describe('cli', () => {
   pipelines:`,
       ),
     );
-    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Добавить логин', '--json');
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Add login', '--json');
     const { runId } = runOf(started.stdout);
     await aip(box, 'run', 'watch', runId);
     const shown = await aip(box, 'run', 'show', runId);
@@ -348,7 +348,7 @@ describe('cli', () => {
   pipelines:`,
       ),
     );
-    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Добавить логин', '--json');
+    const started = await aip(box, 'run', 'start', 'feature', '--task', 'Add login', '--json');
     const { runId } = runOf(started.stdout);
     await waitUntil('the running action', async () => {
       const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as QueueJson;

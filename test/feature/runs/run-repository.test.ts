@@ -166,9 +166,9 @@ describe('runs', () => {
     const store = temporaryStorage();
     const state = run(2);
     step(state);
-    finish(state, 'done', { summary: 'план' });
+    finish(state, 'done', { summary: 'plan' });
     step(state);
-    finish(state, 'rejected', { slug: 'gruppa-2', feedback: 'нет' });
+    finish(state, 'rejected', { slug: 'group-2', feedback: 'no' });
     state.groups[0]!.attempts.at(-1)!.usage = { inputTokens: 10, outputTokens: 5 };
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)).toEqual(state);
@@ -179,8 +179,8 @@ describe('runs', () => {
     const state = run(1);
     step(state);
     const questions = [
-      { text: 'OAuth или пароль?', options: ['OAuth', 'пароль'], recommendation: 'OAuth' },
-      { text: 'Где хранить?' },
+      { text: 'OAuth or password?', options: ['OAuth', 'password'], recommendation: 'OAuth' },
+      { text: 'Where to store?' },
     ];
     finish(state, 'needs_human', { questions });
     store.runs.saveRun(state);
@@ -193,7 +193,7 @@ describe('runs', () => {
     const store = temporaryStorage();
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'Глянь', humanOnly: true });
+    finish(state, 'needs_human', { feedback: 'Take a look', humanOnly: true });
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)!.groups[0]!.humanOnly).toBe('request');
     state.groups[0]!.humanOnly = 'review';
@@ -213,7 +213,7 @@ describe('runs', () => {
       state,
       {
         kind: 'run_named',
-        title: 'Флаг --json',
+        title: 'The --json flag',
         name: 'add-json-flag',
         usage: { inputTokens: 30, outputTokens: 10 },
       },
@@ -221,7 +221,7 @@ describe('runs', () => {
     );
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)?.run).toMatchObject({
-      title: 'Флаг --json',
+      title: 'The --json flag',
       name: 'add-json-flag',
       namingUsage: { inputTokens: 30, outputTokens: 10 },
     });
@@ -263,7 +263,7 @@ describe('runs', () => {
     }
     const merged = transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
       60,
     );
     expect(merged).toEqual([expect.objectContaining({ kind: 'deliver', auto: true })]);
@@ -272,7 +272,7 @@ describe('runs', () => {
     const recovered = recoverRuns(store.database, store.runs, 99);
     expect(recovered.map(({ state: each }) => each.run.id)).toEqual([state.run.id]);
     expect(recovered[0]?.effects).toEqual([
-      expect.objectContaining({ kind: 'deliver', groups: ['gruppa-1'], auto: true }),
+      expect.objectContaining({ kind: 'deliver', groups: ['group-1'], auto: true }),
     ]);
     expect(store.runs.loadRun(state.run.id)?.run.pendingDelivery).toMatchObject({ auto: true });
   });
@@ -502,8 +502,8 @@ describe('finishedRunsPage', () => {
 describe('runs with pipeline actions', () => {
   const ACTIONS_CONFIG = `swarm:
   specialists:
-    plan: { name: Планировщик }
-    coder: { name: Кодировщик }
+    plan: { name: Planner }
+    coder: { name: Coder }
   actions:
     prepare: { run: make }
     commit: { run: commit }

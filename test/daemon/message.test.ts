@@ -61,10 +61,10 @@ describe('a message to a running specialist', () => {
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     await until('the agent started', () => existsSync(join(h.fakeState, 'calls.jsonl')));
-    await h.call('message', { runId, group: 'g1', seq: 1, text: 'используй OAuth' });
+    await h.call('message', { runId, group: 'g1', seq: 1, text: 'use OAuth' });
     // a second message to the same attempt is refused whether it is stopping or already gone
     await expect(
-      h.call('message', { runId, group: 'g1', seq: 1, text: 'ещё одно' }),
+      h.call('message', { runId, group: 'g1', seq: 1, text: 'one more' }),
     ).rejects.toThrow('attempt 1');
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged']);
@@ -72,8 +72,8 @@ describe('a message to a running specialist', () => {
     expect(codeCalls).toHaveLength(2);
     expect(codeCalls[1]?.args).toContain('--resume');
     expect(codeCalls[1]?.args.join(' ')).toContain('Message from the person');
-    expect(codeCalls[1]?.args.join(' ')).toContain('используй OAuth');
-    expect(codeCalls[1]?.args.join(' ')).not.toContain('ещё одно');
+    expect(codeCalls[1]?.args.join(' ')).toContain('use OAuth');
+    expect(codeCalls[1]?.args.join(' ')).not.toContain('one more');
     const detail = await h.group(runId, 'g1');
     expect(detail.attempts[0]).toMatchObject({
       status: 'cancelled',
@@ -84,7 +84,7 @@ describe('a message to a running specialist', () => {
     expect(detail.attempts[1]).toMatchObject({
       stepId: 'code',
       verdict: 'done',
-      message: { text: 'используй OAuth' },
+      message: { text: 'use OAuth' },
     });
   });
 
@@ -92,8 +92,8 @@ describe('a message to a running specialist', () => {
     const h = await start();
     const runId = await run(h);
     await h.waitFor(runId, (view) => view.finished);
-    await expect(h.call('message', { runId, group: 'g1', seq: 1, text: 'поздно' })).rejects.toThrow(
-      'attempt 1 is not running',
-    );
+    await expect(
+      h.call('message', { runId, group: 'g1', seq: 1, text: 'too late' }),
+    ).rejects.toThrow('attempt 1 is not running');
   });
 });

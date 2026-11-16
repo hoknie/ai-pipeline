@@ -55,7 +55,7 @@ describe('repositoryViews', () => {
   it('counts unfinished and waiting runs and queued tasks, sorted by path', () => {
     const waiting = inRepository('/a', 'run00000000a');
     step(waiting);
-    finish(waiting, 'needs_human', { feedback: 'вопрос?' });
+    finish(waiting, 'needs_human', { feedback: 'a question?' });
     const active = inRepository('/a', 'run00000000b');
     const done = inRepository('/b', 'run00000000c');
     transition(done, { kind: 'cancel', group: null }, 10);
@@ -178,7 +178,7 @@ describe('queueView dependencies', () => {
         kind: 'run',
         id: 'run00000000a',
         number: 1,
-        title: 'задача 1',
+        title: 'task 1',
         state: 'waiting',
         repository: '/repo',
       },
@@ -241,16 +241,16 @@ describe('queueView', () => {
   it('shows progress and the step of an active group', () => {
     const state = run(3);
     step(state);
-    finish(state, 'done', { slug: 'gruppa-1' });
+    finish(state, 'done', { slug: 'group-1' });
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
-    group(state, 'gruppa-1').status = 'merged';
+    group(state, 'group-1').status = 'merged';
     const view = queueView(queue, lookup(state)).runs[0]!;
     expect(view).toMatchObject({
       pipeline: 'feature',
       createdAt: 1000,
       groups: { done: 1, total: 3 },
-      // gruppa-1 is merged (4 steps), gruppa-2 runs `plan`, gruppa-3 waits at the start
+      // group-1 is merged (4 steps), group-2 runs `plan`, group-3 waits at the start
       steps: { done: 4, total: 12, current: null },
       delivering: false,
     });
@@ -277,14 +277,14 @@ describe('queueView', () => {
   it('shows the step of a single group and no steps while the task is split', () => {
     const state = run(1);
     step(state);
-    finish(state, 'done', { slug: 'gruppa-1' });
+    finish(state, 'done', { slug: 'group-1' });
     step(state);
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
     expect(queueView(queue, lookup(state)).runs[0]!.steps).toEqual({
       done: 1,
       total: 4,
-      current: { step: 'code', name: 'Кодировщик', number: 2 },
+      current: { step: 'code', name: 'Coder', number: 2 },
     });
     state.groups = [];
     expect(queueView(queue, lookup(state)).runs[0]!.steps).toEqual({
@@ -303,7 +303,7 @@ describe('queueView', () => {
     startQueue(queue, [], 2);
     advance(queue, [state], () => undefined, 3);
     const view = queueView(queue, lookup(state));
-    expect(view.runs[0]!.problem).toMatchObject({ reason: 'needs_human', group: 'gruppa-1' });
+    expect(view.runs[0]!.problem).toMatchObject({ reason: 'needs_human', group: 'group-1' });
     expect(view.stop).toBeNull();
     expect(view.status).toBe('running');
   });
@@ -358,7 +358,7 @@ describe('queueView settings and skipped runs', () => {
     expect(view.skipped).toHaveLength(1);
     expect(view.skipped[0]).toMatchObject({
       id: 'a',
-      problem: { reason: 'failed', group: 'gruppa-1' },
+      problem: { reason: 'failed', group: 'group-1' },
     });
   });
 
@@ -382,12 +382,12 @@ describe('queueView settings and skipped runs', () => {
   it('shows the stopping problem of a skipped run before a question to a human', () => {
     const state = run(2, { id: 'a' });
     step(state);
-    finish(state, 'needs_human', { slug: 'gruppa-1', feedback: 'q' });
-    group(state, 'gruppa-2').status = 'conflict';
+    finish(state, 'needs_human', { slug: 'group-1', feedback: 'q' });
+    group(state, 'group-2').status = 'conflict';
     const queue = emptyQueue('/repo', 1);
     queue.skipped = ['a'];
     const view = queueView(queue, (id) => (id === 'a' ? state : undefined));
-    expect(view.skipped[0]!.problem).toEqual({ group: 'gruppa-2', reason: 'conflict' });
+    expect(view.skipped[0]!.problem).toEqual({ group: 'group-2', reason: 'conflict' });
   });
 });
 
@@ -480,28 +480,28 @@ describe('runView specialists', () => {
       configText: CONFIG_TEXT.replace('coder: {', 'coder: { max: 1,'),
     });
     expect(runView(state, 5000).specialists).toMatchObject([
-      { specialist: 'plan', running: [], waiting: [{ slug: 'gruppa-1' }, { slug: 'gruppa-2' }] },
+      { specialist: 'plan', running: [], waiting: [{ slug: 'group-1' }, { slug: 'group-2' }] },
     ]);
     step(state);
     finish(state, 'done');
-    finish(state, 'done', { slug: 'gruppa-2' });
+    finish(state, 'done', { slug: 'group-2' });
     step(state);
     expect(runView(state, 5000).specialists).toEqual([
       {
         specialist: 'coder',
-        name: 'Кодировщик',
+        name: 'Coder',
         level: 'project',
         max: 1,
         running: [
           {
-            slug: 'gruppa-1',
-            title: 'Группа 1',
+            slug: 'group-1',
+            title: 'Group 1',
             step: 'code',
-            stepName: 'Кодировщик',
+            stepName: 'Coder',
             startedAt: 1500,
           },
         ],
-        waiting: [{ slug: 'gruppa-2', title: 'Группа 2', step: 'code', stepName: 'Кодировщик' }],
+        waiting: [{ slug: 'group-2', title: 'Group 2', step: 'code', stepName: 'Coder' }],
       },
     ]);
   });
@@ -636,8 +636,8 @@ describe('queueView delivery mode and autopilot answer', () => {
     expect(view.items.map((item) => item.deliveryMode)).toEqual(['commit', null]);
     expect(view.autopilotAnswer).toBeNull();
     expect(view.autopilotAnswerDefault).toBe(DEFAULT_AUTOPILOT_ANSWER);
-    queue.autopilotAnswer = 'Согласен';
-    expect(queueView(queue, () => undefined).autopilotAnswer).toBe('Согласен');
+    queue.autopilotAnswer = 'Agreed';
+    expect(queueView(queue, () => undefined).autopilotAnswer).toBe('Agreed');
     expect(queueView(queue, () => undefined).deliveryMode).toBeNull();
   });
 
@@ -653,14 +653,14 @@ describe('a message to the specialist in the views', () => {
     const seq = group(state).attempts.at(-1)!.seq;
     const before = groupView(state, group(state), '/w', null, 2500).attempts[0];
     expect(before).toMatchObject({ message: null, interrupting: false });
-    transition(state, { kind: 'message', group: 'gruppa-1', seq, text: 'проверь OAuth' }, 2600);
+    transition(state, { kind: 'message', group: 'group-1', seq, text: 'check OAuth' }, 2600);
     const during = groupView(state, group(state), '/w', null, 2700).attempts[0];
     expect(during).toMatchObject({ interrupting: true, reason: 'interrupted by a message' });
     transition(
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq,
         exit: { sessionId: 's', usage: null, failure: null, outsideChanges: [] },
       },
@@ -671,7 +671,7 @@ describe('a message to the specialist in the views', () => {
     expect(first).toMatchObject({ status: 'cancelled', interrupting: false, message: null });
     expect(second).toMatchObject({
       interrupting: false,
-      message: { text: 'проверь OAuth', at: 2600 },
+      message: { text: 'check OAuth', at: 2600 },
     });
   });
 });
@@ -685,7 +685,7 @@ describe('a group waiting for a usage limit', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq,
         exit: {
           sessionId: 's',
@@ -724,7 +724,7 @@ describe('live usage in views', () => {
     expect(queueView(queue, () => state).runs[0]!.usage).toBeNull();
     transition(
       state,
-      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage: live }] },
       2000,
     );
     expect(queueView(queue, () => state).runs[0]!.usage).toEqual(live);
@@ -749,12 +749,12 @@ describe('waiting groups in views', () => {
   it('shows a group waiting for a busy specialist as waiting, the run stays active', () => {
     const state = run(2, { max: 1 });
     dispatch([state], 1500);
-    const view = runView(state, 5000, () => null, [], only('gruppa-2', specialistWait));
+    const view = runView(state, 5000, () => null, [], only('group-2', specialistWait));
     expect(view.groups[1]).toMatchObject({ status: 'waiting', wait: specialistWait });
     expect(view.groups[0]).toMatchObject({ status: 'running', wait: null });
     expect(view.state).toBe('active');
     expect(view.counts).toBe('waiting 1 · running 1');
-    expect(groupView(state, group(state, 'gruppa-1'), '/w', null, 5000).wait).toBeNull();
+    expect(groupView(state, group(state, 'group-1'), '/w', null, 5000).wait).toBeNull();
   });
 
   it('shows the full swarm as capacity', () => {
@@ -830,7 +830,7 @@ describe('waiting groups in views', () => {
       {
         group: '_split',
         step: 'split',
-        stepName: 'Планировщик',
+        stepName: 'Planner',
         wait: { reason: 'specialist', specialist: 'plan', name: 'Plan', max: 1 },
       },
     ]);
@@ -869,7 +869,7 @@ describe('the delivery stage', () => {
     expect(view.deliveryStage).toEqual({
       status: 'apply_failed',
       reason: 'does not exist in index',
-      groups: ['gruppa-1'],
+      groups: ['group-1'],
     });
   });
 
@@ -908,10 +908,10 @@ describe('run steps', () => {
     step(state);
     finish(state, 'done');
     expect(runView(state, 1000).steps).toEqual([
-      { id: 'plan', specialist: 'plan', name: 'Планировщик', skipped: false, state: 'done' },
-      { id: 'code', specialist: 'coder', name: 'Кодировщик', skipped: false, state: 'active' },
-      { id: 'review', specialist: 'reviewer', name: 'Ревьюер', skipped: false, state: 'upcoming' },
-      { id: 'qa', specialist: 'qa', name: 'Тестировщик', skipped: true, state: 'upcoming' },
+      { id: 'plan', specialist: 'plan', name: 'Planner', skipped: false, state: 'done' },
+      { id: 'code', specialist: 'coder', name: 'Coder', skipped: false, state: 'active' },
+      { id: 'review', specialist: 'reviewer', name: 'Reviewer', skipped: false, state: 'upcoming' },
+      { id: 'qa', specialist: 'qa', name: 'Tester', skipped: true, state: 'upcoming' },
     ]);
   });
 });
@@ -979,13 +979,13 @@ describe('human names of steps in views', () => {
     const state = run(1);
     step(state);
     const view = runView(state, 2000);
-    expect(view.groups[0]).toMatchObject({ step: 'plan', stepName: 'Планировщик' });
+    expect(view.groups[0]).toMatchObject({ step: 'plan', stepName: 'Planner' });
     const detail = groupView(state, state.groups[0]!, '/w', null, 2000);
-    expect(detail.attempts[0]).toMatchObject({ stepId: 'plan', stepName: 'Планировщик' });
+    expect(detail.attempts[0]).toMatchObject({ stepId: 'plan', stepName: 'Planner' });
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
     expect(queueView(queue, lookup(state)).runs[0]!.active).toEqual([
-      { group: 'gruppa-1', step: 'plan', stepName: 'Планировщик' },
+      { group: 'group-1', step: 'plan', stepName: 'Planner' },
     ]);
   });
 
@@ -998,8 +998,8 @@ describe('human names of steps in views', () => {
     const state = run(1);
     step(state);
     (state.run.config.specialists.find((item) => item.slug === 'plan') as { name: string }).name =
-      'Аналитик';
-    expect(runView(state, 2000).groups[0]?.stepName).toBe('Аналитик');
+      'Analyst';
+    expect(runView(state, 2000).groups[0]?.stepName).toBe('Analyst');
   });
 });
 
@@ -1007,7 +1007,7 @@ describe('runView progress', () => {
   it('counts the steps passed by the groups', () => {
     const state = run(1);
     step(state);
-    finish(state, 'done', { slug: 'gruppa-1' });
+    finish(state, 'done', { slug: 'group-1' });
     step(state);
     expect(runView(state, 2000).progress).toEqual({ done: 1, total: 4 });
   });
@@ -1016,10 +1016,10 @@ describe('runView progress', () => {
     const state = run(1);
     for (let index = 0; index < 2; index += 1) {
       step(state);
-      finish(state, 'done', { slug: 'gruppa-1' });
+      finish(state, 'done', { slug: 'group-1' });
     }
     step(state);
-    finish(state, 'rejected', { slug: 'gruppa-1', feedback: 'переделать' });
+    finish(state, 'rejected', { slug: 'group-1', feedback: 'redo' });
     expect(runView(state, 2000).progress).toEqual({ done: 3, total: 6 });
     const queue = emptyQueue('/repo', 1);
     queue.runs.push(state.run.id);
@@ -1065,9 +1065,9 @@ describe('runView liveDiff', () => {
 
   it('counts a file shared by two groups once', () => {
     const state = run(2);
-    group(state, 'gruppa-1').status = 'merged';
+    group(state, 'group-1').status = 'merged';
     const diffs = (slug: string) =>
-      slug === 'gruppa-1'
+      slug === 'group-1'
         ? stat([['a.ts', 5, 1]])
         : stat([
             ['a.ts', 2, 0],
@@ -1078,9 +1078,9 @@ describe('runView liveDiff', () => {
 
   it('skips cancelled groups', () => {
     const state = run(2);
-    group(state, 'gruppa-2').status = 'cancelled';
+    group(state, 'group-2').status = 'cancelled';
     const diffs = (slug: string) =>
-      slug === 'gruppa-1' ? stat([['a.ts', 1, 0]]) : stat([['b.ts', 9, 9]]);
+      slug === 'group-1' ? stat([['a.ts', 1, 0]]) : stat([['b.ts', 9, 9]]);
     expect(runView(state, 2000, diffs).liveDiff).toEqual({ files: 1, added: 1, removed: 0 });
   });
 
@@ -1090,7 +1090,7 @@ describe('runView liveDiff', () => {
 
   it('skips a group without statistics instead of zeroing the sum', () => {
     const state = run(2);
-    const diffs = (slug: string) => (slug === 'gruppa-1' ? stat([['a.ts', 4, 2]]) : null);
+    const diffs = (slug: string) => (slug === 'group-1' ? stat([['a.ts', 4, 2]]) : null);
     expect(runView(state, 2000, diffs).liveDiff).toEqual({ files: 1, added: 4, removed: 2 });
   });
 });
@@ -1142,10 +1142,10 @@ describe('frozen runs in views', () => {
 });
 
 describe('name of the pipeline in views', () => {
-  const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n');
+  const named = CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: New feature\n');
 
   it('takes the name of a run from its snapshot and the id without a name', () => {
-    expect(runView(run(1, { configText: named }), 1).pipelineName).toBe('Новая функция');
+    expect(runView(run(1, { configText: named }), 1).pipelineName).toBe('New feature');
     expect(runView(run(1), 1).pipelineName).toBe('feature');
   });
 
@@ -1155,7 +1155,7 @@ describe('name of the pipeline in views', () => {
     addItem(queue, { pipeline: 'gone', task: 'B' }, 'q2', 2);
     const working = run(1, { id: 'r', configText: named });
     queue.runs.push('r');
-    const names = (id: string) => (id === 'feature' ? 'Новая функция' : id);
+    const names = (id: string) => (id === 'feature' ? 'New feature' : id);
     const view = queueView(
       queue,
       (id) => (id === 'r' ? working : undefined),
@@ -1165,8 +1165,8 @@ describe('name of the pipeline in views', () => {
       undefined,
       names,
     );
-    expect(view.items.map((item) => item.pipelineName)).toEqual(['Новая функция', 'gone']);
-    expect(view.runs[0]?.pipelineName).toBe('Новая функция');
+    expect(view.items.map((item) => item.pipelineName)).toEqual(['New feature', 'gone']);
+    expect(view.runs[0]?.pipelineName).toBe('New feature');
     expect(queueView(queue, () => undefined).items[0]?.pipelineName).toBe('feature');
   });
 });
@@ -1196,13 +1196,13 @@ describe('statuses of the groups of a held run', () => {
     finish(queued, 'done', { now: 2000 });
     queued.run.hold = 'frozen';
     const held = runView(queued, 3000);
-    const first = held.groups.find((row) => row.slug === 'gruppa-1')!;
+    const first = held.groups.find((row) => row.slug === 'group-1')!;
     expect(first).toMatchObject({ status: 'frozen', hold: 'frozen' });
-    const running = held.groups.find((row) => row.slug === 'gruppa-2')!;
+    const running = held.groups.find((row) => row.slug === 'group-2')!;
     expect(running).toMatchObject({ status: 'running', hold: 'frozen' });
     const onTopology = held.topology.steps.flatMap((item) => item.groups);
-    expect(onTopology.find((item) => item.slug === 'gruppa-1')?.status).toBe('frozen');
-    expect(onTopology.find((item) => item.slug === 'gruppa-2')?.status).toBe('running');
+    expect(onTopology.find((item) => item.slug === 'group-1')?.status).toBe('frozen');
+    expect(onTopology.find((item) => item.slug === 'group-2')?.status).toBe('running');
   });
 
   it('shows a queued split step of a held run as its hold', () => {
@@ -1332,7 +1332,7 @@ describe('a pause stopping the running attempt in the views', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq,
         exit: { sessionId: 's', usage: null, failure: null, outsideChanges: [] },
       },
@@ -1370,10 +1370,10 @@ describe('groupRow diffRevision', () => {
 describe('pipeline actions in the views', () => {
   const ACTIONS_CONFIG = `swarm:
   specialists:
-    plan: { name: Планировщик }
-    coder: { name: Кодировщик }
+    plan: { name: Planner }
+    coder: { name: Coder }
   actions:
-    prepare: { run: make, name: Подготовка }
+    prepare: { run: make, name: Preparation }
     lint: { run: lint }
     commit: { run: commit }
   stages:
@@ -1423,7 +1423,11 @@ describe('pipeline actions in the views', () => {
   it('shows an action by its name in the row and the stage list', () => {
     const state = withActions();
     const view = runView(state, 5000);
-    expect(view.system[0]).toMatchObject({ kind: 'action', title: 'Подготовка', status: 'queued' });
+    expect(view.system[0]).toMatchObject({
+      kind: 'action',
+      title: 'Preparation',
+      status: 'queued',
+    });
     expect(view.topology.stages.map((stage) => stage.id)).toEqual([
       'action:before_split:prepare',
       'split',
@@ -1500,10 +1504,10 @@ describe('observers in views', () => {
     step(state);
     const failed = group(state);
     failed.status = 'failed';
-    failed.reason = 'сломалось';
+    failed.reason = 'broke';
     return state;
   };
-  const incident = { key: 'k1', kind: 'failed', group: 'gruppa-1', detail: 'сломалось' } as const;
+  const incident = { key: 'k1', kind: 'failed', group: 'group-1', detail: 'broke' } as const;
 
   it('shows a failed task an observer may take as repair', () => {
     const state = failedRun();
@@ -1599,8 +1603,8 @@ describe('observers in views', () => {
 
   it('shows why the observer cancelled the task', () => {
     const state = failedRun();
-    state.run.repair.cancelReason = 'задача невыполнима';
-    expect(runView(state, 1000).repair?.cancelReason).toBe('задача невыполнима');
+    state.run.repair.cancelReason = 'the task is impossible';
+    expect(runView(state, 1000).repair?.cancelReason).toBe('the task is impossible');
   });
 
   it('keeps the observer as the author of a decision and of an attempt', () => {
@@ -1608,8 +1612,8 @@ describe('observers in views', () => {
     step(state);
     group(state).decisions.push({
       stepId: 'code',
-      question: 'Продолжать?',
-      answer: 'Да',
+      question: 'Continue?',
+      answer: 'Yes',
       by: 'observer',
       attemptSeq: 1,
     });

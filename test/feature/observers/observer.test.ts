@@ -31,7 +31,7 @@ function failedRun(id: string, at = 1000, repository = '/repo'): RunState {
   const state = run(1, { id, now: at });
   state.run.repository = repository;
   step(state);
-  transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, at + 100);
+  transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, at + 100);
   return state;
 }
 
@@ -57,13 +57,13 @@ describe('incidents of a task', () => {
   it('lists failed groups and questions, with their kind', () => {
     const state = failedRun('run000000001');
     expect(repairIncidents(state)).toEqual([
-      expect.objectContaining({ kind: 'failed', group: 'gruppa-1' }),
+      expect.objectContaining({ kind: 'failed', group: 'group-1' }),
     ]);
     const asking = run(1);
     step(asking);
-    finish(asking, 'needs_human', { questions: [{ text: 'Что делать?' }] });
+    finish(asking, 'needs_human', { questions: [{ text: 'What to do?' }] });
     expect(repairIncidents(asking)).toEqual([
-      expect.objectContaining({ kind: 'question', group: 'gruppa-1' }),
+      expect.objectContaining({ kind: 'question', group: 'group-1' }),
     ]);
   });
 
@@ -85,7 +85,7 @@ describe('incidents of a task', () => {
     (humanOnly) => {
       const state = run(1);
       step(state);
-      finish(state, 'needs_human', { questions: [{ text: 'Пароль?' }] });
+      finish(state, 'needs_human', { questions: [{ text: 'Password?' }] });
       state.groups[0]!.humanOnly = humanOnly;
       expect(repairIncidents(state)).toEqual([]);
       expect(waitsForPerson(state.groups[0]!)).toBe(true);
@@ -96,9 +96,9 @@ describe('incidents of a task', () => {
   it('does not treat a cancelled group with a saved mark as waiting for a person', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { questions: [{ text: 'Пароль?' }] });
+    finish(state, 'needs_human', { questions: [{ text: 'Password?' }] });
     state.groups[0]!.humanOnly = 'request';
-    transition(state, { kind: 'cancel', group: 'gruppa-1' }, 3000);
+    transition(state, { kind: 'cancel', group: 'group-1' }, 3000);
     expect(waitsForPerson(state.groups[0]!)).toBe(false);
     expect(personQuestions(state)).toEqual([]);
   });
@@ -106,11 +106,11 @@ describe('incidents of a task', () => {
   it('puts the person-only rule and the mark into the task of the observer', () => {
     const state = run(2);
     step(state);
-    finish(state, 'needs_human', { questions: [{ text: 'Принять?' }] });
+    finish(state, 'needs_human', { questions: [{ text: 'Accept?' }] });
     state.groups[0]!.humanOnly = 'review';
-    const text = repairTask(state, { key: 'k', kind: 'failed', group: 'gruppa-2', detail: '' });
+    const text = repairTask(state, { key: 'k', kind: 'failed', group: 'group-2', detail: '' });
     expect(text).toContain('is never yours');
-    expect(text).toContain('gruppa-1 (');
+    expect(text).toContain('group-1 (');
     expect(text).toContain('needs_human, question for a person only');
   });
 
@@ -229,13 +229,13 @@ describe('task of the observer', () => {
     const state = failedRun('run000000001');
     const text = repairTask(state, incidentOf(state));
     expect(text).toContain('swarm_repair_retry');
-    expect(text).toContain('gruppa-1');
+    expect(text).toContain('group-1');
     expect(text).toContain('failed');
   });
 
   it('adds the conflicts of a delivery', () => {
     const state = failedRun('run000000001');
-    const incident: Incident = { key: 'k', kind: 'delivery', group: 'gruppa-1', detail: 'x' };
+    const incident: Incident = { key: 'k', kind: 'delivery', group: 'group-1', detail: 'x' };
     const text = repairTask(state, incident, { conflicts: ['src/a.ts'] });
     expect(text).toContain('<<<<<<<');
     expect(text).toContain('- src/a.ts');
@@ -263,7 +263,7 @@ describe('unavailable runtimes', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: {
           sessionId: null,

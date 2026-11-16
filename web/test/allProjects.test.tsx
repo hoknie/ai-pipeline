@@ -59,9 +59,9 @@ function mount(setup: Setup = {}) {
   const configs = setup.configs ?? {
     [APP]: configView({
       repository: APP,
-      specialists: [shared('coder'), own('tester', 'Тестер app')],
+      specialists: [shared('coder'), own('tester', 'Tester app')],
     }),
-    [LIB]: configView({ repository: LIB, specialists: [shared('coder'), own('docs', 'Доки lib')] }),
+    [LIB]: configView({ repository: LIB, specialists: [shared('coder'), own('docs', 'Docs lib')] }),
   };
   const base = fakeApi({ runs: vi.fn(async () => []) });
   const bound = (repository: string | null): Api => {
@@ -197,7 +197,7 @@ describe('addresses in the mode', () => {
     window.location.hash = '#specialists/docs?project=lib';
     mount();
     await waitFor(() =>
-      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Доки lib'),
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Docs lib'),
     );
     expect(label()).toBe('Repository: All projects');
   });
@@ -207,7 +207,7 @@ describe('addresses in the mode', () => {
     window.location.hash = '#specialists/tester?project=nope';
     mount();
     expect((await screen.findByRole('alert')).textContent).toBe('Project not found');
-    expect(await screen.findByText('Тестер app')).toBeTruthy();
+    expect(await screen.findByText('Tester app')).toBeTruthy();
   });
 });
 
@@ -216,11 +216,11 @@ describe('specialists in the mode', () => {
     modeOn();
     window.location.hash = '#specialists';
     mount();
-    await screen.findByText('Тестер app');
+    await screen.findByText('Tester app');
     expect(screen.getAllByText('CODER')).toHaveLength(1);
     expect(document.querySelector('[data-project-label="app"]')).toBeTruthy();
     expect(document.querySelector('[data-project-label="lib"]')).toBeTruthy();
-    expect(screen.getByText('Доки lib')).toBeTruthy();
+    expect(screen.getByText('Docs lib')).toBeTruthy();
     const coder = screen.getByText('CODER').closest('li, a, button')!;
     expect(coder.querySelector('[data-project-label]')).toBeNull();
   });
@@ -230,12 +230,12 @@ describe('specialists in the mode', () => {
     window.location.hash = '#specialists';
     mount({
       configs: {
-        [APP]: configView({ repository: APP, specialists: [own('tester', 'Тестер app')] }),
-        [LIB]: configView({ repository: LIB, specialists: [own('tester', 'Тестер lib')] }),
+        [APP]: configView({ repository: APP, specialists: [own('tester', 'Tester app')] }),
+        [LIB]: configView({ repository: LIB, specialists: [own('tester', 'Tester lib')] }),
       },
     });
-    await screen.findByText('Тестер app');
-    expect(screen.getByText('Тестер lib')).toBeTruthy();
+    await screen.findByText('Tester app');
+    expect(screen.getByText('Tester lib')).toBeTruthy();
   });
 
   it('shows the error of a project and the rows of the others', async () => {
@@ -243,11 +243,11 @@ describe('specialists in the mode', () => {
     window.location.hash = '#specialists';
     mount({
       configs: {
-        [APP]: configView({ repository: APP, specialists: [own('tester', 'Тестер app')] }),
+        [APP]: configView({ repository: APP, specialists: [own('tester', 'Tester app')] }),
         [LIB]: new Error('no such directory'),
       },
     });
-    await screen.findByText('Тестер app');
+    await screen.findByText('Tester app');
     expect(screen.getByText('lib: no such directory')).toBeTruthy();
   });
 
@@ -255,7 +255,7 @@ describe('specialists in the mode', () => {
     modeOn();
     window.location.hash = '#specialists';
     mount();
-    fireEvent.click(await screen.findByText('Доки lib'));
+    fireEvent.click(await screen.findByText('Docs lib'));
     await waitFor(() => expect(window.location.hash).toBe('#specialists/docs?project=lib'));
   });
 
@@ -263,11 +263,11 @@ describe('specialists in the mode', () => {
     modeOn();
     window.location.hash = '#specialists';
     mount();
-    await screen.findByText('Тестер app');
+    await screen.findByText('Tester app');
     fireEvent.click(await screen.findByRole('combobox', { name: 'Project' }));
     fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
-    await waitFor(() => expect(screen.queryByText('Тестер app')).toBeNull());
-    expect(screen.getByText('Доки lib')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText('Tester app')).toBeNull());
+    expect(screen.getByText('Docs lib')).toBeTruthy();
   });
 
   it('asks for the project before a new specialist', async () => {
@@ -303,21 +303,21 @@ describe('pipelines in the mode', () => {
         [APP]: configView({
           repository: APP,
           specialists: [shared('coder')],
-          pipelines: [pipeline('feature', 'project', 'Фича app') as never],
+          pipelines: [pipeline('feature', 'project', 'Feature app') as never],
         }),
         [LIB]: configView({
           repository: LIB,
           specialists: [shared('coder')],
           pipelines: [
-            pipeline('feature', 'project', 'Фича lib') as never,
-            pipeline('explore', 'global', 'Разведка') as never,
+            pipeline('feature', 'project', 'Feature lib') as never,
+            pipeline('explore', 'global', 'Exploration') as never,
           ],
         }),
       },
     });
-    await screen.findByText('Фича app');
-    expect(screen.getByText('Фича lib')).toBeTruthy();
-    expect(screen.getAllByText('Разведка')).toHaveLength(1);
+    await screen.findByText('Feature app');
+    expect(screen.getByText('Feature lib')).toBeTruthy();
+    expect(screen.getAllByText('Exploration')).toHaveLength(1);
   });
 
   it('offers the project in the topology and keeps the mode', async () => {

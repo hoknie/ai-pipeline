@@ -49,7 +49,7 @@ const tagsIn = async (h: Harness, repository: string): Promise<TagView[]> =>
 const addProjects = async (h: Harness, params: Record<string, unknown>): Promise<Added[]> =>
   (await h.call('queue_add_projects', {
     pipeline: 'feature',
-    task: 'Поле email в профиле',
+    task: 'Email field in the profile',
     ...params,
   } as never)) as Added[];
 
@@ -77,7 +77,7 @@ describe('a task in several projects', () => {
       expect(queue.items[0]).toMatchObject({
         id: entry.item,
         pipeline: 'feature',
-        task: 'Поле email в профиле',
+        task: 'Email field in the profile',
         tags: [],
         after: [],
       });
@@ -146,12 +146,12 @@ describe('a task in several projects', () => {
     const { h, lib, web } = await twoProjects();
     const added = await addProjects(h, {
       repositories: ['lib', 'web'],
-      task: 'Поле email',
-      notes: { web: 'Форма в Settings.tsx', lib: '  ' },
+      task: 'Email field',
+      notes: { web: 'Form in Settings.tsx', lib: '  ' },
     });
-    expect(itemById(await queueIn(h, lib), added[0]!.item)?.task).toBe('Поле email');
+    expect(itemById(await queueIn(h, lib), added[0]!.item)?.task).toBe('Email field');
     expect(itemById(await queueIn(h, web), added[1]!.item)?.task).toBe(
-      'Поле email\n\nФорма в Settings.tsx',
+      'Email field\n\nForm in Settings.tsx',
     );
   });
 
@@ -159,10 +159,10 @@ describe('a task in several projects', () => {
     const { h, web } = await twoProjects();
     const added = await addProjects(h, {
       repositories: ['lib', 'web'],
-      task: 'Поле',
-      notes: { [web]: 'Дополнение' },
+      task: 'Field',
+      notes: { [web]: 'Addendum' },
     });
-    expect(itemById(await queueIn(h, web), added[1]!.item)?.task).toBe('Поле\n\nДополнение');
+    expect(itemById(await queueIn(h, web), added[1]!.item)?.task).toBe('Field\n\nAddendum');
   });
 
   it('makes the item of each project wait for the one of the previous project in a chain', async () => {

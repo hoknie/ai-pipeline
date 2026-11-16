@@ -59,7 +59,7 @@ describe('pause of a run', () => {
     const { queue, a } = setup();
     queue.runs = [];
     queue.skipped = ['a'];
-    queue.acknowledged = ['a/gruppa-1/failed/1', 'b/x/failed/1'];
+    queue.acknowledged = ['a/group-1/failed/1', 'b/x/failed/1'];
     pause(queue, a);
     expect(queue.skipped).toEqual([]);
     expect(queue.acknowledged).toEqual(['b/x/failed/1']);

@@ -28,7 +28,7 @@ function pipeline(id: string, overrides: Partial<EditorPipeline> = {}): EditorPi
 
 const feature = pipeline('feature', {
   raw: {
-    name: 'Доставка фичи',
+    name: 'Feature delivery',
     steps: [
       { id: 'plan', specialist: 'plan' },
       { id: 'code', specialist: 'coder' },
@@ -55,7 +55,7 @@ describe('pipeline filters', () => {
 
   it('searches the id and the name without case and edge spaces', () => {
     expect(matchesPipelineSearch(feature, '  FEAT ')).toBe(true);
-    expect(matchesPipelineSearch(feature, 'доставка')).toBe(true);
+    expect(matchesPipelineSearch(feature, 'delivery')).toBe(true);
     expect(matchesPipelineSearch(epic, 'zzz')).toBe(false);
     expect(matchesPipelineSearch(epic, '  ')).toBe(true);
   });
@@ -110,14 +110,14 @@ describe('pipeline filters', () => {
     const named = pipelineFilterOptions(
       all,
       new Map([
-        ['coder', 'Кодировщик'],
-        ['plan', 'Аналитик'],
+        ['coder', 'Code author'],
+        ['plan', 'Analyst'],
       ]),
     ).specialists;
     expect(named).toEqual([
+      { value: 'plan', label: 'Analyst' },
+      { value: 'coder', label: 'Code author' },
       { value: 'splitter', label: 'splitter' },
-      { value: 'plan', label: 'Аналитик' },
-      { value: 'coder', label: 'Кодировщик' },
     ]);
     expect(options.tags.map((tag) => tag.name).sort()).toEqual(['Backend', 'fast']);
     expect(

@@ -17,7 +17,7 @@ const claudeLog = [
     message: {
       content: [
         { type: 'thinking', thinking: 'hidden' },
-        { type: 'text', text: 'План:\n\n- прочитать `src/app.ts`\n- поправить' },
+        { type: 'text', text: 'Plan:\n\n- read `src/app.ts`\n- fix it' },
         { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: `${CWD}/src/app.ts` } },
       ],
     },
@@ -58,7 +58,7 @@ const claudeLog = [
     type: 'result',
     subtype: 'success',
     is_error: false,
-    result: 'готово',
+    result: 'done',
     total_cost_usd: 0.25,
     usage: {
       input_tokens: 10,
@@ -85,7 +85,7 @@ describe('claude transcript', () => {
     ]);
     expect(entries[0]).toEqual({
       kind: 'text',
-      text: 'План:\n\n- прочитать `src/app.ts`\n- поправить',
+      text: 'Plan:\n\n- read `src/app.ts`\n- fix it',
       at: null,
     });
     expect(entries[1]).toMatchObject({
@@ -111,7 +111,7 @@ describe('claude transcript', () => {
     expect(entries[6]).toEqual({ kind: 'raw', text: 'npm warn something odd', at: null });
     expect(entries[8]).toEqual({
       kind: 'result',
-      text: 'готово',
+      text: 'done',
       error: false,
       verdict: null,
       inputTokens: 110,
@@ -175,7 +175,7 @@ describe('opencode transcript', () => {
   it('reads text, tool parts with their output and step totals', () => {
     const entries = opencodeTranscript([
       JSON.stringify({ type: 'step_start', part: { type: 'step-start' } }),
-      JSON.stringify({ type: 'text', part: { type: 'text', text: 'Сделаю' } }),
+      JSON.stringify({ type: 'text', part: { type: 'text', text: 'Will do' } }),
       JSON.stringify({
         type: 'tool_use',
         part: {
@@ -192,7 +192,7 @@ describe('opencode transcript', () => {
       'not json',
     ]);
     expect(entries).toEqual([
-      { kind: 'text', text: 'Сделаю', at: null },
+      { kind: 'text', text: 'Will do', at: null },
       expect.objectContaining({ kind: 'tool_call', id: 'c1', name: 'bash', summary: 'ls' }),
       { kind: 'tool_result', id: 'c1', text: 'a.ts', error: false, at: null },
       expect.objectContaining({ kind: 'result', inputTokens: 7, outputTokens: 3 }),
@@ -299,7 +299,7 @@ describe('times of the entries', () => {
 
   it('gives every opencode entry the time of its line', () => {
     const lines = [
-      JSON.stringify({ type: 'text', part: { type: 'text', text: 'Сделаю' } }),
+      JSON.stringify({ type: 'text', part: { type: 'text', text: 'Will do' } }),
       JSON.stringify({
         type: 'tool_use',
         part: {

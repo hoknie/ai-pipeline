@@ -55,7 +55,7 @@ const onReview = () => {
   moved.steps[1] = { ...moved.steps[1]!, groups: [] };
   moved.steps[2] = {
     ...moved.steps[2]!,
-    groups: [{ slug: 'signup', title: 'Регистрация', status: 'running' }],
+    groups: [{ slug: 'signup', title: 'Sign-up', status: 'running' }],
   };
   return moved;
 };
@@ -109,8 +109,8 @@ describe('layout', () => {
   it('lays a pipeline left to right with reject arcs, the resolver and the groups of active runs', () => {
     const pipeline = pipelineOf({ delivery: { mode: 'worktree', resolver: 'coder' } });
     const runs = [
-      runView({ id: 'a', title: 'Первый' }),
-      runView({ id: 'b', title: 'Второй', topology: onReview() }),
+      runView({ id: 'a', title: 'First run' }),
+      runView({ id: 'b', title: 'Second run', topology: onReview() }),
       runView({ id: 'c', finished: true }),
       runView({ id: 'd', pipeline: 'epic' }),
     ];
@@ -126,7 +126,7 @@ describe('layout', () => {
       'resolver',
     ]);
     expect(nodes.find((node) => node.id === 'step:code')?.data.groups).toEqual([
-      { runId: 'a', runTitle: 'Первый', slug: 'login', title: 'Вход', status: 'running' },
+      { runId: 'a', runTitle: 'First run', slug: 'login', title: 'Sign-in', status: 'running' },
     ]);
     expect(
       nodes.find((node) => node.id === 'step:review')?.data.groups.map((group) => group.runId),
@@ -212,8 +212,8 @@ describe('topology page', () => {
     });
     const { view, select } = page(
       [
-        runView({ id: 'a', title: 'Первый' }),
-        runView({ id: 'b', title: 'Второй', topology: onReview() }),
+        runView({ id: 'a', title: 'First run' }),
+        runView({ id: 'b', title: 'Second run', topology: onReview() }),
       ],
       pipelines,
     );
@@ -224,8 +224,8 @@ describe('topology page', () => {
         .map((button) => button.textContent),
     ).toEqual([expect.stringContaining('active: 2'), expect.stringContaining('no active runs')]);
     await screen.findByTestId('stage-code');
-    expect(within(screen.getByTestId('stage-code')).getByText('Вход')).toBeTruthy();
-    expect(within(screen.getByTestId('stage-review')).getByText('Регистрация')).toBeTruthy();
+    expect(within(screen.getByTestId('stage-code')).getByText('Sign-in')).toBeTruthy();
+    expect(within(screen.getByTestId('stage-review')).getByText('Sign-up')).toBeTruthy();
     expect(screen.getByTestId('stage-review').className).toContain('ring-status-run-bg');
     fireEvent.click(within(list).getByText('epic'));
     expect(select).toHaveBeenCalledWith('epic');
@@ -244,12 +244,12 @@ describe('topology page', () => {
   it('follows a group to its next step', async () => {
     const { view } = page([runView({ id: 'a' })]);
     await screen.findByTestId('stage-code');
-    expect(within(screen.getByTestId('stage-code')).getByText('Вход')).toBeTruthy();
+    expect(within(screen.getByTestId('stage-code')).getByText('Sign-in')).toBeTruthy();
     const moved = topologyOf();
     moved.steps[1] = { ...moved.steps[1]!, groups: [] };
     moved.steps[2] = {
       ...moved.steps[2]!,
-      groups: [{ slug: 'login', title: 'Вход', status: 'running' }],
+      groups: [{ slug: 'login', title: 'Sign-in', status: 'running' }],
     };
     view.rerender(
       <TopologyPage
@@ -261,17 +261,17 @@ describe('topology page', () => {
       />,
     );
     await waitFor(() =>
-      expect(within(screen.getByTestId('stage-review')).getByText('Вход')).toBeTruthy(),
+      expect(within(screen.getByTestId('stage-review')).getByText('Sign-in')).toBeTruthy(),
     );
-    expect(within(screen.getByTestId('stage-code')).queryByText('Вход')).toBeNull();
+    expect(within(screen.getByTestId('stage-code')).queryByText('Sign-in')).toBeNull();
   });
 
   it('lists the groups of a clicked step and opens one with that step', async () => {
-    const { open } = page([runView({ id: 'a', title: 'Первый' })]);
+    const { open } = page([runView({ id: 'a', title: 'First run' })]);
     fireEvent.click(await screen.findByTestId('stage-code'));
     const side = screen.getByRole('complementary', { name: 'node coder' });
-    expect(within(side).getByText('Первый')).toBeTruthy();
-    fireEvent.click(within(side).getByRole('button', { name: 'Вход' }));
+    expect(within(side).getByText('First run')).toBeTruthy();
+    fireEvent.click(within(side).getByRole('button', { name: 'Sign-in' }));
     expect(open).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'a', slug: 'login' }),
       'code',
@@ -328,7 +328,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 1,
               stepId: 'code',
-              stepName: 'Кодер',
+              stepName: 'Coder',
               status: 'finished',
               verdict: 'done',
             },
@@ -336,7 +336,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 2,
               stepId: 'review',
-              stepName: 'Ревьюер',
+              stepName: 'Reviewer',
               status: 'finished',
               verdict: 'rejected',
             },
@@ -344,7 +344,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 3,
               stepId: 'code',
-              stepName: 'Кодер',
+              stepName: 'Coder',
               status: 'running',
               verdict: null,
             },
@@ -370,10 +370,10 @@ describe('tabs', () => {
     fireEvent.click(screen.getByTestId('stage-code'));
     fireEvent.click(
       within(screen.getByRole('complementary', { name: 'node coder' })).getByRole('button', {
-        name: 'Вход',
+        name: 'Sign-in',
       }),
     );
-    await screen.findByText('#3 Кодер');
+    await screen.findByText('#3 Coder');
     expect(window.location.hash).toBe('#runs/run1/login/code');
     expect(expanded()).toEqual([false, false, true]);
     expect(screen.getByRole('tab', { name: 'Log' }).getAttribute('aria-selected')).toBe('true');
@@ -388,7 +388,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 1,
               stepId: 'code',
-              stepName: 'Кодер',
+              stepName: 'Coder',
               status: 'finished',
               verdict: 'done',
             },
@@ -396,7 +396,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 2,
               stepId: 'review',
-              stepName: 'Ревьюер',
+              stepName: 'Reviewer',
               status: 'finished',
               verdict: 'rejected',
             },
@@ -404,7 +404,7 @@ describe('tabs', () => {
               ...groupView().attempts[0]!,
               seq: 3,
               stepId: 'code',
-              stepName: 'Кодер',
+              stepName: 'Coder',
               status: 'running',
               verdict: null,
             },
@@ -425,7 +425,7 @@ describe('tabs', () => {
         onError={() => undefined}
       />,
     );
-    await screen.findByText('#2 Ревьюер');
+    await screen.findByText('#2 Reviewer');
     await waitFor(() => expect(expanded()).toEqual([false, true, false]));
   });
 
@@ -433,7 +433,7 @@ describe('tabs', () => {
     window.location.hash = '#run1/login';
     render(<App api={fakeApi()} openStream={openFake} />);
     act(() => FakeEventSource.last?.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
-    expect(screen.getByRole('region', { name: 'group Вход' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'group Sign-in' })).toBeTruthy();
     expect(window.location.hash).toBe('#runs/run1/login');
   });
 });
@@ -554,10 +554,10 @@ describe('specialist occupancy', () => {
   const other = (overrides: Partial<ReturnType<typeof runView>> = {}) =>
     runView({
       id: 'x',
-      title: 'Чужой',
+      title: 'Foreign',
       repository: '/other',
       pipeline: 'epic',
-      specialists: [specialistUse('coder', { level: 'global', name: 'Кодер', running: ['api'] })],
+      specialists: [specialistUse('coder', { level: 'global', name: 'Coder', running: ['api'] })],
       ...overrides,
     });
   const busyOf = (runs: ReturnType<typeof runView>[], id = 'step:code') => {
@@ -609,7 +609,7 @@ describe('specialist occupancy', () => {
     };
     const first = stabilize([], render1([other()]), new Map(), null);
     const unrelated = other({
-      title: 'Другое название',
+      title: 'Another title',
       specialists: [specialistUse('coder', { level: 'global', running: ['api'] })],
     });
     stabilize(first, render1([unrelated]), new Map(), null).forEach((node, index) =>
@@ -641,9 +641,9 @@ describe('specialist occupancy', () => {
     fireEvent.click(code);
     const side = screen.getByRole('complementary', { name: 'node coder' });
     expect(within(side).getByText('Specialist busy in other runs')).toBeTruthy();
-    expect(within(side).getByText(/Чужой · other/)).toBeTruthy();
+    expect(within(side).getByText(/Foreign · other/)).toBeTruthy();
     expect(
-      within(side).getByText(/other runs and repositories that run on, or wait for, Кодер\./),
+      within(side).getByText(/other runs and repositories that run on, or wait for, Coder\./),
     ).toBeTruthy();
     fireEvent.click(within(side).getByRole('button', { name: 'api' }));
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ runId: 'x', slug: 'api' }), 'code');
@@ -711,7 +711,7 @@ describe('pipeline stages', () => {
   const specialist = (slug: string) => ({ type: 'specialist' as const, slug, name: slug });
   const stages: PipelineStage[] = [
     spec('action:before_split:lint', 'action', 'prepare', {
-      name: 'Линтер',
+      name: 'Linter',
       performer: { type: 'command', command: 'npm run lint' },
     }),
     ...base.steps.map((step) =>
@@ -722,7 +722,7 @@ describe('pipeline stages', () => {
     ),
     spec('merge', 'merge', 'merge'),
     spec('message', 'message', 'delivery', {
-      name: 'Сообщение коммита',
+      name: 'Commit message',
       performer: specialist('coder'),
       condition: 'delivery_commit',
     }),
@@ -731,7 +731,7 @@ describe('pipeline stages', () => {
       performer: specialist('coder'),
       condition: 'conflict',
     }),
-    spec('action:after_delivery:commit', 'action', 'finish', { name: 'Коммит' }),
+    spec('action:after_delivery:commit', 'action', 'finish', { name: 'Commit' }),
     spec('cleanup', 'cleanup', 'finish', { condition: 'not_keep' }),
   ];
   const staged = { ...base, stages };
@@ -883,14 +883,14 @@ describe('pipeline stages', () => {
       stage.id === 'split'
         ? {
             ...stage,
-            performer: { type: 'specialist' as const, slug: 'planner', name: 'Планировщик' },
+            performer: { type: 'specialist' as const, slug: 'planner', name: 'Planner' },
           }
         : stage,
     );
     const split = nodesOf({ ...splitBase, stages: stagesWithName }).nodes.find(
       (node) => node.id === 'split',
     )!.data;
-    expect(split.subtitle).toBe('Планировщик');
+    expect(split.subtitle).toBe('Planner');
     expect(split.subtitleHint).toBe('planner');
     const fallback = nodesOf(splitBase).nodes.find((node) => node.id === 'split')!.data;
     expect(fallback.subtitle).toBe('planner');
@@ -989,7 +989,7 @@ describe('pipeline stages', () => {
 
     fireEvent.click(screen.getByTestId('stage-action:after_delivery:commit'));
     expect(
-      within(screen.getByRole('complementary', { name: 'node Коммит' }))
+      within(screen.getByRole('complementary', { name: 'node Commit' }))
         .getByRole('link', { name: 'Open in Pipeline' })
         .getAttribute('href'),
     ).toBe('#pipelines/actions/commit');

@@ -24,7 +24,7 @@ function configWith(extra: string): string {
   return `swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
 ${extra}
   pipelines:
     feature:
@@ -46,8 +46,8 @@ const SPLIT_TWO = {
   split: [
     {
       split: [
-        { title: 'Первая', task: 'первая' },
-        { title: 'Вторая', task: 'вторая' },
+        { title: 'First', task: 'first' },
+        { title: 'Second', task: 'second' },
       ],
     },
   ],
@@ -63,7 +63,7 @@ async function plainRun(h: Harness): Promise<string> {
   const created = (await startRun(h, {
     repository: h.repo,
     pipeline: 'plain',
-    groups: [{ title: 'Вход', task: 'вход' }],
+    groups: [{ title: 'Login', task: 'login' }],
   })) as RunCreated;
   return created.runId;
 }
@@ -79,7 +79,7 @@ describe('actions before the split', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'сделать',
+      task: 'do it',
     })) as RunCreated;
     const view = await h.waitFor(created.runId, (run) => run.finished);
     expect(system(view)).toEqual(['action:before_split:plan:done', 'split:::done']);
@@ -101,7 +101,7 @@ describe('actions before the split', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'сделать',
+      task: 'do it',
     })) as RunCreated;
     await h.waitFor(created.runId, (run) => run.system[0]?.status === 'running');
     const waiting = await h.status(created.runId);
@@ -121,7 +121,7 @@ describe('actions before the split', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'сделать',
+      task: 'do it',
     })) as RunCreated;
     const failed = await h.waitFor(created.runId, (run) => run.system[0]?.status === 'failed');
     expect(failed.system[0]?.reason).toBe('exit code 1');
@@ -148,7 +148,7 @@ describe('actions after the split', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'сделать',
+      task: 'do it',
     })) as RunCreated;
     const waiting = await h.waitFor(
       created.runId,
@@ -274,17 +274,15 @@ describe('actions before delivery', () => {
     before_delivery: [check]
   delivery: { auto: false }`);
     h.script({
-      code: [
-        { write: { 'first.ts': 'first\n' } },
-        { waitFor: h.gate('second'), write: { 'second.ts': 'second\n' } },
-      ],
+      'code@First': [{ write: { 'first.ts': 'first\n' } }],
+      'code@Second': [{ waitFor: h.gate('second'), write: { 'second.ts': 'second\n' } }],
     });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'plain',
       groups: [
-        { title: 'Первая', task: 'первая' },
-        { title: 'Вторая', task: 'вторая' },
+        { title: 'First', task: 'first' },
+        { title: 'Second', task: 'second' },
       ],
     })) as RunCreated;
     const merged = await h.waitFor(runId, (run) =>
@@ -421,7 +419,7 @@ describe('actions after delivery', () => {
     await h.waitFor(runId, (run) => run.system[0]?.status === 'done');
     await until('the cleanup', () => !existsSync(join(h.repo, '.aip', 'worktrees', runId)));
     const message = git(h.repo, 'log', '-1', '--format=%B');
-    expect(message).toContain('Вход');
+    expect(message).toContain('Login');
     expect(git(h.repo, 'status', '--porcelain', '--', 'lib.ts')).toBe('');
     expect(readFileSync(join(h.repo, '..', 'changed'), 'utf8')).toBe('lib.ts');
     expect(readFileSync(join(h.repo, '..', 'mode'), 'utf8')).toBe('worktree');
@@ -495,12 +493,13 @@ describe('actions after delivery', () => {
       repository: h.repo,
       pipeline: 'plain',
       groups: [
-        { title: 'Первая', task: 'первая' },
-        { title: 'Вторая', task: 'вторая' },
+        { title: 'First', task: 'first' },
+        { title: 'Second', task: 'second' },
       ],
     })) as RunCreated;
     h.script({
-      code: [{ write: { 'a.ts': 'a\n' } }, { write: { 'b.ts': 'b\n' } }],
+      'code@First': [{ write: { 'a.ts': 'a\n' } }],
+      'code@Second': [{ write: { 'b.ts': 'b\n' } }],
     });
     await h.waitFor(created.runId, (run) => run.finished);
     const slugs = (await h.status(created.runId)).groups.map((group) => group.slug);
@@ -550,7 +549,7 @@ describe('specialist actions', () => {
     const created = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'сделать',
+      task: 'do it',
     })) as RunCreated;
     const view = await h.waitFor(created.runId, (run) => run.finished);
     expect(system(view)).toEqual(['split:::done', 'action:after_split:notes:done']);
@@ -655,7 +654,7 @@ describe('the stages of the pipeline', () => {
 
   it('answer the request system_stages with the tasks and the levels of the settings', async () => {
     const h = await start(
-      `  delivery: { resolver: coder, resolver_prompt: Всегда сохраняй правки }`,
+      `  delivery: { resolver: coder, resolver_prompt: Always keep the edits }`,
     );
     const view = (await h.call('system_stages', { repository: h.repo })) as SystemStagesView;
     expect(view.errors).toEqual([]);
@@ -670,7 +669,7 @@ describe('the stages of the pipeline', () => {
     expect(resolver?.performer).toMatchObject({ type: 'specialist', slug: 'coder' });
     expect(resolver?.settings).toContainEqual({
       path: 'delivery.resolver_prompt',
-      value: 'Всегда сохраняй правки',
+      value: 'Always keep the edits',
       level: 'project',
     });
     expect(resolver?.settings).toContainEqual({

@@ -10,11 +10,11 @@ import { startRun, until, type Harness } from './harness.ts';
 export const POOLS_CONFIG = `swarm:
   max: 5
   specialists:
-    claude-coder: { name: Клод, runtime: claude, model: sonnet }
-    gemini-coder: { name: Джемини, runtime: opencode, model: google/gemini-2 }
+    claude-coder: { name: Claude, runtime: claude, model: sonnet }
+    gemini-coder: { name: Gemini, runtime: opencode, model: google/gemini-2 }
     gpt-coder: { name: GPT, runtime: opencode, model: openai/gpt-5 }
     glm-coder: { name: GLM, runtime: opencode, model: zai/glm-5 }
-    plain-coder: { name: Простой, runtime: opencode }
+    plain-coder: { name: Plain, runtime: opencode }
   pipelines:
     on-claude: { steps: [{ id: code, specialist: claude-coder }] }
     on-gemini: { steps: [{ id: code, specialist: gemini-coder }] }
@@ -75,7 +75,7 @@ export async function direct(
   const created = await startRun(h, {
     repository,
     pipeline,
-    groups: titles.map((title) => ({ title, task: `работа ${title}` })),
+    groups: titles.map((title) => ({ title, task: `work ${title}` })),
   });
   return created.runId;
 }

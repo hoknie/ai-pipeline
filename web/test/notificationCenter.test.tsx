@@ -19,8 +19,13 @@ const runs = [
     id: 'r1',
     repository: '/work/app',
     groups: [
-      groupRow({ slug: 'q', title: 'Вопрос', status: 'needs_human', question: 'Какой провайдер?' }),
-      groupRow({ slug: 'f', title: 'Падение', status: 'failed', reason: 'boom' }),
+      groupRow({
+        slug: 'q',
+        title: 'Provider pick',
+        status: 'needs_human',
+        question: 'Which provider?',
+      }),
+      groupRow({ slug: 'f', title: 'Broken build', status: 'failed', reason: 'boom' }),
     ],
   }),
 ];
@@ -68,8 +73,8 @@ describe('notification centre', () => {
     fireEvent.click(bell());
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Вопрос')).toBeTruthy();
-    expect(within(dialog).getByText('Какой провайдер?')).toBeTruthy();
+    expect(within(dialog).getByText('Provider pick')).toBeTruthy();
+    expect(within(dialog).getByText('Which provider?')).toBeTruthy();
     expect(within(dialog).getByText('Needs answer')).toBeTruthy();
     expect(within(dialog).getByText('Failed')).toBeTruthy();
   });
@@ -78,7 +83,7 @@ describe('notification centre', () => {
     stub('granted');
     render(<Harness many />);
     fireEvent.click(bell());
-    expect(screen.getAllByText(/добавить вход · app/)).toHaveLength(2);
+    expect(screen.getAllByText(/add sign-in · app/)).toHaveLength(2);
   });
 
   it('shows an empty state', () => {
@@ -93,20 +98,20 @@ describe('notification centre', () => {
     stub('granted');
     const { rerender } = render(<Harness />);
     fireEvent.click(bell());
-    expect(screen.getByText('Вопрос')).toBeTruthy();
+    expect(screen.getByText('Provider pick')).toBeTruthy();
     const moved = [
       runView({
         id: 'r1',
         repository: '/work/app',
         groups: [
-          groupRow({ slug: 'q', title: 'Вопрос', status: 'running' }),
-          groupRow({ slug: 'f', title: 'Падение', status: 'failed', reason: 'boom' }),
+          groupRow({ slug: 'q', title: 'Provider pick', status: 'running' }),
+          groupRow({ slug: 'f', title: 'Broken build', status: 'failed', reason: 'boom' }),
         ],
       }),
     ];
     rerender(<Harness list={moved} />);
-    expect(screen.queryByText('Вопрос')).toBeNull();
-    expect(screen.getByText('Падение')).toBeTruthy();
+    expect(screen.queryByText('Provider pick')).toBeNull();
+    expect(screen.getByText('Broken build')).toBeTruthy();
   });
 
   it('closes on Escape and returns focus to the bell', async () => {
@@ -123,9 +128,9 @@ describe('notification centre', () => {
     stub('granted');
     render(<Harness />);
     fireEvent.click(bell());
-    fireEvent.click(screen.getByRole('button', { name: 'Hide: Вопрос' }));
-    expect(screen.queryByText('Вопрос')).toBeNull();
-    expect(screen.getByText('Падение')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide: Provider pick' }));
+    expect(screen.queryByText('Provider pick')).toBeNull();
+    expect(screen.getByText('Broken build')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Hide all' }));
     expect(screen.getByText('No notifications')).toBeTruthy();
   });
@@ -135,7 +140,7 @@ describe('notification centre', () => {
     const onOpen = vi.fn();
     render(<Harness onOpen={onOpen} />);
     fireEvent.click(bell());
-    fireEvent.click(screen.getByText('Падение'));
+    fireEvent.click(screen.getByText('Broken build'));
     expect(onOpen).toHaveBeenCalledWith('f');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -144,7 +149,7 @@ describe('notification centre', () => {
     stub('granted');
     render(<Harness compact={false} />);
     fireEvent.click(bell());
-    expect(screen.getByText('Вопрос')).toBeTruthy();
+    expect(screen.getByText('Provider pick')).toBeTruthy();
   });
 
   it.each([

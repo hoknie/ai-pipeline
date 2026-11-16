@@ -13,10 +13,10 @@ import type { Verdict } from '../../../src/feature/agents/types/index.ts';
 export const CONFIG_TEXT = `swarm:
   max: 5
   specialists:
-    plan: { name: Планировщик, prompt: "План: %s" }
-    coder: { name: Кодировщик, runtime: opencode, model: anthropic/sonnet }
-    reviewer: { name: Ревьюер, permissions: read }
-    qa: { name: Тестировщик }
+    plan: { name: Planner, prompt: "Plan: %s" }
+    coder: { name: Coder, runtime: opencode, model: anthropic/sonnet }
+    reviewer: { name: Reviewer, permissions: read }
+    qa: { name: Tester }
   pipelines:
     feature:
       steps:
@@ -56,8 +56,8 @@ export function run(
     config: resolved,
     dirtyWarning: false,
     groups: Array.from({ length: groups }, (_, index) => ({
-      title: `Группа ${index + 1}`,
-      task: `задача ${index + 1}`,
+      title: `Group ${index + 1}`,
+      task: `task ${index + 1}`,
     })),
     split: options.split ?? false,
     now: options.now ?? 1000,
@@ -68,13 +68,13 @@ export function run(
   });
 }
 
-export function group(state: RunState, slug = 'gruppa-1') {
+export function group(state: RunState, slug = 'group-1') {
   const found = findGroup(state, slug);
   if (!found) throw new Error(`no group ${slug}`);
   return found;
 }
 
-export function runningAttempt(state: RunState, slug = 'gruppa-1'): Attempt {
+export function runningAttempt(state: RunState, slug = 'group-1'): Attempt {
   const attempt = group(state, slug).attempts.find((candidate) => candidate.status === 'running');
   if (!attempt) throw new Error(`no running attempt in ${slug}`);
   return attempt;
@@ -92,7 +92,7 @@ export function finish(
     humanOnly?: boolean;
   } = {},
 ): Effect[] {
-  const slug = options.slug ?? 'gruppa-1';
+  const slug = options.slug ?? 'group-1';
   const attempt = runningAttempt(state, slug);
   const now = options.now ?? 2000;
   transition(
@@ -104,8 +104,7 @@ export function finish(
       report: {
         verdict,
         summary: options.summary ?? `${attempt.stepId} ${verdict}`,
-        feedback:
-          options.feedback ?? (verdict === 'done' || options.questions ? null : 'замечания'),
+        feedback: options.feedback ?? (verdict === 'done' || options.questions ? null : 'remarks'),
         ...(options.questions ? { questions: options.questions } : {}),
         ...(options.humanOnly ? { humanOnly: true } : {}),
       },

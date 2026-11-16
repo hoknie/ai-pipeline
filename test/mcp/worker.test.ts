@@ -31,7 +31,7 @@ describe('worker MCP server', () => {
     });
     const result = await client.callTool({
       name: 'swarm_report',
-      arguments: { verdict: 'done', summary: 'готово' },
+      arguments: { verdict: 'done', summary: 'done' },
     });
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('Recorded verdict done');
@@ -41,7 +41,7 @@ describe('worker MCP server', () => {
         params: {
           token: 'token-1',
           verdict: 'done',
-          summary: 'готово',
+          summary: 'done',
           feedback: null,
           questions: null,
           human_only: null,
@@ -60,7 +60,12 @@ describe('worker MCP server', () => {
     expect(Object.keys(tool?.inputSchema.properties ?? {})).toContain('human_only');
     await client.callTool({
       name: 'swarm_report',
-      arguments: { verdict: 'needs_human', summary: 's', feedback: 'Глянь', human_only: true },
+      arguments: {
+        verdict: 'needs_human',
+        summary: 's',
+        feedback: 'Take a look',
+        human_only: true,
+      },
     });
     expect(calls[0]?.params.human_only).toBe(true);
   });
@@ -72,7 +77,7 @@ describe('worker MCP server', () => {
       return null;
     });
     const questions = [
-      { text: 'OAuth или пароль?', options: ['OAuth', 'пароль'], recommendation: 'OAuth' },
+      { text: 'OAuth or password?', options: ['OAuth', 'password'], recommendation: 'OAuth' },
     ];
     const result = await client.callTool({
       name: 'swarm_report',
@@ -199,7 +204,7 @@ describe('worker MCP server', () => {
     });
     const content = await client.callTool({
       name: 'swarm_artifact',
-      arguments: { file_name: 'report.md', title: 'Итог', content: '# hi' },
+      arguments: { file_name: 'report.md', title: 'Summary', content: '# hi' },
     });
     expect(content.isError).toBeFalsy();
     expect(textOf(content)).toContain('Recorded artifact a-1 (report.md)');
@@ -211,7 +216,7 @@ describe('worker MCP server', () => {
     expect(calls).toEqual([
       {
         method: 'artifact_publish',
-        params: { token: 'token-1', fileName: 'report.md', title: 'Итог', content: '# hi' },
+        params: { token: 'token-1', fileName: 'report.md', title: 'Summary', content: '# hi' },
       },
       {
         method: 'artifact_publish',
@@ -266,7 +271,7 @@ describe('worker MCP server', () => {
     expect(Object.keys(add?.inputSchema.properties ?? {})).not.toContain('attachments');
     const result = await client.callTool({
       name: 'swarm_queue_add',
-      arguments: { pipeline: 'feature', task: 'Реализовать web-i18n', title: 'web-i18n' },
+      arguments: { pipeline: 'feature', task: 'Implement web-i18n', title: 'web-i18n' },
     });
     expect(result.isError).toBeFalsy();
     expect(textOf(result)).toContain('q-abc');
@@ -276,7 +281,7 @@ describe('worker MCP server', () => {
         params: {
           token: 'token-1',
           pipeline: 'feature',
-          task: 'Реализовать web-i18n',
+          task: 'Implement web-i18n',
           title: 'web-i18n',
         },
       },

@@ -22,10 +22,7 @@ afterEach(async () => {
   current = null;
 });
 
-const LIMITED = PIPELINE_CONFIG.replace(
-  'coder: { name: Кодировщик }',
-  'coder: { name: Кодировщик, max: 1 }',
-);
+const LIMITED = PIPELINE_CONFIG.replace('coder: { name: Coder }', 'coder: { name: Coder, max: 1 }');
 
 const row = (view: RunView, slug: string) => view.groups.find((group) => group.slug === slug);
 
@@ -49,7 +46,7 @@ describe('groups waiting for a specialist', () => {
     expect(row(waiting, 'signup')?.wait).toEqual({
       reason: 'specialist',
       specialist: 'coder',
-      name: 'Кодировщик',
+      name: 'Coder',
       max: 1,
     });
     expect(row(waiting, 'login')?.status).toBe('running');

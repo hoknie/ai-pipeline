@@ -97,25 +97,25 @@ const stepNow = (index: number) => screen.getAllByRole('listitem', { name: /^ste
 
 describe('the name of a pipeline', () => {
   it('shows the name in the list and in the heading, with the id in the tooltip', async () => {
-    const named = entry('feature', { raw: { ...RAW, name: 'Новая функция' } });
+    const named = entry('feature', { raw: { ...RAW, name: 'New feature' } });
     render(<Page api={api({}, [named])} start="feature" />);
     const list = await screen.findByRole('list', { name: 'pipeline' });
-    const item = within(list).getByRole('button', { name: /Новая функция/ });
+    const item = within(list).getByRole('button', { name: /New feature/ });
     expect(item.getAttribute('title')).toBe('feature');
-    expect(await screen.findByRole('heading', { name: 'Новая функция' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'New feature' })).toBeTruthy();
   });
 
   it('writes the typed name first and drops a cleared one', () => {
-    const draft = draftOf({ ...RAW, name: 'Старое' });
-    expect(draft.name).toBe('Старое');
-    expect(Object.keys(valueOf({ ...draft, name: '  Новое ' }))).toEqual(['name', 'steps']);
-    expect(valueOf({ ...draft, name: '  Новое ' }).name).toBe('Новое');
+    const draft = draftOf({ ...RAW, name: 'Old name' });
+    expect(draft.name).toBe('Old name');
+    expect(Object.keys(valueOf({ ...draft, name: '  Renamed ' }))).toEqual(['name', 'steps']);
+    expect(valueOf({ ...draft, name: '  Renamed ' }).name).toBe('Renamed');
     expect('name' in valueOf({ ...draft, name: '  ' })).toBe(false);
   });
 
   it('keeps the variants block of the file when the name is edited', async () => {
     const variants = {
-      light: { name: 'Лёгкий', skip: ['review'] },
+      light: { name: 'Lightweight', skip: ['review'] },
       strong: { steps: { code: { model: 'opus', additional_prompt: null } } },
     };
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
@@ -125,11 +125,11 @@ describe('the name of a pipeline', () => {
         start="feature"
       />,
     );
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Новое' } });
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Renamed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(writePipeline).toHaveBeenCalled());
     const [, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
-    expect(value.name).toBe('Новое');
+    expect(value.name).toBe('Renamed');
     expect(value.variants).toEqual(variants);
   });
 
@@ -145,7 +145,7 @@ describe('the name of a pipeline', () => {
   it('saves a new pipeline with the name from the field', async () => {
     const writePipeline = vi.fn(async () => ({ ok: true as const, revision: 'r', file: '/f' }));
     render(<Page api={api({ writePipeline })} start="new" />);
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Мой пайплайн' } });
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'My pipeline' } });
     fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'mine' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     const added = await stepBox(0);
@@ -155,7 +155,7 @@ describe('the name of a pipeline', () => {
     const [id, value] = writePipeline.mock.calls[0] as unknown as [string, Record<string, unknown>];
     expect(id).toBe('mine');
     expect(Object.keys(value)[0]).toBe('name');
-    expect(value.name).toBe('Мой пайплайн');
+    expect(value.name).toBe('My pipeline');
   });
 
   it('shows the error of an empty name at the field', async () => {
@@ -286,7 +286,7 @@ describe('the variants in the list', () => {
         pipelines: [
           entry('feature'),
           entry('task', {
-            raw: { ...RAW, variants: { light: { name: 'Лёгкая' }, strong: {} } },
+            raw: { ...RAW, variants: { light: { name: 'Lightweight' }, strong: {} } },
           }),
         ],
       }),
@@ -294,7 +294,10 @@ describe('the variants in the list', () => {
     render(<Page api={fakeApi({ config })} start="feature" />);
     const list = await screen.findByRole('list', { name: 'pipeline' });
     const badges = await within(list).findByTestId('variants-task');
-    expect([...badges.children].map((badge) => badge.textContent)).toEqual(['Лёгкая', 'strong']);
+    expect([...badges.children].map((badge) => badge.textContent)).toEqual([
+      'Lightweight',
+      'strong',
+    ]);
     expect(within(list).queryByTestId('variants-feature')).toBeNull();
   });
 });
@@ -762,14 +765,14 @@ describe('saving and deleting', () => {
 describe('draft conversion', () => {
   it('round-trips a pipeline with split and a prompt on a step', () => {
     const raw = {
-      split: { specialist: 'plan', max_groups: 5, additional_prompt: 'не больше модуля' },
+      split: { specialist: 'plan', max_groups: 5, additional_prompt: 'one module at most' },
       steps: [
         { id: 'code', specialist: 'coder' },
         {
           id: 'review',
           specialist: 'reviewer',
           on_reject: { goto: 'code', max_rounds: 3 },
-          additional_prompt: 'тесты',
+          additional_prompt: 'tests',
         },
       ],
     };

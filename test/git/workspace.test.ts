@@ -85,8 +85,8 @@ describe('git basics', () => {
   });
 
   it('builds a commit subject from the first summary line', () => {
-    expect(commitMessage('login', 'code', '\nДобавил форму\nподробности')).toBe(
-      'aip(login/code): Добавил форму',
+    expect(commitMessage('login', 'code', '\nAdded the form\ndetails')).toBe(
+      'aip(login/code): Added the form',
     );
     expect(commitMessage('g', 's', 'x'.repeat(200)).length).toBe(100);
   });

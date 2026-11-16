@@ -4,13 +4,13 @@ import { answerText, questionKey } from '../src/shared/lib/format.ts';
 
 describe('answerText', () => {
   it('numbers questions and answers and separates them with a blank line', () => {
-    expect(answerText([{ text: 'Первый?' }, { text: 'Второй?' }], ['да', ' нет '])).toBe(
-      'Q1: Первый?\nA1: да\n\nQ2: Второй?\nA2: нет',
+    expect(answerText([{ text: 'First?' }, { text: 'Second?' }], ['yes', ' no '])).toBe(
+      'Q1: First?\nA1: yes\n\nQ2: Second?\nA2: no',
     );
   });
 
   it('leaves the answer empty when it is missing', () => {
-    expect(answerText([{ text: 'Один?' }], [])).toBe('Q1: Один?\nA1: ');
+    expect(answerText([{ text: 'Only one?' }], [])).toBe('Q1: Only one?\nA1: ');
   });
 });
 

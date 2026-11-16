@@ -34,7 +34,7 @@ describe('qualified model identity in daemon runs', () => {
     expect(runtimeFor).not.toHaveBeenCalled();
     expect(state.run.title).toBeNull();
     expect(state.run.name).toBeNull();
-    expect(runTitle(state)).toBe('задача 1');
+    expect(runTitle(state)).toBe('task 1');
   });
 
   it('keeps a full OpenCode ID in the attempt snapshot and fake-agent argv', async () => {
@@ -118,7 +118,7 @@ describe('qualified model identity in daemon runs', () => {
         status: 'failed',
         input: {
           prompt: 'test',
-          groupTitle: 'Группа 1',
+          groupTitle: 'Group 1',
           stepId: 'code',
           specialistName: 'Coder',
           skills: [],

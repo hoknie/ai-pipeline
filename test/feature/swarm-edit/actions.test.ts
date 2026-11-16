@@ -60,7 +60,7 @@ function expectError(errors: FieldError[], path: string, fragment: string): void
 
 const BASE = `swarm:
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   pipelines:
     feature:
       steps:
@@ -91,14 +91,14 @@ describe('the description of an action', () => {
   it('reads a specialist with all fields', () => {
     const config = parseConfig(
       withSwarm(
-        '  actions:\n    notes: { name: Заметки, specialist: coder, additional_prompt: Кратко, on_failure: continue }\n',
+        '  actions:\n    notes: { name: Notes, specialist: coder, additional_prompt: Briefly, on_failure: continue }\n',
       ),
     );
     expect(findAction(config, 'notes')).toMatchObject({
-      name: 'Заметки',
+      name: 'Notes',
       run: null,
       specialist: 'coder',
-      additionalPrompt: 'Кратко',
+      additionalPrompt: 'Briefly',
       onFailure: 'continue',
     });
   });
@@ -114,7 +114,7 @@ describe('the description of an action', () => {
       withSwarm('  actions:\n    check: { run: npm test, specialist: coder }\n'),
     );
     expectError(both, 'swarm.actions.check', 'exactly one');
-    const none = errorsOf(withSwarm('  actions:\n    check: { name: Проверка }\n'));
+    const none = errorsOf(withSwarm('  actions:\n    check: { name: Check }\n'));
     expectError(none, 'swarm.actions.check', 'one of `run` and `specialist`');
   });
 
@@ -212,7 +212,7 @@ describe('the points of the pipeline', () => {
 
   const PIPELINES = (stages: string, split = true) => `swarm:
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   actions:
     prep: { run: a }
     commit: { run: b }
@@ -268,11 +268,11 @@ describe('delivery prompts', () => {
 
   it('are read and merged field by field', () => {
     const config = parseConfig(
-      withSwarm('  delivery: { message_prompt: По-русски, resolver_prompt: Сохраняй правки }\n'),
+      withSwarm('  delivery: { message_prompt: In English, resolver_prompt: Keep the edits }\n'),
     );
     expect(config.delivery).toMatchObject({
-      messagePrompt: 'По-русски',
-      resolverPrompt: 'Сохраняй правки',
+      messagePrompt: 'In English',
+      resolverPrompt: 'Keep the edits',
     });
   });
 

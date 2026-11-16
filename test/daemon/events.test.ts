@@ -64,7 +64,7 @@ describe('event stream', () => {
   it('carries the variant and its name in the run event', async () => {
     const h = (current = await harness(`${PIPELINE_CONFIG}      variants:
         light:
-          name: Лёгкий
+          name: Light
           skip: [review]
 `));
     const events: StreamEvent[] = [];
@@ -87,7 +87,7 @@ describe('event stream', () => {
     const event = events.find((entry) => entry.event === 'run');
     expect(event?.event === 'run' ? event.run : null).toMatchObject({
       variant: 'light',
-      variantName: 'Лёгкий',
+      variantName: 'Light',
     });
   });
 
@@ -141,7 +141,7 @@ describe('queue event of a dependent project', () => {
     await h.call('queue_add', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'клиент',
+      task: 'client',
       after: [api.item],
     });
     const events: StreamEvent[] = [];
@@ -176,7 +176,7 @@ describe('queue event of a dependent project', () => {
     await h.call('queue_add', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'клиент',
+      task: 'client',
       after: [api.item],
     });
     const events: StreamEvent[] = [];
@@ -184,13 +184,13 @@ describe('queue event of a dependent project', () => {
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
     await until('the snapshot', () => events.length > 0);
-    await h.call('queue_edit', { repository: lib, item: api.item, task: 'новый API' });
+    await h.call('queue_edit', { repository: lib, item: api.item, task: 'new API' });
     await until('the queue event of the client with the new title', () =>
       events.some(
         (event) =>
           event.event === 'queue' &&
           (event.queue as unknown as QueueView).repository === h.repo &&
-          (event.queue as unknown as QueueView).items[0]?.after[0]?.title === 'новый API',
+          (event.queue as unknown as QueueView).items[0]?.after[0]?.title === 'new API',
       ),
     );
     await h.close();
@@ -212,7 +212,7 @@ describe('global queue event', () => {
     await until('the snapshot', () => events.length > 0);
     const snapshot = events[0]!;
     expect(snapshot).toMatchObject({ event: 'snapshot', queues: [] });
-    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'работа' });
+    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'work' });
     await until('the event of the global queue', () =>
       events.some(
         (event) =>
@@ -229,7 +229,7 @@ describe('global queue event', () => {
 describe('repositories event', () => {
   it('sends the registry in the snapshot and on every change of the list', async () => {
     const h = (current = await harness());
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'вопрос?' }, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'question?' }, {}] });
     const events: StreamEvent[] = [];
     const ended = subscribe(h.socket, (line) =>
       events.push(streamEventSchema.parse(JSON.parse(line))),

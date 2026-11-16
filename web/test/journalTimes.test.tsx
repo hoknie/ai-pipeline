@@ -28,7 +28,7 @@ describe('format of the time of a log line', () => {
 
 describe('time in the transcript', () => {
   const entries: TranscriptEntry[] = [
-    { kind: 'text', text: 'Читаю файл', at: AT },
+    { kind: 'text', text: 'Reading the file', at: AT },
     { kind: 'tool_call', id: 't1', name: 'Bash', summary: 'npm test', input: '{}', at: AT + 1000 },
     { kind: 'tool_result', id: 't1', text: 'ok', error: false, at: AT + 2000 },
     {
@@ -102,7 +102,7 @@ describe('attempt header and message', () => {
   it('shows when the attempt started and the message the person sent', async () => {
     screenOf({
       attempts: [
-        { ...running, startedAt: AT, message: { text: 'Смотри в **src/auth**', at: AT + 5000 } },
+        { ...running, startedAt: AT, message: { text: 'Look in **src/auth**', at: AT + 5000 } },
       ],
     });
     expect(await screen.findByText(`Attempt started · 14:32:05`)).toBeTruthy();
@@ -124,7 +124,7 @@ describe('attempt header and message', () => {
     expect(header.className).toContain('sticky');
     expect(header.className).toContain('top-[var(--group-header-height,0px)]');
     expect(header.className).toContain('bg-card');
-    const section = screen.getByRole('region', { name: /Вход/ });
+    const section = screen.getByRole('region', { name: /Sign-in/ });
     expect(section.style.getPropertyValue('--group-header-height')).toBe('0px');
   });
 
@@ -145,7 +145,7 @@ describe('attempt header and message', () => {
 
   it('hides the button of a finished, a reporting or an interrupted attempt', async () => {
     screenOf({
-      attempts: [{ ...running, status: 'running', verdict: 'done', summary: 'готово' }],
+      attempts: [{ ...running, status: 'running', verdict: 'done', summary: 'all set' }],
     });
     await screen.findByRole('button', { name: /^attempt 1/ });
     expect(screen.queryByRole('button', { name: 'Message to the specialist' })).toBeNull();
@@ -164,11 +164,11 @@ describe('attempt header and message', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Message to the specialist' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Message'), {
-      target: { value: '  используй OAuth  ' },
+      target: { value: '  use OAuth  ' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Send' }));
     await waitFor(() =>
-      expect(api.message).toHaveBeenCalledWith('run1', 'login', 1, '  используй OAuth  '),
+      expect(api.message).toHaveBeenCalledWith('run1', 'login', 1, '  use OAuth  '),
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect((await screen.findAllByText('Message sent')).length).toBeGreaterThan(0);
@@ -194,13 +194,13 @@ describe('attempt header and message', () => {
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Message to the specialist' }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText('Message'), { target: { value: 'текст' } });
+    fireEvent.change(within(dialog).getByLabelText('Message'), { target: { value: 'some text' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(onError).toHaveBeenCalledWith('attempt 1 is not running'));
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(
       (within(screen.getByRole('dialog')).getByLabelText('Message') as HTMLTextAreaElement).value,
-    ).toBe('текст');
+    ).toBe('some text');
   });
 });
 
@@ -215,9 +215,9 @@ describe('message dialog', () => {
     fireEvent.change(field, { target: { value: '   ' } });
     fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true });
     expect(onSend).not.toHaveBeenCalled();
-    fireEvent.change(field, { target: { value: 'привет' } });
+    fireEvent.change(field, { target: { value: 'hello' } });
     fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true });
-    await waitFor(() => expect(onSend).toHaveBeenCalledWith('привет'));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('hello'));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 

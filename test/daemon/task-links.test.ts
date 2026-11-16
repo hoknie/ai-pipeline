@@ -224,7 +224,7 @@ describe('links of tasks', () => {
             queueChain: [
               {
                 pipeline: 'feature',
-                task: 'модель',
+                task: 'model',
                 title: 'ok',
                 links: [{ kind: 'related', target: 'nope' }],
               },
@@ -242,7 +242,7 @@ describe('links of tasks', () => {
       const created = await startRun(h, {
         repository: h.repo,
         pipeline: 'feature',
-        task: 'итоги',
+        task: 'summary',
       });
       await h.call('queue_pause', { repository: h.repo });
       await h.waitFor(created.runId, (view) => view.finished);

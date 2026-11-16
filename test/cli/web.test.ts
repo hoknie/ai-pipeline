@@ -572,9 +572,9 @@ describe('aip web', () => {
       pipeline: 'feature',
       groups: [{ title: 'login', task: 'x' }],
     })) as RunCreated;
-    const set = await post(`/api/runs/${runId}/title`, { title: '  Новое название ' });
+    const set = await post(`/api/runs/${runId}/title`, { title: '  New title ' });
     expect(set.status).toBe(200);
-    expect(((await set.json()) as { title: string }).title).toBe('Новое название');
+    expect(((await set.json()) as { title: string }).title).toBe('New title');
     expect((await post(`/api/runs/${runId}/title`, {})).status).toBe(400);
     expect((await post(`/api/runs/${runId}/title`, { title: '  ' })).status).toBe(400);
     expect((await post(`/api/runs/${runId}/title`, { title: 'x'.repeat(61) })).status).toBe(400);
@@ -713,7 +713,7 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     const first = (await (
-      await post('/api/queue/items', { pipeline: 'feature', task: 'модель' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'model' })
     ).json()) as QueueView & { item: string };
     const second = (await (
       await post('/api/queue/items', { pipeline: 'feature', task: 'api', after: [first.item] })
@@ -771,7 +771,7 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     const first = (await (
-      await post('/api/queue/items', { pipeline: 'feature', task: 'модель' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'model' })
     ).json()) as QueueView & { item: string };
     const second = (await (
       await post('/api/queue/items', { pipeline: 'feature', task: 'api', after: [first.item] })
@@ -794,7 +794,7 @@ describe('aip web', () => {
         body: JSON.stringify(body),
       });
     h.script({ code: [{ noReport: true }, {}] });
-    await post('/api/queue/items', { pipeline: 'feature', task: 'работа' });
+    await post('/api/queue/items', { pipeline: 'feature', task: 'work' });
     await post('/api/queue/start', {});
     const run = await waitValue('the queue to stop on a problem', async () => {
       const queue = (await (
@@ -826,7 +826,7 @@ describe('aip web', () => {
       });
     h.script({ code: [{ waitFor: h.gate('a') }] });
     const added = (await (
-      await post('/api/queue/items', { pipeline: 'feature', task: 'работа' })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'work' })
     ).json()) as QueueView & { item: string };
     await post(`/api/queue/items/${added.item}/run`, {});
     const run = await waitValue('a run in the queue', async () => {
@@ -856,7 +856,7 @@ describe('aip web', () => {
       });
     h.script({ code: [{ noReport: true }, {}] });
     await post('/api/queue/settings', { skipFailed: true });
-    await post('/api/queue/items', { pipeline: 'feature', task: 'работа' });
+    await post('/api/queue/items', { pipeline: 'feature', task: 'work' });
     await post('/api/queue/start', {});
     const run = await waitValue('a skipped run', async () => {
       const queue = (await (
@@ -892,9 +892,9 @@ describe('aip web', () => {
     expect((await fetch(`${base}/api/queue/start`, { headers: authed(web) })).status).toBe(405);
     expect((await post('/api/queue', {})).status).toBe(405);
 
-    const added = await post('/api/queue/items', { pipeline: 'feature', task: 'первая' });
+    const added = await post('/api/queue/items', { pipeline: 'feature', task: 'first' });
     expect(added.status).toBe(200);
-    await post('/api/queue/items', { pipeline: 'feature', task: 'вторая', title: 'Вторая' });
+    await post('/api/queue/items', { pipeline: 'feature', task: 'second', title: 'Second' });
     const third = (await (
       await post('/api/queue/items', {
         pipeline: 'feature',
@@ -904,12 +904,12 @@ describe('aip web', () => {
       })
     ).json()) as QueueView & { item: string };
     expect(third.repository).toBe(h.repo);
-    expect((await read()).items.map((item) => item.task)).toEqual(['первая', 'вторая', null]);
+    expect((await read()).items.map((item) => item.task)).toEqual(['first', 'second', null]);
 
     const moved = await post(`/api/queue/items/${third.item}`, { position: 1 });
     expect(moved.status).toBe(200);
     expect((await read()).items[0]?.id).toBe(third.item);
-    const edited = await post(`/api/queue/items/${third.item}`, { task: 'текст' });
+    const edited = await post(`/api/queue/items/${third.item}`, { task: 'text' });
     expect(edited.status).toBe(200);
 
     for (const [path, body] of [
@@ -943,9 +943,9 @@ describe('aip web', () => {
     });
     expect((await read()).skipFailed).toBe(true);
     const answered = (await (
-      await post('/api/queue/settings', { autopilotAnswer: 'Согласен' })
+      await post('/api/queue/settings', { autopilotAnswer: 'Agreed' })
     ).json()) as QueueView;
-    expect(answered.autopilotAnswer).toBe('Согласен');
+    expect(answered.autopilotAnswer).toBe('Agreed');
     const restored = (await (
       await post('/api/queue/settings', { autopilotAnswer: null })
     ).json()) as QueueView;
@@ -1016,14 +1016,18 @@ describe('aip web', () => {
     };
     const first = await open();
     await first.until('"snapshot"');
-    await h.call('queue_add', { repository: h.repo, pipeline: 'feature', task: 'из терминала' });
-    expect(await first.until('"event":"queue"')).toContain('из терминала');
+    await h.call('queue_add', {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'from the terminal',
+    });
+    expect(await first.until('"event":"queue"')).toContain('from the terminal');
     first.controller.abort();
     const second = await open();
-    const text = await second.until('из терминала');
+    const text = await second.until('from the terminal');
     second.controller.abort();
     expect(text).toContain('"event":"snapshot"');
-    expect(text).toMatch(/"queues":\[\{[^]*из терминала/);
+    expect(text).toMatch(/"queues":\[\{[^]*from the terminal/);
   });
 
   it('skips a step through POST with validation', async () => {
@@ -1258,7 +1262,7 @@ describe('aip web', () => {
       code: [
         {
           toolCalls: [
-            tool({ file_name: 'Отчёт.md', content: '# Привет\n' }),
+            tool({ file_name: 'Отчёт.md', content: '# Hello\n' }),
             tool({ file_name: 'page.html', content: '<script>alert(1)</script>' }),
             tool({ file_name: 'out.log', content: 'line' }),
           ],
@@ -1304,7 +1308,7 @@ describe('aip web', () => {
     expect(md.headers.get('content-disposition')).toBe(
       `attachment; filename="_____.md"; filename*=UTF-8''%D0%9E%D1%82%D1%87%D1%91%D1%82.md`,
     );
-    expect(await md.text()).toBe('# Привет\n');
+    expect(await md.text()).toBe('# Hello\n');
 
     const html = await fetch(url('page.html'), { headers: authed(web) });
     expect(html.headers.get('content-type')).toBe('application/octet-stream');
@@ -1855,7 +1859,7 @@ describe('aip web repositories', () => {
     });
     expect(outside.status).toBe(400);
 
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'вопрос?' }, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'question?' }, {}] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',
@@ -2589,7 +2593,7 @@ describe('aip web shared pipelines and import', () => {
   });
 });
 
-describe('API наблюдателей', () => {
+describe('observers API', () => {
   it('reads, saves and rejects the settings without a repository', async () => {
     h = await harness(MANUAL_CONFIG);
     web = await startWebServer({

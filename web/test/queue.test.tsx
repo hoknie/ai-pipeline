@@ -148,13 +148,13 @@ describe('queue tab', () => {
               { title: 'c', task: 'd' },
             ],
           }),
-          queueItem('q2', 'длинный\nтекст', 2, { error: 'unknown pipeline `feature`' }),
-          queueItem('q3', 'x', 3, { title: 'Название' }),
+          queueItem('q2', 'lengthy\nnote', 2, { error: 'unknown pipeline `feature`' }),
+          queueItem('q3', 'x', 3, { title: 'Caption' }),
         ],
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    expect(labels()).toEqual(['1. 2 groups', '2. длинный', '3. Название']);
+    expect(labels()).toEqual(['1. 2 groups', '2. lengthy', '3. Caption']);
     expect(screen.getByText(/unknown pipeline/)).toBeTruthy();
   });
 
@@ -164,7 +164,7 @@ describe('queue tab', () => {
         stop: { kind: 'problem', run: 'run1', group: 'login', reason: 'needs_human' },
         runs: [
           queueRun('run1', {
-            title: 'Вход',
+            title: 'Sign-in',
             problem: { group: 'login', reason: 'needs_human' },
           }),
         ],
@@ -174,7 +174,7 @@ describe('queue tab', () => {
     expect(links).toHaveLength(2);
     for (const link of links) expect(link.getAttribute('href')).toBe('#runs/run1/login');
     expect(screen.getAllByText('needs_human', { selector: 'code' })).toHaveLength(2);
-    expect(screen.getByRole('link', { name: 'Вход' }).getAttribute('href')).toBe('#runs/run1');
+    expect(screen.getByRole('link', { name: 'Sign-in' }).getAttribute('href')).toBe('#runs/run1');
   });
 
   it('starts by the button and shows the running state from the answer', async () => {
@@ -318,19 +318,19 @@ describe('runs from the queue', () => {
         parallel: 2,
         runs: [
           queueRun('run1', {
-            title: 'Вход',
+            title: 'Sign-in',
             groups: { done: 1, total: 3 },
             steps: { done: 2, total: 6, current: null },
-            active: [{ group: 'signup', step: 'coder', stepName: 'Кодер' }],
+            active: [{ group: 'signup', step: 'coder', stepName: 'Coder' }],
           }),
         ],
       }),
     );
-    const card = await screen.findByRole('group', { name: 'Вход' });
+    const card = await screen.findByRole('group', { name: 'Sign-in' });
     expect(within(card).getByText('feature')).toBeTruthy();
     expect(within(card).getByText('1 of 3 groups · steps 2 of 6')).toBeTruthy();
     expect(within(card).getByText('signup', { selector: 'code' })).toBeTruthy();
-    expect(within(card).getByText(/Кодер/)).toBeTruthy();
+    expect(within(card).getByText(/Coder/)).toBeTruthy();
     const bar = within(card).getByRole('progressbar');
     expect(bar.getAttribute('aria-valuenow')).toBe('2');
     expect(bar.getAttribute('aria-valuemax')).toBe('6');
@@ -371,7 +371,7 @@ describe('runs from the queue', () => {
   });
 
   it('puts the title and the status on different rows', async () => {
-    const title = 'Очень длинное название запуска '.repeat(5).trim();
+    const title = 'A very long run title '.repeat(5).trim();
     show(
       queueOf({
         status: 'running',
@@ -395,14 +395,14 @@ describe('runs from the queue', () => {
         status: 'running',
         runs: [
           queueRun('run1', {
-            title: 'Один',
-            steps: { done: 1, total: 4, current: { step: 'coder', name: 'Кодер', number: 2 } },
+            title: 'Solo',
+            steps: { done: 1, total: 4, current: { step: 'coder', name: 'Coder', number: 2 } },
           }),
         ],
       }),
     );
-    const card = await screen.findByRole('group', { name: 'Один' });
-    expect(within(card).getByText('step 2 of 4 · Кодер')).toBeTruthy();
+    const card = await screen.findByRole('group', { name: 'Solo' });
+    expect(within(card).getByText('step 2 of 4 · Coder')).toBeTruthy();
     expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
   });
 
@@ -412,13 +412,13 @@ describe('runs from the queue', () => {
         status: 'running',
         runs: [
           queueRun('run1', {
-            title: 'Один',
-            steps: { done: 1, total: 3, current: { step: 'review', name: 'Ревьюер', number: 2 } },
+            title: 'Solo',
+            steps: { done: 1, total: 3, current: { step: 'review', name: 'Reviewer', number: 2 } },
           }),
         ],
       }),
     );
-    const card = await screen.findByRole('group', { name: 'Один' });
+    const card = await screen.findByRole('group', { name: 'Solo' });
     expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
     act(() => {
       stream().open();
@@ -429,14 +429,14 @@ describe('runs from the queue', () => {
           status: 'running',
           runs: [
             queueRun('run1', {
-              title: 'Один',
-              steps: { done: 0, total: 3, current: { step: 'coder', name: 'Кодер', number: 1 } },
+              title: 'Solo',
+              steps: { done: 0, total: 3, current: { step: 'coder', name: 'Coder', number: 1 } },
             }),
           ],
         }),
       });
     });
-    await screen.findByText('step 1 of 3 · Кодер');
+    await screen.findByText('step 1 of 3 · Coder');
     expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0');
   });
 
@@ -446,7 +446,7 @@ describe('runs from the queue', () => {
         status: 'running',
         runs: [
           queueRun('run1', {
-            title: 'Готово',
+            title: 'Wrapped up',
             steps: { done: 4, total: 4, current: null },
           }),
         ],
@@ -478,10 +478,10 @@ describe('runs from the queue', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { active: [{ group: 'g', step: 'code', stepName: 'Кодер' }] })],
+        runs: [queueRun('run1', { active: [{ group: 'g', step: 'code', stepName: 'Coder' }] })],
       }),
     );
-    await screen.findByText(/Кодер/);
+    await screen.findByText(/Coder/);
     act(() => {
       stream().open();
       stream().send({
@@ -490,19 +490,19 @@ describe('runs from the queue', () => {
         queue: queueOf({
           status: 'running',
           runs: [
-            queueRun('run1', { active: [{ group: 'g', step: 'review', stepName: 'Ревьюер' }] }),
+            queueRun('run1', { active: [{ group: 'g', step: 'review', stepName: 'Reviewer' }] }),
           ],
         }),
       });
     });
-    await screen.findByText(/Ревьюер/);
+    await screen.findByText(/Reviewer/);
   });
 });
 
 describe('pipeline badge in the queue', () => {
   it('stands right after the state badge on the card, not in the time row', async () => {
-    show(queueOf({ status: 'running', runs: [queueRun('run1', { title: 'Вход' })] }));
-    const card = await screen.findByRole('group', { name: 'Вход' });
+    show(queueOf({ status: 'running', runs: [queueRun('run1', { title: 'Sign-in' })] }));
+    const card = await screen.findByRole('group', { name: 'Sign-in' });
     const badge = within(card).getByLabelText('Pipeline: feature');
     const state = within(card).getByText('Active').closest('span')!.parentElement!;
     expect(state.nextElementSibling).toBe(badge);
@@ -554,7 +554,7 @@ describe('task numbers', () => {
 describe('new task form', () => {
   it('adds a task and clears the form without starting the queue', async () => {
     const api = show(queueOf(), {
-      queueAdd: vi.fn(async () => ({ ...queueOf({ items: items('Сделать вход') }), item: 'q1' })),
+      queueAdd: vi.fn(async () => ({ ...queueOf({ items: items('Build sign-in') }), item: 'q1' })),
     });
     await openNewTask();
     const text = await screen.findByLabelText('Task text');
@@ -563,11 +563,11 @@ describe('new task form', () => {
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     expect(add.disabled).toBe(true);
-    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    fireEvent.change(text, { target: { value: 'Build sign-in' } });
     expect(add.disabled).toBe(false);
     fireEvent.click(add);
     await waitFor(() =>
-      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Сделать вход' }),
+      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Build sign-in' }),
     );
     await screen.findByLabelText('tasks in the queue');
     await openNewTask();
@@ -578,7 +578,7 @@ describe('new task form', () => {
   it('announces the created task with its number', async () => {
     show(queueOf(), {
       queueAdd: vi.fn(async () => ({
-        ...queueOf({ items: [queueItem('q7', 'Сделать вход', 7)] }),
+        ...queueOf({ items: [queueItem('q7', 'Build sign-in', 7)] }),
         item: 'q7',
       })),
     });
@@ -587,7 +587,7 @@ describe('new task form', () => {
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
     fireEvent.change(await screen.findByLabelText('Task text'), {
-      target: { value: 'Сделать вход' },
+      target: { value: 'Build sign-in' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(screen.getAllByText('Task #7 created').length).toBeGreaterThan(0));
@@ -628,24 +628,24 @@ describe('new task form', () => {
     await screen.findByLabelText('Task text');
     fireEvent.click(screen.getByRole('radio', { name: 'Groups' }));
     const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add' });
-    fireEvent.change(screen.getByLabelText('Title of group 1'), { target: { value: 'Вход' } });
+    fireEvent.change(screen.getByLabelText('Title of group 1'), { target: { value: 'Sign-in' } });
     expect(add.disabled).toBe(false);
-    fireEvent.change(screen.getByLabelText('Text of group 1'), { target: { value: 'форма' } });
+    fireEvent.change(screen.getByLabelText('Text of group 1'), { target: { value: 'form' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add group' }));
     expect(add.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Title of group 2'), { target: { value: 'Выход' } });
-    fireEvent.change(screen.getByLabelText('Text of group 2'), { target: { value: 'кнопка' } });
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Пара' } });
+    fireEvent.change(screen.getByLabelText('Title of group 2'), { target: { value: 'Sign-out' } });
+    fireEvent.change(screen.getByLabelText('Text of group 2'), { target: { value: 'button' } });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pair' } });
     expect(add.disabled).toBe(false);
     fireEvent.click(add);
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
         pipeline: 'feature',
         groups: [
-          { title: 'Вход', task: 'форма' },
-          { title: 'Выход', task: 'кнопка' },
+          { title: 'Sign-in', task: 'form' },
+          { title: 'Sign-out', task: 'button' },
         ],
-        title: 'Пара',
+        title: 'Pair',
       }),
     );
   });
@@ -674,11 +674,11 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    fireEvent.change(text, { target: { value: 'Build sign-in' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/unknown pipeline/);
     expect(api.queueAdd).toHaveBeenCalled();
-    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('Сделать вход');
+    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('Build sign-in');
   });
 
   it('accepts a title without task text and sends the title as task text', async () => {
@@ -724,21 +724,21 @@ describe('new task form', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'черновик' } });
+    fireEvent.change(text, { target: { value: 'draft text' } });
     act(() => {
       stream().open();
       stream().send({ event: 'queue', seq: 5, queue: queueOf({ items: items('A', 'Z') }) });
       stream().send({ event: 'run', seq: 6, run: runView() });
     });
     expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
-    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('черновик');
+    expect((screen.getByLabelText('Task text') as HTMLTextAreaElement).value).toBe('draft text');
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     await waitFor(() => expect(labels()).toEqual(['1. A', '2. Z']));
     fireEvent.click(screen.getByRole('link', { name: /Runs/ }));
     fireEvent.click(await screen.findByRole('link', { name: /Queue/ }));
     await openNewTask();
     expect(((await screen.findByLabelText('Task text')) as HTMLTextAreaElement).value).toBe(
-      'черновик',
+      'draft text',
     );
   });
 
@@ -746,12 +746,12 @@ describe('new task form', () => {
     show(queueOf({ items: items('A') }));
     await openNewTask();
     const text = await screen.findByLabelText('Task text');
-    fireEvent.change(text, { target: { value: 'черновик' } });
+    fireEvent.change(text, { target: { value: 'draft text' } });
     act(() => {
       void i18next.changeLanguage('ru');
     });
     const field = await screen.findByLabelText<HTMLTextAreaElement>('Текст задачи');
-    expect(field.value).toBe('черновик');
+    expect(field.value).toBe('draft text');
     expect(screen.getByRole('button', { name: 'Добавить' })).toBeTruthy();
     expect(screen.queryByLabelText('Task text')).toBeNull();
   });
@@ -761,7 +761,7 @@ describe('automatic delivery switch', () => {
   it('sends autoDeliver false after switching off, and shows the task as manual', async () => {
     const api = show(queueOf(), {
       queueAdd: vi.fn(async () => ({
-        ...queueOf({ items: [queueItem('q1', 'Сделать вход', 1, { autoDeliver: false })] }),
+        ...queueOf({ items: [queueItem('q1', 'Build sign-in', 1, { autoDeliver: false })] }),
         item: 'q1',
       })),
     });
@@ -773,14 +773,14 @@ describe('automatic delivery switch', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    fireEvent.change(text, { target: { value: 'Build sign-in' } });
     fireEvent.click(toggle);
     expect(screen.getByText('for this task')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
         pipeline: 'feature',
-        task: 'Сделать вход',
+        task: 'Build sign-in',
         autoDeliver: false,
       }),
     );
@@ -795,19 +795,21 @@ describe('automatic delivery switch', () => {
   });
 
   it('previews the text of an item as Markdown in the edit form', async () => {
-    show(queueOf({ items: [queueItem('q1', '**важно**', 1)] }));
+    show(queueOf({ items: [queueItem('q1', '**important**', 1)] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     previewMarkdown();
-    expect((await screen.findByText('важно')).tagName).toBe('STRONG');
+    expect((await screen.findByText('important')).tagName).toBe('STRONG');
   });
 
   it('keeps the view of a locked form working and its fields unavailable', async () => {
-    show(queueOf({ items: [queueItem('q1', '**важно**', 1, { run: 'run7', hold: 'paused' })] }));
+    show(
+      queueOf({ items: [queueItem('q1', '**important**', 1, { run: 'run7', hold: 'paused' })] }),
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     const field = await screen.findByLabelText<HTMLTextAreaElement>('Task text');
     expect(field.disabled).toBe(true);
     previewMarkdown();
-    expect((await screen.findByText('важно')).tagName).toBe('STRONG');
+    expect((await screen.findByText('important')).tagName).toBe('STRONG');
     previewMarkdown(null, false);
     expect(field.disabled).toBe(true);
     for (const name of ['Bold', 'Heading', 'Link', 'Code block']) {
@@ -822,7 +824,7 @@ describe('automatic delivery switch', () => {
           queueItem('q1', '', 1, {
             run: 'run7',
             hold: 'paused',
-            groups: [{ title: 'Вход', task: 'форма' }],
+            groups: [{ title: 'Sign-in', task: 'form' }],
           }),
         ],
       }),
@@ -1031,7 +1033,7 @@ describe('items', () => {
             task: null,
             groups: [
               { title: 'Only title', task: 'Only title' },
-              { title: 'Old title', task: 'Исправить вход\nПроверить ошибку' },
+              { title: 'Old title', task: 'Fix sign-in\nCheck the error' },
             ],
           }),
         ],
@@ -1051,7 +1053,7 @@ describe('items', () => {
       expect.objectContaining({
         groups: [
           { title: 'Only title', task: 'Only title' },
-          { title: 'Исправить вход', task: 'Исправить вход\nПроверить ошибку' },
+          { title: 'Fix sign-in', task: 'Fix sign-in\nCheck the error' },
         ],
         title: null,
       }),
@@ -1506,7 +1508,7 @@ describe('pipelines', () => {
         pipelinesView({
           pipelines: [
             { ...pipelinesView().pipelines[0]!, id: 'feature' },
-            { ...pipelinesView().pipelines[0]!, id: 'fix', name: 'Исправление' },
+            { ...pipelinesView().pipelines[0]!, id: 'fix', name: 'Hotfix' },
           ],
         }),
       ),
@@ -1514,10 +1516,10 @@ describe('pipelines', () => {
     await openNewTask();
     const trigger = await screen.findByRole('combobox', { name: 'Pipeline' });
     fireEvent.keyDown(trigger, { key: 'Enter' });
-    await screen.findByRole('option', { name: 'Исправление' });
+    await screen.findByRole('option', { name: 'Hotfix' });
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
       'feature',
-      'Исправление',
+      'Hotfix',
     ]);
   });
 });
@@ -1564,13 +1566,13 @@ describe('tags in the queue', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    fireEvent.change(text, { target: { value: 'Build sign-in' } });
     await pick('auth', 'v2');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
         pipeline: 'feature',
-        task: 'Сделать вход',
+        task: 'Build sign-in',
         tags: ['auth', 'v2'],
       }),
     );
@@ -1640,19 +1642,19 @@ describe('tags in the queue', () => {
   });
 });
 
-const model = (extra = {}) => queueItem('q1', 'модель данных', 1, { title: 'Модель', ...extra });
+const model = (extra = {}) => queueItem('q1', 'data schema', 1, { title: 'Schema', ...extra });
 const apiItem = (extra = {}) =>
   queueItem('q2', 'api', 2, {
     title: 'API',
     readiness: 'waiting',
-    after: [dependency('item', 'q1', 'Модель')],
+    after: [dependency('item', 'q1', 'Schema')],
     links: [
       {
         kind: 'blocked_by',
         id: 'q1',
         ref: 'item',
         number: 1,
-        title: 'Модель',
+        title: 'Schema',
         repository: '/repo',
       },
     ],
@@ -1705,7 +1707,7 @@ describe('queue links', () => {
       uiItem(),
       queueItem('q4', 'other', 4),
     ],
-    runs: [queueRun('run1', { title: 'Запуск' })],
+    runs: [queueRun('run1', { title: 'Launch' })],
   });
 
   it('finds dependents, the related set and the depth of a chain', () => {
@@ -1731,7 +1733,7 @@ describe('queue links', () => {
         model(),
         queueItem('q2', 'b', 2),
         queueItem('q3', 'c', 3, {
-          after: [dependency('item', 'q1', 'Модель'), dependency('item', 'q2', 'b')],
+          after: [dependency('item', 'q1', 'Schema'), dependency('item', 'q2', 'b')],
         }),
       ],
     });
@@ -1763,7 +1765,7 @@ describe('queue links', () => {
   it('counts a run as related but not in the depth, and caps the depth at three', () => {
     const queue = queueOf({
       items: [
-        queueItem('q1', 'a', 1, { after: [dependency('run', 'run1', 'Запуск')] }),
+        queueItem('q1', 'a', 1, { after: [dependency('run', 'run1', 'Launch')] }),
         queueItem('q2', 'b', 2, { after: [dependency('item', 'q1', 'a')] }),
         queueItem('q3', 'c', 3, { after: [dependency('item', 'q2', 'b')] }),
         queueItem('q4', 'd', 4, { after: [dependency('item', 'q3', 'c')] }),
@@ -1794,7 +1796,10 @@ describe('task form layout', () => {
   });
 
   it('shows a long task title whole in the list and in the chip', async () => {
-    const long = 'Очень длинное название задачи которое не помещается в строку'.slice(0, 60);
+    const long = 'A very long task title that does not fit on a single line of the list'.slice(
+      0,
+      60,
+    );
     show(queueOf({ items: [{ ...queueItem('q1', 'x', 1), title: long }] }));
     await openNewTask();
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
@@ -1837,7 +1842,7 @@ describe('dependencies in the form', () => {
       '#runs/run-return',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
-    await pick(screen.getAllByRole('combobox', { name: 'Linked task' })[1]!, 'Модель');
+    await pick(screen.getAllByRole('combobox', { name: 'Linked task' })[1]!, 'Schema');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.queueEdit).toHaveBeenCalledWith('q2', { after: ['q1'] }));
   });
@@ -1846,7 +1851,7 @@ describe('dependencies in the form', () => {
     await openNewTask();
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'API' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
-    await pick(screen.getByRole('combobox', { name: 'Linked task' }), 'Модель');
+    await pick(screen.getByRole('combobox', { name: 'Linked task' }), 'Schema');
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
@@ -1915,14 +1920,14 @@ describe('dependencies in the form', () => {
   it('groups a predecessor that left the queue under current predecessors', async () => {
     const failed = apiItem({
       readiness: 'blocked',
-      after: [dependency('run', 'run7', 'Упавший', 'blocked')],
+      after: [dependency('run', 'run7', 'Crashed', 'blocked')],
       links: [
         {
           kind: 'blocked_by',
           id: 'run7',
           ref: 'run',
           number: null,
-          title: 'Упавший',
+          title: 'Crashed',
           repository: '/repo',
           state: 'blocked',
         },
@@ -1933,7 +1938,7 @@ describe('dependencies in the form', () => {
     await editRow('API');
     const picker = await screen.findByRole('combobox', { name: 'Linked task' });
     fireEvent.click(picker);
-    await screen.findByRole('option', { name: /Модель/ });
+    await screen.findByRole('option', { name: /Schema/ });
     expect(screen.getByText('Current links')).toBeTruthy();
     expect(screen.getByText('Waiting tasks')).toBeTruthy();
   });
@@ -1955,14 +1960,14 @@ describe('dependencies in the form', () => {
   it('offers a predecessor that no longer holds a place and removes it', async () => {
     const failed = apiItem({
       readiness: 'blocked',
-      after: [dependency('run', 'run7', 'Модель', 'blocked')],
+      after: [dependency('run', 'run7', 'Schema', 'blocked')],
       links: [
         {
           kind: 'blocked_by',
           id: 'run7',
           ref: 'run',
           number: null,
-          title: 'Модель',
+          title: 'Schema',
           repository: '/repo',
           state: 'blocked',
         },
@@ -1985,8 +1990,8 @@ describe('dependencies in the form', () => {
     await editRow('API');
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     const picker = await screen.findByRole('combobox', { name: 'Linked task' });
-    await pick(picker, 'Модель');
-    expect(picker.textContent).toContain('#1 Модель');
+    await pick(picker, 'Schema');
+    expect(picker.textContent).toContain('#1 Schema');
     act(() => {
       stream().open();
       stream().send({
@@ -1995,7 +2000,7 @@ describe('dependencies in the form', () => {
         queue: queueOf({ items: [model(), queueItem('q2', 'api', 2, { title: 'API' })] }),
       });
     });
-    expect(picker.textContent).toContain('#1 Модель');
+    expect(picker.textContent).toContain('#1 Schema');
   });
 
   it('keeps the original current link as an option when a queue event removes it', async () => {
@@ -2034,7 +2039,7 @@ describe('dependencies in the form', () => {
       }),
     });
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    await editRow('Модель');
+    await editRow('Schema');
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     const picker = await screen.findByRole('combobox', { name: 'Linked task' });
     await pick(picker, 'API');
@@ -2085,25 +2090,25 @@ describe('dependencies in the list', () => {
       queueOf({
         items: [
           apiItem({
-            after: [dependency('run', 'run1', 'Модель')],
+            after: [dependency('run', 'run1', 'Schema')],
             links: [
               {
                 kind: 'blocked_by',
                 id: 'run1',
                 ref: 'run',
                 number: null,
-                title: 'Модель',
+                title: 'Schema',
                 repository: '/repo',
                 state: 'waiting',
               },
             ],
           }),
         ],
-        runs: [queueRun('run1', { title: 'Модель' })],
+        runs: [queueRun('run1', { title: 'Schema' })],
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    const link = within(row('API')).getByRole('link', { name: /Модель/ });
+    const link = within(row('API')).getByRole('link', { name: /Schema/ });
     expect(link.getAttribute('href')).toBe('#runs/run1');
     expect(link.getAttribute('data-state')).toBe('waiting');
     expect(link.textContent).toContain('waiting');
@@ -2112,8 +2117,8 @@ describe('dependencies in the list', () => {
   it('shows waiting readiness with the predecessor in the hint', async () => {
     show(
       queueOf({
-        items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })],
-        runs: [queueRun('run1', { title: 'Модель' })],
+        items: [apiItem({ after: [dependency('run', 'run1', 'Schema')] })],
+        runs: [queueRun('run1', { title: 'Schema' })],
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
@@ -2122,7 +2127,7 @@ describe('dependencies in the list', () => {
     });
     const holder = badge.closest('[data-readiness]')!;
     expect(holder.getAttribute('data-readiness')).toBe('waiting');
-    expect(holder.getAttribute('title')).toContain('Модель');
+    expect(holder.getAttribute('title')).toContain('Schema');
   });
 
   it('marks a blocked task and its failed predecessor', async () => {
@@ -2131,14 +2136,14 @@ describe('dependencies in the list', () => {
         items: [
           apiItem({
             readiness: 'blocked',
-            after: [dependency('run', 'run1', 'Модель', 'blocked')],
+            after: [dependency('run', 'run1', 'Schema', 'blocked')],
             links: [
               {
                 kind: 'blocked_by',
                 id: 'run1',
                 ref: 'run',
                 number: null,
-                title: 'Модель',
+                title: 'Schema',
                 repository: '/repo',
                 state: 'blocked',
               },
@@ -2157,7 +2162,7 @@ describe('dependencies in the list', () => {
   it('shows an independent task as ready and without labels', async () => {
     show(queueOf({ items: [model()] }));
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    const li = row('Модель');
+    const li = row('Schema');
     expect(li.querySelector('[data-readiness="ready"]')).toBeTruthy();
     expect(
       [...li.querySelectorAll('[data-state]')].filter(
@@ -2170,7 +2175,7 @@ describe('dependencies in the list', () => {
   it('explains in the hint that a ready task has nothing to wait for', async () => {
     show(queueOf({ items: [model()] }));
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    const badge = row('Модель').querySelector('[data-readiness="ready"]')!;
+    const badge = row('Schema').querySelector('[data-readiness="ready"]')!;
     expect(badge.getAttribute('title')).toContain('Nothing to wait for');
   });
 
@@ -2178,14 +2183,14 @@ describe('dependencies in the list', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { title: 'Запуск' })],
+        runs: [queueRun('run1', { title: 'Launch' })],
         items: [model()],
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    fireEvent.mouseEnter(row('Модель'));
-    expect(row('Модель').hasAttribute('data-highlighted')).toBe(false);
-    expect(screen.getByRole('group', { name: 'Запуск' }).hasAttribute('data-highlighted')).toBe(
+    fireEvent.mouseEnter(row('Schema'));
+    expect(row('Schema').hasAttribute('data-highlighted')).toBe(false);
+    expect(screen.getByRole('group', { name: 'Launch' }).hasAttribute('data-highlighted')).toBe(
       false,
     );
   });
@@ -2196,7 +2201,7 @@ describe('dependencies in the list', () => {
     fireEvent.focus(row('API'));
     const edit = within(row('API')).getByRole('button', { name: 'Edit' });
     fireEvent.blur(row('API'), { relatedTarget: edit });
-    for (const title of ['Модель', 'API'])
+    for (const title of ['Schema', 'API'])
       expect(row(title).hasAttribute('data-highlighted')).toBe(true);
     fireEvent.blur(row('API'), { relatedTarget: document.body });
     expect(row('API').hasAttribute('data-highlighted')).toBe(false);
@@ -2207,9 +2212,9 @@ describe('dependencies in the list', () => {
     await screen.findByRole('list', { name: 'tasks in the queue' });
     expect(row('API').getAttribute('data-depth')).toBe('1');
     expect(row('UI').getAttribute('data-depth')).toBe('2');
-    expect(row('Модель').getAttribute('data-depth')).toBe('0');
+    expect(row('Schema').getAttribute('data-depth')).toBe('0');
     fireEvent.mouseEnter(row('API'));
-    for (const title of ['Модель', 'API', 'UI'])
+    for (const title of ['Schema', 'API', 'UI'])
       expect(row(title).hasAttribute('data-highlighted')).toBe(true);
     expect(row('other').hasAttribute('data-highlighted')).toBe(false);
     fireEvent.mouseLeave(row('API'));
@@ -2220,12 +2225,12 @@ describe('dependencies in the list', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { title: 'Модель' })],
-        items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })],
+        runs: [queueRun('run1', { title: 'Schema' })],
+        items: [apiItem({ after: [dependency('run', 'run1', 'Schema')] })],
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    const card = screen.getByRole('group', { name: 'Модель' });
+    const card = screen.getByRole('group', { name: 'Schema' });
     expect(card.hasAttribute('data-highlighted')).toBe(false);
     fireEvent.focus(row('API'));
     expect(card.hasAttribute('data-highlighted')).toBe(true);
@@ -2239,7 +2244,7 @@ describe('dependencies in the list', () => {
 
 describe('confirmations with dependencies', () => {
   const waiting = () =>
-    queueOf({ items: [apiItem({ after: [dependency('run', 'run1', 'Модель')] })] });
+    queueOf({ items: [apiItem({ after: [dependency('run', 'run1', 'Schema')] })] });
 
   it('asks before running a waiting task, then runs it', async () => {
     const api = show(waiting());
@@ -2247,7 +2252,7 @@ describe('confirmations with dependencies', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run now' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog.textContent).toContain('Dependencies are not met');
-    expect(dialog.textContent).toContain('Модель');
+    expect(dialog.textContent).toContain('Schema');
     expect(api.queueRunNow).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Run now' }));
     await waitFor(() => expect(api.queueRunNow).toHaveBeenCalledWith('q2'));
@@ -2287,7 +2292,7 @@ describe('confirmations with dependencies', () => {
       }),
     );
     await screen.findByRole('list', { name: 'tasks in the queue' });
-    fireEvent.click(within(row('Модель')).getByRole('button', { name: 'Remove' }));
+    fireEvent.click(within(row('Schema')).getByRole('button', { name: 'Remove' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog.textContent).toContain('API');
     expect(dialog.textContent).toContain('will stop waiting');
@@ -2406,7 +2411,7 @@ describe('queue controls block', () => {
         queueOf({
           status: 'running',
           autopilot: true,
-          runs: [queueRun('run1', { title: 'Вход' })],
+          runs: [queueRun('run1', { title: 'Sign-in' })],
         }),
       ),
     });
@@ -2420,7 +2425,7 @@ describe('queue controls block', () => {
     );
     await screen.findByRole('region', { name: 'running from the queue' });
     expect((await controlsBlock()).getByText('Running')).toBeTruthy();
-    expect(screen.getByRole('group', { name: 'Вход' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Sign-in' })).toBeTruthy();
   });
 });
 
@@ -2430,10 +2435,10 @@ describe('skipped runs', () => {
       queueOf({
         status: 'running',
         skipFailed: true,
-        runs: [queueRun('run2', { title: 'Регистрация' })],
+        runs: [queueRun('run2', { title: 'Sign-up' })],
         skipped: [
           queueRun('run1', {
-            title: 'Логин',
+            title: 'Login page',
             state: 'failed',
             problem: { group: 'login', reason: 'failed' },
           }),
@@ -2442,29 +2447,29 @@ describe('skipped runs', () => {
     );
     const skipped = within(await screen.findByRole('region', { name: 'skipped with a problem' }));
     expect(skipped.getByRole('heading').textContent).toBe('Skipped with a problem (1)');
-    const card = within(skipped.getByRole('group', { name: 'Логин' }));
+    const card = within(skipped.getByRole('group', { name: 'Login page' }));
     expect(card.getByText('a group failed', { exact: false })).toBeTruthy();
     expect(card.getByRole('link', { name: /login/ }).getAttribute('href')).toBe(
       formatRoute({ view: 'runs', run: 'run1', group: 'login', step: null, tab: null }),
     );
     const running = screen.getByRole('region', { name: 'running from the queue' });
     expect(within(running).getByRole('heading').textContent).toContain('1 of 1 place');
-    expect(within(running).queryByText('Логин')).toBeNull();
+    expect(within(running).queryByText('Login page')).toBeNull();
   });
 
   it('offers the return only for a returnable run and removes after the confirmation', async () => {
     const api = show(
       queueOf({
         skipped: [
-          queueRun('run1', { title: 'Логин', state: 'failed', returnable: false }),
-          queueRun('run2', { title: 'Вход', state: 'failed', returnable: true }),
+          queueRun('run1', { title: 'Login page', state: 'failed', returnable: false }),
+          queueRun('run2', { title: 'Sign-in', state: 'failed', returnable: true }),
         ],
       }),
       { queueDismiss: vi.fn(async () => queueOf()) },
     );
     const skipped = within(await screen.findByRole('region', { name: 'skipped with a problem' }));
-    const first = within(skipped.getByRole('group', { name: 'Логин' }));
-    const second = within(skipped.getByRole('group', { name: 'Вход' }));
+    const first = within(skipped.getByRole('group', { name: 'Login page' }));
+    const second = within(skipped.getByRole('group', { name: 'Sign-in' }));
     expect(first.queryByRole('button', { name: 'Return to the queue' })).toBeNull();
     expect(second.getByRole('button', { name: 'Return to the queue' })).toBeTruthy();
     fireEvent.click(first.getByRole('button', { name: 'Remove from list' }));
@@ -2473,7 +2478,7 @@ describe('skipped runs', () => {
     expect(api.queueDismiss).not.toHaveBeenCalled();
     fireEvent.click(first.getByRole('button', { name: 'Remove from list' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog.textContent).toContain('Remove Логин from the skipped list?');
+    expect(dialog.textContent).toContain('Remove Login page from the skipped list?');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove from list' }));
     await waitFor(() => expect(api.queueDismiss).toHaveBeenCalledWith('run1', '/repo'));
     await waitFor(() =>
@@ -2488,7 +2493,7 @@ describe('skipped runs', () => {
   });
 
   it('shows the block of a paused queue without runs', async () => {
-    show(queueOf({ skipped: [queueRun('run1', { title: 'Логин', state: 'failed' })] }));
+    show(queueOf({ skipped: [queueRun('run1', { title: 'Login page', state: 'failed' })] }));
     await screen.findByRole('region', { name: 'skipped with a problem' });
     expect(screen.queryByRole('region', { name: 'running from the queue' })).toBeNull();
   });
@@ -2509,7 +2514,7 @@ describe('delivery mode of a task', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
     );
-    fireEvent.change(text, { target: { value: 'Сделать вход' } });
+    fireEvent.change(text, { target: { value: 'Build sign-in' } });
     fireEvent.keyDown(select, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('option', { name: 'Branch' }));
     expect(screen.getByText('mode for this task')).toBeTruthy();
@@ -2517,7 +2522,7 @@ describe('delivery mode of a task', () => {
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({
         pipeline: 'feature',
-        task: 'Сделать вход',
+        task: 'Build sign-in',
         deliveryMode: 'branch',
       }),
     );
@@ -2746,7 +2751,7 @@ describe('system stages and waiting in the cards of the queue', () => {
     show(
       queueOf({
         status: 'running',
-        runs: [queueRun('run1', { title: 'Вход', ...overrides })],
+        runs: [queueRun('run1', { title: 'Sign-in', ...overrides })],
       }),
     );
 
@@ -2792,11 +2797,11 @@ describe('system stages and waiting in the cards of the queue', () => {
 });
 
 const STEP_NAMES: Record<string, string> = {
-  plan: 'Планировщик',
-  code: 'Кодер',
-  review: 'Ревьюер',
-  qa: 'Тестировщик',
-  deliver: 'Доставщик',
+  plan: 'Planner',
+  code: 'Coder',
+  review: 'Reviewer',
+  qa: 'Tester',
+  deliver: 'Deliverer',
 };
 const stepOf = (id: string) => ({ ...pipelineOf().steps[0]!, id, name: STEP_NAMES[id] ?? id });
 const skipGroup = () => screen.getByText('Skip steps', { selector: 'legend' }).parentElement!;
@@ -2873,7 +2878,7 @@ describe('new task dialog', () => {
   it('keeps the draft after Esc and does not close on events', async () => {
     show(queueOf());
     await openNewTask();
-    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'черновик' } });
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'draft text' } });
     act(() => {
       stream().open();
       stream().send({ event: 'queue', seq: 5, queue: queueOf() });
@@ -2883,7 +2888,7 @@ describe('new task dialog', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await openNewTask();
-    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('черновик');
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Task text').value).toBe('draft text');
   });
 });
 
@@ -2972,7 +2977,7 @@ describe('two halves of the task form', () => {
           steps: ['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf),
           variants: [
             variantOf(['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf), 'default'),
-            variantOf(['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf), 'light', 'Лёгкий', [
+            variantOf(['plan', 'code', 'review', 'qa', 'deliver'].map(stepOf), 'light', 'Lite', [
               'review',
               'qa',
             ]),
@@ -2987,7 +2992,7 @@ describe('two halves of the task form', () => {
       await openNewTask();
       await skipStepAsync('plan');
       fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
-      fireEvent.click(await screen.findByRole('option', { name: 'Лёгкий' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Lite' }));
       await waitFor(() => expect(skipStep('review').disabled).toBe(true));
       expect(skipStep('review').getAttribute('aria-pressed')).toBe('true');
       expect(skipStep('qa').getAttribute('aria-pressed')).toBe('true');
@@ -3020,7 +3025,7 @@ describe('two halves of the task form', () => {
       };
       await edit();
       fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
-      fireEvent.click(await screen.findByRole('option', { name: 'Лёгкий' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Lite' }));
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() =>
         expect(api.queueEdit).toHaveBeenNthCalledWith(
@@ -3048,7 +3053,7 @@ describe('two halves of the task form', () => {
       await openNewTask();
       await skipStepAsync('plan');
       fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
-      fireEvent.click(await screen.findByRole('option', { name: 'Лёгкий' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Lite' }));
       fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
       fireEvent.click(await screen.findByRole('option', { name: 'small' }));
       await waitFor(() => expect(within(skipGroup()).getAllByRole('button')).toHaveLength(2));
@@ -3064,7 +3069,7 @@ describe('two halves of the task form', () => {
       }),
       { pipelines: vi.fn(async () => fiveSteps) },
     );
-    await screen.findByLabelText('skips: Ревьюер, Тестировщик');
+    await screen.findByLabelText('skips: Reviewer, Tester');
     expect(screen.getAllByLabelText(/^skips:/)).toHaveLength(1);
     expect(screen.queryByText(/^skips:/)).toBeNull();
     fireEvent.click(
@@ -3251,7 +3256,7 @@ describe('parent task in the form', () => {
     show(queueOf({ items: [item] }));
     await sendRuns({
       id: 'run1',
-      title: 'Вход по ссылке',
+      title: 'Magic link sign-in',
       number: 12,
       finished: true,
       state: 'finished',
@@ -3260,7 +3265,7 @@ describe('parent task in the form', () => {
     await editRow('API');
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Linked task' }).textContent).toBe(
-        '#12 Вход по ссылке',
+        '#12 Magic link sign-in',
       ),
     );
   });

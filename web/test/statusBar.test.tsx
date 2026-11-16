@@ -35,7 +35,7 @@ const LIB = '/work/lib';
 const runs = () => [
   runView({
     id: 'r1',
-    title: 'Первый',
+    title: 'First run',
     repository: APP,
     specialists: [
       specialistUse('coder', { level: 'global', max: 1, running: ['login'] }),
@@ -44,7 +44,7 @@ const runs = () => [
   }),
   runView({
     id: 'r2',
-    title: 'Второй',
+    title: 'Second run',
     repository: LIB,
     specialists: [specialistUse('coder', { level: 'global', max: 1, waiting: ['api'] })],
   }),
@@ -108,15 +108,15 @@ describe('status bar', () => {
           id: 'r1',
           repository: APP,
           specialists: [
-            specialistUse('coder', { level: 'global', name: 'Кодер', max: 1, running: ['a'] }),
-            specialistUse('plan', { name: 'Планировщик', waiting: ['b'] }),
+            specialistUse('coder', { level: 'global', name: 'Coder', max: 1, running: ['a'] }),
+            specialistUse('plan', { name: 'Planner', waiting: ['b'] }),
           ],
         }),
       ],
     });
     fireEvent.click(toggle());
-    expect(screen.getByText('Кодер').getAttribute('title')).toBe('coder');
-    expect(screen.getByText(/Планировщик/).getAttribute('title')).toBe('plan');
+    expect(screen.getByText('Coder').getAttribute('title')).toBe('coder');
+    expect(screen.getByText(/Planner/).getAttribute('title')).toBe('plan');
     expect(screen.queryByText('coder')).toBeNull();
   });
 
@@ -228,8 +228,8 @@ describe('background processes tab', () => {
     expect(screen.getByRole('columnheader', { name: 'PID' })).toBeTruthy();
     expect(screen.getByRole('columnheader', { name: 'Command' })).toBeTruthy();
     expect(screen.queryByRole('columnheader', { name: 'Name' })).toBeNull();
-    expect(within(row).queryByText('Логин · Первый')).toBeNull();
-    const header = screen.getByRole('button', { name: 'Логин · Первый' }).closest('tr')!;
+    expect(within(row).queryByText('Login page · First run')).toBeNull();
+    const header = screen.getByRole('button', { name: 'Login page · First run' }).closest('tr')!;
     expect(header.nextElementSibling).toBe(row);
   });
 
@@ -244,20 +244,20 @@ describe('background processes tab', () => {
       fakeApi({
         processes: vi.fn(async () => ({
           processes: [
-            owned('cache', 'Кэш', 100),
-            owned('login', 'Вход', 200),
-            owned('cache', 'Кэш', 300),
+            owned('cache', 'Cache', 100),
+            owned('login', 'Sign-in', 200),
+            owned('cache', 'Cache', 300),
           ],
         })),
       }),
     );
     await screen.findByText('100');
     const rows = screen.getAllByRole('row').slice(1);
-    expect(rows.map((row) => row.textContent!.match(/^(Кэш|Вход)|^\d+/)![0])).toEqual([
-      'Кэш · Первый'.slice(0, 3),
+    expect(rows.map((row) => row.textContent!.match(/^(Cache|Sign-in)|^\d+/)![0])).toEqual([
+      'Cache',
       '100',
       '300',
-      'Вход',
+      'Sign-in',
       '200',
     ]);
   });
@@ -268,33 +268,35 @@ describe('background processes tab', () => {
         processes: vi.fn(async () => ({ processes: [owned(null, 'x', 7)] })),
       }),
     );
-    expect(await screen.findByText('Первый')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Первый/ })).toBeNull();
+    expect(await screen.findByText('First run')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /First run/ })).toBeNull();
   });
 
   it('drops a task header with its last process', async () => {
     const processes = vi
       .fn()
-      .mockResolvedValueOnce({ processes: [owned('a', 'А', 1), owned('b', 'Б', 2)] })
-      .mockResolvedValue({ processes: [owned('b', 'Б', 2)] });
+      .mockResolvedValueOnce({ processes: [owned('a', 'Alpha', 1), owned('b', 'Beta', 2)] })
+      .mockResolvedValue({ processes: [owned('b', 'Beta', 2)] });
     const { api } = await open(fakeApi({ processes }));
     fireEvent.click(await screen.findByRole('button', { name: 'Terminate node (1)' }));
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Terminate' }));
     await waitFor(() => expect(api.killProcess).toHaveBeenCalledWith(1));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'А · Первый' })).toBeNull());
-    expect(screen.getByRole('button', { name: 'Б · Первый' })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Alpha · First run' })).toBeNull(),
+    );
+    expect(screen.getByRole('button', { name: 'Beta · First run' })).toBeTruthy();
   });
 
   it('opens the group with the step of the last process of the task', async () => {
     const { onOpenGroup } = await open(
       fakeApi({
         processes: vi.fn(async () => ({
-          processes: [owned('a', 'А', 1), owned('a', 'А', 2)],
+          processes: [owned('a', 'Alpha', 1), owned('a', 'Alpha', 2)],
         })),
       }),
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'А · Первый' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Alpha · First run' }));
     expect(onOpenGroup).toHaveBeenCalledWith({ runId: 'run1', group: 'a', step: 's2' });
   });
 
@@ -388,7 +390,7 @@ describe('background processes tab', () => {
 
   it('opens the group that owns the process', async () => {
     const { onOpenGroup } = await open();
-    fireEvent.click(await screen.findByRole('button', { name: 'Логин · Первый' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Login page · First run' }));
     expect(onOpenGroup).toHaveBeenCalledWith({ runId: 'run1', group: 'login', step: 'code' });
   });
 });
@@ -545,7 +547,7 @@ describe('status bar in the panel', () => {
         event: 'run',
         run: runView({
           id: 'r2',
-          title: 'Второй',
+          title: 'Second run',
           repository: LIB,
           specialists: [specialistUse('coder', { level: 'global', max: 1, running: ['api'] })],
         }),

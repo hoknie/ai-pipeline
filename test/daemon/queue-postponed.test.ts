@@ -98,7 +98,7 @@ describe('postponed items', () => {
     const queued = (await h.call('run', {
       repository: h.repo,
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
       title: 'R',
       after: [a.item],
       ...({ postponed: true } as object),

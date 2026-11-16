@@ -142,7 +142,7 @@ describe('summary of the changes', () => {
     act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const panel = await screen.findByRole('tabpanel');
     await waitFor(() => expect(panel.textContent).toContain('2 files +9 −2'));
-    const region = screen.getByRole('region', { name: 'group Вход' });
+    const region = screen.getByRole('region', { name: 'group Sign-in' });
     expect(region.querySelector('header')!.textContent).not.toContain('2 files');
   });
 });
@@ -223,11 +223,11 @@ describe('diff in the Changes tab while the step runs', () => {
 describe('moving to another group', () => {
   it('drops the tab from the address and selects the log', async () => {
     window.location.hash = '#runs/run1/login?tab=changes';
-    const other = groupRow({ slug: 'other', title: 'Другая', status: 'running' });
+    const other = groupRow({ slug: 'other', title: 'Second group', status: 'running' });
     mount([runView({ groups: [groupRow(), other] })]);
     const tab = await screen.findByRole('tab', { name: 'Changes' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
-    fireEvent.click(await screen.findByRole('button', { name: /Другая/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Second group/ }));
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1/other'));
     expect((await screen.findByRole('tab', { name: 'Log' })).getAttribute('aria-selected')).toBe(
       'true',
@@ -263,10 +263,10 @@ describe('Artifacts tab', () => {
         {
           id: 'a1',
           step: 'code',
-          stepName: 'Кодировщик',
+          stepName: 'Code author',
           seq: 1,
           specialist: 'coder',
-          title: 'Отчёт',
+          title: 'Report',
           fileName: 'report.md',
           size: 10,
           createdAt: 1000,

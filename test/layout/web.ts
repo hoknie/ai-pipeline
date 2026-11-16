@@ -77,7 +77,7 @@ function problemOf(source: Where, target: Where, targetPath: string): string | u
   }
 }
 
-/** Импорты панели: направления, вход в область через `index.ts`, `src/` только типами. */
+/** Panel imports: directions, entering an area through `index.ts`, `src/` only as types. */
 export function webImportViolations(root: string, tree: Tree = loadTree(root)): Violation[] {
   const found: Violation[] = [];
   for (const [path, parsed] of tree.files) {
@@ -112,7 +112,7 @@ export function webImportViolations(root: string, tree: Tree = loadTree(root)): 
   return found;
 }
 
-/** Расположение файлов: области, группы `shared/ui`, `index.ts` только реэкспортирует. */
+/** File placement: areas, `shared/ui` groups, `index.ts` only re-exports. */
 export function webPlacementViolations(root: string, tree: Tree = loadTree(root)): Violation[] {
   const found: Violation[] = [];
   for (const [path, parsed] of tree.files) {
@@ -142,7 +142,7 @@ export function webPlacementViolations(root: string, tree: Tree = loadTree(root)
   return found;
 }
 
-/** Каждая область — с `index.ts`, граф областей панели описывает только известные области. */
+/** Every area has an `index.ts`; the graph of panel areas describes only known areas. */
 export function webEntryViolations(root: string, tree: Tree = loadTree(root)): Violation[] {
   const found: Violation[] = [];
   const features = new Set<string>();

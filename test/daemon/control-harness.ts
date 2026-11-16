@@ -59,6 +59,6 @@ export function alive(pid: number): boolean {
  * takes a fraction of a second.
  */
 export const SHORT_TIMEOUT = PIPELINE_CONFIG.replace(
-  'coder: { name: Кодировщик }',
-  'coder: { name: Кодировщик, timeout: 1s }',
+  'coder: { name: Coder }',
+  'coder: { name: Coder, timeout: 1s }',
 );

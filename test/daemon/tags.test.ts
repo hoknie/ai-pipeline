@@ -34,7 +34,7 @@ afterEach(async () => {
 // one step in `feature`: the tests count tasks and runs, not the steps
 const SCOUT_CONFIG = `${CODE_ONLY_CONFIG.replace(
   '  pipelines:\n',
-  '    scout: { name: Разведчик, queue: true }\n  pipelines:\n    explore:\n      steps:\n        - { id: explore, specialist: scout }\n',
+  '    scout: { name: Scout, queue: true }\n  pipelines:\n    explore:\n      steps:\n        - { id: explore, specialist: scout }\n',
 )}`;
 
 async function start(config = PIPELINE_CONFIG): Promise<Harness> {
@@ -363,7 +363,7 @@ describe('tags of tasks', () => {
     const untouched = (await h.call('queue_edit', {
       repository: h.repo,
       item: added.item,
-      task: 'новый текст',
+      task: 'new text',
     })) as QueueView;
     expect(names(untouched.items[0]!.tags)).toEqual(['v2']);
     const cleared = (await h.call('queue_edit', {
@@ -496,8 +496,8 @@ describe('tags of tasks from a specialist', () => {
     repository: '',
     pipeline: 'explore',
     groups: [
-      { title: 'один', task: 'a' },
-      { title: 'два', task: 'b' },
+      { title: 'one', task: 'a' },
+      { title: 'two', task: 'b' },
     ],
   };
 
@@ -835,8 +835,8 @@ describe('tags of linked tasks', () => {
       repository: h.repo,
       pipeline: 'explore',
       groups: [
-        { title: 'один', task: 'a' },
-        { title: 'два', task: 'b' },
+        { title: 'one', task: 'a' },
+        { title: 'two', task: 'b' },
       ],
       title: 'Fix login',
     })) as QueueView & { item: string };
@@ -1147,7 +1147,7 @@ describe('linked task tag of every task from a specialist', () => {
     const added = (await h.call('queue_add', {
       repository: h.repo,
       pipeline: 'explore',
-      groups: [{ title: 'один', task: 'a' }],
+      groups: [{ title: 'one', task: 'a' }],
       title,
       tags,
     })) as QueueView & { item: string };

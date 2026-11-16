@@ -58,7 +58,7 @@ export function attemptRecord(overrides: Partial<AttemptRecord> = {}): AttemptRe
   counter += 1;
   return {
     runId: `run-${counter}`,
-    group: 'gruppa-1',
+    group: 'group-1',
     seq: 1,
     kind: 'step',
     repository: '/work/app',

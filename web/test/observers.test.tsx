@@ -107,11 +107,11 @@ describe('the observers as the panel reads them', () => {
       FakeEventSource.last!.send({
         event: 'snapshot',
         seq: 1,
-        runs: [runView({ title: 'Первая задача' })],
+        runs: [runView({ title: 'First task' })],
       }),
     );
     act(() => FakeEventSource.last!.send({ event: 'mystery', payload: { run: 1 } }));
-    expect(screen.getAllByText('Первая задача').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('First task').length).toBeGreaterThan(0);
   });
 });
 
@@ -564,7 +564,7 @@ describe('the screen of the service group of the observer', () => {
         ...groupView().attempts[0]!,
         seq: 1,
         stepId: 'repair',
-        stepName: 'Починка',
+        stepName: 'Repair',
         status: 'failed',
       },
     ];
@@ -586,7 +586,7 @@ describe('the screen of the service group of the observer', () => {
   for (const status of ['running', 'failed', 'cancelled']) {
     it(`is titled «Observer» with its attempts and no delivery or retry when ${status}`, async () => {
       screenOf(status);
-      await screen.findByText(/#1 Починка/);
+      await screen.findByText(/#1 Repair/);
       expect(screen.getAllByText('Observer').length).toBeGreaterThan(0);
       expect(screen.queryByText('Retry delivery')).toBeNull();
       expect(screen.queryByText('Retry step')).toBeNull();

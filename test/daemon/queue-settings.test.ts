@@ -198,7 +198,7 @@ describe('delivery mode per task', () => {
 describe('autopilot answers', () => {
   it('answers a question of a specialist and goes on, marking the decision', async () => {
     const h = await start();
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}, {}] });
     await h.call('queue_settings', { repository: h.repo, autoAnswer: true });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
@@ -209,11 +209,11 @@ describe('autopilot answers', () => {
     const state = h.running.application.services.runs.states.get(created!.id);
     const decisions = state.groups.flatMap((group) => group.decisions);
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]).toMatchObject({ question: 'OAuth или пароль?', by: 'autopilot' });
+    expect(decisions[0]).toMatchObject({ question: 'OAuth or password?', by: 'autopilot' });
     expect(decisions[0]?.answer).toContain('I agree with your recommendations');
     const view = await h.status(created!.id);
     expect(view.decisions).toHaveLength(1);
-    expect(view.decisions[0]).toMatchObject({ by: 'autopilot', question: 'OAuth или пароль?' });
+    expect(view.decisions[0]).toMatchObject({ by: 'autopilot', question: 'OAuth or password?' });
     expect(view.groups.flatMap((row) => row.decisions.map((d) => d.by))).toEqual(['autopilot']);
   });
 
@@ -223,9 +223,9 @@ describe('autopilot answers', () => {
     await h.call('queue_settings', {
       repository: h.repo,
       autoAnswer: true,
-      autopilotAnswer: 'Делай как проще',
+      autopilotAnswer: 'Do whatever is simpler',
     });
-    expect(await queueOf(h)).toMatchObject({ autopilotAnswer: 'Делай как проще' });
+    expect(await queueOf(h)).toMatchObject({ autopilotAnswer: 'Do whatever is simpler' });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.runs.length === 0 && queue.items.length === 0);
@@ -234,7 +234,7 @@ describe('autopilot answers', () => {
     const decisions = h.running.application.services.runs.states
       .get(created!.id)
       .groups.flatMap((g) => g.decisions);
-    expect(decisions[0]?.answer).toBe('Делай как проще');
+    expect(decisions[0]?.answer).toBe('Do whatever is simpler');
     await h.call('queue_settings', { repository: h.repo, autopilotAnswer: null });
     expect((await queueOf(h)).autopilotAnswer).toBeNull();
   });

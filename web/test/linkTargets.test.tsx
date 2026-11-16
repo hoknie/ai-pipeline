@@ -75,7 +75,7 @@ describe('link targets', () => {
           kind: 'blocked_by',
           id: 'gone',
           number: 4,
-          title: 'Упавший',
+          title: 'Failed one',
           repository: '/repo',
           ref: null,
         },
@@ -83,7 +83,7 @@ describe('link targets', () => {
     });
     const queue = queueOf({
       items: [queueItem('q1', 'a', 1), edited],
-      runs: [queueRun('run1', { title: 'Запуск' })],
+      runs: [queueRun('run1', { title: 'Launch' })],
     });
     const ids = (item?: typeof edited) =>
       linkTargets('blocked_by', queue, [], label, item).flatMap((group) =>

@@ -36,7 +36,7 @@ describe('skipped steps', () => {
     }
     step(state);
     expect(runningAttempt(state).stepId).toBe('review');
-    finish(state, 'rejected', { feedback: 'плохо' });
+    finish(state, 'rejected', { feedback: 'bad' });
     step(state);
     expect(runningAttempt(state).stepId).toBe('code');
   });
@@ -66,7 +66,7 @@ describe('step order', () => {
     expect(group(state).status).toBe('merging');
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c1' } },
       3000,
     );
     expect(group(state).status).toBe('merged');
@@ -87,13 +87,13 @@ describe('rejections', () => {
 
   it('returns to the goto step with the feedback of the rejecting specialist', () => {
     const state = toReview();
-    finish(state, 'rejected', { feedback: 'нет тестов' });
-    expect(group(state).pending).toMatchObject({ stepIndex: 1, feedback: 'нет тестов' });
+    finish(state, 'rejected', { feedback: 'no tests' });
+    expect(group(state).pending).toMatchObject({ stepIndex: 1, feedback: 'no tests' });
     step(state);
     const attempt = runningAttempt(state);
     expect(attempt.stepId).toBe('code');
     expect(attempt.round).toBe(2);
-    expect(attempt.input.feedback).toBe('нет тестов');
+    expect(attempt.input.feedback).toBe('no tests');
   });
 
   it('asks a human once max_rounds is exceeded', () => {
@@ -104,10 +104,10 @@ describe('rejections', () => {
       finish(state, 'done');
       step(state);
     }
-    finish(state, 'rejected', { feedback: 'опять' });
+    finish(state, 'rejected', { feedback: 'again' });
     expect(group(state).status).toBe('needs_human');
     expect(group(state).question).toContain('4 times (limit 3)');
-    expect(group(state).question).toMatch(/^Step `Ревьюер` rejected the work 4 times/);
+    expect(group(state).question).toMatch(/^Step `Reviewer` rejected the work 4 times/);
     expect(step(state)).toEqual([]);
   });
 
@@ -119,25 +119,25 @@ describe('rejections', () => {
       finish(state, 'done');
       step(state);
     }
-    finish(state, 'rejected', { feedback: 'нет теста X' });
+    finish(state, 'rejected', { feedback: 'no test X' });
     const reviewSeq = group(state).attempts.at(-1)!.seq;
-    expect(group(state).pending).toMatchObject({ stepIndex: 1, feedback: 'нет теста X' });
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'добавь тест X' }, 2500);
+    expect(group(state).pending).toMatchObject({ stepIndex: 1, feedback: 'no test X' });
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'add test X' }, 2500);
     expect(group(state).pending).not.toHaveProperty('askedBy');
     step(state);
     const attempt = runningAttempt(state);
     expect(attempt.stepId).toBe('code');
-    expect(attempt.input.feedback).toBe('нет теста X');
-    expect(attempt.input.humanAnswer).toBe('добавь тест X');
+    expect(attempt.input.feedback).toBe('no test X');
+    expect(attempt.input.humanAnswer).toBe('add test X');
     expect(group(state).decisions.at(-1)).toMatchObject({
       stepId: 'review',
       attemptSeq: reviewSeq,
-      answer: 'добавь тест X',
+      answer: 'add test X',
     });
     // The rejecting step asks again on the next rejection: every extra round needs a person.
     finish(state, 'done');
     step(state);
-    finish(state, 'rejected', { feedback: 'всё ещё нет' });
+    finish(state, 'rejected', { feedback: 'still missing' });
     expect(group(state).status).toBe('needs_human');
     expect(group(state).question).toMatch(/rejected the work 5 times \(limit 3\)/);
   });
@@ -145,9 +145,9 @@ describe('rejections', () => {
   it('asks a human when a step without on_reject rejects', () => {
     const state = run(1);
     step(state);
-    finish(state, 'rejected', { feedback: 'непонятно' });
+    finish(state, 'rejected', { feedback: 'unclear' });
     expect(group(state).status).toBe('needs_human');
-    expect(group(state).question).toBe('непонятно');
+    expect(group(state).question).toBe('unclear');
   });
 });
 
@@ -155,13 +155,13 @@ describe('questions to a human', () => {
   it('reruns the same step with the answer and resumes the session', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'OAuth или пароль?' });
-    expect(group(state)).toMatchObject({ status: 'needs_human', question: 'OAuth или пароль?' });
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'используй OAuth' }, 2500);
+    finish(state, 'needs_human', { feedback: 'OAuth or password?' });
+    expect(group(state)).toMatchObject({ status: 'needs_human', question: 'OAuth or password?' });
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'use OAuth' }, 2500);
     step(state);
     const attempt = runningAttempt(state);
     expect(attempt.stepId).toBe('plan');
-    expect(attempt.input.humanAnswer).toBe('используй OAuth');
+    expect(attempt.input.humanAnswer).toBe('use OAuth');
     expect(attempt.resumeSession).toBe('session-1');
     finish(state, 'done');
     step(state);
@@ -173,12 +173,12 @@ describe('questions to a human', () => {
     step(state);
     finish(state, 'done');
     step(state);
-    finish(state, 'needs_human', { feedback: 'Как назвать функцию?' });
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'Name it double' }, 2500);
+    finish(state, 'needs_human', { feedback: 'What to name the function?' });
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'Name it double' }, 2500);
     step(state);
     finish(state, 'done');
     step(state);
-    finish(state, 'rejected', { feedback: 'нужен JSDoc' });
+    finish(state, 'rejected', { feedback: 'needs JSDoc' });
     step(state);
     const attempt = runningAttempt(state);
     expect(attempt.stepId).toBe('code');
@@ -186,7 +186,7 @@ describe('questions to a human', () => {
     expect(attempt.input.decisions).toEqual([
       {
         stepId: 'code',
-        question: 'Как назвать функцию?',
+        question: 'What to name the function?',
         answer: 'Name it double',
         by: 'human',
         attemptSeq: 2,
@@ -196,10 +196,10 @@ describe('questions to a human', () => {
 
   it('rejects an answer for a group that is not waiting and an empty answer', () => {
     const state = run(1);
-    expect(() => transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'x' }, 1)).toThrow(
+    expect(() => transition(state, { kind: 'answer', group: 'group-1', answer: 'x' }, 1)).toThrow(
       'needs needs_human',
     );
-    expect(() => transition(state, { kind: 'answer', group: 'gruppa-1', answer: ' ' }, 1)).toThrow(
+    expect(() => transition(state, { kind: 'answer', group: 'group-1', answer: ' ' }, 1)).toThrow(
       'must not be empty',
     );
   });
@@ -211,7 +211,7 @@ describe('questions to a human', () => {
       state,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         report: { verdict: 'done', summary: 's', feedback: null },
       },
@@ -221,7 +221,7 @@ describe('questions to a human', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: { sessionId: null, usage: null, failure: null, outsideChanges: ['README.md'] },
       },
@@ -243,7 +243,7 @@ describe('questions to a human', () => {
     exitWithOutsideChange(state);
     expect(group(state).status).toBe('needs_human');
     expect(group(state).question).toContain('README.md');
-    expect(group(state).question).toContain('while step Планировщик ran');
+    expect(group(state).question).toContain('while step Planner ran');
     expect(group(state).question).not.toContain('The specialist changed');
     expect(group(state).attempts[0]?.outsideChanges).toEqual(['README.md']);
   });
@@ -253,12 +253,12 @@ describe('failures', () => {
   it('fails the step and the group on timeout and stops the process', () => {
     const state = run(2);
     step(state);
-    const effects = transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 9000);
+    const effects = transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 9000);
     expect(effects).toEqual([
-      { kind: 'stop_attempt', run: state.run.id, group: 'gruppa-1', seq: 1 },
+      { kind: 'stop_attempt', run: state.run.id, group: 'group-1', seq: 1 },
     ]);
     expect(group(state)).toMatchObject({ status: 'failed', reason: 'timeout' });
-    expect(group(state, 'gruppa-2').status).toBe('running');
+    expect(group(state, 'group-2').status).toBe('running');
   });
 
   it('fails with no report when the process exits without swarm_report', () => {
@@ -268,7 +268,7 @@ describe('failures', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: { sessionId: null, usage: null, failure: null, outsideChanges: [] },
       },
@@ -284,8 +284,8 @@ describe('failures', () => {
       finish(state, 'done');
     }
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 4 }, 9000);
-    transition(state, { kind: 'retry', group: 'gruppa-1' }, 9100);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 4 }, 9000);
+    transition(state, { kind: 'retry', group: 'group-1' }, 9100);
     step(state);
     const attempt = runningAttempt(state);
     expect(attempt.stepId).toBe('qa');
@@ -297,7 +297,7 @@ describe('failures', () => {
 
   it('refuses to retry a group that has not failed', () => {
     const state = run(1);
-    expect(() => transition(state, { kind: 'retry', group: 'gruppa-1' }, 1)).toThrow(
+    expect(() => transition(state, { kind: 'retry', group: 'group-1' }, 1)).toThrow(
       'needs failed, cancelled or conflict',
     );
   });
@@ -307,7 +307,7 @@ describe('failures', () => {
     step(state);
     transition(state, { kind: 'interrupted' }, 5);
     expect(group(state)).toMatchObject({ status: 'failed', reason: 'interrupted' });
-    expect(group(state, 'gruppa-2').status).toBe('queued');
+    expect(group(state, 'group-2').status).toBe('queued');
   });
 });
 
@@ -328,13 +328,13 @@ describe('cancellation', () => {
   it('rejects a report for a cancelled attempt', () => {
     const state = run(1);
     step(state);
-    transition(state, { kind: 'cancel', group: 'gruppa-1' }, 10);
+    transition(state, { kind: 'cancel', group: 'group-1' }, 10);
     expect(() =>
       transition(
         state,
         {
           kind: 'report',
-          group: 'gruppa-1',
+          group: 'group-1',
           seq: 1,
           report: { verdict: 'done', summary: 's', feedback: null },
         },
@@ -352,19 +352,19 @@ describe('reports', () => {
     const report = { summary: 's', feedback: 'f' };
     transition(
       state,
-      { kind: 'report', group: 'gruppa-1', seq: 1, report: { verdict: 'rejected', ...report } },
+      { kind: 'report', group: 'group-1', seq: 1, report: { verdict: 'rejected', ...report } },
       2,
     );
     transition(
       state,
-      { kind: 'report', group: 'gruppa-1', seq: 1, report: { verdict: 'done', ...report } },
+      { kind: 'report', group: 'group-1', seq: 1, report: { verdict: 'done', ...report } },
       3,
     );
     transition(
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: { sessionId: null, usage: null, failure: null, outsideChanges: [] },
       },
@@ -382,7 +382,7 @@ describe('reports', () => {
         state,
         {
           kind: 'report',
-          group: 'gruppa-1',
+          group: 'group-1',
           seq: 1,
           report: { verdict: 'rejected', summary: 's', feedback: null },
         },
@@ -397,9 +397,9 @@ describe('run names', () => {
     const state = run(1);
     expect(state.run).toMatchObject({ title: null, name: null });
     const usage = { inputTokens: 30, outputTokens: 10 };
-    transition(state, { kind: 'run_named', title: 'Вход', name: 'login', usage }, 10);
-    transition(state, { kind: 'run_named', title: 'Другое', name: 'other', usage: null }, 20);
-    expect(state.run).toMatchObject({ title: 'Вход', name: 'login', namingUsage: usage });
+    transition(state, { kind: 'run_named', title: 'Login', name: 'login', usage }, 10);
+    transition(state, { kind: 'run_named', title: 'Other', name: 'other', usage: null }, 20);
+    expect(state.run).toMatchObject({ title: 'Login', name: 'login', namingUsage: usage });
     expect(summarize(state).usage).toEqual(usage);
   });
 
@@ -419,8 +419,8 @@ describe('run names', () => {
 });
 
 const asked: HumanQuestion[] = [
-  { text: 'OAuth или пароль?', options: ['OAuth', 'пароль'], recommendation: 'OAuth' },
-  { text: 'Где хранить сессии?', recommendation: 'в базе' },
+  { text: 'OAuth or password?', options: ['OAuth', 'password'], recommendation: 'OAuth' },
+  { text: 'Where to store sessions?', recommendation: 'in the database' },
 ];
 
 describe('structured questions', () => {
@@ -473,9 +473,9 @@ describe('structured questions', () => {
 
   it('renders questions as a numbered text', () => {
     expect(questionsText(asked)).toBe(
-      '1. OAuth или пароль?\n   Options: OAuth | пароль\n   Recommended: OAuth\n2. Где хранить сессии?\n   Recommended: в базе',
+      '1. OAuth or password?\n   Options: OAuth | password\n   Recommended: OAuth\n2. Where to store sessions?\n   Recommended: in the database',
     );
-    expect(questionsText([{ text: 'Просто вопрос' }])).toBe('1. Просто вопрос');
+    expect(questionsText([{ text: 'Just a question' }])).toBe('1. Just a question');
   });
 
   it('keeps questions on the group, fills the text and clears them on answer', () => {
@@ -485,7 +485,7 @@ describe('structured questions', () => {
     expect(group(state).status).toBe('needs_human');
     expect(group(state).questions).toEqual(asked);
     expect(group(state).question).toBe(questionsText(asked));
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'Q1: OAuth' }, 2500);
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'Q1: OAuth' }, 2500);
     expect(group(state).questions).toBeNull();
     expect(group(state).question).toBeNull();
     expect(group(state).decisions[0]?.question).toBe(questionsText(asked));
@@ -495,8 +495,8 @@ describe('structured questions', () => {
     const state = run(1);
     step(state);
     finish(state, 'needs_human', { questions: asked });
-    transition(state, { kind: 'cancel', group: 'gruppa-1' }, 10);
-    transition(state, { kind: 'retry', group: 'gruppa-1' }, 11);
+    transition(state, { kind: 'cancel', group: 'group-1' }, 10);
+    transition(state, { kind: 'retry', group: 'group-1' }, 11);
     expect(group(state).status).toBe('needs_human');
     expect(group(state).questions).toEqual(asked);
   });
@@ -504,7 +504,7 @@ describe('structured questions', () => {
   it('has no questions for a plain question to a human', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'обычный вопрос' });
+    finish(state, 'needs_human', { feedback: 'a plain question' });
     expect(group(state).questions).toBeNull();
   });
 });
@@ -514,8 +514,8 @@ describe('title_set', () => {
     const state = run(1);
     transition(state, { kind: 'cancel', group: null }, 10);
     const name = state.run.name;
-    expect(transition(state, { kind: 'title_set', title: 'Новое' }, 20)).toEqual([]);
-    expect(state.run.title).toBe('Новое');
+    expect(transition(state, { kind: 'title_set', title: 'New' }, 20)).toEqual([]);
+    expect(state.run.title).toBe('New');
     expect(state.run.name).toBe(name);
   });
 
@@ -523,8 +523,8 @@ describe('title_set', () => {
     const state = run(1);
     step(state);
     const groups = JSON.stringify(state.groups);
-    transition(state, { kind: 'title_set', title: 'Ручное' }, 20);
-    expect(state.run.title).toBe('Ручное');
+    transition(state, { kind: 'title_set', title: 'Manual' }, 20);
+    expect(state.run.title).toBe('Manual');
     expect(state.run.namingUsage).toBeNull();
     expect(JSON.stringify(state.groups)).toBe(groups);
   });
@@ -532,9 +532,9 @@ describe('title_set', () => {
   it('is not overwritten by a late run_named, which still counts its usage', () => {
     const state = run(1);
     const usage = { inputTokens: 30, outputTokens: 10 };
-    transition(state, { kind: 'title_set', title: 'Ручное' }, 10);
-    transition(state, { kind: 'run_named', title: 'Модель', name: 'model', usage }, 20);
-    expect(state.run).toMatchObject({ title: 'Ручное', namingUsage: usage });
+    transition(state, { kind: 'title_set', title: 'Manual' }, 10);
+    transition(state, { kind: 'run_named', title: 'Model', name: 'model', usage }, 20);
+    expect(state.run).toMatchObject({ title: 'Manual', namingUsage: usage });
   });
 });
 
@@ -612,7 +612,7 @@ describe('step_skip', () => {
   it('drops the question of a step skipped while it waits for a human', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { questions: [{ text: 'Что?' }] as HumanQuestion[] });
+    finish(state, 'needs_human', { questions: [{ text: 'What?' }] as HumanQuestion[] });
     expect(group(state).status).toBe('needs_human');
     skip(state, 'plan');
     expect(group(state).question).toBeNull();
@@ -632,7 +632,7 @@ describe('step_skip', () => {
   it('binds the answer to the asking attempt after a skip and a repeated question', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'Первый?' });
+    finish(state, 'needs_human', { feedback: 'First?' });
     const firstSeq = group(state).attempts.at(-1)!.seq;
     skip(state, 'plan');
     expect(group(state).decisions).toEqual([]);
@@ -642,11 +642,11 @@ describe('step_skip', () => {
     group(state).status = 'queued';
     step(state);
     expect(runningAttempt(state).stepId).toBe('plan');
-    finish(state, 'needs_human', { feedback: 'Второй?' });
+    finish(state, 'needs_human', { feedback: 'Second?' });
     const secondSeq = group(state).attempts.at(-1)!.seq;
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'ответ' }, 4000);
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'answer' }, 4000);
     expect(group(state).decisions).toHaveLength(1);
-    expect(group(state).decisions[0]).toMatchObject({ question: 'Второй?', attemptSeq: secondSeq });
+    expect(group(state).decisions[0]).toMatchObject({ question: 'Second?', attemptSeq: secondSeq });
     expect(secondSeq).not.toBe(firstSeq);
   });
 
@@ -680,8 +680,8 @@ describe('step_skip', () => {
 describe('retry with the current config', () => {
   const FIXED = (text: string) =>
     text.replace(
-      'reviewer: { name: Ревьюер, permissions: read }',
-      'reviewer: { name: Ревьюер, permissions: read, model: opus }',
+      'reviewer: { name: Reviewer, permissions: read }',
+      'reviewer: { name: Reviewer, permissions: read, model: opus }',
     );
 
   function failedAtReview() {
@@ -694,7 +694,7 @@ describe('retry with the current config', () => {
     step(state);
     transition(
       state,
-      { kind: 'timed_out', group: 'gruppa-1', seq: runningAttempt(state).seq },
+      { kind: 'timed_out', group: 'group-1', seq: runningAttempt(state).seq },
       2000,
     );
     expect(group(state).status).toBe('failed');
@@ -705,7 +705,7 @@ describe('retry with the current config', () => {
     const state = failedAtReview();
     transition(
       state,
-      { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config(FIXED(CONFIG_TEXT))) },
+      { kind: 'retry', group: 'group-1', specialists: specialistsOf(config(FIXED(CONFIG_TEXT))) },
       2500,
     );
     expect(group(state).status).toBe('queued');
@@ -721,10 +721,10 @@ describe('retry with the current config', () => {
   it('warns about no changes', () => {
     const state = run(1);
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 2000);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 2000);
     transition(
       state,
-      { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config()) },
+      { kind: 'retry', group: 'group-1', specialists: specialistsOf(config()) },
       2500,
     );
     expect(group(state).warnings).toContain('config refreshed: no changes');
@@ -740,7 +740,7 @@ describe('retry with the current config', () => {
     );
     transition(
       state,
-      { kind: 'retry', group: 'gruppa-1', specialists: specialistsOf(config(text)) },
+      { kind: 'retry', group: 'group-1', specialists: specialistsOf(config(text)) },
       2500,
     );
     expect(state.run.config.pipelines).toEqual(pipelines);
@@ -756,7 +756,7 @@ describe('retry with the current config', () => {
         state,
         {
           kind: 'retry',
-          group: 'gruppa-1',
+          group: 'group-1',
           specialists: specialistsOf(config(FIXED(CONFIG_TEXT))),
         },
         2500,

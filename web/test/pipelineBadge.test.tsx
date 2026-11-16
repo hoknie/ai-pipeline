@@ -10,9 +10,9 @@ afterEach(() => cleanup());
 
 describe('pipeline badge', () => {
   it('shows the name, with the id in the tooltip', async () => {
-    render(<PipelineBadge id="feature" name="Новая функция" />);
-    const badge = screen.getByLabelText('Pipeline: Новая функция (feature)');
-    expect(badge.textContent).toBe('Новая функция');
+    render(<PipelineBadge id="feature" name="New feature" />);
+    const badge = screen.getByLabelText('Pipeline: New feature (feature)');
+    expect(badge.textContent).toBe('New feature');
     fireEvent.focus(badge);
     expect((await screen.findByRole('tooltip')).textContent).toContain('(feature)');
   });

@@ -76,8 +76,8 @@ describe('specialist form model identity', () => {
         specialists: [
           specialistEntry(
             'coder',
-            { raw: { name: 'Кодировщик', runtime: 'opencode', model: currentModel } },
-            { name: 'Кодировщик', runtime: 'opencode', model: currentModel },
+            { raw: { name: 'Code author', runtime: 'opencode', model: currentModel } },
+            { name: 'Code author', runtime: 'opencode', model: currentModel },
           ),
         ],
       });

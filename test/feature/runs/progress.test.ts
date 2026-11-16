@@ -8,15 +8,15 @@ import { CONFIG_TEXT, finish, run, runningAttempt as runningAttemptOf, step } fr
 describe('stepProgress', () => {
   it('counts every step of merged, merging and conflict groups', () => {
     const state = run(3);
-    findGroup(state, 'gruppa-1')!.status = 'merged';
-    findGroup(state, 'gruppa-2')!.status = 'merging';
-    findGroup(state, 'gruppa-3')!.status = 'conflict';
+    findGroup(state, 'group-1')!.status = 'merged';
+    findGroup(state, 'group-2')!.status = 'merging';
+    findGroup(state, 'group-3')!.status = 'conflict';
     expect(stepProgress(state)).toEqual({ done: 12, total: 12, current: null });
   });
 
   it('counts a queued group without passes as 0 and its path from the pending step', () => {
     const state = run(2);
-    findGroup(state, 'gruppa-2')!.pending!.stepIndex = 2;
+    findGroup(state, 'group-2')!.pending!.stepIndex = 2;
     expect(stepProgress(state)).toEqual({ done: 0, total: 6, current: null });
   });
 
@@ -28,7 +28,7 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({
       done: 1,
       total: 4,
-      current: { step: 'code', name: 'Кодировщик', number: 2 },
+      current: { step: 'code', name: 'Coder', number: 2 },
     });
   });
 
@@ -38,7 +38,7 @@ describe('stepProgress', () => {
       step(state);
       finish(state, 'done');
       step(state);
-      findGroup(state, 'gruppa-1')!.status = status;
+      findGroup(state, 'group-1')!.status = status;
       expect(stepProgress(state).done).toBe(1);
     }
   });
@@ -49,7 +49,7 @@ describe('stepProgress', () => {
       finish(state, 'done');
     }
     step(state);
-    finish(state, 'rejected', { feedback: 'переделать' });
+    finish(state, 'rejected', { feedback: 'redo' });
   }
 
   it('lengthens the path when a group returns to an earlier step', () => {
@@ -58,7 +58,7 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({
       done: 3,
       total: 6,
-      current: { step: 'code', name: 'Кодировщик', number: 4 },
+      current: { step: 'code', name: 'Coder', number: 4 },
     });
   });
 
@@ -69,7 +69,7 @@ describe('stepProgress', () => {
     step(state);
     finish(state, 'done');
     step(state);
-    finish(state, 'rejected', { feedback: 'переделать' });
+    finish(state, 'rejected', { feedback: 'redo' });
     const progress = stepProgress(state);
     expect([progress.done, progress.total]).toEqual([2, 5]);
     expect(progress.current).toMatchObject({ step: 'code', number: 3 });
@@ -90,7 +90,7 @@ describe('stepProgress', () => {
     for (const status of ['failed', 'cancelled'] as const) {
       const state = run(1);
       sentBack(state, 2);
-      findGroup(state, 'gruppa-1')!.status = status;
+      findGroup(state, 'group-1')!.status = status;
       expect(stepProgress(state).done).toBe(3);
     }
   });
@@ -100,7 +100,7 @@ describe('stepProgress', () => {
     step(state);
     finish(state, 'done');
     step(state);
-    finish(state, 'needs_human', { questions: [{ text: 'что делать?' } as never] });
+    finish(state, 'needs_human', { questions: [{ text: 'what to do?' } as never] });
     expect(stepProgress(state).done).toBe(1);
     const failed = run(1);
     step(failed);
@@ -112,10 +112,10 @@ describe('stepProgress', () => {
     const configText = `swarm:
   max: 5
   specialists:
-    coder: { name: Кодировщик }
-    reviewer: { name: Ревьюер, permissions: read }
-    qa: { name: Тестировщик }
-    sum: { name: Сумматор }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer, permissions: read }
+    qa: { name: Tester }
+    sum: { name: Summarizer }
   pipelines:
     feature:
       steps:
@@ -130,14 +130,14 @@ describe('stepProgress', () => {
       finish(state, 'done');
     }
     step(state);
-    finish(state, 'rejected', { feedback: 'переделать' });
+    finish(state, 'rejected', { feedback: 'redo' });
     expect(stepProgress(state)).toMatchObject({ done: 3, total: 7 });
     step(state);
     finish(state, 'done');
     expect(stepProgress(state)).toEqual({
       done: 4,
       total: 7,
-      current: { step: 'review', name: 'Ревьюер', number: 5 },
+      current: { step: 'review', name: 'Reviewer', number: 5 },
     });
   });
 
@@ -148,7 +148,7 @@ describe('stepProgress', () => {
       step(state);
       finish(state, 'done');
     }
-    findGroup(state, 'gruppa-1')!.status = 'merged';
+    findGroup(state, 'group-1')!.status = 'merged';
     expect(stepProgress(state)).toEqual({ done: 6, total: 6, current: null });
   });
 
@@ -157,18 +157,18 @@ describe('stepProgress', () => {
     expect(stepProgress(state)).toEqual({
       done: 0,
       total: 3,
-      current: { step: 'plan', name: 'Планировщик', number: 1 },
+      current: { step: 'plan', name: 'Planner', number: 1 },
     });
   });
 
   it('sets the current step only for a single group', () => {
     expect(stepProgress(run(2)).current).toBeNull();
-    expect(stepProgress(run(1)).current).toEqual({ step: 'plan', name: 'Планировщик', number: 1 });
+    expect(stepProgress(run(1)).current).toEqual({ step: 'plan', name: 'Planner', number: 1 });
   });
 
   it('has no current step when the single group passed all steps', () => {
     const state = run(1);
-    findGroup(state, 'gruppa-1')!.status = 'merged';
+    findGroup(state, 'group-1')!.status = 'merged';
     expect(stepProgress(state)).toEqual({ done: 4, total: 4, current: null });
   });
 

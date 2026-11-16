@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { queueApi } from '../src/shared/api/queueApi.ts';
 
-describe('API связей задач', () => {
+describe('task links API', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('отправляет связь и её снятие на соответствующие маршруты', async () => {
+  it('sends a link and its removal to the matching routes', async () => {
     const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
     vi.stubGlobal('fetch', fetch);
     const api = queueApi((path) => `${path}?repository=repo`);

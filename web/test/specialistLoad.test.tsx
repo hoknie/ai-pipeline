@@ -24,21 +24,21 @@ describe('machineLoad', () => {
       }),
     ]);
     const coder = load.get('coder')!;
-    expect(coder.running[0]).toMatchObject({ step: 'code', stepName: 'Кодер' });
-    expect(coder.waiting[0]).toMatchObject({ step: 'code', stepName: 'Кодер' });
+    expect(coder.running[0]).toMatchObject({ step: 'code', stepName: 'Coder' });
+    expect(coder.waiting[0]).toMatchObject({ step: 'code', stepName: 'Coder' });
   });
 
   it('adds up one global specialist over two repositories', () => {
     const load = machineLoad([
       runView({
         id: 'r1',
-        title: 'Первый',
+        title: 'First run',
         repository: APP,
         specialists: [specialistUse('coder', { level: 'global', max: 1, running: ['login'] })],
       }),
       runView({
         id: 'r2',
-        title: 'Второй',
+        title: 'Second run',
         repository: LIB,
         pipeline: 'epic',
         specialists: [specialistUse('coder', { level: 'global', max: 1, waiting: ['api'] })],
@@ -47,7 +47,7 @@ describe('machineLoad', () => {
     const coder = load.get('coder')!;
     expect(coder.max).toBe(1);
     expect(coder.running).toMatchObject([
-      { runId: 'r1', runTitle: 'Первый', repository: APP, pipeline: 'feature', group: 'login' },
+      { runId: 'r1', runTitle: 'First run', repository: APP, pipeline: 'feature', group: 'login' },
     ]);
     expect(coder.waiting).toMatchObject([
       { runId: 'r2', repository: LIB, pipeline: 'epic', group: 'api', status: 'queued' },
@@ -141,16 +141,16 @@ describe('machineLoad', () => {
         id: 'r1',
         repository: APP,
         specialists: [
-          specialistUse('coder', { level: 'global', name: 'Кодер', running: ['a'] }),
-          specialistUse('plan', { name: 'Планировщик', waiting: ['b'] }),
+          specialistUse('coder', { level: 'global', name: 'Coder', running: ['a'] }),
+          specialistUse('plan', { name: 'Planner', waiting: ['b'] }),
         ],
       }),
     ]);
     const sections = loadSections(load, null);
-    expect(sections.global[0]).toMatchObject({ specialist: 'coder', name: 'Кодер' });
+    expect(sections.global[0]).toMatchObject({ specialist: 'coder', name: 'Coder' });
     expect(sections.project[0]?.specialists[0]).toMatchObject({
       specialist: 'plan',
-      name: 'Планировщик',
+      name: 'Planner',
     });
   });
 

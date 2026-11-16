@@ -85,7 +85,7 @@ describe('notificationItems', () => {
     expect(items[0]).toMatchObject({
       repository: '/b',
       detail: 'Which one?',
-      runTitle: 'добавить вход',
+      runTitle: 'add sign-in',
     });
     expect(items[1]!.detail).toBe('boom');
   });

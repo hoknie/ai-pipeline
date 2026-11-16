@@ -59,7 +59,7 @@ function expectError(errors: FieldError[], path: string, fragment: string): void
   expect(errors).toContainEqual({ path, message: expect.stringContaining(fragment) });
 }
 
-const BASE = 'swarm:\n  specialists:\n    coder: { name: Кодировщик }\n';
+const BASE = 'swarm:\n  specialists:\n    coder: { name: Coder }\n';
 
 describe('loading files', () => {
   it('replaces the global specialist with the project one', () => {
@@ -314,24 +314,24 @@ describe('yaml features and examples', () => {
   max: 5 # parallel specialists
   specialists:
     plan: # specialist slug
-      name: Планировщик
+      name: Planner
       model: opus-5-5
       skills:
         - opsx:propose
         - grill-me
       prompt: |
-        Используя все навыки, которые нам передали, необходимо сделать следующее: %s
+        Using every skill we were given, do the following: %s
     coder:
-      name: Кодировщик
+      name: Coder
       model: sonnet-5
     qa:
-      name: Тестировщик
+      name: Tester
       model: opus-5-5
-      prompt: Проверь все внесенные изменения и выведи QA Check List
+      prompt: Check every change made and print a QA Check List
 `);
     expect(config.max).toBe(5);
     expect(findSpecialist(config, 'plan')).toMatchObject({
-      name: 'Планировщик',
+      name: 'Planner',
       skills: ['opsx:propose', 'grill-me'],
     });
   });
@@ -654,13 +654,13 @@ describe('additional prompts', () => {
   it('reads the additional prompt of a step and of the split, null by default', () => {
     const config = parseConfig(
       PIPELINE(
-        ', additional_prompt: "Только тесты"',
-        '      split: { specialist: coder, additional_prompt: Не больше двух групп }\n',
+        ', additional_prompt: "Tests only"',
+        '      split: { specialist: coder, additional_prompt: No more than two groups }\n',
       ),
     );
     const feature = config.pipelines[0]!;
-    expect(feature.steps.map((step) => step.additionalPrompt)).toEqual([null, 'Только тесты']);
-    expect(feature.split?.additionalPrompt).toBe('Не больше двух групп');
+    expect(feature.steps.map((step) => step.additionalPrompt)).toEqual([null, 'Tests only']);
+    expect(feature.split?.additionalPrompt).toBe('No more than two groups');
     expect(parseConfig(PIPELINE('')).pipelines[0]?.split).toBeNull();
   });
 
@@ -679,7 +679,7 @@ describe('additional prompts', () => {
 });
 
 describe('configuration directory', () => {
-  const CODER = 'name: Кодировщик\n';
+  const CODER = 'name: Coder\n';
   const FEATURE = 'steps:\n  - { id: code, specialist: coder }\n';
 
   function files(paths: ConfigPaths): string {
@@ -727,7 +727,7 @@ describe('configuration directory', () => {
     write(join(dir, 'real', 'coder.yaml'), CODER);
     mkdirSync(join(dir, 'specialists'), { recursive: true });
     symlinkSync(join(dir, 'real', 'coder.yaml'), join(dir, 'specialists', 'coder.yaml'));
-    expect(findSpecialist(loadConfig(paths), 'coder')?.name).toBe('Кодировщик');
+    expect(findSpecialist(loadConfig(paths), 'coder')?.name).toBe('Coder');
   });
 
   it('merges delivery fields of the two levels', () => {
@@ -1083,7 +1083,7 @@ describe('runtimes settings', () => {
 });
 
 describe('split.pipeline', () => {
-  const SPEC = `${BASE}    plan: { name: П }\n`;
+  const SPEC = `${BASE}    plan: { name: P }\n`;
   const epic = (body: string, extra = '') =>
     `${SPEC}  pipelines:\n    explore:\n      steps:\n        - { id: research, specialist: coder }\n${extra}    epic:\n${body}`;
   const WITH = '      split: { specialist: plan, pipeline: explore }\n';
@@ -1156,7 +1156,7 @@ describe('split.pipeline', () => {
     const paths = temporaryPaths();
     writeLevel(
       paths.global,
-      `swarm:\n  specialists:\n    coder: { name: C }\n    plan: { name: П }\n`,
+      `swarm:\n  specialists:\n    coder: { name: C }\n    plan: { name: P }\n`,
     );
     write(
       join(paths.global.directory, 'pipelines', 'explore.yaml'),
@@ -1180,10 +1180,10 @@ describe('name of a pipeline', () => {
   const text = (extra: string) => `${BASE}  pipelines:\n    feature:\n${extra}${STEPS}`;
 
   it('reads the name, trimmed, and falls back to the id without it', () => {
-    const named = parseConfig(text('      name: "  Новая функция "\n'));
-    expect(findPipeline(named, 'feature')?.name).toBe('Новая функция');
-    expect(pipelineName(findPipeline(named, 'feature')!)).toBe('Новая функция');
-    expect(pipelineNameOf(named, 'feature')).toBe('Новая функция');
+    const named = parseConfig(text('      name: "  New feature "\n'));
+    expect(findPipeline(named, 'feature')?.name).toBe('New feature');
+    expect(pipelineName(findPipeline(named, 'feature')!)).toBe('New feature');
+    expect(pipelineNameOf(named, 'feature')).toBe('New feature');
     const plain = parseConfig(text(''));
     expect(findPipeline(plain, 'feature')?.name).toBeNull();
     expect(pipelineNameOf(plain, 'feature')).toBe('feature');
@@ -1200,9 +1200,9 @@ describe('name of a pipeline', () => {
 
   it('accepts a name together with split.pipeline', () => {
     const config = parseConfig(
-      `${BASE}  pipelines:\n    explore:\n${STEPS}    epic:\n      name: Эпик\n      split: { specialist: coder, pipeline: explore }\n`,
+      `${BASE}  pipelines:\n    explore:\n${STEPS}    epic:\n      name: Epic\n      split: { specialist: coder, pipeline: explore }\n`,
     );
-    expect(pipelineNameOf(config, 'epic')).toBe('Эпик');
+    expect(pipelineNameOf(config, 'epic')).toBe('Epic');
   });
 
   it('rejects an empty name and a name that is not a string', () => {
@@ -1215,7 +1215,7 @@ describe('specialist tags', () => {
   it('accepts tags without changing the specialist', () => {
     const plain = parseConfig(BASE);
     const tagged = parseConfig(
-      'swarm:\n  specialists:\n    coder: { name: Кодировщик, tags: [backend, review] }\n',
+      'swarm:\n  specialists:\n    coder: { name: Coder, tags: [backend, review] }\n',
     );
     expect(tagged.specialists).toEqual(plain.specialists);
   });

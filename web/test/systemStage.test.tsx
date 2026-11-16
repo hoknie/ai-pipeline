@@ -113,7 +113,7 @@ describe('the screen of a system stage', () => {
 
   it('shows the specialists of the stages by «Name (slug)»', async () => {
     const config = vi.fn(async () =>
-      configView({ specialists: [specialistEntry('coder', {}, { name: 'Кодер' })] }),
+      configView({ specialists: [specialistEntry('coder', {}, { name: 'Coder' })] }),
     );
     const systemStages = vi.fn(async () =>
       withStage('resolve', [{ path: 'delivery.resolver', value: 'coder', level: 'project' }])(),
@@ -121,7 +121,7 @@ describe('the screen of a system stage', () => {
     render(<Page api={api({ config, systemStages })} start="resolve" />);
     await waitFor(async () =>
       expect(within(await value('delivery.resolver')).getByTestId('stage-shown').textContent).toBe(
-        'Кодер (coder)',
+        'Coder (coder)',
       ),
     );
   });

@@ -44,7 +44,7 @@ async function runWith(h: Harness, action: Record<string, unknown>): Promise<str
   const { runId } = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
-    groups: [{ title: 'Вход', task: 'вход' }],
+    groups: [{ title: 'Login', task: 'login' }],
   })) as RunCreated;
   await h.waitFor(runId, (view) => view.finished);
   return runId;
@@ -65,7 +65,7 @@ describe('step artifacts', () => {
     const runId = await runWith(h, {
       write: { 'out/build.log': 'line 1\nline 2\n' },
       toolCalls: [
-        publish({ file_name: 'report.md', content: '# Отчёт\n', title: 'Итог' }),
+        publish({ file_name: 'report.md', content: '# The report\n', title: 'Summary' }),
         publish({ file_name: 'build.log', path: 'out/build.log' }),
         publish({ file_name: 'data.zip', content: 'PK' }),
       ],
@@ -82,7 +82,7 @@ describe('step artifacts', () => {
     ]);
     const report = artifacts.find((artifact) => artifact.fileName === 'report.md')!;
     expect(report).toMatchObject({
-      title: 'Итог',
+      title: 'Summary',
       step: 'code',
       specialist: 'coder',
       seq: 1,
@@ -101,7 +101,7 @@ describe('step artifacts', () => {
       group: await slugOf(h, runId),
       id: report.id,
     })) as ArtifactContentView;
-    expect(Buffer.from(content.base64, 'base64').toString('utf8')).toBe('# Отчёт\n');
+    expect(Buffer.from(content.base64, 'base64').toString('utf8')).toBe('# The report\n');
     expect(content).toMatchObject({ fileName: 'report.md', size: 13 });
     const row = (await h.status(runId)).groups[0];
     expect(row?.artifacts).toBe(3);
@@ -198,7 +198,7 @@ describe('step artifacts', () => {
     await expect(h.call('artifact', { runId, group: 'missing', id: artifact!.id })).rejects.toThrow(
       'unknown group',
     );
-    await expect(h.call('group_artifacts', { runId: 'unknown', group: 'Вход' })).rejects.toThrow(
+    await expect(h.call('group_artifacts', { runId: 'unknown', group: 'Login' })).rejects.toThrow(
       'unknown run',
     );
     h.running.application.database.prepare("UPDATE artifacts SET uri = 's3://bucket/x'").run();
@@ -222,8 +222,8 @@ describe('step artifacts', () => {
       repository: h.repo,
       pipeline: 'feature',
       groups: [
-        { title: 'Вход', task: 'вход' },
-        { title: 'Выход', task: 'выход' },
+        { title: 'Login', task: 'login' },
+        { title: 'Logout', task: 'logout' },
       ],
     })) as RunCreated;
     await h.waitFor(runId, (view) => view.finished);

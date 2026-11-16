@@ -35,13 +35,13 @@ describe('permissions on retry and answer', () => {
   it('takes the permissions of the current config on an answer, and keeps the prompt', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'запустите claude plugin test' });
+    finish(state, 'needs_human', { feedback: 'run claude plugin test' });
     transition(
       state,
       {
         kind: 'answer',
-        group: 'gruppa-1',
-        answer: 'добавил',
+        group: 'group-1',
+        answer: 'added',
         permissions: refreshed(['claude plugin *']),
       },
       2500,
@@ -49,7 +49,7 @@ describe('permissions on retry and answer', () => {
     expect(specialist(state, 'plan')).toMatchObject({
       allowCommands: ['claude plugin *'],
       permissions: 'full',
-      prompt: 'План: %s',
+      prompt: 'Plan: %s',
     });
     expect(state.run.config.claude.editMode).toBe('accept_edits');
     expect(state.run.config.claude.settings).toBe('inherit');
@@ -64,7 +64,7 @@ describe('permissions on retry and answer', () => {
     const refresh = refreshed(['ls *']);
     if ('error' in refresh) throw new Error(refresh.error);
     delete refresh.specialists.reviewer;
-    transition(state, { kind: 'answer', group: 'gruppa-1', answer: 'да', permissions: refresh }, 1);
+    transition(state, { kind: 'answer', group: 'group-1', answer: 'yes', permissions: refresh }, 1);
     expect(specialist(state, 'reviewer').permissions).toBe('read');
     expect(specialist(state, 'plan').allowCommands).toEqual(['ls *']);
   });
@@ -72,11 +72,11 @@ describe('permissions on retry and answer', () => {
   it('retries with the old permissions and a warning when the config is broken', () => {
     const state = run(1);
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 2000);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 2000);
     expect(group(state).status).toBe('failed');
     transition(
       state,
-      { kind: 'retry', group: 'gruppa-1', permissions: { error: 'swarm.max: must be 1-50' } },
+      { kind: 'retry', group: 'group-1', permissions: { error: 'swarm.max: must be 1-50' } },
       2500,
     );
     expect(group(state).status).toBe('queued');
@@ -88,7 +88,7 @@ describe('permissions on retry and answer', () => {
     const state = run(1);
     step(state);
     expect(() =>
-      transition(state, { kind: 'retry', group: 'gruppa-1', permissions: refreshed(['ls *']) }, 1),
+      transition(state, { kind: 'retry', group: 'group-1', permissions: refreshed(['ls *']) }, 1),
     ).toThrow('needs failed, cancelled or conflict');
     expect(specialist(state, 'plan').allowCommands).toEqual([]);
     expect(state.run.config.claude.editMode).toBe('allowlist');
@@ -102,7 +102,7 @@ describe('permissions on retry and answer', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: {
           sessionId: null,
@@ -191,11 +191,11 @@ describe('specialists refresh', () => {
   });
 
   const NEW_CONFIG = CONFIG_TEXT.replace(
-    'reviewer: { name: Ревьюер, permissions: read }',
-    'reviewer: { name: Ревьюер, permissions: read, model: opus, allow_commands: ["ls *"] }',
+    'reviewer: { name: Reviewer, permissions: read }',
+    'reviewer: { name: Reviewer, permissions: read, model: opus, allow_commands: ["ls *"] }',
   ).replace(
-    'coder: { name: Кодировщик, runtime: opencode, model: anthropic/sonnet }',
-    'coder: { name: Кодировщик, model: anthropic/sonnet, prompt: "Код: %s" }',
+    'coder: { name: Coder, runtime: opencode, model: anthropic/sonnet }',
+    'coder: { name: Coder, model: anthropic/sonnet, prompt: "Code: %s" }',
   );
 
   it('reports the changed fields and replaces the definitions', () => {

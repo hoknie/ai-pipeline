@@ -113,7 +113,7 @@ describe('switching the variant of a run', () => {
     first.sessionId = 'session-1';
     const effects = switchTo(state, 'strong');
     expect(effects).toEqual([
-      { kind: 'stop_attempt', run: 'run000000001', group: 'gruppa-1', seq: first.seq },
+      { kind: 'stop_attempt', run: 'run000000001', group: 'group-1', seq: first.seq },
     ]);
     expect(first).toMatchObject({
       status: 'cancelled',

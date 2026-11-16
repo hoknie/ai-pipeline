@@ -30,7 +30,7 @@ describe('RepositoryMenu without any repository', () => {
         }}
       />,
     );
-    const button = screen.getByRole('button', { name: /Add repository|Добавить репозиторий/ });
+    const button = screen.getByRole('button', { name: /Add repository/ });
     fireEvent.click(button);
     expect(await screen.findByRole('dialog')).toBeTruthy();
   });

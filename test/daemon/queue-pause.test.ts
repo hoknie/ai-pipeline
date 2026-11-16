@@ -32,13 +32,13 @@ async function failedPaused() {
     split: [
       {
         split: [
-          { title: 'Вход', task: 'вход' },
-          { title: 'Выход', task: 'выход' },
+          { title: 'Sign in', task: 'sign in' },
+          { title: 'Sign out', task: 'sign out' },
         ],
       },
     ],
-    'code@Вход': [{ noReport: true }, {}],
-    'code@Выход': [{ waitFor: h.gate('a') }, {}],
+    'code@Sign in': [{ noReport: true }, {}],
+    'code@Sign out': [{ waitFor: h.gate('a') }, {}],
     review: [{}],
   });
   await add(h, 'A');
@@ -343,13 +343,13 @@ describe('pause a run: outside the queue and skipped', () => {
       split: [
         {
           split: [
-            { title: 'Вход', task: 'вход' },
-            { title: 'Выход', task: 'выход' },
+            { title: 'Sign in', task: 'sign in' },
+            { title: 'Sign out', task: 'sign out' },
           ],
         },
       ],
-      'code@Вход': [{ noReport: true }],
-      'code@Выход': [{ waitFor: h.gate('a') }, {}],
+      'code@Sign in': [{ noReport: true }],
+      'code@Sign out': [{ waitFor: h.gate('a') }, {}],
     });
     await h.call('queue_settings', { repository: h.repo, skipFailed: true });
     await add(h, 'A');
@@ -389,7 +389,7 @@ describe('pause a run: daemon restart', () => {
   const SINGLE = `swarm:
   max: 3
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   pipelines:
     feature:
       steps:

@@ -54,7 +54,7 @@ function failedRun(groups = 1, auto = false): RunState {
   state.run.config.delivery.auto = auto;
   step(state);
   for (let index = 1; index <= groups; index += 1) {
-    transition(state, { kind: 'timed_out', group: `gruppa-${index}`, seq: 1 }, 1100);
+    transition(state, { kind: 'timed_out', group: `group-${index}`, seq: 1 }, 1100);
   }
   return state;
 }
@@ -166,7 +166,7 @@ describe('pause during the repair of a delivery', () => {
 describe('limit of the repair', () => {
   it('waits for no limit in planDispatch: the group starts', () => {
     const state = failedRun(2);
-    // gruppa-2 hit the limit of the runtime
+    // group-2 hit the limit of the runtime
     const attempt = state.groups[1]!.attempts[0]!;
     attempt.reason = { kind: 'usage_limit', resetsAt: 9_999_999 } as never;
     startRepair(state);
@@ -251,7 +251,7 @@ describe('skipped task under repair', () => {
     finish(state, 'done', { slug: REPAIR_GROUP, now: 3000 });
     advance(queue, [state], lookup, 3100);
     expect(queue.runs).not.toContain(state.run.id);
-    transition(state, { kind: 'retry', group: 'gruppa-1' }, 3200);
+    transition(state, { kind: 'retry', group: 'group-1' }, 3200);
     advance(queue, [state], lookup, 3300);
     expect(queue.skipped).not.toContain(state.run.id);
     expect(queue.runs).toContain(state.run.id);
@@ -319,7 +319,7 @@ describe('cancelling the task while the tree is prepared', () => {
 
   it('cancels the group of a delivery repair with the task', () => {
     const state = conflicted();
-    transition(state, { kind: 'cancel', group: null, reason: 'стоп' }, 8000);
+    transition(state, { kind: 'cancel', group: null, reason: 'stop' }, 8000);
     expect(state.repair?.status).toBe('cancelled');
     expect(state.run.repair.incident).toBeNull();
     expect(state.run.pendingDelivery).toBeNull();
@@ -386,6 +386,6 @@ describe('repair group in the use of specialists', () => {
     expect(use).toBeDefined();
     expect(use?.specialist).toBe('coder');
     expect(use?.max).toBeNull();
-    expect(use?.running[0]?.stepName).toBe('Кодировщик');
+    expect(use?.running[0]?.stepName).toBe('Coder');
   });
 });

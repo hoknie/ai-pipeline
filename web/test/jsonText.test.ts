@@ -22,8 +22,8 @@ describe('readableJson', () => {
   });
 
   it('indents nested values and marks items with a dash', () => {
-    expect(readableJson({ todos: [{ content: 'Спека', status: 'done' }] })).toBe(
-      'todos:\n  - content: Спека\n    status: done',
+    expect(readableJson({ todos: [{ content: 'Spec', status: 'done' }] })).toBe(
+      'todos:\n  - content: Spec\n    status: done',
     );
     expect(readableJson(['a', 'b'])).toBe('- a\n- b');
   });

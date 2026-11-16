@@ -112,7 +112,7 @@ describe('answers-only switch of the run screen', () => {
     cursor: 2,
     running: false,
     entries: [
-      { kind: 'text' as const, text: 'ответ специалиста' },
+      { kind: 'text' as const, text: 'specialist answer' },
       { kind: 'tool_call' as const, id: 't1', name: 'Read', summary: 'a.ts', input: '{}' },
     ],
   }));
@@ -143,7 +143,7 @@ describe('answers-only switch of the run screen', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle);
     expect(screen.queryByText('Read')).toBeNull();
-    expect(screen.getByText('ответ специалиста')).toBeTruthy();
+    expect(screen.getByText('specialist answer')).toBeTruthy();
   });
 
   it('keeps the filter on after the panel is opened again', async () => {
@@ -152,7 +152,7 @@ describe('answers-only switch of the run screen', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Specialist replies' }));
     first.unmount();
     open();
-    await screen.findByText('ответ специалиста');
+    await screen.findByText('specialist answer');
     expect(
       screen.getByRole('switch', { name: 'Specialist replies' }).getAttribute('aria-checked'),
     ).toBe('true');

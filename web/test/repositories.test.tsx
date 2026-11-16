@@ -102,10 +102,10 @@ describe('names, colors and disabled projects', () => {
   });
 
   it('names a project by its name and finds it by name, slug or path', () => {
-    rememberProjects([entry(APP, 0, { name: 'Магазин', label: 'Магазин', slug: 'shop' })]);
-    expect(repositoryLabel(APP)).toBe('Магазин');
+    rememberProjects([entry(APP, 0, { name: 'Storefront', label: 'Storefront', slug: 'shop' })]);
+    expect(repositoryLabel(APP)).toBe('Storefront');
     expect(repositoryLabel(LIB)).toBe('lib');
-    for (const query of ['магаз', 'SHO', 'app', '/work']) {
+    for (const query of ['storef', 'SHO', 'app', '/work']) {
       expect(repositoryMatches(APP, APP, query)).toBe(true);
     }
     expect(repositoryMatches(APP, APP, 'zzz')).toBe(false);

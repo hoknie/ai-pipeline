@@ -105,23 +105,23 @@ describe('planDispatch with pools', () => {
     const states = AGENTS.map(agentRun);
     const plan = planDispatch(states, 3000, OFF_NETWORK, limit(5));
     expect(names(plan)).toEqual(['c1', 'c2', 'g1', 'p1', 'z1']);
-    expect(plan.waits.get(waitKey('c3', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('c3', 'group-1'))).toEqual({
       reason: 'pool',
       pool: 'claude',
       max: 2,
     });
-    expect(plan.waits.get(waitKey('p2', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('p2', 'group-1'))).toEqual({
       reason: 'pool',
       pool: 'mix',
       max: 2,
     });
-    expect(plan.waits.get(waitKey('z2', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('z2', 'group-1'))).toEqual({
       reason: 'pool',
       pool: 'glm',
       max: 1,
     });
     // The default pool has a free place, the machine has none.
-    expect(plan.waits.get(waitKey('d1', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('d1', 'group-1'))).toEqual({
       reason: 'capacity',
       scope: 'machine',
       max: 5,
@@ -132,7 +132,7 @@ describe('planDispatch with pools', () => {
     const states = AGENTS.filter((agent) => agent.runtime === 'claude').map(agentRun);
     const plan = planDispatch(states, 3000, OFF_NETWORK, limit(5));
     expect(names(plan)).toEqual(['c1', 'c2']);
-    expect(plan.waits.get(waitKey('c3', 'gruppa-1'))).toMatchObject({ reason: 'pool' });
+    expect(plan.waits.get(waitKey('c3', 'group-1'))).toMatchObject({ reason: 'pool' });
   });
 
   it('skips the group a full pool holds and starts the next one of a free pool', () => {
@@ -153,7 +153,7 @@ describe('planDispatch with pools', () => {
     dispatch(states.slice(0, 2), 2000, OFF_NETWORK, limit(5));
     const plan = planDispatch(states, 3000, OFF_NETWORK, limit(5));
     expect(plan.start).toEqual([]);
-    expect(plan.waits.get(waitKey('p2', 'gruppa-1'))).toMatchObject({
+    expect(plan.waits.get(waitKey('p2', 'group-1'))).toMatchObject({
       reason: 'pool',
       pool: 'mix',
     });
@@ -165,7 +165,7 @@ describe('planDispatch with pools', () => {
     );
     const plan = planDispatch(states, 3000, OFF_NETWORK, limit(5));
     expect(names(plan)).toEqual(['d0']);
-    expect(plan.waits.get(waitKey('d1', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('d1', 'group-1'))).toEqual({
       reason: 'pool',
       pool: 'default',
       max: 1,
@@ -181,7 +181,7 @@ describe('planDispatch with pools', () => {
       limit(5, { pools: [], defaultPool: null }),
     );
     expect(plan.start).toHaveLength(5);
-    expect(plan.waits.get(waitKey('z2', 'gruppa-1'))).toMatchObject({ reason: 'capacity' });
+    expect(plan.waits.get(waitKey('z2', 'group-1'))).toMatchObject({ reason: 'capacity' });
   });
 
   it('lets a shell command start although the pool and the machine are full', () => {
@@ -240,9 +240,9 @@ describe('planDispatch with pools', () => {
     const plan = planDispatch([...states, next], 3000, OFF_NETWORK, smaller);
     expect(states.every((state) => state.groups[0]!.status === 'running')).toBe(true);
     expect(plan.start).toEqual([]);
-    finish(states[0]!, 'done', { slug: 'gruppa-1' });
+    finish(states[0]!, 'done', { slug: 'group-1' });
     expect(planDispatch([...states, next], 3100, OFF_NETWORK, smaller).start).toEqual([]);
-    finish(states[1]!, 'done', { slug: 'gruppa-1' });
+    finish(states[1]!, 'done', { slug: 'group-1' });
     expect(names(planDispatch([...states, next], 3200, OFF_NETWORK, smaller))).toEqual(['c3']);
   });
 });
@@ -298,7 +298,7 @@ describe('the chosen runtime of a waiting attempt', () => {
     for (const now of [1500, 9000, 123_456]) {
       const plan = planDispatch([filler, state], now, OFF_NETWORK, limit(5, { pools: [full] }));
       expect(plan.start).toEqual([]);
-      expect(plan.waits.get(waitKey(state.run.id, 'gruppa-1'))).toMatchObject({
+      expect(plan.waits.get(waitKey(state.run.id, 'group-1'))).toMatchObject({
         reason: 'pool',
         pool: full.name,
       });
@@ -352,7 +352,7 @@ describe('the order of the reasons to wait', () => {
     );
     dispatch(states.slice(0, 2), 2000, OFF_NETWORK, limit(5));
     const plan = planDispatch(states, 3000, network, limit(2));
-    expect(plan.waits.get(waitKey('c3', 'gruppa-1'))).toMatchObject({ reason: 'network' });
+    expect(plan.waits.get(waitKey('c3', 'group-1'))).toMatchObject({ reason: 'network' });
   });
 
   it('shows the specialist before the pool, and the pool before the machine', () => {
@@ -367,7 +367,7 @@ describe('the order of the reasons to wait', () => {
     const states = ['c1', 'c2', 'c3'].map(limited);
     dispatch(states.slice(0, 1), 2000, OFF_NETWORK, limit(1));
     const plan = planDispatch(states, 3000, OFF_NETWORK, limit(1));
-    expect(plan.waits.get(waitKey('c2', 'gruppa-1'))).toMatchObject({ reason: 'specialist' });
+    expect(plan.waits.get(waitKey('c2', 'group-1'))).toMatchObject({ reason: 'specialist' });
     const unlimited = ['c1', 'c2', 'c3'].map((id, index) =>
       agentRun(
         AGENTS.find((a) => a.id === id)!,
@@ -377,7 +377,7 @@ describe('the order of the reasons to wait', () => {
     dispatch(unlimited.slice(0, 2), 2000, OFF_NETWORK, limit(2));
     // The pool of Claude and the machine are both full: the pool is named.
     expect(
-      planDispatch(unlimited, 3000, OFF_NETWORK, limit(2)).waits.get(waitKey('c3', 'gruppa-1')),
+      planDispatch(unlimited, 3000, OFF_NETWORK, limit(2)).waits.get(waitKey('c3', 'group-1')),
     ).toEqual({ reason: 'pool', pool: 'claude', max: 2 });
   });
 });

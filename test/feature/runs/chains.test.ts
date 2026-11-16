@@ -41,13 +41,13 @@ const CHAIN_CONFIG = `swarm:
         - runtime: opencode
   specialists:
     worker:
-      name: Исполнитель
+      name: Executor
       runtime_chain: fallback
     cycler:
-      name: Круговой
+      name: Cycler
       runtime_chain: cycle
     fallback-spec:
-      name: Отключенный
+      name: Disabled one
       runtime_chain: disabled-chain
   pipelines:
     feature:
@@ -103,7 +103,7 @@ describe('selectAttemptRuntime', () => {
         prompt: 'test',
         groupTitle: 'g1',
         stepId: 'work',
-        specialistName: 'Исполнитель',
+        specialistName: 'Executor',
         skills: [],
         previous: [],
         feedback: null,
@@ -163,7 +163,7 @@ describe('selectAttemptRuntime', () => {
         prompt: 'test',
         groupTitle: 'g1',
         stepId: 's',
-        specialistName: 'Круговой',
+        specialistName: 'Cycler',
         skills: [],
         previous: [],
         feedback: null,
@@ -256,7 +256,7 @@ describe('execution with on_error runtime chains', () => {
     expect(effects).toContainEqual({
       kind: 'start_attempt',
       run: state.run.id,
-      group: 'gruppa-1',
+      group: 'group-1',
       seq: 1,
     });
     const g = group(state);
@@ -268,7 +268,7 @@ describe('execution with on_error runtime chains', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: {
           sessionId: 'sess-1',
@@ -295,7 +295,7 @@ describe('execution with on_error runtime chains', () => {
     expect(nextEffects).toContainEqual({
       kind: 'start_attempt',
       run: state.run.id,
-      group: 'gruppa-1',
+      group: 'group-1',
       seq: 2,
     });
     expect(g.attempts[1]?.runtime).toBe('opencode');
@@ -314,7 +314,7 @@ describe('execution with on_error runtime chains', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: {
           sessionId: null,
@@ -342,7 +342,7 @@ describe('execution with on_error runtime chains', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: {
           sessionId: null,
@@ -369,7 +369,7 @@ describe('execution with on_error runtime chains', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: {
           sessionId: null,
@@ -391,7 +391,7 @@ describe('execution with on_error runtime chains', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 2,
         exit: {
           sessionId: null,
@@ -563,7 +563,7 @@ describe('chains and failures of the network', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: { sessionId: null, usage: null, failure: failure as never, outsideChanges: [] },
       },
@@ -606,7 +606,7 @@ describe('chains and failures of the network', () => {
       state,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         report: { verdict: 'done', summary: 'ok', feedback: null },
       },

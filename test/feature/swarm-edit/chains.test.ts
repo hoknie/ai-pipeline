@@ -29,15 +29,15 @@ describe('chains in editor', () => {
     const paths = temporaryPaths();
     write(
       join(paths.global.directory, 'chains', 'shared.yaml'),
-      'name: Общая\nmode: on_error\nruntimes:\n  - runtime: claude\n',
+      'name: Shared\nmode: on_error\nruntimes:\n  - runtime: claude\n',
     );
     write(
       join(paths.project.directory, 'chains', 'shared.yaml'),
-      'name: Переопределенная\nmode: random\nruntimes:\n  - runtime: opencode\n',
+      'name: Overridden\nmode: random\nruntimes:\n  - runtime: opencode\n',
     );
     write(
       join(paths.project.directory, 'chains', 'own.yaml'),
-      'name: Собственная\nmode: round_robin\nruntimes:\n  - runtime: agy\n',
+      'name: Own\nmode: round_robin\nruntimes:\n  - runtime: agy\n',
     );
 
     const view = editorView(paths);
@@ -45,13 +45,13 @@ describe('chains in editor', () => {
 
     const shared = view.chains.find((c) => c.slug === 'shared');
     expect(shared?.level).toBe('project_over_global');
-    expect(shared?.raw).toMatchObject({ name: 'Переопределенная', mode: 'random' });
-    expect(shared?.sources.global?.raw).toMatchObject({ name: 'Общая' });
-    expect(shared?.sources.project?.raw).toMatchObject({ name: 'Переопределенная' });
+    expect(shared?.raw).toMatchObject({ name: 'Overridden', mode: 'random' });
+    expect(shared?.sources.global?.raw).toMatchObject({ name: 'Shared' });
+    expect(shared?.sources.project?.raw).toMatchObject({ name: 'Overridden' });
 
     const own = view.chains.find((c) => c.slug === 'own');
     expect(own?.level).toBe('project');
-    expect(own?.raw).toMatchObject({ name: 'Собственная', mode: 'round_robin' });
+    expect(own?.raw).toMatchObject({ name: 'Own', mode: 'round_robin' });
   });
 
   it('plans creation, update with revision and deletion of a chain', () => {
@@ -63,7 +63,7 @@ describe('chains in editor', () => {
       kind: 'chain',
       id: 'main',
       value: {
-        name: 'Основная',
+        name: 'Main',
         mode: 'on_error',
         runtimes: [{ runtime: 'claude' }],
       },
@@ -78,7 +78,7 @@ describe('chains in editor', () => {
     const conflict = planEdit(paths, {
       kind: 'chain',
       id: 'main',
-      value: { name: 'Другая' },
+      value: { name: 'Other' },
       revision: 'wrong-revision',
       level: 'project',
     });
@@ -90,7 +90,7 @@ describe('chains in editor', () => {
       kind: 'chain',
       id: 'main',
       value: {
-        name: 'Обновленная',
+        name: 'Updated',
         mode: 'random',
         runtimes: [{ runtime: 'opencode' }],
       },
@@ -183,11 +183,11 @@ describe('chains in editor', () => {
     const paths = temporaryPaths();
     write(
       join(paths.project.directory, 'chains', 'main.yaml'),
-      'name: Основная\nmode: on_error\nruntimes:\n  - runtime: claude\n',
+      'name: Main\nmode: on_error\nruntimes:\n  - runtime: claude\n',
     );
     write(
       join(paths.project.directory, 'specialists', 'coder.yaml'),
-      'name: Кодировщик\nruntime_chain: main\n',
+      'name: Coder\nruntime_chain: main\n',
     );
 
     const file = entryFile(paths, 'chain', 'main', 'project');
@@ -195,7 +195,7 @@ describe('chains in editor', () => {
       kind: 'chain',
       id: 'main',
       value: null,
-      revision: revisionOf('name: Основная\nmode: on_error\nruntimes:\n  - runtime: claude\n'),
+      revision: revisionOf('name: Main\nmode: on_error\nruntimes:\n  - runtime: claude\n'),
       level: 'project',
     });
 
@@ -210,8 +210,8 @@ describe('chains in editor', () => {
     const tree = {
       swarm: {
         specialists: {
-          coder: { name: 'Кодировщик', runtime_chain: 'fallback' },
-          reviewer: { name: 'Ревьюер', runtime: 'claude' },
+          coder: { name: 'Coder', runtime_chain: 'fallback' },
+          reviewer: { name: 'Reviewer', runtime: 'claude' },
         },
       },
     };

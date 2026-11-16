@@ -49,11 +49,11 @@ const PNG = new Uint8Array(2048).fill(7);
 describe('uploads of the panel', () => {
   it('keeps a file in the state directory and answers with its id, name and size', async () => {
     const { upload, h } = await setup();
-    const response = await upload('скриншот.png', PNG);
+    const response = await upload('screenshot.png', PNG);
     expect(response.status).toBe(200);
     const body = (await response.json()) as { upload: string; fileName: string; size: number };
-    expect(body).toMatchObject({ fileName: 'скриншот.png', size: 2048 });
-    expect(readdirSync(join(h.state, 'uploads', body.upload))).toEqual(['скриншот.png']);
+    expect(body).toMatchObject({ fileName: 'screenshot.png', size: 2048 });
+    expect(readdirSync(join(h.state, 'uploads', body.upload))).toEqual(['screenshot.png']);
   });
 
   it('refuses a file over 20 MB with 413 and keeps nothing', async () => {
@@ -86,7 +86,7 @@ describe('uploads in the requests of the queue', () => {
     const { upload: id } = (await (await upload('shot.png', PNG)).json()) as { upload: string };
     const response = await post('/api/queue/items', {
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
       uploads: [id],
     });
     expect(response.status).toBe(200);
@@ -127,7 +127,7 @@ describe('download of an attachment of a run', () => {
     const { upload: id } = (await (await upload(name, bytes)).json()) as { upload: string };
     h.script({ code: [{}] });
     const queued = (await (
-      await post('/api/queue/items', { pipeline: 'feature', task: 'работа', uploads: [id] })
+      await post('/api/queue/items', { pipeline: 'feature', task: 'work', uploads: [id] })
     ).json()) as QueueView;
     await h.call('queue_start', { repository: h.repo });
     const runView = (await h.call('status', {})) as RunView[];

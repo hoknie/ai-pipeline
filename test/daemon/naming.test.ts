@@ -24,7 +24,7 @@ async function create(h: Harness, extra: Record<string, unknown> = {}): Promise<
   const { runId } = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
-    task: 'Добавить флаг --json к команде aip version\nподробности',
+    task: 'Add a --json flag to the aip version command\ndetails',
     ...extra,
   })) as RunCreated;
   return runId;
@@ -36,21 +36,21 @@ describe('run names', () => {
     h.script({
       naming: {
         waitFor: h.gate('naming'),
-        answer: '{"title": "Флаг --json для version", "name": "add-version-json-flag"}',
+        answer: '{"title": "The --json flag for version", "name": "add-version-json-flag"}',
       },
       code: [{ waitFor: h.gate('code') }],
     });
     const runId = await create(h);
     const early = await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     expect(early.name).toBeNull();
-    expect(early.title).toBe('Добавить флаг --json к команде aip version');
+    expect(early.title).toBe('Add a --json flag to the aip version command');
     h.open('naming');
     const named = await h.waitFor(runId, (view) => view.name !== null);
     // the step still runs: the name came in the background
     expect(named.groups[0]?.status).toBe('running');
     h.open('code');
     expect(named).toMatchObject({
-      title: 'Флаг --json для version',
+      title: 'The --json flag for version',
       name: 'add-version-json-flag',
     });
     expect(named.usage?.inputTokens).toBeGreaterThan(0);
@@ -65,7 +65,10 @@ describe('run names', () => {
     // the naming answer is applied with its usage (0.002 on top of the two steps), named or not
     const view = await h.waitFor(runId, (run) => run.finished && (run.usage?.inputTokens ?? 0) > 0);
     expect(existsSync(join(h.fakeState, 'oneshots.jsonl'))).toBe(true);
-    expect(view).toMatchObject({ name: null, title: 'Добавить флаг --json к команде aip version' });
+    expect(view).toMatchObject({
+      name: null,
+      title: 'Add a --json flag to the aip version command',
+    });
   });
 
   it('does not ask the model for a title given at the start, nor when naming is off', async () => {

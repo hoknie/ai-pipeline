@@ -37,8 +37,8 @@ function show(run: ReturnType<typeof runView>, props: Props = {}) {
 
 describe('the variant badge', () => {
   it('is on a run with a variant and absent on default', () => {
-    show(runView({ variant: 'light', variantName: 'Лёгкий' }));
-    expect(screen.getByLabelText('Variant: Лёгкий (light)')).toBeTruthy();
+    show(runView({ variant: 'light', variantName: 'Light' }));
+    expect(screen.getByLabelText('Variant: Light (light)')).toBeTruthy();
     cleanup();
     show(runView());
     expect(screen.queryByLabelText(/^Variant:/)).toBeNull();
@@ -48,7 +48,7 @@ describe('the variant badge', () => {
 const full = () =>
   runView({
     number: 7,
-    title: 'форма входа',
+    title: 'sign-in form',
     name: 'login-form',
     tags: [tagView('auth')],
     progress: { done: 2, total: 4 },
@@ -89,7 +89,7 @@ describe('run row layout', () => {
   });
 
   it('wraps the full title and keeps it in the tooltip', () => {
-    const title = 'очень длинное название запуска '.repeat(8).trim();
+    const title = 'a very long run title '.repeat(8).trim();
     const row = show(runView({ title }));
     const first = row.querySelector('span')!;
     expect(first.className).not.toContain('truncate');
@@ -164,9 +164,15 @@ describe('run row layout', () => {
 
 describe('accepted answers on the card', () => {
   const decisions = [
-    { group: 'login', stepId: 'plan', question: 'Формат?', answer: 'JSON', by: 'human' as const },
-    { group: 'login', stepId: 'code', question: 'Дальше?', answer: 'Да', by: 'autopilot' as const },
-    { group: 'api', stepId: 'code', question: 'Ещё?', answer: 'Нет', by: 'autopilot' as const },
+    { group: 'login', stepId: 'plan', question: 'Format?', answer: 'JSON', by: 'human' as const },
+    {
+      group: 'login',
+      stepId: 'code',
+      question: 'Continue?',
+      answer: 'Yes',
+      by: 'autopilot' as const,
+    },
+    { group: 'api', stepId: 'code', question: 'More?', answer: 'No', by: 'autopilot' as const },
   ];
 
   it('counts answers by author and lists them in the title', () => {
@@ -175,9 +181,9 @@ describe('accepted answers on the card', () => {
     expect(line.textContent).toBe('Answers: human 1 · autopilot 2');
     expect(line.getAttribute('title')).toBe(
       [
-        'login · plan (human): Формат? → JSON',
-        'login · code (autopilot): Дальше? → Да',
-        'api · code (autopilot): Ещё? → Нет',
+        'login · plan (human): Format? → JSON',
+        'login · code (autopilot): Continue? → Yes',
+        'api · code (autopilot): More? → No',
       ].join('\n'),
     );
   });
@@ -353,7 +359,7 @@ describe('stage in the status badge', () => {
 
   it('shows the step after the state of a running run', () => {
     const row = show(runView({ groups: [groupRow()] }));
-    expect(within(row).getByLabelText(/^Active · Кодер \(active\)$/)).toBeTruthy();
+    expect(within(row).getByLabelText(/^Active · Coder \(active\)$/)).toBeTruthy();
   });
 
   it('adds the number of other stages', () => {
@@ -362,12 +368,12 @@ describe('stage in the status badge', () => {
         state: 'needs_human' as never,
         groups: [
           groupRow({ slug: 'ui' }),
-          groupRow({ slug: 'api', status: 'needs_human', stepName: 'Ревьюер' }),
+          groupRow({ slug: 'api', status: 'needs_human', stepName: 'Reviewer' }),
         ],
       }),
     );
-    const badge = within(row).getByLabelText(/Ревьюер \+1 \(needs_human\)$/);
-    expect(badge.textContent).toContain('Ревьюер +1');
+    const badge = within(row).getByLabelText(/Reviewer \+1 \(needs_human\)$/);
+    expect(badge.textContent).toContain('Reviewer +1');
   });
 
   it('has no stage for a finished run', () => {
@@ -381,11 +387,11 @@ describe('stage in the status badge', () => {
     const run = runView({ groups: [groupRow()] });
     const view = render(<RunList runs={[run]} {...props} />);
     const element = view.container.querySelector('[data-run]');
-    expect(screen.getByLabelText(/Кодер \(active\)$/)).toBeTruthy();
+    expect(screen.getByLabelText(/Coder \(active\)$/)).toBeTruthy();
     view.rerender(
-      <RunList runs={[{ ...run, groups: [groupRow({ stepName: 'Ревьюер' })] }]} {...props} />,
+      <RunList runs={[{ ...run, groups: [groupRow({ stepName: 'Reviewer' })] }]} {...props} />,
     );
-    expect(screen.getByLabelText(/Ревьюер \(active\)$/)).toBeTruthy();
+    expect(screen.getByLabelText(/Reviewer \(active\)$/)).toBeTruthy();
     expect(view.container.querySelector('[data-run]')).toBe(element);
   });
 });

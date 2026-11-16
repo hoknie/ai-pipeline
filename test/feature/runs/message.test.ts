@@ -6,9 +6,9 @@ import { type Effect, dispatch, transition } from '../../../src/feature/runs/mac
 
 import { finish, group, run, runningAttempt, step } from './helpers.ts';
 
-function send(state: RunState, text = 'используй OAuth', now = 3000): Effect[] {
+function send(state: RunState, text = 'use OAuth', now = 3000): Effect[] {
   const attempt = runningAttempt(state);
-  return transition(state, { kind: 'message', group: 'gruppa-1', seq: attempt.seq, text }, now);
+  return transition(state, { kind: 'message', group: 'group-1', seq: attempt.seq, text }, now);
 }
 
 function exit(state: RunState, sessionId: string | null = 's1', now = 3500): Effect[] {
@@ -17,7 +17,7 @@ function exit(state: RunState, sessionId: string | null = 's1', now = 3500): Eff
     state,
     {
       kind: 'attempt_exited',
-      group: 'gruppa-1',
+      group: 'group-1',
       seq: attempt.seq,
       exit: { sessionId, usage: null, failure: null, outsideChanges: [] },
     },
@@ -37,11 +37,11 @@ describe('a message to a running attempt', () => {
     const state = started();
     const seq = runningAttempt(state).seq;
     const effects = send(state);
-    expect(effects).toEqual([{ kind: 'stop_attempt', run: state.run.id, group: 'gruppa-1', seq }]);
+    expect(effects).toEqual([{ kind: 'stop_attempt', run: state.run.id, group: 'group-1', seq }]);
     expect(group(state).status).toBe('running');
     expect(runningAttempt(state).reason).toEqual({
       kind: 'message',
-      text: 'используй OAuth',
+      text: 'use OAuth',
       at: 3000,
     });
   });
@@ -58,14 +58,14 @@ describe('a message to a running attempt', () => {
     });
     expect(group(state).status).toBe('queued');
     const [start] = dispatch([state], 4000);
-    expect(start).toMatchObject({ kind: 'start_attempt', group: 'gruppa-1' });
+    expect(start).toMatchObject({ kind: 'start_attempt', group: 'group-1' });
     const next = runningAttempt(state);
     expect(next).toMatchObject({
       stepId: interrupted.stepId,
       resumeSession: 's1',
       round: interrupted.round + 1,
     });
-    expect(next.input.message).toEqual({ text: 'используй OAuth', at: 3000 });
+    expect(next.input.message).toEqual({ text: 'use OAuth', at: 3000 });
     expect(interrupted.input.message).toBeUndefined();
   });
 
@@ -102,10 +102,10 @@ describe('a message to a running attempt', () => {
     const state = started();
     finish(state, 'done');
     expect(() =>
-      transition(state, { kind: 'message', group: 'gruppa-1', seq: 1, text: 'x' }, 3000),
+      transition(state, { kind: 'message', group: 'group-1', seq: 1, text: 'x' }, 3000),
     ).toThrow(AppError);
     expect(() =>
-      transition(state, { kind: 'message', group: 'gruppa-1', seq: 1, text: 'x' }, 3000),
+      transition(state, { kind: 'message', group: 'group-1', seq: 1, text: 'x' }, 3000),
     ).toThrow('attempt 1 is not running');
   });
 
@@ -116,7 +116,7 @@ describe('a message to a running attempt', () => {
       state,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq,
         report: { verdict: 'done', summary: 'ok', feedback: null },
       },
@@ -128,8 +128,8 @@ describe('a message to a running attempt', () => {
   it('refuses a second message while the attempt is being interrupted', () => {
     const state = started();
     send(state);
-    expect(() => send(state, 'ещё')).toThrow('already being interrupted');
-    expect(runningAttempt(state).reason).toMatchObject({ text: 'используй OAuth' });
+    expect(() => send(state, 'more')).toThrow('already being interrupted');
+    expect(runningAttempt(state).reason).toMatchObject({ text: 'use OAuth' });
   });
 
   it('rejects a report that arrives after the message', () => {
@@ -141,7 +141,7 @@ describe('a message to a running attempt', () => {
         state,
         {
           kind: 'report',
-          group: 'gruppa-1',
+          group: 'group-1',
           seq,
           report: { verdict: 'done', summary: 'ok', feedback: null },
         },
@@ -156,7 +156,7 @@ describe('a message to a running attempt', () => {
     const state = started();
     const seq = runningAttempt(state).seq;
     send(state);
-    expect(transition(state, { kind: 'timed_out', group: 'gruppa-1', seq }, 3100)).toEqual([]);
+    expect(transition(state, { kind: 'timed_out', group: 'group-1', seq }, 3100)).toEqual([]);
     expect(group(state).status).toBe('running');
     exit(state);
     expect(group(state).status).toBe('queued');
@@ -170,14 +170,14 @@ describe('a message to a running attempt', () => {
     expect(group(state).status).toBe('queued');
     expect(group(state).pending).toMatchObject({
       resume: true,
-      message: { text: 'используй OAuth', at: 3000 },
+      message: { text: 'use OAuth', at: 3000 },
     });
   });
 
   it('loses the message when the group is cancelled meanwhile', () => {
     const state = started();
     send(state);
-    transition(state, { kind: 'cancel', group: 'gruppa-1' }, 3100);
+    transition(state, { kind: 'cancel', group: 'group-1' }, 3100);
     expect(group(state).status).toBe('cancelled');
     expect(group(state).attempts[0]?.status).toBe('cancelled');
     expect(group(state).pending?.message ?? null).toBeNull();

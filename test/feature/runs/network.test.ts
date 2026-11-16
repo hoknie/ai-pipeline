@@ -30,7 +30,7 @@ function networkFailure(
   now = 2000,
   options: { slug?: string; problem?: string; sessionId?: string | null } = {},
 ): void {
-  const slug = options.slug ?? 'gruppa-1';
+  const slug = options.slug ?? 'group-1';
   const attempt = runningAttempt(state, slug);
   transition(
     state,
@@ -120,7 +120,7 @@ describe('a group whose attempt failed because of the network', () => {
     networkFailure(state, 2000);
     expect(dispatch([state], 2000 + NETWORK_RETRY_MS - 1)).toEqual([]);
     const effects = dispatch([state], 2000 + NETWORK_RETRY_MS);
-    expect(effects).toMatchObject([{ kind: 'start_attempt', group: 'gruppa-1', seq: 2 }]);
+    expect(effects).toMatchObject([{ kind: 'start_attempt', group: 'group-1', seq: 2 }]);
     expect(group(state).attempts[1]).toMatchObject({ stepIndex: 0, resumeSession: 'session-1' });
   });
 
@@ -137,7 +137,7 @@ describe('a group whose attempt failed because of the network', () => {
       status: 'failed',
       reason: 'network: Connection error',
     });
-    transition(state, { kind: 'retry', group: 'gruppa-1' }, 21_000);
+    transition(state, { kind: 'retry', group: 'group-1' }, 21_000);
     expect(group(state).status).toBe('queued');
   });
 
@@ -153,7 +153,7 @@ describe('a group whose attempt failed because of the network', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: { sessionId: null, usage: null, failure: null, outsideChanges: [] },
       },
@@ -171,7 +171,7 @@ describe('a group whose attempt failed because of the network', () => {
       state,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         report: { verdict: 'done', summary: 'plan done', feedback: null },
       },
@@ -181,7 +181,7 @@ describe('a group whose attempt failed because of the network', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: {
           sessionId: 's',
@@ -201,7 +201,7 @@ describe('a group whose attempt failed because of the network', () => {
     const state = run(1);
     step(state);
     networkFailure(state);
-    transition(state, { kind: 'cancel', group: 'gruppa-1', reason: 'no need' }, 3000);
+    transition(state, { kind: 'cancel', group: 'group-1', reason: 'no need' }, 3000);
     expect(group(state).status).toBe('cancelled');
     expect(dispatch([state], 100_000)).toEqual([]);
   });
@@ -212,7 +212,7 @@ describe('planDispatch with the network', () => {
     const state = run(2);
     const plan = planDispatch([state], 1500, DOWN);
     expect(plan.start).toEqual([]);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey(state.run.id, 'group-1'))).toEqual({
       reason: 'network',
       problem: 'interface wt0 is down',
       until: null,
@@ -243,7 +243,7 @@ describe('planDispatch with the network', () => {
     const text = `swarm:
   max: 2
   specialists:
-    coder: { name: Кодировщик }
+    coder: { name: Coder }
   actions:
     lint: { run: "npm test" }
   stages:
@@ -262,7 +262,7 @@ describe('planDispatch with the network', () => {
     finish(actions, 'done');
     transition(
       actions,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'm1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'm1' } },
       2500,
     );
     const next = planDispatch([actions], 3000, DOWN);
@@ -277,7 +277,7 @@ describe('planDispatch with the network', () => {
     networkFailure(state, 12_000);
     const plan = planDispatch([state], 12_001, { state: 'up', problem: null });
     expect(plan.start).toEqual([]);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey(state.run.id, 'group-1'))).toEqual({
       reason: 'network',
       problem: 'Connection error',
       until: 12_000 + NETWORK_RETRY_MS,
@@ -295,7 +295,7 @@ describe('planDispatch with the network', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: {
           sessionId: 's',
@@ -306,11 +306,11 @@ describe('planDispatch with the network', () => {
       },
       2000,
     );
-    expect(planDispatch([state], 3000).waits.get(waitKey(state.run.id, 'gruppa-1'))).toMatchObject({
+    expect(planDispatch([state], 3000).waits.get(waitKey(state.run.id, 'group-1'))).toMatchObject({
       reason: 'limit',
     });
     expect(
-      planDispatch([state], 3000, DOWN).waits.get(waitKey(state.run.id, 'gruppa-1')),
+      planDispatch([state], 3000, DOWN).waits.get(waitKey(state.run.id, 'group-1')),
     ).toMatchObject({ reason: 'network', until: null });
   });
 });
@@ -320,7 +320,7 @@ describe('a failed repair', () => {
     const state = run(1);
     state.run.config.delivery.auto = false;
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 1100);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 1100);
     const [incident] = repairIncidents(state);
     const coder = findSpecialist(state.run.config, 'coder');
     if (!incident || !coder) throw new Error('no incident');

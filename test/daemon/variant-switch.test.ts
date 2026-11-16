@@ -7,11 +7,11 @@ import { PIPELINE_CONFIG, statuses } from './harness.ts';
 import { calls, run, start, until } from './control-harness.ts';
 
 const CONFIG = `${PIPELINE_CONFIG.replace(
-  'coder: { name: Кодировщик }',
-  'coder: { name: Кодировщик, runtime: claude, model: sonnet }',
+  'coder: { name: Coder }',
+  'coder: { name: Coder, runtime: claude, model: sonnet }',
 )}      variants:
         strong:
-          name: Сильный
+          name: Strong
           steps:
             code: { model: opus }
 `;
@@ -32,10 +32,10 @@ describe('switching the variant of a running run', () => {
       variant: string;
       variantName: string;
     };
-    expect(switched).toMatchObject({ variant: 'strong', variantName: 'Сильный' });
+    expect(switched).toMatchObject({ variant: 'strong', variantName: 'Strong' });
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged']);
-    expect(final).toMatchObject({ variant: 'strong', variantName: 'Сильный' });
+    expect(final).toMatchObject({ variant: 'strong', variantName: 'Strong' });
     const group = await h.group(runId, 'g1');
     const code = group.attempts.filter((attempt) => attempt.stepId === 'code');
     expect(code[0]).toMatchObject({ status: 'cancelled' });

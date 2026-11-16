@@ -103,15 +103,17 @@ describe('a queue stopped by a usage limit', () => {
 describe('return to the queue', () => {
   it('returns a skipped run from its card', async () => {
     const api = showQueue(
-      queueOf({ skipped: [queueRun('r1', { title: 'Логин', state: 'failed' })] }),
+      queueOf({ skipped: [queueRun('r1', { title: 'Login page', state: 'failed' })] }),
       {
         queueReturn: vi.fn(async () => ({
-          ...queueOf({ items: [queueItem('q9', 'работа', 1, { run: 'r1', title: 'Логин' })] }),
+          ...queueOf({
+            items: [queueItem('q9', 'some work', 1, { run: 'r1', title: 'Login page' })],
+          }),
           item: 'q9',
         })),
       },
     );
-    const card = await screen.findByRole('group', { name: 'Логин' });
+    const card = await screen.findByRole('group', { name: 'Login page' });
     fireEvent.click(within(card).getByRole('button', { name: 'Return to the queue' }));
     await waitFor(() => expect(api.queueReturn).toHaveBeenCalledWith('r1', '/repo'));
     const list = await screen.findByRole('list', { name: 'tasks in the queue' });
@@ -122,7 +124,7 @@ describe('return to the queue', () => {
 
   it('keeps the task of a returned item locked in the edit form', async () => {
     const api = showQueue(
-      queueOf({ items: [queueItem('q9', 'работа', 1, { run: 'r1', title: 'Логин' })] }),
+      queueOf({ items: [queueItem('q9', 'some work', 1, { run: 'r1', title: 'Login page' })] }),
     );
     const list = await screen.findByRole('list', { name: 'tasks in the queue' });
     fireEvent.click(within(list).getByRole('button', { name: 'Edit' }));

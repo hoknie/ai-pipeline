@@ -15,12 +15,12 @@ import {
 
 const none = (): undefined => undefined;
 
-/** Two projects: `lib` holds q1 «API», `web` holds q2 «Клиент». */
+/** Two projects: `lib` holds q1 «API», `web` holds q2 «Client». */
 function projects(): { lib: Queue; web: Queue } {
   const lib = emptyQueue('/work/lib', 1);
   const web = emptyQueue('/work/web', 1);
   addItem(lib, { pipeline: 'feature', task: 'API' }, 'q1', 2);
-  addItem(web, { pipeline: 'feature', task: 'Клиент' }, 'q2', 2);
+  addItem(web, { pipeline: 'feature', task: 'Client' }, 'q2', 2);
   return { lib, web };
 }
 
@@ -59,7 +59,7 @@ describe('dependencies between queues', () => {
   it('does not inherit the tags of a predecessor from another repository', () => {
     const { lib, web } = projects();
     lib.items[0]!.tags = ['auth'];
-    addItem(web, { pipeline: 'feature', task: 'свой' }, 'q3', 3);
+    addItem(web, { pipeline: 'feature', task: 'own' }, 'q3', 3);
     web.items[1]!.tags = ['own'];
     const find = lookupIn(lib, web);
     expect(dependencyTags(web, ['q1'], none, find)).toEqual([]);

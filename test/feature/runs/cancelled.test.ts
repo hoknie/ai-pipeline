@@ -19,7 +19,7 @@ function cancel(state: RunState, slug: string | null = null) {
   transition(state, { kind: 'cancel', group: slug }, 10);
 }
 
-function retry(state: RunState, slug = 'gruppa-1') {
+function retry(state: RunState, slug = 'group-1') {
   return transition(state, { kind: 'retry', group: slug }, 11);
 }
 
@@ -44,15 +44,15 @@ describe('run phase', () => {
   it('is failed for a failed group', () => {
     const state = run(1);
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 5);
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 5);
     expect(runPhase(state)).toBe('failed');
     expect(summarize(state)).toMatchObject({ finished: true, state: 'failed' });
   });
 
   it('is cancelled when one of three groups is cancelled', () => {
     const state = run(3);
-    cancel(state, 'gruppa-1');
-    for (const slug of ['gruppa-2', 'gruppa-3']) group(state, slug).status = 'merged';
+    cancel(state, 'group-1');
+    for (const slug of ['group-2', 'group-3']) group(state, slug).status = 'merged';
     expect(runPhase(state)).toBe('cancelled');
   });
 
@@ -98,10 +98,10 @@ describe('retry of a cancelled group', () => {
   it('returns a group cancelled during a question to the question', () => {
     const state = run(1);
     step(state);
-    finish(state, 'needs_human', { feedback: 'OAuth или пароль?' });
+    finish(state, 'needs_human', { feedback: 'OAuth or password?' });
     cancel(state);
     retry(state);
-    expect(group(state)).toMatchObject({ status: 'needs_human', question: 'OAuth или пароль?' });
+    expect(group(state)).toMatchObject({ status: 'needs_human', question: 'OAuth or password?' });
   });
 
   it('queues the merge again for a group cancelled while merging', () => {

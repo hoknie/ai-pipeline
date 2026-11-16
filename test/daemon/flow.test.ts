@@ -19,10 +19,7 @@ async function start(config?: string, environment?: NodeJS.ProcessEnv): Promise<
   return current;
 }
 
-async function run(
-  h: Harness,
-  groups = [{ title: 'Логин', task: 'добавить логин' }],
-): Promise<string> {
+async function run(h: Harness, groups = [{ title: 'Login', task: 'add login' }]): Promise<string> {
   const created = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
@@ -36,15 +33,15 @@ describe('daemon flow', () => {
     const h = await start();
     h.script({ code: [{ write: { 'feature.ts': 'export const feature = true;\n' } }] });
     const runId = await run(h, [
-      { title: 'Логин', task: 'добавить логин' },
-      { title: 'Выход', task: 'добавить выход' },
+      { title: 'Login', task: 'add login' },
+      { title: 'Logout', task: 'add logout' },
     ]);
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(statuses(final)).toEqual(['merged', 'merged']);
     const log = git(h.repo, 'log', '--format=%s', `refs/aip/${runId}/run`);
     expect(git(h.repo, 'branch', '--list', 'aip/*')).toBe('');
     expect(log).toContain('aip: merge login');
-    expect(log).toContain('aip: merge vyhod');
+    expect(log).toContain('aip: merge logout');
     expect(log).toContain('aip(login/code): code done');
     expect(git(h.repo, 'branch', '--show-current')).toBe('main');
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
@@ -65,14 +62,14 @@ describe('daemon flow', () => {
 describe('specialist limit', () => {
   it('never runs more than one limited coder at a time and finishes every group', async () => {
     const h = await start(
-      PIPELINE_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+      PIPELINE_CONFIG.replace('coder: { name: Coder }', 'coder: { name: Coder, max: 1 }'),
     );
     // the coders wait until the test has seen the other groups wait for the limited specialist
     h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, [
-      { title: 'Первая', task: 'один' },
-      { title: 'Вторая', task: 'два' },
-      { title: 'Третья', task: 'три' },
+      { title: 'First', task: 'one' },
+      { title: 'Second', task: 'two' },
+      { title: 'Third', task: 'three' },
     ]);
     const held = await h.waitFor(runId, (view) =>
       view.specialists.some((use) => use.running.length === 1 && use.waiting.length === 2),
@@ -93,12 +90,12 @@ describe('specialist limit', () => {
 
   it('reports the running and the waiting group of a limited specialist in the run view', async () => {
     const h = await start(
-      PIPELINE_CONFIG.replace('coder: { name: Кодировщик }', 'coder: { name: Кодировщик, max: 1 }'),
+      PIPELINE_CONFIG.replace('coder: { name: Coder }', 'coder: { name: Coder, max: 1 }'),
     );
     h.script({ code: [{ waitFor: h.gate('code') }] });
     const runId = await run(h, [
-      { title: 'Первая', task: 'один' },
-      { title: 'Вторая', task: 'два' },
+      { title: 'First', task: 'one' },
+      { title: 'Second', task: 'two' },
     ]);
     const busy = await h.waitFor(runId, (view) =>
       view.specialists.some((use) => use.running.length === 1 && use.waiting.length === 1),
@@ -108,8 +105,8 @@ describe('specialist limit', () => {
         specialist: 'coder',
         level: 'project',
         max: 1,
-        running: [{ slug: 'pervaya', step: 'code' }],
-        waiting: [{ slug: 'vtoraya', step: 'code' }],
+        running: [{ slug: 'first', step: 'code' }],
+        waiting: [{ slug: 'second', step: 'code' }],
       },
     ]);
     h.open('code');
@@ -124,10 +121,10 @@ describe('configuration directory', () => {
     rmSync(join(h.repo, 'aip'), { recursive: true });
     mkdirSync(join(h.repo, 'aip', 'specialists'), { recursive: true });
     mkdirSync(join(h.repo, 'aip', 'pipelines'));
-    writeFileSync(join(h.repo, 'aip', 'specialists', 'coder.yaml'), 'name: Кодировщик\n');
+    writeFileSync(join(h.repo, 'aip', 'specialists', 'coder.yaml'), 'name: Coder\n');
     writeFileSync(
       join(h.repo, 'aip', 'specialists', 'reviewer.yaml'),
-      'name: Ревьюер\npermissions: read\n',
+      'name: Reviewer\npermissions: read\n',
     );
     writeFileSync(join(h.repo, 'aip', 'settings.yaml'), 'delivery: { auto: false }\n');
     writeFileSync(

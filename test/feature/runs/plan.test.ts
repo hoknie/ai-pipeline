@@ -15,16 +15,13 @@ import {
 
 import { CONFIG_TEXT, finish, run, runningAttempt, step } from './helpers.ts';
 
-const LIMITED = CONFIG_TEXT.replace(
-  'coder: { name: Кодировщик,',
-  'coder: { name: Кодировщик, max: 1,',
-);
+const LIMITED = CONFIG_TEXT.replace('coder: { name: Coder,', 'coder: { name: Coder, max: 1,');
 
 /** Groups of the run go through `plan` and wait for `code`. */
 function planned(groups: number, options: { id?: string; now?: number; max?: number } = {}) {
   const state = run(groups, { configText: LIMITED, ...options });
   step(state);
-  for (let index = 1; index <= groups; index++) finish(state, 'done', { slug: `gruppa-${index}` });
+  for (let index = 1; index <= groups; index++) finish(state, 'done', { slug: `group-${index}` });
   return state;
 }
 
@@ -45,23 +42,23 @@ describe('planDispatch', () => {
     const before = structuredClone(state);
     const plan = planDispatch([state], 1500);
     expect(state).toEqual(before);
-    expect(plan.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
+    expect(plan.start.map((entry) => entry.group.slug)).toEqual(['group-1']);
     const effects = dispatch([state], 1500);
     expect(effects.map((effect) => (effect.kind === 'start_attempt' ? effect.group : ''))).toEqual([
-      'gruppa-1',
+      'group-1',
     ]);
   });
 
   it('makes groups wait for a busy specialist in the same run', () => {
     const state = planned(3);
     const plan = planDispatch([state], 1500);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toEqual({
+    expect(plan.waits.get(waitKey(state.run.id, 'group-2'))).toEqual({
       reason: 'specialist',
       specialist: 'coder',
-      name: 'Кодировщик',
+      name: 'Coder',
       max: 1,
     });
-    expect(plan.waits.has(waitKey(state.run.id, 'gruppa-1'))).toBe(false);
+    expect(plan.waits.has(waitKey(state.run.id, 'group-1'))).toBe(false);
   });
 
   it('makes a group wait for a specialist busy in another run', () => {
@@ -69,7 +66,7 @@ describe('planDispatch', () => {
     const second = planned(1, { id: 'run000000002', now: 2000 });
     const plan = planDispatch([first, second], 1500);
     expect(plan.start.map((entry) => entry.state.run.id)).toEqual(['run000000001']);
-    expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toMatchObject({
+    expect(plan.waits.get(waitKey('run000000002', 'group-1'))).toMatchObject({
       reason: 'specialist',
     });
   });
@@ -78,7 +75,7 @@ describe('planDispatch', () => {
     const state = run(3, { max: 2 });
     const plan = planDispatch([state], 1500);
     expect(plan.start).toHaveLength(2);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-3'))).toEqual({
+    expect(plan.waits.get(waitKey(state.run.id, 'group-3'))).toEqual({
       reason: 'capacity',
       scope: 'repository',
       max: 2,
@@ -91,10 +88,10 @@ describe('planDispatch', () => {
     second.run.repository = '/other';
     const plan = planDispatch([first, second], 1500);
     expect(plan.start.map((entry) => `${entry.state.run.id}/${entry.group.slug}`)).toEqual([
-      'run000000001/gruppa-1',
-      'run000000002/gruppa-1',
+      'run000000001/group-1',
+      'run000000002/group-1',
     ]);
-    expect(plan.waits.get(waitKey('run000000001', 'gruppa-2'))).toEqual({
+    expect(plan.waits.get(waitKey('run000000001', 'group-2'))).toEqual({
       reason: 'capacity',
       scope: 'repository',
       max: 1,
@@ -108,12 +105,12 @@ describe('planDispatch', () => {
     elsewhere.run.repository = '/other';
     const plan = planDispatch([older, newer, elsewhere], 3500);
     expect(plan.start.map((entry) => `${entry.state.run.id}/${entry.group.slug}`)).toEqual([
-      'run000000001/gruppa-1',
-      'run000000001/gruppa-2',
-      'run000000001/gruppa-3',
-      'run000000003/gruppa-1',
+      'run000000001/group-1',
+      'run000000001/group-2',
+      'run000000001/group-3',
+      'run000000003/group-1',
     ]);
-    expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('run000000002', 'group-1'))).toEqual({
       reason: 'capacity',
       scope: 'repository',
       max: 3,
@@ -128,7 +125,7 @@ describe('planDispatch', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: {
           sessionId: 's',
@@ -141,7 +138,7 @@ describe('planDispatch', () => {
     );
     const plan = planDispatch([state], 3000);
     expect(plan.start).toEqual([]);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey(state.run.id, 'group-1'))).toEqual({
       reason: 'limit',
       runtime: 'opencode',
       until: 50_000,
@@ -151,8 +148,8 @@ describe('planDispatch', () => {
   it('names the specialist, not the capacity, when both hold a group back', () => {
     const state = withMax(planned(2), 1);
     const plan = planDispatch([state], 1500);
-    expect(plan.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toMatchObject({
+    expect(plan.start.map((entry) => entry.group.slug)).toEqual(['group-1']);
+    expect(plan.waits.get(waitKey(state.run.id, 'group-2'))).toMatchObject({
       reason: 'specialist',
     });
   });
@@ -201,7 +198,7 @@ describe('planDispatch', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: {
           sessionId: 's',
@@ -214,7 +211,7 @@ describe('planDispatch', () => {
     );
     const plan = planDispatch([withMax(state, 0)], 3000);
     expect(plan.start).toEqual([]);
-    expect(plan.waits.get(waitKey(state.run.id, 'gruppa-2'))).toMatchObject({ reason: 'limit' });
+    expect(plan.waits.get(waitKey(state.run.id, 'group-2'))).toMatchObject({ reason: 'limit' });
   });
 
   it.each([
@@ -246,7 +243,7 @@ describe('a run with a hold', () => {
     expect(held.waits.size).toBe(0);
     transition(state, { kind: 'hold', hold: null }, 3002);
     const lifted = planDispatch([state], 3003);
-    expect(lifted.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
+    expect(lifted.start.map((entry) => entry.group.slug)).toEqual(['group-1']);
     expect(lifted.start[0]!.group.pending?.stepIndex).toBe(1);
   });
 
@@ -283,11 +280,11 @@ describe('planDispatch with a limit of the machine', () => {
     const { app, lib } = twoProjects();
     const plan = planDispatch([app, lib], 3000, undefined, machine(3));
     expect(started(plan)).toEqual([
-      'run000000001/gruppa-1',
-      'run000000001/gruppa-2',
-      'run000000002/gruppa-1',
+      'run000000001/group-1',
+      'run000000001/group-2',
+      'run000000002/group-1',
     ]);
-    expect(plan.waits.get(waitKey('run000000002', 'gruppa-2'))).toEqual({
+    expect(plan.waits.get(waitKey('run000000002', 'group-2'))).toEqual({
       reason: 'capacity',
       scope: 'machine',
       max: 3,
@@ -307,8 +304,8 @@ describe('planDispatch with a limit of the machine', () => {
     const repository = planDispatch([app], 3000, undefined, REPOSITORY_LIMIT);
     const global = planDispatch([app], 3000, undefined, machine(5));
     for (const plan of [repository, global]) {
-      expect(plan.start.map((entry) => entry.group.slug)).toEqual(['gruppa-1']);
-      expect(plan.waits.get(waitKey('run000000001', 'gruppa-2'))).toMatchObject({
+      expect(plan.start.map((entry) => entry.group.slug)).toEqual(['group-1']);
+      expect(plan.waits.get(waitKey('run000000001', 'group-2'))).toMatchObject({
         reason: 'specialist',
       });
     }
@@ -317,13 +314,13 @@ describe('planDispatch with a limit of the machine', () => {
   it('leaves the mode of the projects as it was', () => {
     const { app, lib } = twoProjects();
     const plan = planDispatch([app, lib], 3000, undefined, REPOSITORY_LIMIT);
-    expect(started(plan)).toEqual(['run000000001/gruppa-1', 'run000000002/gruppa-1']);
+    expect(started(plan)).toEqual(['run000000001/group-1', 'run000000002/group-1']);
   });
 
   it('lets the older run take the places of the machine first', () => {
     const { app, lib } = twoProjects();
     const plan = planDispatch([lib, app], 3000, undefined, machine(1));
-    expect(started(plan)).toEqual(['run000000001/gruppa-1']);
+    expect(started(plan)).toEqual(['run000000001/group-1']);
   });
 });
 
@@ -349,11 +346,11 @@ describe('planDispatch with the machine limit in the project mode', () => {
     const { a, b } = projects({ a: 3, b: 2, aMax: 4, bMax: 4 });
     const plan = planDispatch([a, b], 3000, undefined, project(3));
     expect(started(plan)).toEqual([
-      'run000000001/gruppa-1',
-      'run000000001/gruppa-2',
-      'run000000001/gruppa-3',
+      'run000000001/group-1',
+      'run000000001/group-2',
+      'run000000001/group-3',
     ]);
-    expect(plan.waits.get(waitKey('run000000002', 'gruppa-1'))).toEqual({
+    expect(plan.waits.get(waitKey('run000000002', 'group-1'))).toEqual({
       reason: 'capacity',
       scope: 'machine',
       max: 3,
@@ -364,11 +361,11 @@ describe('planDispatch with the machine limit in the project mode', () => {
     const { a, b } = projects({ a: 1, b: 3, bMax: 2 });
     const plan = planDispatch([a, b], 3000, undefined, project(5));
     expect(started(plan)).toEqual([
-      'run000000001/gruppa-1',
-      'run000000002/gruppa-1',
-      'run000000002/gruppa-2',
+      'run000000001/group-1',
+      'run000000002/group-1',
+      'run000000002/group-2',
     ]);
-    expect(plan.waits.get(waitKey('run000000002', 'gruppa-3'))).toEqual({
+    expect(plan.waits.get(waitKey('run000000002', 'group-3'))).toEqual({
       reason: 'capacity',
       scope: 'repository',
       max: 2,
@@ -376,7 +373,7 @@ describe('planDispatch with the machine limit in the project mode', () => {
     const more = run(1, { id: 'run000000003', now: 3000, max: 5 });
     more.run.repository = '/third';
     expect(started(planDispatch([a, b, more], 3000, undefined, project(5)))).toContain(
-      'run000000003/gruppa-1',
+      'run000000003/group-1',
     );
   });
 
@@ -384,17 +381,17 @@ describe('planDispatch with the machine limit in the project mode', () => {
     const { a, b } = projects({ a: 1, b: 3, bMax: 2 });
     dispatch([a, b], 3000, undefined, project(3));
     const both = planDispatch([a, b], 3100, undefined, project(3));
-    expect(both.waits.get(waitKey('run000000002', 'gruppa-3'))).toEqual({
+    expect(both.waits.get(waitKey('run000000002', 'group-3'))).toEqual({
       reason: 'capacity',
       scope: 'machine',
       max: 3,
     });
     // The agent of the other project ends; the place of the machine is free, the repository is not.
-    finish(a, 'done', { slug: 'gruppa-1', now: 3200 });
+    finish(a, 'done', { slug: 'group-1', now: 3200 });
     transition(a, { kind: 'hold', hold: 'paused' }, 3300);
     const after = planDispatch([a, b], 3400, undefined, project(3));
     expect(after.start).toEqual([]);
-    expect(after.waits.get(waitKey('run000000002', 'gruppa-3'))).toEqual({
+    expect(after.waits.get(waitKey('run000000002', 'group-3'))).toEqual({
       reason: 'capacity',
       scope: 'repository',
       max: 2,
@@ -409,7 +406,7 @@ describe('planDispatch with the machine limit in the project mode', () => {
     expect(a.groups.map((group) => group.status)).toEqual(['running', 'running']);
     expect(
       planDispatch([a, b, next], 3100, undefined, project(1)).waits.get(
-        waitKey('run000000003', 'gruppa-1'),
+        waitKey('run000000003', 'group-1'),
       ),
     ).toEqual({ reason: 'capacity', scope: 'machine', max: 1 });
   });
@@ -418,7 +415,7 @@ describe('planDispatch with the machine limit in the project mode', () => {
     const { a, b } = projects({ a: 1, b: 1, aMax: 1 });
     const direct = run(1, { id: 'run000000003', now: 3000, max: 1 });
     const plan = planDispatch([a, b, direct], 3000, undefined, project(5));
-    expect(plan.waits.get(waitKey('run000000003', 'gruppa-1'))).toMatchObject({
+    expect(plan.waits.get(waitKey('run000000003', 'group-1'))).toMatchObject({
       scope: 'repository',
     });
   });

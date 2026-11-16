@@ -53,16 +53,16 @@ function specialistFile(paths: ConfigPaths, slug: string, level = paths.project)
 }
 
 const CODER = [
-  '# основной кодировщик',
-  'name: Кодировщик',
-  'model: sonnet # дешёвая модель',
+  '# main coder',
+  'name: Coder',
+  'model: sonnet # cheap model',
   '',
-  '# команды, которые можно запускать',
+  '# commands it may run',
   'allow_commands:',
   "  - 'npm test*'",
   'prompt: |',
-  '  Пиши код.',
-  '  Задача: %s',
+  '  Write code.',
+  '  Task: %s',
   '',
 ].join('\n');
 
@@ -74,60 +74,60 @@ function accepted(plan: EditPlan) {
 describe('editDocument', () => {
   it('keeps comments and key order when one value changes', () => {
     const text = editDocument(CODER, {
-      name: 'Кодировщик',
+      name: 'Coder',
       model: 'opus',
       allow_commands: ['npm test*'],
-      prompt: 'Пиши код.\nЗадача: %s\n',
+      prompt: 'Write code.\nTask: %s\n',
     });
     expect(text).toBe(CODER.replace('model: sonnet', 'model: opus'));
   });
 
   it('does not touch a file whose values did not change', () => {
     const value = {
-      name: 'Кодировщик',
+      name: 'Coder',
       model: 'sonnet',
       allow_commands: ['npm test*'],
-      prompt: 'Пиши код.\nЗадача: %s\n',
+      prompt: 'Write code.\nTask: %s\n',
     };
     expect(editDocument(CODER, value)).toBe(CODER);
   });
 
   it('removes a cleared key and appends a new one at the end', () => {
     const text = editDocument(CODER, {
-      name: 'Кодировщик',
+      name: 'Coder',
       allow_commands: ['npm test*'],
-      prompt: 'Пиши код.\nЗадача: %s\n',
+      prompt: 'Write code.\nTask: %s\n',
       timeout: '1h',
     });
     expect(text).not.toContain('model');
     expect(text.trimEnd().endsWith('timeout: 1h')).toBe(true);
-    expect(text).toContain('# команды, которые можно запускать');
+    expect(text).toContain('# commands it may run');
   });
 
   it('writes a multi-line prompt as a block literal', () => {
-    const fresh = editDocument(undefined, { name: 'Автор', prompt: 'Первая\nВторая' });
+    const fresh = editDocument(undefined, { name: 'Author', prompt: 'First\nSecond' });
     expect(fresh).toContain('prompt: |-');
-    expect(fresh).toContain('  Первая\n  Вторая');
-    const changed = editDocument('name: Автор\nprompt: x\n', {
-      name: 'Автор',
-      prompt: 'Первая\nВторая\n',
+    expect(fresh).toContain('  First\n  Second');
+    const changed = editDocument('name: Author\nprompt: x\n', {
+      name: 'Author',
+      prompt: 'First\nSecond\n',
     });
-    expect(changed).toContain('prompt: |\n  Первая\n  Вторая\n');
+    expect(changed).toContain('prompt: |\n  First\n  Second\n');
   });
 
   it('keeps long plain values unfolded', () => {
-    const long = `${'слово '.repeat(40)}конец`;
+    const long = `${'words '.repeat(40)}end`;
     const text = editDocument(`name: A\ndescription: ${long}\n`, { name: 'B', description: long });
     expect(text).toContain(`description: ${long}`);
   });
 
   it('treats a mapping with the keys in another order as unchanged', () => {
-    const text = 'steps:\n  # первый\n  - { specialist: coder, id: code }\n';
+    const text = 'steps:\n  # first\n  - { specialist: coder, id: code }\n';
     expect(editDocument(text, { steps: [{ id: 'code', specialist: 'coder' }] })).toBe(text);
   });
 
   it('creates a new file from a value', () => {
-    expect(editDocument(undefined, { name: 'Новый', max: 2 })).toBe('name: Новый\nmax: 2\n');
+    expect(editDocument(undefined, { name: 'New', max: 2 })).toBe('name: New\nmax: 2\n');
   });
 
   it('refuses a file with a syntax error', () => {
@@ -156,7 +156,7 @@ describe('split.pipeline target', () => {
   it('refuses to delete a pipeline another pipeline splits into', () => {
     const paths = setup();
     write(specialistFile(paths, 'coder'), CODER);
-    write(specialistFile(paths, 'plan'), 'name: Планировщик\n');
+    write(specialistFile(paths, 'plan'), 'name: Planner\n');
     const explore = join(paths.project.directory, 'pipelines', 'explore.yaml');
     const epic = join(paths.project.directory, 'pipelines', 'epic.yaml');
     const exploreText = 'steps:\n  - { id: research, specialist: coder }\n';
@@ -178,7 +178,7 @@ describe('split.pipeline target', () => {
 describe('planEdit and commitEdit', () => {
   function project(paths: ConfigPaths): void {
     write(specialistFile(paths, 'coder'), CODER);
-    write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
+    write(specialistFile(paths, 'reviewer'), 'name: Reviewer\npermissions: read\n');
     write(
       join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: coder }\n  - { id: review, specialist: reviewer }\n',
@@ -194,7 +194,7 @@ describe('planEdit and commitEdit', () => {
       planEdit(paths, {
         kind: 'specialist',
         id: 'coder',
-        value: { name: 'Кодировщик', model: 'opus' },
+        value: { name: 'Coder', model: 'opus' },
         revision: revisionOf(CODER),
       }),
     );
@@ -209,7 +209,7 @@ describe('planEdit and commitEdit', () => {
     const plan = planEdit(paths, {
       kind: 'specialist',
       id: 'coder',
-      value: { name: 'Кодировщик', permissions: 'admin' },
+      value: { name: 'Coder', permissions: 'admin' },
       revision: revisionOf(CODER),
     });
     expect(plan).toMatchObject({ ok: false, reason: 'invalid' });
@@ -232,7 +232,7 @@ describe('planEdit and commitEdit', () => {
     const plan = planEdit(paths, {
       kind: 'specialist',
       id: 'coder',
-      value: { name: 'Кодировщик', model: 'opus' },
+      value: { name: 'Coder', model: 'opus' },
       revision: revisionOf(CODER),
     });
     expect(plan.ok).toBe(true);
@@ -255,7 +255,7 @@ describe('planEdit and commitEdit', () => {
     const paths = setup();
     project(paths);
     const seen = revisionOf(CODER);
-    writeFileSync(specialistFile(paths, 'coder'), `${CODER}# правка в редакторе\n`);
+    writeFileSync(specialistFile(paths, 'coder'), `${CODER}# edit in the editor\n`);
     const edit = { kind: 'specialist', id: 'coder', value: { name: 'C' }, revision: seen } as const;
     expect(planEdit(paths, edit)).toMatchObject({ ok: false, reason: 'conflict' });
     expect(planEdit(paths, { ...edit, revision: null })).toMatchObject({
@@ -266,7 +266,7 @@ describe('planEdit and commitEdit', () => {
     expect(planEdit(paths, { ...edit, id: 'gone', revision: seen })).toMatchObject({
       reason: 'conflict',
     });
-    expect(readFileSync(specialistFile(paths, 'coder'), 'utf8')).toContain('правка в редакторе');
+    expect(readFileSync(specialistFile(paths, 'coder'), 'utf8')).toContain('edit in the editor');
   });
 
   it('creates the directory for a new specialist', () => {
@@ -287,7 +287,7 @@ describe('planEdit and commitEdit', () => {
       kind: 'specialist',
       id: 'reviewer',
       value: null,
-      revision: revisionOf('name: Ревьюер\npermissions: read\n'),
+      revision: revisionOf('name: Reviewer\npermissions: read\n'),
     });
     expect(plan).toEqual({
       ok: false,
@@ -343,7 +343,7 @@ describe('planEdit and commitEdit', () => {
       ),
     );
     expect(existsSync(specialistFile(paths, 'extra'))).toBe(false);
-    write(specialistFile(paths, 'coder', paths.global), 'name: Общий\n');
+    write(specialistFile(paths, 'coder', paths.global), 'name: Shared\n');
     commitEdit(
       accepted(
         planEdit(paths, {
@@ -354,24 +354,24 @@ describe('planEdit and commitEdit', () => {
         }),
       ),
     );
-    expect(loadConfig(paths).specialists.find((s) => s.slug === 'coder')?.name).toBe('Общий');
+    expect(loadConfig(paths).specialists.find((s) => s.slug === 'coder')?.name).toBe('Shared');
   });
 
   it('never touches the global level', () => {
     const paths = setup();
-    write(specialistFile(paths, 'qa', paths.global), 'name: Общий QA\n');
+    write(specialistFile(paths, 'qa', paths.global), 'name: Shared QA\n');
     const plan = accepted(
       planEdit(paths, {
         kind: 'specialist',
         id: 'qa',
-        value: { name: 'Общий QA' },
+        value: { name: 'Shared QA' },
         revision: null,
       }),
     );
     commitEdit(plan);
     expect(plan.file).toBe(specialistFile(paths, 'qa'));
     expect(readFileSync(specialistFile(paths, 'qa', paths.global), 'utf8')).toBe(
-      'name: Общий QA\n',
+      'name: Shared QA\n',
     );
   });
 });
@@ -411,10 +411,10 @@ describe('specialistReferences', () => {
 describe('editorView', () => {
   it('shows the project over the global level and where each setting comes from', () => {
     const paths = setup();
-    write(specialistFile(paths, 'coder', paths.global), 'name: Общий\nmodel: a\n');
+    write(specialistFile(paths, 'coder', paths.global), 'name: Shared\nmodel: a\n');
     write(specialistFile(paths, 'qa', paths.global), 'name: QA\n');
-    write(specialistFile(paths, 'coder'), 'name: Проектный\nmodel: b\n');
-    write(specialistFile(paths, 'plan'), 'name: План\n');
+    write(specialistFile(paths, 'coder'), 'name: Project-level\nmodel: b\n');
+    write(specialistFile(paths, 'plan'), 'name: Plan\n');
     write(join(paths.global.directory, 'settings.yaml'), 'max: 5\n');
     write(join(paths.project.directory, 'settings.yaml'), 'delivery: { auto: false }\n');
     const view = editorView(paths);
@@ -424,7 +424,7 @@ describe('editorView', () => {
     const coder = view.specialists.find((s) => s.slug === 'coder');
     expect(coder?.file).toBe(specialistFile(paths, 'coder'));
     expect(coder?.effective?.model).toBe('b');
-    expect(coder?.revision).toBe(revisionOf('name: Проектный\nmodel: b\n'));
+    expect(coder?.revision).toBe(revisionOf('name: Project-level\nmodel: b\n'));
     const qa = view.specialists.find((s) => s.slug === 'qa');
     expect(qa).toMatchObject({ file: specialistFile(paths, 'qa', paths.global), revision: null });
     const max = view.settings.find((setting) => setting.path === 'max');
@@ -473,11 +473,11 @@ describe('pipeline entries', () => {
     '  - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 2 } }',
     '',
   ].join('\n');
-  const WITH_SPLIT = `# деление на группы\nsplit: { specialist: coder, max_groups: 3 }\n${FEATURE}`;
+  const WITH_SPLIT = `# split into groups\nsplit: { specialist: coder, max_groups: 3 }\n${FEATURE}`;
 
   function project(paths: ConfigPaths, text = FEATURE): void {
-    write(specialistFile(paths, 'coder'), 'name: Кодировщик\n');
-    write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
+    write(specialistFile(paths, 'coder'), 'name: Coder\n');
+    write(specialistFile(paths, 'reviewer'), 'name: Reviewer\npermissions: read\n');
     write(join(paths.project.directory, 'pipelines', 'feature.yaml'), text);
   }
 
@@ -512,7 +512,7 @@ describe('pipeline entries', () => {
     commitEdit(plan);
     const text = readFileSync(pipelineFile(paths), 'utf8');
     expect(
-      text.startsWith('# деление на группы\nsplit: { specialist: coder, max_groups: 3 }'),
+      text.startsWith('# split into groups\nsplit: { specialist: coder, max_groups: 3 }'),
     ).toBe(true);
     expect(loadConfig(paths).pipelines[0]?.steps.map((step) => step.id)).toEqual([
       'code',
@@ -664,7 +664,7 @@ describe('global level', () => {
 
   it('creates the global file and directory and leaves the project alone', () => {
     const paths = setup();
-    write(specialistFile(paths, 'coder'), 'name: Проект\n');
+    write(specialistFile(paths, 'coder'), 'name: Project\n');
     const plan = accepted(
       planEdit(paths, {
         kind: 'specialist',
@@ -683,7 +683,7 @@ describe('global level', () => {
   it('rejects a global pipeline that names a project-only specialist', () => {
     const paths = setup();
     write(globalSpecialist(paths, 'reviewer'), 'name: R\n');
-    write(specialistFile(paths, 'coder'), 'name: Проект\n');
+    write(specialistFile(paths, 'coder'), 'name: Project\n');
     const plan = planEdit(paths, {
       kind: 'pipeline',
       id: 'feature',
@@ -739,7 +739,7 @@ describe('global level', () => {
     write(globalSpecialist(paths, 'coder'), 'name: C\n');
     write(globalSpecialist(paths, 'reviewer'), 'name: R\n');
     write(globalPipeline(paths), FEATURE);
-    write(specialistFile(paths, 'coder'), 'name: Проект\n');
+    write(specialistFile(paths, 'coder'), 'name: Project\n');
     const plan = planEdit(paths, {
       kind: 'specialist',
       id: 'coder',
@@ -787,18 +787,18 @@ describe('global level', () => {
 
   it('shows the files of both levels in sources', () => {
     const paths = setup();
-    write(globalSpecialist(paths, 'coder'), 'name: Общий\n');
-    write(specialistFile(paths, 'coder'), 'name: Проект\n');
+    write(globalSpecialist(paths, 'coder'), 'name: Shared\n');
+    write(specialistFile(paths, 'coder'), 'name: Project\n');
     write(globalSpecialist(paths, 'qa'), 'name: QA\n');
     const view = editorView(paths);
     const coder = view.specialists.find((entry) => entry.slug === 'coder')!;
     expect(coder.sources.project).toEqual({
       file: specialistFile(paths, 'coder'),
-      revision: revisionOf('name: Проект\n'),
-      raw: { name: 'Проект' },
+      revision: revisionOf('name: Project\n'),
+      raw: { name: 'Project' },
     });
-    expect(coder.sources.global?.revision).toBe(revisionOf('name: Общий\n'));
-    expect(coder.sources.global?.raw).toEqual({ name: 'Общий' });
+    expect(coder.sources.global?.revision).toBe(revisionOf('name: Shared\n'));
+    expect(coder.sources.global?.raw).toEqual({ name: 'Shared' });
     const qa = view.specialists.find((entry) => entry.slug === 'qa')!;
     expect(qa.sources.project).toBeUndefined();
     expect(qa.sources.global?.file).toBe(globalSpecialist(paths, 'qa'));
@@ -831,8 +831,8 @@ describe('global level', () => {
 describe('general settings', () => {
   function levels(globalText: string | null, projectText = 'delivery: { resolver: reviewer }\n') {
     const paths = setup();
-    write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
-    write(specialistFile(paths, 'coder'), 'name: Кодировщик\n');
+    write(specialistFile(paths, 'reviewer'), 'name: Reviewer\npermissions: read\n');
+    write(specialistFile(paths, 'coder'), 'name: Coder\n');
     write(
       join(paths.project.directory, 'pipelines', 'feature.yaml'),
       'steps:\n  - { id: code, specialist: coder }\n',
@@ -841,11 +841,11 @@ describe('general settings', () => {
     if (globalText !== null) write(join(paths.global.directory, 'settings.yaml'), globalText);
     return paths;
   }
-  const GLOBAL = '# общие\nmax: 5 # параллельно\ndelivery:\n  mode: commit\n';
+  const GLOBAL = '# shared\nmax: 5 # in parallel\ndelivery:\n  mode: commit\n';
 
   it('sets one field and keeps comments and the other keys', () => {
     expect(editSetting(GLOBAL, 'delivery.auto', false)).toBe(
-      '# общие\nmax: 5 # параллельно\ndelivery:\n  mode: commit\n  auto: false\n',
+      '# shared\nmax: 5 # in parallel\ndelivery:\n  mode: commit\n  auto: false\n',
     );
   });
 
@@ -868,7 +868,7 @@ describe('general settings', () => {
       planSetting(paths, { path: 'delivery.auto', value: false, revision: revisionOf(GLOBAL) }),
     );
     commitEdit(plan);
-    expect(readFileSync(file, 'utf8')).toContain('max: 5 # параллельно');
+    expect(readFileSync(file, 'utf8')).toContain('max: 5 # in parallel');
     expect(loadConfig(paths).delivery.auto).toBe(false);
     expect(loadConfig(paths).max).toBe(5);
   });
@@ -1037,10 +1037,10 @@ describe('catalog of setting fields', () => {
 });
 
 describe('batch write of settings', () => {
-  const GLOBAL = '# общие\nmax: 5 # параллельно\ndelivery:\n  mode: commit\n';
+  const GLOBAL = '# shared\nmax: 5 # in parallel\ndelivery:\n  mode: commit\n';
   function levels(globalText: string | null) {
     const paths = setup();
-    write(specialistFile(paths, 'reviewer'), 'name: Ревьюер\npermissions: read\n');
+    write(specialistFile(paths, 'reviewer'), 'name: Reviewer\npermissions: read\n');
     if (globalText !== null) write(join(paths.global.directory, 'settings.yaml'), globalText);
     return paths;
   }
@@ -1060,8 +1060,8 @@ describe('batch write of settings', () => {
       ),
     );
     const text = readFileSync(settingsFile(paths, 'global'), 'utf8');
-    expect(text).toContain('# общие');
-    expect(text).toContain('max: 8 # параллельно');
+    expect(text).toContain('# shared');
+    expect(text).toContain('max: 8 # in parallel');
     expect(loadConfig(paths).max).toBe(8);
     expect(loadConfig(paths).workspace.include).toEqual(['.env', 'secrets/*']);
   });
@@ -1281,7 +1281,7 @@ describe('batch write of settings', () => {
 });
 
 describe('specialist tags in the editor', () => {
-  const tagged = (tags: string) => `name: Кодировщик\n${tags}\n`;
+  const tagged = (tags: string) => `name: Coder\n${tags}\n`;
 
   it('splits the tags of the shared and the project file', () => {
     const paths = setup();

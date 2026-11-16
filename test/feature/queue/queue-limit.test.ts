@@ -54,7 +54,7 @@ function exit(
     state,
     {
       kind: 'attempt_exited',
-      group: 'gruppa-1',
+      group: 'group-1',
       seq: attempt.seq,
       exit: {
         sessionId: 's',
@@ -127,7 +127,7 @@ describe('stop on a usage limit', () => {
     expect(queue.stop).toEqual({
       kind: 'limit',
       run: a.run.id,
-      group: 'gruppa-1',
+      group: 'group-1',
       runtime: 'claude',
       resetsAt: RESET,
       autoResume: true,
@@ -267,7 +267,7 @@ describe('return a run to the queue', () => {
   it('keeps the task of a returned run, but moves and removes it', () => {
     const { queue, a } = skippedRun();
     returnRun(queue, a, 'q9', 10);
-    expect(() => editItem(queue, 'q9', { task: 'другое' }, 11)).toThrow(
+    expect(() => editItem(queue, 'q9', { task: 'other' }, 11)).toThrow(
       'a returned run keeps its own task',
     );
     editItem(queue, 'q9', { position: queue.items.length }, 12);

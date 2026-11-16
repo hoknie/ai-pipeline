@@ -100,15 +100,15 @@ describe('system steps in the runs section', () => {
   it('lists groups and then system steps with a mark', async () => {
     mount([
       runView({
-        groups: [groupRow({ slug: 'a', title: 'Альфа' }), groupRow({ slug: 'b', title: 'Бета' })],
+        groups: [groupRow({ slug: 'a', title: 'Alpha' }), groupRow({ slug: 'b', title: 'Beta' })],
         system: [systemRow('message', { status: 'done' })],
       }),
     ]);
     const list = await screen.findByRole('list', { name: 'run groups' });
     const items = within(list).getAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual([
-      expect.stringContaining('Альфа'),
-      expect.stringContaining('Бета'),
+      expect.stringContaining('Alpha'),
+      expect.stringContaining('Beta'),
       expect.stringContaining('Commit message'),
     ]);
     expect(items[2]!.textContent).toContain('system step');
@@ -126,17 +126,17 @@ describe('system steps in the runs section', () => {
         runView({
           state: 'needs_human',
           groups: [],
-          system: [systemRow('split', { status: 'needs_human', question: 'Сколько групп?' })],
+          system: [systemRow('split', { status: 'needs_human', question: 'How many groups?' })],
         }),
       ],
       { group: vi.fn(async () => groupView({ slug: '_split', status: 'needs_human' })) },
     );
-    expect(await screen.findByText('Сколько групп?')).toBeTruthy();
+    expect(await screen.findByText('How many groups?')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('answer for Split into groups'), {
-      target: { value: 'три' },
+      target: { value: 'three' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
-    await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', '_split', 'три'));
+    await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', '_split', 'three'));
   });
 
   it('cancels a running resolver after the confirmation', async () => {
@@ -189,15 +189,15 @@ describe('actions of the pipeline in the runs section', () => {
   const action = (overrides = {}) =>
     systemRow('action', {
       slug: '_action-before-delivery-lint',
-      title: 'Проверка стиля',
+      title: 'Style check',
       ...overrides,
     });
 
   it('lists an action by its title with the system mark', async () => {
-    mount([runView({ groups: [groupRow({ slug: 'a', title: 'Альфа' })], system: [action()] })]);
+    mount([runView({ groups: [groupRow({ slug: 'a', title: 'Alpha' })], system: [action()] })]);
     const list = await screen.findByRole('list', { name: 'run groups' });
     const items = within(list).getAllByRole('listitem');
-    expect(items[1]!.textContent).toContain('Проверка стиля');
+    expect(items[1]!.textContent).toContain('Style check');
     expect(items[1]!.textContent).toContain('system step');
   });
 
@@ -216,9 +216,9 @@ describe('actions of the pipeline in the runs section', () => {
         ),
       },
     );
-    expect(await screen.findByRole('region', { name: 'group Проверка стиля' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'group Style check' })).toBeTruthy();
     expect(screen.queryByRole('tab', { name: /Changes/ })).toBeNull();
-    fireEvent.keyDown(await screen.findByRole('button', { name: 'More actions: Проверка стиля' }), {
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'More actions: Style check' }), {
       key: 'Enter',
     });
     fireEvent.click(screen.getByRole('menuitem', { name: 'Retry' }));
@@ -318,7 +318,7 @@ describe('opening a split from the topology', () => {
     fireEvent.click(await screen.findByTestId('stage-split'));
     fireEvent.click(
       within(await screen.findByRole('complementary', { name: /^node/ })).getByRole('button', {
-        name: 'добавить вход',
+        name: 'add sign-in',
       }),
     );
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1/_split'));

@@ -21,7 +21,7 @@ describe('attempt_usage', () => {
     step(state);
     const effects = transition(
       state,
-      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage: live }] },
       2000,
     );
     expect(effects).toEqual([]);
@@ -37,7 +37,7 @@ describe('attempt_usage', () => {
     for (const usage of [live, more]) {
       transition(
         state,
-        { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage }] },
+        { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage }] },
         2000,
       );
     }
@@ -53,9 +53,9 @@ describe('attempt_usage', () => {
       {
         kind: 'attempt_usage',
         updates: [
-          { group: 'gruppa-1', seq: 1, usage: live },
+          { group: 'group-1', seq: 1, usage: live },
           { group: 'missing', seq: 1, usage: live },
-          { group: 'gruppa-1', seq: 9, usage: live },
+          { group: 'group-1', seq: 9, usage: live },
         ],
       },
       2000,
@@ -72,10 +72,10 @@ describe('attempt_exited and usage', () => {
     step(state);
     transition(
       state,
-      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage: live }] },
       2000,
     );
-    transition(state, { kind: 'attempt_exited', group: 'gruppa-1', seq: 1, exit: exitOf(null) }, 3);
+    transition(state, { kind: 'attempt_exited', group: 'group-1', seq: 1, exit: exitOf(null) }, 3);
     expect(group(state).attempts[0]!.usage).toEqual(live);
   });
 
@@ -84,15 +84,11 @@ describe('attempt_exited and usage', () => {
     step(state);
     transition(
       state,
-      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage: live }] },
       2000,
     );
     const final = { inputTokens: 900, outputTokens: 90 };
-    transition(
-      state,
-      { kind: 'attempt_exited', group: 'gruppa-1', seq: 1, exit: exitOf(final) },
-      3,
-    );
+    transition(state, { kind: 'attempt_exited', group: 'group-1', seq: 1, exit: exitOf(final) }, 3);
     expect(group(state).attempts[0]!.usage).toEqual(final);
   });
 
@@ -102,7 +98,7 @@ describe('attempt_exited and usage', () => {
     transition(state, { kind: 'cancel', group: null }, 10);
     const effects = transition(
       state,
-      { kind: 'attempt_exited', group: 'gruppa-1', seq: 1, exit: exitOf(live) },
+      { kind: 'attempt_exited', group: 'group-1', seq: 1, exit: exitOf(live) },
       11,
     );
     expect(effects).toEqual([]);
@@ -114,12 +110,8 @@ describe('attempt_exited and usage', () => {
   it('saves the usage of an attempt that timed out', () => {
     const state = run(1);
     step(state);
-    transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: 1 }, 10);
-    transition(
-      state,
-      { kind: 'attempt_exited', group: 'gruppa-1', seq: 1, exit: exitOf(live) },
-      11,
-    );
+    transition(state, { kind: 'timed_out', group: 'group-1', seq: 1 }, 10);
+    transition(state, { kind: 'attempt_exited', group: 'group-1', seq: 1, exit: exitOf(live) }, 11);
     expect(group(state).attempts[0]).toMatchObject({
       status: 'failed',
       reason: { kind: 'timeout' },
@@ -133,15 +125,11 @@ describe('attempt_exited and usage', () => {
     step(state);
     transition(
       state,
-      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage: live }] },
       2000,
     );
     transition(state, { kind: 'cancel', group: null }, 10);
-    transition(
-      state,
-      { kind: 'attempt_exited', group: 'gruppa-1', seq: 1, exit: exitOf(null) },
-      11,
-    );
+    transition(state, { kind: 'attempt_exited', group: 'group-1', seq: 1, exit: exitOf(null) }, 11);
     expect(group(state).attempts[0]!.usage).toEqual(live);
   });
 });
@@ -152,7 +140,7 @@ describe('sums with a running attempt', () => {
     step(state);
     transition(
       state,
-      { kind: 'attempt_usage', updates: [{ group: 'gruppa-1', seq: 1, usage: live }] },
+      { kind: 'attempt_usage', updates: [{ group: 'group-1', seq: 1, usage: live }] },
       2000,
     );
     expect(summarize(state).usage).toEqual(live);
@@ -166,7 +154,7 @@ describe('sums with a running attempt', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: exitOf({ inputTokens: 1000, outputTokens: 200 }),
       },
@@ -176,7 +164,7 @@ describe('sums with a running attempt', () => {
       state,
       {
         kind: 'repair_start',
-        incident: { key: 'k', kind: 'failed', group: 'gruppa-1', detail: 'no report' },
+        incident: { key: 'k', kind: 'failed', group: 'group-1', detail: 'no report' },
         specialist: state.run.config.specialists[0]!,
       },
       20,

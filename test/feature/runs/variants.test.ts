@@ -72,7 +72,7 @@ describe('a run with a variant', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: { sessionId: null, usage: null, failure: null, outsideChanges: [] },
       },
@@ -147,7 +147,7 @@ describe('a variant with a chain', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: 1,
         exit: {
           sessionId: null,

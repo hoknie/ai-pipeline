@@ -31,7 +31,7 @@ async function start(environment: NodeJS.ProcessEnv): Promise<Harness> {
 }
 
 async function run(h: Harness): Promise<string> {
-  return (await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'сделать' })).runId;
+  return (await startRun(h, { repository: h.repo, pipeline: 'feature', task: 'do it' })).runId;
 }
 
 describe('environment references of MCP servers', () => {

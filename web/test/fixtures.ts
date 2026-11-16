@@ -73,7 +73,7 @@ export function topologyOf(overrides: Partial<Topology> = {}): Topology {
     steps: [
       step('plan', 'plan'),
       step('code', 'coder', {
-        groups: [{ slug: 'login', title: 'Вход', status: 'running' }],
+        groups: [{ slug: 'login', title: 'Sign-in', status: 'running' }],
         attempts: 2,
         usage: { inputTokens: 10, outputTokens: 1 },
       }),
@@ -95,11 +95,11 @@ export function topologyOf(overrides: Partial<Topology> = {}): Topology {
 export function groupRow(overrides: Partial<GroupRow> = {}): GroupRow {
   return {
     slug: 'login',
-    title: 'Вход',
+    title: 'Sign-in',
     status: 'running',
     hold: null,
     step: 'code',
-    stepName: 'Кодер',
+    stepName: 'Coder',
     round: 1,
     durationMs: 65_000,
     question: null,
@@ -138,10 +138,10 @@ export function processView(overrides: Partial<BackgroundProcessView> = {}): Bac
     memoryBytes: 120 * 1024 * 1024,
     owner: {
       runId: 'run1',
-      runTitle: 'Первый',
+      runTitle: 'First run',
       repository: '/work/app',
       group: 'login',
-      groupTitle: 'Логин',
+      groupTitle: 'Login page',
       step: 'code',
     },
     ...overrides,
@@ -151,7 +151,7 @@ export function processView(overrides: Partial<BackgroundProcessView> = {}): Bac
 export function runView(overrides: Partial<RunView> = {}): RunView {
   return {
     id: 'run1',
-    title: 'добавить вход',
+    title: 'add sign-in',
     name: null,
     repository: '/repo',
     pipeline: 'feature',
@@ -206,8 +206,8 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
   return {
     runId: 'run1',
     slug: 'login',
-    title: 'Вход',
-    task: 'сделать **вход**',
+    title: 'Sign-in',
+    task: 'build **sign-in**',
     status: 'running',
     wait: null,
     branch: 'refs/aip/run1/groups/login',
@@ -234,7 +234,7 @@ export function groupView(overrides: Partial<GroupView> = {}): GroupView {
       {
         seq: 1,
         stepId: 'code',
-        stepName: 'Кодер',
+        stepName: 'Coder',
         round: 1,
         specialist: 'coder',
         runtime: 'claude',
@@ -324,7 +324,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
-    steps: { done: 0, total: 4, current: { step: 'plan', name: 'Планировщик', number: 1 } },
+    steps: { done: 0, total: 4, current: { step: 'plan', name: 'Planner', number: 1 } },
     active: [],
     system: [],
     delivery: null,
@@ -709,7 +709,7 @@ export function catalogView(overrides: Partial<ConfigCatalogResponse> = {}): Con
           { name: 'mcp__jira', source: 'project' },
         ],
         skills: [
-          { name: 'review', source: 'project', description: 'Проверка кода' },
+          { name: 'review', source: 'project', description: 'Code review' },
           { name: 'review', source: 'global' },
           { name: 'grill-me-2', source: 'global' },
         ],
@@ -748,7 +748,7 @@ export function configView(overrides: Partial<ConfigEditorResponse> = {}): Confi
       global: { file: '/xdg/aip/settings.yaml', revision: 'g1' },
       project: { file: '/repo/aip/settings.yaml', revision: null },
     },
-    specialists: [specialistEntry('coder', { raw: { name: 'Кодировщик', model: 'sonnet' } })],
+    specialists: [specialistEntry('coder', { raw: { name: 'Code author', model: 'sonnet' } })],
     chains: [],
     pipelines: [],
     actions: [],
@@ -1031,7 +1031,7 @@ export function specialistUse(
     waiting?: string[];
   } = {},
 ): Use {
-  const item = (slug: string) => ({ slug, title: slug, step: 'code', stepName: 'Кодер' });
+  const item = (slug: string) => ({ slug, title: slug, step: 'code', stepName: 'Coder' });
   return {
     specialist,
     name: overrides.name ?? specialist,

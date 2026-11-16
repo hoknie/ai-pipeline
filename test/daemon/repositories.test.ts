@@ -102,7 +102,7 @@ describe('repository registry', () => {
 
   it('refuses removal while a run is unfinished and allows it after the run ends', async () => {
     const h = (current = await harness());
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}] });
     const { runId } = (await startRun(h, {
       repository: h.repo,
       pipeline: 'feature',

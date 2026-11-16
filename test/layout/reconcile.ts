@@ -2,15 +2,15 @@ import type { Rule, Violation } from './check.ts';
 
 export interface ExceptionEntry {
   rule: Rule;
-  /** Путь от корня репозитория: `src/...` или `web/src/...`. */
+  /** Path from the repository root: `src/...` or `web/src/...`. */
   path: string;
-  /** Функция или класс, если запись о них; для `purity` — внешняя зависимость (`node:fs`, `yaml`). */
+  /** Function or class, if the entry is about one; for `purity`, the external dependency (`node:fs`, `yaml`). */
   name?: string;
-  /** Размер на момент записи: строки кода, методы, файлы в папке, 1 для `purity` (одна запись на зависимость), число `process.env`. */
+  /** Size at the time of the entry: lines of code, methods, files in the folder, 1 for `purity` (one entry per dependency), count of `process.env`. */
   size: number;
 }
 
-/** Правила, нарушения которых можно записать в список; остальные не прощаются никогда. */
+/** Rules whose violations may be listed; the rest are never forgiven. */
 export const excusableRules: readonly Rule[] = [
   'file-size',
   'function-size',
@@ -24,8 +24,8 @@ const keyOf = (entry: { rule: Rule; path: string; name?: string | undefined }): 
   `${entry.rule}|${entry.path}|${entry.name ?? ''}`;
 
 /**
- * Сверяет нарушения со списком исключений. Возвращает сообщения: нарушение без записи,
- * размер выше записанного, запись, которая больше не нужна, повторная запись.
+ * Reconciles violations with the exception list. Returns messages: a violation without an entry,
+ * a size above the recorded one, an entry that is no longer needed, a duplicate entry.
  */
 export function reconcile(
   violations: Violation[],

@@ -26,7 +26,7 @@ describe('queue contents', () => {
     await h.call('queue_add', {
       repository: join(h.repo, 'app'),
       pipeline: 'feature',
-      task: 'работа',
+      task: 'work',
       title: 'A',
     });
     const view = await add(h, 'B');
@@ -51,8 +51,8 @@ describe('queue contents', () => {
       repository: h.repo,
       pipeline: 'feature',
       groups: [
-        { title: 'Вход', task: 'форма входа' },
-        { title: 'Регистрация', task: 'форма регистрации' },
+        { title: 'Sign in', task: 'sign-in form' },
+        { title: 'Sign up', task: 'sign-up form' },
       ],
     })) as QueueView;
     expect(view.items[0]).toMatchObject({ task: null });
@@ -88,18 +88,18 @@ describe('queue contents', () => {
 describe('name of the pipeline in the queue', () => {
   it('takes the name from the current configuration and follows its edits', async () => {
     const h = await start(
-      PIPELINE_CONFIG.replace('    feature:\n', '    feature:\n      name: Новая функция\n'),
+      PIPELINE_CONFIG.replace('    feature:\n', '    feature:\n      name: New feature\n'),
     );
     await add(h, 'A');
     expect((await queueOf(h)).items[0]).toMatchObject({
       pipeline: 'feature',
-      pipelineName: 'Новая функция',
+      pipelineName: 'New feature',
     });
     writeConfigDirectory(
       h.repo,
-      PIPELINE_CONFIG.replace('    feature:\n', '    feature:\n      name: Другое\n'),
+      PIPELINE_CONFIG.replace('    feature:\n', '    feature:\n      name: Other\n'),
     );
-    expect((await queueOf(h)).items[0]?.pipelineName).toBe('Другое');
+    expect((await queueOf(h)).items[0]?.pipelineName).toBe('Other');
     writeConfigDirectory(h.repo, PIPELINE_CONFIG.replace('feature:', 'other:'));
     expect((await queueOf(h)).items[0]?.pipelineName).toBe('feature');
   });
@@ -109,8 +109,8 @@ describe('running the queue', () => {
   it('runs one task at a time and gives the next one the delivered result', async () => {
     const h = await start();
     h.script({ code: [WRITE_LIB, { read: ['lib.ts'] }] });
-    await add(h, 'первая');
-    await add(h, 'вторая');
+    await add(h, 'first');
+    await add(h, 'second');
     await h.call('queue_start', { repository: h.repo });
     const first = await queueOf(h);
     expect(first.status).toBe('running');
@@ -190,7 +190,7 @@ describe('running the queue', () => {
 
   it('keeps running on a question to a human and goes on after the answer', async () => {
     const h = await start();
-    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth или пароль?' }, {}, {}] });
+    h.script({ code: [{ verdict: 'needs_human', feedback: 'OAuth or password?' }, {}, {}] });
     await add(h, 'A');
     await add(h, 'B');
     await h.call('queue_start', { repository: h.repo });
@@ -200,7 +200,7 @@ describe('running the queue', () => {
     expect(waiting.items).toHaveLength(1);
     const run = waiting.runs[0]!;
     const group = (await h.status(run.id)).groups[0]!.slug;
-    await h.call('answer', { runId: run.id, group, answer: 'пароль' });
+    await h.call('answer', { runId: run.id, group, answer: 'password' });
     const done = await waitQueue(
       h,
       (queue) => queue.status === 'stopped' && queue.items.length === 0,
@@ -342,7 +342,7 @@ describe('running the queue', () => {
 describe('pipeline variants in the queue', () => {
   const VARIANT_CONFIG = `${PIPELINE_CONFIG}      variants:
         light:
-          name: Лёгкий
+          name: Light
           skip: [review]
 `;
 
@@ -352,7 +352,7 @@ describe('pipeline variants in the queue', () => {
     await add(h, 'B');
     const items = (await queueOf(h)).items;
     expect(items.map((item) => [item.variant, item.variantName])).toEqual([
-      ['light', 'Лёгкий'],
+      ['light', 'Light'],
       ['default', 'default'],
     ]);
   });
@@ -373,7 +373,7 @@ describe('pipeline variants in the queue', () => {
       variant: 'light',
     })) as QueueView;
     expect(edited.items[0]?.variant).toBe('light');
-    expect((await queueOf(h)).items[0]).toMatchObject({ variant: 'light', variantName: 'Лёгкий' });
+    expect((await queueOf(h)).items[0]).toMatchObject({ variant: 'light', variantName: 'Light' });
   });
 
   it('rejects a change of pipeline that keeps a variant the new pipeline lacks', async () => {
@@ -408,13 +408,13 @@ describe('pipeline variants in the queue', () => {
     await h.call('queue_start', { repository: h.repo });
     await waitQueue(h, (queue) => queue.items.length === 0);
     const [created] = await allRuns(h);
-    expect(created).toMatchObject({ variant: 'light', variantName: 'Лёгкий' });
+    expect(created).toMatchObject({ variant: 'light', variantName: 'Light' });
     const pipelines = (await h.call('pipelines', { repository: h.repo })) as {
       pipelines: { id: string; variants: unknown }[];
     };
     expect(pipelines.pipelines.find((entry) => entry.id === 'feature')?.variants).toMatchObject([
       { id: 'default', name: 'default', skip: [] },
-      { id: 'light', name: 'Лёгкий', skip: ['review'] },
+      { id: 'light', name: 'Light', skip: ['review'] },
     ]);
   });
 

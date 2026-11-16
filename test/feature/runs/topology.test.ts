@@ -39,11 +39,11 @@ describe('topology', () => {
     for (const _ of ['plan', 'code']) {
       step(state);
       finish(state, 'done');
-      finish(state, 'done', { slug: 'gruppa-2' });
+      finish(state, 'done', { slug: 'group-2' });
     }
     step(state);
-    finish(state, 'rejected', { feedback: 'нет тестов' });
-    finish(state, 'done', { slug: 'gruppa-2' });
+    finish(state, 'rejected', { feedback: 'no tests' });
+    finish(state, 'done', { slug: 'group-2' });
     step(state);
     state.groups[0]!.attempts.at(-1)!.usage = { inputTokens: 10, outputTokens: 2 };
     const view = topology(state);
@@ -51,11 +51,11 @@ describe('topology', () => {
     const [plan, code, review, qa] = view.steps;
     expect(code).toMatchObject({
       specialist: 'coder',
-      name: 'Кодировщик',
+      name: 'Coder',
       runtime: 'opencode',
       model: 'anthropic/sonnet',
       attempts: 3,
-      groups: [{ slug: 'gruppa-1', status: 'running' }],
+      groups: [{ slug: 'group-1', status: 'running' }],
       usage: { inputTokens: 10, outputTokens: 2 },
     });
     expect(review).toMatchObject({
@@ -65,7 +65,7 @@ describe('topology', () => {
       permissions: 'read',
       groups: [],
     });
-    expect(qa?.groups).toEqual([{ slug: 'gruppa-2', title: 'Группа 2', status: 'running' }]);
+    expect(qa?.groups).toEqual([{ slug: 'group-2', title: 'Group 2', status: 'running' }]);
     expect(plan?.groups).toEqual([]);
     expect(view.split).toBeNull();
     expect(view.delivery).toMatchObject({ mode: 'worktree', resolver: null });
@@ -78,16 +78,16 @@ describe('topology', () => {
       finish(state, 'done');
     }
     expect(topology(state).merging).toEqual([
-      { slug: 'gruppa-1', title: 'Группа 1', status: 'merging' },
+      { slug: 'group-1', title: 'Group 1', status: 'merging' },
     ]);
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
       5000,
     );
     const view = topology(state);
     expect(view.merging).toEqual([]);
-    expect(view.merged.map((group) => group.slug)).toEqual(['gruppa-1']);
+    expect(view.merged.map((group) => group.slug)).toEqual(['group-1']);
     expect(view.steps.every((entry) => entry.groups.length === 0)).toBe(true);
   });
 });
@@ -99,7 +99,7 @@ describe('pipeline topology', () => {
     expect(all[0]?.steps[2]).toEqual({
       id: 'review',
       specialist: 'reviewer',
-      name: 'Ревьюер',
+      name: 'Reviewer',
       runtime: 'claude',
       model: null,
       permissions: 'read',
@@ -111,8 +111,8 @@ describe('pipeline topology', () => {
 
   it('gives the limit of the specialists of the split, the steps and the resolver', () => {
     const text = `${CONFIG_TEXT}  delivery: { resolver: qa }\n`
-      .replace('plan: { name: Планировщик,', 'plan: { name: Планировщик, max: 2,')
-      .replace('coder: { name: Кодировщик,', 'coder: { name: Кодировщик, max: 1,')
+      .replace('plan: { name: Planner,', 'plan: { name: Planner, max: 2,')
+      .replace('coder: { name: Coder,', 'coder: { name: Coder, max: 1,')
       .replace(
         '    feature:\n      steps:',
         '    feature:\n      split: { specialist: plan, max_groups: 3 }\n      steps:',
@@ -158,15 +158,15 @@ describe('topology of a pipeline that splits into another', () => {
     step(state);
     const view = topology(state);
     expect(view.split?.pipeline).toBe('explore');
-    expect(view.steps[0]).toMatchObject({ id: 'research', groups: [{ slug: 'gruppa-1' }] });
+    expect(view.steps[0]).toMatchObject({ id: 'research', groups: [{ slug: 'group-1' }] });
   });
 });
 
 const TWINS = `swarm:
   specialists:
-    coder: { name: Кодер }
-    reviewer: { name: Ревьюер }
-    mute: { name: Тихий }
+    coder: { name: Coder }
+    reviewer: { name: Reviewer }
+    mute: { name: Silent }
   pipelines:
     feature:
       steps:
@@ -187,7 +187,7 @@ describe('human names of specialists', () => {
   it('returns the name, and the slug without a name or for an unknown specialist', () => {
     const state = twins();
     const { config } = state.run;
-    expect(specialistName(config, 'coder')).toBe('Кодер');
+    expect(specialistName(config, 'coder')).toBe('Coder');
     expect(specialistName(config, 'mute')).toBe('mute');
     expect(specialistName(config, 'nobody')).toBe('nobody');
   });
@@ -197,7 +197,7 @@ describe('human names of steps', () => {
   it('names a step after its specialist, or by the specialist slug when the name is empty', () => {
     const state = twins();
     const steps = state.run.config.pipelines[0]!.steps;
-    expect(stepName(state.run.config, steps[0]!)).toBe('Кодер');
+    expect(stepName(state.run.config, steps[0]!)).toBe('Coder');
     expect(stepName(state.run.config, steps[3]!)).toBe('mute');
   });
 
@@ -205,15 +205,15 @@ describe('human names of steps', () => {
     const state = twins();
     const steps = state.run.config.pipelines[0]!.steps;
     expect(steps.map((item) => stepLabel(state.run.config, steps, item))).toEqual([
-      'Кодер',
-      'Ревьюер (review)',
-      'Ревьюер (review-2)',
+      'Coder',
+      'Reviewer (review)',
+      'Reviewer (review-2)',
       'mute',
     ]);
     expect(topology(state).steps.map((item) => item.name)).toEqual([
-      'Кодер',
-      'Ревьюер (review)',
-      'Ревьюер (review-2)',
+      'Coder',
+      'Reviewer (review)',
+      'Reviewer (review-2)',
       'mute',
     ]);
   });
@@ -221,12 +221,12 @@ describe('human names of steps', () => {
   it('names the step of an attempt, falling back to the specialist of the attempt and the id', () => {
     const state = run(1);
     step(state);
-    const group = findGroup(state, 'gruppa-1')!;
+    const group = findGroup(state, 'group-1')!;
     const attempt = group.attempts[0]!;
-    expect(attemptStepLabel(state, group, attempt)).toBe('Планировщик');
+    expect(attemptStepLabel(state, group, attempt)).toBe('Planner');
     expect(
       attemptStepLabel(state, group, { ...attempt, stepId: 'gone', specialist: 'coder' }),
-    ).toBe('Кодировщик');
+    ).toBe('Coder');
     expect(
       attemptStepLabel(state, group, { ...attempt, stepId: 'gone', specialist: 'nobody' }),
     ).toBe('gone');
@@ -234,31 +234,31 @@ describe('human names of steps', () => {
 });
 
 describe('name of a pipeline in the topology', () => {
-  const named = `${CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: Новая функция\n')}    epic:\n      split: { specialist: plan, pipeline: feature }\n`;
+  const named = `${CONFIG_TEXT.replace('    feature:\n', '    feature:\n      name: New feature\n')}    epic:\n      split: { specialist: plan, pipeline: feature }\n`;
 
   it('carries the name, or the id without one, and the name of the split target', () => {
     const topologies = pipelineTopologies(config(named));
     const feature = topologies.find((entry) => entry.id === 'feature')!;
-    expect(feature.name).toBe('Новая функция');
+    expect(feature.name).toBe('New feature');
     const epic = topologies.find((entry) => entry.id === 'epic')!;
     expect(epic.name).toBe('epic');
-    expect(epic.split?.pipelineName).toBe('Новая функция');
+    expect(epic.split?.pipelineName).toBe('New feature');
     expect(pipelineTopology(config(), 'feature')?.name).toBe('feature');
   });
 
   it('takes the name of the split target from the snapshot of the run', () => {
     const state = run(1, { configText: named, split: true });
     state.run.pipeline = 'epic';
-    expect(topology(state).split?.pipelineName).toBe('Новая функция');
+    expect(topology(state).split?.pipelineName).toBe('New feature');
   });
 });
 
 describe('stages in the topology', () => {
   const TEXT = `swarm:
   specialists:
-    plan: { name: Планировщик }
-    coder: { name: Кодировщик }
-    writer: { name: Писатель }
+    plan: { name: Planner }
+    coder: { name: Coder }
+    writer: { name: Writer }
   actions:
     lint: { run: lint }
     commit: { run: commit }
@@ -347,7 +347,7 @@ describe('stages in the topology', () => {
     expect(status('merge')).toBe('merging');
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'm1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'm1' } },
       2500,
     );
     expect(status('merge')).toBe('done');

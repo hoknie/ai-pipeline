@@ -11,7 +11,7 @@ const REVIEW_CONFIG = PIPELINE_CONFIG.replace(
 describe('human review in a queue with auto answer', () => {
   it('waits on the review, then goes on after the answer of a person', async () => {
     const h = await start(REVIEW_CONFIG);
-    h.script({ review: [{ summary: 'проверь архитектуру' }, { summary: 'принято' }] });
+    h.script({ review: [{ summary: 'check the architecture' }, { summary: 'accepted' }] });
     await h.call('queue_settings', { repository: h.repo, autoAnswer: true });
     await add(h, 'A');
     await h.call('queue_start', { repository: h.repo });
@@ -23,15 +23,15 @@ describe('human review in a queue with auto answer', () => {
     const runId = created!.id;
     const row = (await h.status(runId)).groups[0]!;
     expect(row).toMatchObject({ status: 'needs_human', humanOnly: 'review', step: 'review' });
-    expect(row.question).toContain('проверь архитектуру');
+    expect(row.question).toContain('check the architecture');
     expect((await h.group(runId, row.slug)).humanOnly).toBe('review');
     expect(h.running.application.services.runs.states.get(runId).groups[0]?.decisions).toEqual([]);
 
-    await h.call('answer', { runId, group: row.slug, answer: 'Принято' });
+    await h.call('answer', { runId, group: row.slug, answer: 'Accepted' });
     const final = await h.waitFor(runId, (view) => view.finished);
     expect(final.groups.map((group) => group.status)).toEqual(['merged']);
     const decisions = h.running.application.services.runs.states.get(runId).groups[0]!.decisions;
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]).toMatchObject({ by: 'human', answer: 'Принято' });
+    expect(decisions[0]).toMatchObject({ by: 'human', answer: 'Accepted' });
   });
 });

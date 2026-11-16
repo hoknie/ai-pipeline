@@ -38,12 +38,12 @@ describe('projects in the picker', () => {
 
   it('shows the name and the color of a project and finds it by its slug', () => {
     rememberProjects([
-      repositoryView(APP, { name: 'Магазин', label: 'Магазин', slug: 'shop', color: 'teal' }),
+      repositoryView(APP, { name: 'Storefront', label: 'Storefront', slug: 'shop', color: 'teal' }),
     ]);
     expect(matchRepositories(ALL, 'SHOP')).toEqual([APP]);
-    expect(matchRepositories(ALL, 'магаз')).toEqual([APP]);
+    expect(matchRepositories(ALL, 'storef')).toEqual([APP]);
     const { trigger } = mount();
-    expect(trigger.textContent).toContain('Магазин');
+    expect(trigger.textContent).toContain('Storefront');
     expect(trigger.querySelector('[data-project-color="teal"]')).toBeTruthy();
   });
 });

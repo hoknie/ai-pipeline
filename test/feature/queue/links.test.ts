@@ -75,7 +75,7 @@ describe('views of links', () => {
   const describe = (other: string) => ({
     ref: other.startsWith('r') ? ('run' as const) : ('item' as const),
     number: 7,
-    title: `задача ${other}`,
+    title: `task ${other}`,
     repository: '/repo',
   });
 

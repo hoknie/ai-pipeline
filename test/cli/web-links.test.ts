@@ -33,7 +33,7 @@ async function setup() {
   return { post, queue };
 }
 
-const task = { pipeline: 'feature', task: 'работа' };
+const task = { pipeline: 'feature', task: 'work' };
 
 describe('links in the panel', () => {
   it('passes links of a new task and of an edit to the daemon', async () => {

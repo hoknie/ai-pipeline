@@ -489,7 +489,7 @@ describe('view only', () => {
 describe('the variants of a pipeline', () => {
   const withVariants = {
     ...RAW,
-    variants: { light: { name: 'Лёгкая', skip: ['review'] }, strong: {} },
+    variants: { light: { name: 'Light one', skip: ['review'] }, strong: {} },
   };
   const variantsWritten = (writePipeline: ReturnType<typeof saved>) =>
     (writePipeline.mock.calls.at(-1) as unknown as [string, Record<string, unknown>])[1]
@@ -507,7 +507,7 @@ describe('the variants of a pipeline', () => {
       switcher()
         .getAllByRole('radio')
         .map((item) => item.textContent),
-    ).toEqual(['default', 'Лёгкая', 'strong']);
+    ).toEqual(['default', 'Light one', 'strong']);
     expect(switcher().getByRole('radio', { name: 'default' }).getAttribute('aria-checked')).toBe(
       'true',
     );
@@ -538,9 +538,9 @@ describe('the variants of a pipeline', () => {
     const id = screen.getByLabelText('Id') as HTMLInputElement;
     expect(id.value).toBe('variant');
     fireEvent.change(id, { target: { value: 'light' } });
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Лёгкая' } });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Light one' } });
     await pressSave(writePipeline);
-    expect(variantsWritten(writePipeline)).toEqual({ light: { name: 'Лёгкая' } });
+    expect(variantsWritten(writePipeline)).toEqual({ light: { name: 'Light one' } });
   });
 
   it('shows the error of the check at the id field', async () => {
@@ -568,7 +568,7 @@ describe('the variants of a pipeline', () => {
     fireEvent.click(screen.getByRole('button', { name: 'plan' }));
     await pressSave(writePipeline);
     expect(variantsWritten(writePipeline)).toEqual({
-      light: { name: 'Лёгкая', skip: ['review'] },
+      light: { name: 'Light one', skip: ['review'] },
       strong: { skip: ['plan'] },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Delete variant' }));
@@ -576,6 +576,8 @@ describe('the variants of a pipeline', () => {
       'true',
     );
     await pressSave(writePipeline);
-    expect(variantsWritten(writePipeline)).toEqual({ light: { name: 'Лёгкая', skip: ['review'] } });
+    expect(variantsWritten(writePipeline)).toEqual({
+      light: { name: 'Light one', skip: ['review'] },
+    });
   });
 });

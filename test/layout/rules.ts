@@ -1,11 +1,11 @@
 /**
- * Таблицы проверок раскладки: граф фич, виды папок, пакеты, пределы размера. Новое правило о
- * размещении кода приходит сюда вместе с проверкой.
+ * Tables of the layout checks: feature graph, folder views, packages, size limits. A new rule about
+ * code placement comes here together with its check.
  */
 
 /**
- * Старые слои `src`. Значение — слои и подпути, которые слою разрешено импортировать (кроме себя).
- * Слой исчезает из таблицы вместе с папкой; подпуть вроде `platform/errors` разрешает только его.
+ * Old `src` layers. The value is the layers and subpaths the layer may import (besides itself).
+ * A layer leaves the table together with its folder; a subpath like `platform/errors` allows only that subpath.
  */
 export const oldLayers: Record<string, string[]> = {
   platform: [],
@@ -13,10 +13,10 @@ export const oldLayers: Record<string, string[]> = {
   cli: ['presentation/cli'],
 };
 
-/** Старые слои, которые видит `app`: он собирает приложение из них. */
+/** Old layers visible to `app`: it assembles the application from them. */
 export const appOldLayers: readonly string[] = [];
 
-/** Виды папок фичи. */
+/** Folder views of a feature. */
 export const featureViews = [
   'types',
   'machine',
@@ -28,10 +28,10 @@ export const featureViews = [
 ] as const;
 export type FeatureView = (typeof featureViews)[number];
 
-/** Чистые виды: не тянут `node:*` и внешние пакеты даже косвенно. */
+/** Pure views: they pull in neither `node:*` nor external packages, even indirectly. */
 export const pureViews: readonly string[] = ['types', 'machine'];
 
-/** Какие виды своей фичи может импортировать каждый вид. */
+/** Which views of its own feature each view may import. */
 export const ownViews: Record<FeatureView, readonly FeatureView[]> = {
   types: ['types'],
   machine: ['types', 'machine'],
@@ -42,7 +42,7 @@ export const ownViews: Record<FeatureView, readonly FeatureView[]> = {
   clients: ['types', 'ports', 'services', 'clients'],
 };
 
-/** Какие виды чужой фичи (по стрелке графа) может импортировать каждый вид. */
+/** Which views of another feature (along a graph arrow) each view may import. */
 export const foreignViews: Record<FeatureView, readonly FeatureView[]> = {
   types: ['types'],
   machine: ['types'],
@@ -53,10 +53,10 @@ export const foreignViews: Record<FeatureView, readonly FeatureView[]> = {
   clients: ['types', 'services'],
 };
 
-/** Виды, разрешённые фиче `compose`: только сервисы. */
+/** Views allowed to the `compose` feature: services only. */
 export const composeViews: readonly FeatureView[] = ['services'];
 
-/** Граф фич: ключ видит перечисленные фичи. Ацикличен. */
+/** Feature graph: the key sees the listed features. Acyclic. */
 export const featureGraph: Record<string, readonly string[]> = {
   'swarm-config': [],
   repos: [],
@@ -75,7 +75,7 @@ export const featureGraph: Record<string, readonly string[]> = {
   compose: ['observers', 'queue', 'runs', 'tags', 'repos'],
 };
 
-/** Подслои представления. */
+/** Presentation sublayers. */
 export type PresentationSub =
   'ipc/contract' | 'ipc/client' | 'ipc/views' | 'ipc' | 'format' | 'web' | 'mcp' | 'cli';
 
@@ -91,13 +91,13 @@ export const presentationSubs: readonly string[] = [
 ];
 
 interface PresentationRule {
-  /** Подслои представления, которые разрешено импортировать (кроме запрещённых внутри ipc). */
+  /** Presentation sublayers that may be imported (except those forbidden inside ipc). */
   presentation: readonly string[];
-  /** Виды фич, доступные подслою. */
+  /** Feature views available to the sublayer. */
   views: readonly FeatureView[];
   platform: boolean;
   app: boolean;
-  /** Фичи, чьи `services` доступны, если `services` нет в `views`. */
+  /** Features whose `services` are available when `services` is not in `views`. */
   serviceFeatures?: readonly string[];
 }
 
@@ -147,10 +147,10 @@ export const presentationRules: Record<PresentationSub, PresentationRule> = {
   },
 };
 
-/** Подслои, в которые `cli` входит только через их `index.ts`. */
+/** Sublayers that `cli` enters only through their `index.ts`. */
 export const entryOnlySubs: readonly string[] = ['mcp', 'web'];
 
-/** Что `app` видит в фичах и в представлении. */
+/** What `app` sees in the features and in the presentation. */
 export const appViews: readonly FeatureView[] = ['types', 'ports', 'services', 'clients'];
 export const appPresentation: readonly string[] = [
   'ipc',
@@ -160,8 +160,8 @@ export const appPresentation: readonly string[] = [
 ];
 
 /**
- * Где разрешён внешний пакет. Элемент — начало пути от корня `src`; `*` заменяет один сегмент.
- * Старые папки стоят рядом с целевыми и уходят вместе со слоем.
+ * Where an external package is allowed. An element is a path prefix from the `src` root; `*` replaces one segment.
+ * Old folders sit next to the target ones and leave together with their layer.
  */
 export const packagePlaces: Record<string, readonly string[]> = {
   zod: ['presentation', 'feature/*/clients'],
@@ -170,30 +170,30 @@ export const packagePlaces: Record<string, readonly string[]> = {
   '@modelcontextprotocol/sdk': ['presentation/mcp', 'presentation/cli'],
 };
 
-/** Классы, чьё создание через `new` допустимо только в `app` и `<фича>/services/create.ts`. */
+/** Classes that may be created with `new` only in `app` and `<feature>/services/create.ts`. */
 export const assemblyClassPattern = /(Services?|Repository|Client|UseCase)$/;
 
-/** Слои, где проверяется `new` сборочных классов: старый код с `new` не трогаем. */
+/** Layers where `new` of assembly classes is checked: old code with `new` is left alone. */
 export const assemblyCheckedTops: readonly string[] = ['feature', 'presentation', 'platform'];
 
-/** Где читают `process.env` (пути от корня `src`). */
+/** Where `process.env` is read (paths from the `src` root). */
 export const environmentPlaces: readonly string[] = ['cli/main.ts', 'app', 'platform'];
 
-/** Файлы, чистота которых проверяется, помимо видов `types/` и `machine/` фич. */
+/** Files whose purity is checked, besides the `types/` and `machine/` views of features. */
 export const purePaths: readonly string[] = ['platform/errors'];
 
 export const sizeLimits = { file: 300, function: 80, folder: 12, classMethods: 12 };
 
-/** Пути от корня, которым пределы размера не нужны: словари интерфейса. */
+/** Paths from the root that need no size limits: interface dictionaries. */
 export const sizeExempt: readonly string[] = ['shared/i18n/locales'];
 
-/** Области `shared` панели (`web/src/shared/<область>`). */
+/** `shared` areas of the panel (`web/src/shared/<area>`). */
 export const webSharedAreas: readonly string[] = ['api', 'ui', 'lib', 'i18n'];
 
-/** Группы дизайн-системы: файл `shared/ui` лежит в одной из них. */
+/** Design system groups: a `shared/ui` file lies in one of them. */
 export const webUiGroups: readonly string[] = ['forms', 'feedback', 'layout', 'overlays', 'charts'];
 
-/** Граф областей панели: ключ видит перечисленные области (только через их `index.ts`). Ацикличен. */
+/** Graph of panel areas: the key sees the listed areas (only through their `index.ts`). Acyclic. */
 export const webGraph: Record<string, readonly string[]> = {
   topology: [],
   stats: [],
@@ -207,9 +207,9 @@ export const webGraph: Record<string, readonly string[]> = {
 };
 
 /**
- * Что панель берёт из `src/` (пути от корня `src`; `*` заменяет один сегмент) и только как
- * `import type`. Пока контракт лежит в `protocol/`, его вход `protocol/index.ts` стоит рядом с
- * целевым `presentation/ipc/contract/index.ts`.
+ * What the panel takes from `src/` (paths from the `src` root; `*` replaces one segment), and only as
+ * `import type`. While the contract lives in `protocol/`, its entry `protocol/index.ts` sits next to
+ * the target `presentation/ipc/contract/index.ts`.
  */
 export const webSrcPlaces: readonly string[] = [
   'presentation/ipc/contract/index.ts',

@@ -9,9 +9,9 @@ const stage = (run: ReturnType<typeof runView>) => runStage(run, name);
 describe('runStage', () => {
   it('names the step of a single group', () => {
     expect(stage(runView({ groups: [groupRow()] }))).toEqual({
-      first: 'Кодер',
+      first: 'Coder',
       rest: 0,
-      all: ['Кодер'],
+      all: ['Coder'],
     });
   });
 
@@ -25,32 +25,32 @@ describe('runStage', () => {
       state: 'needs_human',
       groups: [
         groupRow({ slug: 'ui', status: 'running' }),
-        groupRow({ slug: 'api', status: 'needs_human', stepName: 'Ревьюер' }),
+        groupRow({ slug: 'api', status: 'needs_human', stepName: 'Reviewer' }),
       ],
     });
-    expect(stage(run)).toEqual({ first: 'Ревьюер', rest: 1, all: ['Ревьюер', 'Кодер'] });
+    expect(stage(run)).toEqual({ first: 'Reviewer', rest: 1, all: ['Reviewer', 'Coder'] });
   });
 
   it('puts a running group before a waiting one', () => {
     const run = runView({
       groups: [
-        groupRow({ slug: 'api', status: 'waiting', stepName: 'Кодер' }),
-        groupRow({ slug: 'ui', status: 'running', stepName: 'Ревьюер' }),
+        groupRow({ slug: 'api', status: 'waiting', stepName: 'Coder' }),
+        groupRow({ slug: 'ui', status: 'running', stepName: 'Reviewer' }),
       ],
     });
-    expect(stage(run)).toMatchObject({ first: 'Ревьюер', rest: 1 });
+    expect(stage(run)).toMatchObject({ first: 'Reviewer', rest: 1 });
   });
 
   it('counts groups on one step once', () => {
     const run = runView({
       groups: ['a', 'b', 'c'].map((slug) => groupRow({ slug })),
     });
-    expect(stage(run)).toMatchObject({ first: 'Кодер', rest: 0 });
+    expect(stage(run)).toMatchObject({ first: 'Coder', rest: 0 });
   });
 
   it('shows a stage of a paused run', () => {
-    const run = runView({ state: 'paused', groups: [groupRow({ stepName: 'Ревьюер' })] });
-    expect(stage(run)?.first).toBe('Ревьюер');
+    const run = runView({ state: 'paused', groups: [groupRow({ stepName: 'Reviewer' })] });
+    expect(stage(run)?.first).toBe('Reviewer');
   });
 
   it.each(['finished', 'failed', 'cancelled', 'queued'] as const)(
@@ -68,9 +68,9 @@ describe('runStage', () => {
   it('names a pipeline action by its title', () => {
     const run = runView({
       groups: [],
-      system: [systemRow('action', { title: 'Деплой' })],
+      system: [systemRow('action', { title: 'Deploy' })],
     });
-    expect(stage(run)?.first).toBe('Деплой');
+    expect(stage(run)?.first).toBe('Deploy');
   });
 
   it('skips a merged system step', () => {
@@ -78,6 +78,6 @@ describe('runStage', () => {
       groups: [groupRow()],
       system: [systemRow('split', { status: 'done' })],
     });
-    expect(stage(run)).toMatchObject({ first: 'Кодер', rest: 0 });
+    expect(stage(run)).toMatchObject({ first: 'Coder', rest: 0 });
   });
 });

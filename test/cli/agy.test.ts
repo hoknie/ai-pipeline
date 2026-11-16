@@ -6,7 +6,7 @@ import { aip, sandbox } from './sandbox.ts';
 
 describe('agy config check', () => {
   const config = CODE_ONLY_CONFIG.replace(
-    'coder: { name: Кодировщик }',
+    'coder: { name: Coder }',
     'coder: { name: C, runtime: agy }',
   );
   it('uses the agy override and reports its version', async () => {

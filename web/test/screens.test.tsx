@@ -33,20 +33,20 @@ async function expectOneNotice(text: string) {
   await waitFor(() => expect(screen.getAllByText(text)).toHaveLength(2));
 }
 
-const asking = () => groupRow({ status: 'needs_human', question: 'Какой провайдер?', diff: null });
+const asking = () => groupRow({ status: 'needs_human', question: 'Which provider?', diff: null });
 
 describe('group screen', () => {
   it('shows the question of a group waiting for an answer and sends the answer with a notice', async () => {
     const api = mount([runView({ state: 'needs_human', waiting: 1, groups: [asking()] })], {
       group: vi.fn(async () => groupView({ status: 'needs_human' })),
     });
-    expect(await screen.findByText('Какой провайдер?')).toBeTruthy();
+    expect(await screen.findByText('Which provider?')).toBeTruthy();
     expect(screen.getAllByLabelText('Needs answer (needs_human)').length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('answer for Вход'), { target: { value: 'OAuth' } });
+    fireEvent.change(screen.getByLabelText('answer for Sign-in'), { target: { value: 'OAuth' } });
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
     await waitFor(() => expect(api.answer).toHaveBeenCalledWith('run1', 'login', 'OAuth'));
     await expectOneNotice('Answer sent');
-    expect((screen.getByLabelText('answer for Вход') as HTMLTextAreaElement).value).toBe('');
+    expect((screen.getByLabelText('answer for Sign-in') as HTMLTextAreaElement).value).toBe('');
   });
 
   it('marks a human review and accepts it with one button', async () => {
@@ -131,7 +131,7 @@ describe('group screen', () => {
     await screen.findByRole('tab', { name: 'Task' });
     openTab('Task');
     const block = await screen.findByRole('region', { name: 'Task' });
-    expect(within(block).getByText('вход').tagName).toBe('STRONG');
+    expect(within(block).getByText('sign-in').tagName).toBe('STRONG');
   });
 
   it('opens the log on a link to a step', async () => {
@@ -140,14 +140,14 @@ describe('group screen', () => {
     const tab = await screen.findByRole('tab', { name: 'Log' });
     expect(tab.getAttribute('aria-selected')).toBe('true');
     expect(
-      screen.getByRole('button', { name: /^attempt 1 Кодер/ }).getAttribute('aria-expanded'),
+      screen.getByRole('button', { name: /^attempt 1 Coder/ }).getAttribute('aria-expanded'),
     ).toBe('true');
   });
 
   it('shows the step by its name in the head of the group and keeps the id in the hint', async () => {
     window.location.hash = '#runs/run1/login';
-    mount([runView({ groups: [groupRow({ step: 'plan', stepName: 'Планировщик' })] })]);
-    const name = await screen.findByText('Планировщик', { selector: 'span.font-medium' });
+    mount([runView({ groups: [groupRow({ step: 'plan', stepName: 'Planner' })] })]);
+    const name = await screen.findByText('Planner', { selector: 'span.font-medium' });
     expect(name.getAttribute('title')).toBe('plan');
   });
 
@@ -155,7 +155,7 @@ describe('group screen', () => {
     const api = mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     const dialog = await screen.findByRole('alertdialog');
-    expect(dialog.textContent).toContain('Вход');
+    expect(dialog.textContent).toContain('Sign-in');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Do not cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(api.cancel).not.toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe('group screen', () => {
     mount([runView({ state: 'active', groups: [groupRow({ status: 'failed' })] })], {
       retry,
     } as never);
-    const button = await screen.findByRole('button', { name: 'More actions: Вход' });
+    const button = await screen.findByRole('button', { name: 'More actions: Sign-in' });
     fireEvent.keyDown(button, { key: 'Enter' });
     fireEvent.click(screen.getByRole('menuitem', { name: 'Retry' }));
     await waitFor(() => expect(button.hasAttribute('disabled')).toBe(true));
@@ -456,7 +456,7 @@ describe('run header', () => {
     expect(file.className).toContain('bg-muted');
     expect(file.className).toContain('break-all');
     expect(file.getAttribute('title')).toBe('a.ts');
-    expect(within(dialog).getByText('Вход')).toBeTruthy();
+    expect(within(dialog).getByText('Sign-in')).toBeTruthy();
   });
 });
 
@@ -503,7 +503,7 @@ describe('delivery in progress on the group screen', () => {
 
 describe('pipeline badge in runs', () => {
   it('shows the badge in the run list instead of plain text', async () => {
-    mount([runView({ id: 'a', title: 'Первый', pipeline: 'feature' })]);
+    mount([runView({ id: 'a', title: 'First run', pipeline: 'feature' })]);
     const badge = await screen.findByLabelText('Pipeline: feature');
     expect(badge.closest('button')).toBeTruthy();
     expect(badge.hasAttribute('tabindex')).toBe(false);
@@ -558,11 +558,11 @@ describe('empty states and narrow window', () => {
       removeEventListener: () => undefined,
     })) as unknown as typeof window.matchMedia;
     try {
-      mount([runView({ id: 'a', title: 'Первый' }), runView({ id: 'b', title: 'Второй' })]);
+      mount([runView({ id: 'a', title: 'First run' }), runView({ id: 'b', title: 'Second run' })]);
       expect(screen.queryByRole('button', { name: 'Back to the list' })).toBeNull();
       fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
       const dialog = await screen.findByRole('dialog');
-      fireEvent.click(within(dialog).getByText('Второй'));
+      fireEvent.click(within(dialog).getByText('Second run'));
       await waitFor(() => expect(window.location.hash).toBe('#runs/b'));
       expect(await screen.findByRole('button', { name: 'Back to the list' })).toBeTruthy();
     } finally {
@@ -579,14 +579,14 @@ describe('empty states and narrow window', () => {
       removeEventListener: () => undefined,
     })) as unknown as typeof window.matchMedia;
     try {
-      mount([runView({ id: 'a', title: 'Первый' }), runView({ id: 'b', title: 'Второй' })]);
+      mount([runView({ id: 'a', title: 'First run' }), runView({ id: 'b', title: 'Second run' })]);
       expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy();
       expect(screen.queryByRole('navigation', { name: 'sections' })).toBeNull();
       expect(screen.queryByRole('region', { name: /group/ })).toBeNull();
-      fireEvent.click(screen.getByText('Второй'));
-      expect(await screen.findByRole('region', { name: 'group Вход' })).toBeTruthy();
+      fireEvent.click(screen.getByText('Second run'));
+      expect(await screen.findByRole('region', { name: 'group Sign-in' })).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Back to the list' }));
-      expect(screen.getByText('Первый')).toBeTruthy();
+      expect(screen.getByText('First run')).toBeTruthy();
       expect(screen.queryByRole('region', { name: /group/ })).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
       expect(await screen.findByRole('link', { name: /Queue/ })).toBeTruthy();
@@ -598,13 +598,13 @@ describe('empty states and narrow window', () => {
 
 describe('structured questions', () => {
   const questions = [
-    { text: 'Какой **провайдер**?', options: ['OAuth', 'пароль'], recommendation: 'OAuth' },
-    { text: 'Где хранить сессии?', recommendation: 'в базе' },
+    { text: 'Which **provider**?', options: ['OAuth', 'password'], recommendation: 'OAuth' },
+    { text: 'Where to store sessions?', recommendation: 'in the database' },
   ];
   const askingMany = (overrides: Parameters<typeof groupRow>[0] = {}) =>
     groupRow({
       status: 'needs_human',
-      question: '1. Какой провайдер?',
+      question: '1. Which provider?',
       questions,
       diff: null,
       ...overrides,
@@ -620,14 +620,14 @@ describe('structured questions', () => {
     expect(await screen.findByText('Specialist questions · 2')).toBeTruthy();
     expect(screen.getByRole('group', { name: 'Question 1 of 2' })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'Question 2 of 2' })).toBeTruthy();
-    expect(screen.getByText('Recommendation: в базе')).toBeTruthy();
+    expect(screen.getByText('Recommendation: in the database')).toBeTruthy();
     expect(screen.queryByText(/Unanswered/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
     await waitFor(() =>
       expect(api.answer).toHaveBeenCalledWith(
         'run1',
         'login',
-        'Q1: Какой **провайдер**?\nA1: OAuth\n\nQ2: Где хранить сессии?\nA2: в базе',
+        'Q1: Which **provider**?\nA1: OAuth\n\nQ2: Where to store sessions?\nA2: in the database',
       ),
     );
     await expectOneNotice('Answer sent');
@@ -636,13 +636,13 @@ describe('structured questions', () => {
   it('puts a chosen option into the field and marks the recommended one', async () => {
     mountAsking();
     const oauth = await screen.findByRole('button', { name: /^OAuth/ });
-    const password = screen.getByRole('button', { name: 'пароль' });
+    const password = screen.getByRole('button', { name: 'password' });
     expect(within(oauth).getByText('recommended')).toBeTruthy();
     expect(oauth.getAttribute('aria-pressed')).toBe('true');
     expect(password.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(password);
     expect((screen.getByLabelText('answer to question 1') as HTMLTextAreaElement).value).toBe(
-      'пароль',
+      'password',
     );
     expect(password.getAttribute('aria-pressed')).toBe('true');
     expect(oauth.getAttribute('aria-pressed')).toBe('false');
@@ -692,20 +692,20 @@ describe('structured questions', () => {
     fireEvent.change(field, { target: { value: '' } });
     expect(screen.getByText('Unanswered: 1')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Answer' }).hasAttribute('disabled')).toBe(true);
-    fireEvent.change(field, { target: { value: 'в файле' } });
+    fireEvent.change(field, { target: { value: 'in a file' } });
     expect(screen.queryByText(/Unanswered/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Answer' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('keeps the draft over events, tabs and a move to another group', async () => {
-    const other = groupRow({ slug: 'other', title: 'Другая', status: 'running' });
+    const other = groupRow({ slug: 'other', title: 'Another one', status: 'running' });
     const runs = (row: ReturnType<typeof groupRow>) => [
       runView({ state: 'needs_human', waiting: 1, groups: [row, other] }),
     ];
     mountAsking({}, askingMany());
     FakeEventSource.last!.send({ event: 'snapshot', seq: 2, runs: runs(askingMany()) });
     fireEvent.change(await screen.findByLabelText('answer to question 2'), {
-      target: { value: 'в файле' },
+      target: { value: 'in a file' },
     });
     act(() =>
       FakeEventSource.last!.send({
@@ -715,12 +715,12 @@ describe('structured questions', () => {
       }),
     );
     expect((screen.getByLabelText('answer to question 2') as HTMLTextAreaElement).value).toBe(
-      'в файле',
+      'in a file',
     );
     openTab(/^Changes/);
     openTab('Log');
     expect((screen.getByLabelText('answer to question 2') as HTMLTextAreaElement).value).toBe(
-      'в файле',
+      'in a file',
     );
     act(() => {
       window.location.hash = '#runs/run1/other';
@@ -733,13 +733,13 @@ describe('structured questions', () => {
     });
     expect(
       ((await screen.findByLabelText('answer to question 2')) as HTMLTextAreaElement).value,
-    ).toBe('в файле');
+    ).toBe('in a file');
   });
 
   it('fills the fields of new questions with their recommendations after an answer', async () => {
     mountAsking();
     fireEvent.change(await screen.findByLabelText('answer to question 2'), {
-      target: { value: 'в файле' },
+      target: { value: 'in a file' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
     await expectOneNotice('Answer sent');
@@ -750,28 +750,30 @@ describe('structured questions', () => {
         run: runView({
           state: 'needs_human',
           waiting: 1,
-          groups: [askingMany({ questions: [{ text: 'Нужен ли кеш?', recommendation: 'да' }] })],
+          groups: [
+            askingMany({ questions: [{ text: 'Is a cache needed?', recommendation: 'yes' }] }),
+          ],
         }),
       }),
     );
     expect(
       ((await screen.findByLabelText('answer to question 1')) as HTMLTextAreaElement).value,
-    ).toBe('да');
+    ).toBe('yes');
   });
 
   it('shows the error and keeps the fields when the answer fails', async () => {
     const answer = vi.fn(async () => {
-      throw new Error('демон недоступен');
+      throw new Error('daemon unavailable');
     });
     mountAsking({ answer } as never);
     fireEvent.change(await screen.findByLabelText('answer to question 2'), {
-      target: { value: 'в файле' },
+      target: { value: 'in a file' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
-    await expectOneNotice('демон недоступен');
+    await expectOneNotice('daemon unavailable');
     expect(screen.queryByText('Answer sent')).toBeNull();
     expect((screen.getByLabelText('answer to question 2') as HTMLTextAreaElement).value).toBe(
-      'в файле',
+      'in a file',
     );
     expect(answer).toHaveBeenCalledTimes(1);
   });
@@ -782,12 +784,12 @@ describe('structured questions', () => {
         runView({
           state: 'needs_human',
           waiting: 1,
-          groups: [asking()].map((row) => ({ ...row, question: '- вариант А\n- вариант Б' })),
+          groups: [asking()].map((row) => ({ ...row, question: '- option A\n- option B' })),
         }),
       ],
       { group: vi.fn(async () => groupView({ status: 'needs_human' })) },
     );
-    const form = (await screen.findByLabelText('answer for Вход')).closest('form')!;
+    const form = (await screen.findByLabelText('answer for Sign-in')).closest('form')!;
     expect(within(form).getByRole('list')).toBeTruthy();
     expect(within(form).getAllByRole('listitem')).toHaveLength(2);
   });
@@ -849,8 +851,8 @@ describe('runs section columns', () => {
   afterEach(() => restore());
 
   const two = () => [
-    runView({ id: 'a', title: 'Первый', state: 'needs_human', waiting: 1 }),
-    runView({ id: 'b', title: 'Второй' }),
+    runView({ id: 'a', title: 'First run', state: 'needs_human', waiting: 1 }),
+    runView({ id: 'b', title: 'Second run' }),
   ];
 
   it('stands the filters, the list and the run in three columns in a wide window', async () => {
@@ -863,9 +865,9 @@ describe('runs section columns', () => {
     expect(within(filters).getByRole('combobox', { name: 'State' })).toBeTruthy();
     expect(within(filters).getByRole('combobox', { name: 'Specialists' })).toBeTruthy();
     expect(within(filters).queryByRole('radio')).toBeNull();
-    expect(within(filters).queryByText('Первый')).toBeNull();
+    expect(within(filters).queryByText('First run')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Filters/ })).toBeNull();
-    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('320px');
+    expect(screen.getAllByText('First run')[0]!.closest('aside')?.style.width).toBe('320px');
     expect(screen.getByRole('main')).toBeTruthy();
   });
 
@@ -887,7 +889,7 @@ describe('runs section columns', () => {
     fireEvent.click(await screen.findByRole('option', { name: /Needs answer/ }));
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search runs' }), {
-      target: { value: 'Первый' },
+      target: { value: 'First run' },
     });
     expect(await screen.findByRole('button', { name: 'Filters (2)' })).toBeTruthy();
   });
@@ -897,14 +899,14 @@ describe('runs section columns', () => {
     window.location.hash = '#runs/a';
     mount(two());
     const filters = await screen.findByRole('complementary', { name: 'Filters' });
-    const list = screen.getAllByText('Первый')[0]!.closest('aside')!;
+    const list = screen.getAllByText('First run')[0]!.closest('aside')!;
     expect(list.style.width).toBe('320px');
     fireEvent.click(within(filters).getByRole('button', { name: 'Collapse filters' }));
     const strip = await screen.findByRole('complementary', { name: 'Filters' });
     expect(strip.style.width).toBe('40px');
     expect(within(strip).queryByRole('searchbox')).toBeNull();
     // 320 + 2/3 of the freed 216 px; the run keeps the rest
-    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('464px');
+    expect(screen.getAllByText('First run')[0]!.closest('aside')?.style.width).toBe('464px');
     expect(screen.getByRole('main')).toBeTruthy();
     // the choice outlives the page
     cleanup();
@@ -940,7 +942,7 @@ describe('runs section columns', () => {
     window.localStorage.setItem('aip.web.runFiltersCollapsed', 'true');
     mount(two());
     expect(await screen.findByRole('button', { name: 'Filters' })).toBeTruthy();
-    expect(screen.getAllByText('Первый')[0]!.closest('aside')?.style.width).toBe('320px');
+    expect(screen.getAllByText('First run')[0]!.closest('aside')?.style.width).toBe('320px');
   });
 
   it('opens the filters in a sheet in a phone-wide window', async () => {
@@ -964,7 +966,7 @@ describe('runs section columns', () => {
         (within(filters).getByRole('searchbox', { name: 'Search runs' }) as HTMLInputElement).value,
       ).toBe(''),
     );
-    expect(screen.getAllByText('Первый').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('First run').length).toBeGreaterThan(0);
   });
 });
 
@@ -975,13 +977,13 @@ describe('notification centre in the panel', () => {
       runView({
         id: 'b',
         repository: '/work/lib',
-        title: 'чужой запуск',
+        title: 'foreign run',
         groups: [
           groupRow({
             slug: 'ask',
-            title: 'Вопрос чужого',
+            title: 'Foreign question',
             status,
-            question: status === 'needs_human' ? 'Какой тип?' : null,
+            question: status === 'needs_human' ? 'Which type?' : null,
           }),
         ],
       });
@@ -993,7 +995,7 @@ describe('notification centre in the panel', () => {
     const bell = screen.getByRole('button', { name: 'Notifications, 1 unread' });
     expect(bell.textContent).toBe('1');
     fireEvent.click(bell);
-    fireEvent.click(await screen.findByText('Вопрос чужого'));
+    fireEvent.click(await screen.findByText('Foreign question'));
     await waitFor(() => expect(window.location.hash).toContain('b'));
     await waitFor(() => expect(api.group).toHaveBeenCalledWith('b', 'ask'));
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
@@ -1047,8 +1049,8 @@ describe('usage in the group header', () => {
   describe('header layout', () => {
     const rows = () => document.querySelectorAll('[data-slot="group-header-row"]');
 
-    const cancel = { name: /Cancel|Отменить/ };
-    const skip = { name: /Skip step|Пропустить/ };
+    const cancel = { name: /Cancel/ };
+    const skip = { name: /Skip step/ };
     const withDiff = groupRow({
       ...row,
       diff: { files: 2, added: 367, removed: 4 },
@@ -1086,15 +1088,13 @@ describe('usage in the group header', () => {
       const row0 = within(rows()[0] as HTMLElement);
       expect(row0.getByText(row.stepName ?? '')).toBeTruthy();
       expect(row0.getByRole('button', cancel)).toBeTruthy();
-      expect(
-        row0.getByRole('switch', { name: /Specialist replies|Ответы специалиста/ }),
-      ).toBeTruthy();
+      expect(row0.getByRole('switch', { name: /Specialist replies/ })).toBeTruthy();
       const collapse = document.querySelector('[data-slot="group-header-collapse"]') as HTMLElement;
       const titleRow = collapse.querySelector(
         '[data-slot="group-header-title-row"]',
       ) as HTMLElement;
       expect(titleRow.className).not.toContain('flex-col');
-      expect(within(titleRow).getByText(/добавить вход/)).toBeTruthy();
+      expect(within(titleRow).getByText(/add sign-in/)).toBeTruthy();
       const statuses = titleRow.querySelector('[data-slot="group-header-statuses"]') as HTMLElement;
       expect(statuses.className).toContain('justify-end');
       expect(within(statuses).getByText('Run:')).toBeTruthy();
@@ -1165,19 +1165,19 @@ describe('usage in the group header', () => {
   });
 
   describe('run title', () => {
-    const title = () => screen.getByText('добавить вход', { exact: false });
+    const title = () => screen.getByText('add sign-in', { exact: false });
 
     it('is not shown as a heading before scrolling, the section keeps its group label', () => {
       show();
-      expect(screen.queryByRole('heading', { name: /добавить вход/ })).toBeNull();
+      expect(screen.queryByRole('heading', { name: /add sign-in/ })).toBeNull();
       expect(screen.queryByRole('heading', { name: row.title })).toBeNull();
       expect(title().closest('[aria-hidden="true"]')).toBeTruthy();
-      expect(screen.getByRole('region', { name: /Вход|login/i })).toBeTruthy();
+      expect(screen.getByRole('region', { name: /Sign-in|login/i })).toBeTruthy();
     });
 
     it('is shown as a heading with the run id in the tooltip after scrolling', () => {
       show(true);
-      const heading = screen.getByRole('heading', { name: '#1 добавить вход' });
+      const heading = screen.getByRole('heading', { name: '#1 add sign-in' });
       expect(heading).toBeTruthy();
       expect(title().getAttribute('title')).toContain('run1');
     });

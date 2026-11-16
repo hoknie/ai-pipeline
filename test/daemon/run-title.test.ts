@@ -21,7 +21,7 @@ async function create(h: Harness, extra: Record<string, unknown> = {}): Promise<
   const { runId } = (await startRun(h, {
     repository: h.repo,
     pipeline: 'feature',
-    task: 'Добавить флаг --json\nподробности',
+    task: 'Add a --json flag\ndetails',
     ...extra,
   })) as RunCreated;
   return runId;
@@ -30,7 +30,7 @@ async function create(h: Harness, extra: Record<string, unknown> = {}): Promise<
 describe('run_title', () => {
   it('renames a finished run, keeps the name, survives a restart and reaches subscribers', async () => {
     const h = (current = await harness(MANUAL_CONFIG));
-    h.script({ naming: { answer: '{"title": "Модель", "name": "model-name"}' } });
+    h.script({ naming: { answer: '{"title": "Model", "name": "model-name"}' } });
     const runId = await create(h);
     const done = await h.waitFor(runId, (view) => view.finished && view.name !== null);
     const events: StreamEvent[] = [];
@@ -38,16 +38,16 @@ describe('run_title', () => {
       events.push(streamEventSchema.parse(JSON.parse(line))),
     );
     await until('the snapshot', () => events.length > 0);
-    const view = (await h.call('run_title', { runId, title: '  Своё название ' })) as RunView;
-    expect(view).toMatchObject({ title: 'Своё название', name: done.name });
+    const view = (await h.call('run_title', { runId, title: '  Custom title ' })) as RunView;
+    expect(view).toMatchObject({ title: 'Custom title', name: done.name });
     await until('the run event', () =>
       events.some(
         (event) =>
-          event.event === 'run' && (event.run as unknown as RunView).title === 'Своё название',
+          event.event === 'run' && (event.run as unknown as RunView).title === 'Custom title',
       ),
     );
     await h.restart();
-    expect((await h.status(runId)).title).toBe('Своё название');
+    expect((await h.status(runId)).title).toBe('Custom title');
     void ended;
   });
 
@@ -61,16 +61,16 @@ describe('run_title', () => {
     h.script({
       naming: {
         waitFor: h.gate('naming'),
-        answer: '{"title": "Модель", "name": "model-name"}',
+        answer: '{"title": "Model", "name": "model-name"}',
       },
       code: [{ waitFor: h.gate('code') }],
     });
     const runId = await create(h);
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
-    await h.call('run_title', { runId, title: 'Ручное' });
+    await h.call('run_title', { runId, title: 'Manual' });
     h.open('naming');
     const named = await h.waitFor(runId, (view) => (view.usage?.inputTokens ?? 0) > 0);
     h.open('code');
-    expect(named).toMatchObject({ title: 'Ручное', name: null });
+    expect(named).toMatchObject({ title: 'Manual', name: null });
   });
 });

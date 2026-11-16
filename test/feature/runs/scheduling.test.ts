@@ -19,28 +19,28 @@ describe('step input', () => {
   it('gives code after a rejection the summaries of plan, the previous code and the feedback', () => {
     const state = run(1);
     step(state);
-    finish(state, 'done', { summary: 'план готов' });
+    finish(state, 'done', { summary: 'plan ready' });
     step(state);
-    finish(state, 'done', { summary: 'код v1' });
+    finish(state, 'done', { summary: 'code v1' });
     step(state);
-    finish(state, 'rejected', { summary: 'ревью: ошибки', feedback: 'нет тестов' });
+    finish(state, 'rejected', { summary: 'review: errors', feedback: 'no tests' });
     step(state);
     const input = runningAttempt(state).input;
     expect(input.previous.map((previous) => previous.summary)).toEqual([
-      'план готов',
-      'код v1',
-      'ревью: ошибки',
+      'plan ready',
+      'code v1',
+      'review: errors',
     ]);
-    expect(input.feedback).toBe('нет тестов');
+    expect(input.feedback).toBe('no tests');
     expect(input.stepId).toBe('code');
-    expect(input.specialistName).toBe('Кодировщик');
+    expect(input.specialistName).toBe('Coder');
   });
 
   it('builds the prompt from the specialist prompt and the group task', () => {
     const state = run(1);
     step(state);
-    expect(runningAttempt(state).input.prompt).toBe('План: задача 1');
-    expect(runningAttempt(state).input.groupTitle).toBe('Группа 1');
+    expect(runningAttempt(state).input.prompt).toBe('Plan: task 1');
+    expect(runningAttempt(state).input.groupTitle).toBe('Group 1');
   });
 
   it('takes runtime and model from the specialist', () => {
@@ -55,7 +55,7 @@ describe('step input', () => {
 describe('additional prompt of a step', () => {
   const TEXT = CONFIG_TEXT.replace(
     '        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 3 } }',
-    '        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 3 }, additional_prompt: Проверяй только тесты }\n        - { id: final, specialist: reviewer }',
+    '        - { id: review, specialist: reviewer, on_reject: { goto: code, max_rounds: 3 }, additional_prompt: Check only the tests }\n        - { id: final, specialist: reviewer }',
   );
 
   it('appends the text of the step after the specialist prompt, only in that step', () => {
@@ -66,11 +66,11 @@ describe('additional prompt of a step', () => {
     }
     step(state);
     const review = runningAttempt(state).input.prompt;
-    expect(review.endsWith('задача 1\n\nПроверяй только тесты')).toBe(true);
+    expect(review.endsWith('task 1\n\nCheck only the tests')).toBe(true);
     finish(state, 'done');
     step(state);
     expect(runningAttempt(state).stepId).toBe('final');
-    expect(runningAttempt(state).input.prompt).not.toContain('Проверяй только тесты');
+    expect(runningAttempt(state).input.prompt).not.toContain('Check only the tests');
   });
 
   it('keeps the prompt of runs saved before the field existed', () => {
@@ -103,7 +103,7 @@ describe('scheduler', () => {
       effects.map((effect) =>
         effect.kind === 'start_attempt' ? `${effect.run}/${effect.group}` : '',
       ),
-    ).toEqual(['run000000001/gruppa-1', 'run000000001/gruppa-2', 'run000000002/gruppa-1']);
+    ).toEqual(['run000000001/group-1', 'run000000001/group-2', 'run000000002/group-1']);
   });
 
   it('counts running specialists across runs of a repository', () => {
@@ -115,10 +115,7 @@ describe('scheduler', () => {
 });
 
 describe('specialist limit', () => {
-  const LIMITED = CONFIG_TEXT.replace(
-    'coder: { name: Кодировщик,',
-    'coder: { name: Кодировщик, max: 1,',
-  );
+  const LIMITED = CONFIG_TEXT.replace('coder: { name: Coder,', 'coder: { name: Coder, max: 1,');
 
   function startedBy(effects: ReturnType<typeof dispatch>, state: RunState): string[] {
     return effects.flatMap((effect) =>
@@ -135,8 +132,7 @@ describe('specialist limit', () => {
   function planned(groups: number, options: { id?: string; now?: number } = {}): RunState {
     const state = run(groups, { configText: LIMITED, ...options });
     step(state);
-    for (let index = 1; index <= groups; index++)
-      finish(state, 'done', { slug: `gruppa-${index}` });
+    for (let index = 1; index <= groups; index++) finish(state, 'done', { slug: `group-${index}` });
     return state;
   }
 
@@ -150,22 +146,22 @@ describe('specialist limit', () => {
   it('lets one coder work and starts the next group when it finishes', () => {
     const state = planned(3);
     const effects = step(state);
-    expect(startedBy(effects, state)).toEqual(['gruppa-1:coder']);
+    expect(startedBy(effects, state)).toEqual(['group-1:coder']);
     expect(state.groups.map((entry) => entry.status)).toEqual(['running', 'queued', 'queued']);
-    finish(state, 'done', { slug: 'gruppa-1' });
-    expect(startedBy(step(state), state)).toContain('gruppa-2:coder');
-    expect(group(state, 'gruppa-3').status).toBe('queued');
+    finish(state, 'done', { slug: 'group-1' });
+    expect(startedBy(step(state), state)).toContain('group-2:coder');
+    expect(group(state, 'group-3').status).toBe('queued');
   });
 
   it('does not block specialists without a limit behind a waiting group', () => {
     const state = run(3, { configText: LIMITED, max: 2 });
     step(state);
-    finish(state, 'done', { slug: 'gruppa-1' });
+    finish(state, 'done', { slug: 'group-1' });
     step(state);
-    expect(runningAttempt(state, 'gruppa-1').specialist).toBe('coder');
-    finish(state, 'done', { slug: 'gruppa-2' });
-    expect(startedBy(step(state), state)).toEqual(['gruppa-3:plan']);
-    expect(group(state, 'gruppa-2').status).toBe('queued');
+    expect(runningAttempt(state, 'group-1').specialist).toBe('coder');
+    finish(state, 'done', { slug: 'group-2' });
+    expect(startedBy(step(state), state)).toEqual(['group-3:plan']);
+    expect(group(state, 'group-2').status).toBe('queued');
   });
 
   it('applies the limit across runs', () => {
@@ -213,11 +209,11 @@ describe('merge queue', () => {
     ]);
     const effects = transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c1' } },
       5,
     );
     expect(effects).toEqual([
-      { kind: 'merge', run: state.run.id, group: 'gruppa-2', updateOnConflict: false },
+      { kind: 'merge', run: state.run.id, group: 'group-2', updateOnConflict: false },
     ]);
   });
 
@@ -227,7 +223,7 @@ describe('merge queue', () => {
       state,
       {
         kind: 'merge_finished',
-        group: 'gruppa-1',
+        group: 'group-1',
         outcome: { kind: 'conflict', files: ['src/lib.ts'] },
       },
       5,
@@ -240,18 +236,18 @@ describe('merge queue', () => {
     const state = readyToMerge(1);
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'conflict', files: ['a'] } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'conflict', files: ['a'] } },
       5,
     );
-    const effects = transition(state, { kind: 'retry', group: 'gruppa-1' }, 6);
+    const effects = transition(state, { kind: 'retry', group: 'group-1' }, 6);
     expect(effects).toEqual([
-      { kind: 'merge', run: state.run.id, group: 'gruppa-1', updateOnConflict: true },
+      { kind: 'merge', run: state.run.id, group: 'group-1', updateOnConflict: true },
     ]);
     transition(
       state,
       {
         kind: 'merge_finished',
-        group: 'gruppa-1',
+        group: 'group-1',
         outcome: { kind: 'conflict_updated', files: ['a'] },
       },
       7,
@@ -266,13 +262,13 @@ describe('merge queue', () => {
     const state = readyToMerge(1);
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'conflict', files: ['a'] } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'conflict', files: ['a'] } },
       5,
     );
-    transition(state, { kind: 'retry', group: 'gruppa-1' }, 6);
+    transition(state, { kind: 'retry', group: 'group-1' }, 6);
     transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c1' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c1' } },
       7,
     );
     expect(group(state).status).toBe('merged');
@@ -326,7 +322,7 @@ describe('identifiers', () => {
   });
 
   it('cuts long titles to a valid slug', () => {
-    const slug = slugify('очень длинный заголовок группы '.repeat(4));
+    const slug = slugify('a very long title of a group '.repeat(4));
     expect(slug.length).toBeLessThanOrEqual(32);
     expect(isValidSlug(slug)).toBe(true);
   });
@@ -348,13 +344,10 @@ describe('dispatch and the plan', () => {
   it('starts exactly the groups of the plan and leaves the waiting ones queued', () => {
     const first = run(3, {
       id: 'run000000001',
-      configText: CONFIG_TEXT.replace(
-        'coder: { name: Кодировщик,',
-        'coder: { name: Кодировщик, max: 1,',
-      ),
+      configText: CONFIG_TEXT.replace('coder: { name: Coder,', 'coder: { name: Coder, max: 1,'),
     });
     step(first);
-    for (let index = 1; index <= 3; index++) finish(first, 'done', { slug: `gruppa-${index}` });
+    for (let index = 1; index <= 3; index++) finish(first, 'done', { slug: `group-${index}` });
     const plan = planDispatch([first], 1500);
     const effects = dispatch([first], 1500);
     expect(effects.map((effect) => (effect.kind === 'start_attempt' ? effect.group : ''))).toEqual(

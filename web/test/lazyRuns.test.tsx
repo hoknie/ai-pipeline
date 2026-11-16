@@ -69,10 +69,10 @@ describe('history of finished runs', () => {
     expect(result.current.history.error).toBeNull();
     expect(finishedRuns).toHaveBeenNthCalledWith(2, 'c1', undefined);
     expect(finishedRuns).toHaveBeenNthCalledWith(3, 'c1', undefined);
-    act(() => stream().send({ event: 'run', run: { ...done('a'), title: 'новое' } }));
-    expect(result.current.runs.find((run) => run.id === 'a')?.title).toBe('новое');
+    act(() => stream().send({ event: 'run', run: { ...done('a'), title: 'renamed' } }));
+    expect(result.current.runs.find((run) => run.id === 'a')?.title).toBe('renamed');
     act(() => stream().send({ event: 'snapshot', seq: 2, runs: [runView()] }));
-    expect(result.current.runs.find((run) => run.id === 'a')?.title).toBe('новое');
+    expect(result.current.runs.find((run) => run.id === 'a')?.title).toBe('renamed');
   });
 });
 
@@ -295,7 +295,7 @@ describe('search through old runs', () => {
       .mockResolvedValueOnce({ runs: [done('p1')], next: 'c1' })
       .mockResolvedValueOnce({ runs: [done('p2')], next: 'c2' })
       .mockResolvedValueOnce({
-        runs: [runView({ id: 'old', title: 'Старая задача', finished: true, state: 'finished' })],
+        runs: [runView({ id: 'old', title: 'Ancient task', finished: true, state: 'finished' })],
         next: null,
       });
     const api = fakeApi({ finishedRuns });
@@ -310,7 +310,7 @@ describe('search through old runs', () => {
       });
     });
     fireEvent.change(await screen.findByRole('searchbox', { name: 'Search runs' }), {
-      target: { value: 'Старая' },
+      target: { value: 'Ancient' },
     });
     await waitFor(() => expect(document.querySelector('li[data-run="old"]')).toBeTruthy());
     expect(finishedRuns).toHaveBeenCalledTimes(3);

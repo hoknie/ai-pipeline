@@ -17,19 +17,19 @@ const FENCE = '```';
 
 describe('inline markup', () => {
   it('wraps the selection and keeps it selected', () => {
-    expect(run('раз два', 0, 3, 'bold')).toBe('**[раз]** два');
-    expect(run('раз два', 4, 7, 'strike')).toBe('раз ~~[два]~~');
-    expect(run('раз два', 0, 3, 'code')).toBe('`[раз]` два');
+    expect(run('one two', 0, 3, 'bold')).toBe('**[one]** two');
+    expect(run('one two', 4, 7, 'strike')).toBe('one ~~[two]~~');
+    expect(run('one two', 0, 3, 'code')).toBe('`[one]` two');
   });
 
   it('uses _ for italic, so that it is not confused with the edge of **', () => {
-    expect(run('раз', 0, 3, 'italic')).toBe('_[раз]_');
-    expect(run('**раз**', 2, 5, 'italic')).toBe('**_[раз]_**');
-    expect(run('**раз**', 2, 5, 'bold')).toBe('[раз]');
+    expect(run('one', 0, 3, 'italic')).toBe('_[one]_');
+    expect(run('**one**', 2, 5, 'italic')).toBe('**_[one]_**');
+    expect(run('**one**', 2, 5, 'bold')).toBe('[one]');
   });
 
   it('leaves the spaces at the edges outside', () => {
-    expect(run('а  раз  б', 1, 8, 'bold')).toBe('а  **[раз]**  б');
+    expect(run('a  one  b', 1, 8, 'bold')).toBe('a  **[one]**  b');
   });
 
   it('puts the cursor between the markers without a selection', () => {
@@ -39,9 +39,9 @@ describe('inline markup', () => {
   });
 
   it('takes the markers off when they are outside or at the edges of the selection', () => {
-    expect(run('**раз** два', 2, 5, 'bold')).toBe('[раз] два');
-    expect(run('**раз** два', 0, 7, 'bold')).toBe('[раз] два');
-    expect(run('~~раз~~', 2, 5, 'strike')).toBe('[раз]');
+    expect(run('**one** two', 2, 5, 'bold')).toBe('[one] two');
+    expect(run('**one** two', 0, 7, 'bold')).toBe('[one] two');
+    expect(run('~~one~~', 2, 5, 'strike')).toBe('[one]');
   });
 
   it('puts a code span with a long enough fence', () => {
@@ -52,67 +52,67 @@ describe('inline markup', () => {
   });
 
   it('makes a link from the selection, a URL or nothing', () => {
-    expect(run('смотри тут', 7, 10, 'link')).toBe('смотри [тут]([url])');
+    expect(run('please see', 7, 10, 'link')).toBe('please [see]([url])');
     expect(run('', 0, 0, 'link')).toBe('[|](url)');
   });
 });
 
 describe('line markup', () => {
   it('numbers the non-empty lines of the selection and leaves the empty ones', () => {
-    expect(applyMarkup('раз\n\nдва', 0, 8, 'numberedList').text).toBe('1. раз\n\n2. два');
+    expect(applyMarkup('one\n\ntwo', 0, 8, 'numberedList').text).toBe('1. one\n\n2. two');
   });
 
   it('puts the marker after the indent and keeps the cursor at its letter', () => {
-    expect(run('  пункт', 4, 4, 'quote')).toBe('  > пу|нкт');
+    expect(run('  point', 4, 4, 'quote')).toBe('  > po|int');
   });
 
   it('works on the line of the cursor without a selection and on a lone empty line', () => {
-    expect(run('а\nб\nв', 3, 3, 'bulletList')).toBe('а\n- б|\nв');
-    expect(run('а\nб\nв', 2, 2, 'bulletList')).toBe('а\n- |б\nв');
-    expect(run('\nабв', 0, 0, 'quote')).toBe('> |\nабв');
+    expect(run('a\nb\nc', 3, 3, 'bulletList')).toBe('a\n- b|\nc');
+    expect(run('a\nb\nc', 2, 2, 'bulletList')).toBe('a\n- |b\nc');
+    expect(run('\nabc', 0, 0, 'quote')).toBe('> |\nabc');
     expect(run('', 0, 0, 'taskList')).toBe('- [ ] |');
   });
 
   it('does not take a line after the selection that ends with a line break', () => {
-    expect(applyMarkup('а\nб\nв', 0, 4, 'quote').text).toBe('> а\n> б');
+    expect(applyMarkup('a\nb\nc', 0, 4, 'quote').text).toBe('> a\n> b');
   });
 
   it('takes the marker off when every non-empty line has it', () => {
-    expect(applyMarkup('- раз\n- два', 0, 11, 'bulletList').text).toBe('раз\nдва');
-    expect(applyMarkup('1. раз\n\n2. два', 0, 13, 'numberedList').text).toBe('раз\n\nдва');
-    expect(applyMarkup('- [x] раз', 0, 0, 'taskList').text).toBe('раз');
-    expect(applyMarkup('> раз\n> два', 0, 11, 'quote').text).toBe('раз\nдва');
-    expect(applyMarkup('## Итог', 0, 0, 'heading').text).toBe('Итог');
+    expect(applyMarkup('- one\n- two', 0, 11, 'bulletList').text).toBe('one\ntwo');
+    expect(applyMarkup('1. one\n\n2. two', 0, 13, 'numberedList').text).toBe('one\n\ntwo');
+    expect(applyMarkup('- [x] one', 0, 0, 'taskList').text).toBe('one');
+    expect(applyMarkup('> one\n> two', 0, 11, 'quote').text).toBe('one\ntwo');
+    expect(applyMarkup('## Total', 0, 0, 'heading').text).toBe('Total');
   });
 
   it('replaces the marker of another list kind', () => {
-    expect(applyMarkup('- [ ] раз\n1. два', 0, 16, 'bulletList').text).toBe('- раз\n- два');
-    expect(applyMarkup('- раз\n* два', 0, 11, 'numberedList').text).toBe('1. раз\n2. два');
-    expect(applyMarkup('- раз\n- [x] два', 0, 15, 'taskList').text).toBe('- [ ] раз\n- [ ] два');
+    expect(applyMarkup('- [ ] one\n1. two', 0, 16, 'bulletList').text).toBe('- one\n- two');
+    expect(applyMarkup('- one\n* two', 0, 11, 'numberedList').text).toBe('1. one\n2. two');
+    expect(applyMarkup('- one\n- [x] two', 0, 15, 'taskList').text).toBe('- [ ] one\n- [ ] two');
   });
 
   it('puts a marker on the lines that have none when only some have it', () => {
-    expect(applyMarkup('- раз\nдва', 0, 9, 'bulletList').text).toBe('- раз\n- два');
+    expect(applyMarkup('- one\ntwo', 0, 9, 'bulletList').text).toBe('- one\n- two');
   });
 
   it('changes the level of a heading', () => {
-    expect(applyMarkup('# Итог', 0, 0, 'heading').text).toBe('## Итог');
-    expect(applyMarkup('### Итог', 0, 0, 'heading').text).toBe('## Итог');
+    expect(applyMarkup('# Total', 0, 0, 'heading').text).toBe('## Total');
+    expect(applyMarkup('### Total', 0, 0, 'heading').text).toBe('## Total');
   });
 
   it('moves the cursor out of a replaced marker to its end', () => {
-    expect(run('# Итог', 1, 1, 'heading')).toBe('## |Итог');
+    expect(run('# Total', 1, 1, 'heading')).toBe('## |Total');
   });
 
   it('keeps a selection over several lines', () => {
-    expect(run('а\nб', 0, 3, 'quote')).toBe('[> а\n> б]');
+    expect(run('a\nb', 0, 3, 'quote')).toBe('[> a\n> b]');
   });
 });
 
 describe('code block', () => {
   it('surrounds the lines of the cursor with the fence on its own lines', () => {
-    expect(applyMarkup('до\nкод\nпосле', 4, 4, 'codeBlock').text).toBe('```\nкод\n```');
-    expect(run('до\nкод\nпосле', 4, 4, 'codeBlock')).toBe(`до\n${FENCE}\n[код]\n${FENCE}\nпосле`);
+    expect(applyMarkup('in\nrun\nout', 4, 4, 'codeBlock').text).toBe('```\nrun\n```');
+    expect(run('in\nrun\nout', 4, 4, 'codeBlock')).toBe(`in\n${FENCE}\n[run]\n${FENCE}\nout`);
   });
 
   it('inserts an empty block with the cursor on the empty line', () => {

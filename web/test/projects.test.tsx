@@ -70,10 +70,7 @@ describe('the group Projects', () => {
 
   it('finds a project by its slug and opens its form at its address', async () => {
     await show(
-      [
-        repositoryView(APP, { name: 'Магазин', label: 'Магазин', slug: 'shop' }),
-        repositoryView(LIB),
-      ],
+      [repositoryView(APP, { name: 'Shop', label: 'Shop', slug: 'shop' }), repositoryView(LIB)],
       '#settings/global/projects',
     );
     await waitFor(() => expect(within(list()).getAllByRole('button')).toHaveLength(2));
@@ -83,7 +80,7 @@ describe('the group Projects', () => {
     const rows = within(list()).getAllByRole('button');
     expect(rows).toHaveLength(1);
     fireEvent.click(rows[0]!);
-    await projectForm('Магазин');
+    await projectForm('Shop');
     await waitFor(() => expect(window.location.hash).toBe('#settings/global/projects/shop'));
   });
 
@@ -106,20 +103,18 @@ describe('the group Projects', () => {
 
   it('saves the name and shows it in the repository menu', async () => {
     const updateRepository = vi.fn(async () => [
-      repositoryView(APP, { name: 'Магазин', label: 'Магазин' }),
+      repositoryView(APP, { name: 'Shop', label: 'Shop' }),
     ]);
     const api = await show([repositoryView(APP)], '#settings/global/projects/app', {
       updateRepository,
     });
     const form = within(await projectForm('app'));
-    fireEvent.change(form.getByLabelText('Name'), { target: { value: ' Магазин ' } });
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: ' Shop ' } });
     fireEvent.click(form.getByRole('button', { name: 'Save' }));
-    await waitFor(() =>
-      expect(api.updateRepository).toHaveBeenCalledWith(APP, { name: 'Магазин' }),
-    );
+    await waitFor(() => expect(api.updateRepository).toHaveBeenCalledWith(APP, { name: 'Shop' }));
     await waitFor(() =>
       expect(document.querySelector('[data-repository-trigger]')?.getAttribute('aria-label')).toBe(
-        'Repository: Магазин',
+        'Repository: Shop',
       ),
     );
   });
@@ -398,16 +393,16 @@ describe('disabled projects in the panel', () => {
   it('names a project by its name with its color in the menu and links to the projects', async () => {
     await show(
       [
-        repositoryView(APP, { name: 'Магазин', label: 'Магазин', color: 'teal' }),
+        repositoryView(APP, { name: 'Shop', label: 'Shop', color: 'teal' }),
         repositoryView(LIB, { enabled: false }),
       ],
       '#queue',
     );
     const trigger = () => document.querySelector<HTMLElement>('[data-repository-trigger]')!;
-    await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: Магазин'));
+    await waitFor(() => expect(trigger().getAttribute('aria-label')).toBe('Repository: Shop'));
     expect(trigger().querySelector('[data-project-color="teal"]')).toBeTruthy();
     fireEvent.keyDown(trigger(), { key: 'Enter' });
-    await screen.findByRole('menuitemradio', { name: /Магазин/ });
+    await screen.findByRole('menuitemradio', { name: /Shop/ });
     expect(screen.queryByRole('menuitemradio', { name: /lib/ })).toBeNull();
     expect(document.querySelector('[data-projects-link]')?.getAttribute('href')).toBe(
       '#settings/global/projects',

@@ -51,9 +51,9 @@ describe('hold event', () => {
     transition(state, { kind: 'hold', hold: 'paused' }, 2);
     step(state);
     group(state).status = 'failed';
-    transition(state, { kind: 'cancel', group: 'gruppa-1' }, 5);
+    transition(state, { kind: 'cancel', group: 'group-1' }, 5);
     expect(state.run.finishedAt).not.toBeNull();
-    expect(retryableGroups(state)).toEqual(['gruppa-1']);
+    expect(retryableGroups(state)).toEqual(['group-1']);
     expect(state.run.hold).toBe('paused');
 
     const other = run(1, { id: 'run000000002' });
@@ -92,7 +92,7 @@ describe('planDispatch with a hold and delivery groups', () => {
     const state = run(1);
     step(state);
     finish(state, 'done');
-    state.message = newGroup('message', 'Сообщение', 'сообщение', 100);
+    state.message = newGroup('message', 'Message', 'message', 100);
     state.run.hold = 'paused';
     const slugs = planDispatch([state], 1500).start.map((entry) => entry.group.slug);
     expect(slugs).toEqual(['message']);
@@ -104,7 +104,7 @@ describe('pauseRun', () => {
     const state = run(1);
     const queue = queueWith(state);
     addItem(queue, { pipeline: 'feature', task: 'B' }, 'q1', 2);
-    queue.acknowledged.push(`${state.run.id}/gruppa-1/failed/1`);
+    queue.acknowledged.push(`${state.run.id}/group-1/failed/1`);
     const item = pauseRun(queue, state, 'q2', 3);
     expect(queue.runs).toEqual([]);
     expect(queue.acknowledged).toEqual([]);
@@ -235,7 +235,7 @@ describe('a pause stops the running step', () => {
       state,
       {
         kind: 'attempt_exited',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         exit: { sessionId: 's1', usage: null, failure, outsideChanges: [] },
       },
@@ -248,7 +248,7 @@ describe('a pause stops the running step', () => {
     step(state);
     const attempt = runningAttempt(state);
     expect(pause(state)).toEqual([
-      { kind: 'stop_attempt', run: state.run.id, group: 'gruppa-1', seq: attempt.seq },
+      { kind: 'stop_attempt', run: state.run.id, group: 'group-1', seq: attempt.seq },
     ]);
     expect(attempt.reason).toEqual({ kind: 'paused', at: 3000 });
     expect(describeFailReason({ kind: 'paused', at: 1 })).toBe('interrupted by a pause');
@@ -270,7 +270,7 @@ describe('a pause stops the running step', () => {
       reported,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         report: { verdict: 'done', summary: 'ok', feedback: null },
       },
@@ -315,7 +315,7 @@ describe('a pause stops the running step', () => {
       state,
       {
         kind: 'report',
-        group: 'gruppa-1',
+        group: 'group-1',
         seq: attempt.seq,
         report: { verdict: 'done', summary: 'ok', feedback: null },
       },
@@ -333,7 +333,7 @@ describe('a pause stops the running step', () => {
     pause(state);
     const attempt = runningAttempt(state);
     expect(
-      transition(state, { kind: 'timed_out', group: 'gruppa-1', seq: attempt.seq }, 9000),
+      transition(state, { kind: 'timed_out', group: 'group-1', seq: attempt.seq }, 9000),
     ).toEqual([]);
     expect(attempt.status).toBe('running');
     expect(group(state).status).toBe('running');
@@ -362,7 +362,7 @@ describe('a pause stops the running step', () => {
     pause(state);
     const attempt = runningAttempt(state);
     expect(() =>
-      transition(state, { kind: 'message', group: 'gruppa-1', seq: attempt.seq, text: 'x' }, 3100),
+      transition(state, { kind: 'message', group: 'group-1', seq: attempt.seq, text: 'x' }, 3100),
     ).toThrow(AppError);
   });
 });

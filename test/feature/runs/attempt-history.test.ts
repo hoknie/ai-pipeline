@@ -101,7 +101,7 @@ describe('AttemptHistoryRepository', () => {
     expect(repository.page({ group: '_repair', repository: '/missing', limit: 20 }).items).toEqual(
       [],
     );
-    insertAttempt(store, runId, 4, { group: 'gruppa-1', startedAt: 30, verdict: 'done' });
+    insertAttempt(store, runId, 4, { group: 'group-1', startedAt: 30, verdict: 'done' });
     expect(repository.page({ group: '_repair', limit: 100 }).items).toHaveLength(28);
     store.database.close();
   });

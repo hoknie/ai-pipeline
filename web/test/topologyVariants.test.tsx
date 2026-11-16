@@ -46,7 +46,7 @@ const task = () => {
     steps: base.steps,
     variants: [
       variantOf(base.steps, 'default'),
-      variantOf(base.steps, 'light', 'Лёгкая', ['review']),
+      variantOf(base.steps, 'light', 'Light one', ['review']),
     ],
   });
 };
@@ -109,10 +109,10 @@ describe('the topology of a variant', () => {
     const items = within(choice).getAllByRole('radio');
     expect(items.map((item) => item.textContent)).toEqual([
       'default active: 1',
-      'Лёгкая active: 1',
+      'Light one active: 1',
     ]);
     expect((await screen.findByTestId('stage-plan')).textContent).toContain('group a');
-    fireEvent.click(within(choice).getByRole('radio', { name: /Лёгкая/ }));
+    fireEvent.click(within(choice).getByRole('radio', { name: /Light one/ }));
     await waitFor(() => expect(screen.getByTestId('stage-review').dataset.skipped).toBe('true'));
     expect(screen.getByTestId('stage-code').textContent).toContain('group b');
     expect(screen.getByTestId('stage-plan').textContent).not.toContain('group a');
@@ -161,7 +161,7 @@ describe('the address of a variant in the panel', () => {
     const choice = await screen.findByRole('radiogroup', { name: 'Variant' });
     expect(
       within(choice)
-        .getByRole('radio', { name: /Лёгкая/ })
+        .getByRole('radio', { name: /Light one/ })
         .getAttribute('aria-checked'),
     ).toBe('true');
     expect((await screen.findByTestId('stage-review')).dataset.skipped).toBe('true');

@@ -106,7 +106,7 @@ describe('watch activity', () => {
     expect(groupCalls.length).toBe(2);
     expect(groupCalls[0]?.params).toMatchObject({ tailLines: 1 });
     expect(ACTIVITY_INTERVAL_MS).toBe(2000);
-    expect(out.every((text) => text.includes('gruppa-1: Editing src/login.ts'))).toBe(true);
+    expect(out.every((text) => text.includes('group-1: Editing src/login.ts'))).toBe(true);
   });
 
   it('skips the line of a group whose request fails and still draws', async () => {
@@ -117,7 +117,7 @@ describe('watch activity', () => {
     const { ctx, out } = fakeContext(false, createStyle(false));
     await watch(ctx, 'r1', 1);
     expect(out).toHaveLength(1);
-    expect(out[0]).not.toContain('gruppa-1:');
+    expect(out[0]).not.toContain('group-1:');
   });
 
   it('asks for no logs when no group runs', async () => {

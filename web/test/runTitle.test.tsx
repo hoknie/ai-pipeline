@@ -11,7 +11,7 @@ afterEach(cleanup);
 function setup(setRunTitle = vi.fn(async () => runView())) {
   const api = { ...fakeApi(), setRunTitle };
   render(
-    <RunHeader run={runView({ title: 'Старое' })} api={api} now={0} onError={() => undefined} />,
+    <RunHeader run={runView({ title: 'Old title' })} api={api} now={0} onError={() => undefined} />,
   );
   return setRunTitle;
 }
@@ -33,18 +33,18 @@ describe('run title edit in place', () => {
     const set = setup();
     edit();
     expect(field().maxLength).toBe(60);
-    fireEvent.change(field(), { target: { value: '  Новое  ' } });
+    fireEvent.change(field(), { target: { value: '  New title  ' } });
     fireEvent.keyDown(field(), { key: 'Enter' });
     fireEvent.blur(field());
     await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
     expect(set).toHaveBeenCalledTimes(1);
-    expect(set).toHaveBeenCalledWith(expect.any(String), 'Новое');
+    expect(set).toHaveBeenCalledWith(expect.any(String), 'New title');
   });
 
   it('saves on blur', async () => {
     const set = setup();
     edit();
-    fireEvent.change(field(), { target: { value: 'Другое' } });
+    fireEvent.change(field(), { target: { value: 'Another title' } });
     fireEvent.blur(field());
     await waitFor(() => expect(set).toHaveBeenCalledTimes(1));
   });
@@ -52,10 +52,10 @@ describe('run title edit in place', () => {
   it('cancels on Escape without a request', () => {
     const set = setup();
     edit();
-    fireEvent.change(field(), { target: { value: 'Другое' } });
+    fireEvent.change(field(), { target: { value: 'Another title' } });
     fireEvent.keyDown(field(), { key: 'Escape' });
     expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByText('Старое')).toBeTruthy();
+    expect(screen.getByText('Old title')).toBeTruthy();
     expect(set).not.toHaveBeenCalled();
   });
 
@@ -78,10 +78,10 @@ describe('run title edit in place', () => {
       }),
     );
     edit();
-    fireEvent.change(field(), { target: { value: 'Другое' } });
+    fireEvent.change(field(), { target: { value: 'Another title' } });
     fireEvent.keyDown(field(), { key: 'Enter' });
     expect(await screen.findByText('daemon refused')).toBeTruthy();
-    expect(field().value).toBe('Другое');
+    expect(field().value).toBe('Another title');
     expect(set).toHaveBeenCalledTimes(1);
   });
 
@@ -89,7 +89,7 @@ describe('run title edit in place', () => {
     const set = setup();
     edit();
     const input = field();
-    fireEvent.change(input, { target: { value: 'Другое' } });
+    fireEvent.change(input, { target: { value: 'Another title' } });
     fireEvent.keyDown(input, { key: 'Escape' });
     fireEvent.blur(input);
     expect(set).not.toHaveBeenCalled();
@@ -99,7 +99,7 @@ describe('run title edit in place', () => {
     const set = setup();
     edit();
     const input = field();
-    fireEvent.change(input, { target: { value: 'Новое' } });
+    fireEvent.change(input, { target: { value: 'New title' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
     fireEvent.blur(input);
@@ -120,7 +120,7 @@ describe('run title edit in place', () => {
       }),
     );
     edit();
-    fireEvent.change(field(), { target: { value: 'Другое' } });
+    fireEvent.change(field(), { target: { value: 'Another title' } });
     fireEvent.keyDown(field(), { key: 'Enter' });
     await screen.findByText('daemon refused');
     fireEvent.blur(field());

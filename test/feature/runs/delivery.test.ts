@@ -26,7 +26,7 @@ function mergedRun(
   for (const _ of ['plan', 'code', 'review', 'qa']) {
     step(state);
     for (const group of done)
-      finish(state, 'done', { slug: group.slug, summary: `${group.title} готово` });
+      finish(state, 'done', { slug: group.slug, summary: `${group.title} done` });
   }
   for (const group of done) {
     transition(
@@ -60,7 +60,7 @@ describe('delivery requests', () => {
     expect(effects).toEqual([
       expect.objectContaining({
         kind: 'deliver',
-        groups: ['gruppa-1', 'gruppa-2'],
+        groups: ['group-1', 'group-2'],
         force: false,
         auto: false,
       }),
@@ -72,11 +72,11 @@ describe('delivery requests', () => {
 
   it('refuses a second delivery of a group, unmerged groups and a delivery in progress', () => {
     const state = mergedRun(3, { leaveLast: true });
-    request(state, ['gruppa-1']);
-    expect(() => request(state, ['gruppa-2'])).toThrow('already in progress');
+    request(state, ['group-1']);
+    expect(() => request(state, ['group-2'])).toThrow('already in progress');
     transition(state, { kind: 'delivery_finished', result: applied }, 7000);
-    expect(() => request(state, ['gruppa-1'])).toThrow('already delivered');
-    expect(() => request(state, ['gruppa-3'])).toThrow('only merged groups can be delivered');
+    expect(() => request(state, ['group-1'])).toThrow('already delivered');
+    expect(() => request(state, ['group-3'])).toThrow('only merged groups can be delivered');
     expect(() => request(state, ['nope'])).toThrow('unknown group');
   });
 
@@ -190,7 +190,7 @@ describe('manual delivery mark', () => {
 
   it('marks groups waiting in pending and a chosen part of them', () => {
     const state = mergedRun(2);
-    expect(mark(state, ['gruppa-1'])).toEqual([]);
+    expect(mark(state, ['group-1'])).toEqual([]);
     expect(state.groups.map((group) => group.delivery.state)).toEqual(['applied', 'pending']);
     expect(mark(state)).toEqual([{ kind: 'cleanup', run: state.run.id }]);
     expect(state.groups.every((group) => group.delivery.manual)).toBe(true);
@@ -216,13 +216,13 @@ describe('manual delivery mark', () => {
 
   it('refuses without changing anything', () => {
     const state = mergedRun(3, { leaveLast: true });
-    request(state, ['gruppa-1']);
+    request(state, ['group-1']);
     expect(() => mark(state)).toThrow('already in progress');
     transition(state, { kind: 'delivery_finished', result: applied }, 7000);
-    expect(() => mark(state, ['gruppa-1'])).toThrow('already delivered');
-    expect(() => mark(state, ['gruppa-3'])).toThrow('only merged groups can be marked delivered');
+    expect(() => mark(state, ['group-1'])).toThrow('already delivered');
+    expect(() => mark(state, ['group-3'])).toThrow('only merged groups can be marked delivered');
     expect(() => mark(state, ['nope'])).toThrow('unknown group');
-    expect(() => mark(state, ['gruppa-2', 'gruppa-1'])).toThrow('already delivered');
+    expect(() => mark(state, ['group-2', 'group-1'])).toThrow('already delivered');
     expect(state.groups[1]?.delivery.state).toBe('pending');
     expect(state.groups[0]?.delivery.manual).toBe(false);
     expect(() => mark(run(1))).toThrow('nothing to mark: no merged groups are waiting');
@@ -233,28 +233,28 @@ describe('commit messages', () => {
   it('uses the group title and summaries by default', () => {
     const state = mergedRun(1);
     expect(renderCommitMessage('{title}\n\n{groups}', state, state.groups)).toBe(
-      'Группа 1\n\n- Группа 1: Группа 1 готово',
+      'Group 1\n\n- Group 1: Group 1 done',
     );
   });
 
   it('fills every placeholder', () => {
     const state = mergedRun(2);
     expect(renderCommitMessage('[{run}/{pipeline}] {title}\n{task}', state, state.groups)).toBe(
-      `[${state.run.id}/feature] 2 groups: Группа 1, Группа 2\nзадача 1\n\nзадача 2`,
+      `[${state.run.id}/feature] 2 groups: Group 1, Group 2\ntask 1\n\ntask 2`,
     );
   });
 
   it('still fills the old {workflow} placeholder with the pipeline', () => {
     const state = mergedRun(1);
     expect(renderCommitMessage('[{workflow}] {title}', state, state.groups)).toBe(
-      `[${state.run.pipeline}] Группа 1`,
+      `[${state.run.pipeline}] Group 1`,
     );
   });
 
   const WRITER =
     CONFIG_TEXT.replace(
-      '    qa: { name: Тестировщик }',
-      '    qa: { name: Тестировщик }\n    writer: { name: Автор }',
+      '    qa: { name: Tester }',
+      '    qa: { name: Tester }\n    writer: { name: Author }',
     ) + '  delivery: { mode: commit, message_specialist: writer }\n';
 
   it('asks the message specialist and uses its summary', () => {
@@ -268,10 +268,10 @@ describe('commit messages', () => {
     });
     const effects = finish(state, 'done', {
       slug: MESSAGE_GROUP,
-      summary: 'feat: вход\n\nподробности',
+      summary: 'feat: login\n\ndetails',
     });
     expect(effects).toEqual([
-      expect.objectContaining({ kind: 'deliver', message: 'feat: вход\n\nподробности' }),
+      expect.objectContaining({ kind: 'deliver', message: 'feat: login\n\ndetails' }),
     ]);
   });
 
@@ -283,7 +283,7 @@ describe('commit messages', () => {
     expect(effects).toContainEqual(
       expect.objectContaining({
         kind: 'deliver',
-        message: 'Группа 1\n\n- Группа 1: Группа 1 готово',
+        message: 'Group 1\n\n- Group 1: Group 1 done',
       }),
     );
   });
@@ -297,7 +297,7 @@ describe('automatic delivery of one run', () => {
     }
     return transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
       5000,
     );
   }
@@ -327,7 +327,7 @@ describe('automatic delivery of one run', () => {
       baseCommit: 'abc',
       config: source.run.config,
       dirtyWarning: false,
-      groups: [{ title: 'Группа 1', task: 'задача 1' }],
+      groups: [{ title: 'Group 1', task: 'task 1' }],
       split: false,
       now: 1000,
       autoDeliver: true,
@@ -336,7 +336,7 @@ describe('automatic delivery of one run', () => {
     expect(overridden.run.config.delivery.auto).toBe(true);
     expect(source.run.config.delivery.auto).toBe(false);
     expect(finishAndMerge(overridden)).toEqual([
-      expect.objectContaining({ kind: 'deliver', auto: true, groups: ['gruppa-1'] }),
+      expect.objectContaining({ kind: 'deliver', auto: true, groups: ['group-1'] }),
     ]);
   });
 
@@ -370,11 +370,11 @@ describe('automatic delivery', () => {
     }
     const effects = transition(
       state,
-      { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+      { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
       5000,
     );
     expect(effects).toEqual([
-      expect.objectContaining({ kind: 'deliver', auto: true, groups: ['gruppa-1'] }),
+      expect.objectContaining({ kind: 'deliver', auto: true, groups: ['group-1'] }),
     ]);
     transition(
       state,
@@ -397,7 +397,7 @@ describe('automatic delivery', () => {
     expect(
       transition(
         state,
-        { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+        { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
         5000,
       ),
     ).toEqual([]);
@@ -430,7 +430,7 @@ describe('automatic delivery', () => {
     expect(
       transition(
         state,
-        { kind: 'merge_finished', group: 'gruppa-1', outcome: { kind: 'merged', commit: 'c' } },
+        { kind: 'merge_finished', group: 'group-1', outcome: { kind: 'merged', commit: 'c' } },
         5000,
       ),
     ).toEqual([]);
@@ -452,7 +452,7 @@ describe('delivery resolver', () => {
     request(state);
     const effects = transition(state, { kind: 'delivery_finished', result: conflict }, 6100);
     expect(effects).toEqual([
-      { kind: 'prepare_resolve', run: state.run.id, groups: ['gruppa-1'], round: 1 },
+      { kind: 'prepare_resolve', run: state.run.id, groups: ['group-1'], round: 1 },
     ]);
     expect(state.run.pendingDelivery).not.toBeNull();
     expect(
@@ -475,8 +475,8 @@ describe('delivery resolver', () => {
       {
         kind: 'finish_resolve',
         run: state.run.id,
-        groups: ['gruppa-1'],
-        message: 'Группа 1\n\n- Группа 1: Группа 1 готово',
+        groups: ['group-1'],
+        message: 'Group 1\n\n- Group 1: Group 1 done',
         conflicts: ['src/app.ts'],
       },
     ]);
@@ -489,11 +489,11 @@ describe('delivery resolver', () => {
     const state = refusedWithResolver(2);
     const second = finish(state, 'rejected', {
       slug: RESOLVE_GROUP,
-      feedback: 'не могу',
+      feedback: 'cannot',
       now: 6400,
     });
     expect(second).toEqual([
-      { kind: 'prepare_resolve', run: state.run.id, groups: ['gruppa-1'], round: 2 },
+      { kind: 'prepare_resolve', run: state.run.id, groups: ['group-1'], round: 2 },
     ]);
     transition(state, { kind: 'resolve_prepared', conflicts: ['src/app.ts'] }, 6500);
     expect(state.resolve?.status).toBe('queued');
@@ -552,11 +552,11 @@ describe('delivery after a daemon restart', () => {
 
   it('starts again a delivery whose git work was cut off', () => {
     const state = mergedRun(2);
-    request(state, ['gruppa-1'], true);
+    request(state, ['group-1'], true);
     expect(interrupt(state)).toEqual([
-      expect.objectContaining({ kind: 'deliver', groups: ['gruppa-1'], force: true, auto: false }),
+      expect.objectContaining({ kind: 'deliver', groups: ['group-1'], force: true, auto: false }),
     ]);
-    expect(state.run.pendingDelivery).toMatchObject({ groups: ['gruppa-1'], force: true });
+    expect(state.run.pendingDelivery).toMatchObject({ groups: ['group-1'], force: true });
     transition(state, { kind: 'delivery_finished', result: applied }, 9100);
     expect(state.groups.map((group) => group.delivery.state)).toEqual(['applied', 'pending']);
   });
@@ -564,8 +564,8 @@ describe('delivery after a daemon restart', () => {
   it('asks the message specialist again when it was cut off', () => {
     const WRITER =
       CONFIG_TEXT.replace(
-        '    qa: { name: Тестировщик }',
-        '    qa: { name: Тестировщик }\n    writer: { name: Автор }',
+        '    qa: { name: Tester }',
+        '    qa: { name: Tester }\n    writer: { name: Author }',
       ) + '  delivery: { mode: commit, message_specialist: writer }\n';
     const state = mergedRun(1, { configText: WRITER });
     request(state);
@@ -593,7 +593,7 @@ describe('delivery after a daemon restart', () => {
     transition(state, { kind: 'resolve_prepared', conflicts: ['src/app.ts'] }, 6200);
     dispatch([state], 6300);
     expect(interrupt(state)).toEqual([
-      expect.objectContaining({ kind: 'deliver', groups: ['gruppa-1'] }),
+      expect.objectContaining({ kind: 'deliver', groups: ['group-1'] }),
     ]);
     expect(state.resolve?.status).toBe('failed');
     expect(state.run.pendingDelivery).toEqual(
