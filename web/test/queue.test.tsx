@@ -2860,14 +2860,34 @@ const STEP_NAMES: Record<string, string> = {
   deliver: 'Deliverer',
 };
 const stepOf = (id: string) => ({ ...pipelineOf().steps[0]!, id, name: STEP_NAMES[id] ?? id });
-const skipGroup = () => screen.getByText('Skip steps', { selector: 'legend' }).parentElement!;
-/** The segment of a step by its id; it is labelled with the name of the step. */
-const skipStep = (id: string) =>
-  within(skipGroup()).getByRole<HTMLButtonElement>('button', { name: STEP_NAMES[id] ?? id });
+const skipTrigger = () => screen.getByRole<HTMLButtonElement>('combobox', { name: 'Skip steps' });
+/** The list of the steps; it is opened when it is closed. */
+const openSkip = () => {
+  if (skipTrigger().getAttribute('aria-expanded') !== 'true') fireEvent.click(skipTrigger());
+};
+const skipOptions = () => {
+  openSkip();
+  return screen
+    .getAllByRole('option')
+    .filter((option) => option.querySelector('[id*="-skip-"]') !== null);
+};
+/** The list item of a step by its id; it is labelled with the name of the step. */
+const skipStep = (id: string) => {
+  openSkip();
+  return screen.getByRole('option', { name: STEP_NAMES[id] ?? id });
+};
 const skipStepAsync = async (name: string) => {
-  await waitFor(() => skipStep(name));
+  await waitFor(() => skipTrigger());
   return skipStep(name);
 };
+const isChecked = (option: HTMLElement) => option.getAttribute('aria-checked') === 'true';
+const isLocked = (option: HTMLElement) => option.getAttribute('aria-disabled') === 'true';
+/** The chips of the skipped steps, by their names. */
+const skipChips = () =>
+  within(skipTrigger().parentElement!)
+    .queryAllByText(/./, { selector: 'span, div' })
+    .map((el) => el.textContent!)
+    .filter((text) => Object.values(STEP_NAMES).includes(text));
 
 const fiveSteps = pipelinesView({
   pipelines: [
@@ -2989,23 +3009,21 @@ describe('main and properties columns of the task form', () => {
     expect(within(dialog).queryByRole('group', { name: 'Projects' })).toBeNull();
   });
 
-  it('offers a segment for every step in order', async () => {
+  it('offers a list item for every step in order', async () => {
     show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     await openNewTask();
     await skipStepAsync('plan');
-    expect(
-      within(skipGroup())
-        .getAllByRole('button')
-        .map((box) => box.id),
-    ).toEqual(['plan', 'code', 'review', 'qa', 'deliver'].map((step) => `new-skip-${step}`));
+    expect(skipOptions().map((box) => box.querySelector('[id]')!.id)).toEqual(
+      ['plan', 'code', 'review', 'qa', 'deliver'].map((step) => `new-skip-${step}`),
+    );
   });
 
   it('does not let the last step be skipped', async () => {
     show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     await openNewTask();
     for (const step of ['plan', 'code', 'review', 'qa']) fireEvent.click(await skipStepAsync(step));
-    expect(skipStep('deliver').disabled).toBe(true);
-    expect(skipStep('plan').disabled).toBe(false);
+    expect(isLocked(skipStep('deliver'))).toBe(true);
+    expect(isLocked(skipStep('plan'))).toBe(false);
   });
 
   it('sends the skipped steps on create', async () => {
@@ -3030,12 +3048,44 @@ describe('main and properties columns of the task form', () => {
     fireEvent.click(await skipStepAsync('qa'));
     fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
     fireEvent.click(await screen.findByRole('option', { name: 'small' }));
-    await waitFor(() => expect(within(skipGroup()).getAllByRole('button')).toHaveLength(2));
+    await waitFor(() => expect(skipOptions()).toHaveLength(2));
     fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() =>
       expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'small', task: 'T' }),
     );
+  });
+
+  it('keeps the list open after a choice and shows a chip with the name of the step', async () => {
+    show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    fireEvent.click(await skipStepAsync('review'));
+    expect(skipTrigger().getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getAllByRole('option').length).toBe(5);
+    expect(skipChips()).toEqual(['Reviewer']);
+    expect(screen.getByRole('button', { name: 'Remove Reviewer' })).toBeTruthy();
+  });
+
+  it('removes the mark with the button of the chip', async () => {
+    const api = show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    fireEvent.click(await skipStepAsync('review'));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Reviewer' }));
+    expect(skipChips()).toEqual([]);
+    expect(isChecked(skipStep('review'))).toBe(false);
+    fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'T' }),
+    );
+  });
+
+  it('keeps the chips in the order of the steps whatever the order of choosing', async () => {
+    show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
+    await openNewTask();
+    fireEvent.click(await skipStepAsync('qa'));
+    fireEvent.click(skipStep('plan'));
+    expect(skipChips()).toEqual(['Planner', 'Tester']);
   });
 
   describe('variants of the pipeline', () => {
@@ -3061,10 +3111,10 @@ describe('main and properties columns of the task form', () => {
       await skipStepAsync('plan');
       fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
       fireEvent.click(await screen.findByRole('option', { name: 'Lite' }));
-      await waitFor(() => expect(skipStep('review').disabled).toBe(true));
-      expect(skipStep('review').getAttribute('aria-pressed')).toBe('true');
-      expect(skipStep('qa').getAttribute('aria-pressed')).toBe('true');
-      expect(skipStep('plan').getAttribute('aria-pressed')).toBe('false');
+      await waitFor(() => expect(isLocked(skipStep('review'))).toBe(true));
+      expect(isChecked(skipStep('review'))).toBe(true);
+      expect(isChecked(skipStep('qa'))).toBe(true);
+      expect(isChecked(skipStep('plan'))).toBe(false);
       fireEvent.click(skipStep('plan'));
       fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -3077,6 +3127,17 @@ describe('main and properties columns of the task form', () => {
           skip: ['plan'],
         }),
       );
+    });
+
+    it('shows the steps of the variant as chips without a remove button', async () => {
+      show(queueOf(), { pipelines: vi.fn(async () => withVariants) });
+      await openNewTask();
+      await skipStepAsync('plan');
+      fireEvent.click(screen.getByRole('combobox', { name: 'Variant' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'Lite' }));
+      await waitFor(() => expect(skipChips()).toEqual(['Reviewer', 'Tester']));
+      expect(screen.queryByRole('button', { name: 'Remove Reviewer' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Remove Tester' })).toBeNull();
     });
 
     it('sends the selected variant and a return to default when editing', async () => {
@@ -3124,9 +3185,9 @@ describe('main and properties columns of the task form', () => {
       fireEvent.click(await screen.findByRole('option', { name: 'Lite' }));
       fireEvent.click(screen.getByRole('combobox', { name: 'Pipeline' }));
       fireEvent.click(await screen.findByRole('option', { name: 'small' }));
-      await waitFor(() => expect(within(skipGroup()).getAllByRole('button')).toHaveLength(2));
+      await waitFor(() => expect(skipOptions()).toHaveLength(2));
       expect(screen.queryByRole('combobox', { name: 'Variant' })).toBeNull();
-      expect(skipStep('review').disabled).toBe(false);
+      expect(isLocked(skipStep('review'))).toBe(false);
     });
   });
 
@@ -3249,8 +3310,8 @@ describe('main and properties columns of the task form', () => {
       within(screen.getAllByRole('listitem')[0]!).getByRole('button', { name: 'Edit' }),
     );
     const review = await skipStepAsync('review');
-    expect(review.getAttribute('aria-pressed')).toBe('true');
-    expect(skipStep('qa').getAttribute('aria-pressed')).toBe('true');
+    expect(isChecked(review)).toBe(true);
+    expect(isChecked(skipStep('qa'))).toBe(true);
     fireEvent.click(review);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
@@ -3268,6 +3329,21 @@ describe('main and properties columns of the task form', () => {
     await waitFor(() =>
       expect(api.queueEdit).toHaveBeenCalledWith('q1', expect.objectContaining({ skip: [] })),
     );
+  });
+});
+
+describe('skip steps of a returned item', () => {
+  it('keeps the chips and the list unavailable', async () => {
+    show(
+      queueOf({
+        items: [queueItem('q1', 'A', 1, { run: 'run7', hold: 'paused', skip: ['review'] })],
+      }),
+      { pipelines: vi.fn(async () => fiveSteps) },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await waitFor(() => expect(skipTrigger().matches(':disabled')).toBe(true));
+    expect(skipChips()).toEqual(['Reviewer']);
+    expect(screen.getByRole('button', { name: 'Remove Reviewer' }).matches(':disabled')).toBe(true);
   });
 });
 

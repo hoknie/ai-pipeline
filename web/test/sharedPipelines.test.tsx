@@ -247,9 +247,8 @@ describe('variants of a shared pipeline', () => {
     expect(
       (screen.getByRole('button', { name: 'Delete variant' }) as HTMLButtonElement).disabled,
     ).toBe(true);
-    const skips = document.querySelectorAll<HTMLButtonElement>('[id*="-skip-"]');
-    expect(skips.length).toBe(2);
-    for (const skip of skips) expect(skip.disabled).toBe(true);
+    const skip = screen.getByRole<HTMLButtonElement>('combobox', { name: 'Skip steps' });
+    expect(skip.disabled).toBe(true);
     const combos = within(screen.getByRole('region', { name: 'variant light' })).getAllByRole(
       'combobox',
     );

@@ -565,7 +565,8 @@ describe('the variants of a pipeline', () => {
     render(<Page api={api({ writePipeline }, [entry('feature', { raw: withVariants })])} />);
     await screen.findAllByRole('listitem', { name: /^step \d+$/ });
     fireEvent.click(switcher().getByRole('radio', { name: 'strong' }));
-    fireEvent.click(screen.getByRole('button', { name: 'plan' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Skip steps' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'plan' }));
     await pressSave(writePipeline);
     expect(variantsWritten(writePipeline)).toEqual({
       light: { name: 'Light one', skip: ['review'] },

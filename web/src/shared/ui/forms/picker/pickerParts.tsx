@@ -23,7 +23,7 @@ export interface ValueLook {
 export const GROUPS: OptionSource[] = ['builtin', 'project', 'global', 'other'];
 export const CREATE = '__create';
 
-function ValueChip({
+export function ValueChip({
   text,
   icon,
   hint,
