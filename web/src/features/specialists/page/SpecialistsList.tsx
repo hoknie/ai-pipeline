@@ -28,6 +28,30 @@ function subtitleOf(entry: EditorSpecialist): string {
   return [entry.slug, runtime].filter(Boolean).join(' · ');
 }
 
+/** One row under the title: the projects of the entry (in «All projects») and its tags. */
+function Badges({ entry }: { entry: EditorSpecialist & GroupInfo }) {
+  const tags = tagsOfSpecialist(entry);
+  if (!entry.presences && tags.length === 0) return null;
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {entry.presences ? (
+        <ProjectChips
+          everywhere={entry.everywhere === true}
+          presences={entry.presences}
+          className="contents"
+        />
+      ) : null}
+      {tags.length > 0 ? (
+        <span data-testid={`tags-${entry.slug}`} className="contents">
+          {tags.map((tag) => (
+            <SpecialistTagChip key={tag.name} name={tag.name} shared={tag.shared} />
+          ))}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /** The new/import buttons, the filters, the hint for an empty result and the list itself. */
 export function SpecialistsList({
   specialists,
@@ -91,20 +115,7 @@ export function SpecialistsList({
           title: specialistName(entry),
           subtitle: subtitleOf(entry),
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
-          extra: (
-            <>
-              {entry.presences ? (
-                <ProjectChips everywhere={entry.everywhere === true} presences={entry.presences} />
-              ) : null}
-              {tagsOfSpecialist(entry).length > 0 ? (
-                <span data-testid={`tags-${entry.slug}`} className="flex flex-wrap gap-1">
-                  {tagsOfSpecialist(entry).map((tag) => (
-                    <SpecialistTagChip key={tag.name} name={tag.name} shared={tag.shared} />
-                  ))}
-                </span>
-              ) : null}
-            </>
-          ),
+          extra: <Badges entry={entry} />,
         }))}
       />
     </>

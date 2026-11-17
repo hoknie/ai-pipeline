@@ -706,12 +706,13 @@ export const ru: Dictionary = {
   projectOverview: {
     hint: 'Чтобы изменить, выберите проект',
     open: 'Открыть в проекте',
-    preview: 'Конфигурация в проекте {{project}}',
     steps: 'Этапов: {{count}}',
     models: 'Моделей: {{count}}',
     everywhere: 'Во всех проектах',
     project: 'Проект',
     overrides: 'Проект · переопределяет общий',
+    shared: 'Общий',
+    choose: 'Какую конфигурацию показать',
   },
   queue: {
     settings: {

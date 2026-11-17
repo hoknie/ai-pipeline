@@ -685,12 +685,13 @@ export const zh: Dictionary = {
   projectOverview: {
     hint: '要修改，请先选择项目',
     open: '在项目中打开',
-    preview: '项目 {{project}} 中的配置',
     steps: '步骤数：{{count}}',
     models: '模型数：{{count}}',
     everywhere: '在所有项目中',
     project: '项目',
     overrides: '项目 · 覆盖共享',
+    shared: '共享',
+    choose: '显示的配置',
   },
   queue: {
     settings: {

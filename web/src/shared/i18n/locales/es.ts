@@ -709,12 +709,13 @@ export const es: Dictionary = {
   projectOverview: {
     hint: 'Para cambiar, elija un proyecto',
     open: 'Abrir en el proyecto',
-    preview: 'Configuración en el proyecto {{project}}',
     steps: 'Pasos: {{count}}',
     models: 'Modelos: {{count}}',
     everywhere: 'En todos los proyectos',
     project: 'Proyecto',
     overrides: 'Proyecto · sustituye al compartido',
+    shared: 'Compartido',
+    choose: 'Configuración que se muestra',
   },
   queue: {
     settings: {

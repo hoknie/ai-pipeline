@@ -88,12 +88,12 @@ The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`; `#pipeli
 
 ## All projects
 
-With "All projects" chosen in the repository picker, "Specialists", "Chains", "Pipeline" (pipelines and actions) and "Providers" group the enabled projects by entry: one row per slug or id, and under it the projects that have it ("In all projects" for a shared entry every project uses as it is; a project's own entry is marked "Project", an override "Project · overrides shared").
+With "All projects" chosen in the repository picker, "Specialists", "Chains", "Pipeline" (pipelines and actions) and "Providers" group the enabled projects by entry: one row per slug or id, and under it a badge per project with its own entry or an override ("In all projects" for a shared entry every project uses as it is; projects that use the shared entry as it is get no badge).
 
 A project whose configuration cannot be read shows its error, and the others stay.
 
-- The view changes nothing: no "New" or "Import", and a form only as a preview with disabled fields. Choosing a row opens an overview on the right: a compact list of the projects that have the entry, one line per project with the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
-- For a specialist or a chain the overview also previews the entry in one project: the same form with disabled fields and no buttons that write. Choosing another project's line switches the preview.
+- The view changes nothing: no "New" or "Import", and a form only as a preview with disabled fields. For a pipeline, an action or a provider, choosing a row opens an overview on the right: one line per project that has the entry, with the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
+- A specialist or a chain opens with a switch on top: "Shared" first (when there is a shared file), then each project with its own entry or an override. Below it is the chosen configuration in the same form with disabled fields and no buttons that write; "Open in project" opens it in that project (for "Shared", in a project that uses it as it is).
 - The filter "Project" (the shared entries and each project, with the number of rows) narrows the list; a row stays when any of its projects is chosen. It is remembered per tab.
-- The address of a row is `#specialists/<slug>` (the same for `#pipelines/…` and `#providers/<slug>`). An old address with `?project=<project slug>` opens the same row and marks that project's line and previews it; an unknown project shows "Project not found".
+- The address of a row is `#specialists/<slug>` (the same for `#pipelines/…` and `#providers/<slug>`). An old address with `?project=<project slug>` opens the same row and marks or chooses that project; an unknown project shows "Project not found".
 - "Topology" and "System stages" show one project at a time: choose it in the "Project" field above the content; the mode stays on.

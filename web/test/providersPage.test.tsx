@@ -332,7 +332,7 @@ describe('the mode «All projects»', () => {
     expect(within(anthropic).getByText('In all projects')).toBeTruthy();
     const local = within(list).getByRole('button', { name: /Local/ });
     expect(within(local).getByText(app.label)).toBeTruthy();
-    expect(within(local).getByText(/Project/)).toBeTruthy();
+    expect(within(local).getByTitle('Project')).toBeTruthy();
     expect(screen.getByText('To change, choose a project')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Create provider/ })).toBeNull();
     cleanup();

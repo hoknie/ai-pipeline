@@ -696,12 +696,13 @@ export const en = {
   projectOverview: {
     hint: 'To change, choose a project',
     open: 'Open in project',
-    preview: 'Configuration in project {{project}}',
     steps: 'Steps: {{count}}',
     models: 'Models: {{count}}',
     everywhere: 'In all projects',
     project: 'Project',
     overrides: 'Project · overrides shared',
+    shared: 'Shared',
+    choose: 'Configuration to show',
   },
   queue: {
     settings: {

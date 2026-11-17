@@ -80,19 +80,21 @@ export function ChainsList({
             title: String(chain.raw.name || chain.slug),
             subtitle: subtitleOf(chain, modeLabel),
             tag: t(`settings.editor.levels.${chain.level}`),
-            extra: (
-              <>
-                {chain.presences ? (
-                  <ProjectChips
-                    everywhere={chain.everywhere === true}
-                    presences={chain.presences}
-                  />
-                ) : null}
-                {chain.raw.enabled === false ? (
-                  <Badge variant="mute">{t('chains.disabled')}</Badge>
-                ) : null}
-              </>
-            ),
+            extra:
+              chain.presences || chain.raw.enabled === false ? (
+                <span className="flex flex-wrap items-center gap-1">
+                  {chain.presences ? (
+                    <ProjectChips
+                      everywhere={chain.everywhere === true}
+                      presences={chain.presences}
+                      className="contents"
+                    />
+                  ) : null}
+                  {chain.raw.enabled === false ? (
+                    <Badge variant="mute">{t('chains.disabled')}</Badge>
+                  ) : null}
+                </span>
+              ) : null,
           };
         })}
       />

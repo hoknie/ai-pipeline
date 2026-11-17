@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
@@ -12,13 +11,15 @@ import type { SpecialistsSource } from '../page/useAllSpecialistsData.ts';
 const noop = () => {};
 
 /**
- * The configuration of an entry in one project, in the form of the page with every field
- * disabled and no way to write.
+ * The configuration of an entry in one project (or its shared file), in the form of the page with
+ * every field disabled and no way to write. The sticky bar of the form stays in its place here:
+ * its negative margins only fit the top of the page.
  */
 export function EntryPreview({
   api,
   data,
   project,
+  choice,
   view,
   slug,
   isChains,
@@ -26,19 +27,20 @@ export function EntryPreview({
   api: Api;
   data: SpecialistsSource;
   project: ProjectRef;
+  /** The value of the choice shown: a project slug, or the shared one. */
+  choice: string;
   view: ConfigEditorResponse;
   slug: string;
   isChains: boolean;
 }) {
-  const { t } = useTranslation();
   const projectApi = useMemo(() => api.forRepository(project.path), [api, project.path]);
   const dirty = useMemo(() => ({ current: false }), []);
   return (
     <ModelCatalogProvider api={projectApi}>
-      <div data-entry-preview={project.slug} className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">
-          {t('projectOverview.preview', { project: project.label })}
-        </p>
+      <div
+        data-entry-preview={choice}
+        className="flex flex-col gap-2 [&_[data-sticky]]:static [&_[data-sticky]]:m-0 [&_[data-sticky]]:px-0"
+      >
         {isChains ? (
           <ChainsPane
             api={projectApi}

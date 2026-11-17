@@ -50,6 +50,15 @@ const shared = (slug: string, name = slug.toUpperCase()): EditorSpecialist =>
 const own = (slug: string, name: string): EditorSpecialist =>
   specialistEntry(slug, { level: 'project', raw: { name } }, { name });
 
+/** The switch of the configurations of an open entry: its values and one of its items. */
+const SHARED = '*shared';
+const choices = () =>
+  Array.from(document.querySelectorAll('[data-config-choice]')).map((item) =>
+    item.getAttribute('data-config-choice'),
+  );
+const choice = (value: string) =>
+  document.querySelector<HTMLElement>(`[data-config-choice="${value}"]`);
+
 type Setup = {
   configs?: Record<string, ConfigEditorResponse | Error>;
   runs?: RunView[];
@@ -202,16 +211,11 @@ describe('addresses in the mode', () => {
     expect(label()).toBe('Repository: All projects');
   });
 
-  it('opens the group and marks the block of the project of an old address', async () => {
+  it('opens the group and chooses the project of an old address', async () => {
     modeOn();
     window.location.hash = '#specialists/docs?project=lib';
     mount();
-    const block = await waitFor(() => {
-      const found = document.querySelector('[data-overview-project="lib"]');
-      expect(found).toBeTruthy();
-      return found!;
-    });
-    expect(block.getAttribute('data-highlighted')).toBe('true');
+    await waitFor(() => expect(choice('lib')?.getAttribute('data-state')).toBe('on'));
     expect(label()).toBe('Repository: All projects');
   });
 
@@ -268,7 +272,7 @@ describe('specialists in the mode', () => {
     expect(row.querySelector('[data-project-label="lib"]')).toBeTruthy();
   });
 
-  it('marks a project that overrides the shared one', async () => {
+  it('names only the projects that override the shared one', async () => {
     modeOn();
     window.location.hash = '#specialists';
     mount({
@@ -284,7 +288,11 @@ describe('specialists in the mode', () => {
     });
     const row = (await screen.findByText('CODER')).closest('li, a, button')!;
     expect(row.querySelector('[data-project-chips="projects"]')).toBeTruthy();
-    expect(row.textContent).toContain('Project · overrides shared');
+    expect(row.textContent).not.toContain('overrides shared');
+    expect(row.querySelector('[data-project-label="lib"]')).toBeNull();
+    expect(row.querySelector('[data-project-label="app"]')?.getAttribute('title')).toBe(
+      'Project · overrides shared',
+    );
   });
 
   it('shows the error of a project and the rows of the others', async () => {
@@ -306,26 +314,25 @@ describe('specialists in the mode', () => {
     ).filter((field) => !(field as HTMLInputElement).disabled);
   const writeButtons = /^(Save|Save as|Override|Make shared|Delete|Remove|Reset)$/;
 
-  it('shows a compact list of projects with a disabled preview instead of a form', async () => {
+  it('shows a switch of the projects with a disabled preview instead of a form', async () => {
     modeOn();
     window.location.hash = '#specialists/tester';
     mount({ configs: twoTesters });
     const overview = await screen.findByRole('region', { name: 'Tester app' });
-    expect(overview.querySelector('[data-overview-project="app"]')).toBeTruthy();
-    expect(overview.querySelector('[data-overview-project="lib"]')).toBeTruthy();
+    expect(choices()).toEqual(['app', 'lib']);
+    expect(choice('app')?.textContent).toBe('app');
     const preview = await waitFor(() => {
       const found = overview.querySelector('[data-entry-preview]');
       expect(found).toBeTruthy();
       return found!;
     });
     expect(preview.getAttribute('data-entry-preview')).toBe('app');
-    expect(within(overview).getByText('Configuration in project app')).toBeTruthy();
     expect((screen.getByLabelText('Name') as HTMLInputElement).disabled).toBe(true);
     expect(enabledFields().map((f) => f.outerHTML)).toEqual([]);
     expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull();
   });
 
-  it('names only the projects in the list', async () => {
+  it('offers the shared configuration only when no project overrides it', async () => {
     modeOn();
     window.location.hash = '#specialists/coder';
     mount({
@@ -335,10 +342,43 @@ describe('specialists in the mode', () => {
       },
     });
     await screen.findByRole('region', { name: 'CODER' });
-    for (const slug of ['app', 'lib']) {
-      const row = document.querySelector<HTMLElement>(`[data-overview-project="${slug}"]`)!;
-      expect(row.textContent).toBe(`${slug}Open in project ${slug}`);
-    }
+    expect(choices()).toEqual([SHARED]);
+    expect(choice(SHARED)?.textContent).toBe('Shared');
+  });
+
+  it('puts the shared configuration first, then the projects that override it', async () => {
+    modeOn();
+    window.location.hash = '#specialists/coder';
+    const globalSource = {
+      file: '/shared/coder.yaml',
+      revision: 'g',
+      raw: { name: 'Coder shared' },
+    };
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          specialists: [
+            specialistEntry('coder', {
+              level: 'project_over_global',
+              raw: { name: 'Coder app' },
+              sources: { global: globalSource },
+            }),
+          ],
+        }),
+        [LIB]: configView({ repository: LIB, specialists: [shared('coder', 'Coder shared')] }),
+      },
+    });
+    await waitFor(() => expect(choices()).toEqual([SHARED, 'app']));
+    expect(choice(SHARED)?.getAttribute('data-state')).toBe('on');
+    expect(choice('app')?.getAttribute('title')).toBe('Project · overrides shared');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder shared'),
+    );
+    fireEvent.click(choice('app')!);
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder app'),
+    );
   });
 
   it('switches the preview to another project without leaving the mode', async () => {
@@ -349,12 +389,11 @@ describe('specialists in the mode', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester app'),
     );
-    const lib = document.querySelector<HTMLElement>('[data-overview-project="lib"]')!;
-    fireEvent.click(within(lib).getByRole('button', { name: /^lib/ }));
+    fireEvent.click(choice('lib')!);
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester lib'),
     );
-    expect(lib.getAttribute('data-active')).toBe('true');
+    expect(choice('lib')?.getAttribute('data-state')).toBe('on');
     expect(label()).toBe('Repository: All projects');
     expect(window.location.hash).toBe('#specialists/tester');
     expect(enabledFields().map((f) => f.outerHTML)).toEqual([]);
@@ -367,9 +406,7 @@ describe('specialists in the mode', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester lib'),
     );
-    expect(
-      document.querySelector('[data-overview-project="lib"]')?.getAttribute('data-highlighted'),
-    ).toBe('true');
+    expect(choice('lib')?.getAttribute('data-state')).toBe('on');
   });
 
   it('changes nothing in the mode: no enabled fields, no writes', async () => {
@@ -514,12 +551,8 @@ describe('chains and actions in the mode', () => {
     fireEvent.click(row.querySelector('button, a') ?? row);
     await waitFor(() => expect(window.location.hash).toBe('#specialists/chains/fast'));
     const overview = await screen.findByRole('region', { name: 'Fast app' });
-    fireEvent.click(
-      within(overview.querySelector<HTMLElement>('[data-overview-project="lib"]')!).getByRole(
-        'button',
-        { name: /Open in project/ },
-      ),
-    );
+    fireEvent.click(choice('lib')!);
+    fireEvent.click(within(overview).getByRole('button', { name: /Open in project/ }));
     await waitFor(() => expect(label()).toBe('Repository: lib'));
     expect(window.location.hash).toBe('#specialists/chains/fast');
   });

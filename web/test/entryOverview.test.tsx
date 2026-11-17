@@ -49,40 +49,17 @@ describe('the overview of an entry', () => {
     expect(within(projectRow('lib')).getByText('in lib')).toBeTruthy();
   });
 
-  it('opens the entry in the project with its path and does not preview', () => {
+  it('opens the entry in the project with its path', () => {
     const onOpen = vi.fn();
-    const onPreview = vi.fn();
-    mount({ onOpen, onPreview });
+    mount({ onOpen });
     fireEvent.click(within(projectRow('lib')).getByRole('button', { name: /Open in project/ }));
     expect(onOpen).toHaveBeenCalledWith('/work/lib');
-    expect(onPreview).not.toHaveBeenCalled();
-  });
-
-  it('previews the project of a clicked row', () => {
-    const onPreview = vi.fn();
-    mount({ onPreview });
-    fireEvent.click(within(projectRow('lib')).getByRole('button', { name: /^lib/ }));
-    expect(onPreview).toHaveBeenCalledWith('lib');
-  });
-
-  it('marks the active row', () => {
-    mount({ active: 'lib' });
-    expect(projectRow('lib').getAttribute('data-active')).toBe('true');
-    expect(projectRow('lib').getAttribute('aria-current')).toBe('true');
-    expect(projectRow('app').getAttribute('data-active')).toBeNull();
   });
 
   it('marks the row of the highlighted project', () => {
     mount({ highlight: 'lib' });
     expect(projectRow('lib').getAttribute('data-highlighted')).toBe('true');
     expect(projectRow('app').getAttribute('data-highlighted')).toBeNull();
-  });
-
-  it('renders the preview under the list', () => {
-    mount({ preview: <p>the preview</p> });
-    const text = screen.getByText('the preview');
-    const list = document.querySelector('ul')!;
-    expect(list.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('has nothing to edit', () => {
@@ -97,9 +74,12 @@ describe('the projects under a row', () => {
     expect(screen.getByText('In all projects')).toBeTruthy();
   });
 
-  it('names the projects with the level of their own entries', () => {
+  it('names the projects as badges with the level of their own entries in the tooltip', () => {
     render(<ProjectChips everywhere={false} presences={row!.presences} />);
-    expect(screen.getByText('app')).toBeTruthy();
-    expect(screen.getByText(/overrides shared/)).toBeTruthy();
+    const badge = (slug: string) => screen.getByText(slug).closest('[data-project-label]')!;
+    expect(badge('app').textContent).toBe('app');
+    expect(badge('app').getAttribute('title')).toBe('Project');
+    expect(badge('lib').getAttribute('title')).toBe('Project · overrides shared');
+    expect(screen.queryByText(/overrides shared/)).toBeNull();
   });
 });

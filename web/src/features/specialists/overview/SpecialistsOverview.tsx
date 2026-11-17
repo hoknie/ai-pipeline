@@ -6,11 +6,18 @@ import type { Grouped } from '../../../shared/lib/catalog/projectRows.ts';
 import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { useMediaQuery } from '../../../shared/lib/browser/media.ts';
 import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
-import { EntryOverview, type ProjectsMode } from '../../repositories/index.ts';
+import type { ProjectsMode } from '../../repositories/index.ts';
 import { ChainsList } from '../chains/index.ts';
 import { SpecialistsList } from '../page/SpecialistsList.tsx';
 import type { SpecialistsSource } from '../page/useAllSpecialistsData.ts';
 import { useSpecialistSearch } from '../page/useSpecialistSearch.tsx';
+import {
+  ConfigSwitch,
+  SHARED_CHOICE,
+  configChoices,
+  initialChoice,
+  sharedView,
+} from './ConfigSwitch.tsx';
 import { EntryPreview } from './EntryPreview.tsx';
 import { Problems, UnknownProject } from './Problems.tsx';
 
@@ -109,40 +116,38 @@ function Detail({
   >[];
   const row = rows.find((candidate) => candidate.slug === selected);
   if (!row) return null;
-  const slugs = row.presences.map((presence) => presence.project.slug);
+  const choices = configChoices(row, highlight);
   const active =
-    chosen !== null && slugs.includes(chosen)
-      ? chosen
-      : highlight !== null && slugs.includes(highlight)
-        ? highlight
-        : (slugs[0] ?? null);
-  const source = data.projects?.find((entry) => entry.project.slug === active);
-  const preview =
-    source?.view && active !== null ? (
-      <EntryPreview
-        key={`${active}:${row.slug}`}
-        api={api}
-        data={data}
-        project={source.project}
-        view={source.view}
-        slug={row.slug}
-        isChains={isChains}
-      />
-    ) : null;
+    choices.find((choice) => choice.value === chosen) ?? initialChoice(choices, row, highlight);
+  const source = data.projects?.find((entry) => entry.project.path === active?.project.path);
+  const title = isChains
+    ? String((row as EditorChain).raw.name || row.slug)
+    : specialistName(row as EditorSpecialist);
   return (
-    <EntryOverview
-      title={
-        isChains
-          ? String((row as EditorChain).raw.name || row.slug)
-          : specialistName(row as EditorSpecialist)
-      }
-      id={row.slug}
-      row={row}
-      highlight={highlight}
-      active={active}
-      onPreview={setChosen}
-      preview={preview}
-      onOpen={onOpen}
-    />
+    <section aria-label={title} data-entry-overview={row.slug} className="flex flex-col gap-3">
+      <header className="flex flex-col gap-0.5">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="text-xs text-muted-foreground">{row.slug}</p>
+      </header>
+      {active ? (
+        <ConfigSwitch choices={choices} active={active} onChoose={setChosen} onOpen={onOpen} />
+      ) : null}
+      {source?.view && active ? (
+        <EntryPreview
+          key={`${active.value}:${row.slug}`}
+          api={api}
+          data={data}
+          project={source.project}
+          choice={active.value}
+          view={
+            active.value === SHARED_CHOICE
+              ? sharedView(source.view, row.slug, isChains)
+              : source.view
+          }
+          slug={row.slug}
+          isChains={isChains}
+        />
+      ) : null}
+    </section>
   );
 }

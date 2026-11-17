@@ -14,32 +14,18 @@ function ProjectRow({
   level,
   description,
   highlighted,
-  chosen,
   marked,
-  onPreview,
   onOpen,
 }: {
   project: ProjectRef;
   level: EntryLevel;
   description: ReactNode;
   highlighted: boolean;
-  chosen: boolean;
   marked: MutableRefObject<HTMLElement | null>;
-  onPreview: ((slug: string) => void) | undefined;
   onOpen: (path: string) => void;
 }) {
   const { t } = useTranslation();
   const label = useLevelLabel()(level);
-  const content = (
-    <>
-      <ProjectDot color={project.color} />
-      <span className="text-sm font-medium">{project.label}</span>
-      {label ? <span className="text-xs text-muted-foreground">{label}</span> : null}
-      {description ? (
-        <span className="min-w-0 truncate text-sm text-muted-foreground">{description}</span>
-      ) : null}
-    </>
-  );
   return (
     <li
       ref={(node) => {
@@ -47,25 +33,19 @@ function ProjectRow({
       }}
       data-overview-project={project.slug}
       data-highlighted={highlighted ? 'true' : undefined}
-      data-active={chosen ? 'true' : undefined}
-      aria-current={chosen ? 'true' : undefined}
       className={cn(
         'flex items-center gap-2 px-3 py-1.5',
         highlighted && 'ring-2 ring-inset ring-primary',
-        chosen && 'bg-muted',
       )}
     >
-      {onPreview ? (
-        <button
-          type="button"
-          onClick={() => onPreview(project.slug)}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        >
-          {content}
-        </button>
-      ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-2">{content}</div>
-      )}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <ProjectDot color={project.color} />
+        <span className="text-sm font-medium">{project.label}</span>
+        {label ? <span className="text-xs text-muted-foreground">{label}</span> : null}
+        {description ? (
+          <span className="min-w-0 truncate text-sm text-muted-foreground">{description}</span>
+        ) : null}
+      </div>
       <Button variant="ghost" size="sm" onClick={() => onOpen(project.path)}>
         {t('projectOverview.open')}
         <span className="sr-only"> {project.label}</span>
@@ -76,7 +56,7 @@ function ProjectRow({
 
 /**
  * The entry of the mode «All projects», read only: a compact list of the projects that have it,
- * a row per project with a button that opens the entry in the project, and a preview below.
+ * a row per project with a button that opens the entry in the project.
  */
 export function EntryOverview<T extends { level: EntryLevel }>({
   title,
@@ -84,9 +64,6 @@ export function EntryOverview<T extends { level: EntryLevel }>({
   row,
   describe,
   highlight,
-  active,
-  onPreview,
-  preview,
   onOpen,
 }: {
   title: string;
@@ -96,12 +73,6 @@ export function EntryOverview<T extends { level: EntryLevel }>({
   describe?: ((entry: T) => ReactNode) | undefined;
   /** Slug of the project whose row is marked (the old `?project=` of an address). */
   highlight?: string | null | undefined;
-  /** Slug of the project the preview shows. */
-  active?: string | null | undefined;
-  /** Chooses the project of the preview (a click on its row, not on the button). */
-  onPreview?: ((slug: string) => void) | undefined;
-  /** What is shown under the list: the preview of the configuration. */
-  preview?: ReactNode;
   /** Opens the entry in the form of the project (leaves the mode). */
   onOpen: (path: string) => void;
 }) {
@@ -124,14 +95,11 @@ export function EntryOverview<T extends { level: EntryLevel }>({
             level={entry.level}
             description={describe?.(entry)}
             highlighted={highlight === project.slug}
-            chosen={active === project.slug}
             marked={marked}
-            onPreview={onPreview}
             onOpen={onOpen}
           />
         ))}
       </ul>
-      {preview}
     </section>
   );
 }
