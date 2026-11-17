@@ -242,13 +242,16 @@ describe('the global queue moves', () => {
     h.script({ code: [{ waitFor: h.gate('rename') }] });
     await addIn(h, h.repo, 'A', { tags: ['selected'] });
     await addIn(h, h.repo, 'B', { tags: ['selected', 'before'] });
+    // No item matches the filter yet: autopilot keeps the queue running until one does.
     await h.call('queue_settings', {
       repository: h.repo,
       parallel: 2,
+      autopilot: true,
       filter: { tags: ['selected', 'after'] },
     });
-    await h.call('queue_start', { repository: h.repo });
-    expect((await globalOf(h)).items[0]?.filtered).toBe(true);
+    const before = await globalOf(h);
+    expect(before.status).toBe('running');
+    expect(before.items.map((item) => item.filtered)).toEqual([true, true]);
     await h.call('tag_edit', { repository: h.repo, tag: 'before', name: 'after' });
     const view = await waitGlobal(h, (v) => v.items.length === 1 && v.runs.length === 1);
     expect(titles(view)).toEqual(['A']);
