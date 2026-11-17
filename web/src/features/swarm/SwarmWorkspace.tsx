@@ -32,7 +32,7 @@ export function SwarmWorkspace(props: SwarmWorkspaceProps) {
       <div className="px-4 pt-3">
         <SwarmTabs
           scope={scope}
-          tab={place.tab}
+          place={place}
           dirty={props.dirty}
           hrefOf={hrefOf}
           onNavigate={onNavigate}

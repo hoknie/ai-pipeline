@@ -125,6 +125,14 @@ describe('the window «Swarm» of the top bar', () => {
     await waitFor(() => expect(window.location.hash).toBe('#providers/zai'));
   });
 
+  it('returns to the list of the tab when its own tab is clicked inside an open entry', async () => {
+    mount('#providers/zai');
+    expect(await screen.findByRole('heading', { name: 'Provider zai' })).toBeTruthy();
+    fireEvent.click(tabs().getByRole('tab', { name: 'Providers' }));
+    await waitFor(() => expect(window.location.hash).toBe('#providers'));
+    expect(screen.queryByRole('heading', { name: 'Provider zai' })).toBeNull();
+  });
+
   it('asks before leaving a form with unsaved edits and stays on a refusal', async () => {
     mount('#specialists/coder');
     const name = (await screen.findByLabelText('Name')) as HTMLInputElement;
