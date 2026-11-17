@@ -1,6 +1,6 @@
 {
   "name": "aip",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Watch and control the aip agent swarm from Claude Code: a pane, a status line, toasts and slash commands",
   "author": {
     "name": "hoknie"
