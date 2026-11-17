@@ -12,14 +12,12 @@ export const SETTINGS_GROUPS_BY_SCOPE = {
     'delivery',
     'queue',
     'runtimes',
-    'chains',
-    'specialists',
-    'pipelines',
+    'swarm',
     'observers',
     'projects',
     'system',
   ],
-  project: ['general', 'agents', 'delivery', 'queue', 'tags'],
+  project: ['general', 'agents', 'delivery', 'queue', 'swarm', 'tags'],
 } as const;
 
 export type SettingsGroup =
@@ -44,13 +42,33 @@ export const LEGACY_SETTINGS_GROUPS: Record<
   naming: { scope: 'global', group: 'general' },
   claude: { scope: 'global', group: 'agents' },
   runtimes: { scope: 'global', group: 'runtimes' },
-  chains: { scope: 'global', group: 'chains' },
+  chains: { scope: 'global', group: 'swarm' },
   web: { scope: 'global', group: 'system' },
   network: { scope: 'global', group: 'system' },
   queue: { scope: 'project', group: 'queue' },
   tags: { scope: 'project', group: 'tags' },
   system: { scope: 'global', group: 'system' },
 };
+
+/** The tabs of the window «Swarm», in the order of the entities: a provider is used by a chain, and so on. */
+export const SWARM_TABS = ['providers', 'roles', 'chains', 'specialists', 'pipelines'] as const;
+export type SwarmTab = (typeof SWARM_TABS)[number];
+
+/** The tab of the window «Swarm» for the part of an address; an unknown one is «Specialists». */
+export function swarmTabOf(part: string | null): SwarmTab {
+  return SWARM_TABS.find((tab) => tab === part) ?? 'specialists';
+}
+
+/**
+ * The tab of the window «Swarm» an old address of the shared tab leads to
+ * (`#settings/global/specialists`, `#settings/chains`); null for any other address.
+ */
+export function swarmLegacyTab(first: string | null, second: string | null): SwarmTab | null {
+  const old = (key: string | null): SwarmTab | null =>
+    key === 'specialists' || key === 'pipelines' || key === 'chains' ? key : null;
+  if (first === 'global') return old(second);
+  return first === 'chains' ? 'chains' : null;
+}
 
 /** The tabs of the group «Observers»; the third part of its address. */
 export const OBSERVER_TABS = ['general', 'specialist', 'projects', 'history'] as const;
@@ -83,6 +101,8 @@ export function settingsLocationOf(
 ): { scope: SettingsScope; group: SettingsGroup } {
   // the catalog of tags left the shared tab: its address leads to the project tab
   if (scope === 'global' && group === 'tags') return { scope: 'project', group: 'tags' };
+  // the groups of the swarm parts of the shared tab became tabs of the window «Swarm»
+  if (swarmLegacyTab(scope, group) !== null) return { scope: 'global', group: 'swarm' };
   if (isScope(scope)) {
     const groups: readonly string[] = SETTINGS_GROUPS_BY_SCOPE[scope];
     const found = groups.find((candidate) => candidate === group);

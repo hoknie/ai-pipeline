@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { modLabel } from '../../../shared/lib/browser/hotkeys.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
-import type { SECTIONS } from '../../sections.ts';
+import type { Section } from '../../sections.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Kbd } from '../../../shared/ui/feedback/kbd.tsx';
@@ -30,12 +30,12 @@ function Tip({ label, children }: { label: string; children: ReactElement }) {
 export function TopNavSection(props: {
   target: View;
   label: string;
-  icon: (typeof SECTIONS)[number]['icon'];
+  icon: Section['icon'];
   count: number;
   active: boolean;
   waiting: number;
   href: string;
-  onNavigate: (view: View) => void;
+  onNavigate: () => void;
 }) {
   const { t } = useTranslation();
   const { target, label, count, active, waiting, onNavigate, icon: Icon } = props;
@@ -50,7 +50,7 @@ export function TopNavSection(props: {
         )}
         onClick={(event) => {
           event.preventDefault();
-          onNavigate(target);
+          onNavigate();
         }}
       >
         <span data-nav-icon className="relative flex size-4 items-center justify-center">

@@ -45,6 +45,7 @@ export function presetDraft(id: PresetId, roles: readonly string[]): ProviderDra
       access: [
         access({
           runtime: 'claude',
+          customEndpoint: true,
           baseUrl: 'https://api.z.ai/api/anthropic',
           keyEnv: 'ZAI_API_KEY',
         }),
@@ -70,6 +71,6 @@ export function presetDraft(id: PresetId, roles: readonly string[]): ProviderDra
   }
   return {
     ...emptyDraft(),
-    access: [access({ runtime: 'codex', endpointRequired: true })],
+    access: [access({ runtime: 'codex', customEndpoint: true })],
   };
 }

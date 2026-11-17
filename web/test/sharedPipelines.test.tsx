@@ -74,7 +74,7 @@ const view = () =>
     ],
   });
 
-function show(overrides: Partial<Api> = {}, hash = '#settings/global/pipelines') {
+function show(overrides: Partial<Api> = {}, hash = '#settings/global/swarm/pipelines') {
   window.location.hash = hash;
   const api = fakeApi({
     queue: vi.fn(async () => queueOf()),
@@ -106,7 +106,7 @@ describe('shared pipelines group', () => {
     expect(entries.getByText('Quick')).toBeTruthy();
     expect(entries.getByText('fast')).toBeTruthy();
     const region = screen.getByRole('region', { name: 'Where the settings are saved' });
-    expect(within(region).getByText('/xdg/aip/pipelines')).toBeTruthy();
+    expect(within(region).getByText('/xdg/aip')).toBeTruthy();
     expect(screen.queryByLabelText('Project')).toBeNull();
   });
 
@@ -128,7 +128,9 @@ describe('shared pipelines group', () => {
   it('changes the address when a pipeline is chosen and opens it from the address', async () => {
     show();
     fireEvent.click((await (await list()).findByText('Quick')).closest('button') as HTMLElement);
-    await waitFor(() => expect(window.location.hash).toBe('#settings/global/pipelines/quick'));
+    await waitFor(() =>
+      expect(window.location.hash).toBe('#settings/global/swarm/pipelines/quick'),
+    );
     expect(await screen.findByRole('heading', { name: 'Quick' })).toBeTruthy();
   });
 
@@ -139,7 +141,7 @@ describe('shared pipelines group', () => {
   });
 
   it('saves an edit of the tags to the shared file', async () => {
-    const api = show({}, '#settings/global/pipelines/quick');
+    const api = show({}, '#settings/global/swarm/pipelines/quick');
     expect(await screen.findByRole('button', { name: 'Remove fast' })).toBeTruthy();
     expect(screen.queryByRole('group', { name: 'Level' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Override in the project' })).toBeNull();
@@ -160,7 +162,7 @@ describe('shared pipelines group', () => {
   });
 
   it('offers only shared specialists', async () => {
-    show({}, '#settings/global/pipelines/quick');
+    show({}, '#settings/global/swarm/pipelines/quick');
     await screen.findByRole('heading', { name: 'Quick' });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     const triggers = screen.getAllByRole('combobox', { name: /specialist/i });
@@ -170,7 +172,7 @@ describe('shared pipelines group', () => {
   });
 
   it('asks before leaving a pipeline with unsaved edits', async () => {
-    show({}, '#settings/global/pipelines/quick');
+    show({}, '#settings/global/swarm/pipelines/quick');
     const tags = await screen.findByTestId('pipeline-tags');
     fireEvent.click(within(tags).getByRole('button', { name: 'Remove fast' }));
     fireEvent.click(
@@ -178,26 +180,28 @@ describe('shared pipelines group', () => {
     );
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
-    expect(window.location.hash).toBe('#settings/global/pipelines/quick');
+    expect(window.location.hash).toBe('#settings/global/swarm/pipelines/quick');
   });
 
   it('creates a new pipeline on the shared level and opens it', async () => {
     const api = show();
     fireEvent.click(await screen.findByRole('button', { name: 'New pipeline' }));
-    expect(window.location.hash).toBe('#settings/global/pipelines/new');
+    expect(window.location.hash).toBe('#settings/global/swarm/pipelines/new');
     fireEvent.change(await screen.findByLabelText('Id'), { target: { value: 'fresh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.writePipeline).toHaveBeenCalled());
     expect(vi.mocked(api.writePipeline).mock.calls[0]?.[0]).toBe('fresh');
     expect(vi.mocked(api.writePipeline).mock.calls[0]?.[3]).toBe('global');
-    await waitFor(() => expect(window.location.hash).toBe('#settings/global/pipelines/fresh'));
+    await waitFor(() =>
+      expect(window.location.hash).toBe('#settings/global/swarm/pipelines/fresh'),
+    );
   });
 });
 
 describe('variants of a shared pipeline', () => {
   it('adds a variant in the settings and writes it to the shared file', async () => {
-    const api = show({}, '#settings/global/pipelines/quick');
+    const api = show({}, '#settings/global/swarm/pipelines/quick');
     await screen.findByRole('heading', { name: 'Quick' });
     fireEvent.click(screen.getByRole('button', { name: 'Add variant' }));
     fireEvent.change(screen.getByLabelText('Id'), { target: { value: 'light' } });
@@ -215,7 +219,7 @@ describe('variants of a shared pipeline', () => {
     const raw = { steps: STEPS, variants: { light: { name: 'Lite' } } };
     const api = show(
       { config: vi.fn(async () => configView({ pipelines: [shared('quick', raw)] })) },
-      '#settings/global/pipelines/quick',
+      '#settings/global/swarm/pipelines/quick',
     );
     const switcher = await screen.findByRole('radiogroup', { name: 'Pipeline variants' });
     fireEvent.click(within(switcher).getByRole('radio', { name: 'Lite' }));
@@ -256,7 +260,7 @@ describe('variants of a shared pipeline', () => {
 
 describe('usage of a shared pipeline', () => {
   it('shows the number of projects, their references and the shared level', async () => {
-    show({}, '#settings/global/pipelines/quick');
+    show({}, '#settings/global/swarm/pipelines/quick');
     const block = within(await screen.findByRole('region', { name: 'Used in projects' }));
     expect((await block.findByTestId('usage-count')).textContent).toBe('Projects: 1');
     expect(block.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
@@ -267,7 +271,7 @@ describe('usage of a shared pipeline', () => {
   });
 
   it('says that the pipeline is not used', async () => {
-    show({}, '#settings/global/pipelines/explore');
+    show({}, '#settings/global/swarm/pipelines/explore');
     const block = within(await screen.findByRole('region', { name: 'Used in projects' }));
     expect(await block.findByText('Not used in any project')).toBeTruthy();
     expect(block.getByTestId('usage-count').textContent).toBe('Projects: 0');
@@ -276,7 +280,7 @@ describe('usage of a shared pipeline', () => {
   it('keeps the form when the usage cannot be loaded and blocks delete', async () => {
     show(
       { sharedPipelines: vi.fn(async () => Promise.reject(new Error('daemon is down'))) },
-      '#settings/global/pipelines/explore',
+      '#settings/global/swarm/pipelines/explore',
     );
     expect(await screen.findByText('Could not load usage: daemon is down')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Delete' }) as HTMLButtonElement).disabled).toBe(
@@ -285,7 +289,7 @@ describe('usage of a shared pipeline', () => {
   });
 
   it('disables Delete while the pipeline is used and explains why', async () => {
-    show({}, '#settings/global/pipelines/quick');
+    show({}, '#settings/global/swarm/pipelines/quick');
     const button = await screen.findByRole('button', { name: 'Delete' });
     await screen.findByTestId('usage-count');
     expect((button as HTMLButtonElement).disabled).toBe(true);
@@ -293,7 +297,7 @@ describe('usage of a shared pipeline', () => {
   });
 
   it('deletes an unused pipeline after confirmation and goes back to the list', async () => {
-    const api = show({}, '#settings/global/pipelines/explore');
+    const api = show({}, '#settings/global/swarm/pipelines/explore');
     const button = (await screen.findByRole('button', { name: 'Delete' })) as HTMLButtonElement;
     await waitFor(() => expect(button.disabled).toBe(false));
     fireEvent.click(button);
@@ -302,7 +306,7 @@ describe('usage of a shared pipeline', () => {
     await waitFor(() =>
       expect(api.deletePipeline).toHaveBeenCalledWith('explore', 'g-explore', 'global'),
     );
-    await waitFor(() => expect(window.location.hash).toBe('#settings/global/pipelines'));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/swarm/pipelines'));
   });
 
   it('shows the refusal of the daemon with repositories and rereads the usage', async () => {
@@ -327,7 +331,7 @@ describe('usage of a shared pipeline', () => {
           references: [{ pipeline: 'f', split: true, repository: '/work/lib' }],
         })),
       },
-      '#settings/global/pipelines/explore',
+      '#settings/global/swarm/pipelines/explore',
     );
     const button = (await screen.findByRole('button', { name: 'Delete' })) as HTMLButtonElement;
     await waitFor(() => expect(button.disabled).toBe(false));

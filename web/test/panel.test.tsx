@@ -90,8 +90,7 @@ describe('top bar and connection', () => {
     expect(screen.getByRole('link', { name: /aip\s*web/ })).toBeTruthy();
     expect(screen.getByRole('link', { name: /^Runs/ }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: /^Queue/ }).getAttribute('href')).toBe('#queue');
-    for (const name of ['Specialists', 'Pipeline'])
-      expect(screen.getByRole('link', { name })).toBeTruthy();
+    for (const name of ['Swarm']) expect(screen.getByRole('link', { name })).toBeTruthy();
     act(() => {
       stream().open();
       stream().send({ event: 'snapshot', seq: 1, runs: [runView()] });

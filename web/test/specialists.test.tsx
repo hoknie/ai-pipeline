@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { forgetSwarm } from '../src/features/swarm/index.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 import { chooseModel, modelValue } from './modelField.ts';
 import { useState } from 'react';
@@ -101,7 +102,7 @@ describe('routes', () => {
         step: 'fallback',
         tab: null,
       }),
-    ).toBe('#settings/global/chains/fallback');
+    ).toBe('#settings/global/swarm/chains/fallback');
   });
 });
 
@@ -547,15 +548,16 @@ describe('the tab', () => {
   it('opens the form of the specialist from the address', async () => {
     window.location.hash = '#specialists/coder';
     render(<App api={fakeApi()} openStream={openFake} />);
-    const tab = screen.getByRole('link', { name: 'Specialists' });
+    const tab = screen.getByRole('link', { name: 'Swarm' });
     expect(tab.getAttribute('aria-current')).toBe('page');
     expect(await screen.findByRole('heading', { name: 'coder' })).toBeTruthy();
     expect(window.location.hash).toBe('#specialists/coder');
   });
 
   it('switches to the tab from the runs', async () => {
+    forgetSwarm();
     render(<App api={fakeApi()} openStream={openFake} />);
-    fireEvent.click(screen.getByRole('link', { name: 'Specialists' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Swarm' }));
     expect(await screen.findByRole('button', { name: 'New specialist' })).toBeTruthy();
     expect(window.location.hash).toBe('#specialists');
   });

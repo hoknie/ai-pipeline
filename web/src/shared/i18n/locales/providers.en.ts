@@ -51,7 +51,21 @@ export const providersEn = {
     effortDefault: 'By default',
     apply: 'Apply',
   },
+  search: 'Search providers',
+  detailsEmpty: 'Pick a provider in the list or create a new one.',
+  globalWarning: 'A shared provider applies in every repository.',
+  chainRoles: 'Roles of the provider',
+  usage: {
+    title: 'Where it is used',
+    none: 'Not used: add the provider to an item of a chain',
+    chain: 'Chain {{name}}, item {{item}}',
+    specialist: 'Specialist {{name}}',
+    pipeline: 'Pipeline {{name}}, step {{step}}',
+  },
   roles: {
+    models: 'Models of the role',
+    noModels: 'No provider has a model of this role.',
+    detailsEmpty: 'Pick a role in the list.',
     label: 'Roles',
     level: 'Level to write',
     add: 'Add role',
@@ -104,6 +118,11 @@ export const providersEn = {
     level: 'Level',
     levelHint: 'Shared: for all projects. Project: only for this one.',
     enabled: 'Enabled',
+    customEndpoint: 'Own API address for the CLI',
+    customEndpointHint:
+      'Only needed when the CLI reaches the model through an address of its own (a proxy or a compatible API). The key is the name of an environment variable, never the key itself.',
+    kindHint:
+      'CLI runs the agent on this machine. API sends requests to the model directly (soon).',
     accessHint: 'The first available access is used.',
     accessN: 'Access {{n}}',
     accessEnabled: 'Access {{n}} enabled',

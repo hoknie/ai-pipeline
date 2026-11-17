@@ -1,10 +1,10 @@
 import { useMemo, type RefObject } from 'react';
 
-import type { Api } from '../../shared/api/api.ts';
-import type { ConfigEditorResponse, EditorChain } from '../../shared/api/types.ts';
-import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
-import { SplitPage } from '../../shared/ui/layout/EntryList.tsx';
-import { ChainsList, ChainsPane, NEW_CHAIN } from '../specialists';
+import type { Api } from '../../../shared/api/api.ts';
+import type { ConfigEditorResponse, EditorChain } from '../../../shared/api/types.ts';
+import { ModelCatalogProvider } from '../../../shared/lib/catalog/models.tsx';
+import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
+import { ChainsList, ChainsPane, NEW_CHAIN } from '../../specialists/index.ts';
 
 export { NEW_CHAIN as NEW_SHARED_CHAIN };
 

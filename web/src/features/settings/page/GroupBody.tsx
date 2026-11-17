@@ -2,13 +2,13 @@ import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { repositoryLabel } from '../../../shared/lib/catalog/repositories.ts';
+import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import { agentTabOf, observerTabOf } from '../../../shared/lib/nav/settingsGroups.ts';
+import { settingsRouteOfSwarmTarget } from '../../swarm/index.ts';
 import { Skeleton } from '../../../shared/ui/feedback/skeleton.tsx';
 import { SettingsForm } from '../../../shared/ui/forms/settings/SettingsForm.tsx';
 import { ObserversGroup } from '../ObserversGroup.tsx';
 import { QueueModes } from '../QueueModes.tsx';
-import { SharedChainsGroup } from '../SharedChainsGroup.tsx';
-import { SharedSpecialistsGroup } from '../SharedSpecialistsGroup.tsx';
 import { SystemGroup } from '../SystemGroup.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
 import { AgentsGroup } from '../agents/AgentsGroup.tsx';
@@ -16,11 +16,9 @@ import { ProjectsGroup } from '../projects/ProjectsGroup.tsx';
 import type { SettingsPageProps } from './types.ts';
 import type { SettingsConfig } from './useSettingsConfig.ts';
 
-// loaded on demand: it draws the pipeline graph
-const SharedPipelinesGroup = lazy(() =>
-  import('../SharedPipelinesGroup.tsx').then((module) => ({
-    default: module.SharedPipelinesGroup,
-  })),
+// loaded on demand: it carries the pages of the swarm
+const SwarmWorkspace = lazy(() =>
+  import('../../swarm/index.ts').then((module) => ({ default: module.SwarmWorkspace })),
 );
 
 function Loading() {
@@ -65,45 +63,25 @@ function QueueBody({ props, settings }: BodyProps) {
   );
 }
 
-function SharedBody({ props, settings }: BodyProps) {
-  const { api, group, dirty } = props;
-  const { config, failure, reload } = settings;
-  if (!config) return failure ? null : <Loading />;
-  if (group === 'pipelines') {
-    return (
-      <Suspense fallback={<Loading />}>
-        <SharedPipelinesGroup
-          api={api}
-          config={config}
-          selected={props.pipeline}
-          onSelect={props.onSelectPipeline}
-          onReload={reload}
-          dirty={dirty}
-        />
-      </Suspense>
-    );
-  }
-  if (group === 'chains') {
-    return (
-      <SharedChainsGroup
-        api={api}
-        config={config}
-        selected={props.chain ?? null}
-        onSelect={props.onSelectChain ?? (() => undefined)}
-        onReload={reload}
-        dirty={dirty}
-      />
-    );
-  }
+/** The group «Swarm»: the window with its tabs, over the whole width of the group. */
+function SwarmBody({ props, settings }: BodyProps) {
+  const { scope } = props;
   return (
-    <SharedSpecialistsGroup
-      api={api}
-      config={config}
-      selected={props.specialist}
-      onSelect={props.onSelectSpecialist}
-      onReload={reload}
-      dirty={dirty}
-    />
+    <Suspense fallback={<Loading />}>
+      <SwarmWorkspace
+        api={props.api}
+        scope={scope}
+        place={props.swarm}
+        repository={props.repository}
+        runs={props.runs}
+        dirty={props.dirty}
+        config={settings.config}
+        onReload={settings.reload}
+        hrefOf={(target) => formatRoute(settingsRouteOfSwarmTarget(scope, target))}
+        onNavigate={props.onSelectSwarm}
+        onOpenGroup={props.onOpenGroup}
+      />
+    </Suspense>
   );
 }
 
@@ -190,8 +168,6 @@ export function GroupBody({ props, settings }: BodyProps) {
       />
     );
   }
-  if (group === 'pipelines' || group === 'specialists' || group === 'chains') {
-    return <SharedBody props={props} settings={settings} />;
-  }
+  if (group === 'swarm') return <SwarmBody props={props} settings={settings} />;
   return <FormBody props={props} settings={settings} />;
 }

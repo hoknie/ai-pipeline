@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { RunsPage, linkTargets } from '../../features/runs/index.ts';
 import { itemLabel, otherQueues } from '../../features/queue/index.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
-import { ListRoute, ProvidersRoute, QueueRoute, SettingsRoute, StatsRoute } from './pages.tsx';
+import { QueueRoute, SettingsRoute, StatsRoute, SwarmRoute } from './pages.tsx';
 import type { PanelData } from '../state/usePanelData.ts';
 import type { useRepositoryActions } from '../state/useRepositoryActions.ts';
 import type { LinkKind } from '../../features/runs/index.ts';
@@ -140,19 +140,14 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
       );
     case 'settings':
       return <SettingsCase panel={panel} actions={actions} common={common} />;
-    case 'providers':
-      return (
-        <ProvidersRoute
-          common={common}
-          repository={state.selected}
-          projects={listProjects(panel)}
-        />
-      );
     case 'stats':
       return <StatsRoute common={common} registry={state.registry} />;
+    case 'providers':
     case 'pipelines':
     case 'specialists':
-      return <ListRoute common={common} allProjects={listProjects(panel)} />;
+      return (
+        <SwarmRoute common={common} repository={state.selected} allProjects={listProjects(panel)} />
+      );
     default:
       return (
         <RunsPage

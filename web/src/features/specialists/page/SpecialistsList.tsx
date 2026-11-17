@@ -72,6 +72,9 @@ export function SpecialistsList({
           </Button>
         </div>
       ) : null}
+      {loaded && specialists.length === 0 && !narrowed ? (
+        <p className="text-sm text-muted-foreground">{t('swarm.hints.chainsAbout')}</p>
+      ) : null}
       <EntryList
         label={t('specialists.list')}
         selected={selected}

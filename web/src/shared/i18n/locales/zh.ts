@@ -1,5 +1,6 @@
 import type { Dictionary } from '../types.ts';
 import { providersZh } from './providers.zh.ts';
+import { swarmZh } from './swarm.zh.ts';
 
 /*
  * 术语表：run — 运行，group — 分组，step — 步骤，attempt — 尝试，
@@ -8,6 +9,7 @@ import { providersZh } from './providers.zh.ts';
  */
 export const zh: Dictionary = {
   providers: providersZh,
+  swarm: swarmZh,
   links: {
     editRun: '在运行页面编辑',
     title: '关联',
@@ -49,6 +51,7 @@ export const zh: Dictionary = {
     loadingStats: '统计',
   },
   nav: {
+    swarm: '集群',
     runs: '运行',
     queue: '队列',
     specialists: '专员',
@@ -1716,7 +1719,9 @@ export const zh: Dictionary = {
         project_over_global: '项目覆盖共享',
       },
     },
+    swarmNoteProject: '层级在保存时选择：项目或共享。',
     group: {
+      swarm: '集群',
       projects: '项目',
       general: '常规',
       agents: '代理',
@@ -1731,6 +1736,7 @@ export const zh: Dictionary = {
       tags: '标签',
     },
     about: {
+      swarm: '提供商、角色、链、专家和 pipeline 按标签页集中在一个窗口。',
       projects: '守护进程的所有项目：名称、slug、颜色、是否启用以及路径。已停用的项目也列在这里。',
       observers: '观察者：在出现问题（提问、失败、冲突、交付被拒）后接手任务并尝试修复的智能体。',
       general: '限制、运行的工作副本和运行命名；专家和 pipeline 的错误也显示在这里。',

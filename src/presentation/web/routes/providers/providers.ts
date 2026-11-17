@@ -16,7 +16,11 @@ export function providerRoutes({ call }: RouteKit): Route[] {
     {
       method: 'GET',
       pattern: /^\/api\/config\/providers$/,
-      handle: (_match, _body, repository) => call('config_providers', { repository }),
+      handle: (_match, _body, repository, query) =>
+        call('config_providers', {
+          repository,
+          ...(query.get('level') === 'global' ? { level: 'global' as const } : {}),
+        }),
     },
     {
       method: 'GET',
@@ -26,6 +30,7 @@ export function providerRoutes({ call }: RouteKit): Route[] {
           repository,
           provider: entryId(provider),
           refresh: query.get('refresh') === '1',
+          ...(query.get('level') === 'global' ? { level: 'global' as const } : {}),
         }),
     },
     {

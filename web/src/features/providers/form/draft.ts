@@ -20,8 +20,8 @@ export interface AccessDraft {
   keyEnv: string;
   command: string;
   args: string;
-  /** Both fields of the endpoint must be filled (the preset of an own endpoint). */
-  endpointRequired: boolean;
+  /** The CLI goes to an own API address: both fields of the endpoint are written and required. */
+  customEndpoint: boolean;
   /** The models of this access that replace the ones of the provider. */
   models: Record<string, ModelDraft>;
 }
@@ -46,7 +46,7 @@ export const emptyAccess = (runtime = 'claude'): AccessDraft => ({
   keyEnv: '',
   command: '',
   args: '',
-  endpointRequired: false,
+  customEndpoint: false,
   models: {},
 });
 
@@ -91,6 +91,7 @@ function accessOf(value: unknown): AccessDraft {
     modelPrefix: text(raw.model_prefix),
     baseUrl: text(endpoint.base_url),
     keyEnv: text(endpoint.key_env),
+    customEndpoint: isRaw(raw.endpoint),
     command: text(raw.command),
     args: Array.isArray(raw.args) ? raw.args.map(String).join(' ') : '',
     models: modelsOf(raw.models),
@@ -131,7 +132,7 @@ function accessValue(access: AccessDraft, level: 'global' | 'project', options: 
   if (access.kind === 'api') return { kind: 'api', ...(access.enabled ? {} : { enabled: false }) };
   const fields = accessFields(access.runtime, level);
   const models = modelsValue(access.models, options);
-  const endpoint = fields.endpoint && (access.baseUrl.trim() !== '' || access.keyEnv.trim() !== '');
+  const endpoint = fields.endpoint && access.customEndpoint;
   const args = access.args.trim().split(/\s+/).filter(Boolean);
   return {
     kind: 'cli',
@@ -198,13 +199,12 @@ function accessErrors(access: AccessDraft, index: number, level: 'global' | 'pro
   if (fields.modelPrefix && prefix !== '' && /\s|^\/|\/$/.test(prefix)) {
     errors[at('model_prefix')] = 'prefixFormat';
   }
-  if (!fields.endpoint) return errors;
+  if (!fields.endpoint || !access.customEndpoint) return errors;
   const url = access.baseUrl.trim();
   const key = access.keyEnv.trim();
-  const needed = access.endpointRequired || url !== '' || key !== '';
-  if (needed && url === '') errors[at('endpoint.base_url')] = 'required';
+  if (url === '') errors[at('endpoint.base_url')] = 'required';
   else if (url !== '' && !URL_PATTERN.test(url)) errors[at('endpoint.base_url')] = 'urlFormat';
-  if (needed && key === '') errors[at('endpoint.key_env')] = 'required';
+  if (key === '') errors[at('endpoint.key_env')] = 'required';
   else if (key !== '' && !ENV_NAME.test(key)) errors[at('endpoint.key_env')] = 'keyNotName';
   return errors;
 }

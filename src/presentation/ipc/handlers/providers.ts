@@ -58,9 +58,13 @@ export function providersView(
 function loaded(
   services: IpcContext['services'],
   repository: string,
+  level?: 'global',
 ): { config: ResolvedConfig; files: string[] } | ConfigLoadError {
   try {
-    const { config, files } = services.config.loadSources(repository);
+    const { config, files } =
+      level === 'global'
+        ? services.config.loadGlobalSources(repository)
+        : services.config.loadSources(repository);
     return { config, files };
   } catch (error) {
     if (error instanceof ConfigLoadError) return error;
@@ -72,7 +76,7 @@ function loaded(
 export const providerHandlers = {
   config_providers: async (params, { services }): Promise<ProvidersView> => {
     const repository = await services.registry.rootOf(params.repository);
-    const result = loaded(services, repository);
+    const result = loaded(services, repository, params.level);
     if (result instanceof ConfigLoadError) {
       return { repository, errors: configLoadErrors(result), roles: [], providers: [], matrix: [] };
     }
@@ -90,7 +94,7 @@ export const providerHandlers = {
   },
   provider_models: async (params, { services }) => {
     const repository = await services.registry.rootOf(params.repository);
-    const result = loaded(services, repository);
+    const result = loaded(services, repository, params.level);
     if (result instanceof ConfigLoadError) {
       throw rejected(
         `configuration not loaded: ${result.message.split('\n')[1]?.trim() ?? result.message}`,

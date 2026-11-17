@@ -36,6 +36,8 @@ function props(extra: Partial<NavProps> = {}): NavProps {
     view: 'runs',
     hrefFor: (view) => `#${view}`,
     onNavigate: () => {},
+    hrefSwarm: '#specialists',
+    onOpenSwarm: () => {},
     working: 0,
     waiting: 0,
     queued: 0,
@@ -79,7 +81,7 @@ describe('top navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Runs', 'Queue', 'Specialists', 'Pipeline', 'Providers', 'Statistics', 'Settings']);
+    ).toEqual(['Runs', 'Queue', 'Swarm', 'Statistics', 'Settings']);
     expect(within(bar!).getByText('web')).toBeTruthy();
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])
@@ -113,9 +115,12 @@ describe('top navigation', () => {
 
   it('navigates by the section links', () => {
     const onNavigate = vi.fn();
-    mount({ onNavigate });
-    fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
-    expect(onNavigate).toHaveBeenCalledWith('pipelines');
+    const onOpenSwarm = vi.fn();
+    mount({ onNavigate, onOpenSwarm });
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    expect(onNavigate).toHaveBeenCalledWith('queue');
+    fireEvent.click(screen.getByRole('link', { name: 'Swarm' }));
+    expect(onOpenSwarm).toHaveBeenCalledTimes(1);
   });
 
   const corner = () => document.querySelector<HTMLElement>('[data-nav-icon] .absolute');
@@ -354,7 +359,7 @@ describe('providers section', () => {
     render(<App api={api} openStream={openFake} />);
     act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
     const nav = screen.getByRole('navigation', { name: 'sections' });
-    expect(within(nav).getByRole('link', { name: 'Providers' }).getAttribute('aria-current')).toBe(
+    expect(within(nav).getByRole('link', { name: 'Swarm' }).getAttribute('aria-current')).toBe(
       'page',
     );
     const tab = await screen.findByRole('tab', { name: 'Roles' });

@@ -5,6 +5,7 @@ import type { NavProps } from '../shell/nav/NavSidebar.tsx';
 import type { PanelData } from './usePanelData.ts';
 import type { useRepositoryActions } from './useRepositoryActions.ts';
 import { tabRoute } from './tabRoute.ts';
+import { lastSwarmTab, routeOfSwarmTarget, swarmTabOfRoute } from '../../features/swarm/index.ts';
 
 /** The properties of the navigation strip: tabs, counters and the repository menu. */
 export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavProps {
@@ -17,6 +18,9 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
     onNavigate: (view: View) => {
       setRoute(tabRoute(view, route, panel.lastRun.current));
     },
+    // the section «Swarm» opens the tab it was left on; inside it a click keeps the open place
+    hrefSwarm: formatRoute(swarmRoute(route)),
+    onOpenSwarm: () => setRoute(swarmRoute(route)),
     repository: {
       repositories: panel.state.repositories,
       paths: panel.repositoryPaths,
@@ -43,6 +47,12 @@ export function usePanelNav(panel: PanelData, actions: RepositoryActions): NavPr
         : undefined,
     notifications: panel.notifications,
   };
+}
+
+/** The route of the section «Swarm»: the open one inside it, else its last tab. */
+function swarmRoute(route: Route): Route {
+  if (swarmTabOfRoute(route) !== null) return route;
+  return routeOfSwarmTarget({ tab: lastSwarmTab(), entry: null });
 }
 
 type RepositoryActions = ReturnType<typeof useRepositoryActions>;

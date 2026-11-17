@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '../../../shared/ui/forms/select.tsx';
 import type { ProviderDraft } from './draft.ts';
+import { useProvidersScope } from '../page/scope.ts';
 import { Field } from './FormParts.tsx';
 import { PRESET_IDS, PRESET_NAMES, type PresetId } from './presets.ts';
 import { slugOf } from './slug.ts';
@@ -91,6 +92,7 @@ export function NameStep({
   onPreset: (id: PresetId) => void;
 }) {
   const { t } = useTranslation();
+  const scope = useProvidersScope();
   return (
     <div className="flex flex-col gap-4">
       {isNew ? <PresetField onPreset={onPreset} /> : null}
@@ -121,7 +123,7 @@ export function NameStep({
           onChange={(event) => onChange({ slug: event.target.value, slugTouched: true })}
         />
       </Field>
-      <LevelField draft={draft} isNew={isNew} onChange={onChange} />
+      {scope === 'project' ? <LevelField draft={draft} isNew={isNew} onChange={onChange} /> : null}
       <div className="flex items-center gap-2">
         <Switch
           id="provider-enabled"

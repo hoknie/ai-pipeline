@@ -1,16 +1,14 @@
 # Web panel
 
-The web panel is a page in your browser. In it you follow runs, answer specialists, manage the queue and edit specialists, pipelines (pipelines) and settings. The daemon serves it, so it is there whenever the daemon runs.
+The web panel is a page in your browser. In it you follow runs, answer specialists, manage the queue and edit the swarm (providers, roles, chains, specialists, pipelines) and settings. The daemon serves it, so it is there whenever the daemon runs.
 
 | Section | What it does | Read more |
 |---|---|---|
 | "Runs" | Follow, answer, retry and deliver runs | [web/runs.md](runs.md) |
 | "Queue" | Add, order and run tasks | [web/queue.md](queue.md) |
-| "Specialists" | Edit specialist files | [web/config.md](config.md#specialists) |
-| "Pipeline" | Edit pipeline files; the "Topology" tab shows the graph of a pipeline with live groups | [web/config.md](config.md#pipeline) |
-| "Providers" | Providers with status and limit, the role × provider matrix, roles, the provider form with presets | [web/providers.md](providers.md) |
+| "Swarm" | One window with the tabs "Providers", "Roles", "Chains", "Specialists" and "Pipeline" | [web/swarm.md](swarm.md) |
 | "Statistics" | Tokens and time by day, project, specialist and model | [web/stats.md](stats.md) |
-| "Settings" | Edit `settings.yaml`, shared specialists and pipelines; the system state | [web/settings.md](settings.md) |
+| "Settings" | Edit `settings.yaml` and the shared swarm; the system state | [web/settings.md](settings.md) |
 
 The counter on "Runs" shows unfinished runs, and on "Queue" the queued tasks. The panel talks to the daemon through its [HTTP API](http-api.md).
 
@@ -60,8 +58,8 @@ The repository picker lists the enabled [projects of the daemon](../usage/reposi
 
 - "Add repository…" takes a path inside a git repository, absolute or from the home directory (`~/…`), adds its root and selects it. "Browse…" next to the field opens a folder browser of the machine the panel runs on; git roots are marked.
 - The picker does not remove repositories: remove one in the group ["Projects"](settings.md#projects) of the settings or with `aip repo remove`.
-- The first item, "All projects", turns on a mode in which "Runs", "Queue", "Specialists" and "Pipeline" show all enabled projects at once. Choosing a project turns the mode off. The mode and the last chosen project are remembered in the browser; the project stays the default where one project is needed (the new task dialog, the "Project" tab of the settings).
-- Outside that mode "Queue", "Specialists", "Pipeline" and the command palette work with the selected repository.
+- The first item, "All projects", turns on a mode in which "Runs", "Queue" and "Swarm" show all enabled projects at once. Choosing a project turns the mode off. The mode and the last chosen project are remembered in the browser; the project stays the default where one project is needed (the new task dialog, the "Project" tab of the settings).
+- Outside that mode "Queue", "Swarm" and the command palette work with the selected repository.
 - Other repositories with runs waiting for an answer get a counter in the list; with "All projects" on, the header button counts them all.
 
 ## Status
@@ -87,7 +85,7 @@ The tab lists what the agents of the daemon started: their child processes and t
 
 - `Cmd+K` on macOS, `Ctrl+K` elsewhere, opens the command palette. It searches sections, runs (those waiting for an answer first), groups of the open run, pipelines and specialists, and runs actions such as "New task in the queue" and "New task on a page".
 - Outside input fields and dialogs: `Ctrl+N` opens a new task, `Ctrl+P` opens the project menu, `j` and `k` move to the next and previous run, `?` shows all shortcuts.
-- `Ctrl` and a letter go to a section: `R` runs, `Q` queue, `S` specialists, `B` pipelines, `O` providers, `T` statistics, `C` settings. With selected text `Ctrl+C` keeps copying instead of going to the settings.
+- `Ctrl` and a letter go to a section: `R` runs, `Q` queue, `S` the tab "Specialists", `B` the tab "Pipeline", `O` the tab "Providers" (all three in "Swarm"), `T` statistics, `C` settings. With selected text `Ctrl+C` keeps copying instead of going to the settings.
 - Letters work in any keyboard layout, because the physical key counts.
 - Cancelling a run or a group, removing from the queue, leaving an unsaved form and rereading the configuration ask for confirmation. Focus is on the refusal, and `Esc` refuses.
 - Results of actions are notifications. Errors stay until you dismiss them.

@@ -27,12 +27,15 @@ export function ChainsList({
   selected,
   onNew,
   onSelect,
+  onProviders,
 }: {
   chains: (EditorChain & { project?: ProjectRef | null })[];
   loaded: boolean;
   selected: string | null;
   onNew: () => void;
   onSelect: (slug: string) => void;
+  /** Opens the tab «Providers» of the window; the hint of an empty list links to it. */
+  onProviders?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -43,6 +46,16 @@ export function ChainsList({
           {t('chains.new')}
         </Button>
       </div>
+      {loaded && chains.length === 0 ? (
+        <div className="flex flex-col items-start gap-1 text-sm text-muted-foreground">
+          <p>{t('swarm.hints.needProvider')}</p>
+          {onProviders ? (
+            <button type="button" className="underline" onClick={onProviders}>
+              {t('swarm.hints.toProviders')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <EntryList
         label={t('chains.list')}
         selected={selected}

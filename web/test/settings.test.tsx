@@ -455,14 +455,12 @@ const GLOBAL_GROUPS = [
   'Delivery',
   'Queue',
   'Runtimes',
-  'Chains',
-  'Specialists',
-  'Pipeline',
+  'Swarm',
   'Observers',
   'Projects',
   'System',
 ];
-const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Tags'];
+const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Swarm', 'Tags'];
 
 const groupNav = () => screen.getByRole('navigation', { name: 'groups of settings' });
 /** The names of the groups in the column, without the «beta» marks. */

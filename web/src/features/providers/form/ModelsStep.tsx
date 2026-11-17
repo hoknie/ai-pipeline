@@ -5,6 +5,7 @@ import type { AccessModels, ProviderModelsView, RoleView } from '../../../shared
 import { ModelPicker } from '../../../shared/ui/forms/ModelPicker.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { EFFORTS } from '../matrix/CellOptions.tsx';
+import { levelOf, useProvidersScope } from '../page/scope.ts';
 import { accessModelsOf, useProviderModels } from '../page/useProviderModels.ts';
 import { hasOpencode } from './accessFields.ts';
 import type { ModelDraft, ProviderDraft } from './draft.ts';
@@ -133,7 +134,8 @@ export function ModelsStep(props: {
 }) {
   const { api, repository, slug, roles, draft, onChange } = props;
   const { t } = useTranslation();
-  const asked = useProviderModels(api, repository, slug ?? '');
+  const scope = useProvidersScope();
+  const asked = useProviderModels(api, repository, slug ?? '', levelOf(scope));
   const catalog: Catalog = slug === null ? { ...asked, ensure: () => {}, view: null } : asked;
   const first = draft.access.findIndex((item) => item.enabled && item.kind === 'cli');
   const active = accessModelsOf(catalog.view, first);

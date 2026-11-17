@@ -52,10 +52,10 @@ export function PipelineButtons(props: ButtonsProps) {
             <a
               href={formatRoute({
                 view: 'settings',
-                run: 'pipelines',
+                run: 'swarm',
                 group: 'global',
                 step: pipeline?.id ?? null,
-                tab: null,
+                tab: 'pipelines',
               })}
             >
               {t('pipelines.editInSettings')}

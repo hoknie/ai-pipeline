@@ -11,11 +11,16 @@ import type {
   RunView,
 } from '../../shared/api/types.ts';
 import { otherQueues, type QueueDraft } from '../../features/queue/index.ts';
-import type { ProvidersProjects } from '../../features/providers/index.ts';
 import { Loading } from './Loading.tsx';
 import { AllQueuesRoute, GlobalQueueRoute, type AllQueues } from './queueModes.tsx';
-import { statsPeriodOf, type Route } from '../../shared/lib/nav/route.ts';
-import { settingsLocationOf } from '../../shared/lib/nav/settingsGroups.ts';
+import { formatRoute, statsPeriodOf, type Route } from '../../shared/lib/nav/route.ts';
+import { settingsLocationOf, swarmTabOf } from '../../shared/lib/nav/settingsGroups.ts';
+import {
+  routeOfSwarmTarget,
+  settingsRouteOfSwarmTarget,
+  swarmTargetOfRoute,
+  type SwarmTarget,
+} from '../../features/swarm/index.ts';
 
 export const NewTaskDialog = lazy(() =>
   import('../../features/queue/index.ts').then((module) => ({ default: module.NewTaskDialog })),
@@ -26,16 +31,8 @@ const NewTaskPage = lazy(() =>
 const QueuePage = lazy(() =>
   import('../../features/queue/index.ts').then((module) => ({ default: module.QueuePage })),
 );
-const SpecialistsPage = lazy(() =>
-  import('../../features/specialists/index.ts').then((module) => ({
-    default: module.SpecialistsPage,
-  })),
-);
-const PipelinesPage = lazy(() =>
-  import('../../features/pipelines/index.ts').then((module) => ({ default: module.PipelinesPage })),
-);
-const ProvidersPage = lazy(() =>
-  import('../../features/providers/index.ts').then((module) => ({ default: module.ProvidersPage })),
+const SwarmWorkspace = lazy(() =>
+  import('../../features/swarm/index.ts').then((module) => ({ default: module.SwarmWorkspace })),
 );
 const StatsPage = lazy(() =>
   import('../../features/stats/index.ts').then((module) => ({ default: module.StatsPage })),
@@ -150,36 +147,6 @@ export function StatsRoute({ common, registry }: { common: Common; registry: Rep
   );
 }
 
-export function ProvidersRoute({
-  common,
-  repository,
-  projects,
-}: {
-  common: Common;
-  repository: string | null;
-  projects?: ProvidersProjects | undefined;
-}) {
-  const { t } = useTranslation();
-  const { route, onRoute } = common;
-  return (
-    <Suspense fallback={<Loading what={t('providers.title')} />}>
-      <ProvidersPage
-        api={common.api}
-        repository={repository}
-        runs={common.runs}
-        selected={route.run}
-        section={route.group}
-        preset={route.tab}
-        project={route.project ?? null}
-        projects={projects}
-        onSelect={(run, section = null, preset = null, project = null) =>
-          onRoute({ view: 'providers', run, group: section, step: null, tab: preset, project })
-        }
-      />
-    </Suspense>
-  );
-}
-
 export function SettingsRoute(props: {
   common: Common;
   streamedObservers: ObserversView | null;
@@ -201,6 +168,13 @@ export function SettingsRoute(props: {
   const location = settingsLocationOf(common.route.group, common.route.run);
   const select = (run: string) => (value: string | null) =>
     common.onRoute({ ...to('settings', run, 'global'), step: value });
+  const swarm: SwarmTarget = {
+    tab: swarmTabOf(common.route.tab),
+    entry: common.route.step,
+    section: common.route.section ?? null,
+    variant: common.route.variant ?? null,
+    preset: common.route.preset ?? null,
+  };
   return (
     <Suspense fallback={<Loading what={t('app.loadingSettings')} />}>
       <SettingsPage
@@ -208,12 +182,14 @@ export function SettingsRoute(props: {
         api={common.api}
         scope={location.scope}
         group={location.group}
-        specialist={common.route.step}
-        onSelectSpecialist={select('specialists')}
-        pipeline={common.route.step}
-        onSelectPipeline={select('pipelines')}
-        chain={common.route.step}
-        onSelectChain={select('chains')}
+        swarm={swarm}
+        onSelectSwarm={(target) =>
+          common.onRoute(settingsRouteOfSwarmTarget(location.scope, target))
+        }
+        runs={common.runs}
+        onOpenGroup={(target, step) =>
+          common.onRoute({ ...to('runs', target.runId, target.slug), step })
+        }
         project={common.route.step}
         onSelectProject={select('projects')}
         agentTab={common.route.step}
@@ -226,67 +202,36 @@ export function SettingsRoute(props: {
   );
 }
 
-/** What the lists of specialists and pipelines need of the mode «All projects»; absent outside it. */
+/** What the lists of the window «Swarm» need of the mode «All projects»; absent outside it. */
 export type AllProjectsList = { registry: RepositoryView[]; last: string | null };
 
-export function ListRoute({
+/** The window «Swarm» of the top bar: the tabs of the selected project (or of all projects). */
+export function SwarmRoute({
   common,
+  repository,
   allProjects,
 }: {
   common: Common;
+  repository: string | null;
   allProjects?: AllProjectsList;
 }) {
   const { t } = useTranslation();
   const { route, onRoute } = common;
-  if (route.view === 'pipelines')
-    return (
-      <Suspense fallback={<Loading what="pipeline" />}>
-        <PipelinesPage
-          key={common.pageKey}
-          dirty={common.dirty}
-          api={common.api}
-          runs={common.runs}
-          selected={route.run}
-          section={route.group}
-          variant={route.step}
-          projects={
-            allProjects
-              ? {
-                  registry: allProjects.registry,
-                  project: route.project ?? null,
-                  last: allProjects.last,
-                }
-              : undefined
-          }
-          onSelect={(id, section = null, variant = null, project = null) =>
-            onRoute({ ...to('pipelines', id, section), step: variant, project })
-          }
-          onOpenGroup={(target, step) =>
-            onRoute({ ...to('runs', target.runId, target.slug), step })
-          }
-        />
-      </Suspense>
-    );
+  const place = swarmTargetOfRoute(route);
   return (
-    <Suspense fallback={<Loading what={t('app.loadingSpecialists')} />}>
-      <SpecialistsPage
+    <Suspense fallback={<Loading what={t('swarm.title')} />}>
+      <SwarmWorkspace
         key={common.pageKey}
-        dirty={common.dirty}
         api={common.api}
-        selected={route.run}
-        section={route.group}
-        projects={
-          allProjects
-            ? {
-                registry: allProjects.registry,
-                project: route.project ?? null,
-                last: allProjects.last,
-              }
-            : undefined
-        }
-        onSelect={(id, section = null, project = null) =>
-          common.onRoute({ ...to('specialists', id), group: section, project })
-        }
+        scope="project"
+        place={place}
+        repository={repository}
+        runs={common.runs}
+        dirty={common.dirty}
+        projects={allProjects}
+        hrefOf={(target) => formatRoute(routeOfSwarmTarget(target))}
+        onNavigate={(target) => onRoute(routeOfSwarmTarget(target))}
+        onOpenGroup={(target, step) => onRoute({ ...to('runs', target.runId, target.slug), step })}
       />
     </Suspense>
   );

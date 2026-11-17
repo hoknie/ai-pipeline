@@ -54,7 +54,21 @@ export const providersEs: Dictionary['providers'] = {
     effortDefault: 'Por defecto',
     apply: 'Aplicar',
   },
+  search: 'Buscar proveedor',
+  detailsEmpty: 'Elige un proveedor de la lista o crea uno nuevo.',
+  globalWarning: 'Un proveedor compartido se aplica en todos los repositorios.',
+  chainRoles: 'Roles del proveedor',
+  usage: {
+    title: 'Dónde se usa',
+    none: 'No se usa: añade el proveedor a un elemento de una cadena',
+    chain: 'Cadena {{name}}, elemento {{item}}',
+    specialist: 'Especialista {{name}}',
+    pipeline: 'Pipeline {{name}}, paso {{step}}',
+  },
   roles: {
+    models: 'Modelos del rol',
+    noModels: 'Ningún proveedor tiene un modelo de este rol.',
+    detailsEmpty: 'Elige un rol de la lista.',
     label: 'Roles',
     level: 'Nivel de escritura',
     add: 'Añadir rol',
@@ -108,6 +122,11 @@ export const providersEs: Dictionary['providers'] = {
     level: 'Nivel',
     levelHint: 'Compartido: para todos los proyectos. Proyecto: solo para este.',
     enabled: 'Activado',
+    customEndpoint: 'Dirección de API propia para la CLI',
+    customEndpointHint:
+      'Solo hace falta si la CLI llega al modelo por una dirección propia (proxy o API compatible). La clave es el nombre de una variable de entorno, nunca la clave.',
+    kindHint:
+      'CLI ejecuta el agente en esta máquina. API envía peticiones directas al modelo (próximamente).',
     accessHint: 'Se usa el primer acceso disponible.',
     accessN: 'Acceso {{n}}',
     accessEnabled: 'Acceso {{n}} activado',

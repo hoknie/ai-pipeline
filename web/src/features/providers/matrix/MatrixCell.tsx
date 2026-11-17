@@ -6,6 +6,7 @@ import type { MatrixCell as Cell, ProviderView, RoleView } from '../../../shared
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { ModelPicker } from '../../../shared/ui/forms/ModelPicker.tsx';
 import type { Raw } from '../page/sources.ts';
+import { levelOf, useProvidersScope } from '../page/scope.ts';
 import { accessModelsOf, useProviderModels } from '../page/useProviderModels.ts';
 import { CellOptions } from './CellOptions.tsx';
 import { clearRole, roleModelOf, setRoleModel, type ModelOptions } from './edit.ts';
@@ -37,7 +38,8 @@ export interface CellProps {
 export function MatrixCellView(props: CellProps) {
   const { api, repository, provider, role, cell, raw, error, busy, onWrite } = props;
   const { t } = useTranslation();
-  const catalog = useProviderModels(api, repository, provider.slug);
+  const scope = useProvidersScope();
+  const catalog = useProviderModels(api, repository, provider.slug, levelOf(scope));
   const access = accessModelsOf(catalog.view, provider.active);
   const label = `${role.name} × ${provider.name}`;
   const model = cell?.model?.model ?? '';

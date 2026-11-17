@@ -2,13 +2,15 @@
 
 The "Settings" section is a set of forms for the [`aip/` configuration](../configuration/README.md), in two tabs. "Shared" edits the shared `settings.yaml`, and "Project" edits the `aip/settings.yaml` of the selected repository.
 
-A block under the tabs, "Where the settings are saved", shows the file the open group saves to. On "Project" it also has a "Project" selector with the full path of the repository; choosing one switches the repository of the whole panel. The groups "Queue" and "Tags" show no file. Without repositories "Project" shows only a note.
+A block under the tabs, "Where the settings are saved", shows the file the open group saves to. On "Project" it also has a "Project" selector with the full path of the repository; choosing one switches the repository of the whole panel.
+
+The groups "Queue" and "Tags" show no file. "Swarm" on "Shared" shows the shared directory, and on "Project" a note that every entry is saved to the file of its level. Without repositories "Project" shows only a note.
 
 The address is `#settings/<tab>/<group>`, for example `#settings/global/delivery` or `#settings/project/queue`. An unknown group opens "General" of the tab.
 
 ## Shared groups
 
-"General" (runs, working copy, naming), "Agents" (defaults, Claude, OpenCode and Antigravity, and the tab ["MCP servers"](#mcp-servers)), "Delivery", ["Queue"](#queue-group), "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Specialists"](#shared-specialists), ["Pipeline"](#shared-pipelines), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system).
+"General" (runs, working copy, naming), "Agents" (defaults, Claude, OpenCode and Antigravity, and the tab ["MCP servers"](#mcp-servers)), "Delivery", ["Queue"](#queue-group), "Runtimes" (Claude, OpenCode and Antigravity CLI), ["Swarm"](#swarm), ["Observers"](#observers), ["Projects"](#projects) and ["System"](#system).
 Fields of `web.*`, `runtimes.*`, `network.*`, `attachments.*`, `queue.*` and `stats.*` exist only here.
 
 ### Queue group
@@ -55,22 +57,17 @@ A server marked "All specialists" goes to every specialist; the others are chose
 - The daemon refuses to delete a server that a specialist names in `mcp_servers` and shows the reference.
 - Leaving the form with unsaved changes asks for confirmation.
 
-## Shared specialists
+## Swarm
 
-The group "Specialists" of "Shared" edits the files of the shared `specialists/` directory: a list on the left and a form on the right. The form saves to the shared file; there is no level switch.
+The group "Swarm" is the [swarm window](swarm.md) with its five tabs; it is on both tabs of the settings. The address is `#settings/<tab>/swarm/<window tab>[/<entry>]`, for example `#settings/global/swarm/providers/anthropic`; a pipeline entry may carry a section: `#settings/project/swarm/pipelines/actions/commit`.
 
-- The block "Used in projects" shows the number of repositories where the specialist is used and the list of them, with the pipeline and step, `split` or delivery field that refer to it. References from the shared pipelines and shared `delivery.*` get a separate line "Shared level".
-- A specialist is used in a repository when the configuration of the repository refers to it and the repository has no project file with that name.
-- "Delete" stays disabled while the specialist is used anywhere. The daemon checks this too, and refuses with the references and the repositories they come from.
+An unknown window tab opens "Specialists". The addresses `#settings/global/specialists`, `#settings/global/pipelines` and `#settings/global/chains` lead to the matching tab of the window.
 
-## Shared pipelines
+On "Shared" every tab edits the shared files only and writes no project file; a change applies in every repository that has no project file of the same name. Changing the settings tab keeps the window tab and drops the open entry.
 
-The group "Pipeline" of "Shared" edits the files of the shared `pipelines/` directory: a list with search by id, name and tag, and a form that saves to the shared file. The shared tags are edited here. Only shared specialists can be chosen for the steps. A change applies in every repository.
-
-- The block "Used in projects" lists the repositories where a `split.pipeline` refers to the pipeline. References from other shared pipelines get the line "Shared level". A repository with its own file of that id is not counted.
-- "Delete" stays disabled while the pipeline is used anywhere. The daemon checks this too, across all repositories of the panel, and refuses with the references.
-
-The addresses are `#settings/global/pipelines`, `#settings/global/pipelines/<id>` and `#settings/global/pipelines/new`.
+- "Specialists": the list holds the specialists with a shared file. The block "Used in projects" shows the repositories where the specialist is used, with the pipeline and step, `split` or delivery field that refer to it; "Delete" stays disabled while it is used anywhere.
+- "Pipeline": the list holds the pipelines with a shared file, with search by id, name and tag. Only shared specialists can be chosen for the steps. "Delete" stays disabled while another pipeline or a project refers to it.
+- "Chains" and "Providers" offer shared providers only.
 
 ## Observers
 

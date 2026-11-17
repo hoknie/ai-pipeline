@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
-import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
+import type { Api } from '../../../../shared/api/api.ts';
+import { useConfirm } from '../../../../shared/ui/overlays/confirm.tsx';
 import type {
   ConfigEditorResponse,
   EditorPipeline,
   SharedPipelinesView,
-} from '../../../shared/api/types.ts';
-import { rawName } from '../../../shared/lib/pipeline/pipelineName.ts';
+} from '../../../../shared/api/types.ts';
+import { rawName } from '../../../../shared/lib/pipeline/pipelineName.ts';
 
 /** The pipeline as its shared file has it: the only file this group edits. */
 function sharedOf(pipeline: EditorPipeline): EditorPipeline | null {

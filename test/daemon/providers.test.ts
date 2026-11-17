@@ -8,6 +8,8 @@ import type {
   ProviderModelsView,
   ProvidersView,
 } from '../../src/presentation/ipc/contract/index.ts';
+import { writeLevelDirectory } from '../fixtures/config.ts';
+import type { Harness } from './harness.ts';
 import { start } from './control-harness.ts';
 
 const CONFIG = `swarm:
@@ -45,6 +47,62 @@ function fakeOpencode(): string {
   chmodSync(path, 0o755);
   return path;
 }
+
+const GLOBAL = `swarm:
+  roles:
+    think: { name: Think }
+  providers:
+    zai:
+      name: Z.ai shared
+      access: [{ kind: cli, runtime: opencode, model_prefix: gproxy/glmcode }]
+      models: { think: GLM-5.3 }
+`;
+
+describe('config_providers of the shared level', () => {
+  async function started(): Promise<Harness> {
+    const h = await start(CONFIG, { AIP_OPENCODE_BIN: fakeOpencode() });
+    writeLevelDirectory(join(h.environment.XDG_CONFIG_HOME as string, 'aip'), GLOBAL);
+    return h;
+  }
+
+  it('answers with the shared level only', async () => {
+    const h = await started();
+    const view = (await h.call('config_providers', {
+      repository: h.repo,
+      level: 'global',
+    })) as ProvidersView;
+    expect(view.errors).toEqual([]);
+    expect(view.providers.map((provider) => provider.slug)).toEqual(['zai']);
+    expect(view.providers[0]).toMatchObject({ name: 'Z.ai shared' });
+    expect(view.providers[0]?.file).toMatch(/xdg\/aip\/providers\/zai\.yaml$/);
+  });
+
+  it('does not show a project role on the shared level', async () => {
+    const h = await started();
+    const view = (await h.call('config_providers', {
+      repository: h.repo,
+      level: 'global',
+    })) as ProvidersView;
+    expect(view.roles.map((role) => role.slug)).toEqual(['think']);
+  });
+
+  it('takes the models of a shared provider', async () => {
+    const h = await started();
+    const view = (await h.call('provider_models', {
+      repository: h.repo,
+      provider: 'zai',
+      level: 'global',
+    })) as ProviderModelsView;
+    expect(view.provider).toBe('zai');
+  });
+
+  it('refuses the models of a project provider on the shared level', async () => {
+    const h = await started();
+    await expect(
+      h.call('provider_models', { repository: h.repo, provider: 'off', level: 'global' }),
+    ).rejects.toThrow();
+  });
+});
 
 describe('config_providers', () => {
   it('answers with the roles, the providers with status and the matrix with an empty cell', async () => {

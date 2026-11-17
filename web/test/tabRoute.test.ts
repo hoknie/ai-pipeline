@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { tabRoute } from '../src/app/state/tabRoute.ts';
-import { formatRoute, type Route } from '../src/shared/lib/nav/route.ts';
+import { formatRoute, parseRoute, type Route } from '../src/shared/lib/nav/route.ts';
 
 const runs: Route = { view: 'runs', run: 'mwci7xaswlhy', group: 'g1', step: null, tab: null };
 
@@ -32,5 +32,30 @@ describe('tabRoute', () => {
     expect(tabRoute('pipelines', runs, 'x').run).toBeNull();
     const settings = tabRoute('settings', runs, 'x');
     expect([settings.run, settings.group]).toEqual(['general', 'global']);
+  });
+});
+
+describe('the addresses of the group «Swarm» of the settings', () => {
+  it.each([
+    '#settings/global/swarm/providers/new?preset=zai',
+    '#settings/project/swarm/pipelines/topology/feature/variant-b',
+    '#settings/project/swarm/pipelines/actions',
+    '#settings/project/swarm/pipelines/system/stage',
+    '#settings/project/swarm/pipelines/feature',
+    '#settings/global/swarm/chains/thinking',
+  ])('keeps %s through parse and format', (hash) => {
+    expect(formatRoute(parseRoute(hash))).toBe(hash);
+  });
+
+  it('reads the preset, the variant and the section without an entry', () => {
+    expect(parseRoute('#settings/global/swarm/providers/new?preset=zai').preset).toBe('zai');
+    const topology = parseRoute('#settings/project/swarm/pipelines/topology/feature/b');
+    expect([topology.section, topology.step, topology.variant]).toEqual([
+      'topology',
+      'feature',
+      'b',
+    ]);
+    const actions = parseRoute('#settings/project/swarm/pipelines/actions');
+    expect([actions.section, actions.step]).toEqual(['actions', null]);
   });
 });

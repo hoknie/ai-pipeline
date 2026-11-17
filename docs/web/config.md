@@ -23,7 +23,7 @@ Both editors follow these rules:
 
 ## Specialists
 
-The page has two tabs: "Specialists" and "Chains".
+The tabs "Specialists" and "Chains" of the [swarm window](swarm.md).
 
 The "Specialists" tab edits the `aip/specialists/<slug>.yaml` files of the project and of the shared directory. The form has the [fields of a specialist](../configuration/specialists.md#fields).
 
@@ -45,15 +45,15 @@ The "Chains" tab edits project runtime chains (`aip/chains/<slug>.yaml`) for fai
 - Ordered list of runtimes with individual provider, model, variant, reasoning effort, and enable toggles. In the "By provider" mode the provider is required and one item can be switched to "Default"; the errors of both show at the item's field.
 - A `provider` of an item is chosen in the [provider combobox](providers.md#choosing-a-provider-elsewhere) and must name a [provider](../configuration/providers.md); a disabled one is allowed.
 - Shared chains are view-only here. "Override in the project" copies a shared chain into the project; "Remove the override" returns to the shared chain.
-- Shared chains (`~/.config/aip/chains/<slug>.yaml`) are created and edited in [Settings](settings.md) under the "Chains" group (`#settings/global/chains`). This form edits the shared source even when the current project overrides it.
+- Shared chains (`~/.config/aip/chains/<slug>.yaml`) are created and edited in [Settings](settings.md#swarm) on the tab "Chains" of the group "Swarm" (`#settings/global/swarm/chains`). This form edits the shared source even when the current project overrides it.
 
 The addresses are `#specialists/chains`, `#specialists/chains/<slug>` and `#specialists/chains/new`.
 
 ## Pipeline
 
-The page has three tabs: "Pipeline", "Actions" and "System stages". Each tab shows only its own list; the filters belong to the "Pipeline" tab. Choosing a tab opens the entry that was last open on it, or the default one: the first action (the form of a new action when there are none) and the first system stage.
+The tab "Pipeline" of the [swarm window](swarm.md) has three sections: "Pipeline", "Actions" and "System stages". Each tab shows only its own list; the filters belong to the "Pipeline" tab. Choosing a tab opens the entry that was last open on it, or the default one: the first action (the form of a new action when there are none) and the first system stage.
 
-The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Shared pipelines are edited in [Settings](settings.md#shared-pipelines).
+The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Shared pipelines are edited in [Settings](settings.md#swarm).
 
 - The "Name" field sets the optional `name` of the pipeline; lists, badges, the graph and the palette show it instead of the id.
 - The form lists the steps: id, specialist, the return on rejection with the number of rounds, and the additional prompt. Steps are added, deleted and reordered with buttons. Deleting a step also clears the return of every step that pointed to it, with its number of rounds.
@@ -65,7 +65,7 @@ The "Pipeline" tab edits the `aip/pipelines/<id>.yaml` files of the project. Sha
 - A variant follows its steps, not their ids: reordering steps or changing a specialist keeps the overrides on the same steps; deleting a step removes its overrides. With `split.pipeline` a variant has no steps or skip.
 - "Diagram" for a chosen variant is read only: it shows the specialists the variant applies and marks the skipped steps. The list shows the variants other than `default` as badges under the name. A shared pipeline is edited with its variants in Settings; the project page only shows them.
 - The block "Actions at the points of the pipeline" lists the actions that run at each point. A point without a list of its own shows the inherited one with an "inherited" mark; an empty list turns the point off.
-- A shared pipeline opens for viewing only. "Override in the project" copies it into the project; "Edit in Settings" leads to `#settings/global/pipelines/<id>`. A new pipeline is always a project one.
+- A shared pipeline opens for viewing only. "Override in the project" copies it into the project; "Edit in Settings" leads to `#settings/global/swarm/pipelines/<id>`. A new pipeline is always a project one.
 - Running runs continue from their snapshot after the pipeline is deleted. A new run of a deleted pipeline is rejected.
 
 The "Actions" tab edits one action. A sticky header shows its name, the level, the file and the buttons "Save", "Discard changes" (after an edit) and "Delete".

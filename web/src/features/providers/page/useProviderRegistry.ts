@@ -7,15 +7,28 @@ import { createShared } from './shared.ts';
 /** The registry is read again at most this often because of the events of the runs. */
 export const REFRESH_MS = 5000;
 
-const registries = createShared<ProvidersView>((api) => api.providers());
+/** The level a registry is read at: both levels merged for a project, or the shared one alone. */
+export type RegistryLevel = 'global' | undefined;
+
+const GLOBAL_MARK = '\u0000global';
+
+const registries = createShared<ProvidersView>((api, key) =>
+  api.providers(key.endsWith(GLOBAL_MARK) ? 'global' : undefined),
+);
 const editors = createShared<ConfigEditorResponse>((api) => api.config());
 
 const keyOf = (repository: string | null) => repository ?? '';
+const registryKey = (repository: string | null, level?: RegistryLevel) =>
+  level === 'global' ? `${keyOf(repository)}${GLOBAL_MARK}` : keyOf(repository);
 
-/** Reads the registry of a project again, for every component that watches it. */
+/** Reads the registry of a project again, for every component that watches it; both levels. */
 export function invalidateProviders(repository: string | null): Promise<void> {
   const key = keyOf(repository);
-  return Promise.all([registries.reload(key, true), editors.reload(key, true)]).then(() => {});
+  return Promise.all([
+    registries.reload(key, true),
+    registries.reload(registryKey(repository, 'global'), true),
+    editors.reload(key, true),
+  ]).then(() => {});
 }
 
 /** Calls `read` again at most once per `REFRESH_MS` while `watch` changes. */
@@ -41,8 +54,13 @@ function useThrottledReload(key: string, watch: unknown): void {
  * request; it is repeated when the window gets focus, after a write (`invalidateProviders`) and
  * when `watch` (the runs) changes, at most every five seconds.
  */
-export function useProviderRegistry(api: Api, repository: string | null, watch?: unknown) {
-  const key = keyOf(repository);
+export function useProviderRegistry(
+  api: Api,
+  repository: string | null,
+  watch?: unknown,
+  level?: RegistryLevel,
+) {
+  const key = registryKey(repository, level);
   const subscribe = useCallback(
     (listener: () => void) => registries.subscribe(key, api, listener, true),
     [key, api],

@@ -171,9 +171,7 @@ describe('the former addresses of the topology', () => {
     await waitFor(() => expect(window.location.hash).toBe('#pipelines/topology/epic'));
     expect(window.history.length).toBe(before);
     expect(selectedTab()).toEqual(['Topology']);
-    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Swarm' }).getAttribute('aria-current')).toBe('page');
   });
 
   it('lead from the bare address to the first pipeline', async () => {
@@ -190,7 +188,7 @@ describe('the sections of the panel', () => {
   it('have no section «Topology» in the navigation and the palette', async () => {
     render(<App api={api()} openStream={openFake} />);
     const nav = screen.getByRole('navigation', { name: 'sections' });
-    expect(within(nav).getAllByRole('link')).toHaveLength(7);
+    expect(within(nav).getAllByRole('link')).toHaveLength(5);
     expect(within(nav).queryByRole('link', { name: 'Topology' })).toBeNull();
     act(() => {
       fireEvent.keyDown(document, { key: 'k', ctrlKey: true });

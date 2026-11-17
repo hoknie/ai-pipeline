@@ -319,7 +319,7 @@ describe('repository selector', () => {
     const calls = (base as Api & { calls: [string, string | null][] }).calls;
     expect(calls).toContainEqual(['config', LIB]);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Pipeline' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Swarm' }));
     await waitFor(() => expect(calls).toContainEqual(['config', LIB]));
     window.location.hash = '#pipelines/topology/feature';
     await waitFor(() => expect(calls).toContainEqual(['pipelines', LIB]));

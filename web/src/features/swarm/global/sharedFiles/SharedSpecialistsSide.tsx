@@ -1,9 +1,9 @@
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Button } from '../../../shared/ui/forms/button.tsx';
-import { Input } from '../../../shared/ui/forms/input.tsx';
-import { ConfigErrors, EntryList } from '../../../shared/ui/layout/EntryList.tsx';
+import { Button } from '../../../../shared/ui/forms/button.tsx';
+import { Input } from '../../../../shared/ui/forms/input.tsx';
+import { ConfigErrors, EntryList } from '../../../../shared/ui/layout/EntryList.tsx';
 import { NEW_SHARED } from './constants.ts';
 import type { SharedSpecialistsState } from './useSharedSpecialists.ts';
 

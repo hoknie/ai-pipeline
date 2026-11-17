@@ -156,7 +156,7 @@ mcp:
 
 ## Tags
 
-`tags` are labels of the specialist for the filter and the import on the panel's [Specialists](../web/config.md#specialists) page. They do not change the specialist's configuration, prompt, permissions or the snapshot of a run. They are separate from the [tags of tasks and runs](../usage/tags.md).
+`tags` are labels of the specialist for the filter and the import on the panel's [Specialists](../web/config.md#specialists) tab of the swarm window. They do not change the specialist's configuration, prompt, permissions or the snapshot of a run. They are separate from the [tags of tasks and runs](../usage/tags.md).
 
 - A name is trimmed, 1 to 30 characters, without a line break; repeats that differ only in case are merged.
 - A value that is not a list of such names is an error at `swarm.specialists.<slug>.tags`.

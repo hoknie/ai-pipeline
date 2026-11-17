@@ -225,9 +225,7 @@ describe('routes and the tab', () => {
   it('opens the form of the pipeline from the address', async () => {
     window.location.hash = '#pipelines/feature';
     render(<App api={api()} openStream={openFake} />);
-    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Swarm' }).getAttribute('aria-current')).toBe('page');
     expect(await screen.findByRole('heading', { name: 'feature' })).toBeTruthy();
     expect(window.location.hash).toBe('#pipelines/feature');
   });
@@ -865,7 +863,7 @@ describe('global level', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
     const link = screen.getByRole('link', { name: 'Edit in Settings' });
-    expect(link.getAttribute('href')).toBe('#settings/global/pipelines/quick');
+    expect(link.getAttribute('href')).toBe('#settings/global/swarm/pipelines/quick');
     expect(writePipeline).not.toHaveBeenCalled();
   });
 

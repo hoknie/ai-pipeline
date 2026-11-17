@@ -1,5 +1,6 @@
 import { Trans, useTranslation } from 'react-i18next';
 
+import { formatRoute } from '../../shared/lib/nav/route.ts';
 import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
 import {
   BETA_SETTINGS_GROUPS,
@@ -11,6 +12,7 @@ import {
 } from '../../shared/lib/nav/settingsGroups.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { ConfigErrors } from '../../shared/ui/layout/EntryList.tsx';
+import { settingsRouteOfSwarmTarget } from '../swarm/index.ts';
 import { SettingsTarget } from './SettingsTarget.tsx';
 import { BetaBadge } from './page/BetaBadge.tsx';
 import { GroupBody } from './page/GroupBody.tsx';
@@ -25,9 +27,8 @@ function targetOf(
   config: ReturnType<typeof useSettingsConfig>['config'],
 ): string | null {
   const { group, scope } = props;
-  if (group === 'specialists' || group === 'pipelines' || group === 'chains') {
-    return config ? `${config.directories.global}/${group}` : null;
-  }
+  // the swarm of the shared tab saves into the shared directory; the project one by level
+  if (group === 'swarm') return scope === 'global' && config ? config.directories.global : null;
   const isForm =
     group !== 'tags' && group !== 'queue' && group !== 'observers' && group !== 'projects';
   return isForm ? (config?.settingsFiles[scope].file ?? null) : null;
@@ -45,6 +46,11 @@ export default function SettingsPage(props: SettingsPageProps) {
   const errors = errorsByGroup(config?.errors ?? []);
   const tabGroup = (target: SettingsScope): SettingsGroup =>
     (SETTINGS_GROUPS_BY_SCOPE[target] as readonly string[]).includes(group) ? group : 'general';
+  // the tab of the window stays when the settings tab changes; its entry does not
+  const tabHref = (target: SettingsScope) =>
+    tabGroup(target) === 'swarm'
+      ? formatRoute(settingsRouteOfSwarmTarget(target, { tab: props.swarm.tab, entry: null }))
+      : hrefOf(target, tabGroup(target));
   return (
     <div className="flex w-full flex-col gap-4 p-4">
       <LinkTabs
@@ -52,9 +58,9 @@ export default function SettingsPage(props: SettingsPageProps) {
         tabs={SETTINGS_SCOPES.map((tab) => ({
           key: tab,
           label: t(`settingsPage.scope.${tab}`),
-          href: hrefOf(tab, tabGroup(tab)),
+          href: tabHref(tab),
           selected: tab === scope,
-          onClick: leave(hrefOf(tab, tabGroup(tab))),
+          onClick: leave(tabHref(tab)),
         }))}
       />
       <SettingsTarget
@@ -63,7 +69,13 @@ export default function SettingsPage(props: SettingsPageProps) {
         repositories={repositories}
         onSelectRepository={props.onSelectRepository}
         file={targetOf(props, config)}
-        note={group === 'projects' ? t('settingsPage.projectsNote') : null}
+        note={
+          group === 'projects'
+            ? t('settingsPage.projectsNote')
+            : group === 'swarm' && scope === 'project'
+              ? t('settingsPage.swarmNoteProject')
+              : null
+        }
         anyProject={props.registry.length > 0}
       />
       {scope === 'project' && repositories.length === 0 ? null : (

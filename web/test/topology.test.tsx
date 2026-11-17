@@ -303,9 +303,7 @@ describe('edit link', () => {
     render(<App api={fakeApi()} openStream={openFake} />);
     fireEvent.click(await screen.findByRole('link', { name: 'Edit' }));
     expect(window.location.hash).toBe('#pipelines/feature');
-    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Swarm' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('tab', { name: 'Pipelines' }).getAttribute('aria-selected')).toBe(
       'true',
     );
@@ -364,9 +362,7 @@ describe('tabs', () => {
     await waitFor(() => expect(window.location.hash).toBe('#runs/run1'));
     window.location.hash = '#pipelines/topology/feature';
     await screen.findByTestId('stage-review');
-    expect(screen.getByRole('link', { name: 'Pipeline' }).getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Swarm' }).getAttribute('aria-current')).toBe('page');
     fireEvent.click(screen.getByTestId('stage-code'));
     fireEvent.click(
       within(screen.getByRole('complementary', { name: 'node coder' })).getByRole('button', {

@@ -88,6 +88,45 @@ describe('the form of a new provider', () => {
     expect(screen.getByText('Access 2')).toBeTruthy();
   });
 
+  it('hides the address and the variable of a new CLI until the own address is turned on', async () => {
+    mount({ selected: 'new' });
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Plain' } });
+    next();
+    await screen.findByText('Access 1');
+    expect(screen.queryByLabelText('Address')).toBeNull();
+    expect(screen.queryByLabelText('Variable with the key')).toBeNull();
+    expect(screen.getByText(/CLI runs the agent on this machine/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('switch', { name: /Own API address for the CLI/ }));
+    expect(screen.getByLabelText('Address')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('switch', { name: /Own API address for the CLI/ }));
+    expect(screen.queryByLabelText('Address')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it('has no such switch for OpenCode', async () => {
+    mount({ selected: 'new', preset: 'gemini' });
+    await screen.findByLabelText('Name');
+    next();
+    await screen.findByText('Access 1');
+    expect(screen.queryByRole('switch', { name: /Own API address/ })).toBeNull();
+  });
+
+  it('turns the own address on in the preset of an own endpoint, with required fields', async () => {
+    mount({ selected: 'new', preset: 'custom' });
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Mine' } });
+    next();
+    await screen.findByText('Access 1');
+    expect(
+      screen
+        .getByRole('switch', { name: /Own API address for the CLI/ })
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('refuses a value that is not a name of a variable', async () => {
     mount({ selected: 'new', preset: 'zai' });
     await screen.findByLabelText('Name');

@@ -1,4 +1,5 @@
 import { providersEn } from './providers.en.ts';
+import { swarmEn } from './swarm.en.ts';
 
 /**
  * The reference dictionary: every other language has exactly these keys (checked by `tsc`).
@@ -6,6 +7,7 @@ import { providersEn } from './providers.en.ts';
  */
 export const en = {
   providers: providersEn,
+  swarm: swarmEn,
   links: {
     editRun: 'Edit on the run page',
     title: 'Links',
@@ -52,6 +54,7 @@ export const en = {
     loadingStats: 'statistics',
   },
   nav: {
+    swarm: 'Swarm',
     runs: 'Runs',
     queue: 'Queue',
     specialists: 'Specialists',
@@ -1757,7 +1760,9 @@ export const en = {
         project_over_global: 'Project over shared',
       },
     },
+    swarmNoteProject: 'The level is chosen when saving: project or shared.',
     group: {
+      swarm: 'Swarm',
       projects: 'Projects',
       general: 'General',
       agents: 'Agents',
@@ -1772,6 +1777,7 @@ export const en = {
       tags: 'Tags',
     },
     about: {
+      swarm: 'Providers, roles, chains, specialists and pipelines in one window, by tabs.',
       projects:
         'Every project of the daemon: its name, slug, color, whether it is enabled, and its path. Disabled projects are listed here too.',
       observers:

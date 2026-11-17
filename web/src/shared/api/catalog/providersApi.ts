@@ -4,9 +4,9 @@ import { call, edit, enc, json, levelQuery } from '../http.ts';
 /** The providers of the registry: the list, their models, writing and deleting. */
 export interface ProviderApi {
   /** The roles, the providers with status and limit, and the role × provider matrix. */
-  providers(): Promise<ProvidersView>;
+  providers(level?: 'global'): Promise<ProvidersView>;
   /** The models of a provider by access; `refresh` asks the catalogs again. */
-  providerModels(slug: string, refresh?: boolean): Promise<ProviderModelsView>;
+  providerModels(slug: string, refresh?: boolean, level?: 'global'): Promise<ProviderModelsView>;
   /** Writes a provider file; problems with the edit come back as a result, not an error. */
   writeProvider(
     slug: string,
@@ -20,9 +20,13 @@ export interface ProviderApi {
 
 export function providerApi(at: (path: string) => string): ProviderApi {
   return {
-    providers: () => call(at('/api/config/providers')),
-    providerModels: (slug, refresh) =>
-      call(at(`/api/config/providers/${enc(slug)}/models${refresh ? '?refresh=1' : ''}`)),
+    providers: (level) => call(at(`/api/config/providers${level ? '?level=global' : ''}`)),
+    providerModels: (slug, refresh, level) => {
+      const query = [refresh ? 'refresh=1' : '', level ? 'level=global' : ''].filter(Boolean);
+      return call(
+        at(`/api/config/providers/${enc(slug)}/models${query.length ? `?${query.join('&')}` : ''}`),
+      );
+    },
     writeProvider: (slug, value, revision, level) =>
       edit(
         at(`/api/config/providers/${enc(slug)}`),

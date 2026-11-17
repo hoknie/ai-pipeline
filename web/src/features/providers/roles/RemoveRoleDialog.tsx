@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../shared/ui/overlays/dialog.tsx';
+import { useProvidersScope } from '../page/scope.ts';
 import { clearHolders } from './removal.ts';
 
 /**
@@ -40,6 +41,7 @@ export function RemoveRoleDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const scope = useProvidersScope();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cleared, setCleared] = useState<string[]>([]);
@@ -47,7 +49,7 @@ export function RemoveRoleDialog({
     setBusy(true);
     setError(null);
     const todo = holders.filter((holder) => !cleared.includes(holder.slug));
-    const result = await clearHolders(api, editor, todo, role);
+    const result = await clearHolders(api, editor, todo, role, scope);
     const done = [...cleared, ...result.cleared];
     setCleared(done);
     const failure = result.error ?? (await removeRole());

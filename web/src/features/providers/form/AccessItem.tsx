@@ -85,7 +85,7 @@ function KindFields({
   const { t } = useTranslation();
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field id={id('kind')} label={t('providers.form.kind')}>
+      <Field id={id('kind')} label={t('providers.form.kind')} hint={t('providers.form.kindHint')}>
         <Select value={access.kind} onValueChange={(kind) => onChange({ kind: kind as 'cli' })}>
           <SelectTrigger id={id('kind')}>
             <SelectValue />
@@ -162,6 +162,30 @@ function EndpointFields({ id, at, access, errorOf, onChange }: FieldsProps) {
   );
 }
 
+/** The switch «own API address for the CLI»; the address and the key variable only with it on. */
+function CustomEndpoint(props: FieldsProps) {
+  const { id, access, onChange } = props;
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start gap-2">
+        <Switch
+          id={id('custom_endpoint')}
+          checked={access.customEndpoint}
+          onCheckedChange={(customEndpoint) => onChange({ customEndpoint })}
+        />
+        <label htmlFor={id('custom_endpoint')} className="flex flex-col gap-0.5 text-sm">
+          <span className="font-medium">{t('providers.form.customEndpoint')}</span>
+          <span className="text-xs text-muted-foreground">
+            {t('providers.form.customEndpointHint')}
+          </span>
+        </label>
+      </div>
+      {access.customEndpoint ? <EndpointFields {...props} /> : null}
+    </div>
+  );
+}
+
 /** `command` and `args` of the CLI (the shared level only). */
 function CommandFields({ id, at, access, errorOf, onChange }: FieldsProps) {
   return (
@@ -206,7 +230,7 @@ function CliFields(props: FieldsProps & { level: 'global' | 'project' }) {
           />
         </Field>
       ) : null}
-      {fields.endpoint ? <EndpointFields {...props} /> : null}
+      {fields.endpoint ? <CustomEndpoint {...props} /> : null}
       {fields.command ? <CommandFields {...props} /> : null}
     </>
   );

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditResult, EditorProvider } from '../../../shared/api/types.ts';
 import { invalidateProviders } from '../page/useProviderRegistry.ts';
+import { useProvidersScope } from '../page/scope.ts';
 import { sourceOf, type Raw } from '../page/sources.ts';
 
 /** The text of a failed edit: the first error of the file, or the conflict. */
@@ -20,11 +21,15 @@ export function useCellWrite(
   repository: string | null,
   providers: readonly EditorProvider[],
 ) {
+  const scope = useProvidersScope();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const write = useCallback(
     async (cell: string, slug: string, change: (raw: Raw) => Raw) => {
-      const source = sourceOf(providers.find((provider) => provider.slug === slug));
+      const source = sourceOf(
+        providers.find((provider) => provider.slug === slug),
+        scope,
+      );
       if (!source) return;
       setBusy(cell);
       try {
@@ -45,7 +50,7 @@ export function useCellWrite(
         await invalidateProviders(repository);
       }
     },
-    [api, repository, providers],
+    [api, repository, providers, scope],
   );
   return { write, errors, busy };
 }

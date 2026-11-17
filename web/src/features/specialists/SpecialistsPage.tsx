@@ -10,7 +10,6 @@ import { useMediaQuery } from '../../shared/lib/browser/media.ts';
 import { notifySuccess } from '../../shared/lib/browser/notify.ts';
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { ConfigErrors, SplitPage } from '../../shared/ui/layout/EntryList.tsx';
-import { LinkTabs } from '../../shared/ui/layout/LinkTabs.tsx';
 import { ChainsList, ChainsPane, NEW_CHAIN } from './chains/index.ts';
 import { SpecialistImportDialog } from './importing/SpecialistImportDialog.tsx';
 import { NEW_ID, SpecialistPane } from './page/SpecialistPane.tsx';
@@ -127,6 +126,7 @@ function ChainsBody({
   dirty,
   go,
   onSelect,
+  onProviders,
 }: {
   data: SpecialistsSource;
   selected: string | null;
@@ -134,6 +134,7 @@ function ChainsBody({
   dirty: RefObject<boolean>;
   go: (id: string | null, extra?: string | null) => Promise<void>;
   onSelect: Select;
+  onProviders?: (() => void) | undefined;
 }) {
   const { view, load } = data;
   const newEntry = useNewEntry(
@@ -153,6 +154,7 @@ function ChainsBody({
             selected={selected}
             onNew={newEntry.ask}
             onSelect={(key) => void go(key, 'chains')}
+            {...(onProviders ? { onProviders } : {})}
           />
         </>
       }
@@ -171,7 +173,6 @@ function ChainsBody({
   );
 }
 
-/** The tabs «Specialists» and «Chains»; a click asks first when the open form has edits. */
 function UnknownProject() {
   const { t } = useTranslation();
   return (
@@ -183,31 +184,6 @@ function UnknownProject() {
   );
 }
 
-function useSpecialistTabs(
-  isChains: boolean,
-  go: (id: string | null, extra?: string | null) => Promise<void>,
-) {
-  const { t } = useTranslation();
-  const tabs = [
-    {
-      key: 'specialists',
-      label: t('specialists.tabs.specialists'),
-      href: '#specialists',
-      selected: !isChains,
-      onClick: () => (isChains ? go(null, null) : Promise.resolve()),
-    },
-    {
-      key: 'chains',
-      label: t('specialists.tabs.chains'),
-      href: '#specialists/chains',
-      selected: isChains,
-      onClick: () => (!isChains ? go(null, 'chains') : Promise.resolve()),
-    },
-  ];
-
-  return tabs;
-}
-
 function SpecialistsScreen({
   api,
   data,
@@ -215,6 +191,7 @@ function SpecialistsScreen({
   section,
   projects,
   onSelect,
+  onProviders,
   dirty: sharedDirty,
 }: {
   api: Api;
@@ -223,9 +200,9 @@ function SpecialistsScreen({
   section: string | null;
   projects: ProjectsMode | undefined;
   onSelect: Select;
+  onProviders?: (() => void) | undefined;
   dirty?: RefObject<boolean> | undefined;
 }) {
-  const { t } = useTranslation();
   const [notice, setNotice] = useState<string | null>(null);
   const ownDirty = useRef(false);
   const dirty = sharedDirty ?? ownDirty;
@@ -240,14 +217,9 @@ function SpecialistsScreen({
   };
   const go = useLeaveGuard(key, dirty, choose, () => setNotice(null));
 
-  const tabs = useSpecialistTabs(isChains, go);
-
   return (
     <ModelCatalogProvider api={api}>
       <div className="flex flex-col gap-3">
-        <div className="px-4 pt-3">
-          <LinkTabs label={t('specialists.tabs.label')} tabs={tabs} />
-        </div>
         {unknown ? <UnknownProject /> : null}
         {isChains ? (
           <ChainsBody
@@ -257,6 +229,7 @@ function SpecialistsScreen({
             dirty={dirty}
             go={go}
             onSelect={onSelect}
+            onProviders={onProviders}
           />
         ) : (
           <SpecialistsBody
@@ -280,6 +253,8 @@ type PageProps = {
   selected: string | null;
   section?: string | null;
   onSelect: Select;
+  /** Opens the tab «Providers» of the window (a hint of an empty list of chains). */
+  onProviders?: () => void;
   dirty?: RefObject<boolean>;
   /** Set in the mode «All projects»: the list merges the projects. */
   projects?: ProjectsMode;

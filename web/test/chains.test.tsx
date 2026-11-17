@@ -13,9 +13,9 @@ import {
 import { ChainForm } from '../src/features/specialists/chains/ChainForm.tsx';
 import { ChainsList } from '../src/features/specialists/chains/ChainsList.tsx';
 import SpecialistsPage from '../src/features/specialists/SpecialistsPage.tsx';
-import { SharedChainsGroup } from '../src/features/settings/SharedChainsGroup.tsx';
+import { SharedChainsGroup } from '../src/features/swarm/global/SharedChainsGroup.tsx';
 import { configView, fakeApi } from './fixtures.ts';
-import { providersView, providerView } from './providerFixtures.ts';
+import { providersView, providerView, roleView } from './providerFixtures.ts';
 
 afterEach(() => {
   cleanup();
@@ -628,5 +628,78 @@ describe('a chain in the By provider mode', () => {
       expect(writeProvider).toHaveBeenCalledWith('corp', expect.anything(), null, 'global'),
     );
     await waitFor(() => expect(providerButtons()[1]!.dataset.providerValue).toBe('corp'));
+  });
+});
+
+describe('shared chains and the roles of providers', () => {
+  const sharedTier: EditorChain = {
+    ...tierFixture,
+    level: 'global',
+    file: '/xdg/aip/chains/thinking.yaml',
+    revision: null,
+    sources: {
+      global: { file: '/xdg/aip/chains/thinking.yaml', revision: 'g1', raw: tierRaw },
+    },
+  };
+
+  it('offers only the shared providers in the combobox of a shared chain', async () => {
+    const providers = vi.fn(async (level?: 'global') =>
+      providersView({
+        providers:
+          level === 'global'
+            ? [providerView('anthropic', { name: 'Anthropic' })]
+            : [providerView('local', { name: 'Local' })],
+      }),
+    );
+    render(
+      <SharedChainsGroup
+        api={fakeApi({ providers })}
+        config={configView({ chains: [sharedTier] })}
+        selected="thinking"
+        dirty={{ current: false }}
+        onSelect={vi.fn()}
+        onReload={vi.fn(async () => undefined)}
+      />,
+    );
+    await waitFor(() => expect(providerButtons()[0]!.disabled).toBe(false));
+    expect(providers).toHaveBeenCalledWith('global');
+    fireEvent.click(providerButtons()[0]!);
+    expect(await screen.findByRole('option', { name: /Anthropic/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /Local/ })).toBeNull();
+  });
+
+  const withRoles = () =>
+    fakeApi({
+      providers: vi.fn(async () =>
+        providersView({
+          roles: [roleView('think', 'Think'), roleView('light', 'Light')],
+          providers: [
+            providerView('anthropic', {
+              name: 'Anthropic',
+              models: { think: { model: 'opus' } } as never,
+            }),
+            providerView('zai', { name: 'Z.ai', models: { think: { model: 'glm' } } as never }),
+          ],
+        }),
+      ),
+    });
+
+  it('puts the models of the roles of the provider first in the model choice of an item', async () => {
+    renderTier(withRoles());
+    await waitFor(() => expect(providerButtons()[0]!.disabled).toBe(false));
+    fireEvent.click(screen.getAllByRole('combobox', { name: 'Model' })[0]!);
+    expect(await screen.findByText('Roles of the provider')).toBeTruthy();
+    const option = await screen.findByRole('option', { name: /Think — opus/ });
+    fireEvent.click(option);
+    expect(screen.getAllByRole('combobox', { name: 'Model' })[0]!.dataset.value).toBe('opus');
+  });
+
+  it('gives no role models when the provider has no access for the runtime of the item', async () => {
+    renderTier(withRoles());
+    await waitFor(() => expect(providerButtons()[1]!.disabled).toBe(false));
+    // the second item runs `zai` through opencode, and `zai` has only a claude access
+    fireEvent.click(screen.getAllByRole('combobox', { name: 'Model' })[1]!);
+    await screen.findByRole('listbox');
+    expect(screen.queryByText('Roles of the provider')).toBeNull();
   });
 });

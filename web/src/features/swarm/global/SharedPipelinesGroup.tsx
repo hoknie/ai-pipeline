@@ -1,9 +1,9 @@
 import type { RefObject } from 'react';
 
-import type { Api } from '../../shared/api/api.ts';
-import type { ConfigEditorResponse } from '../../shared/api/types.ts';
-import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
-import { SplitPage } from '../../shared/ui/layout/EntryList.tsx';
+import type { Api } from '../../../shared/api/api.ts';
+import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
+import { ModelCatalogProvider } from '../../../shared/lib/catalog/models.tsx';
+import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
 import { SharedPipelineEditor } from './sharedFiles/SharedPipelineEditor.tsx';
 import { SharedPipelinesSide } from './sharedFiles/SharedPipelinesSide.tsx';
 import { useSharedPipelines } from './sharedFiles/useSharedPipelines.ts';

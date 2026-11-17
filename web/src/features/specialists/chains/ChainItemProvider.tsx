@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import type { Api } from '../../../shared/api/api.ts';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { Switch } from '../../../shared/ui/forms/switch.tsx';
-import { ProviderPicker, useProviderRegistry } from '../../providers/index.ts';
+import {
+  levelOf,
+  ProviderPicker,
+  useProviderRegistry,
+  useProvidersScope,
+} from '../../providers/index.ts';
 import type { ChainRuntimeDraft } from './types.ts';
 
 export interface ItemErrors {
@@ -29,7 +34,8 @@ export function ItemProvider({
   onChange: (patch: Partial<ChainRuntimeDraft>) => void;
 }) {
   const { t } = useTranslation();
-  const { view } = useProviderRegistry(api, null);
+  const scope = useProvidersScope();
+  const { view } = useProviderRegistry(api, null, undefined, levelOf(scope));
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={`chain-item-${index}-provider`}>{t('chains.item.provider')}</Label>

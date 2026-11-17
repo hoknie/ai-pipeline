@@ -88,6 +88,16 @@ export function loadConfigSources(paths: ConfigPaths): LoadedConfig {
   return { ...loaded, legacy: [...(global.legacy ?? []), ...(project.legacy ?? [])] };
 }
 
+/** The shared level alone: the project files do not take part; throws `ConfigLoadError` without shared files. */
+export function loadGlobalConfigSources(paths: ConfigPaths): LoadedConfig {
+  const global = readLevel(paths.global);
+  if (levelIsEmpty(global)) {
+    throw new ConfigLoadError({ kind: 'no_files', expected: [paths.global.directory] });
+  }
+  const loaded = resolveLevels(assembleLevel(global), emptyLevel());
+  return { ...loaded, legacy: [...(global.legacy ?? [])] };
+}
+
 /** One project level without a global one, built from texts; keys are file names without extension. */
 export function configFromFiles(files: {
   settings?: string;

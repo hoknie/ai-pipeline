@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/types.ts';
+import { useProvidersScope } from '../page/scope.ts';
 import { sourceOf, type ProviderSource } from '../page/sources.ts';
 import { invalidateProviders } from '../page/useProviderRegistry.ts';
 import {
@@ -95,12 +96,25 @@ export function useProviderForm(options: {
   onDeleted: () => void;
 }) {
   const { slug, registry, editor } = options;
+  const scope = useProvidersScope();
   const isNew = slug === null;
   const source = useMemo(
-    () => (slug === null ? null : sourceOf(editor?.providers.find((item) => item.slug === slug))),
-    [slug, editor],
+    () =>
+      slug === null
+        ? null
+        : sourceOf(
+            editor?.providers.find((item) => item.slug === slug),
+            scope,
+          ),
+    [slug, editor, scope],
   );
-  const [draft, setDraft] = useDraft(slug, options.initial, source);
+  const [draft, setDraft] = useDraft(
+    slug,
+    options.initial && scope === 'global'
+      ? { ...options.initial, level: 'global' }
+      : options.initial,
+    source,
+  );
   const [step, setStep] = useState<FormStep>('name');
   const submit = useSubmit({ ...options, source, draft, onStep: setStep });
   const taken = useMemo(

@@ -68,7 +68,7 @@ describe('the list of providers', () => {
     expect(within(list).getByText('Unavailable')).toBeTruthy();
     expect(within(list).getByText('variable ZAI_KEY is not set')).toBeTruthy();
     expect(within(list).getAllByText('Shared').length).toBe(2);
-    expect(screen.getByTestId('limit-anthropic').textContent).toBe('—');
+    expect(screen.getByTestId('limit-anthropic').textContent).toBe('Limit: —');
   });
 
   it('shows a limit with a countdown while it lasts', async () => {
@@ -81,7 +81,7 @@ describe('the list of providers', () => {
   it('shows the limit as gone once it has ended', async () => {
     mount(providersView({ providers: [providerView('zai', { limitUntil: Date.now() - 1000 })] }));
     await screen.findByRole('region', { name: 'Providers' });
-    expect(screen.getByTestId('limit-zai').textContent).toBe('—');
+    expect(screen.getByTestId('limit-zai').textContent).toBe('Limit: —');
   });
 
   it('opens the form of a provider on a click', async () => {
@@ -146,12 +146,51 @@ describe('the phone', () => {
   });
 });
 
-describe('the tabs', () => {
-  it('has a way to the tab Roles', async () => {
+describe('the way to the tab Roles', () => {
+  it('links the empty matrix to the tab Roles', async () => {
     const { onSelect } = mount(providersView({ providers: [providerView('zai')] }));
-    await screen.findByRole('region', { name: 'Providers' });
-    fireEvent.click(screen.getByRole('tab', { name: 'Roles' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Add roles' }));
     expect(onSelect).toHaveBeenCalledWith(null, 'roles');
+  });
+});
+
+describe('the layout list — details', () => {
+  it('shows the list on the left and the matrix on the right while no provider is open', async () => {
+    mount(
+      providersView({
+        roles: [roleView('code')],
+        providers: [providerView('zai', { name: 'Z.ai' })],
+      }),
+    );
+    const list = await screen.findByRole('region', { name: 'Providers' });
+    expect(list.closest('aside')).not.toBeNull();
+    const main = document.querySelector('main')!;
+    expect(within(main).getByText(/Pick a provider in the list/)).toBeTruthy();
+    expect(within(main).getByRole('region', { name: /matrix/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create provider' })).toBeTruthy();
+  });
+
+  it('filters the list by the typed words', async () => {
+    mount(
+      providersView({
+        providers: [
+          providerView('zai', { name: 'Z.ai' }),
+          providerView('anthropic', { name: 'Anthropic' }),
+        ],
+      }),
+    );
+    await screen.findByRole('region', { name: 'Providers' });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search providers' }), {
+      target: { value: 'anth' },
+    });
+    expect(screen.queryByRole('button', { name: /Z\.ai/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Anthropic/ })).toBeTruthy();
+  });
+
+  it('opens a new provider with the button of the column', async () => {
+    const { onSelect } = mount(providersView({ providers: [providerView('zai')] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create provider' }));
+    expect(onSelect).toHaveBeenCalledWith('new');
   });
 });
 
@@ -289,5 +328,83 @@ describe('the mode «All projects»', () => {
     expect(within(local).getByText(app.label)).toBeTruthy();
     expect(within(local).getByText('Project')).toBeTruthy();
     expect(screen.getByText(/The shared level is shown/)).toBeTruthy();
+  });
+});
+
+describe('the shared scope', () => {
+  const mountShared = (
+    overrides: Overrides = {},
+    selected: string | null = null,
+    section = null,
+  ) => {
+    counter += 1;
+    const api = fakeApi({
+      providers: vi.fn(async () =>
+        providersView({
+          roles: [roleView('code', 'Code')],
+          providers: [providerView('zai', { name: 'Z.ai' })],
+        }),
+      ),
+      ...overrides,
+    });
+    render(
+      <ProvidersPage
+        api={api}
+        repository={`/shared-${counter}`}
+        runs={[]}
+        scope="global"
+        selected={selected}
+        section={section}
+        preset={null}
+        project={null}
+        onSelect={vi.fn()}
+      />,
+    );
+    return api;
+  };
+
+  it('reads the registry of the shared level only', async () => {
+    const api = mountShared();
+    await screen.findByRole('region', { name: 'Providers' });
+    expect(api.providers).toHaveBeenCalledWith('global');
+  });
+
+  it('writes the shared file of a provider a project overrides, and warns about the reach', async () => {
+    const shared = { name: 'Shared Z.ai', access: [{ kind: 'cli', runtime: 'claude' }] };
+    const project = { name: 'Project Z.ai', access: [{ kind: 'cli', runtime: 'claude' }] };
+    const api = mountShared(
+      {
+        config: vi.fn(async () =>
+          configView({
+            providers: [
+              {
+                ...editorProvider('zai', project, 'project'),
+                level: 'project_over_global',
+                sources: {
+                  global: { file: '/xdg/aip/providers/zai.yaml', revision: 'g1', raw: shared },
+                  project: { file: '/repo/aip/providers/zai.yaml', revision: 'p1', raw: project },
+                },
+              },
+            ],
+          }),
+        ),
+      },
+      'zai',
+    );
+    const name = (await screen.findByDisplayValue('Shared Z.ai')) as HTMLInputElement;
+    expect(screen.getByText('A shared provider applies in every repository.')).toBeTruthy();
+    expect(screen.queryByLabelText('Level')).toBeNull();
+    fireEvent.change(name, { target: { value: 'Z.ai Plan' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.writeProvider).toHaveBeenCalled());
+    const call = vi.mocked(api.writeProvider).mock.calls[0]!;
+    expect([call[0], call[2], call[3]]).toEqual(['zai', 'g1', 'global']);
+  });
+
+  it('shows the roles without a choice of the level', async () => {
+    mountShared({}, null, 'roles' as never);
+    await screen.findByRole('region', { name: 'Roles' });
+    expect(screen.queryByRole('radio', { name: 'Project' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Shared' })).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { modLabel } from '../../../shared/lib/browser/hotkeys.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
-import { SECTIONS } from '../../sections.ts';
+import { SECTIONS, showsView } from '../../sections.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Kbd } from '../../../shared/ui/feedback/kbd.tsx';
@@ -21,6 +21,8 @@ export function TopNav({
   view,
   hrefFor,
   onNavigate,
+  hrefSwarm,
+  onOpenSwarm,
   working,
   waiting,
   queued,
@@ -51,17 +53,19 @@ export function TopNav({
         <RepositoryMenu choice={repository} compact />
       </div>
       <nav aria-label={t('nav.sections')} className="flex shrink-0 items-center gap-1">
-        {SECTIONS.map(({ view: target, labelKey, icon }) => (
+        {SECTIONS.map((section) => (
           <TopNavSection
-            key={target}
-            target={target}
-            label={t(`nav.${labelKey}`)}
-            icon={icon}
-            count={counter(target)}
-            active={target === view}
+            key={section.labelKey}
+            target={section.view}
+            label={t(`nav.${section.labelKey}`)}
+            icon={section.icon}
+            count={counter(section.view)}
+            active={showsView(section, view)}
             waiting={waiting}
-            href={hrefFor(target)}
-            onNavigate={onNavigate}
+            href={section.labelKey === 'swarm' ? hrefSwarm : hrefFor(section.view)}
+            onNavigate={() =>
+              section.labelKey === 'swarm' ? onOpenSwarm() : onNavigate(section.view)
+            }
           />
         ))}
       </nav>

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { modLabel } from '../../../shared/lib/browser/hotkeys.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import type { View } from '../../../shared/lib/nav/route.ts';
-import { SECTIONS } from '../../sections.ts';
+import { SECTIONS, showsView, type Section } from '../../sections.ts';
 import type { NotificationCenterState } from '../../notifications.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
@@ -21,6 +21,10 @@ export interface NavProps {
   view: View;
   hrefFor: (view: View) => string;
   onNavigate: (view: View) => void;
+  /** The address of the section «Swarm»: its last tab. */
+  hrefSwarm: string;
+  /** Opens the section «Swarm» on its last tab. */
+  onOpenSwarm: () => void;
   /** Runs in progress (active or waiting for an answer). */
   working: number;
   /** Runs waiting for an answer. */
@@ -39,12 +43,12 @@ export interface NavProps {
 function SectionLink(props: {
   target: View;
   label: string;
-  icon: (typeof SECTIONS)[number]['icon'];
+  icon: Section['icon'];
   count: number;
   active: boolean;
   waiting: number;
   href: string;
-  onNavigate: (view: View) => void;
+  onNavigate: () => void;
 }) {
   const { t } = useTranslation();
   const { target, active, count, waiting, icon: Icon } = props;
@@ -60,7 +64,7 @@ function SectionLink(props: {
       )}
       onClick={(event) => {
         event.preventDefault();
-        props.onNavigate(target);
+        props.onNavigate();
       }}
     >
       <span data-nav-icon className="relative flex size-4 items-center justify-center">
@@ -82,6 +86,8 @@ export function NavSidebar({
   view,
   hrefFor,
   onNavigate,
+  hrefSwarm,
+  onOpenSwarm,
   working,
   waiting,
   queued,
@@ -121,17 +127,19 @@ export function NavSidebar({
         <Kbd>{modLabel()}K</Kbd>
       </Button>
       <nav aria-label={t('nav.sections')} className="flex flex-col gap-0.5">
-        {SECTIONS.map(({ view: target, labelKey, icon }) => (
+        {SECTIONS.map((section) => (
           <SectionLink
-            key={target}
-            target={target}
-            label={t(`nav.${labelKey}`)}
-            icon={icon}
-            count={counter(target)}
-            active={target === view}
+            key={section.labelKey}
+            target={section.view}
+            label={t(`nav.${section.labelKey}`)}
+            icon={section.icon}
+            count={counter(section.view)}
+            active={showsView(section, view)}
             waiting={waiting}
-            href={hrefFor(target)}
-            onNavigate={onNavigate}
+            href={section.labelKey === 'swarm' ? hrefSwarm : hrefFor(section.view)}
+            onNavigate={() =>
+              section.labelKey === 'swarm' ? onOpenSwarm() : onNavigate(section.view)
+            }
           />
         ))}
       </nav>

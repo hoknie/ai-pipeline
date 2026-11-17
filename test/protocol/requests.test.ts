@@ -141,6 +141,25 @@ describe('links in requests', () => {
   });
 });
 
+describe('provider requests of the shared level', () => {
+  const parse = (method: string, params: unknown) =>
+    parseRequest(JSON.stringify({ id: 1, method, params }));
+
+  it('accepts config_providers and provider_models with and without level', () => {
+    for (const level of [undefined, 'global']) {
+      for (const method of ['config_providers', 'provider_models'] as const) {
+        const parsed = parse(method, { ...(SAMPLES[method] as object), level });
+        expect(parsed).toMatchObject({ request: { method } });
+      }
+    }
+  });
+
+  it('refuses a level other than global', () => {
+    const bad = parse('config_providers', { repository: '/work/app', level: 'project' });
+    expect('error' in bad).toBe(true);
+  });
+});
+
 describe('IPC requests', () => {
   it('has 90 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);

@@ -1,39 +1,53 @@
-import {
-  Activity,
-  BarChart3,
-  GitBranch,
-  ListOrdered,
-  Server,
-  Settings,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+import { Activity, BarChart3, Boxes, ListOrdered, Settings, type LucideIcon } from 'lucide-react';
 
 import type { TFunction } from 'i18next';
 
 import type { View } from '../shared/lib/nav/route.ts';
 
 export interface Section {
+  /** The view a click on the section opens (the section «Swarm» opens its last tab). */
   view: View;
-  labelKey: 'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
+  /** Every view the section shows; the section is highlighted for any of them. */
+  views: View[];
+  labelKey: 'runs' | 'queue' | 'swarm' | 'stats' | 'settings';
   icon: LucideIcon;
-  /** The letter of the `ctrl` shortcut that goes to the section. */
-  key: 'r' | 'q' | 's' | 'b' | 'o' | 't' | 'c';
 }
+
+/** The views of the section «Swarm»: tabs of one window. */
+export const SWARM_VIEWS: View[] = ['providers', 'specialists', 'pipelines'];
 
 /** Sections of the panel: navigation, palette and headings take labels from here. */
 export const SECTIONS: Section[] = [
-  { view: 'runs', labelKey: 'runs', icon: Activity, key: 'r' },
-  { view: 'queue', labelKey: 'queue', icon: ListOrdered, key: 'q' },
-  { view: 'specialists', labelKey: 'specialists', icon: Users, key: 's' },
+  { view: 'runs', views: ['runs'], labelKey: 'runs', icon: Activity },
+  { view: 'queue', views: ['queue'], labelKey: 'queue', icon: ListOrdered },
+  { view: 'specialists', views: SWARM_VIEWS, labelKey: 'swarm', icon: Boxes },
+  { view: 'stats', views: ['stats'], labelKey: 'stats', icon: BarChart3 },
+  { view: 'settings', views: ['settings'], labelKey: 'settings', icon: Settings },
+];
+
+/** Whether a section shows a view. */
+export const showsView = (section: Section, view: View): boolean => section.views.includes(view);
+
+/** A `ctrl` shortcut that goes to a view; the tabs of the swarm have their own letters. */
+export interface SectionShortcut {
+  key: 'r' | 'q' | 's' | 'b' | 'o' | 't' | 'c';
+  view: View;
+  /** The label in `nav.*`. */
+  labelKey: 'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
+}
+
+export const SECTION_SHORTCUTS: SectionShortcut[] = [
+  { key: 'r', view: 'runs', labelKey: 'runs' },
+  { key: 'q', view: 'queue', labelKey: 'queue' },
+  { key: 's', view: 'specialists', labelKey: 'specialists' },
   // `ctrl+p` opens the project menu, so pipelines take the letter of their git-branch icon
-  { view: 'pipelines', labelKey: 'pipelines', icon: GitBranch, key: 'b' },
-  { view: 'providers', labelKey: 'providers', icon: Server, key: 'o' },
-  { view: 'stats', labelKey: 'stats', icon: BarChart3, key: 't' },
-  { view: 'settings', labelKey: 'settings', icon: Settings, key: 'c' },
+  { key: 'b', view: 'pipelines', labelKey: 'pipelines' },
+  { key: 'o', view: 'providers', labelKey: 'providers' },
+  { key: 't', view: 'stats', labelKey: 'stats' },
+  { key: 'c', view: 'settings', labelKey: 'settings' },
 ];
 
 export function sectionLabel(view: View, t: TFunction): string {
-  const section = SECTIONS.find((candidate) => candidate.view === view);
+  const section = SECTIONS.find((candidate) => showsView(candidate, view));
   return section ? t(`nav.${section.labelKey}`) : view;
 }

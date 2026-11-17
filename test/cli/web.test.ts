@@ -1697,6 +1697,43 @@ describe('aip web configuration editor', () => {
     expect((await send('DELETE', '/api/config/providers/corp')).status).toBe(400);
   });
 
+  it('lists the providers of the shared level only with ?level=global', async () => {
+    const { web, base } = await editor();
+    const send = (method: string, path: string, body?: unknown) =>
+      fetch(`${base}${path}`, {
+        method,
+        headers: authed(web, JSON_TYPE),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const value = (name: string) => ({ name, access: [{ kind: 'cli', runtime: 'claude' }] });
+    expect(
+      (
+        await send('PUT', '/api/config/providers/shared', {
+          value: value('Shared'),
+          revision: null,
+          level: 'global',
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await send('PUT', '/api/config/providers/own', {
+          value: value('Own'),
+          revision: null,
+          level: 'project',
+        })
+      ).status,
+    ).toBe(200);
+    const slugs = async (path: string) =>
+      ((await (await send('GET', path)).json()) as { providers: { slug: string }[] }).providers
+        .map((item) => item.slug)
+        .sort();
+    expect(await slugs('/api/config/providers')).toEqual(['own', 'shared']);
+    expect(await slugs('/api/config/providers?level=global')).toEqual(['shared']);
+    const anonymous = await fetch(`${base}/api/config/providers?level=global`);
+    expect(anonymous.status).toBe(401);
+  });
+
   it('writes and deletes on the global level and rejects an unknown level', async () => {
     const { h, web, base } = await editor();
     const file = join(h.repo, '..', 'xdg', 'aip', 'specialists', 'qa.yaml');

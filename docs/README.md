@@ -51,10 +51,11 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | [web/README.md](web/README.md) | opening and controlling the panel, security, the status strip, keyboard and look |
 | [web/runs.md](web/runs.md) | the "Runs" section: filters, a run, a group, its log, answering questions |
 | [web/queue.md](web/queue.md) | the "Queue" section: the task form, reordering, the queue modes |
-| [web/config.md](web/config.md) | the "Topology", "Specialists" and "Pipeline" sections |
-| [web/providers.md](web/providers.md) | the "Providers" section: list, matrix, roles, the provider form and presets |
+| [web/swarm.md](web/swarm.md) | the "Swarm" section: one window with providers, roles, chains, specialists and pipelines |
+| [web/config.md](web/config.md) | the "Specialists", "Chains" and "Pipeline" tabs of the swarm window |
+| [web/providers.md](web/providers.md) | the "Providers" and "Roles" tabs: list, matrix, roles, the provider form and presets |
 | [web/stats.md](web/stats.md) | the "Statistics" section: filters, tiles, charts, tables, clearing a project |
-| [web/settings.md](web/settings.md) | the "Settings" section: shared and project forms, shared specialists and pipelines, the system group |
+| [web/settings.md](web/settings.md) | the "Settings" section: shared and project forms, the group "Swarm", the system group |
 | [web/http-api.md](web/http-api.md) | the HTTP API behind the panel |
 
 ## Development

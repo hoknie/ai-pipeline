@@ -1,5 +1,6 @@
 import type { Dictionary } from '../types.ts';
 import { providersRu } from './providers.ru.ts';
+import { swarmRu } from './swarm.ru.ts';
 
 /*
  * Глоссарий: run — запуск, group — группа, step — этап, attempt — попытка,
@@ -8,6 +9,7 @@ import { providersRu } from './providers.ru.ts';
  */
 export const ru: Dictionary = {
   providers: providersRu,
+  swarm: swarmRu,
   links: {
     editRun: 'Изменить на странице запуска',
     title: 'Связи',
@@ -54,6 +56,7 @@ export const ru: Dictionary = {
     loadingStats: 'статистика',
   },
   nav: {
+    swarm: 'Рой',
     runs: 'Запуски',
     queue: 'Очередь',
     specialists: 'Специалисты',
@@ -1783,7 +1786,9 @@ export const ru: Dictionary = {
         project_over_global: 'Проект поверх общего',
       },
     },
+    swarmNoteProject: 'Уровень сохранения выбирается при записи: проект или общий.',
     group: {
+      swarm: 'Рой',
       projects: 'Проекты',
       general: 'Основное',
       agents: 'Агенты',
@@ -1798,6 +1803,7 @@ export const ru: Dictionary = {
       tags: 'Теги',
     },
     about: {
+      swarm: 'Провайдеры, роли, цепочки, специалисты и pipeline в одном окне по вкладкам.',
       projects:
         'Все проекты демона: название, slug, цвет, включён ли проект и его путь. Выключенные проекты тоже здесь.',
       observers:

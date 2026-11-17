@@ -12,6 +12,7 @@ import {
 import { emptyDraft } from '../form/draft.ts';
 import { ProviderWizard } from '../form/ProviderWizard.tsx';
 import { slugOf } from '../form/slug.ts';
+import { levelOf, useProvidersScope } from '../page/scope.ts';
 import { useProviderEditor, useProviderRegistry } from '../page/useProviderRegistry.ts';
 
 /**
@@ -32,7 +33,8 @@ export function ProviderCreateDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const { view } = useProviderRegistry(api, repository);
+  const scope = useProvidersScope();
+  const { view } = useProviderRegistry(api, repository, undefined, levelOf(scope));
   const { editor } = useProviderEditor(api, repository);
   const initial = useMemo(() => ({ ...emptyDraft(), name, slug: slugOf(name) }), [name]);
   return (

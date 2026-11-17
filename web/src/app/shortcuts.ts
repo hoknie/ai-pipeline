@@ -1,6 +1,6 @@
 import type { ParseKeys } from 'i18next';
 
-import { SECTIONS } from './sections.ts';
+import { SECTION_SHORTCUTS } from './sections.ts';
 
 export type ShortcutGroup = 'general' | 'navigation' | 'runs' | 'queue' | 'providers';
 
@@ -26,7 +26,7 @@ export const SHORTCUTS: Shortcut[] = [
   { combo: 'Escape', label: 'shortcuts.close', group: 'general' },
   { combo: 'ctrl+n', label: 'shortcuts.newTask', group: 'general' },
   { combo: 'ctrl+p', label: 'shortcuts.project', group: 'general' },
-  ...SECTIONS.map((section) => ({
+  ...SECTION_SHORTCUTS.map((section) => ({
     combo: `ctrl+${section.key}`,
     label: `nav.${section.labelKey}` as const,
     group: 'navigation' as const,

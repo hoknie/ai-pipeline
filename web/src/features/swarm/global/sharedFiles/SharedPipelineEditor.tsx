@@ -1,11 +1,11 @@
 import { GitBranch } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
-import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
-import type { ConfigEditorResponse, EditorPipeline } from '../../../shared/api/types.ts';
-import { Empty } from '../../../shared/ui/feedback/empty.tsx';
-import { PipelineForm } from '../../pipelines/index.ts';
+import type { Api } from '../../../../shared/api/api.ts';
+import { notifySuccess } from '../../../../shared/lib/browser/notify.ts';
+import type { ConfigEditorResponse, EditorPipeline } from '../../../../shared/api/types.ts';
+import { Empty } from '../../../../shared/ui/feedback/empty.tsx';
+import { PipelineForm } from '../../../pipelines/index.ts';
 import { NEW_SHARED_PIPELINE } from './constants.ts';
 import type { SharedPipelinesState } from './useSharedPipelines.ts';
 

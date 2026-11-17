@@ -21,6 +21,7 @@ import {
   configPaths,
   loadConfig,
   loadConfigSources,
+  loadGlobalConfigSources,
   loadRuntimeSettings,
   loadWebSettings,
   parseConfig,
@@ -1290,5 +1291,34 @@ describe('pipeline tags', () => {
       'swarm.pipelines.feature.tags',
       'at most 30 characters',
     );
+  });
+});
+
+describe('loadGlobalConfigSources', () => {
+  it('leaves the project providers and roles out and takes the shared one over an overriding project one', () => {
+    const paths = temporaryPaths();
+    writeLevel(
+      paths.global,
+      `swarm:
+  roles: { think: { name: Think } }
+  providers:
+    zai: { name: Shared, access: [{ kind: cli, runtime: claude }] }
+`,
+    );
+    writeLevel(
+      paths.project,
+      `swarm:
+  roles: { code: { name: Code } }
+  providers:
+    zai: { name: Project, access: [{ kind: cli, runtime: claude }] }
+    own: { name: Own, access: [{ kind: cli, runtime: claude }] }
+`,
+    );
+    const loaded = loadGlobalConfigSources(paths);
+    expect(loaded.config.providers.map((provider) => [provider.slug, provider.name])).toEqual([
+      ['zai', 'Shared'],
+    ]);
+    expect(loaded.config.roles.map((role) => role.slug)).toEqual(['think']);
+    expect(loaded.files.every((file) => file.startsWith(paths.global.directory))).toBe(true);
   });
 });

@@ -16,6 +16,13 @@ import {
 } from '../../../shared/ui/forms/select.tsx';
 import { Switch } from '../../../shared/ui/forms/switch.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
+import type { ModelEntry } from '../../../shared/api/types.ts';
+import {
+  levelOf,
+  roleModelOptions,
+  useProviderRegistry,
+  useProvidersScope,
+} from '../../providers/index.ts';
 import { ItemProvider, type ItemErrors } from './ChainItemProvider.tsx';
 import type { ChainRuntimeDraft, SpecialistRuntimeName } from './types.ts';
 
@@ -127,12 +134,15 @@ function ItemFields({
   index,
   item,
   disabled,
+  extra,
   onRuntime,
   onModel,
 }: {
   index: number;
   item: ChainRuntimeDraft;
   disabled: boolean;
+  /** The models of the roles of the provider of the item. */
+  extra: ModelEntry[];
   onRuntime: (val: SpecialistRuntimeName) => void;
   onModel: (val: string) => void;
 }) {
@@ -163,6 +173,7 @@ function ItemFields({
           value={item.model}
           disabled={disabled}
           placeholder={t('chains.item.modelPlaceholder')}
+          extra={extra}
           onChange={onModel}
         />
       </div>
@@ -233,6 +244,18 @@ export function ChainRuntimeItem({
   onMoveDown,
   onRemove,
 }: ChainRuntimeItemProps) {
+  const { t } = useTranslation();
+  const scope = useProvidersScope();
+  const { view } = useProviderRegistry(api, null, undefined, levelOf(scope));
+  const provider = view?.providers.find((candidate) => candidate.slug === item.provider);
+  // the models of the roles of the provider through the CLI of the item, before the catalog
+  const extra: ModelEntry[] = provider
+    ? roleModelOptions(provider, view?.roles ?? [], item.runtime).map((option) => ({
+        id: option.model,
+        name: `${option.name} — ${option.model}`,
+        group: t('providers.chainRoles'),
+      }))
+    : [];
   const setField = <K extends keyof ChainRuntimeDraft>(key: K, val: ChainRuntimeDraft[K]) =>
     onChange({ ...item, [key]: val });
 
@@ -261,6 +284,7 @@ export function ChainRuntimeItem({
         index={index}
         item={item}
         disabled={disabled}
+        extra={extra}
         onRuntime={(val) => setField('runtime', val)}
         onModel={(val) => setField('model', val)}
       />

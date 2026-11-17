@@ -7,6 +7,7 @@ export {
   loadAttachmentSettings,
   loadConfig,
   loadConfigSources,
+  loadGlobalConfigSources,
   loadNetworkSettings,
   loadRuntimeSettings,
   loadQueueSettings,

@@ -6,9 +6,10 @@ import { createShared } from './shared.ts';
 
 const SEPARATOR = '\n';
 
-const catalogs = createShared<ProviderModelsView>((api, key, refresh) =>
-  api.providerModels(key.split(SEPARATOR)[1] ?? '', refresh),
-);
+const catalogs = createShared<ProviderModelsView>((api, key, refresh) => {
+  const [, slug = '', level] = key.split(SEPARATOR);
+  return api.providerModels(slug, refresh, level === 'global' ? 'global' : undefined);
+});
 
 /** Models of the access that applies: the effective one, else the first with a runtime. */
 export function accessModelsOf(
@@ -27,8 +28,13 @@ export function accessModelsOf(
  * The model catalog of a provider, asked for when a combobox first opens (`ensure`) and shared by
  * the comboboxes of the page; `refresh` asks the CLIs again.
  */
-export function useProviderModels(api: Api, repository: string | null, slug: string) {
-  const key = `${repository ?? ''}${SEPARATOR}${slug}`;
+export function useProviderModels(
+  api: Api,
+  repository: string | null,
+  slug: string,
+  level?: 'global',
+) {
+  const key = `${repository ?? ''}${SEPARATOR}${slug}${level ? `${SEPARATOR}global` : ''}`;
   const subscribe = useCallback(
     (listener: () => void) => catalogs.subscribe(key, api, listener, false),
     [key, api],

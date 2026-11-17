@@ -6,46 +6,48 @@ import type { Api } from '../../../shared/api/api.ts';
 import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/types.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
+import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
+import { useProvidersScope } from '../page/scope.ts';
+import { RoleDetails } from './RoleDetails.tsx';
 import { RoleDialogHost, RolesFailure } from './RoleDialogs.tsx';
 import { RoleRow } from './RoleRow.tsx';
 import { canMove } from './edit.ts';
 import { useRoleActions, type Level } from './useRoleActions.ts';
 
-/** The roles of the configuration: a level to write, add, rename, reorder, remove. */
-export function RolesTab({
-  api,
-  repository,
+/** The column of the roles: the level to write, «Add role» and the list. */
+function RolesSide({
   view,
   editor,
+  level,
   allProjects,
+  actions,
+  onLevel,
 }: {
-  api: Api;
-  repository: string | null;
   view: ProvidersView;
   editor: ConfigEditorResponse | null;
+  level: Level;
   allProjects: boolean;
+  actions: ReturnType<typeof useRoleActions>;
+  onLevel: (level: Level) => void;
 }) {
   const { t } = useTranslation();
-  const [chosen, setLevel] = useState<Level>('global');
-  const level: Level = allProjects ? 'global' : chosen;
-  const actions = useRoleActions({ api, repository, view, editor, level });
-  const { dialog } = actions;
-  const target =
-    dialog && dialog.kind !== 'add' ? view.roles.find((r) => r.slug === dialog.slug) : null;
+  const scope = useProvidersScope();
   return (
     <section aria-label={t('providers.roles.label')} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <ToggleGroup
-          type="single"
-          value={level}
-          aria-label={t('providers.roles.level')}
-          onValueChange={(next) => next && setLevel(next as Level)}
-        >
-          <ToggleGroupItem value="global">{t('providers.level.global')}</ToggleGroupItem>
-          <ToggleGroupItem value="project" disabled={allProjects}>
-            {t('providers.level.project')}
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {scope === 'project' ? (
+          <ToggleGroup
+            type="single"
+            value={level}
+            aria-label={t('providers.roles.level')}
+            onValueChange={(next) => next && onLevel(next as Level)}
+          >
+            <ToggleGroupItem value="global">{t('providers.level.global')}</ToggleGroupItem>
+            <ToggleGroupItem value="project" disabled={allProjects}>
+              {t('providers.level.project')}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        ) : null}
         <Button size="sm" disabled={!editor} onClick={() => actions.setDialog({ kind: 'add' })}>
           <Plus /> {t('providers.roles.add')}
         </Button>
@@ -53,32 +55,92 @@ export function RolesTab({
       {allProjects ? (
         <p className="text-xs text-muted-foreground">{t('providers.allProjectsHint')}</p>
       ) : null}
-      <RolesFailure message={actions.failure} />
       {view.roles.length === 0 ? (
         <div className="rounded-lg border p-4 text-sm text-muted-foreground">
           {t('providers.empty.noRoles')}
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {view.roles.map((role) => (
+          {view.roles.map((item) => (
             <RoleRow
-              key={role.slug}
-              role={role}
-              count={view.providers.filter((provider) => role.slug in provider.models).length}
-              selected={actions.selected === role.slug}
-              ready={editor !== null}
-              inLevel={role.slug in actions.record}
-              canUp={canMove(actions.movable, role.slug, -1)}
-              canDown={canMove(actions.movable, role.slug, 1)}
-              onSelect={() => actions.select(role.slug)}
-              onRename={() => actions.setDialog({ kind: 'rename', slug: role.slug })}
-              onMove={(step) => actions.move(role.slug, step)}
-              onRemove={() => void actions.askRemove(role.slug, role.name)}
+              key={item.slug}
+              role={item}
+              count={view.providers.filter((provider) => item.slug in provider.models).length}
+              selected={actions.selected === item.slug}
+              onSelect={() => actions.select(item.slug)}
             />
           ))}
         </ul>
       )}
-      <RoleDialogHost api={api} editor={editor} view={view} actions={actions} />
     </section>
+  );
+}
+
+/** The roles: the list on the left, the open role with its models by provider on the right. */
+export function RolesTab({
+  api,
+  repository,
+  view,
+  editor,
+  allProjects,
+  onProviders,
+}: {
+  api: Api;
+  repository: string | null;
+  view: ProvidersView;
+  editor: ConfigEditorResponse | null;
+  allProjects: boolean;
+  /** Opens the tab «Providers» (the hint of a swarm without providers). */
+  onProviders?: () => void;
+}) {
+  const { t } = useTranslation();
+  const scope = useProvidersScope();
+  const [chosen, setLevel] = useState<Level>('global');
+  const level: Level = allProjects || scope === 'global' ? 'global' : chosen;
+  const actions = useRoleActions({ api, repository, view, editor, level });
+  const role = view.roles.find((item) => item.slug === actions.selected);
+  return (
+    <SplitPage
+      side={
+        <RolesSide
+          view={view}
+          editor={editor}
+          level={level}
+          allProjects={allProjects}
+          actions={actions}
+          onLevel={setLevel}
+        />
+      }
+    >
+      <RolesFailure message={actions.failure} />
+      {role ? (
+        <RoleDetails
+          api={api}
+          repository={repository}
+          view={view}
+          editor={editor}
+          role={role}
+          actions={{
+            ready: editor !== null,
+            inLevel: role.slug in actions.record,
+            canUp: canMove(actions.movable, role.slug, -1),
+            canDown: canMove(actions.movable, role.slug, 1),
+            onRename: () => actions.setDialog({ kind: 'rename', slug: role.slug }),
+            onMove: (step) => actions.move(role.slug, step),
+            onRemove: () => void actions.askRemove(role.slug, role.name),
+          }}
+        />
+      ) : (
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <p>{t('providers.roles.detailsEmpty')}</p>
+          {view.providers.length === 0 && onProviders ? (
+            <button type="button" className="w-fit underline" onClick={onProviders}>
+              {t('swarm.hints.toProviders')}
+            </button>
+          ) : null}
+        </div>
+      )}
+      <RoleDialogHost api={api} editor={editor} view={view} actions={actions} />
+    </SplitPage>
   );
 }

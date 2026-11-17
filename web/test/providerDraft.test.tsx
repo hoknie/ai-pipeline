@@ -80,6 +80,47 @@ describe('draft', () => {
   });
 });
 
+describe('the own API address of a CLI', () => {
+  const cli = { kind: 'cli', runtime: 'claude' };
+
+  it('is off for a CLI without an endpoint and writes no endpoint', () => {
+    const draft = draftOf('anthropic', { name: 'A', access: [cli] }, 'global');
+    expect(draft.access[0]?.customEndpoint).toBe(false);
+    expect(valueOf(draft).access).toEqual([cli]);
+    expect(formErrors(draft, 'access', new Set(), false)).toEqual({});
+  });
+
+  it('is on when the file has an endpoint, and needs both fields', () => {
+    const draft = draftOf(
+      'zai',
+      { name: 'Z', access: [{ ...cli, endpoint: { base_url: 'https://a.b', key_env: 'K' } }] },
+      'global',
+    );
+    expect(draft.access[0]?.customEndpoint).toBe(true);
+    draft.access[0]!.baseUrl = '';
+    expect(formErrors(draft, 'access', new Set(), false)['access.0.endpoint.base_url']).toBe(
+      'required',
+    );
+  });
+
+  it('writes no endpoint once the switch is off, whatever the fields hold', () => {
+    const draft = presetDraft('zai', []);
+    draft.access[0]!.customEndpoint = false;
+    expect(valueOf(draft).access).toEqual([
+      { kind: 'cli', runtime: 'claude' },
+      { kind: 'cli', runtime: 'opencode', model_prefix: 'zai-coding-plan' },
+    ]);
+    expect(formErrors(draft, 'access', new Set(), true)).toEqual({});
+  });
+
+  it('is on in the presets Z.ai and own endpoint, off in the others', () => {
+    expect(presetDraft('zai', []).access[0]?.customEndpoint).toBe(true);
+    expect(presetDraft('custom', []).access[0]?.customEndpoint).toBe(true);
+    expect(presetDraft('anthropic', []).access[0]?.customEndpoint).toBe(false);
+    expect(presetDraft('openai', []).access[0]?.customEndpoint).toBe(false);
+  });
+});
+
 describe('presets', () => {
   it('gives Anthropic models only for the roles that exist', () => {
     expect(presetDraft('anthropic', []).models).toEqual({});

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { runTitle, taskNumber } from '../../../shared/lib/format.ts';
 import { LANGUAGES, useLanguage, type LanguageChoice } from '../../../shared/i18n/index.ts';
 import { SECTIONS } from '../../sections.ts';
+import { lastSwarmTab, routeOfSwarmTarget, SWARM_TABS } from '../../../features/swarm/index.ts';
 import type { Route } from '../../../shared/lib/nav/route.ts';
 import { runStatusLabel } from '../../../shared/lib/status.ts';
 import type { EditorSpecialist, EditorPipeline, RunView } from '../../../shared/api/types.ts';
@@ -29,11 +30,29 @@ export function SectionsGroup({ go, to }: { go: Go; to: To }) {
         const label = t(`nav.${labelKey}`);
         return (
           <CommandItem
-            key={view}
+            key={labelKey}
             value={`${t('palette.section')} ${label}`}
-            onSelect={() => go(to(view))}
+            onSelect={() =>
+              go(
+                labelKey === 'swarm'
+                  ? routeOfSwarmTarget({ tab: lastSwarmTab(), entry: null })
+                  : to(view),
+              )
+            }
           >
             <Icon />
+            {label}
+          </CommandItem>
+        );
+      })}
+      {SWARM_TABS.map((tab) => {
+        const label = t('swarm.palette', { tab: t(`swarm.tabs.${tab}`) });
+        return (
+          <CommandItem
+            key={`swarm:${tab}`}
+            value={`${t('palette.section')} ${label}`}
+            onSelect={() => go(routeOfSwarmTarget({ tab, entry: null }))}
+          >
             {label}
           </CommandItem>
         );

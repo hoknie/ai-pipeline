@@ -1,5 +1,6 @@
 import type { Dictionary } from '../types.ts';
 import { providersEs } from './providers.es.ts';
+import { swarmEs } from './swarm.es.ts';
 
 /*
  * Glosario: run — ejecución, group — grupo, step — paso, attempt — intento,
@@ -8,6 +9,7 @@ import { providersEs } from './providers.es.ts';
  */
 export const es: Dictionary = {
   providers: providersEs,
+  swarm: swarmEs,
   links: {
     editRun: 'Editar en la página de la ejecución',
     title: 'Enlaces',
@@ -54,6 +56,7 @@ export const es: Dictionary = {
     loadingStats: 'las estadísticas',
   },
   nav: {
+    swarm: 'Enjambre',
     runs: 'Ejecuciones',
     queue: 'Cola',
     specialists: 'Especialistas',
@@ -1789,7 +1792,9 @@ export const es: Dictionary = {
         project_over_global: 'Proyecto sobre compartido',
       },
     },
+    swarmNoteProject: 'El nivel se elige al guardar: proyecto o compartido.',
     group: {
+      swarm: 'Enjambre',
       projects: 'Proyectos',
       general: 'General',
       agents: 'Agentes',
@@ -1804,6 +1809,7 @@ export const es: Dictionary = {
       tags: 'Etiquetas',
     },
     about: {
+      swarm: 'Proveedores, roles, cadenas, especialistas y pipelines en una ventana, por pestañas.',
       projects:
         'Todos los proyectos del daemon: nombre, slug, color, si está activado y su ruta. Los proyectos desactivados también aparecen aquí.',
       observers:

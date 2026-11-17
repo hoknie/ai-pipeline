@@ -5,8 +5,18 @@ import { Empty } from '../../../shared/ui/feedback/empty.tsx';
 import { buttonVariants } from '../../../shared/ui/forms/button.tsx';
 import { PRESET_IDS, PRESET_NAMES } from '../form/presets.ts';
 
+const defaultHref = (preset: string | null) =>
+  preset === null ? '#providers/new' : `#providers/new?preset=${preset}`;
+
 /** No providers yet: what a provider is, and the ways to create the first one. */
-export function EmptyProviders({ onCreate }: { onCreate: (preset: string | null) => void }) {
+export function EmptyProviders({
+  onCreate,
+  hrefOfNew = defaultHref,
+}: {
+  onCreate: (preset: string | null) => void;
+  /** The address of the form of a new provider, for opening in a new tab; the top bar's by default. */
+  hrefOfNew?: (preset: string | null) => string;
+}) {
   const { t } = useTranslation();
   return (
     <Empty
@@ -17,7 +27,7 @@ export function EmptyProviders({ onCreate }: { onCreate: (preset: string | null)
     >
       <p className="max-w-xl">{t('providers.empty.description')}</p>
       <a
-        href="#providers/new"
+        href={hrefOfNew(null)}
         className={buttonVariants({ variant: 'default' })}
         onClick={(event) => {
           event.preventDefault();
@@ -33,7 +43,7 @@ export function EmptyProviders({ onCreate }: { onCreate: (preset: string | null)
         {PRESET_IDS.map((id) => (
           <a
             key={id}
-            href={`#providers/new?preset=${id}`}
+            href={hrefOfNew(id)}
             className={buttonVariants({ variant: 'outline', size: 'sm' })}
             onClick={(event) => {
               event.preventDefault();

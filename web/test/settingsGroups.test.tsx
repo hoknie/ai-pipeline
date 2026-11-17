@@ -18,9 +18,7 @@ describe('groups of settings', () => {
       'delivery',
       'queue',
       'runtimes',
-      'chains',
-      'specialists',
-      'pipelines',
+      'swarm',
       'observers',
       'projects',
       'system',
@@ -30,6 +28,7 @@ describe('groups of settings', () => {
       'agents',
       'delivery',
       'queue',
+      'swarm',
       'tags',
     ]);
   });
@@ -120,37 +119,71 @@ describe('settings addresses', () => {
     expect(formatRoute(route('tags', 'project'))).toBe('#settings/project/tags');
   });
 
-  it('keeps the shared specialist in the address of its group only', () => {
-    expect(parseRoute('#settings/global/specialists/qa')).toEqual({
-      ...route('specialists', 'global'),
-      step: 'qa',
-    });
-    expect(parseRoute('#settings/global/specialists/new').step).toBe('new');
-    expect(parseRoute('#settings/global/specialists').step).toBeNull();
-    expect(parseRoute('#settings/global/delivery/qa').step).toBeNull();
-    // the project tab has no such group
-    expect(parseRoute('#settings/project/specialists')).toEqual(route('general', 'project'));
-    expect(formatRoute({ ...route('specialists', 'global'), step: 'qa' })).toBe(
-      '#settings/global/specialists/qa',
+  const swarm = (
+    scope: string,
+    tab: string,
+    step: string | null = null,
+    section: string | null = null,
+  ) => ({
+    view: 'settings' as const,
+    run: 'swarm',
+    group: scope,
+    step,
+    tab,
+    section,
+    variant: null,
+  });
+
+  it('reads and writes the addresses of the group «Swarm» with the tab of the window and the entry', () => {
+    expect(parseRoute('#settings/global/swarm/providers/anthropic')).toEqual(
+      swarm('global', 'providers', 'anthropic'),
     );
-    expect(formatRoute(route('specialists', 'global'))).toBe('#settings/global/specialists');
-    expect(formatRoute({ ...route('delivery', 'global'), step: 'qa' })).toBe(
-      '#settings/global/delivery',
+    expect(parseRoute('#settings/project/swarm/chains/new')).toEqual(
+      swarm('project', 'chains', 'new'),
+    );
+    expect(parseRoute('#settings/project/swarm/pipelines/actions/commit')).toEqual(
+      swarm('project', 'pipelines', 'commit', 'actions'),
+    );
+    expect(formatRoute(swarm('project', 'pipelines', 'commit', 'actions'))).toBe(
+      '#settings/project/swarm/pipelines/actions/commit',
+    );
+    expect(formatRoute(swarm('global', 'providers', 'anthropic'))).toBe(
+      '#settings/global/swarm/providers/anthropic',
+    );
+    expect(formatRoute(swarm('project', 'roles'))).toBe('#settings/project/swarm/roles');
+  });
+
+  it('opens «Specialists» for a missing or unknown tab of the window', () => {
+    expect(parseRoute('#settings/global/swarm')).toEqual(swarm('global', 'specialists'));
+    expect(parseRoute('#settings/global/swarm/nope')).toEqual(swarm('global', 'specialists'));
+    expect(formatRoute(parseRoute('#settings/global/swarm/nope'))).toBe(
+      '#settings/global/swarm/specialists',
     );
   });
 
-  it('keeps the shared pipeline in the address of its group only', () => {
-    expect(parseRoute('#settings/global/pipelines/quick')).toEqual({
-      ...route('pipelines', 'global'),
-      step: 'quick',
-    });
-    expect(parseRoute('#settings/global/pipelines/new').step).toBe('new');
-    expect(parseRoute('#settings/global/pipelines').step).toBeNull();
-    expect(parseRoute('#settings/project/pipelines')).toEqual(route('general', 'project'));
-    expect(formatRoute({ ...route('pipelines', 'global'), step: 'quick' })).toBe(
-      '#settings/global/pipelines/quick',
+  it('leads the former addresses of the groups of the shared tab to the tabs of the window', () => {
+    expect(parseRoute('#settings/global/specialists/qa')).toEqual(
+      swarm('global', 'specialists', 'qa'),
     );
-    expect(formatRoute(route('pipelines', 'global'))).toBe('#settings/global/pipelines');
+    expect(parseRoute('#settings/global/specialists/new').step).toBe('new');
+    expect(parseRoute('#settings/global/specialists').step).toBeNull();
+    expect(parseRoute('#settings/global/pipelines/quick')).toEqual(
+      swarm('global', 'pipelines', 'quick'),
+    );
+    expect(parseRoute('#settings/global/chains/default')).toEqual(
+      swarm('global', 'chains', 'default'),
+    );
+    expect(parseRoute('#settings/chains')).toEqual(swarm('global', 'chains'));
+    expect(formatRoute(parseRoute('#settings/global/pipelines/quick'))).toBe(
+      '#settings/global/swarm/pipelines/quick',
+    );
+    // the project tab has no such groups
+    expect(parseRoute('#settings/project/specialists')).toEqual(route('general', 'project'));
+    expect(parseRoute('#settings/project/pipelines')).toEqual(route('general', 'project'));
+    expect(parseRoute('#settings/global/delivery/qa').step).toBeNull();
+    expect(formatRoute({ ...route('delivery', 'global'), step: 'qa' })).toBe(
+      '#settings/global/delivery',
+    );
   });
 
   it('sends the former general settings address to the settings page', () => {

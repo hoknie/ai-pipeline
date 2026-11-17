@@ -196,7 +196,7 @@ export const configRequests = [
   }),
   z.object({
     method: z.literal('config_providers'),
-    params: z.object({ repository: z.string().min(1) }),
+    params: z.object({ repository: z.string().min(1), level: z.literal('global').optional() }),
   }),
   z.object({
     method: z.literal('provider_models'),
@@ -204,6 +204,7 @@ export const configRequests = [
       repository: z.string().min(1),
       provider: z.string().min(1),
       refresh: z.boolean().optional(),
+      level: z.literal('global').optional(),
     }),
   }),
 ] as const;

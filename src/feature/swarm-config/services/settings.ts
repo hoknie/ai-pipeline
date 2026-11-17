@@ -21,6 +21,7 @@ import {
   loadAttachmentSettings,
   loadConfig,
   loadConfigSources,
+  loadGlobalConfigSources,
   loadNetworkSettings,
   loadRuntimeSettings,
   loadQueueSettings,
@@ -63,6 +64,11 @@ export class ConfigService {
   /** The merged configuration with the files it was read from; throws `ConfigLoadError`. */
   loadSources(repository: string): LoadedConfig {
     return loadConfigSources(this.pathsOf(repository));
+  }
+
+  /** The shared level alone, without the files of the repository; throws `ConfigLoadError`. */
+  loadGlobalSources(repository: string): LoadedConfig {
+    return loadGlobalConfigSources(this.pathsOf(repository));
   }
 
   /** `delivery.auto`, `delivery.mode` and pipeline names of the repository now. */

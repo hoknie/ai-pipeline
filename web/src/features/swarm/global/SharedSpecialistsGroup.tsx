@@ -1,9 +1,9 @@
-import { ModelCatalogProvider } from '../../shared/lib/catalog/models.tsx';
+import { ModelCatalogProvider } from '../../../shared/lib/catalog/models.tsx';
 import type { RefObject } from 'react';
 
-import type { Api } from '../../shared/api/api.ts';
-import type { ConfigEditorResponse } from '../../shared/api/types.ts';
-import { SplitPage } from '../../shared/ui/layout/EntryList.tsx';
+import type { Api } from '../../../shared/api/api.ts';
+import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
+import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
 import { SharedSpecialistEditor } from './sharedFiles/SharedSpecialistEditor.tsx';
 import { SharedSpecialistsSide } from './sharedFiles/SharedSpecialistsSide.tsx';
 import { useSharedSpecialists } from './sharedFiles/useSharedSpecialists.ts';

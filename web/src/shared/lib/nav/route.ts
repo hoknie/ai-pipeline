@@ -1,4 +1,10 @@
-import { agentTabOf, observerTabOf, settingsLocationOf } from './settingsGroups.ts';
+import {
+  agentTabOf,
+  observerTabOf,
+  settingsLocationOf,
+  swarmLegacyTab,
+  swarmTabOf,
+} from './settingsGroups.ts';
 
 export type View =
   'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
@@ -20,21 +26,56 @@ export interface Route {
   step: string | null;
   /** Tab of the group screen; null for the default log tab. */
   tab: string | null;
+  /** The section of a pipeline entry on the settings tab «Swarm» (`actions`, `system`, `topology`). */
+  section?: string | null;
+  /** The variant of the topology section on the settings tab «Swarm». */
+  variant?: string | null;
+  /** The preset of a new provider on the settings tab «Swarm» (`?preset=`). */
+  preset?: string | null;
   /** Slug of the project of an entry of the specialists or pipelines tab (`?project=`); null: a shared one. */
   project?: string | null;
 }
 
 /** Groups of the shared tab whose third address part opens an entry (a slug, an id or `new`). */
-const SLUG_GROUPS: ReadonlySet<string> = new Set([
-  'specialists',
-  'pipelines',
-  'chains',
-  'projects',
-]);
+const SLUG_GROUPS: ReadonlySet<string> = new Set(['projects']);
+
+/** The route of the group «Swarm»: the tab of the window in `tab`, its entry in `step`. */
+function swarmRoute(first: string | null, second: string | null, parts: (string | null)[]) {
+  const { scope } = settingsLocationOf(first, second);
+  const legacy = swarmLegacyTab(first, second);
+  // an old address of the shared tab: the entry follows the group; a new one: the tab comes first
+  const [tabPart, one, two, three] =
+    legacy === null ? parts : [legacy, parts[0] ?? null, null, null];
+  const tab = swarmTabOf(tabPart ?? null);
+  const isSection = tab === 'pipelines' && isPipelineSection(one ?? null);
+  const sectioned = isSection && two !== null;
+  return {
+    view: 'settings' as const,
+    run: 'swarm',
+    group: scope,
+    step: sectioned ? (two ?? null) : isSection ? null : (one ?? null),
+    tab,
+    section: isSection ? (one ?? null) : null,
+    variant: sectioned && one === 'topology' ? (three ?? null) : null,
+  } satisfies Route;
+}
 
 /** The settings route of `#settings/<tab>/<group>`, or of an old `#settings/<group>`. */
-function settingsRoute(first: string | null, second: string | null, third: string | null): Route {
+function settingsRoute(
+  first: string | null,
+  second: string | null,
+  third: string | null,
+  rest: (string | null)[] = [],
+): Route {
   const { scope, group } = settingsLocationOf(first, second);
+  if (group === 'swarm') {
+    // `#settings/<tab>/swarm/<window tab>/…` carries the tab from the third part; an old one has the entry there
+    return swarmRoute(
+      first,
+      second,
+      swarmLegacyTab(first, second) === null ? [third, ...rest] : [third],
+    );
+  }
   // a shared specialist (or `new`) of the group «Specialists» is the third part; for the
   // observers it is the tab of the group
   const step =
@@ -137,7 +178,16 @@ function parseBase(hash: string): Route {
     }
     return { view: 'specialists', run: decode(rest[0]), group: null, step: null, tab: null };
   }
-  if (head === 'settings') return settingsRoute(decode(rest[0]), decode(rest[1]), decode(rest[2]));
+  if (head === 'settings') {
+    const route = settingsRoute(decode(rest[0]), decode(rest[1]), decode(rest[2]), [
+      decode(rest[3]),
+      decode(rest[4]),
+      decode(rest[5]),
+    ]);
+    return route.run === 'swarm' && params.get('preset')
+      ? { ...route, preset: params.get('preset') }
+      : route;
+  }
   if (head === 'runs') {
     return {
       view: 'runs',
@@ -156,6 +206,24 @@ export function formatRoute(route: Route): string {
     route.view === 'specialists' || route.view === 'pipelines' || route.view === 'providers';
   if (!route.project || !withProject) return base;
   return `${base}${base.includes('?') ? '&' : '?'}project=${encodeURIComponent(route.project)}`;
+}
+
+/** `#settings/<tab>/swarm/<window tab>[/<entry>|/<section>/<id>]`. */
+function swarmHash(scope: string, route: Route): string {
+  const enc = encodeURIComponent;
+  // an old route names the group of the shared tab (`chains`) instead of the tab of the window
+  const tab = swarmTabOf(route.tab ?? swarmLegacyTab(route.group, route.run));
+  const entry = route.step === null ? '' : `/${enc(route.step)}`;
+  const section = tab === 'pipelines' && route.section ? `/${route.section}` : '';
+  const variant =
+    tab === 'pipelines' && route.section === 'topology' && route.step && route.variant
+      ? `/${enc(route.variant)}`
+      : '';
+  const preset =
+    tab === 'providers' && route.step === 'new' && route.preset
+      ? `?preset=${enc(route.preset)}`
+      : '';
+  return `#settings/${scope}/swarm/${tab}${section}${entry}${variant}${preset}`;
 }
 
 function formatBase(route: Route): string {
@@ -179,6 +247,7 @@ function formatBase(route: Route): string {
   }
   if (route.view === 'settings') {
     const place = settingsLocationOf(route.group, route.run);
+    if (place.group === 'swarm') return swarmHash(place.scope, route);
     // an old route with the group only (`run`) leads to its new place
     const { scope, group } = route.group === null ? settingsLocationOf(route.run, null) : place;
     const slug =

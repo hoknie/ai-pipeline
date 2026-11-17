@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../src/app/App.tsx';
-import { SECTIONS } from '../src/app/sections.ts';
+import { SECTION_SHORTCUTS } from '../src/app/sections.ts';
 import { SHORTCUTS } from '../src/app/shortcuts.ts';
 
 import { FakeEventSource, configView, fakeApi, groupView, openFake, queueOf } from './fixtures.ts';
@@ -30,7 +30,7 @@ const press = (key: string, code: string, init: KeyboardEventInit = {}) =>
 
 describe('shortcut list', () => {
   it('has exactly one ctrl row per section and unique combos', () => {
-    for (const section of SECTIONS) {
+    for (const section of SECTION_SHORTCUTS) {
       expect(SHORTCUTS.filter((item) => item.combo === `ctrl+${section.key}`)).toHaveLength(1);
     }
     // the same key may do something else in another group: in the list of runs, of providers

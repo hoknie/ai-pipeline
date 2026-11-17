@@ -1,6 +1,6 @@
 import { useHotkey } from '../../shared/lib/browser/hotkeys.ts';
 import type { NavProps } from '../shell/nav/NavSidebar.tsx';
-import { SECTIONS } from '../sections.ts';
+import { SECTION_SHORTCUTS } from '../sections.ts';
 
 /** Whether the page has selected text. */
 function hasSelection(): boolean {
@@ -16,7 +16,7 @@ export function useAppHotkeys(nav: NavProps): void {
     nav.onNewTask();
   });
   // the list of sections is fixed, so the hooks run in the same order on every render
-  for (const section of SECTIONS) {
+  for (const section of SECTION_SHORTCUTS) {
     useHotkey(`ctrl+${section.key}`, (event) => {
       // with selected text ctrl+c keeps copying instead of going to the settings
       if (section.key === 'c' && hasSelection()) return;

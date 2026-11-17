@@ -1,11 +1,11 @@
 import { Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
-import { notifySuccess } from '../../../shared/lib/browser/notify.ts';
-import type { ConfigEditorResponse, EditorSpecialist } from '../../../shared/api/types.ts';
-import { Empty } from '../../../shared/ui/feedback/empty.tsx';
-import { SpecialistForm } from '../../specialists/index.ts';
+import type { Api } from '../../../../shared/api/api.ts';
+import { notifySuccess } from '../../../../shared/lib/browser/notify.ts';
+import type { ConfigEditorResponse, EditorSpecialist } from '../../../../shared/api/types.ts';
+import { Empty } from '../../../../shared/ui/feedback/empty.tsx';
+import { SpecialistForm } from '../../../specialists/index.ts';
 import { NEW_SHARED } from './constants.ts';
 import type { SharedSpecialistsState } from './useSharedSpecialists.ts';
 

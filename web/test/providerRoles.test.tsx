@@ -62,7 +62,23 @@ function mount(overrides: Parameters<typeof fakeApi>[0] = {}) {
   return api;
 }
 
+/** Opens the details of a role by its line in the list. */
+async function pick(line: RegExp) {
+  const tab = await screen.findByRole('region', { name: 'Roles' });
+  fireEvent.click(within(tab).getByText(line));
+}
+
 describe('the tab «Roles»', () => {
+  it('shows the models of the open role by provider', async () => {
+    mount();
+    expect(await screen.findByText('Pick a role in the list.')).toBeTruthy();
+    await pick(/code · Shared/);
+    const models = await screen.findByRole('region', { name: 'Models of the role' });
+    expect(within(models).getByText('Z.ai')).toBeTruthy();
+    expect(within(models).getByText('Anthropic')).toBeTruthy();
+    expect(within(models).getByText('glm')).toBeTruthy();
+  });
+
   it('lists the roles with the number of providers and shared level by default', async () => {
     mount();
     const tab = await screen.findByRole('region', { name: 'Roles' });
@@ -94,7 +110,7 @@ describe('the tab «Roles»', () => {
 
   it('moves a role down and keeps the others in place', async () => {
     const api = mount();
-    await screen.findByRole('region', { name: 'Roles' });
+    await pick(/think · Shared/);
     await waitFor(() =>
       expect(
         (screen.getByRole('button', { name: 'Move Think down' }) as HTMLButtonElement).disabled,
@@ -110,13 +126,12 @@ describe('the tab «Roles»', () => {
 
   it('moves the selected role with Alt+↓', async () => {
     const api = mount();
-    const tab = await screen.findByRole('region', { name: 'Roles' });
+    await pick(/think · Shared/);
     await waitFor(() =>
       expect(
         (screen.getByRole('button', { name: 'Move Think down' }) as HTMLButtonElement).disabled,
       ).toBe(false),
     );
-    fireEvent.click(within(tab).getByText(/think · Shared/));
     fireEvent.keyDown(window, { key: 'ArrowDown', altKey: true });
     await waitFor(() => expect(api.writeSetting).toHaveBeenCalled());
     expect(Object.keys(vi.mocked(api.writeSetting).mock.calls[0]?.[1] as object)).toEqual([
@@ -127,7 +142,7 @@ describe('the tab «Roles»', () => {
 
   it('removes a role through clearing its cells, one provider after another', async () => {
     const api = mount();
-    await screen.findByRole('region', { name: 'Roles' });
+    await pick(/code · Shared/);
     await waitFor(() =>
       expect(
         (screen.getByRole('button', { name: 'Remove Code' }) as HTMLButtonElement).disabled,
@@ -157,7 +172,7 @@ describe('the tab «Roles»', () => {
         message: 'file changed',
       })),
     });
-    await screen.findByRole('region', { name: 'Roles' });
+    await pick(/code · Shared/);
     await waitFor(() =>
       expect(
         (screen.getByRole('button', { name: 'Remove Code' }) as HTMLButtonElement).disabled,

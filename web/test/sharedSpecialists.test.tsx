@@ -70,7 +70,7 @@ const view = () =>
     pipelines: [],
   });
 
-function show(overrides: Partial<Api> = {}, hash = '#settings/global/specialists') {
+function show(overrides: Partial<Api> = {}, hash = '#settings/global/swarm/specialists') {
   window.location.hash = hash;
   const api = fakeApi({
     queue: vi.fn(async () => queueOf()),
@@ -111,7 +111,7 @@ describe('shared specialists group', () => {
     expect(entries.getByText('Shared plan')).toBeTruthy();
     expect(entries.queryByText('Project plan')).toBeNull();
     const region = screen.getByRole('region', { name: 'Where the settings are saved' });
-    expect(within(region).getByText('/xdg/aip/specialists')).toBeTruthy();
+    expect(within(region).getByText('/xdg/aip')).toBeTruthy();
     expect(screen.queryByLabelText('Project')).toBeNull();
   });
 
@@ -133,15 +133,15 @@ describe('shared specialists group', () => {
   it('changes the address when a specialist is chosen and opens it from the address', async () => {
     show();
     fireEvent.click((await (await list()).findByText('Tester')).closest('button') as HTMLElement);
-    await waitFor(() => expect(window.location.hash).toBe('#settings/global/specialists/qa'));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/swarm/specialists/qa'));
     expect(await screen.findByRole('heading', { name: 'qa' })).toBeTruthy();
   });
 
   it('opens the specialist of the address and nothing for an unknown slug', async () => {
-    show({}, '#settings/global/specialists/writer');
+    show({}, '#settings/global/swarm/specialists/writer');
     expect(await screen.findByRole('heading', { name: 'writer' })).toBeTruthy();
     cleanup();
-    show({}, '#settings/global/specialists/nobody');
+    show({}, '#settings/global/swarm/specialists/nobody');
     await list();
     expect(screen.queryByRole('heading', { name: 'nobody' })).toBeNull();
     expect(screen.getByText('Choose a specialist on the left')).toBeTruthy();
@@ -156,7 +156,7 @@ describe('shared specialists group', () => {
           }),
         ),
       },
-      '#settings/global/specialists/qa',
+      '#settings/global/swarm/specialists/qa',
     );
     const model = await screen.findByRole('combobox', { name: 'Model' });
     expect((model as HTMLButtonElement).disabled).toBe(false);
@@ -175,24 +175,26 @@ describe('shared specialists group', () => {
   });
 
   it('asks before leaving a specialist with unsaved edits', async () => {
-    show({}, '#settings/global/specialists/qa');
+    show({}, '#settings/global/swarm/specialists/qa');
     await chooseModel('opus');
     fireEvent.click((await (await list()).findByText('WRITER')).closest('button') as HTMLElement);
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
-    expect(window.location.hash).toBe('#settings/global/specialists/qa');
+    expect(window.location.hash).toBe('#settings/global/swarm/specialists/qa');
   });
 
   it('creates a new specialist on the shared level and opens it', async () => {
     const api = show();
     fireEvent.click(await screen.findByRole('button', { name: 'New specialist' }));
-    expect(window.location.hash).toBe('#settings/global/specialists/new');
+    expect(window.location.hash).toBe('#settings/global/swarm/specialists/new');
     fireEvent.change(await screen.findByLabelText('Slug'), { target: { value: 'helper' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Helper' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.writeSpecialist).toHaveBeenCalled());
     expect(api.writeSpecialist).toHaveBeenCalledWith('helper', { name: 'Helper' }, null, 'global');
-    await waitFor(() => expect(window.location.hash).toBe('#settings/global/specialists/helper'));
+    await waitFor(() =>
+      expect(window.location.hash).toBe('#settings/global/swarm/specialists/helper'),
+    );
   });
 
   it('hints the shared defaults, not the project ones', async () => {
@@ -211,7 +213,7 @@ describe('shared specialists group', () => {
           }),
         ),
       },
-      '#settings/global/specialists/qa',
+      '#settings/global/swarm/specialists/qa',
     );
     await screen.findByLabelText('Model');
     expect(screen.getAllByText(/read \(from defaults\)/).length).toBeGreaterThan(0);
@@ -221,7 +223,7 @@ describe('shared specialists group', () => {
 
 describe('usage of a shared specialist', () => {
   it('shows the number of projects, their references and the shared level', async () => {
-    show({}, '#settings/global/specialists/qa');
+    show({}, '#settings/global/swarm/specialists/qa');
     const block = within(await screen.findByRole('region', { name: 'Used in projects' }));
     expect((await block.findByTestId('usage-count')).textContent).toBe('Projects: 2');
     const items = block.getAllByRole('listitem');
@@ -234,7 +236,7 @@ describe('usage of a shared specialist', () => {
   });
 
   it('says that the specialist is not used', async () => {
-    show({}, '#settings/global/specialists/writer');
+    show({}, '#settings/global/swarm/specialists/writer');
     const block = within(await screen.findByRole('region', { name: 'Used in projects' }));
     expect(await block.findByText('Not used in any project')).toBeTruthy();
     expect(block.getByTestId('usage-count').textContent).toBe('Projects: 0');
@@ -243,7 +245,7 @@ describe('usage of a shared specialist', () => {
   it('keeps the form when the usage cannot be loaded and blocks delete', async () => {
     show(
       { sharedSpecialists: vi.fn(async () => Promise.reject(new Error('daemon is down'))) },
-      '#settings/global/specialists/writer',
+      '#settings/global/swarm/specialists/writer',
     );
     expect(await screen.findByText('Could not load usage: daemon is down')).toBeTruthy();
     expect(screen.getByLabelText('Model')).toBeTruthy();
@@ -253,7 +255,7 @@ describe('usage of a shared specialist', () => {
   });
 
   it('disables Delete while the specialist is used and explains why', async () => {
-    show({}, '#settings/global/specialists/qa');
+    show({}, '#settings/global/swarm/specialists/qa');
     const button = await screen.findByRole('button', { name: 'Delete' });
     await screen.findByTestId('usage-count');
     expect((button as HTMLButtonElement).disabled).toBe(true);
@@ -273,7 +275,7 @@ describe('usage of a shared specialist', () => {
             }) as never,
         ),
       },
-      '#settings/global/specialists/writer',
+      '#settings/global/swarm/specialists/writer',
     );
     const button = (await screen.findByRole('button', { name: 'Delete' })) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
@@ -282,7 +284,7 @@ describe('usage of a shared specialist', () => {
   });
 
   it('deletes an unused specialist after confirmation and goes back to the list', async () => {
-    const api = show({}, '#settings/global/specialists/writer');
+    const api = show({}, '#settings/global/swarm/specialists/writer');
     const button = (await screen.findByRole('button', { name: 'Delete' })) as HTMLButtonElement;
     await waitFor(() => expect(button.disabled).toBe(false));
     fireEvent.click(button);
@@ -292,7 +294,7 @@ describe('usage of a shared specialist', () => {
     await waitFor(() =>
       expect(api.deleteSpecialist).toHaveBeenCalledWith('writer', 'g-writer', 'global'),
     );
-    await waitFor(() => expect(window.location.hash).toBe('#settings/global/specialists'));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/swarm/specialists'));
   });
 
   it('shows the refusal of the daemon with repositories and rereads the usage', async () => {
@@ -320,7 +322,7 @@ describe('usage of a shared specialist', () => {
           references: [{ pipeline: 'f', step: 's', repository: '/work/lib' }],
         })),
       },
-      '#settings/global/specialists/writer',
+      '#settings/global/swarm/specialists/writer',
     );
     const button = (await screen.findByRole('button', { name: 'Delete' })) as HTMLButtonElement;
     await waitFor(() => expect(button.disabled).toBe(false));

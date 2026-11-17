@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { Api } from '../../../shared/api/api.ts';
-import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
+import type { Api } from '../../../../shared/api/api.ts';
+import { useConfirm } from '../../../../shared/ui/overlays/confirm.tsx';
 import type {
   ConfigCatalogResponse,
   ConfigEditorResponse,
   EditorSpecialist,
   SharedSpecialistsView,
-} from '../../../shared/api/types.ts';
+} from '../../../../shared/api/types.ts';
 
 /** The specialist as its shared file has it: the only file this group edits. */
 function sharedOf(specialist: EditorSpecialist): EditorSpecialist | null {
