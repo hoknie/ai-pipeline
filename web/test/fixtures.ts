@@ -888,6 +888,7 @@ export function fakeApi(overrides: Partial<Api> = {}): Api & { calls: [string, s
     addTag: vi.fn(async (name: string) => [tagView(name)]),
     editTag: vi.fn(async () => []),
     removeTag: vi.fn(async () => []),
+    removeTags: vi.fn(async () => []),
     setRunTitle: vi.fn(async () => runView()),
     cancelAutoDelivery: vi.fn(async () => runView({ autoDeliver: false })),
     setRunTags: vi.fn(async () => runView()),

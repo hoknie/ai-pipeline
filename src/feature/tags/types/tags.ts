@@ -141,11 +141,6 @@ export function editTag(
   return { ...tag, name: next, color };
 }
 
-/** Returns the tag to remove; the catalog itself is not modified. */
-export function removeTag(catalog: readonly Tag[], name: string): Tag {
-  return findTag(catalog, name);
-}
-
 /** Names to ids; no duplicates, order of first appearance, an unknown name rejects all. */
 export function resolveTags(catalog: readonly Tag[], names: readonly string[]): string[] {
   const ids: string[] = [];

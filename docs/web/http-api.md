@@ -161,7 +161,7 @@ Writing `settings.yaml`:
 | `GET /api/tags` | The catalog of a repository |
 | `POST /api/tags` | Creates a tag |
 | `POST /api/tags/edit` | Changes a tag |
-| `POST /api/tags/remove` | Removes a tag |
+| `POST /api/tags/remove` | Removes a tag (`{tag}`) or several at once (`{tags}`: all of them or none) |
 
 ## Repositories
 

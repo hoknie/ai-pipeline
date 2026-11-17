@@ -377,7 +377,7 @@ describe('tags of linked tasks', () => {
     const cells = document.querySelectorAll('[data-tag-cells]');
     expect(cells).toHaveLength(2);
     for (const row of cells) {
-      expect(row.className).toContain('sm:grid-cols-[10rem_minmax(0,16rem)_9rem_auto]');
+      expect(row.className).toContain('sm:grid-cols-[auto_10rem_minmax(0,16rem)_9rem_auto]');
     }
   });
 });
@@ -401,5 +401,142 @@ describe('catalogs per repository', () => {
     expect(replaceTags(current, [tagView('auth', 'blue', 'a')], '/repo')).toBe(current);
     expect(replaceTags(current, [lib('x', 'x')], '/repo').map((tag) => tag.name)).toEqual(['ui']);
     expect(replaceTags(current, [], null)).toBe(current);
+  });
+});
+
+describe('bulk tag selection', () => {
+  const tags = () => screen.getByRole('region', { name: 'Tags' });
+  const open = async (list: TagView[], overrides: Partial<Api> = {}) => {
+    const api = boot('#settings/tags', list, [runView()], overrides);
+    await screen.findByRole('region', { name: 'Tags' });
+    return api;
+  };
+  const pick = (name: string) =>
+    fireEvent.click(within(tags()).getByRole('checkbox', { name: `Select tag ${name}` }));
+  const all = () =>
+    within(tags()).getAllByRole('checkbox', { name: 'Select all tags of the card' });
+  const catalog = () => [
+    tagView('auth', 'blue', 'a'),
+    tagView('v2', 'red', 'b'),
+    linkedTag('cards-half-width'),
+  ];
+
+  it('selects all tags of one card only and shows the mixed state', async () => {
+    await open(catalog());
+    expect(within(tags()).queryByText(/^Selected:/)).toBeNull();
+    pick('auth');
+    expect(all()[0]!.getAttribute('data-state')).toBe('indeterminate');
+    expect(within(tags()).getByText('Selected: 1')).toBeTruthy();
+    fireEvent.click(all()[0]!);
+    expect(all()[0]!.getAttribute('data-state')).toBe('checked');
+    expect(all()[1]!.getAttribute('data-state')).toBe('unchecked');
+    expect(within(tags()).getByText('Selected: 2')).toBeTruthy();
+    fireEvent.click(within(tags()).getByRole('button', { name: 'Clear selection' }));
+    expect(within(tags()).queryByText(/^Selected:/)).toBeNull();
+  });
+
+  it('removes the selected tags with one request after one confirmation', async () => {
+    const api = await open(catalog(), {
+      removeTags: vi.fn(async () => [tagView('v2', 'red', 'b')]),
+    });
+    pick('auth');
+    fireEvent.click(all()[1]!);
+    fireEvent.click(within(tags()).getByRole('button', { name: 'Delete selected' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Delete tags: 2?')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(api.removeTags).toHaveBeenCalledWith(['auth', 'cards-half-width']));
+    expect(api.removeTags).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(within(tags()).queryByLabelText('Name of tag auth')).toBeNull());
+    expect(within(tags()).queryByText(/^Selected:/)).toBeNull();
+  });
+
+  it('keeps the selection when the confirmation is declined', async () => {
+    const api = await open(catalog());
+    pick('auth');
+    fireEvent.click(within(tags()).getByRole('button', { name: 'Delete selected' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.removeTags).not.toHaveBeenCalled();
+    expect(within(tags()).getByText('Selected: 1')).toBeTruthy();
+  });
+
+  it('shows the error and keeps the selection when the removal fails', async () => {
+    await open(catalog(), {
+      removeTags: vi.fn(async () => {
+        throw new ApiError(400, 'unknown tag `auth`');
+      }),
+    });
+    pick('auth');
+    fireEvent.click(within(tags()).getByRole('button', { name: 'Delete selected' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(await within(tags()).findByText('unknown tag `auth`')).toBeTruthy();
+    expect(within(tags()).getByText('Selected: 1')).toBeTruthy();
+  });
+
+  it('resets the selection when the project changes and does not bring it back', async () => {
+    const entry = (path: string) => ({
+      path,
+      displayPath: path,
+      addedAt: 1,
+      unfinished: 0,
+      waiting: 0,
+      queued: 0,
+    });
+    window.localStorage.setItem('aip.web.repository', JSON.stringify('/repo'));
+    const lib = { ...tagView('lib-only', 'red', 'b'), repository: '/work/lib' };
+    window.location.hash = '#settings/project/tags';
+    render(<App api={fakeApi({ runs: vi.fn(async () => [runView()]) })} openStream={openFake} />);
+    act(() => {
+      stream().open();
+      stream().send({
+        event: 'snapshot',
+        seq: 1,
+        runs: [runView()],
+        queues: [queueOf({ repository: '/repo' }), queueOf({ repository: '/work/lib' })],
+        tags: [...catalog(), lib],
+        repositories: [entry('/repo'), entry('/work/lib')],
+      });
+    });
+    await screen.findByRole('region', { name: 'Tags' });
+    pick('auth');
+    expect(within(tags()).getByText('Selected: 1')).toBeTruthy();
+    const switchTo = async (name: string) => {
+      const select = await screen.findByRole('combobox', { name: 'Project' });
+      fireEvent.keyDown(select, { key: 'Enter' });
+      fireEvent.click(await screen.findByRole('option', { name }));
+    };
+    await switchTo('lib');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Project' }).textContent).toBe('lib'),
+    );
+    await within(tags()).findByLabelText('Name of tag lib-only');
+    expect(within(tags()).queryByText(/^Selected:/)).toBeNull();
+    await switchTo('repo');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Project' }).textContent).toBe('repo'),
+    );
+    await within(tags()).findByLabelText('Name of tag auth');
+    expect(within(tags()).queryByText(/^Selected:/)).toBeNull();
+    for (const box of within(tags()).getAllByRole('checkbox')) {
+      expect(box.getAttribute('data-state')).toBe('unchecked');
+    }
+  });
+
+  it('drops a tag that left the catalog from the selection', async () => {
+    await open(catalog());
+    pick('auth');
+    pick('v2');
+    expect(within(tags()).getByText('Selected: 2')).toBeTruthy();
+    act(() =>
+      stream().send({
+        event: 'tags',
+        seq: 2,
+        tags: [tagView('v2', 'red', 'b'), linkedTag('cards-half-width')],
+      }),
+    );
+    await waitFor(() => expect(within(tags()).getByText('Selected: 1')).toBeTruthy());
   });
 });

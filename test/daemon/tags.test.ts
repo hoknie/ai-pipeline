@@ -290,6 +290,55 @@ describe('tag removal', () => {
   });
 });
 
+describe('bulk tag removal', () => {
+  it('removes a list in one request with one tags event', async () => {
+    const h = await start();
+    for (const name of ['auth', 'v2', 'keep']) await addTag(h, name);
+    const finished = await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      groups: [{ title: 'g', task: 't' }],
+      tags: ['auth', 'v2', 'keep'],
+    });
+    await h.waitFor(finished.runId, (run) => run.finished);
+    await waitQueue(h, (queue) => queue.status === 'stopped');
+    await h.call('queue_add', {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'x',
+      tags: ['auth', 'v2', 'keep'],
+    });
+    const events: StreamEvent[] = [];
+    void subscribe(h.socket, (line) => events.push(streamEventSchema.parse(JSON.parse(line))));
+    await until('the snapshot', () => events.length > 0);
+    const before = events.length;
+    const left = (await h.call('tag_remove', {
+      repository: h.repo,
+      tags: ['AUTH', 'v2', 'auth'],
+    })) as TagView[];
+    expect(names(left)).toEqual(['keep']);
+    await until('a tags event', () => events.some((event) => event.event === 'tags'));
+    const fresh = events.slice(before);
+    expect(fresh.filter((event) => event.event === 'tags')).toHaveLength(1);
+    expect(fresh.filter((event) => event.event === 'run')).toHaveLength(1);
+    expect(names((await h.status(finished.runId)).tags)).toEqual(['keep']);
+    expect(names((await queueOf(h)).items[0]!.tags)).toEqual(['keep']);
+    await h.restart();
+    expect(names(await tagsOf(h))).toEqual(['keep']);
+  });
+
+  it('removes nothing when one name is unknown', async () => {
+    const h = await start();
+    await addTag(h, 'auth');
+    await expect(
+      h.call('tag_remove', { repository: h.repo, tags: ['auth', 'nope'] }),
+    ).rejects.toThrow('unknown tag `nope`');
+    expect(names(await tagsOf(h))).toEqual(['auth']);
+    await h.restart();
+    expect(names(await tagsOf(h))).toEqual(['auth']);
+  });
+});
+
 describe('tag events', () => {
   it('sends the catalog in the snapshot and a tags event to a subscriber', async () => {
     const h = await start();
@@ -846,6 +895,17 @@ describe('tags of linked tasks', () => {
     await h.waitFor(created.runId, (run) => run.finished);
     return { h, explore: await h.status(created.runId) };
   }
+
+  it('removes a linked tag together with regular ones in one list', async () => {
+    const { h, explore } = await chain();
+    await addTag(h, 'v2');
+    await h.call('run_tags', { runId: explore.id, add: ['v2'] });
+    expect(names((await h.status(explore.id)).tags)).toContain('v2');
+    await h.call('tag_remove', { repository: h.repo, tags: ['v2', 'fix-login'] });
+    expect(names(await tagsOf(h))).toEqual([]);
+    expect(names((await h.status(explore.id)).tags)).toEqual([]);
+    expect(names((await queueOf(h)).items[0]!.tags)).toEqual([]);
+  });
 
   it('makes the automatic tag indigo with the source task, and keeps it after a restart', async () => {
     const { h, explore } = await chain();

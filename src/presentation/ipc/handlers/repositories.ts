@@ -37,6 +37,13 @@ export const repositoryHandlers = {
     ),
   tag_remove: (params, { services }) =>
     services.runs.engine.serial(async () =>
-      catalogView(services.tags.of(await services.queue.taskTags.remove(params))),
+      catalogView(
+        services.tags.of(
+          await services.queue.taskTags.remove({
+            repository: params.repository,
+            tags: params.tags ?? (params.tag === undefined ? [] : [params.tag]),
+          }),
+        ),
+      ),
     ),
 } satisfies Partial<HandlerTable>;

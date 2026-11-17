@@ -31,6 +31,8 @@ export interface QueueApi {
   /** Renames and/or recolors a tag, addressed by its current name; returns the catalog. */
   editTag(tag: string, patch: { name?: string; color?: string }): Promise<TagView[]>;
   removeTag(tag: string): Promise<TagView[]>;
+  /** Removes several tags at once: all of them or none; returns the catalog. */
+  removeTags(tags: string[]): Promise<TagView[]>;
   /** The queue of the bound repository. */
   queue(): Promise<QueueView>;
   queueAdd(fields: QueueFields): Promise<QueueView & { item: string }>;
@@ -56,6 +58,7 @@ export function queueApi(at: (path: string) => string): QueueApi {
     addTag: (name, color) => post(at('/api/tags'), color ? { name, color } : { name }),
     editTag: (tag, patch) => post(at('/api/tags/edit'), { tag, ...patch }),
     removeTag: (tag) => post(at('/api/tags/remove'), { tag }),
+    removeTags: (tags) => post(at('/api/tags/remove'), { tags }),
     queue: () => call(at('/api/queue')),
     queueAdd: (fields) => post(at('/api/queue/items'), fields),
     queueAddProjects: (fields) => post(at('/api/queue/projects'), fields),

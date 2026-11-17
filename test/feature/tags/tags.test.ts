@@ -17,7 +17,6 @@ import {
   withoutLinkedTags,
   knownTags,
   mergeTags,
-  removeTag,
   resolveManualTags,
   resolveTags,
 } from '../../../src/feature/tags/types/index.ts';
@@ -88,11 +87,6 @@ describe('tag catalog', () => {
     expect(() => editTag(catalog, 'v2', { name: 'AUTH' })).toThrow('already exists');
     expect(() => editTag(catalog, 'v2', {})).toThrow(AppError);
     expect(editTag(catalog, 'V2', { color: 'teal' }).color).toBe('teal');
-  });
-
-  it('finds the tag to remove by name', () => {
-    expect(removeTag(catalogOf('auth'), ' AUTH ').id).toBe('tg-0');
-    expect(() => removeTag(catalogOf('auth'), 'nope')).toThrow('unknown tag `nope`');
   });
 });
 

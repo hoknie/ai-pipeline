@@ -8,7 +8,6 @@ import {
   knownTags,
   linkedTagOf,
   mergeTags,
-  removeTag,
   resolveManualTags,
   resolveTags,
   type Tag,
@@ -37,32 +36,35 @@ export class TaskTags {
   }
 
   /**
-   * `tag_remove`: takes the tag off every run and queue item, in the database and in memory,
-   * then publishes. Returns the root of the repository whose catalog changed.
+   * `tag_remove`: takes the tags off every run and queue item, in the database and in memory,
+   * then publishes once. All names are resolved first: an unknown one rejects the whole request.
+   * Returns the root of the repository whose catalog changed.
    */
-  async remove(params: { repository: string; tag: string }): Promise<string> {
+  async remove(params: { repository: string; tags: readonly string[] }): Promise<string> {
     const { database, store, tags, registry, runs, now } = this.dependencies;
     const repository = await registry.rootOf(params.repository);
-    const { id } = removeTag(tags.of(repository), params.tag);
+    const ids = new Set(resolveTags(tags.of(repository), params.tags));
+    const hit = (list: readonly string[]) => list.some((tag) => ids.has(tag));
+    const keep = (list: readonly string[]) => list.filter((tag) => !ids.has(tag));
     // Three tables, one transaction: the scenario is opened here, each feature changes its own.
     database.transaction(() => {
-      tags.deleteStored(repository, id);
-      runs.states.changeStored(repository, { dropTag: id });
-      store.dropTag(repository, id);
+      for (const id of ids) {
+        tags.deleteStored(repository, id);
+        runs.states.changeStored(repository, { dropTag: id });
+        store.dropTag(repository, id);
+      }
     });
-    tags.forget(id);
+    for (const id of ids) tags.forget(id);
     for (const state of runs.states.all()) {
-      if (state.run.repository === repository && state.run.tags.includes(id)) {
-        const rest = state.run.tags.filter((tag) => tag !== id);
-        await runs.engine.apply(state, { kind: 'tags_set', tags: rest });
+      if (state.run.repository === repository && hit(state.run.tags)) {
+        await runs.engine.apply(state, { kind: 'tags_set', tags: keep(state.run.tags) });
       }
     }
     for (const queue of store.all()) {
       if (queue.repository !== repository) continue;
-      const inFilter = queue.filter.tags.includes(id);
-      if (!inFilter && !queue.items.some((item) => item.tags.includes(id))) continue;
-      for (const item of queue.items) item.tags = item.tags.filter((tag) => tag !== id);
-      queue.filter = { ...queue.filter, tags: queue.filter.tags.filter((tag) => tag !== id) };
+      if (!hit(queue.filter.tags) && !queue.items.some((item) => hit(item.tags))) continue;
+      for (const item of queue.items) item.tags = keep(item.tags);
+      queue.filter = { ...queue.filter, tags: keep(queue.filter.tags) };
       queue.updatedAt = now();
       store.save(queue);
     }

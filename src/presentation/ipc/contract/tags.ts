@@ -27,7 +27,15 @@ export const tagsRequests = [
   }),
   z.object({
     method: z.literal('tag_remove'),
-    params: z.object({ repository: queueRepository, tag: z.string().min(1) }),
+    params: z
+      .object({
+        repository: queueRepository,
+        tag: z.string().min(1).optional(),
+        tags: z.array(z.string().min(1)).min(1).max(200).optional(),
+      })
+      .refine((params) => (params.tag === undefined) !== (params.tags === undefined), {
+        message: 'pass a tag or a list of tags',
+      }),
   }),
   z.object({
     method: z.literal('run_tags'),

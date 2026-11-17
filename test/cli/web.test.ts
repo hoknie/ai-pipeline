@@ -557,6 +557,11 @@ describe('aip web', () => {
     expect((await post('/api/tags/remove', { tag: 'nope' })).status).toBe(400);
     expect((await post('/api/tags/remove', { tag: 'login' })).status).toBe(200);
     expect(await names()).toEqual([]);
+    for (const name of ['a1', 'b1']) await post('/api/tags', { name });
+    expect((await post('/api/tags/remove', { tags: [] })).status).toBe(400);
+    expect((await post('/api/tags/remove', { tag: 'a1', tags: ['b1'] })).status).toBe(400);
+    expect((await post('/api/tags/remove', { tags: ['a1', 'b1'] })).status).toBe(200);
+    expect(await names()).toEqual([]);
   });
 
   it('changes the title of a run through the API', async () => {

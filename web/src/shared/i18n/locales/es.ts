@@ -1131,6 +1131,15 @@ export const es: Dictionary = {
       removeDescription: 'La etiqueta se quitará de todas las tareas y ejecuciones del proyecto.',
       keep: 'Conservar',
       removed: 'Etiqueta eliminada',
+      select: 'Seleccionar la etiqueta {{name}}',
+      selectAll: 'Seleccionar todas las etiquetas de la tarjeta',
+      selected: 'Seleccionadas: {{count}}',
+      clearSelection: 'Quitar la selección',
+      removeSelected: 'Eliminar las seleccionadas',
+      removeSelectedTitle: '¿Eliminar etiquetas: {{count}}?',
+      removeSelectedDescription:
+        'Las etiquetas se quitarán de todas las tareas y ejecuciones del proyecto.',
+      removedMany: 'Etiquetas eliminadas: {{count}}',
     },
   },
   pathPicker: {

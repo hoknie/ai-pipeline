@@ -587,6 +587,10 @@ describe('tag requests', () => {
     bad('tag_edit', { repository, tag: 'auth' });
     ok('tag_remove', { repository, tag: 'auth' });
     bad('tag_remove', { repository });
+    ok('tag_remove', { repository, tags: ['a', 'b'] });
+    bad('tag_remove', { repository, tags: [] });
+    bad('tag_remove', { repository, tag: 'a', tags: ['a'] });
+    bad('tag_remove', { repository, tags: Array.from({ length: 201 }, (_, i) => `t${i}`) });
   });
 
   it('rejects the catalog methods without a repository, naming the field', () => {

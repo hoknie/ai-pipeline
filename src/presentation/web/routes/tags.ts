@@ -12,7 +12,11 @@ const tagEditBody = z
     message: 'pass a new name or a new color',
   });
 
-const tagRemoveBody = z.object({ tag: tagName });
+const tagRemoveBody = z
+  .object({ tag: tagName.optional(), tags: z.array(tagName).min(1).max(200).optional() })
+  .refine((body) => (body.tag === undefined) !== (body.tags === undefined), {
+    message: 'pass a tag or a list of tags',
+  });
 
 const runTagsBody = z
   .object({ add: z.array(tagName).max(20).optional(), remove: z.array(tagName).max(20).optional() })

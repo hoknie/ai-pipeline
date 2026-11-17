@@ -87,6 +87,8 @@ describe('queue take filter', () => {
     expect(after.filter.pipelines).toEqual(['feature']);
     expect(after.filter.tags).toHaveLength(1);
     expect(after.filterTags.map((tag) => tag.name)).toEqual(['v2']);
+    await h.call('tag_remove', { repository: h.repo, tags: ['v2'] });
+    expect((await queueOf(h)).filter.tags).toEqual([]);
     const cleared = (await h.call('queue_settings', {
       repository: h.repo,
       filter: { tags: [] },

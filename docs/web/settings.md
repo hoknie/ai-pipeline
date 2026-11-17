@@ -22,7 +22,7 @@ Quota pools (`queue.pools`, `queue.default_pool`) are written in `settings.yaml`
 "General", "Agents", "Delivery", "Queue" and "Tags".
 
 - ["Queue"](queue.md#queue-modes) holds the modes of the queue, which switch at once without "Save".
-- "Tags" is the [tag catalog](../usage/tags.md) of the repository, in two cards: "Regular tags" (label, name, color, delete) and, when there are any, "Linked task tags" (name and delete, without a color choice).
+- "Tags" is the [tag catalog](../usage/tags.md) of the repository, in two cards: "Regular tags" (label, name, color, delete) and, when there are any, "Linked task tags" (name and delete, without a color choice). Tags are selected with checkboxes (also "all in the card") and deleted together with "Delete selected" after one confirmation.
 
 [Linked task tags](../usage/tags.md#linked-task-tags) are shown as `#115: name`. The label is a link to the task that created the tag. These tags are not offered in the tag pickers, cannot be created there, and are never sent when other tags of a task or run change.
 
