@@ -65,7 +65,7 @@ export function takesProject(filter: GlobalFilter, repository: string): boolean 
   return filter.projects.length === 0 || filter.projects.includes(repository);
 }
 
-/** Whether an item's project-specific tag ids match any selected name. */
+/** Whether an item's project-specific tag ids match every selected name. */
 export function takesTags(
   filter: GlobalFilter,
   ids: readonly string[],
@@ -73,7 +73,7 @@ export function takesTags(
 ): boolean {
   return (
     filter.tags.length === 0 ||
-    filter.tags.some((name) => {
+    filter.tags.every((name) => {
       const tag = tagNamed(catalog, name);
       return tag !== undefined && ids.includes(tag.id);
     })

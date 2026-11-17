@@ -47,7 +47,7 @@ With `queue.scope: global` in the shared [`settings.yaml`](../configuration/READ
 
 - The state, `parallel`, autopilot, auto answer, skip failed, `on limit`, the reason for stopping, the runs holding a place and the skipped runs are those of the global queue. The settings of the project queues do not apply and are kept for the way back.
 - Agents of all projects together are limited by `queue.max`, and [pools](../configuration/README.md#queue) can split these places between runtimes and models. `max` of a repository does not apply.
-- Tasks of a disabled project are not taken. The take filter selects pipelines, projects and tag names across projects; a task matches a nonempty tag filter if it has at least one of those names.
+- Tasks of a disabled project are not taken. The take filter selects pipelines, projects and tag names across projects; a task matches a nonempty tag filter if it has every one of those names.
 - `aip queue start`, `pause`, `parallel`, `settings`, `move` and `list` work with the global queue. `--repo` is ignored with the warning `queue scope is global: --repo is ignored`. `aip queue add --repo` still picks the project of the task, and the task goes to the end of the order. The position of `aip queue move` is a place among the tasks of all projects.
 - A task may wait for a task of another project; the same goes for the `swarm_queue*` tools, which answer with the global queue.
 - Changing the mode pauses every queue; running runs go on. Going back to `project` gives each project queue its tasks in their global order.
@@ -136,7 +136,7 @@ aip queue unlink <task> related <target>
 | `--default-autopilot-answer` | Restores the default text |
 | `--on-limit wait\|stop` | What happens on a usage limit (see [Usage limit](#usage-limit)) |
 | `--filter-pipelines <ids>` | Take only tasks of these pipelines (comma-separated; an empty string means any) |
-| `--filter-tags <names>` | Take only tasks with at least one of these tags (comma-separated; an empty string means any) |
+| `--filter-tags <names>` | Take only tasks with all of these tags (comma-separated; an empty string means any) |
 
 ```
 aip queue settings --autopilot on
@@ -151,7 +151,7 @@ A call without settings is refused with `pass parallel, autopilot, autoAnswer, a
 
 ### Take filter
 
-The take filter tells a running queue which new tasks to take: the pipeline must be one of `--filter-pipelines` (when set) and the task must have at least one of `--filter-tags` (when set). A task that does not fit waits in its place, marked `filtered out` in `aip queue list` and in the panel. It does not stop the queue. A queue without autopilot stops when nothing that fits is left.
+The take filter tells a running queue which new tasks to take: the pipeline must be one of `--filter-pipelines` (when set) and the task must have every one of `--filter-tags` (when set). A task that does not fit waits in its place, marked `filtered out` in `aip queue list` and in the panel. It does not stop the queue. A queue without autopilot stops when nothing that fits is left.
 
 - The filter changes only while the queue is stopped; a running queue refuses it with `queue filter can be changed only while the queue is stopped`.
 - Returned and frozen runs are taken regardless of the filter; "Run now" ignores it.

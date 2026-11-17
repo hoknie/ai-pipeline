@@ -39,6 +39,31 @@ describe('queue take filter', () => {
     expect(await allRuns(h)).toHaveLength(1);
   });
 
+  it('takes only the tasks that have every tag of the filter', async () => {
+    const h = await start();
+    h.script({ code: [{}] });
+    await h.call('tag_add', { repository: h.repo, name: 'v0.3.0' });
+    await h.call('tag_add', { repository: h.repo, name: 'auth' });
+    await h.call('queue_settings', { repository: h.repo, parallel: 2 });
+    const a = await add(h, 'A', { tags: ['v0.3.0'] });
+    const b = await add(h, 'B', { tags: ['v0.3.0', 'auth'] });
+    const c = await add(h, 'C', { tags: ['auth'] });
+    const view = (await h.call('queue_settings', {
+      repository: h.repo,
+      filter: { tags: ['v0.3.0', 'auth'] },
+    })) as QueueView;
+    expect(itemById(view, a.item)?.filtered).toBe(true);
+    expect(itemById(view, b.item)?.filtered).toBe(false);
+    expect(itemById(view, c.item)?.filtered).toBe(true);
+    await h.call('queue_start', { repository: h.repo });
+    const done = await waitQueue(
+      h,
+      (queue) => queue.items.length === 2 && queue.runs.length === 0 && queue.status === 'stopped',
+    );
+    expect(done.items.map((item) => item.id)).toEqual([a.item, c.item]);
+    expect(await allRuns(h)).toHaveLength(1);
+  });
+
   it('refuses a filter in a running queue and keeps the other settings', async () => {
     const h = await start(TWO_PIPELINES);
     h.script({ code: [{ waitFor: h.gate('a') }] });

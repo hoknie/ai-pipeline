@@ -219,7 +219,7 @@ export function addSettings(kit: QueueKit): void {
       )
       .option('--default-autopilot-answer', 'answer with the default text again')
       .option('--filter-pipelines <ids>', 'take only these pipelines (comma-separated)')
-      .option('--filter-tags <names>', 'take only tasks with one of these tags'),
+      .option('--filter-tags <names>', 'take only tasks with all of these tags'),
   )
     .addHelpText(
       'after',

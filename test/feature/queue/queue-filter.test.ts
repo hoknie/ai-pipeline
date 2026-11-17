@@ -5,6 +5,7 @@ import {
   advance,
   emptyQueue,
   isFilterEmpty,
+  takesTags,
   matchesFilter,
   setQueueFilter,
   setQueueSettings,
@@ -30,7 +31,7 @@ describe('take filter', () => {
     expect(queue.items.every((item) => matchesFilter(queue.filter, item))).toBe(true);
   });
 
-  it('needs the pipeline and at least one tag', () => {
+  it('needs the pipeline and every tag', () => {
     const queue = queueOf();
     const [a, b, c] = queue.items as [
       (typeof queue.items)[0],
@@ -39,7 +40,10 @@ describe('take filter', () => {
     ];
     expect(matchesFilter({ pipelines: ['feature'], tags: [] }, a)).toBe(true);
     expect(matchesFilter({ pipelines: ['feature'], tags: [] }, b)).toBe(false);
-    expect(matchesFilter({ pipelines: [], tags: ['v2', 'x'] }, b)).toBe(true);
+    expect(matchesFilter({ pipelines: [], tags: ['v2', 'x'] }, b)).toBe(false);
+    expect(matchesFilter({ pipelines: [], tags: ['auth', 'v2'] }, b)).toBe(true);
+    expect(matchesFilter({ pipelines: [], tags: ['v2', 'auth'] }, a)).toBe(false);
+    expect(matchesFilter({ pipelines: [], tags: [] }, c)).toBe(true);
     expect(matchesFilter({ pipelines: [], tags: ['v2'] }, a)).toBe(false);
     expect(matchesFilter({ pipelines: ['feature'], tags: ['auth'] }, a)).toBe(true);
     expect(matchesFilter({ pipelines: ['feature'], tags: ['auth'] }, b)).toBe(false);
@@ -121,5 +125,20 @@ describe('take filter', () => {
     startQueue(queue, [], 6);
     advance(queue, [], none, 7);
     expect(queue.status).toBe('stopped');
+  });
+});
+
+describe('global tag filter', () => {
+  const catalog = [
+    { id: 't1', name: 'Auth' },
+    { id: 't2', name: 'v2' },
+  ] as unknown as Parameters<typeof takesTags>[2];
+  const filter = (tags: string[]) => ({ projects: [], pipelines: [], tags });
+
+  it('needs every selected name, ignoring case', () => {
+    expect(takesTags(filter([]), [], catalog)).toBe(true);
+    expect(takesTags(filter(['auth', 'V2']), ['t1', 't2'], catalog)).toBe(true);
+    expect(takesTags(filter(['auth', 'v2']), ['t1'], catalog)).toBe(false);
+    expect(takesTags(filter(['auth', 'missing']), ['t1', 't2'], catalog)).toBe(false);
   });
 });

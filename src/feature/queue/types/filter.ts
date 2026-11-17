@@ -11,13 +11,13 @@ export function isFilterEmpty(filter: QueueFilter): boolean {
 }
 
 /**
- * Whether a running queue takes the item: its pipeline is in the filter and it has at
- * least one of the filter tags (an empty list means any). A returned run always fits.
+ * Whether a running queue takes the item: its pipeline is in the filter and it has all of
+ * the filter tags (an empty list means any). A returned run always fits.
  */
 export function matchesFilter(filter: QueueFilter, item: QueueItem): boolean {
   if (item.run !== null) return true;
   if (filter.pipelines.length > 0 && !filter.pipelines.includes(item.pipeline)) return false;
-  if (filter.tags.length > 0 && !item.tags.some((tag) => filter.tags.includes(tag))) return false;
+  if (filter.tags.length > 0 && !filter.tags.every((tag) => item.tags.includes(tag))) return false;
   return true;
 }
 

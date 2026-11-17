@@ -60,7 +60,7 @@ export type QueueStop =
 export interface QueueFilter {
   /** Ids of pipelines. */
   pipelines: string[];
-  /** Ids of catalog tags; a task needs at least one of them. */
+  /** Ids of catalog tags; a task needs all of them. */
   tags: string[];
 }
 

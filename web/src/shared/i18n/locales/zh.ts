@@ -725,7 +725,7 @@ export const zh: Dictionary = {
     filter: {
       title: '领取过滤器',
       label: '领取过滤器',
-      help: '运行中的队列只领取符合条件的任务：属于所选 pipeline 且至少带有一个所选标签。留空表示不限。仅在队列停止时可修改。',
+      help: '运行中的队列只领取符合条件的任务：属于所选 pipeline 且带有所有所选标签。留空表示不限。仅在队列停止时可修改。',
       pipelines: 'Pipeline',
       tags: '标签',
       clear: '清除',

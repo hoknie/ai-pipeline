@@ -512,7 +512,7 @@ describe('colored text', () => {
   it('shows the take filter with tag names and marks the items that do not fit', () => {
     const queue = emptyQueue('/repo', 1);
     queue.filter = { pipelines: ['feature', 'explore'], tags: ['t1', 't9'] };
-    addItem(queue, { pipeline: 'feature', task: 'A', tags: ['t1'] }, 'q1', 2);
+    addItem(queue, { pipeline: 'feature', task: 'A', tags: ['t1', 't9'] }, 'q1', 2);
     addItem(queue, { pipeline: 'other', task: 'B' }, 'q2', 3);
     const catalog = [{ id: 't1', repository: '/repo', name: 'auth', color: 'blue', task: null }];
     const text = formatQueue(queueView(queue, () => undefined, null, catalog as never));

@@ -736,7 +736,7 @@ export const en = {
     filter: {
       title: 'Take filter',
       label: 'take filter',
-      help: 'A running queue takes only tasks that fit: of the chosen pipelines and with at least one of the chosen tags. Empty: any. Changed only while the queue is stopped.',
+      help: 'A running queue takes only tasks that fit: of the chosen pipelines and with all of the chosen tags. Empty: any. Changed only while the queue is stopped.',
       pipelines: 'Pipeline',
       tags: 'Tags',
       clear: 'Clear',

@@ -749,7 +749,7 @@ export const es: Dictionary = {
     filter: {
       title: 'Filtro de toma',
       label: 'filtro de toma',
-      help: 'Una cola en marcha toma solo las tareas que encajan: de los pipelines elegidos y con al menos una de las etiquetas elegidas. Vacío: cualquiera. Solo cambia con la cola detenida.',
+      help: 'Una cola en marcha toma solo las tareas que encajan: de los pipelines elegidos y con todas las etiquetas elegidas. Vacío: cualquiera. Solo cambia con la cola detenida.',
       pipelines: 'Pipeline',
       tags: 'Etiquetas',
       clear: 'Borrar',
