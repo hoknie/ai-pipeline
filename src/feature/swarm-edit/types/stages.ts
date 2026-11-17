@@ -47,6 +47,7 @@ export function systemStagesOf(
       performer: named(delivery.messageSpecialist),
       task: [
         ...MESSAGE_INSTRUCTIONS('{run}'),
+        'Task number: {number}',
         'Task:\n{task}',
         'Groups:\n{groups}',
         'Changed files:\n{files}',

@@ -251,6 +251,13 @@ describe('commit messages', () => {
     );
   });
 
+  it('fills the task number', () => {
+    const state = mergedRun(1);
+    expect(renderCommitMessage('feat(AIP-{number}): {title}', state, state.groups)).toBe(
+      `feat(AIP-${state.run.number}): Group 1`,
+    );
+  });
+
   const WRITER =
     CONFIG_TEXT.replace(
       '    qa: { name: Tester }',
@@ -261,6 +268,7 @@ describe('commit messages', () => {
     const state = mergedRun(1, { configText: WRITER });
     expect(request(state)).toEqual([]);
     expect(state.message?.task).toContain('src/app.ts');
+    expect(state.message?.task).toContain(`Task number: ${state.run.number}`);
     dispatch([state], 6100);
     expect(runningAttempt(state, MESSAGE_GROUP)).toMatchObject({
       stepId: 'message',

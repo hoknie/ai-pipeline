@@ -48,13 +48,14 @@ export function renderCommitMessage(template: string, state: RunState, groups: G
     title: title(state, groups),
     task: task(state, groups),
     run: state.run.id,
+    number: String(state.run.number),
     pipeline: state.run.pipeline,
     // The old name of `{pipeline}`, kept for templates written before the rename.
     workflow: state.run.pipeline,
     groups: groups.map((group) => `- ${group.title}: ${lastSummary(group)}`).join('\n'),
   };
   const text = template.replace(
-    /\{(title|task|run|pipeline|workflow|groups)\}/g,
+    /\{(title|task|run|number|pipeline|workflow|groups)\}/g,
     (_, key: string) => values[key] ?? '',
   );
   return text.replace(/\n{3,}/g, '\n\n').trim();
@@ -68,6 +69,7 @@ export function messageTask(state: RunState, groups: Group[], files: string[]): 
   return withPrompt(
     [
       ...MESSAGE_INSTRUCTIONS(state.run.id),
+      `Task number: ${state.run.number}`,
       `Task:\n${task(state, groups)}`,
       `Groups:\n${groups.map((group) => `- ${group.title}: ${lastSummary(group)}`).join('\n')}`,
       `Changed files:\n${files.map((file) => `- ${file}`).join('\n') || '- (none)'}`,

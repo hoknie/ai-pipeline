@@ -59,8 +59,9 @@ export function splitInstructionText(maxGroups: number | string): string {
 
 /** The fixed part of the task of the commit message author; the run adds its own sections. */
 export const MESSAGE_INSTRUCTIONS = (run: string): string[] => [
-  `Write a git commit message for the changes of run ${run}. The first line is a short subject; then a blank line and a body.`,
+  `Write a git commit message for the changes of run ${run}. The first line is a short subject; a body, if any, follows after a blank line.`,
   `Report the full message as the summary of swarm_report with verdict "done". Do not change any files.`,
+  'The summary becomes the commit message verbatim: it holds the message and nothing else, with no preface, no explanation of your choices, no quotes and no code fences.',
 ];
 
 /** The fixed part of the task of the resolver; the run adds its own sections. */

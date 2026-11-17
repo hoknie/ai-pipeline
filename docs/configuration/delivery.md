@@ -88,10 +88,26 @@ prompt: |
 - `{title}` is the title of the only group, or the first line of the task;
 - `{task}` is the task text;
 - `{run}` is the run identifier;
+- `{number}` is the task number;
 - `{pipeline}` is the pipeline name (`{workflow}`, the name used before, means the same);
 - `{groups}` is the list of groups with their results.
 
-With `message_specialist`, this specialist writes the message before the commit, from the task, the group summaries and the list of changed files. If it fails, the template is used.
+With `message_specialist`, this specialist writes the message before the commit, from the task number, the task, the group summaries and the list of changed files. If it fails, the template is used.
+
+For a one-line message `feat(AIP-312): updates the docs`:
+
+```yaml
+delivery:
+  mode: commit
+  message_specialist: writer
+  commit_message: 'chore(AIP-{number}): {title}'   # used if the specialist fails
+  message_prompt: |
+    The message is exactly one line, no body and no trailers:
+    <type>(AIP-<task number>): <what changed>
+    type is a Conventional Commits type: feat, fix, docs, refactor, test, chore.
+    The description is short, lowercase, a verb in the third person present
+    tense: "updates the docs", "fixes the crash". No final period.
+```
 
 `message_prompt` is appended to the task of `message_specialist`, and `resolver_prompt` to the task of the `resolver`.
 
