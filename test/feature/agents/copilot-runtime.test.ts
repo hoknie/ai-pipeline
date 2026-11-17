@@ -24,10 +24,12 @@ describe('Copilot launch', () => {
     const context = conversationContext('copilot', { environment: SANDBOX });
     const launch = createCopilotRuntime('/bin/copilot').buildLaunch(context);
     expect(launch.command).toBe('/usr/bin/sandbox-exec');
-    expect(launch.args.slice(0, 2)).toEqual([
-      '-f',
-      join(context.conversationDirectory!, 'sandbox.sb'),
-    ]);
+    // the sandbox follows the host: Seatbelt on macOS, bubblewrap elsewhere
+    expect(launch.args.slice(0, 2)).toEqual(
+      process.platform === 'darwin'
+        ? ['-f', join(context.conversationDirectory!, 'sandbox.sb')]
+        : ['--ro-bind', '/'],
+    );
     expect(launch.args).toContain('/bin/copilot');
     expect(launch.args).toContain('--output-format=json');
     expect(launch.args).toContain('--no-ask-user');
