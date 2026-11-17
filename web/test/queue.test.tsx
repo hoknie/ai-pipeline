@@ -2679,6 +2679,19 @@ describe('postponed items', () => {
     expect(screen.queryByText('Postponed')).toBeNull();
   });
 
+  it('closes the error notice with its close button', async () => {
+    show(queueOf({ items: [queueItem('q1', 'A', 1)] }), {
+      queueEdit: vi.fn(async () => {
+        throw new ApiError(500, 'boom');
+      }),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Postpone' }));
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('boom')).toBeTruthy();
+    fireEvent.click(within(alert).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByText('boom')).toBeNull());
+  });
+
   async function fillNewTask(text = 'X') {
     await openNewTask();
     await waitFor(() =>

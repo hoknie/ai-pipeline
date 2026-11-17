@@ -162,6 +162,39 @@ describe('freezing for a priority run', () => {
     expect(await h.call('tags', { repository: h.repo })).toEqual(catalog);
   });
 
+  it('postpones and un-postpones the item of a returned run, and still refuses a new task', async () => {
+    const h = await start();
+    const { a, b } = await skippedAndRunning(h, { waitFor: h.gate('a') });
+    await h.call('queue_return', { runId: a });
+    const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
+    const postponed = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: item.id,
+      postponed: true,
+    })) as QueueView;
+    expect(postponed.items.find((entry) => entry.id === item.id)).toMatchObject({
+      run: b,
+      postponed: true,
+    });
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item: item.id,
+        postponed: false,
+        task: 'something else',
+      }),
+    ).rejects.toThrow('a returned run keeps its own task');
+    const cleared = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: item.id,
+      postponed: false,
+    })) as QueueView;
+    expect(cleared.items.find((entry) => entry.id === item.id)?.postponed).toBe(false);
+    h.open('a');
+    h.open('b');
+    await h.waitFor(b, (view) => view.finished);
+  });
+
   it('changes the variant of a returned run through its queue item and keeps its task', async () => {
     const h = await start(`${PIPELINE_CONFIG}      variants:
         careful:

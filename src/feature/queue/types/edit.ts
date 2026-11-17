@@ -112,9 +112,9 @@ export interface ItemPatch {
   position?: number | undefined;
 }
 
-/** Rejects a patch of a returned run's item that changes more than its place and `after`; `skip` is allowed when `skipInRun`. */
+/** Rejects a patch of a returned run's item that changes more than its place, `after` and `postponed`; `skip` is allowed when `skipInRun`. */
 export function checkReturnedPatch(patch: ItemPatch, skipInRun = false): void {
-  const { position: _position, after: _after, skip, ...rest } = patch;
+  const { position: _position, after: _after, postponed: _postponed, skip, ...rest } = patch;
   const others = skipInRun ? rest : { ...rest, skip };
   if (Object.values(others).some((value) => value !== undefined)) {
     throw rejected('a returned run keeps its own task');

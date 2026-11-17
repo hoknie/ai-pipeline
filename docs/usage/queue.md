@@ -36,6 +36,7 @@ Every task gets an integer number within its repository when it is added: 1, 2, 
 
 - `--postpone` on `aip queue add` and `aip queue edit` postpones a task. It keeps its place, but a running queue does not take it, and `aip queue list` shows `· postponed`.
 - `--no-postpone` on `aip queue edit` clears the flag. The queue then takes the task at once if a place is free.
+- A returned run (cancelled, failed or paused) can be postponed too: `aip queue edit <item> --postpone`. A postponed returned run is not taken by a running queue until the flag is cleared; the rest of its task stays as it is.
 - Tasks that wait for a postponed task stay `waiting`.
 - `swarm_queue_run_now` and "Run now" start a postponed task anyway. Starting the queue does not clear the flag.
 - A queue without autopilot that has only postponed tasks left (and no runs) stops.

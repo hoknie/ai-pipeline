@@ -13,6 +13,14 @@ import { useQueueActions } from './list/useQueueActions.ts';
 import { useQueueDrag } from './list/useQueueDrag.ts';
 import { useQueueOrder } from './list/useQueueOrder.ts';
 
+function Notice({ message, onClose }: { message: string | null; onClose: () => void }) {
+  return message ? (
+    <Alert variant="destructive" onDismiss={onClose}>
+      {message}
+    </Alert>
+  ) : null;
+}
+
 export function QueueList({
   api,
   queue,
@@ -60,7 +68,7 @@ export function QueueList({
   const { shown, move } = useQueueOrder(itemScope, queue, onQueue, notice);
   const actions = useQueueActions(itemScope, onQueue, onDraft, notice);
   const drag = useQueueDrag(shown, move);
-  const alert = message ? <Alert variant="destructive">{message}</Alert> : null;
+  const alert = <Notice message={message} onClose={() => setMessage(null)} />;
 
   if (shown.length === 0) {
     return (

@@ -165,7 +165,6 @@ export class QueueEdit {
       tags: params.tags,
       autoDeliver: params.autoDeliver,
       deliveryMode: params.deliveryMode,
-      postponed: params.postponed,
       skip,
     });
   }
@@ -215,18 +214,8 @@ export class QueueEdit {
   /** A returned run has no item-level skip: the steps are skipped in the run itself. */
   private async skipInRun(queue: Queue, item: QueueItem, params: QueueEditRequest): Promise<void> {
     const { runs, items } = this.dependencies;
-    const {
-      pipeline,
-      variant,
-      provider,
-      task,
-      groups,
-      title,
-      autoDeliver,
-      deliveryMode,
-      postponed,
-      skip,
-    } = params;
+    const { pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode, skip } =
+      params;
     checkReturnedPatch(
       {
         pipeline,
@@ -238,7 +227,6 @@ export class QueueEdit {
         tags: params.tags,
         autoDeliver,
         deliveryMode,
-        postponed,
         skip,
       },
       true,

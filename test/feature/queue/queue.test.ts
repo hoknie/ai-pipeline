@@ -173,6 +173,14 @@ describe('returned run patch', () => {
     expect(() => checkReturnedPatch({ task: 'x' })).toThrow('a returned run keeps its own task');
     expect(() => checkReturnedPatch({ position: 1, after: [] })).not.toThrow();
   });
+
+  it('allows postponing and taking back a returned run', () => {
+    expect(() => checkReturnedPatch({ postponed: true })).not.toThrow();
+    expect(() => checkReturnedPatch({ postponed: false })).not.toThrow();
+    expect(() => checkReturnedPatch({ postponed: true, task: 'x' })).toThrow(
+      'a returned run keeps its own task',
+    );
+  });
 });
 
 describe('task numbers', () => {
