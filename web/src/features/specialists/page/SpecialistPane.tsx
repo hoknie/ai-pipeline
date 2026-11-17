@@ -27,6 +27,7 @@ export function SpecialistPane({
   load,
   onSelect,
   onNotice,
+  locked,
 }: {
   api: Api;
   view: ConfigEditorResponse | null;
@@ -39,6 +40,7 @@ export function SpecialistPane({
   load: () => Promise<void>;
   onSelect: (id: string | null) => void;
   onNotice: (notice: string | null) => void;
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   if (!view) {
@@ -69,6 +71,7 @@ export function SpecialistPane({
       }
       api={api}
       view={view}
+      locked={locked ?? false}
       specialist={specialist as EditorSpecialist | null}
       catalog={catalog}
       catalogError={catalogError}

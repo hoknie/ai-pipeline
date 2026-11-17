@@ -684,7 +684,7 @@ export const zh: Dictionary = {
   projectOverview: {
     hint: '要修改，请先选择项目',
     open: '在项目中打开',
-    shared: '共享层级',
+    preview: '项目 {{project}} 中的配置',
     steps: '步骤数：{{count}}',
     models: '模型数：{{count}}',
     everywhere: '在所有项目中',

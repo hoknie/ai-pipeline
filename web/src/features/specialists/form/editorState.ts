@@ -15,6 +15,8 @@ export interface EditorInput {
   /** null for a new specialist. */
   specialist: EditorSpecialist | null;
   sharedOnly?: SharedOnly | undefined;
+  /** View only: every field is disabled and no way to write is offered. */
+  locked?: boolean | undefined;
   onDirty: (dirty: boolean) => void;
 }
 
@@ -77,14 +79,14 @@ function defaultsOf(view: ConfigEditorResponse, shared: boolean): Record<string,
 
 /** What follows from the fields: the file of the level, the dirty flag, the errors by field. */
 export function useEditorDerived(
-  { view, specialist, sharedOnly, onDirty }: EditorInput,
+  { view, specialist, sharedOnly, locked, onDirty }: EditorInput,
   { level, draft, slug }: ReturnType<typeof useEditorFields>,
   { errors }: ReturnType<typeof useEditorFeedback>,
 ) {
   const file = levelView(specialist, level);
   const initial = useMemo(() => draftOf(file.raw), [file.raw]);
   // a shared (global) specialist is view only; the project override is how to change it
-  const readOnly = Boolean(specialist) && level === 'global' && !sharedOnly;
+  const readOnly = Boolean(locked) || (Boolean(specialist) && level === 'global' && !sharedOnly);
   const dirty = !sameDraft(draft, initial) || (!specialist && slug !== '');
   useEffect(() => {
     onDirty(dirty);

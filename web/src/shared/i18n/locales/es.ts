@@ -707,7 +707,7 @@ export const es: Dictionary = {
   projectOverview: {
     hint: 'Para cambiar, elija un proyecto',
     open: 'Abrir en el proyecto',
-    shared: 'Nivel compartido',
+    preview: 'Configuración en el proyecto {{project}}',
     steps: 'Pasos: {{count}}',
     models: 'Modelos: {{count}}',
     everywhere: 'En todos los proyectos',

@@ -228,6 +228,7 @@ function AllProjects(props: PageProps & { projects: ProjectsMode }) {
   const data = useAllSpecialistsData(props.api, list, single);
   return (
     <SpecialistsOverview
+      api={props.api}
       data={data}
       selected={props.selected}
       isChains={props.section === 'chains'}

@@ -17,6 +17,8 @@ export interface UseChainEditorArgs {
   api: Api;
   chain: EditorChain | null;
   scope?: 'global' | null;
+  /** View only: no field is editable and no way to write is offered. */
+  locked?: boolean | undefined;
   onDirty: (dirty: boolean) => void;
   onSaved: (slug: string) => Promise<void>;
   onDeleted: () => Promise<void>;
@@ -161,6 +163,7 @@ export function useChainEditor({
   onDirty,
   onSaved,
   onDeleted,
+  locked,
 }: UseChainEditorArgs) {
   const level: WriteLevel = scope ?? 'project';
   const initial = useMemo(
@@ -185,8 +188,8 @@ export function useChainEditor({
     setProblem(null);
   }, [initial]);
 
-  const readOnly = chain?.level === 'global' && scope !== 'global';
-  const canOverride = Boolean(chain?.sources.global && !chain.sources.project && !scope);
+  const readOnly = Boolean(locked) || (chain?.level === 'global' && scope !== 'global');
+  const canOverride = !locked && Boolean(chain?.sources.global && !chain.sources.project && !scope);
   const dirty = !sameChainDraft(draft, initial);
   useEffect(() => {
     onDirty(dirty);

@@ -16,6 +16,7 @@ export interface ChainsPaneProps {
   selected: string | null;
   dirty: { current: boolean };
   scope?: 'global' | null;
+  locked?: boolean;
   load: () => Promise<void>;
   onSelect: (slug: string | null) => void;
 }
@@ -27,6 +28,7 @@ export function ChainsPane({
   selected,
   dirty,
   scope,
+  locked,
   load,
   onSelect,
 }: ChainsPaneProps) {
@@ -80,6 +82,7 @@ export function ChainsPane({
       api={api}
       chain={chain}
       scope={scope}
+      locked={locked ?? false}
       onDirty={(val) => {
         dirty.current = val;
       }}

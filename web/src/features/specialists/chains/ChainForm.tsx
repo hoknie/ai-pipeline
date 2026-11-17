@@ -15,6 +15,7 @@ export interface ChainFormProps {
   api: Api;
   chain: EditorChain | null;
   scope?: 'global' | null;
+  locked?: boolean;
   onDirty: (dirty: boolean) => void;
   onSaved: (slug: string) => Promise<void>;
   onDeleted: () => Promise<void>;
@@ -48,9 +49,17 @@ function ChainNotices({
   );
 }
 
-export function ChainForm({ api, chain, scope, onDirty, onSaved, onDeleted }: ChainFormProps) {
+export function ChainForm({
+  api,
+  chain,
+  scope,
+  locked,
+  onDirty,
+  onSaved,
+  onDeleted,
+}: ChainFormProps) {
   const { t } = useTranslation();
-  const editor = useChainEditor({ api, chain, scope, onDirty, onSaved, onDeleted });
+  const editor = useChainEditor({ api, chain, scope, locked, onDirty, onSaved, onDeleted });
   const { draft, setDraft, busy, readOnly } = editor;
   const disabled = busy || readOnly;
 
@@ -61,7 +70,7 @@ export function ChainForm({ api, chain, scope, onDirty, onSaved, onDeleted }: Ch
         aria-label={t('chains.section', { id: draft.slug || t('chains.new') })}
       >
         <ChainHeader chain={chain} scope={scope} editor={editor} />
-        {readOnly ? <Alert role="status">{t('chains.sharedReadOnly')}</Alert> : null}
+        {readOnly && !locked ? <Alert role="status">{t('chains.sharedReadOnly')}</Alert> : null}
         <ChainNotices
           problem={editor.problem}
           conflict={editor.conflict}
@@ -69,7 +78,7 @@ export function ChainForm({ api, chain, scope, onDirty, onSaved, onDeleted }: Ch
           errors={editor.errors}
         />
         <LevelHint
-          level={readOnly ? 'global' : editor.level}
+          level={chain?.level === 'global' && scope !== 'global' ? 'global' : editor.level}
           projectFile={Boolean(chain?.sources.project)}
           globalFile={chain?.sources.global?.file ?? null}
         />

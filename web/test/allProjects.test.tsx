@@ -212,7 +212,6 @@ describe('addresses in the mode', () => {
       return found!;
     });
     expect(block.getAttribute('data-highlighted')).toBe('true');
-    expect(screen.queryByLabelText('Name')).toBeNull();
     expect(label()).toBe('Repository: All projects');
   });
 
@@ -301,15 +300,90 @@ describe('specialists in the mode', () => {
     expect(screen.getByText('lib: no such directory')).toBeTruthy();
   });
 
-  it('shows an overview with a block per project instead of a form', async () => {
+  const enabledFields = () =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>('[data-entry-overview] :is(input, textarea, select)'),
+    ).filter((field) => !(field as HTMLInputElement).disabled);
+  const writeButtons = /^(Save|Save as|Override|Make shared|Delete|Remove|Reset)$/;
+
+  it('shows a compact list of projects with a disabled preview instead of a form', async () => {
     modeOn();
     window.location.hash = '#specialists/tester';
     mount({ configs: twoTesters });
     const overview = await screen.findByRole('region', { name: 'Tester app' });
     expect(overview.querySelector('[data-overview-project="app"]')).toBeTruthy();
     expect(overview.querySelector('[data-overview-project="lib"]')).toBeTruthy();
-    expect(screen.queryByLabelText('Name')).toBeNull();
+    const preview = await waitFor(() => {
+      const found = overview.querySelector('[data-entry-preview]');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    expect(preview.getAttribute('data-entry-preview')).toBe('app');
+    expect(within(overview).getByText('Configuration in project app')).toBeTruthy();
+    expect((screen.getByLabelText('Name') as HTMLInputElement).disabled).toBe(true);
+    expect(enabledFields().map((f) => f.outerHTML)).toEqual([]);
     expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull();
+  });
+
+  it('names only the projects in the list', async () => {
+    modeOn();
+    window.location.hash = '#specialists/coder';
+    mount({
+      configs: {
+        [APP]: configView({ repository: APP, specialists: [shared('coder')] }),
+        [LIB]: configView({ repository: LIB, specialists: [shared('coder')] }),
+      },
+    });
+    await screen.findByRole('region', { name: 'CODER' });
+    for (const slug of ['app', 'lib']) {
+      const row = document.querySelector<HTMLElement>(`[data-overview-project="${slug}"]`)!;
+      expect(row.textContent).toBe(`${slug}Open in project ${slug}`);
+    }
+  });
+
+  it('switches the preview to another project without leaving the mode', async () => {
+    modeOn();
+    window.location.hash = '#specialists/tester';
+    mount({ configs: twoTesters });
+    await screen.findByRole('region', { name: 'Tester app' });
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester app'),
+    );
+    const lib = document.querySelector<HTMLElement>('[data-overview-project="lib"]')!;
+    fireEvent.click(within(lib).getByRole('button', { name: /^lib/ }));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester lib'),
+    );
+    expect(lib.getAttribute('data-active')).toBe('true');
+    expect(label()).toBe('Repository: All projects');
+    expect(window.location.hash).toBe('#specialists/tester');
+    expect(enabledFields().map((f) => f.outerHTML)).toEqual([]);
+  });
+
+  it('previews the project of the address', async () => {
+    modeOn();
+    window.location.hash = '#specialists/tester?project=lib';
+    mount({ configs: twoTesters });
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester lib'),
+    );
+    expect(
+      document.querySelector('[data-overview-project="lib"]')?.getAttribute('data-highlighted'),
+    ).toBe('true');
+  });
+
+  it('changes nothing in the mode: no enabled fields, no writes', async () => {
+    modeOn();
+    window.location.hash = '#specialists/tester';
+    const { calls } = mount({ configs: twoTesters });
+    await waitFor(() => expect(screen.getByLabelText('Name')).toBeTruthy());
+    expect(enabledFields().map((f) => f.outerHTML)).toEqual([]);
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.textContent).not.toMatch(writeButtons);
+    }
+    expect(
+      calls.filter(([name]) => /save|write|remove|delete|override|create/i.test(name)),
+    ).toEqual([]);
   });
 
   it('has no creation or import in the mode', async () => {
@@ -448,6 +522,27 @@ describe('chains and actions in the mode', () => {
     );
     await waitFor(() => expect(label()).toBe('Repository: lib'));
     expect(window.location.hash).toBe('#specialists/chains/fast');
+  });
+
+  it('previews a chain with disabled fields and no buttons of writing', async () => {
+    modeOn();
+    window.location.hash = '#specialists/chains/fast';
+    mount({
+      configs: {
+        [APP]: configView({ repository: APP, chains: [chain('Fast app') as never] }),
+        [LIB]: configView({ repository: LIB, chains: [chain('Fast lib') as never] }),
+      },
+    });
+    const overview = await screen.findByRole('region', { name: 'Fast app' });
+    await waitFor(() => expect(overview.querySelector('[data-entry-preview="app"]')).toBeTruthy());
+    const fields = Array.from(
+      overview.querySelectorAll<HTMLInputElement>('input, textarea, select'),
+    );
+    expect(fields.length).toBeGreaterThan(0);
+    expect(fields.filter((field) => !field.disabled)).toEqual([]);
+    for (const name of [/^Save/, /^Reset/, /^Override/, /^Delete$/, /^Remove$/]) {
+      expect(within(overview).queryByRole('button', { name })).toBeNull();
+    }
   });
 
   it('shows an action as an overview', async () => {

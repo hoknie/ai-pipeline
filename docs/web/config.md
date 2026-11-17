@@ -92,7 +92,8 @@ With "All projects" chosen in the repository picker, "Specialists", "Chains", "P
 
 A project whose configuration cannot be read shows its error, and the others stay.
 
-- The view is read only: no forms, no "New" or "Import". Choosing a row opens an overview on the right with a block per project and the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
+- The view changes nothing: no "New" or "Import", and a form only as a preview with disabled fields. Choosing a row opens an overview on the right: a compact list of the projects that have the entry, one line per project with the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
+- For a specialist or a chain the overview also previews the entry in one project: the same form with disabled fields and no buttons that write. Choosing another project's line switches the preview.
 - The filter "Project" (the shared entries and each project, with the number of rows) narrows the list; a row stays when any of its projects is chosen. It is remembered per tab.
-- The address of a row is `#specialists/<slug>` (the same for `#pipelines/…` and `#providers/<slug>`). An old address with `?project=<project slug>` opens the same row and marks that project's block; an unknown project shows "Project not found".
+- The address of a row is `#specialists/<slug>` (the same for `#pipelines/…` and `#providers/<slug>`). An old address with `?project=<project slug>` opens the same row and marks that project's line and previews it; an unknown project shows "Project not found".
 - "Topology" and "System stages" show one project at a time: choose it in the "Project" field above the content; the mode stays on.

@@ -10,6 +10,8 @@ import type { useSpecialistsData } from './useSpecialistsData.ts';
 export type SpecialistsSource = ReturnType<typeof useSpecialistsData> & {
   /** Why the configuration of a project could not be read, one line per project. */
   failures: string[];
+  /** The configuration of every project of the mode «All projects»; null where it failed. */
+  projects?: readonly { project: ProjectRef; view: ConfigEditorResponse | null }[];
 };
 
 /**
@@ -55,6 +57,7 @@ export function useAllSpecialistsData(
     view,
     failure: failures.length > 0 && view === null ? failures.join('\n') : single.failure,
     failures,
+    projects: (configs ?? []).map(({ project, view }) => ({ project, view })),
     load: async () => {
       await Promise.all([reload(), single.load()]);
     },

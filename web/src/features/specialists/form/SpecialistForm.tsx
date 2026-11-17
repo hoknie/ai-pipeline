@@ -37,6 +37,8 @@ interface SpecialistFormProps {
   onDeleted: () => Promise<void>;
   /** Edits a shared specialist at the shared level only, with the usage by the projects. */
   sharedOnly?: SharedOnly;
+  /** View only (the preview of the mode «All projects»). */
+  locked?: boolean;
 }
 
 /** The field for the slug of a new specialist. */
@@ -71,9 +73,10 @@ function headerOf(
   editor: Editor,
   specialist: EditorSpecialist | null,
   sharedOnly: SharedOnly | undefined,
+  locked: boolean,
 ): HeaderProps {
   const { sources, source, readOnly } = editor;
-  const copyOnly = specialist !== null && !sharedOnly;
+  const copyOnly = specialist !== null && !sharedOnly && !locked;
   return {
     specialist,
     level: editor.level,
@@ -84,7 +87,7 @@ function headerOf(
     canSave: Boolean(specialist) || editor.slug !== '',
     overrideInProject: copyOnly && Boolean(sources.global) && !sources.project,
     makeGlobal: copyOnly && Boolean(sources.project) && !sources.global && !readOnly,
-    canRemove: Boolean(specialist && source) && !readOnly,
+    canRemove: Boolean(specialist && source) && !readOnly && !locked,
     removeBlocked: editor.removeBlocked,
     removeBlockedReason: editor.removeBlockedReason,
     removeLabel: editor.removeLabel,
@@ -129,6 +132,7 @@ function SaveAsRow({
 
 export function SpecialistForm(props: SpecialistFormProps) {
   const { view, specialist, catalog, catalogError, notice, sharedOnly } = props;
+  const locked = props.locked ?? false;
   const { t } = useTranslation();
   const editor = useEditorActions(props);
   const { level, draft, slug, saveAs, busy, sources, readOnly } = editor;
@@ -148,7 +152,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
       className="flex flex-col gap-3"
       aria-label={t('specialists.section', { id: editor.id || t('specialists.newName') })}
     >
-      <SpecialistHeader {...headerOf(editor, specialist, sharedOnly)} />
+      <SpecialistHeader {...headerOf(editor, specialist, sharedOnly, locked)} />
       {saveAs !== null ? (
         <SaveAsRow
           slug={saveAs}
@@ -162,7 +166,7 @@ export function SpecialistForm(props: SpecialistFormProps) {
           {editor.removeBlockedReason}
         </p>
       ) : null}
-      {readOnly ? <Alert role="status">{t('specialists.sharedReadOnly')}</Alert> : null}
+      {readOnly && !locked ? <Alert role="status">{t('specialists.sharedReadOnly')}</Alert> : null}
       <SpecialistNotices
         view={view}
         notice={notice}
