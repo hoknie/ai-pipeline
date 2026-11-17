@@ -83,7 +83,9 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
 
 /** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
-  // The newest migration adds the provider of a task, a run and the requested one of an attempt.
+  // The newest migration adds the generation of a conversation.
+  dropColumn(database, 'attempts', 'generation');
+  // The one before adds the provider of a task, a run and the requested one of an attempt.
   dropColumn(database, 'runs', 'provider');
   dropColumn(database, 'queue_items', 'provider');
   dropColumn(database, 'attempts', 'requested_provider');

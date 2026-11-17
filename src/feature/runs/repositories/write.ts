@@ -76,8 +76,8 @@ function writeAttempt(
 ): void {
   database
     .prepare(
-      `INSERT OR REPLACE INTO attempts (run_id, group_slug, seq, step_id, step_index, round, specialist, runtime, model, status, input_json, resume_session, session_id, report_json, reason_json, started_at, finished_at, usage_json, proposal_json, denials_json, outside_changes_json, chain_index, provider, requested_provider)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO attempts (run_id, group_slug, seq, step_id, step_index, round, specialist, runtime, model, status, input_json, resume_session, session_id, report_json, reason_json, started_at, finished_at, usage_json, proposal_json, denials_json, outside_changes_json, chain_index, provider, requested_provider, generation)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       runId,
@@ -104,6 +104,7 @@ function writeAttempt(
       attempt.chainIndex ?? null,
       attempt.provider ?? null,
       attempt.requestedProvider ?? null,
+      attempt.generation,
     );
 }
 

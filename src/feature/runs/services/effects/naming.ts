@@ -8,7 +8,7 @@ import { modelIdProblem } from '../../../swarm-config/types/index.ts';
 import type { RunState } from '../../types/index.ts';
 
 import type { EffectDependencies } from './context.ts';
-import { withProxy } from './proxy.ts';
+import { withProxy } from './runtime-check.ts';
 import type { RunningAgents } from './running.ts';
 import { workspaceOf } from './worktrees.ts';
 

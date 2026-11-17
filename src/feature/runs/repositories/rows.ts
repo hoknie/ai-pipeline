@@ -127,6 +127,8 @@ function hydrateAttempt(row: Row): Attempt {
     specialist: String(row.specialist),
     runtime: String(row.runtime) as Runtime,
     model: text(row.model ?? null),
+    generation:
+      row.generation === null || row.generation === undefined ? null : Number(row.generation),
     ...(row.chain_index !== null && row.chain_index !== undefined
       ? { chainIndex: Number(row.chain_index) }
       : {}),

@@ -15,7 +15,7 @@ export type PoolProblem =
   | 'noModel'
   | 'overlap';
 
-const PLAIN_SELECTORS = ['claude', 'agy', 'opencode'];
+const PLAIN_SELECTORS = ['claude', 'agy', 'opencode', 'codex', 'kilo', 'cline', 'copilot'];
 const MODEL_SELECTOR = /^opencode:([^/\s*]+)\/([^\s*]*)(\*?)$/;
 
 /** What is wrong with a selector as such; the same rules as the daemon's check of the queue. */

@@ -18,7 +18,15 @@ import { Card } from '../../../shared/ui/layout/card.tsx';
 import { ItemProvider, type ItemErrors } from './ChainItemProvider.tsx';
 import type { ChainRuntimeDraft, SpecialistRuntimeName } from './types.ts';
 
-const RUNTIMES: readonly SpecialistRuntimeName[] = ['claude', 'opencode', 'agy'];
+const RUNTIMES: readonly SpecialistRuntimeName[] = [
+  'claude',
+  'opencode',
+  'agy',
+  'codex',
+  'kilo',
+  'cline',
+  'copilot',
+];
 const REASONING_EFFORTS = [
   'none',
   'minimal',

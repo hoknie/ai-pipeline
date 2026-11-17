@@ -1,6 +1,13 @@
-export const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
+export const RUNTIMES = ['claude', 'opencode', 'agy', 'codex', 'kilo', 'cline', 'copilot'] as const;
 
 export type Runtime = (typeof RUNTIMES)[number];
+
+/** CLIs that keep a conversation in their own private state: it outlives an attempt. */
+export const CONVERSATION_RUNTIMES: readonly Runtime[] = ['codex', 'kilo', 'cline', 'copilot'];
+
+export function keepsConversation(runtime: string): boolean {
+  return (CONVERSATION_RUNTIMES as readonly string[]).includes(runtime);
+}
 
 /** Returns a diagnostic for an explicitly configured OpenCode model without modifying it. */
 export function modelIdProblem(runtime: Runtime | string, model: string | null): string | null {

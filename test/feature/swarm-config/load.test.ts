@@ -959,7 +959,22 @@ describe('runtimes settings', () => {
       claude: { command: 'claude', enabled: null, args: [], env: {} },
       opencode: { command: 'opencode', enabled: null, args: [], env: {} },
       agy: { command: 'agy', enabled: null, args: [], env: {} },
+      codex: { command: 'codex', enabled: null, args: [], env: {} },
+      kilo: { command: 'kilo', enabled: null, args: [], env: {} },
+      cline: { command: 'cline', enabled: null, args: [], env: {} },
+      copilot: { command: 'copilot', enabled: null, args: [], env: {} },
     });
+  });
+
+  it('take the four CLIs with their own command, arguments and variables, off by default', () => {
+    const result = runtimes(
+      '  runtimes:\n    codex: { command: /opt/codex, enabled: true }\n    kilo: { args: [--x] }\n    cline: { env: { A_B: "1" } }\n    copilot: { enabled: false }\n',
+    );
+    expect(result.codex).toEqual({ command: '/opt/codex', enabled: true, args: [], env: {} });
+    expect(result.kilo).toEqual({ command: 'kilo', enabled: null, args: ['--x'], env: {} });
+    expect(result.cline.env).toEqual({ A_B: '1' });
+    expect(result.copilot.enabled).toBe(false);
+    expect(result.claude.enabled).toBeNull();
   });
 
   it('take a path, arguments and variables of one runtime and leave the other', () => {
@@ -996,9 +1011,19 @@ describe('runtimes settings', () => {
 
   it('reject an unknown runtime, wrong types, a relative path and a bad variable name', () => {
     expectError(
-      errorsOf(`${BASE}  runtimes: { codex: {} }\n`),
-      'swarm.runtimes.codex',
+      errorsOf(`${BASE}  runtimes: { cursor: {} }\n`),
+      'swarm.runtimes.cursor',
       'unknown key',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { copilot: { env: { 1BAD: x } } }\n`),
+      'swarm.runtimes.copilot.env.1BAD',
+      'valid variable name',
+    );
+    expectError(
+      errorsOf(`${BASE}  runtimes: { copilot: { env: { KEY: 1 } } }\n`),
+      'swarm.runtimes.copilot.env.KEY',
+      'must be a string',
     );
     expectError(
       errorsOf(`${BASE}  runtimes: { opencode: { args: -y } }\n`),

@@ -123,6 +123,10 @@ export function defaultRuntimes(): RuntimeSettings {
     claude: { command: 'claude', enabled: null, args: [], env: {} },
     opencode: { command: 'opencode', enabled: null, args: [], env: {} },
     agy: { command: 'agy', enabled: null, args: [], env: {} },
+    codex: { command: 'codex', enabled: null, args: [], env: {} },
+    kilo: { command: 'kilo', enabled: null, args: [], env: {} },
+    cline: { command: 'cline', enabled: null, args: [], env: {} },
+    copilot: { command: 'copilot', enabled: null, args: [], env: {} },
   };
 }
 
@@ -152,6 +156,17 @@ function normalizedSplit(split: Split | null | undefined): Split | null {
   return workflow === undefined ? split : { ...rest, pipeline: rest.pipeline ?? workflow };
 }
 
+/** The commands of every runtime; a snapshot of an older build lacks the runtimes added since. */
+function runtimesWithDefaults(stored: Partial<RuntimeSettings> | undefined): RuntimeSettings {
+  const defaults = defaultRuntimes();
+  return Object.fromEntries(
+    (Object.keys(defaults) as Runtime[]).map((name) => [
+      name,
+      { ...defaults[name], ...stored?.[name] },
+    ]),
+  ) as RuntimeSettings;
+}
+
 /** Fills settings added after a run was stored, so older runs keep working. */
 export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const stored = config as Omit<
@@ -177,12 +192,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
   const delivery: DeliverySettings = { ...defaultDelivery(), auto: false, ...stored.delivery };
   const naming: NamingSettings = { ...defaultNaming(), ...stored.naming };
   const web: WebSettings = { ...defaultWeb(), ...stored.web };
-  const defaults = defaultRuntimes();
-  const runtimes: RuntimeSettings = {
-    claude: { ...defaults.claude, ...stored.runtimes?.claude },
-    opencode: { ...defaults.opencode, ...stored.runtimes?.opencode },
-    agy: { ...defaults.agy, ...stored.runtimes?.agy },
-  };
+  const runtimes = runtimesWithDefaults(stored.runtimes);
   const specialists = stored.specialists.map((specialist) => ({
     ...specialist,
     max: specialist.max ?? null,

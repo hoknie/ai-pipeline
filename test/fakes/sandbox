@@ -1,0 +1,5 @@
+#!/bin/sh
+# The fake sandbox program: records how it was called and runs the command that follows.
+echo "$@" >> "$AIP_FAKE_STATE/sandbox.log"
+if [ "$1" = "-f" ]; then shift 2; else while [ "$1" != "--" ]; do shift; done; shift; fi
+exec "$@"

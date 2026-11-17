@@ -48,7 +48,7 @@ describe('migrations', () => {
       'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
     );
     dropQueueFilter(previous.database.connection);
-    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11}`);
     previous.database.close();
 
     const migrated = openStorage(path);
@@ -115,7 +115,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(39);
+    expect(SCHEMA_VERSION).toBe(40);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -128,8 +128,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -14).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 14}`);
+    MIGRATIONS.slice(0, -15).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 15}`);
     prepare(database);
     migrate(database);
     return database;
@@ -248,7 +248,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 12}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 13}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -278,7 +278,7 @@ describe('project attributes', () => {
     old.known.addRepository('/a/app', 9);
     dropQueueFilter(old.database.connection);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 12}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(
@@ -304,7 +304,7 @@ describe('migration to the usage journal', () => {
     old.runs.saveRun(state);
     old.database.exec('DROP TABLE stats_attempts; DROP TABLE stats_runs; DROP TABLE stats_meta;');
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const names = (type: string) =>
@@ -339,7 +339,7 @@ describe('migration to pipeline variants', () => {
     old.queues.saveQueue(queue);
     // a database written before the variants: the column is not there, the rows are
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun('variant-run')?.run.variant).toBe('default');
@@ -355,7 +355,7 @@ describe('migration to attachments', () => {
     const state = run(1);
     old.runs.saveRun(state);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.attachments).toEqual([]);
@@ -391,9 +391,9 @@ describe('migration that removes the cost', () => {
          'claude', 'finished', 1, 2, 1, 12, 4, 0.5);`,
     );
     old.database.exec(
-      'ALTER TABLE attempts DROP COLUMN chain_index; ALTER TABLE attempts DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN requested_provider; ALTER TABLE runs DROP COLUMN provider; ALTER TABLE queue_items DROP COLUMN provider',
+      'ALTER TABLE attempts DROP COLUMN chain_index; ALTER TABLE attempts DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN requested_provider; ALTER TABLE runs DROP COLUMN provider; ALTER TABLE queue_items DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN generation',
     );
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 5}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -415,8 +415,8 @@ describe('migration to task links', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -3).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    MIGRATIONS.slice(0, -4).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     prepare(database);
     migrate(database);
     return database;
@@ -502,8 +502,8 @@ describe('migration to task links', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const legacy = new DatabaseSync(path);
-    MIGRATIONS.slice(0, -3).forEach((sql) => legacy.exec(sql));
-    legacy.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    MIGRATIONS.slice(0, -4).forEach((sql) => legacy.exec(sql));
+    legacy.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     addQueue(legacy, '/a');
     addItemRow(legacy, 'q1', '/a', 0, ['q0'], []);
     addTag(legacy, 'foreign', 'r2');
@@ -532,7 +532,7 @@ describe('migration to the global queue', () => {
     addItem(queue, { pipeline: 'feature', task: 'task' }, 'q1', 2);
     old.queues.saveQueue(queue);
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const row = store.database.prepare('SELECT * FROM global_queue').all() as Record<
@@ -551,7 +551,7 @@ describe('migration to the global queue', () => {
 });
 
 describe('migration to the chain item of an attempt', () => {
-  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void, back = 2) {
+  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void, back = 3) {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
@@ -596,12 +596,91 @@ describe('migration to the chain item of an attempt', () => {
       db.prepare(
         "INSERT INTO queue_items (id, repository, position, pipeline, task, created_at) VALUES ('q1', '/repo', 0, 'f', 't', 1)",
       ).run();
-    }, 1);
+    }, 2);
     expect(database.prepare('SELECT provider FROM runs').get()).toEqual({ provider: null });
     expect(database.prepare('SELECT provider FROM queue_items').get()).toEqual({ provider: null });
     expect(database.prepare('SELECT requested_provider FROM attempts').get()).toEqual({
       requested_provider: null,
     });
     database.close();
+  });
+});
+
+describe('migration to the generation of a conversation', () => {
+  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void) {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
+    const database = new DatabaseSync(':memory:');
+    MIGRATIONS.slice(0, -1).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    prepare(database);
+    migrate(database);
+    return database;
+  }
+
+  it('adds a nullable generation and leaves the attempts of an older database with NULL', async () => {
+    const database = await before((db) => {
+      db.prepare(
+        "INSERT INTO runs (id, repository, pipeline, base_commit, branch, created_at, config_json, dirty_warning, next_merge_seq) VALUES ('old-run', '/repo', 'f', 'abc', 'b', 1, '{}', 0, 0)",
+      ).run();
+      db.prepare(
+        "INSERT INTO groups (run_id, slug, position, title, task, status, rejections_json, warnings_json, decisions_json, conflict_files_json, merge_in_flight, update_on_conflict) VALUES ('old-run', 'g', 0, 'G', 't', 'queued', '{}', '[]', '[]', '[]', 0, 0)",
+      ).run();
+      db.prepare(
+        "INSERT INTO attempts (run_id, group_slug, seq, step_id, step_index, round, specialist, runtime, status, input_json, started_at) VALUES ('old-run', 'g', 1, 'code', 0, 1, 'coder', 'claude', 'failed', '{}', 1)",
+      ).run();
+    });
+    const row = database.prepare('SELECT * FROM attempts').get() as Record<string, unknown>;
+    expect(row).toMatchObject({ generation: null, seq: 1, runtime: 'claude' });
+    const column = (
+      database.prepare('PRAGMA table_info(attempts)').all() as { name: string; notnull: number }[]
+    ).find((entry) => entry.name === 'generation');
+    expect(column?.notnull).toBe(0);
+    database.close();
+  });
+
+  it('reads old attempts as null and keeps a new generation after the database is reopened', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-generation-')), 'aip'));
+    const path = databasePath(directory);
+    const first = openStorage(path);
+    const state = run(1, { id: 'generation-run' });
+    step(state);
+    const attempts = state.groups[0]!.attempts;
+    attempts[0]!.generation = null;
+    first.runs.saveRun(state);
+    first.database.close();
+
+    const second = openStorage(path);
+    const loaded = second.runs.loadRun(state.run.id)!;
+    expect(loaded.groups[0]!.attempts[0]!.generation).toBeNull();
+    loaded.groups[0]!.attempts[0]!.generation = 7;
+    loaded.groups[0]!.attempts[0]!.runtime = 'codex';
+    second.runs.saveRun(loaded);
+    second.database.close();
+
+    const third = openStorage(path);
+    const again = third.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!;
+    expect(again.generation).toBe(7);
+    expect(again.runtime).toBe('codex');
+    third.database.close();
+  });
+
+  it('writes the generation inside the transaction of the run and rolls it back with it', () => {
+    const store = temporaryStorage();
+    const state = run(1, { id: 'rollback-run' });
+    step(state);
+    store.runs.saveRun(state);
+    const changed = structuredClone(state);
+    changed.groups[0]!.attempts[0]!.generation = 3;
+    expect(() =>
+      store.database.transaction(() => {
+        store.runs.writeRun(changed);
+        throw new Error('the transition failed');
+      }),
+    ).toThrow('the transition failed');
+    expect(store.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.generation).toBeNull();
+    store.database.transaction(() => store.runs.writeRun(changed));
+    expect(store.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.generation).toBe(3);
+    store.database.close();
   });
 });

@@ -1,5 +1,6 @@
 import { target } from './runs.ts';
 import { z } from 'zod';
+import { RUNTIMES } from '../../../feature/swarm-config/types/index.ts';
 
 export { TRANSCRIPT_TEXT_LIMIT, clip } from '../../../feature/agents/types/index.ts';
 
@@ -81,15 +82,21 @@ export const runtimeCatalogSchema = z.object({
 
 export type RuntimeCatalog = z.infer<typeof runtimeCatalogSchema>;
 
+/** One value per runtime; the keys are `RUNTIMES`. */
+function runtimeRecord<T extends z.ZodType>(schema: T) {
+  return z.object(
+    Object.fromEntries(RUNTIMES.map((name) => [name, schema])) as Record<
+      (typeof RUNTIMES)[number],
+      T
+    >,
+  );
+}
+
 export const configCatalogResponseSchema = z.object({
   repository: z.string(),
   /** `claude.mcp: inherit` — the MCP servers of the user are available to specialists. */
   mcpInherited: z.boolean(),
-  runtimes: z.object({
-    claude: runtimeCatalogSchema,
-    opencode: runtimeCatalogSchema,
-    agy: runtimeCatalogSchema,
-  }),
+  runtimes: runtimeRecord(runtimeCatalogSchema),
 });
 
 export type ConfigCatalogResponse = z.infer<typeof configCatalogResponseSchema>;
@@ -112,11 +119,7 @@ export type RuntimeModels = z.infer<typeof runtimeModelsSchema>;
 
 export const configModelsResponseSchema = z.object({
   repository: z.string(),
-  runtimes: z.object({
-    claude: runtimeModelsSchema,
-    opencode: runtimeModelsSchema,
-    agy: runtimeModelsSchema,
-  }),
+  runtimes: runtimeRecord(runtimeModelsSchema),
 });
 
 export type ConfigModelsResponse = z.infer<typeof configModelsResponseSchema>;

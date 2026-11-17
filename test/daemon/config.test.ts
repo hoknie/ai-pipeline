@@ -481,6 +481,37 @@ describe('general setting', () => {
     expect(JSON.stringify(await view(h))).not.toContain('topsecret');
     expect(readFileSync(globalFile(h), 'utf8')).toContain('API_KEY: topsecret');
   });
+
+  it('writes the variables of the four CLIs on the global level only, and lists their catalog and models', async () => {
+    const h = await start();
+    const result = await settings(
+      h,
+      {
+        'runtimes.copilot.env.COPILOT_PROVIDER_API_KEY': 'topsecret',
+        'runtimes.codex.env.AIP_CODEX_API_KEY': 'topsecret',
+        'runtimes.kilo.enabled': true,
+      },
+      'global',
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(await settings(h, { 'runtimes.cline.enabled': true }, 'project')).toMatchObject({
+      ok: false,
+    });
+    const shown = JSON.stringify(await view(h));
+    expect(shown).not.toContain('topsecret');
+    expect(shown).toContain('COPILOT_PROVIDER_API_KEY');
+    const catalog = (await h.call('config_catalog', { repository: h.repo })) as {
+      runtimes: Record<string, unknown>;
+    };
+    const models = (await h.call('config_models', { repository: h.repo })) as {
+      runtimes: Record<string, { models: unknown[]; error: string | null }>;
+    };
+    for (const name of ['codex', 'kilo', 'cline', 'copilot']) {
+      expect(catalog.runtimes[name]).toBeDefined();
+      expect(models.runtimes[name]).toEqual({ models: [], error: null });
+    }
+    expect(JSON.stringify(catalog) + JSON.stringify(models)).not.toContain('topsecret');
+  });
 });
 
 describe('config catalog', () => {

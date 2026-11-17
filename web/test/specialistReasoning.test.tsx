@@ -160,6 +160,10 @@ describe('OpenCode model options in the specialist form', () => {
         claude: catalogView().runtimes.claude,
         opencode: catalogView().runtimes.opencode,
         agy: { tools: [], skills: [{ name: 'review', source: 'project' }] },
+        codex: { tools: [], skills: [] },
+        kilo: { tools: [], skills: [] },
+        cline: { tools: [], skills: [] },
+        copilot: { tools: [], skills: [] },
       },
     });
     const openPage = open(

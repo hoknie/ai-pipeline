@@ -6,6 +6,10 @@ import {
 } from '../../../src/feature/agents/clients/opencode/index.ts';
 import { createAgentsServices } from '../../../src/feature/agents/services/index.ts';
 import { createAgyRuntime } from '../../../src/feature/agents/clients/agy/index.ts';
+import { createClineRuntime } from '../../../src/feature/agents/clients/cline/index.ts';
+import { createCodexRuntime } from '../../../src/feature/agents/clients/codex/index.ts';
+import { createCopilotRuntime } from '../../../src/feature/agents/clients/copilot/index.ts';
+import { createKiloRuntime } from '../../../src/feature/agents/clients/kilo/index.ts';
 import { createClaudeRuntime } from '../../../src/feature/agents/clients/claude/index.ts';
 import { defaultRuntimes } from '../../../src/feature/swarm-config/types/index.ts';
 import type { CommandRunner } from '../../../src/feature/agents/ports/index.ts';
@@ -92,6 +96,13 @@ describe('listModels of the runtimes', () => {
   });
 });
 
+const NEW_FACTORIES = {
+  codex: createCodexRuntime,
+  kilo: createKiloRuntime,
+  cline: createClineRuntime,
+  copilot: createCopilotRuntime,
+};
+
 describe('AgentsService.models', () => {
   function service(results: (() => Promise<{ stdout: string }>)[]) {
     let calls = 0;
@@ -101,6 +112,7 @@ describe('AgentsService.models', () => {
         claude: createClaudeRuntime,
         opencode: createOpencodeRuntime,
         agy: createAgyRuntime,
+        ...NEW_FACTORIES,
       },
       naming: { parse: () => null },
       commands: (_file, _args, options) => {
@@ -153,6 +165,7 @@ describe('AgentsService.models', () => {
           claude: createClaudeRuntime,
           opencode: createOpencodeRuntime,
           agy: createAgyRuntime,
+          ...NEW_FACTORIES,
         },
         naming: { parse: () => null },
         commands: () => Promise.resolve({ stdout: '' }),

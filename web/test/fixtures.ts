@@ -701,6 +701,10 @@ export function modelsView(overrides: Partial<ConfigModelsResponse> = {}): Confi
         error: null,
       },
       agy: { models: [], error: null },
+      codex: { models: [], error: null },
+      kilo: { models: [], error: null },
+      cline: { models: [], error: null },
+      copilot: { models: [], error: null },
     },
     ...overrides,
   };
@@ -725,6 +729,10 @@ export function catalogView(overrides: Partial<ConfigCatalogResponse> = {}): Con
       },
       opencode: { tools: [], skills: [] },
       agy: { tools: [], skills: [] },
+      codex: { tools: [], skills: [] },
+      kilo: { tools: [], skills: [] },
+      cline: { tools: [], skills: [] },
+      copilot: { tools: [], skills: [] },
     },
     ...overrides,
   };

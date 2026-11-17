@@ -10,6 +10,8 @@ Every [specialist](specialists.md) works at one permission level, set with `perm
 | `edit` | editing files and `Bash(<pattern>)` for each command in `allow_commands` (or see [`claude.edit_mode`](#claudeedit_mode)) | `edit: allow`, `bash`: everything denied except `allow_commands` | Worktree edits and commands verified against `allow_commands` |
 | `full` | `--dangerously-skip-permissions` | `--auto`, `bash: allow` | Editing and shell allowed, except protected Git operations |
 
+The levels of `codex`, `kilo`, `cline` and `copilot` are in [CLIs with your own LLM endpoint](#clis-with-your-own-llm-endpoint).
+
 `git push` is forbidden at every level, and `git checkout` and `git switch` are also forbidden at `read` and `edit`. The `full` level is enabled only explicitly, and `aip config check` warns about every specialist with `full`.
 
 ### Tools of a Claude specialist
@@ -45,6 +47,21 @@ Sets how the `claude` runtime gets the `edit` level. The mode does not affect th
 Antigravity runs headlessly with a permission hook scoped to the current attempt. Its user-level `permissions` may add restrictions; they do not grant a specialist more access than `aip` assigned.
 
 In `edit`, `allow_commands` is checked against the whole command: `npm test` does not authorize `npm test -- --update`, while `npm test*` does. Shell substitutions, redirections and commands the hook cannot inspect are denied. Writes are limited to the worktree. `agy` does not return permission denials in the same structured form as Claude Code.
+
+### CLIs with your own LLM endpoint
+
+These CLIs are experimental: their permission settings are tested against fake CLIs, not against the live ones, so check them on a throwaway repository first.
+For these CLIs `aip` writes the permissions into the private configuration of every attempt; the instructions in the prompt are not a boundary and the CLI's own auto-approve mode never replaces them.
+Only the worker of the attempt, by exact name and only its tools (`swarm_report` and the others the step may use), and the MCP servers of the specialist are allowed; the servers of your profile, of other specialists and of earlier attempts are refused, and a server whose name merely starts with an allowed name is another server.
+Any action that is not listed is refused instead of asking a person.
+
+- `codex`: sandbox `read-only`, `workspace-write` (no network) or `danger-full-access`; at `edit` the approval policy `untrusted` and an execution rule for each prefix of `allow_commands` (a rule matches the start of the command, not the whole line); `git push`, `git checkout` and `git switch` are forbidden by rules at every level.
+- `kilo`: a rule set with `*: deny` first, then the read tools, `edit`, the commands of the level and the exact tools of the worker. The deny rules for the protected Git commands stay in force under `--auto` at `full`.
+- `cline`: a `PreToolUse` hook of the private profile decides every action: the whole command against `allow_commands`, the canonical path inside the worktree (links and `..` resolved), the exact MCP server and tool. A hook that fails refuses the action.
+- `copilot`: a pre-tool hook decides every shell, file and MCP action like the one of `cline`, and the CLI with all its children runs in an OS sandbox (Seatbelt on macOS, bubblewrap on Linux).
+Outside the private state of its conversation the sandbox writes only the worktree, and only at `edit` and `full`; the other conversations are hidden. Without the sandbox program or the hook `copilot` does not start. `--trust-folder` and `--continue` are never used.
+
+In `edit`, `allow_commands` of `cline` and `copilot` is checked against the whole command like for `agy`: a chain runs only when every command in it is allowed.
 
 ## Denied commands
 

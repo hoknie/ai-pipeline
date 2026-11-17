@@ -147,7 +147,7 @@ queue:
 
 Pools are quotas for a runtime and a model:
 
-- Selectors are case-sensitive: `claude`, `agy`, `opencode` (an OpenCode agent without an explicit model) and `opencode:provider/model`, where a trailing `*` makes a prefix (`opencode:google/*`).
+- Selectors are case-sensitive: `claude`, `agy`, `codex`, `kilo`, `cline`, `copilot`, `opencode` (an OpenCode agent without an explicit model) and `opencode:provider/model`, where a trailing `*` makes a prefix (`opencode:google/*`).
 - A selector may be in one pool only, and selectors of different pools may not overlap. `max` is 1 to 32 and `members` is not empty. The quotas need not add up to `queue.max`.
 - An attempt takes a place in the pool of the runtime and model it starts with, otherwise in `default_pool`. Give OpenCode agents an explicit `model: provider/model` to count them exactly. Without `pools` there are no quotas.
 - Quotas are strict: an idle pool lends nothing to a full one, and a full pool never switches a [runtime chain](runtimes.md#runtime-chains) to another runtime: the attempt waits for its pool. A resumed attempt keeps the runtime and model of the previous one.

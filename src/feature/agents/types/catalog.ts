@@ -1,3 +1,5 @@
+import type { Runtime } from '../../swarm-config/types/index.ts';
+
 export interface CatalogEntry {
   name: string;
   source: 'builtin' | 'project' | 'global';
@@ -10,8 +12,4 @@ export interface RuntimeCatalog {
   skills: CatalogEntry[];
 }
 
-export interface RuntimeCatalogs {
-  claude: RuntimeCatalog;
-  opencode: RuntimeCatalog;
-  agy: RuntimeCatalog;
-}
+export type RuntimeCatalogs = Record<Runtime, RuntimeCatalog>;

@@ -77,8 +77,6 @@ export function modelsOf(
   catalog: ConfigModelsResponse | null,
   runtime: string,
 ): RuntimeModels | null {
-  if (runtime === 'claude' || runtime === 'opencode' || runtime === 'agy') {
-    return catalog?.runtimes[runtime] ?? null;
-  }
-  return null;
+  const runtimes: Record<string, RuntimeModels | undefined> | undefined = catalog?.runtimes;
+  return runtimes?.[runtime] ?? null;
 }

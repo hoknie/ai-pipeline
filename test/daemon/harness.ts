@@ -139,6 +139,12 @@ export async function harness(
     AIP_CLAUDE_BIN: join(fakes, 'claude'),
     AIP_OPENCODE_BIN: join(fakes, 'opencode'),
     AIP_AGY_BIN: join(fakes, 'agy'),
+    AIP_CODEX_BIN: join(fakes, 'codex'),
+    AIP_KILO_BIN: join(fakes, 'kilo'),
+    AIP_CLINE_BIN: join(fakes, 'cline'),
+    AIP_COPILOT_BIN: join(fakes, 'copilot'),
+    // the fake sandbox program: Seatbelt cannot be nested in the sandbox of a test run
+    AIP_COPILOT_SANDBOX_BIN: join(fakes, 'sandbox'),
     AIP_FAKE_STATE: fakeState,
     AIP_FAKE_SCRIPT: scriptPath,
     ...environment,

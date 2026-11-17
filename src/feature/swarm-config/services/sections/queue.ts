@@ -8,6 +8,7 @@ import {
   readMapping,
   readString,
 } from '../validate-context.ts';
+import { RUNTIMES } from '../../types/specialist.ts';
 import { type FieldError } from '../../types/errors.ts';
 import {
   QUEUE_MAX_RANGE,
@@ -20,7 +21,7 @@ import {
 const QUEUE_KEYS = ['scope', 'max', 'pools', 'default_pool'];
 const POOL_KEYS = ['max', 'members'];
 const DEFAULT_POOL_KEYS = ['max'];
-const PLAIN_SELECTORS = ['claude', 'agy', 'opencode'];
+const PLAIN_SELECTORS: readonly string[] = RUNTIMES;
 const MODEL_SELECTOR = /^opencode:([^/\s*]+)\/([^\s*]*)(\*?)$/;
 
 /** A selector problem as text; null when the selector is valid. */
@@ -28,7 +29,7 @@ function selectorProblem(selector: string): string | null {
   if (PLAIN_SELECTORS.includes(selector)) return null;
   const match = MODEL_SELECTOR.exec(selector);
   if (!match) {
-    return `selector \`${selector}\` must be claude, agy, opencode or opencode:provider/model (a trailing * marks a prefix)`;
+    return `selector \`${selector}\` must be a runtime name (${RUNTIMES.join(', ')}) or opencode:provider/model (a trailing * marks a prefix)`;
   }
   if (match[3] === '' && match[2] === '') {
     return `selector \`${selector}\` must name a model after the provider`;

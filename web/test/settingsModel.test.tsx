@@ -32,6 +32,10 @@ const catalog = (claude = {}) =>
           error: null,
         },
         agy: { models: [], error: null },
+        codex: { models: [], error: null },
+        kilo: { models: [], error: null },
+        cline: { models: [], error: null },
+        copilot: { models: [], error: null },
       },
     }),
   );

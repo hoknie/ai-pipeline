@@ -23,11 +23,23 @@ export function defaultChainDraft(slug = ''): ChainDraft {
   };
 }
 
+const RUNTIME_NAMES: readonly string[] = [
+  'claude',
+  'opencode',
+  'agy',
+  'codex',
+  'kilo',
+  'cline',
+  'copilot',
+];
+
 function runtimeItemFrom(raw: unknown): ChainRuntimeDraft {
   if (typeof raw !== 'object' || raw === null) return defaultRuntimeItem();
   const item = raw as Record<string, unknown>;
   const rt: SpecialistRuntimeName =
-    item.runtime === 'opencode' || item.runtime === 'agy' ? item.runtime : 'claude';
+    typeof item.runtime === 'string' && RUNTIME_NAMES.includes(item.runtime)
+      ? (item.runtime as SpecialistRuntimeName)
+      : 'claude';
   return {
     runtime: rt,
     model: item.model !== undefined && item.model !== null ? String(item.model) : '',

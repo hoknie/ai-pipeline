@@ -13,7 +13,6 @@ import { expandMcpServers, type Runtime } from '../../../agents/types/index.ts';
 import { modelIdProblem, type Specialist } from '../../../swarm-config/types/index.ts';
 import { attemptDirectory } from '../../../../platform/git/index.ts';
 import {
-  SPLIT_GROUP,
   findGroup,
   isRepairGroup,
   specialistOfStep,
@@ -26,8 +25,13 @@ import { NETWORK_FRESH_MS } from '../../../network/types/index.ts';
 
 import type { ActionRunner } from './actions.ts';
 import type { AttemptKey, EffectDependencies } from './context.ts';
-import { withProxy } from './proxy.ts';
-import { runtimeProblem } from './runtime-check.ts';
+import {
+  conversationFolder,
+  effectiveSpecialist,
+  purgeConversations,
+  workerCommand,
+} from './conversations.ts';
+import { runtimeProblem, withProxy } from './runtime-check.ts';
 import type { OutsideChanges } from './outside.ts';
 import type { RunningAgents } from './running.ts';
 import type { UsageBuffers } from './usage.ts';
@@ -189,33 +193,16 @@ export class AttemptStarter {
   private launch(prepared: Prepared, directory: string, token: string): SupervisedProcess {
     const { state, group, attempt, key, runtime, worktree, specialist } = prepared;
     const { context, entry, socket, environment, graceMs, timings } = this.dependencies;
-    const effectiveSpecialist: Specialist = {
-      ...specialist,
-      runtime: attempt.runtime as Specialist['runtime'],
-      model: attempt.model,
-      ...(attempt.variant !== undefined ? { variant: attempt.variant } : {}),
-      ...(attempt.reasoningEffort !== undefined
-        ? { reasoningEffort: attempt.reasoningEffort }
-        : {}),
-    };
     const launch = runtime.buildLaunch({
-      specialist: effectiveSpecialist,
+      specialist: effectiveSpecialist(specialist, attempt),
       input: attempt.input,
       worktree,
       environment,
       attemptDirectory: directory,
       attachmentsDirectory: prepared.attachments,
-      workerCommand: [
-        ...entry,
-        'mcp',
-        '--worker',
-        token,
-        '--socket',
-        socket,
-        ...(group.slug === SPLIT_GROUP ? ['--split'] : []),
-        ...(specialist.queue === true ? ['--queue'] : []),
-        ...(isRepairGroup(group) ? ['--repair'] : []),
-      ],
+      workerCommand: workerCommand(entry, token, socket, group, specialist),
+      generation: attempt.generation,
+      conversationDirectory: conversationFolder(state, group.slug, attempt),
       sessionId: randomUUID(),
       resumeSession: attempt.resumeSession,
       claudeEditMode: state.run.config.claude.editMode,
@@ -286,16 +273,19 @@ export class AttemptStarter {
         usage: exit.outcome.usage,
         failure: exit.spawnError
           ? { kind: 'spawn', message: exit.spawnError }
-          : exit.outcome.usageLimit
-            ? { kind: 'usage_limit', resetsAt: exit.outcome.usageLimit.resetsAt }
-            : network !== null
-              ? { kind: 'network', problem: network }
-              : null,
+          : exit.outcome.conversationError
+            ? { kind: 'spawn', message: exit.outcome.conversationError }
+            : exit.outcome.usageLimit
+              ? { kind: 'usage_limit', resetsAt: exit.outcome.usageLimit.resetsAt }
+              : network !== null
+                ? { kind: 'network', problem: network }
+                : null,
         outsideChanges,
         denials: exit.outcome.denials,
         onLimit: this.dependencies.queue.onLimitOf(state.run.repository),
       },
     });
+    purgeConversations(state, group.slug, key.seq);
   }
 
   private async fail(

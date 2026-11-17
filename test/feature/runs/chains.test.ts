@@ -120,6 +120,7 @@ describe('selectAttemptRuntime', () => {
       proposal: null,
       denials: [],
       outsideChanges: [],
+      generation: null,
     };
     const selected = selectAttemptRuntime({
       specialist: spec,
@@ -180,6 +181,7 @@ describe('selectAttemptRuntime', () => {
       proposal: null,
       denials: [],
       outsideChanges: [],
+      generation: null,
     });
 
     const first = selectAttemptRuntime({

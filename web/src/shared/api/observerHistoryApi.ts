@@ -1,6 +1,15 @@
 import { ApiError, call } from './http.ts';
 
-const HISTORY_RUNTIMES = ['claude', 'opencode', 'agy', 'command'] as const;
+const HISTORY_RUNTIMES = [
+  'claude',
+  'opencode',
+  'agy',
+  'codex',
+  'kilo',
+  'cline',
+  'copilot',
+  'command',
+] as const;
 const ATTEMPT_STATUSES = ['running', 'finished', 'failed', 'cancelled'] as const;
 const HISTORY_VERDICTS = ['done', 'rejected', 'needs_human'] as const;
 const isDate = (value: unknown): value is number =>

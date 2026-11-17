@@ -23,6 +23,13 @@ export interface LaunchContext {
   /** Where the attachments of the run are laid out; null for a run without attachments. */
   attachmentsDirectory?: string | null;
   workerCommand: string[];
+  /** The generation of the conversation of a CLI with its own history; null for the others. */
+  generation?: number | null;
+  /**
+   * The private folder of this conversation (run, group, step, generation, runtime), outside the
+   * worktree; it outlives the attempt. Null for a runtime without conversation state.
+   */
+  conversationDirectory?: string | null;
   sessionId: string;
   resumeSession: string | null;
   claudeEditMode: ClaudeEditMode;
@@ -41,6 +48,8 @@ export interface LaunchContext {
 export interface GeneratedFile {
   path: string;
   content: string;
+  /** File mode; `0600` when absent. A script a CLI executes needs `0700`. */
+  mode?: number;
 }
 
 export interface OneShotRequest {
@@ -61,6 +70,8 @@ export interface RunOutcome {
   sessionId: string | null;
   usage: Usage | null;
   error: string | null;
+  /** A resumed conversation was replaced or lost; the attempt fails, never counts. */
+  conversationError?: string | null;
   /** Tool calls the agent CLI refused, each once. */
   denials: Denial[];
   /** The agent CLI stopped because its usage limit ran out; `resetsAt` in ms or null. */
@@ -119,4 +130,43 @@ export function describePermissions(
 export interface RuntimeExtra {
   args: string[];
   env: Record<string, string>;
+}
+
+/** The endpoint of an LLM API a CLI is pointed at; the key is only the name of a variable. */
+export interface Endpoint {
+  baseUrl: string;
+  /** The name of the environment variable that holds the key; never the key. */
+  keyEnv: string;
+}
+
+const envPrefix = (runtime: RuntimeName): string => `AIP_${runtime.toUpperCase()}`;
+
+/**
+ * The own endpoint of a runtime from its environment (`AIP_<NAME>_BASE_URL`, and the name of the
+ * variable with the key in `AIP_<NAME>_API_KEY_ENV`, `AIP_<NAME>_API_KEY` by default); null when no
+ * base URL is set. Throws for a base URL that is not http(s).
+ */
+export function endpointOf(
+  runtime: RuntimeName,
+  environment: Record<string, string | undefined>,
+): Endpoint | null {
+  const prefix = envPrefix(runtime);
+  const baseUrl = environment[`${prefix}_BASE_URL`]?.trim();
+  if (!baseUrl) return null;
+  if (!/^https?:\/\/[^\s]+$/.test(baseUrl)) {
+    throw new Error(`${prefix}_BASE_URL must be an http(s) URL`);
+  }
+  const keyEnv = environment[`${prefix}_API_KEY_ENV`]?.trim() || `${prefix}_API_KEY`;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(keyEnv)) {
+    throw new Error(`${prefix}_API_KEY_ENV must be a variable name`);
+  }
+  return { baseUrl, keyEnv };
+}
+
+/**
+ * The folder name of a conversation inside the folder of its group: the step, the generation and the
+ * runtime. The run and the group are the folders above it.
+ */
+export function conversationName(stepId: string, generation: number, runtime: RuntimeName): string {
+  return `${stepId.replace(/[^A-Za-z0-9_.-]/g, '_')}-g${generation}-${runtime}`;
 }

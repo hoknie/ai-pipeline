@@ -137,6 +137,7 @@ describe('qualified model identity in daemon runs', () => {
         proposal: null,
         denials: [],
         outsideChanges: [],
+        generation: null,
       },
     ];
     snapshot.run.finishedAt = null;

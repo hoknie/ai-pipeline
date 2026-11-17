@@ -25,6 +25,7 @@ import {
 } from '../../types/index.ts';
 
 import type { ActionRunner } from './actions.ts';
+import { purgeGroupConversations } from './conversations.ts';
 import type { EffectDependencies } from './context.ts';
 import type { OutsideChanges } from './outside.ts';
 import { ensureGroupWorktree, resolveWorktree, workspaceOf, worktreePath } from './worktrees.ts';
@@ -100,6 +101,7 @@ export class GitEffects {
       outcome = { kind: 'failed', message: (error as Error).message };
     }
     await this.dependencies.context.apply(state, { kind: 'merge_finished', group: slug, outcome });
+    purgeGroupConversations(state, slug);
     void this.dependencies.diff.refreshDiff(state, slug);
     if (outcome.kind === 'merged') void this.dependencies.diff.savePatch(state);
   }

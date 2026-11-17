@@ -27,7 +27,7 @@ const RESULTS = [
   'cancelled',
   'unknown',
 ] as const;
-const RUNTIMES = ['claude', 'opencode', 'agy'] as const;
+const RUNTIMES = ['claude', 'opencode', 'agy', 'codex', 'kilo', 'cline', 'copilot'] as const;
 /** The value of «all» in a select: an empty value is not allowed there. */
 const ALL = '*';
 const CONTROL = 'h-8';

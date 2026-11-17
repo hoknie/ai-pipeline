@@ -104,6 +104,42 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
         'runtimes.agy.env',
       ],
     },
+    {
+      key: 'codex',
+      paths: [
+        'runtimes.codex.enabled',
+        'runtimes.codex.command',
+        'runtimes.codex.args',
+        'runtimes.codex.env',
+      ],
+    },
+    {
+      key: 'kilo',
+      paths: [
+        'runtimes.kilo.enabled',
+        'runtimes.kilo.command',
+        'runtimes.kilo.args',
+        'runtimes.kilo.env',
+      ],
+    },
+    {
+      key: 'cline',
+      paths: [
+        'runtimes.cline.enabled',
+        'runtimes.cline.command',
+        'runtimes.cline.args',
+        'runtimes.cline.env',
+      ],
+    },
+    {
+      key: 'copilot',
+      paths: [
+        'runtimes.copilot.enabled',
+        'runtimes.copilot.command',
+        'runtimes.copilot.args',
+        'runtimes.copilot.env',
+      ],
+    },
   ],
   system: [
     { key: 'panel', paths: ['web.autostart', 'web.auth', 'web.host', 'web.port'] },

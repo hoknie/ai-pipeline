@@ -17,7 +17,15 @@ const FIELD_OF: Partial<Record<PoolProblem, PoolField>> = {
   noMembers: 'members',
 };
 
-const SUGGESTIONS: PickerOption[] = ['claude', 'agy', 'opencode'].map((name) => ({
+const SUGGESTIONS: PickerOption[] = [
+  'claude',
+  'agy',
+  'opencode',
+  'codex',
+  'kilo',
+  'cline',
+  'copilot',
+].map((name) => ({
   name,
   source: 'builtin',
 }));

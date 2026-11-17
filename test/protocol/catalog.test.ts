@@ -13,6 +13,10 @@ describe('configCatalogResponseSchema', () => {
         claude: { tools: [{ name: 'Read', source: 'builtin' }], skills: [] },
         opencode: empty,
         agy: empty,
+        codex: empty,
+        kilo: empty,
+        cline: empty,
+        copilot: empty,
       },
     };
     expect(configCatalogResponseSchema.parse(value)).toEqual(value);
@@ -26,6 +30,10 @@ describe('configCatalogResponseSchema', () => {
         claude: { tools: [{ name: 'x', source: 'plugin' }], skills: [] },
         opencode: empty,
         agy: empty,
+        codex: empty,
+        kilo: empty,
+        cline: empty,
+        copilot: empty,
       },
     };
     expect(configCatalogResponseSchema.safeParse(value).success).toBe(false);

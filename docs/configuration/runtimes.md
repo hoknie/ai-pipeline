@@ -1,6 +1,7 @@
 # Runtimes
 
-A runtime is the agent CLI that executes a step: `claude` (Claude Code), `opencode`, or `agy` (Antigravity CLI). A specialist picks one with [`runtime`](specialists.md#fields). This page covers how `aip` finds and starts it, and what a specialist inherits from your own setup.
+A runtime is the agent CLI that executes a step: `claude` (Claude Code), `opencode`, `agy` (Antigravity CLI), or one of four CLIs that can talk to your own LLM endpoint: `codex` (Codex CLI), `kilo` (Kilo Code CLI), `cline` (Cline CLI) and `copilot` (GitHub Copilot CLI).
+A specialist picks one with [`runtime`](specialists.md#fields). This page covers how `aip` finds and starts it, and what a specialist inherits from your own setup.
 
 ## `runtimes`
 
@@ -18,16 +19,19 @@ runtimes:
   agy:
     command: agy
     args: [--effort, high]
+  codex:
+    enabled: true
+    env: { AIP_CODEX_BASE_URL: "https://llm.example/v1", AIP_CODEX_API_KEY: "sk-..." }
 ```
 
 This section is set in the shared `settings.yaml` only. In a project `aip/settings.yaml` it is a validation error (`swarm.runtimes`).
 
 - **`enabled`** switches the runtime on or off. Every runtime is off until you switch it on: without the field, `aip` does not start it. A step of a specialist on a runtime that is off fails with `runtime disabled: <name>` (a chain with `on_error` moves on to its next item), the request for a run name is skipped and the list of its models stays empty.
   - [Observers](../usage/runs.md#observers) do not repair such a failure and do not start a repair on a runtime that is off.
-  - A non-empty `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN` in the daemon's environment switches the runtime on while `enabled` is not set. An explicit `enabled: false` wins over the variable.
+  - A non-empty `AIP_<NAME>_BIN` (`AIP_CLAUDE_BIN`, `AIP_OPENCODE_BIN`, `AIP_AGY_BIN`, `AIP_CODEX_BIN`, `AIP_KILO_BIN`, `AIP_CLINE_BIN`, `AIP_COPILOT_BIN`) in the daemon's environment switches the runtime on while `enabled` is not set. An explicit `enabled: false` wins over the variable.
   - Switch it in the panel (Settings → Runtimes → Enabled) or set `runtimes.<name>.enabled: true` in the shared `settings.yaml`. To go back to an older `aip`, remove `enabled` from the file first.
-- **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is the runtime's name: `claude`, `opencode` or `agy`.
-  - The order of choice is: `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN` from the daemon's environment, then `command`, then `PATH`.
+- **`command`** is the agent CLI to start: a name looked up in `PATH`, or an absolute path (`~` is not expanded; a relative path with `/` is an error). The default is the runtime's name.
+  - The order of choice is: `AIP_<NAME>_BIN` from the daemon's environment, then `command`, then `PATH`.
 - **`args`** are put right after the command, before the arguments `aip` builds, for every start of the agent: a step, a retry, an answer and the request for a run name. A wrapper such as `npx -y opencode-ai` works this way: `npx -y opencode-ai run --format json …`.
   - `args` are also added when the command comes from `AIP_CLAUDE_BIN` / `AIP_OPENCODE_BIN` / `AIP_AGY_BIN`.
   - `aip` does not filter `args`: a flag such as `--dangerously-skip-permissions` weakens the limits of a specialist.
@@ -87,6 +91,37 @@ OpenCode applies the selected variant after the agent options. A variant that se
 - `aip` applies its own permission check to file writes and commands. A shell command is denied unless it matches `allow_commands`; commands with uninspectable shell syntax are denied.
 - `variant` and `reasoning_effort` are OpenCode-only and cannot be used with agy.
 
+## CLIs with your own LLM endpoint
+
+`codex`, `kilo`, `cline` and `copilot` start only when you switch them on (`enabled: true` or `AIP_<NAME>_BIN`); none of them is a default.
+
+**Experimental.** These four runtimes are tested against fake CLIs only, not against the live ones.
+What may differ in a real CLI: for `codex`, `kilo` and `cline` the endpoint handling, the permission settings and the resume of a conversation; for `copilot` the JSONL stream and the session id, the hooks read from `COPILOT_HOME`, and the specialist MCP servers.
+Try one on a throwaway profile and repository before you rely on it.
+
+Each keeps its conversation in a private folder of the group in the workspace (`logs/<run>/<group>/conversations/`), outside the worktree and apart from your own profile of the CLI.
+A resume after a human answer, a pause or a restart of the daemon continues the same conversation with the exact id the CLI reported; a retry starts an empty one, and a fall back to another runtime in a [chain](#runtime-chains) never carries the id or the folder over.
+The folder of a step is removed when the step ends with `done` or `rejected` (a step waiting for review keeps it) and with the merged group. Every attempt gets a new worker server and a new token, and the registration of the earlier one is replaced before the CLI starts.
+
+The endpoint is set in the environment of the CLI, in the shared `settings.yaml` (`runtimes.<name>.env`) or in the environment of the daemon. The panel shows the names of the variables, never their values.
+A key is passed to the CLI as the name of a variable, not in an argument or a file of the attempt; a CLI may still print a key it is given in its own raw error output, which `aip` does not filter.
+
+| Runtime | Endpoint | Protocol | Models |
+|---|---|---|---|
+| `codex` | `AIP_CODEX_BASE_URL`, key in `AIP_CODEX_API_KEY` or the variable named in `AIP_CODEX_API_KEY_ENV` | Responses API only; an endpoint that answers Chat Completions is refused | typed by hand |
+| `kilo` | `AIP_KILO_BASE_URL`, key as above with `AIP_KILO_` | OpenAI-compatible; the config of the private home holds `{env:KEY}` | typed by hand; `provider/model`, or a bare name for your endpoint |
+| `cline` | `AIP_CLINE_BASE_URL`, key as above with `AIP_CLINE_` | OpenAI-compatible | typed by hand |
+| `copilot` | `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_API_KEY` | the provider types of the CLI; the model must stream and call tools | `model` of the specialist (`COPILOT_MODEL`) |
+
+Without an endpoint the CLI uses its own login (`codex`: `CODEX_API_KEY`). The endpoint has to support streaming and tool calls; a name that only looks OpenAI-compatible is not enough. The list of models is empty and a model typed by hand stays valid: no CLI of these four has a documented command to list the models of a custom endpoint.
+
+- **Permissions** are enforced by the generated configuration of every attempt, see [Permissions](permissions.md#clis-with-your-own-llm-endpoint). `copilot` does not start without a pre-tool gate and an OS sandbox.
+- **Skills**: `.codex/skills`, `.kilo/skills`, `.cline/skills`, and `.github/skills` with `~/.copilot/skills`.
+- `variant` and `reasoning_effort` are OpenCode-only.
+- **Ready for use only after a manual check.** The generated settings follow the documentation of each CLI. Each of them has to be checked once on a disposable profile of the installed version (endpoint, worker, permissions, cancel, resume by id) before you rely on it.
+- **Not runtimes**: Cursor CLI (its key signs in to Cursor; no documented own model endpoint), Gemini CLI (only the documented Gemini and Vertex routes), the IDE extensions of Kilo, Cursor, Cline and Copilot, and `agy` for this purpose (no documented base URL of the model).
+GLM Coding Plan is a subscription and provider, not an agent: use it through a CLI above with the key and the protocol its documentation names for that client.
+
 ## `claude.mcp`
 
 - `isolated` (the default): the `claude` specialist sees only the `aip` server, with none of the MCP servers from your Claude Code settings.
@@ -144,13 +179,13 @@ How the `claude` runtime gets the `edit` level is described in [configuration/pe
 
 ## What differs between runtimes
 
-| | `claude` | `opencode` | `agy` |
-|---|---|---|---|
-| Continuing a session | Always | By session id | By `conversation_id` |
-| Reporting denied commands | Yes | No, see [Denied commands](permissions.md#denied-commands) | Shown in the journal |
-| Recognizing a [usage limit](../usage/queue.md#usage-limit) | Yes | No | No |
-| [`tools`](specialists.md#tools) of a specialist | Yes | No | No |
-| [MCP servers](specialists.md#mcp-servers) of a specialist | Yes | Yes | Yes, under other names: see [MCP servers of a specialist](#mcp-servers-of-a-specialist) |
+| | `claude` | `opencode` | `agy` | `codex`, `kilo`, `cline`, `copilot` |
+|---|---|---|---|---|
+| Continuing a session | Always | By session id | By `conversation_id` | By id from the private state of the conversation |
+| Reporting denied commands | Yes | No, see [Denied commands](permissions.md#denied-commands) | Shown in the journal | No |
+| Recognizing a [usage limit](../usage/queue.md#usage-limit) | Yes | No | No | No |
+| [`tools`](specialists.md#tools) of a specialist | Yes | No | No | No |
+| [MCP servers](specialists.md#mcp-servers) of a specialist | Yes | Yes | Yes, under other names: see [MCP servers of a specialist](#mcp-servers-of-a-specialist) | Yes, under the name of the attempt's worker plus `-<name>` |
 
 ## Runtime chains
 
@@ -172,7 +207,7 @@ runtimes:
   - `random`: picks a random enabled runtime from the pool for each step.
   - `round_robin`: cycles through the enabled runtimes in order across steps.
   - `by_provider`: a tier, see [Tiers](#tiers-by_provider).
-- **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, or `agy`), optional `model`, optional `enabled` (default `true`), optional `provider` (a provider id: lowercase letters, digits and `-`, up to 32 characters, starting with a letter), and optional `variant` and `reasoning_effort` for OpenCode.
+- **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, `agy`, `codex`, `kilo`, `cline` or `copilot`), optional `model`, optional `enabled` (default `true`), optional `provider` (a provider id: lowercase letters, digits and `-`, up to 32 characters, starting with a letter), and optional `variant` and `reasoning_effort` for OpenCode.
 - **`enabled`**: optional boolean (default `true`). When a chain or all its runtimes are disabled, specialists bound to it use `defaults.runtime` with no explicit model.
 
 A specialist binds to a chain via `runtime_chain: <slug>` in its definition (see [Specialists](specialists.md#fields)). The `runtime_chain` field cannot be used together with explicit `runtime`, `model`, `variant`, or `reasoning_effort`.

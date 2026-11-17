@@ -1,3 +1,5 @@
+import type { Runtime } from '../../swarm-config/types/index.ts';
+
 /** A model a specialist of a runtime can name. */
 export interface ModelEntry {
   /** The value of `model` in the configuration. */
@@ -14,11 +16,7 @@ export interface RuntimeModels {
   error: string | null;
 }
 
-export interface ModelCatalogs {
-  claude: RuntimeModels;
-  opencode: RuntimeModels;
-  agy: RuntimeModels;
-}
+export type ModelCatalogs = Record<Runtime, RuntimeModels>;
 
 export interface CommandOptions {
   cwd: string;

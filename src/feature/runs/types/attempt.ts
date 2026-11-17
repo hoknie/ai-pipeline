@@ -190,6 +190,8 @@ export interface Attempt {
   model: string | null;
   variant?: string;
   reasoningEffort?: ReasoningEffort;
+  /** The `seq` of the first attempt of the conversation a CLI with its own history keeps; null for the others. */
+  generation: number | null;
   chainIndex?: number | null;
   /** Provider of the chain item, when it has one: the key of the usage-limit hold. */
   provider?: string;

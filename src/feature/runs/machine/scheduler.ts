@@ -11,6 +11,7 @@ import {
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
+import { keepsConversation } from '../../swarm-config/types/index.ts';
 import { OFF_NETWORK, type NetworkSnapshot } from '../../network/types/index.ts';
 import type { Effect } from './events.ts';
 import { isCommandAction, planDispatch } from './plan.ts';
@@ -52,6 +53,7 @@ function startCommand(state: RunState, group: Group, now: number): Attempt {
     specialist: action.id,
     runtime: COMMAND_RUNTIME,
     model: null,
+    generation: null,
     status: 'running',
     input: {
       prompt: action.run,
@@ -95,21 +97,23 @@ function startAttempt(
   const specialist = specialistOfStep(state.run, group, step);
   if (!specialist) throw new Error(`specialist ${step.specialist} does not exist`);
   const previousOfStep = group.attempts.filter((attempt) => attempt.stepId === step.id);
-  const resumeSession = pending.resume
-    ? (previousOfStep.findLast((attempt) => (attempt.sessionId ?? attempt.resumeSession) !== null)
-        ?.sessionId ??
-      previousOfStep.findLast((attempt) => attempt.resumeSession !== null)?.resumeSession ??
-      null)
-    : null;
   if (!selected) throw new Error(`group ${group.slug} has no runtime chosen`);
+  const seq = (group.attempts.at(-1)?.seq ?? 0) + 1;
+  const { generation, resumeSession } = conversationOf(
+    previousOfStep,
+    pending.resume,
+    selected.runtime,
+    seq,
+  );
   const attempt: Attempt = {
-    seq: (group.attempts.at(-1)?.seq ?? 0) + 1,
+    seq,
     stepId: step.id,
     stepIndex: pending.stepIndex,
     round: previousOfStep.length + 1,
     specialist: specialist.slug,
     runtime: selected.runtime,
     model: selected.model,
+    generation,
     ...(selected.variant !== undefined ? { variant: selected.variant } : {}),
     ...(selected.reasoningEffort !== undefined
       ? { reasoningEffort: selected.reasoningEffort }
@@ -138,4 +142,33 @@ function startAttempt(
   group.status = 'running';
   group.pending = null;
   return attempt;
+}
+
+/**
+ * The conversation of a new attempt. A CLI with its own history inherits the generation and the exact
+ * session of the last attempt of the step only on a resume on the same runtime; otherwise the attempt
+ * opens a generation of its own (`seq`), so no id or private state crosses a runtime or a retry.
+ * The other runtimes keep `generation = null` and the session of any earlier attempt.
+ */
+function conversationOf(
+  previousOfStep: Attempt[],
+  resume: boolean,
+  runtime: string,
+  seq: number,
+): { generation: number | null; resumeSession: string | null } {
+  const sessionOf = (attempt: Attempt): string | null => attempt.sessionId ?? attempt.resumeSession;
+  if (keepsConversation(runtime)) {
+    const last = previousOfStep.at(-1);
+    if (resume && last && last.runtime === runtime && last.generation !== null) {
+      return { generation: last.generation, resumeSession: sessionOf(last) };
+    }
+    return { generation: seq, resumeSession: null };
+  }
+  if (!resume) return { generation: null, resumeSession: null };
+  const usable = previousOfStep.filter((attempt) => !keepsConversation(attempt.runtime));
+  const resumeSession =
+    usable.findLast((attempt) => sessionOf(attempt) !== null)?.sessionId ??
+    usable.findLast((attempt) => attempt.resumeSession !== null)?.resumeSession ??
+    null;
+  return { generation: null, resumeSession };
 }

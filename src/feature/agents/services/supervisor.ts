@@ -4,6 +4,7 @@ import {
   createWriteStream,
   mkdirSync,
   readFileSync,
+  renameSync,
   writeFileSync,
   type WriteStream,
 } from 'node:fs';
@@ -174,7 +175,10 @@ function exitOf(watched: Watched): Promise<ProcessExit> {
 export function launchProcess(launch: Launch, options: LaunchOptions): SupervisedProcess {
   for (const file of launch.files) {
     mkdirSync(dirname(file.path), { recursive: true });
-    writeFileSync(file.path, file.content, { mode: 0o600 });
+    // Replaced whole: a reader never sees half of a config, and nothing of an earlier attempt stays.
+    const temporary = `${file.path}.${process.pid}.tmp`;
+    writeFileSync(temporary, file.content, { mode: file.mode ?? 0o600 });
+    renameSync(temporary, file.path);
   }
   mkdirSync(dirname(options.logPath), { recursive: true });
   const stamp = lineStamper(options);

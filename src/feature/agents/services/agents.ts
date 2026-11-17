@@ -1,5 +1,6 @@
 import {
   defaultRuntimes,
+  RUNTIMES,
   type Runtime as RuntimeName,
   type RuntimeSettings,
 } from '../../swarm-config/types/index.ts';
@@ -14,7 +15,14 @@ import type {
 
 import { mcpServers, skillCatalog, sortEntries } from './catalog.ts';
 
-const RUNTIME_NAMES: readonly RuntimeName[] = ['claude', 'opencode', 'agy'];
+const RUNTIME_NAMES: readonly RuntimeName[] = RUNTIMES;
+
+function byRuntime<T>(make: (name: RuntimeName) => T): Record<RuntimeName, T> {
+  return Object.fromEntries(RUNTIME_NAMES.map((name) => [name, make(name)])) as Record<
+    RuntimeName,
+    T
+  >;
+}
 
 const envName = (name: RuntimeName): string => `AIP_${name.toUpperCase()}_BIN`;
 
@@ -43,7 +51,8 @@ export class AgentsService {
   runtimeFor(name: RuntimeName, settings: RuntimeSettings = defaultRuntimes()): Runtime {
     const { environment, factories } = this.dependencies;
     const { command, args, env } = settings[name];
-    return factories[name](environment[envName(name)] || command, { args, env });
+    const factory = factories[name];
+    return factory(environment[envName(name)] || command, { args, env });
   }
 
   /**
@@ -67,7 +76,7 @@ export class AgentsService {
         skills: skillCatalog(runtime.skillDirectories(repository, home), repository, home),
       };
     };
-    return { claude: build('claude'), opencode: build('opencode'), agy: build('agy') };
+    return byRuntime(build);
   }
 
   /**
@@ -97,8 +106,11 @@ export class AgentsService {
       this.isEnabled(name, settings)
         ? this.runtimeFor(name, settings).listModels(repository, run)
         : Promise.resolve({ models: [], error: null });
-    const pending = Promise.all([list('claude'), list('opencode'), list('agy')]).then(
-      ([claude, opencode, agy]) => ({ claude, opencode, agy }),
+    const pending = Promise.all(RUNTIME_NAMES.map(list)).then(
+      (entries): ModelCatalogs =>
+        Object.fromEntries(
+          RUNTIME_NAMES.map((name, index) => [name, entries[index]]),
+        ) as ModelCatalogs,
     );
     this.modelCache.set(key, pending);
     void pending.then((catalogs) => {

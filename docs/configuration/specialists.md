@@ -26,9 +26,9 @@ prompt: |
 |---|---|---|
 | `name` | The display name. Required | |
 | `prompt` | The instructions; see [Prompt](#prompt) | Only the task |
-| `runtime` | `claude`, `opencode` or `agy`; see [configuration/runtimes.md](runtimes.md) | [`defaults`](README.md#defaults) |
+| `runtime` | `claude`, `opencode`, `agy`, `codex`, `kilo`, `cline` or `copilot`; see [configuration/runtimes.md](runtimes.md) | [`defaults`](README.md#defaults) |
 | `runtime_chain` | Name of a runtime chain; see [Runtime chains](runtimes.md#runtime-chains) | Mutually exclusive with `runtime`, `model`, `variant`, `reasoning_effort` |
-| `model` | `opus`, `sonnet` or a full id for Claude; `provider/model` for OpenCode; a model id accepted by Antigravity for agy | The runtime's default model |
+| `model` | `opus`, `sonnet` or a full id for Claude; `provider/model` for OpenCode; a model id accepted by Antigravity for agy; the model of your endpoint for `codex`, `kilo`, `cline` and `copilot` | The runtime's default model |
 | `variant` | OpenCode model variant name; see [OpenCode model options](#opencode-model-options) | OpenCode's choice |
 | `reasoning_effort` | OpenCode `reasoningEffort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | OpenCode's choice |
 | `permissions` | `read`, `edit` or `full`; see [configuration/permissions.md](permissions.md#permission-levels) | `defaults` |

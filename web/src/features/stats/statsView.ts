@@ -179,7 +179,7 @@ export function projectValue(
 export type BreakdownTab = 'specialist' | 'model' | 'pipeline' | 'runtime';
 
 const UNKNOWN_MODEL = 'unknown';
-const RUNTIMES = ['claude', 'opencode', 'agy', 'command'];
+const RUNTIMES = ['claude', 'opencode', 'agy', 'codex', 'kilo', 'cline', 'copilot', 'command'];
 
 /** The label of a model: the id, «unknown» in words of the panel. */
 export function modelLabel(model: string, t: TFunction): string {
