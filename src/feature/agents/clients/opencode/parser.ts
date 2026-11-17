@@ -48,11 +48,25 @@ function addStep(usage: Usage | null, step: Record<string, unknown>): Usage {
   };
 }
 
+/** The text of a `text` part event (`{ type: 'text', part: { type: 'text', text } }`), if not blank. */
+function textPart(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const event = value as Record<string, unknown>;
+  const part =
+    typeof event.part === 'object' && event.part !== null
+      ? (event.part as Record<string, unknown>)
+      : event;
+  if (part.type !== 'text' || typeof part.text !== 'string') return null;
+  return part.text.trim() ? part.text : null;
+}
+
 /** Reads the `run --format json` output of OpenCode line by line. */
 class OpencodeParser implements OutputParser {
   private sessionId: string | null = null;
   private current: Usage | null = null;
   private error: string | null = null;
+  /** The last non-empty text part of the answer. */
+  private reply: string | null = null;
 
   push(line: string): void {
     let value: unknown;
@@ -64,6 +78,8 @@ class OpencodeParser implements OutputParser {
     this.sessionId ??= findSession(value);
     const step = findStepFinish(value);
     if (step) this.current = addStep(this.current, step);
+    const text = textPart(value);
+    if (text !== null) this.reply = text;
     if (
       typeof value === 'object' &&
       value !== null &&
@@ -79,7 +95,13 @@ class OpencodeParser implements OutputParser {
   }
 
   outcome(): RunOutcome {
-    return { sessionId: this.sessionId, usage: this.usage(), error: this.error, denials: [] };
+    return {
+      sessionId: this.sessionId,
+      usage: this.usage(),
+      error: this.error,
+      denials: [],
+      reply: this.reply,
+    };
   }
 }
 

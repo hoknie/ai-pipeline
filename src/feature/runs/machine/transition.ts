@@ -12,6 +12,7 @@ import { afterDeliveryDone, markDelivered } from './delivery-checks.ts';
 import {
   advanceChecks,
   finishDelivery,
+  replyAsMessage,
   requestDelivery,
   resolvePrepared,
 } from './delivery-flow.ts';
@@ -69,7 +70,10 @@ function autoDeliveryCancelled(m: Ctx): void {
 const HANDLERS: Handlers = {
   report: (m, e) => reportAttempt(m, e.group, e.seq, e.report),
   split_proposed: (m, e) => proposeSplit(m, e.seq, e.groups),
-  attempt_exited: (m, e) => attemptExited(m, e.group, e.seq, e.exit),
+  attempt_exited: (m, e) => {
+    replyAsMessage(m.state, e.group, e.seq, e.exit);
+    attemptExited(m, e.group, e.seq, e.exit);
+  },
   attempt_usage: (m, e) => recordUsage(m, e.updates),
   timed_out: (m, e) => timedOut(m, e.group, e.seq),
   action_finished: (m, e) => actionFinished(m, e.group, e.seq, e.outcome),

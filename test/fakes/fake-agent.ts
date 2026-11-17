@@ -72,6 +72,11 @@ interface Action {
   /** Pause between the calls of `usage`. */
   usageGapMs?: number;
   noResult?: boolean;
+  /**
+   * The final text answer: `claude` puts it in `result.result` (none without it), `opencode` prints
+   * it as the text part (`done` without it). Works with `noReport` as well.
+   */
+  reply?: string;
 }
 
 /**
@@ -699,6 +704,7 @@ if (mode === 'claude') {
         type: 'result',
         subtype: 'success',
         is_error: false,
+        ...(action.reply !== undefined ? { result: action.reply } : {}),
         session_id: session,
         total_cost_usd: 0.01,
         permission_denials: denied,
@@ -761,7 +767,7 @@ if (mode === 'claude') {
         messageID: message,
         sessionID: session,
         type: 'text',
-        text: 'done',
+        text: action.reply ?? 'done',
         time: { start: timestamp, end: timestamp },
       },
     }),

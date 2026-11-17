@@ -138,6 +138,8 @@ class ClaudeParser implements OutputParser {
   private error: string | null = null;
   private usageLimit: { resetsAt: number | null } | null = null;
   private networkError: string | null = null;
+  /** The text of the final `result` event that is not an error. */
+  private reply: string | null = null;
   private readonly denials = new Denials();
 
   push(line: string): void {
@@ -185,6 +187,7 @@ class ClaudeParser implements OutputParser {
       denials: this.denials.values(),
       usageLimit: this.usageLimit,
       networkError: this.networkError,
+      reply: this.reply,
     };
   }
 
@@ -227,7 +230,9 @@ class ClaudeParser implements OutputParser {
         outputTokens: tokens.output_tokens ?? 0,
       };
     }
-    if (event.is_error) {
+    if (!event.is_error) {
+      this.reply = typeof event.result === 'string' && event.result.trim() ? event.result : null;
+    } else {
       this.error = typeof event.result === 'string' ? event.result : 'claude reported an error';
       if (typeof event.result === 'string' && NETWORK_ERROR.test(event.result)) {
         this.networkError = event.result.slice(0, NETWORK_ERROR_LIMIT);

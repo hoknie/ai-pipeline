@@ -78,6 +78,8 @@ export interface RunOutcome {
   usageLimit?: { resetsAt: number | null } | null;
   /** The CLI failed on a network error of the API (at most 200 characters); null otherwise. */
   networkError?: string | null;
+  /** The last text answer of the agent; null or absent when the runtime gives none. */
+  reply?: string | null;
 }
 
 export interface OutputParser {

@@ -7,14 +7,16 @@ import {
   RESOLVE_GROUP,
   actionGroupsOf,
   enterPoint,
+  findGroup,
   freshPending,
   isHeldByAction,
+  isMessageGroup,
   newGroup,
   pointClosed,
   pointStalled,
 } from '../types/index.ts';
 import { cleanupIfDelivered, selectGroups } from './delivery-checks.ts';
-import type { DeliveryEffect, DeliveryRequest, DeliveryResult } from './events.ts';
+import type { AttemptExit, DeliveryEffect, DeliveryRequest, DeliveryResult } from './events.ts';
 import { closeRepair, deliveryKeys, openRepairGroup, repairTask } from './repair.ts';
 import { messageTask, renderCommitMessage, resolveTask } from './texts.ts';
 
@@ -106,6 +108,19 @@ export function finishMessage(state: RunState, summary: string | null): Delivery
     ? summary.trim()
     : renderCommitMessage(state.run.config.delivery.commitMessage, state, groups);
   return [deliverEffect(state, message)];
+}
+
+/**
+ * The commit message author answered with text but sent no report: the text is the message. Only
+ * a clean exit counts; a stop, a timeout, a limit or a network error keeps the attempt failed.
+ */
+export function replyAsMessage(state: RunState, slug: string, seq: number, exit: AttemptExit) {
+  const group = findGroup(state, slug);
+  const reply = exit.reply?.trim();
+  if (!group || !isMessageGroup(group) || exit.failure !== null || !reply) return;
+  const attempt = group.attempts.find((a) => a.seq === seq && a.status === 'running');
+  if (!attempt || attempt.report !== null || attempt.reason !== null) return;
+  attempt.report = { verdict: 'done', summary: reply, feedback: null, source: 'reply' };
 }
 
 export function cancelDelivery(state: RunState): void {

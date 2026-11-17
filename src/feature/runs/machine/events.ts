@@ -43,6 +43,8 @@ export interface AttemptExit {
   denials?: Denial[];
   /** What a usage limit does to the group: `wait` (default) keeps it queued, `stop` fails it. */
   onLimit?: OnLimit;
+  /** The last text answer of the agent, when the runtime gives one. */
+  reply?: string | null;
 }
 
 export type DeliveryEffect =

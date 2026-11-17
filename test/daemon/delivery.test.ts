@@ -154,6 +154,23 @@ describe('delivery through the daemon', () => {
     expect(git(h.repo, 'show', '--name-only', '--format=', 'HEAD')).toBe('lib.ts');
   });
 
+  it('commits with the text answer of the message specialist that sent no report', async () => {
+    const h = await start(
+      '  delivery: { mode: commit, auto: false, message_specialist: reviewer }\n',
+    );
+    h.script({ ...WRITE_LIB, message: [{ noReport: true, reply: 'fix: login\n' }] });
+    const runId = await finishedRun(h);
+    await h.call('apply', { runId });
+    await h.waitFor(runId, (view) => view.delivery.applied === 1);
+    expect(git(h.repo, 'log', '-1', '--format=%B')).toBe('fix: login');
+    const message = (await h.call('group', { runId, group: '_message' })) as {
+      attempts: { status: string; summary: string | null; reportSource?: string }[];
+    };
+    expect(message.attempts).toEqual([
+      expect.objectContaining({ status: 'finished', summary: 'fix: login', reportSource: 'reply' }),
+    ]);
+  });
+
   it('delivers a run with autoDeliver true although delivery.auto is off', async () => {
     const h = await start();
     h.script(WRITE_LIB);

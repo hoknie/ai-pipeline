@@ -90,6 +90,9 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
         ),
       );
     }
+    if (attempt.reportSource === 'reply') {
+      lines.push(style.muted('     message taken from the reply (no report)'));
+    }
     if (attempt.summary) lines.push(`     summary: ${attempt.summary}`);
     if (attempt.feedback) lines.push(`     feedback: ${attempt.feedback}`);
     if (attempt.decision) {

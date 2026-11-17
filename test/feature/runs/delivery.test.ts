@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type FailReason,
   type RunState,
   MESSAGE_GROUP,
   createRun,
@@ -14,7 +15,7 @@ import {
   transition,
 } from '../../../src/feature/runs/machine/index.ts';
 
-import { CONFIG_TEXT, finish, run, runningAttempt, step } from './helpers.ts';
+import { CONFIG_TEXT, finish, group, run, runningAttempt, step } from './helpers.ts';
 
 function mergedRun(
   groups: number,
@@ -294,6 +295,104 @@ describe('commit messages', () => {
         message: 'Group 1\n\n- Group 1: Group 1 done',
       }),
     );
+  });
+
+  describe('the text answer of the message specialist without a report', () => {
+    const WRITER_CHAIN =
+      CONFIG_TEXT.replace(
+        '  specialists:\n',
+        `  chains:
+    fallback:
+      name: Fallback
+      mode: on_error
+      runtimes:
+        - { runtime: claude, model: haiku }
+        - { runtime: claude, model: sonnet }
+  specialists:
+`,
+      ).replace(
+        '    qa: { name: Tester }',
+        '    qa: { name: Tester }\n    writer: { name: Author, runtime_chain: fallback }',
+      ) + '  delivery: { mode: commit, message_specialist: writer }\n';
+
+    function exit(
+      state: RunState,
+      slug: string,
+      reply: string | null,
+      failure: FailReason | null = null,
+    ): Effect[] {
+      const attempt = runningAttempt(state, slug);
+      return transition(
+        state,
+        {
+          kind: 'attempt_exited',
+          group: slug,
+          seq: attempt.seq,
+          exit: { sessionId: 's', usage: null, failure, outsideChanges: [], reply },
+        },
+        6200,
+      );
+    }
+
+    function messageRun(configText: string): RunState {
+      const state = mergedRun(1, { configText });
+      request(state);
+      dispatch([state], 6100);
+      return state;
+    }
+
+    it('takes the text as the message and marks the report', () => {
+      const state = messageRun(WRITER);
+      const effects = exit(state, MESSAGE_GROUP, '\nfix(AIP-422): add back button\n');
+      expect(effects).toEqual([
+        expect.objectContaining({ kind: 'deliver', message: 'fix(AIP-422): add back button' }),
+      ]);
+      const message = state.message!;
+      expect(message.status).toBe('merged');
+      expect(message.attempts[0]).toMatchObject({
+        status: 'finished',
+        reason: null,
+        report: { verdict: 'done', summary: 'fix(AIP-422): add back button', source: 'reply' },
+      });
+    });
+
+    it('takes the text before the next item of the chain', () => {
+      const state = messageRun(WRITER_CHAIN);
+      expect(runningAttempt(state, MESSAGE_GROUP).model).toBe('haiku');
+      const effects = exit(state, MESSAGE_GROUP, 'feat: login');
+      expect(effects).toContainEqual(
+        expect.objectContaining({ kind: 'deliver', message: 'feat: login' }),
+      );
+      expect(state.message!.attempts).toHaveLength(1);
+    });
+
+    it('falls back to the template without text and without another item', () => {
+      const state = messageRun(WRITER);
+      const effects = exit(state, MESSAGE_GROUP, '  ');
+      expect(effects).toContainEqual(
+        expect.objectContaining({ kind: 'deliver', message: 'Group 1\n\n- Group 1: Group 1 done' }),
+      );
+      expect(state.message!.attempts[0]).toMatchObject({ reason: { kind: 'no_report' } });
+    });
+
+    it('falls back to the template when the attempt failed, text or not', () => {
+      const state = messageRun(WRITER);
+      const effects = exit(state, MESSAGE_GROUP, 'feat: login', { kind: 'timeout' });
+      expect(effects).toContainEqual(
+        expect.objectContaining({ kind: 'deliver', message: 'Group 1\n\n- Group 1: Group 1 done' }),
+      );
+    });
+
+    it('does not take the text of an ordinary step', () => {
+      const state = run(1);
+      step(state);
+      exit(state, 'group-1', 'the plan is done');
+      expect(group(state).attempts[0]).toMatchObject({
+        status: 'failed',
+        reason: { kind: 'no_report' },
+        report: null,
+      });
+    });
   });
 });
 

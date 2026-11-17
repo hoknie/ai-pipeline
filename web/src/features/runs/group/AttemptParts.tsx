@@ -82,6 +82,15 @@ export function AttemptHeading({ attempt, verdict }: { attempt: AttemptView; ver
         </span>
       ) : null}
       <StatusBadge status={verdict} />
+      {attempt.reportSource === 'reply' ? (
+        <span
+          className="text-xs text-status-warn"
+          title={t('runs.attempt.fromReplyTitle')}
+          data-report-source="reply"
+        >
+          {t('runs.attempt.fromReply')}
+        </span>
+      ) : null}
       <span className="text-xs text-muted-foreground tabular-nums">
         {duration(attempt.durationMs)} · {tokens(attempt.usage?.inputTokens)}/
         {tokens(attempt.usage?.outputTokens)}

@@ -88,6 +88,7 @@ export function attemptView(
     verdict: attemptVerdict(attempt),
     summary: attempt.report?.summary ?? null,
     feedback: attempt.report?.feedback ?? null,
+    ...(attempt.report?.source === 'reply' ? { reportSource: 'reply' as const } : {}),
     decision: attemptDecision(group, attempt),
     reason: attempt.reason ? describeFailReason(attempt.reason) : null,
     startedAt: attempt.startedAt,

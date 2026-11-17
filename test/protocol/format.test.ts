@@ -1285,6 +1285,20 @@ describe('the provider in text', () => {
     expect(formatGroup(view)).toContain('provider anthropic instead of openai');
   });
 
+  it('notes a commit message taken from the reply, not for an ordinary report', () => {
+    const state = run(1);
+    step(state, 1000);
+    const attempt = state.groups[0]!.attempts[0]!;
+    attempt.report = { verdict: 'done', summary: 'feat: x', feedback: null, source: 'reply' };
+    const view = groupView(state, state.groups[0]!, '/w', null, 5000);
+    expect(view.attempts[0]!.reportSource).toBe('reply');
+    expect(formatGroup(view)).toContain('message taken from the reply (no report)');
+    delete attempt.report.source;
+    const plain = groupView(state, state.groups[0]!, '/w', null, 5000);
+    expect(plain.attempts[0]).not.toHaveProperty('reportSource');
+    expect(formatGroup(plain)).not.toContain('taken from the reply');
+  });
+
   it('notes an attempt that ran on another provider than the run asked for', () => {
     const state = run(1, { configText: TIER, provider: 'openai' });
     step(state, 1000);

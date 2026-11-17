@@ -34,6 +34,8 @@ export interface AttemptView {
   verdict: string | null;
   summary: string | null;
   feedback: string | null;
+  /** `reply`: the commit message author sent no report, `summary` is the text of its answer. */
+  reportSource?: 'reply';
   /** The accepted answer to the question this attempt asked (verdict needs_human), if any. */
   decision: AttemptDecision | null;
   reason: string | null;

@@ -391,6 +391,25 @@ describe('claude adapter', () => {
       denials: [],
       usageLimit: null,
       networkError: null,
+      reply: 'ok',
+    });
+  });
+
+  describe('reply', () => {
+    it('takes the text of the final result', () => {
+      const parser = runtime.createParser();
+      parser.push(JSON.stringify({ type: 'result', is_error: false, result: 'fix: a thing\n' }));
+      expect(parser.outcome().reply).toBe('fix: a thing\n');
+    });
+
+    it('gives none for an empty text, an error result or no result', () => {
+      const empty = runtime.createParser();
+      empty.push(JSON.stringify({ type: 'result', is_error: false, result: '  \n' }));
+      expect(empty.outcome().reply).toBeNull();
+      const failed = runtime.createParser();
+      failed.push(JSON.stringify({ type: 'result', is_error: true, result: 'Invalid model' }));
+      expect(failed.outcome().reply).toBeNull();
+      expect(runtime.createParser().outcome().reply).toBeNull();
     });
   });
 
@@ -862,6 +881,7 @@ describe('opencode run --format json output', () => {
       usage: { inputTokens: 19026 + 19090, outputTokens: 25 + 20 + 3 + 1 },
       error: null,
       denials: [],
+      reply: 'OK',
     });
   });
 
@@ -1010,5 +1030,16 @@ describe('live usage', () => {
     parser.push(step(20, 2));
     expect(parser.usage()).toEqual({ inputTokens: 30, outputTokens: 3 });
     expect(parser.outcome().usage).toEqual(parser.usage());
+  });
+
+  it('gives the last non-empty text part of opencode as the reply', () => {
+    const parser = createOpencodeRuntime('/bin/opencode').createParser();
+    expect(parser.outcome().reply).toBeNull();
+    const text = (value: string) =>
+      JSON.stringify({ type: 'text', sessionID: 'ses_1', part: { type: 'text', text: value } });
+    parser.push(text('Looking at the changes.'));
+    parser.push(text('feat: add a thing'));
+    parser.push(text('   '));
+    expect(parser.outcome().reply).toBe('feat: add a thing');
   });
 });

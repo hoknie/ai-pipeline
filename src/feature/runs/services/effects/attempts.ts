@@ -283,6 +283,7 @@ export class AttemptStarter {
         outsideChanges,
         denials: exit.outcome.denials,
         onLimit: this.dependencies.queue.onLimitOf(state.run.repository),
+        reply: exit.outcome.reply ?? null,
       },
     });
     purgeConversations(state, group.slug, key.seq);

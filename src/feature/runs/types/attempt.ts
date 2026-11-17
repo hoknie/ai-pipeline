@@ -26,6 +26,8 @@ export interface Report {
   questions?: HumanQuestion[] | null;
   /** With `needs_human`: only a person can answer; the queue autopilot leaves it alone. */
   humanOnly?: boolean;
+  /** `reply`: built from the text answer of the commit message author, who sent no report. */
+  source?: 'reply';
 }
 
 export type FailReason =

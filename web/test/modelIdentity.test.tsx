@@ -80,6 +80,22 @@ describe('the provider of an attempt', () => {
   });
 });
 
+describe('the source of the report of an attempt', () => {
+  it('marks a commit message taken from the reply', () => {
+    const { container } = render(
+      <AttemptHeading attempt={{ ...attempt, reportSource: 'reply' }} verdict="passed" />,
+    );
+    const mark = container.querySelector('[data-report-source="reply"]');
+    expect(mark?.textContent).toBe('from the reply');
+    expect(mark?.getAttribute('title')).toContain('sent no report');
+  });
+
+  it('shows no mark for an ordinary report', () => {
+    const { container } = render(<AttemptHeading attempt={attempt} verdict="passed" />);
+    expect(container.querySelector('[data-report-source]')).toBeNull();
+  });
+});
+
 describe('attempt model identity', () => {
   it('shows the complete model ID and keeps it in the tooltip', () => {
     render(<AttemptHeading attempt={attempt} verdict="passed" />);
