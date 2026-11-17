@@ -1,7 +1,7 @@
 import { rejected } from '../../../platform/errors/index.ts';
 import type { AttachmentService } from '../../attachments/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
-import { variantConfig, type RunsServices } from '../../runs/services/index.ts';
+import { providerEvent, variantConfig, type RunsServices } from '../../runs/services/index.ts';
 import type { ConfigService } from '../../swarm-config/services/index.ts';
 import { checkSkip, stepStates, type RunState } from '../../runs/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
@@ -71,8 +71,10 @@ export class QueueEdit {
     }
     const plan = links.planEdit(repository, request, existing?.run != null);
     const runVariant = existing?.run ? request.variant : undefined;
+    const runProvider = existing?.run ? request.provider : undefined;
     const params: QueueEditRequest = { ...request, after: plan.after, parent: plan.parent };
     if (runVariant !== undefined) delete params.variant;
+    if (runProvider !== undefined) delete params.provider;
     const changesAttachments = this.checkAttachments(existing, params);
     let skip = params.skip;
     if (existing?.run && skip !== undefined) {
@@ -81,6 +83,7 @@ export class QueueEdit {
     }
     if (existing?.run) this.checkReturned(params, skip);
     if (existing?.run && runVariant !== undefined) await this.variantInRun(existing, runVariant);
+    if (existing?.run && runProvider !== undefined) await this.providerInRun(existing, runProvider);
     await this.ensureFields(repository, existing, params, skip);
     const after = params.after === undefined ? undefined : items.resolveDependencies(params.after);
     const {
@@ -198,6 +201,15 @@ export class QueueEdit {
       config: variantConfig(config, state, variant),
     });
     item.variant = variant;
+  }
+
+  /** The provider of a returned run goes to the run itself, as the variant does, and to its item. */
+  private async providerInRun(item: QueueItem, provider: string | null): Promise<void> {
+    const { runs, config } = this.dependencies;
+    const state = runs.states.lookup(item.run as string);
+    if (!state) throw rejected(`unknown run \`${item.run}\``);
+    await runs.engine.apply(state, providerEvent(config, state, provider));
+    item.provider = provider;
   }
 
   /** A returned run has no item-level skip: the steps are skipped in the run itself. */

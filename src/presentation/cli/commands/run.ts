@@ -21,6 +21,7 @@ import {
   addClean,
   addMarkDelivered,
   addPause,
+  addProvider,
   addSkip,
   addVariant,
 } from './run-delivery.ts';
@@ -253,4 +254,5 @@ export function registerRun(program: Command, io: CliIo, style: Style): void {
   const kit = runKit(program, io, style);
   for (const add of [addStart, addList, addTag, addUntag, addShow, addWatch, addCancel]) add(kit);
   for (const add of [addPause, addApply, addMarkDelivered, addSkip, addVariant, addClean]) add(kit);
+  addProvider(kit);
 }

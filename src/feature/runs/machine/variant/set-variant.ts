@@ -8,8 +8,9 @@ import {
   findPipeline,
   groupPipeline,
 } from '../../../swarm-config/types/index.ts';
-import { allGroups, type Attempt, type Group, type Run } from '../../types/index.ts';
+import { allGroups, type Group, type Run } from '../../types/index.ts';
 import type { Ctx } from '../events.ts';
+import { dropResume, restartStep } from '../restart/index.ts';
 
 /** What a variant sets in a step or in the split. */
 interface Definition {
@@ -90,34 +91,13 @@ function addMissing(run: Run, config: ResolvedConfig, definitions: Definition[])
   }
 }
 
-function restart(m: Ctx, group: Group, running: Attempt, from: string, to: string): void {
-  running.status = 'cancelled';
-  running.reason = { kind: 'variant', from, to };
-  running.finishedAt = m.now;
-  m.effects.push({
-    kind: 'stop_attempt',
-    run: m.state.run.id,
-    group: group.slug,
-    seq: running.seq,
-  });
-  group.status = 'queued';
-  group.pending = {
-    stepIndex: running.stepIndex,
-    feedback: running.input.feedback,
-    humanAnswer: running.input.humanAnswer,
-    resume: false,
-    ...(running.input.reviewed ? { reviewed: true } : {}),
-  };
-}
-
 /** The executor of a step may have changed: no session of the old one is resumed. */
 function restartGroup(m: Ctx, group: Group, changed: boolean[], from: string, to: string): void {
   const running = group.attempts.find((attempt) => attempt.status === 'running');
   if (running && changed[running.stepIndex]) {
-    restart(m, group, running, from, to);
+    restartStep(m, group, running, { kind: 'variant', from, to });
   } else if (!running && group.pending && changed[group.pending.stepIndex]) {
-    const { keepRuntime: _keep, ...pending } = group.pending;
-    group.pending = { ...pending, resume: false };
+    dropResume(group);
   }
 }
 

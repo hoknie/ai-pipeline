@@ -19,6 +19,7 @@ import {
 
 import type { AttemptKey } from './effects/context.ts';
 import type { RunEffects } from './effects/effects.ts';
+import { providerEvent } from './refresh.ts';
 import type { RunEngine } from './engine.ts';
 import type { RunStates } from './states.ts';
 
@@ -47,6 +48,12 @@ export class RunRequests {
       await engine.apply(state, typeof event === 'function' ? event(state) : event);
       return state;
     });
+  }
+
+  /** The run goes on with another provider (null: none); an unknown provider refuses the request. */
+  setProvider(runId: string, provider: string | null): Promise<RunState> {
+    const { config } = this.dependencies;
+    return this.event(runId, (state) => providerEvent(config, state, provider));
   }
 
   /** An event reported by the worker MCP server of a running attempt. */

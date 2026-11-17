@@ -537,6 +537,7 @@ describe('cli', () => {
       'swarm_retry',
       'swarm_run',
       'swarm_run_pause',
+      'swarm_run_provider',
       'swarm_run_variant',
       'swarm_skip_step',
       'swarm_status',
@@ -1033,5 +1034,42 @@ describe('cli provider', () => {
     const result = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--provider', 'nope');
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('unknown provider `nope`; known: anthropic, zai');
+  });
+
+  it('switches the provider of a run, resets it with --none and refuses an unknown one', async () => {
+    const box = sandbox(TIER_CONFIG);
+    const started = await aip(
+      box,
+      'run',
+      'start',
+      'feature',
+      '--task',
+      'x',
+      '--provider',
+      'zai',
+      '--json',
+    );
+    expect(started.code).toBe(0);
+    const runId = await waitValue('the run id', async () => {
+      const list = JSON.parse((await aip(box, 'run', 'list', '--json')).stdout) as {
+        id: string;
+      }[];
+      return list[0]?.id ?? null;
+    });
+    const switched = await aip(box, 'run', 'provider', runId, 'anthropic', '--json');
+    expect(switched.code).toBe(0);
+    expect(JSON.parse(switched.stdout)).toMatchObject({ id: runId, provider: 'anthropic' });
+    const reset = await aip(box, 'run', 'provider', runId, '--none', '--json');
+    expect(reset.code).toBe(0);
+    expect(JSON.parse(reset.stdout)).toMatchObject({ id: runId, provider: null });
+    const unknown = await aip(box, 'run', 'provider', runId, 'nope');
+    expect(unknown.code).toBe(1);
+    expect(unknown.stderr).toContain('unknown provider `nope`; known: anthropic, zai');
+    const neither = await aip(box, 'run', 'provider', runId);
+    expect(neither.code).not.toBe(0);
+    expect(neither.stderr).toContain('name a <provider> or pass --none');
+    const both = await aip(box, 'run', 'provider', runId, 'zai', '--none');
+    expect(both.code).not.toBe(0);
+    expect(both.stderr).toContain('--none cannot be combined with a <provider>');
   });
 });

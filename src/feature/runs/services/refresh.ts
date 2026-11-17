@@ -12,7 +12,9 @@ import {
   applyVariant,
   checkVariant,
   firstConfigError,
+  providerProblem,
 } from '../../swarm-config/types/index.ts';
+import type { Event } from '../machine/index.ts';
 import type { RunState } from '../types/index.ts';
 
 /**
@@ -58,4 +60,28 @@ export function variantConfig(
   const problem = checkVariant(current, state.run.pipeline, variant);
   if (problem !== null) throw rejected(problem);
   return applyVariant(current, state.run.pipeline, variant);
+}
+
+/**
+ * The event that gives the run another provider (null: none). The provider must be known to the
+ * current configuration of the run's repository, which must load; the run keeps its own provider
+ * when the request names it again.
+ */
+export function providerEvent(
+  config: ConfigService,
+  state: RunState,
+  provider: string | null,
+): Event {
+  let current: ResolvedConfig;
+  try {
+    current = config.load(state.run.repository);
+  } catch (error) {
+    if (!(error instanceof ConfigLoadError)) throw rejected((error as Error).message);
+    throw rejected(`configuration not loaded: ${firstConfigError(error)}`);
+  }
+  if (provider !== null && provider !== state.run.provider) {
+    const problem = providerProblem(current, provider);
+    if (problem !== null) throw rejected(problem);
+  }
+  return { kind: 'provider_set', provider };
 }

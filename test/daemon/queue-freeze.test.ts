@@ -192,6 +192,58 @@ describe('freezing for a priority run', () => {
     expect((await h.status(b)).variant).toBe('careful');
   });
 
+  it('changes the provider of a returned run through its queue item', async () => {
+    const h = await start(`swarm:
+  max: 3
+  chains:
+    coding:
+      name: Coding
+      mode: by_provider
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: claude, model: sonnet }
+  specialists:
+    coder: { name: Coder, runtime_chain: coding }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`);
+    h.script({
+      code: [{ noReport: true }, { waitFor: h.gate('b') }, { waitFor: h.gate('a') }, {}],
+    });
+    await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+    await add(h, 'A', { provider: 'zai' });
+    await add(h, 'B', { provider: 'zai' });
+    await h.call('queue_start', { repository: h.repo });
+    const queue = await waitQueue(h, (view) => view.skipped.length === 1 && view.runs.length === 1);
+    const a = queue.skipped[0]!.id;
+    const b = queue.runs[0]!.id;
+    await h.call('queue_return', { runId: a });
+    const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item: item.id, provider: 'nope' }),
+    ).rejects.toThrow('unknown provider `nope`; known: anthropic, zai');
+    expect((await h.status(b)).provider).toBe('zai');
+    await h.call('queue_edit', { repository: h.repo, item: item.id, provider: 'anthropic' });
+    expect((await h.status(b)).provider).toBe('anthropic');
+    expect((await queueOf(h)).items.find((entry) => entry.run === b)).toMatchObject({
+      provider: 'anthropic',
+    });
+    await h.call('queue_edit', { repository: h.repo, item: item.id, provider: null });
+    expect((await h.status(b)).provider).toBeNull();
+    await expect(
+      h.call('queue_edit', {
+        repository: h.repo,
+        item: item.id,
+        provider: 'zai',
+        task: 'something else',
+      }),
+    ).rejects.toThrow('a returned run keeps its own task');
+    h.open('a');
+    h.open('b');
+  });
+
   it('shows in the queue the variant set on the returned run from its details', async () => {
     const h = await start(`${PIPELINE_CONFIG}      variants:
         careful:

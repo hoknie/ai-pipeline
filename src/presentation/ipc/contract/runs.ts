@@ -129,6 +129,10 @@ export const runsRequests = [
     params: z.object({ runId: z.string().min(1), variant: z.string().trim().min(1) }),
   }),
   z.object({
+    method: z.literal('run_provider'),
+    params: z.object({ runId: z.string().min(1), provider: providerId.nullable() }),
+  }),
+  z.object({
     method: z.literal('apply'),
     params: z.object({
       runId: z.string().min(1),

@@ -132,6 +132,45 @@ export function addVariant(kit: RunKit): void {
     });
 }
 
+export function addProvider(kit: RunKit): void {
+  const { output, examples, context, activeStyle, run } = kit;
+  run
+    .command('provider')
+    .description(
+      'Switch a run that is not finished yet to another provider of the tiers, or to none; a running step on a tier whose item changes is stopped without a commit and starts again in a new session',
+    )
+    .argument('<run-id>', 'run id')
+    .argument('[provider]', 'provider id')
+    .option(
+      '--none',
+      'reset the provider: the next attempts pick the item by the rules of the tier',
+    )
+    .option('--json', 'print JSON')
+    .addHelpText(
+      'after',
+      examples(['aip run provider 0mh3k2ab1x9z openai', 'aip run provider 0mh3k2ab1x9z --none']),
+    )
+    .action(
+      async (
+        runId: string,
+        provider: string | undefined,
+        options: { none?: boolean; json?: boolean },
+      ) => {
+        if (options.none === true && provider !== undefined) {
+          throw usage('--none cannot be combined with a <provider>');
+        }
+        if (options.none !== true && provider === undefined) {
+          throw usage('name a <provider> or pass --none');
+        }
+        const view = (await call(context(), 'run_provider', {
+          runId,
+          provider: options.none === true ? null : (provider as string),
+        })) as RunView;
+        output(options.json, formatRun(view, Date.now(), activeStyle), view);
+      },
+    );
+}
+
 export function addClean(kit: RunKit): void {
   const { print, output, examples, context, activeStyle, run } = kit;
   run

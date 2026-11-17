@@ -139,6 +139,7 @@ export function MoreMenu({
   onSubtask,
   onAddLink,
   onChangeVariant,
+  onChangeProvider,
 }: {
   run: RunView;
   retry: ReturnType<typeof useRetryFailed>;
@@ -147,6 +148,8 @@ export function MoreMenu({
   onAddLink?: (() => void) | undefined;
   /** Opens the choice of another variant; undefined: the run has no other variant or is finished. */
   onChangeVariant?: (() => void) | undefined;
+  /** Opens the choice of another provider; undefined: the project has no provider or the run is finished. */
+  onChangeProvider?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   return (
@@ -165,6 +168,11 @@ export function MoreMenu({
         {onChangeVariant ? (
           <DropdownMenuItem onSelect={onChangeVariant}>
             {t('runs.header.changeVariant')}
+          </DropdownMenuItem>
+        ) : null}
+        {onChangeProvider ? (
+          <DropdownMenuItem onSelect={onChangeProvider}>
+            {t('runs.header.changeProvider')}
           </DropdownMenuItem>
         ) : null}
         {onSubtask ? (

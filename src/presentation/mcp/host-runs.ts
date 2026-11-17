@@ -205,6 +205,23 @@ export function registerVariant(kit: HostKit): void {
   );
 }
 
+export function registerProvider(kit: HostKit): void {
+  const { server, runId, showRun } = kit;
+  server.registerTool(
+    'swarm_run_provider',
+    {
+      title: 'Switch a run to another provider',
+      description:
+        'Switch a run that is not finished to another provider of the tiers, or pass null for none. A running step on a tier whose item changes with the provider is stopped without a commit and starts again in a new session; the other steps go on. A waiting group takes the new item with its next attempt. Resetting to none does not stop a running step.',
+      inputSchema: {
+        run_id: runId,
+        provider: z.string().min(1).nullable().describe('Id of a provider, or null for none'),
+      },
+    },
+    ({ run_id, provider }) => attempt(() => showRun('run_provider', { runId: run_id, provider })),
+  );
+}
+
 export function registerAnswer(kit: HostKit): void {
   const { server, runId, group, showRun } = kit;
   server.registerTool(

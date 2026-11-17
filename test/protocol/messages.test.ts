@@ -612,6 +612,13 @@ describe('tag requests', () => {
     bad('run_variant', { runId: 'r' });
   });
 
+  it('accepts run_provider with a provider or null, not with an empty one or none', () => {
+    ok('run_provider', { runId: 'r', provider: 'zai' });
+    ok('run_provider', { runId: 'r', provider: null });
+    bad('run_provider', { runId: 'r', provider: '' });
+    bad('run_provider', { runId: 'r' });
+  });
+
   it('takes a run id in run_auto_deliver_cancel', () => {
     ok('run_auto_deliver_cancel', { runId: 'r' });
     bad('run_auto_deliver_cancel', {});

@@ -44,6 +44,8 @@ export type FailReason =
   | { kind: 'skipped' }
   /** The variant of the run was changed while the attempt ran; the step starts again. */
   | { kind: 'variant'; from: string; to: string }
+  /** The provider of the run was changed while the attempt ran; the step starts again. */
+  | { kind: 'provider'; from: string | null; to: string | null }
   /** The runtime ran out of its usage limit; `resetsAt`: when it resets (ms), null when unknown. */
   | { kind: 'usage_limit'; resetsAt: number | null }
   /** The network was down or the API of the agent was unreachable; the step goes on after a pause. */
@@ -99,6 +101,8 @@ export function describeFailReason(reason: FailReason): string {
       return 'step skipped';
     case 'variant':
       return `variant changed: ${reason.from} → ${reason.to}`;
+    case 'provider':
+      return `provider changed: ${reason.from ?? 'none'} → ${reason.to ?? 'none'}`;
     case 'message':
       return 'interrupted by a message';
     case 'paused':

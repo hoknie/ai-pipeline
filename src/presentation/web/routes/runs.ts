@@ -7,6 +7,8 @@ const skipBody = z.object({ step: z.string().trim().min(1), skip: z.boolean() })
 
 const variantBody = z.object({ variant: z.string().trim().min(1) });
 
+const providerBody = z.object({ provider: z.string().trim().min(1).nullable() });
+
 const applyBody = z.object({
   groups: z.array(z.string().min(1)).optional(),
   force: z.boolean().optional(),
@@ -18,8 +20,28 @@ const runObserverBody = z.object({ enabled: z.boolean() });
 
 const runTitleBody = z.object({ title: z.string().trim().min(1).max(RUN_TITLE_LIMIT) });
 
-export function runsRoutes({ call }: RouteKit): Route[] {
+/** A POST of a run whose body goes to the method of the daemon next to the run id. */
+function runBody(
+  { call }: RouteKit,
+  path: string,
+  method: 'run_observer' | 'run_variant' | 'run_provider' | 'run_title',
+  schema: z.ZodType<object>,
+): Route {
+  return {
+    method: 'POST',
+    pattern: new RegExp(`^/api/runs/${segment}/${path}$`),
+    handle: async ([runId], body) =>
+      call(method, { runId: runId ?? '', ...parseBody(schema, body) } as never),
+  };
+}
+
+export function runsRoutes(kit: RouteKit): Route[] {
+  const { call } = kit;
   return [
+    runBody(kit, 'observer', 'run_observer', runObserverBody),
+    runBody(kit, 'variant', 'run_variant', variantBody),
+    runBody(kit, 'provider', 'run_provider', providerBody),
+    runBody(kit, 'title', 'run_title', runTitleBody),
     { method: 'GET', pattern: /^\/api\/runs$/, handle: () => call('status', {}) },
     {
       method: 'GET',
@@ -31,12 +53,6 @@ export function runsRoutes({ call }: RouteKit): Route[] {
       method: 'GET',
       pattern: new RegExp(`^/api/runs/${segment}$`),
       handle: ([runId]) => call('status', { runId: runId ?? '' }),
-    },
-    {
-      method: 'POST',
-      pattern: new RegExp(`^/api/runs/${segment}/observer$`),
-      handle: async ([runId], body) =>
-        call('run_observer', { runId: runId ?? '', ...parseBody(runObserverBody, body) }),
     },
     {
       method: 'POST',
@@ -58,14 +74,6 @@ export function runsRoutes({ call }: RouteKit): Route[] {
     },
     {
       method: 'POST',
-      pattern: new RegExp(`^/api/runs/${segment}/variant$`),
-      handle: async ([runId], body) => {
-        const { variant } = parseBody(variantBody, body);
-        return call('run_variant', { runId: runId ?? '', variant });
-      },
-    },
-    {
-      method: 'POST',
       pattern: new RegExp(`^/api/runs/${segment}/apply$`),
       handle: async ([runId], body) => {
         const { groups, force } = parseBody(applyBody, body);
@@ -83,12 +91,6 @@ export function runsRoutes({ call }: RouteKit): Route[] {
         const { groups } = parseBody(markDeliveredBody, body);
         return call('run_mark_delivered', { runId: runId ?? '', ...(groups ? { groups } : {}) });
       },
-    },
-    {
-      method: 'POST',
-      pattern: new RegExp(`^/api/runs/${segment}/title$`),
-      handle: async ([runId], body) =>
-        call('run_title', { runId: runId ?? '', ...parseBody(runTitleBody, body) }),
     },
     {
       method: 'POST',

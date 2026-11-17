@@ -37,6 +37,8 @@ export const runHandlers = {
       variant: params.variant,
       config: variantConfig(context.services.config, state, params.variant),
     })),
+  run_provider: async (params, { services, snapshots }) =>
+    snapshots.run(await services.runs.requests.setProvider(params.runId, params.provider)),
   run_observer: (params, context) =>
     event(context, params.runId, { kind: 'repair_allowed', allowed: params.enabled }),
   answer: (params, context) =>

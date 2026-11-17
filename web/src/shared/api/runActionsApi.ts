@@ -11,6 +11,8 @@ export interface RunActionsApi {
   skipStep(runId: string, step: string, skip: boolean): Promise<unknown>;
   /** Switches an unfinished run to another variant of its pipeline; a running step whose definition changes starts again. */
   setRunVariant(runId: string, variant: string): Promise<RunView>;
+  /** Switches an unfinished run to another provider of the tiers (null: none); a running step on a tier whose item changes starts again. */
+  setRunProvider(runId: string, provider: string | null): Promise<RunView>;
   cancel(runId: string, group?: string): Promise<unknown>;
   apply(runId: string, force: boolean): Promise<ApplyResult>;
   /** Marks merged groups delivered after the user merged them by hand; nothing is applied. */
@@ -38,6 +40,7 @@ export function runActionsApi(): RunActionsApi {
       ),
     skipStep: (runId, step, skip) => post(`/api/runs/${enc(runId)}/skip`, { step, skip }),
     setRunVariant: (runId, variant) => post(`/api/runs/${enc(runId)}/variant`, { variant }),
+    setRunProvider: (runId, provider) => post(`/api/runs/${enc(runId)}/provider`, { provider }),
     cancel: (runId, group) =>
       group
         ? post(`/api/runs/${enc(runId)}/groups/${enc(group)}/cancel`)

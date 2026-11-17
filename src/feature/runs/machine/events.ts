@@ -116,6 +116,8 @@ export type Event =
   | { kind: 'step_skip'; step: string; skip: boolean }
   /** The variant of the run changes; `config` is the current configuration with the variant applied. */
   | { kind: 'variant_set'; variant: string; config: ResolvedConfig }
+  /** The provider of the run changes; null: none. The service has checked that it is known. */
+  | { kind: 'provider_set'; provider: string | null }
   | { kind: 'hold'; hold: RunHold | null }
   /** An observer takes the incident; `specialist` is its profile at this moment. */
   | { kind: 'repair_start'; incident: Incident; specialist: Specialist }

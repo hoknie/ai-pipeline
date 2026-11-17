@@ -971,6 +971,46 @@ describe('host MCP swarm_run_variant', () => {
   });
 });
 
+describe('host MCP swarm_run_provider', () => {
+  it('sends run_provider with a provider or null and answers with the view of the run', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return runView(run(1), 1000);
+    });
+    const tool = (await client.listTools()).tools.find(
+      (item) => item.name === 'swarm_run_provider',
+    );
+    expect(tool?.description).toContain('starts again');
+    const switched = await client.callTool({
+      name: 'swarm_run_provider',
+      arguments: { run_id: 'run000000001', provider: 'openai' },
+    });
+    expect(switched.isError).toBeFalsy();
+    expect(textOf(switched)).toContain('run000000001');
+    await client.callTool({
+      name: 'swarm_run_provider',
+      arguments: { run_id: 'run000000001', provider: null },
+    });
+    expect(calls).toEqual([
+      { method: 'run_provider', params: { runId: 'run000000001', provider: 'openai' } },
+      { method: 'run_provider', params: { runId: 'run000000001', provider: null } },
+    ]);
+  });
+
+  it('reports a refusal of the daemon as a tool error', async () => {
+    const client = await connect(async () => {
+      throw new Error('unknown provider `nope`; known: anthropic, zai');
+    });
+    const result = await client.callTool({
+      name: 'swarm_run_provider',
+      arguments: { run_id: 'run000000001', provider: 'nope' },
+    });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('unknown provider');
+  });
+});
+
 describe('host MCP swarm_skip_step', () => {
   it('sends run_skip, skipping by default and bringing back with skip=false', async () => {
     const calls: unknown[] = [];

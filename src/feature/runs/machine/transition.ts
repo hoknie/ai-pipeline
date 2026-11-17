@@ -27,6 +27,7 @@ import {
   startNextMerge,
 } from './run-control.ts';
 import { actionFinished, commitFailed, skipAhead, stepSkip, timedOut } from './steps.ts';
+import { setProvider } from './provider/index.ts';
 import { setVariant } from './variant/index.ts';
 
 function updateFinished(state: RunState, now: number): void {
@@ -91,6 +92,7 @@ const HANDLERS: Handlers = {
   auto_delivery_cancelled: autoDeliveryCancelled,
   step_skip: (m, e) => stepSkip(m, e.step, e.skip),
   variant_set: (m, e) => setVariant(m, e.variant, e.config),
+  provider_set: (m, e) => setProvider(m, e.provider),
   hold: (m, e) => holdRun(m, e.hold),
   repair_start: (m, e) => repairStart(m, e.incident, e.specialist),
   repair_allowed: (m, e) => repairAllowed(m, e.allowed),

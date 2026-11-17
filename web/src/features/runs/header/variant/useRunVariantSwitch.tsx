@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 
 import type { Api } from '../../../../shared/api/api.ts';
 import type { RunView } from '../../../../shared/api/types.ts';
+import { canSwitchRun } from '../switchable.ts';
 import { RunVariantDialog } from './RunVariantDialog.tsx';
 import { useRunVariants } from './useRunVariants.ts';
 
@@ -16,13 +17,7 @@ export function useRunVariantSwitch(
 ): { open: (() => void) | undefined; dialog: ReactNode } {
   const [opened, setOpened] = useState(false);
   const variants = useRunVariants(run, api);
-  // a finished run with a failed or cancelled group can be retried, so it may change its variant
-  const retryable =
-    run.groups.some((group) => group.status === 'failed' || group.status === 'cancelled') ||
-    (run.split !== null &&
-      run.split !== undefined &&
-      (run.split.status === 'failed' || run.split.status === 'cancelled'));
-  const switchable = (!run.finished || retryable) && variants.length > 1;
+  const switchable = canSwitchRun(run) && variants.length > 1;
   return {
     open: switchable ? () => setOpened(true) : undefined,
     dialog: opened ? (

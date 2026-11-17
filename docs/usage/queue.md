@@ -245,7 +245,7 @@ aip queue edit <item> --no-provider                          # not chosen again
 - A tier without an enabled item of the provider uses its default item, and the attempt is marked `provider <default> instead of <chosen>`.
 - A run never moves to another provider: when the provider's limit is hit the group waits for the reset, or fails with `--on-limit stop`; other failures follow the usual rules. A network failure retries on the same item.
 - A provider removed from the tiers before the task starts gives the task an error; the queue stops and the run is not created.
-- The provider of a returned run cannot be changed.
+- `aip queue edit <item> --provider …` on an item whose run returned to the queue switches the provider of the run itself, as [Changing the provider](runs.md#changing-the-provider) of a running run does.
 - Resetting or changing the provider of a task that has not started changes nothing in a run. A group that waits for an answer keeps its session while the same step goes on with the answer; a step that starts again (a retry, a retry with the configuration refreshed) picks its item anew, and the session with the earlier conversation is not continued.
 
 ## Skipping steps
