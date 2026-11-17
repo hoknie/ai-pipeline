@@ -11,6 +11,8 @@ export interface TaskFields {
   pipeline: string;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string | undefined;
+  /** Id of a known provider the task runs on; absent or `null`: not chosen. */
+  provider?: string | null | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | undefined;

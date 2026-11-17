@@ -54,6 +54,7 @@ function taskFields(pipeline: string, options: AddOptions) {
     ...(options.autoDeliver !== undefined ? { autoDeliver: options.autoDeliver } : {}),
     ...(deliveryMode !== undefined ? { deliveryMode } : {}),
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
+    ...(typeof options.provider === 'string' ? { provider: options.provider } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
     ...(links !== undefined ? { links } : {}),

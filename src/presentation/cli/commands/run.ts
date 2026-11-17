@@ -49,6 +49,7 @@ interface StartOptions {
   tag?: string[];
   parent?: string;
   variant?: string;
+  provider?: string;
   skip?: string[];
   after?: string[];
   attach?: string[];
@@ -78,6 +79,7 @@ function startParams(pipeline: string, options: StartOptions) {
     ...(options.tag !== undefined ? { tags: options.tag } : {}),
     ...(options.parent !== undefined ? { parent: options.parent } : {}),
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
+    ...(options.provider !== undefined ? { provider: options.provider } : {}),
     ...(options.skip !== undefined ? { skip: options.skip } : {}),
     ...(options.after !== undefined ? { after: options.after } : {}),
     ...(links !== undefined ? { links } : {}),
@@ -117,6 +119,10 @@ function addStart(kit: RunKit): void {
     .option(
       '--variant <id>',
       'variant of the pipeline (other models, specialists or skipped steps); default: the pipeline as it is',
+    )
+    .option(
+      '--provider <id>',
+      'provider of the tiers: every step on a tier runs on the model of this provider; default: none',
     )
     .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
     .option(

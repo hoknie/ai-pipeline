@@ -8,6 +8,7 @@ import {
   ConfigLoadError,
   configLoadErrors,
   defaultRuntimes,
+  knownProviders,
 } from '../../swarm-config/types/index.ts';
 import type { ConfigChangedPort } from '../ports/index.ts';
 import {
@@ -169,10 +170,15 @@ export class ConfigEditService {
     const repository = await this.dependencies.registry.rootOf(path);
     try {
       const config = this.dependencies.config.load(repository);
-      return { repository, pipelines: pipelineTopologies(config), errors: [] };
+      return {
+        repository,
+        pipelines: pipelineTopologies(config),
+        providers: knownProviders(config),
+        errors: [],
+      };
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
-      return { repository, pipelines: [], errors: configLoadErrors(error) };
+      return { repository, pipelines: [], providers: [], errors: configLoadErrors(error) };
     }
   }
 

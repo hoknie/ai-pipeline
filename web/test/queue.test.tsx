@@ -3062,6 +3062,68 @@ describe('two halves of the task form', () => {
     });
   });
 
+  describe('provider of the task', () => {
+    const withProviders = pipelinesView({ providers: ['anthropic', 'zai'] });
+
+    it('chooses a provider and sends it', async () => {
+      const api = show(queueOf(), { pipelines: vi.fn(async () => withProviders) });
+      await openNewTask();
+      fireEvent.click(await screen.findByRole('combobox', { name: 'Provider' }));
+      fireEvent.click(await screen.findByRole('option', { name: 'zai' }));
+      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await waitFor(() =>
+        expect(api.queueAdd).toHaveBeenCalledWith({
+          pipeline: 'feature',
+          provider: 'zai',
+          task: 'T',
+        }),
+      );
+    });
+
+    it('sends no provider when none is chosen', async () => {
+      const api = show(queueOf(), { pipelines: vi.fn(async () => withProviders) });
+      await openNewTask();
+      await screen.findByRole('combobox', { name: 'Provider' });
+      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await waitFor(() =>
+        expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'T' }),
+      );
+    });
+
+    it('has no field when the tiers name no provider', async () => {
+      show(queueOf(), { pipelines: vi.fn(async () => pipelinesView({ providers: [] })) });
+      await openNewTask();
+      await screen.findByLabelText('Task text');
+      expect(screen.queryByRole('combobox', { name: 'Provider' })).toBeNull();
+    });
+
+    it('sends a reset to not chosen when editing', async () => {
+      const zai = queueOf({ items: [queueItem('q1', 'A', 1, { provider: 'zai' })] });
+      const api = show(zai, {
+        pipelines: vi.fn(async () => withProviders),
+        queueEdit: vi.fn(async () => zai),
+      });
+      const item = (await screen.findAllByRole('listitem'))[0]!;
+      expect(within(item).getByText('@zai')).not.toBeNull();
+      fireEvent.click(within(item).getByRole('button', { name: 'Edit' }));
+      fireEvent.click(await screen.findByLabelText('Provider'));
+      // a query by role walks the accessibility tree of the whole page: ask the list itself
+      const option = (await screen.findAllByText('Not chosen')).find(
+        (node) => node.closest('[role=option]') !== null,
+      );
+      fireEvent.click(option!);
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(api.queueEdit).toHaveBeenCalledWith(
+          'q1',
+          expect.objectContaining({ provider: null }),
+        ),
+      );
+    });
+  });
+
   it('shows the skipped steps of an item and edits them', async () => {
     const api = show(
       queueOf({

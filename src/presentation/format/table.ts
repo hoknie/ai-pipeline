@@ -60,14 +60,16 @@ export function pipelineLabel(id: string, name: string): string {
   return name === id ? id : `${name} (${id})`;
 }
 
-/** The pipeline of a run with its variant, `pipeline:variant`; just the pipeline for `default`. */
+/** The pipeline of a run with its variant and provider, `pipeline:variant@provider`; just the pipeline for `default` without a provider. */
 export function runPipelineLabel(run: {
   pipeline: string;
   pipelineName: string;
   variant: string;
+  provider?: string | null;
 }): string {
   const label = pipelineLabel(run.pipeline, run.pipelineName);
-  return run.variant === 'default' ? label : `${label}:${run.variant}`;
+  const variant = run.variant === 'default' ? label : `${label}:${run.variant}`;
+  return run.provider ? `${variant}@${run.provider}` : variant;
 }
 
 /** `#7`: how a task number is shown. */

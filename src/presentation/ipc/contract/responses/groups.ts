@@ -22,6 +22,10 @@ export interface AttemptView {
   specialist: string;
   runtime: string;
   model: string | null;
+  /** Provider of the chain item the attempt ran on, when it has one. */
+  provider?: string;
+  /** The provider of the run, when the tier of the step had no enabled item of it. */
+  requestedProvider?: string;
   status: string;
   verdict: string | null;
   summary: string | null;

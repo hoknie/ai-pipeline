@@ -63,6 +63,7 @@ function useRetargetedDraft(input: {
         pipelines.pipelines.map((pipeline) => pipeline.id),
         (id) => stepIds(found(id)),
         (id) => found(id)?.variants.map((variant) => variant.id) ?? [],
+        pipelines.providers ?? [],
       ),
       ...(clearTags ? { tags: [] } : {}),
       repository: target,
@@ -133,7 +134,12 @@ function useCommonDraft(input: {
     if (!draft || !common || draft.pipeline === '') return;
     const pipeline = common.pipelines.find((candidate) => candidate.id === draft.pipeline);
     if (pipeline === undefined) {
-      onDraft({ ...draft, pipeline: common.pipelines[0]?.id ?? '', variant: 'default', skip: [] });
+      onDraft({
+        ...draft,
+        pipeline: common.pipelines[0]?.id ?? '',
+        variant: 'default',
+        skip: [],
+      });
       return;
     }
     const steps = pipeline.steps.map((step) => step.id);
@@ -141,8 +147,17 @@ function useCommonDraft(input: {
       ? draft.variant
       : 'default';
     const skip = draft.skip.filter((id) => steps.includes(id));
-    if (variant !== draft.variant || skip.length !== draft.skip.length) {
-      onDraft({ ...draft, variant, skip });
+    // The provider must be known to every selected project.
+    const provider =
+      draft.provider !== null && (common.providers ?? []).includes(draft.provider)
+        ? draft.provider
+        : null;
+    if (
+      variant !== draft.variant ||
+      skip.length !== draft.skip.length ||
+      provider !== draft.provider
+    ) {
+      onDraft({ ...draft, variant, skip, provider });
     }
   }, [draft, common, onDraft]);
 }

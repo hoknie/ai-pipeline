@@ -36,6 +36,30 @@ function Page({ api, start = null }: { api: Api; start?: string | null }) {
   return <SpecialistsPage api={api} selected={selected} onSelect={setSelected} />;
 }
 
+describe('the provider of an attempt', () => {
+  it('shows the provider of the item the attempt ran on', () => {
+    render(<AttemptHeading attempt={{ ...attempt, provider: 'zai' }} verdict="passed" />);
+    expect(screen.getByText('@zai')).not.toBeNull();
+    expect(screen.queryByText(/instead of/)).toBeNull();
+  });
+
+  it('marks an attempt that did not go to the provider of the run', () => {
+    render(
+      <AttemptHeading
+        attempt={{ ...attempt, provider: 'anthropic', requestedProvider: 'zai' }}
+        verdict="passed"
+      />,
+    );
+    const mark = screen.getByText('provider anthropic instead of zai');
+    expect(mark.getAttribute('title')).toContain('no enabled item');
+  });
+
+  it('shows nothing extra for an attempt without a provider', () => {
+    render(<AttemptHeading attempt={attempt} verdict="passed" />);
+    expect(screen.queryByText(/^@/)).toBeNull();
+  });
+});
+
 describe('attempt model identity', () => {
   it('shows the complete model ID and keeps it in the tooltip', () => {
     render(<AttemptHeading attempt={attempt} verdict="passed" />);

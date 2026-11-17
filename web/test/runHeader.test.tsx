@@ -154,3 +154,15 @@ describe('Create subtask in the More menu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Create subtask…' })).toBeNull();
   });
 });
+
+describe('the provider of a run in the header', () => {
+  it('shows the provider badge, and none for a run without a provider', () => {
+    render(
+      <RunHeader run={runView({ provider: 'zai' })} api={fakeApi()} now={0} onError={vi.fn()} />,
+    );
+    expect(screen.getByLabelText('Provider: zai').textContent).toBe('@zai');
+    cleanup();
+    render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={vi.fn()} />);
+    expect(screen.queryByText(/^@/)).toBeNull();
+  });
+});

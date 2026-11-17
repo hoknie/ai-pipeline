@@ -44,6 +44,10 @@ function queueKit(program: Command, io: CliIo, style: Style) {
         '--variant <id>',
         'variant of the pipeline (other models, specialists or skipped steps); default: the pipeline as it is',
       )
+      .option(
+        '--provider <id>',
+        'provider of the tiers: every step on a tier runs on the model of this provider; default: none',
+      )
       .option('--skip <step>', 'step of the pipeline to skip; repeat for several', collect)
       .option(
         '--after <id>',

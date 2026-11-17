@@ -561,6 +561,9 @@ export const es: Dictionary = {
       label: 'intento {{seq}} {{step}}',
       round: 'ronda {{round}}',
       denialsTitle: 'comandos denegados por los permisos del especialista',
+      providerInstead: 'proveedor {{provider}} en lugar de {{requested}}',
+      providerInsteadTitle:
+        'El nivel de este paso no tiene un elemento activo del proveedor de la ejecución; se usó el elemento por defecto del nivel',
       denials: 'denegaciones: {{n}}',
       outsideTitle: 'archivos cambiados en la copia de trabajo durante el paso',
       outside: 'en la copia de trabajo: {{n}}',
@@ -860,6 +863,9 @@ export const es: Dictionary = {
       deliveryModeReset: 'modo como en la configuración',
       pipeline: 'Pipeline',
       noPipeline: 'sin pipeline',
+      provider: 'Proveedor',
+      noProvider: 'Sin elegir',
+      providerHint: 'El proveedor en el que corre la tarea: cada paso de un nivel usa su modelo',
       variant: 'Variante',
       skipByVariant: 'Omitido por la variante: {{id}}',
       kind: 'tipo de tarea',
@@ -1041,6 +1047,9 @@ export const es: Dictionary = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  providerBadge: {
+    label: 'Proveedor: {{id}}',
   },
   variantBadge: {
     label: 'Variante: {{name}} ({{id}})',

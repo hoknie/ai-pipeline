@@ -106,7 +106,7 @@ function failAttempt(
   const holds = limitHolds([m.state], m.now);
   if (
     isFailoverError(failure.kind) &&
-    hasNextChainItem(chain, group.attempts, attempt.stepIndex, holds)
+    hasNextChainItem(chain, group.attempts, attempt.stepIndex, holds, m.state.run.provider)
   ) {
     group.status = 'queued';
     group.pending = freshPending(attempt.stepIndex);

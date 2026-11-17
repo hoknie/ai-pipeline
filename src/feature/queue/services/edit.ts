@@ -81,20 +81,12 @@ export class QueueEdit {
     }
     if (existing?.run) this.checkReturned(params, skip);
     if (existing?.run && runVariant !== undefined) await this.variantInRun(existing, runVariant);
-    if (params.pipeline !== undefined || params.variant !== undefined || skip !== undefined) {
-      if (existing) {
-        await items.ensureItem(
-          repository,
-          params.pipeline ?? existing.pipeline,
-          params.variant ?? existing.variant,
-          skip ?? existing.skip,
-        );
-      }
-    }
+    await this.ensureFields(repository, existing, params, skip);
     const after = params.after === undefined ? undefined : items.resolveDependencies(params.after);
     const {
       pipeline,
       variant,
+      provider,
       task,
       groups,
       title,
@@ -104,7 +96,7 @@ export class QueueEdit {
       postponed,
     } = params;
     const patch = {
-      ...{ pipeline, variant, task, groups, title, autoDeliver, deliveryMode },
+      ...{ pipeline, variant, provider, task, groups, title, autoDeliver, deliveryMode },
       position: global ? undefined : position,
     };
     const fields = { ...patch, skip, after, postponed };
@@ -136,11 +128,34 @@ export class QueueEdit {
     return queue;
   }
 
+  /** The pipeline, variant, provider and skipped steps of the edited item must still fit the configuration. */
+  private async ensureFields(
+    repository: string,
+    existing: QueueItem | undefined,
+    params: QueueEditRequest,
+    skip: string[] | undefined,
+  ): Promise<void> {
+    const changed =
+      params.pipeline !== undefined ||
+      params.variant !== undefined ||
+      params.provider !== undefined ||
+      skip !== undefined;
+    if (!changed || !existing) return;
+    await this.dependencies.items.ensureItem(
+      repository,
+      params.pipeline ?? existing.pipeline,
+      params.variant ?? existing.variant,
+      skip ?? existing.skip,
+      params.provider === undefined ? existing.provider : params.provider,
+    );
+  }
+
   /** Before any check of the new values: a returned run answers with its own error. */
   private checkReturned(params: QueueEditRequest, skip: string[] | undefined): void {
     checkReturnedPatch({
       pipeline: params.pipeline,
       variant: params.variant,
+      provider: params.provider,
       task: params.task,
       groups: params.groups,
       title: params.title,
@@ -188,12 +203,23 @@ export class QueueEdit {
   /** A returned run has no item-level skip: the steps are skipped in the run itself. */
   private async skipInRun(queue: Queue, item: QueueItem, params: QueueEditRequest): Promise<void> {
     const { runs, items } = this.dependencies;
-    const { pipeline, variant, task, groups, title, autoDeliver, deliveryMode, postponed, skip } =
-      params;
+    const {
+      pipeline,
+      variant,
+      provider,
+      task,
+      groups,
+      title,
+      autoDeliver,
+      deliveryMode,
+      postponed,
+      skip,
+    } = params;
     checkReturnedPatch(
       {
         pipeline,
         variant,
+        provider,
         task,
         groups,
         title,

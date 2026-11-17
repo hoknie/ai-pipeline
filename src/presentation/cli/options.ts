@@ -32,6 +32,8 @@ export interface QueueTaskOptions {
   after?: string[];
   skip?: string[];
   variant?: string;
+  /** A provider id; `false` after `--no-provider` of `queue edit`. */
+  provider?: string | false;
   task?: string;
   groups?: string;
   title?: string;

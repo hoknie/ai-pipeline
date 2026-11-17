@@ -40,6 +40,7 @@ export function hydrateRun(database: Database, row: Row): RunState {
       repository: String(row.repository),
       pipeline: String(row.pipeline),
       variant: row.variant === null || row.variant === undefined ? 'default' : String(row.variant),
+      provider: text(row.provider ?? null),
       baseCommit: String(row.base_commit),
       branch: String(row.branch),
       refStyle: String(row.ref_style) as RefStyle,
@@ -130,6 +131,9 @@ function hydrateAttempt(row: Row): Attempt {
       ? { chainIndex: Number(row.chain_index) }
       : {}),
     ...(typeof row.provider === 'string' ? { provider: row.provider } : {}),
+    ...(typeof row.requested_provider === 'string'
+      ? { requestedProvider: row.requested_provider }
+      : {}),
     status: String(row.status) as AttemptStatus,
     input: parse(row.input_json ?? null),
     resumeSession: text(row.resume_session ?? null),

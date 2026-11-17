@@ -552,6 +552,9 @@ export const en = {
       label: 'attempt {{seq}} {{step}}',
       round: 'round {{round}}',
       denialsTitle: 'commands denied by the specialist permissions',
+      providerInstead: 'provider {{provider}} instead of {{requested}}',
+      providerInsteadTitle:
+        'The tier of this step has no enabled item of the run provider; the default item of the tier was used',
       denials: 'denials: {{n}}',
       outsideTitle: 'files changed in the working copy during the step',
       outside: 'in working copy: {{n}}',
@@ -841,6 +844,9 @@ export const en = {
       deliveryModeReset: 'mode as in the settings',
       pipeline: 'Pipeline',
       noPipeline: 'no pipeline',
+      provider: 'Provider',
+      noProvider: 'Not chosen',
+      providerHint: 'The provider the task runs on: every step on a tier uses its model',
       variant: 'Variant',
       skipByVariant: 'Skipped by the variant: {{id}}',
       kind: 'kind of task',
@@ -1020,6 +1026,9 @@ export const en = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  providerBadge: {
+    label: 'Provider: {{id}}',
   },
   variantBadge: {
     label: 'Variant: {{name}} ({{id}})',

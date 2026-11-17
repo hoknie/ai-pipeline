@@ -74,6 +74,7 @@ function queueRunView(
     pipelineName: pipelineNameOf(state.run.config, state.run.pipeline),
     variant: state.run.variant,
     variantName: variantNameOf(state.run.config, state.run.pipeline, state.run.variant),
+    provider: state.run.provider,
     tags: tagViews(catalog, state.run.tags),
     createdAt: state.run.createdAt,
     groups: {
@@ -144,9 +145,31 @@ function itemBody(
   };
 }
 
+/** The pipeline, variant and provider an item stands for: a returned run keeps its own variant and provider. */
+function itemTarget(
+  item: QueueItem,
+  lookup: (id: string) => RunState | undefined,
+  names: (id: string) => string,
+  variantNames: (pipeline: string, variant: string) => string,
+): Pick<QueueItemView, 'pipeline' | 'pipelineName' | 'variant' | 'variantName' | 'provider'> {
+  const variant = variantOf(item, lookup);
+  return {
+    pipeline: item.pipeline,
+    pipelineName: names(item.pipeline),
+    variant,
+    variantName: variantNames(item.pipeline, variant),
+    provider: providerOf(item, lookup),
+  };
+}
+
 /** The variant of an item; a returned run keeps its own, which is changed in the run details. */
 function variantOf(item: QueueItem, lookup: (id: string) => RunState | undefined): string {
   return (item.run === null ? undefined : lookup(item.run)?.run.variant) ?? item.variant;
+}
+
+/** The provider of an item; a returned run keeps its own. */
+function providerOf(item: QueueItem, lookup: (id: string) => RunState | undefined): string | null {
+  return item.run === null ? item.provider : (lookup(item.run)?.run.provider ?? item.provider);
 }
 
 /** A predecessor of a queue item: another item of the queue, or a run. */
@@ -231,10 +254,7 @@ export function queueView(
       id: item.id,
       number: item.number,
       position: index + 1,
-      pipeline: item.pipeline,
-      pipelineName: names(item.pipeline),
-      variant: variantOf(item, lookup),
-      variantName: variantNames(item.pipeline, variantOf(item, lookup)),
+      ...itemTarget(item, lookup, names, variantNames),
       ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,

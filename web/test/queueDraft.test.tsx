@@ -46,6 +46,50 @@ describe('variant of the queue draft', () => {
   });
 });
 
+describe('provider of the queue draft', () => {
+  it('starts as not chosen and is sent only when chosen, always on edit but not for a return', () => {
+    const draft = emptyDraft('feature');
+    expect(draft.provider).toBeNull();
+    expect(fieldsOf({ ...draft, task: 'x' })).not.toHaveProperty('provider');
+    expect(fieldsOf({ ...draft, task: 'x', provider: 'zai' }).provider).toBe('zai');
+    expect(fieldsOf({ ...draft, task: 'x' }, () => undefined, true).provider).toBeNull();
+    expect(
+      fieldsOf({ ...draft, task: 'x', provider: 'zai' }, () => undefined, true, true),
+    ).not.toHaveProperty('provider');
+  });
+
+  it('is read from an item and dropped when the new repository does not know it', () => {
+    const draft = draftOf({
+      pipeline: 'feature',
+      provider: 'zai',
+      task: 'x',
+      groups: null,
+      title: null,
+      autoDeliver: null,
+    });
+    expect(draft.provider).toBe('zai');
+    expect(retarget(draft, ['feature'], () => [], undefined, ['zai', 'openai']).provider).toBe(
+      'zai',
+    );
+    expect(retarget(draft, ['feature'], () => [], undefined, ['openai']).provider).toBeNull();
+    expect(retarget(draft, ['feature'], () => [], undefined, []).provider).toBeNull();
+  });
+
+  it('goes into the request of a task for several projects', () => {
+    const request = projectsFields(
+      { pipeline: 'feature', task: 'x', provider: 'zai' },
+      { projects: ['/a', '/b'], notes: {}, tag: '', chain: false },
+    );
+    expect(request.provider).toBe('zai');
+    expect(
+      projectsFields(
+        { pipeline: 'feature', task: 'x' },
+        { projects: ['/a', '/b'], notes: {}, tag: '', chain: false },
+      ),
+    ).not.toHaveProperty('provider');
+  });
+});
+
 describe('queue draft task/title normalization', () => {
   it.each([
     ['', '', false],

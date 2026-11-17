@@ -77,6 +77,7 @@ export function addItem(
     number: queue.nextNumber,
     pipeline: cleanPipeline(fields.pipeline),
     variant: fields.variant ?? DEFAULT_VARIANT,
+    provider: fields.provider ?? null,
     ...cleanBody(fields),
     title: cleanTitle(fields.title),
     autoDeliver: fields.autoDeliver ?? null,
@@ -98,6 +99,7 @@ export function addItem(
 export interface ItemPatch {
   pipeline?: string | undefined;
   variant?: string | undefined;
+  provider?: string | null | undefined;
   task?: string | undefined;
   groups?: NewGroup[] | undefined;
   title?: string | null | undefined;
@@ -143,6 +145,7 @@ export function editItem(
   const deliveryMode = cleanDeliveryMode(patch.deliveryMode);
   if (pipeline !== null) item.pipeline = pipeline;
   if (patch.variant !== undefined) item.variant = patch.variant;
+  if (patch.provider !== undefined) item.provider = patch.provider;
   if (body) Object.assign(item, body);
   if (title !== undefined) item.title = title;
   if (patch.autoDeliver !== undefined) item.autoDeliver = patch.autoDeliver;

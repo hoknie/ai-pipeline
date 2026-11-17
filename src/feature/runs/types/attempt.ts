@@ -189,6 +189,8 @@ export interface Attempt {
   chainIndex?: number | null;
   /** Provider of the chain item, when it has one: the key of the usage-limit hold. */
   provider?: string;
+  /** The provider the run asked for when the tier of the step had no enabled item of it. */
+  requestedProvider?: string;
   status: AttemptStatus;
   input: StepInput;
   resumeSession: string | null;

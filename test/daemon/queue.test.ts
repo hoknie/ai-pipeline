@@ -431,6 +431,106 @@ describe('pipeline variants in the queue', () => {
   });
 });
 
+describe('task provider in the queue', () => {
+  const TIER_CONFIG = `swarm:
+  max: 3
+  chains:
+    coding:
+      name: Coding
+      mode: by_provider
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+  specialists:
+    coder: { name: Coder, runtime_chain: coding }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+  it('adds a task with a provider, null without one, and resets it on edit', async () => {
+    const h = await start(TIER_CONFIG);
+    await add(h, 'A', { provider: 'zai' });
+    await add(h, 'B');
+    const items = (await queueOf(h)).items;
+    expect(items.map((item) => item.provider)).toEqual(['zai', null]);
+    const edited = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: items[0]!.id,
+      provider: null,
+    })) as QueueView;
+    expect(edited.items.map((item) => item.provider)).toEqual([null, null]);
+    const again = (await h.call('queue_edit', {
+      repository: h.repo,
+      item: items[1]!.id,
+      title: 'B2',
+    })) as QueueView;
+    expect(again.items.map((item) => item.provider)).toEqual([null, null]);
+  });
+
+  it('rejects an unknown provider without changing the queue, on add and on edit', async () => {
+    const h = await start(TIER_CONFIG);
+    await expect(add(h, 'A', { provider: 'openai' })).rejects.toThrow(
+      'unknown provider `openai`; known: anthropic, zai',
+    );
+    const { item } = await add(h, 'B');
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item, provider: 'openai' }),
+    ).rejects.toThrow('unknown provider `openai`');
+    expect((await queueOf(h)).items.map((entry) => entry.provider)).toEqual([null]);
+  });
+
+  it('says none when the configuration has no tier', async () => {
+    const h = await start();
+    await expect(add(h, 'A', { provider: 'zai' })).rejects.toThrow(
+      'unknown provider `zai`; known: none',
+    );
+    expect((await queueOf(h)).items).toEqual([]);
+  });
+
+  it('refuses the provider on the run request of an unknown one', async () => {
+    const h = await start(TIER_CONFIG);
+    await expect(
+      h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', provider: 'nope' }),
+    ).rejects.toThrow('unknown provider `nope`; known: anthropic, zai');
+    expect((await queueOf(h)).items).toEqual([]);
+  });
+
+  it('lists the providers of the tiers in the pipelines view', async () => {
+    const h = await start(TIER_CONFIG);
+    const view = (await h.call('pipelines', { repository: h.repo })) as { providers: string[] };
+    expect(view.providers).toEqual(['anthropic', 'zai']);
+  });
+
+  it('creates the run with the provider of the item', async () => {
+    const h = await start(TIER_CONFIG);
+    await add(h, 'A', { provider: 'zai' });
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.items.length === 0);
+    const [created] = await allRuns(h);
+    expect(created).toMatchObject({ provider: 'zai' });
+  });
+
+  it('keeps an item first with an error when its provider was removed before the start', async () => {
+    const h = await start(TIER_CONFIG);
+    await add(h, 'A', { provider: 'zai' });
+    writeConfigDirectory(
+      h.repo,
+      TIER_CONFIG.replace(
+        '        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }\n',
+        '',
+      ),
+    );
+    await h.call('queue_start', { repository: h.repo });
+    const queue = await queueOf(h);
+    expect(queue.status).toBe('stopped');
+    expect(queue.stop).toMatchObject({ kind: 'item' });
+    expect(queue.items[0]?.error).toContain('unknown provider `zai`; known: anthropic');
+    expect(await allRuns(h)).toEqual([]);
+  });
+});
+
 describe('queues of all projects', () => {
   const gitRepository = (name: string): string => {
     const repo = join(realpathSync(mkdtempSync(join(tmpdir(), 'aip-queues-'))), name);

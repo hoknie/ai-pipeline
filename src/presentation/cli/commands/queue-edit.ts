@@ -53,6 +53,8 @@ interface EditFlags {
   noAfter: boolean;
   parent: boolean;
   noParent: boolean;
+  provider: boolean;
+  noProvider: boolean;
 }
 
 /** Refuses flags that contradict each other. */
@@ -63,6 +65,7 @@ function checkEdit(options: EditOptions, flags: EditFlags): void {
       '--workflow is the old name of --pipeline; pass only --pipeline',
     ],
     [flags.after && flags.noAfter, '--no-after cannot be combined with --after'],
+    [flags.noProvider && flags.provider, '--no-provider cannot be combined with --provider'],
     [flags.parent && flags.noParent, '--no-parent cannot be combined with --parent'],
     [
       options.tags === false && options.tag !== undefined,
@@ -99,6 +102,10 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
     item,
     ...(pipeline !== undefined ? { pipeline } : {}),
     ...(options.variant !== undefined ? { variant: options.variant } : {}),
+    ...(flags.noProvider ? { provider: null } : {}),
+    ...(!flags.noProvider && typeof options.provider === 'string'
+      ? { provider: options.provider }
+      : {}),
     ...(options.task !== undefined ? { task: options.task } : {}),
     ...(options.groups !== undefined ? { groups: readGroups(options.groups) } : {}),
     ...(options.title !== undefined ? { title: options.title } : {}),
@@ -130,7 +137,14 @@ function editParams(item: string, options: EditOptions, flags: EditFlags) {
 
 export function addEdit(kit: QueueKit): void {
   const { examples, context, showQueue, queue, taskOptions, common } = kit;
-  const flags: EditFlags = { after: false, noAfter: false, parent: false, noParent: false };
+  const flags: EditFlags = {
+    after: false,
+    noAfter: false,
+    parent: false,
+    noParent: false,
+    provider: false,
+    noProvider: false,
+  };
   common(
     taskOptions(
       queue
@@ -139,12 +153,15 @@ export function addEdit(kit: QueueKit): void {
         .on('option:no-after', () => (flags.noAfter = true))
         .on('option:parent', () => (flags.parent = true))
         .on('option:no-parent', () => (flags.noParent = true))
+        .on('option:provider', () => (flags.provider = true))
+        .on('option:no-provider', () => (flags.noProvider = true))
         .description('Change a waiting task')
         .argument('<item>', 'item id from `aip queue list`')
         .option('-p, --pipeline <id>', 'new pipeline id')
         .addOption(new Option('-w, --workflow <id>', 'old name of --pipeline').hideHelp())
         .option('--default-auto-deliver', 'follow delivery.auto of the configuration again')
         .option('--default-delivery-mode', 'follow delivery.mode of the configuration again')
+        .option('--no-provider', 'remove the provider of the task')
         .option('--no-tags', 'remove all tags of the task')
         .option('--no-parent', 'remove the linked task tags of the task')
         .option('--no-skips', 'run every step of the pipeline again')

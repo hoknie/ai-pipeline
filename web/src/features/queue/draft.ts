@@ -20,6 +20,8 @@ export interface QueueDraft {
   pipeline: string;
   /** Id of the chosen variant of the pipeline; `default` is the pipeline as it is. */
   variant: string;
+  /** Id of the chosen provider of the tiers; `null`: not chosen. */
+  provider: string | null;
   mode: 'task' | 'groups';
   task: string;
   groups: { title: string; task: string }[];
@@ -59,6 +61,7 @@ export function emptyDraft(pipeline = ''): QueueDraft {
   return {
     pipeline,
     variant: 'default',
+    provider: null,
     mode: 'task',
     task: '',
     groups: [{ title: '', task: '' }],
@@ -88,6 +91,7 @@ export function continueDraft(draft: QueueDraft): QueueDraft {
 export function draftOf(item: {
   pipeline: string;
   variant?: string;
+  provider?: string | null;
   task: string | null;
   groups: { title: string; task: string }[] | null;
   title: string | null;
@@ -101,6 +105,7 @@ export function draftOf(item: {
   return {
     pipeline: item.pipeline,
     variant: item.variant ?? 'default',
+    provider: item.provider ?? null,
     mode: item.groups ? 'groups' : 'task',
     task: item.task ?? '',
     groups: item.groups ? item.groups.map((group) => ({ ...group })) : [{ title: '', task: '' }],
@@ -127,6 +132,7 @@ export function retarget(
   pipelineIds: readonly string[],
   stepIdsOf: (pipeline: string) => string[],
   variantIdsOf: (pipeline: string) => string[] = () => [],
+  providers?: readonly string[],
 ): QueueDraft {
   const pipeline = pipelineIds.includes(draft.pipeline)
     ? draft.pipeline
@@ -136,6 +142,10 @@ export function retarget(
     ...draft,
     pipeline,
     variant: variants.includes(draft.variant) ? draft.variant : 'default',
+    provider:
+      providers === undefined || (draft.provider !== null && providers.includes(draft.provider))
+        ? draft.provider
+        : null,
     links: [],
     linksTouched: false,
     skip: pruneSkip(draft.skip, stepIdsOf(pipeline)),
@@ -190,6 +200,8 @@ export function fieldsOf(
   return {
     pipeline: draft.pipeline,
     ...(allTags || draft.variant !== 'default' ? { variant: draft.variant } : {}),
+    // A returned run keeps its provider: an edit of it does not send the field.
+    ...(returned || (!allTags && draft.provider === null) ? {} : { provider: draft.provider }),
     ...(draft.mode === 'task'
       ? { task: draft.task.trim() || title }
       : {

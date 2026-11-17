@@ -43,6 +43,7 @@ export function run(
     skip?: string[];
     pipeline?: string;
     variant?: string;
+    provider?: string;
   } = {},
 ): RunState {
   const resolved = config(options.configText);
@@ -65,6 +66,7 @@ export function run(
     deliveryMode: options.deliveryMode,
     skip: options.skip,
     variant: options.variant,
+    provider: options.provider,
   });
 }
 

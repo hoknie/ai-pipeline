@@ -1,6 +1,11 @@
 import type { Defaults, RuntimeChain, Specialist } from '../../swarm-config/types/index.ts';
 import type { Attempt } from './attempt.ts';
-import { type SelectedRuntime, holdKey, pickChainItem } from './chains/chain-select.ts';
+import {
+  type SelectedRuntime,
+  holdKey,
+  pickChainItem,
+  pickProviderItem,
+} from './chains/chain-select.ts';
 import { COMMAND_RUNTIME, USAGE_LIMIT_FALLBACK_MS, type AttemptRuntime } from './constants.ts';
 import { NETWORK_RETRY_MS } from '../../network/types/index.ts';
 import { type Group } from './group.ts';
@@ -121,6 +126,8 @@ export interface SelectAttemptOptions {
   resume: boolean;
   /** The attempt before it failed because of the network: keep its runtime even without a session. */
   keepRuntime?: boolean;
+  /** The provider of the run: a `by_provider` tier then picks its item strictly. */
+  provider?: string | null;
   seed?: number;
 }
 
@@ -150,6 +157,9 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
           ? { chainIndex: prev.chainIndex }
           : {}),
         ...(prev.provider !== undefined ? { provider: prev.provider } : {}),
+        ...(prev.requestedProvider !== undefined
+          ? { requestedProvider: prev.requestedProvider }
+          : {}),
       };
     }
   }
@@ -162,6 +172,9 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
     .filter(({ item }) => item.enabled);
   if (enabledItems.length === 0) {
     return { runtime: defaults.runtime, model: null };
+  }
+  if (chain.mode === 'by_provider' && options.provider) {
+    return pickProviderItem(chain, enabledItems, options.provider);
   }
   return pickChainItem(
     chain.mode,

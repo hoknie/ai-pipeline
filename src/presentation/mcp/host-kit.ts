@@ -34,6 +34,14 @@ async function projectsOf(
   return Array.isArray(list) ? (list as RepositoryView[]) : [];
 }
 
+/** The provider of a task: every step on a tier runs on the model of that provider. */
+const providerArgument = z
+  .string()
+  .optional()
+  .describe(
+    'Id of a provider of the tiers (the `provider` of the items of `by_provider` chains): every step of the task on a tier runs on the model of that provider; omit for none. In an edit null clears it',
+  );
+
 export function hostKit(options: HostOptions) {
   const now = options.now ?? Date.now;
   const server = new McpServer({ name: 'aip', version: packageVersion() });
@@ -101,6 +109,7 @@ export function hostKit(options: HostOptions) {
     tags,
     parent,
     variant,
+    provider: providerArgument,
     skip,
     after,
     attachments,

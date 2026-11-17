@@ -60,6 +60,23 @@ export function AttemptHeading({ attempt, verdict }: { attempt: AttemptView; ver
       >
         {attempt.model ?? attempt.runtime}
       </span>
+      {attempt.provider ? (
+        <span className="text-xs text-muted-foreground" data-provider={attempt.provider}>
+          @{attempt.provider}
+        </span>
+      ) : null}
+      {attempt.requestedProvider ? (
+        <span
+          className="text-xs text-status-warn"
+          title={t('runs.attempt.providerInsteadTitle')}
+          data-requested-provider={attempt.requestedProvider}
+        >
+          {t('runs.attempt.providerInstead', {
+            provider: attempt.provider ?? attempt.runtime,
+            requested: attempt.requestedProvider,
+          })}
+        </span>
+      ) : null}
       <StatusBadge status={verdict} />
       <span className="text-xs text-muted-foreground tabular-nums">
         {duration(attempt.durationMs)} · {tokens(attempt.usage?.inputTokens)}/

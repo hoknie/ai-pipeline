@@ -552,3 +552,45 @@ describe('the limit of the machine and the pools in the project mode', () => {
     await h.waitFor(run, (view) => view.finished);
   });
 });
+
+describe('the provider of a task in several projects', () => {
+  const TIERS = (providers: string[]) => `swarm:
+  max: 3
+  chains:
+    coding:
+      name: Coding
+      mode: by_provider
+      runtimes:
+${providers
+  .map((id) => `        - { provider: ${id}, runtime: opencode, model: ${id}/model }`)
+  .join('\n')}
+  specialists:
+    coder: { name: Coder, runtime_chain: coding }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+  it('adds the task when every project knows the provider', async () => {
+    const h = await start(TIERS(['zai']));
+    await project(h, 'lib', TIERS(['zai', 'openai']));
+    await project(h, 'web', TIERS(['zai']));
+    const added = await addProjects(h, { repositories: ['lib', 'web'], provider: 'zai' });
+    expect(added).toHaveLength(2);
+    for (const entry of added) {
+      expect((await queueIn(h, entry.repository)).items[0]).toMatchObject({ provider: 'zai' });
+    }
+  });
+
+  it('refuses the whole task naming the first project that lacks the provider', async () => {
+    const h = await start(TIERS(['zai']));
+    const lib = await project(h, 'lib', TIERS(['zai']));
+    const web = await project(h, 'web', TIERS(['openai']));
+    await expect(addProjects(h, { repositories: ['lib', 'web'], provider: 'zai' })).rejects.toThrow(
+      'unknown provider `zai`; known: openai in project `web`',
+    );
+    expect((await queueIn(h, lib)).items).toEqual([]);
+    expect((await queueIn(h, web)).items).toEqual([]);
+  });
+});

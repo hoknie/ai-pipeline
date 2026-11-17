@@ -36,6 +36,8 @@ export interface Run {
   pipeline: string;
   /** Id of the pipeline variant the run follows; `default` for the pipeline as it is. */
   variant: string;
+  /** Id of the provider the run follows in its tiers, or `null`: not chosen. */
+  provider: string | null;
   baseCommit: string;
   branch: string;
   refStyle: RefStyle;

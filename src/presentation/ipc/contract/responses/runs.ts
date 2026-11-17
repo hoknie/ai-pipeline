@@ -160,6 +160,8 @@ export interface RunView {
   variant: string;
   /** Name of the variant in the configuration of the run; the id without a name. */
   variantName: string;
+  /** Id of the provider of the run; `null`: not chosen. */
+  provider: string | null;
   branch: string;
   createdAt: number;
   /** When the first attempt of any group started; null while the run waits for a free slot. */

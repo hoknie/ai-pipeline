@@ -16,6 +16,7 @@ export function returnItem(state: RunState, id: string, now: number): QueueItem 
     number: state.run.number,
     pipeline: state.run.pipeline,
     variant: state.run.variant,
+    provider: state.run.provider,
     task: null,
     groups: null,
     title: state.run.title,

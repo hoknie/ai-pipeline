@@ -336,6 +336,36 @@ describe('worker MCP server', () => {
     ]);
   });
 
+  it('passes the provider a specialist names and never inherits the one of its run', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(
+      false,
+      async (method, params) => {
+        calls.push({ method, params });
+        return { item: 'q-abc' };
+      },
+      true,
+    );
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x' },
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', provider: 'zai' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', pipeline: 'feature', task: 'x' },
+      },
+      {
+        method: 'worker_queue_add',
+        params: { token: 'token-1', pipeline: 'feature', task: 'x', provider: 'zai' },
+      },
+    ]);
+  });
+
   it('passes autoDeliver of a queued task from a specialist', async () => {
     const calls: unknown[] = [];
     const client = await connect(

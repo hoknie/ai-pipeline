@@ -8,6 +8,7 @@ import {
   checkVariant,
   findPipeline,
   isValidSlug,
+  providerProblem,
   variantSkip,
 } from '../../swarm-config/types/index.ts';
 import { SPLIT_GROUP } from './constants.ts';
@@ -33,6 +34,8 @@ export interface RunRequest {
   skip?: string[] | undefined;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string | undefined;
+  /** Id of a known provider the run follows in its tiers; absent or `null`: not chosen. */
+  provider?: string | null | undefined;
   /** The files attached to the task. */
   attachments?: RunAttachment[] | undefined;
 }
@@ -88,8 +91,21 @@ export interface NewRun {
   skip?: string[] | undefined;
   /** Id of a variant of the pipeline; absent: `default`. */
   variant?: string | undefined;
+  /** Id of a known provider the run follows in its tiers; absent or `null`: not chosen. */
+  provider?: string | null | undefined;
   /** Files attached to the task. */
   attachments?: RunAttachment[] | undefined;
+}
+
+/** The provider of a new run; a name the configuration does not know is refused. */
+function checkedProvider(
+  config: ResolvedConfig,
+  provider: string | null | undefined,
+): string | null {
+  if (provider === undefined || provider === null) return null;
+  const problem = providerProblem(config, provider);
+  if (problem !== null) throw rejected(problem);
+  return provider;
 }
 
 export function createRun(input: NewRun): RunState {
@@ -110,6 +126,7 @@ export function createRun(input: NewRun): RunState {
   const variant = input.variant ?? DEFAULT_VARIANT;
   const variantError = checkVariant(input.config, input.pipeline, variant);
   if (variantError !== null) throw rejected(variantError);
+  const provider = checkedProvider(input.config, input.provider);
   const skipped = applySkip(applyVariant(input.config, input.pipeline, variant), input.pipeline, [
     ...variantSkip(input.config, input.pipeline, variant),
     ...(input.skip ?? []),
@@ -134,6 +151,7 @@ export function createRun(input: NewRun): RunState {
       repository: input.repository,
       pipeline: input.pipeline,
       variant,
+      provider,
       baseCommit: input.baseCommit,
       branch: `refs/aip/${input.id}/run`,
       refStyle: 'refs',

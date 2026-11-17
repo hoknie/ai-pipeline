@@ -6,7 +6,7 @@ import { repairOf } from '../../../shared/api/observerTypes.ts';
 import type { GroupRow, RunView, SystemStepRow } from '../../../shared/api/types.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { PipelineBadge } from '../../../shared/ui/feedback/PipelineBadge.tsx';
-import { VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
+import { ProviderBadge, VariantBadge } from '../../../shared/ui/feedback/VariantBadge.tsx';
 import { TagPicker } from '../../tags/index.ts';
 import { RunTitle } from './RunTitle.tsx';
 import { RunSteps } from './RunSteps.tsx';
@@ -42,6 +42,7 @@ function RunInfo({
       <div className="flex flex-wrap items-center gap-2">
         <PipelineBadge id={run.pipeline} name={run.pipelineName} />
         <VariantBadge id={run.variant} name={run.variantName} />
+        <ProviderBadge provider={run.provider} />
       </div>
       {run.name ? <div className="font-mono text-xs text-muted-foreground">{run.name}</div> : null}
       <div className="flex flex-col gap-1">

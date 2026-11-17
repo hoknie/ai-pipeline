@@ -67,6 +67,10 @@ export function attemptView(
     specialist: attempt.specialist,
     runtime: attempt.runtime,
     model: attempt.model,
+    ...(attempt.provider !== undefined ? { provider: attempt.provider } : {}),
+    ...(attempt.requestedProvider !== undefined
+      ? { requestedProvider: attempt.requestedProvider }
+      : {}),
     status: attempt.status,
     verdict: attemptVerdict(attempt),
     summary: attempt.report?.summary ?? null,

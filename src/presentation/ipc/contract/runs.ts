@@ -54,6 +54,9 @@ export const attachmentSources = z
 /** Id of a variant of a pipeline. */
 export const variantId = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
 
+/** Id of a provider of the tiers; the daemon checks that it is known. */
+export const providerId = z.string().min(1);
+
 export const parentRef = z.union([z.string().trim().min(1), z.number().int().positive()]);
 
 /** A link of a task: the kind is checked by the queue, so an unknown one gets its own error. */
@@ -64,6 +67,7 @@ const runParams = z
     repository: z.string().min(1),
     pipeline: z.string().min(1),
     variant: variantId.optional(),
+    provider: providerId.optional(),
     task: z.string().trim().min(1).optional(),
     groups: z.array(proposedGroupSchema).min(1).optional(),
     title: z.string().trim().min(1).max(RUN_TITLE_LIMIT).optional(),

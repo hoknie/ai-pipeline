@@ -205,6 +205,47 @@ describe('a usage limit of a provider of a by_provider chain', () => {
   });
 });
 
+describe('a run with a provider', () => {
+  it('runs its steps on the item of the provider and shows the provider in the attempt', async () => {
+    const h = (current = await harness(TIER_CONFIG(`${ANTHROPIC}\n${ZAI}`)));
+    const created = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'work',
+      provider: 'zai',
+    })) as RunCreated;
+    const final = await h.waitFor(created.runId, (view) => view.finished);
+    expect(final).toMatchObject({ provider: 'zai' });
+    const detail = await h.group(created.runId, final.groups[0]!.slug);
+    expect(detail.attempts.map((attempt) => [attempt.runtime, attempt.provider])).toEqual([
+      ['opencode', 'zai'],
+    ]);
+    expect(detail.attempts[0]).not.toHaveProperty('requestedProvider');
+  });
+
+  it('waits for the limit of its provider instead of going to the next item', async () => {
+    const h = (current = await harness(
+      TIER_CONFIG(`${ANTHROPIC}\n${ZAI}`),
+      {},
+      { now: () => Date.now() },
+    ));
+    h.script({ code: [{ usageLimit: { resetsAt: resetIn(3600) } }, {}] });
+    const created = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'work',
+      provider: 'anthropic',
+    })) as RunCreated;
+    const waiting = await h.waitFor(
+      created.runId,
+      (view) => view.groups[0]?.wait?.reason === 'limit',
+    );
+    expect(waiting.groups[0]?.wait).toMatchObject({ runtime: 'claude', provider: 'anthropic' });
+    const detail = await h.group(created.runId, waiting.groups[0]!.slug);
+    expect(detail.attempts.map((attempt) => attempt.runtime)).toEqual(['claude']);
+  });
+});
+
 describe('return a run to the queue', () => {
   async function failedRun(h: Harness): Promise<string> {
     h.script({ code: [{ noReport: true }, {}] });

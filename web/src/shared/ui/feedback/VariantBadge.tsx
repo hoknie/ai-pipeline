@@ -41,3 +41,23 @@ export function VariantBadge({
     </Tooltip>
   );
 }
+
+/**
+ * The provider a run or a queue task follows in its tiers, next to the pipeline badge. Nothing
+ * when none is chosen. Not interactive.
+ */
+export function ProviderBadge({ provider }: { provider: string | null | undefined }) {
+  const { t } = useTranslation();
+  if (!provider) return null;
+  return (
+    <Badge
+      variant="outline"
+      className="max-w-32 rounded-md"
+      aria-label={t('providerBadge.label', { id: provider })}
+      title={t('providerBadge.label', { id: provider })}
+      data-provider={provider}
+    >
+      <span className="min-w-0 truncate">@{provider}</span>
+    </Badge>
+  );
+}

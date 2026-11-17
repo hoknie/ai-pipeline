@@ -29,6 +29,10 @@ function editPayload(item: QueueItemView, fields: EditFields) {
   return {
     pipeline: fields.pipeline,
     ...(fields.variant !== undefined ? { variant: fields.variant } : {}),
+    // Only a changed provider goes: an edit of other fields leaves it as it is.
+    ...(fields.provider !== undefined && fields.provider !== item.provider
+      ? { provider: fields.provider }
+      : {}),
     ...(fields.task !== undefined ? { task: fields.task } : {}),
     ...(fields.groups !== undefined ? { groups: fields.groups } : {}),
     title: fields.title ?? null,

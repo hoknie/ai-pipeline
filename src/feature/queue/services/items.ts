@@ -12,6 +12,7 @@ import {
   checkVariant,
   findPipeline,
   findSpecialist,
+  providerProblem,
   variantSkip,
 } from '../../swarm-config/types/index.ts';
 import type { TagCatalogService } from '../../tags/services/index.ts';
@@ -52,11 +53,22 @@ export interface QueueItemsDependencies {
 
 /** The fields of a new item without the tags, which are resolved separately. */
 function fields(request: TaskFields & { postponed?: boolean | undefined }): ItemFields {
-  const { pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after } =
-    request;
+  const {
+    pipeline,
+    variant,
+    provider,
+    task,
+    groups,
+    title,
+    autoDeliver,
+    deliveryMode,
+    skip,
+    after,
+  } = request;
   return {
     pipeline,
     variant,
+    provider,
     task,
     groups,
     title,
@@ -83,7 +95,13 @@ export class QueueItems {
     registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
-    await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
+    await this.ensureItem(
+      repository,
+      params.pipeline,
+      params.variant,
+      params.skip,
+      params.provider,
+    );
     const plan = links.plan(repository, params, params.links);
     const { after } = plan;
     const manual = resolveManualTags(tags.of(repository), params.tags ?? []);
@@ -180,7 +198,13 @@ export class QueueItems {
       // Every task carries the linked task tag of its run, then the other tags of the run.
       const repository = state.run.repository;
       this.dependencies.registry.requireEnabled(repository);
-      await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
+      await this.ensureItem(
+        repository,
+        params.pipeline,
+        params.variant,
+        params.skip,
+        params.provider,
+      );
       const queue = store.of(repository);
       if (params.links?.some((link) => link.kind === 'parent')) {
         throw rejected("a specialist's task has its run as the parent");
@@ -199,6 +223,7 @@ export class QueueItems {
     pipeline: string,
     variant: string = DEFAULT_VARIANT,
     skip: readonly string[] = [],
+    provider: string | null = null,
   ) {
     const config = this.dependencies.config.load(repository);
     if (!findPipeline(config, pipeline)) {
@@ -209,6 +234,8 @@ export class QueueItems {
     if (variantError !== null) throw rejected(variantError);
     const error = checkSkip(config, pipeline, [...variantSkip(config, pipeline, variant), ...skip]);
     if (error !== null) throw rejected(error);
+    const providerError = provider === null ? null : providerProblem(config, provider);
+    if (providerError !== null) throw rejected(providerError);
   }
 
   /** The ids a task waits for: ids of queue items or runs of any project (see `TaskLinks.resolveAfter`). */
@@ -226,7 +253,13 @@ export class QueueItems {
     this.dependencies.registry.requireEnabled(repository);
     const queue = store.of(repository);
     const moment = now();
-    await this.ensureItem(repository, params.pipeline, params.variant, params.skip);
+    await this.ensureItem(
+      repository,
+      params.pipeline,
+      params.variant,
+      params.skip,
+      params.provider,
+    );
     const plan: LinkPlan = links.plan(repository, params, params.links);
     const { after } = plan;
     let own = inherited ?? resolveManualTags(tags.of(repository), params.tags ?? []);

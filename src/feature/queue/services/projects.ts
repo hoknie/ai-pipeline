@@ -42,11 +42,22 @@ export interface QueueProjectsDependencies {
 
 /** The fields of the new item of a task for several projects. */
 function fields(request: TaskFields & { postponed?: boolean | undefined }): ItemFields {
-  const { pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after } =
-    request;
+  const {
+    pipeline,
+    variant,
+    provider,
+    task,
+    groups,
+    title,
+    autoDeliver,
+    deliveryMode,
+    skip,
+    after,
+  } = request;
   return {
     pipeline,
     variant,
+    provider,
     task,
     groups,
     title,
@@ -178,7 +189,7 @@ export class QueueProjects {
     }
   }
 
-  /** The pipeline, the variant and the skipped steps must exist in the configuration of the project. */
+  /** The pipeline, the variant, the provider and the skipped steps must exist in the configuration of the project. */
   private async ensureIn(
     root: string,
     label: string,
@@ -188,7 +199,13 @@ export class QueueProjects {
       throw rejected(`unknown pipeline \`${params.pipeline}\` in project \`${label}\``);
     }
     await this.inProject(label, () =>
-      this.dependencies.items.ensureItem(root, params.pipeline, params.variant, params.skip),
+      this.dependencies.items.ensureItem(
+        root,
+        params.pipeline,
+        params.variant,
+        params.skip,
+        params.provider,
+      ),
     );
   }
 

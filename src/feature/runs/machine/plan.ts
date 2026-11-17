@@ -107,6 +107,7 @@ function plannedRuntime(
     round: group.attempts.filter((a) => a.stepIndex === stepIndex).length + 1,
     resume: group.pending?.resume ?? false,
     keepRuntime: group.pending?.keepRuntime ?? false,
+    provider: state.run.provider,
     seed: attemptSeed(state.run.id, group.slug, stepId, seq),
   });
 }

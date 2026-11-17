@@ -169,6 +169,49 @@ function VariantSelect({
   );
 }
 
+const NO_PROVIDER = '__none';
+
+/** The provider of the tiers the task runs on; nothing to choose when the tiers name none. */
+function ProviderSelect({
+  state,
+  pipelines,
+}: {
+  state: FormState;
+  pipelines: PipelinesView | null;
+}) {
+  const { t } = useTranslation();
+  const { idPrefix, effective, change } = state;
+  const providers = pipelines?.providers ?? [];
+  if (providers.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Label htmlFor={`${idPrefix}-provider`}>{t('queue.form.provider')}</Label>
+      <Select
+        value={effective.provider ?? NO_PROVIDER}
+        onValueChange={(provider) =>
+          change({ provider: provider === NO_PROVIDER ? null : provider })
+        }
+      >
+        <SelectTrigger
+          id={`${idPrefix}-provider`}
+          className="w-48"
+          title={t('queue.form.providerHint')}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_PROVIDER}>{t('queue.form.noProvider')}</SelectItem>
+          {providers.map((provider) => (
+            <SelectItem key={provider} value={provider}>
+              {provider}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 /** The left half of the form: repository, name, pipeline, and the text or the groups. */
 export function TaskFields(props: {
   state: FormState;
@@ -206,6 +249,8 @@ export function TaskFields(props: {
       </fieldset>
       {/* a returned run keeps its task but may follow another variant */}
       <VariantSelect state={state} pipelines={props.pipelines} />
+      {/* a returned run keeps its provider: the field is for a task that waits */}
+      {state.locked ? null : <ProviderSelect state={state} pipelines={props.pipelines} />}
       {effective.mode === 'task' ? (
         <>
           <p className="text-xs text-muted-foreground">{t('queue.form.alternativeHint')}</p>

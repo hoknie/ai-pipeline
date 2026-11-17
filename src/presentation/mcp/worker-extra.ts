@@ -5,8 +5,16 @@ import { FEEDBACK_LIMIT } from '../../feature/runs/types/index.ts';
 import { RUN_TITLE_LIMIT, WORKER_TOOLS } from '../../feature/agents/types/index.ts';
 import { invalid } from '../../platform/errors/index.ts';
 import { attempt } from './tools.ts';
-import { linkInputs } from './host-links.ts';
+import { linkInputs, present } from './host-links.ts';
 import type { WorkerKit } from './worker-tools.ts';
+
+/** The provider of a task a specialist adds: its own, never the one of the run. */
+const providerField = z
+  .string()
+  .optional()
+  .describe(
+    'Id of a provider of the tiers; omit for none: the task does not inherit the provider of this run',
+  );
 
 export function registerSplit(kit: WorkerKit): void {
   const { options, server } = kit;
@@ -69,6 +77,7 @@ export function registerQueueAdd(kit: WorkerKit): void {
             .string()
             .optional()
             .describe('Id of a variant of the pipeline; omit for `default`, the pipeline as it is'),
+          provider: providerField,
           skip: z
             .array(z.string())
             .optional()
@@ -82,23 +91,15 @@ export function registerQueueAdd(kit: WorkerKit): void {
           links: linkInputs,
         },
       },
-      ({ pipeline, variant, task, groups, title, autoDeliver, deliveryMode, skip, after, links }) =>
+      ({ pipeline, ...fields }) =>
         attempt(async () => {
-          if ((task === undefined) === (groups === undefined)) {
+          if ((fields.task === undefined) === (fields.groups === undefined)) {
             throw invalid('mcp.invalid_arguments', 'pass either task or groups');
           }
           const result = (await options.send('worker_queue_add', {
             token: options.token,
             pipeline,
-            ...(variant !== undefined ? { variant } : {}),
-            ...(task !== undefined ? { task } : {}),
-            ...(groups !== undefined ? { groups } : {}),
-            ...(title !== undefined ? { title } : {}),
-            ...(autoDeliver !== undefined ? { autoDeliver } : {}),
-            ...(deliveryMode !== undefined ? { deliveryMode } : {}),
-            ...(skip !== undefined ? { skip } : {}),
-            ...(after !== undefined ? { after } : {}),
-            ...(links !== undefined ? { links } : {}),
+            ...present(fields),
           })) as { item?: string };
           return `Queued ${result.item ?? 'the task'} for pipeline ${pipeline}. It starts when the queue runs.`;
         }),

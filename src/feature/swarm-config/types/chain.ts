@@ -35,6 +35,16 @@ export function knownProviders(config: { chains: readonly RuntimeChain[] }): str
   return [...providers].sort();
 }
 
+/** The error of a provider the configuration does not know; null when it is known. */
+export function providerProblem(
+  config: { chains: readonly RuntimeChain[] },
+  provider: string,
+): string | null {
+  const known = knownProviders(config);
+  if (known.includes(provider)) return null;
+  return `unknown provider \`${provider}\`; known: ${known.join(', ') || 'none'}`;
+}
+
 /** Index of the enabled `default: true` item, else of the first enabled item; null when none is enabled. */
 export function tierDefaultIndex(chain: Pick<RuntimeChain, 'runtimes'>): number | null {
   const marked = chain.runtimes.findIndex((item) => item.enabled && item.default === true);

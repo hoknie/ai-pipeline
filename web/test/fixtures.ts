@@ -158,6 +158,7 @@ export function runView(overrides: Partial<RunView> = {}): RunView {
     pipelineName: overrides.pipeline ?? 'feature',
     variant: 'default',
     variantName: overrides.variant ?? 'default',
+    provider: null,
     branch: 'refs/aip/run1/run',
     createdAt: 1_000,
     startedAt: 1_000,
@@ -297,7 +298,13 @@ export function pipelineOf(overrides: Partial<PipelineTopology> = {}): PipelineT
 }
 
 export function pipelinesView(overrides: Partial<PipelinesView> = {}): PipelinesView {
-  return { repository: '/repo', pipelines: [pipelineOf()], errors: [], ...overrides };
+  return {
+    repository: '/repo',
+    pipelines: [pipelineOf()],
+    providers: [],
+    errors: [],
+    ...overrides,
+  };
 }
 
 /** A catalog tag; the id follows the name unless given. */
@@ -321,6 +328,7 @@ export function queueRun(id: string, overrides: Partial<QueueRunView> = {}): Que
     pipelineName: overrides.pipeline ?? 'feature',
     variant: 'default',
     variantName: overrides.variant ?? 'default',
+    provider: null,
     tags: [],
     createdAt: 0,
     groups: { done: 0, total: 1 },
@@ -491,6 +499,7 @@ export function queueItem(
     pipelineName: extra.pipeline ?? 'feature',
     variant: 'default',
     variantName: extra.variant ?? 'default',
+    provider: null,
     task,
     groups: null,
     title: null,

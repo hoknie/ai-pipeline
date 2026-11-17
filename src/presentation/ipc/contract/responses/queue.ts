@@ -31,6 +31,8 @@ export interface QueueItemView {
   variant: string;
   /** Name of the variant in the current configuration; the id without a name. */
   variantName: string;
+  /** Id of the provider the task runs on; `null`: not chosen. */
+  provider: string | null;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -86,6 +88,8 @@ export interface QueueRunView {
   pipelineName: string;
   variant: string;
   variantName: string;
+  /** Id of the provider of the run; `null`: not chosen. */
+  provider: string | null;
   tags: TagView[];
   createdAt: number;
   /** Work groups in a final status out of all work groups; `total` is 0 while the task is split. */

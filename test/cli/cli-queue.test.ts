@@ -964,3 +964,74 @@ describe('cli task links', () => {
     expect(conflict.stderr).toContain('--no-links cannot be combined with --link');
   });
 });
+
+describe('cli provider', () => {
+  const TIER_CONFIG = `${MANUAL_CONFIG.trimEnd()}
+`
+    .replace(
+      '  specialists:\n',
+      `  chains:
+    coding:
+      name: Coding
+      mode: by_provider
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+  specialists:
+`,
+    )
+    .replace('    coder: { name: Coder }', '    coder: { name: Coder, runtime_chain: coding }');
+
+  it('adds a task with a provider, marks it, and resets it with --no-provider', async () => {
+    const box = sandbox(TIER_CONFIG);
+    const added = await aip(
+      box,
+      'queue',
+      'add',
+      'feature',
+      '--task',
+      'Fix a typo',
+      '--provider',
+      'zai',
+    );
+    expect(added.code).toBe(0);
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('provider: zai');
+    const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      items: { id: string; provider: string | null }[];
+    };
+    expect(json.items[0]).toMatchObject({ provider: 'zai' });
+    const item = json.items[0]!.id;
+    const edited = await aip(box, 'queue', 'edit', item, '--provider', 'anthropic');
+    expect(edited.code).toBe(0);
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('provider: anthropic');
+    const reset = await aip(box, 'queue', 'edit', item, '--no-provider');
+    expect(reset.code).toBe(0);
+    expect((await aip(box, 'queue', 'list')).stdout).not.toContain('provider:');
+  });
+
+  it('refuses --provider together with --no-provider', async () => {
+    const box = sandbox(TIER_CONFIG);
+    await aip(box, 'queue', 'add', 'feature', '--task', 'x');
+    const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
+      items: { id: string }[];
+    };
+    const result = await aip(
+      box,
+      'queue',
+      'edit',
+      json.items[0]!.id,
+      '--provider',
+      'zai',
+      '--no-provider',
+    );
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('--no-provider cannot be combined with --provider');
+  });
+
+  it('fails with code 1 naming an unknown provider and the known ones', async () => {
+    const box = sandbox(TIER_CONFIG);
+    const result = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--provider', 'nope');
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('unknown provider `nope`; known: anthropic, zai');
+  });
+});

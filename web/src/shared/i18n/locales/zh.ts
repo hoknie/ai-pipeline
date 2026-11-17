@@ -544,6 +544,8 @@ export const zh: Dictionary = {
       label: '尝试 {{seq}} {{step}}',
       round: '第 {{round}} 轮',
       denialsTitle: '被专员权限拒绝的命令',
+      providerInstead: '提供商 {{provider}}，而非 {{requested}}',
+      providerInsteadTitle: '此步骤的层级中没有运行所选提供商的已启用项；使用了该层级的默认项',
       denials: '拒绝：{{n}}',
       outsideTitle: '步骤期间工作副本中变化的文件',
       outside: '工作副本：{{n}}',
@@ -830,6 +832,9 @@ export const zh: Dictionary = {
       deliveryModeReset: '方式恢复为设置值',
       pipeline: 'Pipeline',
       noPipeline: '没有 pipeline',
+      provider: '提供商',
+      noProvider: '未选择',
+      providerHint: '任务运行所用的提供商：层级上的每个步骤都使用其模型',
       variant: '变体',
       skipByVariant: '被变体跳过：{{id}}',
       kind: '任务类型',
@@ -1008,6 +1013,9 @@ export const zh: Dictionary = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  providerBadge: {
+    label: '提供商：{{id}}',
   },
   variantBadge: {
     label: '变体：{{name}}（{{id}}）',

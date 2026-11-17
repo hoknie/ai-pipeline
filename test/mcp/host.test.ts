@@ -32,6 +32,7 @@ const VIEW: QueueView & { item: string } = {
       pipeline: 'feature',
       variant: 'default',
       variantName: 'default',
+      provider: null,
       pipelineName: 'feature',
       task: 'Build the login',
       groups: null,
@@ -213,6 +214,51 @@ describe('host MCP parent of a task', () => {
         method: 'run',
         params: { repository: '/repo', pipeline: 'feature', variant: 'light', task: 'x' },
       },
+    ]);
+  });
+
+  it('passes provider of swarm_run and swarm_queue_add only when given', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return method === 'run' ? { item: 'q1', number: 1, run: null, queue: VIEW } : VIEW;
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x', provider: 'zai' },
+    });
+    await client.callTool({
+      name: 'swarm_run',
+      arguments: { pipeline: 'feature', task: 'x', provider: 'zai' },
+    });
+    await client.callTool({
+      name: 'swarm_queue_add',
+      arguments: { pipeline: 'feature', task: 'x' },
+    });
+    expect(calls).toEqual([
+      {
+        method: 'queue_add',
+        params: { repository: '/repo', pipeline: 'feature', provider: 'zai', task: 'x' },
+      },
+      {
+        method: 'run',
+        params: { repository: '/repo', pipeline: 'feature', provider: 'zai', task: 'x' },
+      },
+      { method: 'queue_add', params: { repository: '/repo', pipeline: 'feature', task: 'x' } },
+    ]);
+  });
+
+  it('resets the provider with null in swarm_queue_edit', async () => {
+    const calls: unknown[] = [];
+    const client = await connect(async (method, params) => {
+      calls.push({ method, params });
+      return VIEW;
+    });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', provider: null } });
+    await client.callTool({ name: 'swarm_queue_edit', arguments: { item: 'q1', title: 'T' } });
+    expect(calls).toEqual([
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', provider: null } },
+      { method: 'queue_edit', params: { repository: '/repo', item: 'q1', title: 'T' } },
     ]);
   });
 

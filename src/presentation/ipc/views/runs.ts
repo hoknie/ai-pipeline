@@ -207,6 +207,7 @@ function runHead(state: RunState, observers: RepairPolicy) {
     pipelineName: pipelineNameOf(state.run.config, state.run.pipeline),
     variant: state.run.variant,
     variantName: variantNameOf(state.run.config, state.run.pipeline, state.run.variant),
+    provider: state.run.provider,
     branch: state.run.branch,
     createdAt: state.run.createdAt,
     startedAt: runStartedAt(state),

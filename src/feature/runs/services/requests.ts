@@ -112,6 +112,7 @@ export class RunRequests {
       deliveryMode: params.deliveryMode,
       skip: params.skip,
       variant: params.variant,
+      provider: params.provider,
       attachments: params.attachments,
       tags: tagIds,
       now: now(),

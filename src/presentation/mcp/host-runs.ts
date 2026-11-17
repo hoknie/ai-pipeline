@@ -6,7 +6,7 @@ import { repositoryArgument } from '../ipc/client/index.ts';
 import type { ApplyResult, GroupView, RunQueued, RunView } from '../ipc/contract/index.ts';
 import { attempt } from './tools.ts';
 import { withData, type HostKit } from './host-kit.ts';
-import { linkInputs } from './host-links.ts';
+import { linkInputs, present } from './host-links.ts';
 
 export function registerRun(kit: HostKit): void {
   const { options, server, tags, parent, variant, skip, after, attachments, repo } = kit;
@@ -43,6 +43,7 @@ export function registerRun(kit: HostKit): void {
         tags,
         parent,
         variant,
+        provider: kit.provider,
         skip,
         after,
         links: linkInputs,
@@ -52,6 +53,7 @@ export function registerRun(kit: HostKit): void {
     ({
       pipeline,
       variant: variantId,
+      provider: providerId,
       task,
       groups,
       repo,
@@ -69,7 +71,7 @@ export function registerRun(kit: HostKit): void {
         const queued = (await options.send('run', {
           repository: repo === undefined ? options.cwd : repositoryArgument(repo, options.cwd),
           pipeline,
-          ...(variantId !== undefined ? { variant: variantId } : {}),
+          ...present({ variant: variantId, provider: providerId }),
           ...(task !== undefined ? { task } : {}),
           ...(groups !== undefined ? { groups } : {}),
           ...(title !== undefined ? { title } : {}),

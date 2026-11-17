@@ -1192,3 +1192,60 @@ describe('observer in the text output', () => {
     expect(formatRun(view as ReturnType<typeof runView>, 2000)).not.toContain('Observer');
   });
 });
+
+describe('the provider in text', () => {
+  const TIER = `swarm:
+  chains:
+    lite:
+      name: Lite
+      mode: by_provider
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: haiku, default: true }
+        - { provider: openai, runtime: opencode, model: openai/gpt-6.1-mini }
+  specialists:
+    light: { name: Light, runtime_chain: lite }
+  pipelines:
+    feature:
+      steps:
+        - { id: work, specialist: light }
+      variants:
+        light: { name: Light }
+`;
+
+  it('adds @provider to the pipeline column, after the variant', () => {
+    const state = run(1, { configText: TIER, variant: 'light', provider: 'openai' });
+    const text = formatRunList([runView(state, 2000)]);
+    expect(text).toContain('feature:light@openai');
+    expect(formatRun(runView(state, 2000), 2000)).toContain('feature:light@openai');
+    const plain = run(1, { configText: TIER });
+    expect(formatRunList([runView(plain, 2000)])).not.toContain('@');
+  });
+
+  it('marks a queued task with provider: <id>', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a', provider: 'zai' }, 'q1', 1000);
+    addItem(queue, { pipeline: 'feature', task: 'b' }, 'q2', 1000);
+    const text = formatQueue(queueView(queue, () => undefined));
+    const lines = text.split('\n').filter((line) => /q[12]/.test(line));
+    expect(lines[0]).toContain('provider: zai');
+    expect(lines[1]).not.toContain('provider:');
+  });
+
+  it('notes an attempt that ran on another provider than the run asked for', () => {
+    const state = run(1, { configText: TIER, provider: 'openai' });
+    step(state, 1000);
+    const attempt = state.groups[0]!.attempts[0]!;
+    attempt.provider = 'anthropic';
+    attempt.requestedProvider = 'openai';
+    const text = formatGroup(groupView(state, state.groups[0]!, '/w', null, 5000));
+    expect(text).toContain('provider anthropic instead of openai');
+  });
+
+  it('says nothing for an attempt on the provider asked for', () => {
+    const state = run(1, { configText: TIER, provider: 'openai' });
+    step(state, 1000);
+    state.groups[0]!.attempts[0]!.provider = 'openai';
+    const text = formatGroup(groupView(state, state.groups[0]!, '/w', null, 5000));
+    expect(text).not.toContain('instead of');
+  });
+});

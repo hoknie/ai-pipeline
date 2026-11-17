@@ -37,4 +37,5 @@ export const LATER_MIGRATIONS: string[] = [
   `,
   TASK_LINKS_MIGRATION,
   `ALTER TABLE attempts ADD COLUMN chain_index INTEGER; ALTER TABLE attempts ADD COLUMN provider TEXT`,
+  `ALTER TABLE runs ADD COLUMN provider TEXT; ALTER TABLE queue_items ADD COLUMN provider TEXT; ALTER TABLE attempts ADD COLUMN requested_provider TEXT`,
 ];

@@ -198,6 +198,8 @@ runtimes:
 
 A specialist uses a tier through `runtime_chain: thinking`. Until a step asks for a provider, a tier takes the first available item in file order, and the next one after a failure: the `on_error` rule. `default` does not change that order. A session that continues stays on the item it started on.
 
+A task can ask for a provider (`--provider zai`, see [Provider](../usage/queue.md#provider)). Its steps on a tier then use the item of that provider, or the `default` item (else the first enabled one) when the tier has none. The tier never switches to another provider for such a task, neither after a failure nor at a usage limit.
+
 ### Usage limit and providers
 
 A [usage limit](../usage/queue.md#usage-limit) holds the provider of the attempt when its chain item has a `provider` (also in chains of other modes), and the runtime otherwise. A held provider does not stop other providers on the same runtime, while a limit of a runtime without a provider holds every item of that runtime.

@@ -44,7 +44,10 @@ export function commonPipelines(
       },
     ];
   });
-  return { ...first, pipelines };
+  const providers = first.providers.filter((id) =>
+    loaded.every((view) => view.providers.includes(id)),
+  );
+  return { ...first, pipelines, providers };
 }
 
 /** The request of a task of several projects from the fields of the form. */
@@ -64,6 +67,7 @@ export function projectsFields(
     pipeline: fields.pipeline,
     task: fields.task ?? '',
     ...(fields.variant !== undefined ? { variant: fields.variant } : {}),
+    ...(typeof fields.provider === 'string' ? { provider: fields.provider } : {}),
     ...(fields.title !== undefined ? { title: fields.title } : {}),
     ...(fields.postponed ? { postponed: true } : {}),
     ...(fields.autoDeliver !== undefined ? { autoDeliver: fields.autoDeliver } : {}),

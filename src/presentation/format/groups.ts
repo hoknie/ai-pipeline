@@ -74,6 +74,13 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     lines.push(
       `  #${attempt.seq} ${attempt.stepName} r${attempt.round} · ${attempt.specialist} (${attempt.runtime}${attempt.model ? ` ${attempt.model}` : ''}) · ${statusBadge(attempt.status, style)}${attempt.verdict ? ` ${attempt.verdict}` : ''} · ${seconds(attempt.durationMs)} · ${formatUsage(attempt.usage, style)}`,
     );
+    if (attempt.requestedProvider !== undefined) {
+      lines.push(
+        style.muted(
+          `     provider ${attempt.provider ?? attempt.runtime} instead of ${attempt.requestedProvider}`,
+        ),
+      );
+    }
     if (attempt.summary) lines.push(`     summary: ${attempt.summary}`);
     if (attempt.feedback) lines.push(`     feedback: ${attempt.feedback}`);
     if (attempt.decision) {

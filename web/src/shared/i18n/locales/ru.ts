@@ -559,6 +559,9 @@ export const ru: Dictionary = {
       label: 'попытка {{seq}} {{step}}',
       round: 'круг {{round}}',
       denialsTitle: 'команды, отклонённые правами специалиста',
+      providerInstead: 'провайдер {{provider}} вместо {{requested}}',
+      providerInsteadTitle:
+        'В уровне этого этапа нет включённого элемента провайдера запуска; взят элемент уровня по умолчанию',
       denials: 'отказов: {{n}}',
       outsideTitle: 'файлы, изменённые в рабочей копии во время этапа',
       outside: 'в рабочей копии: {{n}}',
@@ -861,6 +864,10 @@ export const ru: Dictionary = {
       deliveryModeReset: 'способ как в настройке',
       pipeline: 'Pipeline',
       noPipeline: 'нет pipeline',
+      provider: 'Провайдер',
+      noProvider: 'Не выбран',
+      providerHint:
+        'Провайдер, на котором идёт задача: каждый этап на уровне использует его модель',
       variant: 'Вариант',
       skipByVariant: 'Пропускает вариант: {{id}}',
       kind: 'вид задачи',
@@ -1043,6 +1050,9 @@ export const ru: Dictionary = {
   pipelineBadge: {
     label: 'Pipeline: {{name}} ({{id}})',
     labelSame: 'Pipeline: {{id}}',
+  },
+  providerBadge: {
+    label: 'Провайдер: {{id}}',
   },
   variantBadge: {
     label: 'Вариант: {{name}} ({{id}})',
