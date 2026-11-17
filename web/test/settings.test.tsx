@@ -463,15 +463,11 @@ const GLOBAL_GROUPS = [
 const PROJECT_GROUPS = ['General', 'Agents', 'Delivery', 'Queue', 'Swarm', 'Tags'];
 
 const groupNav = () => screen.getByRole('navigation', { name: 'groups of settings' });
-/** The names of the groups in the column, without the «beta» marks. */
+/** The names of the groups in the column. */
 const groupNames = () =>
   within(groupNav())
     .getAllByRole('link')
-    .map((link) => {
-      const copy = link.cloneNode(true) as HTMLElement;
-      copy.querySelectorAll('[data-beta]').forEach((badge) => badge.remove());
-      return copy.textContent;
-    });
+    .map((link) => link.textContent);
 
 describe('settings page', () => {
   it('has the tabs Shared and Project and opens General of Shared by default', async () => {
@@ -481,12 +477,8 @@ describe('settings page', () => {
     expect(tabs.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Shared', 'Project']);
     expect(tabs.getByRole('tab', { name: 'Shared' }).getAttribute('aria-selected')).toBe('true');
     expect(groupNames()).toEqual(GLOBAL_GROUPS);
-    expect(
-      within(groupNav())
-        .getAllByRole('link')
-        .filter((link) => link.querySelector('[data-beta]'))
-        .map((link) => link.getAttribute('href')),
-    ).toEqual(['#settings/global/observers/general']);
+    expect(groupNav().querySelector('[data-beta]')).toBeNull();
+    expect(screen.queryByText('beta')).toBeNull();
     expect(
       within(groupNav()).getByRole('link', { name: 'General' }).getAttribute('aria-current'),
     ).toBe('page');

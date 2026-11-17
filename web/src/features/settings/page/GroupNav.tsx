@@ -1,12 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '../../../shared/lib/browser/cn.ts';
-import {
-  BETA_SETTINGS_GROUPS,
-  type SettingsGroup,
-  type SettingsScope,
-} from '../../../shared/lib/nav/settingsGroups.ts';
-import { BetaBadge } from './BetaBadge.tsx';
+import type { SettingsGroup, SettingsScope } from '../../../shared/lib/nav/settingsGroups.ts';
 import { hrefOf } from './hrefOf.ts';
 
 /** The groups of the open tab; a group with errors is marked. */
@@ -38,10 +33,7 @@ export function GroupNav({
                 key === group && 'border-border bg-accent',
               )}
             >
-              <span className="flex items-center gap-2">
-                {t(`settingsPage.group.${key}`)}
-                {BETA_SETTINGS_GROUPS.has(key) ? <BetaBadge /> : null}
-              </span>
+              <span>{t(`settingsPage.group.${key}`)}</span>
               {errors.has(key) ? (
                 <span
                   className="rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"

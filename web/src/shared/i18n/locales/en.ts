@@ -1664,8 +1664,6 @@ export const en = {
       },
     },
     groups: 'groups of settings',
-    beta: 'beta',
-    betaHint: 'still in development: behaviour and settings may change',
     hasErrors: 'the group has configuration errors',
     restartNote: 'Changes take effect after the restart: see the <link>System</link> group.',
     runtimeNote:

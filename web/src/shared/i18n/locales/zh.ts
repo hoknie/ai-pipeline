@@ -1628,8 +1628,6 @@ export const zh: Dictionary = {
       },
     },
     groups: '设置分组',
-    beta: 'beta',
-    betaHint: '仍在开发中：行为和设置可能会变化',
     hasErrors: '该分组存在配置错误',
     restartNote: '更改在重启后生效：见<link>系统</link>分组。',
     runtimeNote: '启动下一个代理前会重新读取运行器设置；无需重启守护进程。',
