@@ -17,19 +17,10 @@ import { AttachmentFields } from './form/AttachmentFields.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
 import { DeliveryFields } from './form/DeliveryFields.tsx';
 import { TagsField, withCurrent } from './form/LinkFields.tsx';
+import { useEffectiveDraft } from './form/usePresetDraft.ts';
 import { TaskFields, type FormState } from './form/TaskFields.tsx';
 
-export {
-  TITLE_LIMIT,
-  continueDraft,
-  draftOf,
-  draftValid,
-  emptyDraft,
-  fieldsOf,
-  retarget,
-  type AttachmentEntry,
-  type QueueDraft,
-} from './draft.ts';
+export { draftOf, draftValid, emptyDraft, fieldsOf, retarget, type QueueDraft } from './draft.ts';
 
 function FormButtons({
   disabled,
@@ -123,6 +114,8 @@ function useSubmit(
     submitAndContinue: onSubmitAndContinue ? () => send(true) : undefined,
     busy,
     error,
+    // the daemon refuses an unknown or disabled provider by name: the field shows it
+    providerError: error && /provider/i.test(error) ? error : undefined,
   };
 }
 
@@ -199,6 +192,8 @@ interface QueueFormProps {
   repositoryField?: ReactNode;
   /** The task goes to several projects: no groups, attachments, project tags or parent. */
   several?: boolean;
+  /** The projects whose providers the task may name; by default the repository of the task. */
+  providerRepositories?: readonly string[];
   /** Fields of a task in several projects, under the text of the task. */
   extras?: ReactNode;
   /** The projects of a task in several projects, first in the right half. */
@@ -259,6 +254,7 @@ export function QueueForm({
   returnedRun = null,
   repositoryField,
   several = false,
+  providerRepositories,
   extras,
   projectsPanel,
   blockedHint,
@@ -271,11 +267,7 @@ export function QueueForm({
   fill = false,
 }: QueueFormProps) {
   const { t } = useTranslation();
-  const ids = pipelines?.pipelines.map((pipeline) => pipeline.id) ?? [];
-  // a draft started before the pipelines were known takes the first one
-  const effective: QueueDraft =
-    draft.pipeline === '' && ids[0] ? { ...draft, pipeline: ids[0] } : draft;
-  const change = (patch: Partial<QueueDraft>) => onDraft({ ...effective, ...patch });
+  const { ids, effective, change } = useEffectiveDraft(draft, pipelines, onDraft);
   const valid = draftValid(effective);
   const state = { idPrefix, effective, change, locked, several };
   const sent = useSubmit(
@@ -309,6 +301,9 @@ export function QueueForm({
           repositoryField={repositoryField}
           extras={extras}
           fill={fill}
+          api={api}
+          repositories={providerRepositories ?? (repository ? [repository] : [])}
+          providerError={sent.providerError}
         />
         <SideFields
           state={state}
@@ -323,7 +318,7 @@ export function QueueForm({
         />
       </div>
       <SubmitButtons {...{ valid, blocked, blockedHint, sent, submitLabel, onCancel }} />
-      {sent.error ? <Alert variant="destructive">{sent.error}</Alert> : null}
+      {sent.error && !sent.providerError ? <Alert variant="destructive">{sent.error}</Alert> : null}
     </form>
   );
 }

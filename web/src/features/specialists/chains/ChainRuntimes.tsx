@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
+import type { Api } from '../../../shared/api/api.ts';
 import type { FieldError } from '../../../shared/api/types.ts';
 import type { ItemErrors } from './ChainItemProvider.tsx';
 import { ChainRuntimeItem } from './ChainRuntimeItem.tsx';
@@ -22,9 +23,11 @@ export function itemErrors(errors: FieldError[], index: number): ItemErrors {
 }
 
 export function ChainRuntimes({
+  api,
   editor,
   disabled,
 }: {
+  api: Api;
   editor: ReturnType<typeof useChainEditor>;
   disabled: boolean;
 }) {
@@ -44,6 +47,7 @@ export function ChainRuntimes({
         {editor.draft.runtimes.map((item, index) => (
           <ChainRuntimeItem
             key={index}
+            api={api}
             index={index}
             item={item}
             total={editor.draft.runtimes.length}

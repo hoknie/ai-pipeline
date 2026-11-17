@@ -1195,6 +1195,9 @@ describe('observer in the text output', () => {
 
 describe('the provider in text', () => {
   const TIER = `swarm:
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
   chains:
     lite:
       name: Lite
@@ -1231,6 +1234,57 @@ describe('the provider in text', () => {
     expect(lines[1]).not.toContain('provider:');
   });
 
+  it('shows the name next to the slug of a queued task, and the slug alone without a name', () => {
+    const queue = emptyQueue('/repo', 1);
+    addItem(queue, { pipeline: 'feature', task: 'a', provider: 'zai' }, 'q1', 1000);
+    addItem(queue, { pipeline: 'feature', task: 'b', provider: 'gone' }, 'q2', 1000);
+    const names = (slug: string) => (slug === 'zai' ? 'Z.ai' : null);
+    const view = queueView(
+      queue,
+      () => undefined,
+      ...([undefined, undefined, undefined, undefined, undefined, undefined, undefined] as const),
+      undefined,
+      undefined,
+      names,
+    );
+    expect(view.items.map((item) => item.providerName)).toEqual(['Z.ai', null]);
+    const lines = formatQueue(view)
+      .split('\n')
+      .filter((line) => /q[12]/.test(line));
+    expect(lines[0]).toContain('provider: zai (Z.ai)');
+    expect(lines[1]).toContain('provider: gone');
+    expect(lines[1]).not.toContain('gone (');
+  });
+
+  it('gives the name of the provider of a run from the snapshot, null for an old snapshot', () => {
+    const state = run(1, { configText: TIER, provider: 'openai' });
+    expect(runView(state, 2000)).toMatchObject({ provider: 'openai', providerName: 'OpenAI' });
+    const stored = run(1, { configText: TIER, provider: 'openai' });
+    stored.run.config.providers = [];
+    expect(runView(stored, 2000)).toMatchObject({ provider: 'openai', providerName: null });
+  });
+
+  it('names the provider of a usage limit wait: slug (name, runtime)', () => {
+    const wait = { reason: 'limit', runtime: 'opencode', provider: 'zai', until: 60_000 } as const;
+    expect(waitNote({ ...wait, providerName: 'Z.ai' })).toContain('zai (Z.ai, opencode)');
+    expect(waitNote(wait)).toContain('zai (opencode)');
+    expect(waitNote({ reason: 'limit', runtime: 'claude', until: 60_000 })).toContain(
+      'waiting for claude usage limit',
+    );
+  });
+
+  it('names both providers of an attempt without a name by their slugs', () => {
+    const state = run(1, { configText: TIER, provider: 'openai' });
+    step(state, 1000);
+    const attempt = state.groups[0]!.attempts[0]!;
+    attempt.provider = 'anthropic';
+    attempt.requestedProvider = 'openai';
+    state.run.config.providers = [];
+    const view = groupView(state, state.groups[0]!, '/w', null, 5000);
+    expect(view.attempts[0]).not.toHaveProperty('providerName');
+    expect(formatGroup(view)).toContain('provider anthropic instead of openai');
+  });
+
   it('notes an attempt that ran on another provider than the run asked for', () => {
     const state = run(1, { configText: TIER, provider: 'openai' });
     step(state, 1000);
@@ -1238,7 +1292,7 @@ describe('the provider in text', () => {
     attempt.provider = 'anthropic';
     attempt.requestedProvider = 'openai';
     const text = formatGroup(groupView(state, state.groups[0]!, '/w', null, 5000));
-    expect(text).toContain('provider anthropic instead of openai');
+    expect(text).toContain('provider anthropic (Anthropic) instead of openai (OpenAI)');
   });
 
   it('says nothing for an attempt on the provider asked for', () => {

@@ -46,18 +46,30 @@ export function VariantBadge({
  * The provider a run or a queue task follows in its tiers, next to the pipeline badge. Nothing
  * when none is chosen. Not interactive.
  */
-export function ProviderBadge({ provider }: { provider: string | null | undefined }) {
+export function ProviderBadge({
+  provider,
+  name,
+}: {
+  provider: string | null | undefined;
+  /** The human name of the provider; without it (a removed provider, an old snapshot) the slug is shown. */
+  name?: string | null | undefined;
+}) {
   const { t } = useTranslation();
   if (!provider) return null;
+  const named = name?.trim() ? name.trim() : null;
   return (
     <Badge
       variant="outline"
       className="max-w-32 rounded-md"
-      aria-label={t('providerBadge.label', { id: provider })}
-      title={t('providerBadge.label', { id: provider })}
+      aria-label={
+        named
+          ? t('providerBadge.named', { name: named, id: provider })
+          : t('providerBadge.label', { id: provider })
+      }
+      title={provider}
       data-provider={provider}
     >
-      <span className="min-w-0 truncate">@{provider}</span>
+      <span className="min-w-0 truncate">{named ?? `@${provider}`}</span>
     </Badge>
   );
 }

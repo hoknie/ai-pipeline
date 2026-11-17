@@ -29,6 +29,7 @@ import {
 import {
   type DeliveryMode,
   pipelineNameOf,
+  providerName,
   variantNameOf,
 } from '../../../feature/swarm-config/types/index.ts';
 import type { Tag } from '../../../feature/tags/types/index.ts';
@@ -75,6 +76,8 @@ function queueRunView(
     variant: state.run.variant,
     variantName: variantNameOf(state.run.config, state.run.pipeline, state.run.variant),
     provider: state.run.provider,
+    providerName:
+      state.run.provider === null ? null : providerName(state.run.config, state.run.provider),
     tags: tagViews(catalog, state.run.tags),
     createdAt: state.run.createdAt,
     groups: {
@@ -151,14 +154,20 @@ function itemTarget(
   lookup: (id: string) => RunState | undefined,
   names: (id: string) => string,
   variantNames: (pipeline: string, variant: string) => string,
-): Pick<QueueItemView, 'pipeline' | 'pipelineName' | 'variant' | 'variantName' | 'provider'> {
+  providerNames: (slug: string) => string | null,
+): Pick<
+  QueueItemView,
+  'pipeline' | 'pipelineName' | 'variant' | 'variantName' | 'provider' | 'providerName'
+> {
   const variant = variantOf(item, lookup);
+  const provider = providerOf(item, lookup);
   return {
     pipeline: item.pipeline,
     pipelineName: names(item.pipeline),
     variant,
     variantName: variantNames(item.pipeline, variant),
-    provider: providerOf(item, lookup),
+    provider,
+    providerName: provider === null ? null : providerNames(provider),
   };
 }
 
@@ -203,6 +212,17 @@ function dependencyView(
   };
 }
 
+/** The stop of a queue; a usage limit of a provider also names the provider by the run's configuration. */
+function stopView(
+  stop: Queue['stop'],
+  lookup: (id: string) => RunState | undefined,
+): QueueView['stop'] {
+  if (stop === null || stop.kind !== 'limit' || stop.provider === undefined) return stop;
+  const config = lookup(stop.run)?.run.config;
+  const name = config === undefined ? null : providerName(config, stop.provider);
+  return name === null ? stop : { ...stop, providerName: name };
+}
+
 export function queueView(
   queue: Queue,
   lookup: (id: string) => RunState | undefined,
@@ -218,6 +238,7 @@ export function queueView(
     links: [],
     linkedBy: [],
   }),
+  providerNames: (slug: string) => string | null = () => null,
 ): QueueView {
   const cards = (ids: string[], stopping: boolean): QueueRunView[] =>
     ids.flatMap((id) => {
@@ -241,7 +262,7 @@ export function queueView(
     onLimit: queue.onLimit,
     filter: { pipelines: [...queue.filter.pipelines], tags: [...queue.filter.tags] },
     filterTags: tagViews(catalog, queue.filter.tags),
-    stop: queue.stop,
+    stop: stopView(queue.stop, lookup),
     freezeCandidate:
       queue.runs.length >= queue.parallel
         ? freezeCandidate(
@@ -254,7 +275,7 @@ export function queueView(
       id: item.id,
       number: item.number,
       position: index + 1,
-      ...itemTarget(item, lookup, names, variantNames),
+      ...itemTarget(item, lookup, names, variantNames, providerNames),
       ...itemBody(item, lookup),
       title: item.title,
       autoDeliver: item.autoDeliver,

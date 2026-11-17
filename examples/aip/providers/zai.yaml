@@ -1,0 +1,8 @@
+name: Z.ai
+access:
+  - kind: cli
+    runtime: opencode
+    model_prefix: zai
+models:
+  think: glm-5.3
+  code: glm-5.3

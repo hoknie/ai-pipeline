@@ -30,7 +30,7 @@ export function CardBadges({ run }: { run: QueueRunView }) {
       <StatusBadge status={run.state} />
       <PipelineBadge id={run.pipeline} name={run.pipelineName} />
       <VariantBadge id={run.variant} name={run.variantName} />
-      <ProviderBadge provider={run.provider} />
+      <ProviderBadge provider={run.provider} name={run.providerName} />
       <TagChips tags={run.tags ?? []} />
       {run.priority ? (
         <Badge variant="run" title={t('queue.priorityHint')}>

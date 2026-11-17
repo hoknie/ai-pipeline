@@ -1,4 +1,5 @@
 import type { Dictionary } from '../types.ts';
+import { providersEs } from './providers.es.ts';
 
 /*
  * Glosario: run — ejecución, group — grupo, step — paso, attempt — intento,
@@ -6,6 +7,7 @@ import type { Dictionary } from '../types.ts';
  * Pipeline y worktree se dejan en inglés.
  */
 export const es: Dictionary = {
+  providers: providersEs,
   links: {
     editRun: 'Editar en la página de la ejecución',
     title: 'Enlaces',
@@ -56,6 +58,7 @@ export const es: Dictionary = {
     queue: 'Cola',
     specialists: 'Especialistas',
     pipelines: 'Pipeline',
+    providers: 'Proveedores',
     stats: 'Estadísticas',
     settings: 'Ajustes',
     sections: 'secciones',
@@ -326,7 +329,17 @@ export const es: Dictionary = {
     newTask: 'Nueva tarea',
     project: 'Cambiar de proyecto',
     moveItem: 'Mover una tarea en la cola',
-    groups: { general: 'General', navigation: 'Navegación', runs: 'Ejecuciones', queue: 'Cola' },
+    nextProvider: 'Proveedor siguiente',
+    previousProvider: 'Proveedor anterior',
+    openProvider: 'Abrir el proveedor',
+    moveRole: 'Mover un rol',
+    groups: {
+      general: 'General',
+      navigation: 'Navegación',
+      runs: 'Ejecuciones',
+      queue: 'Cola',
+      providers: 'Proveedores',
+    },
   },
   format: {
     unitSec: 's',
@@ -355,6 +368,7 @@ export const es: Dictionary = {
       state: 'Estado',
       pipeline: 'Pipeline',
       variant: 'Variante',
+      provider: 'Proveedor',
       specialists: 'Especialistas',
       repositories: 'Repositorio',
       clear: 'Borrar',
@@ -574,9 +588,9 @@ export const es: Dictionary = {
       label: 'intento {{seq}} {{step}}',
       round: 'ronda {{round}}',
       denialsTitle: 'comandos denegados por los permisos del especialista',
-      providerInstead: 'proveedor {{provider}} en lugar de {{requested}}',
+      providerInstead: 'otro proveedor',
       providerInsteadTitle:
-        'El nivel de este paso no tiene un elemento activo del proveedor de la ejecución; se usó el elemento por defecto del nivel',
+        'La tarea pidió {{requested}}, pero la cadena del paso no lo tiene: el paso se ejecutó en {{provider}}',
       denials: 'denegaciones: {{n}}',
       outsideTitle: 'archivos cambiados en la copia de trabajo durante el paso',
       outside: 'en la copia de trabajo: {{n}}',
@@ -1063,6 +1077,7 @@ export const es: Dictionary = {
   },
   providerBadge: {
     label: 'Proveedor: {{id}}',
+    named: 'Proveedor: {{name}} ({{id}})',
   },
   variantBadge: {
     label: 'Variante: {{name}} ({{id}})',
@@ -1355,6 +1370,8 @@ export const es: Dictionary = {
       moveDown: 'Bajar',
       remove: 'Eliminar ejecutor',
       provider: 'Proveedor',
+      noProvider: 'Sin proveedor',
+      chooseProvider: 'Elija un proveedor',
       providerPlaceholder: 'anthropic, zai, openai',
       providerHint: 'Id del proveedor: clave de la retención por límite de uso. Un id por cuenta.',
       providerRequired: 'Obligatorio en el modo Por proveedor',

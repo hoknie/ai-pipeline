@@ -30,6 +30,9 @@ function matches(combo: string, event: KeyboardEvent): boolean {
       keyMatches(combo.slice(4), event)
     );
   }
+  if (combo.startsWith('Alt+')) {
+    return event.altKey && !event.ctrlKey && !event.metaKey && event.key === combo.slice(4);
+  }
   if (combo.startsWith('ctrl+')) {
     const key = combo.slice(5);
     return (

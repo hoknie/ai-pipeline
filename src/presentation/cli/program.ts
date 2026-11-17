@@ -8,6 +8,7 @@ import { registerDaemon, registerEvents } from './commands/daemon.ts';
 import { registerGroup } from './commands/group.ts';
 import { registerMcp } from './commands/mcp.ts';
 import { registerOverview } from './commands/overview/index.ts';
+import { registerProvider } from './commands/provider/index.ts';
 import { registerQueue } from './commands/queue.ts';
 import { registerRepositories } from './commands/repositories.ts';
 import { registerRun } from './commands/run.ts';
@@ -70,6 +71,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
   program.commandsGroup(queueGroup!.heading);
   registerQueue(program, io, style);
   registerRepositories(program, io, style);
+  registerProvider(program, io, style);
   registerTag(program, io, style);
   program.commandsGroup(dashboards!.heading);
   registerOverview(program, io, style);

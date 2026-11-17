@@ -3,8 +3,10 @@ import { existsSync } from 'node:fs';
 import { databasePath } from '../platform/paths/index.ts';
 import { Database } from '../platform/sqlite/index.ts';
 import { createRunArchive, type RunArchive } from '../feature/runs/services/index.ts';
+import type { ProviderState } from '../feature/agents/types/index.ts';
 import type { RunState } from '../feature/runs/types/index.ts';
 import type {
+  ResolvedConfig,
   Runtime as RuntimeName,
   RuntimeSettings,
 } from '../feature/swarm-config/types/index.ts';
@@ -48,4 +50,12 @@ export function agentExecutable(
   settings: RuntimeSettings,
 ): string {
   return createAgents(environment).agents.runtimeFor(name, settings).executable;
+}
+
+/** The availability of the providers of a configuration, as the daemon would find it. */
+export function providerStates(
+  config: ResolvedConfig,
+  environment: NodeJS.ProcessEnv,
+): ProviderState[] {
+  return createAgents(environment).providers.status(config);
 }

@@ -54,3 +54,19 @@ export function usePresetDraft(input: {
     onPresetApplied();
   }, [open, preset, target, draft, draftTarget, pipelines, onDraft, onPresetApplied]);
 }
+
+/** The draft with the first pipeline when it started before the pipelines were known. */
+export function useEffectiveDraft(
+  draft: QueueDraft,
+  pipelines: PipelinesView | null,
+  onDraft: (draft: QueueDraft) => void,
+) {
+  const ids = pipelines?.pipelines.map((pipeline) => pipeline.id) ?? [];
+  const effective: QueueDraft =
+    draft.pipeline === '' && ids[0] ? { ...draft, pipeline: ids[0] } : draft;
+  return {
+    ids,
+    effective,
+    change: (patch: Partial<QueueDraft>) => onDraft({ ...effective, ...patch }),
+  };
+}

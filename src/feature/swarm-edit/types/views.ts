@@ -36,8 +36,10 @@ export interface SystemStagesView {
 export interface PipelinesView {
   repository: string;
   pipelines: PipelineTopology[];
-  /** Providers of the tiers of the repository: the ids a task may name as its provider. */
+  /** Providers of the repository, disabled ones included: the ids a task may name as its provider. */
   providers: string[];
+  /** The human names of `providers` by slug. */
+  providerNames: Record<string, string>;
   /** Problems of the configuration; the list of pipelines is empty when there are any. */
   errors: { file?: string; path: string; message: string }[];
 }

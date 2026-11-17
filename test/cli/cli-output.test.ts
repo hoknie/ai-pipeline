@@ -364,6 +364,9 @@ describe('cli', () => {
 
   it('shows a by_provider chain with provider and default in config check', async () => {
     const box = sandbox(`swarm:
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
   chains:
     thinking:
       name: Thinking

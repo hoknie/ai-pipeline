@@ -34,6 +34,12 @@ export interface ModelPickerProps {
   placeholder?: string;
   disabled?: boolean;
   invalid?: boolean;
+  /** Said above the list when the catalog has no models and a model is typed by hand. */
+  manualHint?: string;
+  /** The label of the empty choice in the list; by default «by default». */
+  emptyOption?: string;
+  /** Called when the list opens: the place to ask for the models. */
+  onOpen?: () => void;
 }
 
 function ModelOption({
@@ -142,9 +148,10 @@ function ModelGroups(props: {
   value: string;
   typed: string;
   canCreate: boolean;
+  emptyOption?: string;
   pick: (next: string) => void;
 }) {
-  const { models, value, typed, canCreate, pick } = props;
+  const { models, value, typed, canCreate, emptyOption, pick } = props;
   const { t } = useTranslation();
   return (
     <>
@@ -152,7 +159,7 @@ function ModelGroups(props: {
         <CommandGroup>
           <CommandItem value={DEFAULT} onSelect={() => pick('')}>
             <Check className={value === '' ? 'opacity-100' : 'opacity-0'} />
-            {t('models.default')}
+            {emptyOption ?? t('models.default')}
           </CommandItem>
         </CommandGroup>
       ) : null}
@@ -189,7 +196,7 @@ function ModelGroups(props: {
  */
 export function ModelPicker(props: ModelPickerProps) {
   const { id, label, value, onChange, models, error, loading, onRefresh, placeholder } = props;
-  const { disabled = false, invalid = false } = props;
+  const { disabled = false, invalid = false, manualHint, emptyOption, onOpen } = props;
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -205,6 +212,7 @@ export function ModelPicker(props: ModelPickerProps) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        if (next) onOpen?.();
         if (!next) setQuery('');
       }}
     >
@@ -222,12 +230,18 @@ export function ModelPicker(props: ModelPickerProps) {
             placeholder={t('picker.searchOrType')}
           />
           <CommandList>
+            {manualHint && models.length === 0 && !error ? (
+              <p role="note" className="px-2 py-1.5 text-xs text-muted-foreground">
+                {manualHint}
+              </p>
+            ) : null}
             <CommandEmpty>{t('picker.nothing')}</CommandEmpty>
             <ModelGroups
               models={matchingModels(models, query)}
               value={value}
               typed={typed}
               canCreate={typed !== '' && !models.some((model) => model.id === typed)}
+              emptyOption={emptyOption}
               pick={pick}
             />
           </CommandList>

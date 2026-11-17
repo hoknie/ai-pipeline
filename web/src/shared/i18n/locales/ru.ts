@@ -1,4 +1,5 @@
 import type { Dictionary } from '../types.ts';
+import { providersRu } from './providers.ru.ts';
 
 /*
  * Глоссарий: run — запуск, group — группа, step — этап, attempt — попытка,
@@ -6,6 +7,7 @@ import type { Dictionary } from '../types.ts';
  * Pipeline и worktree остаются латиницей.
  */
 export const ru: Dictionary = {
+  providers: providersRu,
   links: {
     editRun: 'Изменить на странице запуска',
     title: 'Связи',
@@ -56,6 +58,7 @@ export const ru: Dictionary = {
     queue: 'Очередь',
     specialists: 'Специалисты',
     pipelines: 'Pipeline',
+    providers: 'Провайдеры',
     stats: 'Статистика',
     settings: 'Настройки',
     sections: 'разделы',
@@ -326,7 +329,17 @@ export const ru: Dictionary = {
     newTask: 'Новая задача',
     project: 'Переключить проект',
     moveItem: 'Сдвинуть задачу в очереди',
-    groups: { general: 'Общие', navigation: 'Переходы', runs: 'Запуски', queue: 'Очередь' },
+    nextProvider: 'Следующий провайдер',
+    previousProvider: 'Предыдущий провайдер',
+    openProvider: 'Открыть провайдера',
+    moveRole: 'Переместить роль',
+    groups: {
+      general: 'Общие',
+      navigation: 'Переходы',
+      runs: 'Запуски',
+      queue: 'Очередь',
+      providers: 'Провайдеры',
+    },
   },
   format: {
     unitSec: 'с',
@@ -356,6 +369,7 @@ export const ru: Dictionary = {
       state: 'Состояние',
       pipeline: 'Pipeline',
       variant: 'Вариант',
+      provider: 'Провайдер',
       specialists: 'Специалисты',
       repositories: 'Репозиторий',
       clear: 'Очистить',
@@ -572,9 +586,9 @@ export const ru: Dictionary = {
       label: 'попытка {{seq}} {{step}}',
       round: 'круг {{round}}',
       denialsTitle: 'команды, отклонённые правами специалиста',
-      providerInstead: 'провайдер {{provider}} вместо {{requested}}',
+      providerInstead: 'другой провайдер',
       providerInsteadTitle:
-        'В уровне этого этапа нет включённого элемента провайдера запуска; взят элемент уровня по умолчанию',
+        'Задача просила {{requested}}, но в цепочке этапа его нет — этап пошёл на {{provider}}',
       denials: 'отказов: {{n}}',
       outsideTitle: 'файлы, изменённые в рабочей копии во время этапа',
       outside: 'в рабочей копии: {{n}}',
@@ -1066,6 +1080,7 @@ export const ru: Dictionary = {
   },
   providerBadge: {
     label: 'Провайдер: {{id}}',
+    named: 'Провайдер: {{name}} ({{id}})',
   },
   variantBadge: {
     label: 'Вариант: {{name}} ({{id}})',
@@ -1353,6 +1368,8 @@ export const ru: Dictionary = {
       moveDown: 'Ниже',
       remove: 'Удалить исполнителя',
       provider: 'Провайдер',
+      noProvider: 'Без провайдера',
+      chooseProvider: 'Выберите провайдера',
       providerPlaceholder: 'anthropic, zai, openai',
       providerHint: 'Id провайдера: ключ удержания по лимиту. Один id на аккаунт.',
       providerRequired: 'Обязателен в режиме «По провайдеру»',

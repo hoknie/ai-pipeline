@@ -137,10 +137,10 @@ export function addProvider(kit: RunKit): void {
   run
     .command('provider')
     .description(
-      'Switch a run that is not finished yet to another provider of the tiers, or to none; a running step on a tier whose item changes is stopped without a commit and starts again in a new session',
+      'Switch a run that is not finished yet to another provider, or to none; a running step on a tier whose item changes is stopped without a commit and starts again in a new session',
     )
     .argument('<run-id>', 'run id')
-    .argument('[provider]', 'provider id')
+    .argument('[id]', 'provider slug')
     .option(
       '--none',
       'reset the provider: the next attempts pick the item by the rules of the tier',

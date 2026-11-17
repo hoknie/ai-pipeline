@@ -165,4 +165,30 @@ describe('the provider of a run in the header', () => {
     render(<RunHeader run={runView()} api={fakeApi()} now={0} onError={vi.fn()} />);
     expect(screen.queryByText(/^@/)).toBeNull();
   });
+
+  it('shows the name of the provider with the slug in the hint', () => {
+    render(
+      <RunHeader
+        run={runView({ provider: 'zai', providerName: 'Z.ai' })}
+        api={fakeApi()}
+        now={0}
+        onError={vi.fn()}
+      />,
+    );
+    const badge = screen.getByLabelText('Provider: Z.ai (zai)');
+    expect(badge.textContent).toBe('Z.ai');
+    expect(badge.getAttribute('title')).toBe('zai');
+  });
+
+  it('falls back to the slug when the name is not known', () => {
+    render(
+      <RunHeader
+        run={runView({ provider: 'zai', providerName: null })}
+        api={fakeApi()}
+        now={0}
+        onError={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Provider: zai').textContent).toBe('@zai');
+  });
 });

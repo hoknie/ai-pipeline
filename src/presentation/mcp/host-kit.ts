@@ -39,7 +39,7 @@ const providerArgument = z
   .string()
   .optional()
   .describe(
-    'Id of a provider of the tiers (the `provider` of the items of `by_provider` chains): every step of the task on a tier runs on the model of that provider; omit for none. In an edit null clears it',
+    'Slug of a provider of the configuration (a `providers/<slug>.yaml` file): every step of the task on a tier runs on the model of that provider; omit for none. In an edit null clears it',
   );
 
 export function hostKit(options: HostOptions) {

@@ -1,8 +1,11 @@
+import { providersEn } from './providers.en.ts';
+
 /**
  * The reference dictionary: every other language has exactly these keys (checked by `tsc`).
  * Plural keys end with `_one` / `_other`; other languages add the CLDR forms they need.
  */
 export const en = {
+  providers: providersEn,
   links: {
     editRun: 'Edit on the run page',
     title: 'Links',
@@ -53,6 +56,7 @@ export const en = {
     queue: 'Queue',
     specialists: 'Specialists',
     pipelines: 'Pipeline',
+    providers: 'Providers',
     stats: 'Statistics',
     settings: 'Settings',
     sections: 'sections',
@@ -320,7 +324,17 @@ export const en = {
     newTask: 'Create a task',
     project: 'Switch project',
     moveItem: 'Move a task in the queue',
-    groups: { general: 'General', navigation: 'Navigation', runs: 'Runs', queue: 'Queue' },
+    nextProvider: 'Next provider',
+    previousProvider: 'Previous provider',
+    openProvider: 'Open the provider',
+    moveRole: 'Move a role',
+    groups: {
+      general: 'General',
+      navigation: 'Navigation',
+      runs: 'Runs',
+      queue: 'Queue',
+      providers: 'Providers',
+    },
   },
   format: {
     unitSec: 's',
@@ -348,6 +362,7 @@ export const en = {
       state: 'State',
       pipeline: 'Pipeline',
       variant: 'Variant',
+      provider: 'Provider',
       specialists: 'Specialists',
       repositories: 'Repository',
       clear: 'Clear',
@@ -565,9 +580,9 @@ export const en = {
       label: 'attempt {{seq}} {{step}}',
       round: 'round {{round}}',
       denialsTitle: 'commands denied by the specialist permissions',
-      providerInstead: 'provider {{provider}} instead of {{requested}}',
+      providerInstead: 'other provider',
       providerInsteadTitle:
-        'The tier of this step has no enabled item of the run provider; the default item of the tier was used',
+        'The task asked for {{requested}}, but the chain of the step has no such provider — the step ran on {{provider}}',
       denials: 'denials: {{n}}',
       outsideTitle: 'files changed in the working copy during the step',
       outside: 'in working copy: {{n}}',
@@ -1042,6 +1057,7 @@ export const en = {
   },
   providerBadge: {
     label: 'Provider: {{id}}',
+    named: 'Provider: {{name}} ({{id}})',
   },
   variantBadge: {
     label: 'Variant: {{name}} ({{id}})',
@@ -1330,6 +1346,8 @@ export const en = {
       moveDown: 'Move down',
       remove: 'Remove runtime',
       provider: 'Provider',
+      noProvider: 'No provider',
+      chooseProvider: 'Choose a provider',
       providerPlaceholder: 'anthropic, zai, openai',
       providerHint: 'Provider id: the key of the usage-limit hold. Use one id per account.',
       providerRequired: 'Required in the By provider mode',

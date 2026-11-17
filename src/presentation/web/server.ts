@@ -22,6 +22,7 @@ import { DEFAULT_ASSETS, type WebOptions, type WebServer } from './options.ts';
 import { serveAsset, servePage } from './pages.ts';
 import { requestBody, requestRepository } from './request.ts';
 import { configRoutes } from './routes/config.ts';
+import { providerRoutes } from './routes/providers/providers.ts';
 import { artifactRoute, attachmentRoute, patchRoute } from './routes/downloads.ts';
 import { groupsRoutes } from './routes/groups.ts';
 import { processesRoutes } from './routes/processes.ts';
@@ -74,6 +75,7 @@ function routeTable(kit: RouteKit): { raw: RawRoute[]; table: Route[] } {
       groupsRoutes,
       queueRoutes,
       configRoutes,
+      providerRoutes,
       settingsRoutes,
       mcpServerRoutes,
       observerHistoryRoutes,

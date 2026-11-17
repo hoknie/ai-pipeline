@@ -23,7 +23,11 @@ import {
   stepStates,
   topology,
 } from '../../../feature/runs/types/index.ts';
-import { pipelineNameOf, variantNameOf } from '../../../feature/swarm-config/types/index.ts';
+import {
+  pipelineNameOf,
+  providerName,
+  variantNameOf,
+} from '../../../feature/swarm-config/types/index.ts';
 import type { Tag } from '../../../feature/tags/types/index.ts';
 import type {
   ArtifactCounts,
@@ -208,6 +212,8 @@ function runHead(state: RunState, observers: RepairPolicy) {
     variant: state.run.variant,
     variantName: variantNameOf(state.run.config, state.run.pipeline, state.run.variant),
     provider: state.run.provider,
+    providerName:
+      state.run.provider === null ? null : providerName(state.run.config, state.run.provider),
     branch: state.run.branch,
     createdAt: state.run.createdAt,
     startedAt: runStartedAt(state),

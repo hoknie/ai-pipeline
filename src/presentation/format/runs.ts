@@ -2,6 +2,7 @@ import { formatAttachmentSize } from '../../feature/attachments/types/index.ts';
 import { type GroupWait, clockTime } from '../../feature/runs/types/index.ts';
 import { formatDiff, limitNote } from './groups.ts';
 import { runHints } from './hints.ts';
+import { limitOwnerText } from './providers/index.ts';
 import { formatLinks } from './links.ts';
 import { progressLine, stepsLine } from './run-steps.ts';
 import { formatUsage } from './numbers.ts';
@@ -194,9 +195,13 @@ function decisionLines(run: RunView, style: Style): string[] {
   ];
 }
 
-/** Who a usage limit holds: `zai (opencode)` for a provider, the runtime alone otherwise. */
-export function limitOwner(owner: { runtime: string; provider?: string }): string {
-  return owner.provider ? `${owner.provider} (${owner.runtime})` : owner.runtime;
+/** Who a usage limit holds: `zai (Z.ai, opencode)` for a provider, the runtime alone otherwise. */
+export function limitOwner(owner: {
+  runtime: string;
+  provider?: string;
+  providerName?: string | null;
+}): string {
+  return limitOwnerText(owner);
 }
 
 /** What a waiting group waits for, for the NOTE column. */

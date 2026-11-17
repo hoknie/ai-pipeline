@@ -7,6 +7,10 @@ import { group, run, step } from './helpers.ts';
 
 const TEXT = `swarm:
   max: 5
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
   chains:
     thinking:
       name: Thinking

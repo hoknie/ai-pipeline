@@ -50,8 +50,28 @@ describe('the provider of an attempt', () => {
         verdict="passed"
       />,
     );
-    const mark = screen.getByText('provider anthropic instead of zai');
-    expect(mark.getAttribute('title')).toContain('no enabled item');
+    const mark = screen.getByText('other provider');
+    expect(mark.getAttribute('title')).toContain('The task asked for zai');
+    expect(mark.getAttribute('title')).toContain('ran on anthropic');
+  });
+
+  it('shows the names of the providers and the slug in the hint', () => {
+    render(
+      <AttemptHeading
+        attempt={{
+          ...attempt,
+          provider: 'anthropic',
+          providerName: 'Anthropic',
+          requestedProvider: 'zai',
+          requestedProviderName: 'Z.ai',
+        }}
+        verdict="passed"
+      />,
+    );
+    expect(screen.getByText('Anthropic').getAttribute('title')).toBe('anthropic');
+    expect(screen.getByText('other provider').getAttribute('title')).toBe(
+      'The task asked for Z.ai, but the chain of the step has no such provider — the step ran on Anthropic',
+    );
   });
 
   it('shows nothing extra for an attempt without a provider', () => {

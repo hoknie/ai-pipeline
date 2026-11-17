@@ -195,6 +195,9 @@ describe('freezing for a priority run', () => {
   it('changes the provider of a returned run through its queue item', async () => {
     const h = await start(`swarm:
   max: 3
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
   chains:
     coding:
       name: Coding
@@ -223,7 +226,7 @@ describe('freezing for a priority run', () => {
     const item = (await queueOf(h)).items.find((entry) => entry.run === b)!;
     await expect(
       h.call('queue_edit', { repository: h.repo, item: item.id, provider: 'nope' }),
-    ).rejects.toThrow('unknown provider `nope`; known: anthropic, zai');
+    ).rejects.toThrow('unknown provider `nope`; known: anthropic (Anthropic), zai (Z.ai)');
     expect((await h.status(b)).provider).toBe('zai');
     await h.call('queue_edit', { repository: h.repo, item: item.id, provider: 'anthropic' });
     expect((await h.status(b)).provider).toBe('anthropic');

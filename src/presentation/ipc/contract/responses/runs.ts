@@ -162,6 +162,8 @@ export interface RunView {
   variantName: string;
   /** Id of the provider of the run; `null`: not chosen. */
   provider: string | null;
+  /** Name of the provider in the configuration of the run; `null`: not chosen or not known. */
+  providerName: string | null;
   branch: string;
   createdAt: number;
   /** When the first attempt of any group started; null while the run waits for a free slot. */

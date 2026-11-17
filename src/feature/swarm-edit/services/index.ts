@@ -9,7 +9,13 @@ export { editorView } from './editor-view.ts';
 export { planMcpServer } from './mcp/plan-mcp-server.ts';
 export { draftConfig, planEdit } from './plan-edit.ts';
 export { editSetting, planSetting, planSettings } from './plan-settings.ts';
-export { actionReferences, chainReferences, specialistReferences } from './references.ts';
+export {
+  actionReferences,
+  chainReferences,
+  providerReferences,
+  sharedProviderUsage,
+  specialistReferences,
+} from './references.ts';
 export { sharedPipelineUsage } from './shared-pipelines.ts';
 export { sharedSpecialistUsage } from './shared-specialists.ts';
 export {

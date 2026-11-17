@@ -16,6 +16,10 @@ import { group, run, runningAttempt } from './helpers.ts';
 
 const TIERS = `swarm:
   max: 5
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
   chains:
     thinking:
       name: Thinking
@@ -106,12 +110,22 @@ describe('providerProblem', () => {
 
   it('names the known providers of an unknown one', () => {
     expect(providerProblem(config, 'nope')).toBe(
-      'unknown provider `nope`; known: anthropic, openai, zai',
+      'unknown provider `nope`; known: anthropic (Anthropic), openai (OpenAI), zai (Z.ai)',
     );
   });
 
-  it('says none when no tier has a provider', () => {
-    expect(providerProblem({ chains: [] }, 'zai')).toBe('unknown provider `zai`; known: none');
+  it('says none when the registry is empty', () => {
+    expect(providerProblem({ providers: [] }, 'zai')).toBe('unknown provider `zai`; known: none');
+  });
+
+  it('refuses a disabled provider', () => {
+    const disabled = {
+      providers: config.providers.map((provider) =>
+        provider.slug === 'zai' ? { ...provider, enabled: false } : provider,
+      ),
+    };
+    expect(providerProblem(disabled, 'zai')).toBe('provider `zai` is disabled');
+    expect(providerProblem(disabled, 'openai')).toBeNull();
   });
 });
 
@@ -229,6 +243,7 @@ describe('a run with a provider in the scheduler', () => {
       reason: 'limit',
       runtime: 'opencode',
       provider: 'zai',
+      providerName: 'Z.ai',
       until: 60_000,
     });
     dispatch([state], 60_000);

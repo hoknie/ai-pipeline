@@ -3,8 +3,10 @@ import { homedir } from 'node:os';
 import {
   ConfigLoadError,
   pipelineNameOf,
+  providerName,
   variantNameOf,
   type ConfigPaths,
+  type LoadedConfig,
   type AttachmentSettings,
   type DeliveryMode,
   type NetworkSettings,
@@ -18,6 +20,7 @@ import { configPaths } from './discover.ts';
 import {
   loadAttachmentSettings,
   loadConfig,
+  loadConfigSources,
   loadNetworkSettings,
   loadRuntimeSettings,
   loadQueueSettings,
@@ -31,6 +34,8 @@ export interface DeliverySettings {
   names: (id: string) => string;
   /** Name of a variant of a pipeline; the id without such a variant. */
   variantNames: (pipeline: string, variant: string) => string;
+  /** The human name of a provider; null without a name. */
+  providerNames: (slug: string) => string | null;
 }
 
 /** The configuration files of the repositories, read from disk on every call. */
@@ -55,6 +60,11 @@ export class ConfigService {
     return loadConfig(this.pathsOf(repository));
   }
 
+  /** The merged configuration with the files it was read from; throws `ConfigLoadError`. */
+  loadSources(repository: string): LoadedConfig {
+    return loadConfigSources(this.pathsOf(repository));
+  }
+
   /** `delivery.auto`, `delivery.mode` and pipeline names of the repository now. */
   delivery(repository: string): DeliverySettings {
     try {
@@ -64,6 +74,7 @@ export class ConfigService {
         mode: config.delivery.mode,
         names: (id) => pipelineNameOf(config, id),
         variantNames: (pipeline, variant) => variantNameOf(config, pipeline, variant),
+        providerNames: (slug) => providerName(config, slug),
       };
     } catch (error) {
       if (error instanceof ConfigLoadError)
@@ -72,6 +83,7 @@ export class ConfigService {
           mode: null,
           names: (id) => id,
           variantNames: (_pipeline, variant) => variant,
+          providerNames: () => null,
         };
       throw error;
     }

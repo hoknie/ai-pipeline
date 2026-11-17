@@ -238,13 +238,13 @@ aip queue edit <item> --provider anthropic
 aip queue edit <item> --no-provider                          # not chosen again
 ```
 
-`--provider <id>` (also on `aip run start`, MCP `provider`) names a provider of the [tiers](../configuration/runtimes.md#tiers-by_provider). The steps whose specialist uses a tier then run on the item of that provider. Without it the task has no provider and the tiers take their items in file order. `aip queue list` shows `provider: zai`, `aip run list` shows `feature@zai`.
+`--provider <id>` (also on `aip run start`, MCP `provider`) names a [provider](../configuration/providers.md). The steps whose specialist uses a tier then run on the item of that provider. Without it the task has no provider and the tiers take their items in file order. `aip queue list` shows `provider: zai (Z.ai)`, `aip run list` shows `feature@zai`.
 
-- An unknown provider is refused with the list of the known ones, or `known: none` when no tier names any. A task for several projects needs the provider in every project; the answer names the first project that lacks it, and no queue changes.
+- An unknown provider is refused with the list of the known ones (`anthropic (Anthropic), zai (Z.ai)`), or `known: none`; a disabled one is refused with ``provider `zai` is disabled``. A task for several projects needs the provider, enabled, in every project; the answer names the first project that lacks it, and no queue changes.
 - The provider acts only on steps that use a tier. Steps with an explicit runtime and model, other chain modes, the name generator and the observers ignore it.
 - A tier without an enabled item of the provider uses its default item, and the attempt is marked `provider <default> instead of <chosen>`.
 - A run never moves to another provider: when the provider's limit is hit the group waits for the reset, or fails with `--on-limit stop`; other failures follow the usual rules. A network failure retries on the same item.
-- A provider removed from the tiers before the task starts gives the task an error; the queue stops and the run is not created.
+- A provider removed or switched off before the task starts gives the task an error; the queue stops and the run is not created.
 - `aip queue edit <item> --provider …` on an item whose run returned to the queue switches the provider of the run itself, as [Changing the provider](runs.md#changing-the-provider) of a running run does.
 - Resetting or changing the provider of a task that has not started changes nothing in a run. A group that waits for an answer keeps its session while the same step goes on with the answer; a step that starts again (a retry, a retry with the configuration refreshed) picks its item anew, and the session with the earlier conversation is not continued.
 

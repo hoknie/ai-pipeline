@@ -39,6 +39,7 @@ export function RunFilters({
     [t('runs.list.variant'), 'variants', options.variants],
     [t('runs.list.specialists'), 'specialists', options.specialists],
     [t('runs.list.tags'), 'tagIds', options.tags],
+    [t('runs.list.provider'), 'providers', options.providers],
   ];
   if (scope === 'all') {
     fields.push([t('runs.list.repositories'), 'repositories', options.repositories]);

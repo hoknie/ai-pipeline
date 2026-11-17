@@ -69,6 +69,7 @@ export class Snapshots {
       (item) => this.services.attachments.listOf(item),
       this.services.queue.store.findItem,
       (ids) => this.services.queue.links.index.viewsOf(...ids),
+      delivery.providerNames,
     );
   }
 
@@ -89,6 +90,7 @@ export class Snapshots {
       project: (repository) => ({
         names: delivery(repository).names,
         variantNames: delivery(repository).variantNames,
+        providerNames: delivery(repository).providerNames,
         catalog: tags.of(repository),
       }),
     });

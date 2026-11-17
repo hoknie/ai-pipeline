@@ -36,6 +36,7 @@ export function emptyLevel(): Level {
   return assembleLevel({
     specialists: [],
     chains: [],
+    providers: [],
     pipelines: [],
     actions: [],
     problems: [],

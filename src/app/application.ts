@@ -74,7 +74,7 @@ interface Context {
 /** The features below the runs: configuration, agents, the registry, tags and their editor. */
 function createLower(context: Context) {
   const { environment, database, now, ports } = context;
-  const { agents } = createAgents(environment);
+  const { agents, providers } = createAgents(environment);
   const { config } = createSwarmConfigServices({ environment });
   const { monitor: network } = createNetworkServices({
     config,
@@ -95,7 +95,7 @@ function createLower(context: Context) {
     agents,
     changed: ports.config.port,
   });
-  return { agents, config, network, registry, projects, tags, edits, shared };
+  return { agents, providers, config, network, registry, projects, tags, edits, shared };
 }
 
 type Lower = ReturnType<typeof createLower>;

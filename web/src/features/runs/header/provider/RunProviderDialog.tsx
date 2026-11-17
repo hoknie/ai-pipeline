@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../../shared/api/api.ts';
-import type { RunView } from '../../../../shared/api/types.ts';
+import type { ProviderView, RunView } from '../../../../shared/api/types.ts';
+import { ProviderPicker } from '../../../providers/index.ts';
 import { notifySuccess } from '../../../../shared/lib/browser/notify.ts';
 import { Alert } from '../../../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../../../shared/ui/forms/button.tsx';
@@ -24,7 +25,7 @@ export function RunProviderDialog({
 }: {
   run: RunView;
   api: Api;
-  providers: string[];
+  providers: ProviderView[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -44,10 +45,6 @@ export function RunProviderDialog({
       setBusy(false);
     }
   };
-  const options: { id: string | null; label: string }[] = [
-    { id: null, label: t('runs.header.providerNone') },
-    ...providers.map((id) => ({ id, label: id })),
-  ];
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
@@ -55,26 +52,17 @@ export function RunProviderDialog({
           <DialogTitle>{t('runs.header.changeProviderTitle')}</DialogTitle>
           <DialogDescription>{t('runs.header.changeProviderDescription')}</DialogDescription>
         </DialogHeader>
-        <div role="radiogroup" className="flex flex-col gap-2">
-          {options.map((option) => (
-            <label key={option.id ?? 'none'} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="run-provider"
-                value={option.id ?? ''}
-                checked={chosen === option.id}
-                disabled={busy}
-                onChange={() => setChosen(option.id)}
-              />
-              {option.label}
-              {option.id === current ? (
-                <span className="text-xs text-muted-foreground">
-                  {t('runs.header.providerCurrent')}
-                </span>
-              ) : null}
-            </label>
-          ))}
-        </div>
+        <ProviderPicker
+          label={t('runs.header.changeProviderTitle')}
+          value={chosen}
+          onChange={setChosen}
+          providers={providers}
+          emptyLabel={t('runs.header.providerNone')}
+          current={current}
+          repository={run.repository}
+          api={api}
+          disabled={busy}
+        />
         {error ? <Alert variant="destructive">{error}</Alert> : null}
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={onClose}>

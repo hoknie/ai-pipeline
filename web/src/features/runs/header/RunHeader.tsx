@@ -43,7 +43,7 @@ function RunInfo({
       <div className="flex flex-wrap items-center gap-2">
         <PipelineBadge id={run.pipeline} name={run.pipelineName} />
         <VariantBadge id={run.variant} name={run.variantName} />
-        <ProviderBadge provider={run.provider} />
+        <ProviderBadge provider={run.provider} name={run.providerName} />
       </div>
       {run.name ? <div className="font-mono text-xs text-muted-foreground">{run.name}</div> : null}
       <div className="flex flex-col gap-1">

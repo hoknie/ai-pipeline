@@ -33,6 +33,8 @@ export interface QueueItemView {
   variantName: string;
   /** Id of the provider the task runs on; `null`: not chosen. */
   provider: string | null;
+  /** Name of the provider in the current configuration; `null`: not chosen or not known. */
+  providerName: string | null;
   task: string | null;
   groups: NewGroup[] | null;
   title: string | null;
@@ -90,6 +92,8 @@ export interface QueueRunView {
   variantName: string;
   /** Id of the provider of the run; `null`: not chosen. */
   provider: string | null;
+  /** Name of the provider in the configuration of the run; `null`: not chosen or not known. */
+  providerName: string | null;
   tags: TagView[];
   createdAt: number;
   /** Work groups in a final status out of all work groups; `total` is 0 while the task is split. */
@@ -136,7 +140,8 @@ export interface QueueView {
   filter: { pipelines: string[]; tags: string[] };
   /** The tags of the filter that are still in the catalog. */
   filterTags: TagView[];
-  stop: QueueStop | null;
+  /** Why the queue stopped; a usage limit also names the provider. */
+  stop: (QueueStop & { providerName?: string }) | null;
   /** The run a priority action would freeze now; null when a place is free or there is none. */
   freezeCandidate: string | null;
   items: QueueItemView[];

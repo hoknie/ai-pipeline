@@ -966,12 +966,17 @@ describe('cli task links', () => {
   });
 });
 
+const BLOCK = `  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+`;
+
 describe('cli provider', () => {
   const TIER_CONFIG = `${MANUAL_CONFIG.trimEnd()}
 `
     .replace(
       '  specialists:\n',
-      `  chains:
+      `${BLOCK}  chains:
     coding:
       name: Coding
       mode: by_provider
@@ -996,7 +1001,7 @@ describe('cli provider', () => {
       'zai',
     );
     expect(added.code).toBe(0);
-    expect((await aip(box, 'queue', 'list')).stdout).toContain('provider: zai');
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('provider: zai (Z.ai)');
     const json = JSON.parse((await aip(box, 'queue', 'list', '--json')).stdout) as {
       items: { id: string; provider: string | null }[];
     };
@@ -1004,7 +1009,7 @@ describe('cli provider', () => {
     const item = json.items[0]!.id;
     const edited = await aip(box, 'queue', 'edit', item, '--provider', 'anthropic');
     expect(edited.code).toBe(0);
-    expect((await aip(box, 'queue', 'list')).stdout).toContain('provider: anthropic');
+    expect((await aip(box, 'queue', 'list')).stdout).toContain('provider: anthropic (Anthropic)');
     const reset = await aip(box, 'queue', 'edit', item, '--no-provider');
     expect(reset.code).toBe(0);
     expect((await aip(box, 'queue', 'list')).stdout).not.toContain('provider:');
@@ -1033,7 +1038,9 @@ describe('cli provider', () => {
     const box = sandbox(TIER_CONFIG);
     const result = await aip(box, 'run', 'start', 'feature', '--task', 'x', '--provider', 'nope');
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain('unknown provider `nope`; known: anthropic, zai');
+    expect(result.stderr).toContain(
+      'unknown provider `nope`; known: anthropic (Anthropic), zai (Z.ai)',
+    );
   });
 
   it('switches the provider of a run, resets it with --none and refuses an unknown one', async () => {
@@ -1064,7 +1071,9 @@ describe('cli provider', () => {
     expect(JSON.parse(reset.stdout)).toMatchObject({ id: runId, provider: null });
     const unknown = await aip(box, 'run', 'provider', runId, 'nope');
     expect(unknown.code).toBe(1);
-    expect(unknown.stderr).toContain('unknown provider `nope`; known: anthropic, zai');
+    expect(unknown.stderr).toContain(
+      'unknown provider `nope`; known: anthropic (Anthropic), zai (Z.ai)',
+    );
     const neither = await aip(box, 'run', 'provider', runId);
     expect(neither.code).not.toBe(0);
     expect(neither.stderr).toContain('name a <provider> or pass --none');

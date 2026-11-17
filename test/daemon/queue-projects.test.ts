@@ -556,6 +556,13 @@ describe('the limit of the machine and the pools in the project mode', () => {
 describe('the provider of a task in several projects', () => {
   const TIERS = (providers: string[]) => `swarm:
   max: 3
+  providers:
+${providers
+  .map(
+    (id) =>
+      `    ${id}: { name: ${id.toUpperCase()}, access: [{ kind: cli, runtime: opencode, model_prefix: ${id} }] }`,
+  )
+  .join('\n')}
   chains:
     coding:
       name: Coding
@@ -583,12 +590,27 @@ ${providers
     }
   });
 
+  it('refuses the whole task when the provider is disabled in one project', async () => {
+    const h = await start(TIERS(['zai']));
+    const lib = await project(h, 'lib', TIERS(['zai']));
+    const web = await project(
+      h,
+      'web',
+      TIERS(['zai']).replace('zai: { name: ZAI,', 'zai: { name: ZAI, enabled: false,'),
+    );
+    await expect(addProjects(h, { repositories: ['lib', 'web'], provider: 'zai' })).rejects.toThrow(
+      'provider `zai` is disabled in project `web`',
+    );
+    expect((await queueIn(h, lib)).items).toEqual([]);
+    expect((await queueIn(h, web)).items).toEqual([]);
+  });
+
   it('refuses the whole task naming the first project that lacks the provider', async () => {
     const h = await start(TIERS(['zai']));
     const lib = await project(h, 'lib', TIERS(['zai']));
     const web = await project(h, 'web', TIERS(['openai']));
     await expect(addProjects(h, { repositories: ['lib', 'web'], provider: 'zai' })).rejects.toThrow(
-      'unknown provider `zai`; known: openai in project `web`',
+      'unknown provider `zai`; known: openai (OPENAI) in project `web`',
     );
     expect((await queueIn(h, lib)).items).toEqual([]);
     expect((await queueIn(h, web)).items).toEqual([]);

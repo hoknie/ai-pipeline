@@ -6,7 +6,7 @@ Addresses can be shared: `#runs/<run-id>` opens a run, `#runs/<run-id>/<group>` 
 
 ## The run list
 
-- Filters: a search (title, name, task number `#N`, pipeline, specialists, groups, tags), and the filters "State", "Pipeline", "Variant", "Specialists", "Tags" and, in the "All projects" mode, "Repository". The list shows the runs of the repository chosen in the header; "All projects" in the repository picker shows the runs of every repository, and each card names its project.
+- Filters: a search (title, name, task number `#N`, pipeline, specialists, groups, tags), and the filters "State", "Pipeline", "Variant", "Specialists", "Tags", "Provider" and, in the "All projects" mode, "Repository". The list shows the runs of the repository chosen in the header; "All projects" in the repository picker shows the runs of every repository, and each card names its project.
 - A run card shows the first line of the task, the status, the name of its pipeline (the id is in the tooltip) and, unless it is `default`, a badge with its variant, time, tokens and a summary of changes (`2 files +367 −0`).
 - The state "Repair" is shown by a badge in the list, in the header and in the statuses, and can be chosen in the "State" filter. A run in "Repair" counts as working in the navigation, and its question, failure, conflict and refused delivery raise no notifications while the observer works on it.
 - A finished run with group warnings has a yellow "Warnings: N" badge.

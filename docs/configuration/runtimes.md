@@ -207,14 +207,14 @@ runtimes:
   - `random`: picks a random enabled runtime from the pool for each step.
   - `round_robin`: cycles through the enabled runtimes in order across steps.
   - `by_provider`: a tier, see [Tiers](#tiers-by_provider).
-- **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, `agy`, `codex`, `kilo`, `cline` or `copilot`), optional `model`, optional `enabled` (default `true`), optional `provider` (a provider id: lowercase letters, digits and `-`, up to 32 characters, starting with a letter), and optional `variant` and `reasoning_effort` for OpenCode.
+- **`runtimes`**: a non-empty list of items. Each item defines `runtime` (`claude`, `opencode`, `agy`, `codex`, `kilo`, `cline` or `copilot`), optional `model`, optional `enabled` (default `true`), optional `provider` (the slug of a [provider](providers.md); it must exist, a disabled one is allowed), and optional `variant` and `reasoning_effort` for OpenCode.
 - **`enabled`**: optional boolean (default `true`). When a chain or all its runtimes are disabled, specialists bound to it use `defaults.runtime` with no explicit model.
 
 A specialist binds to a chain via `runtime_chain: <slug>` in its definition (see [Specialists](specialists.md#fields)). The `runtime_chain` field cannot be used together with explicit `runtime`, `model`, `variant`, or `reasoning_effort`.
 
 ### Tiers (`by_provider`)
 
-A tier is a chain with `mode: by_provider` that gives each provider its own runtime and model, for a role such as thinking, coding or ultralight. Every item names its `provider`, and the providers of one tier are unique, disabled items included. At most one item may be `default: true`; `default` is allowed in tiers only.
+A tier is a chain with `mode: by_provider` that gives each provider its own runtime and model, for a role such as thinking, coding or ultralight. Every item names its `provider`, which must be defined in [`providers/`](providers.md), and the providers of one tier are unique, disabled items included. At most one item may be `default: true`; `default` is allowed in tiers only.
 
 ```yaml
 name: Thinking
@@ -239,6 +239,6 @@ A task can ask for a provider (`--provider zai`, see [Provider](../usage/queue.m
 
 A [usage limit](../usage/queue.md#usage-limit) holds the provider of the attempt when its chain item has a `provider` (also in chains of other modes), and the runtime otherwise. A held provider does not stop other providers on the same runtime, while a limit of a runtime without a provider holds every item of that runtime.
 
-The wait of a group and the stop of the queue then name the provider, for example `zai (opencode)`. Use one provider id for one account: two ids for the same account do not share a limit.
+The wait of a group and the stop of the queue then name the provider, for example `zai (Z.ai, opencode)`. Use one provider id for one account: two ids for the same account do not share a limit.
 
 Connecting the hosts themselves is a separate matter: see [hosts/claude-code.md](../hosts/claude-code.md) and [hosts/opencode.md](../hosts/opencode.md).

@@ -50,9 +50,22 @@ export class AgentsService {
   /** The adapter of a runtime with the executable and extras of the settings. */
   runtimeFor(name: RuntimeName, settings: RuntimeSettings = defaultRuntimes()): Runtime {
     const { environment, factories } = this.dependencies;
-    const { command, args, env } = settings[name];
+    const { args, env } = settings[name];
     const factory = factories[name];
-    return factory(environment[envName(name)] || command, { args, env });
+    return factory(this.commandFor(name, settings), { args, env });
+  }
+
+  /**
+   * The executable of a runtime: a non-empty `AIP_<NAME>_BIN`, then the `command` of the access
+   * route (when the start goes through one), then `runtimes.<name>.command`. The start of an agent
+   * and the availability of a provider choose it through this one function.
+   */
+  commandFor(
+    name: RuntimeName,
+    settings: RuntimeSettings = defaultRuntimes(),
+    accessCommand?: string,
+  ): string {
+    return this.dependencies.environment[envName(name)] || accessCommand || settings[name].command;
   }
 
   /**

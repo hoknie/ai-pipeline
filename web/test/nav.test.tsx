@@ -79,7 +79,7 @@ describe('top navigation', () => {
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Runs', 'Queue', 'Specialists', 'Pipeline', 'Statistics', 'Settings']);
+    ).toEqual(['Runs', 'Queue', 'Specialists', 'Pipeline', 'Providers', 'Statistics', 'Settings']);
     expect(within(bar!).getByText('web')).toBeTruthy();
     expect(within(bar!).getByRole('button', { name: 'Add repository…' })).toBeTruthy();
     for (const name of [/Command palette/, /^Notifications$/, /^Language/, /^Theme/])
@@ -344,6 +344,31 @@ describe('scrolling of the shell', () => {
     expect(area.classList.contains('relative')).toBe(true);
     expect(area.classList.contains('overflow-y-auto')).toBe(true);
     expect(area.classList.contains('overscroll-contain')).toBe(true);
+  });
+});
+
+describe('providers section', () => {
+  it('opens the tab «Roles» after a reload and is marked in the navigation', async () => {
+    window.location.hash = '#providers/roles';
+    const api = fakeApi();
+    render(<App api={api} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    const nav = screen.getByRole('navigation', { name: 'sections' });
+    expect(within(nav).getByRole('link', { name: 'Providers' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    const tab = await screen.findByRole('tab', { name: 'Roles' });
+    expect(tab.getAttribute('aria-selected')).toBe('true');
+    expect(window.location.hash).toBe('#providers/roles');
+    window.location.hash = '';
+  });
+
+  it('opens the form of a provider from its address', async () => {
+    window.location.hash = '#providers/zai';
+    render(<App api={fakeApi()} openStream={openFake} />);
+    act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
+    expect(await screen.findByRole('heading', { name: 'Provider zai' })).toBeTruthy();
+    window.location.hash = '';
   });
 });
 

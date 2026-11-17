@@ -16,14 +16,14 @@ export function useRunProviderSwitch(
   api: Api,
 ): { open: (() => void) | undefined; dialog: ReactNode } {
   const [opened, setOpened] = useState(false);
-  const providers = useRunProviders(run, api);
+  const { providers, scoped } = useRunProviders(run, api);
   const switchable = canSwitchRun(run) && providers.length > 0;
   return {
     open: switchable ? () => setOpened(true) : undefined,
     dialog: opened ? (
       <RunProviderDialog
         run={run}
-        api={api}
+        api={scoped}
         providers={providers}
         onClose={() => setOpened(false)}
       />

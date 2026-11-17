@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
-import { Input } from '../../../shared/ui/forms/input.tsx';
+import type { Api } from '../../../shared/api/api.ts';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { Switch } from '../../../shared/ui/forms/switch.tsx';
+import { ProviderPicker, useProviderRegistry } from '../../providers/index.ts';
 import type { ChainRuntimeDraft } from './types.ts';
 
 export interface ItemErrors {
@@ -11,6 +12,7 @@ export interface ItemErrors {
 }
 
 export function ItemProvider({
+  api,
   index,
   item,
   disabled,
@@ -18,6 +20,7 @@ export function ItemProvider({
   errors,
   onChange,
 }: {
+  api: Api;
   index: number;
   item: ChainRuntimeDraft;
   disabled: boolean;
@@ -26,17 +29,22 @@ export function ItemProvider({
   onChange: (patch: Partial<ChainRuntimeDraft>) => void;
 }) {
   const { t } = useTranslation();
+  const { view } = useProviderRegistry(api, null);
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={`chain-item-${index}-provider`}>{t('chains.item.provider')}</Label>
-      <Input
+      <ProviderPicker
         id={`chain-item-${index}-provider`}
-        value={item.provider}
-        disabled={disabled}
-        required={tier}
-        aria-invalid={errors.provider ? true : undefined}
-        placeholder={t('chains.item.providerPlaceholder')}
-        onChange={(e) => onChange({ provider: e.target.value })}
+        label={t('chains.item.provider')}
+        value={item.provider === '' ? null : item.provider}
+        onChange={(provider) => onChange({ provider: provider ?? '' })}
+        providers={view?.providers ?? []}
+        {...(tier ? {} : { emptyLabel: t('chains.item.noProvider') })}
+        placeholder={t('chains.item.chooseProvider')}
+        repository={null}
+        api={api}
+        invalid={errors.provider !== undefined}
+        disabled={disabled || view === null}
       />
       {errors.provider ? (
         <p role="alert" className="text-xs text-destructive">

@@ -10,6 +10,7 @@ import {
   type LevelFiles,
   type LevelPaths,
   PIPELINES_DIR,
+  PROVIDERS_DIR,
   SETTINGS_NAME,
   SPECIALISTS_DIR,
 } from '../types/levels.ts';
@@ -65,6 +66,7 @@ export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {
   const settings = pick([paths.directory], '', SETTINGS_NAME);
   const specialists = pick([join(paths.directory, SPECIALISTS_DIR)], 'specialists');
   const chains = pick([join(paths.directory, CHAINS_DIR)], 'chains');
+  const providers = pick([join(paths.directory, PROVIDERS_DIR)], 'providers');
   const legacyDirectory = join(paths.directory, LEGACY_PIPELINES_DIR);
   const pipelines = pick(
     [join(paths.directory, PIPELINES_DIR), legacyDirectory],
@@ -83,6 +85,7 @@ export function readLevel(paths: LevelPaths, options: { tolerant?: boolean } = {
     ...(first ? { settings: first } : {}),
     specialists,
     chains,
+    providers,
     pipelines,
     actions,
     problems,

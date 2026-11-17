@@ -289,6 +289,14 @@ describe('chains in editor', () => {
   it('writes and reads a by_provider chain with provider and default', () => {
     const paths = temporaryPaths();
     write(join(paths.project.directory, 'settings.yaml'), 'max: 3\n');
+    write(
+      join(paths.project.directory, 'providers', 'anthropic.yaml'),
+      'name: Anthropic\naccess: [{ kind: cli, runtime: claude }]\n',
+    );
+    write(
+      join(paths.project.directory, 'providers', 'zai.yaml'),
+      'name: Z.ai\naccess: [{ kind: cli, runtime: opencode, model_prefix: zai }]\n',
+    );
     const initial =
       '# tier\nname: Thinking\nmode: by_provider\nruntimes:\n  - provider: anthropic\n    runtime: claude\n';
     write(join(paths.project.directory, 'chains', 'thinking.yaml'), initial);

@@ -2,7 +2,7 @@ import type { ParseKeys } from 'i18next';
 
 import { SECTIONS } from './sections.ts';
 
-export type ShortcutGroup = 'general' | 'navigation' | 'runs' | 'queue';
+export type ShortcutGroup = 'general' | 'navigation' | 'runs' | 'queue' | 'providers';
 
 export interface Shortcut {
   combo: string;
@@ -11,7 +11,13 @@ export interface Shortcut {
   group: ShortcutGroup;
 }
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = ['general', 'navigation', 'runs', 'queue'];
+export const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  'general',
+  'navigation',
+  'runs',
+  'queue',
+  'providers',
+];
 
 /** Every shortcut of the panel: the reference dialog reads this list. */
 export const SHORTCUTS: Shortcut[] = [
@@ -29,4 +35,9 @@ export const SHORTCUTS: Shortcut[] = [
   { combo: 'k', label: 'shortcuts.previousRun', group: 'runs' },
   { combo: 'Alt+ArrowUp', label: 'shortcuts.moveItem', group: 'queue' },
   { combo: 'Alt+ArrowDown', label: 'shortcuts.moveItem', group: 'queue' },
+  { combo: 'j', label: 'shortcuts.nextProvider', group: 'providers' },
+  { combo: 'k', label: 'shortcuts.previousProvider', group: 'providers' },
+  { combo: 'Enter', label: 'shortcuts.openProvider', group: 'providers' },
+  { combo: 'Alt+ArrowUp', label: 'shortcuts.moveRole', group: 'providers' },
+  { combo: 'Alt+ArrowDown', label: 'shortcuts.moveRole', group: 'providers' },
 ];

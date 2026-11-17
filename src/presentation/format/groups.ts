@@ -1,14 +1,23 @@
 import { clockTime } from '../../feature/runs/types/index.ts';
 import { type Style, plainStyle, statusBadge } from './style.ts';
 import { formatUsage } from './numbers.ts';
+import { providerText } from './providers/index.ts';
 import { humanMark, oneLine, seconds } from './table.ts';
 import type {
   ApplyResult,
+  AttemptView,
   DenialView,
   DiffTotals,
   FileStat,
   GroupView,
 } from '../ipc/contract/index.ts';
+
+/** The provider an attempt ran on, `<slug> (<name>)`; the runtime when the item has none. */
+function chosenProvider(attempt: AttemptView): string {
+  return attempt.provider === undefined
+    ? attempt.runtime
+    : providerText(attempt.provider, attempt.providerName);
+}
 
 export function formatDiff(diff: DiffTotals | null | undefined, style: Style = plainStyle): string {
   // A daemon older than the client sends no statistics.
@@ -77,7 +86,7 @@ export function formatGroup(group: GroupView, style: Style = plainStyle): string
     if (attempt.requestedProvider !== undefined) {
       lines.push(
         style.muted(
-          `     provider ${attempt.provider ?? attempt.runtime} instead of ${attempt.requestedProvider}`,
+          `     provider ${chosenProvider(attempt)} instead of ${providerText(attempt.requestedProvider, attempt.requestedProviderName)}`,
         ),
       );
     }

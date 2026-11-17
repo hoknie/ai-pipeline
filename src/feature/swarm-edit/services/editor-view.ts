@@ -6,6 +6,7 @@ import {
   isMapping,
   type Level,
   mergeConfigs,
+  type ResolvedConfig,
   type Specialist,
   tagsOf,
 } from '../../swarm-config/types/index.ts';
@@ -17,6 +18,7 @@ import {
   type EditorAction,
   type EditorChain,
   type EditorPipeline,
+  type EditorProvider,
   type EditorSpecialist,
   type EditorSpecialistValues,
   type EntryLevel,
@@ -155,11 +157,21 @@ function editorChains(files: Files): EditorChain[] {
   }));
 }
 
+function editorProviders(files: Files, config: ResolvedConfig | null): EditorProvider[] {
+  return entriesOf(files.global.providers, files.project.providers).map((entry) => ({
+    slug: entry.id,
+    level: entry.level,
+    ...entryFields(entry),
+    effective: config?.providers.find((provider) => provider.slug === entry.id) ?? null,
+  }));
+}
+
 /** Everything the specialists tab shows, also when the configuration does not pass validation. */
 export function editorView(paths: ConfigPaths): ConfigEditorView {
   const files = readLevels(paths);
   const global = assembleLevel(files.global);
   const project = assembleLevel(files.project);
+  const resolved = resolution(global, project);
   const settingsView = (level: WriteLevel): SettingsFileView => ({
     file: settingsFile(paths, level),
     revision: revisionOf(files[level].settings?.text),
@@ -169,10 +181,11 @@ export function editorView(paths: ConfigPaths): ConfigEditorView {
     settingsFiles: { global: settingsView('global'), project: settingsView('project') },
     specialists: editorSpecialists(files, global, project),
     chains: editorChains(files),
+    providers: editorProviders(files, resolved.config),
     pipelines: editorPipelines(files),
     actions: editorActions(files),
     settings: editorSettings(paths, files, global, project),
     mcpServers: editorMcpServers(paths, global, project),
-    errors: resolution(global, project).errors,
+    errors: resolved.errors,
   };
 }

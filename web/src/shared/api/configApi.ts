@@ -15,9 +15,10 @@ import type {
   WriteLevel,
 } from './types.ts';
 import { mcpServerApi, type McpServerApi } from './catalog/mcpApi.ts';
+import { providerApi, type ProviderApi } from './catalog/providersApi.ts';
 import { call, edit, enc, json, levelQuery, post, withRepository } from './http.ts';
 
-export interface ConfigApi extends McpServerApi {
+export interface ConfigApi extends McpServerApi, ProviderApi {
   /** Pipelines of the bound repository, or of the one given. */
   pipelines(repository?: string): Promise<PipelinesView>;
   /** The configuration of the bound repository, for the editors. */
@@ -162,6 +163,7 @@ export function configApi(repository: string | null): ConfigApi {
       edit(at(`/api/config/chains/${enc(id)}?revision=${enc(revision)}${levelQuery(level)}`), {
         method: 'DELETE',
       }),
+    ...providerApi(at),
     systemStages: () => call(at('/api/system-stages')),
   };
 }

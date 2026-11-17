@@ -17,6 +17,7 @@ import {
   type RuntimeChain,
 } from '../types/chain.ts';
 import { isValidSlug, SLUG_PATTERN_TEXT } from '../types/lookups.ts';
+import { type ProviderRegistry, unknownProviderMessage } from '../types/providers/provider.ts';
 import { type RuntimeSettings } from '../types/settings.ts';
 import {
   REASONING_EFFORTS,
@@ -42,13 +43,17 @@ export const CHAIN_RUNTIME_KEYS = [
   'default',
 ];
 
-export function checkChains(ctx: ValidateContext, value: unknown): RuntimeChain[] {
+export function checkChains(
+  ctx: ValidateContext,
+  value: unknown,
+  registry: ProviderRegistry,
+): RuntimeChain[] {
   const mapping = readMapping(ctx, value, 'swarm.chains');
   if (!mapping) return [];
   return readEntries(ctx, mapping, 'swarm.chains', null).flatMap(([slug, field]) => {
     const path = join('swarm.chains', slug);
     if (!isValidSlug(slug)) addError(ctx, path, `slug must match ${SLUG_PATTERN_TEXT}`);
-    const chain = checkChain(ctx, slug, field, path);
+    const chain = checkChain(ctx, slug, field, path, registry);
     return chain ? [chain] : [];
   });
 }
@@ -58,6 +63,7 @@ export function checkChain(
   slug: string,
   value: unknown,
   path: string,
+  registry: ProviderRegistry,
 ): RuntimeChain | null {
   const mapping = readMapping(ctx, value, path);
   if (!mapping) return null;
@@ -75,7 +81,8 @@ export function checkChain(
     else if (key === 'mode')
       chain.mode = readChoice<ChainMode>(ctx, field, fieldPath, CHAIN_MODES) ?? chain.mode;
     else if (key === 'enabled') chain.enabled = readBoolean(ctx, field, fieldPath) ?? true;
-    else if (key === 'runtimes') chain.runtimes = checkChainRuntimes(ctx, field, fieldPath);
+    else if (key === 'runtimes')
+      chain.runtimes = checkChainRuntimes(ctx, field, fieldPath, registry);
   }
   if (Array.isArray(mapping.runtimes))
     checkTier(ctx, chain, mapping.runtimes, join(path, 'runtimes'));
@@ -89,6 +96,7 @@ function checkChainRuntimes(
   ctx: ValidateContext,
   value: unknown,
   path: string,
+  registry: ProviderRegistry,
 ): ChainRuntimeItem[] {
   if (!Array.isArray(value)) {
     addError(ctx, path, 'must be a list');
@@ -115,8 +123,10 @@ function checkChainRuntimes(
       else if (key === 'provider') {
         const provider = readString(ctx, field, fieldPath);
         if (provider === null) continue;
-        if (isValidSlug(provider)) runtimeItem.provider = provider;
-        else addError(ctx, fieldPath, `provider must match ${SLUG_PATTERN_TEXT}`);
+        runtimeItem.provider = provider;
+        if (!registry.providers.some((item) => item.slug === provider)) {
+          addError(ctx, fieldPath, unknownProviderMessage(registry, provider));
+        }
       } else if (key === 'default') {
         const flag = readBoolean(ctx, field, fieldPath);
         if (flag !== null) runtimeItem.default = flag;

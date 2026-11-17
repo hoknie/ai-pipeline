@@ -224,6 +224,8 @@ swarm:
   it('allows mcp in a chain without a claude runtime', () => {
     const config = parseConfig(`
 swarm:
+  providers:
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
   chains:
     no-claude:
       name: With Claude
@@ -252,9 +254,19 @@ swarm:
   });
 });
 
+/** The `providers:` lines of a configuration text: one provider per slug, name in capitals. */
+const registry = (...slugs: string[]): string =>
+  `  providers:\n${slugs
+    .map(
+      (slug) =>
+        `    ${slug}: { name: ${slug.toUpperCase()}, access: [{ kind: cli, runtime: claude }] }\n`,
+    )
+    .join('')}`;
+
 describe('by_provider chains (tiers)', () => {
-  const tier = (items: string, mode = 'by_provider'): string =>
-    `\nswarm:\n  chains:\n    thinking:\n      name: Thinking\n      mode: ${mode}\n      runtimes:\n${items}`;
+  const known = ['anthropic', 'zai', 'openai', 'a', 'b', 'c', 'ok'];
+  const tier = (items: string, mode = 'by_provider', slugs = known): string =>
+    `\nswarm:\n${registry(...slugs)}  chains:\n    thinking:\n      name: Thinking\n      mode: ${mode}\n      runtimes:\n${items}`;
 
   it('accepts a tier and keeps provider and default of the items', () => {
     const config = parseConfig(
@@ -297,7 +309,7 @@ describe('by_provider chains (tiers)', () => {
     expect(errors.some((e) => e.path.endsWith('runtimes[0].default'))).toBe(false);
   });
 
-  it('checks the provider id pattern and rejects default outside a tier', () => {
+  it('refuses a provider id the registry does not know and a default outside a tier', () => {
     const errors = errorsOf(
       tier(
         `        - { provider: Z.ai, runtime: opencode, default: true }
@@ -306,7 +318,7 @@ describe('by_provider chains (tiers)', () => {
         'on_error',
       ),
     );
-    expectError(errors, 'swarm.chains.thinking.runtimes[0].provider', 'provider must match');
+    expectError(errors, 'swarm.chains.thinking.runtimes[0].provider', 'unknown provider `Z.ai`');
     expectError(
       errors,
       'swarm.chains.thinking.runtimes[0].default',
@@ -321,10 +333,56 @@ describe('by_provider chains (tiers)', () => {
     expect(config.chains[0]?.runtimes[0]?.provider).toBe('zai');
   });
 
-  it('lists known providers of tiers only, sorted, and picks the default item', () => {
+  it('names the registry in the error of a provider without an entity', () => {
+    const errors = errorsOf(
+      `
+swarm:
+  providers:
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+  chains:
+    thinking:
+      name: T
+      mode: by_provider
+      runtimes:
+        - { provider: openai, runtime: opencode }
+`,
+    );
+    expect(errors).toContainEqual({
+      path: 'swarm.chains.thinking.runtimes[0].provider',
+      message: 'unknown provider `openai`; known: anthropic (Anthropic), zai (Z.ai)',
+    });
+  });
+
+  it('says none when no provider is defined', () => {
+    const errors = errorsOf(
+      tier('        - { provider: zai, runtime: opencode }\n', 'by_provider', []),
+    );
+    expect(errors).toContainEqual({
+      path: 'swarm.chains.thinking.runtimes[0].provider',
+      message: 'unknown provider `zai`; known: none',
+    });
+  });
+
+  it('accepts the provider of an item although the provider is disabled', () => {
     const config = parseConfig(`
 swarm:
+  providers:
+    zai: { name: Z.ai, enabled: false, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
   chains:
+    thinking:
+      name: T
+      mode: by_provider
+      runtimes:
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+`);
+    expect(config.chains[0]?.runtimes[0]?.provider).toBe('zai');
+  });
+
+  it('lists the registry sorted by slug, whatever the chains say, and picks the default item', () => {
+    const config = parseConfig(`
+swarm:
+${registry('zai', 'anthropic', 'openai', 'google', 'gemini', 'local', 'unused')}  chains:
     thinking:
       name: T
       mode: by_provider
@@ -345,7 +403,15 @@ swarm:
       runtimes:
         - { provider: local, runtime: opencode }
 `);
-    expect(knownProviders(config)).toEqual(['anthropic', 'gemini', 'google', 'openai', 'zai']);
+    expect(knownProviders(config).map((provider) => provider.slug)).toEqual([
+      'anthropic',
+      'gemini',
+      'google',
+      'local',
+      'openai',
+      'unused',
+      'zai',
+    ]);
     const by = (slug: string) => config.chains.find((c) => c.slug === slug)!;
     expect(tierDefaultIndex(by('thinking'))).toBe(0);
     expect(tierDefaultIndex(by('lite'))).toBe(1);

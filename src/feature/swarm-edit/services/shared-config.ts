@@ -16,6 +16,7 @@ import {
   type TagPlan,
 } from '../types/index.ts';
 
+import { sharedProviderUsage } from './references.ts';
 import { sharedPipelineUsage } from './shared-pipelines.ts';
 import { sharedSpecialistUsage } from './shared-specialists.ts';
 import {
@@ -75,6 +76,11 @@ export class SharedConfigService {
     return (usage.pipelines[0]?.projects ?? []).flatMap((project) =>
       project.references.map((reference) => ({ ...reference, repository: project.repository })),
     );
+  }
+
+  /** References to a shared provider from the registry and the requesting repository. */
+  providerUsageOf(repository: string, slug: string): EntryReference[] {
+    return sharedProviderUsage(this.shared(), this.projects(this.with(repository)), slug);
   }
 
   /** The shared level, then one folder per repository of the registry. */

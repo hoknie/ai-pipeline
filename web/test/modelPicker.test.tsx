@@ -113,3 +113,29 @@ describe('ModelPicker', () => {
     ).toBe(true);
   });
 });
+
+describe('ModelPicker for a catalog without a list', () => {
+  it('says to type the ID when there are no models and the hint is given', async () => {
+    render(<Harness models={[]} manualHint="Type the ID" />);
+    await open();
+    expect(screen.getByRole('note').textContent).toBe('Type the ID');
+  });
+
+  it('says nothing about it while models are listed or the list failed', async () => {
+    render(<Harness manualHint="Type the ID" />);
+    await open();
+    expect(screen.queryByRole('note')).toBeNull();
+  });
+
+  it('takes a typed ID and calls onOpen when the list opens; the empty choice has its own label', async () => {
+    const onOpen = vi.fn();
+    render(<Harness models={[]} manualHint="Type the ID" onOpen={onOpen} emptyOption="No model" />);
+    const search = await open();
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.change(search, { target: { value: 'glm-5.3' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'Use «glm-5.3»' }));
+    expect(held()).toBe('glm-5.3');
+    await open();
+    expect(screen.getByRole('option', { name: 'No model' })).toBeTruthy();
+  });
+});

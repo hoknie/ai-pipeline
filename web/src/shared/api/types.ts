@@ -8,6 +8,10 @@ export type {
   ConfigEditResult,
   ConfigEditorResponse,
   ConfigPreview,
+  ProviderModelsView,
+  ProviderView,
+  ProvidersView,
+  RoleView,
   EditorChain,
   SharedSpecialistView,
   SharedSpecialistsView,
@@ -204,6 +208,7 @@ export interface QueuePatch {
 export type {
   EditorMcpServer,
   EditorMcpServerValues,
+  EditorProvider,
   McpServerValue,
   EditorSetting,
   EditorSpecialist,
@@ -219,6 +224,14 @@ export type {
   WriteLevel,
 } from '../../../../src/feature/swarm-edit/types/index.ts';
 export type { FieldError } from '../../../../src/feature/swarm-config/types/index.ts';
+export type {
+  AccessModels,
+  AccessState,
+  MatrixCell,
+  ModelEntry as ProviderModelEntry,
+  ProviderStatus,
+} from '../../../../src/feature/agents/types/index.ts';
+export type { RoleModel, RoleModels } from '../../../../src/feature/swarm-config/types/index.ts';
 
 /** The network the daemon holds; the proxy has no login and password. */
 export interface NetworkStatus {

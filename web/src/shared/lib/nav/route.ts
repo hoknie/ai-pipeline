@@ -1,6 +1,7 @@
 import { agentTabOf, observerTabOf, settingsLocationOf } from './settingsGroups.ts';
 
-export type View = 'runs' | 'queue' | 'specialists' | 'pipelines' | 'stats' | 'settings';
+export type View =
+  'runs' | 'queue' | 'specialists' | 'pipelines' | 'providers' | 'stats' | 'settings';
 
 export interface Route {
   view: View;
@@ -66,7 +67,9 @@ const decode = (part: string | undefined) => (part ? decodeURIComponent(part) : 
 /** `#runs/<run>/<group>/<step>`, the older `#topology/<pipeline>` opens the topology section; the older `#<run>/<group>` still works. */
 export function parseRoute(hash: string): Route {
   const route = parseBase(hash);
-  if (route.view !== 'specialists' && route.view !== 'pipelines') return route;
+  if (route.view !== 'specialists' && route.view !== 'pipelines' && route.view !== 'providers') {
+    return route;
+  }
   const project = new URLSearchParams(hash.split('?', 2)[1] ?? '').get('project') || null;
   return project === null ? route : { ...route, project };
 }
@@ -81,6 +84,19 @@ function parseBase(hash: string): Route {
     // `#queue/new` is the page of a new task; any other part is the queue itself
     const run = decode(rest[0]) === 'new' ? 'new' : null;
     return { view: 'queue', run, group: null, step: null, tab: null };
+  }
+  if (head === 'providers') {
+    // `#providers/roles` is the tab «Roles»; `new` (with `?preset=`) or a slug is the form
+    const first = decode(rest[0]);
+    if (first === 'roles')
+      return { view: 'providers', run: null, group: 'roles', step: null, tab: null };
+    return {
+      view: 'providers',
+      run: first,
+      group: null,
+      step: null,
+      tab: first === 'new' ? params.get('preset') || null : null,
+    };
   }
   if (head === 'stats')
     return {
@@ -136,13 +152,21 @@ function parseBase(hash: string): Route {
 
 export function formatRoute(route: Route): string {
   const base = formatBase(route);
-  if (!route.project || (route.view !== 'specialists' && route.view !== 'pipelines')) return base;
+  const withProject =
+    route.view === 'specialists' || route.view === 'pipelines' || route.view === 'providers';
+  if (!route.project || !withProject) return base;
   return `${base}${base.includes('?') ? '&' : '?'}project=${encodeURIComponent(route.project)}`;
 }
 
 function formatBase(route: Route): string {
   const enc = encodeURIComponent;
   if (route.view === 'queue') return route.run === 'new' ? '#queue/new' : '#queue';
+  if (route.view === 'providers') {
+    if (route.group === 'roles') return '#providers/roles';
+    if (!route.run) return '#providers';
+    const preset = route.run === 'new' && route.tab ? `?preset=${enc(route.tab)}` : '';
+    return `#providers/${enc(route.run)}${preset}`;
+  }
   if (route.view === 'stats') {
     const project = route.run ? `&project=${enc(route.run)}` : '';
     return `#stats?period=${statsPeriodOf(route.group)}${project}`;

@@ -19,6 +19,10 @@ import { group, run, runningAttempt } from './helpers.ts';
 
 const TIERS = `swarm:
   max: 5
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
   chains:
     thinking:
       name: Thinking
@@ -219,6 +223,7 @@ describe('the limit of one provider in the dispatch plan', () => {
       reason: 'limit',
       runtime: 'opencode',
       provider: 'zai',
+      providerName: 'Z.ai',
       until: 60_000,
     });
     expect(planDispatch([state], 60_000).start).toHaveLength(1);

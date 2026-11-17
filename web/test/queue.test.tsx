@@ -26,6 +26,7 @@ import { formatRoute, parseRoute } from '../src/shared/lib/nav/route.ts';
 import { useRuns } from '../src/shared/api/runs/useRuns.ts';
 
 import { setWindowWidth } from './media.ts';
+import { providersView, providerView } from './providerFixtures.ts';
 import {
   FakeEventSource,
   dependency,
@@ -3063,13 +3064,26 @@ describe('two halves of the task form', () => {
   });
 
   describe('provider of the task', () => {
-    const withProviders = pipelinesView({ providers: ['anthropic', 'zai'] });
+    const registry = (...slugs: string[]) =>
+      vi.fn(async () =>
+        providersView({
+          providers: slugs.map((slug) =>
+            providerView(slug, {
+              name: slug === 'zai' ? 'Z.ai' : slug === 'anthropic' ? 'Anthropic' : slug,
+            }),
+          ),
+        }),
+      );
+    const withProviders = { providers: registry('anthropic', 'zai') };
 
-    it('chooses a provider and sends it', async () => {
-      const api = show(queueOf(), { pipelines: vi.fn(async () => withProviders) });
+    it('finds a provider by a part of its name, chooses it and sends it', async () => {
+      const api = show(queueOf(), withProviders);
       await openNewTask();
       fireEvent.click(await screen.findByRole('combobox', { name: 'Provider' }));
-      fireEvent.click(await screen.findByRole('option', { name: 'zai' }));
+      fireEvent.change(await screen.findByPlaceholderText('Name or slug'), {
+        target: { value: 'z.a' },
+      });
+      fireEvent.click(await screen.findByRole('option', { name: /Z\.ai/ }));
       fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() =>
@@ -3082,9 +3096,13 @@ describe('two halves of the task form', () => {
     });
 
     it('sends no provider when none is chosen', async () => {
-      const api = show(queueOf(), { pipelines: vi.fn(async () => withProviders) });
+      const api = show(queueOf(), withProviders);
       await openNewTask();
-      await screen.findByRole('combobox', { name: 'Provider' });
+      await waitFor(() =>
+        expect(screen.getByRole<HTMLButtonElement>('combobox', { name: 'Provider' }).disabled).toBe(
+          false,
+        ),
+      );
       fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() =>
@@ -3092,28 +3110,34 @@ describe('two halves of the task form', () => {
       );
     });
 
-    it('has no field when the tiers name no provider', async () => {
-      show(queueOf(), { pipelines: vi.fn(async () => pipelinesView({ providers: [] })) });
+    it('has no field when the project has no providers', async () => {
+      show(queueOf(), { providers: registry() });
       await openNewTask();
       await screen.findByLabelText('Task text');
-      expect(screen.queryByRole('combobox', { name: 'Provider' })).toBeNull();
+      await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Provider' })).toBeNull());
+    });
+
+    it('shows the field with «Not chosen» and a provider when the project has no tiers', async () => {
+      show(queueOf(), {
+        providers: registry('zai'),
+        pipelines: vi.fn(async () => pipelinesView({ providers: [] })),
+      });
+      await openNewTask();
+      const field = await screen.findByRole('combobox', { name: 'Provider' });
+      await waitFor(() => expect((field as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(field);
+      expect(await screen.findByRole('option', { name: /Not chosen/ })).toBeTruthy();
+      expect(screen.getByRole('option', { name: /zai/ })).toBeTruthy();
     });
 
     it('sends a reset to not chosen when editing', async () => {
       const zai = queueOf({ items: [queueItem('q1', 'A', 1, { provider: 'zai' })] });
-      const api = show(zai, {
-        pipelines: vi.fn(async () => withProviders),
-        queueEdit: vi.fn(async () => zai),
-      });
+      const api = show(zai, { ...withProviders, queueEdit: vi.fn(async () => zai) });
       const item = (await screen.findAllByRole('listitem'))[0]!;
       expect(within(item).getByText('@zai')).not.toBeNull();
       fireEvent.click(within(item).getByRole('button', { name: 'Edit' }));
       fireEvent.click(await screen.findByLabelText('Provider'));
-      // a query by role walks the accessibility tree of the whole page: ask the list itself
-      const option = (await screen.findAllByText('Not chosen')).find(
-        (node) => node.closest('[role=option]') !== null,
-      );
-      fireEvent.click(option!);
+      fireEvent.click(await screen.findByRole('option', { name: /Not chosen/ }));
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       await waitFor(() =>
         expect(api.queueEdit).toHaveBeenCalledWith(
@@ -3121,6 +3145,26 @@ describe('two halves of the task form', () => {
           expect.objectContaining({ provider: null }),
         ),
       );
+    });
+
+    it('shows the refusal of the daemon about the provider at the field', async () => {
+      const api = show(queueOf(), {
+        ...withProviders,
+        queueAdd: vi.fn(async () => {
+          throw new Error('unknown provider `old`; known: zai');
+        }),
+      });
+      await openNewTask();
+      await waitFor(() =>
+        expect(screen.getByRole<HTMLButtonElement>('combobox', { name: 'Provider' }).disabled).toBe(
+          false,
+        ),
+      );
+      fireEvent.change(screen.getByLabelText('Task text'), { target: { value: 'T' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await waitFor(() => expect(api.queueAdd).toHaveBeenCalled());
+      const alert = await screen.findByText(/unknown provider `old`/);
+      expect(alert.closest('p')).not.toBeNull();
     });
   });
 

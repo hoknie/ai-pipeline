@@ -67,7 +67,7 @@ export function RowMeta({
   const locale = useLocale();
   return (
     <>
-      <ProviderBadge provider={item.provider} />
+      <ProviderBadge provider={item.provider} name={item.providerName} />
       {item.autoDeliver === null ? null : (
         <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
           {item.autoDeliver ? t('queue.list.autoDelivery') : t('queue.list.manualDelivery')}

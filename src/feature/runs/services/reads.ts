@@ -2,7 +2,13 @@ import { rejected } from '../../../platform/errors/index.ts';
 import { readLines, readTail, readTimes, timesPath } from '../../agents/services/index.ts';
 import type { AgentsService } from '../../agents/services/index.ts';
 import type { AgentTranscript, TranscriptEntry } from '../../agents/types/index.ts';
-import { findGroup, parseRunReference, type Group, type RunState } from '../types/index.ts';
+import {
+  findGroup,
+  limitHolds,
+  parseRunReference,
+  type Group,
+  type RunState,
+} from '../types/index.ts';
 
 import type { RunEffects } from './effects/effects.ts';
 import type { RunStates } from './states.ts';
@@ -88,6 +94,15 @@ export class RunReads {
       tasks: state.groups.map(({ slug, title, task }) => ({ slug, title, task })),
       group: slug === null ? null : this.group(id, slug, params.tailLines),
     };
+  }
+
+  /** The moment each provider's usage-limit hold lifts (keys `provider:<slug>`), by slug. */
+  providerHolds(now: number): Map<string, number> {
+    const holds = new Map<string, number>();
+    for (const [key, until] of limitHolds(this.dependencies.states.all(), now)) {
+      if (key.startsWith('provider:')) holds.set(key.slice('provider:'.length), until);
+    }
+    return holds;
   }
 
   /** The readable entries of an attempt log, from line `after` on. */

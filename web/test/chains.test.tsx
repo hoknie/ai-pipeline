@@ -15,6 +15,7 @@ import { ChainsList } from '../src/features/specialists/chains/ChainsList.tsx';
 import SpecialistsPage from '../src/features/specialists/SpecialistsPage.tsx';
 import { SharedChainsGroup } from '../src/features/settings/SharedChainsGroup.tsx';
 import { configView, fakeApi } from './fixtures.ts';
+import { providersView, providerView } from './providerFixtures.ts';
 
 afterEach(() => {
   cleanup();
@@ -437,6 +438,24 @@ const tierFixture: EditorChain = {
   sources: { project: { file: '/repo/aip/chains/thinking.yaml', revision: 't1', raw: tierRaw } },
 };
 
+const providerButtons = () =>
+  screen.getAllByRole<HTMLButtonElement>('combobox', { name: 'Provider' });
+
+/** The API of a project with the providers `anthropic` «Anthropic» and `zai` «Z.ai». */
+function registryApi(overrides: Parameters<typeof fakeApi>[0] = {}) {
+  return fakeApi({
+    providers: vi.fn(async () =>
+      providersView({
+        providers: [
+          providerView('anthropic', { name: 'Anthropic' }),
+          providerView('zai', { name: 'Z.ai' }),
+        ],
+      }),
+    ),
+    ...overrides,
+  });
+}
+
 function renderTier(api = fakeApi()) {
   render(
     <ChainForm
@@ -487,11 +506,15 @@ describe('a chain in the By provider mode', () => {
       revision: 't2',
       file: '/f',
     }));
-    renderTier(fakeApi({ writeChain }));
-    expect(screen.getAllByLabelText<HTMLInputElement>('Provider').map((i) => i.value)).toEqual([
+    renderTier(registryApi({ writeChain }));
+    await waitFor(() => expect(providerButtons().every((button) => !button.disabled)).toBe(true));
+    expect(providerButtons().map((button) => button.dataset.providerValue)).toEqual([
       'anthropic',
       'zai',
     ]);
+    expect(providerButtons().map((button) => button.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Z.ai')]),
+    );
     const switches = screen.getAllByRole('switch', { name: 'Default' });
     expect(switches.map((el) => el.getAttribute('aria-checked'))).toEqual(['false', 'true']);
     fireEvent.click(switches[0]!);
@@ -543,11 +566,67 @@ describe('a chain in the By provider mode', () => {
         },
       ],
     }));
-    renderTier(fakeApi({ writeChain }));
-    fireEvent.change(screen.getAllByLabelText('Provider')[0]!, { target: { value: 'zai' } });
+    renderTier(registryApi({ writeChain }));
+    await waitFor(() => expect(providerButtons()[0]!.disabled).toBe(false));
+    fireEvent.click(providerButtons()[0]!);
+    fireEvent.click(await screen.findByRole('option', { name: /Z\.ai/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const message = await screen.findByText('duplicate provider `zai`');
     expect(message.closest('div')?.querySelector('#chain-item-1-provider')).not.toBeNull();
     expect(screen.getAllByText('duplicate provider `zai`')).toHaveLength(1);
+  });
+
+  it('shows a provider that is not in the registry with a note', async () => {
+    const api = fakeApi({
+      providers: vi.fn(async () =>
+        providersView({ providers: [providerView('zai', { name: 'Z.ai' })] }),
+      ),
+    });
+    renderTier(api);
+    await waitFor(() => expect(providerButtons()[0]!.disabled).toBe(false));
+    const old = providerButtons()[0]!;
+    expect(old.dataset.providerValue).toBe('anthropic');
+    expect(old.textContent).toContain('unknown provider');
+  });
+
+  it('offers «No provider» outside the By provider mode', async () => {
+    renderTier(registryApi());
+    await waitFor(() => expect(providerButtons()[0]!.disabled).toBe(false));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Execution mode' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'On error' }));
+    fireEvent.click(providerButtons()[0]!);
+    expect(await screen.findByRole('option', { name: /No provider/ })).toBeTruthy();
+  });
+
+  it('creates a provider from the combobox of an item and chooses it', async () => {
+    const created: Record<string, unknown>[] = [];
+    const providers = vi.fn(async () =>
+      providersView({
+        providers: [
+          providerView('anthropic', { name: 'Anthropic' }),
+          ...created.map((value) => providerView('corp', { name: String(value.name) })),
+        ],
+      }),
+    );
+    const writeProvider = vi.fn(async (_slug: string, value: Record<string, unknown>) => {
+      created.push(value);
+      return { ok: true as const, revision: 'n', file: '/f' };
+    });
+    renderTier(fakeApi({ providers, writeProvider, config: vi.fn(async () => configView()) }));
+    await waitFor(() => expect(providerButtons()[1]!.disabled).toBe(false));
+    fireEvent.click(providerButtons()[1]!);
+    fireEvent.change(await screen.findByPlaceholderText('Name or slug'), {
+      target: { value: 'Corp' },
+    });
+    fireEvent.click(await screen.findByRole('option', { name: /Create provider/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'New provider' });
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Corp');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(writeProvider).toHaveBeenCalledWith('corp', expect.anything(), null, 'global'),
+    );
+    await waitFor(() => expect(providerButtons()[1]!.dataset.providerValue).toBe('corp'));
   });
 });

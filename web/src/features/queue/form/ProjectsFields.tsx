@@ -82,6 +82,7 @@ export function projectsFormProps(input: {
       />
     ),
     several: multi.on,
+    providerRepositories: multi.on ? multi.projects : undefined,
     extras: multi.on ? <SharedTagField idPrefix="new" multi={multi} /> : undefined,
     projectsPanel: multi.on ? (
       <ProjectsPanel

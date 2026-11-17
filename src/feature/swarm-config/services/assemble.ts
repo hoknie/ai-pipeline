@@ -1,6 +1,7 @@
 import { stem } from '../types/levels.ts';
 import { join } from 'node:path';
 import { listYaml, readYaml } from '../repositories/config-files.ts';
+import { projectCommandProblems } from './sections/providers.ts';
 import { validateConfig } from './validate.ts';
 import { ConfigLoadError, type FieldError } from '../types/errors.ts';
 import {
@@ -30,7 +31,13 @@ export function assembleLevel(files: LevelFiles): Level {
       problems.push({ file: settingsFile, path: 'swarm', message: 'must be a mapping' });
     } else {
       for (const [key, field] of Object.entries(value)) {
-        if (key === 'specialists' || key === 'chains' || key === 'pipelines' || key === 'actions') {
+        if (
+          key === 'specialists' ||
+          key === 'chains' ||
+          key === 'providers' ||
+          key === 'pipelines' ||
+          key === 'actions'
+        ) {
           problems.push({
             file: settingsFile,
             path: `swarm.${key}`,
@@ -66,12 +73,14 @@ export function assembleLevel(files: LevelFiles): Level {
   };
   entries('specialists', files.specialists);
   entries('chains', files.chains);
+  entries('providers', files.providers);
   entries('pipelines', files.pipelines);
   entries('actions', files.actions);
   const present =
     files.settings !== undefined ||
     files.specialists.length +
       (files.chains?.length ?? 0) +
+      files.providers.length +
       files.pipelines.length +
       files.actions.length >
       0;
@@ -82,6 +91,7 @@ export function assembleLevel(files: LevelFiles): Level {
       ...(settingsFile === undefined ? [] : [settingsFile]),
       ...files.specialists.map((source) => source.path),
       ...files.chains.map((source) => source.path),
+      ...files.providers.map((source) => source.path),
       ...files.pipelines.map((source) => source.path),
       ...files.actions.map((source) => source.path),
     ],
@@ -151,6 +161,12 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
       message: `${section} is set only in the global aip/ directory`,
     });
   }
+  const projectProviders = isMapping(projectSwarm) ? projectSwarm.providers : undefined;
+  for (const problem of projectCommandProblems(projectProviders)) {
+    const slug = problem.path.split('.')[2] ?? '';
+    const file = project.origins.get(`swarm.providers.${slug}`);
+    problems.push({ ...(file === undefined ? {} : { file }), ...problem });
+  }
   const result = validateConfig(mergeConfigs(global.tree, project.tree) ?? null);
   const errors = [
     ...problems,
@@ -164,6 +180,7 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
   if (errors.length > 0 || !result.ok) throw new ConfigLoadError({ kind: 'invalid', errors });
   const projectSpecialists = isMapping(projectSwarm) ? projectSwarm.specialists : undefined;
   const projectChains = isMapping(projectSwarm) ? projectSwarm.chains : undefined;
+  const projectRoles = isMapping(projectSwarm) ? projectSwarm.roles : undefined;
   const projectActions = isMapping(projectSwarm) ? projectSwarm.actions : undefined;
   const config: ResolvedConfig = {
     ...result.config,
@@ -176,6 +193,14 @@ export function resolveLevels(global: Level, project: Level): LoadedConfig {
       isMapping(projectChains) && chain.slug in projectChains
         ? chain
         : { ...chain, level: 'global' },
+    ),
+    providers: result.config.providers.map((provider) =>
+      isMapping(projectProviders) && provider.slug in projectProviders
+        ? provider
+        : { ...provider, level: 'global' },
+    ),
+    roles: result.config.roles.map((role) =>
+      isMapping(projectRoles) && role.slug in projectRoles ? role : { ...role, level: 'global' },
     ),
     actions: result.config.actions.map((action) =>
       isMapping(projectActions) && action.id in projectActions

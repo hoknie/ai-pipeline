@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { RunsPage, linkTargets } from '../../features/runs/index.ts';
 import { itemLabel, otherQueues } from '../../features/queue/index.ts';
 import { notifyError } from '../../shared/lib/browser/notify.ts';
-import { ListRoute, QueueRoute, SettingsRoute, StatsRoute } from './pages.tsx';
+import { ListRoute, ProvidersRoute, QueueRoute, SettingsRoute, StatsRoute } from './pages.tsx';
 import type { PanelData } from '../state/usePanelData.ts';
 import type { useRepositoryActions } from '../state/useRepositoryActions.ts';
 import type { LinkKind } from '../../features/runs/index.ts';
@@ -82,6 +82,37 @@ function runLinkProps(panel: PanelData, t: TFunction) {
   };
 }
 
+/** The settings page with what it takes from the panel. */
+function SettingsCase({
+  panel,
+  actions,
+  common,
+}: {
+  panel: PanelData;
+  actions: RepositoryActions;
+  common: ReturnType<typeof commonProps>;
+}) {
+  const { state } = panel;
+  return (
+    <SettingsRoute
+      common={common}
+      streamedObservers={state.streamedObservers}
+      streamedNetwork={state.streamedNetwork}
+      repository={state.selected}
+      repositories={state.repositories}
+      onSelectRepository={(path) => void actions.switchProject(path)}
+      registry={state.registry}
+      onRegistry={state.setRegistry}
+      onProjectMoved={actions.projectMoved}
+      onRemoveProject={actions.removeRepository}
+      onOpenProject={(path, target) => void actions.openProject(path, target)}
+      queue={state.queue}
+      onQueue={state.setQueue}
+      onError={notifyError}
+    />
+  );
+}
+
 /** The page of the open section. */
 export function PageSwitch({ panel, actions }: { panel: PanelData; actions: RepositoryActions }) {
   const { t } = useTranslation();
@@ -108,22 +139,13 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
         />
       );
     case 'settings':
+      return <SettingsCase panel={panel} actions={actions} common={common} />;
+    case 'providers':
       return (
-        <SettingsRoute
+        <ProvidersRoute
           common={common}
-          streamedObservers={state.streamedObservers}
-          streamedNetwork={state.streamedNetwork}
           repository={state.selected}
-          repositories={state.repositories}
-          onSelectRepository={(path) => void actions.switchProject(path)}
-          registry={state.registry}
-          onRegistry={state.setRegistry}
-          onProjectMoved={actions.projectMoved}
-          onRemoveProject={actions.removeRepository}
-          onOpenProject={(path, target) => void actions.openProject(path, target)}
-          queue={state.queue}
-          onQueue={state.setQueue}
-          onError={notifyError}
+          projects={listProjects(panel)}
         />
       );
     case 'stats':

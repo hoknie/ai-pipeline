@@ -89,7 +89,8 @@ function settingTypeError(
   switch (setting.kind) {
     case 'json':
       return isMapping(value) ? null : fail('must be an object');
-    case 'pools': {
+    case 'pools':
+    case 'roles': {
       if (!isMapping(value)) return fail('must be an object');
       for (const [name, pool] of Object.entries(value)) {
         if (!isMapping(pool)) return fail('must be an object', `.${name}`);

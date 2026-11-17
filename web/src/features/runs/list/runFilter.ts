@@ -30,7 +30,12 @@ export interface RunFilterState {
   tagIds: string[];
   /** Repository paths; applies only to the runs of every repository. */
   repositories: string[];
+  /** Provider slugs; `NO_PROVIDER` stands for the runs without one. */
+  providers: string[];
 }
+
+/** The value of the filter «Provider» for the runs without a provider. */
+export const NO_PROVIDER = '__none';
 
 export const EMPTY_FILTERS: RunFilterState = {
   states: [],
@@ -39,6 +44,7 @@ export const EMPTY_FILTERS: RunFilterState = {
   specialists: [],
   tagIds: [],
   repositories: [],
+  providers: [],
 };
 
 /** A filter of the state; `key` names its list. */
@@ -51,6 +57,7 @@ const FILTER_KEYS: RunFilterKey[] = [
   'specialists',
   'tagIds',
   'repositories',
+  'providers',
 ];
 
 /** Specialists of the steps the run does not skip, plus the one of the split. */
@@ -133,6 +140,8 @@ function passes(
       );
     case 'tagIds':
       return inTags(run, state.tagIds, catalog);
+    case 'providers':
+      return state.providers.length === 0 || state.providers.includes(run.provider ?? NO_PROVIDER);
     case 'repositories':
       return (
         scope !== 'all' ||
@@ -210,6 +219,9 @@ export function optionCounts(
         break;
       case 'repositories':
         add(run.repository);
+        break;
+      case 'providers':
+        add(run.provider ?? NO_PROVIDER);
         break;
       case 'tagIds': {
         // a run counts for each tag of the catalog it carries, also by the name (other repository)

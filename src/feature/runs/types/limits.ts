@@ -107,7 +107,7 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
 
 /** Why a queued group is not started yet. */
 export type GroupWait =
-  | { reason: 'limit'; runtime: string; provider?: string; until: number }
+  | { reason: 'limit'; runtime: string; provider?: string; providerName?: string; until: number }
   | { reason: 'specialist'; specialist: string; name: string; max: number }
   | { reason: 'pool'; pool: string; max: number }
   /** `machine`: `queue.max` is taken; `repository`: `swarm.max` of the project mode. */

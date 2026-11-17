@@ -14,7 +14,9 @@ import {
   SelectValue,
 } from '../../../shared/ui/forms/select.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
+import type { Api } from '../../../shared/api/api.ts';
 import type { PipelinesView } from '../../../shared/api/types.ts';
+import { ProviderPicker, useCommonProviders } from '../../providers/index.ts';
 import { TITLE_LIMIT, stepsOf, type QueueDraft } from '../draft.ts';
 import { pruneSkip } from '../../../shared/ui/forms/picker/SkipSteps.tsx';
 
@@ -169,45 +171,44 @@ function VariantSelect({
   );
 }
 
-const NO_PROVIDER = '__none';
-
-/** The provider of the tiers the task runs on; nothing to choose when the tiers name none. */
+/** The provider of the tiers the task runs on: a choice among the providers of the registry. */
 function ProviderSelect({
   state,
-  pipelines,
+  api,
+  repositories,
+  error,
 }: {
   state: FormState;
-  pipelines: PipelinesView | null;
+  api: Api;
+  repositories: readonly string[];
+  error?: string | undefined;
 }) {
   const { t } = useTranslation();
   const { idPrefix, effective, change } = state;
-  const providers = pipelines?.providers ?? [];
-  if (providers.length === 0) return null;
+  const { providers, loaded } = useCommonProviders(api, repositories);
+  if (loaded && providers.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-1.5" title={t('queue.form.providerHint')}>
       <Label htmlFor={`${idPrefix}-provider`}>{t('queue.form.provider')}</Label>
-      <Select
-        value={effective.provider ?? NO_PROVIDER}
-        onValueChange={(provider) =>
-          change({ provider: provider === NO_PROVIDER ? null : provider })
-        }
-      >
-        <SelectTrigger
+      <div className="max-w-xs">
+        <ProviderPicker
           id={`${idPrefix}-provider`}
-          className="w-48"
-          title={t('queue.form.providerHint')}
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NO_PROVIDER}>{t('queue.form.noProvider')}</SelectItem>
-          {providers.map((provider) => (
-            <SelectItem key={provider} value={provider}>
-              {provider}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          label={t('queue.form.provider')}
+          value={effective.provider}
+          onChange={(provider) => change({ provider })}
+          providers={providers}
+          emptyLabel={t('queue.form.noProvider')}
+          repository={repositories[0] ?? null}
+          api={api}
+          invalid={error !== undefined}
+          disabled={!loaded}
+        />
+      </div>
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -222,6 +223,11 @@ export function TaskFields(props: {
   extras?: ReactNode;
   /** The text of the task grows with the column. */
   fill?: boolean;
+  /** The API of the target project and the projects whose providers the task may name. */
+  api: Api | undefined;
+  repositories: readonly string[];
+  /** The error of the daemon about the provider. */
+  providerError?: string | undefined;
 }) {
   const { t } = useTranslation();
   const { state } = props;
@@ -250,7 +256,14 @@ export function TaskFields(props: {
       {/* a returned run keeps its task but may follow another variant */}
       <VariantSelect state={state} pipelines={props.pipelines} />
       {/* a returned run keeps its provider: the field is for a task that waits */}
-      {state.locked ? null : <ProviderSelect state={state} pipelines={props.pipelines} />}
+      {state.locked || !props.api ? null : (
+        <ProviderSelect
+          state={state}
+          api={props.api}
+          repositories={props.repositories}
+          error={props.providerError}
+        />
+      )}
       {effective.mode === 'task' ? (
         <>
           <p className="text-xs text-muted-foreground">{t('queue.form.alternativeHint')}</p>

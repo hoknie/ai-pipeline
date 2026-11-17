@@ -153,6 +153,10 @@ describe('a usage limit in the queue', () => {
 
 const TIER_CONFIG = (items: string) => `swarm:
   max: 3
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
   chains:
     thinking:
       name: Thinking

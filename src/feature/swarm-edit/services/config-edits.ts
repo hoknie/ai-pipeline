@@ -101,14 +101,16 @@ export class ConfigEditService {
     const plan = planned(() => planEdit(config.pathsOf(repository), edit));
     if (!plan.ok) return plan;
     if (
-      (edit.kind === 'specialist' || edit.kind === 'pipeline') &&
+      (edit.kind === 'specialist' || edit.kind === 'pipeline' || edit.kind === 'provider') &&
       edit.value === null &&
       edit.level === 'global'
     ) {
       const references =
         edit.kind === 'specialist'
           ? shared.specialistUsageOf(repository, edit.id)
-          : shared.pipelineUsageOf(repository, edit.id);
+          : edit.kind === 'pipeline'
+            ? shared.pipelineUsageOf(repository, edit.id)
+            : shared.providerUsageOf(repository, edit.id);
       if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };
     }
     const result = { ok: true as const, ...commitEdit(plan) };
@@ -173,12 +175,21 @@ export class ConfigEditService {
       return {
         repository,
         pipelines: pipelineTopologies(config),
-        providers: knownProviders(config),
+        providers: knownProviders(config).map((provider) => provider.slug),
+        providerNames: Object.fromEntries(
+          knownProviders(config).map((provider) => [provider.slug, provider.name]),
+        ),
         errors: [],
       };
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
-      return { repository, pipelines: [], providers: [], errors: configLoadErrors(error) };
+      return {
+        repository,
+        pipelines: [],
+        providers: [],
+        providerNames: {},
+        errors: configLoadErrors(error),
+      };
     }
   }
 

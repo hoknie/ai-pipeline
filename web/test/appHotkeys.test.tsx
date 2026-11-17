@@ -33,7 +33,8 @@ describe('shortcut list', () => {
     for (const section of SECTIONS) {
       expect(SHORTCUTS.filter((item) => item.combo === `ctrl+${section.key}`)).toHaveLength(1);
     }
-    const combos = SHORTCUTS.map((item) => item.combo);
+    // the same key may do something else in another group: in the list of runs, of providers
+    const combos = SHORTCUTS.map((item) => `${item.group}:${item.combo}`);
     expect(new Set(combos).size).toBe(combos.length);
   });
 });
@@ -55,6 +56,14 @@ describe('panel hotkeys', () => {
     await waitFor(() => expect(window.location.hash).toMatch(/^#pipelines/));
     press('t', 'KeyT', { ctrlKey: true });
     await waitFor(() => expect(window.location.hash).toMatch(/^#stats/));
+  });
+
+  it('ctrl+o goes to the providers', async () => {
+    mount();
+    press('q', 'KeyQ', { ctrlKey: true });
+    await waitFor(() => expect(window.location.hash).toMatch(/^#queue/));
+    press('o', 'KeyO', { ctrlKey: true });
+    await waitFor(() => expect(window.location.hash).toBe('#providers'));
   });
 
   it('works in the Russian layout', async () => {

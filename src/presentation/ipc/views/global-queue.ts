@@ -28,6 +28,7 @@ export interface GlobalViewSources {
   project: (repository: string) => {
     names: (id: string) => string;
     variantNames: (pipeline: string, variant: string) => string;
+    providerNames: (slug: string) => string | null;
     catalog: readonly Tag[];
   };
 }
@@ -87,12 +88,14 @@ export function globalQueueView(
     items: items.map((view, index) => {
       const item = line.items[index]!;
       const repository = ownerOf(item);
-      const { names, variantNames, catalog } = project(repository);
+      const { names, variantNames, providerNames, catalog } = project(repository);
       return {
         ...view,
         repository,
         pipelineName: names(view.pipeline),
         variantName: variantNames(view.pipeline, view.variant),
+        providerName:
+          view.provider === null ? null : (view.providerName ?? providerNames(view.provider)),
         tags: tagViews(catalog, item.tags),
         filtered:
           view.filtered ||

@@ -23,7 +23,13 @@ import {
   sameValue,
 } from '../repositories/documents.ts';
 import { emptyLevel, readLevels, resolution, type Resolution } from './levels.ts';
-import { actionReferences, chainReferences, specialistReferences, stemOf } from './references.ts';
+import {
+  actionReferences,
+  chainReferences,
+  providerReferences,
+  specialistReferences,
+  stemOf,
+} from './references.ts';
 import {
   ConfigEditError,
   type EditPlan,
@@ -194,14 +200,16 @@ function keepSharedTags(request: EditRequest, file: string, current: string | un
   };
 }
 
-/** Entries that still name a removed specialist, chain or action, or none. */
+/** Entries that still name a removed specialist, chain, provider or action, or none. */
 function referencesOfRemoved(draft: Draft, edit: EditRequest, level: WriteLevel) {
   const referencesTo =
     edit.kind === 'specialist'
       ? specialistReferences
       : edit.kind === 'chain'
         ? chainReferences
-        : actionReferences;
+        : edit.kind === 'provider'
+          ? providerReferences
+          : actionReferences;
   const has = (files: LevelFiles) =>
     sourcesOf(files, edit.kind).some((source) => stemOf(source.path) === edit.id);
   const globalTree = assembleLevel(draft.files.global).tree;
@@ -259,7 +267,10 @@ export function planEdit(paths: ConfigPaths, request: EditRequest): EditPlan {
   }
   if (
     edit.value === null &&
-    (edit.kind === 'specialist' || edit.kind === 'action' || edit.kind === 'chain')
+    (edit.kind === 'specialist' ||
+      edit.kind === 'action' ||
+      edit.kind === 'chain' ||
+      edit.kind === 'provider')
   ) {
     const references = referencesOfRemoved(draft, edit, level);
     if (references.length > 0) return { ok: false, reason: 'invalid', errors: [], references };

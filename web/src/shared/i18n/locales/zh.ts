@@ -1,4 +1,5 @@
 import type { Dictionary } from '../types.ts';
+import { providersZh } from './providers.zh.ts';
 
 /*
  * 术语表：run — 运行，group — 分组，step — 步骤，attempt — 尝试，
@@ -6,6 +7,7 @@ import type { Dictionary } from '../types.ts';
  * Pipeline 和 worktree 保留英文。
  */
 export const zh: Dictionary = {
+  providers: providersZh,
   links: {
     editRun: '在运行页面编辑',
     title: '关联',
@@ -51,6 +53,7 @@ export const zh: Dictionary = {
     queue: '队列',
     specialists: '专员',
     pipelines: 'Pipeline',
+    providers: '提供商',
     stats: '统计',
     settings: '设置',
     sections: '栏目',
@@ -316,7 +319,17 @@ export const zh: Dictionary = {
     newTask: '新建任务',
     project: '切换项目',
     moveItem: '在队列中移动任务',
-    groups: { general: '通用', navigation: '导航', runs: '运行', queue: '队列' },
+    nextProvider: '下一个提供商',
+    previousProvider: '上一个提供商',
+    openProvider: '打开提供商',
+    moveRole: '移动角色',
+    groups: {
+      general: '通用',
+      navigation: '导航',
+      runs: '运行',
+      queue: '队列',
+      providers: '提供商',
+    },
   },
   format: {
     unitSec: '秒',
@@ -343,6 +356,7 @@ export const zh: Dictionary = {
       state: '状态',
       pipeline: 'Pipeline',
       variant: '变体',
+      provider: '提供商',
       specialists: '专家',
       repositories: '仓库',
       clear: '清除',
@@ -557,8 +571,9 @@ export const zh: Dictionary = {
       label: '尝试 {{seq}} {{step}}',
       round: '第 {{round}} 轮',
       denialsTitle: '被专员权限拒绝的命令',
-      providerInstead: '提供商 {{provider}}，而非 {{requested}}',
-      providerInsteadTitle: '此步骤的层级中没有运行所选提供商的已启用项；使用了该层级的默认项',
+      providerInstead: '其他提供商',
+      providerInsteadTitle:
+        '任务请求的是 {{requested}}，但该步骤的链中没有它——步骤运行在 {{provider}} 上',
       denials: '拒绝：{{n}}',
       outsideTitle: '步骤期间工作副本中变化的文件',
       outside: '工作副本：{{n}}',
@@ -1029,6 +1044,7 @@ export const zh: Dictionary = {
   },
   providerBadge: {
     label: '提供商：{{id}}',
+    named: '提供商：{{name}}（{{id}}）',
   },
   variantBadge: {
     label: '变体：{{name}}（{{id}}）',
@@ -1306,6 +1322,8 @@ export const zh: Dictionary = {
       moveDown: '下移',
       remove: '删除运行器',
       provider: '提供商',
+      noProvider: '无提供商',
+      chooseProvider: '选择提供商',
       providerPlaceholder: 'anthropic, zai, openai',
       providerHint: '提供商 id：用量限制保持的键。每个账户使用一个 id。',
       providerRequired: '“按提供商”模式下必填',

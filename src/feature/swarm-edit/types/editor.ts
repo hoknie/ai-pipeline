@@ -5,26 +5,33 @@ import {
   CHAINS_DIR,
   type FieldError,
   PIPELINES_DIR,
+  PROVIDERS_DIR,
   SPECIALISTS_DIR,
+  type Provider,
   type ReasoningEffort,
 } from '../../swarm-config/types/index.ts';
 import { field } from './setting-fields.ts';
 
-export type EntryKind = 'specialist' | 'pipeline' | 'action' | 'chain';
+export type EntryKind = 'specialist' | 'pipeline' | 'action' | 'chain' | 'provider';
 
 export const KIND_DIRECTORY: Record<EntryKind, string> = {
   specialist: SPECIALISTS_DIR,
   pipeline: PIPELINES_DIR,
   action: ACTIONS_DIR,
   chain: CHAINS_DIR,
+  provider: PROVIDERS_DIR,
 };
 
 /** Key of the section of the configuration tree (`swarm.<section>.<id>`) that holds the kind. */
-export const KIND_SECTION: Record<EntryKind, 'specialists' | 'pipelines' | 'actions' | 'chains'> = {
+export const KIND_SECTION: Record<
+  EntryKind,
+  'specialists' | 'pipelines' | 'actions' | 'chains' | 'providers'
+> = {
   specialist: 'specialists',
   pipeline: 'pipelines',
   action: 'actions',
   chain: 'chains',
+  provider: 'providers',
 };
 
 export type EntryLevel = 'project' | 'global' | 'project_over_global';
@@ -50,6 +57,10 @@ export interface EntryReference {
   action?: string;
   /** Specialist that references the chain. */
   specialist?: string;
+  /** Chain whose item references the provider. */
+  chain?: string;
+  /** Index of the item of the chain that references the provider. */
+  item?: number;
   /** `delivery.resolver` or `delivery.message_specialist`. */
   field?: string;
   /** Pipeline point (`swarm.stages.<point>` or `stages.<point>` of the pipeline) that names an action. */
@@ -84,6 +95,7 @@ export type SettingKind =
   | 'specialist'
   | 'env'
   | 'pools'
+  | 'roles'
   | 'json';
 
 /** A value the editor writes into settings.yaml; null removes the field. */
@@ -202,6 +214,18 @@ export interface EditorChain {
   sources: EntrySources;
 }
 
+/** A provider in the editor: where it lives, what its files say and what the merged config has. */
+export interface EditorProvider {
+  slug: string;
+  level: EntryLevel;
+  file: string;
+  revision: string | null;
+  raw: Record<string, unknown>;
+  sources: EntrySources;
+  /** The provider of the merged configuration; null when the configuration does not load. */
+  effective: Provider | null;
+}
+
 export interface EditorSetting {
   /** Key path in settings.yaml, such as `delivery.mode`. */
   path: string;
@@ -275,6 +299,7 @@ export interface ConfigEditorView {
   settingsFiles: { global: SettingsFileView; project: SettingsFileView };
   specialists: EditorSpecialist[];
   chains: EditorChain[];
+  providers: EditorProvider[];
   pipelines: EditorPipeline[];
   actions: EditorAction[];
   settings: EditorSetting[];

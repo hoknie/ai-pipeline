@@ -8,6 +8,10 @@ import { calls, run, start, until } from './control-harness.ts';
 
 const CONFIG = `swarm:
   max: 3
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
+    openai: { name: OpenAI, access: [{ kind: cli, runtime: opencode, model_prefix: openai }] }
   chains:
     coding:
       name: Coding
@@ -97,10 +101,26 @@ describe('switching the provider of a running run', () => {
     const runId = await runWith(h, 'zai');
     await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
     await expect(h.call('run_provider', { runId, provider: 'nope' })).rejects.toThrow(
-      'unknown provider `nope`; known: anthropic, openai, zai',
+      'unknown provider `nope`; known: anthropic (Anthropic), openai (OpenAI), zai (Z.ai)',
     );
     const view = await h.status(runId);
     expect(view.provider).toBe('zai');
+    expect(view.groups[0]?.status).toBe('running');
+  });
+
+  it('refuses a disabled provider and changes nothing', async () => {
+    const h = await start(
+      CONFIG.replace('openai: { name: OpenAI,', 'openai: { name: OpenAI, enabled: false,'),
+    );
+    h.script({ code: [{ hang: true }] });
+    const runId = await runWith(h, 'zai');
+    await h.waitFor(runId, (view) => view.groups[0]?.status === 'running');
+    await expect(h.call('run_provider', { runId, provider: 'openai' })).rejects.toThrow(
+      'provider `openai` is disabled',
+    );
+    const view = await h.status(runId);
+    expect(view.provider).toBe('zai');
+    expect(view.providerName).toBe('Z.ai');
     expect(view.groups[0]?.status).toBe('running');
   });
 

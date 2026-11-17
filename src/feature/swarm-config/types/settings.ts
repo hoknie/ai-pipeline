@@ -1,6 +1,7 @@
 import { type Action, legacyScript, type StagePoints } from './action.ts';
 import { type RuntimeChain } from './chain.ts';
 import { type Pipeline, type Split, type Step } from './pipeline.ts';
+import { type Provider, type Role, withRegistryDefaults } from './providers/provider.ts';
 import { type CatalogMcpServer } from './specialist.ts';
 import { type Defaults, type Runtime, type Specialist } from './specialist.ts';
 
@@ -167,26 +168,40 @@ function runtimesWithDefaults(stored: Partial<RuntimeSettings> | undefined): Run
   ) as RuntimeSettings;
 }
 
+/** A configuration as a snapshot of an older build may have stored it. */
+type StoredConfig = Omit<
+  ResolvedConfig,
+  | 'workspace'
+  | 'delivery'
+  | 'actions'
+  | 'stages'
+  | 'pipelines'
+  | 'chains'
+  | 'opencode'
+  | 'agy'
+  | 'providers'
+  | 'roles'
+> & {
+  chains?: RuntimeChain[];
+  providers?: Provider[];
+  roles?: Role[];
+  pipelines?: Pipeline[];
+  /** Name of the pipelines in snapshots stored by older builds. */
+  workflows?: Pipeline[];
+  actions?: (Omit<Action, 'run'> & { run: string | readonly string[] | null })[];
+  stages?: StagePoints;
+  workspace?: Partial<WorkspaceSettings>;
+  delivery: Partial<DeliverySettings>;
+  naming?: Partial<NamingSettings>;
+  web?: Partial<WebSettings>;
+  runtimes?: Partial<RuntimeSettings>;
+  opencode?: Partial<OpencodeSettings>;
+  agy?: Partial<AgySettings>;
+};
+
 /** Fills settings added after a run was stored, so older runs keep working. */
 export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
-  const stored = config as Omit<
-    ResolvedConfig,
-    'workspace' | 'delivery' | 'actions' | 'stages' | 'pipelines' | 'chains' | 'opencode' | 'agy'
-  > & {
-    chains?: RuntimeChain[];
-    pipelines?: Pipeline[];
-    /** Name of the pipelines in snapshots stored by older builds. */
-    workflows?: Pipeline[];
-    actions?: (Omit<Action, 'run'> & { run: string | readonly string[] | null })[];
-    stages?: StagePoints;
-    workspace?: Partial<WorkspaceSettings>;
-    delivery: Partial<DeliverySettings>;
-    naming?: Partial<NamingSettings>;
-    web?: Partial<WebSettings>;
-    runtimes?: Partial<RuntimeSettings>;
-    opencode?: Partial<OpencodeSettings>;
-    agy?: Partial<AgySettings>;
-  };
+  const stored = config as StoredConfig;
   // Runs stored before these settings existed started from HEAD and were delivered by hand.
   const workspace: WorkspaceSettings = { base: 'head', include: [], ...stored.workspace };
   const delivery: DeliverySettings = { ...defaultDelivery(), auto: false, ...stored.delivery };
@@ -242,6 +257,7 @@ export function withConfigDefaults(config: ResolvedConfig): ResolvedConfig {
     runtimes,
     specialists,
     chains,
+    ...withRegistryDefaults(stored),
     claude,
     opencode: { mcp: 'inherit', overrides: {}, ...stored.opencode },
     agy: { mcp: 'isolated', overrides: {}, ...stored.agy },
@@ -270,6 +286,10 @@ export interface ResolvedConfig {
   mcpServers: Record<string, CatalogMcpServer>;
   specialists: Specialist[];
   chains: RuntimeChain[];
+  /** Providers of the providers/ directories: the registry of the known providers. */
+  providers: Provider[];
+  /** Roles of the models, in the order of settings.yaml. */
+  roles: Role[];
   pipelines: Pipeline[];
   /** Pipeline actions by id. */
   actions: Action[];
@@ -277,118 +297,4 @@ export interface ResolvedConfig {
   stages: StagePoints;
 }
 
-/** The network check of the daemon; read from the global settings.yaml only. */
-export interface NetworkSettings {
-  /** The daemon checks the network and holds agents while it is down. */
-  enabled: boolean;
-  /** `host:port` (a TCP connection) or an `http(s)://` URL (a GET request). */
-  targets: string[];
-  /** Interfaces that must exist and have a non-loopback address, such as `wt0` of NetBird. */
-  interfaces: string[];
-  /** An `http(s)://` proxy: probes go through it and agents get it as `HTTPS_PROXY`. */
-  proxy: string | null;
-  /** Seconds between two checks. */
-  interval: number;
-  /** Seconds a probe may take. */
-  timeout: number;
-}
-
-export const ATTACHMENT_STORAGES = ['local', 's3'] as const;
-
-export type AttachmentStorage = (typeof ATTACHMENT_STORAGES)[number];
-
-/** Storage for new task attachments; read from the shared settings.yaml only. */
-export interface AttachmentSettings {
-  storage: AttachmentStorage;
-  s3: {
-    bucket: string | null;
-    region: string;
-    endpoint: string | null;
-    prefix: string;
-    pathStyle: boolean;
-  };
-}
-
-export function defaultAttachments(): AttachmentSettings {
-  return {
-    storage: 'local',
-    s3: {
-      bucket: null,
-      region: 'us-east-1',
-      endpoint: null,
-      prefix: 'aip/attachments/',
-      pathStyle: false,
-    },
-  };
-}
-
-/** The usage statistics of the daemon; read from the global settings.yaml only. */
-export interface StatsSettings {
-  /** The daemon keeps the usage journal. */
-  enabled: boolean;
-  /** Project paths whose usage is not recorded and not reported. */
-  exclude: string[];
-}
-
-export function defaultStats(): StatsSettings {
-  return { enabled: true, exclude: [] };
-}
-
-export const QUEUE_SCOPES = ['project', 'global'] as const;
-export type QueueScopeName = (typeof QUEUE_SCOPES)[number];
-export const QUEUE_MAX_RANGE = [1, 32] as const;
-
-/** A named quota of the agent attempts that work at once on the machine. */
-export interface QueuePool {
-  name: string;
-  /** The most attempts of the pool working at once; the pool lends and borrows no places. */
-  max: number;
-  /** `claude`, `agy`, `opencode` (no explicit model) or `opencode:provider/model` (a trailing `*` for a prefix). */
-  members: string[];
-}
-
-/** The quota of the attempts no pool takes. */
-export interface DefaultQueuePool {
-  max: number;
-}
-
-/** The mode of the task queue and the specialist limits of the machine; the global settings.yaml only. */
-export interface QueueSettings {
-  /** `project`: a queue per project; `global`: one queue for all projects. */
-  scope: QueueScopeName;
-  /** The most agent attempts working at once on the machine in both modes. */
-  max: number;
-  /** Quotas of the attempts by runtime and model; empty: no quotas. */
-  pools: QueuePool[];
-  /** The quota of the attempts outside every pool; set exactly when `pools` is not empty. */
-  defaultPool: DefaultQueuePool | null;
-}
-
-export function defaultQueue(): QueueSettings {
-  return { scope: 'project', max: 5, pools: [], defaultPool: null };
-}
-
-export const DEFAULT_NETWORK_TARGET = 'https://api.anthropic.com';
-
-export function defaultNetwork(): NetworkSettings {
-  return {
-    enabled: false,
-    targets: [DEFAULT_NETWORK_TARGET],
-    interfaces: [],
-    proxy: null,
-    interval: 30,
-    timeout: 5,
-  };
-}
-
-/** The proxy URL without login and password; text that is not a URL is returned as it is. */
-export function redactProxy(proxy: string): string {
-  try {
-    const url = new URL(proxy);
-    url.username = '';
-    url.password = '';
-    return url.toString().replace(/\/$/, '');
-  } catch {
-    return proxy;
-  }
-}
+export * from './machine/machine-settings.ts';

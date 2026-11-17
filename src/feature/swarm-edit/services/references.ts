@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
-import { isMapping } from '../../swarm-config/types/index.ts';
+import { assembleLevel, readLevel } from '../../swarm-config/services/index.ts';
+import { type ConfigPaths, isMapping, mergeConfigs } from '../../swarm-config/types/index.ts';
 import { type EntryReference } from '../types/editor.ts';
 import { field } from '../types/setting-fields.ts';
 
@@ -108,6 +109,42 @@ export function chainReferences(tree: unknown, slug: string): EntryReference[] {
   return references;
 }
 
+/** Everything in a merged `{ swarm }` tree that names the provider in an item of a chain. */
+export function providerReferences(tree: unknown, slug: string): EntryReference[] {
+  const swarm = isMapping(tree) && isMapping(tree.swarm) ? tree.swarm : {};
+  const references: EntryReference[] = [];
+  const chains = isMapping(swarm.chains) ? swarm.chains : {};
+  for (const [name, chain] of Object.entries(chains)) {
+    const items = isMapping(chain) && Array.isArray(chain.runtimes) ? chain.runtimes : [];
+    items.forEach((item, index) => {
+      if (isMapping(item) && item.provider === slug) references.push({ chain: name, item: index });
+    });
+  }
+  return references;
+}
+
 export function stemOf(path: string): string {
   return basename(path).replace(/\.ya?ml$/, '');
+}
+
+/**
+ * References from chain items to a shared provider in the repositories that do not define a project
+ * provider of that slug. Works on files that read as YAML, so a broken configuration still counts.
+ */
+export function sharedProviderUsage(
+  global: ConfigPaths,
+  projects: readonly { repository: string; paths: ConfigPaths }[],
+  slug: string,
+): EntryReference[] {
+  const globalLevel = assembleLevel(readLevel(global.global, { tolerant: true }));
+  const references: EntryReference[] = [];
+  for (const { repository, paths } of projects) {
+    const level = assembleLevel(readLevel(paths.project, { tolerant: true }));
+    const swarm = isMapping(level.tree) && isMapping(level.tree.swarm) ? level.tree.swarm : {};
+    if (isMapping(swarm.providers) && Object.hasOwn(swarm.providers, slug)) continue;
+    for (const reference of providerReferences(mergeConfigs(globalLevel.tree, level.tree), slug)) {
+      references.push({ ...reference, repository });
+    }
+  }
+  return references;
 }

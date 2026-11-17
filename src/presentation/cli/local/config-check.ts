@@ -12,9 +12,10 @@ import {
 } from '../../../feature/swarm-config/services/index.ts';
 import { repositoryRoot } from '../../../platform/git/index.ts';
 import { findExecutable } from '../../../platform/process/index.ts';
-import { agentExecutable } from '../../../app/maintenance.ts';
+import { agentExecutable, providerStates } from '../../../app/maintenance.ts';
 
 import { probeVersion } from '../probe.ts';
+import { providerLines, providerWarnings } from './config-check-providers.ts';
 import { presentVariants } from './present-variants.ts';
 
 type Config = ResolvedConfig;
@@ -256,6 +257,9 @@ export async function checkConfig(
       '  Move the files to aip/pipelines/ and rename split.workflow to split.pipeline in them.\n',
     );
   }
+  for (const line of providerLines(config, providerStates(config, environment))) {
+    io.stdout(`${line}\n`);
+  }
   io.stdout('\nAgent CLIs:\n');
   const disabled: string[] = [];
   for (const name of runtimes) {
@@ -277,6 +281,8 @@ export async function checkConfig(
       `Warning: runtime \`${name}\` is disabled and specialists on it fail; set runtimes.${name}.enabled: true in the shared settings.yaml\n`,
     );
   }
-  for (const warning of configWarnings(config)) io.stdout(`Warning: ${warning}\n`);
+  for (const warning of [...configWarnings(config), ...providerWarnings(config)]) {
+    io.stdout(`Warning: ${warning}\n`);
+  }
   return 0;
 }

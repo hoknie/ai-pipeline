@@ -141,6 +141,9 @@ SVG and any other file come back with code 400 and are only downloaded. An unkno
 | `PUT /api/config/specialists/<slug>`, `PUT /api/config/pipelines/<id>` | Writes a file |
 | `DELETE /api/config/specialists/<slug>`, `DELETE /api/config/pipelines/<id>` | Deletes a file |
 | `POST /api/config/pipelines/<id>/preview` | The graph of a draft |
+| `GET /api/config/providers` | The roles, the providers with status, reasons and `limitUntil`, and the role × provider matrix |
+| `GET /api/config/providers/<slug>/models` | The models of a provider by access; `refresh=1` asks the catalog again |
+| `PUT /api/config/providers/<slug>`, `DELETE /api/config/providers/<slug>?revision=…&level=…` | Writes or deletes a provider file; deleting a provider a chain uses is refused with the list of references |
 | `POST /api/config/specialists/import`, `POST /api/config/pipelines/import` | Imports from another repository |
 | `GET /api/shared-specialists`, `GET /api/shared-pipelines` | Shared entries with their usage |
 | `GET /api/specialist-tags` | The tags of specialists |

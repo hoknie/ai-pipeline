@@ -43,6 +43,7 @@ function settingsOf(config: ResolvedConfig): [string, unknown][] {
   return [
     ['max', config.max],
     ['workspace_dir', config.workspaceDir],
+    ['roles', Object.fromEntries(config.roles.map((role) => [role.slug, { name: role.name }]))],
     ['outside_changes', config.outsideChanges],
     ['defaults.runtime', config.defaults.runtime],
     ['defaults.permissions', config.defaults.permissions],

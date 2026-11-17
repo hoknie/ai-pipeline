@@ -1,4 +1,8 @@
 max: 3
+roles:
+  think: { name: Think }
+  code: { name: Code }
+  light: { name: Light }
 workspace:
   base: working_tree
 delivery:

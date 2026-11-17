@@ -19,6 +19,7 @@ import {
   type LevelPaths,
   type LoadedConfig,
   PIPELINES_DIR,
+  PROVIDERS_DIR,
   SETTINGS_NAME,
   SPECIALISTS_DIR,
 } from '../types/levels.ts';
@@ -56,6 +57,7 @@ export function levelIsEmpty(files: LevelFiles): boolean {
     files.settings === undefined &&
     files.specialists.length === 0 &&
     files.chains.length === 0 &&
+    files.providers.length === 0 &&
     files.pipelines.length === 0 &&
     files.actions.length === 0 &&
     files.problems.length === 0
@@ -91,6 +93,7 @@ export function configFromFiles(files: {
   settings?: string;
   specialists?: Record<string, string>;
   chains?: Record<string, string>;
+  providers?: Record<string, string>;
   pipelines?: Record<string, string>;
   actions?: Record<string, string>;
 }): ResolvedConfig {
@@ -107,6 +110,9 @@ export function configFromFiles(files: {
     ),
     chains: Object.entries(files.chains ?? {}).map(([name, text]) =>
       source(`${CHAINS_DIR}/${name}.yaml`, text),
+    ),
+    providers: Object.entries(files.providers ?? {}).map(([name, text]) =>
+      source(`${PROVIDERS_DIR}/${name}.yaml`, text),
     ),
     pipelines: Object.entries(files.pipelines ?? {}).map(([name, text]) => {
       const read = source(`${PIPELINES_DIR}/${name}.yaml`, text);

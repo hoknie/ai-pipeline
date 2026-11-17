@@ -45,6 +45,7 @@ export function field(
 export const SETTING_FIELDS: readonly SettingField[] = [
   field('max', 'integer', { range: MAX_RANGE }),
   field('workspace_dir', 'string'),
+  field('roles', 'roles'),
   field('outside_changes', 'choice', { options: OUTSIDE_CHANGES }),
   field('defaults.runtime', 'choice', { options: RUNTIMES }),
   field('defaults.permissions', 'choice', { options: PERMISSIONS }),
@@ -120,10 +121,10 @@ export function settingFieldOf(path: string): SettingField | undefined {
   return undefined;
 }
 
-/** Whether the field takes an object as its value (`json` and `pools`). */
+/** Whether the field takes an object as its value (`json`, `pools` and `roles`). */
 export function isObjectSetting(path: string): boolean {
   const kind = settingFieldOf(path)?.kind;
-  return kind === 'json' || kind === 'pools';
+  return kind === 'json' || kind === 'pools' || kind === 'roles';
 }
 
 /** A variable of `runtimes.<runtime>.env` (a string), as opposed to the whole `env` section. */

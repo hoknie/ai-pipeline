@@ -9,6 +9,8 @@ export const KEYED_SECTIONS = new Set([
   'mcp_servers',
   'specialists',
   'chains',
+  'providers',
+  'roles',
   'pipelines',
   'actions',
   'stages',

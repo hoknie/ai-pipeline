@@ -15,7 +15,7 @@ export function writeConfigDirectory(repo: string, text: string): void {
 export function writeLevelDirectory(directory: string, text: string): void {
   rmSync(directory, { recursive: true, force: true });
   const root = (parse(text) ?? {}) as { swarm?: Record<string, unknown> };
-  const { specialists, pipelines, actions, chains, ...settings } = root.swarm ?? {};
+  const { specialists, pipelines, actions, chains, providers, ...settings } = root.swarm ?? {};
   mkdirSync(directory, { recursive: true });
   if (root.swarm !== undefined) {
     writeFileSync(join(directory, 'settings.yaml'), stringify(settings));
@@ -25,6 +25,7 @@ export function writeLevelDirectory(directory: string, text: string): void {
     ['pipelines', pipelines],
     ['actions', actions],
     ['chains', chains],
+    ['providers', providers],
   ] as const) {
     if (entries === undefined || entries === null || typeof entries !== 'object') continue;
     mkdirSync(join(directory, section), { recursive: true });

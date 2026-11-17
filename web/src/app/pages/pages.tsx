@@ -11,6 +11,7 @@ import type {
   RunView,
 } from '../../shared/api/types.ts';
 import { otherQueues, type QueueDraft } from '../../features/queue/index.ts';
+import type { ProvidersProjects } from '../../features/providers/index.ts';
 import { Loading } from './Loading.tsx';
 import { AllQueuesRoute, GlobalQueueRoute, type AllQueues } from './queueModes.tsx';
 import { statsPeriodOf, type Route } from '../../shared/lib/nav/route.ts';
@@ -32,6 +33,9 @@ const SpecialistsPage = lazy(() =>
 );
 const PipelinesPage = lazy(() =>
   import('../../features/pipelines/index.ts').then((module) => ({ default: module.PipelinesPage })),
+);
+const ProvidersPage = lazy(() =>
+  import('../../features/providers/index.ts').then((module) => ({ default: module.ProvidersPage })),
 );
 const StatsPage = lazy(() =>
   import('../../features/stats/index.ts').then((module) => ({ default: module.StatsPage })),
@@ -140,6 +144,36 @@ export function StatsRoute({ common, registry }: { common: Common; registry: Rep
         project={route.run}
         onFilter={(period, project) =>
           onRoute({ view: 'stats', run: project, group: period, step: null, tab: null })
+        }
+      />
+    </Suspense>
+  );
+}
+
+export function ProvidersRoute({
+  common,
+  repository,
+  projects,
+}: {
+  common: Common;
+  repository: string | null;
+  projects?: ProvidersProjects | undefined;
+}) {
+  const { t } = useTranslation();
+  const { route, onRoute } = common;
+  return (
+    <Suspense fallback={<Loading what={t('providers.title')} />}>
+      <ProvidersPage
+        api={common.api}
+        repository={repository}
+        runs={common.runs}
+        selected={route.run}
+        section={route.group}
+        preset={route.tab}
+        project={route.project ?? null}
+        projects={projects}
+        onSelect={(run, section = null, preset = null, project = null) =>
+          onRoute({ view: 'providers', run, group: section, step: null, tab: preset, project })
         }
       />
     </Suspense>

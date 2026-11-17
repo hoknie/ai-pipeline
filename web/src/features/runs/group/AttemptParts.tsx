@@ -61,20 +61,24 @@ export function AttemptHeading({ attempt, verdict }: { attempt: AttemptView; ver
         {attempt.model ?? attempt.runtime}
       </span>
       {attempt.provider ? (
-        <span className="text-xs text-muted-foreground" data-provider={attempt.provider}>
-          @{attempt.provider}
+        <span
+          className="text-xs text-muted-foreground"
+          title={attempt.provider}
+          data-provider={attempt.provider}
+        >
+          {attempt.providerName?.trim() ? attempt.providerName : `@${attempt.provider}`}
         </span>
       ) : null}
       {attempt.requestedProvider ? (
         <span
           className="text-xs text-status-warn"
-          title={t('runs.attempt.providerInsteadTitle')}
+          title={t('runs.attempt.providerInsteadTitle', {
+            requested: attempt.requestedProviderName?.trim() || attempt.requestedProvider,
+            provider: attempt.providerName?.trim() || attempt.provider || attempt.runtime,
+          })}
           data-requested-provider={attempt.requestedProvider}
         >
-          {t('runs.attempt.providerInstead', {
-            provider: attempt.provider ?? attempt.runtime,
-            requested: attempt.requestedProvider,
-          })}
+          {t('runs.attempt.providerInstead')}
         </span>
       ) : null}
       <StatusBadge status={verdict} />

@@ -9,6 +9,7 @@ import type { RunView } from '../../../shared/api/types.ts';
 import type { FilterOption } from '../../../shared/ui/forms/filters/FilterField.tsx';
 import { TagLabel } from '../../../shared/ui/feedback/TagChip.tsx';
 import {
+  NO_PROVIDER,
   RUN_STATES,
   optionCounts,
   runSpecialists,
@@ -25,6 +26,33 @@ interface FilterOptionsInput {
   scope: RunScope;
   repository: string | null;
   repositoryPaths?: ReadonlyMap<string, string>;
+}
+
+/**
+ * The options of the filter «Provider»: the providers of the runs by name (the slug when the
+ * name is not known) and «Not chosen» for the runs without one; the chosen ones stay with 0.
+ */
+function providerOptions(
+  scoped: RunView[],
+  chosen: readonly string[],
+  countsOf: (key: RunFilterKey) => ReadonlyMap<string, number>,
+  noneLabel: string,
+): FilterOption[] {
+  const counts = countsOf('providers');
+  const names = new Map<string, string>();
+  for (const run of scoped)
+    if (run.provider) names.set(run.provider, run.providerName ?? run.provider);
+  for (const slug of chosen) if (slug !== NO_PROVIDER && !names.has(slug)) names.set(slug, slug);
+  const options: FilterOption[] = [...names]
+    .map(([value, label]) => ({
+      value,
+      label,
+      hint: label === value ? '' : value,
+      count: counts.get(value) ?? 0,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'en'));
+  const none = { value: NO_PROVIDER, label: noneLabel, count: counts.get(NO_PROVIDER) ?? 0 };
+  return [none, ...options];
 }
 
 /** The options of the multiselect filters, each with the count of runs it would leave. */
@@ -110,5 +138,6 @@ export function useFilterOptions(input: FilterOptionsInput) {
     specialists: specialistOptions,
     tags: tagOptions,
     repositories: repositoryOptions,
+    providers: providerOptions(scoped, filters.providers, counts, t('queue.form.noProvider')),
   };
 }

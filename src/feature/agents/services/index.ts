@@ -1,4 +1,5 @@
 export { AgentsService, type AgentsDependencies } from './agents.ts';
+export { ProvidersService } from './providers.ts';
 export { mcpServers, skillCatalog } from './catalog.ts';
 export { createAgentsServices, type AgentsServices } from './create.ts';
 export { readLines, readTail, readTimes, timesPath } from './logs.ts';

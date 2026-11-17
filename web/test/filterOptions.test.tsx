@@ -20,3 +20,16 @@ describe('visibleOptions', () => {
     expect(visibleOptions(options, [], '')).toHaveLength(3);
   });
 });
+
+describe('visibleOptions of the filter «Provider»', () => {
+  const providers: FilterOption[] = [
+    { value: '__none', label: 'Not chosen', count: 1 },
+    { value: 'zai', label: 'Z.ai GLM Coding Plan', hint: 'zai', count: 2 },
+    { value: 'anthropic', label: 'Anthropic', hint: 'anthropic', count: 3 },
+  ];
+
+  it('finds a provider by its name and by its slug', () => {
+    expect(visibleOptions(providers, [], 'glm').map((option) => option.value)).toEqual(['zai']);
+    expect(visibleOptions(providers, [], 'ZAI').map((option) => option.value)).toEqual(['zai']);
+  });
+});

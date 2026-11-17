@@ -10,7 +10,7 @@ export interface HelpGroup {
 /** Groups of `aip --help`, in the order they are printed. */
 export const HELP_GROUPS: HelpGroup[] = [
   { heading: 'Runs:', commands: ['run', 'group'] },
-  { heading: 'Queue & repositories:', commands: ['queue', 'repo', 'tag'] },
+  { heading: 'Queue & repositories:', commands: ['queue', 'repo', 'tag', 'provider'] },
   { heading: 'Dashboards & streams:', commands: ['overview', 'web', 'events', 'stats'] },
   { heading: 'Setup & maintenance:', commands: ['setup', 'init', 'config', 'version', 'help'] },
   { heading: 'Plumbing (started by hosts and aip itself):', commands: ['daemon', 'mcp'] },

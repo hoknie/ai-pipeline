@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import type { Api } from '../../../shared/api/api.ts';
 import type { ReasoningEffort } from '../../../shared/api/types.ts';
 import { ModelField } from '../../../shared/ui/forms/picker/ModelField.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
@@ -39,6 +40,7 @@ const REASONING_EFFORTS = [
 const INHERIT = '__inherit';
 
 export interface ChainRuntimeItemProps {
+  api: Api;
   index: number;
   item: ChainRuntimeDraft;
   total: number;
@@ -219,6 +221,7 @@ function ItemOpencodeFields({
 }
 
 export function ChainRuntimeItem({
+  api,
   index,
   item,
   total,
@@ -246,6 +249,7 @@ export function ChainRuntimeItem({
         onRemove={onRemove}
       />
       <ItemProvider
+        api={api}
         index={index}
         item={item}
         disabled={disabled}

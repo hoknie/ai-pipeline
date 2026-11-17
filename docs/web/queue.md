@@ -19,6 +19,8 @@ Drag a task by its handle to reorder it, or use `Alt+↑` / `Alt+↓`. The row a
 
 "Run now" on a task that is not ready asks to confirm "Dependencies are not met" and lists them.
 
+The task form has a "Provider" combobox over the providers of the project (of all selected projects in several); it can create one. See [Providers in the panel](providers.md#choosing-a-provider-elsewhere).
+
 A task with links shows them on a second line, grouped by kind; see [Links](#links). Only the "Blocked by" links affect readiness and the "Dependencies are not met" confirmation. A chip of another project carries the project name and opens that project's queue.
 
 ## Runs out of line

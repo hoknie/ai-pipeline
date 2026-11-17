@@ -1,3 +1,4 @@
+import type { ProvidersService } from '../../feature/agents/services/index.ts';
 import type { ArtifactService } from '../../feature/artifacts/services/index.ts';
 import type { AttachmentService } from '../../feature/attachments/services/index.ts';
 import type { ComposeServices } from '../../feature/compose/services/index.ts';
@@ -23,6 +24,7 @@ import type { TagCatalogService } from '../../feature/tags/services/index.ts';
 export interface DaemonServices {
   now: () => number;
   config: ConfigService;
+  providers: ProvidersService;
   network: NetworkMonitor;
   registry: RegistryService;
   projects: ProjectService;

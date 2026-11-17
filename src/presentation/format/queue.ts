@@ -17,6 +17,7 @@ import type {
   RepositoryView,
 } from '../ipc/contract/index.ts';
 import { formatLinks } from './links.ts';
+import { providerText } from './providers/index.ts';
 
 export function stopReason(view: QueueView | GlobalQueueView): string | null {
   const stop = view.stop;
@@ -161,7 +162,10 @@ export function formatQueue(
           : ' · manual delivery') +
       (item.deliveryMode === null ? '' : ` · delivery: ${item.deliveryMode}`);
     const variant = item.variant === 'default' ? '' : ` · variant: ${item.variant}`;
-    const provider = item.provider === null ? '' : ` · provider: ${item.provider}`;
+    const provider =
+      item.provider === null
+        ? ''
+        : ` · provider: ${providerText(item.provider, item.providerName)}`;
     const skipped = item.skip.length === 0 ? '' : ` · skip: ${item.skip.join(', ')}`;
     const mark =
       item.readiness === 'ready'

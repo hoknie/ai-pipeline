@@ -43,7 +43,7 @@ export const entryIdSchema = z
   .string()
   .refine(isValidSlug, { message: `id must match ${SLUG_PATTERN_TEXT}` });
 
-const entryKindSchema = z.enum(['specialist', 'pipeline', 'action', 'chain']);
+const entryKindSchema = z.enum(['specialist', 'pipeline', 'action', 'chain', 'provider']);
 
 /** Repository of the project level; null is the shared level. */
 const levelRepository = z.string().min(1).nullable();
@@ -192,6 +192,18 @@ export const configRequests = [
       id: entryIdSchema,
       revision: z.string().min(1),
       level: writeLevelSchema.optional(),
+    }),
+  }),
+  z.object({
+    method: z.literal('config_providers'),
+    params: z.object({ repository: z.string().min(1) }),
+  }),
+  z.object({
+    method: z.literal('provider_models'),
+    params: z.object({
+      repository: z.string().min(1),
+      provider: z.string().min(1),
+      refresh: z.boolean().optional(),
     }),
   }),
 ] as const;

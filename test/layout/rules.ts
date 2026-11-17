@@ -199,10 +199,11 @@ export const webGraph: Record<string, readonly string[]> = {
   stats: [],
   tags: [],
   repositories: [],
-  specialists: ['tags', 'repositories'],
+  providers: ['repositories'],
+  specialists: ['tags', 'repositories', 'providers'],
   pipelines: ['specialists', 'topology', 'repositories'],
-  runs: ['pipelines', 'tags', 'repositories'],
-  queue: ['runs', 'tags', 'repositories'],
+  runs: ['pipelines', 'tags', 'repositories', 'providers'],
+  queue: ['runs', 'tags', 'repositories', 'providers'],
   settings: ['specialists', 'pipelines', 'repositories'],
 };
 

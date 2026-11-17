@@ -1,0 +1,8 @@
+name: Anthropic
+access:
+  - kind: cli
+    runtime: claude
+models:
+  think: opus
+  code: sonnet
+  light: haiku

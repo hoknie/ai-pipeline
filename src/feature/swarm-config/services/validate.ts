@@ -21,7 +21,9 @@ import {
   checkWorkspace,
 } from './validate-settings.ts';
 import { checkMcpCatalog, resolveMcpServers } from './sections/mcp-servers.ts';
+import { checkProviders } from './sections/providers.ts';
 import { checkQueue } from './sections/queue.ts';
+import { checkRoles } from './sections/roles.ts';
 import { checkStats } from './sections/stats.ts';
 import { validateAttachmentsSection } from './sections/attachments.ts';
 import { checkSpecialist, checkSpecialists, SPECIALIST_KEYS } from './validate-specialists.ts';
@@ -72,6 +74,8 @@ const SWARM_KEYS = [
   'mcp_servers',
   'specialists',
   'chains',
+  'providers',
+  'roles',
   'pipelines',
   'actions',
   'stages',
@@ -179,6 +183,8 @@ function defaultConfig(): ResolvedConfig {
     mcpServers: {},
     specialists: [],
     chains: [],
+    providers: [],
+    roles: [],
     pipelines: [],
     actions: [],
     stages: {},
@@ -234,7 +240,9 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
   }
   if ('defaults' in swarm) checkDefaults(ctx, swarm.defaults, config.defaults);
   if ('mcp_servers' in swarm) config.mcpServers = checkMcpCatalog(ctx, swarm.mcp_servers);
-  if ('chains' in swarm) config.chains = checkChains(ctx, swarm.chains);
+  if ('roles' in swarm) config.roles = checkRoles(ctx, swarm.roles);
+  if ('providers' in swarm) config.providers = checkProviders(ctx, swarm.providers, config.roles);
+  if ('chains' in swarm) config.chains = checkChains(ctx, swarm.chains, config);
   if ('specialists' in swarm)
     config.specialists = checkSpecialists(ctx, swarm.specialists, config.defaults);
   resolveMcpServers(ctx, config.specialists, config.mcpServers);

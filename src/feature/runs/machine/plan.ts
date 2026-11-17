@@ -26,7 +26,11 @@ import {
   specialistOfStep,
   stepsOf,
 } from '../types/index.ts';
-import type { Specialist } from '../../swarm-config/types/index.ts';
+import {
+  providerName,
+  type ResolvedConfig,
+  type Specialist,
+} from '../../swarm-config/types/index.ts';
 import { OFF_NETWORK, type NetworkSnapshot } from '../../network/types/index.ts';
 
 export interface DispatchPlan {
@@ -200,6 +204,7 @@ export function planDispatch(
         reason: 'limit',
         runtime: selected.runtime,
         ...(held.provider !== undefined ? { provider: held.provider } : {}),
+        ...limitProviderName(state.run.config, held.provider),
         until: held.until,
       });
       continue;
@@ -234,4 +239,13 @@ export function planDispatch(
     bump(counters.repository, state.run.repository);
   }
   return { start, waits };
+}
+
+/** The name of the provider a usage limit holds, when the configuration of the run knows it. */
+function limitProviderName(
+  config: ResolvedConfig,
+  provider: string | undefined,
+): { providerName?: string } {
+  const name = provider === undefined ? null : providerName(config, provider);
+  return name === null ? {} : { providerName: name };
 }

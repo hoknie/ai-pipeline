@@ -8,6 +8,7 @@ export * from './mcp/reference.ts';
 export * from './merge.ts';
 export * from './pipeline.ts';
 export * from './prompt.ts';
+export * from './providers/provider.ts';
 export * from './settings.ts';
 export * from './specialist.ts';
 export * from './tag-names.ts';

@@ -6,6 +6,7 @@ import { TagsProvider } from '../src/shared/lib/catalog/tags.tsx';
 import { renderHook } from '@testing-library/react';
 import { useFilterOptions } from '../src/features/runs/list/filterOptions.tsx';
 import { RunList } from '../src/features/runs/list/RunList.tsx';
+import { useRunFilters } from '../src/features/runs/page/useRunFilters.ts';
 import {
   activeFilters,
   EMPTY_FILTERS,
@@ -536,5 +537,124 @@ describe('the specialists filter of the run list', () => {
       { value: 'coder', label: 'Code author' },
       { value: 'ghost', label: 'ghost' },
     ]);
+  });
+});
+
+describe('the filter «Provider»', () => {
+  const byProvider = [
+    runView({ id: 'z', provider: 'zai', providerName: 'Z.ai' }),
+    runView({ id: 'z2', provider: 'zai', providerName: 'Z.ai' }),
+    runView({ id: 'x', provider: 'anthropic', providerName: 'Anthropic' }),
+    runView({ id: 'n', provider: null, providerName: null }),
+  ];
+  const options = (filters: RunFilterState = EMPTY_FILTERS, list: RunView[] = byProvider) =>
+    renderHook(() =>
+      useFilterOptions({ runs: list, query: '', filters, scope: 'all', repository: null }),
+    ).result.current.providers;
+
+  it('keeps the runs of the chosen provider', () => {
+    expect(ids(find(byProvider, '', only({ providers: ['zai'] })))).toEqual(['z', 'z2']);
+  });
+
+  it('keeps the runs of any of several providers', () => {
+    expect(ids(find(byProvider, '', only({ providers: ['zai', 'anthropic'] })))).toEqual([
+      'z',
+      'z2',
+      'x',
+    ]);
+  });
+
+  it('keeps the runs without a provider with «Not chosen»', () => {
+    expect(ids(find(byProvider, '', only({ providers: ['__none'] })))).toEqual(['n']);
+  });
+
+  it('counts the runs of each provider and the runs without one', () => {
+    expect(options().map(({ value, label, count }) => ({ value, label, count }))).toEqual([
+      { value: '__none', label: 'Not chosen', count: 1 },
+      { value: 'anthropic', label: 'Anthropic', count: 1 },
+      { value: 'zai', label: 'Z.ai', count: 2 },
+    ]);
+  });
+
+  it('names a provider by its slug when the name is not known', () => {
+    const list = [runView({ id: 'o', provider: 'old', providerName: null })];
+    expect(options(EMPTY_FILTERS, list).map((option) => option.label)).toEqual([
+      'Not chosen',
+      'old',
+    ]);
+  });
+
+  it('keeps a chosen provider without runs with the count 0', () => {
+    const chosen = only({ providers: ['gone'] });
+    expect(options(chosen).find((option) => option.value === 'gone')).toMatchObject({
+      label: 'gone',
+      count: 0,
+    });
+  });
+
+  it('counts the chosen filter in the number of active filters', () => {
+    expect(activeFilters('', only({ providers: ['zai'] }), 'all')).toBe(1);
+    expect(
+      optionCounts(byProvider, '', EMPTY_FILTERS, 'all', null, new Map(), 'providers'),
+    ).toEqual(
+      new Map([
+        ['zai', 2],
+        ['anthropic', 1],
+        ['__none', 1],
+      ]),
+    );
+  });
+
+  it('reads filters stored before the provider filter as an empty choice', () => {
+    window.localStorage.setItem(
+      'aip.web.runFilters',
+      JSON.stringify({
+        states: ['active'],
+        pipelines: [],
+        variants: [],
+        specialists: [],
+        tagIds: [],
+        repositories: [],
+      }),
+    );
+    const { result } = renderHook(() => useRunFilters(null));
+    expect(result.current.filters.providers).toEqual([]);
+    expect(result.current.filters.states).toEqual(['active']);
+  });
+
+  it('is a field of the list: a choice of «Z.ai» leaves its runs', async () => {
+    function Listed() {
+      const [filters, setFilters] = useState<RunFilterState>(EMPTY_FILTERS);
+      return (
+        <RunList
+          runs={[
+            runView({ id: 'z', title: 'On GLM', provider: 'zai', providerName: 'Z.ai' }),
+            runView({
+              id: 'x',
+              title: 'On Claude',
+              provider: 'anthropic',
+              providerName: 'Anthropic',
+            }),
+            runView({ id: 'n', title: 'No provider' }),
+          ]}
+          selectedRun={null}
+          selectedGroup={null}
+          now={0}
+          query=""
+          onQuery={() => undefined}
+          filters={filters}
+          onFilters={setFilters}
+          onSelect={() => undefined}
+          scope="repository"
+          repository={null}
+        />
+      );
+    }
+    render(<Listed />);
+    expect(screen.getAllByText(/On GLM|On Claude|No provider/)).toHaveLength(3);
+    await choose('Provider', /Z\.ai/);
+    expect(screen.queryByText('On Claude')).toBeNull();
+    expect(screen.queryByText('No provider')).toBeNull();
+    expect(screen.getByText('On GLM')).toBeTruthy();
   });
 });

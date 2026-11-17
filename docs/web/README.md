@@ -8,6 +8,7 @@ The web panel is a page in your browser. In it you follow runs, answer specialis
 | "Queue" | Add, order and run tasks | [web/queue.md](queue.md) |
 | "Specialists" | Edit specialist files | [web/config.md](config.md#specialists) |
 | "Pipeline" | Edit pipeline files; the "Topology" tab shows the graph of a pipeline with live groups | [web/config.md](config.md#pipeline) |
+| "Providers" | Providers with status and limit, the role × provider matrix, roles, the provider form with presets | [web/providers.md](providers.md) |
 | "Statistics" | Tokens and time by day, project, specialist and model | [web/stats.md](stats.md) |
 | "Settings" | Edit `settings.yaml`, shared specialists and pipelines; the system state | [web/settings.md](settings.md) |
 
@@ -86,7 +87,7 @@ The tab lists what the agents of the daemon started: their child processes and t
 
 - `Cmd+K` on macOS, `Ctrl+K` elsewhere, opens the command palette. It searches sections, runs (those waiting for an answer first), groups of the open run, pipelines and specialists, and runs actions such as "New task in the queue" and "New task on a page".
 - Outside input fields and dialogs: `Ctrl+N` opens a new task, `Ctrl+P` opens the project menu, `j` and `k` move to the next and previous run, `?` shows all shortcuts.
-- `Ctrl` and a letter go to a section: `R` runs, `Q` queue, `S` specialists, `B` pipelines, `T` statistics, `C` settings. With selected text `Ctrl+C` keeps copying instead of going to the settings.
+- `Ctrl` and a letter go to a section: `R` runs, `Q` queue, `S` specialists, `B` pipelines, `O` providers, `T` statistics, `C` settings. With selected text `Ctrl+C` keeps copying instead of going to the settings.
 - Letters work in any keyboard layout, because the physical key counts.
 - Cancelling a run or a group, removing from the queue, leaving an unsaved form and rereading the configuration ask for confirmation. Focus is on the refusal, and `Esc` refuses.
 - Results of actions are notifications. Errors stay until you dismiss them.

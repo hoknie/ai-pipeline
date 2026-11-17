@@ -33,6 +33,8 @@ const SAMPLES: Record<Method, unknown> = {
   config: repository,
   config_catalog: repository,
   config_models: { ...repository, refresh: true },
+  config_providers: repository,
+  provider_models: { ...repository, provider: 'zai', refresh: true },
   config_write: written,
   config_setting: { ...repository, path: 'web.port', value: 7341, revision: null },
   config_settings: { ...repository, values: { 'web.port': 7341 }, revision: null },
@@ -140,9 +142,9 @@ describe('links in requests', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 88 methods, each in the request schema once', () => {
+  it('has 90 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(88);
+    expect(methods).toHaveLength(90);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

@@ -1637,6 +1637,66 @@ describe('aip web configuration editor', () => {
     ).toBe(400);
   });
 
+  it('lists, writes and deletes providers, and refuses to delete one a chain uses', async () => {
+    const { web, base } = await editor();
+    const send = (method: string, path: string, body?: unknown) =>
+      fetch(`${base}${path}`, {
+        method,
+        headers: authed(web, JSON_TYPE),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const list = async () =>
+      (await (await send('GET', '/api/config/providers')).json()) as {
+        errors: unknown[];
+        providers: { slug: string; name: string; limitUntil: number | null }[];
+      };
+    expect((await list()).providers).toEqual([]);
+
+    const created = await send('PUT', '/api/config/providers/corp', {
+      value: { name: 'Corp', access: [{ kind: 'cli', runtime: 'claude' }] },
+      revision: null,
+    });
+    expect(created.status).toBe(200);
+    expect((await list()).providers).toMatchObject([
+      { slug: 'corp', name: 'Corp', limitUntil: null },
+    ]);
+    const invalid = await send('PUT', '/api/config/providers/bad', {
+      value: { name: 'Bad', access: [{ kind: 'cli', runtime: 'claude', model_prefix: '/x' }] },
+      revision: null,
+    });
+    expect(invalid.status).toBe(422);
+    const badId = await send('PUT', '/api/config/providers/..%2Fx', { value: {}, revision: null });
+    expect(badId.status).toBe(400);
+    const noModels = await send('GET', '/api/config/providers/nope/models');
+    expect(noModels.status).toBeGreaterThanOrEqual(400);
+
+    const editorView = (await (await send('GET', '/api/config')).json()) as {
+      providers: { slug: string; revision: string }[];
+    };
+    const revision = editorView.providers.find((item) => item.slug === 'corp')!.revision;
+    const chain = {
+      name: 'Thinking',
+      mode: 'by_provider',
+      runtimes: [{ provider: 'corp', runtime: 'claude', model: 'opus' }],
+    };
+    expect(
+      (await send('PUT', '/api/config/chains/thinking', { value: chain, revision: null })).status,
+    ).toBe(200);
+    const used = await send('DELETE', `/api/config/providers/corp?revision=${revision}`);
+    expect(used.status).toBe(422);
+    expect(((await used.json()) as { references: unknown[] }).references.length).toBeGreaterThan(0);
+
+    const chains = (await (await send('GET', '/api/config')).json()) as {
+      chains: { slug: string; revision: string }[];
+    };
+    const thinking = chains.chains.find((item) => item.slug === 'thinking')!;
+    await send('DELETE', `/api/config/chains/thinking?revision=${thinking.revision}`);
+    const removed = await send('DELETE', `/api/config/providers/corp?revision=${revision}`);
+    expect(removed.status).toBe(200);
+    expect((await list()).providers).toEqual([]);
+    expect((await send('DELETE', '/api/config/providers/corp')).status).toBe(400);
+  });
+
   it('writes and deletes on the global level and rejects an unknown level', async () => {
     const { h, web, base } = await editor();
     const file = join(h.repo, '..', 'xdg', 'aip', 'specialists', 'qa.yaml');

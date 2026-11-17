@@ -160,8 +160,14 @@ describe('documentation examples', () => {
       ),
       pipelines: { feature: read('pipelines/feature.yaml') },
       actions: { lint: read('actions/lint.yaml'), commit: read('actions/commit.yaml') },
+      providers: Object.fromEntries(
+        ['anthropic', 'zai'].map((p) => [p, read(`providers/${p}.yaml`)]),
+      ),
     });
     expect(findPipeline(example, 'feature')?.stages).toEqual({ before_delivery: ['lint'] });
+    expect(example.roles.map((role) => role.slug)).toEqual(['think', 'code', 'light']);
+    expect(example.providers.map((provider) => provider.slug)).toEqual(['anthropic', 'zai']);
+    expect(example.providers[1]?.models.think).toEqual({ model: 'glm-5.3' });
   });
 
   it('the epic example of docs/configuration/pipelines.md splits into another pipeline', () => {

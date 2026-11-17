@@ -26,6 +26,10 @@ export interface AttemptView {
   provider?: string;
   /** The provider of the run, when the tier of the step had no enabled item of it. */
   requestedProvider?: string;
+  /** The name of `provider` in the configuration of the run, when it has one. */
+  providerName?: string;
+  /** The name of `requestedProvider` in the configuration of the run, when it has one. */
+  requestedProviderName?: string;
   status: string;
   verdict: string | null;
   summary: string | null;

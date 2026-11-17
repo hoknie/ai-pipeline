@@ -43,6 +43,7 @@ The "Chains" tab edits project runtime chains (`aip/chains/<slug>.yaml`) for fai
 
 - Mode: `on_error` (failover on limits or unavailable runtime), `round_robin` (turn-based iteration), `random`, or "By provider" (`by_provider`, see [Tiers](../configuration/runtimes.md#tiers-by_provider)).
 - Ordered list of runtimes with individual provider, model, variant, reasoning effort, and enable toggles. In the "By provider" mode the provider is required and one item can be switched to "Default"; the errors of both show at the item's field.
+- A `provider` of an item is chosen in the [provider combobox](providers.md#choosing-a-provider-elsewhere) and must name a [provider](../configuration/providers.md); a disabled one is allowed.
 - Shared chains are view-only here. "Override in the project" copies a shared chain into the project; "Remove the override" returns to the shared chain.
 - Shared chains (`~/.config/aip/chains/<slug>.yaml`) are created and edited in [Settings](settings.md) under the "Chains" group (`#settings/global/chains`). This form edits the shared source even when the current project overrides it.
 

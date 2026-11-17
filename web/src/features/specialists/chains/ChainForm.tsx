@@ -79,7 +79,7 @@ export function ChainForm({ api, chain, scope, onDirty, onSaved, onDeleted }: Ch
             draft={draft}
             onChange={setDraft}
           />
-          <ChainRuntimes editor={editor} disabled={disabled} />
+          <ChainRuntimes api={api} editor={editor} disabled={disabled} />
         </div>
       </div>
     </section>

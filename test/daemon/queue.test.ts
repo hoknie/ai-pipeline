@@ -434,6 +434,9 @@ describe('pipeline variants in the queue', () => {
 describe('task provider in the queue', () => {
   const TIER_CONFIG = `swarm:
   max: 3
+  providers:
+    anthropic: { name: Anthropic, access: [{ kind: cli, runtime: claude }] }
+    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }
   chains:
     coding:
       name: Coding
@@ -472,7 +475,7 @@ describe('task provider in the queue', () => {
   it('rejects an unknown provider without changing the queue, on add and on edit', async () => {
     const h = await start(TIER_CONFIG);
     await expect(add(h, 'A', { provider: 'openai' })).rejects.toThrow(
-      'unknown provider `openai`; known: anthropic, zai',
+      'unknown provider `openai`; known: anthropic (Anthropic), zai (Z.ai)',
     );
     const { item } = await add(h, 'B');
     await expect(
@@ -493,14 +496,18 @@ describe('task provider in the queue', () => {
     const h = await start(TIER_CONFIG);
     await expect(
       h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', provider: 'nope' }),
-    ).rejects.toThrow('unknown provider `nope`; known: anthropic, zai');
+    ).rejects.toThrow('unknown provider `nope`; known: anthropic (Anthropic), zai (Z.ai)');
     expect((await queueOf(h)).items).toEqual([]);
   });
 
   it('lists the providers of the tiers in the pipelines view', async () => {
     const h = await start(TIER_CONFIG);
-    const view = (await h.call('pipelines', { repository: h.repo })) as { providers: string[] };
+    const view = (await h.call('pipelines', { repository: h.repo })) as {
+      providers: string[];
+      providerNames: Record<string, string>;
+    };
     expect(view.providers).toEqual(['anthropic', 'zai']);
+    expect(view.providerNames).toEqual({ anthropic: 'Anthropic', zai: 'Z.ai' });
   });
 
   it('creates the run with the provider of the item', async () => {
@@ -512,6 +519,44 @@ describe('task provider in the queue', () => {
     expect(created).toMatchObject({ provider: 'zai' });
   });
 
+  const DISABLED = TIER_CONFIG.replace('zai: { name: Z.ai,', 'zai: { name: Z.ai, enabled: false,');
+
+  it('refuses a disabled provider on add, on edit and on the run request, changing nothing', async () => {
+    const h = await start(DISABLED);
+    await expect(add(h, 'A', { provider: 'zai' })).rejects.toThrow('provider `zai` is disabled');
+    const { item } = await add(h, 'B');
+    await expect(
+      h.call('queue_edit', { repository: h.repo, item, provider: 'zai' }),
+    ).rejects.toThrow('provider `zai` is disabled');
+    await expect(
+      h.call('run', { repository: h.repo, pipeline: 'feature', task: 'x', provider: 'zai' }),
+    ).rejects.toThrow('provider `zai` is disabled');
+    expect((await queueOf(h)).items.map((entry) => entry.provider)).toEqual([null]);
+    await add(h, 'C', { provider: 'anthropic' });
+  });
+
+  it('keeps an item first with an error when its provider was switched off before the start', async () => {
+    const h = await start(TIER_CONFIG);
+    await add(h, 'A', { provider: 'zai' });
+    writeConfigDirectory(h.repo, DISABLED);
+    await h.call('queue_start', { repository: h.repo });
+    const queue = await queueOf(h);
+    expect(queue.status).toBe('stopped');
+    expect(queue.stop).toMatchObject({ kind: 'item' });
+    expect(queue.items[0]?.error).toContain('provider `zai` is disabled');
+    expect(await allRuns(h)).toEqual([]);
+  });
+
+  it('names the provider in the item of the queue and in the run', async () => {
+    const h = await start(TIER_CONFIG);
+    await add(h, 'A', { provider: 'zai' });
+    expect((await queueOf(h)).items[0]).toMatchObject({ provider: 'zai', providerName: 'Z.ai' });
+    await h.call('queue_start', { repository: h.repo });
+    await waitQueue(h, (queue) => queue.items.length === 0);
+    const [created] = await allRuns(h);
+    expect(created).toMatchObject({ provider: 'zai', providerName: 'Z.ai' });
+  });
+
   it('keeps an item first with an error when its provider was removed before the start', async () => {
     const h = await start(TIER_CONFIG);
     await add(h, 'A', { provider: 'zai' });
@@ -520,13 +565,16 @@ describe('task provider in the queue', () => {
       TIER_CONFIG.replace(
         '        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }\n',
         '',
+      ).replace(
+        '    zai: { name: Z.ai, access: [{ kind: cli, runtime: opencode, model_prefix: zai }] }\n',
+        '',
       ),
     );
     await h.call('queue_start', { repository: h.repo });
     const queue = await queueOf(h);
     expect(queue.status).toBe('stopped');
     expect(queue.stop).toMatchObject({ kind: 'item' });
-    expect(queue.items[0]?.error).toContain('unknown provider `zai`; known: anthropic');
+    expect(queue.items[0]?.error).toContain('unknown provider `zai`; known: anthropic (Anthropic)');
     expect(await allRuns(h)).toEqual([]);
   });
 });

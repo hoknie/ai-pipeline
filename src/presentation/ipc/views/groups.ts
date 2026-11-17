@@ -1,4 +1,5 @@
 import { suggestPatterns } from '../../../feature/agents/types/index.ts';
+import { providerName } from '../../../feature/swarm-config/types/index.ts';
 import {
   type Attempt,
   type Group,
@@ -52,6 +53,16 @@ function attemptDecision(group: Group, attempt: Attempt): AttemptDecision | null
     : null;
 }
 
+/** `{ [key]: name }` when the configuration of the run names the provider, else nothing. */
+function nameOf<K extends string>(
+  key: K,
+  state: RunState,
+  slug: string | undefined,
+): { [P in K]?: string } {
+  const name = slug === undefined ? null : providerName(state.run.config, slug);
+  return (name === null ? {} : { [key]: name }) as { [P in K]?: string };
+}
+
 export function attemptView(
   state: RunState,
   group: Group,
@@ -68,6 +79,8 @@ export function attemptView(
     runtime: attempt.runtime,
     model: attempt.model,
     ...(attempt.provider !== undefined ? { provider: attempt.provider } : {}),
+    ...nameOf('providerName', state, attempt.provider),
+    ...nameOf('requestedProviderName', state, attempt.requestedProvider),
     ...(attempt.requestedProvider !== undefined
       ? { requestedProvider: attempt.requestedProvider }
       : {}),

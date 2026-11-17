@@ -12,6 +12,7 @@ import type {
   QueueView,
   RunView,
 } from '../../../shared/api/types.ts';
+import { useCommonProviders } from '../../providers/index.ts';
 import { emptyDraft, retarget, type QueueDraft } from '../draft.ts';
 import { useOpenTarget, usePresetDraft } from './usePresetDraft.ts';
 import { useTargetQueue, useTargetQueues } from './useTargetQueue.ts';
@@ -121,6 +122,37 @@ function useMultiProjects(input: {
       setTag(null);
     },
   };
+}
+
+/** The providers of a pipelines view are the ones of the registry once it is known. */
+function withRegistry(
+  view: PipelinesView | null,
+  registry: ReturnType<typeof useCommonProviders>,
+): PipelinesView | null {
+  if (view === null || !registry.loaded) return view;
+  return {
+    ...view,
+    providers: registry.providers.map((provider) => provider.slug),
+    providerNames: Object.fromEntries(registry.providers.map((p) => [p.slug, p.name])),
+  };
+}
+
+/** The pipelines of the target and the common ones, with the providers of the registry. */
+function useRegistryViews(
+  api: Api,
+  loaded: ReadonlyMap<string, PipelinesView | undefined>,
+  multi: { on: boolean; projects: readonly string[] },
+  target: string,
+) {
+  const registry = useCommonProviders(api, multi.on ? multi.projects : [target]);
+  const rawTarget = loaded.get(target) ?? null;
+  const targetPipelines = useMemo(
+    () => (multi.on ? rawTarget : withRegistry(rawTarget, registry)),
+    [multi.on, rawTarget, registry],
+  );
+  const rawCommon = multi.on ? commonPipelines(multi.projects.map((p) => loaded.get(p))) : null;
+  const common = useMemo(() => withRegistry(rawCommon, registry), [rawCommon, registry]);
+  return { targetPipelines, common };
 }
 
 /** The pipeline, variant and skipped steps of the draft stay among those every project has. */
@@ -242,8 +274,7 @@ export function useNewTaskState(props: {
     onMode: () => onDraft({ ...current, mode: 'task', repository: current.repository ?? target }),
   });
   const loaded = useTargetPipelines(api, multi.on ? multi.projects : [target]);
-  const targetPipelines = loaded.get(target) ?? null;
-  const common = multi.on ? commonPipelines(multi.projects.map((path) => loaded.get(path))) : null;
+  const { targetPipelines, common } = useRegistryViews(api, loaded, multi, target);
   const pipelines = multi.on ? common : targetPipelines;
   useCommonDraft({ draft: multi.on ? draft : undefined, common, onDraft });
   const queue = queues.get(target);

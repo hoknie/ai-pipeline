@@ -3,6 +3,7 @@ import type { Method, Request } from '../contract/index.ts';
 import { configHandlers } from './config.ts';
 import { groupHandlers } from './groups.ts';
 import { observerHandlers } from './observers.ts';
+import { providerHandlers } from './providers.ts';
 import { queueHandlers } from './queue.ts';
 import { repositoryHandlers } from './repositories.ts';
 import { runHandlers } from './runs.ts';
@@ -16,6 +17,7 @@ export const handlers: HandlerTable = {
   ...repositoryHandlers,
   ...observerHandlers,
   ...configHandlers,
+  ...providerHandlers,
   ...runHandlers,
   ...groupHandlers,
   ...queueHandlers,
