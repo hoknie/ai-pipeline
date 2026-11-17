@@ -309,25 +309,38 @@ describe('the mode «All projects»', () => {
       ...bind(path),
       providers: async () => views[path ?? '']!,
     });
-    render(
-      <ProvidersPage
-        api={api}
-        repository="/work/app"
-        runs={[]}
-        selected={null}
-        section={null}
-        preset={null}
-        project={null}
-        projects={{ registry: [app, lib], last: null }}
-        onSelect={vi.fn()}
-      />,
-    );
+    const open = vi.fn();
+    const mountMode = (selected: string | null) =>
+      render(
+        <ProvidersPage
+          api={api}
+          repository="/work/app"
+          runs={[]}
+          selected={selected}
+          section={null}
+          preset={null}
+          project={null}
+          projects={{ registry: [app, lib], last: null }}
+          onSelect={vi.fn()}
+          onOpenInProject={open}
+        />,
+      );
+    mountMode(null);
     const list = await screen.findByRole('region', { name: 'Providers' });
     await waitFor(() => expect(within(list).getAllByText('Anthropic')).toHaveLength(1));
+    const anthropic = within(list).getByRole('button', { name: /Anthropic/ });
+    expect(within(anthropic).getByText('In all projects')).toBeTruthy();
     const local = within(list).getByRole('button', { name: /Local/ });
     expect(within(local).getByText(app.label)).toBeTruthy();
-    expect(within(local).getByText('Project')).toBeTruthy();
-    expect(screen.getByText(/The shared level is shown/)).toBeTruthy();
+    expect(within(local).getByText(/Project/)).toBeTruthy();
+    expect(screen.getByText('To change, choose a project')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Create provider/ })).toBeNull();
+    cleanup();
+    mountMode('local');
+    const overview = await screen.findByRole('region', { name: 'Local' });
+    expect(within(overview).queryByRole('textbox')).toBeNull();
+    fireEvent.click(within(overview).getByRole('button', { name: /Open in project/ }));
+    expect(open).toHaveBeenCalledWith('/work/app', 'local');
   });
 });
 

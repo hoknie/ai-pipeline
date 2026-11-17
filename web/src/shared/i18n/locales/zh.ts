@@ -679,11 +679,15 @@ export const zh: Dictionary = {
     commit: '提交',
     branch: '分支',
   },
-  projectChoice: {
-    title: '项目',
-    description: '新条目将保存到所选项目。',
-    label: '项目',
-    choose: '继续',
+  projectOverview: {
+    hint: '要修改，请先选择项目',
+    open: '在项目中打开',
+    shared: '共享层级',
+    steps: '步骤数：{{count}}',
+    models: '模型数：{{count}}',
+    everywhere: '在所有项目中',
+    project: '项目',
+    overrides: '项目 · 覆盖共享',
   },
   queue: {
     settings: {

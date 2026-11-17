@@ -5,8 +5,6 @@ export const providersEs: Dictionary['providers'] = {
   title: 'Proveedores',
   createButton: 'Crear proveedor',
   loading: 'Cargando proveedores…',
-  allProjectsHint:
-    'Se muestra el nivel compartido. Elige un proyecto para ver y cambiar sus proveedores, roles y modelos.',
   tabs: { label: 'Pestañas de proveedores', providers: 'Proveedores', roles: 'Roles' },
   level: {
     global: 'Compartido',

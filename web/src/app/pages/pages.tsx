@@ -210,10 +210,12 @@ export function SwarmRoute({
   common,
   repository,
   allProjects,
+  onOpenInProject,
 }: {
   common: Common;
   repository: string | null;
   allProjects?: AllProjectsList;
+  onOpenInProject?: (path: string, route: Route) => void;
 }) {
   const { t } = useTranslation();
   const { route, onRoute } = common;
@@ -229,6 +231,12 @@ export function SwarmRoute({
         runs={common.runs}
         dirty={common.dirty}
         projects={allProjects}
+        onOpenInProject={
+          onOpenInProject
+            ? (path, target) =>
+                onOpenInProject(path, routeOfSwarmTarget({ ...target, project: null }))
+            : undefined
+        }
         hrefOf={(target) => formatRoute(routeOfSwarmTarget(target))}
         onNavigate={(target) => onRoute(routeOfSwarmTarget(target))}
         onOpenGroup={(target, step) => onRoute({ ...to('runs', target.runId, target.slug), step })}

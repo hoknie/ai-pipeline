@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { ConfigEditorResponse } from '../../../shared/api/types.ts';
 import { SYSTEM_KINDS, isSystemKind } from '../../../shared/lib/pipeline/pipelineEntries.ts';
-import { rowKey, splitRowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
 import { formatRoute, type PipelineSection } from '../../../shared/lib/nav/route.ts';
 import { NEW_ID } from '../../specialists/index.ts';
 import type { PipelineNavigation } from './usePipelineNavigation.ts';
@@ -23,17 +22,9 @@ function topologyTarget(
   return known(last.pipelines) ? last.pipelines : (ids[0] ?? null);
 }
 
-/** The route of an entry key (`<project>/<id>` in the mode «All projects»). */
-function routeOf(key: string | null, group: PipelineSection | null) {
-  const { project, id } = key === null ? { project: null, id: null } : splitRowKey(key);
-  return {
-    view: 'pipelines' as const,
-    run: id,
-    group,
-    step: null,
-    tab: null,
-    ...(project === null ? {} : { project }),
-  };
+/** The route of an entry of a tab. */
+function routeOf(id: string | null, group: PipelineSection | null) {
+  return { view: 'pipelines' as const, run: id, group, step: null, tab: null };
 }
 
 /** The tabs «pipelines», «actions», «system» and «topology»; each leads to the entry last open on it. */
@@ -46,8 +37,7 @@ export function usePipelineTabs(props: {
 }) {
   const { view, actions, section, selected, navigation } = props;
   const { t } = useTranslation();
-  const keyed = (entries: readonly { id: string; project?: ProjectRef | null }[]) =>
-    entries.map((entry) => rowKey(entry.project?.slug, entry.id));
+  const keyed = (entries: readonly { id: string }[]) => entries.map((entry) => entry.id);
   /** Where a tab leads: the entry last open on it, else the default one. */
   const targetOf = (tab: Tab): string | null => {
     const last = navigation.lastOpen.current[tab];

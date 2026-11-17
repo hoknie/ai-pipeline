@@ -88,9 +88,11 @@ The addresses are `#pipelines`, `#pipelines/<id>` and `#pipelines/new`; `#pipeli
 
 ## All projects
 
-With "All projects" chosen in the repository picker, "Specialists" (with "Chains") and "Pipeline" show every enabled project at once: shared entries once, project entries one row each with the project name, so the same slug in two projects gives two rows. A project whose configuration cannot be read shows its error, and the others stay.
+With "All projects" chosen in the repository picker, "Specialists", "Chains", "Pipeline" (pipelines and actions) and "Providers" group the enabled projects by entry: one row per slug or id, and under it the projects that have it ("In all projects" for a shared entry every project uses as it is; a project's own entry is marked "Project", an override "Project · overrides shared").
 
-- The filter "Project" (the shared entries and each project, with the number of rows) narrows the list; it is remembered per tab.
-- A project row opens its form in its own project: reading and saving go to that project. Its address is `#specialists/<slug>?project=<project slug>` (the same for `#pipelines/…`); an address without `project` opens the shared entry, and an unknown project shows "Project not found".
-- "New" and "Import" first ask for the project.
+A project whose configuration cannot be read shows its error, and the others stay.
+
+- The view is read only: no forms, no "New" or "Import". Choosing a row opens an overview on the right with a block per project and the button "Open in project", which leaves the mode, selects that project and opens the entry in its form.
+- The filter "Project" (the shared entries and each project, with the number of rows) narrows the list; a row stays when any of its projects is chosen. It is remembered per tab.
+- The address of a row is `#specialists/<slug>` (the same for `#pipelines/…` and `#providers/<slug>`). An old address with `?project=<project slug>` opens the same row and marks that project's block; an unknown project shows "Project not found".
 - "Topology" and "System stages" show one project at a time: choose it in the "Project" field above the content; the mode stays on.

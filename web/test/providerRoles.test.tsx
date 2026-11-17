@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProvidersPage } from '../src/features/providers/index.ts';
 import type { EditorSetting } from '../src/shared/api/types.ts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
-import { configView, fakeApi } from './fixtures.ts';
+import { configView, fakeApi, repositoryView } from './fixtures.ts';
 import { editorProvider, providersView, providerView, roleView } from './providerFixtures.ts';
 
 afterEach(cleanup);
@@ -204,5 +204,44 @@ describe('the tab «Roles»', () => {
       />,
     );
     expect(await screen.findByText('No roles yet. Add the first one.')).toBeTruthy();
+  });
+});
+
+describe('the roles in the mode «All projects»', () => {
+  it('are shown without any way to change them', async () => {
+    counter += 1;
+    const app = repositoryView('/work/app');
+    const lib = repositoryView('/work/lib');
+    const view = providersView({
+      roles: [roleView('code', 'Code')],
+      providers: [
+        providerView('zai', { name: 'Z.ai', models: { code: { model: 'glm' } } as never }),
+      ],
+    });
+    const api = fakeApi({ providers: vi.fn(async () => view) });
+    const bind = api.forRepository;
+    api.forRepository = (path) => ({ ...bind(path), providers: async () => view });
+    render(
+      <ProvidersPage
+        api={api}
+        repository="/work/app"
+        runs={[]}
+        selected={null}
+        section="roles"
+        preset={null}
+        project={null}
+        projects={{ registry: [app, lib], last: null }}
+        onSelect={vi.fn()}
+      />,
+    );
+    const tab = await screen.findByRole('region', { name: 'Roles' });
+    expect(screen.queryByRole('button', { name: /Add role/ })).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull();
+    fireEvent.click(within(tab).getByText(/Code/));
+    const models = await screen.findByRole('region', { name: 'Models of the role' });
+    expect(within(models).getByText('glm')).toBeTruthy();
+    expect(within(models).queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Rename|Remove|Move/ })).toBeNull();
+    expect(screen.getByText('To change, choose a project')).toBeTruthy();
   });
 });

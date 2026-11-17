@@ -688,11 +688,15 @@ export const en = {
     commit: 'Commit',
     branch: 'Branch',
   },
-  projectChoice: {
-    title: 'Project',
-    description: 'The new entry is saved into the project you choose.',
-    label: 'Project',
-    choose: 'Continue',
+  projectOverview: {
+    hint: 'To change, choose a project',
+    open: 'Open in project',
+    shared: 'Shared level',
+    steps: 'Steps: {{count}}',
+    models: 'Models: {{count}}',
+    everywhere: 'In all projects',
+    project: 'Project',
+    overrides: 'Project · overrides shared',
   },
   queue: {
     settings: {

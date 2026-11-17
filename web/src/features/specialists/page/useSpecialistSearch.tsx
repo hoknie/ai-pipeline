@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { usePreference } from '../../../shared/lib/browser/preferences.ts';
 import { FiltersButton } from '../../../shared/ui/layout/FiltersButton.tsx';
 import type { ConfigEditorResponse, EditorSpecialist } from '../../../shared/api/types.ts';
-import { projectCounts, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
+import { projectCounts, type GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
 import { EMPTY_FILTER, activeFilterCount, applyFilter } from '../specialistFilters.ts';
 import { SpecialistFilters } from '../SpecialistFilters.tsx';
 import { useSpecialistFilter } from './useSpecialistFilter.ts';
@@ -14,7 +14,7 @@ export function useSpecialistSearch(view: ConfigEditorResponse | null, columns: 
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = usePreference<boolean>('specialistFiltersCollapsed', false);
   const [search, setSearch] = useState('');
-  const rows: (EditorSpecialist & { project?: ProjectRef | null })[] = view?.specialists ?? [];
+  const rows: (EditorSpecialist & GroupInfo)[] = view?.specialists ?? [];
   const { filter, setFilter, options } = useSpecialistFilter(
     rows,
     view?.repository ?? null,

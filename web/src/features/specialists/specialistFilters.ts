@@ -4,7 +4,7 @@ import {
   inProjects,
   projectOptions,
   type ProjectOption,
-  type ProjectRef,
+  type GroupInfo,
 } from '../../shared/lib/catalog/projectRows.ts';
 
 export type LevelFilter = 'all' | 'project' | 'global';
@@ -39,7 +39,8 @@ export const LIST_FIELDS: ListField[] = ['runtimes', 'models', 'skills', 'tools'
 type Entry = Pick<
   EditorSpecialist,
   'slug' | 'level' | 'raw' | 'effective' | 'shared_tags' | 'own_tags'
-> & { project?: ProjectRef | null };
+> &
+  GroupInfo;
 
 export interface SpecialistValues {
   name: string | null;

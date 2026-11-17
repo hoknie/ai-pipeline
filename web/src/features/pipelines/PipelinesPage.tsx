@@ -20,7 +20,7 @@ const TopologyPage = lazy(() =>
 );
 
 interface PipelinesPageProps {
-  /** Set in the mode «All projects»: the lists merge the projects. */
+  /** Set in the mode «All projects»: the lists group the projects and only show them. */
   projects?: ProjectsMode;
   api: Api;
   runs: RunView[];
@@ -38,6 +38,8 @@ interface PipelinesPageProps {
   ) => void;
   /** Opens a group of a run (a click on a live group of the topology). */
   onOpenGroup?: (group: LiveGroup, step: string | null) => void;
+  /** Opens an entry in the form of a project (leaves the mode «All projects»). */
+  onOpenInProject?: ((path: string, entry: string, section?: string | null) => void) | undefined;
   /** Whether the open form has unsaved edits; the caller owns it to guard other navigation. */
   dirty?: RefObject<boolean>;
 }
@@ -50,6 +52,7 @@ export default function PipelinesPage({
   variant = null,
   onSelect,
   onOpenGroup,
+  onOpenInProject,
   dirty: sharedDirty,
   projects,
 }: PipelinesPageProps) {
@@ -61,10 +64,10 @@ export default function PipelinesPage({
       ? shownSection
       : null;
   const scope = usePipelinesScope({ api, projects, section, selected, dirty, onSelect });
-  const { listMode, picker, tabApi, data, contextOf, selectedKey, navigation } = scope;
+  const { listMode, picker, tabApi, data, navigation } = scope;
   const { view } = data;
   const actions = view ? actionsOf(view) : [];
-  const tabs = usePipelineTabs({ view, actions, section, selected: selectedKey, navigation });
+  const tabs = usePipelineTabs({ view, actions, section, selected, navigation });
   const firstPipeline = view?.pipelines[0]?.id ?? null;
 
   // the former address `#topology` has no pipeline: open the first one
@@ -106,12 +109,12 @@ export default function PipelinesPage({
             runs={runs}
             data={data}
             navigation={navigation}
-            selected={selectedKey}
+            selected={selected}
             section={section}
             dirty={dirty}
             onSelect={scope.choose}
             projects={listMode ? projects : undefined}
-            contextOf={listMode ? contextOf : undefined}
+            onOpenInProject={onOpenInProject}
           />
         </>
       )}

@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
 import type { ProviderView } from '../../../shared/api/types.ts';
-import type { ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
-import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
+import type { GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectChips } from '../../repositories/index.ts';
 import { cn } from '../../../shared/lib/browser/cn.ts';
 import { LimitCell } from './LimitCell.tsx';
 import { ProviderStatusBadge, accessSummary } from './ProviderStatus.tsx';
@@ -13,8 +13,8 @@ export interface ProviderRow {
   provider: ProviderView;
   /** The project file overrides a shared one. */
   overrides: boolean;
-  /** The project of a project provider in the mode «All projects»; null otherwise. */
-  project: ProjectRef | null;
+  /** The projects that have the provider, in the mode «All projects»; absent otherwise. */
+  group?: GroupInfo;
 }
 
 export const reasonsOf = (provider: ProviderView): string[] => [
@@ -50,9 +50,14 @@ function RowBody({ row, narrow }: { row: ProviderRow; narrow: boolean }) {
         <span className="truncate text-xs text-muted-foreground">{provider.slug}</span>
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground">
-        {row.project ? <ProjectDot color={row.project.color} /> : null}
-        {row.project ? <span>{row.project.label}</span> : null}
-        <span>{levelText(row)}</span>
+        {row.group?.presences ? (
+          <ProjectChips
+            everywhere={row.group.everywhere === true}
+            presences={row.group.presences}
+          />
+        ) : (
+          <span>{levelText(row)}</span>
+        )}
       </span>
       <span
         className="truncate text-sm"

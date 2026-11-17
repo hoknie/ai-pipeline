@@ -71,14 +71,16 @@ export function useRepositoryActions(panel: PanelData) {
       panel.rememberProject(to);
   };
 
-  /** Makes a project the panel's repository, then opens its settings or its queue. */
-  const openProject = async (path: string, target: 'settings' | 'queue') => {
+  /** Makes a project the panel's repository, then opens its settings, its queue or a route. */
+  const openProject = async (path: string, target: 'settings' | 'queue' | Route) => {
     if (!(await selectRepository(path))) return;
-    setRoute(
-      target === 'queue'
-        ? { view: 'queue', run: null, group: null, step: null, tab: null }
-        : { view: 'settings', run: 'general', group: 'project', step: null, tab: null },
-    );
+    if (typeof target !== 'string') setRoute(target);
+    else
+      setRoute(
+        target === 'queue'
+          ? { view: 'queue', run: null, group: null, step: null, tab: null }
+          : { view: 'settings', run: 'general', group: 'project', step: null, tab: null },
+      );
   };
   return {
     selectAllProjects,

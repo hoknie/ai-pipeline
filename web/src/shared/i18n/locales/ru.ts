@@ -698,11 +698,15 @@ export const ru: Dictionary = {
     commit: 'Коммит',
     branch: 'Ветка',
   },
-  projectChoice: {
-    title: 'Проект',
-    description: 'Новая запись сохранится в выбранный проект.',
-    label: 'Проект',
-    choose: 'Продолжить',
+  projectOverview: {
+    hint: 'Чтобы изменить, выберите проект',
+    open: 'Открыть в проекте',
+    shared: 'Общий уровень',
+    steps: 'Этапов: {{count}}',
+    models: 'Моделей: {{count}}',
+    everywhere: 'Во всех проектах',
+    project: 'Проект',
+    overrides: 'Проект · переопределяет общий',
   },
   queue: {
     settings: {

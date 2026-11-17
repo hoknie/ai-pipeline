@@ -6,7 +6,7 @@ import {
   inProjects,
   projectOptions,
   type ProjectOption,
-  type ProjectRef,
+  type GroupInfo,
 } from '../../shared/lib/catalog/projectRows.ts';
 
 /** What the pipelines list is narrowed by; the search text lives apart from it. */
@@ -25,9 +25,7 @@ export const EMPTY_PIPELINE_FILTER: PipelineFilter = {
   projects: [],
 };
 
-type Entry = Pick<EditorPipeline, 'id' | 'level' | 'raw' | 'shared_tags' | 'own_tags'> & {
-  project?: ProjectRef | null;
-};
+type Entry = Pick<EditorPipeline, 'id' | 'level' | 'raw' | 'shared_tags' | 'own_tags'> & GroupInfo;
 
 export interface PipelineFilterOptions {
   tags: { name: string; shared: boolean }[];

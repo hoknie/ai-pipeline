@@ -2,8 +2,8 @@ import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { EditorChain, EntryLevel } from '../../../shared/api/types.ts';
-import { rowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
-import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
+import type { GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectChips, ReadOnlyHint } from '../../repositories/index.ts';
 import { Badge } from '../../../shared/ui/feedback/badge.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { EntryList } from '../../../shared/ui/layout/EntryList.tsx';
@@ -25,14 +25,17 @@ export function ChainsList({
   chains,
   loaded,
   selected,
+  readOnly = false,
   onNew,
   onSelect,
   onProviders,
 }: {
-  chains: (EditorChain & { project?: ProjectRef | null })[];
+  chains: (EditorChain & GroupInfo)[];
   loaded: boolean;
   selected: string | null;
-  onNew: () => void;
+  /** The mode «All projects»: nothing is created here. */
+  readOnly?: boolean;
+  onNew?: () => void;
   onSelect: (slug: string) => void;
   /** Opens the tab «Providers» of the window; the hint of an empty list links to it. */
   onProviders?: () => void;
@@ -40,12 +43,16 @@ export function ChainsList({
   const { t } = useTranslation();
   return (
     <>
-      <div className="flex gap-2">
-        <Button className="flex-1" disabled={!loaded} onClick={onNew}>
-          <Plus />
-          {t('chains.new')}
-        </Button>
-      </div>
+      {readOnly ? (
+        <ReadOnlyHint />
+      ) : (
+        <div className="flex gap-2">
+          <Button className="flex-1" disabled={!loaded} onClick={onNew}>
+            <Plus />
+            {t('chains.new')}
+          </Button>
+        </div>
+      )}
       {loaded && chains.length === 0 ? (
         <div className="flex flex-col items-start gap-1 text-sm text-muted-foreground">
           <p>{t('swarm.hints.needProvider')}</p>
@@ -69,20 +76,17 @@ export function ChainsList({
               : 'on_error';
           const modeLabel = t(`chains.modes.${mode}`);
           return {
-            id: rowKey(chain.project?.slug, chain.slug),
+            id: chain.slug,
             title: String(chain.raw.name || chain.slug),
             subtitle: subtitleOf(chain, modeLabel),
             tag: t(`settings.editor.levels.${chain.level}`),
             extra: (
               <>
-                {chain.project ? (
-                  <span
-                    data-project-label={chain.project.slug}
-                    className="flex items-center gap-1 text-xs text-muted-foreground"
-                  >
-                    <ProjectDot color={chain.project.color} />
-                    {chain.project.label}
-                  </span>
+                {chain.presences ? (
+                  <ProjectChips
+                    everywhere={chain.everywhere === true}
+                    presences={chain.presences}
+                  />
                 ) : null}
                 {chain.raw.enabled === false ? (
                   <Badge variant="mute">{t('chains.disabled')}</Badge>

@@ -5,6 +5,7 @@ The "Swarm" section holds everything a run is made of, in one window with five t
 - The strip opens the window for the selected project (or for all projects). Clicking "Swarm" opens the tab you were on last, "Specialists" the first time.
 - `Ctrl+O` opens "Providers", `Ctrl+S` "Specialists" and `Ctrl+B` "Pipeline". The command palette has an item for each tab ("Swarm → Roles").
 - The same window is the group "Swarm" of the [settings](settings.md#swarm), on both tabs: "Shared" works with the shared files only, "Project" with the selected project.
+- With "All projects" the lists group entries by slug with their projects under each row and everything is read only; "Open in project" switches to that project and opens the entry for editing (see [All projects](config.md#all-projects)).
 - A tab remembers its last open entry while the page lives. Changing the tab with unsaved edits asks first.
 - The addresses of the tabs are `#providers`, `#providers/roles`, `#specialists/chains`, `#specialists` and `#pipelines`, each with `/<entry>`.
 

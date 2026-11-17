@@ -9,7 +9,8 @@ The tab is a list on the left (with "Create provider" and a search) and the form
 - The status is "Available" or "Unavailable" with the reasons in words: the access is turned off, its runtime is disabled in the settings, the command is not found, the key variable is not set, or the access is "API — soon".
 - A provider in a usage limit shows "Limit" with a countdown to its end; after the end the mark disappears.
 - Disabled providers are dimmed. A configuration that cannot be assembled shows its errors above the list.
-- `j` and `k` move through the list, `Enter` opens the form. With "All projects" the list shows each shared provider once and each project's own providers as separate rows with the project mark; the matrix and "Roles" show the shared level only, with a hint to choose a project.
+- `j` and `k` move through the list, `Enter` opens the form. With "All projects" the list has one row per provider with the projects that have it under it; a row opens a read-only overview with "Open in project".
+- The matrix and "Roles" show the shared level only and cannot be changed there: choose a project to edit.
 - The data are read again on opening, when the window gets focus and on run events, at most once in 5 seconds.
 
 ## Matrix

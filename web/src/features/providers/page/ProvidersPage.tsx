@@ -7,9 +7,12 @@ import { useMediaQuery } from '../../../shared/lib/browser/media.ts';
 import { enabledProjects } from '../../../shared/lib/catalog/projectRows.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { ConfigErrors, SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
+import type { Grouped } from '../../../shared/lib/catalog/projectRows.ts';
+import type { ProviderView } from '../../../shared/api/types.ts';
 import { type ProviderRow } from '../list/ProvidersList.tsx';
 import { ProvidersSide } from '../list/ProvidersSide.tsx';
 import { RolesTab } from '../roles/RolesTab.tsx';
+import { ProvidersOverviewPane } from '../overview/ProviderOverview.tsx';
 import { ProviderPane } from './ProviderPane.tsx';
 import { rowsOfAll, rowsOfProject, sharedLevel } from './providerRows.ts';
 import { levelOf, ScopeContext } from './scope.ts';
@@ -47,6 +50,8 @@ export interface ProvidersPageProps {
   usage?: ((slug: string) => ReactNode) | undefined;
   /** The address of the form of a new provider (for the empty state); the top bar's by default. */
   hrefOfNew?: ((preset: string | null) => string) | undefined;
+  /** Opens a provider in the form of a project (leaves the mode «All projects»). */
+  onOpenInProject?: ((path: string, entry: string) => void) | undefined;
   onSelect: (
     run: string | null,
     section?: string | null,
@@ -99,14 +104,10 @@ function LoadingNote() {
   );
 }
 
-/** The key of the row of the open provider: the slug, or in «All projects» with its project. */
+/** The key of the row of the open provider. */
 function openKey(rows: ProviderRow[], props: ProvidersPageProps): string | null {
   if (props.selected === null || props.selected === 'new') return null;
-  const project = props.projects ? props.project : null;
-  const found = rows.find(
-    (row) => row.provider.slug === props.selected && (row.project?.slug ?? null) === project,
-  );
-  return found?.key ?? null;
+  return rows.find((row) => row.provider.slug === props.selected)?.key ?? null;
 }
 
 /** The open provider; one that is not there (a stale address) leaves the tab without a chosen one. */
@@ -138,8 +139,7 @@ function ProvidersScreen(props: ProvidersPageProps & { scope: ProvidersScope }) 
   const data = useRows(props, scope);
   const { own, editor } = data;
   const onRoles = section === 'roles';
-  const open = (row: ProviderRow) =>
-    onSelect(row.provider.slug, null, null, row.project?.slug ?? null);
+  const open = (row: ProviderRow) => onSelect(row.provider.slug, null, null, null);
   const view = own.view;
   const shared = projects && view ? sharedLevel(view) : view;
   const broken = !projects && view !== null && view.errors.length > 0;
@@ -167,15 +167,13 @@ function ProvidersScreen(props: ProvidersPageProps & { scope: ProvidersScope }) 
             repository={repository}
             view={shared}
             editor={editor}
-            allProjects={projects !== undefined}
+            readOnly={projects !== undefined}
             onProviders={() => onSelect(null)}
           />
         ) : null}
       </div>
     );
   }
-  const owner =
-    projects?.registry.find((entry) => entry.slug === props.project)?.path ?? repository;
   return (
     <SplitPage
       side={
@@ -185,28 +183,70 @@ function ProvidersScreen(props: ProvidersPageProps & { scope: ProvidersScope }) 
             rows={rows}
             selected={openKey(rows, { ...props, selected }) ?? current}
             onOpen={open}
+            readOnly={projects !== undefined}
             onNew={() => onSelect('new')}
-            note={projects ? t('providers.allProjectsHint') : null}
           />
         </>
       }
     >
       {loading}
-      <ProviderPane
-        api={api}
-        repository={repository}
-        owner={owner}
+      <MainPane
+        {...props}
+        owner={repository}
         selected={selected}
-        preset={props.preset}
-        usage={props.usage}
-        hrefOfNew={props.hrefOfNew}
-        ready={ready}
-        rowCount={rows.length}
+        rows={rows}
         view={shared}
         editor={editor}
         narrow={narrow}
-        onSelect={onSelect}
+        ready={ready}
       />
     </SplitPage>
+  );
+}
+
+/** The right part: the overview of the mode «All projects», else the form or the matrix. */
+function MainPane(
+  props: ProvidersPageProps & {
+    owner: string | null;
+    rows: ProviderRow[];
+    view: ProvidersView | null;
+    editor: ReturnType<typeof useProviderEditor>['editor'];
+    narrow: boolean;
+    ready: boolean;
+  },
+) {
+  const { api, repository, selected, projects, rows, onSelect } = props;
+  if (projects) {
+    return (
+      <ProvidersOverviewPane
+        api={api}
+        repository={repository}
+        rows={rows.flatMap((row) => (row.group ? [row.group as Grouped<ProviderView>] : []))}
+        selected={selected}
+        highlight={props.project}
+        view={props.view}
+        narrow={props.narrow}
+        ready={props.ready}
+        onOpen={(path) => props.onOpenInProject?.(path, selected ?? '')}
+        onRoles={() => onSelect(null, 'roles')}
+      />
+    );
+  }
+  return (
+    <ProviderPane
+      api={api}
+      repository={repository}
+      owner={props.owner}
+      selected={selected}
+      preset={props.preset}
+      usage={props.usage}
+      hrefOfNew={props.hrefOfNew}
+      ready={props.ready}
+      rowCount={rows.length}
+      view={props.view}
+      editor={props.editor}
+      narrow={props.narrow}
+      onSelect={onSelect}
+    />
   );
 }

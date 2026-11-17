@@ -30,6 +30,7 @@ export function ProvidersMatrix({
   view,
   editor,
   narrow,
+  readOnly = false,
   onRoles,
 }: {
   api: Api;
@@ -37,6 +38,8 @@ export function ProvidersMatrix({
   view: ProvidersView;
   editor: ConfigEditorResponse | null;
   narrow: boolean;
+  /** The mode «All projects»: the matrix only shows the models. */
+  readOnly?: boolean;
   /** Opens the tab «Roles» of the window (the link of the empty matrix). */
   onRoles?: () => void;
 }) {
@@ -71,6 +74,7 @@ export function ProvidersMatrix({
         raw={sourceOf(found, scope)?.raw ?? null}
         error={errors[id]}
         busy={busy === id}
+        readOnly={readOnly}
         onWrite={(change) => void write(id, provider.slug, change)}
       />
     );

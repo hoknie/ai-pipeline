@@ -7,6 +7,7 @@ import type { ConfigEditorResponse, ProvidersView } from '../../../shared/api/ty
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
 import { SplitPage } from '../../../shared/ui/layout/EntryList.tsx';
+import { ReadOnlyHint } from '../../repositories/index.ts';
 import { useProvidersScope } from '../page/scope.ts';
 import { RoleDetails } from './RoleDetails.tsx';
 import { RoleDialogHost, RolesFailure } from './RoleDialogs.tsx';
@@ -19,14 +20,14 @@ function RolesSide({
   view,
   editor,
   level,
-  allProjects,
+  readOnly,
   actions,
   onLevel,
 }: {
   view: ProvidersView;
   editor: ConfigEditorResponse | null;
   level: Level;
-  allProjects: boolean;
+  readOnly: boolean;
   actions: ReturnType<typeof useRoleActions>;
   onLevel: (level: Level) => void;
 }) {
@@ -35,7 +36,7 @@ function RolesSide({
   return (
     <section aria-label={t('providers.roles.label')} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {scope === 'project' ? (
+        {scope === 'project' && !readOnly ? (
           <ToggleGroup
             type="single"
             value={level}
@@ -43,18 +44,16 @@ function RolesSide({
             onValueChange={(next) => next && onLevel(next as Level)}
           >
             <ToggleGroupItem value="global">{t('providers.level.global')}</ToggleGroupItem>
-            <ToggleGroupItem value="project" disabled={allProjects}>
-              {t('providers.level.project')}
-            </ToggleGroupItem>
+            <ToggleGroupItem value="project">{t('providers.level.project')}</ToggleGroupItem>
           </ToggleGroup>
         ) : null}
-        <Button size="sm" disabled={!editor} onClick={() => actions.setDialog({ kind: 'add' })}>
-          <Plus /> {t('providers.roles.add')}
-        </Button>
+        {readOnly ? null : (
+          <Button size="sm" disabled={!editor} onClick={() => actions.setDialog({ kind: 'add' })}>
+            <Plus /> {t('providers.roles.add')}
+          </Button>
+        )}
       </div>
-      {allProjects ? (
-        <p className="text-xs text-muted-foreground">{t('providers.allProjectsHint')}</p>
-      ) : null}
+      {readOnly ? <ReadOnlyHint /> : null}
       {view.roles.length === 0 ? (
         <div className="rounded-lg border p-4 text-sm text-muted-foreground">
           {t('providers.empty.noRoles')}
@@ -82,22 +81,29 @@ export function RolesTab({
   repository,
   view,
   editor,
-  allProjects,
+  readOnly,
   onProviders,
 }: {
   api: Api;
   repository: string | null;
   view: ProvidersView;
   editor: ConfigEditorResponse | null;
-  allProjects: boolean;
+  /** The mode «All projects»: the roles are shown, nothing is written. */
+  readOnly: boolean;
   /** Opens the tab «Providers» (the hint of a swarm without providers). */
   onProviders?: () => void;
 }) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
   const [chosen, setLevel] = useState<Level>('global');
-  const level: Level = allProjects || scope === 'global' ? 'global' : chosen;
-  const actions = useRoleActions({ api, repository, view, editor, level });
+  const level: Level = readOnly || scope === 'global' ? 'global' : chosen;
+  const actions = useRoleActions({
+    api,
+    repository,
+    view,
+    editor: readOnly ? null : editor,
+    level,
+  });
   const role = view.roles.find((item) => item.slug === actions.selected);
   return (
     <SplitPage
@@ -106,7 +112,7 @@ export function RolesTab({
           view={view}
           editor={editor}
           level={level}
-          allProjects={allProjects}
+          readOnly={readOnly}
           actions={actions}
           onLevel={setLevel}
         />
@@ -120,6 +126,7 @@ export function RolesTab({
           view={view}
           editor={editor}
           role={role}
+          readOnly={readOnly}
           actions={{
             ready: editor !== null,
             inLevel: role.slug in actions.record,

@@ -701,11 +701,15 @@ export const es: Dictionary = {
     commit: 'Confirmación (commit)',
     branch: 'Rama',
   },
-  projectChoice: {
-    title: 'Proyecto',
-    description: 'La nueva entrada se guarda en el proyecto elegido.',
-    label: 'Proyecto',
-    choose: 'Continuar',
+  projectOverview: {
+    hint: 'Para cambiar, elija un proyecto',
+    open: 'Abrir en el proyecto',
+    shared: 'Nivel compartido',
+    steps: 'Pasos: {{count}}',
+    models: 'Modelos: {{count}}',
+    everywhere: 'En todos los proyectos',
+    project: 'Proyecto',
+    overrides: 'Proyecto · sustituye al compartido',
   },
   queue: {
     settings: {

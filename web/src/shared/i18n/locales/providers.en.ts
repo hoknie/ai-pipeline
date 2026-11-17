@@ -3,8 +3,6 @@ export const providersEn = {
   title: 'Providers',
   createButton: 'Create provider',
   loading: 'Loading providers…',
-  allProjectsHint:
-    'The shared level is shown. Choose a project to see and change its own providers, roles and models.',
   tabs: { label: 'Providers sections', providers: 'Providers', roles: 'Roles' },
   level: {
     global: 'Shared',

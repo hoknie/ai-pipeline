@@ -3,7 +3,7 @@ import type {
   ProvidersView,
   RepositoryView,
 } from '../../../shared/api/types.ts';
-import { projectRef } from '../../../shared/lib/catalog/projectRows.ts';
+import { groupRows, projectRef } from '../../../shared/lib/catalog/projectRows.ts';
 import type { ProviderRow } from '../list/ProvidersList.tsx';
 
 const overrides = (editor: ConfigEditorResponse | null | undefined, slug: string) =>
@@ -18,38 +18,33 @@ export function rowsOfProject(
     key: provider.slug,
     provider,
     overrides: provider.level === 'project' && overrides(editor, provider.slug),
-    project: null,
   }));
 }
 
 /**
- * The rows of the mode «All projects»: the shared providers once (from the first project that has
- * them), the project ones of every project with the project's mark. Sorted by slug.
+ * The rows of the mode «All projects»: one row per provider slug with the projects that have it
+ * (the shared provider's fields when there is one). Sorted by slug.
  */
 export function rowsOfAll(
   entries: { project: RepositoryView; view: ProvidersView }[],
 ): ProviderRow[] {
-  const seen = new Set<string>();
-  const rows: ProviderRow[] = [];
-  for (const { project, view } of entries) {
-    for (const provider of view.providers) {
-      if (provider.level === 'global') {
-        if (seen.has(provider.slug)) continue;
-        seen.add(provider.slug);
-        rows.push({ key: `*:${provider.slug}`, provider, overrides: false, project: null });
-      } else {
-        rows.push({
-          key: `${project.slug}:${provider.slug}`,
-          provider,
-          overrides: false,
-          project: projectRef(project),
-        });
-      }
-    }
-  }
-  return rows.sort((a, b) =>
-    a.provider.slug < b.provider.slug ? -1 : a.provider.slug > b.provider.slug ? 1 : 0,
+  const grouped = groupRows(
+    entries.map(({ project, view }) => ({
+      project: projectRef(project),
+      entries: view.providers,
+    })),
+    (provider) => provider.slug,
   );
+  return grouped
+    .map((provider) => ({
+      key: provider.slug,
+      provider,
+      overrides: false,
+      group: provider,
+    }))
+    .sort((a, b) =>
+      a.provider.slug < b.provider.slug ? -1 : a.provider.slug > b.provider.slug ? 1 : 0,
+    );
 }
 
 /** The view of the shared level only: its roles and providers, with the matrix of those. */

@@ -5,7 +5,6 @@ export const providersZh: Dictionary['providers'] = {
   title: '提供商',
   createButton: '创建提供商',
   loading: '正在加载提供商…',
-  allProjectsHint: '显示的是共享层级。选择一个项目即可查看并修改它自己的提供商、角色和模型。',
   tabs: { label: '提供商标签', providers: '提供商', roles: '角色' },
   level: { global: '共享', project: '项目', overrides: '项目 · 覆盖共享' },
   status: { available: '可用', unavailable: '不可用', disabled: '已停用' },

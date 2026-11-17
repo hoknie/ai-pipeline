@@ -26,12 +26,14 @@ function RoleModels({
   view,
   editor,
   role,
+  readOnly,
 }: {
   api: Api;
   repository: string | null;
   view: ProvidersView;
   editor: ConfigEditorResponse | null;
   role: RoleView;
+  readOnly: boolean;
 }) {
   const { t } = useTranslation();
   const scope = useProvidersScope();
@@ -64,6 +66,7 @@ function RoleModels({
                   raw={sourceOf(found, scope)?.raw ?? null}
                   error={errors[id]}
                   busy={busy === id}
+                  readOnly={readOnly}
                   onWrite={(change) => void write(id, provider.slug, change)}
                 />
               </li>
@@ -83,6 +86,8 @@ export function RoleDetails(props: {
   editor: ConfigEditorResponse | null;
   role: RoleView;
   actions: RoleActions;
+  /** The mode «All projects»: no rename, order or removal, and the models are shown only. */
+  readOnly?: boolean;
 }) {
   const { role, actions } = props;
   const { t } = useTranslation();
@@ -97,42 +102,46 @@ export function RoleDetails(props: {
             {role.slug} · {t(`providers.level.${role.level}`)}
           </span>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          disabled={!ready}
-          aria-label={t('providers.roles.renameRole', { name })}
-          onClick={actions.onRename}
-        >
-          <Pencil />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          disabled={!ready || !actions.canUp}
-          aria-label={t('providers.roles.up', { name })}
-          onClick={() => actions.onMove(-1)}
-        >
-          <ArrowUp />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          disabled={!ready || !actions.canDown}
-          aria-label={t('providers.roles.down', { name })}
-          onClick={() => actions.onMove(1)}
-        >
-          <ArrowDown />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          disabled={!ready || !actions.inLevel}
-          aria-label={t('providers.roles.removeRole', { name })}
-          onClick={actions.onRemove}
-        >
-          <Trash2 />
-        </Button>
+        {props.readOnly ? null : (
+          <>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={!ready}
+              aria-label={t('providers.roles.renameRole', { name })}
+              onClick={actions.onRename}
+            >
+              <Pencil />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={!ready || !actions.canUp}
+              aria-label={t('providers.roles.up', { name })}
+              onClick={() => actions.onMove(-1)}
+            >
+              <ArrowUp />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={!ready || !actions.canDown}
+              aria-label={t('providers.roles.down', { name })}
+              onClick={() => actions.onMove(1)}
+            >
+              <ArrowDown />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={!ready || !actions.inLevel}
+              aria-label={t('providers.roles.removeRole', { name })}
+              onClick={actions.onRemove}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )}
       </div>
       <RoleModels
         api={props.api}
@@ -140,6 +149,7 @@ export function RoleDetails(props: {
         view={props.view}
         editor={props.editor}
         role={role}
+        readOnly={props.readOnly === true}
       />
     </div>
   );

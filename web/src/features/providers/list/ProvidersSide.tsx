@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
+import { ReadOnlyHint } from '../../repositories/index.ts';
 import { ProvidersList, type ProviderRow } from './ProvidersList.tsx';
 
 /** Whether a row matches the words typed in the search: by name or slug. */
@@ -18,23 +19,28 @@ export function ProvidersSide({
   rows,
   selected,
   onOpen,
+  readOnly = false,
   onNew,
-  note,
 }: {
   rows: ProviderRow[];
   selected: string | null;
   onOpen: (row: ProviderRow) => void;
-  onNew: () => void;
-  note?: string | null;
+  /** The mode «All projects»: nothing is created here. */
+  readOnly?: boolean;
+  onNew?: () => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const shown = rows.filter((row) => matchesRow(row, query));
   return (
     <div className="flex flex-col gap-3">
-      <Button onClick={onNew}>
-        <Plus /> {t('providers.createButton')}
-      </Button>
+      {readOnly ? (
+        <ReadOnlyHint />
+      ) : (
+        <Button onClick={onNew}>
+          <Plus /> {t('providers.createButton')}
+        </Button>
+      )}
       {rows.length > 0 ? (
         <Input
           type="search"
@@ -47,7 +53,6 @@ export function ProvidersSide({
       {rows.length > 0 ? (
         <ProvidersList rows={shown} selected={selected} narrow onOpen={onOpen} />
       ) : null}
-      {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
 import type { EditorSpecialist } from '../../../shared/api/types.ts';
-import type { ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
+import type { GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
 import { usePreference } from '../../../shared/lib/browser/preferences.ts';
 import {
   EMPTY_FILTER,
@@ -30,7 +30,7 @@ function savedOthers(saved: unknown): Partial<Omit<SpecialistFilter, 'tags'>> {
 
 /** The filter of the list, kept per repository; a value nobody has any more drops out. */
 export function useSpecialistFilter(
-  specialists: readonly (EditorSpecialist & { project?: ProjectRef | null })[],
+  specialists: readonly (EditorSpecialist & GroupInfo)[],
   repository: string | null,
   loaded: boolean,
 ) {

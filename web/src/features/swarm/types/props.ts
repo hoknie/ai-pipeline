@@ -29,6 +29,8 @@ export interface SwarmWorkspaceProps {
   /** The address of a place, for the links of the tabs. */
   hrefOf: (target: SwarmTarget) => string;
   onNavigate: (target: SwarmTarget) => void;
+  /** Leaves the mode «All projects», selects the project and opens the place there. */
+  onOpenInProject?: ((path: string, target: SwarmTarget) => void) | undefined;
   /** Opens a group of a run (from the topology of a pipeline). */
   onOpenGroup: (target: { runId: string; slug: string }, step: string | null) => void;
 }

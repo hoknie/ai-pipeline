@@ -13,8 +13,8 @@ import {
   actionsOf,
   type ActionEntry,
 } from '../../../shared/lib/pipeline/pipelineEntries.ts';
-import { rowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
-import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
+import type { GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectChips, ReadOnlyHint } from '../../repositories/index.ts';
 import {
   LEVEL_KEYS,
   NEW_ID,
@@ -35,17 +35,10 @@ import type { PipelineFilterState } from './usePipelineFilterState.ts';
 type Go = (id: string | null, section?: 'actions' | 'system' | null) => Promise<void>;
 type Section = 'actions' | 'system' | null;
 
-function ProjectLabel({ project }: { project: ProjectRef | null | undefined }) {
-  if (!project) return null;
-  return (
-    <span
-      data-project-label={project.slug}
-      className="flex items-center gap-1 text-xs text-muted-foreground"
-    >
-      <ProjectDot color={project.color} />
-      {project.label}
-    </span>
-  );
+function Chips({ row }: { row: GroupInfo }) {
+  return row.presences ? (
+    <ProjectChips everywhere={row.everywhere === true} presences={row.presences} />
+  ) : null;
 }
 
 const levelTag = (t: TFunction) => (level: 'project' | 'global' | 'project_over_global') =>
@@ -74,29 +67,34 @@ function NothingFound({ filters }: { filters: PipelineFilterState }) {
 function PipelineList(props: {
   view: ConfigEditorResponse | null;
   filters: PipelineFilterState;
-  shown: (ConfigEditorResponse['pipelines'][number] & { project?: ProjectRef | null })[];
+  shown: (ConfigEditorResponse['pipelines'][number] & GroupInfo)[];
   count: number;
   filtersControl: boolean;
   wide: boolean;
   selected: string | null;
   go: Go;
-  onNew: () => void;
-  onImport: () => void;
+  readOnly: boolean;
+  onNew?: (() => void) | undefined;
+  onImport?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const { view, filters, shown, count, go } = props;
   return (
     <>
-      <div className="flex gap-2">
-        <Button className="flex-1" onClick={props.onNew}>
-          <Plus />
-          {t('pipelines.new')}
-        </Button>
-        <Button variant="outline" disabled={!view} onClick={props.onImport}>
-          <Download />
-          {t('pipelines.import.open')}
-        </Button>
-      </div>
+      {props.readOnly ? (
+        <ReadOnlyHint />
+      ) : (
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={props.onNew}>
+            <Plus />
+            {t('pipelines.new')}
+          </Button>
+          <Button variant="outline" disabled={!view} onClick={props.onImport}>
+            <Download />
+            {t('pipelines.import.open')}
+          </Button>
+        </div>
+      )}
       {props.filtersControl ? (
         <FiltersButton
           label={t('pipelines.filters.button')}
@@ -112,13 +110,13 @@ function PipelineList(props: {
         selected={props.selected}
         onSelect={(id) => void go(id)}
         entries={shown.map((entry) => ({
-          id: rowKey(entry.project?.slug, entry.id),
+          id: entry.id,
           title: rawName(entry.raw) ?? entry.id,
           hint: entry.id,
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
           extra: (
             <>
-              <ProjectLabel project={entry.project} />
+              <Chips row={entry} />
               <VariantBadges id={entry.id} raw={entry.raw} />
               {tagsOfSpecialist(entry).length > 0 ? (
                 <span data-testid={`tags-${entry.id}`} className="flex flex-wrap gap-1">
@@ -142,31 +140,36 @@ function PipelineList(props: {
 
 function ActionList(props: {
   view: ConfigEditorResponse | null;
-  actions: (ActionEntry & { project?: ProjectRef | null })[];
+  actions: (ActionEntry & GroupInfo)[];
   selected: string | null;
   go: Go;
-  onNew: () => void;
+  readOnly: boolean;
+  onNew?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const { go } = props;
   return (
     <>
-      <Button variant="outline" disabled={!props.view} onClick={props.onNew}>
-        <Plus />
-        {t('pipeline.actions.new')}
-      </Button>
+      {props.readOnly ? (
+        <ReadOnlyHint />
+      ) : (
+        <Button variant="outline" disabled={!props.view} onClick={props.onNew}>
+          <Plus />
+          {t('pipeline.actions.new')}
+        </Button>
+      )}
       <EntryList
         label={t('pipeline.sections.actions')}
         selected={props.selected}
         onSelect={(id) => void go(id, 'actions')}
         entries={props.actions.map((entry) => ({
-          id: rowKey(entry.project?.slug, entry.id),
+          id: entry.id,
           title:
             typeof entry.raw.name === 'string' && entry.raw.name !== '' ? entry.raw.name : entry.id,
           hint: entry.id,
           tag: levelTag(t)(entry.level),
           subtitle: entry.id,
-          extra: <ProjectLabel project={entry.project} />,
+          extra: <Chips row={entry} />,
         }))}
       />
     </>
@@ -182,13 +185,15 @@ export function PipelinesSide(props: {
   filtersControl: boolean;
   wide: boolean;
   go: Go;
-  onNew: () => void;
-  onImport: () => void;
+  /** The mode «All projects»: the lists only show, nothing is created or imported. */
+  readOnly?: boolean;
+  onNew?: (() => void) | undefined;
+  onImport?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const { section, selected, go, filters } = props;
   const { view, failure, stages } = props.data;
-  const actions: (ActionEntry & { project?: ProjectRef | null })[] = view ? actionsOf(view) : [];
+  const actions: (ActionEntry & GroupInfo)[] = view ? actionsOf(view) : [];
   const shown = applyPipelineFilter(view?.pipelines ?? [], filters.filter, filters.search);
   const count = activePipelineFilterCount(filters.filter, filters.search);
   return (
@@ -196,10 +201,23 @@ export function PipelinesSide(props: {
       {failure ? <Alert variant="destructive">{failure}</Alert> : null}
       {view ? <ConfigErrors errors={view.errors} /> : null}
       {section === null ? (
-        <PipelineList {...props} view={view} shown={shown} count={count} />
+        <PipelineList
+          {...props}
+          readOnly={props.readOnly === true}
+          view={view}
+          shown={shown}
+          count={count}
+        />
       ) : null}
       {section === 'actions' ? (
-        <ActionList view={view} actions={actions} selected={selected} go={go} onNew={props.onNew} />
+        <ActionList
+          view={view}
+          actions={actions}
+          selected={selected}
+          go={go}
+          readOnly={props.readOnly === true}
+          onNew={props.onNew}
+        />
       ) : null}
       {section === 'system' ? (
         <EntryList

@@ -7,6 +7,7 @@ import type { ConfigEditorResponse, EditorSpecialist, RunView } from '../src/sha
 
 import {
   FakeEventSource,
+  actionEntry,
   configView,
   fakeApi,
   openFake,
@@ -192,13 +193,26 @@ describe('addresses in the mode', () => {
     await waitFor(() => expect(label()).toBe('Repository: lib'));
   });
 
-  it('opens the specialist of the project and keeps the mode', async () => {
+  it('opens the group of a row by its slug without a project', async () => {
+    modeOn();
+    window.location.hash = '#specialists';
+    mount();
+    fireEvent.click(await screen.findByText('Docs lib'));
+    await waitFor(() => expect(window.location.hash).toBe('#specialists/docs'));
+    expect(label()).toBe('Repository: All projects');
+  });
+
+  it('opens the group and marks the block of the project of an old address', async () => {
     modeOn();
     window.location.hash = '#specialists/docs?project=lib';
     mount();
-    await waitFor(() =>
-      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Docs lib'),
-    );
+    const block = await waitFor(() => {
+      const found = document.querySelector('[data-overview-project="lib"]');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    expect(block.getAttribute('data-highlighted')).toBe('true');
+    expect(screen.queryByLabelText('Name')).toBeNull();
     expect(label()).toBe('Repository: All projects');
   });
 
@@ -207,35 +221,71 @@ describe('addresses in the mode', () => {
     window.location.hash = '#specialists/tester?project=nope';
     mount();
     expect((await screen.findByRole('alert')).textContent).toBe('Project not found');
-    expect(await screen.findByText('Tester app')).toBeTruthy();
+    expect((await screen.findAllByText('Tester app')).length).toBeGreaterThan(0);
+  });
+
+  it('opens the form of the same entry when a project is chosen in the header', async () => {
+    modeOn();
+    window.location.hash = '#specialists/tester';
+    mount();
+    await screen.findByRole('region', { name: 'Tester app' });
+    await chooseInMenu(/app/);
+    await waitFor(() => expect(label()).toBe('Repository: app'));
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Tester app'),
+    );
+    expect(window.location.hash).toBe('#specialists/tester');
   });
 });
 
 describe('specialists in the mode', () => {
-  it('lists the shared ones once and the project ones with their project', async () => {
+  const twoTesters = {
+    [APP]: configView({ repository: APP, specialists: [own('tester', 'Tester app')] }),
+    [LIB]: configView({ repository: LIB, specialists: [own('tester', 'Tester lib')] }),
+  };
+
+  it('groups the shared one once with «In all projects» and projects under the others', async () => {
     modeOn();
     window.location.hash = '#specialists';
     mount();
     await screen.findByText('Tester app');
     expect(screen.getAllByText('CODER')).toHaveLength(1);
-    expect(document.querySelector('[data-project-label="app"]')).toBeTruthy();
-    expect(document.querySelector('[data-project-label="lib"]')).toBeTruthy();
-    expect(screen.getByText('Docs lib')).toBeTruthy();
     const coder = screen.getByText('CODER').closest('li, a, button')!;
-    expect(coder.querySelector('[data-project-label]')).toBeNull();
+    expect(coder.querySelector('[data-project-chips="everywhere"]')?.textContent).toBe(
+      'In all projects',
+    );
+    const docs = screen.getByText('Docs lib').closest('li, a, button')!;
+    expect(docs.querySelector('[data-project-label="lib"]')).toBeTruthy();
+    expect(docs.querySelector('[data-project-label="app"]')).toBeNull();
   });
 
-  it('shows one slug of two projects as two rows', async () => {
+  it('shows one slug of two projects as one row with both projects', async () => {
+    modeOn();
+    window.location.hash = '#specialists';
+    mount({ configs: twoTesters });
+    const row = (await screen.findByText('Tester app')).closest('li, a, button')!;
+    expect(screen.queryByText('Tester lib')).toBeNull();
+    expect(row.querySelector('[data-project-label="app"]')).toBeTruthy();
+    expect(row.querySelector('[data-project-label="lib"]')).toBeTruthy();
+  });
+
+  it('marks a project that overrides the shared one', async () => {
     modeOn();
     window.location.hash = '#specialists';
     mount({
       configs: {
-        [APP]: configView({ repository: APP, specialists: [own('tester', 'Tester app')] }),
-        [LIB]: configView({ repository: LIB, specialists: [own('tester', 'Tester lib')] }),
+        [APP]: configView({
+          repository: APP,
+          specialists: [
+            specialistEntry('coder', { level: 'project_over_global', raw: { name: 'CODER' } }),
+          ],
+        }),
+        [LIB]: configView({ repository: LIB, specialists: [shared('coder')] }),
       },
     });
-    await screen.findByText('Tester app');
-    expect(screen.getByText('Tester lib')).toBeTruthy();
+    const row = (await screen.findByText('CODER')).closest('li, a, button')!;
+    expect(row.querySelector('[data-project-chips="projects"]')).toBeTruthy();
+    expect(row.textContent).toContain('Project · overrides shared');
   });
 
   it('shows the error of a project and the rows of the others', async () => {
@@ -251,12 +301,25 @@ describe('specialists in the mode', () => {
     expect(screen.getByText('lib: no such directory')).toBeTruthy();
   });
 
-  it('opens the address of a row with the project', async () => {
+  it('shows an overview with a block per project instead of a form', async () => {
+    modeOn();
+    window.location.hash = '#specialists/tester';
+    mount({ configs: twoTesters });
+    const overview = await screen.findByRole('region', { name: 'Tester app' });
+    expect(overview.querySelector('[data-overview-project="app"]')).toBeTruthy();
+    expect(overview.querySelector('[data-overview-project="lib"]')).toBeTruthy();
+    expect(screen.queryByLabelText('Name')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Save/ })).toBeNull();
+  });
+
+  it('has no creation or import in the mode', async () => {
     modeOn();
     window.location.hash = '#specialists';
     mount();
-    fireEvent.click(await screen.findByText('Docs lib'));
-    await waitFor(() => expect(window.location.hash).toBe('#specialists/docs?project=lib'));
+    await screen.findByText('Tester app');
+    expect(screen.queryByRole('button', { name: /New specialist/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Import/ })).toBeNull();
+    expect(screen.getByText('To change, choose a project')).toBeTruthy();
   });
 
   it('narrows the list by the filter «Project»', async () => {
@@ -270,16 +333,18 @@ describe('specialists in the mode', () => {
     expect(screen.getByText('Docs lib')).toBeTruthy();
   });
 
-  it('asks for the project before a new specialist', async () => {
+  it('opens the entry in the project: leaves the mode, selects the project, opens the form', async () => {
     modeOn();
-    window.location.hash = '#specialists';
+    window.location.hash = '#specialists/docs';
     mount();
-    fireEvent.click(await screen.findByRole('button', { name: /New specialist/ }));
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('combobox', { name: 'Project' }));
-    fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
-    await waitFor(() => expect(window.location.hash).toBe('#specialists/new?project=lib'));
+    const overview = await screen.findByRole('region', { name: 'Docs lib' });
+    fireEvent.click(within(overview).getByRole('button', { name: /Open in project/ }));
+    await waitFor(() => expect(label()).toBe('Repository: lib'));
+    expect(window.localStorage.getItem('aip.web.projects.all')).toBe('false');
+    expect(window.location.hash).toBe('#specialists/docs');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Docs lib'),
+    );
   });
 });
 
@@ -295,7 +360,7 @@ describe('pipelines in the mode', () => {
     sources: {},
   });
 
-  it('lists the shared pipelines once and the project ones with their project', async () => {
+  it('groups the pipelines of two projects and shows an overview of the open one', async () => {
     modeOn();
     window.location.hash = '#pipelines';
     mount({
@@ -315,9 +380,23 @@ describe('pipelines in the mode', () => {
         }),
       },
     });
-    await screen.findByText('Feature app');
-    expect(screen.getByText('Feature lib')).toBeTruthy();
+    const row = (await screen.findByText('Feature app')).closest('li, a, button')!;
+    expect(screen.queryByText('Feature lib')).toBeNull();
+    expect(row.querySelector('[data-project-label="app"]')).toBeTruthy();
+    expect(row.querySelector('[data-project-label="lib"]')).toBeTruthy();
     expect(screen.getAllByText('Exploration')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /New pipeline/ })).toBeNull();
+    fireEvent.click(row.querySelector('button, a') ?? row);
+    const overview = await screen.findByRole('region', { name: 'Feature app' });
+    expect(overview.querySelectorAll('[data-overview-project]')).toHaveLength(2);
+    fireEvent.click(
+      within(overview.querySelector<HTMLElement>('[data-overview-project="lib"]')!).getByRole(
+        'button',
+        { name: /Open in project/ },
+      ),
+    );
+    await waitFor(() => expect(label()).toBe('Repository: lib'));
+    expect(window.location.hash).toBe('#pipelines/feature');
   });
 
   it('offers the project in the topology and keeps the mode', async () => {
@@ -329,6 +408,95 @@ describe('pipelines in the mode', () => {
     fireEvent.click(await screen.findByRole('option', { name: /lib/ }));
     await waitFor(() => expect(calls).toContainEqual(['pipelines', LIB]));
     expect(label()).toBe('Repository: All projects');
+  });
+});
+
+describe('chains and actions in the mode', () => {
+  const chain = (name: string) => {
+    const raw = { name, mode: 'on_error', enabled: true, runtimes: [{ provider: 'zai' }] };
+    return {
+      slug: 'fast',
+      level: 'project' as const,
+      file: '/x/fast.yaml',
+      revision: 'c',
+      raw,
+      sources: {},
+    };
+  };
+
+  it('groups a chain of two projects and opens an overview without creation', async () => {
+    modeOn();
+    window.location.hash = '#specialists/chains';
+    mount({
+      configs: {
+        [APP]: configView({ repository: APP, chains: [chain('Fast app') as never] }),
+        [LIB]: configView({ repository: LIB, chains: [chain('Fast lib') as never] }),
+      },
+    });
+    const row = (await screen.findByText('Fast app')).closest('li, a, button')!;
+    expect(screen.queryByText('Fast lib')).toBeNull();
+    expect(row.querySelector('[data-project-label="lib"]')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /New chain/ })).toBeNull();
+    fireEvent.click(row.querySelector('button, a') ?? row);
+    await waitFor(() => expect(window.location.hash).toBe('#specialists/chains/fast'));
+    const overview = await screen.findByRole('region', { name: 'Fast app' });
+    fireEvent.click(
+      within(overview.querySelector<HTMLElement>('[data-overview-project="lib"]')!).getByRole(
+        'button',
+        { name: /Open in project/ },
+      ),
+    );
+    await waitFor(() => expect(label()).toBe('Repository: lib'));
+    expect(window.location.hash).toBe('#specialists/chains/fast');
+  });
+
+  it('shows an action as an overview', async () => {
+    modeOn();
+    window.location.hash = '#pipelines/actions/notify';
+    const action = actionEntry('notify', { name: 'Notify', command: 'echo hi' });
+    mount({
+      configs: {
+        [APP]: configView({ repository: APP, actions: [action] }),
+        [LIB]: configView({ repository: LIB, actions: [action] }),
+      },
+    });
+    const overview = await screen.findByRole('region', { name: 'Notify' });
+    expect(overview.querySelectorAll('[data-overview-project]')).toHaveLength(2);
+    expect(within(overview).getAllByText('command: echo hi').length).toBe(2);
+    expect(screen.queryByRole('button', { name: /New action/ })).toBeNull();
+  });
+});
+
+describe('the swarm window in the mode', () => {
+  const editing = [
+    /^New (specialist|chain|pipeline|action)/,
+    /Import/,
+    /^Save/,
+    /^Delete/,
+    /Add role/,
+    /Create provider/,
+    /^Rename/,
+  ];
+
+  it.each(['#providers', '#providers/roles', '#specialists', '#specialists/chains', '#pipelines'])(
+    'changes nothing on %s',
+    async (hash) => {
+      modeOn();
+      window.location.hash = hash;
+      mount();
+      await waitFor(() => expect(label()).toBe('Repository: All projects'));
+      await screen.findByRole('tablist', { name: 'Swarm tabs' });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      for (const name of editing) expect(screen.queryByRole('button', { name })).toBeNull();
+      expect(screen.queryByLabelText('Name')).toBeNull();
+    },
+  );
+
+  it('opens the form of the settings without the mode', async () => {
+    modeOn();
+    window.location.hash = '#settings/project/swarm/specialists/coder';
+    mount();
+    await waitFor(() => expect(screen.getByLabelText('Name')).toBeTruthy());
   });
 });
 

@@ -5,8 +5,6 @@ export const providersRu: Dictionary['providers'] = {
   title: 'Провайдеры',
   createButton: 'Создать провайдера',
   loading: 'Загрузка провайдеров…',
-  allProjectsHint:
-    'Показан общий уровень. Выберите проект, чтобы видеть и менять его провайдеров, роли и модели.',
   tabs: { label: 'Вкладки провайдеров', providers: 'Провайдеры', roles: 'Роли' },
   level: {
     global: 'Общий',

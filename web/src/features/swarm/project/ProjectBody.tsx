@@ -13,31 +13,9 @@ const PipelinesPage = lazy(() =>
 export function ProjectBody(
   props: SwarmWorkspaceProps & { usage?: ((slug: string) => React.ReactNode) | undefined },
 ) {
-  const { api, place, repository, runs, dirty, projects, onNavigate } = props;
+  const { api, place, repository, runs, dirty, projects, onNavigate, onOpenInProject } = props;
   const project = place.project ?? null;
-  if (place.tab === 'providers' || place.tab === 'roles') {
-    return (
-      <ProvidersPage
-        api={api}
-        repository={repository}
-        runs={runs}
-        selected={place.tab === 'roles' ? null : place.entry}
-        section={place.tab === 'roles' ? 'roles' : null}
-        preset={place.preset ?? null}
-        project={project}
-        projects={projects}
-        usage={props.usage}
-        hrefOfNew={(preset) => props.hrefOf({ tab: 'providers', entry: 'new', preset, project })}
-        onSelect={(run, section = null, preset = null, owner = null) =>
-          onNavigate(
-            section === 'roles'
-              ? { tab: 'roles', entry: null }
-              : { tab: 'providers', entry: run, preset, project: owner },
-          )
-        }
-      />
-    );
-  }
+  if (place.tab === 'providers' || place.tab === 'roles') return <ProvidersBody {...props} />;
   if (place.tab === 'pipelines') {
     return (
       <Suspense fallback={null}>
@@ -53,6 +31,12 @@ export function ProjectBody(
             onNavigate({ tab: 'pipelines', entry: id, section, variant, project: owner })
           }
           onOpenGroup={props.onOpenGroup}
+          onOpenInProject={
+            onOpenInProject
+              ? (path, entry, section = null) =>
+                  onOpenInProject(path, { tab: 'pipelines', entry, section, project: null })
+              : undefined
+          }
         />
       </Suspense>
     );
@@ -65,12 +49,55 @@ export function ProjectBody(
       section={place.tab === 'chains' ? 'chains' : null}
       projects={projects ? { ...projects, project } : undefined}
       onProviders={() => onNavigate({ tab: 'providers', entry: null })}
+      onOpenInProject={
+        onOpenInProject
+          ? (path, entry, section = null) =>
+              onOpenInProject(path, {
+                tab: section === 'chains' ? 'chains' : 'specialists',
+                entry,
+                project: null,
+              })
+          : undefined
+      }
       onSelect={(id, section = null, owner = null) =>
         onNavigate({
           tab: section === 'chains' ? 'chains' : 'specialists',
           entry: id,
           project: owner,
         })
+      }
+    />
+  );
+}
+
+function ProvidersBody(
+  props: SwarmWorkspaceProps & { usage?: ((slug: string) => React.ReactNode) | undefined },
+) {
+  const { api, place, repository, runs, projects, onNavigate, onOpenInProject } = props;
+  const project = place.project ?? null;
+  return (
+    <ProvidersPage
+      api={api}
+      repository={repository}
+      runs={runs}
+      selected={place.tab === 'roles' ? null : place.entry}
+      section={place.tab === 'roles' ? 'roles' : null}
+      preset={place.preset ?? null}
+      project={project}
+      projects={projects}
+      onOpenInProject={
+        onOpenInProject
+          ? (path, entry) => onOpenInProject(path, { tab: 'providers', entry, project: null })
+          : undefined
+      }
+      usage={props.usage}
+      hrefOfNew={(preset) => props.hrefOf({ tab: 'providers', entry: 'new', preset, project })}
+      onSelect={(run, section = null, preset = null, owner = null) =>
+        onNavigate(
+          section === 'roles'
+            ? { tab: 'roles', entry: null }
+            : { tab: 'providers', entry: run, preset, project: owner },
+        )
       }
     />
   );

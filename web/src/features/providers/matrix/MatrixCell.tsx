@@ -32,10 +32,31 @@ export interface CellProps {
   error: string | undefined;
   busy: boolean;
   onWrite: (change: (raw: Raw) => Raw) => void;
+  /** The mode «All projects»: the model is shown, not edited. */
+  readOnly?: boolean;
+}
+
+/** The model of a role at a provider as text. */
+function ReadOnlyCell({ cell, role, provider }: Pick<CellProps, 'cell' | 'role' | 'provider'>) {
+  const { t } = useTranslation();
+  const model = cell?.model?.model ?? '';
+  return (
+    <span
+      data-empty={model === '' ? 'true' : undefined}
+      aria-label={`${role.name} × ${provider.name}`}
+      className="min-w-40 text-sm text-muted-foreground"
+    >
+      {model === '' ? t('providers.matrix.noModel') : model}
+    </span>
+  );
 }
 
 /** One cell of the matrix: the model of a role at a provider, edited in place. */
 export function MatrixCellView(props: CellProps) {
+  return props.readOnly ? <ReadOnlyCell {...props} /> : <EditableCell {...props} />;
+}
+
+function EditableCell(props: CellProps) {
   const { api, repository, provider, role, cell, raw, error, busy, onWrite } = props;
   const { t } = useTranslation();
   const scope = useProvidersScope();

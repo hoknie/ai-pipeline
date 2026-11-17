@@ -146,7 +146,12 @@ export function PageSwitch({ panel, actions }: { panel: PanelData; actions: Repo
     case 'pipelines':
     case 'specialists':
       return (
-        <SwarmRoute common={common} repository={state.selected} allProjects={listProjects(panel)} />
+        <SwarmRoute
+          common={common}
+          repository={state.selected}
+          allProjects={listProjects(panel)}
+          onOpenInProject={(path, target) => void actions.openProject(path, target)}
+        />
       );
     default:
       return (

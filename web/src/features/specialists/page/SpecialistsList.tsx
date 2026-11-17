@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { EditorSpecialist, EntryLevel } from '../../../shared/api/types.ts';
-import { rowKey, type ProjectRef } from '../../../shared/lib/catalog/projectRows.ts';
-import { ProjectDot } from '../../../shared/ui/feedback/ProjectDot.tsx';
+import type { GroupInfo } from '../../../shared/lib/catalog/projectRows.ts';
+import { ProjectChips, ReadOnlyHint } from '../../repositories/index.ts';
 import { specialistName } from '../../../shared/lib/catalog/specialists.ts';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { EntryList } from '../../../shared/ui/layout/EntryList.tsx';
@@ -35,34 +35,41 @@ export function SpecialistsList({
   selected,
   narrowed,
   filtersControl,
+  readOnly = false,
   onNew,
   onImport,
   onReset,
   onSelect,
 }: {
-  specialists: (EditorSpecialist & { project?: ProjectRef | null })[];
+  specialists: (EditorSpecialist & GroupInfo)[];
   loaded: boolean;
   selected: string | null;
   narrowed: boolean;
   filtersControl: ReactNode;
-  onNew: () => void;
-  onImport: () => void;
+  /** The mode «All projects»: nothing is created or imported here. */
+  readOnly?: boolean;
+  onNew?: () => void;
+  onImport?: () => void;
   onReset: () => void;
   onSelect: (id: string) => void;
 }) {
   const { t } = useTranslation();
   return (
     <>
-      <div className="flex gap-2">
-        <Button className="flex-1" onClick={onNew}>
-          <Plus />
-          {t('specialists.new')}
-        </Button>
-        <Button variant="outline" disabled={!loaded} onClick={onImport}>
-          <Download />
-          {t('specialists.import.open')}
-        </Button>
-      </div>
+      {readOnly ? (
+        <ReadOnlyHint />
+      ) : (
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={onNew}>
+            <Plus />
+            {t('specialists.new')}
+          </Button>
+          <Button variant="outline" disabled={!loaded} onClick={onImport}>
+            <Download />
+            {t('specialists.import.open')}
+          </Button>
+        </div>
+      )}
       {filtersControl}
       {loaded && specialists.length === 0 && narrowed ? (
         <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
@@ -80,20 +87,14 @@ export function SpecialistsList({
         selected={selected}
         onSelect={onSelect}
         entries={specialists.map((entry) => ({
-          id: rowKey(entry.project?.slug, entry.slug),
+          id: entry.slug,
           title: specialistName(entry),
           subtitle: subtitleOf(entry),
           tag: t(`settings.editor.levels.${LEVEL_KEYS[entry.level]}`),
           extra: (
             <>
-              {entry.project ? (
-                <span
-                  data-project-label={entry.project.slug}
-                  className="flex items-center gap-1 text-xs text-muted-foreground"
-                >
-                  <ProjectDot color={entry.project.color} />
-                  {entry.project.label}
-                </span>
+              {entry.presences ? (
+                <ProjectChips everywhere={entry.everywhere === true} presences={entry.presences} />
               ) : null}
               {tagsOfSpecialist(entry).length > 0 ? (
                 <span data-testid={`tags-${entry.slug}`} className="flex flex-wrap gap-1">
