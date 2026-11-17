@@ -12,6 +12,8 @@ export const en = {
     editRun: 'Edit on the run page',
     title: 'Links',
     add: 'Add link',
+    startedHint:
+      '“Blocked by” cannot be set on a started task. Return it to the queue to change its blockers.',
     remove: 'Remove link',
     outgoing: 'Outgoing',
     incoming: 'Incoming',

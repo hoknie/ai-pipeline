@@ -10,6 +10,8 @@ import type { LinkKind } from './linkKinds.ts';
 import type { LinkTargetGroup } from './linkTargets.ts';
 
 const EDITABLE: readonly LinkKind[] = ['parent', 'related', 'duplicates'];
+/** A run put back in the queue waits again, so its «blocked by» links can change. */
+const EDITABLE_RETURNED: readonly LinkKind[] = ['blocked_by', ...EDITABLE];
 
 const rowsOf = (run: RunView): LinkRow[] =>
   run.links.map((link) => ({ kind: link.kind, target: link.id }));
@@ -65,9 +67,14 @@ export function LinksEditTab({
         value={rows}
         onChange={(next) => setDraft({ from: signature, rows: next })}
         choices={choices}
-        editableKinds={EDITABLE}
+        editableKinds={
+          run.state === 'queued' && run.queueItem !== null ? EDITABLE_RETURNED : EDITABLE
+        }
         disabled={busy}
       />
+      {run.state === 'queued' && run.queueItem !== null ? null : (
+        <p className="text-xs text-muted-foreground">{t('links.startedHint')}</p>
+      )}
       {error ? <Alert variant="destructive">{error}</Alert> : null}
       <div className="flex flex-wrap items-center gap-2">
         <Button disabled={busy || !dirty || !complete} onClick={() => void save()}>

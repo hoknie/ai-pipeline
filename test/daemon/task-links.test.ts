@@ -215,6 +215,78 @@ describe('links of tasks', () => {
     }
   });
 
+  it('changes blocked_by of a returned run through its return item', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    try {
+      h.script({
+        code: [{ noReport: true }, { waitFor: h.gate('b') }, { waitFor: h.gate('a') }, {}],
+      });
+      await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+      await add(h, 'A');
+      await add(h, 'B');
+      await h.call('queue_start', { repository: h.repo });
+      const skipped = await waitQueue(h, (q) => q.skipped.length === 1 && q.runs.length === 1);
+      await h.call('queue_return', { runId: skipped.skipped[0]!.id });
+      const runId = (await queueOf(h)).items[0]!.run!;
+      const blocker = await add(h, 'C');
+      await h.call('task_link', {
+        repository: h.repo,
+        source: runId,
+        kind: 'blocked_by',
+        target: blocker.item,
+      });
+      let returned = (await queueOf(h)).items.find((item) => item.run === runId)!;
+      expect(returned.links).toEqual([
+        expect.objectContaining({ kind: 'blocked_by', id: blocker.item }),
+      ]);
+      const view = () => allRuns(h).then((runs) => runs.find((run) => run.id === runId)!);
+      expect((await view()).links).toEqual([
+        expect.objectContaining({ kind: 'blocked_by', id: blocker.item }),
+      ]);
+      await h.call('task_unlink', {
+        repository: h.repo,
+        source: runId,
+        kind: 'blocked_by',
+        target: blocker.item,
+      });
+      returned = (await queueOf(h)).items.find((item) => item.run === runId)!;
+      expect(returned.links).toEqual([]);
+      expect((await view()).links).toEqual([]);
+      h.open('a');
+      h.open('b');
+    } finally {
+      await stop(h);
+    }
+  });
+
+  it('removes blocked_by that a returned run kept from before its start', async () => {
+    const h = await start(PIPELINE_CONFIG);
+    try {
+      h.script({ code: [{}, { noReport: true }, { waitFor: h.gate('b') }, {}] });
+      await h.call('queue_settings', { repository: h.repo, skipFailed: true });
+      const first = await add(h, 'A');
+      await add(h, 'B', { after: [first.item] });
+      await h.call('queue_start', { repository: h.repo });
+      const skipped = await waitQueue(h, (q) => q.skipped.length === 1);
+      await h.call('queue_return', { runId: skipped.skipped[0]!.id });
+      const runId = (await queueOf(h)).items[0]!.run!;
+      const view = () => allRuns(h).then((runs) => runs.find((run) => run.id === runId)!);
+      const link = (await view()).links.find((l) => l.kind === 'blocked_by');
+      expect(link).toBeDefined();
+      await h.call('task_unlink', {
+        repository: h.repo,
+        source: runId,
+        kind: 'blocked_by',
+        target: link!.id,
+      });
+      expect((await view()).links.filter((l) => l.kind === 'blocked_by')).toEqual([]);
+      h.open('a');
+      h.open('b');
+    } finally {
+      await stop(h);
+    }
+  });
+
   it('gives a task of a specialist its run as the parent and refuses a parent link', async () => {
     const h = await start(WORKER_QUEUE_CONFIG);
     try {

@@ -45,7 +45,10 @@ export class Snapshots {
     );
     const own = queue.store.get(state.run.repository);
     const item = own ? returnItemOf(own, state.run.id) : null;
-    const linked = withLinks(view, queue.links.index.viewsOf(state.run.id));
+    const linked = withLinks(
+      view,
+      queue.links.index.viewsOf(...[state.run.id, ...(item ? [item.id] : [])]),
+    );
     return withQueue({ ...linked, returnable: this.returnable(state) }, item?.id ?? null);
   }
 

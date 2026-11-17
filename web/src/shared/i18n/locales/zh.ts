@@ -14,6 +14,7 @@ export const zh: Dictionary = {
     editRun: '在运行页面编辑',
     title: '关联',
     add: '添加关联',
+    startedHint: '已启动的任务不能设置“被阻塞于”。请先将其放回队列再修改阻塞关系。',
     remove: '移除关联',
     outgoing: '出站关联',
     incoming: '入站关联',

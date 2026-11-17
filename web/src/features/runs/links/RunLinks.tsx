@@ -21,7 +21,7 @@ import type { LinkTargetGroup } from './linkTargets.ts';
 
 export type RunLinkChoices = (kind: LinkKind) => LinkTargetGroup[];
 
-/** The «Добавить связь» dialog: one editor row without «Блокируется», an error stays inside. */
+/** The «Добавить связь» dialog: one editor row («Блокируется» only for a returned run), an error stays inside. */
 function AddDialog({
   run,
   api,
@@ -67,11 +67,12 @@ function AddDialog({
           onChange={(rows) => setRow(rows[0] ?? { kind: 'related', target: '' })}
           choices={choices ?? (() => [])}
           addButton={false}
-          editableKinds={
-            run.links.some((link) => link.kind === 'parent')
-              ? ['related', 'duplicates']
-              : ['parent', 'related', 'duplicates']
-          }
+          editableKinds={[
+            ...(run.state === 'queued' && run.queueItem !== null ? (['blocked_by'] as const) : []),
+            ...(run.links.some((link) => link.kind === 'parent') ? [] : (['parent'] as const)),
+            'related',
+            'duplicates',
+          ]}
         />
         {error ? <Alert variant="destructive">{error}</Alert> : null}
         <Button disabled={busy || !row.target || !choices} onClick={() => void add()}>

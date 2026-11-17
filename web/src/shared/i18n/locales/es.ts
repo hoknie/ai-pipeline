@@ -14,6 +14,8 @@ export const es: Dictionary = {
     editRun: 'Editar en la página de la ejecución',
     title: 'Enlaces',
     add: 'Añadir enlace',
+    startedHint:
+      '«Bloqueada por» no se puede fijar en una tarea iniciada. Devuélvela a la cola para cambiar sus bloqueos.',
     remove: 'Quitar enlace',
     outgoing: 'Salientes',
     incoming: 'Entrantes',

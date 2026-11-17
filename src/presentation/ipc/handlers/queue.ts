@@ -10,6 +10,13 @@ function serial<T>(context: IpcContext, work: () => Promise<T>): Promise<T> {
   });
 }
 
+/** The links of a task; an item that became a run shares them with its run. */
+function viewsOfTask(context: IpcContext, id: string) {
+  const { queue } = context.services;
+  const run = queue.store.findItem(id)?.item.run;
+  return queue.links.index.viewsOf(...(run ? [id, run] : [id]));
+}
+
 /** The queue of tasks of a repository and the runs it holds. */
 export const queueHandlers = {
   run: (params, context) =>
@@ -90,11 +97,11 @@ export const queueHandlers = {
   task_link: (params, context) =>
     serial(context, async () => {
       const source = await context.services.queue.links.link(params);
-      return { source, ...context.services.queue.links.index.viewsOf(source) };
+      return { source, ...viewsOfTask(context, source) };
     }),
   task_unlink: (params, context) =>
     serial(context, async () => {
       const source = await context.services.queue.links.unlink(params);
-      return { source, ...context.services.queue.links.index.viewsOf(source) };
+      return { source, ...viewsOfTask(context, source) };
     }),
 } satisfies Partial<HandlerTable>;

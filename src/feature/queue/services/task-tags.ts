@@ -185,3 +185,18 @@ export async function setRunParent(
   const queue = store.of(state.run.repository);
   if (spreadTags(queue, run, added, now()).length > 0) store.save(queue);
 }
+
+/**
+ * `blocked_by` of a returned run is a link of its return item: the run waits in the queue through
+ * that item, so the link changes like the link of any waiting task. Anything else stays as it is.
+ */
+export function linkSource(
+  deps: { store: QueueStore; runs: Pick<RunsServices, 'states'> },
+  source: { id: string; ref: 'item' | 'run' },
+  kind: string,
+): { id: string; ref: 'item' | 'run' } {
+  if (source.ref !== 'run' || kind !== 'blocked_by') return source;
+  const repository = deps.runs.states.lookup(source.id)?.run.repository;
+  const item = repository && deps.store.get(repository)?.items.find((i) => i.run === source.id);
+  return item ? { id: item.id, ref: 'item' } : source;
+}

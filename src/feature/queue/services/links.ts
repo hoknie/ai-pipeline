@@ -18,7 +18,7 @@ import {
 } from '../types/index.ts';
 
 import { LinkIndex } from './link-index.ts';
-import { setRunParent } from './task-tags.ts';
+import { linkSource, setRunParent } from './task-tags.ts';
 import type { QueueStore } from './store.ts';
 import type { TaskTags } from './task-tags.ts';
 
@@ -192,11 +192,13 @@ export class TaskLinks {
     repository?: string | undefined;
   }): Promise<string> {
     const kind = checkLinkKind(params.kind);
-    const { source, target } = await endsOf(
+    const ends = await endsOf(
       this.dependencies.registry,
       (repo, ref) => this.resolveTaskRef(repo, ref),
       params,
     );
+    const source = linkSource(this.dependencies, ends.source, kind);
+    const { target } = ends;
     checkLinks(source.id, [{ source: source.id, kind, target: target.id }], source.ref === 'run');
     const touched = [source.id, target.id];
     if (kind === 'related' || kind === 'duplicates') {
@@ -228,15 +230,20 @@ export class TaskLinks {
     repository?: string | undefined;
   }): Promise<string> {
     const kind = checkLinkKind(params.kind);
-    const { source, target } = await endsOf(
+    const ends = await endsOf(
       this.dependencies.registry,
       (repo, ref) => this.resolveTaskRef(repo, ref),
       params,
     );
+    const { target } = ends;
     const { links } = this.dependencies;
-    const touched = [source.id, target.id];
     const has = (from: string, to: string) =>
       this.index.from(from).some((link) => link.kind === kind && link.target === to);
+    // A blocked_by moved to the run when the task started stays a link of the run.
+    const moved = linkSource(this.dependencies, ends.source, kind);
+    const source =
+      !has(moved.id, target.id) && has(ends.source.id, target.id) ? ends.source : moved;
+    const touched = [source.id, target.id];
     if (kind === 'related' || kind === 'duplicates') {
       links.remove({ source: source.id, kind, target: target.id });
       if (kind === 'related') links.remove({ source: target.id, kind, target: source.id });
