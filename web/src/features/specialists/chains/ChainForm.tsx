@@ -7,7 +7,7 @@ import { ConfigErrors } from '../../../shared/ui/layout/EntryList.tsx';
 import { LevelHint } from '../form/SpecialistNotices.tsx';
 import { ChainFields } from './ChainFields.tsx';
 import { ChainHeader } from './ChainHeader.tsx';
-import { ChainRuntimes } from './ChainRuntimes.tsx';
+import { ChainRuntimes, ITEM_FIELD_ERROR } from './ChainRuntimes.tsx';
 import { useChainEditor } from './useChainEditor.ts';
 
 export interface ChainFormProps {
@@ -31,6 +31,8 @@ function ChainNotices({
   errors: FieldError[];
 }) {
   const { t } = useTranslation();
+  // The errors of provider and default are shown at the fields of the item.
+  const general = errors.filter((error) => !ITEM_FIELD_ERROR.test(error.path));
   return (
     <>
       {problem ? <Alert variant="destructive">{problem}</Alert> : null}
@@ -40,7 +42,7 @@ function ChainNotices({
           {t('chains.referencedNotice', { refs: references.join(', ') })}
         </Alert>
       ) : null}
-      {errors.length > 0 ? <ConfigErrors errors={errors} /> : null}
+      {general.length > 0 ? <ConfigErrors errors={general} /> : null}
     </>
   );
 }

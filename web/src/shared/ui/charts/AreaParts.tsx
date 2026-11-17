@@ -1,7 +1,7 @@
 import { ChartTooltip } from './ChartTooltip.tsx';
 import type { ChartCategory } from './BarParts.tsx';
 import type { AreaLayer } from './spline.ts';
-import type { ChartSeries } from './scale.ts';
+import { tipSeries, type ChartSeries } from './scale.ts';
 
 export type { ChartCategory };
 
@@ -262,14 +262,12 @@ export function AreaActiveTip({
       title={category.title}
       total={total}
       left={left}
-      rows={series
-        .filter((part) => (part.values[index] ?? 0) > 0)
-        .map((part) => ({
-          key: part.key,
-          label: part.label,
-          color: part.color,
-          value: format(part.values[index] ?? 0),
-        }))}
+      rows={tipSeries(series, index).map((part) => ({
+        key: part.key,
+        label: part.label,
+        color: part.color,
+        value: format(part.values[index] ?? 0),
+      }))}
     />
   );
 }

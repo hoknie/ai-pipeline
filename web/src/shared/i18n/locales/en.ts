@@ -1257,7 +1257,7 @@ export const en = {
     section: 'chain {{id}}',
     help: {
       name: 'How the chain is shown in the panel.',
-      mode: 'Use the next runtime on error, cycle through runtimes, or choose one at random.',
+      mode: 'Use the next runtime on error, cycle through runtimes, choose one at random, or give each provider its runtime and model.',
     },
     sharedReadOnly:
       'Shared chains are view-only here. Override this chain in the project, or edit it in Settings for all repositories.',
@@ -1280,6 +1280,7 @@ export const en = {
       on_error: 'On error',
       round_robin: 'Round-robin',
       random: 'Random',
+      by_provider: 'By provider',
     },
     fields: {
       slug: 'Slug',
@@ -1298,6 +1299,11 @@ export const en = {
       moveUp: 'Move up',
       moveDown: 'Move down',
       remove: 'Remove runtime',
+      provider: 'Provider',
+      providerPlaceholder: 'anthropic, zai, openai',
+      providerHint: 'Provider id: the key of the usage-limit hold. Use one id per account.',
+      providerRequired: 'Required in the By provider mode',
+      default: 'Default',
     },
   },
   pipeline: {

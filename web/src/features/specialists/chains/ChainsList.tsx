@@ -49,7 +49,9 @@ export function ChainsList({
         onSelect={onSelect}
         entries={chains.map((chain) => {
           const mode =
-            chain.raw.mode === 'round_robin' || chain.raw.mode === 'random'
+            chain.raw.mode === 'round_robin' ||
+            chain.raw.mode === 'random' ||
+            chain.raw.mode === 'by_provider'
               ? chain.raw.mode
               : 'on_error';
           const modeLabel = t(`chains.modes.${mode}`);

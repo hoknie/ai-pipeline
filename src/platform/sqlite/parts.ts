@@ -3,7 +3,7 @@ import { TASK_LINKS_MIGRATION } from './links-migration.ts';
 
 export { STATS_MIGRATION } from './stats-migration.ts';
 
-/** The migrations after the usage journal: the queue filter, pipeline variants, attachments, the removal of the cost. */
+/** The migrations after the usage journal: the queue filter, pipeline variants, attachments, the removal of the cost, the chain item of an attempt. */
 export const LATER_MIGRATIONS: string[] = [
   `ALTER TABLE queues ADD COLUMN filter_json TEXT NOT NULL DEFAULT '{"pipelines":[],"tags":[]}'`,
   `ALTER TABLE runs ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'; ALTER TABLE queue_items ADD COLUMN variant TEXT NOT NULL DEFAULT 'default'`,
@@ -36,4 +36,5 @@ export const LATER_MIGRATIONS: string[] = [
   UPDATE runs SET naming_usage_json = json_remove(naming_usage_json, '$.costUsd') WHERE naming_usage_json IS NOT NULL;
   `,
   TASK_LINKS_MIGRATION,
+  `ALTER TABLE attempts ADD COLUMN chain_index INTEGER; ALTER TABLE attempts ADD COLUMN provider TEXT`,
 ];

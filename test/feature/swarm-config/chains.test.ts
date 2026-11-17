@@ -8,6 +8,8 @@ import {
   ConfigLoadError,
   type ConfigPaths,
   type FieldError,
+  knownProviders,
+  tierDefaultIndex,
 } from '../../../src/feature/swarm-config/types/index.ts';
 import {
   configPaths,
@@ -131,7 +133,7 @@ swarm:
     expectError(
       errors,
       'swarm.chains.bad-mode.mode',
-      'must be one of on_error, random, round_robin',
+      'must be one of on_error, random, round_robin, by_provider',
     );
     expectError(errors, 'swarm.chains.empty-runtimes.runtimes', 'must not be empty');
     expectError(errors, 'swarm.chains.no-runtime.runtimes[0].runtime', 'is required');
@@ -229,13 +231,137 @@ swarm:
       runtimes:
         - runtime: opencode
         - runtime: agy
+    lite:
+      name: Lite
+      mode: by_provider
+      runtimes:
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
   specialists:
     worker:
       name: Worker
       runtime_chain: no-claude
       mcp:
         tools: { command: tools }
+    coder:
+      name: Coder
+      runtime_chain: lite
+      mcp:
+        tools: { command: tools }
 `);
-    expect(config.specialists[0]?.runtimeChain).toBe('no-claude');
+    expect(config.specialists.map((s) => s.runtimeChain)).toEqual(['no-claude', 'lite']);
+  });
+});
+
+describe('by_provider chains (tiers)', () => {
+  const tier = (items: string, mode = 'by_provider'): string =>
+    `\nswarm:\n  chains:\n    thinking:\n      name: Thinking\n      mode: ${mode}\n      runtimes:\n${items}`;
+
+  it('accepts a tier and keeps provider and default of the items', () => {
+    const config = parseConfig(
+      tier(
+        `        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3, default: true }
+        - { provider: openai, runtime: opencode, model: openai/gpt-6.1-sol }
+`,
+      ),
+    );
+    const chain = config.chains[0]!;
+    expect(chain.mode).toBe('by_provider');
+    expect(chain.runtimes.map((item) => item.provider)).toEqual(['anthropic', 'zai', 'openai']);
+    expect(chain.runtimes.map((item) => item.default)).toEqual([undefined, true, undefined]);
+  });
+
+  it('requires a unique provider in every item, disabled ones included', () => {
+    const errors = errorsOf(
+      tier(
+        `        - { provider: zai, runtime: opencode }
+        - { runtime: opencode }
+        - { provider: zai, runtime: opencode, enabled: false }
+`,
+      ),
+    );
+    expectError(errors, 'swarm.chains.thinking.runtimes[1].provider', 'is required');
+    expectError(errors, 'swarm.chains.thinking.runtimes[2].provider', 'duplicate provider `zai`');
+  });
+
+  it('allows one default item only', () => {
+    const errors = errorsOf(
+      tier(
+        `        - { provider: a, runtime: opencode, default: true }
+        - { provider: b, runtime: opencode }
+        - { provider: c, runtime: opencode, default: true }
+`,
+      ),
+    );
+    expectError(errors, 'swarm.chains.thinking.runtimes[2].default', 'only one item');
+    expect(errors.some((e) => e.path.endsWith('runtimes[0].default'))).toBe(false);
+  });
+
+  it('checks the provider id pattern and rejects default outside a tier', () => {
+    const errors = errorsOf(
+      tier(
+        `        - { provider: Z.ai, runtime: opencode, default: true }
+        - { provider: ok, runtime: opencode }
+`,
+        'on_error',
+      ),
+    );
+    expectError(errors, 'swarm.chains.thinking.runtimes[0].provider', 'provider must match');
+    expectError(
+      errors,
+      'swarm.chains.thinking.runtimes[0].default',
+      'is supported by the by_provider mode only',
+    );
+  });
+
+  it('accepts a provider on an item of an on_error chain', () => {
+    const config = parseConfig(
+      tier('        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }\n', 'on_error'),
+    );
+    expect(config.chains[0]?.runtimes[0]?.provider).toBe('zai');
+  });
+
+  it('lists known providers of tiers only, sorted, and picks the default item', () => {
+    const config = parseConfig(`
+swarm:
+  chains:
+    thinking:
+      name: T
+      mode: by_provider
+      runtimes:
+        - { provider: zai, runtime: opencode }
+        - { provider: anthropic, runtime: claude }
+        - { provider: openai, runtime: opencode, enabled: false }
+    lite:
+      name: L
+      mode: by_provider
+      runtimes:
+        - { provider: zai, runtime: opencode, enabled: false }
+        - { provider: google, runtime: opencode, default: true }
+        - { provider: gemini, runtime: opencode }
+    fallback:
+      name: F
+      mode: on_error
+      runtimes:
+        - { provider: local, runtime: opencode }
+`);
+    expect(knownProviders(config)).toEqual(['anthropic', 'gemini', 'google', 'openai', 'zai']);
+    const by = (slug: string) => config.chains.find((c) => c.slug === slug)!;
+    expect(tierDefaultIndex(by('thinking'))).toBe(0);
+    expect(tierDefaultIndex(by('lite'))).toBe(1);
+    expect(
+      tierDefaultIndex({ runtimes: [{ runtime: 'claude', model: null, enabled: false }] }),
+    ).toBeNull();
+  });
+
+  it('does not treat a disabled default item as the default', () => {
+    const config = parseConfig(
+      tier(
+        `        - { provider: a, runtime: opencode }
+        - { provider: b, runtime: opencode, default: true, enabled: false }
+`,
+      ),
+    );
+    expect(tierDefaultIndex(config.chains[0]!)).toBe(0);
   });
 });

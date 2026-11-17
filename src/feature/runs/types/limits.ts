@@ -1,10 +1,6 @@
-import type {
-  Defaults,
-  ReasoningEffort,
-  RuntimeChain,
-  Specialist,
-} from '../../swarm-config/types/index.ts';
+import type { Defaults, RuntimeChain, Specialist } from '../../swarm-config/types/index.ts';
 import type { Attempt } from './attempt.ts';
+import { type SelectedRuntime, holdKey, pickChainItem } from './chains/chain-select.ts';
 import { COMMAND_RUNTIME, USAGE_LIMIT_FALLBACK_MS, type AttemptRuntime } from './constants.ts';
 import { NETWORK_RETRY_MS } from '../../network/types/index.ts';
 import { type Group } from './group.ts';
@@ -26,7 +22,7 @@ export function networkRetryAt(group: Group): number | null {
   return (last.finishedAt ?? last.startedAt) + NETWORK_RETRY_MS;
 }
 
-/** Runtimes held by a usage limit that has not reset at `now`, with the moment it resets. */
+/** Hold keys (`holdKey`: provider or runtime) of usage limits that have not reset at `now`, with the moment each resets. */
 export function limitHolds(states: Iterable<RunState>, now: number): Map<string, number> {
   const holds = new Map<string, number>();
   for (const state of states) {
@@ -34,7 +30,8 @@ export function limitHolds(states: Iterable<RunState>, now: number): Map<string,
       for (const attempt of group.attempts) {
         const until = limitResetsAt(attempt);
         if (until === null || until <= now) continue;
-        holds.set(attempt.runtime, Math.max(holds.get(attempt.runtime) ?? 0, until));
+        const key = holdKey(attempt.runtime, attempt.provider);
+        holds.set(key, Math.max(holds.get(key) ?? 0, until));
       }
     }
   }
@@ -105,21 +102,13 @@ export function runningBySpecialist(states: RunState[]): Map<string, number> {
 
 /** Why a queued group is not started yet. */
 export type GroupWait =
-  | { reason: 'limit'; runtime: string; until: number }
+  | { reason: 'limit'; runtime: string; provider?: string; until: number }
   | { reason: 'specialist'; specialist: string; name: string; max: number }
   | { reason: 'pool'; pool: string; max: number }
   /** `machine`: `queue.max` is taken; `repository`: `swarm.max` of the project mode. */
   | { reason: 'capacity'; scope: 'machine' | 'repository'; max: number }
   /** The network is down (`until` null) or the last attempt failed because of it (`until`: retry). */
   | { reason: 'network'; problem: string; until: number | null };
-
-export interface SelectedRuntime {
-  runtime: AttemptRuntime;
-  model: string | null;
-  variant?: string;
-  reasoningEffort?: ReasoningEffort;
-  chainIndex?: number | null;
-}
 
 export interface SelectAttemptOptions {
   specialist: Specialist;
@@ -160,6 +149,7 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
         ...(prev.chainIndex !== undefined && prev.chainIndex !== null
           ? { chainIndex: prev.chainIndex }
           : {}),
+        ...(prev.provider !== undefined ? { provider: prev.provider } : {}),
       };
     }
   }
@@ -181,82 +171,5 @@ export function selectAttemptRuntime(options: SelectAttemptOptions): SelectedRun
     specialist.slug,
     stepIndex,
     seed,
-  );
-}
-
-function currentStepFailedIndices(attempts: Attempt[], stepIndex: number): Set<number> {
-  const failed = new Set<number>();
-  for (let i = attempts.length - 1; i >= 0; i--) {
-    const a = attempts[i]!;
-    if (a.stepIndex !== stepIndex || a.status !== 'failed') break;
-    // The network, not the runtime, failed: the item stays a candidate.
-    if (a.reason?.kind === 'network') continue;
-    if (a.chainIndex !== undefined && a.chainIndex !== null) {
-      failed.add(a.chainIndex);
-    }
-  }
-  return failed;
-}
-
-function pickChainItem(
-  mode: RuntimeChain['mode'],
-  enabledItems: { item: RuntimeChain['runtimes'][number]; index: number }[],
-  limitHolds: Map<string, number>,
-  attempts: Attempt[],
-  specialistSlug: string,
-  stepIndex: number,
-  seed?: number,
-): SelectedRuntime {
-  if (mode === 'on_error') {
-    const failedIndices = currentStepFailedIndices(attempts, stepIndex);
-    const candidate = enabledItems.find(
-      ({ item, index }) => !failedIndices.has(index) && !limitHolds.has(item.runtime),
-    );
-    const choice =
-      candidate ?? enabledItems.find(({ index }) => !failedIndices.has(index)) ?? enabledItems[0]!;
-    return formatSelected(choice);
-  }
-  const available = enabledItems.filter(({ item }) => !limitHolds.has(item.runtime));
-  const pool = available.length > 0 ? available : enabledItems;
-  if (mode === 'round_robin') {
-    const count = attempts.filter(
-      (a) => a.specialist === specialistSlug && a.chainIndex !== null && a.chainIndex !== undefined,
-    ).length;
-    const choice = pool[count % pool.length]!;
-    return formatSelected(choice);
-  }
-  const pick = seed !== undefined ? Math.abs(seed) % pool.length : 0;
-  const choice = pool[pick]!;
-  return formatSelected(choice);
-}
-
-function formatSelected(entry: {
-  item: RuntimeChain['runtimes'][number];
-  index: number;
-}): SelectedRuntime {
-  return {
-    runtime: entry.item.runtime,
-    model: entry.item.model ?? null,
-    ...(entry.item.variant !== undefined ? { variant: entry.item.variant } : {}),
-    ...(entry.item.reasoningEffort !== undefined
-      ? { reasoningEffort: entry.item.reasoningEffort }
-      : {}),
-    chainIndex: entry.index,
-  };
-}
-
-export function hasNextChainItem(
-  chain: RuntimeChain | undefined,
-  attempts: Attempt[],
-  stepIndex: number,
-  limitHolds: Map<string, number>,
-): boolean {
-  if (!chain || !chain.enabled || chain.mode !== 'on_error') return false;
-  const enabledItems = chain.runtimes
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => item.enabled);
-  const failedIndices = currentStepFailedIndices(attempts, stepIndex);
-  return enabledItems.some(
-    ({ item, index }) => !failedIndices.has(index) && !limitHolds.has(item.runtime),
   );
 }

@@ -125,6 +125,9 @@ describe('waiting', () => {
     expect(waitText({ reason: 'limit', runtime: 'claude', until: 0 }, t)).toMatch(
       /^Waiting for the claude usage limit to reset, until \d\d:\d\d$/,
     );
+    expect(
+      waitText({ reason: 'limit', runtime: 'opencode', provider: 'zai', until: 0 }, t),
+    ).toMatch(/^Waiting for the zai \(opencode\) usage limit to reset, until \d\d:\d\d$/);
   });
 
   it.each(['en', 'es', 'ru', 'zh'])(

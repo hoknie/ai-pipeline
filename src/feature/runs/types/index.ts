@@ -4,6 +4,7 @@ export * from './create.ts';
 export * from './group.ts';
 export * from './history/attempt-history.ts';
 export * from './input.ts';
+export * from './chains/chain-select.ts';
 export * from './limits.ts';
 export * from './pools/pools.ts';
 export * from './problems.ts';

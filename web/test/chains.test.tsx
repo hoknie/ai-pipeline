@@ -73,6 +73,8 @@ describe('chain draft logic', () => {
       variant: '',
       reasoning_effort: '',
       enabled: true,
+      provider: '',
+      default: false,
     });
 
     const value = valueOfChain(draft, chainFixture.raw);
@@ -413,5 +415,139 @@ describe('shared chains in Settings', () => {
         'global',
       ),
     );
+  });
+});
+
+const tierRaw = {
+  name: 'Thinking',
+  mode: 'by_provider',
+  enabled: true,
+  runtimes: [
+    { runtime: 'claude', model: 'opus', enabled: true, provider: 'anthropic' },
+    { runtime: 'opencode', model: 'zai/glm-5.3', enabled: true, provider: 'zai', default: true },
+  ],
+};
+
+const tierFixture: EditorChain = {
+  slug: 'thinking',
+  level: 'project',
+  file: '/repo/aip/chains/thinking.yaml',
+  revision: 't1',
+  raw: tierRaw,
+  sources: { project: { file: '/repo/aip/chains/thinking.yaml', revision: 't1', raw: tierRaw } },
+};
+
+function renderTier(api = fakeApi()) {
+  render(
+    <ChainForm
+      api={api}
+      chain={tierFixture}
+      onDirty={vi.fn()}
+      onSaved={vi.fn(async () => undefined)}
+      onDeleted={vi.fn(async () => undefined)}
+    />,
+  );
+  return api;
+}
+
+describe('a chain in the By provider mode', () => {
+  it('reads provider and default into the draft and writes them back', () => {
+    const draft = draftOfChain(tierFixture);
+    expect(draft.mode).toBe('by_provider');
+    expect(draft.runtimes.map((item) => [item.provider, item.default])).toEqual([
+      ['anthropic', false],
+      ['zai', true],
+    ]);
+    expect(valueOfChain(draft, tierRaw)).toEqual(tierRaw);
+  });
+
+  it('keeps provider and drops default when the mode is not By provider', () => {
+    const draft = { ...draftOfChain(tierFixture), mode: 'on_error' as const };
+    const value = valueOfChain(draft) as { runtimes: Record<string, unknown>[] };
+    expect(value.runtimes.map((item) => item.provider)).toEqual(['anthropic', 'zai']);
+    expect(value.runtimes.every((item) => !('default' in item))).toBe(true);
+  });
+
+  it('labels the mode By provider and not with the word level', () => {
+    render(
+      <ChainsList
+        chains={[tierFixture]}
+        loaded={true}
+        selected={null}
+        onNew={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/thinking · By provider · 2/)).toBeTruthy();
+  });
+
+  it('shows the provider fields and one Default switch at a time, and saves the file shape', async () => {
+    const writeChain = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 't2',
+      file: '/f',
+    }));
+    renderTier(fakeApi({ writeChain }));
+    expect(screen.getAllByLabelText<HTMLInputElement>('Provider').map((i) => i.value)).toEqual([
+      'anthropic',
+      'zai',
+    ]);
+    const switches = screen.getAllByRole('switch', { name: 'Default' });
+    expect(switches.map((el) => el.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+    fireEvent.click(switches[0]!);
+    expect(
+      screen
+        .getAllByRole('switch', { name: 'Default' })
+        .map((el) => el.getAttribute('aria-checked')),
+    ).toEqual(['true', 'false']);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeChain).toHaveBeenCalled());
+    const saved = writeChain.mock.calls[0]?.[1] as typeof tierRaw & {
+      runtimes: Record<string, unknown>[];
+    };
+    expect(saved.mode).toBe('by_provider');
+    expect(saved.runtimes.map((item) => item.provider)).toEqual(['anthropic', 'zai']);
+    expect(saved.runtimes.map((item) => 'default' in item)).toEqual([true, false]);
+  });
+
+  it('removes default from the items when the mode changes', async () => {
+    const writeChain = vi.fn(async (..._args: unknown[]) => ({
+      ok: true as const,
+      revision: 't2',
+      file: '/f',
+    }));
+    renderTier(fakeApi({ writeChain }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Execution mode' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'On error' }));
+    expect(screen.queryByRole('switch', { name: 'Default' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writeChain).toHaveBeenCalled());
+    const saved = writeChain.mock.calls[0]?.[1] as {
+      mode: string;
+      runtimes: Record<string, unknown>[];
+    };
+    expect(saved.mode).toBe('on_error');
+    expect(saved.runtimes.map((item) => item.provider)).toEqual(['anthropic', 'zai']);
+    expect(saved.runtimes.some((item) => 'default' in item)).toBe(false);
+  });
+
+  it('shows a validation error at the provider field of the item', async () => {
+    const writeChain = vi.fn(async (..._args: unknown[]) => ({
+      ok: false as const,
+      reason: 'invalid' as const,
+      errors: [
+        {
+          file: '/f',
+          path: 'swarm.chains.thinking.runtimes[1].provider',
+          message: 'duplicate provider `zai`',
+        },
+      ],
+    }));
+    renderTier(fakeApi({ writeChain }));
+    fireEvent.change(screen.getAllByLabelText('Provider')[0]!, { target: { value: 'zai' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const message = await screen.findByText('duplicate provider `zai`');
+    expect(message.closest('div')?.querySelector('#chain-item-1-provider')).not.toBeNull();
+    expect(screen.getAllByText('duplicate provider `zai`')).toHaveLength(1);
   });
 });

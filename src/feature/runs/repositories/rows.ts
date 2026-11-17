@@ -126,6 +126,10 @@ function hydrateAttempt(row: Row): Attempt {
     specialist: String(row.specialist),
     runtime: String(row.runtime) as Runtime,
     model: text(row.model ?? null),
+    ...(row.chain_index !== null && row.chain_index !== undefined
+      ? { chainIndex: Number(row.chain_index) }
+      : {}),
+    ...(typeof row.provider === 'string' ? { provider: row.provider } : {}),
     status: String(row.status) as AttemptStatus,
     input: parse(row.input_json ?? null),
     resumeSession: text(row.resume_session ?? null),

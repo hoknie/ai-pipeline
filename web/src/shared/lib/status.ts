@@ -84,6 +84,11 @@ export function statusInfo(code: string, t: TFunction): StatusInfo {
   };
 }
 
+/** Who a usage limit holds: `zai (opencode)` for a provider, the runtime alone otherwise. */
+export function limitOwner(owner: { runtime: string; provider?: string }): string {
+  return owner.provider ? `${owner.provider} (${owner.runtime})` : owner.runtime;
+}
+
 /** Why a group waits, for people: the busy specialist, the full pool, the machine or the repository limit, the usage limit or the network. */
 export function waitText(wait: GroupWait, t: TFunction): string {
   switch (wait.reason) {
@@ -96,7 +101,7 @@ export function waitText(wait: GroupWait, t: TFunction): string {
         ? t('wait.capacityMachine', { max: wait.max })
         : t('wait.capacityRepository', { max: wait.max });
     case 'limit':
-      return t('wait.limit', { runtime: wait.runtime, time: clock(wait.until) });
+      return t('wait.limit', { runtime: limitOwner(wait), time: clock(wait.until) });
     case 'network':
       return wait.until === null
         ? t('wait.network', { problem: wait.problem })

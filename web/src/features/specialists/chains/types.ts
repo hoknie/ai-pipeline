@@ -8,6 +8,8 @@ export interface ChainRuntimeDraft {
   variant: string;
   reasoning_effort: ReasoningEffort | '';
   enabled: boolean;
+  provider: string;
+  default: boolean;
 }
 
 export interface ChainDraft {

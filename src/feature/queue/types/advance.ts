@@ -27,6 +27,7 @@ function stopOnLimit(queue: Queue, own: readonly RunState[]): void {
     run: first.run,
     group: first.group,
     runtime: first.runtime,
+    ...(first.provider !== undefined ? { provider: first.provider } : {}),
     resetsAt: Math.max(...fresh.map((hit) => hit.resetsAt)),
     autoResume: running && queue.onLimit === 'wait',
   };

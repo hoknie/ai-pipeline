@@ -1,5 +1,5 @@
 import { ChartTooltip } from './ChartTooltip.tsx';
-import { scaleValue, type BarSlot, type ChartSeries } from './scale.ts';
+import { scaleValue, tipSeries, type BarSlot, type ChartSeries } from './scale.ts';
 
 export interface ChartCategory {
   key: string;
@@ -184,14 +184,12 @@ export function ActiveTip({
       title={category.title}
       total={total}
       left={left}
-      rows={series
-        .filter((part) => (part.values[index] ?? 0) > 0)
-        .map((part) => ({
-          key: part.key,
-          label: part.label,
-          color: part.color,
-          value: format(part.values[index] ?? 0),
-        }))}
+      rows={tipSeries(series, index).map((part) => ({
+        key: part.key,
+        label: part.label,
+        color: part.color,
+        value: format(part.values[index] ?? 0),
+      }))}
     />
   );
 }

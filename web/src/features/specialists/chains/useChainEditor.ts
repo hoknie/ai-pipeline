@@ -108,8 +108,9 @@ async function executeDelete(ctx: DeleteContext): Promise<void> {
 function useChainItems(setDraft: (updater: (cur: ChainDraft) => ChainDraft) => void) {
   const updateItem = (index: number, item: ChainRuntimeDraft) => {
     setDraft((cur) => {
-      const runtimes = [...cur.runtimes];
-      runtimes[index] = item;
+      const runtimes = cur.runtimes.map((other, i) =>
+        i === index ? item : item.default ? { ...other, default: false } : other,
+      );
       return { ...cur, runtimes };
     });
   };

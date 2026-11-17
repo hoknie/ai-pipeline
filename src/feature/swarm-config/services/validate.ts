@@ -267,6 +267,7 @@ function checkSpecialistChains(
     if (!chain) {
       const hint = known.length > 0 ? `; known: ${known.join(', ')}` : '; none defined';
       addError(ctx, path, `unknown chain \`${specialist.runtimeChain}\`${hint}`);
+      continue;
     }
   }
 }

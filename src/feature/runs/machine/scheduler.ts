@@ -117,6 +117,7 @@ function startAttempt(
     ...(selected.chainIndex !== undefined && selected.chainIndex !== null
       ? { chainIndex: selected.chainIndex }
       : {}),
+    ...(selected.provider !== undefined ? { provider: selected.provider } : {}),
     status: 'running',
     input: buildInput(state.run, group, pending),
     resumeSession,

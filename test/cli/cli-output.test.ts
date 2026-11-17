@@ -362,6 +362,25 @@ describe('cli', () => {
     expect(result.stdout).toContain('Agent CLIs:\n  opencode:');
   });
 
+  it('shows a by_provider chain with provider and default in config check', async () => {
+    const box = sandbox(`swarm:
+  chains:
+    thinking:
+      name: Thinking
+      mode: by_provider
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3, default: true }
+`);
+    const result = await aip(box, 'config', 'check');
+    expect(result.code, result.stderr).toBe(0);
+    const chain = result.stdout.split('thinking:')[1] ?? '';
+    expect(chain).toContain('mode: by_provider');
+    expect(chain).toContain('provider: anthropic');
+    expect(chain).toContain('provider: zai');
+    expect(chain).toContain('default: true');
+  });
+
   it('lists the files with old names in config check without changing the exit code', async () => {
     const box = sandbox();
     const old = join(box.repo, 'aip', 'workflows', 'legacy.yaml');

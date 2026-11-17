@@ -15,6 +15,7 @@ import {
 } from '../../../shared/ui/forms/select.tsx';
 import { Switch } from '../../../shared/ui/forms/switch.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
+import { ItemProvider, type ItemErrors } from './ChainItemProvider.tsx';
 import type { ChainRuntimeDraft, SpecialistRuntimeName } from './types.ts';
 
 const RUNTIMES: readonly SpecialistRuntimeName[] = ['claude', 'opencode', 'agy'];
@@ -34,6 +35,9 @@ export interface ChainRuntimeItemProps {
   item: ChainRuntimeDraft;
   total: number;
   disabled: boolean;
+  /** The chain is in the By provider mode: the provider is required and an item may be the default. */
+  tier: boolean;
+  errors: ItemErrors;
   onChange: (item: ChainRuntimeDraft) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -211,6 +215,8 @@ export function ChainRuntimeItem({
   item,
   total,
   disabled,
+  tier,
+  errors,
   onChange,
   onMoveUp,
   onMoveDown,
@@ -230,6 +236,14 @@ export function ChainRuntimeItem({
         onMoveUp={onMoveUp}
         onMoveDown={onMoveDown}
         onRemove={onRemove}
+      />
+      <ItemProvider
+        index={index}
+        item={item}
+        disabled={disabled}
+        tier={tier}
+        errors={errors}
+        onChange={(patch) => onChange({ ...item, ...patch })}
       />
       <ItemFields
         index={index}

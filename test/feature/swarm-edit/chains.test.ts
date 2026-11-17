@@ -285,4 +285,68 @@ describe('chains in editor', () => {
       runtimes: [{ model: 'provider/gpt-project' }],
     });
   });
+
+  it('writes and reads a by_provider chain with provider and default', () => {
+    const paths = temporaryPaths();
+    write(join(paths.project.directory, 'settings.yaml'), 'max: 3\n');
+    const initial =
+      '# tier\nname: Thinking\nmode: by_provider\nruntimes:\n  - provider: anthropic\n    runtime: claude\n';
+    write(join(paths.project.directory, 'chains', 'thinking.yaml'), initial);
+    const plan = planEdit(paths, {
+      kind: 'chain',
+      id: 'thinking',
+      value: {
+        name: 'Thinking',
+        mode: 'by_provider',
+        runtimes: [
+          { provider: 'anthropic', runtime: 'claude' },
+          { provider: 'zai', runtime: 'opencode', model: 'zai/glm-5.3', default: true },
+        ],
+      },
+      revision: revisionOf(initial),
+      level: 'project',
+    });
+    if (!plan.ok) throw new Error('expected a valid tier');
+    expect(plan.text).toContain('# tier');
+    expect(plan.text).toContain('provider: zai');
+    expect(plan.text).toContain('default: true');
+    write(plan.file, plan.text!);
+    const chain = editorView(paths).chains.find((c) => c.slug === 'thinking');
+    expect(chain?.raw).toMatchObject({
+      mode: 'by_provider',
+      runtimes: [{ provider: 'anthropic' }, { provider: 'zai', default: true }],
+    });
+  });
+
+  it('reports a duplicate provider and a missing provider of a tier with field paths', () => {
+    const paths = temporaryPaths();
+    write(join(paths.project.directory, 'settings.yaml'), 'max: 3\n');
+    const plan = planEdit(paths, {
+      kind: 'chain',
+      id: 'thinking',
+      value: {
+        name: 'Thinking',
+        mode: 'by_provider',
+        runtimes: [
+          { provider: 'zai', runtime: 'opencode' },
+          { provider: 'zai', runtime: 'opencode' },
+          { runtime: 'opencode' },
+        ],
+      },
+      revision: null,
+      level: 'project',
+    });
+    if (plan.ok || plan.reason !== 'invalid') throw new Error('expected an invalid tier');
+    const file = join(paths.project.directory, 'chains', 'thinking.yaml');
+    expect(plan.errors).toContainEqual({
+      file,
+      path: 'swarm.chains.thinking.runtimes[1].provider',
+      message: 'duplicate provider `zai`',
+    });
+    expect(plan.errors).toContainEqual({
+      file,
+      path: 'swarm.chains.thinking.runtimes[2].provider',
+      message: 'is required',
+    });
+  });
 });

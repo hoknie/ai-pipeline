@@ -8,6 +8,7 @@ import {
   OTHER_KEY,
   scaleValue,
   thinLabels,
+  tipSeries,
   type ChartSeries,
 } from '../src/shared/ui/charts/scale.ts';
 import {
@@ -114,6 +115,31 @@ describe('foldSeries', () => {
     expect(last.label).toBe('Other');
     // p0, p1, p2: 1+2+3 and 0+1+2
     expect(last.values).toEqual([6, 0, 3]);
+  });
+});
+
+describe('tipSeries', () => {
+  it('orders by the value of the bucket, the largest first', () => {
+    const input = [series('a', [1, 9]), series('b', [5, 2]), series('c', [3, 4])];
+    expect(tipSeries(input, 0).map((item) => item.key)).toEqual(['b', 'c', 'a']);
+    expect(tipSeries(input, 1).map((item) => item.key)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('drops zero and missing values', () => {
+    const input = [series('a', [0, 1]), series('b', [2]), series('c', [3, 0])];
+    expect(tipSeries(input, 1).map((item) => item.key)).toEqual(['a']);
+    expect(tipSeries(input, 0).map((item) => item.key)).toEqual(['c', 'b']);
+  });
+
+  it('keeps the order of the series on equal values, «Other» last', () => {
+    const input = [series('a', [4]), series('b', [4]), series(OTHER_KEY, [4])];
+    expect(tipSeries(input, 0).map((item) => item.key)).toEqual(['a', 'b', OTHER_KEY]);
+  });
+
+  it('does not change the input', () => {
+    const input = [series('a', [1]), series('b', [2])];
+    tipSeries(input, 0);
+    expect(input.map((item) => item.key)).toEqual(['a', 'b']);
   });
 });
 

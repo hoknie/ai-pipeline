@@ -1,5 +1,5 @@
 import { clockTime } from '../../feature/runs/types/index.ts';
-import { waitNote, withTags } from './runs.ts';
+import { limitOwner, waitNote, withTags } from './runs.ts';
 import {
   type Style,
   isTerminal,
@@ -24,7 +24,7 @@ export function stopReason(view: QueueView | GlobalQueueView): string | null {
   if (stop.kind === 'item') return `item ${stop.item}: ${stop.error}`;
   if (stop.kind === 'limit') {
     const resumes = stop.autoResume ? ', resumes automatically' : '';
-    return `usage limit of ${stop.runtime} in ${stop.run}, resets ${clockTime(stop.resetsAt)}${resumes}`;
+    return `usage limit of ${limitOwner(stop)} in ${stop.run}, resets ${clockTime(stop.resetsAt)}${resumes}`;
   }
   const where = stop.group ? `run ${stop.run}, group ${stop.group}` : `run ${stop.run}`;
   return `${where}: ${stop.reason}`;

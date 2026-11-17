@@ -100,6 +100,13 @@ describe('a queue stopped by a usage limit', () => {
   });
 });
 
+describe('a queue stopped by the usage limit of a provider', () => {
+  it('names the provider and its runtime', async () => {
+    showQueue(queueOf({ stop: { ...limitStop(false), runtime: 'opencode', provider: 'zai' } }));
+    expect(await screen.findByText(/the usage limit of zai \(opencode\) ran out/)).toBeTruthy();
+  });
+});
+
 describe('return to the queue', () => {
   it('returns a skipped run from its card', async () => {
     const api = showQueue(

@@ -100,6 +100,16 @@ export function foldSeries(
   ];
 }
 
+/**
+ * The series that have a value in the category `index`, from the largest value to the smallest;
+ * equal values keep the order of the series. The input is not changed.
+ */
+export function tipSeries(series: ChartSeries[], index: number): ChartSeries[] {
+  return series
+    .filter((part) => (part.values[index] ?? 0) > 0)
+    .sort((left, right) => (right.values[index] ?? 0) - (left.values[index] ?? 0));
+}
+
 /** The sum of the values of every category. */
 export function columnTotals(series: ChartSeries[], count: number): number[] {
   return Array.from({ length: count }, (_, index) =>

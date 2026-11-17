@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { clock } from '../../../shared/lib/format.ts';
+import { limitOwner } from '../../../shared/lib/status.ts';
 import { formatRoute } from '../../../shared/lib/nav/route.ts';
 import type { QueueView } from '../../../shared/api/types.ts';
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
@@ -28,7 +29,7 @@ export function StopReason({ queue }: { queue: QueueView }) {
   if (stop.kind === 'limit') {
     return (
       <Alert variant="warn" role="status">
-        {t('queue.stopped')} {t('queue.limitStop', { runtime: stop.runtime })},{' '}
+        {t('queue.stopped')} {t('queue.limitStop', { runtime: limitOwner(stop) })},{' '}
         {t('queue.limitResets', { time: clock(stop.resetsAt) })}.{' '}
         {stop.autoResume ? `${t('queue.limitResumes', { time: clock(stop.resetsAt) })} ` : null}
         <a className="underline" href={route}>

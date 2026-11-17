@@ -1235,7 +1235,7 @@ export const zh: Dictionary = {
     section: '链 {{id}}',
     help: {
       name: '链在面板中的显示名称。',
-      mode: '出错时使用下一个运行器、按顺序轮换，或随机选择。',
+      mode: '出错时使用下一个运行器、按顺序轮换、随机选择，或为每个提供商指定运行器和模型。',
     },
     sharedReadOnly: '共享链在此仅可查看。请在项目中覆盖此链，或在设置中为所有仓库修改。',
     new: '新建链',
@@ -1257,6 +1257,7 @@ export const zh: Dictionary = {
       on_error: '出错时故障转移 (on_error)',
       round_robin: '轮询 (round_robin)',
       random: '随机 (random)',
+      by_provider: '按提供商 (by_provider)',
     },
     fields: {
       slug: 'Slug',
@@ -1275,6 +1276,11 @@ export const zh: Dictionary = {
       moveUp: '上移',
       moveDown: '下移',
       remove: '删除运行器',
+      provider: '提供商',
+      providerPlaceholder: 'anthropic, zai, openai',
+      providerHint: '提供商 id：用量限制保持的键。每个账户使用一个 id。',
+      providerRequired: '“按提供商”模式下必填',
+      default: '默认',
     },
   },
   pipeline: {

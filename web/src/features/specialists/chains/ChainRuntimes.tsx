@@ -3,8 +3,23 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Card } from '../../../shared/ui/layout/card.tsx';
+import type { FieldError } from '../../../shared/api/types.ts';
+import type { ItemErrors } from './ChainItemProvider.tsx';
 import { ChainRuntimeItem } from './ChainRuntimeItem.tsx';
 import type { useChainEditor } from './useChainEditor.ts';
+
+export const ITEM_FIELD_ERROR = /\.runtimes\[(\d+)\]\.(provider|default)$/;
+
+/** The errors of `provider` and `default` of one item, to show at their fields. */
+export function itemErrors(errors: FieldError[], index: number): ItemErrors {
+  const result: ItemErrors = {};
+  for (const error of errors) {
+    const match = ITEM_FIELD_ERROR.exec(error.path);
+    if (match && Number(match[1]) === index)
+      result[match[2] as 'provider' | 'default'] = error.message;
+  }
+  return result;
+}
 
 export function ChainRuntimes({
   editor,
@@ -33,6 +48,8 @@ export function ChainRuntimes({
             item={item}
             total={editor.draft.runtimes.length}
             disabled={disabled}
+            tier={editor.draft.mode === 'by_provider'}
+            errors={itemErrors(editor.errors, index)}
             onChange={(updated) => editor.updateItem(index, updated)}
             onMoveUp={() => editor.moveItem(index, index - 1)}
             onMoveDown={() => editor.moveItem(index, index + 1)}

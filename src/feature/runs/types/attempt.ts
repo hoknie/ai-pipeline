@@ -187,6 +187,8 @@ export interface Attempt {
   variant?: string;
   reasoningEffort?: ReasoningEffort;
   chainIndex?: number | null;
+  /** Provider of the chain item, when it has one: the key of the usage-limit hold. */
+  provider?: string;
   status: AttemptStatus;
   input: StepInput;
   resumeSession: string | null;

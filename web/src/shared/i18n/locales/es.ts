@@ -1281,7 +1281,7 @@ export const es: Dictionary = {
     section: 'cadena {{id}}',
     help: {
       name: 'Cómo se muestra la cadena en el panel.',
-      mode: 'Usar el siguiente ejecutor en caso de error, elegir por turnos o elegir al azar.',
+      mode: 'Usar el siguiente ejecutor en caso de error, elegir por turnos, al azar o dar a cada proveedor su ejecutor y modelo.',
     },
     sharedReadOnly:
       'Las cadenas compartidas son de solo lectura aquí. Sustituya esta cadena en el proyecto o edítela en Ajustes para todos los repositorios.',
@@ -1304,6 +1304,7 @@ export const es: Dictionary = {
       on_error: 'En caso de error (on_error)',
       round_robin: 'Por turnos (round_robin)',
       random: 'Aleatorio (random)',
+      by_provider: 'Por proveedor (by_provider)',
     },
     fields: {
       slug: 'Slug',
@@ -1322,6 +1323,11 @@ export const es: Dictionary = {
       moveUp: 'Subir',
       moveDown: 'Bajar',
       remove: 'Eliminar ejecutor',
+      provider: 'Proveedor',
+      providerPlaceholder: 'anthropic, zai, openai',
+      providerHint: 'Id del proveedor: clave de la retención por límite de uso. Un id por cuenta.',
+      providerRequired: 'Obligatorio en el modo Por proveedor',
+      default: 'Por defecto',
     },
   },
   pipeline: {

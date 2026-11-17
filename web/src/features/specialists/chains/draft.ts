@@ -8,6 +8,8 @@ export function defaultRuntimeItem(): ChainRuntimeDraft {
     variant: '',
     reasoning_effort: '',
     enabled: true,
+    provider: '',
+    default: false,
   };
 }
 
@@ -35,6 +37,8 @@ function runtimeItemFrom(raw: unknown): ChainRuntimeDraft {
         ? (String(item.reasoning_effort) as ChainRuntimeDraft['reasoning_effort'])
         : '',
     enabled: item.enabled !== false,
+    provider: typeof item.provider === 'string' ? item.provider : '',
+    default: item.default === true,
   };
 }
 
@@ -43,7 +47,10 @@ export function draftOfChain(entry: EditorChain): ChainDraft {
   const runtimesRaw = Array.isArray(raw.runtimes) ? raw.runtimes : [];
   const runtimes =
     runtimesRaw.length > 0 ? runtimesRaw.map(runtimeItemFrom) : [defaultRuntimeItem()];
-  const mode = raw.mode === 'round_robin' || raw.mode === 'random' ? raw.mode : 'on_error';
+  const mode =
+    raw.mode === 'round_robin' || raw.mode === 'random' || raw.mode === 'by_provider'
+      ? raw.mode
+      : 'on_error';
   return {
     slug: entry.slug,
     name: raw.name !== undefined && raw.name !== null ? String(raw.name) : '',
@@ -53,11 +60,13 @@ export function draftOfChain(entry: EditorChain): ChainDraft {
   };
 }
 
-function valueOfItem(item: ChainRuntimeDraft): Record<string, unknown> {
+function valueOfItem(item: ChainRuntimeDraft, tier: boolean): Record<string, unknown> {
   const res: Record<string, unknown> = {
     runtime: item.runtime,
     enabled: item.enabled,
   };
+  if (item.provider.trim()) res.provider = item.provider.trim();
+  if (tier && item.default) res.default = true;
   if (item.model.trim()) res.model = item.model.trim();
   if (item.runtime === 'opencode') {
     if (item.variant.trim()) res.variant = item.variant.trim();
@@ -74,7 +83,7 @@ export function valueOfChain(
     name: draft.name.trim() || draft.slug,
     mode: draft.mode,
     enabled: draft.enabled,
-    runtimes: draft.runtimes.map(valueOfItem),
+    runtimes: draft.runtimes.map((item) => valueOfItem(item, draft.mode === 'by_provider')),
   };
   if (raw) {
     for (const [k, v] of Object.entries(raw)) {
@@ -91,7 +100,9 @@ function sameItem(a: ChainRuntimeDraft, b: ChainRuntimeDraft | undefined): boole
     a.model === b.model &&
     a.variant === b.variant &&
     a.reasoning_effort === b.reasoning_effort &&
-    a.enabled === b.enabled
+    a.enabled === b.enabled &&
+    a.provider === b.provider &&
+    a.default === b.default
   );
 }
 

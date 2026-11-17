@@ -32,6 +32,35 @@ function mount() {
   return screen.getByRole('group', { name: 'Chart by day: Tokens by project' });
 }
 
+const ascending = [
+  { key: 'small', label: 'small', color: '#3b82f6', values: [10, 0, 0] },
+  { key: 'big', label: 'big', color: '#22c55e', values: [90, 0, 0] },
+];
+
+describe('tip row order', () => {
+  const props = {
+    label: 'Order',
+    categories,
+    series: ascending,
+    format: (value: number) => `${value}t`,
+    categoryHead: 'Day',
+    totalLabel: 'Total',
+  };
+
+  it.each([
+    ['BarChart', <BarChart key="bar" {...props} />],
+    ['AreaChart', <AreaChart key="area" {...props} />],
+  ])('lists the largest value first in %s, the legend keeps its order', (_name, chart) => {
+    render(chart);
+    fireEvent.focus(screen.getByRole('group', { name: 'Order' }));
+    const rows = within(screen.getByTestId('chart-tooltip')).getAllByRole('listitem');
+    expect(rows.map((item) => item.textContent)).toEqual(['big90t', 'small10t']);
+    const tip = screen.getByTestId('chart-tooltip');
+    const legend = [...document.querySelectorAll('ul')].find((list) => !tip.contains(list))!;
+    expect([...legend.querySelectorAll('li')].map((i) => i.textContent)).toEqual(['small', 'big']);
+  });
+});
+
 describe('BarChart', () => {
   it('has an accessible name and draws a bar for every day', () => {
     const chart = mount();

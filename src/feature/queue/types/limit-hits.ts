@@ -36,6 +36,7 @@ export interface LimitHit {
   run: string;
   group: string;
   runtime: string;
+  provider?: string;
   resetsAt: number;
 }
 
@@ -55,6 +56,7 @@ export function limitHits(state: RunState): LimitHit[] {
                 run: state.run.id,
                 group: group.slug,
                 runtime: attempt.runtime,
+                ...(attempt.provider !== undefined ? { provider: attempt.provider } : {}),
                 resetsAt,
               },
             ];

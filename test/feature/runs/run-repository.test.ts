@@ -98,7 +98,7 @@ describe('hold of a run and priority runs', () => {
     old.database.exec('ALTER TABLE runs DROP COLUMN repair_json');
     old.database.exec('DROP TABLE observers');
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10 - (7 + 1)}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11 - (7 + 1)}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.hold).toBeNull();
@@ -376,7 +376,7 @@ describe('refused tool calls', () => {
       { tool: 'Bash', command: 'python3 fix.py' },
     ]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-34)).toContain('denials_json');
+    expect(MIGRATIONS.at(-35)).toContain('denials_json');
   });
 
   it('keeps the files an attempt changed outside its worktree and reads older attempts as none', async () => {
@@ -400,7 +400,7 @@ describe('refused tool calls', () => {
     const reopened = openStorage(databasePath(directory));
     expect(reopened.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.outsideChanges).toEqual([]);
     reopened.database.close();
-    expect(MIGRATIONS.at(-33)).toContain('outside_changes_json');
+    expect(MIGRATIONS.at(-34)).toContain('outside_changes_json');
   });
 });
 
@@ -647,6 +647,68 @@ describe('attachments of a run', () => {
     state.run.attachments = [];
     store.runs.saveRun(state);
     expect(store.runs.loadRun(state.run.id)?.run.attachments).toHaveLength(1);
+    store.database.close();
+  });
+});
+
+describe('chain item of an attempt', () => {
+  const TIER = `swarm:
+  chains:
+    thinking:
+      name: Thinking
+      mode: by_provider
+      runtimes:
+        - { provider: anthropic, runtime: claude, model: opus }
+        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }
+  specialists:
+    thinker: { name: Thinker, runtime_chain: thinking }
+  pipelines:
+    feature:
+      steps:
+        - { id: work, specialist: thinker }
+`;
+
+  it('keeps chainIndex and provider across a close and a reopen, and goes on to the next item', () => {
+    const directory = ensureDirectory(join(mkdtempSync(join(tmpdir(), 'aip-store-')), 'aip'));
+    const first = openStorage(databasePath(directory));
+    const state = run(1, { configText: TIER });
+    dispatch([state], 1000);
+    const attempt = state.groups[0]!.attempts[0]!;
+    expect(attempt).toMatchObject({ chainIndex: 0, provider: 'anthropic' });
+    transition(
+      state,
+      {
+        kind: 'attempt_exited',
+        group: 'group-1',
+        seq: attempt.seq,
+        exit: { sessionId: null, usage: null, failure: { kind: 'no_report' }, outsideChanges: [] },
+      },
+      2000,
+    );
+    first.runs.saveRun(state);
+    first.database.close();
+
+    const reopened = openStorage(databasePath(directory));
+    const loaded = reopened.runs.loadRun(state.run.id)!;
+    expect(loaded.groups[0]!.attempts[0]).toMatchObject({ chainIndex: 0, provider: 'anthropic' });
+    dispatch([loaded], 3000);
+    expect(loaded.groups[0]!.attempts[1]).toMatchObject({
+      chainIndex: 1,
+      provider: 'zai',
+      runtime: 'opencode',
+    });
+    reopened.database.close();
+  });
+
+  it('reads an attempt without a chain item as having none', () => {
+    const store = temporaryStorage();
+    const state = run(1);
+    step(state);
+    store.runs.saveRun(state);
+    const loaded = store.runs.loadRun(state.run.id)!;
+    const attempt = loaded.groups[0]!.attempts[0]!;
+    expect('chainIndex' in attempt).toBe(false);
+    expect('provider' in attempt).toBe(false);
     store.database.close();
   });
 });

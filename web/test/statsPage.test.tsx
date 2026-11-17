@@ -248,6 +248,33 @@ describe('daily chart', () => {
     expect(tip.getByText('60k')).toBeTruthy();
     expect(tip.getByText('10k')).toBeTruthy();
     expect(tip.getByText('70k')).toBeTruthy();
+    expect(tip.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'sonnet60k',
+      'opus10k',
+    ]);
+  });
+
+  it('lists the tip rows from the largest value to the smallest', async () => {
+    const base = twoProjects();
+    mount({
+      ...base,
+      series: [
+        {
+          ...base.series[0]!,
+          projects: [
+            { repository: '/work/app', tokens: 10_000, agentMs: 0, tasks: 1 },
+            { repository: '/work/lib', tokens: 60_000, agentMs: 0, tasks: 1 },
+          ],
+        },
+      ],
+    });
+    const chart = await screen.findByRole('group', { name: 'Chart by day: Tokens by project' });
+    fireEvent.focus(chart);
+    const tip = within(screen.getByTestId('chart-tooltip'));
+    expect(tip.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'lib60k',
+      'app10k',
+    ]);
   });
 
   it('offers no tasks in the model split and brings them back with the projects', async () => {

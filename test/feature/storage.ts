@@ -83,6 +83,9 @@ export function dropProjectAttributes(database: import('node:sqlite').DatabaseSy
 
 /** Takes away the columns of the newest migrations (the variants and the take filter), when they are there. */
 export function dropQueueFilter(database: import('node:sqlite').DatabaseSync): void {
+  // The newest migration adds the chain item of an attempt: it goes first.
+  dropColumn(database, 'attempts', 'chain_index');
+  dropColumn(database, 'attempts', 'provider');
   // The migration that removed the cost is the newest: the journal gets its column back first.
   const journal = database.prepare('PRAGMA table_info(stats_attempts)').all() as { name: string }[];
   if (journal.length > 0 && !journal.some((column) => column.name === 'cost_usd')) {

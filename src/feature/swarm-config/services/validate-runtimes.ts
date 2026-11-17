@@ -32,7 +32,15 @@ const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export const CHAIN_KEYS = ['name', 'mode', 'runtimes', 'enabled'];
 
-export const CHAIN_RUNTIME_KEYS = ['runtime', 'model', 'enabled', 'variant', 'reasoning_effort'];
+export const CHAIN_RUNTIME_KEYS = [
+  'runtime',
+  'model',
+  'enabled',
+  'variant',
+  'reasoning_effort',
+  'provider',
+  'default',
+];
 
 export function checkChains(ctx: ValidateContext, value: unknown): RuntimeChain[] {
   const mapping = readMapping(ctx, value, 'swarm.chains');
@@ -69,6 +77,8 @@ export function checkChain(
     else if (key === 'enabled') chain.enabled = readBoolean(ctx, field, fieldPath) ?? true;
     else if (key === 'runtimes') chain.runtimes = checkChainRuntimes(ctx, field, fieldPath);
   }
+  if (Array.isArray(mapping.runtimes))
+    checkTier(ctx, chain, mapping.runtimes, join(path, 'runtimes'));
   if (!('name' in mapping)) addError(ctx, join(path, 'name'), 'is required');
   if (!('mode' in mapping)) addError(ctx, join(path, 'mode'), 'is required');
   if (!('runtimes' in mapping)) addError(ctx, join(path, 'runtimes'), 'is required');
@@ -102,6 +112,15 @@ function checkChainRuntimes(
           readChoice<Runtime>(ctx, field, fieldPath, RUNTIMES) ?? runtimeItem.runtime;
       } else if (key === 'model') runtimeItem.model = readString(ctx, field, fieldPath);
       else if (key === 'enabled') runtimeItem.enabled = readBoolean(ctx, field, fieldPath) ?? true;
+      else if (key === 'provider') {
+        const provider = readString(ctx, field, fieldPath);
+        if (provider === null) continue;
+        if (isValidSlug(provider)) runtimeItem.provider = provider;
+        else addError(ctx, fieldPath, `provider must match ${SLUG_PATTERN_TEXT}`);
+      } else if (key === 'default') {
+        const flag = readBoolean(ctx, field, fieldPath);
+        if (flag !== null) runtimeItem.default = flag;
+      }
     }
     if (!('runtime' in mapping)) addError(ctx, join(itemPath, 'runtime'), 'is required');
     const modelProblem = modelIdProblem(runtimeItem.runtime, runtimeItem.model);
@@ -110,6 +129,34 @@ function checkChainRuntimes(
     items.push(runtimeItem);
   }
   return items;
+}
+
+/** `provider` and `default` of the items: required, unique and single in a `by_provider` chain. */
+function checkTier(ctx: ValidateContext, chain: RuntimeChain, raw: unknown[], path: string): void {
+  const tier = chain.mode === 'by_provider';
+  const seen = new Set<string>();
+  let defaults = 0;
+  raw.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return;
+    const mapping = entry as Record<string, unknown>;
+    const itemPath = `${path}[${index}]`;
+    if (!tier) {
+      if ('default' in mapping) {
+        addError(ctx, join(itemPath, 'default'), 'is supported by the by_provider mode only');
+      }
+      return;
+    }
+    if (!('provider' in mapping)) addError(ctx, join(itemPath, 'provider'), 'is required');
+    const provider = typeof mapping.provider === 'string' ? mapping.provider : null;
+    if (provider !== null && isValidSlug(provider)) {
+      if (seen.has(provider))
+        addError(ctx, join(itemPath, 'provider'), `duplicate provider \`${provider}\``);
+      seen.add(provider);
+    }
+    if (mapping.default === true && ++defaults > 1) {
+      addError(ctx, join(itemPath, 'default'), 'only one item may be the default');
+    }
+  });
 }
 
 function checkChainRuntimeOpencode(

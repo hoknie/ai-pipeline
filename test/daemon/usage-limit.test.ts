@@ -11,7 +11,7 @@ import {
 } from '../../src/presentation/ipc/contract/index.ts';
 import { subscribe } from '../../src/presentation/ipc/client/index.ts';
 
-import { POLL_MS, harness, until, type Harness } from './harness.ts';
+import { POLL_MS, harness, startRun, until, type Harness } from './harness.ts';
 
 let current: Harness | null = null;
 
@@ -148,6 +148,60 @@ describe('a usage limit in the queue', () => {
     const runId = (stopped.stop as { run: string }).run;
     await h.waitFor(runId, (view) => view.state === 'finished');
     expect((await queueOf(h)).stop?.kind).not.toBe('limit');
+  });
+});
+
+const TIER_CONFIG = (items: string) => `swarm:
+  max: 3
+  chains:
+    thinking:
+      name: Thinking
+      mode: by_provider
+      runtimes:
+${items}
+  specialists:
+    coder: { name: Coder, runtime_chain: thinking }
+  pipelines:
+    feature:
+      steps:
+        - { id: code, specialist: coder }
+`;
+
+const ANTHROPIC = '        - { provider: anthropic, runtime: claude, model: opus }';
+const ZAI = '        - { provider: zai, runtime: opencode, model: zai/glm-5.3 }';
+
+describe('a usage limit of a provider of a by_provider chain', () => {
+  it('names the provider in the wait and the queue stop, and keeps it after a restart', async () => {
+    const h = (current = await harness(TIER_CONFIG(ANTHROPIC), {}, { now: () => Date.now() }));
+    h.script({ code: [{ usageLimit: { resetsAt: resetIn(3600) } }, {}] });
+    await add(h, 'A');
+    await h.call('queue_start', { repository: h.repo });
+    const stopped = await waitQueue(h, (view) => view.stop?.kind === 'limit');
+    expect(stopped.stop).toMatchObject({ runtime: 'claude', provider: 'anthropic' });
+    const runId = (stopped.stop as { run: string }).run;
+    const waiting = await h.status(runId);
+    expect(waiting.groups[0]?.wait).toMatchObject({
+      reason: 'limit',
+      runtime: 'claude',
+      provider: 'anthropic',
+    });
+    await h.restart();
+    const again = await h.waitFor(runId, (view) => view.groups[0]?.wait?.reason === 'limit');
+    expect(again.groups[0]?.wait).toMatchObject({ runtime: 'claude', provider: 'anthropic' });
+  });
+
+  it('goes on at the next item of the chain after the limit of the first one', async () => {
+    const h = (current = await harness(TIER_CONFIG(`${ANTHROPIC}\n${ZAI}`)));
+    h.script({ code: [{ usageLimit: { resetsAt: resetIn(3600) } }, {}] });
+    const created = (await startRun(h, {
+      repository: h.repo,
+      pipeline: 'feature',
+      task: 'work',
+    })) as RunCreated;
+    const final = await h.waitFor(created.runId, (view) => view.finished);
+    expect(final.groups[0]?.status).toBe('merged');
+    const detail = await h.group(created.runId, final.groups[0]!.slug);
+    expect(detail.attempts.map((attempt) => attempt.runtime)).toEqual(['claude', 'opencode']);
   });
 });
 

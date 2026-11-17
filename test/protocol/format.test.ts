@@ -709,6 +709,22 @@ describe('usage limit in the text output', () => {
     );
   });
 
+  it('names the provider in the stop by a usage limit', () => {
+    const queue = emptyQueue('/repo', 1);
+    queue.stop = {
+      kind: 'limit',
+      run: 'A',
+      group: 'a',
+      runtime: 'opencode',
+      provider: 'zai',
+      resetsAt: RESET,
+      autoResume: false,
+    };
+    expect(formatQueue(queueView(queue, () => run(1)))).toContain(
+      'Stopped: usage limit of zai (opencode) in A, resets 20:50',
+    );
+  });
+
   it('marks the item of a paused run', () => {
     const queue = emptyQueue('/repo', 1);
     addItem(queue, { pipeline: 'feature', task: 'work' }, 'q1', 2);
@@ -848,6 +864,9 @@ describe('system stages and waiting in text', () => {
     expect(waitNote({ reason: 'pool', pool: 'mix', max: 2 })).toBe('waiting for pool mix (max 2)');
     expect(waitNote({ reason: 'limit', runtime: 'claude', until: 0 })).toMatch(
       /^waiting for claude usage limit, until \d\d:\d\d$/,
+    );
+    expect(waitNote({ reason: 'limit', runtime: 'opencode', provider: 'zai', until: 0 })).toMatch(
+      /^waiting for zai \(opencode\) usage limit, until \d\d:\d\d$/,
     );
     expect(waitNote(null)).toBe('');
   });

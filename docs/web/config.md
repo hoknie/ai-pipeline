@@ -41,8 +41,8 @@ The addresses are `#specialists`, `#specialists/<slug>` and `#specialists/new`.
 
 The "Chains" tab edits project runtime chains (`aip/chains/<slug>.yaml`) for failover and multi-model execution. New chains on this tab are always saved to the project.
 
-- Mode: `on_error` (failover on limits or unavailable runtime), `round_robin` (turn-based iteration), or `random`.
-- Ordered list of runtimes with individual model, variant, reasoning effort, and enable toggles.
+- Mode: `on_error` (failover on limits or unavailable runtime), `round_robin` (turn-based iteration), `random`, or "By provider" (`by_provider`, see [Tiers](../configuration/runtimes.md#tiers-by_provider)).
+- Ordered list of runtimes with individual provider, model, variant, reasoning effort, and enable toggles. In the "By provider" mode the provider is required and one item can be switched to "Default"; the errors of both show at the item's field.
 - Shared chains are view-only here. "Override in the project" copies a shared chain into the project; "Remove the override" returns to the shared chain.
 - Shared chains (`~/.config/aip/chains/<slug>.yaml`) are created and edited in [Settings](settings.md) under the "Chains" group (`#settings/global/chains`). This form edits the shared source even when the current project overrides it.
 

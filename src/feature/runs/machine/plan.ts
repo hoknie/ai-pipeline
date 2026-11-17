@@ -13,6 +13,7 @@ import {
   runningByPool,
   type PoolSlot,
   type SelectedRuntime,
+  holdOf,
   limitHolds,
   networkRetryAt,
   openAction,
@@ -191,10 +192,15 @@ export function planDispatch(
     const slug = specialist?.slug;
     const selected =
       specialist && step ? plannedRuntime(state, group, specialist, step.id, holds) : undefined;
-    const until = selected ? holds.get(selected.runtime) : undefined;
+    const held = selected ? holdOf(holds, selected.runtime, selected.provider) : undefined;
     // A repair ignores the hold of a usage limit: an agent that hits it ends the repair.
-    if (selected && until !== undefined && !isRepairGroup(group)) {
-      waits.set(key, { reason: 'limit', runtime: selected.runtime, until });
+    if (selected && held !== undefined && !isRepairGroup(group)) {
+      waits.set(key, {
+        reason: 'limit',
+        runtime: selected.runtime,
+        ...(held.provider !== undefined ? { provider: held.provider } : {}),
+        until: held.until,
+      });
       continue;
     }
     const max = specialist?.max ?? null;

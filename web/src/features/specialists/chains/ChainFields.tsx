@@ -28,13 +28,23 @@ function ChainMode({ disabled, draft, onChange }: Omit<ChainFieldsProps, 'isNew'
       <Select
         value={draft.mode}
         disabled={disabled}
-        onValueChange={(mode) => onChange((cur) => ({ ...cur, mode: mode as ChainDraft['mode'] }))}
+        onValueChange={(mode) =>
+          onChange((cur) => ({
+            ...cur,
+            mode: mode as ChainDraft['mode'],
+            // The default item exists in the By provider mode only.
+            runtimes:
+              mode === 'by_provider'
+                ? cur.runtimes
+                : cur.runtimes.map((item) => ({ ...item, default: false })),
+          }))
+        }
       >
         <SelectTrigger id="chain-mode">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {(['on_error', 'round_robin', 'random'] as const).map((mode) => (
+          {(['on_error', 'round_robin', 'random', 'by_provider'] as const).map((mode) => (
             <SelectItem key={mode} value={mode}>
               {t(`chains.modes.${mode}`)}
             </SelectItem>

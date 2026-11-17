@@ -46,6 +46,8 @@ export type QueueStop =
       run: string;
       group: string;
       runtime: string;
+      /** The provider whose limit it is, when the attempt had one. */
+      provider?: string;
       /** When the limit resets (ms). */
       resetsAt: number;
       /** The queue starts by itself at `resetsAt`. */

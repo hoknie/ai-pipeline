@@ -84,9 +84,11 @@ function presentChains(config: Config): unknown {
         mode: chain.mode,
         runtimes: chain.runtimes.map((item) => ({
           runtime: item.runtime,
+          ...(item.provider ? { provider: item.provider } : {}),
           ...(item.model ? { model: item.model } : {}),
           ...(item.variant ? { variant: item.variant } : {}),
           ...(item.reasoningEffort ? { reasoning_effort: item.reasoningEffort } : {}),
+          ...(item.default ? { default: true } : {}),
           ...(item.enabled ? {} : { enabled: false }),
         })),
         ...(chain.enabled ? {} : { enabled: false }),

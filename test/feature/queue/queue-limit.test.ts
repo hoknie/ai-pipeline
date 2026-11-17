@@ -141,6 +141,16 @@ describe('stop on a usage limit', () => {
     expect(queue.stop).toBeNull();
   });
 
+  it('names the provider of the attempt in the stop', () => {
+    const queue = queueOf('b');
+    startQueue(queue, [], 3);
+    const a = queueRun(queue);
+    runningAttempt(a).provider = 'zai';
+    hitLimit(a);
+    expect(tick(queue, [a])).toEqual([]);
+    expect(queue.stop).toMatchObject({ kind: 'limit', runtime: 'claude', provider: 'zai' });
+  });
+
   it('stops without a resume and never skips the run with onLimit stop', () => {
     const queue = queueOf('b');
     queue.skipFailed = true;

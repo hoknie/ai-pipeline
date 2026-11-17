@@ -1279,7 +1279,7 @@ export const ru: Dictionary = {
     section: 'цепочка {{id}}',
     help: {
       name: 'Как цепочка отображается в панели.',
-      mode: 'Переход к следующему исполнителю при ошибке, выбор по очереди или случайный выбор.',
+      mode: 'Переход к следующему исполнителю при ошибке, выбор по очереди, случайный выбор или свой исполнитель и модель для каждого провайдера.',
     },
     sharedReadOnly:
       'Общая цепочка здесь доступна только для просмотра. Переопределите её в проекте или измените в настройках для всех репозиториев.',
@@ -1302,6 +1302,7 @@ export const ru: Dictionary = {
       on_error: 'При ошибке (on_error)',
       round_robin: 'По очереди (round_robin)',
       random: 'Случайно (random)',
+      by_provider: 'По провайдеру (by_provider)',
     },
     fields: {
       slug: 'Slug',
@@ -1320,6 +1321,11 @@ export const ru: Dictionary = {
       moveUp: 'Выше',
       moveDown: 'Ниже',
       remove: 'Удалить исполнителя',
+      provider: 'Провайдер',
+      providerPlaceholder: 'anthropic, zai, openai',
+      providerHint: 'Id провайдера: ключ удержания по лимиту. Один id на аккаунт.',
+      providerRequired: 'Обязателен в режиме «По провайдеру»',
+      default: 'По умолчанию',
     },
   },
   pipeline: {

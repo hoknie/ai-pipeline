@@ -194,6 +194,11 @@ function decisionLines(run: RunView, style: Style): string[] {
   ];
 }
 
+/** Who a usage limit holds: `zai (opencode)` for a provider, the runtime alone otherwise. */
+export function limitOwner(owner: { runtime: string; provider?: string }): string {
+  return owner.provider ? `${owner.provider} (${owner.runtime})` : owner.runtime;
+}
+
 /** What a waiting group waits for, for the NOTE column. */
 export function waitNote(wait: GroupWait | null | undefined, withProblem = true): string {
   if (!wait) return '';
@@ -204,7 +209,7 @@ export function waitNote(wait: GroupWait | null | undefined, withProblem = true)
       : 'waiting for network';
   }
   if (wait.reason === 'limit')
-    return `waiting for ${wait.runtime} usage limit, until ${clockTime(wait.until)}`;
+    return `waiting for ${limitOwner(wait)} usage limit, until ${clockTime(wait.until)}`;
   if (wait.reason === 'specialist') return `waiting for ${wait.specialist}`;
   if (wait.reason === 'pool') return `waiting for pool ${wait.pool} (max ${wait.max})`;
   return wait.scope === 'machine'
