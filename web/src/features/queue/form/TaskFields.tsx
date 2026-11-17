@@ -6,19 +6,8 @@ import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Input } from '../../../shared/ui/forms/input.tsx';
 import { Label } from '../../../shared/ui/forms/label.tsx';
 import { MarkdownField } from '../../../shared/ui/forms/MarkdownField.tsx';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../shared/ui/forms/select.tsx';
 import { ToggleGroup, ToggleGroupItem } from '../../../shared/ui/forms/toggle-group.tsx';
-import type { Api } from '../../../shared/api/api.ts';
-import type { PipelinesView } from '../../../shared/api/types.ts';
-import { ProviderPicker, useCommonProviders } from '../../providers/index.ts';
-import { TITLE_LIMIT, stepsOf, type QueueDraft } from '../draft.ts';
-import { pruneSkip } from '../../../shared/ui/forms/picker/SkipSteps.tsx';
+import { TITLE_LIMIT, type QueueDraft } from '../draft.ts';
 
 export type FormState = {
   idPrefix: string;
@@ -83,151 +72,32 @@ function GroupsEditor({ idPrefix, effective, change, locked }: FormState) {
   );
 }
 
-function PipelineSelect({
-  state,
-  pipelines,
-  options,
-}: {
-  state: FormState;
-  pipelines: PipelinesView | null;
-  options: string[];
-}) {
+function KindSwitch({ state }: { state: FormState }) {
   const { t } = useTranslation();
-  const { idPrefix, effective, change } = state;
+  const { effective, change, locked } = state;
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Label htmlFor={`${idPrefix}-pipeline`}>{t('queue.form.pipeline')}</Label>
-      <Select
-        value={effective.pipeline}
-        onValueChange={(pipeline) =>
-          change({
-            pipeline,
-            variant: 'default',
-            skip: pruneSkip(
-              effective.skip,
-              stepsOf(pipelines?.pipelines.find((candidate) => candidate.id === pipeline)).map(
-                (step) => step.id,
-              ),
-            ),
-          })
-        }
-        disabled={options.length === 0}
-      >
-        <SelectTrigger id={`${idPrefix}-pipeline`} className="w-48">
-          <SelectValue placeholder={t('queue.form.noPipeline')} />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((id) => (
-            <SelectItem key={id} value={id}>
-              {pipelines?.pipelines.find((candidate) => candidate.id === id)?.name ?? id}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {state.several ? null : (
-        <ToggleGroup
-          type="single"
-          aria-label={t('queue.form.kind')}
-          value={effective.mode}
-          onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
-        >
-          <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
-          <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
-        </ToggleGroup>
-      )}
-    </div>
+    <ToggleGroup
+      type="single"
+      aria-label={t('queue.form.kind')}
+      className="w-fit"
+      disabled={locked}
+      value={effective.mode}
+      onValueChange={(mode) => mode && change({ mode: mode as QueueDraft['mode'] })}
+    >
+      <ToggleGroupItem value="task">{t('queue.form.task')}</ToggleGroupItem>
+      <ToggleGroupItem value="groups">{t('queue.form.groups')}</ToggleGroupItem>
+    </ToggleGroup>
   );
 }
 
-function VariantSelect({
-  state,
-  pipelines,
-}: {
-  state: FormState;
-  pipelines: PipelinesView | null;
-}) {
-  const { t } = useTranslation();
-  const { idPrefix, effective, change } = state;
-  const variants =
-    pipelines?.pipelines.find((candidate) => candidate.id === effective.pipeline)?.variants ?? [];
-  // A pipeline with only `default` has nothing to choose.
-  if (variants.length <= 1) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Label htmlFor={`${idPrefix}-variant`}>{t('queue.form.variant')}</Label>
-      <Select value={effective.variant} onValueChange={(variant) => change({ variant })}>
-        <SelectTrigger id={`${idPrefix}-variant`} className="w-48">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {variants.map((variant) => (
-            <SelectItem key={variant.id} value={variant.id}>
-              {variant.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-/** The provider of the tiers the task runs on: a choice among the providers of the registry. */
-function ProviderSelect({
-  state,
-  api,
-  repositories,
-  error,
-}: {
-  state: FormState;
-  api: Api;
-  repositories: readonly string[];
-  error?: string | undefined;
-}) {
-  const { t } = useTranslation();
-  const { idPrefix, effective, change } = state;
-  const { providers, loaded } = useCommonProviders(api, repositories);
-  if (loaded && providers.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1.5" title={t('queue.form.providerHint')}>
-      <Label htmlFor={`${idPrefix}-provider`}>{t('queue.form.provider')}</Label>
-      <div className="max-w-xs">
-        <ProviderPicker
-          id={`${idPrefix}-provider`}
-          label={t('queue.form.provider')}
-          value={effective.provider}
-          onChange={(provider) => change({ provider })}
-          providers={providers}
-          emptyLabel={t('queue.form.noProvider')}
-          repository={repositories[0] ?? null}
-          api={api}
-          invalid={error !== undefined}
-          disabled={!loaded}
-        />
-      </div>
-      {error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/** The left half of the form: repository, name, pipeline, and the text or the groups. */
+/** The main column: repository, name, the kind of the task, and the text or the groups. */
 export function TaskFields(props: {
   state: FormState;
-  pipelines: PipelinesView | null;
-  options: string[];
   repositoryField?: ReactNode;
   /** Fields under the text of the task. */
   extras?: ReactNode;
   /** The text of the task grows with the column. */
   fill?: boolean;
-  /** The API of the target project and the projects whose providers the task may name. */
-  api: Api | undefined;
-  repositories: readonly string[];
-  /** The error of the daemon about the provider. */
-  providerError?: string | undefined;
 }) {
   const { t } = useTranslation();
   const { state } = props;
@@ -251,22 +121,10 @@ export function TaskFields(props: {
             onChange={(event) => change({ title: event.target.value })}
           />
         </div>
-        <PipelineSelect state={state} pipelines={props.pipelines} options={props.options} />
       </fieldset>
-      {/* a returned run keeps its task but may follow another variant */}
-      <VariantSelect state={state} pipelines={props.pipelines} />
-      {/* a returned run keeps its provider: the field is for a task that waits */}
-      {state.locked || !props.api ? null : (
-        <ProviderSelect
-          state={state}
-          api={props.api}
-          repositories={props.repositories}
-          error={props.providerError}
-        />
-      )}
+      {state.several ? null : <KindSwitch state={state} />}
       {effective.mode === 'task' ? (
         <>
-          <p className="text-xs text-muted-foreground">{t('queue.form.alternativeHint')}</p>
           <MarkdownField
             id={`${idPrefix}-task`}
             aria-label={t('queue.form.taskText')}
@@ -277,6 +135,7 @@ export function TaskFields(props: {
             disabled={locked}
             onChange={(task) => change({ task })}
           />
+          <p className="text-xs text-muted-foreground">{t('queue.form.alternativeHint')}</p>
         </>
       ) : (
         <GroupsEditor {...state} />

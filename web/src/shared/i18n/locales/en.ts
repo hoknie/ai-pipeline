@@ -586,6 +586,9 @@ export const en = {
       providerInstead: 'other provider',
       providerInsteadTitle:
         'The task asked for {{requested}}, but the chain of the step has no such provider — the step ran on {{provider}}',
+      fromReply: 'from the reply',
+      fromReplyTitle:
+        'The author of the commit message sent no report: the message is the text of its answer',
       denials: 'denials: {{n}}',
       outsideTitle: 'files changed in the working copy during the step',
       outside: 'in working copy: {{n}}',
@@ -866,6 +869,11 @@ export const en = {
       repository: 'Repository',
       repositorySearch: 'Search repository…',
       tags: 'Tags',
+      sectionProjects: 'Projects',
+      sectionRun: 'Run',
+      sectionFiles: 'Tags and files',
+      sectionDelivery: 'Delivery',
+      submitShortcut: 'Ctrl/⌘+Enter — send the form',
       postpone: 'Postpone',
       autoDeliver: 'Auto delivery',
       autoDeliverBySetting: 'as in the settings',

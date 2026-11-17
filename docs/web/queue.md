@@ -31,16 +31,20 @@ A task with links shows them on a second line, grouped by kind; see [Links](#lin
 
 ## The task form
 
-"New task" opens a dialog with two halves: the task on the left and its settings on the right.
+"New task" opens a dialog with two columns: the task on the left (repository, title, the "Task / Groups" switch, then the text or the groups) and a column of properties on the right, split into titled sections: "Projects" (only in several projects), "Run", "Links", "Tags and files" and "Delivery". On a narrow screen the columns stack.
+
+**Ctrl+Enter** (⌘+Enter on macOS) adds the task from any field, like "Add".
 
 - **"Repository"** defaults to the repository selected in the top bar. Choosing another one adds the task to its queue and does not switch the panel. The pipelines, the link choices and the delivery defaults come from that repository; the links are cleared on a switch, the text and tags stay.
-- **Title, pipeline, text or groups** describe the task.
+- **Title and text or groups** describe the task; the pipeline, the variant and the provider are in "Run".
 - **"Links"** holds one row per [link](../usage/queue.md#task-links): a kind and a task picked by number or title; "Add link" adds a row, and the × on a row removes it.
 - **"Postpone"** adds the task [postponed](../usage/queue.md#postponed-tasks). The switch is only in the new task; for an existing task the "Postpone" button in the list changes the flag.
 - **"Attachments"** has an "Attach files" button and a drop zone. Each file is uploaded at once, with its progress shown. A file over 20 MB, an eleventh file and a repeated name are refused with a message and stay out of the list; a failed upload shows its error and is not sent with the task. "Add" is unavailable while a file is uploading.
-- **Tags** and **delivery** are the [tags](../usage/tags.md) and [delivery settings](../configuration/delivery.md#settings-for-one-task) of the task.
+- **Tags** and **delivery** (a switch "Auto delivery" and the delivery mode, each with a badge: as in the settings or for this task, and a reset icon for its own value) are the [tags](../usage/tags.md) and [delivery settings](../configuration/delivery.md#settings-for-one-task) of the task.
 - **"Variant"** chooses a [variant of the pipeline](../usage/queue.md#variants); it is shown only when the pipeline has variants, and changing the pipeline resets it to `default`. The queue and the cards of runs show a badge with the variant name next to the pipeline badge, except for `default`.
 - **"Skip steps"** is a row of segments: a pressed segment is a [skipped step](../usage/queue.md#skipping-steps), and the last unpressed one stays disabled. Steps skipped by the chosen variant are pressed and cannot be changed.
+
+The buttons are on one row under the form, on the right: "Cancel", "Add and continue", "Add"; in the dialog the row stays at the bottom while the form scrolls.
 
 **"Add and continue"**, next to "Add" in the new task dialog, adds the task and keeps the form open: the title, the text, the groups and every link row except "Parent" are cleared, the other settings stay, and the focus returns to the text. The form of an existing task has no such button.
 

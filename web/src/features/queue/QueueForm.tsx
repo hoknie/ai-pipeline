@@ -1,26 +1,31 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Alert } from '../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../shared/ui/forms/button.tsx';
 import { cn } from '../../shared/lib/browser/cn.ts';
-import { formatRoute } from '../../shared/lib/nav/route.ts';
-import { Label } from '../../shared/ui/forms/label.tsx';
 
 import type { Api } from '../../shared/api/api.ts';
+import { type LinkKind, type LinkTargetGroup } from '../runs/index.ts';
 import type { DeliveryMode } from '../../../../src/feature/swarm-config/types/index.ts';
 import { useTags } from '../../shared/lib/catalog/tags.tsx';
 import type { QueueFields, PipelinesView } from '../../shared/api/types.ts';
-import { LinksEditor, type LinkKind, type LinkTargetGroup } from '../runs/index.ts';
 import { continueDraft, draftValid, fieldsOf, type QueueDraft } from './draft.ts';
-import { AttachmentFields } from './form/AttachmentFields.tsx';
 import { focusNewTaskField } from './form/focusNewTaskField.ts';
-import { DeliveryFields } from './form/DeliveryFields.tsx';
-import { TagsField, withCurrent } from './form/LinkFields.tsx';
+import { withCurrent } from './form/LinkFields.tsx';
+import { SideFields } from './form/properties/SideFields.tsx';
 import { useEffectiveDraft } from './form/usePresetDraft.ts';
 import { TaskFields, type FormState } from './form/TaskFields.tsx';
 
 export { draftOf, draftValid, emptyDraft, fieldsOf, retarget, type QueueDraft } from './draft.ts';
+
+/** Ctrl/⌘+Enter sends the form like the main button does. */
+function sendOnShortcut(event: KeyboardEvent<HTMLElement>, allowed: boolean, send: () => void) {
+  if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+  if (event.nativeEvent.isComposing) return;
+  event.preventDefault();
+  if (allowed) send();
+}
 
 function FormButtons({
   disabled,
@@ -28,6 +33,7 @@ function FormButtons({
   label,
   onContinue,
   onCancel,
+  sticky,
 }: {
   disabled: boolean;
   /** Why the task cannot be added yet. */
@@ -35,24 +41,31 @@ function FormButtons({
   label: string;
   onContinue: (() => void) | undefined;
   onCancel: (() => void) | undefined;
+  /** The row stays at the bottom of the scrolling dialog. */
+  sticky: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button type="submit" disabled={disabled} title={hint}>
-        {label}
-      </Button>
-      {onContinue ? (
-        <Button type="button" variant="outline" disabled={disabled} onClick={onContinue}>
-          {t('queue.addAndContinue')}
-        </Button>
-      ) : null}
+    <div
+      className={cn(
+        'flex flex-wrap items-center justify-end gap-2 border-t pt-3',
+        sticky && 'sticky -bottom-5 z-10 -mx-3 -mb-3 bg-card px-3 pb-3',
+      )}
+    >
+      {hint ? <span className="mr-auto text-xs text-muted-foreground">{hint}</span> : null}
       {onCancel ? (
         <Button variant="ghost" onClick={onCancel}>
           {t('queue.form.cancel')}
         </Button>
       ) : null}
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+      {onContinue ? (
+        <Button type="button" variant="outline" disabled={disabled} onClick={onContinue}>
+          {t('queue.addAndContinue')}
+        </Button>
+      ) : null}
+      <Button type="submit" disabled={disabled} title={hint ?? t('queue.form.submitShortcut')}>
+        {label}
+      </Button>
     </div>
   );
 }
@@ -119,59 +132,6 @@ function useSubmit(
   };
 }
 
-/** The right half of the form: links, tags, attachments and delivery. */
-function SideFields(props: {
-  state: FormState;
-  pipelines: PipelinesView | null;
-  repository: string | null;
-  api: Api | undefined;
-  linkChoices: (kind: LinkKind) => LinkTargetGroup[];
-  autoDeliverDefault: boolean | null;
-  deliveryModeDefault: DeliveryMode | null;
-  projectsPanel?: ReactNode;
-  returnedRun?: string | null;
-}) {
-  const { state, pipelines, repository, api } = props;
-  const { t } = useTranslation();
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      {state.several ? props.projectsPanel : null}
-      <LinksEditor
-        value={state.effective.links}
-        choices={props.linkChoices}
-        editableKinds={state.locked || state.several ? ['blocked_by'] : undefined}
-        onChange={(links) => state.change({ links, linksTouched: true })}
-      />
-      {props.returnedRun && state.effective.links.some((link) => link.kind !== 'blocked_by') ? (
-        <a
-          className="text-sm text-primary underline"
-          href={formatRoute({
-            view: 'runs',
-            run: props.returnedRun,
-            group: null,
-            step: null,
-            tab: null,
-          })}
-        >
-          {t('links.editRun')}
-        </a>
-      ) : null}
-      {state.several ? null : (
-        <>
-          <TagsField state={state} repository={repository} api={api} />
-          {api ? <AttachmentFields state={state} api={api} /> : null}
-        </>
-      )}
-      <DeliveryFields
-        state={state}
-        pipelines={pipelines}
-        autoDeliverDefault={props.autoDeliverDefault}
-        deliveryModeDefault={props.deliveryModeDefault}
-      />
-    </div>
-  );
-}
-
 interface QueueFormProps {
   idPrefix: string;
   draft: QueueDraft;
@@ -211,6 +171,8 @@ interface QueueFormProps {
   onCancel?: () => void;
   /** The form fills the height of its parent: the text of the task grows. */
   fill?: boolean;
+  /** The action row sticks to the bottom of the scrolling parent (the dialog). */
+  stickyActions?: boolean;
 }
 
 function SubmitButtons({
@@ -220,6 +182,7 @@ function SubmitButtons({
   sent,
   submitLabel,
   onCancel,
+  sticky,
 }: {
   valid: boolean;
   blocked: boolean;
@@ -227,9 +190,11 @@ function SubmitButtons({
   sent: ReturnType<typeof useSubmit>;
   submitLabel: string;
   onCancel: (() => void) | undefined;
+  sticky: boolean;
 }) {
   return (
     <FormButtons
+      sticky={sticky}
       disabled={!valid || sent.busy || blocked}
       hint={blockedHint}
       label={submitLabel}
@@ -265,6 +230,7 @@ export function QueueForm({
   onSubmitAndContinue,
   onCancel,
   fill = false,
+  stickyActions = false,
 }: QueueFormProps) {
   const { t } = useTranslation();
   const { ids, effective, change } = useEffectiveDraft(draft, pipelines, onDraft);
@@ -280,7 +246,6 @@ export function QueueForm({
     locked,
   );
 
-  const options = withCurrent(ids, effective.pipeline);
   const blocked = pending || blockedHint !== undefined;
   return (
     <form
@@ -292,33 +257,27 @@ export function QueueForm({
         event.preventDefault();
         void (!blocked && sent.submit());
       }}
+      onKeyDown={(event) => sendOnShortcut(event, valid && !blocked, () => void sent.submit())}
     >
-      <div className={cn('grid gap-4 @3xl:grid-cols-2', fill && 'flex-1')}>
-        <TaskFields
-          state={state}
-          pipelines={pipelines}
-          options={options}
-          repositoryField={repositoryField}
-          extras={extras}
-          fill={fill}
-          api={api}
-          repositories={providerRepositories ?? (repository ? [repository] : [])}
-          providerError={sent.providerError}
-        />
+      <div
+        className={cn(
+          'grid gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]',
+          fill && 'flex-1',
+        )}
+      >
+        <TaskFields state={state} repositoryField={repositoryField} extras={extras} fill={fill} />
         <SideFields
-          state={state}
-          pipelines={pipelines}
-          repository={repository}
-          api={api}
-          linkChoices={linkChoices}
-          returnedRun={returnedRun}
-          autoDeliverDefault={autoDeliverDefault}
-          deliveryModeDefault={deliveryModeDefault}
-          projectsPanel={projectsPanel}
+          {...{ state, pipelines, repository, api, linkChoices, returnedRun, projectsPanel }}
+          {...{ autoDeliverDefault, deliveryModeDefault, providerError: sent.providerError }}
+          options={withCurrent(ids, effective.pipeline)}
+          repositories={providerRepositories ?? (repository ? [repository] : [])}
         />
       </div>
-      <SubmitButtons {...{ valid, blocked, blockedHint, sent, submitLabel, onCancel }} />
       {sent.error && !sent.providerError ? <Alert variant="destructive">{sent.error}</Alert> : null}
+      <SubmitButtons
+        {...{ valid, blocked, blockedHint, sent, submitLabel, onCancel }}
+        sticky={stickyActions}
+      />
     </form>
   );
 }

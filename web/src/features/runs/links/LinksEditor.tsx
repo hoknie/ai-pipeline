@@ -36,6 +36,8 @@ export interface LinksEditorProps {
   disabled?: boolean;
   /** The «Add link» row button; a caller with its own submit button turns it off. */
   addButton?: boolean;
+  /** Classes of the legend; by default the heading of a stand-alone block. */
+  legendClassName?: string;
 }
 
 function targetLabel(target: LinkTarget): string {
@@ -229,6 +231,7 @@ export function LinksEditor({
   editableKinds = linkKinds,
   disabled = false,
   addButton = true,
+  legendClassName,
 }: LinksEditorProps) {
   const { t } = useTranslation();
   const hasParent = value.some((row) => row.kind === 'parent');
@@ -237,7 +240,7 @@ export function LinksEditor({
     onChange(value.map((old, i) => (i === index ? row : old)));
   return (
     <fieldset className="flex min-w-0 flex-col gap-3 border-0 p-0" disabled={disabled}>
-      <legend className="mb-1 text-sm font-medium">{t('links.title')}</legend>
+      <legend className={legendClassName ?? 'mb-1 text-sm font-medium'}>{t('links.title')}</legend>
       {value.map((row, index) => (
         <Row
           key={index}

@@ -1544,15 +1544,13 @@ describe('tags in the queue', () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
   };
 
-  it('puts the label above the tags field in the settings half next to "Waits for"', async () => {
+  it('puts the label above the tags field, after the links of the properties column', async () => {
     withTags(queueOf());
     await openNewTask();
     const tags = await screen.findByRole('combobox', { name: 'Tags' });
     const after = screen.getByRole('group', { name: 'Links' });
     const column = screen.getByText('Tags', { selector: 'label' }).parentElement!;
-    const half = column.parentElement!;
-    expect(half.contains(after)).toBe(true);
-    expect(half.className).not.toContain('order-');
+    expect(column.parentElement!.className).not.toMatch(/(^| )order-/);
     expect(column.className).toContain('flex-col');
     expect(column.className).not.toContain('max-w-xl');
     const label = screen.getByText('Tags', { selector: 'label' });
@@ -2529,6 +2527,50 @@ describe('delivery mode of a task', () => {
     );
   });
 
+  it('shows the source as a badge and the reset as an icon button only for its own mode', async () => {
+    const api = show(queueOf({ deliveryMode: 'worktree' }), {
+      queueAdd: vi.fn(async () => ({ ...queueOf(), item: 'q1' })),
+    });
+    await openNewTask();
+    const text = await screen.findByLabelText('Task text');
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Pipeline' }).textContent).toBe('feature'),
+    );
+    expect(screen.queryByRole('button', { name: 'mode as in the settings' })).toBeNull();
+    const select = screen
+      .getAllByRole('combobox', { name: 'Delivery mode' })
+      .find((node) => node.id === 'new-delivery-mode')!;
+    fireEvent.keyDown(select, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('option', { name: 'Branch' }));
+    const badge = screen.getByText('mode for this task');
+    expect(badge.tagName).toBe('SPAN');
+    expect(badge.className).toContain('rounded-full');
+    fireEvent.click(screen.getByRole('button', { name: 'mode as in the settings' }));
+    expect(screen.queryByRole('button', { name: 'mode as in the settings' })).toBeNull();
+    expect(screen.getByText('mode as in the settings')).toBeTruthy();
+    fireEvent.change(text, { target: { value: 'Build' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Build' }),
+    );
+  });
+
+  it('saves an edited item on Ctrl+Enter', async () => {
+    const api = show(queueOf({ items: [queueItem('q1', 'A', 1)] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const text = await screen.findByLabelText('Task text');
+    fireEvent.keyDown(text, { key: 'Enter', ctrlKey: true });
+    await waitFor(() => expect(api.queueEdit).toHaveBeenCalled());
+  });
+
+  it('names the shortcut in the Save tooltip without saying "add"', async () => {
+    show(queueOf({ items: [queueItem('q1', 'A', 1)] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const save = await screen.findByRole('button', { name: 'Save' });
+    expect(save.getAttribute('title')).toContain('Ctrl/⌘+Enter');
+    expect(save.getAttribute('title')?.toLowerCase()).not.toContain('add');
+  });
+
   it('marks a task with its own mode and sends null when an edit resets it', async () => {
     const api = show(queueOf({ items: [queueItem('q1', 'A', 1, { deliveryMode: 'commit' })] }));
     expect(await screen.findByText('delivery: Commit')).toBeTruthy();
@@ -2893,33 +2935,45 @@ describe('new task dialog', () => {
   });
 });
 
-describe('two halves of the task form', () => {
-  it('puts the task half first in the DOM and on a wide form', async () => {
+describe('main and properties columns of the task form', () => {
+  it('puts the main column first in the DOM and the properties column beside it on a wide form', async () => {
     show(queueOf(), { pipelines: vi.fn(async () => fiveSteps) });
     const dialog = await openNewTask();
     await skipStepAsync('plan');
     const order = [
       screen.getByLabelText('Name'),
-      screen.getByRole('combobox', { name: 'Pipeline' }),
       screen.getByLabelText('Task text'),
+      screen.getByRole('combobox', { name: 'Pipeline' }),
+      screen.getByRole('switch', { name: 'Postpone' }),
+      screen.getByText('Skip steps'),
       screen.getByRole('group', { name: 'Links' }),
       screen.getByRole('combobox', { name: 'Tags' }),
-      screen.getByRole('switch', { name: 'Postpone' }),
       screen.getByRole('switch', { name: 'Auto delivery' }),
       screen.getByRole('combobox', { name: 'Delivery mode' }),
-      screen.getByText('Skip steps'),
       screen.getByRole('button', { name: 'Add' }),
     ];
     for (let i = 1; i < order.length; i++)
       expect(
         order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
-    const grid = screen.getByLabelText('Task text').closest('.\\@3xl\\:grid-cols-2')!;
+    const grid = screen
+      .getByLabelText('Task text')
+      .closest('.\\@3xl\\:grid-cols-\\[minmax\\(0\\,1fr\\)_minmax\\(20rem\\,24rem\\)\\]')!;
     expect(grid).toBeTruthy();
     expect(grid.className).not.toMatch(/(^| )(@3xl:)?order-/);
     expect(dialog.querySelector('.\\@3xl\\:order-first')).toBeNull();
-    expect(grid.children[0]!.contains(order[2]!)).toBe(true);
-    expect(grid.children[1]!.contains(order[3]!)).toBe(true);
+    expect(grid.children[0]!.contains(order[1]!)).toBe(true);
+    expect(grid.children[1]!.contains(order[2]!)).toBe(true);
+    expect(grid.children[1]!.contains(order[8]!)).toBe(true);
+    expect(grid.children[0]!.contains(order[2]!)).toBe(false);
+  });
+
+  it('titles the sections of the properties column', async () => {
+    show(queueOf());
+    const dialog = await openNewTask();
+    for (const name of ['Run', 'Links', 'Tags and files', 'Delivery'])
+      expect(within(dialog).getByRole('group', { name })).toBeTruthy();
+    expect(within(dialog).queryByRole('group', { name: 'Projects' })).toBeNull();
   });
 
   it('offers a segment for every step in order', async () => {

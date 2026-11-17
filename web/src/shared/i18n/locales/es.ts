@@ -594,6 +594,9 @@ export const es: Dictionary = {
       providerInstead: 'otro proveedor',
       providerInsteadTitle:
         'La tarea pidió {{requested}}, pero la cadena del paso no lo tiene: el paso se ejecutó en {{provider}}',
+      fromReply: 'de la respuesta',
+      fromReplyTitle:
+        'El autor del mensaje de commit no envió informe: el mensaje es el texto de su respuesta',
       denials: 'denegaciones: {{n}}',
       outsideTitle: 'archivos cambiados en la copia de trabajo durante el paso',
       outside: 'en la copia de trabajo: {{n}}',
@@ -884,6 +887,11 @@ export const es: Dictionary = {
       repository: 'Repositorio',
       repositorySearch: 'Buscar repositorio…',
       tags: 'Etiquetas',
+      sectionProjects: 'Proyectos',
+      sectionRun: 'Ejecución',
+      sectionFiles: 'Etiquetas y archivos',
+      sectionDelivery: 'Entrega',
+      submitShortcut: 'Ctrl/⌘+Enter — enviar el formulario',
       postpone: 'Aplazar',
       autoDeliver: 'Entrega automática',
       autoDeliverBySetting: 'según la configuración',

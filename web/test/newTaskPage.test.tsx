@@ -157,6 +157,19 @@ describe('page of a new task', () => {
     expect((field as HTMLTextAreaElement).value).toBe('Keep');
   });
 
+  it('puts Cancel, Add and continue and Add in this order', async () => {
+    mount();
+    await ready();
+    const names = screen
+      .getAllByRole('button')
+      .map((button) => button.textContent)
+      .filter((name) => ['Cancel', 'Add and continue', 'Add'].includes(name ?? ''));
+    expect(names).toEqual(['Cancel', 'Add and continue', 'Add']);
+    expect(screen.getByRole('button', { name: 'Add' }).parentElement!.className).not.toContain(
+      'sticky',
+    );
+  });
+
   it('Cancel and the link lead to the queue without a request and keep the draft', async () => {
     const { api } = mount();
     const field = await ready();

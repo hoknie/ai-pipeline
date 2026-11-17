@@ -1165,12 +1165,12 @@ describe('add and continue', () => {
     return dialog;
   }
 
-  it('stands after "Add" and is disabled while the task is empty', async () => {
+  it('stands before "Add" and is disabled while the task is empty', async () => {
     const dialog = await openDialog(fakeApi({ queue: vi.fn(async () => queueOf()) }));
     const names = within(dialog)
       .getAllByRole('button')
       .map((item) => item.textContent);
-    expect(names.indexOf('Add and continue')).toBe(names.indexOf('Add') + 1);
+    expect(names.indexOf('Add and continue') + 1).toBe(names.indexOf('Add'));
     const next = within(dialog).getByRole<HTMLButtonElement>('button', {
       name: 'Add and continue',
     });
@@ -1450,6 +1450,18 @@ describe('new task in several projects', () => {
     return dialog;
   }
 
+  it('starts the properties column with Projects and has no tags section', async () => {
+    multiMount();
+    const dialog = await openMulti();
+    const titles = within(dialog)
+      .getAllByRole('group')
+      .map((group) => group.querySelector(':scope > legend')?.textContent);
+    expect(titles.indexOf('Projects')).toBeGreaterThanOrEqual(0);
+    expect(titles.indexOf('Projects')).toBeLessThan(titles.indexOf('Run'));
+    expect(within(dialog).queryByRole('group', { name: 'Tags and files' })).toBeNull();
+    expect(within(dialog).queryByRole('radio', { name: 'Groups' })).toBeNull();
+  });
+
   async function clickAdd(dialog: HTMLElement) {
     const button = within(dialog).getByRole<HTMLButtonElement>('button', { name: 'Add' });
     await waitFor(() => expect(button.disabled).toBe(false));
@@ -1713,5 +1725,60 @@ describe('the shared tag of a title', () => {
     expect(defaultSharedTag('Add the email field to the user')).toBe('Add the email field to the');
     expect(defaultSharedTag('x'.repeat(40))).toBe('x'.repeat(30));
     expect(defaultSharedTag('')).toBe('');
+  });
+});
+
+describe('layout and keyboard of the task form', () => {
+  async function mount() {
+    const api = fakeApi({ queue: vi.fn(async () => queueOf()) });
+    render(<App api={api} openStream={openFake} />);
+    const dialog = await openDialog();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('combobox', { name: 'Pipeline' }).textContent).toBe(
+        'feature',
+      ),
+    );
+    return { api, dialog };
+  }
+  const before = (first: HTMLElement, second: HTMLElement) =>
+    Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('puts the Task / Groups switch above the text and the pipeline after it', async () => {
+    const { dialog } = await mount();
+    const task = within(dialog).getByRole('radio', { name: 'Task' });
+    expect(within(dialog).getByRole('radio', { name: 'Groups' })).toBeTruthy();
+    const text = within(dialog).getByLabelText('Task text');
+    const pipeline = within(dialog).getByRole('combobox', { name: 'Pipeline' });
+    expect(before(task, text)).toBe(true);
+    expect(before(text, pipeline)).toBe(true);
+  });
+
+  it('keeps the action row of the dialog at the bottom of the scroll', async () => {
+    const { dialog } = await mount();
+    const row = within(dialog).getByRole('button', { name: 'Add' }).parentElement!;
+    expect(row.className).toContain('sticky');
+  });
+
+  it('sends the task on Ctrl+Enter and on Meta+Enter', async () => {
+    for (const key of ['ctrlKey', 'metaKey'] as const) {
+      const { api, dialog } = await mount();
+      const text = within(dialog).getByLabelText('Task text');
+      fireEvent.change(text, { target: { value: 'Do it' } });
+      fireEvent.keyDown(text, { key: 'Enter', [key]: true });
+      await waitFor(() =>
+        expect(api.queueAdd).toHaveBeenCalledWith({ pipeline: 'feature', task: 'Do it' }),
+      );
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      cleanup();
+    }
+  });
+
+  it('does not send an empty form or a plain Enter', async () => {
+    const { api, dialog } = await mount();
+    const text = within(dialog).getByLabelText('Task text');
+    fireEvent.keyDown(text, { key: 'Enter', ctrlKey: true });
+    fireEvent.change(text, { target: { value: 'Do it' } });
+    fireEvent.keyDown(text, { key: 'Enter' });
+    expect(api.queueAdd).not.toHaveBeenCalled();
   });
 });

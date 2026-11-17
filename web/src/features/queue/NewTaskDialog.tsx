@@ -135,6 +135,7 @@ export default function NewTaskDialog(props: Props) {
             needMore: t('queue.multi.needMore'),
             repositoryLabel: t('queue.form.repository'),
           })}
+          stickyActions
           submitLabel={t('queue.add')}
           onDraft={(next) => onDraft({ ...next, repository: next.repository ?? target })}
           onSubmit={state.submit}

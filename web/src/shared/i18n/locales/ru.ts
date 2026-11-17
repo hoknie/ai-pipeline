@@ -592,6 +592,9 @@ export const ru: Dictionary = {
       providerInstead: 'другой провайдер',
       providerInsteadTitle:
         'Задача просила {{requested}}, но в цепочке этапа его нет — этап пошёл на {{provider}}',
+      fromReply: 'из ответа',
+      fromReplyTitle:
+        'Автор сообщения коммита не прислал отчёт: сообщение взято из текста его ответа',
       denials: 'отказов: {{n}}',
       outsideTitle: 'файлы, изменённые в рабочей копии во время этапа',
       outside: 'в рабочей копии: {{n}}',
@@ -885,6 +888,11 @@ export const ru: Dictionary = {
       repository: 'Репозиторий',
       repositorySearch: 'Поиск репозитория…',
       tags: 'Теги',
+      sectionProjects: 'Проекты',
+      sectionRun: 'Запуск',
+      sectionFiles: 'Теги и файлы',
+      sectionDelivery: 'Доставка',
+      submitShortcut: 'Ctrl/⌘+Enter — отправить форму',
       postpone: 'Отложить',
       autoDeliver: 'Автодоставка',
       autoDeliverBySetting: 'по настройке',
