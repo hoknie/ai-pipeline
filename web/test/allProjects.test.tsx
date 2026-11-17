@@ -381,6 +381,93 @@ describe('specialists in the mode', () => {
     );
   });
 
+  it('hides the level switch in the preview', async () => {
+    modeOn();
+    window.location.hash = '#specialists/coder';
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          specialists: [
+            specialistEntry('coder', {
+              level: 'project_over_global',
+              raw: { name: 'Coder app' },
+              sources: {
+                project: {
+                  file: '/work/app/aip/specialists/coder.yaml',
+                  revision: 'p',
+                  raw: { name: 'Coder app' },
+                },
+                global: {
+                  file: '/shared/coder.yaml',
+                  revision: 'g',
+                  raw: { name: 'Coder shared' },
+                },
+              },
+            }),
+          ],
+        }),
+        [LIB]: configView({ repository: LIB, specialists: [shared('coder', 'Coder shared')] }),
+      },
+    });
+    await waitFor(() => expect(choices()).toEqual([SHARED, 'app']));
+    const level = () => {
+      const preview = document.querySelector<HTMLElement>('[data-entry-preview]');
+      expect(preview).not.toBeNull();
+      const scope = within(preview!);
+      return (
+        scope.queryByRole('group', { name: 'Level' }) ??
+        scope.queryByRole('radio', { name: 'Global' }) ??
+        scope.queryByRole('radio', { name: 'Project' })
+      );
+    };
+    fireEvent.click(choice('app')!);
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder app'),
+    );
+    expect(level()).toBeNull();
+    fireEvent.click(choice(SHARED)!);
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder shared'),
+    );
+    expect(level()).toBeNull();
+  });
+
+  it('keeps the level switch in the project form outside the mode', async () => {
+    window.location.hash = '#specialists/coder';
+    mount({
+      configs: {
+        [APP]: configView({
+          repository: APP,
+          specialists: [
+            specialistEntry('coder', {
+              level: 'project_over_global',
+              raw: { name: 'Coder app' },
+              sources: {
+                project: {
+                  file: '/work/app/aip/specialists/coder.yaml',
+                  revision: 'p',
+                  raw: { name: 'Coder app' },
+                },
+                global: {
+                  file: '/shared/coder.yaml',
+                  revision: 'g',
+                  raw: { name: 'Coder shared' },
+                },
+              },
+            }),
+          ],
+        }),
+        [LIB]: configView({ repository: LIB }),
+      },
+    });
+    await waitFor(() =>
+      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Coder app'),
+    );
+    expect(screen.getByRole('radio', { name: 'Global' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Project' })).toBeTruthy();
+  });
+
   it('switches the preview to another project without leaving the mode', async () => {
     modeOn();
     window.location.hash = '#specialists/tester';

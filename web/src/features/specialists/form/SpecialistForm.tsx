@@ -81,7 +81,7 @@ function headerOf(
     specialist,
     level: editor.level,
     file: specialist ? (source?.file ?? specialist.file) : undefined,
-    levelChoice: !sharedOnly && (!specialist || editor.bothLevels),
+    levelChoice: !sharedOnly && !locked && (!specialist || editor.bothLevels),
     readOnly,
     busy: editor.busy,
     canSave: Boolean(specialist) || editor.slug !== '',

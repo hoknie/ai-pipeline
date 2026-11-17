@@ -55,7 +55,7 @@ describe('the form of a specialist with locked', () => {
     expect(screen.queryByText(/it is view only/)).toBeNull();
   });
 
-  it('keeps the level switch working: another file, still disabled, no writes', async () => {
+  it('has no level switch: the file of the level stays, fields disabled, no writes', () => {
     const api = specialistForm('project', true, {
       sources: {
         project: { file: '/x/qa.yaml', revision: 'r1', raw: { name: 'Project QA' } },
@@ -64,11 +64,8 @@ describe('the form of a specialist with locked', () => {
     });
     expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Project QA');
     expect(screen.getByText('/x/qa.yaml')).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'Global' }));
-    await waitFor(() =>
-      expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Global QA'),
-    );
-    expect(screen.getByText('/g/qa.yaml')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Level' })).toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Global' })).toBeNull();
     expect(fields().filter((field) => !field.disabled)).toEqual([]);
     expect(api.writeSpecialist).not.toHaveBeenCalled();
     expect(api.deleteSpecialist).not.toHaveBeenCalled();
