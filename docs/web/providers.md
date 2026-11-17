@@ -31,7 +31,7 @@ Deleting a role asks for confirmation and offers "Clear cells and delete": the c
 
 "New provider" and a provider row open the form at `#providers/new` and `#providers/<slug>`.
 
-- A new provider goes through the steps "Name", "Access" and "Models". An existing one shows all sections on one page; its slug and level are read-only.
+- A new provider goes through the steps "General", "Access" and "Models". An existing one has a pinned header with its name, slug, level, status, file and the buttons "Save" and "Delete", and the three sections as cards on one page; its slug and level are read-only.
 - Access is "CLI" (the runtime and, for some runtimes, the model prefix or the command). "API" is not available yet. The order of accesses is the order of trying.
 - "Own API address for the CLI" is off by default. Turn it on only when the CLI reaches the model through an address of its own (a proxy or a compatible API): then the address and the key variable are required. `opencode` has no such switch.
 - The form takes **names of environment variables** only. It has no field for a secret value and never stores or shows one.

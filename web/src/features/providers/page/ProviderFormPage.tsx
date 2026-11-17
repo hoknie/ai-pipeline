@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
@@ -17,7 +17,6 @@ export function ProviderFormPage({
   repository,
   slug,
   preset,
-  usage,
   onLeave,
 }: {
   api: Api;
@@ -25,8 +24,6 @@ export function ProviderFormPage({
   /** The slug of the provider; null: a new one. */
   slug: string | null;
   preset: string | null;
-  /** The block «Where it is used» under the form. */
-  usage?: ReactNode;
   onLeave: () => void;
 }) {
   const { t } = useTranslation();
@@ -47,11 +44,13 @@ export function ProviderFormPage({
   const waiting = view === null || (slug !== null && editor === null);
   return (
     <div className="flex w-full flex-col gap-4">
-      <h2 className="text-lg font-semibold">
-        {slug === null ? t('providers.form.newTitle') : t('providers.form.editTitle', { slug })}
-      </h2>
-      {scope === 'global' ? (
-        <p className="text-sm text-muted-foreground">{t('providers.globalWarning')}</p>
+      {slug === null ? (
+        <>
+          <h2 className="text-lg font-semibold">{t('providers.form.newTitle')}</h2>
+          {scope === 'global' ? (
+            <p className="text-sm text-muted-foreground">{t('providers.globalWarning')}</p>
+          ) : null}
+        </>
       ) : null}
       {waiting ? (
         <p role="status" className="text-sm text-muted-foreground">
@@ -77,7 +76,6 @@ export function ProviderFormPage({
           onCancel={slug === null ? onLeave : undefined}
         />
       )}
-      {usage}
     </div>
   );
 }

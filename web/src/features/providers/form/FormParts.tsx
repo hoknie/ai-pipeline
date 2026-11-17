@@ -46,7 +46,7 @@ export function useErrorText(local: FormErrors, server: Record<string, string>) 
   };
 }
 
-/** The steps «Name» → «Access» → «Models» with the current one marked. */
+/** The steps «General» → «Access» → «Models» with the current one marked. */
 export function StepIndicator({
   step,
   onStep,

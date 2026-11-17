@@ -19,7 +19,9 @@ function mount(props: {
   counter += 1;
   const files = props.files ?? {};
   const roles = [roleView('think'), roleView('code')];
-  const providers = Object.keys(files).map((slug) => providerView(slug, { name: slug }));
+  const providers = Object.keys(files).map((slug) =>
+    providerView(slug, { name: String(files[slug]?.name ?? slug) }),
+  );
   const api = fakeApi({
     providers: vi.fn(async () => providersView({ roles, providers })),
     config: vi.fn(async () =>
@@ -172,6 +174,16 @@ describe('the form of a new provider', () => {
   });
 });
 
+describe('the steps of a new provider', () => {
+  it('names the first step «General»', async () => {
+    mount({ selected: 'new', preset: 'zai' });
+    await screen.findByLabelText('Name');
+    expect(
+      within(screen.getByRole('list', { name: 'Steps' })).getByText(/1\. General/),
+    ).toBeTruthy();
+  });
+});
+
 describe('the form of an existing provider', () => {
   const files = { zai: { name: 'Z.ai', access: [{ kind: 'cli', runtime: 'claude' }] } };
 
@@ -184,6 +196,30 @@ describe('the form of an existing provider', () => {
     expect((within(form).getByLabelText('Slug') as HTMLInputElement).readOnly).toBe(true);
     expect(within(form).getByRole('heading', { name: 'Models' })).toBeTruthy();
     expect(within(form).queryByRole('button', { name: 'Next' })).toBeNull();
+  });
+
+  it('has a sticky header with the name, slug, level, status and the actions', async () => {
+    mount({ selected: 'zai', files });
+    const header = await screen.findByRole('toolbar', { name: 'Provider' });
+    expect(within(header).getByRole('heading', { level: 2, name: 'Z.ai' })).toBeTruthy();
+    expect(within(header).getByText('zai').tagName).toBe('CODE');
+    expect(within(header).getByText('Shared')).toBeTruthy();
+    expect(within(header).getByText('Available')).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Save' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Delete' })).toBeTruthy();
+    // no buttons outside the header
+    expect(screen.getAllByRole('button', { name: 'Save' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+  });
+
+  it('says «Name» once and heads the parts General, Access, Models', async () => {
+    mount({ selected: 'zai', files });
+    const form = await screen.findByRole('form', { name: 'Provider form' });
+    expect(screen.getAllByText('Name')).toHaveLength(1);
+    expect(within(form).queryByRole('heading', { name: 'Name' })).toBeNull();
+    for (const part of ['General', 'Access', 'Models']) {
+      expect(within(form).getByRole('heading', { level: 3, name: part })).toBeTruthy();
+    }
   });
 
   it('writes with the revision of the file', async () => {

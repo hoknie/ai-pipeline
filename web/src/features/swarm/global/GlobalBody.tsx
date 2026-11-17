@@ -16,9 +16,7 @@ function Loading() {
 }
 
 /** The body of a tab of the shared area: the files of the shared directory only. */
-export function GlobalBody(
-  props: SwarmWorkspaceProps & { usage?: ((slug: string) => React.ReactNode) | undefined },
-) {
+export function GlobalBody(props: SwarmWorkspaceProps) {
   const { api, place, repository, runs, dirty, config, onNavigate } = props;
   const reload = props.onReload ?? (() => Promise.resolve());
   if (place.tab === 'providers' || place.tab === 'roles') {
@@ -32,7 +30,6 @@ export function GlobalBody(
         section={place.tab === 'roles' ? 'roles' : null}
         preset={place.preset ?? null}
         project={null}
-        usage={props.usage}
         hrefOfNew={(preset) => props.hrefOf({ tab: 'providers', entry: 'new', preset })}
         onSelect={(run, section = null, preset = null) =>
           onNavigate(

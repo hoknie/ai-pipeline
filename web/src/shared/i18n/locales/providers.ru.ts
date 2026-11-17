@@ -56,14 +56,8 @@ export const providersRu: Dictionary['providers'] = {
   search: 'Поиск провайдера',
   detailsEmpty: 'Выберите провайдера в списке или создайте нового.',
   globalWarning: 'Общий провайдер действует во всех репозиториях.',
+  header: 'Провайдер',
   chainRoles: 'Роли провайдера',
-  usage: {
-    title: 'Где используется',
-    none: 'Не используется: добавьте провайдера в элемент цепочки',
-    chain: 'Цепочка {{name}}, элемент {{item}}',
-    specialist: 'Специалист {{name}}',
-    pipeline: 'Pipeline {{name}}, этап {{step}}',
-  },
   roles: {
     models: 'Модели роли',
     noModels: 'Ни у одного провайдера нет модели этой роли.',
@@ -98,7 +92,7 @@ export const providersRu: Dictionary['providers'] = {
   form: {
     label: 'Форма провайдера',
     steps: 'Этапы',
-    step: { name: 'Имя', access: 'Доступ', models: 'Модели' },
+    step: { name: 'Основное', access: 'Доступ', models: 'Модели' },
     back: 'Назад',
     next: 'Далее',
     save: 'Сохранить',
@@ -110,7 +104,6 @@ export const providersRu: Dictionary['providers'] = {
     usedBy: 'Провайдер ещё используется:',
     refChain: 'цепочка {{chain}}, элемент {{item}}',
     newTitle: 'Новый провайдер',
-    editTitle: 'Провайдер {{slug}}',
     notFound: 'Провайдер «{{slug}}» не найден',
     preset: 'Пресет',
     presetHint: 'Заполняет имя и способы доступа; всё остаётся правимым.',

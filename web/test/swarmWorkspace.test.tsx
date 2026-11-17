@@ -118,7 +118,7 @@ describe('the window «Swarm» of the top bar', () => {
 
   it('comes back to the entry a tab was left on', async () => {
     mount('#providers/zai');
-    expect(await screen.findByRole('heading', { name: 'Provider zai' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Z.ai' })).toBeTruthy();
     fireEvent.click(tabs().getByRole('tab', { name: 'Specialists' }));
     await waitFor(() => expect(window.location.hash).toBe('#specialists'));
     fireEvent.click(tabs().getByRole('tab', { name: 'Providers' }));
@@ -127,10 +127,10 @@ describe('the window «Swarm» of the top bar', () => {
 
   it('returns to the list of the tab when its own tab is clicked inside an open entry', async () => {
     mount('#providers/zai');
-    expect(await screen.findByRole('heading', { name: 'Provider zai' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Z.ai' })).toBeTruthy();
     fireEvent.click(tabs().getByRole('tab', { name: 'Providers' }));
     await waitFor(() => expect(window.location.hash).toBe('#providers'));
-    expect(screen.queryByRole('heading', { name: 'Provider zai' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Z.ai' })).toBeNull();
   });
 
   it('asks before leaving a form with unsaved edits and stays on a refusal', async () => {
@@ -146,28 +146,11 @@ describe('the window «Swarm» of the top bar', () => {
     await waitFor(() => expect(window.location.hash).toBe('#providers'));
   });
 
-  it('shows where a provider is used and opens the specialist from the block', async () => {
+  it('has no block «Where it is used» on the page of a provider', async () => {
     mount('#providers/zai');
-    const block = await screen.findByRole('region', { name: 'Where it is used' });
-    expect(within(block).getByRole('link', { name: 'Chain Thinking, item 2' })).toBeTruthy();
-    expect(within(block).getByRole('link', { name: 'Pipeline Feature, step code' })).toBeTruthy();
-    fireEvent.click(within(block).getByRole('link', { name: 'Specialist Coder' }));
-    await waitFor(() => expect(window.location.hash).toBe('#specialists/coder'));
-    expect(await screen.findByRole('heading', { name: 'coder' })).toBeTruthy();
-  });
-
-  it('says a provider is not used and links to the chains', async () => {
-    mount('#providers/anthropic', {
-      config: vi.fn(async () =>
-        configView({ providers: [editorProvider('anthropic', { name: 'Anthropic' })] }),
-      ),
-    });
-    const block = await screen.findByRole('region', { name: 'Where it is used' });
-    expect(
-      within(block).getByText(/Not used: add the provider to an item of a chain/),
-    ).toBeTruthy();
-    fireEvent.click(within(block).getByRole('link', { name: 'Chains' }));
-    await waitFor(() => expect(window.location.hash).toBe('#specialists/chains'));
+    expect(await screen.findByRole('heading', { name: 'Z.ai' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Where it is used' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Specialist Coder' })).toBeNull();
   });
 });
 
@@ -212,10 +195,10 @@ describe('the group «Swarm» of the settings', () => {
 
   it('keeps the tab of the window when the settings tab changes and drops the entry', async () => {
     mount('#settings/global/swarm/providers/zai');
-    expect(await screen.findByRole('heading', { name: 'Provider zai' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Z.ai' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'Project' }));
     await waitFor(() => expect(window.location.hash).toBe('#settings/project/swarm/providers'));
-    expect(screen.queryByRole('heading', { name: 'Provider zai' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Z.ai' })).toBeNull();
   });
 
   it('shows the project specialist on the project tab', async () => {

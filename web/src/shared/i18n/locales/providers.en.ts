@@ -52,14 +52,8 @@ export const providersEn = {
   search: 'Search providers',
   detailsEmpty: 'Pick a provider in the list or create a new one.',
   globalWarning: 'A shared provider applies in every repository.',
+  header: 'Provider',
   chainRoles: 'Roles of the provider',
-  usage: {
-    title: 'Where it is used',
-    none: 'Not used: add the provider to an item of a chain',
-    chain: 'Chain {{name}}, item {{item}}',
-    specialist: 'Specialist {{name}}',
-    pipeline: 'Pipeline {{name}}, step {{step}}',
-  },
   roles: {
     models: 'Models of the role',
     noModels: 'No provider has a model of this role.',
@@ -92,7 +86,7 @@ export const providersEn = {
   form: {
     label: 'Provider form',
     steps: 'Steps',
-    step: { name: 'Name', access: 'Access', models: 'Models' },
+    step: { name: 'General', access: 'Access', models: 'Models' },
     back: 'Back',
     next: 'Next',
     save: 'Save',
@@ -104,7 +98,6 @@ export const providersEn = {
     usedBy: 'The provider is still used by:',
     refChain: 'chain {{chain}}, item {{item}}',
     newTitle: 'New provider',
-    editTitle: 'Provider {{slug}}',
     notFound: 'Provider «{{slug}}» not found',
     preset: 'Preset',
     presetHint: 'Fills the name and the accesses; everything stays editable.',

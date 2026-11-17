@@ -10,7 +10,8 @@ import { AppShell } from '../src/app/shell/AppShell.tsx';
 import { TopNav } from '../src/app/shell/nav/TopNav.tsx';
 import { TooltipProvider } from '../src/shared/ui/feedback/tooltip.tsx';
 
-import { FakeEventSource, fakeApi, openFake, runView } from './fixtures.ts';
+import { FakeEventSource, configView, fakeApi, openFake, runView } from './fixtures.ts';
+import { editorProvider, providersView, providerView } from './providerFixtures.ts';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from './render.tsx';
 
 afterEach(() => cleanup());
@@ -370,9 +371,17 @@ describe('providers section', () => {
 
   it('opens the form of a provider from its address', async () => {
     window.location.hash = '#providers/zai';
-    render(<App api={fakeApi()} openStream={openFake} />);
+    const api = fakeApi({
+      providers: vi.fn(async () =>
+        providersView({ providers: [providerView('zai', { name: 'Z.ai' })] }),
+      ),
+      config: vi.fn(async () =>
+        configView({ providers: [editorProvider('zai', { name: 'Z.ai' })] }),
+      ),
+    });
+    render(<App api={api} openStream={openFake} />);
     act(() => FakeEventSource.last!.send({ event: 'snapshot', seq: 1, runs: [runView()] }));
-    expect(await screen.findByRole('heading', { name: 'Provider zai' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Z.ai' })).toBeTruthy();
     window.location.hash = '';
   });
 });

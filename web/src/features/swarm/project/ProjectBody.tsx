@@ -10,9 +10,7 @@ const PipelinesPage = lazy(() =>
 );
 
 /** The body of a tab of the project area: the pages of the selected project (or of all of them). */
-export function ProjectBody(
-  props: SwarmWorkspaceProps & { usage?: ((slug: string) => React.ReactNode) | undefined },
-) {
+export function ProjectBody(props: SwarmWorkspaceProps) {
   const { api, place, repository, runs, dirty, projects, onNavigate, onOpenInProject } = props;
   const project = place.project ?? null;
   if (place.tab === 'providers' || place.tab === 'roles') return <ProvidersBody {...props} />;
@@ -70,9 +68,7 @@ export function ProjectBody(
   );
 }
 
-function ProvidersBody(
-  props: SwarmWorkspaceProps & { usage?: ((slug: string) => React.ReactNode) | undefined },
-) {
+function ProvidersBody(props: SwarmWorkspaceProps) {
   const { api, place, repository, runs, projects, onNavigate, onOpenInProject } = props;
   const project = place.project ?? null;
   return (
@@ -90,7 +86,6 @@ function ProvidersBody(
           ? (path, entry) => onOpenInProject(path, { tab: 'providers', entry, project: null })
           : undefined
       }
-      usage={props.usage}
       hrefOfNew={(preset) => props.hrefOf({ tab: 'providers', entry: 'new', preset, project })}
       onSelect={(run, section = null, preset = null, owner = null) =>
         onNavigate(

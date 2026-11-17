@@ -12,4 +12,3 @@ export {
   type SwarmTarget,
 } from './types/tabs.ts';
 export type { SwarmProjects, SwarmWorkspaceProps } from './types/props.ts';
-export { providerUsage, levelEntries, isUnused, type ProviderUsage } from './types/usage.ts';

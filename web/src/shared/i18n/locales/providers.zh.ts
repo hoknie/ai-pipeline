@@ -50,14 +50,8 @@ export const providersZh: Dictionary['providers'] = {
   search: '搜索提供商',
   detailsEmpty: '请在列表中选择提供商，或新建一个。',
   globalWarning: '共享提供商对所有仓库生效。',
+  header: '提供商',
   chainRoles: '提供商的角色',
-  usage: {
-    title: '使用位置',
-    none: '未使用：请将提供商添加到链的某个元素中',
-    chain: '链 {{name}}，第 {{item}} 项',
-    specialist: '专家 {{name}}',
-    pipeline: 'Pipeline {{name}}，步骤 {{step}}',
-  },
   roles: {
     models: '角色的模型',
     noModels: '没有提供商配置了该角色的模型。',
@@ -89,7 +83,7 @@ export const providersZh: Dictionary['providers'] = {
   form: {
     label: '提供商表单',
     steps: '步骤',
-    step: { name: '名称', access: '访问', models: '模型' },
+    step: { name: '基本信息', access: '访问', models: '模型' },
     back: '上一步',
     next: '下一步',
     save: '保存',
@@ -101,7 +95,6 @@ export const providersZh: Dictionary['providers'] = {
     usedBy: '该提供商仍被以下位置使用：',
     refChain: '链 {{chain}}，第 {{item}} 项',
     newTitle: '新提供商',
-    editTitle: '提供商 {{slug}}',
     notFound: '找不到提供商“{{slug}}”',
     preset: '预设',
     presetHint: '填入名称和访问方式；之后仍可修改。',

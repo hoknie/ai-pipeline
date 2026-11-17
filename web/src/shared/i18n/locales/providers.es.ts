@@ -55,14 +55,8 @@ export const providersEs: Dictionary['providers'] = {
   search: 'Buscar proveedor',
   detailsEmpty: 'Elige un proveedor de la lista o crea uno nuevo.',
   globalWarning: 'Un proveedor compartido se aplica en todos los repositorios.',
+  header: 'Proveedor',
   chainRoles: 'Roles del proveedor',
-  usage: {
-    title: 'Dónde se usa',
-    none: 'No se usa: añade el proveedor a un elemento de una cadena',
-    chain: 'Cadena {{name}}, elemento {{item}}',
-    specialist: 'Especialista {{name}}',
-    pipeline: 'Pipeline {{name}}, paso {{step}}',
-  },
   roles: {
     models: 'Modelos del rol',
     noModels: 'Ningún proveedor tiene un modelo de este rol.',
@@ -96,7 +90,7 @@ export const providersEs: Dictionary['providers'] = {
   form: {
     label: 'Formulario del proveedor',
     steps: 'Pasos',
-    step: { name: 'Nombre', access: 'Acceso', models: 'Modelos' },
+    step: { name: 'General', access: 'Acceso', models: 'Modelos' },
     back: 'Atrás',
     next: 'Siguiente',
     save: 'Guardar',
@@ -108,7 +102,6 @@ export const providersEs: Dictionary['providers'] = {
     usedBy: 'El proveedor aún se usa en:',
     refChain: 'cadena {{chain}}, elemento {{item}}',
     newTitle: 'Nuevo proveedor',
-    editTitle: 'Proveedor {{slug}}',
     notFound: 'No se encuentra el proveedor «{{slug}}»',
     preset: 'Preajuste',
     presetHint: 'Rellena el nombre y los accesos; todo sigue siendo editable.',

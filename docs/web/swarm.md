@@ -9,10 +9,6 @@ The "Swarm" section holds everything a run is made of, in one window with five t
 - A tab remembers its last open entry while the page lives. Changing the tab with unsaved edits asks first.
 - The addresses of the tabs are `#providers`, `#providers/roles`, `#specialists/chains`, `#specialists` and `#pipelines`, each with `/<entry>`.
 
-## Where a provider is used
-
-The page of a provider ends with "Where it is used": the chains that name it (with the item numbers), the specialists that run those chains and the pipelines whose steps or split run those specialists. Each line is a link to its tab. A provider nobody uses says so and links to "Chains".
-
 ## Chains
 
 Choosing a provider in an item of a chain adds its roles to the model choice: a group "Roles of the provider" with each role's model through the CLI of the item. Choosing one writes the model id; the chain does not follow later changes of the role.

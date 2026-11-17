@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
@@ -15,7 +14,6 @@ export function ProviderPane(props: {
   owner: string | null;
   selected: string | null;
   preset: string | null;
-  usage: ((slug: string) => ReactNode) | undefined;
   hrefOfNew: ((preset: string | null) => string) | undefined;
   ready: boolean;
   rowCount: number;
@@ -39,7 +37,6 @@ export function ProviderPane(props: {
         repository={owner}
         slug={selected === 'new' ? null : selected}
         preset={props.preset}
-        usage={selected === 'new' ? undefined : props.usage?.(selected)}
         onLeave={() => onSelect(null)}
       />
     );

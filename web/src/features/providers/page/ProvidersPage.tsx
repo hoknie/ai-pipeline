@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Api } from '../../../shared/api/api.ts';
@@ -46,8 +46,6 @@ export interface ProvidersPageProps {
   projects?: ProvidersProjects | undefined;
   /** `global`: the shared level alone, written to the shared files only. */
   scope?: ProvidersScope;
-  /** The block «Where it is used» under the form of a provider. */
-  usage?: ((slug: string) => ReactNode) | undefined;
   /** The address of the form of a new provider (for the empty state); the top bar's by default. */
   hrefOfNew?: ((preset: string | null) => string) | undefined;
   /** Opens a provider in the form of a project (leaves the mode «All projects»). */
@@ -239,7 +237,6 @@ function MainPane(
       owner={props.owner}
       selected={selected}
       preset={props.preset}
-      usage={props.usage}
       hrefOfNew={props.hrefOfNew}
       ready={props.ready}
       rowCount={rows.length}

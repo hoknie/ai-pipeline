@@ -77,7 +77,7 @@ function LevelField({
   );
 }
 
-/** The step «Name»: a preset (new provider only), name, slug, level and the switch. */
+/** The step «General»: a preset (new provider only), name, slug, level and the switch. */
 export function NameStep({
   draft,
   isNew,
@@ -94,8 +94,12 @@ export function NameStep({
   const { t } = useTranslation();
   const scope = useProvidersScope();
   return (
-    <div className="flex flex-col gap-4">
-      {isNew ? <PresetField onPreset={onPreset} /> : null}
+    <div className="grid gap-4 md:grid-cols-2">
+      {isNew ? (
+        <div className="md:col-span-2">
+          <PresetField onPreset={onPreset} />
+        </div>
+      ) : null}
       <Field id="provider-name" label={t('providers.form.name')} error={errorOf('name')}>
         <Input
           id="provider-name"
@@ -124,7 +128,7 @@ export function NameStep({
         />
       </Field>
       {scope === 'project' ? <LevelField draft={draft} isNew={isNew} onChange={onChange} /> : null}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 self-end pb-2">
         <Switch
           id="provider-enabled"
           checked={draft.enabled}

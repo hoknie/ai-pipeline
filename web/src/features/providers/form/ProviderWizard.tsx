@@ -11,8 +11,8 @@ import type {
 import { Alert } from '../../../shared/ui/feedback/alert.tsx';
 import { Button } from '../../../shared/ui/forms/button.tsx';
 import { useConfirm } from '../../../shared/ui/overlays/confirm.tsx';
-import { ProviderStatusBadge } from '../list/ProviderStatus.tsx';
-import { reasonsOf } from '../list/ProvidersList.tsx';
+import { ProviderHeader } from '../editor/ProviderHeader.tsx';
+import { ProviderSections } from '../editor/ProviderSections.tsx';
 import { AccessStep } from './AccessStep.tsx';
 import { FORM_STEPS, type FormStep, type ProviderDraft } from './draft.ts';
 import { StepIndicator, useErrorText } from './FormParts.tsx';
@@ -57,25 +57,23 @@ function Problems({ problems }: { problems: FormProblems }) {
   );
 }
 
-/** Back, cancel and delete on the left; Next, or Save on the last step, on the right. */
+/** Back and cancel on the left; Next, or Save on the last step, on the right (a new provider). */
 function Footer(props: {
-  isNew: boolean;
   step: FormStep;
   busy: boolean;
   stepValid: boolean;
   allValid: boolean;
   onStep: (step: FormStep) => void;
   onSave: () => void;
-  onDelete: () => void;
   onCancel: (() => void) | undefined;
 }) {
-  const { isNew, step, busy, onStep } = props;
+  const { step, busy, onStep } = props;
   const { t } = useTranslation();
   const at = FORM_STEPS.indexOf(step);
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap gap-2">
-        {isNew && at > 0 ? (
+        {at > 0 ? (
           <Button variant="outline" onClick={() => onStep(FORM_STEPS[at - 1]!)}>
             {t('providers.form.back')}
           </Button>
@@ -85,13 +83,8 @@ function Footer(props: {
             {t('common.cancel')}
           </Button>
         ) : null}
-        {!isNew ? (
-          <Button variant="destructive" disabled={busy} onClick={props.onDelete}>
-            {t('providers.form.delete')}
-          </Button>
-        ) : null}
       </div>
-      {isNew && at < FORM_STEPS.length - 1 ? (
+      {at < FORM_STEPS.length - 1 ? (
         <Button disabled={!props.stepValid} onClick={() => onStep(FORM_STEPS[at + 1]!)}>
           {t('providers.form.next')}
         </Button>
@@ -112,7 +105,6 @@ function WizardBody(
   },
 ) {
   const { api, repository, slug, registry, form, errorOf } = props;
-  const { t } = useTranslation();
   const draft = form.draft!;
   const roles = registry?.roles ?? [];
   const sections: Record<FormStep, ReactNode> = {
@@ -153,20 +145,11 @@ function WizardBody(
       </>
     );
   }
-  return FORM_STEPS.map((step) => (
-    <section
-      key={step}
-      aria-label={t(`providers.form.step.${step}`)}
-      className="flex flex-col gap-3"
-    >
-      <h3 className="text-sm font-semibold">{t(`providers.form.step.${step}`)}</h3>
-      {sections[step]}
-    </section>
-  ));
+  return <ProviderSections sections={sections} />;
 }
 
 /**
- * The form of a provider. A new one goes through the steps «Name», «Access», «Models»; an existing one is
+ * The form of a provider. A new one goes through the steps «General», «Access», «Models»; an existing one is
  * one page with the three parts, its slug and level read only. The same component is the page
  * `#providers/new` and the dialog «Create provider…».
  */
@@ -205,33 +188,44 @@ export function ProviderWizard(props: {
     );
   }
   const live = registry?.providers.find((item) => item.slug === slug);
+  const allValid = FORM_STEPS.every((step) => form.stepValid(step));
+  const onDelete = () =>
+    void confirm({
+      title: t('providers.form.deleteTitle', { name: draft.name }),
+      description: t('providers.form.deleteDescription'),
+      confirmLabel: t('providers.form.delete'),
+      destructive: true,
+    }).then((ok) => (ok ? form.remove() : undefined));
   return (
     <form
       className="flex flex-col gap-4"
       aria-label={t('providers.form.label')}
       onSubmit={(event) => event.preventDefault()}
     >
+      {!form.isNew && slug !== null ? (
+        <ProviderHeader
+          slug={slug}
+          live={live}
+          draftName={draft.name}
+          busy={form.busy}
+          canSave={allValid}
+          onSave={() => void form.save()}
+          onDelete={onDelete}
+        />
+      ) : null}
       <Problems problems={form.problems} />
-      {live ? <ProviderStatusBadge status={live.status} reasons={reasonsOf(live)} /> : null}
       <WizardBody {...props} form={form} errorOf={errorOf} />
-      <Footer
-        isNew={form.isNew}
-        step={form.step}
-        busy={form.busy}
-        stepValid={form.stepValid(form.step)}
-        allValid={FORM_STEPS.every((step) => form.stepValid(step))}
-        onStep={form.setStep}
-        onSave={() => void form.save()}
-        onDelete={() =>
-          void confirm({
-            title: t('providers.form.deleteTitle', { name: draft.name }),
-            description: t('providers.form.deleteDescription'),
-            confirmLabel: t('providers.form.delete'),
-            destructive: true,
-          }).then((ok) => (ok ? form.remove() : undefined))
-        }
-        onCancel={props.onCancel}
-      />
+      {form.isNew ? (
+        <Footer
+          step={form.step}
+          busy={form.busy}
+          stepValid={form.stepValid(form.step)}
+          allValid={allValid}
+          onStep={form.setStep}
+          onSave={() => void form.save()}
+          onCancel={props.onCancel}
+        />
+      ) : null}
     </form>
   );
 }
