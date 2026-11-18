@@ -885,6 +885,7 @@ export const en = {
       autoDeliverReset: 'as in the settings',
       skip: 'Skip steps',
       skipNoSteps: 'The pipeline has no steps',
+      skipNone: 'Do not skip',
       deliveryMode: 'Delivery mode',
       deliveryModeBySetting: 'mode as in the settings',
       deliveryModeForTask: 'mode for this task',

@@ -904,6 +904,7 @@ export const ru: Dictionary = {
       autoDeliverReset: 'как в настройке',
       skip: 'Пропустить этапы',
       skipNoSteps: 'У pipeline нет этапов',
+      skipNone: 'Не пропускать',
       deliveryMode: 'Способ доставки',
       deliveryModeBySetting: 'способ по настройке',
       deliveryModeForTask: 'способ для этой задачи',

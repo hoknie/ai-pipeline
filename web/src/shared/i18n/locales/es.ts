@@ -903,6 +903,7 @@ export const es: Dictionary = {
       autoDeliverReset: 'como en la configuración',
       skip: 'Omitir etapas',
       skipNoSteps: 'El pipeline no tiene etapas',
+      skipNone: 'No omitir',
       deliveryMode: 'Modo de entrega',
       deliveryModeBySetting: 'modo según la configuración',
       deliveryModeForTask: 'modo para esta tarea',

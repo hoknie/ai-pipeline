@@ -7,19 +7,17 @@ import { cn } from '../../lib/browser/cn.ts';
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
 
+/** The classes of a dropdown field, shared by every trigger that looks like a select. */
+export const selectTriggerClass =
+  'flex h-9.5 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-card px-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive data-[placeholder]:text-muted-foreground';
+
 export function SelectTrigger({
   className,
   children,
   ...props
 }: ComponentProps<typeof SelectPrimitive.Trigger>) {
   return (
-    <SelectPrimitive.Trigger
-      className={cn(
-        'flex h-9.5 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-card px-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive data-[placeholder]:text-muted-foreground',
-        className,
-      )}
-      {...props}
-    >
+    <SelectPrimitive.Trigger className={cn(selectTriggerClass, className)} {...props}>
       {children}
       <SelectPrimitive.Icon asChild>
         <ChevronDown className="size-4 shrink-0 opacity-60" />

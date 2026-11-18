@@ -1,9 +1,10 @@
+import { ChevronDown } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge } from '../../feedback/badge.tsx';
-import { Popover, PopoverContent } from '../../overlays/popover.tsx';
-import { AddTrigger, ValueChip } from './pickerParts.tsx';
+import { Popover, PopoverContent, PopoverTrigger } from '../../overlays/popover.tsx';
+import { Label } from '../label.tsx';
+import { selectTriggerClass } from '../select.tsx';
 import { SkipStepsList, skipLocked } from './SkipStepsList.tsx';
 
 export { skipLocked };
@@ -14,8 +15,8 @@ export function pruneSkip(skip: string[], steps: string[]): string[] {
 }
 
 /**
- * A multiselect of the steps a task skips: a frame with chips of the skipped steps and «Add»,
- * which opens the list of the steps. At least one step stays unmarked.
+ * A multiselect of the steps a task skips: a dropdown field like a select showing the names of the
+ * skipped steps, which opens the list of the steps. At least one step stays unmarked.
  */
 export function SkipSteps({
   idPrefix,
@@ -40,6 +41,7 @@ export function SkipSteps({
   const fixed = pruneSkip(variantSkip, ids);
   const marked = pruneSkip([...skip, ...fixed], ids);
   const nameOf = (id: string) => steps.find((step) => step.id === id)?.name ?? id;
+  const label = marked.map(nameOf).join(', ');
   const toggle = (id: string) => {
     const next = marked.includes(id) ? marked.filter((step) => step !== id) : [...marked, id];
     onChange(
@@ -50,38 +52,29 @@ export function SkipSteps({
     );
   };
   return (
-    <fieldset className="flex min-w-0 flex-col gap-1.5">
-      <legend className="mb-1.5 text-sm leading-none font-medium">{t('queue.form.skip')}</legend>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={`${idPrefix}-skip`}>{t('queue.form.skip')}</Label>
       {steps.length === 0 ? (
         <span className="text-xs text-muted-foreground">{t('queue.form.skipNoSteps')}</span>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
-          <div className="flex min-h-9.5 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1.5">
-            {marked.map((id) =>
-              fixed.includes(id) ? (
-                <Badge key={id} variant="mute" title={t('queue.form.skipByVariant', { id })}>
-                  {nameOf(id)}
-                </Badge>
-              ) : (
-                <ValueChip
-                  key={id}
-                  text={nameOf(id)}
-                  icon={null}
-                  hint={id}
-                  note={null}
-                  disabled={disabled}
-                  onRemove={() => toggle(id)}
-                />
-              ),
-            )}
-            <AddTrigger
+          <PopoverTrigger asChild>
+            <button
+              type="button"
               id={`${idPrefix}-skip`}
-              label={t('queue.form.skip')}
-              open={open}
-              listId={listId}
+              role="combobox"
+              aria-expanded={open}
+              aria-haspopup="listbox"
+              aria-controls={open ? listId : undefined}
               disabled={disabled}
-            />
-          </div>
+              title={label}
+              data-placeholder={marked.length === 0 ? '' : undefined}
+              className={selectTriggerClass}
+            >
+              <span className="min-w-0 truncate">{label || t('queue.form.skipNone')}</span>
+              <ChevronDown className="size-4 shrink-0 opacity-60" />
+            </button>
+          </PopoverTrigger>
           <PopoverContent className="p-0">
             <SkipStepsList
               idPrefix={idPrefix}
@@ -95,6 +88,6 @@ export function SkipSteps({
           </PopoverContent>
         </Popover>
       )}
-    </fieldset>
+    </div>
   );
 }

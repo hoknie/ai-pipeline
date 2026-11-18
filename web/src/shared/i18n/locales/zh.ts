@@ -871,6 +871,7 @@ export const zh: Dictionary = {
       autoDeliverReset: '恢复为设置值',
       skip: '跳过步骤',
       skipNoSteps: '该 pipeline 没有步骤',
+      skipNone: '不跳过',
       deliveryMode: '交付方式',
       deliveryModeBySetting: '方式按设置',
       deliveryModeForTask: '方式仅此任务',
