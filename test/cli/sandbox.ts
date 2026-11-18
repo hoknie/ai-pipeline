@@ -144,6 +144,22 @@ export function ownDaemon(box: Sandbox): Promise<RunningDaemon> {
 }
 
 let running: Promise<unknown> = Promise.resolve();
+/** Text the next in-process call reads from stdin. */
+let stdinText: string | null = null;
+
+/** Like `aip`, with `input` on stdin of the command. */
+export function aipInput(
+  box: Sandbox,
+  input: string,
+  ...args: string[]
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const call = running.then(() => {
+    stdinText = input;
+    return inProcess(box, args);
+  });
+  running = call.catch(() => undefined);
+  return call;
+}
 
 /**
  * Runs `aip` inside the test process against a daemon of the test process: no node process is
@@ -208,6 +224,11 @@ async function inProcess(
     },
     exit: (code) => process.exit(code),
     onSignal: (signal, handler) => void process.once(signal, handler),
+    readStdin: (limit) => {
+      const text = stdinText ?? '';
+      stdinText = null;
+      return Promise.resolve(Buffer.byteLength(text) > limit ? null : text);
+    },
     watchIntervalMs: 25,
     panelPollMs: 25,
   };

@@ -2,6 +2,7 @@ import type { Method, Request } from '../contract/index.ts';
 
 import { configHandlers } from './config.ts';
 import { groupHandlers } from './groups.ts';
+import { integrationHandlers } from './integrations.ts';
 import { observerHandlers } from './observers.ts';
 import { providerHandlers } from './providers.ts';
 import { queueHandlers } from './queue.ts';
@@ -15,6 +16,7 @@ import type { Handler, HandlerTable, IpcContext } from './types.ts';
 export const handlers: HandlerTable = {
   ...systemHandlers,
   ...repositoryHandlers,
+  ...integrationHandlers,
   ...observerHandlers,
   ...configHandlers,
   ...providerHandlers,

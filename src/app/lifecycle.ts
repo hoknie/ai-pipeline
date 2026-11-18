@@ -20,10 +20,13 @@ export function createLifecycle(services: DaemonServices, database: Database): L
     attachments,
     processes,
     stats,
+    integrations,
   } = services;
   return {
     async start() {
       network.start();
+      // Operations on secrets a stop cut short are finished before anything can use a connection.
+      await integrations.secrets.recover();
       await delivery.patches.sweep();
       await artifacts.sweep();
       await runs.engine.serial(async () => {

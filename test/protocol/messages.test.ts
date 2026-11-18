@@ -90,7 +90,11 @@ describe('requests', () => {
   });
 
   it('rejects unknown methods, invalid JSON and bad parameters with the request id', () => {
-    expect(parseRequest('{')).toEqual({ id: -1, error: 'invalid JSON' });
+    expect(parseRequest('{')).toEqual({
+      id: -1,
+      error: 'request is not valid JSON',
+      code: 'invalid_json',
+    });
     expect(parseRequest(JSON.stringify({ id: 3, method: 'explode', params: {} }))).toMatchObject({
       id: 3,
     });
@@ -104,7 +108,8 @@ describe('requests', () => {
         params: { token: 't', verdict: 'maybe', summary: 's' },
       }),
     );
-    expect('error' in report && report.error).toContain('verdict');
+    // The refusal is a fixed text: it names neither the field nor the value.
+    expect(report).toEqual({ id: 4, error: 'invalid parameters', code: 'invalid_params' });
   });
 
   it('accepts structured questions in a report and rejects too many', () => {
@@ -269,9 +274,7 @@ describe('queue requests', () => {
     bad('queue_settings', { repository: '/r', autopilot: 'on' });
     bad('queue_settings', { repository: '/r', skipFailed: 1 });
     const error = parse('queue_settings', { repository: '/r' });
-    expect(JSON.stringify(error)).toContain(
-      'pass parallel, autopilot, autoAnswer, autopilotAnswer, skipFailed, onLimit or filter',
-    );
+    expect(error).toMatchObject({ code: 'invalid_params' });
   });
 
   it('takes parent as a task number or a non-empty string, null only on edit', () => {
@@ -593,7 +596,7 @@ describe('tag requests', () => {
     bad('tag_remove', { repository, tags: Array.from({ length: 201 }, (_, i) => `t${i}`) });
   });
 
-  it('rejects the catalog methods without a repository, naming the field', () => {
+  it('rejects the catalog methods without a repository', () => {
     for (const [method, params] of [
       ['tags', {}],
       ['tag_add', { name: 'auth' }],
@@ -601,7 +604,7 @@ describe('tag requests', () => {
       ['tag_remove', { tag: 'auth' }],
     ] as const) {
       bad(method, params);
-      expect(JSON.stringify(parse(method, params))).toContain('repository');
+      expect(parse(method, params)).toMatchObject({ code: 'invalid_params' });
     }
   });
 

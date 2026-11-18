@@ -1,4 +1,4 @@
-import { errorMessage } from '../../platform/errors/index.ts';
+import { isAppError } from '../../platform/errors/index.ts';
 import {
   chmodSync,
   existsSync,
@@ -10,7 +10,14 @@ import {
 } from 'node:fs';
 import { createServer, type Server, type Socket } from 'node:net';
 
-import { parseRequest, type Request, type Response } from './contract/index.ts';
+import {
+  MAX_REQUEST_BYTES,
+  ipcError,
+  parseRequest,
+  type IpcErrorCode,
+  type Request,
+  type Response,
+} from './contract/index.ts';
 
 /** What the socket serves: the requests, the subscriptions, the start and the stop. */
 export interface ServedApplication {
@@ -66,13 +73,35 @@ interface Serving {
   closing: Promise<void> | null;
 }
 
-async function answer(daemon: ServedApplication, line: string): Promise<Response> {
-  const parsed = parseRequest(line);
-  if ('error' in parsed) return { id: parsed.id, ok: false, error: parsed.error };
+/** A line for the daemon log: the stage and a fixed code, never a part of a request or of an error. */
+function logFailure(stage: string, code: IpcErrorCode): void {
+  process.stderr.write(`aip daemon: ipc ${stage} failed (${code})\n`);
+}
+
+/**
+ * What a failing handler tells its client: an expected failure that its owner worded (a refused
+ * state, an unknown name), or a fixed text. The message and the cause of any other exception may
+ * hold what the request carried, so they are neither sent nor logged.
+ */
+function handlerFailure(error: unknown): { error: string; code: string } {
+  if (isAppError(error) && error.kind !== 'internal') {
+    return { error: error.message, code: error.code };
+  }
+  logFailure('handler', 'internal');
+  return ipcError('internal');
+}
+
+type Parsed = ReturnType<typeof parseRequest>;
+
+async function answer(daemon: ServedApplication, parsed: Parsed): Promise<Response> {
+  if ('error' in parsed) {
+    logFailure('request', parsed.code);
+    return { id: parsed.id, ok: false, error: parsed.error, code: parsed.code };
+  }
   try {
     return { id: parsed.id, ok: true, result: await daemon.handle(parsed.request) };
   } catch (error) {
-    return { id: parsed.id, ok: false, error: errorMessage(error) };
+    return { id: parsed.id, ok: false, ...handlerFailure(error) };
   }
 }
 
@@ -99,24 +128,39 @@ function handleLine(serving: Serving, connection: Socket, line: string, close: (
     subscribeConnection(serving, connection);
     return;
   }
-  void answer(serving.daemon, line).then((response) => {
+  void answer(serving.daemon, parsed).then((response) => {
     if (!connection.destroyed) connection.write(`${JSON.stringify(response)}\n`);
     if (response.ok && (response.result as { stopping?: boolean })?.stopping) close();
   });
 }
 
+/**
+ * Reads the lines of a connection. What has piled up without a newline is limited in bytes before
+ * anything parses it: a request that grows past the limit is answered with a fixed refusal and the
+ * connection is closed, without the content being read, parsed, quoted or logged.
+ */
 function handleConnection(serving: Serving, connection: Socket, close: () => void): void {
   connection.setEncoding('utf8');
   let buffer = '';
+  let pending = 0;
+  let cutOff = false;
   connection.on('data', (chunk: string) => {
+    if (cutOff) return;
     buffer += chunk;
-    let end = buffer.indexOf('\n');
+    pending += Buffer.byteLength(chunk);
+    let end = buffer.indexOf('\n', Math.max(0, buffer.length - chunk.length));
     while (end !== -1) {
       const line = buffer.slice(0, end);
       buffer = buffer.slice(end + 1);
       handleLine(serving, connection, line, close);
       end = buffer.indexOf('\n');
     }
+    pending = Buffer.byteLength(buffer);
+    if (pending <= MAX_REQUEST_BYTES) return;
+    cutOff = true;
+    buffer = '';
+    logFailure('request', 'request_too_large');
+    connection.end(`${JSON.stringify({ id: -1, ok: false, ...ipcError('request_too_large') })}\n`);
   });
   connection.on('error', () => undefined);
 }

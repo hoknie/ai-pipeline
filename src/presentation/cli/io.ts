@@ -20,6 +20,11 @@ export interface CliIo {
   stderr(text: string): void;
   /** Reads one answer line of the user; null when there is no input. */
   ask?(question: string): Promise<string | null>;
+  /**
+   * Reads the whole of stdin once, up to `limitBytes` (without echo on a terminal); null when it is
+   * longer. The secret of `aip integration secret set` comes this way, never as an argument.
+   */
+  readStdin?(limitBytes: number): Promise<string | null>;
   /** Sets the exit code of the process . */
   setExitCode(code: number): void;
   /** Ends the process at once. */

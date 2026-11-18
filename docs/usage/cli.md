@@ -69,6 +69,7 @@ Every `aip` command, with a link to where its behaviour is described. `aip <comm
 | `aip setup` | [Connects](../getting-started/install.md#what-aip-setup-does) `aip` to Claude Code and OpenCode |
 | `aip init [--shared]` | Creates a starter `aip/` [configuration](../configuration/README.md) |
 | `aip config check` | [Validates](../configuration/README.md#checking-the-configuration) the configuration |
+| `aip integration types\|list\|add\|enable\|disable\|remove`, `aip integration secret set\|remove` | [Connections](../configuration/integrations.md) to external systems and their secrets; a secret is passed with `--stdin`, never as an argument |
 | `aip version [--json]` | The version, also printed by `aip --version`; with `--json`, `{"version":"…"}` on one line |
 | `aip daemon …` | Controls the [daemon](daemon.md) |
 | `aip mcp` | The [MCP server](../hosts/mcp-tools.md) over stdio, started by hosts |

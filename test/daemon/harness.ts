@@ -120,7 +120,13 @@ export async function harness(
   environment: NodeJS.ProcessEnv = {},
   options: Pick<
     DaemonOptions,
-    'build' | 'panel' | 'processesIntervalMs' | 'snapshotProcesses' | 'timings' | 'now'
+    | 'build'
+    | 'panel'
+    | 'processesIntervalMs'
+    | 'snapshotProcesses'
+    | 'timings'
+    | 'now'
+    | 'integrations'
   > = {},
 ): Promise<Harness> {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-daemon-')));

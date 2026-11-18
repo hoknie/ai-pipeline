@@ -72,7 +72,8 @@ export const featureGraph: Record<string, readonly string[]> = {
   queue: ['runs', 'tags', 'repos', 'swarm-config', 'attachments'],
   observers: ['queue', 'runs', 'repos', 'swarm-config'],
   stats: ['runs', 'repos', 'swarm-config'],
-  compose: ['observers', 'queue', 'runs', 'tags', 'repos'],
+  integrations: ['repos'],
+  compose: ['observers', 'queue', 'runs', 'tags', 'repos', 'integrations'],
 };
 
 /** Presentation sublayers. */

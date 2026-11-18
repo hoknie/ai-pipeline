@@ -84,6 +84,14 @@ const SAMPLES: Record<Method, unknown> = {
   run_pause: run,
   queue_dismiss: run,
   queue_run_now: { ...repository, item: 'q1' },
+  integration_types: {},
+  integration_list: {},
+  integration_add: { kind: 'example', name: 'main', global: true },
+  integration_remove: { id: 'c1' },
+  integration_enable: { id: 'c1' },
+  integration_disable: { id: 'c1' },
+  integration_secret_set: { id: 'c1', slot: 'token', value: 'v' },
+  integration_secret_remove: { id: 'c1', slot: 'token' },
   tags: repository,
   tag_add: { ...repository, name: 'auth' },
   tag_edit: { ...repository, tag: 'auth', name: 'login' },
@@ -161,9 +169,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 90 methods, each in the request schema once', () => {
+  it('has 98 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(90);
+    expect(methods).toHaveLength(98);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

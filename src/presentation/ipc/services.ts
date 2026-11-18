@@ -7,6 +7,7 @@ import type {
   ObserverHistoryService,
   ObserverService,
 } from '../../feature/observers/services/index.ts';
+import type { IntegrationsServices } from '../../feature/integrations/services/index.ts';
 import type { NetworkMonitor } from '../../feature/network/services/index.ts';
 import type { ProcessService } from '../../feature/processes/services/index.ts';
 import type { QueueServices } from '../../feature/queue/services/index.ts';
@@ -40,5 +41,6 @@ export interface DaemonServices {
   observers: ObserverService;
   history: ObserverHistoryService;
   stats: StatsServices;
+  integrations: IntegrationsServices;
   compose: ComposeServices;
 }

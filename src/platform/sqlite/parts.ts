@@ -1,4 +1,5 @@
 import { ATTACHMENTS_MIGRATION } from './attachments-migration.ts';
+import { INTEGRATIONS_MIGRATION } from './integrations-migration.ts';
 import { TASK_LINKS_MIGRATION } from './links-migration.ts';
 
 export { STATS_MIGRATION } from './stats-migration.ts';
@@ -40,4 +41,5 @@ export const LATER_MIGRATIONS: string[] = [
   `ALTER TABLE runs ADD COLUMN provider TEXT; ALTER TABLE queue_items ADD COLUMN provider TEXT; ALTER TABLE attempts ADD COLUMN requested_provider TEXT`,
   // the generation of a conversation of a CLI that keeps its own history; old rows stay NULL
   `ALTER TABLE attempts ADD COLUMN generation INTEGER NULL`,
+  INTEGRATIONS_MIGRATION,
 ];

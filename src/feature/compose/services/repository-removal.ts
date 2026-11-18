@@ -1,4 +1,5 @@
 import { rejected } from '../../../platform/errors/index.ts';
+import type { ConnectionService } from '../../integrations/services/index.ts';
 import type { ObserverService } from '../../observers/services/index.ts';
 import type { QueueStore } from '../../queue/services/index.ts';
 import type { RegistryService } from '../../repos/services/index.ts';
@@ -10,6 +11,7 @@ export interface RepositoryRemovalDependencies {
   states: RunStates;
   queues: QueueStore;
   observers: ObserverService;
+  integrations: ConnectionService;
 }
 
 /** Refuses a project with an unfinished run: its worktrees and refs belong to the project's root. */
@@ -46,9 +48,11 @@ export class RepositoryRemoval {
   }
 
   async remove(path: string): Promise<void> {
-    const { registry, states, queues, observers } = this.dependencies;
+    const { registry, states, queues, observers, integrations } = this.dependencies;
     const root = await registry.resolve(path);
     checkIdle(root, states, queues);
+    // Their secrets would be left without an owner: the connections are removed first.
+    integrations.assertNoConnections(root);
     observers.forgetRepository(root);
     registry.forget(root);
   }

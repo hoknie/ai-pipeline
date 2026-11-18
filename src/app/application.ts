@@ -1,11 +1,17 @@
 import { currentBuild, type BuildInfo } from '../platform/build/index.ts';
 import { databasePath, socketPath } from '../platform/paths/index.ts';
 import { snapshotProcesses, type PsRow } from '../platform/process/index.ts';
+import { createSecretStore, installationId, type SecretStore } from '../platform/secrets/index.ts';
 import { Database } from '../platform/sqlite/index.ts';
 import { createAttachmentsServices } from '../feature/attachments/services/index.ts';
 import { createArtifactsServices } from '../feature/artifacts/services/index.ts';
 import { createComposeServices } from '../feature/compose/services/index.ts';
 import { createDeliveryServices } from '../feature/delivery/services/index.ts';
+import type { IntegrationAdapterPort } from '../feature/integrations/ports/index.ts';
+import {
+  createIntegrationsServices,
+  type IntegrationsDependencies,
+} from '../feature/integrations/services/index.ts';
 import { createNetworkServices } from '../feature/network/services/index.ts';
 import { createObserversServices } from '../feature/observers/services/index.ts';
 import { createProcessesServices } from '../feature/processes/services/index.ts';
@@ -23,6 +29,7 @@ import type { DaemonServices } from '../presentation/ipc/services.ts';
 import { Snapshots } from '../presentation/ipc/snapshots.ts';
 
 import { createAgents } from './agents.ts';
+import { integrationOperations } from './integration-operations.ts';
 import { createLifecycle } from './lifecycle.ts';
 import { DEFAULT_TIMINGS, type DaemonTimings } from './timings.ts';
 import { declarePorts, type Ports } from './wiring.ts';
@@ -46,6 +53,14 @@ export interface ApplicationOptions {
   snapshotProcesses?: () => Promise<PsRow[]>;
   /** How often the daemon checks that its socket file is in place; defaults to 5 s. */
   socketCheckMs?: number;
+  /** Trusted setup of the integrations; the first version builds in no adapter and uses the system store. */
+  integrations?: {
+    adapters?: readonly IntegrationAdapterPort[];
+    secretStore?: SecretStore;
+  } & Pick<
+    Partial<IntegrationsDependencies>,
+    'limits' | 'outboundTimeoutMs' | 'secretStep' | 'newGeneration'
+  >;
 }
 
 /** The daemon as the socket serves it: the services of the features, the views, the events. */
@@ -73,7 +88,7 @@ interface Context {
 
 /** The features below the runs: configuration, agents, the registry, tags and their editor. */
 function createLower(context: Context) {
-  const { environment, database, now, ports } = context;
+  const { options, environment, database, now, ports } = context;
   const { agents, providers } = createAgents(environment);
   const { config } = createSwarmConfigServices({ environment });
   const { monitor: network } = createNetworkServices({
@@ -95,7 +110,28 @@ function createLower(context: Context) {
     agents,
     changed: ports.config.port,
   });
-  return { agents, providers, config, network, registry, projects, tags, edits, shared };
+  const integrations = createIntegrationsServices({
+    ...{ database, registry, now },
+    ...options.integrations,
+    store:
+      options.integrations?.secretStore ??
+      createSecretStore({ stateDirectory: options.stateDirectory, environment }),
+    installation: () => installationId(options.stateDirectory),
+    adapters: options.integrations?.adapters ?? [],
+    operations: ports.integrations.port,
+  });
+  return {
+    agents,
+    providers,
+    config,
+    network,
+    registry,
+    projects,
+    tags,
+    edits,
+    shared,
+    integrations,
+  };
 }
 
 type Lower = ReturnType<typeof createLower>;
@@ -196,6 +232,7 @@ function createUpper(context: Context, lower: Lower, runs: RunsServices) {
     queues: queue.store,
     control: queue.control,
     observers: observersServices.observers,
+    integrations: lower.integrations.connections,
   });
   return {
     delivery,
@@ -258,6 +295,7 @@ function wire(ports: Ports, services: DaemonServices, publisher: Publisher): voi
       void engine.serial(() => engine.schedule()).catch(() => undefined);
     },
   });
+  ports.integrations.set(integrationOperations(services));
   ports.processes.set(publications.processes);
   // Every saved run reaches the clients first, then the usage journal.
   ports.runs.set({
