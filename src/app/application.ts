@@ -40,6 +40,8 @@ export interface ApplicationOptions {
   entry: string[];
   environment?: NodeJS.ProcessEnv;
   now?: () => number;
+  /** Receives the messages of the daemon (a provider that cannot be reached); defaults to stderr. */
+  log?: (message: string) => void;
   /** Time between the stop signal and SIGKILL for an agent; overrides `timings.stopGraceMs`. */
   graceMs?: number;
   /** Overrides of the durations the daemon waits for. */
@@ -259,7 +261,7 @@ export function createApplication(options: ApplicationOptions): Application {
   const lower = createLower(context);
   const { runs, processes } = createRuns(context, lower);
   const upper = createUpper(context, lower, runs);
-  const { identity, actorOfRequest } = createActors({ database, config: lower.config, now });
+  const { identity, actorOfRequest } = createActors({ ...context, config: lower.config });
   const services: DaemonServices = { now, ...lower, runs, processes, ...upper, identity };
   const snapshots = new Snapshots(services);
   const publisher = new Publisher(services, snapshots);

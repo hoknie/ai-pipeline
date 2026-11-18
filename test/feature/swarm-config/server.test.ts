@@ -46,6 +46,7 @@ describe('server settings', () => {
       trustedProxies: [],
       sessionTtl: '12h',
       tokenMaxTtl: '90d',
+      sso: { oidc: null },
     });
   });
 
@@ -136,6 +137,92 @@ describe('server settings', () => {
       listen: '0.0.0.0:7341',
       trustedProxies: ['10.0.0.5'],
       sessionTtl: '2d',
+    });
+  });
+
+  describe('sso', () => {
+    const web = defaultWeb();
+    const oidc = {
+      issuer: 'https://sso.example.com/realms/aip',
+      client_id: 'aip',
+      client_secret_env: 'AIP_OIDC_SECRET',
+    };
+
+    it('accept a provider and fill defaults', () => {
+      const { server, errors } = validateServerSection({ sso: { oidc } }, web);
+      expect(errors).toEqual([]);
+      expect(server.sso.oidc).toEqual({
+        issuer: 'https://sso.example.com/realms/aip',
+        clientId: 'aip',
+        clientSecretEnv: 'AIP_OIDC_SECRET',
+        scopes: ['openid', 'email', 'profile'],
+        label: 'SSO',
+        claims: { email: 'email', name: 'name' },
+        attributes: {},
+        allowedDomains: [],
+      });
+    });
+
+    it('read claims, attributes, label and domains', () => {
+      const { server, errors } = validateServerSection(
+        {
+          sso: {
+            oidc: {
+              ...oidc,
+              label: 'Keycloak',
+              scopes: ['openid', 'groups'],
+              claims: { email: 'mail' },
+              attributes: { groups: 'groups', department: 'dept' },
+              allowed_domains: ['Corp.com'],
+            },
+          },
+        },
+        web,
+      );
+      expect(errors).toEqual([]);
+      expect(server.sso.oidc).toMatchObject({
+        label: 'Keycloak',
+        scopes: ['openid', 'groups'],
+        claims: { email: 'mail', name: 'name' },
+        attributes: { groups: 'groups', department: 'dept' },
+        allowedDomains: ['corp.com'],
+      });
+    });
+
+    it('reject client_secret with a hint', () => {
+      const { errors } = validateServerSection(
+        { sso: { oidc: { ...oidc, client_secret: 'x' } } },
+        web,
+      );
+      expect(errors.map((e) => e.path)).toEqual(['swarm.server.sso.oidc.client_secret']);
+      expect(errors[0]?.message).toContain('client_secret_env');
+    });
+
+    it('reject an unknown provider and unknown keys', () => {
+      expect(validateServerSection({ sso: { ldap: {} } }, web).errors.map((e) => e.path)).toEqual([
+        'swarm.server.sso.ldap',
+      ]);
+      expect(
+        validateServerSection({ sso: { oidc: { ...oidc, color: 1 } } }, web).errors.map(
+          (e) => e.path,
+        ),
+      ).toEqual(['swarm.server.sso.oidc.color']);
+    });
+
+    it('name the path of wrong or missing fields', () => {
+      const paths = (value: unknown): string[] =>
+        validateServerSection({ sso: { oidc: value } }, web).errors.map((e) => e.path);
+      expect(paths({ ...oidc, issuer: 'nope' })).toEqual(['swarm.server.sso.oidc.issuer']);
+      expect(paths({ ...oidc, client_secret_env: 'a b' })).toEqual([
+        'swarm.server.sso.oidc.client_secret_env',
+      ]);
+      expect(paths({ ...oidc, allowed_domains: ['corp.com', 'x'] })).toEqual([
+        'swarm.server.sso.oidc.allowed_domains[1]',
+      ]);
+      expect(paths({ issuer: oidc.issuer })).toEqual([
+        'swarm.server.sso.oidc.client_id',
+        'swarm.server.sso.oidc.client_secret_env',
+      ]);
     });
   });
 });

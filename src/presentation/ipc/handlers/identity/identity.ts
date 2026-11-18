@@ -78,6 +78,24 @@ export const identityHandlers = {
     context.services.identity.sessions.logout(params.session);
     return { ok: true };
   },
+  auth_oidc_info: async (_params, context) => {
+    serverOnly(context);
+    return { sso: context.services.identity.sso.info() };
+  },
+  auth_oidc_begin: async (params, context) => {
+    serverOnly(context);
+    return context.services.identity.sso.begin({ returnTo: params.returnTo });
+  },
+  auth_oidc_complete: async (params, context) => {
+    serverOnly(context);
+    const result = await context.services.identity.sso.complete({ query: params.query });
+    return {
+      session: result.session,
+      expiresAt: result.expiresAt,
+      returnTo: result.returnTo,
+      user: userView(result.user),
+    };
+  },
   whoami: async (_params, context) => {
     const { actor } = context;
     if (actor.kind !== 'user') return { actor: actor.kind, user: null };

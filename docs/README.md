@@ -26,6 +26,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | [configuration/integrations.md](configuration/integrations.md) | connections to external systems, the secret storage (keyring, headless key file), `aip integration`, the adapter template |
 | [configuration/stats.md](configuration/stats.md) | usage statistics: what is recorded, exclusions, the report: `stats` |
 | [configuration/server.md](configuration/server.md) | server mode: one shared daemon for several people: `server` |
+| [configuration/sso.md](configuration/sso.md) | sign-in through OpenID Connect: `server.sso.oidc`, the redirect address, Keycloak, Okta, Entra ID, Google |
 
 ## Running work
 

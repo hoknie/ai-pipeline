@@ -5,12 +5,20 @@ export const USER_SOURCES = ['local', 'oidc', 'saml'] as const;
 
 export type UserSource = (typeof USER_SOURCES)[number];
 
+/** Who the provider calls the user: the issuer and the subject never change for a person. */
+export interface UserSubject {
+  issuer: string;
+  subject: string;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   attributes: Attributes;
   source: UserSource;
+  /** The identity at the external provider of a user of the source `oidc`; `null` otherwise. */
+  subject: UserSubject | null;
   disabled: boolean;
   createdAt: number;
   lastLoginAt: number | null;

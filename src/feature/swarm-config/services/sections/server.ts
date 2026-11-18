@@ -10,7 +10,13 @@ import {
   readStrings,
 } from '../validate-context.ts';
 import { type FieldError } from '../../types/errors.ts';
-import { defaultServer, type ServerSettings, type WebSettings } from '../../types/settings.ts';
+import {
+  DEFAULT_OIDC_SCOPES,
+  defaultServer,
+  type OidcSettings,
+  type ServerSettings,
+  type WebSettings,
+} from '../../types/settings.ts';
 
 const SERVER_KEYS = [
   'enabled',
@@ -19,7 +25,137 @@ const SERVER_KEYS = [
   'trusted_proxies',
   'session_ttl',
   'token_max_ttl',
+  'sso',
 ];
+
+const SSO_KEYS = ['oidc'];
+
+const OIDC_KEYS = [
+  'issuer',
+  'client_id',
+  'client_secret_env',
+  'scopes',
+  'label',
+  'claims',
+  'attributes',
+  'allowed_domains',
+];
+
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+const DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+
+function issuerProblem(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return 'must be a URL such as `https://sso.example.com/realms/aip`';
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'must use http or https';
+  if (url.search !== '' || url.hash !== '') return 'must have no query or fragment';
+  return null;
+}
+
+function checkClaims(ctx: ValidateContext, value: unknown, path: string, oidc: OidcSettings): void {
+  const mapping = readMapping(ctx, value, path);
+  if (!mapping) return;
+  for (const [key, field] of readEntries(ctx, mapping, path, ['email', 'name'])) {
+    const text = readString(ctx, field, join(path, key));
+    if (text !== null) oidc.claims[key as 'email' | 'name'] = text;
+  }
+}
+
+function checkAttributes(
+  ctx: ValidateContext,
+  value: unknown,
+  path: string,
+  oidc: OidcSettings,
+): void {
+  const mapping = readMapping(ctx, value, path);
+  if (!mapping) return;
+  for (const [key, field] of readEntries(ctx, mapping, path, null)) {
+    const text = readString(ctx, field, join(path, key));
+    if (text !== null) oidc.attributes[key] = text;
+  }
+}
+
+function checkOidcField(
+  ctx: ValidateContext,
+  oidc: OidcSettings,
+  key: string,
+  field: unknown,
+  path: string,
+): void {
+  if (key === 'issuer') {
+    const value = readString(ctx, field, path);
+    const problem = value === null ? null : issuerProblem(value);
+    if (problem) addError(ctx, path, problem);
+    else if (value !== null) oidc.issuer = value;
+  }
+  if (key === 'client_id') oidc.clientId = readString(ctx, field, path) ?? oidc.clientId;
+  if (key === 'client_secret_env') {
+    const value = readString(ctx, field, path);
+    if (value !== null && !ENV_NAME.test(value)) {
+      addError(ctx, path, 'must be the name of an environment variable');
+    } else if (value !== null) oidc.clientSecretEnv = value;
+  }
+  if (key === 'scopes') {
+    const items = readStrings(ctx, field, path);
+    if (items.length > 0) oidc.scopes = items;
+  }
+  if (key === 'label') oidc.label = readString(ctx, field, path) ?? oidc.label;
+  if (key === 'claims') checkClaims(ctx, field, path, oidc);
+  if (key === 'attributes') checkAttributes(ctx, field, path, oidc);
+  if (key === 'allowed_domains') {
+    const items = readStrings(ctx, field, path);
+    items.forEach((item, index) => {
+      if (!DOMAIN.test(item))
+        addError(ctx, `${path}[${index}]`, 'must be a domain such as corp.com');
+    });
+    oidc.allowedDomains = items.filter((item) => DOMAIN.test(item)).map((d) => d.toLowerCase());
+  }
+}
+
+function checkOidc(ctx: ValidateContext, value: unknown, path: string): OidcSettings | null {
+  const mapping = readMapping(ctx, value, path);
+  if (!mapping) return null;
+  const oidc: OidcSettings = {
+    issuer: '',
+    clientId: '',
+    clientSecretEnv: '',
+    scopes: [...DEFAULT_OIDC_SCOPES],
+    label: 'SSO',
+    claims: { email: 'email', name: 'name' },
+    attributes: {},
+    allowedDomains: [],
+  };
+  if ('client_secret' in mapping) {
+    addError(
+      ctx,
+      join(path, 'client_secret'),
+      'the client secret must not be stored in settings.yaml; set `client_secret_env` to the name of an environment variable of the daemon',
+    );
+  }
+  const keys = [...OIDC_KEYS, 'client_secret'];
+  const before = ctx.errors.length;
+  for (const [key, field] of readEntries(ctx, mapping, path, keys)) {
+    if (key !== 'client_secret') checkOidcField(ctx, oidc, key, field, join(path, key));
+  }
+  for (const required of ['issuer', 'client_id', 'client_secret_env']) {
+    if (!(required in mapping)) addError(ctx, join(path, required), 'is required');
+  }
+  return ctx.errors.length === before ? oidc : null;
+}
+
+function checkSso(ctx: ValidateContext, value: unknown, server: ServerSettings): void {
+  const path = 'swarm.server.sso';
+  const mapping = readMapping(ctx, value, path);
+  if (!mapping) return;
+  for (const [key, field] of readEntries(ctx, mapping, path, SSO_KEYS)) {
+    if (key === 'oidc') server.sso.oidc = checkOidc(ctx, field, join(path, key));
+  }
+}
 
 const SESSION_TTL = /^[1-9]\d*[hd]$/;
 
@@ -51,6 +187,7 @@ function checkField(
   field: unknown,
   path: string,
 ): void {
+  if (key === 'sso') checkSso(ctx, field, server);
   if (key === 'enabled') server.enabled = readBoolean(ctx, field, path) ?? server.enabled;
   if (key === 'listen') {
     const value = readString(ctx, field, path);

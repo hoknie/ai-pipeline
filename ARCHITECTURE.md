@@ -476,6 +476,7 @@ src/feature/<фича>/
 | `yaml`                      | `swarm-config`, `swarm-edit`, `agents`, `presentation/cli` |
 | `commander`                 | `presentation/cli`                       |
 | `@modelcontextprotocol/sdk` | `presentation/mcp`, `presentation/cli`   |
+| `openid-client`             | `feature/identity/clients`               |
 
 В `presentation/cli` пакет `yaml` читает файл групп (`--groups`) и печатает проверенную конфигурацию.
 Таблицу проверяет `test/layout`: пакет вне своих мест — нарушение. Пока переход не закончен, старые

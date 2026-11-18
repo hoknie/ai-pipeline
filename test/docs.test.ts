@@ -16,6 +16,7 @@ import {
   configFromFiles,
   configPaths,
   loadNetworkSettings,
+  loadServerSettings,
   loadRuntimeSettings,
   loadWebSettings,
 } from '../src/feature/swarm-config/services/index.ts';
@@ -211,6 +212,23 @@ describe('documentation examples', () => {
     );
     expect(network).toMatchObject({ enabled: true, interfaces: ['wt0'], interval: 30, timeout: 5 });
     expect(network.targets).toEqual(['https://api.anthropic.com', '10.0.0.5:443']);
+  });
+
+  it('the sign-in example of docs/configuration/sso.md is valid in the global settings', () => {
+    const block =
+      yamlBlocks('docs/configuration/sso.md').find((b) => b.startsWith('server:')) ?? '';
+    const root = mkdtempSync(join(tmpdir(), 'aip-docs-sso-'));
+    mkdirSync(join(root, 'xdg', 'aip'), { recursive: true });
+    writeFileSync(join(root, 'xdg', 'aip', 'settings.yaml'), block);
+    const server = loadServerSettings(
+      configPaths(join(root, 'repo'), join(root, 'xdg'), undefined),
+    );
+    expect(server.sso.oidc).toMatchObject({
+      clientSecretEnv: 'AIP_OIDC_SECRET',
+      label: 'Keycloak',
+      attributes: { groups: 'groups', department: 'dept' },
+      allowedDomains: ['corp.com'],
+    });
   });
 
   it('the web example of docs/configuration/README.md is valid in the global settings', () => {

@@ -127,6 +127,7 @@ export async function harness(
     | 'timings'
     | 'now'
     | 'integrations'
+    | 'log'
   > = {},
 ): Promise<Harness> {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'aip-daemon-')));

@@ -20,6 +20,15 @@ export const identityRequests = [
     method: z.literal('auth_logout'),
     params: z.object({ session: z.string().min(1).max(512) }),
   }),
+  z.object({ method: z.literal('auth_oidc_info'), params: z.object({}).default({}) }),
+  z.object({
+    method: z.literal('auth_oidc_begin'),
+    params: z.object({ returnTo: z.string().max(2048).optional() }),
+  }),
+  z.object({
+    method: z.literal('auth_oidc_complete'),
+    params: z.object({ query: z.string().max(8192) }),
+  }),
   z.object({
     method: z.literal('login_link_create'),
     params: z.object({
@@ -82,6 +91,9 @@ export const remoteDenied: readonly string[] = [
   'auth_resolve',
   'auth_link_login',
   'auth_logout',
+  'auth_oidc_info',
+  'auth_oidc_begin',
+  'auth_oidc_complete',
 ];
 
 export interface UserView {

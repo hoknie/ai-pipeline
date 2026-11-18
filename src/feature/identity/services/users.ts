@@ -58,6 +58,7 @@ export class UsersService {
       name: name?.trim() || trimmed.split('@')[0] || trimmed,
       attributes: admin ? { role: ['admin'] } : {},
       source: 'local',
+      subject: null,
       disabled: false,
       createdAt: this.deps.clock.now(),
       lastLoginAt: null,

@@ -170,6 +170,7 @@ export const packagePlaces: Record<string, readonly string[]> = {
   yaml: ['feature/swarm-config', 'feature/swarm-edit', 'feature/agents', 'presentation/cli'],
   commander: ['presentation/cli'],
   '@modelcontextprotocol/sdk': ['presentation/mcp', 'presentation/cli'],
+  'openid-client': ['feature/identity/clients'],
 };
 
 /** Classes that may be created with `new` only in `app` and `<feature>/services/create.ts`. */

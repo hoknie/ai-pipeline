@@ -2,67 +2,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { z } from 'zod';
 
-import { request, IpcError } from '../../ipc/client/index.ts';
-import {
-  type Method,
-  type ParamsOf,
-  remoteDenied,
-  requestSchema,
-  type UserView,
-} from '../../ipc/contract/index.ts';
+import { remoteDenied, requestSchema } from '../../ipc/contract/index.ts';
 import { panel, renderPanelError } from '../errors.ts';
 import { json, parseBody, readJson, send } from '../http.ts';
 import { requestContext } from './context.ts';
-import { confirmCliPage, errorPage, loginPage } from './pages.ts';
-import { isSecure, type ServerModeOptions } from './proxy.ts';
-import { Authenticator, SESSION_COOKIE, sessionCookie } from './session.ts';
+import { call, cookie, createGate, redirect, statusOf, type ServerGate } from './gate.ts';
+import { oidcCallback, oidcStart, renderLogin } from './oidc.ts';
+import { confirmCliPage, errorPage } from './pages.ts';
+import { sessionCookie } from './session.ts';
 
-/** What the routes of server mode work with: the socket of the daemon and the address of the panel. */
-export interface ServerGate {
-  options: ServerModeOptions;
-  socket: string;
-  auth: Authenticator;
-}
-
-export function createGate(socket: string, options: ServerModeOptions): ServerGate {
-  const resolve = async (credential: { session?: string; token?: string }) => {
-    const result = (await request(socket, 'auth_resolve', credential)) as { user: UserView | null };
-    return result.user;
-  };
-  return { options, socket, auth: new Authenticator(resolve) };
-}
-
-/** A call to the daemon as the system, or as a user. */
-export function call<M extends Method>(
-  gate: ServerGate,
-  method: M,
-  params: ParamsOf<M>,
-  actor?: string,
-): Promise<unknown> {
-  return request(gate.socket, method, params, 30_000, actor);
-}
-
-function cookie(gate: ServerGate, value: string, maxAgeSeconds: number): string {
-  const secure = isSecure(gate.options) ? '; Secure' : '';
-  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`;
-}
-
-function redirect(
-  response: ServerResponse,
-  location: string,
-  headers: Record<string, string> = {},
-) {
-  response.writeHead(302, { location, 'cache-control': 'no-store', ...headers });
-  response.end();
-}
-
-function statusOf(error: unknown): number {
-  if (error instanceof IpcError) {
-    if (error.remoteKind === 'forbidden') return 403;
-    if (error.remoteKind === 'unauthorized') return 401;
-  }
-  return 400;
-}
+export { createGate, type ServerGate };
 
 async function formFields(incoming: IncomingMessage): Promise<Record<string, string>> {
   let text = '';
@@ -111,7 +60,14 @@ async function cliConfirm(
   url: URL,
 ): Promise<void> {
   const user = await gate.auth.identify(incoming);
-  if (user === null) return loginPage(response, 'Sign in first, then run aip login again.');
+  if (user === null) {
+    return renderLogin(
+      gate,
+      response,
+      'Sign in first, then run aip login again.',
+      url.pathname + url.search,
+    );
+  }
   const fields = cliFields.safeParse(Object.fromEntries(url.searchParams));
   if (!fields.success) return errorPage(response, 400, 'The login request is not valid.');
   try {
@@ -128,8 +84,11 @@ async function cliApprove(
   response: ServerResponse,
 ): Promise<void> {
   const user = await gate.auth.identify(incoming);
-  if (user === null) return loginPage(response, 'Sign in first, then run aip login again.');
   const fields = cliFields.safeParse(await formFields(incoming));
+  if (user === null) {
+    const back = fields.success ? `/auth/cli?${new URLSearchParams(fields.data)}` : undefined;
+    return renderLogin(gate, response, 'Sign in first, then run aip login again.', back);
+  }
   if (!fields.success) return errorPage(response, 400, 'The login request is not valid.');
   try {
     const { port, state, ...rest } = fields.data;
@@ -158,7 +117,11 @@ export async function authRoute(
   if (link && verb === 'GET') {
     await linkLogin(gate, response, decodeURIComponent(link[1] as string));
   } else if (path === '/auth/login' && verb === 'GET') {
-    loginPage(response);
+    await renderLogin(gate, response);
+  } else if (path === '/auth/oidc/start' && verb === 'GET') {
+    await oidcStart(gate, response, url);
+  } else if (path === '/auth/oidc/callback' && verb === 'GET') {
+    await oidcCallback(gate, incoming, response, url);
   } else if (path === '/auth/logout' && verb === 'POST') {
     await logout(gate, incoming, response);
   } else if (path === '/auth/cli' && verb === 'GET') {

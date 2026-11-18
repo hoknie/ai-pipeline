@@ -48,7 +48,7 @@ describe('migrations', () => {
       'DROP INDEX attempts_history_order; DROP INDEX runs_history_repository;',
     );
     dropQueueFilter(previous.database.connection);
-    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 13}`);
+    previous.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 14}`);
     previous.database.close();
 
     const migrated = openStorage(path);
@@ -115,7 +115,7 @@ describe('migration to hidden refs', () => {
     expect(loaded.run).toMatchObject({ title: null, name: null, namingUsage: null });
     expect(loaded.run.fromQueue).toBe(false);
     expect(loaded.run.config.claude.settings).toBe('isolated');
-    expect(SCHEMA_VERSION).toBe(42);
+    expect(SCHEMA_VERSION).toBe(43);
     expect(loaded.groups[0]!.questions).toBeNull();
   });
 });
@@ -128,8 +128,8 @@ describe('migration to project tags', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -17).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 17}`);
+    MIGRATIONS.slice(0, -18).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 18}`);
     prepare(database);
     migrate(database);
     return database;
@@ -248,7 +248,7 @@ describe('pipeline rename', () => {
       .prepare('UPDATE runs SET config_json = ? WHERE id = ?')
       .run(JSON.stringify(snapshot), state.run.id);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 15}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 16}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -278,7 +278,7 @@ describe('project attributes', () => {
     old.known.addRepository('/a/app', 9);
     dropQueueFilter(old.database.connection);
     dropProjectAttributes(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 14}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 15}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(
@@ -304,7 +304,7 @@ describe('migration to the usage journal', () => {
     old.runs.saveRun(state);
     old.database.exec('DROP TABLE stats_attempts; DROP TABLE stats_runs; DROP TABLE stats_meta;');
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 12}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 13}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const names = (type: string) =>
@@ -339,7 +339,7 @@ describe('migration to pipeline variants', () => {
     old.queues.saveQueue(queue);
     // a database written before the variants: the column is not there, the rows are
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 12}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun('variant-run')?.run.variant).toBe('default');
@@ -355,7 +355,7 @@ describe('migration to attachments', () => {
     const state = run(1);
     old.runs.saveRun(state);
     renameBack(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 9}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     expect(store.runs.loadRun(state.run.id)?.run.attachments).toEqual([]);
@@ -391,9 +391,9 @@ describe('migration that removes the cost', () => {
          'claude', 'finished', 1, 2, 1, 12, 4, 0.5);`,
     );
     old.database.exec(
-      'ALTER TABLE attempts DROP COLUMN chain_index; ALTER TABLE attempts DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN requested_provider; ALTER TABLE runs DROP COLUMN provider; ALTER TABLE queue_items DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN generation',
+      'ALTER TABLE attempts DROP COLUMN chain_index; ALTER TABLE attempts DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN requested_provider; ALTER TABLE runs DROP COLUMN provider; ALTER TABLE queue_items DROP COLUMN provider; ALTER TABLE attempts DROP COLUMN generation; DROP TABLE sso_requests; DROP INDEX users_by_subject; ALTER TABLE users DROP COLUMN source_issuer; ALTER TABLE users DROP COLUMN source_subject',
     );
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 8}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const loaded = store.runs.loadRun(state.run.id)!;
@@ -415,8 +415,8 @@ describe('migration to task links', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -6).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    MIGRATIONS.slice(0, -7).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     prepare(database);
     migrate(database);
     return database;
@@ -502,8 +502,8 @@ describe('migration to task links', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const legacy = new DatabaseSync(path);
-    MIGRATIONS.slice(0, -6).forEach((sql) => legacy.exec(sql));
-    legacy.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 6}`);
+    MIGRATIONS.slice(0, -7).forEach((sql) => legacy.exec(sql));
+    legacy.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 7}`);
     addQueue(legacy, '/a');
     addItemRow(legacy, 'q1', '/a', 0, ['q0'], []);
     addTag(legacy, 'foreign', 'r2');
@@ -532,7 +532,7 @@ describe('migration to the global queue', () => {
     addItem(queue, { pipeline: 'feature', task: 'task' }, 'q1', 2);
     old.queues.saveQueue(queue);
     dropQueueFilter(old.database.connection);
-    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 10}`);
+    old.database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 11}`);
     old.database.close();
     const store = openStorage(databasePath(directory));
     const row = store.database.prepare('SELECT * FROM global_queue').all() as Record<
@@ -551,7 +551,7 @@ describe('migration to the global queue', () => {
 });
 
 describe('migration to the chain item of an attempt', () => {
-  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void, back = 5) {
+  async function before(prepare: (database: import('node:sqlite').DatabaseSync) => void, back = 6) {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
@@ -596,7 +596,7 @@ describe('migration to the chain item of an attempt', () => {
       db.prepare(
         "INSERT INTO queue_items (id, repository, position, pipeline, task, created_at) VALUES ('q1', '/repo', 0, 'f', 't', 1)",
       ).run();
-    }, 3);
+    }, 4);
     expect(database.prepare('SELECT provider FROM runs').get()).toEqual({ provider: null });
     expect(database.prepare('SELECT provider FROM queue_items').get()).toEqual({ provider: null });
     expect(database.prepare('SELECT requested_provider FROM attempts').get()).toEqual({
@@ -611,8 +611,8 @@ describe('migration to the generation of a conversation', () => {
     const { DatabaseSync } = await import('node:sqlite');
     const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
     const database = new DatabaseSync(':memory:');
-    MIGRATIONS.slice(0, -3).forEach((sql) => database.exec(sql));
-    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 3}`);
+    MIGRATIONS.slice(0, -4).forEach((sql) => database.exec(sql));
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 4}`);
     prepare(database);
     migrate(database);
     return database;
@@ -682,5 +682,74 @@ describe('migration to the generation of a conversation', () => {
     store.database.transaction(() => store.runs.writeRun(changed));
     expect(store.runs.loadRun(state.run.id)!.groups[0]!.attempts[0]!.generation).toBe(3);
     store.database.close();
+  });
+});
+
+describe('sign-in by a provider', () => {
+  it('stores the subject of a user and the requests in progress', () => {
+    const store = temporaryStorage();
+    const insert = store.database.connection.prepare(
+      "INSERT INTO users (id, email, email_key, name, source, source_issuer, source_subject, created_at) VALUES (?, ?, ?, 'n', 'oidc', ?, ?, 1)",
+    );
+    insert.run('1', 'a@corp.com', 'a@corp.com', 'https://i', '42');
+    insert.run('2', 'b@corp.com', 'b@corp.com', 'https://other', '42');
+    expect(() => insert.run('3', 'c@corp.com', 'c@corp.com', 'https://i', '42')).toThrow(/UNIQUE/);
+    store.database.connection
+      .prepare(
+        "INSERT INTO users (id, email, email_key, name, created_at) VALUES ('4', 'd@x.io', 'd@x.io', 'd', 1)",
+      )
+      .run();
+    store.database.connection
+      .prepare(
+        "INSERT INTO users (id, email, email_key, name, created_at) VALUES ('5', 'e@x.io', 'e@x.io', 'e', 1)",
+      )
+      .run();
+    const columns = store.database.connection.prepare('PRAGMA table_info(sso_requests)').all() as {
+      name: string;
+    }[];
+    expect(columns.map((column) => column.name)).toEqual([
+      'state',
+      'nonce',
+      'code_verifier',
+      'redirect_uri',
+      'return_to',
+      'created_at',
+      'expires_at',
+    ]);
+    store.database.close();
+  });
+});
+
+describe('migration of an identity database to sign-in by a provider', () => {
+  it('adds the subject columns, the index and sso_requests, keeping the users', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { MIGRATIONS } = await import('../../../src/platform/sqlite/index.ts');
+    const old = new DatabaseSync(':memory:');
+    MIGRATIONS.slice(0, -1).forEach((sql) => old.exec(sql));
+    old.exec(`PRAGMA user_version = ${SCHEMA_VERSION - 1}`);
+    old
+      .prepare(
+        "INSERT INTO users (id, email, email_key, name, created_at) VALUES ('u1', 'a@x.io', 'a@x.io', 'a', 1)",
+      )
+      .run();
+    migrate(old);
+    const columns = (old.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+      (column) => column.name,
+    );
+    expect(columns).toEqual(expect.arrayContaining(['source_issuer', 'source_subject']));
+    const names = (
+      old
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE name IN ('users_by_subject', 'sso_requests')",
+        )
+        .all() as {
+        name: string;
+      }[]
+    ).map((row) => row.name);
+    expect(names.sort()).toEqual(['sso_requests', 'users_by_subject']);
+    expect(old.prepare('SELECT id, source_issuer, source_subject FROM users').all()).toEqual([
+      { id: 'u1', source_issuer: null, source_subject: null },
+    ]);
+    old.close();
   });
 });

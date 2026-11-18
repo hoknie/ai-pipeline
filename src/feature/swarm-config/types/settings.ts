@@ -315,7 +315,33 @@ export interface ServerSettings {
   sessionTtl: string;
   /** The longest lifetime of a personal token: `<n>d`. */
   tokenMaxTtl: string;
+  /** External sign-in providers; none while unset. */
+  sso: SsoSettings;
 }
+
+/** The OpenID Connect provider of `server.sso.oidc`. */
+export interface OidcSettings {
+  /** The issuer URL; its discovery document is `<issuer>/.well-known/openid-configuration`. */
+  issuer: string;
+  clientId: string;
+  /** The name of the daemon environment variable that holds the client secret. */
+  clientSecretEnv: string;
+  scopes: string[];
+  /** The caption of the sign-in button. */
+  label: string;
+  /** The names of the claims of the email and of the name. */
+  claims: { email: string; name: string };
+  /** The user attribute name → the claim it is taken from. */
+  attributes: Record<string, string>;
+  /** Only emails of these domains may sign in; empty means any. */
+  allowedDomains: string[];
+}
+
+export interface SsoSettings {
+  oidc: OidcSettings | null;
+}
+
+export const DEFAULT_OIDC_SCOPES = ['openid', 'email', 'profile'];
 
 export function defaultServer(): ServerSettings {
   return {
@@ -325,5 +351,6 @@ export function defaultServer(): ServerSettings {
     trustedProxies: [],
     sessionTtl: '12h',
     tokenMaxTtl: '90d',
+    sso: { oidc: null },
   };
 }
