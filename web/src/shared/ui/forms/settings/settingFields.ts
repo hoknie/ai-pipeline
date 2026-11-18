@@ -169,6 +169,15 @@ export const SETTINGS_SECTIONS: Partial<Record<SettingsGroup, SettingsSection[]>
   ],
 };
 
+/** The keys of the runtimes in the order of their cards. */
+export const RUNTIME_KEYS: readonly string[] = (SETTINGS_SECTIONS.runtimes ?? []).map(
+  (section) => section.key,
+);
+
+/** The card of one runtime; undefined for an unknown key. */
+export const runtimeSection = (key: string): SettingsSection | undefined =>
+  SETTINGS_SECTIONS.runtimes?.find((section) => section.key === key);
+
 /** The cards of the settings of a built-in stage; the group of the titles is `delivery`. */
 export const STAGE_SECTIONS: Record<'message' | 'resolve' | 'delivery', SettingsSection[]> = {
   message: [

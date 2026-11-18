@@ -37,7 +37,7 @@ export interface Route {
 }
 
 /** Groups of the shared tab whose third address part opens an entry (a slug, an id or `new`). */
-const SLUG_GROUPS: ReadonlySet<string> = new Set(['projects']);
+const SLUG_GROUPS: ReadonlySet<string> = new Set(['projects', 'runtimes']);
 
 /** The route of the group «Swarm»: the tab of the window in `tab`, its entry in `step`. */
 function swarmRoute(first: string | null, second: string | null, parts: (string | null)[]) {

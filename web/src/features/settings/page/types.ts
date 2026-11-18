@@ -38,6 +38,9 @@ export interface SettingsPageProps {
   /** The open project of the group «Projects» (a slug or `new`); null for none. */
   project: string | null;
   onSelectProject: (slug: string | null) => void;
+  /** The open runtime of the group «Runtimes» (its key); null for the overview. */
+  runtime: string | null;
+  onSelectRuntime: (key: string | null) => void;
   /** Every project of the daemon, disabled ones too. */
   registry: RepositoryView[];
   onRegistry: (registry: RepositoryView[]) => void;

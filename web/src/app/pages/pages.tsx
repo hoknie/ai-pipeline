@@ -192,6 +192,8 @@ export function SettingsRoute(props: {
         }
         project={common.route.step}
         onSelectProject={select('projects')}
+        runtime={common.route.step}
+        onSelectRuntime={select('runtimes')}
         agentTab={common.route.step}
         observerTab={common.route.step}
         onSelectObserverTab={select('observers')}

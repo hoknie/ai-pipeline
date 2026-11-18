@@ -522,7 +522,6 @@ describe('settings page', () => {
     '#settings/global/general',
     '#settings/global/agents',
     '#settings/global/delivery',
-    '#settings/global/runtimes',
     '#settings/global/system',
     '#settings/project/delivery',
   ])('shows a form and no table on the group %s', async (hash) => {
@@ -664,7 +663,7 @@ describe('settings page', () => {
   });
 
   it('explains when runtime and system settings take effect', async () => {
-    show(queueOf(), {}, '#settings/global/runtimes');
+    show(queueOf(), {}, '#settings/global/runtimes/agy');
     await screen.findByTestId('setting-runtimes.agy.command');
     expect(screen.getByText(/before the next agent starts/)).toBeTruthy();
     expect(screen.getByText(/the daemon does not need a restart/)).toBeTruthy();
@@ -1176,36 +1175,25 @@ describe('settings form', () => {
     ).toEqual(['Runs', 'Working copy', 'Naming']);
   });
 
-  it('groups the runtimes by the agent and shows only the names of the variables', async () => {
-    show(queueOf(), {}, '#settings/global/runtimes');
+  it('shows one runtime on its address with the names of the variables only', async () => {
+    show(queueOf(), {}, '#settings/global/runtimes/claude');
     const env = await screen.findByTestId('setting-runtimes.claude.env');
     expect(env.textContent).toContain('ANTHROPIC_API_KEY');
     expect(env.textContent).toContain('value is hidden');
-    expect(screen.getByTestId('setting-runtimes.claude.command')).toBeTruthy();
     expect(
       within(
         screen.getByTestId('setting-runtimes.claude.command'),
       ).getByLabelText<HTMLInputElement>('Command').value,
     ).toBe('claude');
-    expect(
-      within(screen.getByRole('region', { name: 'OpenCode' })).getByLabelText<HTMLInputElement>(
-        'Command',
-      ).value,
-    ).toBe('opencode');
-    expect(
-      within(
-        screen.getByRole('region', { name: 'Antigravity CLI (agy)' }),
-      ).getByLabelText<HTMLInputElement>('Command').value,
-    ).toBe('agy');
-    expect(screen.getByTestId('setting-runtimes.agy.env').textContent).not.toContain(
-      'GEMINI_API_KEY',
-    );
+    expect(screen.queryByRole('region', { name: 'OpenCode' })).toBeNull();
+    expect(screen.queryByTestId('setting-runtimes.opencode.command')).toBeNull();
   });
 
   it('writes Antigravity command, arguments and a secret without showing the secret', async () => {
-    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    const api = show(queueOf(), {}, '#settings/global/runtimes/agy');
     await screen.findByTestId('setting-runtimes.agy.env');
     const agy = within(screen.getByRole('region', { name: 'Antigravity CLI (agy)' }));
+    expect(screen.queryByTestId('setting-runtimes.claude.command')).toBeNull();
     fireEvent.change(agy.getByLabelText('Command'), { target: { value: '/opt/agy' } });
     fireEvent.click(agy.getByRole('combobox', { name: 'Arguments' }));
     const args = await screen.findByRole('combobox', { name: 'Search in Arguments' });
@@ -1234,7 +1222,7 @@ describe('settings form', () => {
   });
 
   it('adds, replaces and deletes variables with values only on write', async () => {
-    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    const api = show(queueOf(), {}, '#settings/global/runtimes/claude');
     await screen.findByTestId('setting-runtimes.claude.env');
     const claude = within(screen.getByRole('region', { name: 'Claude' }));
     fireEvent.change(claude.getByLabelText('Variable name of claude'), {
@@ -1264,7 +1252,7 @@ describe('settings form', () => {
   });
 
   it('deletes a variable and can undo it', async () => {
-    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    const api = show(queueOf(), {}, '#settings/global/runtimes/claude');
     await screen.findByTestId('setting-runtimes.claude.env');
     const claude = within(screen.getByRole('region', { name: 'Claude' }));
     fireEvent.click(claude.getByRole('button', { name: /^Delete ANTHROPIC_API_KEY/ }));
@@ -1283,7 +1271,7 @@ describe('settings form', () => {
   });
 
   it('refuses a name that is not a variable name', async () => {
-    show(queueOf(), {}, '#settings/global/runtimes');
+    show(queueOf(), {}, '#settings/global/runtimes/claude');
     await screen.findByTestId('setting-runtimes.claude.env');
     const claude = within(screen.getByRole('region', { name: 'Claude' }));
     fireEvent.change(claude.getByLabelText('Variable name of claude'), {
@@ -1295,18 +1283,36 @@ describe('settings form', () => {
     );
   });
 
-  it('shows every runtime off with a mark on the first run and writes the switch', async () => {
-    const api = show(queueOf(), {}, '#settings/global/runtimes');
-    await screen.findByTestId('setting-runtimes.claude.enabled');
-    for (const name of ['Claude', 'OpenCode', 'Antigravity CLI (agy)']) {
-      const region = within(screen.getByRole('region', { name }));
-      expect(region.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe(
-        'false',
-      );
-      expect(region.getByText('(off)')).toBeTruthy();
-    }
-    // the switch is the first field of the card
+  it('shows the runtime off with a mark and writes only its switch', async () => {
+    let written = false;
+    const api = show(
+      queueOf(),
+      {
+        config: vi.fn(async () =>
+          configView({
+            settings: settingsOf(
+              written
+                ? {
+                    'runtimes.opencode.enabled': { path: 'runtimes.opencode.enabled', value: true },
+                  }
+                : {},
+            ),
+          }),
+        ),
+        writeSettings: vi.fn(async () => {
+          written = true;
+          return { ok: true as const, revision: 'g2', file: '/xdg/aip/settings.yaml' };
+        }),
+      },
+      '#settings/global/runtimes/opencode',
+    );
+    await screen.findByTestId('setting-runtimes.opencode.enabled');
     const opencode = within(screen.getByRole('region', { name: 'OpenCode' }));
+    expect(opencode.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe(
+      'false',
+    );
+    expect(opencode.getByText('(off)')).toBeTruthy();
+    // the switch is the first field of the card
     expect(opencode.getAllByTestId(/^setting-/)[0]?.dataset.testid).toBe(
       'setting-runtimes.opencode.enabled',
     );
@@ -1320,10 +1326,17 @@ describe('settings form', () => {
         'global',
       ),
     );
+    // the list reads the configuration again: the record is no longer dimmed
+    const list = within(await screen.findByRole('region', { name: 'Runtimes' }));
+    await waitFor(() => {
+      const record = list.getByRole('button', { name: /OpenCode/ });
+      expect(record.textContent).toContain('Enabled');
+      expect(record.className).not.toContain('opacity-60');
+    });
   });
 
   it('adds two variables in a row, one by Enter and one by the button', async () => {
-    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    const api = show(queueOf(), {}, '#settings/global/runtimes/claude');
     await screen.findByTestId('setting-runtimes.claude.env');
     const claude = within(screen.getByRole('region', { name: 'Claude' }));
     expect(claude.getByText('Name')).toBeTruthy();
@@ -1354,7 +1367,7 @@ describe('settings form', () => {
   });
 
   it('saves a pair that was typed but not added, and drops the old name on a rename', async () => {
-    const api = show(queueOf(), {}, '#settings/global/runtimes');
+    const api = show(queueOf(), {}, '#settings/global/runtimes/claude');
     await screen.findByTestId('setting-runtimes.claude.env');
     const claude = within(screen.getByRole('region', { name: 'Claude' }));
     const name = claude.getByLabelText('Variable name of claude');
@@ -1374,7 +1387,7 @@ describe('settings form', () => {
   });
 
   it('clears the row of a variable on «Discard»', async () => {
-    show(queueOf(), {}, '#settings/global/runtimes');
+    show(queueOf(), {}, '#settings/global/runtimes/claude');
     await screen.findByTestId('setting-runtimes.claude.env');
     const claude = within(screen.getByRole('region', { name: 'Claude' }));
     fireEvent.change(claude.getByLabelText('Variable name of claude'), {
@@ -1412,6 +1425,120 @@ describe('settings form', () => {
     fireEvent.click(toggleOf('Keep the result'));
     fireEvent.click(screen.getByRole('tab', { name: 'Shared' }));
     expect(await screen.findByRole('alertdialog')).toBeTruthy();
+  });
+});
+
+describe('group Runtimes', () => {
+  // the list on the left; while no runtime is open the overview is the second region
+  const listOf = async () =>
+    within((await screen.findAllByRole('region', { name: 'Runtimes' }))[0]!);
+  const overrides = (extra = {}) =>
+    ({
+      config: vi.fn(async () =>
+        configView({
+          settings: settingsOf({
+            'runtimes.claude.enabled': { path: 'runtimes.claude.enabled', value: true },
+            ...extra,
+          }),
+        }),
+      ),
+    }) as never;
+
+  it('lists the seven runtimes with their state and dims the disabled ones', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes');
+    const list = await listOf();
+    const records = list.getAllByRole('button');
+    expect(records).toHaveLength(7);
+    const claude = list.getByRole('button', { name: /Claude/ });
+    expect(claude.textContent).toContain('Claude');
+    expect(claude.textContent).toContain('claude');
+    expect(claude.textContent).toContain('Enabled');
+    expect(claude.className).not.toContain('opacity-60');
+    const codex = list.getByRole('button', { name: /Codex CLI/ });
+    expect(codex.textContent).toContain('Disabled');
+    expect(codex.className).toContain('opacity-60');
+    expect(screen.getByRole('searchbox', { name: 'Search runtimes' })).toBeTruthy();
+  });
+
+  it('shows the overview with a hint, no form and no table', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes');
+    await listOf();
+    expect(screen.getByText('Choose a runtime to change its settings')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(document.querySelector('table')).toBeNull();
+    expect(screen.getAllByText('Variables')).toHaveLength(1);
+  });
+
+  it('shows only the number of variables in the overview, never a value', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes');
+    const list = await listOf();
+    expect(list.queryAllByLabelText('Variables')).toHaveLength(0);
+    const overview = within(screen.getAllByRole('region', { name: 'Runtimes' })[1] as HTMLElement);
+    const claude = overview.getByRole('button', { name: /Claude/ });
+    expect(within(claude).getByLabelText('Variables').textContent).toBe('1');
+    expect(document.body.innerHTML).not.toContain('secret');
+  });
+
+  it('opens a runtime from the list and changes the address', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes');
+    const list = await listOf();
+    fireEvent.click(list.getByRole('button', { name: /OpenCode/ }));
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/runtimes/opencode'));
+    expect(await screen.findByRole('region', { name: 'OpenCode' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Claude' })).toBeNull();
+    expect(
+      (await listOf()).getByRole('button', { name: /OpenCode/ }).getAttribute('aria-current'),
+    ).toBe('true');
+  });
+
+  it('opens a runtime by a link', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes/agy');
+    expect(await screen.findByRole('region', { name: 'Antigravity CLI (agy)' })).toBeTruthy();
+    expect(
+      (await listOf()).getByRole('button', { name: /Antigravity/ }).getAttribute('aria-current'),
+    ).toBe('true');
+  });
+
+  it('shows the overview for an unknown runtime', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes/nope');
+    await listOf();
+    expect(screen.getByText('Choose a runtime to change its settings')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('filters only the list by the search', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes');
+    const list = await listOf();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search runtimes' }), {
+      target: { value: 'code' },
+    });
+    expect(list.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      expect.stringContaining('OpenCode'),
+      expect.stringContaining('Codex CLI'),
+      expect.stringContaining('Kilo Code CLI'),
+    ]);
+    const overview = within(screen.getAllByRole('region', { name: 'Runtimes' })[1] as HTMLElement);
+    expect(overview.getAllByRole('button')).toHaveLength(7);
+  });
+
+  it('keeps the page and the draft when the user stays', async () => {
+    show(queueOf(), overrides(), '#settings/global/runtimes/claude');
+    await screen.findByTestId('setting-runtimes.claude.command');
+    const command = () =>
+      within(
+        screen.getByTestId('setting-runtimes.claude.command'),
+      ).getByLabelText<HTMLInputElement>('Command');
+    fireEvent.change(command(), { target: { value: '/opt/claude' } });
+    fireEvent.click((await listOf()).getByRole('button', { name: /Codex CLI/ }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    expect(window.location.hash).toBe('#settings/global/runtimes/claude');
+    expect(command().value).toBe('/opt/claude');
+    fireEvent.click((await listOf()).getByRole('button', { name: /Codex CLI/ }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Leave' }),
+    );
+    await waitFor(() => expect(window.location.hash).toBe('#settings/global/runtimes/codex'));
   });
 });
 

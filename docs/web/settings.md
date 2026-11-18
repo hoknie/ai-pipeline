@@ -37,7 +37,10 @@ Quota pools (`queue.pools`, `queue.default_pool`) are written in `settings.yaml`
 - Errors of validation are shown at the fields. If the file was changed after it was read, the form offers "Reload".
 - Leaving a group, a tab or a project with unsaved changes asks for confirmation.
 - A group with configuration errors gets a mark, and the errors are shown in the group. Errors of specialists and pipelines are shown in "General".
-- Every card of "Runtimes" starts with the switch "Enabled": all runtimes are off until you switch them on, and a card of an off runtime is marked "(off)". See [Runtimes](../configuration/runtimes.md).
+- "Runtimes" lists every runtime (Claude, OpenCode, Antigravity CLI, Codex CLI, Kilo Code CLI, Cline CLI, GitHub Copilot CLI) with its state and command; switched-off ones are dimmed. The search filters the list by name or key.
+  - Until one is chosen, the right part is an overview: command, arguments and the number of variables, never their values.
+  - `#settings/global/runtimes/<name>` opens one runtime. Its card starts with the switch "Enabled": all runtimes are off until you switch them on, and an off one is marked "(off)". "Save" writes only that runtime.
+  - Leaving a form with unsaved changes asks first. See [Runtimes](../configuration/runtimes.md).
 - Environment variables of a runtime are added one by one: fill "Name" and "Value", then press Enter or "Add variable" and repeat for the next one.
 
 ## MCP servers

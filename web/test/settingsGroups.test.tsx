@@ -192,6 +192,27 @@ describe('settings addresses', () => {
   });
 });
 
+describe('addresses of the group Runtimes', () => {
+  it('opens a runtime by its key and the overview without one', () => {
+    expect(parseRoute('#settings/global/runtimes/codex')).toEqual({
+      view: 'settings',
+      run: 'runtimes',
+      group: 'global',
+      step: 'codex',
+      tab: null,
+    });
+    expect(formatRoute(parseRoute('#settings/global/runtimes/codex'))).toBe(
+      '#settings/global/runtimes/codex',
+    );
+    expect(formatRoute(parseRoute('#settings/global/runtimes'))).toBe('#settings/global/runtimes');
+    expect(parseRoute('#settings/project/runtimes')).toMatchObject({
+      run: 'general',
+      group: 'project',
+      step: null,
+    });
+  });
+});
+
 describe('addresses of the group Projects', () => {
   it('opens a project by its slug, the new form, and General on the project tab', () => {
     expect(parseRoute('#settings/global/projects/shop')).toEqual({

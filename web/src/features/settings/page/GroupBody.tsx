@@ -13,6 +13,7 @@ import { SystemGroup } from '../SystemGroup.tsx';
 import { TagsSettings } from '../TagsSettings.tsx';
 import { AgentsGroup } from '../agents/AgentsGroup.tsx';
 import { ProjectsGroup } from '../projects/ProjectsGroup.tsx';
+import { RuntimesGroup } from '../runtimes/RuntimesGroup.tsx';
 import type { SettingsPageProps } from './types.ts';
 import type { SettingsConfig } from './useSettingsConfig.ts';
 
@@ -140,6 +141,9 @@ export function GroupBody({ props, settings }: BodyProps) {
         onOpen={props.onOpenProject}
       />
     );
+  }
+  if (group === 'runtimes' && props.scope === 'global') {
+    return <RuntimesGroup props={props} settings={settings} />;
   }
   if (group === 'agents') {
     return (

@@ -619,6 +619,22 @@ const SETTING_SPECS: SettingSpec[] = [
   ['runtimes.agy.command', 'string', 'agy', { globalOnly: true }],
   ['runtimes.agy.args', 'strings', [], { globalOnly: true }],
   ['runtimes.agy.env', 'env', [], { globalOnly: true }],
+  ['runtimes.codex.enabled', 'boolean', false, { globalOnly: true }],
+  ['runtimes.codex.command', 'string', 'codex', { globalOnly: true }],
+  ['runtimes.codex.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.codex.env', 'env', [], { globalOnly: true }],
+  ['runtimes.kilo.enabled', 'boolean', false, { globalOnly: true }],
+  ['runtimes.kilo.command', 'string', 'kilo', { globalOnly: true }],
+  ['runtimes.kilo.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.kilo.env', 'env', [], { globalOnly: true }],
+  ['runtimes.cline.enabled', 'boolean', false, { globalOnly: true }],
+  ['runtimes.cline.command', 'string', 'cline', { globalOnly: true }],
+  ['runtimes.cline.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.cline.env', 'env', [], { globalOnly: true }],
+  ['runtimes.copilot.enabled', 'boolean', false, { globalOnly: true }],
+  ['runtimes.copilot.command', 'string', 'copilot', { globalOnly: true }],
+  ['runtimes.copilot.args', 'strings', [], { globalOnly: true }],
+  ['runtimes.copilot.env', 'env', [], { globalOnly: true }],
 ];
 
 /**
