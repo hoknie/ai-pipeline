@@ -288,6 +288,27 @@ export const zh: Dictionary = {
     light: '浅色',
     dark: '深色',
   },
+  account: {
+    menu: '账户：{{name}}',
+    logout: '退出登录',
+    tokens: {
+      title: '访问令牌',
+      description: '个人令牌让你机器上和 CI 中的 aip 能够使用此服务器。',
+      name: '令牌名称',
+      days: '天数',
+      create: '创建',
+      once: '请立即复制令牌，它只显示一次：',
+      expires: '{{date}} 到期',
+      revoke: '撤销',
+    },
+    users: {
+      title: '用户',
+      admin: '管理员',
+      disabled: '已停用',
+      enable: '启用',
+      disable: '停用',
+    },
+  },
   language: {
     label: '语言：{{language}}',
     system: '跟随浏览器',

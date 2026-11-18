@@ -12,3 +12,4 @@ export {
   slugOf,
   type ProjectColor,
 } from './project.ts';
+export { normalizeRemote } from './remote.ts';

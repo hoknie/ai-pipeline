@@ -1,6 +1,10 @@
 import type { Command } from 'commander';
 
-import { configPaths, loadWebSettings } from '../../../feature/swarm-config/services/index.ts';
+import {
+  configPaths,
+  loadServerSettings,
+  loadWebSettings,
+} from '../../../feature/swarm-config/services/index.ts';
 import { lockPath } from '../../../platform/paths/index.ts';
 import type { Style } from '../../format/index.ts';
 import {
@@ -12,7 +16,7 @@ import {
 } from '../../ipc/client/index.ts';
 import type { DaemonCheck, PingResult } from '../../ipc/contract/index.ts';
 import { createDaemonPanel, runStandbyPanel } from '../../web/index.ts';
-import { context, daemon } from '../context.ts';
+import { context, daemon, refuseWithServer } from '../context.ts';
 import { examples } from '../help.ts';
 import { failLine, writeLine, type CliIo } from '../io.ts';
 import { startPanel } from '../web-control.ts';
@@ -77,6 +81,8 @@ async function runForeground(io: CliIo, style: Style): Promise<void> {
       entry: ctx.entry,
       environment: io.env,
       readSettings: settingsReader(io),
+      readServer: () =>
+        loadServerSettings(configPaths(io.cwd, io.env.XDG_CONFIG_HOME, io.env.HOME)),
       pid: io.pid,
       log: (line) => io.stderr(`${line}\n`),
     });
@@ -232,6 +238,7 @@ export function registerDaemon(program: Command, style: Style, io: CliIo): void 
     .description('Run the aip daemon in the foreground, or control the background one')
     .addHelpText('after', examples(['aip daemon', 'aip daemon status'], style))
     .action(() => runForeground(io, style));
+  refuseWithServer(command, io);
   registerStart(command, style, io);
   registerStop(command, style, io);
   registerRestart(command, style, io);
@@ -254,7 +261,7 @@ export function registerEvents(program: Command, io: CliIo, style: Style): void 
         interrupted = true;
         io.exit(0);
       });
-      await subscribe(ctx.socket, (line) => print(line));
+      await subscribe(ctx.remote ?? ctx.socket, (line) => print(line));
       if (!interrupted) failLine(io, 'aip events', 'the daemon closed the stream');
     });
 }

@@ -11,6 +11,7 @@ The configuration is an `aip/` directory with settings, specialists and pipeline
 - [configuration/network.md](network.md): the `network` section: the network check and the proxy for agents;
 - [configuration/attachments.md](attachments.md): the `attachments` section: local or S3 task attachment storage;
 - [configuration/stats.md](stats.md): the `stats` section: the usage journal and its report.
+- [configuration/server.md](server.md): the `server` section: one shared daemon for several people.
 
 Every file can also be edited in the [web panel](../web/settings.md).
 
@@ -87,6 +88,7 @@ runtimes: { ... }         # shared directory only
 network: { ... }          # shared directory only
 attachments: { ... }      # shared directory only
 stats: { ... }            # shared directory only
+server: { ... }           # shared directory only
 claude:
   edit_mode: allowlist    # allowlist | accept_edits | auto
   mcp: isolated           # isolated | inherit
@@ -110,6 +112,7 @@ defaults: { ... }
 | `network` | [configuration/network.md](network.md) |
 | `attachments` | [configuration/attachments.md](attachments.md) |
 | `stats` | [configuration/stats.md](stats.md) |
+| `server` | [configuration/server.md](server.md) |
 | `claude.edit_mode` | [configuration/permissions.md](permissions.md#claudeedit_mode) |
 | `claude.mcp` | [configuration/runtimes.md](runtimes.md#claudemcp) |
 | `claude.settings` | [configuration/runtimes.md](runtimes.md#claudesettings) |

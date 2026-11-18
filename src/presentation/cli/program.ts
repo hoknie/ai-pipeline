@@ -14,6 +14,7 @@ import { registerQueue } from './commands/queue.ts';
 import { registerRepositories } from './commands/repositories.ts';
 import { registerRun } from './commands/run.ts';
 import { registerSetup } from './commands/setup.ts';
+import { registerServer } from './commands/server/register.ts';
 import { registerStats } from './commands/stats.ts';
 import { registerTag } from './commands/tag.ts';
 import { registerWeb } from './commands/web.ts';
@@ -82,6 +83,7 @@ export function registerCommands(program: Command, style: Style = plainStyle, io
   program.commandsGroup(setup!.heading);
   registerSetup(program, io, style);
   registerIntegrations(program, io, style);
+  registerServer(program, io, style);
   program.helpCommand('help [command]', 'Show help for a command');
   program.commandsGroup(plumbing!.heading);
   registerDaemon(program, style, io);

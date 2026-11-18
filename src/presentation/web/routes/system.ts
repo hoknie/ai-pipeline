@@ -40,10 +40,16 @@ async function showSystem(kit: RouteKit, response: ServerResponse): Promise<void
   const hooks = kit.options.system;
   const ping = await pingDaemon(kit.options.socket).catch(() => null);
   const check = ping === null ? null : await kit.ensureDaemon().catch(() => null);
-  json(
-    response,
-    200,
-    systemView({
+  const server = kit.options.server !== undefined;
+  const me = server
+    ? (
+        (await kit.call('whoami', {})) as {
+          user: { email: string; name: string; admin: boolean } | null;
+        }
+      ).user
+    : null;
+  json(response, 200, {
+    ...systemView({
       ping,
       check,
       panelBuild: currentBuild(),
@@ -56,7 +62,9 @@ async function showSystem(kit: RouteKit, response: ServerResponse): Promise<void
       },
       logPath: hooks?.logPath ?? null,
     }),
-  );
+    mode: server ? 'server' : 'local',
+    me: me === null ? null : { email: me.email, name: me.name, admin: me.admin },
+  });
 }
 
 function hookOf(kit: RouteKit, action: SystemAction): (force: boolean) => Promise<void> {

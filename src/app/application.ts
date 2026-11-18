@@ -28,6 +28,7 @@ import { Publisher } from '../presentation/ipc/publisher.ts';
 import type { DaemonServices } from '../presentation/ipc/services.ts';
 import { Snapshots } from '../presentation/ipc/snapshots.ts';
 
+import { createActors } from './actors.ts';
 import { createAgents } from './agents.ts';
 import { integrationOperations } from './integration-operations.ts';
 import { createLifecycle } from './lifecycle.ts';
@@ -70,7 +71,7 @@ export interface Application {
   readonly timings: DaemonTimings;
   readonly database: Database;
   readonly services: DaemonServices;
-  handle(request: Request): Promise<unknown>;
+  handle(request: Request, actor?: string): Promise<unknown>;
   subscribe(send: (line: string) => void): () => void;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -258,7 +259,8 @@ export function createApplication(options: ApplicationOptions): Application {
   const lower = createLower(context);
   const { runs, processes } = createRuns(context, lower);
   const upper = createUpper(context, lower, runs);
-  const services: DaemonServices = { now, ...lower, runs, processes, ...upper };
+  const { identity, actorOfRequest } = createActors({ database, config: lower.config, now });
+  const services: DaemonServices = { now, ...lower, runs, processes, ...upper, identity };
   const snapshots = new Snapshots(services);
   const publisher = new Publisher(services, snapshots);
   wire(ports, services, publisher);
@@ -270,7 +272,7 @@ export function createApplication(options: ApplicationOptions): Application {
     timings,
     database,
     services,
-    handle: (request) => handle(request, ipc),
+    handle: (request, actorId) => handle(request, { ...ipc, actor: actorOfRequest(actorId) }),
     subscribe: (send) => publisher.subscribe(send),
     start: () => lifecycle.start(),
     stop: () => lifecycle.stop(),

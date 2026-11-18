@@ -4,6 +4,7 @@ export {
   ensureDirectory,
   expandHome,
   lockPath,
+  remoteProfilePath,
   socketPath,
   stateDirectory,
   stateDirectoryFromEnvironment,

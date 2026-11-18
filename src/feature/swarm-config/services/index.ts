@@ -12,6 +12,7 @@ export {
   loadRuntimeSettings,
   loadQueueSettings,
   loadStatsSettings,
+  loadServerSettings,
   loadWebSettings,
   parseConfig,
 } from './load.ts';

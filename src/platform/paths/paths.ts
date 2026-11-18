@@ -42,3 +42,10 @@ export function socketPath(directory: string, temporary: string = tmpdir()): str
   const key = createHash('sha256').update(directory).digest('hex').slice(0, 16);
   return join(temporary, `aip-${key}.sock`);
 }
+
+/** The profile of the server `aip login` saved: `<config>/aip/remote.json`. */
+export function remoteProfilePath(environment: NodeJS.ProcessEnv): string {
+  const xdg = environment.XDG_CONFIG_HOME;
+  const base = xdg && isAbsolute(xdg) ? xdg : join(environment.HOME ?? '.', '.config');
+  return join(base, 'aip', 'remote.json');
+}

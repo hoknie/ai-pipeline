@@ -10,6 +10,7 @@ import { Button } from '../../../shared/ui/forms/button.tsx';
 import { Kbd } from '../../../shared/ui/feedback/kbd.tsx';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../shared/ui/feedback/tooltip.tsx';
 
+import { AccountMenu } from '../../../features/account/index.ts';
 import { LanguageMenu } from '../menus/LanguageMenu.tsx';
 import { NavCounter } from './NavCounter.tsx';
 import { NotificationCenter } from '../menus/NotificationCenter.tsx';
@@ -128,6 +129,7 @@ export function TopNavActions({
         </Button>
       </Tip>
       <NotificationCenter state={notifications} compact showRepository={showRepository} />
+      <AccountMenu />
       <LanguageMenu compact />
       <ThemeMenu compact />
     </div>

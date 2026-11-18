@@ -25,6 +25,7 @@ New to `aip`? Install it, read [how it works](getting-started/concepts.md), then
 | [configuration/attachments.md](configuration/attachments.md) | local and S3 attachment storage, daemon credentials and MinIO |
 | [configuration/integrations.md](configuration/integrations.md) | connections to external systems, the secret storage (keyring, headless key file), `aip integration`, the adapter template |
 | [configuration/stats.md](configuration/stats.md) | usage statistics: what is recorded, exclusions, the report: `stats` |
+| [configuration/server.md](configuration/server.md) | server mode: one shared daemon for several people: `server` |
 
 ## Running work
 

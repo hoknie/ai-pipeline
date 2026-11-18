@@ -1,5 +1,5 @@
 import { rejected } from '../../../platform/errors/index.ts';
-import { repositoryRoot } from '../../../platform/git/index.ts';
+import { repositoryRoot, runGit } from '../../../platform/git/index.ts';
 import { expandHome } from '../../../platform/paths/index.ts';
 import {
   type KnownRepository,
@@ -7,6 +7,7 @@ import {
   checkColor,
   checkName,
   checkSlug,
+  normalizeRemote,
 } from '../types/index.ts';
 
 import type { RegistryService } from './registry.ts';
@@ -50,6 +51,24 @@ export class ProjectService {
     };
     this.registry.save(next);
     return next;
+  }
+
+  /**
+   * The enabled project whose `origin` is one of `remotes` (addresses compared in the normal form,
+   * so `ssh` and `https` clones of one repository match); `null` when none is.
+   */
+  async matchRemotes(remotes: string[]): Promise<KnownRepository | null> {
+    const wanted = new Set(remotes.flatMap((remote) => normalizeRemote(remote) ?? []));
+    if (wanted.size === 0) return null;
+    for (const project of this.registry.entries()) {
+      if (project.enabled === false) continue;
+      const origin = await runGit(project.path, ['remote', 'get-url', 'origin'], {
+        allowFailure: true,
+      });
+      const normal = origin.code === 0 ? normalizeRemote(origin.stdout) : null;
+      if (normal !== null && wanted.has(normal)) return project;
+    }
+    return null;
   }
 
   /** A slug the user chose: it fits the pattern and no other project has it. */

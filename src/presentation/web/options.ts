@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { packageRoot } from '../../platform/build/index.ts';
+import type { ServerModeOptions } from './auth/proxy.ts';
 import type { DaemonCheck } from '../ipc/contract/index.ts';
 
 export interface WebOptions {
@@ -12,6 +13,11 @@ export interface WebOptions {
   token?: string;
   /** `none` serves the panel without a token; the Host and Origin checks stay. */
   auth?: 'token' | 'none';
+  /**
+   * Server mode: the panel serves several people behind a reverse proxy. The login replaces the
+   * shared token, and `host` may be any address.
+   */
+  server?: ServerModeOptions;
   /** Directory with the built panel; defaults to dist/web of the package. */
   assets?: string;
   /** Fixed repository of requests without `?repository=`; never the process directory. */

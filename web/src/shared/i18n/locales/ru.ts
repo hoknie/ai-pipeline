@@ -299,6 +299,27 @@ export const ru: Dictionary = {
     light: 'Светлая',
     dark: 'Тёмная',
   },
+  account: {
+    menu: 'Учётная запись: {{name}}',
+    logout: 'Выйти',
+    tokens: {
+      title: 'Токены доступа',
+      description: 'Личные токены нужны, чтобы aip на вашей машине и в CI работал с этим сервером.',
+      name: 'Имя токена',
+      days: 'Дней',
+      create: 'Выпустить',
+      once: 'Скопируйте токен сейчас, он показывается один раз:',
+      expires: 'истекает {{date}}',
+      revoke: 'Отозвать',
+    },
+    users: {
+      title: 'Пользователи',
+      admin: 'администратор',
+      disabled: 'отключён',
+      enable: 'Включить',
+      disable: 'Отключить',
+    },
+  },
   language: {
     label: 'Язык: {{language}}',
     system: 'Как в браузере',

@@ -3,6 +3,7 @@ import { agentsRequests } from './agents.ts';
 import { artifactsRequests } from './artifacts.ts';
 import { configRequests } from './config.ts';
 import { groupsRequests } from './groups.ts';
+import { identityRequests } from './identity/identity.ts';
 import { integrationsRequests } from './integrations/integrations.ts';
 import { observersRequests } from './observers.ts';
 import { networkStatusSchema, panelRequests } from './panel.ts';
@@ -28,6 +29,7 @@ export const requestSchema = z.discriminatedUnion('method', [
   ...processesRequests,
   ...agentsRequests,
   ...panelRequests,
+  ...identityRequests,
 ]);
 
 export type Request = z.infer<typeof requestSchema>;
@@ -36,11 +38,13 @@ export type Method = Request['method'];
 
 export type ParamsOf<M extends Method> = Extract<Request, { method: M }>['params'];
 
-export const envelopeSchema = z.object({ id: z.number().int() }).loose();
+export const envelopeSchema = z
+  .object({ id: z.number().int(), actor: z.string().min(1).max(128).optional() })
+  .loose();
 
 export type Response =
   | { id: number; ok: true; result: unknown }
-  | { id: number; ok: false; error: string; code?: string };
+  | { id: number; ok: false; error: string; kind?: string; code?: string };
 
 export const responseSchema = z.union([
   z.object({ id: z.number().int(), ok: z.literal(true), result: z.unknown() }),
@@ -48,6 +52,7 @@ export const responseSchema = z.union([
     id: z.number().int(),
     ok: z.literal(false),
     error: z.string(),
+    kind: z.string().optional(),
     code: z.string().optional(),
   }),
 ]);
@@ -88,7 +93,9 @@ function failureCode(value: unknown): IpcErrorCode {
 
 export function parseRequest(
   line: string,
-): { id: number; request: Request } | { id: number; error: string; code: IpcErrorCode } {
+):
+  | { id: number; request: Request; actor?: string }
+  | { id: number; error: string; code: IpcErrorCode } {
   // The second check of the size: the server has cut the buffer off before, per connection.
   if (line.length > MAX_REQUEST_BYTES || Buffer.byteLength(line) > MAX_REQUEST_BYTES) {
     return { id: -1, ...ipcError('request_too_large') };
@@ -101,9 +108,10 @@ export function parseRequest(
   }
   const envelope = envelopeSchema.safeParse(value);
   const id = envelope.success ? envelope.data.id : -1;
+  const actor = envelope.success ? envelope.data.actor : undefined;
   const parsed = requestSchema.safeParse(value);
   if (!parsed.success) return { id, ...ipcError(failureCode(value)) };
-  return { id, request: parsed.data };
+  return actor === undefined ? { id, request: parsed.data } : { id, request: parsed.data, actor };
 }
 
 export const streamEventSchema = z.discriminatedUnion('event', [

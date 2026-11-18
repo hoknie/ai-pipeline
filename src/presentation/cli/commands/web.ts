@@ -1,6 +1,10 @@
 import type { Command } from 'commander';
 
-import { configPaths, loadWebSettings } from '../../../feature/swarm-config/services/index.ts';
+import {
+  configPaths,
+  loadServerSettings,
+  loadWebSettings,
+} from '../../../feature/swarm-config/services/index.ts';
 import type { WebSettings } from '../../../feature/swarm-config/types/index.ts';
 import type { Style } from '../../format/index.ts';
 import { request } from '../../ipc/client/index.ts';
@@ -13,7 +17,7 @@ import {
   webTokenFromEnv,
   type WebServer,
 } from '../../web/index.ts';
-import { bind, daemon, type Context } from '../context.ts';
+import { bind, daemon, refuseWithServer, type Context } from '../context.ts';
 import { usage, type CliIo } from '../io.ts';
 import { registerWebControl } from '../web-control.ts';
 
@@ -48,11 +52,12 @@ async function daemonPanel(
   ctx: Context,
   io: CliIo,
   settings: WebSettings,
-  at: Target,
+  at: Target | null,
 ): Promise<string | undefined> {
   const autostart =
     settings.autostart && io.env.AIP_WEB_AUTOSTART !== '0' && io.env.AIP_WEB_AUTOSTART !== 'false';
-  if (!autostart || at.host !== settings.host || at.port !== settings.port) return undefined;
+  if (!autostart) return undefined;
+  if (at !== null && (at.host !== settings.host || at.port !== settings.port)) return undefined;
   // A panel stopped by `aip web stop` is not coming back: do not wait for it.
   const stopped = await request(ctx.socket, 'web_status', {}).then(
     (result) => (result as { stopped?: boolean }).stopped === true,
@@ -62,7 +67,11 @@ async function daemonPanel(
   for (;;) {
     const state = readPanelState(ctx.stateDirectory);
     // A stand-in panel hands the port to the daemon started above: wait for the daemon's.
-    if (state !== null && !state.standby && state.host === at.host && state.port === at.port) {
+    if (
+      state !== null &&
+      !state.standby &&
+      (at === null || (state.host === at.host && state.port === at.port))
+    ) {
       io.stdout(`aip web: ${state.url}\n`);
       io.stdout(`aip web: served by the aip daemon (pid ${state.pid})\n`);
       return state.url;
@@ -94,9 +103,28 @@ async function startOwnServer(ctx: Context, settings: WebSettings, at: Target): 
   }
 }
 
+/** In server mode the daemon serves the panel on `server.listen`; `aip web` prints its address. */
+async function runServerWeb(
+  options: WebOptions,
+  io: CliIo,
+  style: Style,
+  settings: WebSettings,
+): Promise<void> {
+  if (options.host !== undefined || options.port !== undefined) {
+    throw usage('server mode is on: the address is set by server.listen, not by --host and --port');
+  }
+  const ctx = bind(io, style).context();
+  await daemon(ctx, 'aip web');
+  const url = await daemonPanel(ctx, io, settings, null);
+  if (url === undefined) throw usage('the daemon serves no web panel yet: see its log');
+  if (options.open) openBrowser(url, io.stderr);
+}
+
 async function runWeb(options: WebOptions, io: CliIo, style: Style): Promise<void> {
   const { print, context } = bind(io, style);
-  const settings = loadWebSettings(configPaths(io.cwd, io.env.XDG_CONFIG_HOME, io.env.HOME));
+  const paths = configPaths(io.cwd, io.env.XDG_CONFIG_HOME, io.env.HOME);
+  const settings = loadWebSettings(paths);
+  if (loadServerSettings(paths).enabled) return runServerWeb(options, io, style, settings);
   const at = target(options, settings, io);
   const ctx = context();
   await daemon(ctx, 'aip web');
@@ -138,5 +166,6 @@ export function registerWeb(program: Command, io: CliIo, style: Style): void {
       examples(['aip web', 'aip web --port 8080 --open', 'aip web start', 'aip web status']),
     )
     .action((options: WebOptions) => runWeb(options, io, style));
+  refuseWithServer(web, io);
   registerWebControl(web, activeStyle, io);
 }

@@ -23,7 +23,7 @@ import {
 export interface ServedApplication {
   /** Path of the daemon socket. */
   readonly socket: string;
-  handle(request: Request): Promise<unknown>;
+  handle(request: Request, actor?: string): Promise<unknown>;
   subscribe(send: (line: string) => void): () => void;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -99,8 +99,17 @@ async function answer(daemon: ServedApplication, parsed: Parsed): Promise<Respon
     return { id: parsed.id, ok: false, error: parsed.error, code: parsed.code };
   }
   try {
-    return { id: parsed.id, ok: true, result: await daemon.handle(parsed.request) };
+    return { id: parsed.id, ok: true, result: await daemon.handle(parsed.request, parsed.actor) };
   } catch (error) {
+    if (isAppError(error) && (error.kind === 'unauthorized' || error.kind === 'forbidden')) {
+      return {
+        id: parsed.id,
+        ok: false,
+        error: error.message,
+        kind: error.kind,
+        ...(error.responseCode === undefined ? {} : { code: error.responseCode }),
+      };
+    }
     return { id: parsed.id, ok: false, ...handlerFailure(error) };
   }
 }

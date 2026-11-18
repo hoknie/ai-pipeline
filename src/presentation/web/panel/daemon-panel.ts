@@ -1,4 +1,4 @@
-import type { WebSettings } from '../../../feature/swarm-config/types/index.ts';
+import type { ServerSettings, WebSettings } from '../../../feature/swarm-config/types/index.ts';
 import { unavailable } from '../../../platform/errors/index.ts';
 import type {
   PanelControl,
@@ -17,6 +17,8 @@ export interface DaemonPanelOptions {
   environment?: NodeJS.ProcessEnv;
   /** Reads the `web` section of the settings; called on every start. */
   readSettings: () => WebSettings;
+  /** Reads the `server` section; server mode serves the panel on `server.listen`. */
+  readServer?: () => ServerSettings;
   /** Process id written to the panel state; the one of this process by default. */
   pid?: number;
   /** Where reasons for not starting go (the daemon log); dropped by default. */
@@ -126,18 +128,39 @@ function chooseToken(ctx: PanelContext, requested: string | undefined): string |
   );
 }
 
+/** `<address>:<port>` of `server.listen`; an IPv6 address may be in brackets. */
+export function parseListen(listen: string): { host: string; port: number } {
+  const index = listen.lastIndexOf(':');
+  const host = listen.slice(0, index).replace(/^\[(.*)\]$/, '$1');
+  return { host, port: Number(listen.slice(index + 1)) };
+}
+
+/** The server mode settings in effect; `null` while it is off. */
+function serverMode(ctx: PanelContext): ServerSettings | null {
+  const server = ctx.options.readServer?.();
+  return server?.enabled === true && server.publicUrl !== null ? server : null;
+}
+
 async function startServer(
   ctx: PanelContext,
   settings: WebSettings,
   token: string | undefined,
 ): Promise<WebServer> {
   const { options } = ctx;
+  const server = serverMode(ctx);
+  if (server !== null && ctx.env.AIP_WEB_TOKEN) {
+    ctx.log('aip daemon: AIP_WEB_TOKEN is ignored in server mode: sign in with a login link');
+  }
+  const at = server === null ? settings : parseListen(server.listen);
   return startWebServer({
     socket: options.socket,
     stateDirectory: options.stateDirectory,
-    host: settings.host,
-    port: settings.port,
+    host: at.host,
+    port: at.port,
     auth: settings.auth,
+    ...(server === null || server.publicUrl === null
+      ? {}
+      : { server: { publicUrl: server.publicUrl, trustedProxies: server.trustedProxies } }),
     ...(token === undefined ? {} : { token }),
     log: ctx.log,
     defaultRepository: () => latestRepository(options.socket),
@@ -158,8 +181,10 @@ async function launch(ctx: PanelContext, requested: string | undefined): Promise
   let address = '';
   try {
     const settings = options.readSettings();
-    address = `${settings.host}:${settings.port}`;
-    const token = settings.auth === 'token' ? chooseToken(ctx, requested) : undefined;
+    const mode = serverMode(ctx);
+    address = mode?.listen ?? `${settings.host}:${settings.port}`;
+    const token =
+      settings.auth === 'token' && mode === null ? chooseToken(ctx, requested) : undefined;
     const server = await startServer(ctx, settings, token);
     try {
       writePanelState(options.stateDirectory, {

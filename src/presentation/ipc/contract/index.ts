@@ -3,6 +3,7 @@ export * from './artifacts.ts';
 export * from './config.ts';
 export * from './envelope.ts';
 export * from './groups.ts';
+export * from './identity/index.ts';
 export * from './integrations/integrations.ts';
 export * from './observers.ts';
 export * from './panel.ts';

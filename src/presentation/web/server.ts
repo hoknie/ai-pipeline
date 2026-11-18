@@ -7,6 +7,9 @@ import { join, normalize } from 'node:path';
 import { checkDaemon, request } from '../ipc/client/index.ts';
 import type { Method, ParamsOf } from '../ipc/contract/index.ts';
 
+import { requestContext } from './auth/context.ts';
+import { serverHostAllowed, serverOriginAllowed } from './auth/proxy.ts';
+import { authRoute, createGate, ipcRoute, type ServerGate } from './auth/routes.ts';
 import { TOKEN_HINT, configError, panel, renderPanelError } from './errors.ts';
 import { Hub } from './hub.ts';
 import {
@@ -94,6 +97,7 @@ interface Dispatch {
   kit: RouteKit;
   raw: RawRoute[];
   table: Route[];
+  gate: ServerGate | null;
 }
 
 /** The JSON route that matches the request; a path that matches with another verb is a 405. */
@@ -137,7 +141,7 @@ async function handleApi(
       cookieToken(incoming.headers.cookie);
     if (!sameToken(given, d.token)) throw panel('unauthorized', 'missing or invalid token');
   }
-  if (url.pathname === '/api/events') {
+  if (url.pathname === '/api/events' || (d.gate !== null && url.pathname === '/api/ipc/events')) {
     if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
     d.hub.attach(incoming, response);
     return;
@@ -155,6 +159,7 @@ async function handle(
   incoming: IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
+  if (d.gate !== null) return handleServerMode(d, d.gate, incoming, response);
   if (!hostAllowed(incoming, port)) throw panel('forbidden', 'forbidden host or origin');
   const url = new URL(incoming.url ?? '/', `http://${incoming.headers.host}`);
   const verb = incoming.method ?? 'GET';
@@ -170,17 +175,61 @@ async function handle(
   return handleApi(d, incoming, response, url);
 }
 
+/** Server mode: the host and origin of `public_url`, the login routes, then a session or a token. */
+async function handleServerMode(
+  d: Dispatch,
+  gate: ServerGate,
+  incoming: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const url = new URL(incoming.url ?? '/', 'http://panel');
+  if (!serverHostAllowed(incoming, gate.options)) throw panel('forbidden', 'forbidden host');
+  const exempt = url.pathname === '/auth/cli/token';
+  if (!serverOriginAllowed(incoming, gate.options, exempt)) {
+    throw panel('forbidden', 'forbidden origin');
+  }
+  if (await authRoute(gate, incoming, response, url)) return;
+  const verb = incoming.method ?? 'GET';
+  if (url.pathname.startsWith('/assets/')) {
+    if (verb !== 'GET') throw panel('method_not_allowed', 'method not allowed');
+    return serveAsset(response, d.assets, url.pathname);
+  }
+  const user = await gate.auth.identify(incoming);
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    if (user === null) {
+      response.writeHead(302, { location: '/auth/login', 'cache-control': 'no-store' });
+      response.end();
+      return;
+    }
+    return servePage(response, d.assets, null, undefined, undefined);
+  }
+  if (!url.pathname.startsWith('/api/')) throw panel('not_found', 'not found');
+  if (user === null) throw panel('unauthorized', 'sign in or send a personal token');
+  if (url.pathname === '/api/directories' && !user.admin) {
+    throw panel('forbidden', 'directories are listed for administrators only', 'access.denied');
+  }
+  await requestContext.run({ actor: user.id }, async () => {
+    if (url.pathname === '/api/ipc') {
+      if (verb !== 'POST') throw panel('method_not_allowed', 'method not allowed');
+      return ipcRoute(gate, incoming, response);
+    }
+    return handleApi(d, incoming, response, url);
+  });
+}
+
 export async function startWebServer(options: WebOptions): Promise<WebServer> {
-  const open = options.auth === 'none';
-  const token = open ? null : (options.token ?? randomBytes(24).toString('base64url'));
+  const serverMode = options.server !== undefined;
+  const open = !serverMode && options.auth === 'none';
+  const token =
+    open || serverMode ? null : (options.token ?? randomBytes(24).toString('base64url'));
   const host = options.host ?? '127.0.0.1';
-  assertLoopbackHost(host);
+  if (!serverMode) assertLoopbackHost(host);
   const ensureDaemon = options.ensureDaemon ?? (() => checkDaemon(options.socket));
   const hub = new Hub(options.socket, ensureDaemon);
   let port = options.port ?? 0;
   const kit: RouteKit = {
     call: <M extends Method>(method: M, params: ParamsOf<M>) =>
-      request(options.socket, method, params),
+      request(options.socket, method, params, undefined, requestContext.getStore()?.actor),
     options,
     host,
     uploads: join(options.stateDirectory ?? join(tmpdir(), 'aip-web'), 'uploads'),
@@ -193,6 +242,7 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     assets: normalize(options.assets ?? DEFAULT_ASSETS),
     hub,
     kit,
+    gate: options.server === undefined ? null : createGate(options.socket, options.server),
     ...routeTable(kit),
   };
   const server = createServer((incoming, response) => {
@@ -225,7 +275,9 @@ export async function startWebServer(options: WebOptions): Promise<WebServer> {
     token,
     host,
     port,
-    url: `http://${shown}:${port}/${token === null ? '' : `?token=${token}`}`,
+    url: options.server
+      ? options.server.publicUrl
+      : `http://${shown}:${port}/${token === null ? '' : `?token=${token}`}`,
     close: () =>
       new Promise((resolve) => {
         clearInterval(sweeper);

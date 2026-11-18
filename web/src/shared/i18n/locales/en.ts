@@ -294,6 +294,27 @@ export const en = {
     light: 'Light',
     dark: 'Dark',
   },
+  account: {
+    menu: 'Account: {{name}}',
+    logout: 'Sign out',
+    tokens: {
+      title: 'Access tokens',
+      description: 'Personal tokens let aip on your machine and your CI work with this server.',
+      name: 'Token name',
+      days: 'Days',
+      create: 'Create',
+      once: 'Copy the token now, it is shown once:',
+      expires: 'expires {{date}}',
+      revoke: 'Revoke',
+    },
+    users: {
+      title: 'Users',
+      admin: 'administrator',
+      disabled: 'disabled',
+      enable: 'Enable',
+      disable: 'Disable',
+    },
+  },
   language: {
     label: 'Language: {{language}}',
     system: 'As in the browser',

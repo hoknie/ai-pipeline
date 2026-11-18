@@ -7,6 +7,7 @@ import {
   validateRuntimesSection,
   validateWebSection,
 } from './validate.ts';
+import { validateServerSection } from './sections/server.ts';
 import { validateQueueSection } from './sections/queue.ts';
 import { validateStatsSection } from './sections/stats.ts';
 import { validateAttachmentsSection } from './sections/attachments.ts';
@@ -30,6 +31,7 @@ import {
   defaultNetwork,
   defaultRuntimes,
   defaultQueue,
+  defaultServer,
   defaultStats,
   type NetworkSettings,
   type QueueSettings,
@@ -37,6 +39,7 @@ import {
   defaultWeb,
   type ResolvedConfig,
   type RuntimeSettings,
+  type ServerSettings,
   type WebSettings,
 } from '../types/settings.ts';
 
@@ -148,6 +151,15 @@ export function loadWebSettings(paths: ConfigPaths): WebSettings {
   return loadGlobalSection(paths, 'web', defaultWeb, (value) => {
     const { web, errors } = validateWebSection(value);
     return { value: web, errors };
+  });
+}
+
+/** Server mode settings from the global settings.yaml only; checked together with `web`. */
+export function loadServerSettings(paths: ConfigPaths): ServerSettings {
+  const web = loadWebSettings(paths);
+  return loadGlobalSection(paths, 'server', defaultServer, (value) => {
+    const { server, errors } = validateServerSection(value, web);
+    return { value: server, errors };
   });
 }
 

@@ -102,6 +102,7 @@ describe('fixed errors', () => {
 describe('integration handlers', () => {
   const context = (thrown: unknown): IpcContext =>
     ({
+      actor: { kind: 'local' },
       services: {
         integrations: {
           connections: {

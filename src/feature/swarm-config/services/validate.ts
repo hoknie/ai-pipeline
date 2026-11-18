@@ -21,6 +21,7 @@ import {
   checkWorkspace,
 } from './validate-settings.ts';
 import { checkMcpCatalog, resolveMcpServers } from './sections/mcp-servers.ts';
+import { checkServer, checkServerWeb } from './sections/server.ts';
 import { checkProviders } from './sections/providers.ts';
 import { checkQueue } from './sections/queue.ts';
 import { checkRoles } from './sections/roles.ts';
@@ -39,6 +40,7 @@ import {
   defaultNetwork,
   defaultRuntimes,
   defaultQueue,
+  defaultServer,
   defaultStats,
   defaultWeb,
   defaultWorkspace,
@@ -60,6 +62,7 @@ const SWARM_KEYS = [
   'workspace',
   'naming',
   'web',
+  'server',
   'runtimes',
   'network',
   'attachments',
@@ -215,6 +218,11 @@ export function checkRoot(ctx: ValidateContext, root: unknown): ResolvedConfig {
     checkWorkspace(ctx, swarm.workspace, config.workspace, config.workspaceDir);
   if ('naming' in swarm) checkNaming(ctx, swarm.naming, config.naming);
   if ('web' in swarm) checkWeb(ctx, swarm.web, config.web);
+  if ('server' in swarm || config.web.auth === 'none') {
+    const server = defaultServer();
+    if ('server' in swarm) checkServer(ctx, swarm.server, server);
+    checkServerWeb(ctx, server, config.web);
+  }
   if ('runtimes' in swarm) checkRuntimes(ctx, swarm.runtimes, config.runtimes);
   if ('network' in swarm) checkNetwork(ctx, swarm.network, defaultNetwork());
   if ('attachments' in swarm) {

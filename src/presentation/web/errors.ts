@@ -61,8 +61,19 @@ export function renderPanelError(error: unknown): {
   status: number;
   body: { error: string; code?: string };
 } {
-  if (error instanceof IpcError)
+  if (error instanceof IpcError) {
+    if (error.remoteKind === 'unauthorized' || error.remoteKind === 'forbidden') {
+      const status = PANEL_STATUS[error.remoteKind];
+      return {
+        status,
+        body: {
+          error: error.message,
+          ...(error.remoteCode === undefined ? {} : { code: error.remoteCode }),
+        },
+      };
+    }
     return { status: daemonErrorStatus(error.message), body: { error: error.message } };
+  }
   if (error instanceof PanelError) {
     return {
       status: PANEL_STATUS[error.kind],

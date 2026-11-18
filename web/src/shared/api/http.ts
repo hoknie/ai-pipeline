@@ -4,6 +4,23 @@
  */
 import type { ConfigEditResult, WriteLevel } from './types.ts';
 
+/**
+ * In the server mode an answer 401 means the session ended: the browser goes to the login page.
+ * The local mode keeps showing the error.
+ */
+let serverMode = false;
+
+export function markServerMode(): void {
+  serverMode = true;
+}
+
+/** Called with the status of every answer; sends the browser to the login page on a 401. */
+export function handleUnauthorized(status: number): void {
+  if (status === 401 && serverMode && typeof window !== 'undefined') {
+    window.location.assign('/auth/login');
+  }
+}
+
 export class ApiError extends Error {
   readonly status: number;
   /** Machine-readable reason of the refusal, such as `daemon_busy`. */
@@ -18,6 +35,7 @@ export class ApiError extends Error {
 export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: 'same-origin', ...init });
   const body = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+  handleUnauthorized(response.status);
   if (!response.ok)
     throw new ApiError(response.status, body.error ?? response.statusText, body.code);
   return body as T;
@@ -45,6 +63,7 @@ export const levelQuery = (level?: WriteLevel) => (level ? `&level=${level}` : '
 export async function edit(path: string, init: RequestInit): Promise<ConfigEditResult> {
   const response = await fetch(path, { credentials: 'same-origin', ...init });
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  handleUnauthorized(response.status);
   if (response.status === 200) return body as unknown as ConfigEditResult;
   if (response.status === 422) {
     return {

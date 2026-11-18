@@ -73,6 +73,7 @@ export const featureGraph: Record<string, readonly string[]> = {
   observers: ['queue', 'runs', 'repos', 'swarm-config'],
   stats: ['runs', 'repos', 'swarm-config'],
   integrations: ['repos'],
+  identity: ['swarm-config'],
   compose: ['observers', 'queue', 'runs', 'tags', 'repos', 'integrations'],
 };
 
@@ -196,6 +197,7 @@ export const webUiGroups: readonly string[] = ['forms', 'feedback', 'layout', 'o
 
 /** Graph of panel areas: the key sees the listed areas (only through their `index.ts`). Acyclic. */
 export const webGraph: Record<string, readonly string[]> = {
+  account: [],
   topology: [],
   stats: [],
   tags: [],

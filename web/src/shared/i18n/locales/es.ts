@@ -299,6 +299,28 @@ export const es: Dictionary = {
     light: 'Claro',
     dark: 'Oscuro',
   },
+  account: {
+    menu: 'Cuenta: {{name}}',
+    logout: 'Cerrar sesión',
+    tokens: {
+      title: 'Tokens de acceso',
+      description:
+        'Los tokens personales permiten que aip en tu equipo y en tu CI trabaje con este servidor.',
+      name: 'Nombre del token',
+      days: 'Días',
+      create: 'Crear',
+      once: 'Copia el token ahora, se muestra una sola vez:',
+      expires: 'caduca el {{date}}',
+      revoke: 'Revocar',
+    },
+    users: {
+      title: 'Usuarios',
+      admin: 'administrador',
+      disabled: 'desactivado',
+      enable: 'Activar',
+      disable: 'Desactivar',
+    },
+  },
   language: {
     label: 'Idioma: {{language}}',
     system: 'Como el navegador',

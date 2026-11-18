@@ -116,6 +116,22 @@ const SAMPLES: Record<Method, unknown> = {
   artifact_publish: { token: 't', fileName: 'a.md', content: 'text' },
   split: { token: 't', groups: [{ title: 'a', task: 'b' }] },
   worker_run_show: { token: 't', run: '#1' },
+  repository_match: { remotes: ['git@github.com:a/b.git'] },
+  auth_resolve: { session: 's' },
+  auth_link_login: { code: 'c' },
+  auth_logout: { session: 's' },
+  login_link_create: { email: 'a@example.com' },
+  whoami: {},
+  users_list: {},
+  users_set: { email: 'a@example.com', attributes: { role: ['admin'] } },
+  users_disable: { email: 'a@example.com' },
+  users_enable: { email: 'a@example.com' },
+  tokens_list: {},
+  tokens_create: { name: 'laptop' },
+  tokens_revoke: { token: 'laptop' },
+  cli_login_begin: { challenge: 'c', machine: 'm' },
+  cli_login_approve: { challenge: 'c', machine: 'm' },
+  cli_login_exchange: { code: 'c', verifier: 'v' },
 };
 
 const methods = Object.keys(SAMPLES) as Method[];
@@ -169,9 +185,9 @@ describe('provider requests of the shared level', () => {
 });
 
 describe('IPC requests', () => {
-  it('has 98 methods, each in the request schema once', () => {
+  it('has 114 methods, each in the request schema once', () => {
     const declared = requestSchema.options.map((option) => option.shape.method.value);
-    expect(methods).toHaveLength(98);
+    expect(methods).toHaveLength(114);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...declared].sort()).toEqual([...methods].sort());
   });

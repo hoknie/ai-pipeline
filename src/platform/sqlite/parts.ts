@@ -1,4 +1,5 @@
 import { ATTACHMENTS_MIGRATION } from './attachments-migration.ts';
+import { IDENTITY_MIGRATION } from './identity-migration.ts';
 import { INTEGRATIONS_MIGRATION } from './integrations-migration.ts';
 import { TASK_LINKS_MIGRATION } from './links-migration.ts';
 
@@ -42,4 +43,5 @@ export const LATER_MIGRATIONS: string[] = [
   // the generation of a conversation of a CLI that keeps its own history; old rows stay NULL
   `ALTER TABLE attempts ADD COLUMN generation INTEGER NULL`,
   INTEGRATIONS_MIGRATION,
+  IDENTITY_MIGRATION,
 ];

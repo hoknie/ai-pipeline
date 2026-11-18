@@ -13,6 +13,7 @@ import {
   type ResolvedConfig,
   type RuntimeSettings,
   type QueueSettings,
+  type ServerSettings,
   type StatsSettings,
 } from '../types/index.ts';
 
@@ -25,6 +26,7 @@ import {
   loadNetworkSettings,
   loadRuntimeSettings,
   loadQueueSettings,
+  loadServerSettings,
   loadStatsSettings,
 } from './load.ts';
 
@@ -132,6 +134,16 @@ export class ConfigService {
     } catch (error) {
       if (!(error instanceof ConfigLoadError)) throw error;
       return `invalid swarm.stats: ${error.message}`;
+    }
+  }
+
+  /** Current `server` of the shared settings.yaml, or the text of the error in it. */
+  serverSettings(): ServerSettings | string {
+    try {
+      return loadServerSettings(this.pathsOf('.'));
+    } catch (error) {
+      if (!(error instanceof ConfigLoadError)) throw error;
+      return `invalid swarm.server: ${error.message}`;
     }
   }
 

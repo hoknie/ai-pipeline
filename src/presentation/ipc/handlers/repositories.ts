@@ -5,6 +5,14 @@ import type { HandlerTable } from './types.ts';
 /** The registry of repositories and the tag catalogs. */
 export const repositoryHandlers = {
   repositories: async (_params, { snapshots }) => snapshots.repositories(),
+  repository_match: async (params, { services }) => {
+    const project = await services.projects.matchRemotes(params.remotes);
+    return {
+      project: project
+        ? { path: project.path, slug: project.slug ?? null, name: project.name }
+        : null,
+    };
+  },
   repository_add: ({ path, ...attributes }, { services, snapshots }) =>
     services.runs.engine.serial(async () => {
       await services.projects.add(path, attributes);

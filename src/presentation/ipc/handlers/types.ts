@@ -1,4 +1,5 @@
 import type { BuildInfo } from '../../../platform/build/index.ts';
+import type { Actor } from '../../../feature/identity/types/index.ts';
 import type { Method, PanelControl, ParamsOf } from '../contract/index.ts';
 import type { DaemonServices } from '../services.ts';
 import type { Snapshots } from '../snapshots.ts';
@@ -10,6 +11,8 @@ export interface IpcContext {
   build: BuildInfo;
   /** Serves `web_status`, `web_start` and `web_stop`; without it the daemon refuses them. */
   panel: PanelControl | undefined;
+  /** Who makes the request: `local`, `system` or a user (set by the application). */
+  actor: Actor;
 }
 
 /** The handler of one method: one change of one service, then the answer through the views. */

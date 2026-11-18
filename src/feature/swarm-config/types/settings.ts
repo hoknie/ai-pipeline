@@ -298,3 +298,32 @@ export interface ResolvedConfig {
 }
 
 export * from './machine/machine-settings.ts';
+
+export const DEFAULT_SERVER_LISTEN = `127.0.0.1:${DEFAULT_WEB_PORT}`;
+
+/** The server mode of the daemon; read from the global settings.yaml only. */
+export interface ServerSettings {
+  /** One shared daemon serves several people over the network. */
+  enabled: boolean;
+  /** `<address>:<port>` the panel listens on. */
+  listen: string;
+  /** The external address (scheme and host, no path); `null` while unset. */
+  publicUrl: string | null;
+  /** Addresses of reverse proxies whose `X-Forwarded-*` headers are trusted. */
+  trustedProxies: string[];
+  /** Lifetime of a panel session: `<n>h` or `<n>d`. */
+  sessionTtl: string;
+  /** The longest lifetime of a personal token: `<n>d`. */
+  tokenMaxTtl: string;
+}
+
+export function defaultServer(): ServerSettings {
+  return {
+    enabled: false,
+    listen: DEFAULT_SERVER_LISTEN,
+    publicUrl: null,
+    trustedProxies: [],
+    sessionTtl: '12h',
+    tokenMaxTtl: '90d',
+  };
+}

@@ -127,6 +127,7 @@ queue       → runs, tags, repos, swarm-config
 observers   → queue, runs, repos, swarm-config
 stats       → runs, repos, swarm-config
 integrations → repos
+identity    → swarm-config
 compose     → observers, queue, runs, tags, repos, integrations
 ```
 
@@ -145,6 +146,7 @@ compose     → observers, queue, runs, tags, repos, integrations
 | `observers`    | наблюдатели и группы ремонта                                                                           |
 | `stats`        | журнал использования агентов (токены, время) и отчёт по нему                                           |
 | `integrations` | подключения к внешним системам: реестр, секреты через порт хранилища, вход событий с проверкой и дедупликацией |
+| `identity`     | пользователи режима сервера, сессии панели, личные токены, ссылки входа и вход из CLI                  |
 | `compose`      | сценарии нескольких фич: удаление, правка и переезд проекта реестра                                    |
 
 Почему правила доставки и ремонта, которые меняют состояние запуска, лежат в `runs/machine`, а не в
@@ -444,6 +446,7 @@ src/feature/<фича>/
 | `artifacts`                          | `artifacts` |
 | `observers`                          | `observers` |
 | `stats_attempts`, `stats_runs`, `stats_meta` | `stats` |
+| `users`, `sessions`, `access_tokens`, `login_links`, `cli_login_codes` | `identity` |
 
 Запрос читает и пишет только таблицы своей фичи. Если значение зависит от таблиц двух фич, как
 следующий номер задачи, каждая фича отдаёт свою часть, а итог считает сервис.

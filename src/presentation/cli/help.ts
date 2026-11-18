@@ -14,7 +14,19 @@ export const HELP_GROUPS: HelpGroup[] = [
   { heading: 'Dashboards & streams:', commands: ['overview', 'web', 'events', 'stats'] },
   {
     heading: 'Setup & maintenance:',
-    commands: ['setup', 'init', 'config', 'integration', 'version', 'help'],
+    commands: [
+      'setup',
+      'init',
+      'config',
+      'integration',
+      'login',
+      'logout',
+      'whoami',
+      'token',
+      'server',
+      'version',
+      'help',
+    ],
   },
   { heading: 'Plumbing (started by hosts and aip itself):', commands: ['daemon', 'mcp'] },
 ];

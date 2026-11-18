@@ -244,6 +244,9 @@ export interface NetworkStatus {
 
 /** What `GET /api/system` answers: the daemon, the panel, the network and the daemon log. */
 export interface SystemView {
+  /** `server` when several people sign in; `me` is the signed in user then. */
+  mode?: 'local' | 'server';
+  me?: { email: string; name: string; admin: boolean } | null;
   attachments: { s3Credentials: boolean };
   daemon: {
     running: boolean;
